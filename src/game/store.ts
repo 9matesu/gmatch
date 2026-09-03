@@ -58,6 +58,8 @@ export interface GameState {
   foeMaxHp: number
   foeClicks: number
   defeated: number
+  /** Round-robin cursor over the tag pool — one tag per fetch, never stacked. */
+  feedCursor: number
   feedOffline: boolean
   fetching: boolean
   toasts: Toast[]
@@ -181,6 +183,7 @@ function freshData() {
     foeMaxHp: 0,
     foeClicks: 0,
     defeated: 0,
+    feedCursor: 0,
     feedOffline: false,
     fetching: false,
     toasts: [] as Toast[],
@@ -362,15 +365,18 @@ export const useGame = create<GameState>((set, get) => ({
     if (s.fetching) return
     set({ fetching: true })
     const owned = feedQuery(s.tags)
-    // Pervert seeds (user spec): the feed always carries hard tags, never vanilla.
-    const q = owned.length > 0 ? [...owned.slice(0, 3), ...pervertSeeds(2)] : pervertSeeds(3)
-    let res = await fetchPosts({ tags: q.join(' '), limit: 10 })
-    if (!res.ok) {
-      // Booru mirrors rate-limit / flake under volume — retry once with
-      // fresh seeds before declaring the feed offline.
-      const retryQ =
-        owned.length > 0 ? [...owned.slice(0, 2), ...pervertSeeds(2)] : pervertSeeds(3)
-      res = await fetchPosts({ tags: retryQ.join(' '), limit: 10 })
+    // Round-robin: ONE tag per fetch, rotating through owned tags + fresh
+    // pervert seeds. Stacked AND-queries truncate on the mirrors and repeat
+    // the same top posts — rotation keeps the feed fresh and online.
+    const pool = owned.length > 0 ? [...owned.slice(0, 4), ...pervertSeeds(2)] : pervertSeeds(3)
+    const first = pool[s.feedCursor % pool.length]
+    let res = await fetchPosts({ tags: first, limit: 10 })
+    let cursor = s.feedCursor + 1
+    if (!res.ok || res.posts.length === 0) {
+      // Flaky round — retry once with the NEXT tag, never the same one.
+      const second = pool[cursor % pool.length]
+      res = await fetchPosts({ tags: second, limit: 10 })
+      cursor += 1
     }
     if (res.ok && res.posts.length > 0) {
       const foe = foeMaxHp(s.defeated)
@@ -380,11 +386,12 @@ export const useGame = create<GameState>((set, get) => ({
         foeHp: foe,
         foeMaxHp: foe,
         foeClicks: 0,
+        feedCursor: cursor,
         feedOffline: false,
         fetching: false,
       })
     } else {
-      set({ current: null, queue: [], foeHp: 0, foeMaxHp: 0, foeClicks: 0, feedOffline: true, fetching: false })
+      set({ current: null, queue: [], foeHp: 0, foeMaxHp: 0, foeClicks: 0, feedCursor: cursor, feedOffline: true, fetching: false })
     }
   },
 

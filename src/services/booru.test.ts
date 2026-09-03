@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fetchPosts } from './booru'
+import { __resetFeedState, fetchPosts } from './booru'
 
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.unstubAllEnvs()
+  __resetFeedState()
 })
 
 describe('fetchPosts (SPEC §6/§8)', () => {
@@ -155,5 +156,66 @@ describe('fetchPosts (SPEC §6/§8)', () => {
     expect(res.ok).toBe(true)
     expect(res.source).toBe('paheal-direct')
     expect(res.posts[0].id).toBe('4242')
+  })
+
+  it('never repeats a seen post — dupes are skipped for the next source', async () => {
+    vi.stubGlobal('window', {})
+    const dupe = {
+      id: 101,
+      file_url: 'https://x/dupe-a.jpg',
+      width: 900,
+      height: 900,
+      rating: 'explicit',
+      tags: 'gangbang',
+    }
+    const fresh = {
+      id: 102,
+      file_url: 'https://x/fresh-b.png',
+      width: 900,
+      height: 900,
+      rating: 'explicit',
+      tags: 'gangbang',
+    }
+    const fetchMock = vi.fn(async (url: string) => {
+      if (String(url).startsWith('/booru/xbooru/')) {
+        return { ok: true, json: () => Promise.resolve([fresh]) }
+      }
+      return { ok: true, json: () => Promise.resolve([dupe]) }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const first = await fetchPosts({ tags: 'gangbang-norepeat', limit: 5 })
+    expect(first.posts.map((p) => p.id)).toEqual(['101'])
+    const second = await fetchPosts({ tags: 'gangbang-norepeat', limit: 5 })
+    expect(second.ok).toBe(true)
+    expect(second.source).toBe('xbooru-direct')
+    expect(second.posts.map((p) => p.id)).toEqual(['102'])
+  })
+
+  it('cools down a throwing mirror and leads with the healthy one', async () => {
+    vi.stubGlobal('window', {})
+    const mk = (id: number) => ({
+      id,
+      file_url: `https://x/cool-${id}.png`,
+      width: 900,
+      height: 900,
+      rating: 'explicit',
+      tags: 'gangbang',
+    })
+    const fetchMock = vi.fn(async (url: string) => {
+      if (String(url).startsWith('/booru/tbib/')) throw new Error('mirror down')
+      return { ok: true, json: () => Promise.resolve([mk(103)]) }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const r1 = await fetchPosts({ tags: 'gangbang-cool', limit: 5 })
+    expect(r1.source).toBe('xbooru-direct')
+    fetchMock.mockClear()
+    fetchMock.mockImplementation(async (url: string) => {
+      if (String(url).startsWith('/booru/tbib/')) throw new Error('mirror down')
+      return { ok: true, json: () => Promise.resolve([mk(104)]) }
+    })
+    const r2 = await fetchPosts({ tags: 'gangbang-cool', limit: 5 })
+    expect(r2.ok).toBe(true)
+    // tbib sat out its cooldown — xbooru was attempted first.
+    expect(String(fetchMock.mock.calls[0][0]).startsWith('/booru/xbooru/')).toBe(true)
   })
 })

@@ -86,14 +86,15 @@ export default function GoonPanel() {
         {!showOffline && (
           <button
             type="button"
-            className="skip-overlay"
+            className="skip-arrow"
+            aria-label="Next image"
             title="Skip this foe — no reward"
             onClick={(e) => {
               e.stopPropagation()
               advanceFeed()
             }}
           >
-            Skip
+            ›
           </button>
         )}
         {floats.map((f) => (

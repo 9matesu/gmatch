@@ -17,6 +17,8 @@ vi.stubGlobal('localStorage', {
 
 import { defaultSave, serialize, SAVE_KEY } from './save'
 import { starterOffers } from './tags'
+import { fetchPosts } from '../services/booru'
+import type { BooruResponse } from '../services/booru'
 import { useGame } from './store'
 
 beforeEach(() => {
@@ -68,6 +70,35 @@ describe('refreshTagMarket', () => {
     const names = useGame.getState().tags.map((t) => t.name)
     expect(names).toContain('gangbang')
     expect(names).toContain('ahegao')
+  })
+})
+
+describe('fetchFeed tag rotation', () => {
+  const mocked = vi.mocked(fetchPosts)
+  const offline: BooruResponse = { posts: [], source: null, ok: false, offline: true }
+
+  it('fetches ONE tag at a time, rotating the pool instead of stacking', async () => {
+    mocked.mockClear()
+    const post = (id: string) => ({ id, url: `https://x/${id}.jpg`, tags: ['gangbang'] })
+    mocked.mockResolvedValue({ posts: [post('r1')], source: 't', ok: true })
+    useGame.setState({
+      tags: [
+        { name: 'aaa', level: 2, base: 10, income: 1, weight: 1 },
+        { name: 'bbb', level: 1, base: 10, income: 1, weight: 1 },
+      ],
+      feedCursor: 0,
+    })
+    await useGame.getState().fetchFeed()
+    const first = mocked.mock.calls[0][0].tags
+    mocked.mockClear()
+    mocked.mockResolvedValue({ posts: [post('r2')], source: 't', ok: true })
+    await useGame.getState().fetchFeed()
+    const second = mocked.mock.calls[0][0].tags
+    mocked.mockResolvedValue(offline)
+    expect(first).toBe('aaa')
+    expect(second).toBe('bbb')
+    expect(first.split(/\s+/)).toHaveLength(1)
+    expect(useGame.getState().current?.id).toBe('r2')
   })
 })
 
