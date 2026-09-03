@@ -158,8 +158,10 @@ function createWindow() {
     },
   })
   win.removeMenu()
-  const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173'
-  if (!app.isPackaged && process.env.GG_PROD !== '1') {
+  // Only use the dev server when explicitly requested — never guess a port,
+  // another app may be listening there.
+  const devUrl = process.env.VITE_DEV_SERVER_URL
+  if (devUrl && !app.isPackaged) {
     win.loadURL(devUrl).catch(() => win.loadFile(path.join(__dirname, '../dist/index.html')))
   } else {
     win.loadFile(path.join(__dirname, '../dist/index.html'))
