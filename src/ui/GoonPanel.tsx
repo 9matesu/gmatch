@@ -1,9 +1,11 @@
-import { useCallback, useRef, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
 import { useGame } from '../game/store'
 import { CAPS, capEffectLabel, capStacks } from '../game/caps'
 import type { CapId } from '../game/types'
 import { offlineSvg } from '../services/offlineSvg'
+import { prefetchImages } from '../services/imageCache'
 import { formatNum } from './format'
+import CachedImg from './CachedImg'
 import { IconChevronL, IconChevronR } from './icons'
 
 interface Float {
@@ -28,6 +30,7 @@ export default function GoonPanel() {
   const advanceFeed = useGame((s) => s.advanceFeed)
   const goBack = useGame((s) => s.goBack)
   const canGoBack = useGame((s) => s.past.length > 0)
+  const queue = useGame((s) => s.queue)
   const popCap = useGame((s) => s.popCap)
 
   const [floats, setFloats] = useState<Float[]>([])
@@ -41,6 +44,11 @@ export default function GoonPanel() {
     setFailedUrl(current?.url ?? null)
     advanceFeed()
   }, [advanceFeed, current])
+
+  // Warm the cache with the queued foes so skip/back arrows show instantly.
+  useEffect(() => {
+    prefetchImages(queue.map((p) => p.url))
+  }, [queue])
 
   const handleClick = (e: MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -76,7 +84,7 @@ export default function GoonPanel() {
         }}
       >
         {critFlash && <div className="crit-flash">CRIT!</div>}
-        <img
+        <CachedImg
           className="goon-image"
           src={src}
           alt="goon feed"

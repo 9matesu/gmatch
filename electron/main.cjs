@@ -1,9 +1,19 @@
 // GoonGrid Electron main process.
 // All booru HTTP happens HERE (renderer never touches the network directly).
 // Endpoints per docs/SPEC.md §6. 10s timeout, browser UA, round-robin health.
-const { app, BrowserWindow, ipcMain } = require('electron')
+const { app, BrowserWindow, ipcMain, protocol, net } = require('electron')
 const https = require('https')
 const path = require('path')
+const imageCache = require('./imageCache.cjs')
+
+// gooncache:// serves cached picture files from the user folder.
+// Privileged (standard+secure, fetchable) so sandboxed <img> tags can use it.
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: imageCache.SCHEME,
+    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
+  },
+])
 
 // Defense-in-depth: enforce the SPEC §8 blocklist on incoming queries too.
 // Single source of truth: shared/blocklist.json (imported by src/game/tagFilter.ts).
@@ -250,15 +260,27 @@ async function fetchBooru({ tags, limit }) {
   if (!query || isQueryBlocked(query)) {
     return { posts: [], source: null, ok: false, error: 'blocked-or-empty query' }
   }
+  // Feed-response cache: repeat tag queries reuse parsed posts for 10 min,
+  // no API round-trip at all.
+  const hit = imageCache.getFeedCache(query)
+  if (hit) {
+    return { posts: hit, source: 'cache', ok: true, cached: true }
+  }
   const variants = queryVariants(query)
   const ordered = SOURCES.map((_, i) => SOURCES[(rrIndex + i) % SOURCES.length])
   for (const source of ordered) {
     for (const variant of variants) {
+      const vhit = imageCache.getFeedCache(variant)
+      if (vhit) {
+        rrIndex = (SOURCES.indexOf(source) + 1) % SOURCES.length
+        return { posts: vhit, source: 'cache', ok: true, query: variant, cached: true }
+      }
       try {
         const body = await httpGet(source.url(variant, n))
         const posts = source.parse(body)
         if (posts.length > 0) {
           rrIndex = (SOURCES.indexOf(source) + 1) % SOURCES.length
+          imageCache.setFeedCache(variant, posts)
           return { posts, source: source.id, ok: true, query: variant }
         }
       } catch {
@@ -295,7 +317,12 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  imageCache.init(app.getPath('userData'), UA)
+  protocol.handle(imageCache.SCHEME, (request) => imageCache.serveImage(request, net))
   ipcMain.handle('booru:fetch', (_event, payload) => fetchBooru(payload ?? {}))
+  ipcMain.handle('cache:image', (_event, url) => imageCache.cacheImage(url).then((local) => ({ local })))
+  ipcMain.handle('cache:stats', () => imageCache.cacheStats())
+  ipcMain.handle('cache:clear', () => imageCache.clearCache())
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

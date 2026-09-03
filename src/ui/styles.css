@@ -702,6 +702,11 @@ body {
   min-height: 14px;
 }
 
+.cache-clear {
+  margin-top: 8px;
+  width: 100%;
+}
+
 /* ---------- shop (right) ---------- */
 
 .shop {

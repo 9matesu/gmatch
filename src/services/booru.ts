@@ -12,12 +12,17 @@ export interface BooruResponse {
   source: string | null
   ok: boolean
   offline?: boolean
+  /** True when posts came from the 10-minute feed cache, not the network. */
+  cached?: boolean
 }
 
 declare global {
   interface Window {
     goongrid?: {
       booruFetch?: (req: BooruRequest) => Promise<BooruResponse>
+      cacheImage?: (url: string) => Promise<{ local: string | null }>
+      cacheStats?: () => Promise<{ files: number; bytes: number }>
+      clearCache?: () => Promise<{ files: number; bytes: number }>
     }
   }
 }

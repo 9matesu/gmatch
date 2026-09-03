@@ -20,6 +20,7 @@ import {
 } from '../game/prestige'
 import { ACHIEVEMENTS } from '../game/achievements'
 import { offlineSvg } from '../services/offlineSvg'
+import CachedImg from './CachedImg'
 import { formatNum } from './format'
 
 type Tab = 'tags' | 'gallery' | 'caps' | 'prestige'
@@ -135,14 +136,12 @@ function GalleryTab() {
                 title="Re-feature in the Goon Panel"
                 onClick={() => featureImage(img.id)}
               >
-                <img
+                <CachedImg
                   src={img.url || offlineSvg(img.tags)}
+                  fallbackSrc={offlineSvg(img.tags)}
                   alt={img.tags.slice(0, 3).join(' ') || 'gallery image'}
                   referrerPolicy="no-referrer"
                   loading="lazy"
-                  onError={(e) => {
-                    e.currentTarget.src = offlineSvg(img.tags)
-                  }}
                 />
               </button>
               <span className={`rarity-badge sm rarity-${img.rarity.toLowerCase()}`}>

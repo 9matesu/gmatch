@@ -72,6 +72,12 @@ anthro, monochrome, sketch, comic, 3d, futa, yaoi, NTR, text overlays).
 - Browser/dev mode: direct fetch may CORS-fail → offline SVG placeholder
   (generated gradient + tag text + "OFFLINE" badge). Never crash on fetch error.
 - Dedupe by post id across a session; cache last 40 urls.
+- Picture + feed caching (no re-parse, no re-download): parsed post lists are
+  cached per query for 10 min (`<userData>/feed-cache.json`, 100 queries max);
+  picture bytes are cached on disk in `<userData>/image-cache/` (400 files /
+  400 MB, LRU-evicted, `gooncache://` scheme) in Electron, or IndexedDB blobs
+  in browser dev mode. The queue is prefetched so skip/back is instant; cache
+  stats + Clear live in the left stats panel.
 
 ### 6b. Feed/market queries (user spec: no vanilla)
 
