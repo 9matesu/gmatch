@@ -25,6 +25,8 @@ export default function GoonPanel() {
   const caps = useGame((s) => s.caps)
   const clickImage = useGame((s) => s.clickImage)
   const advanceFeed = useGame((s) => s.advanceFeed)
+  const goBack = useGame((s) => s.goBack)
+  const canGoBack = useGame((s) => s.past.length > 0)
   const popCap = useGame((s) => s.popCap)
 
   const [floats, setFloats] = useState<Float[]>([])
@@ -82,6 +84,20 @@ export default function GoonPanel() {
           draggable={false}
         />
         {showOffline && <span className="offline-badge">OFFLINE</span>}
+        {!showOffline && canGoBack && (
+          <button
+            type="button"
+            className="back-arrow"
+            aria-label="Previous image"
+            title="Back to the skipped foe"
+            onClick={(e) => {
+              e.stopPropagation()
+              goBack()
+            }}
+          >
+            ‹
+          </button>
+        )}
         {!showOffline && (
           <button
             type="button"

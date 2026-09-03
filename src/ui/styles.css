@@ -458,6 +458,33 @@ body {
   border-color: var(--pink);
 }
 
+.back-arrow {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  transform: translateY(-50%);
+  cursor: pointer;
+  background: rgba(10, 10, 15, 0.6);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  width: 46px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+  opacity: 0.75;
+}
+
+.back-arrow:hover {
+  opacity: 1;
+  border-color: var(--pink);
+}
+
 .rarity-badge {
   font-family: var(--mono);
   font-size: 11px;

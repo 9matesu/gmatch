@@ -53,6 +53,8 @@ export interface GameState {
   lastSeenAt: number
   current: BooruPost | null
   queue: BooruPost[]
+  /** Viewed-image history for the back arrow (session-only, not saved). */
+  past: BooruPost[]
   /** Live foe: HP left / max, clicks landed, lifetime KOs. max 0 = no battle. */
   foeHp: number
   foeMaxHp: number
@@ -71,6 +73,7 @@ export interface GameState {
   refreshTagMarket: () => Promise<void>
   fetchFeed: () => Promise<void>
   advanceFeed: () => void
+  goBack: () => boolean
   featureImage: (id: string) => void
   popCap: (capId: CapId) => boolean
   brainmelt: () => boolean
@@ -180,6 +183,7 @@ function freshData() {
     lastSeenAt: Date.now(),
     current: null as BooruPost | null,
     queue: [] as BooruPost[],
+    past: [] as BooruPost[],
     foeHp: 0,
     foeMaxHp: 0,
     foeClicks: 0,
@@ -196,6 +200,15 @@ function freshData() {
  * Drain a foe into the gallery. Shared by manual clicks and auto-click ticks.
  * Caller supplies the state snapshot and clicks landed on this foe.
  */
+
+/** Viewed-image history cap for the back arrow. */
+export const HISTORY_CAP = 50
+
+/** Push the leaving image onto the back-arrow history. */
+function pushPast(past: BooruPost[], post: BooruPost | null): BooruPost[] {
+  if (!post) return past
+  return [...past, post].slice(-HISTORY_CAP)
+}
 function koFoe(s: GameState, now: number, clicksOnFoe: number) {
   const post = s.current as BooruPost
   const defeated = s.defeated + 1
@@ -221,6 +234,8 @@ function koFoe(s: GameState, now: number, clicksOnFoe: number) {
     gallery: [...s.gallery, img],
     // Auto-generated market: the drained foe's tags become buyable offers.
     tags: discoverTags(s.tags, post.tags),
+    // The drained foe stays reachable via the back arrow (shown beaten, no HP).
+    past: pushPast(s.past, post),
     current,
     queue,
     foeHp: foe,
@@ -296,6 +311,7 @@ export const useGame = create<GameState>((set, get) => ({
       crits: s.crits + (crit ? 1 : 0),
       xp: s.xp + clickXp + KILL_XP,
       tags: ko.tags,
+      past: ko.past,
       gallery: ko.gallery,
       defeated: ko.defeated,
       current: ko.current,
@@ -312,6 +328,7 @@ export const useGame = create<GameState>((set, get) => ({
       crits: next.crits,
       xp: next.xp,
       tags: next.tags,
+      past: next.past,
       gallery: next.gallery,
       defeated: next.defeated,
       current: next.current,
@@ -423,18 +440,42 @@ export const useGame = create<GameState>((set, get) => ({
     const s = get()
     if (s.queue.length > 0) {
       // Skipping is free but pays nothing — the beaten-or-not choice is the player's.
+      // The skipped foe stays reachable via the back arrow at full HP.
       const foe = foeMaxHp(s.defeated)
       set({
         current: s.queue[0],
         queue: s.queue.slice(1),
+        past: pushPast(s.past, s.current),
         foeHp: foe,
         foeMaxHp: foe,
         foeClicks: 0,
         feedOffline: false,
       })
     } else {
+      if (s.current) set({ past: pushPast(s.past, s.current) })
       void s.fetchFeed()
     }
+  },
+
+  goBack: () => {
+    const s = get()
+    if (s.past.length === 0) return false
+    const prev = s.past[s.past.length - 1]
+    // Forward stays intact: the current image waits at the queue front.
+    const queue = s.current ? [s.current, ...s.queue] : s.queue
+    // Beaten foes (in the gallery) come back with no battle, like re-features.
+    const beaten = s.gallery.some((g) => g.url === prev.url)
+    const foe = beaten ? 0 : foeMaxHp(s.defeated)
+    set({
+      past: s.past.slice(0, -1),
+      current: prev,
+      queue,
+      foeHp: foe,
+      foeMaxHp: foe,
+      foeClicks: 0,
+      feedOffline: false,
+    })
+    return true
   },
 
   featureImage: (id) => {
@@ -532,6 +573,7 @@ export const useGame = create<GameState>((set, get) => ({
         totalEarnedGP: s.totalEarnedGP + gain + ko.bonus,
         xp: s.xp + gain * 0.01 + KILL_XP,
         tags: ko.tags,
+        past: ko.past,
         gallery: ko.gallery,
         defeated: ko.defeated,
         current: ko.current,
@@ -548,6 +590,7 @@ export const useGame = create<GameState>((set, get) => ({
         totalEarnedGP: next.totalEarnedGP,
         xp: next.xp,
         tags: next.tags,
+        past: next.past,
         gallery: next.gallery,
         defeated: next.defeated,
         current: next.current,
@@ -639,6 +682,7 @@ export const useGame = create<GameState>((set, get) => ({
       gallery: d.gallery,
       caps,
       capsUsed: d.capsUsed,
+      past: [],
       achievements: d.achievements,
       collectedOfflineEarnings: d.collectedOfflineEarnings,
       ageVerified: d.ageAccepted,

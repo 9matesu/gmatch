@@ -19,7 +19,7 @@ import { defaultSave, serialize, SAVE_KEY } from './save'
 import { starterOffers } from './tags'
 import { fetchPosts } from '../services/booru'
 import type { BooruResponse } from '../services/booru'
-import { useGame } from './store'
+import { useGame, HISTORY_CAP } from './store'
 
 beforeEach(() => {
   mem.clear()
@@ -174,6 +174,74 @@ describe('feed battle', () => {
     expect(useGame.getState().tags.find((t) => t.name === 'aaa')!.selected).toBe(false)
     expect(useGame.getState().toggleTag('bbb')).toBe(false)
     expect(useGame.getState().toggleTag('nope')).toBe(false)
+  })
+
+  it('skip then back restores the skipped foe at full HP, forward intact', () => {
+    useGame.setState({
+      current: foe('k1'),
+      queue: [foe('k2')],
+      past: [],
+      foeHp: 8,
+      foeMaxHp: 8,
+      foeClicks: 0,
+      defeated: 0,
+      gallery: [],
+    })
+    useGame.getState().advanceFeed()
+    expect(useGame.getState().current?.id).toBe('k2')
+    expect(useGame.getState().goBack()).toBe(true)
+    const s = useGame.getState()
+    expect(s.current?.id).toBe('k1')
+    expect(s.foeHp).toBe(s.foeMaxHp) // fresh foe, full scaled HP
+    expect(s.queue.map((p) => p.id)).toEqual(['k2']) // skip again to go forward
+    useGame.getState().advanceFeed()
+    expect(useGame.getState().current?.id).toBe('k2')
+  })
+
+  it('goBack returns false with empty history', () => {
+    useGame.setState({ current: foe('e1'), queue: [], past: [] })
+    expect(useGame.getState().goBack()).toBe(false)
+    expect(useGame.getState().current?.id).toBe('e1')
+  })
+
+  it('back after a KO shows the beaten foe with no battle', () => {
+    useGame.setState({
+      current: foe('b1'),
+      queue: [foe('b2')],
+      past: [],
+      foeHp: 8,
+      foeMaxHp: 8,
+      foeClicks: 0,
+      defeated: 0,
+      gp: 0,
+      gallery: [],
+    })
+    let killed = false
+    for (let i = 0; i < 20 && !killed; i++) killed = useGame.getState().clickImage().killed
+    expect(killed).toBe(true)
+    expect(useGame.getState().current?.id).toBe('b2')
+    expect(useGame.getState().goBack()).toBe(true)
+    const s = useGame.getState()
+    expect(s.current?.id).toBe('b1')
+    expect(s.foeMaxHp).toBe(0) // beaten — no battle, like a re-feature
+  })
+
+  it('history never grows past HISTORY_CAP', () => {
+    const past = Array.from({ length: HISTORY_CAP }, (_, i) => foe(`h${i}`))
+    useGame.setState({
+      current: foe('cap1'),
+      queue: [foe('cap2')],
+      past,
+      foeHp: 8,
+      foeMaxHp: 8,
+      foeClicks: 0,
+      defeated: 0,
+      gallery: [],
+    })
+    useGame.getState().advanceFeed()
+    const s = useGame.getState()
+    expect(s.past).toHaveLength(HISTORY_CAP)
+    expect(s.past[s.past.length - 1].id).toBe('cap1')
   })
 
   it('skipping pays nothing and keeps the KO count', () => {
