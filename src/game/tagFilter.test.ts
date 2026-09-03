@@ -1,0 +1,163 @@
+import { describe, expect, it } from 'vitest'
+import {
+  BLOCKLIST,
+  filterTags,
+  isNoise,
+  isQueryBlocked,
+  isRatingAllowed,
+  isTagBlocked,
+  parseTagField,
+  rankTags,
+} from './tagFilter'
+
+describe('hard blocklist (SPEC §8)', () => {
+  it('rejects minor-related tags', () => {
+    for (const tag of [
+      'loli',
+      'loli_ta',
+      'shota',
+      'school_uniform',
+      'schoolgirl',
+      'kindergarten',
+      'underage',
+      'preteen',
+      'child',
+      'childhood_friends',
+      'kid',
+      'infant',
+      'baby',
+      'toddler',
+      'minor',
+      'juvenile',
+      'young_girl',
+      'student',
+    ]) {
+      expect(isTagBlocked(tag), tag).toBe(true)
+    }
+  })
+
+  it('rejects prohibited-content tags', () => {
+    for (const tag of [
+      'ageplay',
+      'age_play',
+      'incest',
+      'stepsister',
+      'bestiality',
+      'zoo_philia',
+      'necrophilia',
+      'rape',
+      'non-con',
+      'noncon',
+      'non_consensual',
+      'dubcon',
+      'gore',
+      'scat',
+      'urine',
+      'blood',
+      'murder',
+      'death_note',
+    ]) {
+      expect(isTagBlocked(tag), tag).toBe(true)
+    }
+  })
+
+  it('is case-insensitive', () => {
+    expect(isTagBlocked('LOLI')).toBe(true)
+    expect(isTagBlocked('School_Uniform')).toBe(true)
+    expect(isTagBlocked('Bestiality')).toBe(true)
+  })
+
+  it('passes normal adult tags', () => {
+    for (const tag of [
+      '1girl',
+      'wet',
+      'lingerie',
+      'solo',
+      'long_hair',
+      'smile',
+      'closed_eyes',
+      'cosplay',
+      'thighhighs',
+      'cleavage',
+      'navel',
+      'spread_legs',
+      'nude',
+      'nipples',
+      'orgasm',
+    ]) {
+      expect(isTagBlocked(tag), tag).toBe(false)
+    }
+  })
+
+  it('blocklist covers every SPEC §8 term', () => {
+    for (const term of [
+      'loli', 'shota', 'child', 'kid', 'infant', 'baby', 'toddler',
+      'school', 'student', 'ageplay', 'incest', 'bestiality', 'zoo',
+      'necro', 'rape', 'non-consent', 'gore', 'scat', 'urine', 'blood',
+      'murder', 'death',
+    ]) {
+      expect(BLOCKLIST.some((b) => term.includes(b) || b.includes(term)), term).toBe(true)
+    }
+  })
+})
+
+describe('ratings', () => {
+  it('allows explicit/adult, rejects everything else', () => {
+    expect(isRatingAllowed('e')).toBe(true)
+    expect(isRatingAllowed('explicit')).toBe(true)
+    expect(isRatingAllowed('adult')).toBe(true)
+    expect(isRatingAllowed('q')).toBe(false)
+    expect(isRatingAllowed('questionable')).toBe(false)
+    expect(isRatingAllowed('s')).toBe(false)
+    expect(isRatingAllowed('safe')).toBe(false)
+  })
+
+  it('allows posts with no rating field (danbooru-style sources)', () => {
+    expect(isRatingAllowed(undefined)).toBe(true)
+    expect(isRatingAllowed('')).toBe(true)
+  })
+})
+
+describe('noise filtering', () => {
+  it('flags meta/quality tags as noise', () => {
+    expect(isNoise('highres')).toBe(true)
+    expect(isNoise('watermark')).toBe(true)
+    expect(isNoise('rating_explicit')).toBe(true)
+    expect(isNoise('1girl')).toBe(false)
+  })
+})
+
+describe('filterTags', () => {
+  it('drops blocked, noise, empty and duplicate tags', () => {
+    const out = filterTags([
+      '1girl', 'loli', 'wet', 'highres', '1girl', '', 'lingerie', 'school_uniform',
+    ])
+    expect(out).toEqual(['1girl', 'wet', 'lingerie'])
+  })
+
+  it('never returns a blocked tag even if mixed case', () => {
+    const out = filterTags(['LOLI', 'Shota', 'Bestiality', 'solo'])
+    expect(out).toEqual(['solo'])
+  })
+})
+
+describe('parseTagField / rankTags', () => {
+  it('splits whitespace- and comma-separated tag fields', () => {
+    expect(parseTagField('1girl wet, lingerie')).toEqual(['1girl', 'wet', 'lingerie'])
+  })
+
+  it('ranks by frequency then name, excluding blocked', () => {
+    const ranked = rankTags(['wet', '1girl', 'wet', 'loli', '1girl', '1girl'])
+    expect(ranked).toEqual([
+      { name: '1girl', frequency: 3 },
+      { name: 'wet', frequency: 2 },
+    ])
+  })
+})
+
+describe('isQueryBlocked', () => {
+  it('rejects whole queries containing a blocked term', () => {
+    expect(isQueryBlocked('1girl loli')).toBe(true)
+    expect(isQueryBlocked('1girl wet')).toBe(false)
+  })
+})
