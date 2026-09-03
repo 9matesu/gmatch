@@ -4,8 +4,9 @@ import type { EconomyInput } from './economy'
 import { buyTag as buyTagLevel, deriveTagStats, feedQuery, starterOffers } from './tags'
 import { rankTags } from './tagFilter'
 import { pervertSeeds } from './pervertTags'
+import { KILL_XP, foeMaxHp, killBonusGp } from './battle'
 import { CAPS, activeCaps, capAutoClicksPerSec, popCap as popCapList } from './caps'
-import { imageBuyCost, imageRarity } from './rarity'
+import { imageRarity } from './rarity'
 import { applyBrainmelt, canBrainmelt, tierForXp, titleForTier } from './prestige'
 import { ACHIEVEMENTS, newlyEarned } from './achievements'
 import type { AchievementStats } from './achievements'
@@ -29,6 +30,7 @@ export interface Toast {
 export interface ClickResult {
   gain: number
   crit: boolean
+  killed: boolean
 }
 
 export interface GameState {
@@ -47,11 +49,15 @@ export interface GameState {
   achievements: string[]
   collectedOfflineEarnings: boolean
   ageVerified: boolean
-  nsfwBlur: boolean
   lastSaved: number
   lastSeenAt: number
   current: BooruPost | null
   queue: BooruPost[]
+  /** Live foe: HP left / max, clicks landed, lifetime KOs. max 0 = no battle. */
+  foeHp: number
+  foeMaxHp: number
+  foeClicks: number
+  defeated: number
   feedOffline: boolean
   fetching: boolean
   toasts: Toast[]
@@ -62,7 +68,6 @@ export interface GameState {
   refreshTagMarket: () => Promise<void>
   fetchFeed: () => Promise<void>
   advanceFeed: () => void
-  buyCurrentImage: () => boolean
   featureImage: (id: string) => void
   popCap: (capId: CapId) => boolean
   brainmelt: () => boolean
@@ -71,7 +76,6 @@ export interface GameState {
   load: () => void
   collectOffline: () => void
   verifyAge: () => void
-  toggleBlur: () => void
   dismissToast: (id: number) => void
   resetGame: () => void
 }
@@ -169,15 +173,53 @@ function freshData() {
     achievements: [] as string[],
     collectedOfflineEarnings: false,
     ageVerified: false,
-    nsfwBlur: true,
     lastSaved: 0,
     lastSeenAt: Date.now(),
     current: null as BooruPost | null,
     queue: [] as BooruPost[],
+    foeHp: 0,
+    foeMaxHp: 0,
+    foeClicks: 0,
+    defeated: 0,
     feedOffline: false,
     fetching: false,
     toasts: [] as Toast[],
     offlineGain: 0,
+  }
+}
+
+/**
+ * Drain a foe into the gallery. Shared by manual clicks and auto-click ticks.
+ * Caller supplies the state snapshot and clicks landed on this foe.
+ */
+function koFoe(s: GameState, now: number, clicksOnFoe: number) {
+  const post = s.current as BooruPost
+  const defeated = s.defeated + 1
+  const rarityBase = rarityBaseForPost(post.id)
+  const bonus = killBonusGp(rarityBase)
+  const img: GalleryImage = {
+    id: `${post.id}:${now}`,
+    url: post.url,
+    tags: post.tags,
+    rarityBase,
+    clicks: clicksOnFoe,
+    rarity: imageRarity(rarityBase, s.gallery.length, clicksOnFoe),
+    boughtAt: now,
+  }
+  const current = s.queue[0] ?? null
+  const queue = s.queue.slice(1)
+  // Harder with each KO: the next foe scales off the new lifetime total.
+  const foe = current ? foeMaxHp(defeated) : 0
+  return {
+    defeated,
+    bonus,
+    img,
+    gallery: [...s.gallery, img],
+    current,
+    queue,
+    foeHp: foe,
+    foeMaxHp: foe,
+    foeClicks: 0,
   }
 }
 
@@ -189,24 +231,90 @@ export const useGame = create<GameState>((set, get) => ({
     const now = Date.now()
     const clickNumber = s.clicks + 1
     const crit = isCrit(clickNumber)
+    // Damage equals the click's GP gain — store power-ups (caps, shards,
+    // achievements) hit harder, crits deal x10.
     const gain = clickGain(econ(s), clickNumber, now)
+    const clickXp = crit ? 5 : 1
+    // No live foe (empty feed or re-featured gallery piece): clicks just pay GP.
+    if (!s.current || s.foeMaxHp <= 0) {
+      const next: GameState = {
+        ...s,
+        gp: s.gp + gain,
+        totalEarnedGP: s.totalEarnedGP + gain,
+        clicks: clickNumber,
+        crits: s.crits + (crit ? 1 : 0),
+        xp: s.xp + clickXp,
+      }
+      set({
+        gp: next.gp,
+        totalEarnedGP: next.totalEarnedGP,
+        clicks: next.clicks,
+        crits: next.crits,
+        xp: next.xp,
+        ...progress(next, s.xp),
+      })
+      return { gain, crit, killed: false }
+    }
+    const clicksOnFoe = s.foeClicks + 1
+    const hpLeft = s.foeHp - gain
+    if (hpLeft > 0) {
+      const next: GameState = {
+        ...s,
+        gp: s.gp + gain,
+        totalEarnedGP: s.totalEarnedGP + gain,
+        clicks: clickNumber,
+        crits: s.crits + (crit ? 1 : 0),
+        xp: s.xp + clickXp,
+        foeHp: hpLeft,
+        foeClicks: clicksOnFoe,
+      }
+      set({
+        gp: next.gp,
+        totalEarnedGP: next.totalEarnedGP,
+        clicks: next.clicks,
+        crits: next.crits,
+        xp: next.xp,
+        foeHp: next.foeHp,
+        foeClicks: next.foeClicks,
+        ...progress(next, s.xp),
+      })
+      return { gain, crit, killed: false }
+    }
+    // KO: the drained foe joins the gallery with a GP kill bonus.
+    const ko = koFoe(s, now, clicksOnFoe)
     const next: GameState = {
       ...s,
-      gp: s.gp + gain,
-      totalEarnedGP: s.totalEarnedGP + gain,
+      gp: s.gp + gain + ko.bonus,
+      totalEarnedGP: s.totalEarnedGP + gain + ko.bonus,
       clicks: clickNumber,
       crits: s.crits + (crit ? 1 : 0),
-      xp: s.xp + (crit ? 5 : 1),
+      xp: s.xp + clickXp + KILL_XP,
+      gallery: ko.gallery,
+      defeated: ko.defeated,
+      current: ko.current,
+      queue: ko.queue,
+      foeHp: ko.foeHp,
+      foeMaxHp: ko.foeMaxHp,
+      foeClicks: ko.foeClicks,
     }
+    next.toasts = pushToast(next, `Drained ${ko.img.rarity} foe (+${ko.bonus} GP) — kept in gallery`)
     set({
       gp: next.gp,
       totalEarnedGP: next.totalEarnedGP,
       clicks: next.clicks,
       crits: next.crits,
       xp: next.xp,
+      gallery: next.gallery,
+      defeated: next.defeated,
+      current: next.current,
+      queue: next.queue,
+      foeHp: next.foeHp,
+      foeMaxHp: next.foeMaxHp,
+      foeClicks: next.foeClicks,
       ...progress(next, s.xp),
     })
-    return { gain, crit }
+    if (!ko.current) void get().fetchFeed()
+    return { gain, crit, killed: true }
   },
 
   buyTag: (name) => {
@@ -265,56 +373,51 @@ export const useGame = create<GameState>((set, get) => ({
       res = await fetchPosts({ tags: retryQ.join(' '), limit: 10 })
     }
     if (res.ok && res.posts.length > 0) {
-      set({ current: res.posts[0], queue: res.posts.slice(1), feedOffline: false, fetching: false })
+      const foe = foeMaxHp(s.defeated)
+      set({
+        current: res.posts[0],
+        queue: res.posts.slice(1),
+        foeHp: foe,
+        foeMaxHp: foe,
+        foeClicks: 0,
+        feedOffline: false,
+        fetching: false,
+      })
     } else {
-      set({ current: null, queue: [], feedOffline: true, fetching: false })
+      set({ current: null, queue: [], foeHp: 0, foeMaxHp: 0, foeClicks: 0, feedOffline: true, fetching: false })
     }
   },
 
   advanceFeed: () => {
     const s = get()
     if (s.queue.length > 0) {
-      set({ current: s.queue[0], queue: s.queue.slice(1), feedOffline: false })
+      // Skipping is free but pays nothing — the beaten-or-not choice is the player's.
+      const foe = foeMaxHp(s.defeated)
+      set({
+        current: s.queue[0],
+        queue: s.queue.slice(1),
+        foeHp: foe,
+        foeMaxHp: foe,
+        foeClicks: 0,
+        feedOffline: false,
+      })
     } else {
       void s.fetchFeed()
     }
-  },
-
-  buyCurrentImage: () => {
-    const s = get()
-    if (!s.current) return false
-    const now = Date.now()
-    const rarityBase = rarityBaseForPost(s.current.id)
-    const cost = imageBuyCost(rarityBase, s.gallery.length)
-    if (s.gp < cost) return false
-    const img: GalleryImage = {
-      id: `${s.current.id}:${now}`,
-      url: s.current.url,
-      tags: s.current.tags,
-      rarityBase,
-      clicks: 0,
-      rarity: imageRarity(rarityBase, s.gallery.length),
-      boughtAt: now,
-    }
-    const next: GameState = {
-      ...s,
-      gp: s.gp - cost,
-      gallery: [...s.gallery, img],
-    }
-    next.toasts = pushToast(next, `Bought ${img.rarity} image for ${Math.ceil(cost)} GP`)
-    set({
-      gp: next.gp,
-      gallery: next.gallery,
-      ...progress(next, s.xp),
-    })
-    return true
   },
 
   featureImage: (id) => {
     const s = get()
     const img = s.gallery.find((g) => g.id === id)
     if (!img) return
-    set({ current: { id: img.id, url: img.url, tags: img.tags }, feedOffline: false })
+    // Already beaten: re-featuring shows it with no HP bar and no battle.
+    set({
+      current: { id: img.id, url: img.url, tags: img.tags },
+      foeHp: 0,
+      foeMaxHp: 0,
+      foeClicks: 0,
+      feedOffline: false,
+    })
   },
 
   popCap: (capId) => {
@@ -386,13 +489,52 @@ export const useGame = create<GameState>((set, get) => ({
     const input: EconomyInput = { ...econ(s), caps }
     const gps = passiveGps(input, now)
     const auto = capAutoClicksPerSec(caps, now)
+    const autoDmg = clickPower(input, now) * auto * (dtMs / 1000)
     const gain = (gps + clickPower(input, now) * auto) * (dtMs / 1000)
+    // Auto-clicks also batter the live foe (one KO per tick at most).
+    if (s.current && s.foeMaxHp > 0 && autoDmg > 0 && s.foeHp - autoDmg <= 0) {
+      const ko = koFoe(s, now, s.foeClicks)
+      const next: GameState = {
+        ...s,
+        caps,
+        gp: s.gp + gain + ko.bonus,
+        totalEarnedGP: s.totalEarnedGP + gain + ko.bonus,
+        xp: s.xp + gain * 0.01 + KILL_XP,
+        gallery: ko.gallery,
+        defeated: ko.defeated,
+        current: ko.current,
+        queue: ko.queue,
+        foeHp: ko.foeHp,
+        foeMaxHp: ko.foeMaxHp,
+        foeClicks: ko.foeClicks,
+        lastSeenAt: now,
+      }
+      next.toasts = pushToast(next, `Auto-drained ${ko.img.rarity} foe (+${ko.bonus} GP)`)
+      set({
+        caps: next.caps,
+        gp: next.gp,
+        totalEarnedGP: next.totalEarnedGP,
+        xp: next.xp,
+        gallery: next.gallery,
+        defeated: next.defeated,
+        current: next.current,
+        queue: next.queue,
+        foeHp: next.foeHp,
+        foeMaxHp: next.foeMaxHp,
+        foeClicks: next.foeClicks,
+        lastSeenAt: next.lastSeenAt,
+        ...progress(next, s.xp),
+      })
+      if (!ko.current) void get().fetchFeed()
+      return
+    }
     const next: GameState = {
       ...s,
       caps,
       gp: s.gp + gain,
       totalEarnedGP: s.totalEarnedGP + gain,
       xp: s.xp + gain * 0.01,
+      foeHp: s.foeMaxHp > 0 ? Math.max(0, s.foeHp - autoDmg) : s.foeHp,
       lastSeenAt: now,
     }
     set({
@@ -400,6 +542,7 @@ export const useGame = create<GameState>((set, get) => ({
       gp: next.gp,
       totalEarnedGP: next.totalEarnedGP,
       xp: next.xp,
+      foeHp: next.foeHp,
       lastSeenAt: next.lastSeenAt,
       ...progress(next, s.xp),
     })
@@ -425,7 +568,7 @@ export const useGame = create<GameState>((set, get) => ({
       achievements: s.achievements,
       collectedOfflineEarnings: s.collectedOfflineEarnings,
       ageAccepted: s.ageVerified,
-      nsfwBlur: s.nsfwBlur,
+      defeated: s.defeated,
       lastSeenAt: now,
     }
     writeStorage(serialize(data))
@@ -466,7 +609,7 @@ export const useGame = create<GameState>((set, get) => ({
       achievements: d.achievements,
       collectedOfflineEarnings: d.collectedOfflineEarnings,
       ageVerified: d.ageAccepted,
-      nsfwBlur: d.nsfwBlur,
+      defeated: d.defeated,
       lastSeenAt: now,
       offlineGain: gain >= 1 ? gain : 0,
     })
@@ -497,8 +640,6 @@ export const useGame = create<GameState>((set, get) => ({
     set({ ageVerified: true })
     get().save()
   },
-
-  toggleBlur: () => set({ nsfwBlur: !get().nsfwBlur }),
 
   dismissToast: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),
 

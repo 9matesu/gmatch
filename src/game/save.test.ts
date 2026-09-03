@@ -12,7 +12,7 @@ import {
 describe('save key + version (SPEC §11)', () => {
   it('uses goongrid.save.v1', () => {
     expect(SAVE_KEY).toBe('goongrid.save.v1')
-    expect(SAVE_VERSION).toBe(1)
+    expect(SAVE_VERSION).toBe(2)
   })
 })
 
@@ -33,7 +33,7 @@ describe('serialize / deserialize round-trip', () => {
       capsUsed: ['blue' as const],
       achievements: ['first_click'],
       ageAccepted: true,
-      nsfwBlur: false,
+      defeated: 4,
     }
     const back = deserialize(serialize(data))
     expect(back).toEqual(data)
@@ -43,7 +43,7 @@ describe('serialize / deserialize round-trip', () => {
     expect(deserialize(null)).toBeNull()
     expect(deserialize(undefined)).toBeNull()
     expect(deserialize('not json')).toBeNull()
-    expect(deserialize('{"version":2}')).toBeNull()
+    expect(deserialize('{"version":999}')).toBeNull()
     expect(deserialize('[1,2,3]')).toBeNull()
   })
 
@@ -52,7 +52,7 @@ describe('serialize / deserialize round-trip', () => {
     expect(back).not.toBeNull()
     expect(back!.gp).toBe(7)
     expect(back!.tags).toEqual([])
-    expect(back!.nsfwBlur).toBe(true)
+    expect(back!.defeated).toBe(0)
   })
 })
 

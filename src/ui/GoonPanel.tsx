@@ -1,6 +1,5 @@
 import { useCallback, useRef, useState, type MouseEvent } from 'react'
-import { useGame, rarityBaseForPost } from '../game/store'
-import { imageBuyCost, imageRarity } from '../game/rarity'
+import { useGame } from '../game/store'
 import { CAPS, activeCaps } from '../game/caps'
 import type { CapId } from '../game/types'
 import { offlineSvg } from '../services/offlineSvg'
@@ -20,11 +19,11 @@ export default function GoonPanel() {
   const current = useGame((s) => s.current)
   const feedOffline = useGame((s) => s.feedOffline)
   const gp = useGame((s) => s.gp)
-  const gallerySize = useGame((s) => s.gallery.length)
+  const foeHp = useGame((s) => s.foeHp)
+  const foeMaxHp = useGame((s) => s.foeMaxHp)
+  const defeated = useGame((s) => s.defeated)
   const caps = useGame((s) => s.caps)
-  const nsfwBlur = useGame((s) => s.nsfwBlur)
   const clickImage = useGame((s) => s.clickImage)
-  const buyCurrentImage = useGame((s) => s.buyCurrentImage)
   const advanceFeed = useGame((s) => s.advanceFeed)
   const popCap = useGame((s) => s.popCap)
 
@@ -33,9 +32,6 @@ export default function GoonPanel() {
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
   const floatId = useRef(0)
 
-  const rarityBase = current ? rarityBaseForPost(current.id) : 1
-  const price = imageBuyCost(rarityBase, gallerySize)
-  const rarity = imageRarity(rarityBase, gallerySize)
   const now = Date.now()
   const live = activeCaps(caps, now)
 
@@ -60,11 +56,13 @@ export default function GoonPanel() {
 
   const showOffline = feedOffline || !current || failedUrl === current.url
   const src = showOffline ? offlineSvg(current?.tags ?? []) : current.url
+  const inBattle = !showOffline && foeMaxHp > 0
+  const hpPct = inBattle ? Math.max(0, (foeHp / foeMaxHp) * 100) : 0
 
   return (
     <section className="glass panel goon-panel">
       <div
-        className={`image-stage ${nsfwBlur ? 'nsfw' : ''}`}
+        className="image-stage"
         onClick={handleClick}
         role="button"
         tabIndex={0}
@@ -96,18 +94,24 @@ export default function GoonPanel() {
         ))}
       </div>
 
-      <div className="buy-row">
-        <span className={`rarity-badge rarity-${rarity.toLowerCase()}`}>{rarity}</span>
-        <button
-          type="button"
-          className="btn buy-btn"
-          disabled={gp < price || !current}
-          onClick={buyCurrentImage}
-        >
-          Buy this image · {formatNum(price)} GP
-        </button>
+      <div className="battle-row">
+        {inBattle ? (
+          <div className="hp-wrap" title={`${Math.ceil(foeHp)} / ${foeMaxHp} HP`}>
+            <div className="hp-bar">
+              <div className="hp-fill" style={{ width: `${hpPct}%` }} />
+            </div>
+            <span className="hp-text mono">
+              {formatNum(Math.ceil(foeHp))}/{formatNum(foeMaxHp)} HP
+            </span>
+          </div>
+        ) : (
+          <span className="muted">No live foe — take your time.</span>
+        )}
+        <span className="ko-count mono" title="Lifetime KOs — each foe hits harder">
+          KOs: {formatNum(defeated)}
+        </span>
         <button type="button" className="btn next-btn" onClick={advanceFeed}>
-          Next image
+          Skip (no reward)
         </button>
       </div>
 

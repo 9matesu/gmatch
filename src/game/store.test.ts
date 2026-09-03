@@ -88,22 +88,77 @@ describe('popCap', () => {
   })
 })
 
-describe('buyCurrentImage', () => {
-  it('adds a gallery entry at the computed price', () => {
+describe('feed battle', () => {
+  const foe = (id: string) => ({ id, url: `https://x/${id}.jpg`, tags: ['gangbang'] })
+
+  it('drains foe HP and sends the KO to the gallery with a bonus', () => {
     useGame.setState({
-      gp: 100_000,
-      current: { id: '42', url: 'https://x/42.jpg', tags: ['1girl'] },
+      current: foe('b1'),
+      queue: [foe('b2')],
+      foeHp: 8,
+      foeMaxHp: 8,
+      foeClicks: 0,
+      defeated: 0,
+      gp: 0,
     })
-    expect(useGame.getState().buyCurrentImage()).toBe(true)
+    let killed = false
+    for (let i = 0; i < 20 && !killed; i++) killed = useGame.getState().clickImage().killed
+    expect(killed).toBe(true)
     const s = useGame.getState()
     expect(s.gallery).toHaveLength(1)
-    expect(s.gallery[0].boughtAt).toBeTypeOf('number')
-    expect(s.gp).toBeLessThan(100_000)
+    expect(s.defeated).toBe(1)
+    expect(s.gp).toBeGreaterThan(0) // click GP + kill bonus
+    expect(s.current?.id).toBe('b2') // next foe steps up at full scaled HP
+    expect(s.foeMaxHp).toBeGreaterThan(8)
+    expect(s.foeHp).toBe(s.foeMaxHp)
   })
 
-  it('does nothing without a current image', () => {
-    useGame.setState({ gp: 100_000 })
-    expect(useGame.getState().buyCurrentImage()).toBe(false)
+  it('skipping pays nothing and keeps the KO count', () => {
+    useGame.setState({
+      current: foe('s1'),
+      queue: [foe('s2')],
+      foeHp: 8,
+      foeMaxHp: 8,
+      foeClicks: 0,
+      defeated: 3,
+      gp: 0,
+    })
+    useGame.getState().advanceFeed()
+    const s = useGame.getState()
+    expect(s.gallery).toHaveLength(0)
+    expect(s.defeated).toBe(3)
+    expect(s.gp).toBe(0)
+    expect(s.current?.id).toBe('s2')
+  })
+
+  it('featured gallery pieces have no battle — clicks just pay GP', () => {
+    useGame.setState({
+      gp: 100_000,
+      current: foe('42'),
+      queue: [],
+      foeHp: 8,
+      foeMaxHp: 8,
+      foeClicks: 0,
+      defeated: 0,
+    })
+    // Drain it first so it joins the gallery, then re-feature it.
+    for (let i = 0; i < 200 && useGame.getState().gallery.length === 0; i++) {
+      useGame.getState().clickImage()
+    }
+    const id = useGame.getState().gallery[0].id
+    useGame.getState().featureImage(id)
+    const before = useGame.getState()
+    expect(before.foeMaxHp).toBe(0)
+    const res = useGame.getState().clickImage()
+    expect(res.killed).toBe(false)
+    expect(useGame.getState().gallery).toHaveLength(1)
+  })
+
+  it('does nothing battle-wise without a current image', () => {
+    useGame.setState({ gp: 0, current: null })
+    const res = useGame.getState().clickImage()
+    expect(res.killed).toBe(false)
+    expect(useGame.getState().gallery).toHaveLength(0)
   })
 })
 

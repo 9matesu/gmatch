@@ -81,7 +81,7 @@ function GalleryTab() {
   const gallery = useGame((s) => s.gallery)
   const featureImage = useGame((s) => s.featureImage)
   if (gallery.length === 0) {
-    return <div className="tab-body empty">No keepsakes yet. Buy images from the Goon Panel.</div>
+    return <div className="tab-body empty">No keepsakes yet. Drain feed images to keep them.</div>
   }
   return (
     <div className="tab-body">

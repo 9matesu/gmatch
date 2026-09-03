@@ -98,21 +98,6 @@ body {
   flex: 1;
 }
 
-.blur-toggle {
-  cursor: pointer;
-  background: var(--panel-strong);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--muted);
-  font-size: 12px;
-  padding: 6px 14px;
-}
-
-.blur-toggle.on {
-  border-color: rgba(255, 45, 120, 0.5);
-  color: var(--text);
-}
-
 /* ---------- 3-column layout ---------- */
 
 .columns {
@@ -282,16 +267,6 @@ body {
   transition: filter 0.25s ease;
 }
 
-.image-stage.nsfw .goon-image {
-  filter: blur(30px) saturate(1.3);
-  transform: scale(1.08);
-}
-
-.image-stage.nsfw:hover .goon-image {
-  filter: blur(0);
-  transform: scale(1);
-}
-
 .offline-badge {
   position: absolute;
   top: 10px;
@@ -413,15 +388,47 @@ body {
 
 /* ---------- buy row + caps bar ---------- */
 
-.buy-row {
+.battle-row {
   display: flex;
   align-items: center;
   gap: 10px;
   flex: 0 0 auto;
 }
 
-.buy-btn {
+.hp-wrap {
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hp-bar {
+  flex: 1;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.hp-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--grad);
+  transition: width 0.12s linear;
+}
+
+.hp-text {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.ko-count {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .rarity-badge {

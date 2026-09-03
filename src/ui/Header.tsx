@@ -1,8 +1,8 @@
 import { useGame } from '../game/store'
+import { formatNum } from './format'
 
 export default function Header() {
-  const nsfwBlur = useGame((s) => s.nsfwBlur)
-  const toggleBlur = useGame((s) => s.toggleBlur)
+  const defeated = useGame((s) => s.defeated)
   return (
     <header className="app-header glass">
       <h1 className="brand">
@@ -10,14 +10,9 @@ export default function Header() {
       </h1>
       <span className="brand-sub">babecock idle · 18+</span>
       <div className="header-spacer" />
-      <button
-        type="button"
-        className={`blur-toggle ${nsfwBlur ? 'on' : ''}`}
-        onClick={toggleBlur}
-        title="Blur images until hover"
-      >
-        NSFW blur: {nsfwBlur ? 'ON' : 'OFF'}
-      </button>
+      <span className="ko-count mono" title="Lifetime KOs — each foe hits harder">
+        KOs: {formatNum(defeated)}
+      </span>
     </header>
   )
 }

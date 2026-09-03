@@ -1,7 +1,7 @@
 import type { ActiveCap, CapId, GalleryImage, OwnedTag } from './types'
 
 export const SAVE_KEY = 'goongrid.save.v1'
-export const SAVE_VERSION = 1
+export const SAVE_VERSION = 2
 export const OFFLINE_RATE = 0.5
 export const OFFLINE_CAP_MS = 8 * 60 * 60 * 1000
 
@@ -21,7 +21,7 @@ export interface SaveData {
   achievements: string[]
   collectedOfflineEarnings: boolean
   ageAccepted: boolean
-  nsfwBlur: boolean
+  defeated: number
   lastSeenAt: number
 }
 
@@ -42,7 +42,7 @@ export function defaultSave(now = Date.now()): SaveData {
     achievements: [],
     collectedOfflineEarnings: false,
     ageAccepted: false,
-    nsfwBlur: true,
+    defeated: 0,
     lastSeenAt: now,
   }
 }
@@ -82,7 +82,7 @@ export function deserialize(raw: string | null | undefined): SaveData | null {
     achievements: arr<string>(d.achievements),
     collectedOfflineEarnings: d.collectedOfflineEarnings === true,
     ageAccepted: d.ageAccepted === true,
-    nsfwBlur: d.nsfwBlur !== false,
+    defeated: num(d.defeated, 0),
     lastSeenAt: num(d.lastSeenAt, 0),
   }
 }
