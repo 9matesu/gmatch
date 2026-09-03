@@ -37,12 +37,12 @@ describe('shards (SPEC §9)', () => {
 })
 
 describe('tier gating', () => {
-  it('Brainmelt unlocks at tier 5 (Pervert)', () => {
+  it('Brainmelt unlocks at tier 5', () => {
     expect(PRESTIGE_MIN_TIER).toBe(5)
     expect(canBrainmelt(4)).toBe(false)
     expect(canBrainmelt(5)).toBe(true)
-    expect(titleForTier(5)).toBe('Pervert')
-    expect(titleForTier(10)).toBe('Goon Master')
+    expect(titleForTier(5)).toBe('Degenerate')
+    expect(titleForTier(10)).toBe('Brainmelt God')
   })
 
   it('tierForXp is monotonic', () => {

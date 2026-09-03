@@ -3,25 +3,28 @@ import type { ActiveCap, GalleryImage, OwnedTag } from './types'
 export const PRESTIGE_MIN_TIER = 5
 export const SHARD_DIVISOR = 1e6
 
-/** Pornification titles; index+1 = tier. Tier 5 "Pervert", 10 "Goon Master" (SPEC §9/§10). */
+/** Pornification ladder; index+1 = tier (SPEC §9). Tier 5+ unlocks Brainmelt. */
 export const TITLES: readonly string[] = [
   'Curious',
-  'Peeker',
-  'Hornball',
-  'Degenerate',
+  'Flustered',
+  'Kinky',
   'Pervert',
+  'Degenerate',
+  'Goon',
   'Addict',
-  'Fiend',
   'Deviant',
-  'Adept',
-  'Goon Master',
-  'Goon Legend',
+  'Sinlord',
   'Brainmelt God',
 ]
 
 /** Simple XP curve: tier n reached at (n-1)^2 * 100 XP. */
 export function tierForXp(xp: number): number {
   return Math.min(TITLES.length, Math.floor(Math.sqrt(Math.max(0, xp) / 100)) + 1)
+}
+
+/** Inverse of tierForXp: XP needed to reach `tier`. */
+export function xpForTier(tier: number): number {
+  return Math.pow(Math.max(1, tier) - 1, 2) * 100
 }
 
 export function titleForTier(tier: number): string {

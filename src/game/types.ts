@@ -17,6 +17,7 @@ export interface GalleryImage {
   rarityBase: number
   clicks: number
   rarity: Rarity
+  boughtAt?: number
 }
 
 export interface ActiveCap {
