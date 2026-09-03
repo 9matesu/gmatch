@@ -2,6 +2,7 @@ import { useGame } from '../game/store'
 import { clickPower, passiveGps } from '../game/economy'
 import { TITLES, tierForXp, titleForTier, xpForTier } from '../game/prestige'
 import { formatNum } from './format'
+import { IconBolt, IconCoin, IconCursor, IconShard } from './icons'
 
 export default function StatsPanel() {
   const s = useGame()
@@ -22,25 +23,33 @@ export default function StatsPanel() {
     tier >= TITLES.length ? 100 : Math.min(100, Math.max(0, ((s.xp - cur) / (next - cur)) * 100))
 
   return (
-    <aside className="glass panel stats">
+    <aside className="plate panel stats">
       <div className="gp-big mono">{formatNum(s.gp)}</div>
       <div className="gp-label">Goon Points</div>
       <div className="stat-row">
-        <span>GP/s</span>
+        <span>
+          <IconCoin size={13} /> GP/s
+        </span>
         <b className="mono">{formatNum(gps)}</b>
       </div>
       <div className="stat-row">
-        <span>Click power</span>
+        <span>
+          <IconBolt size={13} /> Click power
+        </span>
         <b className="mono">{formatNum(cp)}</b>
       </div>
       <div className="stat-row">
-        <span>Clicks / crits</span>
+        <span>
+          <IconCursor size={13} /> Clicks / crits
+        </span>
         <b className="mono">
           {s.clicks} / {s.crits}
         </b>
       </div>
       <div className="stat-row">
-        <span>Corruption shards</span>
+        <span>
+          <IconShard size={13} /> Corruption shards
+        </span>
         <b className="mono">{s.shards}</b>
       </div>
       <div className="ladder">

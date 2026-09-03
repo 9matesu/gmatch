@@ -34,6 +34,7 @@ describe('serialize / deserialize round-trip', () => {
       achievements: ['first_click'],
       ageAccepted: true,
       defeated: 4,
+      backgroundUrl: 'https://x/bg.jpg',
     }
     const back = deserialize(serialize(data))
     expect(back).toEqual(data)

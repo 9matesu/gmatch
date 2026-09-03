@@ -55,6 +55,8 @@ export interface GameState {
   queue: BooruPost[]
   /** Viewed-image history for the back arrow (session-only, not saved). */
   past: BooruPost[]
+  /** Gallery image used as the app backdrop (persisted). Null = flat steel. */
+  backgroundUrl: string | null
   /** Live foe: HP left / max, clicks landed, lifetime KOs. max 0 = no battle. */
   foeHp: number
   foeMaxHp: number
@@ -74,6 +76,7 @@ export interface GameState {
   fetchFeed: () => Promise<void>
   advanceFeed: () => void
   goBack: () => boolean
+  setBackground: (url: string | null) => void
   featureImage: (id: string) => void
   popCap: (capId: CapId) => boolean
   brainmelt: () => boolean
@@ -184,6 +187,7 @@ function freshData() {
     current: null as BooruPost | null,
     queue: [] as BooruPost[],
     past: [] as BooruPost[],
+    backgroundUrl: null as string | null,
     foeHp: 0,
     foeMaxHp: 0,
     foeClicks: 0,
@@ -492,6 +496,10 @@ export const useGame = create<GameState>((set, get) => ({
     })
   },
 
+  setBackground: (url) => {
+    set({ backgroundUrl: url })
+  },
+
   popCap: (capId) => {
     const s = get()
     const def = CAPS[capId]
@@ -645,6 +653,7 @@ export const useGame = create<GameState>((set, get) => ({
       collectedOfflineEarnings: s.collectedOfflineEarnings,
       ageAccepted: s.ageVerified,
       defeated: s.defeated,
+      backgroundUrl: s.backgroundUrl,
       lastSeenAt: now,
     }
     writeStorage(serialize(data))
@@ -687,6 +696,7 @@ export const useGame = create<GameState>((set, get) => ({
       collectedOfflineEarnings: d.collectedOfflineEarnings,
       ageVerified: d.ageAccepted,
       defeated: d.defeated,
+      backgroundUrl: d.backgroundUrl,
       lastSeenAt: now,
       offlineGain: gain >= 1 ? gain : 0,
     })

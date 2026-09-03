@@ -4,6 +4,7 @@ import { CAPS, capEffectLabel, capStacks } from '../game/caps'
 import type { CapId } from '../game/types'
 import { offlineSvg } from '../services/offlineSvg'
 import { formatNum } from './format'
+import { IconChevronL, IconChevronR } from './icons'
 
 interface Float {
   id: number
@@ -61,7 +62,7 @@ export default function GoonPanel() {
   const hpPct = inBattle ? Math.max(0, (foeHp / foeMaxHp) * 100) : 0
 
   return (
-    <section className="glass panel goon-panel">
+    <section className="plate panel goon-panel">
       <div
         className="image-stage"
         onClick={handleClick}
@@ -95,7 +96,7 @@ export default function GoonPanel() {
               goBack()
             }}
           >
-            ‹
+            <IconChevronL size={26} />
           </button>
         )}
         {!showOffline && (
@@ -109,7 +110,7 @@ export default function GoonPanel() {
               advanceFeed()
             }}
           >
-            ›
+            <IconChevronR size={26} />
           </button>
         )}
         {floats.map((f) => (
@@ -127,7 +128,7 @@ export default function GoonPanel() {
         {inBattle ? (
           <div className="hp-wrap" title={`${Math.ceil(foeHp)} / ${foeMaxHp} HP`}>
             <div className="hp-bar">
-              <div className="hp-fill" style={{ width: `${hpPct}%` }} />
+              <div className={`hp-fill ${hpPct <= 30 ? 'low' : ''}`} style={{ width: `${hpPct}%` }} />
             </div>
             <span className="hp-text mono">
               {formatNum(Math.ceil(foeHp))}/{formatNum(foeMaxHp)} HP

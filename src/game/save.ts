@@ -22,6 +22,7 @@ export interface SaveData {
   collectedOfflineEarnings: boolean
   ageAccepted: boolean
   defeated: number
+  backgroundUrl: string | null
   lastSeenAt: number
 }
 
@@ -43,6 +44,7 @@ export function defaultSave(now = Date.now()): SaveData {
     collectedOfflineEarnings: false,
     ageAccepted: false,
     defeated: 0,
+    backgroundUrl: null,
     lastSeenAt: now,
   }
 }
@@ -83,6 +85,7 @@ export function deserialize(raw: string | null | undefined): SaveData | null {
     collectedOfflineEarnings: d.collectedOfflineEarnings === true,
     ageAccepted: d.ageAccepted === true,
     defeated: num(d.defeated, 0),
+    backgroundUrl: typeof d.backgroundUrl === 'string' ? d.backgroundUrl : null,
     lastSeenAt: num(d.lastSeenAt, 0),
   }
 }

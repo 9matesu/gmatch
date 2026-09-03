@@ -1,8 +1,17 @@
-import { useState } from 'react'
+import { useState, type ComponentType } from 'react'
 import { useGame } from '../game/store'
 import { MAX_TAG_LEVEL, tagCost } from '../game/tags'
 import { CAPS, capEffectLabel, capStacks } from '../game/caps'
 import type { CapId } from '../game/types'
+import {
+  IconFlask,
+  IconImage,
+  IconRefresh,
+  IconTag,
+  IconTrophy,
+  IconWallpaper,
+  IconX,
+} from './icons'
 import {
   PRESTIGE_MIN_TIER,
   canBrainmelt,
@@ -15,11 +24,11 @@ import { formatNum } from './format'
 
 type Tab = 'tags' | 'gallery' | 'caps' | 'prestige'
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'tags', label: 'Tags' },
-  { id: 'gallery', label: 'Gallery' },
-  { id: 'caps', label: 'Caps' },
-  { id: 'prestige', label: 'Prestige' },
+const TABS: { id: Tab; label: string; icon: ComponentType<{ size?: number }> }[] = [
+  { id: 'tags', label: 'Tags', icon: IconTag },
+  { id: 'gallery', label: 'Gallery', icon: IconImage },
+  { id: 'caps', label: 'Caps', icon: IconFlask },
+  { id: 'prestige', label: 'Prestige', icon: IconTrophy },
 ]
 
 function TagsTab() {
@@ -43,7 +52,7 @@ function TagsTab() {
           disabled={fetching}
           onClick={() => void refreshTagMarket()}
         >
-          {fetching ? 'Parsing…' : 'Refresh'}
+          <IconRefresh size={12} /> {fetching ? 'Parsing…' : 'Refresh'}
         </button>
       </div>
       <div className="tag-pills">
@@ -94,35 +103,64 @@ function TagsTab() {
 
 function GalleryTab() {
   const gallery = useGame((s) => s.gallery)
+  const backgroundUrl = useGame((s) => s.backgroundUrl)
   const featureImage = useGame((s) => s.featureImage)
+  const setBackground = useGame((s) => s.setBackground)
   if (gallery.length === 0) {
     return <div className="tab-body empty">No keepsakes yet. Drain feed images to keep them.</div>
   }
   return (
     <div className="tab-body">
-      <div className="gallery-grid">
-        {gallery.map((img) => (
+      {backgroundUrl && (
+        <div className="backdrop-row">
+          <span className="muted">Backdrop live</span>
           <button
-            key={img.id}
             type="button"
-            className="gallery-cell"
-            title="Re-feature in the Goon Panel"
-            onClick={() => featureImage(img.id)}
+            className="btn small"
+            onClick={() => setBackground(null)}
+            title="Remove the app backdrop"
           >
-            <img
-              src={img.url || offlineSvg(img.tags)}
-              alt={img.tags.slice(0, 3).join(' ') || 'gallery image'}
-              referrerPolicy="no-referrer"
-              loading="lazy"
-              onError={(e) => {
-                e.currentTarget.src = offlineSvg(img.tags)
-              }}
-            />
-            <span className={`rarity-badge sm rarity-${img.rarity.toLowerCase()}`}>
-              {img.rarity}
-            </span>
+            <IconX size={12} /> Clear
           </button>
-        ))}
+        </div>
+      )}
+      <div className="gallery-grid">
+        {gallery.map((img) => {
+          const isBackdrop = backgroundUrl === img.url
+          return (
+            <div key={img.id} className={`gallery-cell ${isBackdrop ? 'is-backdrop' : ''}`}>
+              <button
+                type="button"
+                className="gallery-open"
+                title="Re-feature in the Goon Panel"
+                onClick={() => featureImage(img.id)}
+              >
+                <img
+                  src={img.url || offlineSvg(img.tags)}
+                  alt={img.tags.slice(0, 3).join(' ') || 'gallery image'}
+                  referrerPolicy="no-referrer"
+                  loading="lazy"
+                  onError={(e) => {
+                    e.currentTarget.src = offlineSvg(img.tags)
+                  }}
+                />
+              </button>
+              <span className={`rarity-badge sm rarity-${img.rarity.toLowerCase()}`}>
+                {img.rarity}
+              </span>
+              <button
+                type="button"
+                className="gallery-bg"
+                title={isBackdrop ? 'This is the app backdrop' : 'Set as app backdrop'}
+                aria-label={isBackdrop ? 'Current app backdrop' : `Set ${img.tags.slice(0, 2).join(' ') || 'image'} as app backdrop`}
+                disabled={isBackdrop}
+                onClick={() => setBackground(img.url)}
+              >
+                <IconWallpaper size={13} />
+              </button>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -221,18 +259,22 @@ function PrestigeTab() {
 export default function ShopPanel() {
   const [tab, setTab] = useState<Tab>('tags')
   return (
-    <aside className="glass panel shop">
+    <aside className="plate panel shop">
       <nav className="tabs">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={`tab ${tab === t.id ? 'active' : ''}`}
-            onClick={() => setTab(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
+        {TABS.map((t) => {
+          const Icon = t.icon
+          return (
+            <button
+              key={t.id}
+              type="button"
+              className={`tab ${tab === t.id ? 'active' : ''}`}
+              onClick={() => setTab(t.id)}
+            >
+              <Icon size={14} />
+              {t.label}
+            </button>
+          )
+        })}
       </nav>
       {tab === 'tags' && <TagsTab />}
       {tab === 'gallery' && <GalleryTab />}

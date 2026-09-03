@@ -11,6 +11,7 @@ import './ui/styles.css'
 
 export default function App() {
   const ageVerified = useGame((s) => s.ageVerified)
+  const backgroundUrl = useGame((s) => s.backgroundUrl)
 
   useEffect(() => {
     useGame.getState().load()
@@ -36,7 +37,14 @@ export default function App() {
   }, [ageVerified])
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${backgroundUrl ? 'has-backdrop' : ''}`}>
+      {backgroundUrl && (
+        <div
+          className="app-backdrop"
+          style={{ backgroundImage: `url("${backgroundUrl}")` }}
+          aria-hidden="true"
+        />
+      )}
       <Header />
       <main className="columns">
         <StatsPanel />

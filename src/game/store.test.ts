@@ -293,6 +293,16 @@ describe('feed battle', () => {
   })
 })
 
+describe('background backdrop', () => {
+  it('sets and clears the gallery backdrop url', () => {
+    expect(useGame.getState().backgroundUrl).toBeNull()
+    useGame.getState().setBackground('https://x/bg.jpg')
+    expect(useGame.getState().backgroundUrl).toBe('https://x/bg.jpg')
+    useGame.getState().setBackground(null)
+    expect(useGame.getState().backgroundUrl).toBeNull()
+  })
+})
+
 describe('tick', () => {
   it('pays passive GP/s from owned tags', () => {
     useGame.setState({
