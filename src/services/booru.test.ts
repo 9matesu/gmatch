@@ -53,4 +53,61 @@ describe('fetchPosts (SPEC §6/§8)', () => {
     expect(first.posts).toHaveLength(1)
     expect(second.posts).toHaveLength(0)
   })
+
+  it('browser mode fetches tbib through the dev proxy (no CORS)', async () => {
+    vi.stubGlobal('window', {})
+    const tbibPost = {
+      id: 28545394,
+      directory: 10792,
+      image: 'ae15a5c325658023a6123e14f6dcac2bd602e240.jpg',
+      width: 1824,
+      height: 2432,
+      rating: 'explicit',
+      tags: 'gangbang creampie highres',
+    }
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([tbibPost]),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await fetchPosts({ tags: 'gangbang-proxy', limit: 10 })
+    expect(res.ok).toBe(true)
+    expect(res.source).toBe('tbib-direct')
+    expect(fetchMock).toHaveBeenCalledOnce()
+    const url = String(fetchMock.mock.calls[0][0])
+    expect(url.startsWith('/booru/tbib/')).toBe(true)
+    expect(url).not.toContain('tbib.org')
+    expect(res.posts[0].url).toBe(
+      'https://tbib.org/images/10792/ae15a5c325658023a6123e14f6dcac2bd602e240.jpg',
+    )
+  })
+
+  it('browser mode falls through to xbooru when tbib yields nothing usable', async () => {
+    vi.stubGlobal('window', {})
+    const xPost = {
+      id: 1274606,
+      file_url: 'https://img.xbooru.com/images/477/2d9db914816e9fca38dc93f82f0033e5.png',
+      width: 1400,
+      height: 1360,
+      rating: 'explicit',
+      tags: 'gangbang creampie',
+    }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([xPost]) })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await fetchPosts({ tags: 'gangbang-fallthrough', limit: 10 })
+    expect(res.ok).toBe(true)
+    expect(res.source).toBe('xbooru-direct')
+    expect(String(fetchMock.mock.calls[1][0]).startsWith('/booru/xbooru/')).toBe(true)
+  })
+
+  it('browser mode reports offline when all direct sources fail', async () => {
+    vi.stubGlobal('window', {})
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
+    const res = await fetchPosts({ tags: 'gangbang-allfail', limit: 10 })
+    expect(res.offline).toBe(true)
+    expect(res.ok).toBe(false)
+  })
 })

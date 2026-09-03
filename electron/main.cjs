@@ -33,7 +33,7 @@ const NEGATIVES = [
   '-jpeg_artifacts',
   '-watermark',
   '-censored',
-].join('')
+].join(' ')
 
 // Hard post-level floor (user spec: high quality always). The renderer also
 // enforces this in src/services/postFilter.ts — duplicated on purpose so the

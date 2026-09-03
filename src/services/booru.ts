@@ -49,27 +49,58 @@ function sanitize(posts: BooruPost[]): BooruPost[] {
   return allowOnly(posts)
 }
 
-/** Browser-mode fallback: direct fetch (likely CORS-blocked → offline). */
+/** Mirrors reachable through the Vite dev proxy (same-origin → no CORS). */
+const DIRECT_SOURCES = [
+  { id: 'tbib-direct', origin: 'https://tbib.org', proxy: '/booru/tbib' },
+  { id: 'xbooru-direct', origin: 'https://xbooru.com', proxy: '/booru/xbooru' },
+] as const
+
+function toPosts(
+  data: unknown,
+  origin: string,
+): BooruPost[] {
+  const list = Array.isArray(data) ? data : []
+  return list
+    .filter((p): p is Record<string, unknown> => typeof p === 'object' && p !== null)
+    .map((p) => {
+      const dir = p.directory
+      const img = p.image
+      const fileUrl = typeof p.file_url === 'string' ? p.file_url : ''
+      // tbib omits file_url — construct it like electron/main.cjs does.
+      const url =
+        fileUrl ||
+        (typeof dir !== 'undefined' && typeof img === 'string'
+          ? `${origin}/images/${dir}/${img}`
+          : '')
+      return {
+        id: String(p.id ?? ''),
+        url,
+        tags: typeof p.tags === 'string' ? (p.tags as string).split(' ') : [],
+        rating: typeof p.rating === 'string' ? p.rating : undefined,
+      }
+    })
+    .filter((p) => p.id && p.url)
+}
+
+/**
+ * Browser-mode fetch. Hits the booru DAPIs through the Vite dev proxy
+ * (same-origin, so no CORS block). Outside `vite dev` the proxy doesn't
+ * exist → fetch throws → caller reports offline. Tries tbib, then xbooru.
+ */
 async function directFetch(req: BooruRequest): Promise<BooruResponse> {
   const neg =
-    '-ai_generated+-ai-generated+-furry+-anthro+-feral+-scalie+-monochrome+-greyscale+-sketch+-comic+-lowres+-worst_quality+-jpeg_artifacts+-watermark+-censored'
-  const url = `https://tbib.org/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
-    req.tags + ' rating:explicit ' + neg,
-  )}&limit=${req.limit}&json=1`
-  const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const data = (await res.json()) as unknown
-  const list = Array.isArray(data) ? data : []
-  const posts: BooruPost[] = list
-    .filter((p): p is Record<string, unknown> => typeof p === 'object' && p !== null)
-    .map((p) => ({
-      id: String(p.id ?? ''),
-      url: String(p.file_url ?? ''),
-      tags: typeof p.tags === 'string' ? (p.tags as string).split(' ') : [],
-      rating: typeof p.rating === 'string' ? p.rating : undefined,
-    }))
-    .filter((p) => p.id && p.url)
-  return { posts: sanitize(posts), source: 'tbib-direct', ok: true }
+    '-ai_generated -ai-generated -furry -anthro -feral -scalie -monochrome -greyscale -sketch -comic -lowres -worst_quality -jpeg_artifacts -watermark -censored'
+  const tags = `${req.tags} rating:explicit ${neg}`
+  for (const src of DIRECT_SOURCES) {
+    const url = `${src.proxy}/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
+      tags,
+    )}&limit=${req.limit}&json=1`
+    const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) })
+    if (!res.ok) continue
+    const clean = sanitize(toPosts(await res.json(), src.origin))
+    if (clean.length > 0) return { posts: remember(clean), source: src.id, ok: true }
+  }
+  throw new Error('no direct source returned usable posts')
 }
 
 /**
