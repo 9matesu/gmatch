@@ -1,5 +1,6 @@
 import type { BooruPost } from '../game/types'
 import { isQueryBlocked } from '../game/tagFilter'
+import { allowOnly } from './postFilter'
 
 export interface BooruRequest {
   tags: string
@@ -40,9 +41,21 @@ function remember(posts: BooruPost[]): BooruPost[] {
   return fresh
 }
 
+/**
+ * Feed quality gate: explicit-only, humans only, no AI/B&W/comic/furry slop
+ * (user spec). Applied to every response path.
+ */
+function sanitize(posts: BooruPost[]): BooruPost[] {
+  return allowOnly(posts)
+}
+
 /** Browser-mode fallback: direct fetch (likely CORS-blocked → offline). */
 async function directFetch(req: BooruRequest): Promise<BooruResponse> {
-  const url = `https://safebooru.org/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(req.tags)}&limit=${req.limit}&json=1`
+  const neg =
+    '-ai_generated+-ai-generated+-furry+-anthro+-feral+-scalie+-monochrome+-greyscale+-sketch+-comic+-lowres+-worst_quality+-jpeg_artifacts+-watermark+-censored'
+  const url = `https://tbib.org/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
+    req.tags + ' rating:explicit ' + neg,
+  )}&limit=${req.limit}&json=1`
   const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const data = (await res.json()) as unknown
@@ -56,7 +69,7 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
       rating: typeof p.rating === 'string' ? p.rating : undefined,
     }))
     .filter((p) => p.id && p.url)
-  return { posts: remember(posts), source: 'safebooru-direct', ok: true }
+  return { posts: sanitize(posts), source: 'tbib-direct', ok: true }
 }
 
 /**
@@ -70,7 +83,8 @@ export async function fetchPosts(req: BooruRequest): Promise<BooruResponse> {
     if (typeof window !== 'undefined' && window.goongrid?.booruFetch) {
       const res = await window.goongrid.booruFetch(req)
       if (res.ok && res.posts.length > 0) {
-        return { ...res, posts: remember(res.posts) }
+        const clean = sanitize(res.posts)
+        if (clean.length > 0) return { ...res, posts: remember(clean) }
       }
       return { ...offline }
     }

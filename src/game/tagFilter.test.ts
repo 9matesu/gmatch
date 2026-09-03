@@ -69,14 +69,9 @@ describe('hard blocklist (SPEC §8)', () => {
 
   it('passes normal adult tags', () => {
     for (const tag of [
-      '1girl',
       'wet',
-      'lingerie',
-      'solo',
       'long_hair',
-      'smile',
       'closed_eyes',
-      'cosplay',
       'thighhighs',
       'cleavage',
       'navel',
@@ -84,6 +79,12 @@ describe('hard blocklist (SPEC §8)', () => {
       'nude',
       'nipples',
       'orgasm',
+      'gangbang',
+      'creampie',
+      'ahegao',
+      'pregnant',
+      'veiny_penis',
+      'bulge',
     ]) {
       expect(isTagBlocked(tag), tag).toBe(false)
     }
@@ -130,14 +131,14 @@ describe('noise filtering', () => {
 describe('filterTags', () => {
   it('drops blocked, noise, empty and duplicate tags', () => {
     const out = filterTags([
-      '1girl', 'loli', 'wet', 'highres', '1girl', '', 'lingerie', 'school_uniform',
+      'gangbang', 'loli', 'wet', 'highres', 'gangbang', '', 'pregnant', 'school_uniform',
     ])
-    expect(out).toEqual(['1girl', 'wet', 'lingerie'])
+    expect(out).toEqual(['gangbang', 'wet', 'pregnant'])
   })
 
   it('never returns a blocked tag even if mixed case', () => {
-    const out = filterTags(['LOLI', 'Shota', 'Bestiality', 'solo'])
-    expect(out).toEqual(['solo'])
+    const out = filterTags(['LOLI', 'Shota', 'Bestiality', 'creampie'])
+    expect(out).toEqual(['creampie'])
   })
 })
 
@@ -147,9 +148,9 @@ describe('parseTagField / rankTags', () => {
   })
 
   it('ranks by frequency then name, excluding blocked', () => {
-    const ranked = rankTags(['wet', '1girl', 'wet', 'loli', '1girl', '1girl'])
+    const ranked = rankTags(['wet', 'gangbang', 'wet', 'loli', 'gangbang', 'gangbang'])
     expect(ranked).toEqual([
-      { name: '1girl', frequency: 3 },
+      { name: 'gangbang', frequency: 3 },
       { name: 'wet', frequency: 2 },
     ])
   })
@@ -157,7 +158,7 @@ describe('parseTagField / rankTags', () => {
 
 describe('isQueryBlocked', () => {
   it('rejects whole queries containing a blocked term', () => {
-    expect(isQueryBlocked('1girl loli')).toBe(true)
-    expect(isQueryBlocked('1girl wet')).toBe(false)
+    expect(isQueryBlocked('gangbang loli')).toBe(true)
+    expect(isQueryBlocked('gangbang wet')).toBe(false)
   })
 })

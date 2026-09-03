@@ -3,6 +3,7 @@ import { clickGain, clickPower, isCrit, passiveGps } from './economy'
 import type { EconomyInput } from './economy'
 import { buyTag as buyTagLevel, deriveTagStats, feedQuery, starterOffers } from './tags'
 import { rankTags } from './tagFilter'
+import { pervertSeeds } from './pervertTags'
 import { CAPS, activeCaps, capAutoClicksPerSec, popCap as popCapList } from './caps'
 import { imageBuyCost, imageRarity } from './rarity'
 import { applyBrainmelt, canBrainmelt, tierForXp, titleForTier } from './prestige'
@@ -225,8 +226,10 @@ export const useGame = create<GameState>((set, get) => ({
     const s = get()
     if (s.fetching) return
     set({ fetching: true })
-    const q = feedQuery(s.tags)
-    const res = await fetchPosts({ tags: q.length > 0 ? q.join(' ') : '1girl', limit: 60 })
+    const owned = feedQuery(s.tags)
+    // Pervert seeds (user spec): always bias the market toward the hard pool.
+    const q = owned.length > 0 ? [...owned.slice(0, 3), ...pervertSeeds(2)] : pervertSeeds(2)
+    const res = await fetchPosts({ tags: q.join(' '), limit: 60 })
     const levelOf = new Map(s.tags.map((t) => [t.name, t.level]))
     let offers: OwnedTag[]
     if (res.ok && res.posts.length > 0) {
@@ -250,8 +253,10 @@ export const useGame = create<GameState>((set, get) => ({
     const s = get()
     if (s.fetching) return
     set({ fetching: true })
-    const q = feedQuery(s.tags)
-    const res = await fetchPosts({ tags: q.length > 0 ? q.join(' ') : '1girl', limit: 10 })
+    const owned = feedQuery(s.tags)
+    // Pervert seeds (user spec): the feed always carries hard tags, never vanilla.
+    const q = owned.length > 0 ? [...owned.slice(0, 3), ...pervertSeeds(2)] : pervertSeeds(3)
+    const res = await fetchPosts({ tags: q.join(' '), limit: 10 })
     if (res.ok && res.posts.length > 0) {
       set({ current: res.posts[0], queue: res.posts.slice(1), feedOffline: false, fetching: false })
     } else {

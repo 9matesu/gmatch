@@ -9,13 +9,13 @@ afterEach(() => {
 describe('fetchPosts (SPEC §6/§8)', () => {
   it('uses the Electron IPC bridge when present', async () => {
     const booruFetch = vi.fn().mockResolvedValue({
-      posts: [{ id: '1', url: 'https://x/1.png', tags: ['1girl'], rating: 'e' }],
+      posts: [{ id: '1', url: 'https://x/1.png', tags: ['gangbang'], rating: 'e' }],
       source: 'tbib',
       ok: true,
     })
     vi.stubGlobal('window', { goongrid: { booruFetch } })
-    const res = await fetchPosts({ tags: '1girl', limit: 10 })
-    expect(booruFetch).toHaveBeenCalledWith({ tags: '1girl', limit: 10 })
+    const res = await fetchPosts({ tags: 'gangbang', limit: 10 })
+    expect(booruFetch).toHaveBeenCalledWith({ tags: 'gangbang', limit: 10 })
     expect(res.ok).toBe(true)
     expect(res.source).toBe('tbib')
   })

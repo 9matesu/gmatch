@@ -50,14 +50,20 @@ describe('buyTag', () => {
   })
 })
 
-describe('starter tags (SPEC §3)', () => {
-  it('seeds the evergreen list', () => {
+describe('starter tags (user spec: pervert pool, no vanilla)', () => {
+  it('seeds the pervert list', () => {
     expect([...STARTER_TAGS]).toEqual([
-      '1girl', 'solo', 'long_hair', 'smile', 'closed_eyes', 'wet', 'lingerie', 'cosplay',
+      'gangbang', 'creampie', 'ahegao', 'pregnant', 'veiny_penis', 'bulge', 'deepthroat', 'anal',
     ])
     const offers = starterOffers()
     expect(offers.map((o) => o.name)).toEqual([...STARTER_TAGS])
     expect(offers.every((o) => o.level === 0 && o.base > 0 && o.income > 0)).toBe(true)
+  })
+
+  it('contains no vanilla tags', () => {
+    for (const t of ['1girl', 'solo', 'smile', 'long_hair', 'cosplay', 'lingerie']) {
+      expect(STARTER_TAGS).not.toContain(t)
+    }
   })
 })
 

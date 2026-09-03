@@ -47,8 +47,8 @@ describe('buyTag', () => {
   it('levels a tag and deducts cost', () => {
     useGame.setState({ gp: 10_000, tags: starterOffers() })
     const before = useGame.getState().gp
-    expect(useGame.getState().buyTag('1girl')).toBe(true)
-    const t = useGame.getState().tags.find((x) => x.name === '1girl')
+    expect(useGame.getState().buyTag('gangbang')).toBe(true)
+    const t = useGame.getState().tags.find((x) => x.name === 'gangbang')
     expect(t?.level).toBe(1)
     expect(useGame.getState().gp).toBeLessThan(before)
     expect(useGame.getState().achievements).toContain('first_tag')
@@ -56,18 +56,18 @@ describe('buyTag', () => {
 
   it('refuses when broke', () => {
     useGame.setState({ gp: 0, tags: starterOffers() })
-    expect(useGame.getState().buyTag('1girl')).toBe(false)
-    expect(useGame.getState().tags.find((x) => x.name === '1girl')?.level).toBe(0)
+    expect(useGame.getState().buyTag('gangbang')).toBe(false)
+    expect(useGame.getState().tags.find((x) => x.name === 'gangbang')?.level).toBe(0)
   })
 })
 
 describe('refreshTagMarket', () => {
-  it('falls back to starter tags when the feed is offline', async () => {
+  it('falls back to pervert starter tags when the feed is offline', async () => {
     useGame.setState({ tags: [] })
     await useGame.getState().refreshTagMarket()
     const names = useGame.getState().tags.map((t) => t.name)
-    expect(names).toContain('1girl')
-    expect(names).toContain('cosplay')
+    expect(names).toContain('gangbang')
+    expect(names).toContain('ahegao')
   })
 })
 

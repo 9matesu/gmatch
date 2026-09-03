@@ -22,16 +22,16 @@ export function deriveTagStats(name: string, frequency: number): TagStats {
   return { base, income, weight }
 }
 
-/** Evergreen starter tags so the market is never empty (SPEC §3). */
+/** Pervert starter tags so the market is never empty (user spec: no vanilla). */
 export const STARTER_TAGS: readonly string[] = [
-  '1girl',
-  'solo',
-  'long_hair',
-  'smile',
-  'closed_eyes',
-  'wet',
-  'lingerie',
-  'cosplay',
+  'gangbang',
+  'creampie',
+  'ahegao',
+  'pregnant',
+  'veiny_penis',
+  'bulge',
+  'deepthroat',
+  'anal',
 ]
 
 /** cost = base * 1.15^owned (SPEC §3). */
