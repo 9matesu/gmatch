@@ -144,6 +144,38 @@ describe('feed battle', () => {
     expect(s.foeHp).toBe(s.foeMaxHp)
   })
 
+  it('KO auto-discovers the foe tags as buyable market offers', () => {
+    useGame.setState({
+      current: { id: 'd1', url: 'https://x/d1.jpg', tags: ['gangbang', 'huge_breasts'] },
+      queue: [],
+      foeHp: 8,
+      foeMaxHp: 8,
+      foeClicks: 0,
+      defeated: 0,
+      gp: 0,
+      tags: [{ name: 'gangbang', level: 1, base: 10, income: 1, weight: 1, selected: true }],
+    })
+    let killed = false
+    for (let i = 0; i < 20 && !killed; i++) killed = useGame.getState().clickImage().killed
+    expect(killed).toBe(true)
+    const names = useGame.getState().tags.map((t) => t.name)
+    expect(names).toContain('huge_breasts')
+    expect(names).toContain('gangbang')
+  })
+
+  it('toggleTag flips feed selection on owned tags only', () => {
+    useGame.setState({
+      tags: [
+        { name: 'aaa', level: 2, base: 10, income: 1, weight: 1, selected: true },
+        { name: 'bbb', level: 0, base: 10, income: 1, weight: 1, selected: false },
+      ],
+    })
+    expect(useGame.getState().toggleTag('aaa')).toBe(true)
+    expect(useGame.getState().tags.find((t) => t.name === 'aaa')!.selected).toBe(false)
+    expect(useGame.getState().toggleTag('bbb')).toBe(false)
+    expect(useGame.getState().toggleTag('nope')).toBe(false)
+  })
+
   it('skipping pays nothing and keeps the KO count', () => {
     useGame.setState({
       current: foe('s1'),

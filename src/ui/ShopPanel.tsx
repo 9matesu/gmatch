@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useGame } from '../game/store'
 import { MAX_TAG_LEVEL, tagCost } from '../game/tags'
-import { CAPS } from '../game/caps'
+import { CAPS, capEffectLabel, capStacks } from '../game/caps'
 import type { CapId } from '../game/types'
 import {
   PRESTIGE_MIN_TIER,
@@ -22,23 +22,21 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'prestige', label: 'Prestige' },
 ]
 
-const CAP_EFFECT: Record<CapId, string> = {
-  blue: 'x2 click power',
-  filter: 'auto-click 1/s',
-  hypno: 'x2 passive GP/s',
-  melt: 'x10 everything',
-}
-
 function TagsTab() {
   const tags = useGame((s) => s.tags)
   const gp = useGame((s) => s.gp)
   const fetching = useGame((s) => s.fetching)
   const buyTag = useGame((s) => s.buyTag)
+  const toggleTag = useGame((s) => s.toggleTag)
   const refreshTagMarket = useGame((s) => s.refreshTagMarket)
+  const owned = tags.filter((t) => t.level > 0).length
   return (
     <div className="tab-body">
       <div className="market-head">
-        <span className="muted">Live-parsed from the feed. Rarer tags cost more and earn more.</span>
+        <span className="muted">
+          Pills steer the feed — buy the picture types you want, toggle owned pills ON/OFF.
+          New tags drop from drained foes. {owned} owned.
+        </span>
         <button
           type="button"
           className="btn small"
@@ -48,31 +46,48 @@ function TagsTab() {
           {fetching ? 'Parsing…' : 'Refresh'}
         </button>
       </div>
-      <ul className="tag-list">
+      <div className="tag-pills">
         {tags.map((t) => {
+          const isOwned = t.level > 0
+          const on = isOwned && t.selected !== false
           const maxed = t.level >= MAX_TAG_LEVEL
           const cost = tagCost(t.base, t.level)
           const afford = !maxed && gp >= cost
           return (
-            <li key={t.name} className={`tag-row ${afford ? 'pulse' : ''}`}>
-              <div className="tag-info">
-                <span className="tag-name">{t.name}</span>
-                <span className="tag-meta mono">
-                  Lv {t.level} · +{formatNum(t.income)} GP/s
-                </span>
-              </div>
+            <div key={t.name} className={`tag-pill ${on ? 'on' : ''} ${afford ? 'pulse' : ''}`}>
               <button
                 type="button"
-                className="btn small"
-                disabled={!afford}
-                onClick={() => buyTag(t.name)}
+                className="pill-main"
+                disabled={isOwned ? false : !afford}
+                onClick={() => (isOwned ? toggleTag(t.name) : buyTag(t.name))}
+                title={
+                  isOwned
+                    ? `${t.name} — click to switch ${on ? 'OFF' : 'ON'} in the feed`
+                    : `Buy ${t.name} for ${formatNum(cost)} GP`
+                }
               >
-                {maxed ? 'MAX' : `${formatNum(cost)} GP`}
+                <span className="pill-name">{t.name}</span>
+                <span className="pill-stats mono">
+                  Lv {t.level} · +{formatNum(t.income)}/s ·{' '}
+                  {isOwned ? (on ? 'ON' : 'OFF') : `${formatNum(cost)} GP`}
+                </span>
               </button>
-            </li>
+              {isOwned && !maxed && (
+                <button
+                  type="button"
+                  className="pill-lv mono"
+                  disabled={!afford}
+                  onClick={() => buyTag(t.name)}
+                  title={`Level up ${t.name} — ${formatNum(cost)} GP`}
+                >
+                  +{formatNum(cost)}
+                </button>
+              )}
+              {maxed && <span className="pill-max mono">MAX</span>}
+            </div>
           )
         })}
-      </ul>
+      </div>
     </div>
   )
 }
@@ -115,22 +130,29 @@ function GalleryTab() {
 
 function CapsTab() {
   const gp = useGame((s) => s.gp)
+  const caps = useGame((s) => s.caps)
   const popCap = useGame((s) => s.popCap)
+  const now = Date.now()
   return (
     <div className="tab-body">
       <p className="muted">
-        GoonCap vending machine. Different caps stack; repeats refresh the timer.
+        GoonCap vending machine. Every pop stacks — repeats compound instead of refreshing.
       </p>
       <div className="vending">
         {(Object.keys(CAPS) as CapId[]).map((id) => {
           const def = CAPS[id]
           const afford = gp >= def.cost
+          const st = capStacks(caps, id, now)
           return (
             <div key={id} className={`vend-row ${afford ? 'pulse' : ''}`}>
               <div>
-                <div className="cap-name">{def.name}</div>
+                <div className="cap-name">
+                  {def.name}
+                  {st.count > 0 && <span className="mono"> x{st.count}</span>}
+                </div>
                 <div className="muted">
-                  {CAP_EFFECT[id]} · {Math.round(def.durationMs / 1000)}s
+                  {capEffectLabel(id)} · {Math.round(def.durationMs / 1000)}s
+                  {st.count > 0 && ` · ${st.secsLeft}s left`}
                 </div>
               </div>
               <button

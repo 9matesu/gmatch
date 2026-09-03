@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { clickGain, clickPower, isCrit, passiveGps } from './economy'
 import type { EconomyInput } from './economy'
-import { buyTag as buyTagLevel, deriveTagStats, feedQuery, starterOffers } from './tags'
+import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, starterOffers, toggleTag as toggleTagLevel } from './tags'
 import { rankTags } from './tagFilter'
 import { pervertSeeds } from './pervertTags'
 import { KILL_XP, foeMaxHp, killBonusGp } from './battle'
@@ -67,6 +67,7 @@ export interface GameState {
 
   clickImage: () => ClickResult
   buyTag: (name: string) => boolean
+  toggleTag: (name: string) => boolean
   refreshTagMarket: () => Promise<void>
   fetchFeed: () => Promise<void>
   advanceFeed: () => void
@@ -218,6 +219,8 @@ function koFoe(s: GameState, now: number, clicksOnFoe: number) {
     bonus,
     img,
     gallery: [...s.gallery, img],
+    // Auto-generated market: the drained foe's tags become buyable offers.
+    tags: discoverTags(s.tags, post.tags),
     current,
     queue,
     foeHp: foe,
@@ -292,6 +295,7 @@ export const useGame = create<GameState>((set, get) => ({
       clicks: clickNumber,
       crits: s.crits + (crit ? 1 : 0),
       xp: s.xp + clickXp + KILL_XP,
+      tags: ko.tags,
       gallery: ko.gallery,
       defeated: ko.defeated,
       current: ko.current,
@@ -307,6 +311,7 @@ export const useGame = create<GameState>((set, get) => ({
       clicks: next.clicks,
       crits: next.crits,
       xp: next.xp,
+      tags: next.tags,
       gallery: next.gallery,
       defeated: next.defeated,
       current: next.current,
@@ -333,6 +338,18 @@ export const useGame = create<GameState>((set, get) => ({
     return true
   },
 
+  toggleTag: (name) => {
+    const s = get()
+    const idx = s.tags.findIndex((t) => t.name === name)
+    if (idx === -1) return false
+    const next = toggleTagLevel(s.tags[idx])
+    if (!next) return false
+    const tags = [...s.tags]
+    tags[idx] = next
+    set({ tags })
+    return true
+  },
+
   refreshTagMarket: async () => {
     const s = get()
     if (s.fetching) return
@@ -341,18 +358,25 @@ export const useGame = create<GameState>((set, get) => ({
     // Pervert seeds (user spec): always bias the market toward the hard pool.
     const q = owned.length > 0 ? [...owned.slice(0, 3), ...pervertSeeds(2)] : pervertSeeds(2)
     const res = await fetchPosts({ tags: q.join(' '), limit: 60 })
-    const levelOf = new Map(s.tags.map((t) => [t.name, t.level]))
+    const prev = new Map(s.tags.map((t) => [t.name, t]))
     let offers: OwnedTag[]
     if (res.ok && res.posts.length > 0) {
       offers = rankTags(res.posts.flatMap((p) => p.tags))
         .slice(0, 24)
-        .map(({ name, frequency }) => ({
-          name,
-          level: levelOf.get(name) ?? 0,
-          ...deriveTagStats(name, frequency),
-        }))
+        .map(({ name, frequency }) => {
+          const old = prev.get(name)
+          return {
+            name,
+            level: old?.level ?? 0,
+            selected: old ? old.selected ?? old.level > 0 : false,
+            ...deriveTagStats(name, frequency),
+          }
+        })
     } else {
-      offers = starterOffers().map((t) => ({ ...t, level: levelOf.get(t.name) ?? 0 }))
+      offers = starterOffers().map((t) => {
+        const old = prev.get(t.name)
+        return old ? { ...t, level: old.level, selected: old.selected } : t
+      })
     }
     const keptOwned = s.tags.filter(
       (t) => t.level > 0 && !offers.some((o) => o.name === t.name),
@@ -507,6 +531,7 @@ export const useGame = create<GameState>((set, get) => ({
         gp: s.gp + gain + ko.bonus,
         totalEarnedGP: s.totalEarnedGP + gain + ko.bonus,
         xp: s.xp + gain * 0.01 + KILL_XP,
+        tags: ko.tags,
         gallery: ko.gallery,
         defeated: ko.defeated,
         current: ko.current,
@@ -522,6 +547,7 @@ export const useGame = create<GameState>((set, get) => ({
         gp: next.gp,
         totalEarnedGP: next.totalEarnedGP,
         xp: next.xp,
+        tags: next.tags,
         gallery: next.gallery,
         defeated: next.defeated,
         current: next.current,

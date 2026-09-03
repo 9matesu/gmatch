@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
+  MAX_MARKET_OFFERS,
   MAX_TAG_LEVEL,
   STARTER_TAGS,
   buyTag,
   canBuyTag,
   deriveTagStats,
+  discoverTags,
   feedQuery,
+  isTagSelected,
   starterOffers,
   tagCost,
+  toggleTag,
 } from './tags'
 import type { OwnedTag } from './types'
 
@@ -93,5 +97,60 @@ describe('feedQuery (SPEC §3)', () => {
 
   it('ignores unowned tags', () => {
     expect(feedQuery([tag('a', 0), tag('b', 2)])).toEqual(['b'])
+  })
+
+  it('only selected owned tags feed the round-robin', () => {
+    const tags = [
+      { ...tag('aaa', 3), selected: false },
+      tag('bbb', 1),
+      { ...tag('ccc', 0), selected: true },
+    ]
+    expect(feedQuery(tags)).toEqual(['bbb'])
+  })
+})
+
+describe('buy selects / toggleTag', () => {
+  it('first purchase marks the tag selected', () => {
+    const res = buyTag({ ...tag('gangbang', 0), selected: false }, 1_000_000)
+    expect(res).not.toBeNull()
+    expect(res!.tag.level).toBe(1)
+    expect(res!.tag.selected).toBe(true)
+  })
+
+  it('toggle flips selection on owned tags, refuses unowned offers', () => {
+    expect(toggleTag(tag('a', 2))!.selected).toBe(false)
+    expect(toggleTag({ ...tag('a', 2), selected: false })!.selected).toBe(true)
+    expect(toggleTag(tag('a', 0))).toBeNull()
+  })
+
+  it('legacy tags without the flag count as selected when owned', () => {
+    expect(isTagSelected(tag('x', 1))).toBe(true)
+    expect(isTagSelected(tag('x', 0))).toBe(false)
+  })
+})
+
+describe('discoverTags (auto-generated as you progress)', () => {
+  it('adds unseen foe tags as unselected offers, keeps owned levels', () => {
+    const tags = [{ ...tag('gangbang', 2), selected: true }]
+    const out = discoverTags(tags, ['gangbang', 'huge_breasts', 'outdoor'])
+    expect(out.map((t) => t.name)).toContain('huge_breasts')
+    const fresh = out.find((t) => t.name === 'huge_breasts')!
+    expect(fresh.level).toBe(0)
+    expect(fresh.selected).toBe(false)
+    expect(out.find((t) => t.name === 'gangbang')!.level).toBe(2)
+  })
+
+  it('adds nothing new returns the same array, drops blocked tags', () => {
+    const tags = [{ ...tag('gangbang', 1), selected: true }]
+    expect(discoverTags(tags, ['gangbang'])).toBe(tags)
+    expect(discoverTags(tags, ['loli']).map((t) => t.name)).not.toContain('loli')
+  })
+
+  it('caps unowned offers but always keeps owned tags', () => {
+    const tags = [{ ...tag('keeper', 5), selected: true }]
+    const many = Array.from({ length: MAX_MARKET_OFFERS + 10 }, (_, i) => `fresh_tag_${i}`)
+    const out = discoverTags(tags, many)
+    expect(out.map((t) => t.name)).toContain('keeper')
+    expect(out.filter((t) => t.level === 0).length).toBeLessThanOrEqual(MAX_MARKET_OFFERS)
   })
 })

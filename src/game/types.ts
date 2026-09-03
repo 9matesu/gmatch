@@ -8,6 +8,12 @@ export interface OwnedTag {
   base: number
   income: number
   weight: number
+  /**
+   * Feed selection: selected pills drive the round-robin picture pool.
+   * Undefined = legacy default (owned tags feed, market offers don't).
+   * Income always counts owned levels — selection only steers pictures.
+   */
+  selected?: boolean
 }
 
 export interface GalleryImage {

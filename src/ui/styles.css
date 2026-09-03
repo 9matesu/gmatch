@@ -535,6 +535,15 @@ body {
   font-weight: 700;
 }
 
+.cap-stats {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.cap.active .cap-stats {
+  color: var(--text);
+}
+
 .cap-cost {
   font-size: 11px;
   color: var(--muted);
@@ -600,42 +609,83 @@ body {
   margin-bottom: 10px;
 }
 
-.tag-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+/* Selectable tag pills: ON (pink) = drives the feed round-robin. */
+.tag-pills {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.tag-row {
+.tag-pill {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 12px;
+  align-items: stretch;
   border: 1px solid var(--line);
+  border-radius: 999px;
   background: var(--panel);
+  overflow: hidden;
+  max-width: 100%;
 }
 
-.tag-info {
+.tag-pill.on {
+  border-color: var(--pink);
+  box-shadow: 0 0 12px rgba(255, 45, 120, 0.3);
+}
+
+.pill-main {
+  cursor: pointer;
   display: flex;
   flex-direction: column;
+  gap: 1px;
   min-width: 0;
+  padding: 6px 12px;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  text-align: left;
 }
 
-.tag-name {
-  font-size: 13px;
+.pill-main:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.pill-name {
+  font-size: 12px;
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.tag-meta {
-  font-size: 11px;
+.pill-stats {
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.tag-pill.on .pill-stats {
+  color: var(--pink);
+}
+
+.pill-lv {
+  cursor: pointer;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: var(--panel-strong);
+  color: var(--text);
+  font-size: 10px;
+  padding: 0 10px;
+}
+
+.pill-lv:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.pill-max {
+  align-self: center;
+  padding: 0 12px 0 8px;
+  font-size: 10px;
   color: var(--muted);
 }
 

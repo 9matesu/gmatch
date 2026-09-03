@@ -53,14 +53,13 @@ export const CAPS: Record<CapId, CapDef> = {
 export const ALL_CAP_IDS: readonly CapId[] = ['blue', 'filter', 'hypno', 'melt']
 
 /**
- * Pop a cap: different caps stack; same cap refreshes duration (SPEC §5).
+ * Pop a cap: EVERY pop stacks — same-id pops add another live entry so
+ * multipliers compound (click/passive) and auto-click rates add up (SPEC §5).
+ * Caller prunes expired entries (activeCaps) before/after; expiry is per pop.
  */
 export function popCap(active: ActiveCap[], capId: CapId, now: number): ActiveCap[] {
   const def = CAPS[capId]
-  return [
-    ...active.filter((a) => a.capId !== capId),
-    { capId, expiresAt: now + def.durationMs },
-  ]
+  return [...active, { capId, expiresAt: now + def.durationMs }]
 }
 
 export function activeCaps(active: ActiveCap[], now: number): ActiveCap[] {
@@ -77,4 +76,28 @@ export function capPassiveMult(active: ActiveCap[], now: number): number {
 
 export function capAutoClicksPerSec(active: ActiveCap[], now: number): number {
   return activeCaps(active, now).reduce((s, a) => s + CAPS[a.capId].autoClicksPerSec, 0)
+}
+
+/** Short effect line for buttons: what this cap actually does. */
+export function capEffectLabel(id: CapId): string {
+  const d = CAPS[id]
+  const parts: string[] = []
+  if (d.clickMult > 1) parts.push(`x${d.clickMult} click`)
+  if (d.passiveMult > 1) parts.push(`x${d.passiveMult} passive`)
+  if (d.autoClicksPerSec > 0) parts.push(`+${d.autoClicksPerSec} auto/s`)
+  return parts.join(' · ')
+}
+
+/** Live stack count + longest remaining seconds for one cap id. */
+export function capStacks(
+  active: ActiveCap[],
+  capId: CapId,
+  now: number,
+): { count: number; secsLeft: number } {
+  const live = active.filter((a) => a.capId === capId && a.expiresAt > now)
+  if (live.length === 0) return { count: 0, secsLeft: 0 }
+  return {
+    count: live.length,
+    secsLeft: Math.ceil((Math.max(...live.map((a) => a.expiresAt)) - now) / 1000),
+  }
 }

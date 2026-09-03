@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type MouseEvent } from 'react'
 import { useGame } from '../game/store'
-import { CAPS, activeCaps } from '../game/caps'
+import { CAPS, capEffectLabel, capStacks } from '../game/caps'
 import type { CapId } from '../game/types'
 import { offlineSvg } from '../services/offlineSvg'
 import { formatNum } from './format'
@@ -33,7 +33,6 @@ export default function GoonPanel() {
   const floatId = useRef(0)
 
   const now = Date.now()
-  const live = activeCaps(caps, now)
 
   const onImageError = useCallback(() => {
     setFailedUrl(current?.url ?? null)
@@ -129,20 +128,24 @@ export default function GoonPanel() {
       <div className="caps-bar">
         {CAP_ORDER.map((id) => {
           const def = CAPS[id]
-          const liveCap = live.find((c) => c.capId === id)
-          const remaining = liveCap ? Math.max(0, Math.ceil((liveCap.expiresAt - now) / 1000)) : 0
+          const st = capStacks(caps, id, now)
+          const isLive = st.count > 0
           return (
             <button
               key={id}
               type="button"
-              className={`cap ${liveCap ? 'active' : ''}`}
+              className={`cap ${isLive ? 'active' : ''}`}
               disabled={gp < def.cost}
               onClick={() => popCap(id)}
-              title={`${def.name} — ${formatNum(def.cost)} GP`}
+              title={`${def.name} — ${capEffectLabel(id)} — ${formatNum(def.cost)} GP — ${Math.round(def.durationMs / 1000)}s each, pops stack${st.count > 0 ? ` (x${st.count} live)` : ''}`}
             >
-              <span className="cap-name">{def.name}</span>
-              <span className="cap-cost mono">{formatNum(def.cost)}</span>
-              <span className="cap-timer mono">{liveCap ? `${remaining}s` : ''}</span>
+              <span className="cap-name">
+                {def.name}
+                {st.count > 1 ? ` x${st.count}` : ''}
+              </span>
+              <span className="cap-stats">{capEffectLabel(id)}</span>
+              <span className="cap-cost mono">{formatNum(def.cost)} GP</span>
+              <span className="cap-timer mono">{isLive ? `${st.secsLeft}s` : ''}</span>
             </button>
           )
         })}

@@ -5,7 +5,9 @@ import {
   activeCaps,
   capAutoClicksPerSec,
   capClickMult,
+  capEffectLabel,
   capPassiveMult,
+  capStacks,
   popCap,
 } from './caps'
 
@@ -30,12 +32,13 @@ describe('stacking rules (SPEC §5)', () => {
     expect(capPassiveMult(active, NOW)).toBe(2)
   })
 
-  it('same cap refreshes duration instead of stacking', () => {
+  it('same cap STACKS — every pop adds a live entry, mults compound', () => {
     let active = popCap([], 'blue', NOW)
     expect(active[0].expiresAt).toBe(NOW + 60_000)
     active = popCap(active, 'blue', NOW + 30_000)
-    expect(active).toHaveLength(1)
-    expect(active[0].expiresAt).toBe(NOW + 90_000)
+    expect(active).toHaveLength(2)
+    expect(active[1].expiresAt).toBe(NOW + 90_000)
+    expect(capClickMult(active, NOW + 30_000)).toBe(4)
   })
 
   it('expired caps drop out', () => {
@@ -56,5 +59,28 @@ describe('stacking rules (SPEC §5)', () => {
     const active = popCap([], 'filter', NOW)
     expect(capAutoClicksPerSec(active, NOW)).toBe(1)
     expect(capAutoClicksPerSec(active, NOW + 120_001)).toBe(0)
+  })
+
+  it('stacked auto-click rates add up', () => {
+    const active = popCap(popCap([], 'filter', NOW), 'filter', NOW)
+    expect(capAutoClicksPerSec(active, NOW)).toBe(2)
+  })
+})
+
+describe('button stats helpers', () => {
+  it('every cap has a non-empty effect label', () => {
+    for (const id of ALL_CAP_IDS) {
+      expect(capEffectLabel(id).length).toBeGreaterThan(0)
+    }
+    expect(capEffectLabel('blue')).toContain('x2 click')
+    expect(capEffectLabel('filter')).toContain('auto/s')
+  })
+
+  it('capStacks reports count + longest remaining', () => {
+    const stacked = popCap(popCap([], 'blue', NOW), 'blue', NOW + 10_000)
+    const s = capStacks(stacked, 'blue', NOW + 10_000)
+    expect(s.count).toBe(2)
+    expect(s.secsLeft).toBe(Math.ceil(CAPS.blue.durationMs / 1000))
+    expect(capStacks(stacked, 'melt', NOW + 10_000)).toEqual({ count: 0, secsLeft: 0 })
   })
 })
