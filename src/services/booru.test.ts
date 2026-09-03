@@ -110,4 +110,50 @@ describe('fetchPosts (SPEC §6/§8)', () => {
     expect(res.offline).toBe(true)
     expect(res.ok).toBe(false)
   })
+
+  it('browser mode falls back to narrower variants when combos truncate', async () => {
+    vi.stubGlobal('window', {})
+    const good = {
+      id: 99,
+      directory: 5,
+      image: 'good-variant-fallback.jpg',
+      width: 900,
+      height: 900,
+      rating: 'explicit',
+      tags: 'gangbang creampie',
+    }
+    const fetchMock = vi
+      .fn()
+      // full 5-tag query comes back truncated on both mirrors…
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.reject(new Error('truncated')) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.reject(new Error('truncated')) })
+      // …top-2 variant on tbib hits
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([good]) })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await fetchPosts({ tags: 'gangbang creampie ahegao deepthroat anal', limit: 10 })
+    expect(res.ok).toBe(true)
+    expect(res.posts).toHaveLength(1)
+    const urls = fetchMock.mock.calls.map((c) => decodeURIComponent(String(c[0])))
+    expect(urls[0]).toContain('gangbang creampie ahegao deepthroat anal')
+    expect(urls[1]).toContain('gangbang creampie rating:explicit')
+  })
+
+  it('browser mode uses paheal single-tag when danbooru mirrors yield nothing', async () => {
+    vi.stubGlobal('window', {})
+    const xml =
+      `<posts count="1" offset="0">` +
+      `<tag id="4242" file_url="https://paheal.net/_images/abc123.jpg" width="900" height="1000" tags="gangbang creampie" />` +
+      `</posts>`
+    const fetchMock = vi.fn(async (url: string) => {
+      if (String(url).startsWith('/booru/paheal/')) {
+        return { ok: true, text: () => Promise.resolve(xml) }
+      }
+      return { ok: true, json: () => Promise.resolve([]) }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await fetchPosts({ tags: 'gangbang creampie ahegao', limit: 5 })
+    expect(res.ok).toBe(true)
+    expect(res.source).toBe('paheal-direct')
+    expect(res.posts[0].id).toBe('4242')
+  })
 })

@@ -83,6 +83,19 @@ export default function GoonPanel() {
           draggable={false}
         />
         {showOffline && <span className="offline-badge">OFFLINE</span>}
+        {!showOffline && (
+          <button
+            type="button"
+            className="skip-overlay"
+            title="Skip this foe — no reward"
+            onClick={(e) => {
+              e.stopPropagation()
+              advanceFeed()
+            }}
+          >
+            Skip
+          </button>
+        )}
         {floats.map((f) => (
           <span
             key={f.id}
@@ -110,9 +123,6 @@ export default function GoonPanel() {
         <span className="ko-count mono" title="Lifetime KOs — each foe hits harder">
           KOs: {formatNum(defeated)}
         </span>
-        <button type="button" className="btn next-btn" onClick={advanceFeed}>
-          Skip (no reward)
-        </button>
       </div>
 
       <div className="caps-bar">

@@ -55,6 +55,18 @@ const DIRECT_SOURCES = [
   { id: 'xbooru-direct', origin: 'https://xbooru.com', proxy: '/booru/xbooru' },
 ] as const
 
+/**
+ * Combo queries (4-5 tags) get truncated by the mirrors — full query first,
+ * then top-2 tags, then the single leading tag. Mirrors electron/main.cjs.
+ */
+export function queryVariants(query: string): string[] {
+  const parts = query.split(/\s+/).filter(Boolean)
+  const variants = [query]
+  if (parts.length > 2) variants.push(parts.slice(0, 2).join(' '))
+  if (parts.length > 1) variants.push(parts[0])
+  return [...new Set(variants)]
+}
+
 function toPosts(
   data: unknown,
   origin: string,
@@ -85,22 +97,68 @@ function toPosts(
 /**
  * Browser-mode fetch. Hits the booru DAPIs through the Vite dev proxy
  * (same-origin, so no CORS block). Outside `vite dev` the proxy doesn't
- * exist → fetch throws → caller reports offline. Tries tbib, then xbooru.
+ * exist → fetch throws → caller reports offline. Tries tbib, then xbooru,
+ * then paheal (single tag), each with the full→top2→single variant ladder.
  */
 async function directFetch(req: BooruRequest): Promise<BooruResponse> {
   const neg =
     '-ai_generated -ai-generated -furry -anthro -feral -scalie -monochrome -greyscale -sketch -comic -lowres -worst_quality -jpeg_artifacts -watermark -censored'
-  const tags = `${req.tags} rating:explicit ${neg}`
   for (const src of DIRECT_SOURCES) {
-    const url = `${src.proxy}/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
-      tags,
-    )}&limit=${req.limit}&json=1`
-    const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) })
-    if (!res.ok) continue
-    const clean = sanitize(toPosts(await res.json(), src.origin))
-    if (clean.length > 0) return { posts: remember(clean), source: src.id, ok: true }
+    for (const variant of queryVariants(req.tags)) {
+      const url = `${src.proxy}/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
+        `${variant} rating:explicit ${neg}`,
+      )}&limit=${req.limit}&json=1`
+      try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) })
+        if (!res.ok) continue
+        // Combo queries can come back truncated — a parse failure just
+        // means "try the next variant", never offline by itself.
+        const clean = sanitize(toPosts(await res.json(), src.origin))
+        if (clean.length > 0) return { posts: remember(clean), source: src.id, ok: true }
+      } catch {
+        continue
+      }
+    }
+  }
+  // paheal only answers single tags — use the leading one.
+  const single = req.tags.split(/\s+/).filter(Boolean)[0]
+  if (single) {
+    try {
+      const url = `/booru/paheal/api/danbooru/find_posts?tags=${encodeURIComponent(single)}&limit=${req.limit}`
+      const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) })
+      if (res.ok) {
+        const clean = sanitize(parsePaheal(await res.text()))
+        if (clean.length > 0)
+          return { posts: remember(clean), source: 'paheal-direct', ok: true }
+      }
+    } catch {
+      // fall through to offline
+    }
   }
   throw new Error('no direct source returned usable posts')
+}
+
+/** Parse paheal's danbooru XML (`<tag id file_url width height tags …/>`). Regex-based (no DOM), same as electron/main.cjs. */
+function parsePaheal(xml: string): BooruPost[] {
+  const out: BooruPost[] = []
+  const elRe = /<tag\b([^>]*)>/g
+  const attr = (attrs: string, name: string): string => {
+    const m = new RegExp(`${name}="([^"]*)"`, 'i').exec(attrs)
+    return m ? m[1] : ''
+  }
+  let m: RegExpExecArray | null
+  while ((m = elRe.exec(xml))) {
+    const url = attr(m[1], 'file_url')
+    const id = attr(m[1], 'id') || url
+    if (!id || !url) continue
+    out.push({
+      id,
+      url,
+      tags: attr(m[1], 'tags') ? attr(m[1], 'tags').split(/\s+/).filter(Boolean) : [],
+      rating: 'e',
+    })
+  }
+  return out
 }
 
 /**

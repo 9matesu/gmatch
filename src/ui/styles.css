@@ -431,6 +431,25 @@ body {
   white-space: nowrap;
 }
 
+.skip-overlay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  cursor: pointer;
+  background: rgba(10, 10, 15, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 14px;
+  backdrop-filter: blur(6px);
+}
+
+.skip-overlay:hover {
+  border-color: var(--pink);
+}
+
 .rarity-badge {
   font-family: var(--mono);
   font-size: 11px;
