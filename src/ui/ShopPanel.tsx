@@ -427,10 +427,11 @@ export default function ShopPanel() {
               key={t.id}
               type="button"
               className={`tab ${tab === t.id ? 'active' : ''}`}
+              aria-pressed={tab === t.id}
               onClick={() => setTab(t.id)}
             >
               <Icon size={14} />
-              {t.label}
+              <span className="tab-label">{t.label}</span>
             </button>
           )
         })}

@@ -21,7 +21,7 @@ export default function AgeGate() {
           />
           I am 18+ and consent to viewing adult content
         </label>
-        <button type="button" className="btn btn-primary" disabled={!ticked} onClick={verifyAge}>
+        <button type="button" className="btn primary" disabled={!ticked} onClick={verifyAge}>
           Enter the grid
         </button>
       </div>

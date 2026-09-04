@@ -40,6 +40,9 @@ export default function App() {
 
   return (
     <div className={`app-shell ${backgroundUrl ? 'has-backdrop' : ''}`}>
+      <a className="skip-link" href="#goon-main">
+        Skip to content
+      </a>
       {backgroundUrl && (
         <div
           className="app-backdrop"
@@ -48,7 +51,7 @@ export default function App() {
         />
       )}
       <Header />
-      <main className="columns">
+      <main className="columns" id="goon-main">
         <StatsPanel />
         <GoonPanel />
         <ShopPanel />

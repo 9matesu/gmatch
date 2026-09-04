@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useGame } from '../game/store'
 import { formatNum } from './format'
-import { IconSkull } from './icons'
+import { IconBell, IconSkull } from './icons'
 
 export default function Header() {
   const defeated = useGame((s) => s.defeated)
@@ -28,7 +28,7 @@ export default function Header() {
           title={toasts.length > 0 ? `${toasts.length} notifications — open the log` : 'No notifications'}
           onClick={() => setOpen((o) => !o)}
         >
-          🔔 <span className="mono">{toasts.length}</span>
+          <IconBell size={14} /> <span className="mono">{toasts.length}</span>
         </button>
         {open && (
           <div className="notif-panel glass" role="log" aria-label="Notifications">

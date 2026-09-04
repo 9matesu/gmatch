@@ -24,6 +24,20 @@ interface Float {
 
 const CAP_ORDER: CapId[] = ['blue', 'filter', 'hypno', 'melt']
 
+/** Autoplay is opt-in: honor prefers-reduced-motion (SPEC §7 a11y). */
+function useReducedMotion(): boolean {
+  const [reduce, setReduce] = useState(
+    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const on = () => setReduce(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return reduce
+}
+
 export default function GoonPanel() {
   const current = useGame((s) => s.current)
   const feedOffline = useGame((s) => s.feedOffline)
@@ -51,6 +65,7 @@ export default function GoonPanel() {
   const [critFlash, setCritFlash] = useState(false)
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
   const floatId = useRef(0)
+  const reduceMotion = useReducedMotion()
 
   const now = Date.now()
 
@@ -94,7 +109,7 @@ export default function GoonPanel() {
     spawnFloat(e.clientX - rect.left, e.clientY - rect.top, gain, crit, null)
   }
 
-  const handleCellClick = (index: number, e: MouseEvent<HTMLDivElement>) => {
+  const handleCellClick = (index: number, e: MouseEvent<HTMLButtonElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
     const { gain, crit } = clickCell(index)
     if (gain > 0) spawnFloat(e.clientX - rect.left, e.clientY - rect.top, gain, crit, index)
@@ -115,7 +130,7 @@ export default function GoonPanel() {
   return (
     <section className="plate panel goon-panel">
       {isGrid ? (
-        <div className="grid-board" role="grid" aria-label="3x3 goon grid">
+        <div className="grid-board" aria-label="3x3 goon grid">
           {critFlash && <div className="crit-flash">CRIT!</div>}
           {grid.map((cell, i) => {
             const motion =
@@ -123,23 +138,24 @@ export default function GoonPanel() {
               !/\.gif(?:[?#]|$)/i.test(cell.post.url)
             const pct = Math.max(0, (cell.hp / cell.maxHp) * 100)
             return (
-              <div
+              <button
                 key={`${cell.post.id}:${i}`}
-                role="gridcell"
+                type="button"
                 className="grid-cell"
                 onClick={(e) => handleCellClick(i, e)}
-                title={`${Math.ceil(cell.hp)}/${cell.maxHp} HP — click to drain`}
+                aria-label={`Foe ${i + 1}: ${Math.ceil(cell.hp)} of ${cell.maxHp} HP — activate to attack`}
               >
                 {motion ? (
                   <video
                     className="goon-image"
                     src={redgifsPlayable(cell.post.url)}
                     poster={cell.post.preview ? redgifsPlayable(cell.post.preview) : undefined}
-                    autoPlay
+                    autoPlay={!reduceMotion}
                     loop
                     muted
                     playsInline
                     preload="auto"
+                    controls={reduceMotion}
                     onError={() => dropCell(i)}
                   />
                 ) : (
@@ -152,11 +168,11 @@ export default function GoonPanel() {
                     draggable={false}
                   />
                 )}
-                <div className="cell-hp" title={`${Math.ceil(cell.hp)} / ${cell.maxHp} HP`}>
-                  <div className="hp-bar">
-                    <div className={`hp-fill ${pct <= 30 ? 'low' : ''}`} style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
+                <span className="cell-hp">
+                  <span className="hp-bar">
+                    <span className={`hp-fill ${pct <= 30 ? 'low' : ''}`} style={{ width: `${pct}%` }} />
+                  </span>
+                </span>
                 {floats
                   .filter((f) => f.cell === i)
                   .map((f) => (
@@ -164,11 +180,11 @@ export default function GoonPanel() {
                       {f.text}
                     </span>
                   ))}
-              </div>
+              </button>
             )
           })}
           {Array.from({ length: Math.max(0, GRID_SIZE - grid.length) }, (_, k) => (
-            <div key={`empty-${k}`} className="grid-cell cell-empty" aria-label="Loading square">
+            <div key={`empty-${k}`} className="grid-cell cell-empty">
               <span className="cell-empty-label">{fetching ? '…' : 'empty'}</span>
             </div>
           ))}
@@ -183,6 +199,7 @@ export default function GoonPanel() {
           onClick={handleClick}
           role="button"
           tabIndex={0}
+          aria-label="Attack the current foe"
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault()
@@ -196,11 +213,12 @@ export default function GoonPanel() {
               className="goon-image"
               src={redgifsPlayable(current.url)}
               poster={current.preview ? redgifsPlayable(current.preview) : undefined}
-              autoPlay
+              autoPlay={!reduceMotion}
               loop
               muted
               playsInline
               preload="auto"
+              controls={reduceMotion}
               onError={onImageError}
             />
           ) : (
@@ -259,6 +277,7 @@ export default function GoonPanel() {
           <button
             type="button"
             className={viewMode === 'single' ? 'active' : ''}
+            aria-pressed={viewMode === 'single'}
             onClick={() => setViewMode('single')}
             title="Single foe view"
           >
@@ -267,6 +286,7 @@ export default function GoonPanel() {
           <button
             type="button"
             className={viewMode === 'grid' ? 'active' : ''}
+            aria-pressed={viewMode === 'grid'}
             onClick={() => setViewMode('grid')}
             title="3×3 grid — nine foes at once"
           >
@@ -294,6 +314,7 @@ export default function GoonPanel() {
             type="button"
             className="btn small"
             disabled={fetching}
+            aria-label="Retry the feed"
             onClick={() => void fetchFeed()}
             title="Retry the feed"
           >
