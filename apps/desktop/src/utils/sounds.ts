@@ -1,0 +1,307 @@
+"use client";
+
+let ctx: AudioContext | null = null;
+let gestureHooked = false;
+
+function ensureGestureHook() {
+  if (gestureHooked || typeof window === 'undefined') return;
+  gestureHooked = true;
+  const resume = () => {
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+  };
+  window.addEventListener('pointerdown', resume, { passive: true });
+  window.addEventListener('keydown', resume, { passive: true });
+  window.addEventListener('touchstart', resume, { passive: true });
+}
+
+function ensureCtx(): AudioContext | null {
+  if (typeof window === 'undefined') return null;
+  const AC = window.AudioContext || (window as any).webkitAudioContext;
+  if (!AC) return null;
+  if (!ctx) {
+    ctx = new AC();
+  }
+  ensureGestureHook();
+  if (ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+  }
+  return ctx;
+}
+
+/** Short punchy click */
+export function playPress(freq: number = 800) {
+  const audio = ensureCtx();
+  if (!audio) return;
+  const now = audio.currentTime;
+  const osc = audio.createOscillator();
+  const gain = audio.createGain();
+
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(freq, now);
+  osc.frequency.exponentialRampToValueAtTime(freq * 0.5, now + 0.04);
+
+  gain.gain.setValueAtTime(0.3, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+
+  osc.connect(gain).connect(audio.destination);
+  osc.start(now);
+  osc.stop(now + 0.05);
+}
+
+export function playBeep() {
+  playPress(880);
+}
+
+/** Aggressive rimshot "crack" with body thump */
+export function playRimshot() {
+  const audio = ensureCtx();
+  if (!audio) return;
+  const now = audio.currentTime;
+
+  // Low body thump
+  const body = audio.createOscillator();
+  body.type = 'sine';
+  body.frequency.setValueAtTime(210, now);
+  body.frequency.exponentialRampToValueAtTime(80, now + 0.12);
+  const bodyGain = audio.createGain();
+  bodyGain.gain.setValueAtTime(0.7, now);
+  bodyGain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+  body.connect(bodyGain).connect(audio.destination);
+  body.start(now);
+  body.stop(now + 0.16);
+
+  // Sharp noise snap band-passed around high crack
+  const noise = audio.createBufferSource();
+  const buffer = audio.createBuffer(1, Math.floor(audio.sampleRate * 0.12), audio.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+  noise.buffer = buffer;
+
+  const band = audio.createBiquadFilter();
+  band.type = 'bandpass';
+  band.frequency.value = 4400;
+  band.Q.value = 1.4;
+
+  const noiseGain = audio.createGain();
+  noiseGain.gain.setValueAtTime(0.8, now);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+
+  noise.connect(band).connect(noiseGain).connect(audio.destination);
+  noise.start(now);
+  noise.stop(now + 0.13);
+}
+
+export function playChatMessage() {
+  playRimshot();
+}
+
+export function playMsgReceive() {
+  playRimshot();
+}
+
+/** Bright 3-tone notification chime */
+export function playChime() {
+  const audio = ensureCtx();
+  if (!audio) return;
+  const now = audio.currentTime;
+  const notes = [659.25, 830.61, 1046.50]; // E5, G#5, C6
+
+  notes.forEach((freq, idx) => {
+    const start = now + idx * 0.07;
+    const osc = audio.createOscillator();
+    const gain = audio.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, start);
+
+    gain.gain.setValueAtTime(0.4, start);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.25);
+
+    osc.connect(gain).connect(audio.destination);
+    osc.start(start);
+    osc.stop(start + 0.26);
+  });
+}
+
+export const playNotification = playChime;
+
+/** Uplifting like ding */
+export function playLike() {
+  const audio = ensureCtx();
+  if (!audio) return;
+  const now = audio.currentTime;
+  [523.25, 783.99].forEach((freq, idx) => {
+    const osc = audio.createOscillator();
+    const gain = audio.createGain();
+    const start = now + idx * 0.05;
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, start);
+
+    gain.gain.setValueAtTime(0.35, start);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.2);
+
+    osc.connect(gain).connect(audio.destination);
+    osc.start(start);
+    osc.stop(start + 0.22);
+  });
+}
+
+/** Low descending buzz for reject */
+export function playReject() {
+  const audio = ensureCtx();
+  if (!audio) return;
+  const now = audio.currentTime;
+  const osc = audio.createOscillator();
+  const gain = audio.createGain();
+
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(260, now);
+  osc.frequency.exponentialRampToValueAtTime(110, now + 0.16);
+
+  gain.gain.setValueAtTime(0.3, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+  osc.connect(gain).connect(audio.destination);
+  osc.start(now);
+  osc.stop(now + 0.2);
+}
+
+/** Triumphant Match Victory Chime */
+export function playMatch() {
+  const audio = ensureCtx();
+  if (!audio) return;
+  const now = audio.currentTime;
+  const chords = [523.25, 659.25, 783.99, 1046.50, 1318.51]; // C5, E5, G5, C6, E6
+
+  chords.forEach((freq, idx) => {
+    const osc = audio.createOscillator();
+    const gain = audio.createGain();
+    const start = now + idx * 0.06;
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, start);
+
+    gain.gain.setValueAtTime(0.4, start);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.35);
+
+    osc.connect(gain).connect(audio.destination);
+    osc.start(start);
+    osc.stop(start + 0.38);
+  });
+}
+
+export const playWin = playMatch;
+export const playMatchFound = playMatch;
+
+/** Rising cascade for Tier Advance */
+export function playTierUp() {
+  const audio = ensureCtx();
+  if (!audio) return;
+  const now = audio.currentTime;
+  const notes = [440, 554.37, 659.25, 880, 1108.73, 1318.51];
+
+  notes.forEach((freq, idx) => {
+    const osc = audio.createOscillator();
+    const gain = audio.createGain();
+    const start = now + idx * 0.05;
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, start);
+
+    gain.gain.setValueAtTime(0.35, start);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.3);
+
+    osc.connect(gain).connect(audio.destination);
+    osc.start(start);
+    osc.stop(start + 0.32);
+  });
+}
+
+/** Round start gong */
+export function playRoundStart() {
+  const audio = ensureCtx();
+  if (!audio) return;
+  const now = audio.currentTime;
+
+  const osc = audio.createOscillator();
+  const gain = audio.createGain();
+
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(440, now);
+  osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+
+  gain.gain.setValueAtTime(0.3, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+  osc.connect(gain).connect(audio.destination);
+  osc.start(now);
+  osc.stop(now + 0.22);
+}
+
+/** Clock tick */
+export function playCountdown() {
+  const audio = ensureCtx();
+  if (!audio) return;
+  const now = audio.currentTime;
+  const osc = audio.createOscillator();
+  const gain = audio.createGain();
+
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(1200, now);
+
+  gain.gain.setValueAtTime(0.2, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+
+  osc.connect(gain).connect(audio.destination);
+  osc.start(now);
+  osc.stop(now + 0.04);
+}
+
+/** Heavy warning thud */
+export function playTimeout() {
+  const audio = ensureCtx();
+  if (!audio) return;
+  const now = audio.currentTime;
+  const osc = audio.createOscillator();
+  const gain = audio.createGain();
+
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(140, now);
+  osc.frequency.exponentialRampToValueAtTime(40, now + 0.25);
+
+  gain.gain.setValueAtTime(0.4, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+  osc.connect(gain).connect(audio.destination);
+  osc.start(now);
+  osc.stop(now + 0.27);
+}
+
+/** Ascending sweep */
+export function playUpload() {
+  const audio = ensureCtx();
+  if (!audio) return;
+  const now = audio.currentTime;
+  const osc = audio.createOscillator();
+  const gain = audio.createGain();
+
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(300, now);
+  osc.frequency.exponentialRampToValueAtTime(900, now + 0.18);
+
+  gain.gain.setValueAtTime(0.3, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+  osc.connect(gain).connect(audio.destination);
+  osc.start(now);
+  osc.stop(now + 0.22);
+}
+
+export function playQueueJoin() {
+  playPress(1000);
+}
+
+export function resetChatSfx() {}

@@ -1,0 +1,186 @@
+"use client";
+
+import { useState } from 'react';
+import { Camera, UploadCloud, Link as LinkIcon, X, Check } from 'lucide-react';
+import { CameraCapture } from '../CameraCapture';
+import { DropZone } from '../DropZone';
+import { playPress, playWin } from '../../utils/sounds';
+
+interface ProfilePicModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  currentPfp?: string;
+  onSave: (pfpUrl: string) => void;
+  toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
+}
+
+export function ProfilePicModal({
+  isOpen,
+  onClose,
+  currentPfp = '',
+  onSave,
+  toast,
+}: ProfilePicModalProps) {
+  const [tab, setTab] = useState<'upload' | 'url' | 'camera'>('upload');
+  const [preview, setPreview] = useState<string>(currentPfp);
+  const [urlInput, setUrlInput] = useState('');
+  const [rawFile, setRawFile] = useState<File | null>(null);
+
+  if (!isOpen) return null;
+
+  const handleFiles = (files: FileList | File[]) => {
+    if (files.length > 0) {
+      const file = files[0];
+      setRawFile(file);
+      const url = URL.createObjectURL(file);
+      setPreview(url);
+      playPress(750);
+    }
+  };
+
+  const handleUrlChange = (val: string) => {
+    setUrlInput(val);
+    if (val.trim()) {
+      setPreview(val.trim());
+      setRawFile(null);
+    }
+  };
+
+  const handleCameraCapture = (file: File) => {
+    setRawFile(file);
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    setTab('upload');
+    playPress(800);
+  };
+
+  const handleConfirm = () => {
+    if (!preview) {
+      toast?.('Please select a profile photo', 'warning');
+      return;
+    }
+    playWin();
+    onSave(preview);
+    toast?.('Profile photo updated', 'success');
+    onClose();
+  };
+
+  const tabs = [
+    { id: 'upload', label: 'Upload', icon: UploadCloud },
+    { id: 'url', label: 'URL', icon: LinkIcon },
+    { id: 'camera', label: 'Camera', icon: Camera },
+  ];
+
+  return (
+    <div
+      className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div
+        className="w-full max-w-md bg-surface-raised border border-retro-border rounded-lg shadow-xl overflow-hidden flex flex-col max-h-[85vh] animate-orbit-pop"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-retro-border">
+          <h3 className="text-sm font-medium text-retro-fg">Profile Photo</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 text-retro-muted hover:text-retro-body rounded cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-5 space-y-4 overflow-y-auto flex-1 styled-scrollbar">
+          {/* Avatar Preview */}
+          <div className="flex flex-col items-center py-2">
+            <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-retro-border bg-surface-interactive flex items-center justify-center">
+              {preview ? (
+                <img src={preview} alt="Preview" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-2xl text-retro-muted">?</span>
+              )}
+            </div>
+          </div>
+
+          {/* Mode Tabs */}
+          <div className="flex bg-surface-interactive border border-retro-border p-0.5 rounded-md text-xs">
+            {tabs.map((t) => {
+              const Icon = t.icon;
+              const isActive = tab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTab(t.id as any)}
+                  className={`flex-1 py-2 rounded flex items-center justify-center gap-1.5 font-medium transition-colors cursor-pointer ${
+                    isActive ? 'bg-surface-raised text-retro-fg' : 'text-retro-muted hover:text-retro-fg'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{t.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Tab Body */}
+          {tab === 'upload' && (
+            <DropZone
+              onFiles={handleFiles}
+              compact={false}
+              accept="image/jpeg, image/png, image/webp, image/gif, image/*"
+              multiple={false}
+            >
+              <div className="space-y-1 text-center py-4">
+                <p className="text-xs text-retro-body font-medium">Drop image here</p>
+                <p className="text-[11px] text-retro-muted">JPG, PNG, WebP, GIF</p>
+              </div>
+            </DropZone>
+          )}
+
+          {tab === 'url' && (
+            <div className="space-y-3">
+              <label className="text-xs font-medium text-retro-body block">Image URL</label>
+              <div className="flex items-center gap-2 bg-surface-interactive border border-retro-border rounded-lg px-3 py-2">
+                <LinkIcon className="w-4 h-4 text-retro-muted shrink-0" />
+                <input
+                  type="url"
+                  value={urlInput}
+                  onChange={(e) => handleUrlChange(e.target.value)}
+                  placeholder="https://example.com/photo.gif"
+                  className="w-full bg-transparent focus:outline-none text-sm text-retro-fg font-mono placeholder:text-retro-muted"
+                />
+              </div>
+            </div>
+          )}
+
+          {tab === 'camera' && (
+            <CameraCapture onCapture={handleCameraCapture} onCancel={() => setTab('upload')} />
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-retro-border">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-xs font-medium text-retro-muted hover:text-retro-body rounded-lg cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            className="px-4 py-2 bg-retro-accent hover:bg-retro-accent-hover text-black font-medium text-xs rounded-lg cursor-pointer flex items-center gap-1.5"
+          >
+            <Check className="w-3.5 h-3.5" />
+            <span>Apply</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

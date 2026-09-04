@@ -1,0 +1,87 @@
+import { describe, it, expect } from 'vitest'
+import { deriveMyCards, mergeMyCards, type CanonicalCard } from './cardCollection'
+import type { OrbitObject } from '@orbit/shared'
+
+const base = {
+  owner_id: '',
+  size_bytes: 1,
+  mime_type: 'image/jpeg',
+  content_url: 'data:image/jpeg;base64,/9j/4AAQ',
+  created_at: new Date().toISOString(),
+}
+
+const cardBase: CanonicalCard = {
+  id: 'card-1',
+  creatorId: 'me',
+  mediaObjectId: 'obj-1',
+  name: 'My Card',
+  rarity: 'common',
+  value: 100,
+  likeCount: 0,
+  marketStatus: 'none',
+  moderationState: 'active',
+  ownerId: 'me',
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  contentUrl: 'data:image/jpeg;base64,/9j/4AAQ',
+  tags: [],
+  description: null,
+  frame: 'chrome',
+  accentColor: '#9FE3FF',
+}
+
+describe('card collection derivation', () => {
+  it('includes only non-story, non-public, non-chat objects the user owns', () => {
+    const items = [
+      { ...base, id: 'own-card', owner_id: 'me' },
+      { ...base, id: 'own-story', owner_id: 'me', is_story: 1 },
+      { ...base, id: 'own-post', owner_id: 'me', is_public: 1 },
+      { ...base, id: 'own-chat', owner_id: 'me', is_chat: 1 },
+      { ...base, id: 'other-card', owner_id: 'them' },
+      { ...base, id: 'p2p-obj-123', owner_id: 'them' },
+    ]
+    const cards = deriveMyCards(items as OrbitObject[], 'me')
+    expect(cards.map(c => c.id)).toEqual(['own-card'])
+  })
+
+  it('dedupes by id, not content_url', () => {
+    const items = [
+      { ...base, id: 'a', owner_id: 'me', content_url: 'data:image/jpeg;base64,SAME' },
+      { ...base, id: 'b', owner_id: 'me', content_url: 'data:image/jpeg;base64,SAME' },
+    ]
+    const cards = deriveMyCards(items as OrbitObject[], 'me')
+    expect(cards.length).toBe(2)
+  })
+
+  it('returns empty for anonymous', () => {
+    expect(deriveMyCards([], '')).toEqual([])
+  })
+})
+
+describe('mergeMyCards', () => {
+  it('puts canonical cards first with metadata and de-dupes their media object', () => {
+    const items = [
+      { ...base, id: 'obj-1', owner_id: 'me' },
+      { ...base, id: 'legacy-1', owner_id: 'me' },
+    ]
+    const merged = mergeMyCards(items as OrbitObject[], [cardBase], 'me')
+    expect(merged).toHaveLength(2)
+    expect(merged[0].id).toBe('obj-1')
+    expect(merged[0].card_id).toBe('card-1')
+    expect(merged[0].rarity).toBe('common')
+    expect(merged[0].gacha_downloads_count).toBe(100)
+    expect(merged[1].id).toBe('legacy-1')
+    expect(merged[1].card_id).toBeUndefined()
+  })
+
+  it('keeps legacy objects that are not canonical media, excluding stories, public posts, and chat attachments', () => {
+    const items = [
+      { ...base, id: 'plain-obj', owner_id: 'me' },
+      { ...base, id: 'story', owner_id: 'me', is_story: 1 },
+      { ...base, id: 'post', owner_id: 'me', is_public: 1 },
+      { ...base, id: 'chat-pic', owner_id: 'me', is_chat: 1 },
+    ]
+    const merged = mergeMyCards(items as OrbitObject[], [], 'me')
+    expect(merged.map(m => m.id)).toEqual(['plain-obj'])
+  })
+})
