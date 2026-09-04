@@ -252,7 +252,13 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
   }
   if (isHealthy('imh-direct')) {
     try {
-      const fresh = remember(sanitize(await imhentaiDirect(req.tags, req.limit), req.tags))
+      const scraped = await imhentaiDirect(req.tags, req.limit)
+      // Zero scraped posts = every gallery 403'd or the search died — the
+      // same deterministic gallery ids would be retried every round, so cool
+      // the source down instead of spamming 403s. (Posts that came back but
+      // deduped to nothing are NOT a sickness — no cooldown in that case.)
+      if (scraped.length === 0) markUnhealthy('imh-direct')
+      const fresh = remember(sanitize(scraped, req.tags))
       if (fresh.length > 0) {
         unhealthyUntil.delete('imh-direct')
         return { posts: fresh, source: 'imh-direct', ok: true }

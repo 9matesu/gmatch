@@ -306,4 +306,31 @@ describe('fetchPosts (SPEC §6/§8)', () => {
     expect(res.source).toBe('imh-direct')
     expect(res.posts[0].id).toBe('imh-999')
   })
+
+  it('all galleries 403 cools imh-direct down (no per-round retry spam)', async () => {
+    vi.stubGlobal('window', {})
+    const searchHtml = '<a href="/gallery/1/"></a><a href="/gallery/2/"></a>'
+    const fetchMock = vi.fn(async (url: string) => {
+      const u = String(url)
+      if (u.startsWith('/booru/imh/search')) {
+        return { ok: true, text: () => Promise.resolve(searchHtml) }
+      }
+      if (u.startsWith('/booru/imh/gallery')) {
+        return { ok: false, status: 403 }
+      }
+      if (u.startsWith('/booru/tbib/') || u.startsWith('/booru/xbooru/')) {
+        return { ok: true, json: () => Promise.resolve([]) }
+      }
+      return { ok: false }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const first = await fetchPosts({ tags: 'creampie', limit: 5 })
+    expect(first.ok).toBe(false) // everything exhausted -> offline
+    const galleryHits = fetchMock.mock.calls.filter((a) => String(a[0]).startsWith('/booru/imh/gallery')).length
+    expect(galleryHits).toBe(2) // both dead galleries tried once
+    // Second round: imh-direct is cooling down — no gallery fetches at all.
+    await fetchPosts({ tags: 'creampie', limit: 5 })
+    const galleryHits2 = fetchMock.mock.calls.filter((a) => String(a[0]).startsWith('/booru/imh/gallery')).length
+    expect(galleryHits2).toBe(2)
+  })
 })
