@@ -5,3 +5,6 @@ out
 .DS_Store
 
 tmp/
+orbit.snapshot.sqlite
+*.sqlite
+blobs/

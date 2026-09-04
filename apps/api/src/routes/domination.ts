@@ -1,0 +1,221 @@
+import { Hono } from 'hono'
+import { D1Turso } from '../db'
+import { orbitAuth } from '../middleware/auth'
+import { logAdminAction } from '../admin-audit'
+import type { DominationAction } from '@orbit/shared'
+
+type Bindings = {
+  DB: D1Turso
+  BUCKET?: any
+}
+
+type Variables = {
+  orbitId: string
+  requestId: string
+}
+
+const domination = new Hono<{ Bindings: Bindings; Variables: Variables }>()
+
+/** Middleware: require authenticated user */
+domination.use('*', orbitAuth)
+
+/** GET /api/domination/settings - Get current user's domination settings */
+domination.get('/settings', async (c) => {
+  const userId = c.get('orbitId')
+  const db = c.env.DB
+
+  const row = await db.prepare('SELECT pc_domination_enabled, pc_domination_settings FROM Users WHERE id = ?')
+    .bind(userId)
+    .first<{ pc_domination_enabled: number; pc_domination_settings: string }>()
+
+  if (!row) return c.json({ error: 'User not found' }, 404)
+
+  return c.json({
+    enabled: Boolean(row.pc_domination_enabled),
+    settings: JSON.parse(row.pc_domination_settings || '{}')
+  })
+})
+
+/** PUT /api/domination/settings - Update current user's domination settings */
+domination.put('/settings', async (c) => {
+  const userId = c.get('orbitId')
+  const db = c.env.DB
+
+  let body: any = {}
+  try { body = await c.req.json() } catch { }
+
+  const enabled = body.enabled !== undefined ? Boolean(body.enabled) : undefined
+  const settings = body.settings !== undefined ? body.settings : undefined
+
+  if (enabled === undefined && settings === undefined) {
+    return c.json({ error: 'No fields to update' }, 400)
+  }
+
+  const updates: string[] = []
+  const args: any[] = []
+
+  if (enabled !== undefined) {
+    updates.push('pc_domination_enabled = ?')
+    args.push(enabled ? 1 : 0)
+  }
+  if (settings !== undefined) {
+    updates.push('pc_domination_settings = ?')
+    args.push(JSON.stringify(settings))
+  }
+
+  args.push(userId)
+  const res = await db.prepare(`UPDATE Users SET ${updates.join(', ')} WHERE id = ?`).bind(...args).run()
+
+  if ((res as any).changes === 0) return c.json({ error: 'User not found' }, 404)
+
+  return c.json({ success: true })
+})
+
+/** POST /api/domination/trigger - Trigger a domination action on a target user */
+domination.post('/trigger', async (c) => {
+  const dominatorId = c.get('orbitId')
+  const db = c.env.DB
+
+  let body: any = {}
+  try { body = await c.req.json() } catch { }
+
+  const targetId = typeof body.targetId === 'string' ? body.targetId.trim() : ''
+  const action = typeof body.action === 'string' ? body.action.trim() : ''
+  const payload = body.payload && typeof body.payload === 'object' ? body.payload : undefined
+  const intensity = typeof body.intensity === 'string' ? body.intensity : 'medium'
+
+  if (!targetId) return c.json({ error: 'targetId is required' }, 400)
+  if (!action) return c.json({ error: 'action is required' }, 400)
+
+  const validActions = ['wallpaper', 'game_bg', 'popup_video', 'message', 'text_overlay', 'blur', 'camera']
+  if (!validActions.includes(action)) {
+    return c.json({ error: `Invalid action. Must be one of: ${validActions.join(', ')}` }, 400)
+  }
+
+  if (targetId === dominatorId) {
+    return c.json({ error: 'Cannot target yourself' }, 400)
+  }
+
+  const victim = await db.prepare('SELECT id, pc_domination_enabled, pc_domination_settings FROM Users WHERE id = ?')
+    .bind(targetId)
+    .first<{ id: string; pc_domination_enabled: number; pc_domination_settings: string }>()
+
+  if (!victim) return c.json({ error: 'Target user not found' }, 404)
+  if (!victim.pc_domination_enabled) return c.json({ error: 'Target has not enabled PC Domination' }, 403)
+
+  const victimSettings = JSON.parse(victim.pc_domination_settings || '{}')
+
+  const actionKeyMap: Record<string, string> = {
+    wallpaper: 'allowDesktopBackgroundChange',
+    game_bg: 'allowGameBackgroundChange',
+    popup_video: 'allowPopupVideo',
+    message: 'allowPopupMessage',
+    text_overlay: 'allowTextOverlay',
+    blur: 'allowBlurEverything',
+    camera: 'allowRemoteCamera'
+  }
+
+  const requiredSetting = actionKeyMap[action]
+  if (requiredSetting && !victimSettings[requiredSetting]) {
+    return c.json({ error: `Target has not consented to ${action}` }, 403)
+  }
+
+  // If camera action is triggered, check if dominator requested public when victim only allows private
+  if (action === 'camera' && payload?.isPublic && !victimSettings.allowPublicCamera) {
+    // Override isPublic to false so it respects victim's private camera consent
+    if (payload) payload.isPublic = false
+  }
+
+  const actionId = crypto.randomUUID()
+  const nowIso = new Date().toISOString()
+
+  await db.prepare(`
+    INSERT INTO DominationActions (id, dominator_id, victim_id, action, payload, status, created_at)
+    VALUES (?, ?, ?, ?, ?, 'sent', ?)
+  `).bind(actionId, dominatorId, targetId, action, payload ? JSON.stringify(payload) : null, nowIso).run()
+
+  const { broadcastToUser } = await import('../ws-bus')
+  broadcastToUser(targetId, {
+    type: 'domination',
+    action,
+    from: dominatorId,
+    payload: { ...payload, actionId, intensity },
+    timestamp: nowIso
+  })
+
+  await logAdminAction(db, dominatorId, `domination_${action}`, { id: targetId, type: 'domination_target' }, JSON.stringify(payload))
+
+  return c.json({ success: true, actionId })
+})
+
+/** GET /api/domination/targets - Get list of users with domination enabled and their consent flags */
+domination.get('/targets', async (c) => {
+  const userId = c.get('orbitId')
+  const db = c.env.DB
+
+  const rows = await db.prepare(`
+    SELECT id, display_name, pfp_url, pc_domination_enabled, pc_domination_settings
+    FROM Users
+    WHERE id != ?
+    ORDER BY last_seen DESC
+    LIMIT 100
+  `).bind(userId).all<{ id: string; display_name: string | null; pfp_url: string | null; pc_domination_enabled: number; pc_domination_settings: string }>()
+
+  const targets = (rows.results || []).map((u) => {
+    let settingsObj: Record<string, boolean> = {}
+    try {
+      settingsObj = JSON.parse(u.pc_domination_settings || '{}')
+    } catch {}
+    return {
+      id: u.id,
+      displayName: u.display_name?.trim() || 'Unknown',
+      pfpUrl: u.pfp_url,
+      enabled: Boolean(u.pc_domination_enabled),
+      consents: settingsObj,
+    }
+  })
+
+  return c.json({ targets })
+})
+
+/** GET /api/domination/history - Get domination action history for current user (as victim) */
+domination.get('/history', async (c) => {
+  const userId = c.get('orbitId')
+  const db = c.env.DB
+
+  const limit = Number(c.req.query('limit') || '50')
+  const offset = Number(c.req.query('offset') || '0')
+
+  const actions = await db.prepare(`
+    SELECT da.*, u.display_name as dominator_name, u.pfp_url as dominator_pfp
+    FROM DominationActions da
+    LEFT JOIN Users u ON u.id = da.dominator_id
+    WHERE da.victim_id = ?
+    ORDER BY da.created_at DESC
+    LIMIT ? OFFSET ?
+  `).bind(userId, limit, offset).all()
+
+  return c.json({ actions: actions.results })
+})
+
+/** GET /api/domination/outgoing - Get domination actions sent by current user */
+domination.get('/outgoing', async (c) => {
+  const userId = c.get('orbitId')
+  const db = c.env.DB
+
+  const limit = Number(c.req.query('limit') || '50')
+  const offset = Number(c.req.query('offset') || '0')
+
+  const actions = await db.prepare(`
+    SELECT da.*, u.display_name as victim_name, u.pfp_url as victim_pfp
+    FROM DominationActions da
+    LEFT JOIN Users u ON u.id = da.victim_id
+    WHERE da.dominator_id = ?
+    ORDER BY da.created_at DESC
+    LIMIT ? OFFSET ?
+  `).bind(userId, limit, offset).all()
+
+  return c.json({ actions: actions.results })
+})
+
+export default domination

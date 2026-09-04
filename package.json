@@ -9,8 +9,12 @@
     "electron": "electron .",
     "build": "vite build",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint:ws": "npm run lint --workspaces --if-present",
+    "test:ws": "npm run test --workspaces --if-present",
+    "build:ws": "npm run build --workspaces --if-present"
   },
+  "workspaces": ["apps/*", "packages/*"],
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

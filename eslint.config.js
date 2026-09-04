@@ -3,7 +3,8 @@ import tseslint from 'typescript-eslint'
 import globals from 'globals'
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'out/**', 'node_modules/**'] },
+  // Vendored orbit workspaces lint with their own configs (apps/api, packages).
+  { ignores: ['dist/**', 'out/**', 'node_modules/**', 'apps/**', 'packages/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
