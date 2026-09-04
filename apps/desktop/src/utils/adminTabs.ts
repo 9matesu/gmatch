@@ -1,21 +1,12 @@
 import {
   LayoutDashboard,
   Users,
-  Activity,
   GitCompare,
-  History,
-  Layers,
   Image,
-  MessageSquare,
   Flag,
   Megaphone,
-  Heart,
   BarChart2,
-  Bot,
   Settings,
-  Archive,
-  ListChecks,
-  Mail,
   CreditCard,
 } from "lucide-react";
 import type { TabConfig, TabId, TabSection, AdminState } from "./adminTypes";

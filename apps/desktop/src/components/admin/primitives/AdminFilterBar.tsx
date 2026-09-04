@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { Search, X, Filter, ChevronDown, ChevronUp, Calendar, Tag } from "lucide-react";
+import { Search, X, Filter, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import type { FilterConfig } from "../../../utils/adminTypes";
 

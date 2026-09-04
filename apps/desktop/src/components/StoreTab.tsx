@@ -19,8 +19,6 @@ import {
   Shield,
   Crown,
   Award,
-  Gift,
-  Eye,
   Layers,
   Skull,
   EyeOff,

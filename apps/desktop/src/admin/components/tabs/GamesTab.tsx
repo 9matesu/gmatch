@@ -1,12 +1,12 @@
 "use client";
 
-import { AdminTable, AdminFilterBar, AdminEmptyState, AdminLoadingState, Badge, StatusBadge } from "../../../components/admin/primitives";
+import {  AdminFilterBar, AdminEmptyState, AdminLoadingState, Badge, StatusBadge } from "../../../components/admin/primitives";
 import { adminApi } from "../../../utils/adminApi";
 import { useState, useCallback, useEffect } from "react";
-import { GitCompare, History, Layers, Clock, Play, Pause, X, Check, AlertTriangle, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Maximize2, Trash2 } from "lucide-react";
+import {  History, Layers,  Play,       ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { AdminMediaThumbnail } from "../AdminMediaThumbnail";
-import type { AdminMatch, AdminArchivedMatch, AdminTierMatch, AdminRoom, AdminBabecockRound, TableParams, TableResponse } from "../../../utils/adminTypes";
+import type { AdminMatch, AdminArchivedMatch, AdminTierMatch, AdminRoom, AdminBabecockRound, TableParams } from "../../../utils/adminTypes";
 import type { OrbitIdentity } from "@orbit/crypto";
 
 interface GamesTabProps {
@@ -59,7 +59,7 @@ export function GamesTab({ identity, pinVerified, onZoom, onAction }: GamesTabPr
       setSpecialMatches(asArray(specialRes));
       setRooms(asArray(roomsRes));
       setBabecockRounds(asArray(babecockRes));
-    } catch (err) {
+    } catch {
     } finally {
       setIsLoading(false);
     }
@@ -72,7 +72,7 @@ export function GamesTab({ identity, pinVerified, onZoom, onAction }: GamesTabPr
       const rows = asArray(response.data);
       setArchivedMatches(rows);
       setArchiveTotal(response.total || rows.length);
-    } catch (err) {
+    } catch {
     }
   }, [identity, pinVerified, archiveParams]);
 

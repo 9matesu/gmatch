@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import type { OrbitIdentity } from '@orbit/crypto'
 import type { OrbitObject } from '@orbit/shared'
 import { orbitFetch } from '../utils/api'

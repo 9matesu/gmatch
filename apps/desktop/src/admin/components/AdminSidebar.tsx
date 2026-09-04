@@ -2,7 +2,7 @@
 
 
 import { cn } from "../../lib/utils";
-import { X, ChevronRight } from "lucide-react";
+import { X } from "lucide-react";
 
 interface AdminSidebarProps {
   activeTab: string;

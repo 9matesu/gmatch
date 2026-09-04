@@ -2,7 +2,6 @@
 
 import { useCallback, useRef, useState, useEffect } from "react";
 import type { OptimisticUpdate, OrbitIdentity } from "../utils/adminTypes";
-import { orbitFetch } from "../utils/api";
 
 interface UseOptimisticMutationsOptions<T> {
   identity: OrbitIdentity | null;

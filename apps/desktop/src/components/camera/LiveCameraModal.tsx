@@ -56,7 +56,7 @@ export function LiveCameraModal({
           },
           audio: false,
         });
-      } catch (err1) {
+      } catch {
         // Fallback to general video constraint
         newStream = await navigator.mediaDevices.getUserMedia({
           video: true,

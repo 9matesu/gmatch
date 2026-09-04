@@ -10,8 +10,8 @@ import { DropZone } from './DropZone'
 import { CameraCapture } from './CameraCapture'
 import {
   Flame, Camera, UploadCloud, Link as LinkIcon, Clock,
-  Sparkles, Check, X, Grid, Move, Users, RefreshCw, Mail,
-  ChevronDown, ChevronRight, HelpCircle, Layers, ZoomIn, Share2, ImagePlus
+  Sparkles, Check, X, Grid, Move,   Mail,
+  ChevronDown, ChevronRight,  Layers, ZoomIn, Share2, ImagePlus
 } from 'lucide-react'
 import { logger } from '../utils/logger'
 

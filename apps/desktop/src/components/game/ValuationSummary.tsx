@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import type { MatchSnapshot, OrbitObject } from '@orbit/shared';
 import { computeCardRarity, checkRarityPromotion } from '@orbit/shared';
 import { ObjectImage } from '../ObjectImage';
-import { Trophy, Sparkles, Award, ArrowRight, Zap, Heart, X, Check } from 'lucide-react';
+import { Trophy, Sparkles, Award, ArrowRight, Zap, Heart, X } from 'lucide-react';
 
 interface IdentityLike {
   orbitId: string;

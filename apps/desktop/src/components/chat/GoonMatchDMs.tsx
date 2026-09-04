@@ -23,12 +23,10 @@ import {
   Edit2,
   CheckCheck,
   Trash,
-  MoreHorizontal,
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { ChatMessage } from '../../hooks/useP2P';
 import { orbitFetch } from '../../utils/api';
-import { contentHash } from '../../utils/media';
 import { ObjectImage } from '../ObjectImage';
 
 export interface PeerInfo {

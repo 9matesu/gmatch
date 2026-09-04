@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { isMediaVideo, resolveMediaUrl } from '../utils/media';
 import { orbitFetch } from '../utils/api';
 import { MediaBadge } from './MediaBadge';

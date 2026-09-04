@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { cn } from "../../lib/utils";
-import { Menu, X, ChevronLeft, ChevronRight, Search, Bell, User, LogOut, Settings } from "lucide-react";
 import { AdminSidebar } from "./AdminSidebar";
 import { AdminHeader } from "./AdminHeader";
 

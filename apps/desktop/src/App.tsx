@@ -39,16 +39,18 @@ import { GoonMatchFeed, type FeedPost } from "./components/feed/GoonMatchFeed";
 import { ModPatrolWidget } from "./components/feed/ModPatrolWidget";
 import { GoonMatchDMs } from "./components/chat/GoonMatchDMs";
 import { AttachmentUploadModal } from "./components/AttachmentUploadModal";
-import { GoonMatchProfile } from "./components/profile/GoonMatchProfile";
+import { ProfileView } from "./components/views/ProfileView";
+import { MessagesView, DmMinimizedView } from "./components/views/MessagesView";
+import { GameView } from "./components/views/GameView";
 import { AgeGateModal } from "./components/auth/AgeGateModal";
 import { TosModal } from "./components/TosModal";
 import { saveUserProfile, deriveProfileTags } from "./utils/profile";
-import { GamesHub } from "./components/games/GamesHub";
+import { GamesView } from "./components/views/GamesView";
 import { DeckBuilder, getStoredActiveDeckId, type Deck } from "./components/games/DeckBuilder";
 import { HomeFooter, type MainViewType, type ActiveHackSession } from "./components/home/HomeFooter";
 import { SidebarNav } from "./components/home/SidebarNav";
-import { HackSpyView } from "./components/hacks/HackSpyView";
-import { PCDominationTab } from "./components/domination/PCDominationTab";
+import { HackSpyTabView } from "./components/views/HackSpyTabView";
+import { PCDominationView } from "./components/views/PCDominationView";
 import { DominationEffects } from "./components/domination/DominationEffects";
 import { CardTile } from "./components/home/CardTile";
 import type { ActiveHackDebuff } from "@orbit/shared";
@@ -57,57 +59,22 @@ import { Camera, ImagePlus, Coins, ChevronDown, ChevronRight, Gamepad2, Swords, 
 import { WallpaperBackground } from "./components/WallpaperBackground";
 import { ContextOverlay, ReportModal } from "./components/ContextOverlay";
 import { GlobalModals } from "./components/GlobalModals";
-import { GalleryView } from "./components/GalleryView";
+import { GalleryTabView } from "./components/views/GalleryTabView";
 import { CreateCardModal } from "./components/CreateCardModal";
 import { BabecockPanel } from "./components/BabecockPanel";
 import GridWorkspace from "./components/grid/GridWorkspace";
 import AdminApp from "./admin/AdminApp";
 import { Leaderboard } from "./components/Leaderboard";
-import { StoreTab } from "./components/StoreTab";
+import { StoreView } from "./components/views/StoreView";
 import { NotificationsPanel } from "./components/NotificationsPanel";
 import { SocialPanel, type SocialPanelTab } from "./components/chat/SocialPanel";
 import { logger } from './utils/logger';
 import { useNotifications } from './hooks/useNotifications';
 import { OfflineWarningBanner } from "./components/OfflineWarningBanner";
+import { dataUrlToBlob, localObjectBlobUrl } from "./utils/mediaData";
 
 const MAX_GALLERY_ITEMS_IN_MEMORY = 80;
 const MAX_PROFILE_PICS_IN_MEMORY = 120;
-
-// Deterministic, render-pure seed derived from a string (used for stable
-// fallback counts in the feed instead of Math.random during render).
-function hashSeed(input: string): number {
-  let h = 0;
-  for (let i = 0; i < input.length; i++) {
-    h = (h * 31 + input.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h);
-}
-
-function dataUrlToBlob(dataUrl: string): Blob {
-  const [head, base64] = dataUrl.split(',')
-  const mime = (head?.match(/data:(.*?);/) || [])[1] || 'image/jpeg'
-  const bin = atob(base64 || '')
-  const bytes = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-  return new Blob([bytes], { type: mime })
-}
-
-// Local (IndexedDB) object blobs are turned into stable, reusable object URLs so
-// they render directly instead of being decoded to garbage text (which produced
-// broken `file://`/relative requests on the front page). One URL per object id.
-const localObjectUrlCache = new Map<string, string>()
-function localObjectBlobUrl(id: string, data: ArrayBuffer | undefined, mime: string | undefined): string {
-  const cached = localObjectUrlCache.get(id)
-  if (cached) return cached
-  if (data && data.byteLength > 0) {
-    try {
-      const url = URL.createObjectURL(new Blob([data], { type: mime || 'application/octet-stream' }))
-      localObjectUrlCache.set(id, url)
-      return url
-    } catch { }
-  }
-  return ''
-}
 
 export default function Home() {
   useEffect(() => {
@@ -3262,201 +3229,99 @@ export default function Home() {
 
                   {/* goonMatch Direct Messages View */}
                   {mainView === 'messages' && !chatOpen && !dmMinimized && (
-                    <div className="p-2 sm:p-4 h-full flex-1 flex flex-col min-h-0">
-                      <SocialPanel
-                        tab={panelTab}
-                        onTabChange={setPanelTab}
-                        onClose={() => setDmMinimized(true)}
-                        chatUnread={pmUnreadCount}
-                        notificationUnread={lobby.unreadCount}
-                        dm={
-                          <GoonMatchDMs
-                            identity={identity}
-                            chatMessages={chatMessages}
-                            pmMessages={pmPeer ? pmMessagesByPeer[pmPeer.id || (pmPeer as any).orbitId || ''] || [] : []}
-                            activePmPeer={pmPeer ? { orbitId: pmPeer.id || (pmPeer as any).orbitId, name: pmPeer.display_name || (pmPeer as any).name || 'User' } : null}
-                            peers={users.map((u) => ({ orbitId: u.id || (u as any).orbitId, name: u.display_name || (u as any).name || 'User' }))}
-                            threads={pmThreads}
-                            profilePics={profilePics}
-                            myDisplayName={myProfile.displayName || 'You'}
-                            groups={chatGroups}
-                            groupMessages={groupMessagesByGroup}
-                            activeGroupId={activeGroupId}
-                            onSelectGroup={setActiveGroupId}
-                            onSendMessage={sendChatMessage}
-                            onSendPm={(peerId, text, replyToId, attachment) => {
-                              if (attachment) {
-                                void sendPm(peerId, text, replyToId, attachment);
-                              } else {
-                                openAttachmentModal('pm', peerId, undefined, replyToId);
-                              }
-                            }}
-                            onSelectPeer={(p) => {
-                              if (p) {
-                                const found = users.find((u) => u.id === p.orbitId || (u as any).orbitId === p.orbitId);
-                                setPmPeer(found || ({ id: p.orbitId, display_name: p.name } as any));
-                                // Always refetch on open so cached conversations are
-                                // brought up to date with any messages that arrived
-                                // while the thread was closed.
-                                if (p.orbitId !== 'global_lobby' && p.orbitId !== 'card_queue') {
-                                  loadPmMessages(p.orbitId);
-                                }
-                              } else {
-                                setPmPeer(null);
-                              }
-                            }}
-                            onReportMessage={reportPmMessage}
-                            onReportUser={reportPmUser}
-                            onDeleteMessage={(messageId, peerId) => {
-                              if (peerId) void deletePmMessage(messageId, peerId);
-                            }}
-                            onCreateGroup={createGroup}
-                            onOpenAttachment={openAttachmentModal}
-                            onSendGroupMessage={(groupId, text, replyToId, attachment) => {
-                              if (attachment) {
-                                void sendGroupMessage(groupId, text, replyToId, attachment);
-                              } else {
-                                openAttachmentModal('group', undefined, groupId, replyToId);
-                              }
-                            }}
-                            onLeaveGroup={leaveGroup}
-                            onLoadGroupMessages={loadGroupMessages}
-                            onOpenProfile={(userId) => {
-                              const t = users.find((u) => u.id === userId || (u as any).orbitId === userId);
-                              if (t) setSelectedProfileUser(t);
-                            }}
-                            onMinimize={() => setDmMinimized(true)}
-                            onOpenImage={(msg) => setViewerMessage(msg)}
-                            onDeleteThread={deleteThread}
-                            onBackToThreads={() => { setPmPeer(null); loadPmThreads(); }}
-                            onLoadHistory={loadPmHistory}
-                          />
-                        }
-                        notifications={
-                          <NotificationsPanel
-                            notifications={lobby.notifications}
-                            unreadCount={lobby.unreadCount}
-                            invites={lobby.invites}
-                            onMarkAllRead={() => lobby.markNotificationsRead()}
-                            onRespondInvite={(id, accept) => lobby.respondToInvite(id, accept)}
-                            onRespondBabecock={handleRespondBabecock}
-                            onOpenBabecock={() => { setGamesSubTab('babecock'); setMainView('games'); }}
-                          />
-                        }
-                      />
-                    </div>
+                    <MessagesView
+                      panelTab={panelTab}
+                      setPanelTab={setPanelTab}
+                      identity={identity}
+                      chatMessages={chatMessages}
+                      pmPeer={pmPeer}
+                      pmMessagesByPeer={pmMessagesByPeer}
+                      users={users}
+                      pmThreads={pmThreads}
+                      profilePics={profilePics}
+                      myProfile={myProfile}
+                      chatGroups={chatGroups}
+                      groupMessagesByGroup={groupMessagesByGroup}
+                      activeGroupId={activeGroupId}
+                      setActiveGroupId={setActiveGroupId}
+                      sendChatMessage={sendChatMessage}
+                      sendPm={sendPm}
+                      sendGroupMessage={sendGroupMessage}
+                      openAttachmentModal={openAttachmentModal}
+                      loadPmMessages={loadPmMessages}
+                      loadPmThreads={loadPmThreads}
+                      loadPmHistory={loadPmHistory}
+                      reportPmMessage={reportPmMessage}
+                      reportPmUser={reportPmUser}
+                      deletePmMessage={deletePmMessage}
+                      deleteThread={deleteThread}
+                      createGroup={createGroup}
+                      leaveGroup={leaveGroup}
+                      loadGroupMessages={loadGroupMessages}
+                      setPmPeer={setPmPeer}
+                      setSelectedProfileUser={setSelectedProfileUser}
+                      setViewerMessage={setViewerMessage}
+                      setDmMinimized={setDmMinimized}
+                      pmUnreadCount={pmUnreadCount}
+                      lobby={lobby}
+                      handleRespondBabecock={handleRespondBabecock}
+                      setGamesSubTab={setGamesSubTab}
+                      setMainView={setMainView}
+                    />
                   )}
 
                   {mainView === 'messages' && !chatOpen && dmMinimized && (
-                    <div className="w-full flex items-center justify-center py-10">
-                      <div className="text-center space-y-3">
-                        <div className="mx-auto w-16 h-16 rounded-full bg-gradient-to-tr from-cyan-500 via-teal-500 to-amber-500 p-[3px]">
-                          <div className="w-full h-full rounded-full bg-[#09090b] overflow-hidden flex items-center justify-center text-sm font-bold text-retro-muted">
-                            {pmPeer ? (
-                              profilePics[pmPeer.id || (pmPeer as any).orbitId || ''] ? (
-                                <img src={profilePics[pmPeer.id || (pmPeer as any).orbitId || '']} alt="" className="w-full h-full object-cover" />
-                              ) : (
-                                (pmPeer.display_name || 'P').charAt(0).toUpperCase()
-                              )
-                            ) : (
-                              'D'
-                            )}
-                          </div>
-                        </div>
-                        <p className="text-xs font-bold text-retro-body">Direct Messages minimized</p>
-                        <p className="text-[11px] text-retro-muted">Open the chat bubble at the bottom to keep talking.</p>
-                      </div>
-                    </div>
+                    <DmMinimizedView pmPeer={pmPeer} profilePics={profilePics} />
                   )}
 
                   {/* goonMatch Profile View */}
                   {mainView === 'profile' && (
-                    <div className="p-2 sm:p-6 max-w-4xl mx-auto w-full">
-                      <GoonMatchProfile
-                        identity={identity}
-                        myUser={myUser}
-                        profilePic={profilePics[identity?.orbitId || '']}
-                        posts={feedPosts}
-                        cards={myCards as any}
-                        savedPosts={feedPosts.filter((p) => p.is_saved)}
-                        repostPosts={repostedPosts}
-                        followersCount={myUser?.followers_count ?? myUser?.likes_received ?? 0}
-                        followingCount={myUser?.following_count ?? followingIds.length}
-                        onOpenSettings={() => setShowSettingsModal(true)}
-                        onOpenFollowers={(tab) => setFollowersModalState({ isOpen: true, initialTab: tab, targetUserId: null, targetName: null })}
-                        onOpenCardViewer={(card) => {
-                          if (card.id) setExpandedItemId(card.id);
-                        }}
-                        onProfileUpdated={(updated) => {
-                          setMyProfile((prev) => ({ ...prev, displayName: updated.name, pfpUrl: updated.pfpUrl || prev.pfpUrl }));
-                          try { localStorage.setItem('orbit_display_name', updated.name); } catch { }
-                          if (updated.pfpUrl) {
-                            setProfilePics((prev) => {
-                              const next = { ...prev, [identity?.orbitId || '']: updated.pfpUrl as string };
-                              try { localStorage.setItem('goonmatch_pfps', JSON.stringify(next)); } catch { }
-                              return next;
-                            });
-                            try { localStorage.setItem('orbit_pfp_url', updated.pfpUrl); } catch { }
-                          }
-                          window.dispatchEvent(new CustomEvent('orbit_profile_updated', { detail: { displayName: updated.name, tags: myProfile.tags } }));
-                          loadUsers();
-                        }}
-                        onArchivePost={(id) => {
-                          setArchivedPostIds((prev) => new Set(prev).add(id));
-                          toast('Post archived', 'info');
-                        }}
-                        onDeletePost={(id) => {
-                          setDeletedPostIds((prev) => new Set(prev).add(id));
-                          deletePostOnServer(id);
-                          toast('Post deleted', 'success');
-                        }}
-                        toast={toast}
-                      />
-                    </div>
+                    <ProfileView
+                      identity={identity}
+                      myUser={myUser}
+                      profilePics={profilePics}
+                      feedPosts={feedPosts}
+                      myCards={myCards}
+                      repostedPosts={repostedPosts}
+                      followingIds={followingIds}
+                      myProfile={myProfile}
+                      toast={toast}
+                      setShowSettingsModal={setShowSettingsModal}
+                      setFollowersModalState={setFollowersModalState}
+                      setExpandedItemId={setExpandedItemId}
+                      setMyProfile={setMyProfile}
+                      setProfilePics={setProfilePics}
+                      loadUsers={loadUsers}
+                      setArchivedPostIds={setArchivedPostIds}
+                      setDeletedPostIds={setDeletedPostIds}
+                      deletePostOnServer={deletePostOnServer}
+                    />
                   )}
 
                   {/* goonMatch Games & Arcade Hub */}
                   {mainView === 'games' && (
-                    <GamesHub
-                      key={`games-${gamesSubTab}`}
+                    <GamesView
+                      gamesSubTab={gamesSubTab}
                       identity={identity}
                       myUser={myUser}
-                      cards={myCards as any}
+                      myCards={myCards}
                       users={users}
-                      onSelectUser={(uId) => {
-                        const target = users.find((u) => u.id === uId || (u as any).orbitId === uId);
-                        if (target) setSelectedProfileUser(target);
-                      }}
-                      initialSubTab={gamesSubTab}
-                      renderDuelContent={() => (
-                        <LobbyPanel
-                          lobby={lobby}
-                          toggleAutoQueue={toggleAutoQueue}
-                          sendInvite={sendInvite}
-                          identity={identity}
-                          myCards={myCards}
-                          soundEnabled={settings.soundEffects}
-                          onOpenImage={(url) => setLobbyLightboxUrl(url)}
-                          onExpandItem={(id) => setExpandedItemId(id)}
-                          onOpenHelp={() => setShowHelpModal(true)}
-                          onOpenProfile={(user) => setSelectedProfileUser(user)}
-                          onOpenCardChat={() => {
-                            setPmPeer({ id: 'card_queue', display_name: 'Card Game Queue' } as any)
-                            setDmMinimized(false)
-                            setMainView('messages')
-                          }}
-                          onOpenCreateCard={openCreateCardModal}
-                          onOpenDeckBuilder={navigateToDeckBuilder}
-                          onOpenSpectateItem={(items, initialId) => {
-                            setSpectateViewerItems(items);
-                            setExpandedItemId(initialId);
-                          }}
-                          users={users}
-                        />
-                      )}
-                      onOpenStore={() => handleSetMainView('store')}
-                      onOpenCollection={() => handleSetMainView('gallery')}
+                      lobby={lobby}
+                      toggleAutoQueue={toggleAutoQueue}
+                      sendInvite={sendInvite}
+                      soundEnabled={settings.soundEffects}
                       toast={toast}
+                      setSelectedProfileUser={setSelectedProfileUser}
+                      setLobbyLightboxUrl={setLobbyLightboxUrl}
+                      setExpandedItemId={setExpandedItemId}
+                      setShowHelpModal={setShowHelpModal}
+                      setPmPeer={setPmPeer}
+                      setDmMinimized={setDmMinimized}
+                      setMainView={setMainView}
+                      setSpectateViewerItems={setSpectateViewerItems}
+                      openCreateCardModal={openCreateCardModal}
+                      navigateToDeckBuilder={navigateToDeckBuilder}
+                      handleSetMainView={handleSetMainView}
                     />
                   )}
 
@@ -3476,156 +3341,105 @@ export default function Home() {
 
                   {/* Fullscreen Store (mirrors the game store as an independent view) */}
                   {mainView === 'store' && (
-                    <div className="p-2 sm:p-6 max-w-5xl mx-auto w-full">
-                      <StoreTab
-                        points={myUser?.balance ?? 0}
-                        identity={identity}
-                        onOpenCardCollection={() => handleSetMainView('gallery')}
-                        onOpenFlash={() => setShowFlashModal(true)}
-                        users={users}
-                        profilePics={profilePics}
-                        toast={toast}
-                        onDeployHack={(session) => {
-                          setActiveHack(session);
-                          try { localStorage.setItem('orbit_active_hack', JSON.stringify(session)); } catch { }
-                          handleSetMainView('hack_spy');
-                          toast(`Cyber hack deployed on ${session.targetUserName}!`, 'success');
-                        }}
-                      />
-                    </div>
+                    <StoreView
+                      myUser={myUser}
+                      identity={identity}
+                      users={users}
+                      profilePics={profilePics}
+                      toast={toast}
+                      onSetMainView={handleSetMainView}
+                      onOpenFlash={() => setShowFlashModal(true)}
+                      setActiveHack={setActiveHack}
+                    />
                   )}
 
                   {/* Leaderboard & Babecock moved into Games Hub subtabs (removed as standalone views) */}
 
                   {/* Gallery Full-Width Grid View */}
                   {mainView === 'gallery' && (
-                    <div className="space-y-4">
-                      <GalleryView
-                        filteredItems={filteredItems}
-                        itemsLoading={itemsLoading}
-                        galleryFilter={galleryFilter}
-                        setGalleryFilter={setGalleryFilter}
-                        gallerySort={gallerySort}
-                        setGallerySort={setGallerySort}
-                        cardSearch={cardSearch}
-                        setCardSearch={setCardSearch}
-                        cardTypeFilter={cardTypeFilter}
-                        setCardTypeFilter={setCardTypeFilter}
-                        galleryPage={galleryPage}
-                        setGalleryPage={setGalleryPage}
-                        selectedGalleryIds={selectedGalleryIds}
-                        setSelectedGalleryIds={setSelectedGalleryIds}
-                        totalPages={totalPages}
-                        paginatedItems={paginatedItems}
-                        batchDownloading={batchDownloading}
-                        handleDownloadAll={handleDownloadAll}
-                        handleBatchDownload={handleBatchDownload}
-                        handleBatchDelete={handleBatchDelete}
-                        dragActive={dragActive}
-                        setDragActive={setDragActive}
-                        dragAnchorId={dragAnchorId}
-                        setDragAnchorId={setDragAnchorId}
-                        onOpenCreateCard={() => setShowCreateCardModal(true)}
-                        users={users}
-                        identity={identity!}
-                        setExpandedItemId={setExpandedItemId}
-                        posts={feedPosts}
-                        toast={toast}
-                        cardByMedia={cardByMedia}
-                        onOpenOwnerProfile={openProfileById}
-                        onOpenProfile={openProfileById}
-                      />
-
-                      {/* Decks live on the same page as the card gallery */}
-                      <div className="bg-surface-raised border border-retro-border rounded-xl p-4">
-                        <DeckBuilder
-                          identity={identity}
-                          cards={myCards as any}
-                          onEnterArena={() => { setGamesSubTab('duel'); setMainView('games'); }}
-                          toast={toast}
-                        />
-                      </div>
-                    </div>
+                    <GalleryTabView
+                      filteredItems={filteredItems}
+                      itemsLoading={itemsLoading}
+                      galleryFilter={galleryFilter}
+                      setGalleryFilter={setGalleryFilter}
+                      gallerySort={gallerySort}
+                      setGallerySort={setGallerySort}
+                      cardSearch={cardSearch}
+                      setCardSearch={setCardSearch}
+                      cardTypeFilter={cardTypeFilter}
+                      setCardTypeFilter={setCardTypeFilter}
+                      galleryPage={galleryPage}
+                      setGalleryPage={setGalleryPage}
+                      selectedGalleryIds={selectedGalleryIds}
+                      setSelectedGalleryIds={setSelectedGalleryIds}
+                      totalPages={totalPages}
+                      paginatedItems={paginatedItems}
+                      batchDownloading={batchDownloading}
+                      handleDownloadAll={handleDownloadAll}
+                      handleBatchDownload={handleBatchDownload}
+                      handleBatchDelete={handleBatchDelete}
+                      dragActive={dragActive}
+                      setDragActive={setDragActive}
+                      dragAnchorId={dragAnchorId}
+                      setDragAnchorId={setDragAnchorId}
+                      onOpenCreateCard={() => setShowCreateCardModal(true)}
+                      users={users}
+                      identity={identity!}
+                      setExpandedItemId={setExpandedItemId}
+                      posts={feedPosts}
+                      toast={toast}
+                      cardByMedia={cardByMedia}
+                      onOpenOwnerProfile={openProfileById}
+                      myCards={myCards as any}
+                      onEnterArena={() => { setGamesSubTab('duel'); setMainView('games'); }}
+                    />
                   )}
 
                   {/* Game View (Matchmaking Lobby) */}
                   {mainView === 'game' && (
-                    <div className="space-y-6">
-                      <LobbyPanel
-                        lobby={lobby}
-                        toggleAutoQueue={toggleAutoQueue}
-                        sendInvite={sendInvite}
-                        identity={identity}
-                        myCards={myCards}
-                        soundEnabled={settings.soundEffects}
-                        onOpenImage={(url) => setLobbyLightboxUrl(url)}
-                        onExpandItem={(id) => setExpandedItemId(id)}
-                        onOpenHelp={() => setShowHelpModal(true)}
-                        onOpenProfile={(user) => setSelectedProfileUser(user)}
-                        onOpenCreateCard={openCreateCardModal}
-                        onOpenDeckBuilder={navigateToDeckBuilder}
-                        onOpenSpectateItem={(items, initialId) => {
-                          setSpectateViewerItems(items)
-                          setExpandedItemId(initialId)
-                        }}
-                        users={users}
-                      />
-
-                      {(spinTarget || selectedIds.size > 0) && (
-                        <div className="w-full max-w-2xl mx-auto mb-6 module">
-                          <SendPanel
-                            ref={sendPanelRef}
-                            index="03"
-                            identity={identity}
-                            recipientIds={Array.from(selectedIds)}
-                            users={users}
-                            onRecipientsChange={(ids) => setSelectedIds(new Set(ids))}
-                            onUploadComplete={() => { loadGallery(); loadUsers(); window.dispatchEvent(new CustomEvent('orbit-relationships-refresh')) }}
-                            onTransferStart={() => setTransferProgress('Encrypting...')}
-                            onTransferProgress={(pct) => setTransferProgress(`Uploading: ${pct}%`)}
-                            onTransferComplete={() => {
-                              setTransferProgress(null)
-                              setForwardedStashFile(null)
-                              toast('Image card sent successfully!', 'success')
-                              loadGallery()
-                              loadUsers()
-                              window.dispatchEvent(new CustomEvent('orbit-relationships-refresh'))
-                            }}
-                            onTransferError={(err) => { setTransferProgress(null); toast(`Upload failed: ${err}`, 'error') }}
-                            forwardedFile={forwardedStashFile}
-                            onForwardClear={() => setForwardedStashFile(null)}
-                            onSendP2PItem={sendP2PItem}
-                          />
-                        </div>
-                      )}
-                    </div>
+                    <GameView
+                      lobby={lobby}
+                      toggleAutoQueue={toggleAutoQueue}
+                      sendInvite={sendInvite}
+                      identity={identity}
+                      myCards={myCards}
+                      soundEnabled={settings.soundEffects}
+                      users={users}
+                      spinTarget={spinTarget}
+                      selectedIds={selectedIds}
+                      setSelectedIds={setSelectedIds}
+                      sendPanelRef={sendPanelRef}
+                      forwardedStashFile={forwardedStashFile}
+                      setForwardedStashFile={setForwardedStashFile}
+                      setTransferProgress={setTransferProgress}
+                      toast={toast}
+                      loadGallery={loadGallery}
+                      loadUsers={loadUsers}
+                      sendP2PItem={sendP2PItem}
+                      setLobbyLightboxUrl={setLobbyLightboxUrl}
+                      setExpandedItemId={setExpandedItemId}
+                      setShowHelpModal={setShowHelpModal}
+                      setSelectedProfileUser={setSelectedProfileUser}
+                      setSpectateViewerItems={setSpectateViewerItems}
+                      openCreateCardModal={openCreateCardModal}
+                      navigateToDeckBuilder={navigateToDeckBuilder}
+                    />
                   )}
 
                   {/* Active Cyber Hack Spy Infiltration Feed */}
                   {mainView === 'hack_spy' && activeHack && (
-                    <div className="w-full flex-1 flex flex-col items-center justify-start p-2 sm:p-6">
-                      <HackSpyView
-                        session={activeHack}
-                        identity={identity}
-                        onBack={() => handleSetMainView('feed')}
-                        onExpire={() => {
-                          setActiveHack(null);
-                          try { localStorage.removeItem('orbit_active_hack'); } catch { }
-                          handleSetMainView('feed');
-                          toast('Active cyber hack payload expired', 'info');
-                        }}
-                      />
-                    </div>
+                    <HackSpyTabView
+                      activeHack={activeHack}
+                      identity={identity}
+                      toast={toast}
+                      onSetMainView={handleSetMainView}
+                      setActiveHack={setActiveHack}
+                    />
                   )}
 
                   {/* PC Domination Control Panel */}
                   {mainView === 'pc_domination' && (
-                    <div className="w-full flex-1 flex flex-col items-center justify-start p-2 sm:p-6">
-                      <PCDominationTab
-                        identity={identity}
-                        users={users.map(u => ({ id: u.id, orbitId: u.id, display_name: u.display_name || '', pfp_url: u.pfp_url }))}
-                      />
-                    </div>
+                    <PCDominationView identity={identity} users={users} />
                   )}
 
                   {/* Stories & Store live inside the feed tray and Games Hub — removed as standalone views */}

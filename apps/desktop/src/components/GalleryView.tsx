@@ -6,7 +6,6 @@ import type { User, OrbitObject } from '@orbit/shared';
 import { CardTile } from './home/CardTile';
 import { CardSkeleton } from './Skeleton';
 import { EmptyState } from './EmptyState';
-import { DropZone } from './DropZone';
 import { CardDetailView } from './CardDetailView';
 import { SlideshowManager } from './slideshows/SlideshowManager';
 import IdleGalleryView from './grid/IdleGalleryView';

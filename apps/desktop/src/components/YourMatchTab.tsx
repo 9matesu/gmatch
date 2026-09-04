@@ -6,7 +6,6 @@ import { specialTierLine, tierColor, tierLabel, SPECIAL_TIER_POINTS, SPECIAL_FIN
 import { specialTabState, revealedCards } from '../utils/special'
 import { resolveDisplayName } from '../utils/lobby'
 import { useObjectImage } from '../hooks/useObjectImage'
-import { orbitFetch } from '../utils/api'
 import { playTierUp, playMatch, playReject, playTimeout } from '../utils/sounds'
 import { CardZoomModal } from './CardZoomModal'
 import { CardBack } from './CardBack'

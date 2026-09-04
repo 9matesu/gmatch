@@ -1,9 +1,9 @@
 "use client";
 
-import { AdminTable, AdminFilterBar, AdminEmptyState, AdminLoadingState, Badge, StatusBadge, FormModal, ConfirmDialog } from "../../../components/admin/primitives";
+import {   AdminEmptyState, AdminLoadingState, Badge, StatusBadge, FormModal } from "../../../components/admin/primitives";
 import { adminApi } from "../../../utils/adminApi";
 import { useState, useCallback, useEffect } from "react";
-import { Megaphone, Heart, Plus, Trash2, Edit, Check, X, Loader2, Bell, MessageSquare, Star } from "lucide-react";
+import { Megaphone, Heart, Plus } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import type { Announcement, AdminRecommendation, OrbitIdentity } from "../../../utils/adminTypes";
 
@@ -43,7 +43,7 @@ export function PlatformTab({ identity, pinVerified, onAction }: PlatformTabProp
       ]);
       setAnnouncements(asArray(annRes));
       setRecommendations(asArray(recRes));
-    } catch (err) {
+    } catch {
     } finally {
       setIsLoading(false);
     }
@@ -60,7 +60,7 @@ export function PlatformTab({ identity, pinVerified, onAction }: PlatformTabProp
       setNewAnnouncement("");
       setShowCreateModal(false);
       fetchData();
-    } catch (err) {
+    } catch {
     }
   };
 
@@ -69,7 +69,7 @@ export function PlatformTab({ identity, pinVerified, onAction }: PlatformTabProp
     try {
       await adminApi.deleteAnnouncement(identity, id);
       fetchData();
-    } catch (err) {
+    } catch {
     }
   };
 
@@ -79,7 +79,7 @@ export function PlatformTab({ identity, pinVerified, onAction }: PlatformTabProp
       await adminApi.updateRecommendation(identity, id, status);
       setEditingRec(null);
       fetchData();
-    } catch (err) {
+    } catch {
     }
   };
 
@@ -88,7 +88,7 @@ export function PlatformTab({ identity, pinVerified, onAction }: PlatformTabProp
     try {
       await adminApi.deleteRecommendation(identity, id);
       fetchData();
-    } catch (err) {
+    } catch {
     }
   };
 

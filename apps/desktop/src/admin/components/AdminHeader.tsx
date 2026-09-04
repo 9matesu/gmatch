@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "../../lib/utils";
-import { Menu, Search, RefreshCw, Bell, User, LogOut, ChevronDown, Settings } from "lucide-react";
+import { Menu, Search, RefreshCw,  User, LogOut, ChevronDown, Settings } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 
 interface AdminHeaderProps {

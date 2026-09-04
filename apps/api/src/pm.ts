@@ -517,6 +517,7 @@ export async function getPmHistory(
       AND NOT (pm.sender_id = ? AND COALESCE(pm.deleted_by, '') = 'sender')
       AND NOT (pm.recipient_id = ? AND COALESCE(pm.deleted_by, '') = 'recipient')
       AND pm.hidden_at IS NULL
+    )
   `
   const args: any[] = [userId, userId, peerId, userId, peerId, userId, userId]
 

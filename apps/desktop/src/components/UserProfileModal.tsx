@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { parseTags, type User, type OrbitObject } from '@orbit/shared';
-import { X, Copy, Check, Star, Ban, Send, Grid, MessageCircle, Play, Swords, Users, UserPlus } from 'lucide-react';
+import { X, Copy, Check, Star, Ban, Send, Grid, MessageCircle, Play, Swords } from 'lucide-react';
 import { playPress } from '../utils/sounds';
 import { resolveMediaUrl } from '../utils/media';
 import { ObjectImage } from './ObjectImage';

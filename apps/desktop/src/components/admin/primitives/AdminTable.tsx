@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Check, Minus, Search, Filter, X, MoreHorizontal } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight,    Filter,  MoreHorizontal } from "lucide-react";
 import { cn } from "../../../lib/utils";
-import type { TableConfig, TableParams, TableResponse, RowAction, BulkAction } from "../../../utils/adminTypes";
+import type { TableConfig, TableParams,  RowAction } from "../../../utils/adminTypes";
 
 interface AdminTableProps<T> {
   config: TableConfig<T>;
@@ -165,7 +165,7 @@ export function AdminTable<T extends Record<string, unknown>>({
         lastNotifiedParamsRef.current = paramsKey;
         onParamsChange?.(params);
       }
-    } catch (error) {
+    } catch {
     } finally {
       setIsFetching(false);
     }
@@ -491,7 +491,7 @@ export function useAdminTable<T extends Record<string, unknown>>(config: TableCo
       const response = await config.fetchFn(params);
       setData(response.data);
       setTotal(response.total);
-    } catch (error) {
+    } catch {
     } finally {
       setIsLoading(false);
     }

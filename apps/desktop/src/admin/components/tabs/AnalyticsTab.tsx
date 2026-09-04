@@ -56,7 +56,7 @@ export function AnalyticsTab({ identity, pinVerified }: AnalyticsTabProps) {
     try {
       const data = await adminApi.auditLog(identity, 200);
       setAuditLog(data);
-    } catch (err) {
+    } catch {
     }
   }, [identity, pinVerified]);
 
@@ -66,7 +66,7 @@ export function AnalyticsTab({ identity, pinVerified }: AnalyticsTabProps) {
     try {
       const data = await adminApi.dailyStats(identity, 30);
       setDailyStats(data);
-    } catch (err) {
+    } catch {
     } finally {
       setIsLoading(false);
     }
@@ -78,7 +78,7 @@ export function AnalyticsTab({ identity, pinVerified }: AnalyticsTabProps) {
     try {
       const data = await adminApi.trafficSources(identity);
       setTraffic(data);
-    } catch (err) {
+    } catch {
     } finally {
       setIsLoading(false);
     }

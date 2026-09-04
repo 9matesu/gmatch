@@ -1,13 +1,13 @@
 "use client";
 
-import { AdminTable, AdminFilterBar, AdminEmptyState, AdminLoadingState, Badge, StatusBadge, ConfirmDialog, DetailModal } from "../../../components/admin/primitives";
+import {  AdminFilterBar, AdminEmptyState, AdminLoadingState, Badge, StatusBadge } from "../../../components/admin/primitives";
 import { adminApi } from "../../../utils/adminApi";
-import { useState, useCallback, useEffect, useMemo } from "react";
-import { Flag, MessageSquare, Mail, Hash, Trash2, Eye, Shield, Ban, X, Check, AlertTriangle, ChevronDown, ChevronUp, Maximize2, ShieldAlert } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { Flag, MessageSquare, Mail, Hash, Trash2,  Shield, Ban,  Check,  ChevronDown, ChevronUp, Maximize2, ShieldAlert } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { AdminMediaThumbnail } from "../AdminMediaThumbnail";
 import { resolveMediaUrl } from "../../../utils/media";
-import type { AdminReport, AdminLobbyComment, AdminPrivateMessage, AdminChatMessage, TableParams, TableResponse, OrbitIdentity } from "../../../utils/adminTypes";
+import type { AdminReport, AdminLobbyComment, AdminPrivateMessage, AdminChatMessage, TableParams,  OrbitIdentity } from "../../../utils/adminTypes";
 
 interface ModerationTabProps {
   identity: OrbitIdentity | null;
@@ -54,7 +54,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
       const rows = asArray(response.data);
       setReports(rows);
       setReportsTotal(response.total || rows.length);
-    } catch (err) {
+    } catch {
     }
   }, [identity, pinVerified, reportsParams]);
 
@@ -63,7 +63,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
     try {
       const data = await adminApi.lobbyComments(identity);
       setComments(asArray(data));
-    } catch (err) {
+    } catch {
     }
   }, [identity, pinVerified]);
 
@@ -72,7 +72,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
     try {
       const response = await adminApi.privateMessages(identity, { page: 1, pageSize: 200 });
       setPms(asArray(response.data));
-    } catch (err) {
+    } catch {
     }
   }, [identity, pinVerified]);
 
@@ -81,7 +81,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
     try {
       const response = await adminApi.chat(identity, chatParams);
       setChatMessages(asArray(response.data));
-    } catch (err) {
+    } catch {
     }
   }, [identity, pinVerified, chatParams]);
 
@@ -107,7 +107,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
     try {
       await adminApi.resolveReport(identity, report.id, action);
       fetchReports();
-    } catch (err) {
+    } catch {
     } finally {
       setActionLoading(null);
     }

@@ -52,7 +52,10 @@ export default function StatsPanel() {
 
   return (
     <aside className={`${PLATE} ${PANEL}`}>
-      <div className={`${DISPLAY} text-[40px] font-bold leading-[1.1] break-all text-retro-fg [font-variant-numeric:tabular-nums]`}>
+      <div
+        className={`${DISPLAY} text-[40px] font-bold leading-[1.1] break-all text-retro-fg [font-variant-numeric:tabular-nums]`}
+        data-testid="gc-balance"
+      >
         {formatNum(s.gc)}
       </div>
       <div className="mb-3.5 text-[11px] uppercase tracking-[2px] text-retro-muted">g$</div>

@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { playPress, playWin, playMsgReceive } from '../../utils/sounds';
 import {
   Heart,
-  MessageCircle,
   Send,
   Bookmark,
   MoreHorizontal,
@@ -14,9 +13,6 @@ import {
   ChevronRight,
   ZoomIn,
   ZoomOut,
-  Maximize2,
-  CheckCircle2,
-  Share2,
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { FeedPost, PostComment } from './GoonMatchFeed';

@@ -41,7 +41,7 @@ export function OfflineWarningBanner({ identity }: { identity: OrbitIdentity | n
             }
           }
         }
-      } catch (err) {
+      } catch {
       } finally {
         setLoading(false);
       }

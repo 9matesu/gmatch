@@ -7,7 +7,6 @@ import { orbitFetch } from "../utils/api";
 import { useToast } from "../components/Toast";
 import { useConfirm } from "../components/ConfirmDialog";
 import { logger } from "../utils/logger";
-import { parseTags, type Announcement } from "@orbit/shared";
 import { AdminLayout } from "./components/AdminLayout";
 import { DashboardTab } from "./components/tabs/DashboardTab";
 import { GamesTab } from "./components/tabs/GamesTab";
@@ -22,7 +21,7 @@ import { CardZoomModal } from "../components/CardZoomModal";
 import { TAB_REGISTRY, LEGACY_TAB_MAP, getTabBadge } from "../utils/adminTabs";
 import { useAdminWebSocket } from "../hooks/useAdminWebSocket";
 import type { OrbitIdentity } from "@orbit/crypto";
-import type { DashboardStats, AdminState, TabId } from "../utils/adminTypes";
+import type {  AdminState, TabId } from "../utils/adminTypes";
 
 export default function AdminPageClient() {
   const [identity, setIdentity] = useState<OrbitIdentity | null>(() => {

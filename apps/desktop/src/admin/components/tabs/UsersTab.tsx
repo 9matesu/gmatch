@@ -2,11 +2,10 @@
 
 import { AdminTable, AdminFilterBar, AdminEmptyState, AdminLoadingState, Badge, StatusBadge, ConfirmDialog, DetailModal } from "../../../components/admin/primitives";
 import { adminApi } from "../../../utils/adminApi";
-import { useState, useCallback, useEffect, useMemo } from "react";
-import { Users, Ban, Shield, DollarSign, Tag, Trash2, Eye, Settings, Search, ChevronLeft, ChevronRight, MoreHorizontal, X } from "lucide-react";
-import { cn } from "../../../lib/utils";
+import { useState, useCallback, useEffect } from "react";
+import {  Ban, Shield, DollarSign, Tag, Trash2, Eye, Settings } from "lucide-react";
 import { AdminMediaThumbnail } from "../AdminMediaThumbnail";
-import type { AdminUser, AdminObject, TableParams, TableResponse } from "../../../utils/adminTypes";
+import type { AdminUser, AdminObject, TableParams } from "../../../utils/adminTypes";
 import type { OrbitIdentity } from "@orbit/crypto";
 
 interface UsersTabProps {
@@ -45,7 +44,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
       const rows = Array.isArray(response.data) ? response.data : [];
       setUsers(rows);
       setTotal(response.total || rows.length);
-    } catch (err) {
+    } catch {
     } finally {
       setIsLoading(false);
     }
@@ -94,7 +93,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
       await adminApi.banUser(identity, showBanModal.user.id, banReason, banWipe);
       setShowBanModal(null);
       fetchUsers();
-    } catch (err) {
+    } catch {
     }
   };
 
@@ -105,7 +104,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
       await adminApi.editUserTags(identity, showTagsModal.user.id, tagList);
       setShowTagsModal(null);
       fetchUsers();
-    } catch (err) {
+    } catch {
     }
   };
 
@@ -120,7 +119,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
       });
       setShowBalanceModal(null);
       fetchUsers();
-    } catch (err) {
+    } catch {
     }
   };
 
@@ -131,7 +130,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
       setUserObjects(objects);
       setSelectedUser(user);
       setShowUserDetail(true);
-    } catch (err) {
+    } catch {
     }
   };
 

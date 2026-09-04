@@ -5,9 +5,8 @@ import type { MatchSnapshot, OrbitObject, OrbitId } from '@orbit/shared'
 import { Avatar } from './Avatar'
 import { formatCountdown, countdownMs } from '../utils/lobby'
 import { CardZoomModal } from './CardZoomModal'
-import { CardBack } from './CardBack'
-import { computeCardRarity, formatGc } from '@orbit/shared'
-import { isMediaVideo, resolveMediaUrl } from '../utils/media'
+import {  formatGc } from '@orbit/shared'
+import { isMediaVideo } from '../utils/media'
 import { ObjectImage } from './ObjectImage'
 import { playPress, playMatch } from '../utils/sounds'
 import {
@@ -15,12 +14,8 @@ import {
   Minimize2,
   Maximize2,
   ZoomIn,
-  Check,
   Sparkles,
-  Flame,
-  ThumbsUp,
   Award,
-  EyeOff,
 } from 'lucide-react'
 
 interface IdentityLike {

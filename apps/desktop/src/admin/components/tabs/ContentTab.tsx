@@ -1,13 +1,13 @@
 "use client";
 
-import { AdminTable, AdminFilterBar, AdminEmptyState, AdminLoadingState, Badge, StatusBadge } from "../../../components/admin/primitives";
+import {  AdminFilterBar, AdminEmptyState, AdminLoadingState, Badge, StatusBadge } from "../../../components/admin/primitives";
 import { adminApi } from "../../../utils/adminApi";
 import { useState, useCallback, useEffect } from "react";
-import { Image, Globe, MessageSquare, Search, Filter, ChevronLeft, ChevronRight, Eye, Trash2, Shield, Ban, ChevronDown, ChevronUp, Maximize2, ShieldAlert } from "lucide-react";
+import { Image, Globe, MessageSquare,     Eye, Trash2, Shield, Ban, ChevronDown, ChevronUp, Maximize2, ShieldAlert } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { resolveMediaUrl } from "../../../utils/media";
 import { AdminMediaThumbnail } from "../AdminMediaThumbnail";
-import type { AdminObject, AdminPost, AdminLobbyImage, TableParams, TableResponse } from "../../../utils/adminTypes";
+import type { AdminObject, AdminPost, AdminLobbyImage, TableParams } from "../../../utils/adminTypes";
 import type { OrbitIdentity } from "@orbit/crypto";
 
 interface ContentTabProps {
@@ -52,7 +52,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
       const rows = asArray(response.data);
       setObjects(rows);
       setObjectsTotal(response.total || rows.length);
-    } catch (err) {
+    } catch {
     }
   }, [identity, pinVerified, objectsParams]);
 
@@ -63,7 +63,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
       const rows = asArray(response.data);
       setPosts(rows);
       setPostsTotal(response.total || rows.length);
-    } catch (err) {
+    } catch {
     }
   }, [identity, pinVerified, postsParams]);
 
@@ -72,7 +72,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
     try {
       const data = await adminApi.lobbyImages(identity);
       setLobbyImages(asArray(data));
-    } catch (err) {
+    } catch {
     }
   }, [identity, pinVerified]);
 

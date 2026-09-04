@@ -1,12 +1,12 @@
 "use client";
 
-import { AdminTable, AdminFilterBar, AdminEmptyState, AdminLoadingState, Badge, StatusBadge, DetailModal } from "../../../components/admin/primitives";
+import {  AdminFilterBar, AdminEmptyState, AdminLoadingState, Badge, StatusBadge, DetailModal } from "../../../components/admin/primitives";
 import { adminApi } from "../../../utils/adminApi";
-import { useState, useCallback, useEffect, useMemo } from "react";
-import { CreditCard, Wallet, ListChecks, ShoppingBag, Layers, Trash2, Eye, Shield, Ban, DollarSign, ArrowUp, ArrowDown, Minus, Plus, ChevronDown, ChevronUp, Maximize2, ShieldAlert } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { CreditCard, Wallet, ListChecks, ShoppingBag, Layers, Trash2, Eye,  Ban, DollarSign, ArrowUp, ArrowDown,   ChevronDown, ChevronUp, Maximize2 } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { AdminMediaThumbnail } from "../AdminMediaThumbnail";
-import type { AdminCard, TableParams, TableResponse } from "../../../utils/adminTypes";
+import type { AdminCard, TableParams } from "../../../utils/adminTypes";
 import type { OrbitIdentity } from "@orbit/crypto";
 
 interface EconomyTabProps {
@@ -58,7 +58,7 @@ export function EconomyTab({ identity, pinVerified, onZoom, onAction }: EconomyT
       const rows = asArray(response.data);
       setCards(rows);
       setCardsTotal(response.total || rows.length);
-    } catch (err) {
+    } catch {
     }
   }, [identity, pinVerified, cardsParams]);
 
@@ -67,7 +67,7 @@ export function EconomyTab({ identity, pinVerified, onZoom, onAction }: EconomyT
     try {
       const response = await adminApi.wallets(identity, walletsParams);
       setWallets(asArray(response.data));
-    } catch (err) {
+    } catch {
     }
   }, [identity, pinVerified, walletsParams]);
 
@@ -76,7 +76,7 @@ export function EconomyTab({ identity, pinVerified, onZoom, onAction }: EconomyT
     try {
       const response = await adminApi.ledger(identity, ledgerParams);
       setLedger(asArray(response.data));
-    } catch (err) {
+    } catch {
     }
   }, [identity, pinVerified, ledgerParams]);
 
@@ -85,7 +85,7 @@ export function EconomyTab({ identity, pinVerified, onZoom, onAction }: EconomyT
     try {
       const response = await adminApi.marketplace(identity, marketParams);
       setMarketplace(asArray(response.data));
-    } catch (err) {
+    } catch {
     }
   }, [identity, pinVerified, marketParams]);
 
@@ -94,7 +94,7 @@ export function EconomyTab({ identity, pinVerified, onZoom, onAction }: EconomyT
     try {
       const response = await adminApi.decks(identity, decksParams);
       setDecks(asArray(response.data));
-    } catch (err) {
+    } catch {
     }
   }, [identity, pinVerified, decksParams]);
 

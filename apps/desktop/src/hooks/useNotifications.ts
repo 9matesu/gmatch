@@ -4,7 +4,6 @@ import { useEffect, useCallback, useState, useRef } from 'react';
 import { useIdentity } from './useIdentity';
 import { useSettings } from './useSettings';
 import type { LobbyState } from '@orbit/shared';
-import { orbitFetch } from '../utils/api';
 import { playMatch, playMsgReceive, playQueueJoin, playPress } from '../utils/sounds';
 
 interface NotificationData {
@@ -75,7 +74,7 @@ export function useNotifications(lobbyState?: LobbyState | null) {
         if (!cancelled) {
           setSwRegistered(true);
         }
-      } catch (err) {
+      } catch {
       }
     };
 
@@ -100,7 +99,7 @@ export function useNotifications(lobbyState?: LobbyState | null) {
       const permission = await Notification.requestPermission();
       setNotificationPermission(permission);
       return permission === 'granted';
-    } catch (err) {
+    } catch {
       return false;
     }
   }, []);
@@ -154,7 +153,7 @@ export function useNotifications(lobbyState?: LobbyState | null) {
         channel.postMessage({ type: 'PLAY_SOUND', sound: notification.sound });
         channel.close();
       }
-    } catch (err) {
+    } catch {
     }
   }, []);
 

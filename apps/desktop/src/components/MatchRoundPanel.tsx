@@ -5,7 +5,6 @@ import type { MatchSnapshot, LobbyState, OrbitObject, User } from '@orbit/shared
 import { countdownMs, formatCountdown, matchWindowMs, opponentCardId, resolveDisplayName, myCardId } from '../utils/lobby'
 import { useObjectImage } from '../hooks/useObjectImage'
 import {
-  playRoundStart,
   playCountdown,
   playTimeout,
   playLike,
@@ -21,7 +20,7 @@ import { MediaBadge } from './MediaBadge'
 import { CardBack } from './CardBack'
 import { ObjectImage } from './ObjectImage'
 import { ValuationSummary } from './game/ValuationSummary'
-import { ZoomIn, Check, X, Sparkles, Heart, Zap, Link as LinkIcon, Swords, Play, LayoutGrid } from 'lucide-react'
+import { ZoomIn, Check, X, Sparkles, Heart, Zap, Link as LinkIcon,   LayoutGrid } from 'lucide-react'
 
 interface IdentityLike {
   orbitId: string

@@ -11,7 +11,6 @@ import {
   Link as LinkIcon,
   ChevronLeft,
   ChevronRight,
-  ArrowLeftRight,
   Trash2,
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';

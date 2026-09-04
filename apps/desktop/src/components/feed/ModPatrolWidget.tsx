@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { playPress, playWin, playMatchFound, playChime } from '../../utils/sounds';
-import { ShieldAlert, CheckCircle2, XCircle, Flame, Trophy, Sparkles, AlertTriangle, Heart, Coins, Lock, CheckSquare, EyeOff, Send, RefreshCw, Info } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, XCircle, Flame, Trophy, Sparkles, AlertTriangle, Heart, Coins, Lock, CheckSquare, EyeOff, Send, RefreshCw } from 'lucide-react';
 import { fetchUniversalFeed, isExplicitFeederImage, type FeederImage } from '../../utils/universalImageFeeder';
 import { orbitFetch } from '../../utils/api';
 import type { OrbitIdentity } from '@orbit/crypto';

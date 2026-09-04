@@ -1,12 +1,11 @@
 "use client";
 
-import { AdminTable, AdminFilterBar, AdminEmptyState, AdminLoadingState, Badge, StatusBadge, FormModal, ConfirmDialog } from "../../../components/admin/primitives";
+import {        ConfirmDialog } from "../../../components/admin/primitives";
 import { adminApi } from "../../../utils/adminApi";
 import { BotSetupPanel } from "../../../components/admin/BotSetupPanel";
 import { LootboxAdminPanel } from "../../../components/admin/LootboxAdminPanel";
-import { BooruQueryBox } from "../../../components/admin/BooruQueryBox";
 import { useState, useCallback, useEffect } from "react";
-import { Settings, Bot, Box, AlertTriangle, Trash2, Save, RefreshCw, Eye, EyeOff, Plus, Globe, Key, User, Zap, Sparkles, Crown, Gem, Star, Trophy, Zap as ZapIcon, Crown as CrownIcon } from "lucide-react";
+import { Settings, Bot, Box, AlertTriangle,  Save,     Globe,         Zap as ZapIcon } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import type { OrbitIdentity } from "@orbit/crypto";
 
@@ -50,7 +49,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
       ]);
       if (discordRes.url) setDiscordLink(discordRes.url);
       setCashoutRateBps(cashoutRes.cashoutRateBps);
-    } catch (err) {
+    } catch {
     }
   }, [identity, pinVerified]);
 
@@ -63,7 +62,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
     try {
       await adminApi.saveDiscordLink(identity, discordLink);
       fetchSettings();
-    } catch (err) {
+    } catch {
     }
   };
 
@@ -72,7 +71,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
     try {
       await adminApi.saveCashoutRate(identity, cashoutRateBps);
       fetchSettings();
-    } catch (err) {
+    } catch {
     }
   };
 
@@ -82,7 +81,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
     try {
       await adminApi.triggerCleanup(identity);
       onAction("refresh");
-    } catch (err) {
+    } catch {
     }
   };
 
@@ -92,7 +91,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
     try {
       await adminApi.cleanAllPosts(identity);
       onAction("refresh");
-    } catch (err) {
+    } catch {
     }
   };
 
@@ -102,7 +101,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
     try {
       await adminApi.migrateLobbyToPosts(identity);
       onAction("refresh");
-    } catch (err) {
+    } catch {
     }
   };
 

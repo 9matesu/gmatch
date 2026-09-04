@@ -1,6 +1,6 @@
 "use client";
 
-import type { ContentManifest, WrappedKey } from '@orbit/crypto';
+import type { ContentManifest } from '@orbit/crypto';
 
 export interface StoredObject {
   id: string

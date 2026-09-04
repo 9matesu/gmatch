@@ -14,3 +14,6 @@ apps/api/orbit.snapshot.sqlite
 apps/api/blobs/
 *.sqlite.tmp
 .split_scratch/
+coverage/
+test-results/
+playwright-report/

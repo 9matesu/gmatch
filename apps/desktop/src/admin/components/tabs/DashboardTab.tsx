@@ -1,13 +1,12 @@
 "use client";
 
-import { AdminTable, AdminFilterBar, AdminEmptyState, AdminLoadingState, Badge, StatusBadge } from "../../../components/admin/primitives";
+import {   AdminEmptyState, AdminLoadingState, Badge } from "../../../components/admin/primitives";
 import { adminApi } from "../../../utils/adminApi";
 import { useState, useCallback, useEffect } from "react";
-import { CardZoomModal } from "../../../components/CardZoomModal";
-import { Users, Activity, GitCompare, Image, Flag, CreditCard, BarChart2, AlertTriangle, CheckCircle2, XCircle, Clock, TrendingUp, Heart, Bot } from "lucide-react";
+import { Users, Activity, GitCompare, Image, Flag,  BarChart2,   XCircle, Clock, TrendingUp, Heart, Bot } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { AdminMediaThumbnail } from "../AdminMediaThumbnail";
-import type { DashboardStats, AdminObject, TableParams, TableResponse } from "../../../utils/adminTypes";
+import type { DashboardStats, AdminObject } from "../../../utils/adminTypes";
 import type { OrbitIdentity } from "@orbit/crypto";
 
 interface DashboardTabProps {
