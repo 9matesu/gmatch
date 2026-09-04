@@ -8,11 +8,11 @@ interface OfflineCardProps {
   onRetry: () => void
 }
 
-/** Status dot colors (was .status-dot.loading/.offline/.empty/.live). */
+/** Status dot colors (was .status-dot.loading/.offline/.empty/.live) — shell status tokens. */
 const DOT_COLOR = {
-  loading: 'bg-[#3fd68c] animate-[gg-dot-spin_0.9s_linear_infinite]',
-  offline: 'bg-[#ff2d78] animate-[gg-dot-pulse_1.1s_ease-in-out_infinite]',
-  empty: 'bg-[#ffb02e]',
+  loading: 'bg-retro-online animate-[gg-dot-spin_0.9s_linear_infinite]',
+  offline: 'bg-retro-error animate-[gg-dot-pulse_1.1s_ease-in-out_infinite]',
+  empty: 'bg-retro-warning',
 } as const
 
 /**

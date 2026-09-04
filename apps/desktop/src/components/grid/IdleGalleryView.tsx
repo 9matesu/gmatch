@@ -4,11 +4,12 @@ import { IconWallpaper, IconX } from '../../ui/icons'
 import { offlineSvg } from '../../services/offlineSvg'
 import { redgifsPlayable } from '../../services/redgifs'
 import CachedImg from '../../ui/CachedImg'
+import { EmptyState } from '../EmptyState'
 import { BTN, BTN_SMALL, MONO, MUTED, RARITY } from '../../ui/styles'
 
-/** Tag filter input (was .custom-tag-input). */
+/** Tag filter input — shell glass tokens (was .custom-tag-input). */
 const TAG_INPUT =
-  'min-w-0 flex-1 rounded-lg border border-white/[0.14] bg-[#05070a] px-2.5 py-1.5 text-[13px] text-retro-fg outline-none placeholder:text-retro-muted disabled:opacity-50 [@media(pointer:coarse)]:text-[16px]'
+  'min-w-0 flex-1 rounded-lg border border-border-glass bg-retro-bg px-2.5 py-1.5 text-[13px] text-retro-fg outline-none placeholder:text-retro-muted focus:border-retro-accent [@media(pointer:coarse)]:text-[16px]'
 
 /**
  * Idle keepsakes grid (was ShopPanel's Gallery tab): tag filter, backdrop
@@ -25,8 +26,12 @@ export default function IdleGalleryView() {
   const [filter, setFilter] = useState('')
   if (gallery.length === 0) {
     return (
-      <div className="p-3.5 text-[13px] text-retro-muted">
-        No keepsakes yet. Drain feed images to keep them.
+      <div className="min-h-0 flex-1 overflow-y-auto p-3.5">
+        <EmptyState
+          icon="🖼️"
+          title="No keepsakes yet"
+          description="Drain feed images to keep them — featured foes land here with their rarity."
+        />
       </div>
     )
   }
@@ -56,10 +61,19 @@ export default function IdleGalleryView() {
         </div>
       )}
       {shown.length === 0 ? (
-        <div className="p-3.5 text-[13px] text-retro-muted">No keepsakes match that tag.</div>
+        <EmptyState
+          icon="🔍"
+          title="No keepsakes match that tag"
+          description={`Nothing in the gallery carries “${filter.trim()}”. Try a shorter tag.`}
+          action={
+            <button type="button" className={`${BTN} ${BTN_SMALL}`} onClick={() => setFilter('')}>
+              Clear filter
+            </button>
+          }
+        />
       ) : null}
       {backgroundUrl && (
-        <div className="mb-2.5 flex items-center justify-between gap-2.5 rounded-[10px] border border-[rgba(255,45,120,0.4)] bg-[#05070a] px-3 py-2">
+        <div className="mb-2.5 flex items-center justify-between gap-2.5 rounded-[10px] border border-retro-accent/40 bg-retro-bg px-3 py-2">
           <span className={MUTED}>Backdrop live</span>
           <button
             type="button"

@@ -18,6 +18,7 @@ import {
 import { ACHIEVEMENTS } from '../game/achievements'
 import { CAP_SKINS } from './capSkins'
 import { formatNum } from './format'
+import { Skeleton } from '../components/Skeleton'
 import {
   BTN,
   BTN_DANGER,
@@ -41,9 +42,9 @@ const TABS: { id: Tab; label: string; icon: ComponentType<{ size?: number }> }[]
 /** Scrollable tab body (was .tab-body). */
 const TAB_BODY = 'min-h-0 flex-1 overflow-y-auto p-3.5'
 
-/** Tag search / filter input (was .custom-tag-input). */
+/** Tag search / filter input — shell glass tokens (was .custom-tag-input). */
 const TAG_INPUT =
-  'min-w-0 flex-1 rounded-lg border border-white/[0.14] bg-[#05070a] px-2.5 py-1.5 text-[13px] text-retro-fg outline-none placeholder:text-retro-muted disabled:opacity-50 [@media(pointer:coarse)]:text-[16px]'
+  'min-w-0 flex-1 rounded-lg border border-border-glass bg-retro-bg px-2.5 py-1.5 text-[13px] text-retro-fg outline-none placeholder:text-retro-muted focus:border-retro-accent disabled:opacity-50 [@media(pointer:coarse)]:text-[16px]'
 
 function TagsTab() {
   const tags = useGame((s) => s.tags)
@@ -107,6 +108,14 @@ function TagsTab() {
         </button>
       </div>
       {note && <div className={`${MUTED} -mt-1 mb-2.5`}>{note}</div>}
+      {/* Market refresh: shell skeleton pills while the fetch is in flight. */}
+      {fetching && (
+        <div className="mb-2.5 flex gap-2" role="status" aria-label="Refreshing tag market">
+          <Skeleton className="h-9 w-36 rounded-full" />
+          <Skeleton className="h-9 w-28 rounded-full" />
+          <Skeleton className="h-9 w-32 rounded-full" />
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
         {tags.map((t) => {
           const isOwned = t.level > 0
@@ -117,10 +126,10 @@ function TagsTab() {
           return (
             <div
               key={t.name}
-              className={`flex max-w-full items-stretch overflow-hidden rounded-full border shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_0_#05070a] transition-[transform,box-shadow] duration-75 active:translate-y-px ${
+              className={`flex max-w-full items-stretch overflow-hidden rounded-full border shadow-sm transition-[transform,box-shadow] duration-75 active:translate-y-px ${
                 on
-                  ? 'border-[#8f0e42] bg-[#ff2d78] shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_2px_0_#8f0e42]'
-                  : 'border-[#05070a] bg-surface-elevated'
+                  ? 'border-white/50 bg-retro-accent'
+                  : 'border-border-glass bg-surface-elevated'
               } ${afford ? 'animate-[gg-pulse_1.6s_ease-in-out_infinite]' : ''}`}
             >
               <button
@@ -135,12 +144,12 @@ function TagsTab() {
                 }
               >
                 <span
-                  className={`${DISPLAY} truncate text-xs font-bold ${on ? 'text-[#0a0a0f]' : ''}`}
+                  className={`${DISPLAY} truncate text-xs font-bold ${on ? 'text-retro-accent-text' : ''}`}
                 >
                   {t.name}
                 </span>
                 <span
-                  className={`${MONO} whitespace-nowrap text-[10px] ${on ? 'text-[#0a0a0f]' : 'text-retro-muted'}`}
+                  className={`${MONO} whitespace-nowrap text-[10px] ${on ? 'text-retro-accent-text' : 'text-retro-muted'}`}
                 >
                   Lv {t.level} · +{formatNum(t.income)}/s ·{' '}
                   {isOwned ? (on ? 'ON' : 'OFF') : `${formatNum(cost)} g$`}
@@ -149,7 +158,7 @@ function TagsTab() {
               {isOwned && (
                 <button
                   type="button"
-                  className={`${MONO} cursor-pointer border-0 border-l border-black/50 bg-black/25 px-2.5 text-[10px] text-retro-fg enabled:hover:brightness-125 disabled:cursor-not-allowed disabled:opacity-45 ${on ? 'text-[#0a0a0f]' : ''}`}
+                  className={`${MONO} cursor-pointer border-0 border-l border-black/50 bg-black/25 px-2.5 text-[10px] text-retro-fg enabled:hover:brightness-125 disabled:cursor-not-allowed disabled:opacity-45 ${on ? 'text-retro-accent-text' : ''}`}
                   onClick={() => soloTag(t.name)}
                   title={`Solo ${t.name} — feed ONLY this tag`}
                 >
@@ -159,7 +168,7 @@ function TagsTab() {
               {isOwned && !maxed && (
                 <button
                   type="button"
-                  className={`${MONO} cursor-pointer border-0 border-l border-black/50 bg-black/25 px-2.5 text-[10px] text-retro-fg enabled:hover:brightness-125 disabled:cursor-not-allowed disabled:opacity-45 ${on ? 'text-[#0a0a0f]' : ''}`}
+                  className={`${MONO} cursor-pointer border-0 border-l border-black/50 bg-black/25 px-2.5 text-[10px] text-retro-fg enabled:hover:brightness-125 disabled:cursor-not-allowed disabled:opacity-45 ${on ? 'text-retro-accent-text' : ''}`}
                   disabled={!afford}
                   onClick={() => buyTag(t.name)}
                   title={`Level up ${t.name} — ${formatNum(cost)} g$`}
@@ -198,7 +207,7 @@ function CapsTab() {
           return (
             <div
               key={id}
-              className={`${SKIN} flex items-center justify-between gap-2.5 rounded-[10px] border border-[#05070a] bg-surface-elevated p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_0_#05070a] ${
+              className={`${SKIN} flex items-center justify-between gap-2.5 rounded-[10px] border border-border-glass bg-surface-elevated p-2.5 shadow-sm ${
                 afford ? 'animate-[gg-pulse_1.6s_ease-in-out_infinite]' : ''
               }`}
               style={{
@@ -242,14 +251,14 @@ function PrestigeTab() {
   const preview = shardsFromEarned(totalEarnedGc)
   return (
     <div className={TAB_BODY}>
-      <div className="mb-3.5 rounded-[10px] border border-[#8f0e42] bg-[#05070a] p-3">
+      <div className="mb-3.5 rounded-[10px] border border-border-glass bg-retro-bg p-3">
         <p className={`${MUTED} m-0`}>
           Brainmelt burns the run for <b>Corruption shards</b> — each one is a permanent +10%
           global multiplier.
         </p>
         <ul className="my-2 list-none text-xs">
-          <li className="text-[#ff8095]">Resets: g$, XP/tier, tags, caps</li>
-          <li className="text-[#3fd68c]">Keeps: gallery, shards, achievements</li>
+          <li className="text-retro-error">Resets: g$, XP/tier, tags, caps</li>
+          <li className="text-retro-online">Keeps: gallery, shards, achievements</li>
         </ul>
         <div className={`${MONO} mb-2.5 mt-2 text-[13px] text-[#ffd75e]`}>
           +{preview} shards on melt · held: {shards}
@@ -269,8 +278,8 @@ function PrestigeTab() {
           return (
             <div
               key={a.id}
-              className={`flex items-center gap-1.5 rounded-lg border bg-[#05070a] p-2 text-[11px] ${
-                got ? 'border-[rgba(255,215,94,0.5)] text-[#ffd75e]' : 'border-white/[0.08] text-retro-muted'
+              className={`flex items-center gap-1.5 rounded-lg border bg-retro-bg p-2 text-[11px] ${
+                got ? 'border-[rgba(255,215,94,0.5)] text-[#ffd75e]' : 'border-border-subtle text-retro-muted'
               }`}
               title={got ? 'Unlocked' : 'Locked'}
             >
@@ -287,17 +296,15 @@ export default function ShopPanel() {
   const [tab, setTab] = useState<Tab>('tags')
   return (
     <aside className={`${PLATE} ${PANEL} flex flex-col overflow-hidden p-0`}>
-      <nav className="grid flex-none grid-cols-3 gap-1.5 border-b border-white/[0.06] bg-[#05070a] p-3">
+      <nav className="grid flex-none grid-cols-3 gap-1.5 border-b border-border-glass bg-retro-bg p-3">
         {TABS.map((t) => {
           const Icon = t.icon
           return (
             <button
               key={t.id}
               type="button"
-              className={`${DISPLAY} flex min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-t-lg border border-transparent border-b-2 bg-transparent px-0.5 py-2 text-xs font-semibold tracking-[0.5px] transition-[color,background] duration-150 hover:text-retro-fg ${
-                tab === t.id
-                  ? 'border-b-[#ff2d78] bg-surface-elevated text-retro-fg'
-                  : 'text-retro-muted'
+              className={`glass-tab ${DISPLAY} flex min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-0.5 py-2 text-xs font-semibold tracking-[0.5px] ${
+                tab === t.id ? 'glass-tab-active' : ''
               }`}
               aria-pressed={tab === t.id}
               onClick={() => setTab(t.id)}

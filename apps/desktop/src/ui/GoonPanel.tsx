@@ -28,6 +28,8 @@ import {
 } from './styles'
 import CachedImg from './CachedImg'
 import OfflineCard from './OfflineCard'
+import { Badge } from '../components/Badge'
+import { Skeleton } from '../components/Skeleton'
 import { IconChevronL, IconChevronR } from './icons'
 
 interface Float {
@@ -167,7 +169,7 @@ export default function GoonPanel() {
               <button
                 key={`${cell.post.id}:${i}`}
                 type="button"
-                className="relative min-h-0 cursor-pointer overflow-hidden rounded-lg border border-white/[0.06] bg-[#0a0a0f] p-0 text-left font-[inherit] text-[color:inherit] active:cursor-grabbing"
+                className="relative min-h-0 cursor-pointer overflow-hidden rounded-lg border border-border-glass bg-black p-0 text-left font-[inherit] text-[color:inherit] active:cursor-grabbing"
                 onClick={(e) => handleCellClick(i, e)}
                 aria-label={`Foe ${i + 1}: ${Math.ceil(cell.hp)} of ${cell.maxHp} HP — activate to attack`}
               >
@@ -219,19 +221,19 @@ export default function GoonPanel() {
           {Array.from({ length: Math.max(0, GRID_SIZE - grid.length) }, (_, k) => (
             <div
               key={`empty-${k}`}
-              className="relative flex min-h-0 cursor-default items-center justify-center overflow-hidden rounded-lg border border-dashed border-white/[0.06] bg-[#0a0a0f]"
+              className="relative flex min-h-0 cursor-default items-center justify-center overflow-hidden rounded-lg border border-dashed border-border-glass bg-black"
             >
-              <span className={`${MONO} text-xl text-retro-muted`}>
-                {fetching ? '…' : 'empty'}
-              </span>
+              {fetching ? (
+                <Skeleton className="h-full w-full" />
+              ) : (
+                <span className={`${MONO} text-xl text-retro-muted`}>empty</span>
+              )}
             </div>
           ))}
           {feedOffline && (
-            <span
-              className={`${MONO} absolute right-2.5 top-2.5 rounded-lg border border-[#05070a] bg-[#ffb02e] px-2.5 py-1 text-xs font-bold tracking-[1px] text-[#1a1206]`}
-            >
+            <Badge variant="warning" className={`${MONO} absolute right-2.5 top-2.5`}>
               OFFLINE
-            </span>
+            </Badge>
           )}
           {grid.length === 0 && (
             <OfflineCard fetching={fetching} feedOffline={feedOffline} onRetry={() => void fetchFeed()} />
@@ -276,11 +278,9 @@ export default function GoonPanel() {
             />
           )}
           {showOffline && (
-            <span
-              className={`${MONO} absolute right-2.5 top-2.5 rounded-lg border border-[#05070a] bg-[#ffb02e] px-2.5 py-1 text-xs font-bold tracking-[1px] text-[#1a1206]`}
-            >
+            <Badge variant="warning" className={`${MONO} absolute right-2.5 top-2.5`}>
               OFFLINE
-            </span>
+            </Badge>
           )}
           {showOffline && (
             <OfflineCard fetching={fetching} feedOffline={feedOffline} onRetry={() => void fetchFeed()} />
@@ -288,7 +288,7 @@ export default function GoonPanel() {
           {!showOffline && canGoBack && (
             <button
               type="button"
-              className="absolute left-2.5 top-1/2 flex h-16 w-[46px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl border border-[#05070a] bg-surface-elevated text-retro-fg opacity-85 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_3px_0_#05070a] transition-[transform,box-shadow,border-color,opacity] duration-75 hover:opacity-100 hover:border-[#ff2d78] active:translate-y-[calc(-50%+2px)] active:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_0_#05070a]"
+              className="glass-button absolute left-2.5 top-1/2 flex h-16 w-[46px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100"
               aria-label="Previous image"
               title="Back to the skipped foe"
               onClick={(e) => {
@@ -302,7 +302,7 @@ export default function GoonPanel() {
           {!showOffline && (
             <button
               type="button"
-              className="absolute right-2.5 top-1/2 flex h-16 w-[46px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl border border-[#05070a] bg-surface-elevated text-retro-fg opacity-85 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_3px_0_#05070a] transition-[transform,box-shadow,border-color,opacity] duration-75 hover:opacity-100 hover:border-[#ff2d78] active:translate-y-[calc(-50%+2px)] active:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_0_#05070a]"
+              className="glass-button absolute right-2.5 top-1/2 flex h-16 w-[46px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100"
               aria-label="Next image"
               title="Skip this foe — no reward"
               onClick={(e) => {
@@ -326,16 +326,16 @@ export default function GoonPanel() {
             ))}
         </div>
       )}
-      <div className="flex flex-none items-center gap-2.5 rounded-[10px] border border-white/[0.06] bg-[#05070a] px-3 py-2">
+      <div className="flex flex-none items-center gap-2.5 rounded-[10px] border border-border-glass bg-retro-bg px-3 py-2">
         <div
-          className="inline-flex flex-none overflow-hidden rounded-lg border border-white/10"
+          className="inline-flex flex-none overflow-hidden rounded-lg border border-border-glass"
           role="group"
           aria-label="Feed layout"
         >
           <button
             type="button"
             className={`${MONO} cursor-pointer border-0 bg-transparent px-2.5 py-1 text-xs font-bold ${
-              viewMode === 'single' ? 'bg-[#ff2d78] text-[#0a0a0f]' : 'text-retro-muted'
+              viewMode === 'single' ? 'bg-retro-accent text-retro-accent-text' : 'bg-transparent text-retro-muted hover:text-retro-fg'
             }`}
             aria-pressed={viewMode === 'single'}
             onClick={() => setViewMode('single')}
@@ -346,7 +346,7 @@ export default function GoonPanel() {
           <button
             type="button"
             className={`${MONO} cursor-pointer border-0 bg-transparent px-2.5 py-1 text-xs font-bold ${
-              viewMode === 'grid' ? 'bg-[#ff2d78] text-[#0a0a0f]' : 'text-retro-muted'
+              viewMode === 'grid' ? 'bg-retro-accent text-retro-accent-text' : 'bg-transparent text-retro-muted hover:text-retro-fg'
             }`}
             aria-pressed={viewMode === 'grid'}
             onClick={() => setViewMode('grid')}
@@ -380,11 +380,11 @@ export default function GoonPanel() {
             onClick={() => void fetchFeed()}
             title="Retry the feed"
           >
-            {fetching ? '…' : 'Retry'}
+            {fetching ? 'Retrying…' : 'Retry'}
           </button>
         )}
         <span
-          className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-white/[0.08] bg-[#05070a] px-2.5 py-1 text-xs font-bold text-retro-fg [&_svg]:text-[#ff2d78]`}
+          className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border-glass bg-retro-bg px-2.5 py-1 text-xs font-bold text-retro-fg [&_svg]:text-retro-accent`}
           title="Lifetime KOs — each foe hits harder"
         >
           KOs: {formatNum(defeated)}
@@ -400,9 +400,9 @@ export default function GoonPanel() {
             <button
               key={id}
               type="button"
-              className={`${SKIN} flex cursor-pointer flex-col gap-0.5 rounded-[10px] border border-[#05070a] bg-surface-elevated p-2 text-left text-retro-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_3px_0_#05070a] transition-[transform,box-shadow,border-color] duration-75 enabled:hover:border-[#ff2d78] enabled:active:translate-y-0.5 enabled:active:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_0_#05070a] disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none ${
+              className={`${SKIN} flex cursor-pointer flex-col gap-0.5 rounded-[10px] border border-border-glass bg-surface-elevated p-2 text-left text-retro-fg shadow-sm transition-[transform,box-shadow,border-color] duration-75 enabled:hover:border-retro-accent enabled:active:translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none ${
                 isLive
-                  ? 'border-[#ff2d78] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_3px_0_#8f0e42,0_0_12px_rgba(255,45,120,0.35)]'
+                  ? 'border-[#ff2d78] shadow-[0_0_12px_rgba(255,45,120,0.35)]'
                   : ''
               }`}
               style={{

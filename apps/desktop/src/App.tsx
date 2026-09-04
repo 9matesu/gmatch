@@ -27,6 +27,7 @@ import { collectConfigBundle, applyConfigBundle, applyStashFromBundle, parseConf
 import { runMigrations } from "./utils/migration";
 import { startWalletSync } from "./game/walletBridge";
 import { useGame as useIdleGame } from "./game/store";
+import { ROUTE_VIEWS, hashForView, viewFromHash, type RoutedView } from "./utils/routing";
 import { playChime, playPress, playMsgReceive } from "./utils/sounds";
 import { useLobby } from "./hooks/useLobby";
 import { LobbyPanel } from "./components/LobbyPanel";
@@ -174,8 +175,11 @@ export default function Home() {
   const [itemsLoading, setItemsLoading] = useState(true);
   const [mainView, setMainView] = useState<MainViewType>(() => {
     if (typeof window === 'undefined') return 'feed'
-    const saved = localStorage.getItem('orbit_main_view') as any
-    if (saved === 'feed' || saved === 'games' || saved === 'messages' || saved === 'profile') return saved
+    // Direct URL wins over the last-visited persisted view (plan §5).
+    const fromHash = viewFromHash(window.location.hash)
+    if (fromHash) return fromHash
+    const saved = localStorage.getItem('orbit_main_view') as MainViewType | null
+    if (saved && ROUTE_VIEWS.includes(saved as RoutedView)) return saved
     return 'feed'
   });
   const [showCreatePostModal, setShowCreatePostModal] = useState(false);
@@ -287,6 +291,24 @@ export default function Home() {
     }
     if (view === 'games') setGamesSubTab('duel');
     setMainView(view);
+    // Keep the URL in sync (pushState so back/forward navigate views).
+    const want = hashForView(view)
+    if (window.location.hash !== want) window.history.pushState(null, '', want)
+  }, [mainView]);
+
+  // Browser back/forward -> view. pushState entries surface via popstate;
+  // manual hash edits via hashchange. Listen to both.
+  useEffect(() => {
+    const onNav = () => {
+      const v = viewFromHash(window.location.hash)
+      if (v && v !== mainView) setMainView(v)
+    }
+    window.addEventListener('hashchange', onNav)
+    window.addEventListener('popstate', onNav)
+    return () => {
+      window.removeEventListener('hashchange', onNav)
+      window.removeEventListener('popstate', onNav)
+    }
   }, [mainView]);
 
   const handleOpenHome = useCallback(() => {

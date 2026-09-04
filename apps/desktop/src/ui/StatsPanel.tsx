@@ -5,6 +5,7 @@ import { TITLES, tierForXp, titleForTier, xpForTier } from '../game/prestige'
 import { clearImageCache, imageCacheStats, type ImageCacheStats } from '../services/imageCache'
 import { formatNum } from './format'
 import { BTN, BTN_SMALL, DISPLAY, MONO, PANEL, PLATE } from './styles'
+import { Skeleton } from '../components/Skeleton'
 import { IconBolt, IconCoin, IconCursor, IconImage, IconRefresh, IconShard } from './icons'
 
 function formatCacheMb(bytes: number): string {
@@ -41,7 +42,7 @@ export default function StatsPanel() {
   }, [refreshCache])
 
   const statRow = (icon: ReactNode, label: string, value: ReactNode) => (
-    <div className="flex items-center justify-between border-b border-white/[0.06] py-[7px] text-[13px] text-retro-muted">
+    <div className="flex items-center justify-between border-b border-border-subtle py-[7px] text-[13px] text-retro-muted">
       <span className="inline-flex items-center gap-[7px]">
         {icon} {label}
       </span>
@@ -68,7 +69,7 @@ export default function StatsPanel() {
       {statRow(
         <IconImage size={13} />,
         'Picture cache',
-        cache ? `${cache.files} · ${formatCacheMb(cache.bytes)}` : '—',
+        cache ? `${cache.files} · ${formatCacheMb(cache.bytes)}` : <Skeleton className="h-3 w-16" />,
       )}
       {cache && cache.files > 0 && (
         <button
@@ -88,13 +89,13 @@ export default function StatsPanel() {
             Pornification
           </span>
           <span className="inline-flex items-baseline gap-1.5">
-            <span className={`${DISPLAY} font-bold text-[#ff2d78]`}>{titleForTier(tier)}</span>
+            <span className={`${DISPLAY} font-bold text-retro-accent`}>{titleForTier(tier)}</span>
             <span className={`${MONO} text-[11px] text-retro-muted`}>T{tier}</span>
           </span>
         </div>
-        <div className="mb-2.5 h-2 overflow-hidden rounded-full border border-white/[0.06] bg-[#05070a]">
+        <div className="mb-2.5 h-2 overflow-hidden rounded-full border border-border-glass bg-retro-bg">
           <div
-            className="h-full rounded-full bg-[#ff2d78] transition-[width] duration-[400ms] ease-in-out"
+            className="h-full rounded-full bg-retro-accent transition-[width] duration-[400ms] ease-in-out"
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -112,7 +113,7 @@ export default function StatsPanel() {
             >
               <span
                 className={`${MONO} w-4 text-right ${
-                  i + 1 === tier ? 'text-[#ff2d78]' : 'opacity-60'
+                  i + 1 === tier ? 'text-retro-accent' : 'opacity-60'
                 }`}
               >
                 {i + 1}
