@@ -1,0 +1,55 @@
+/* GoonGrid idle — keyframes only (all component styling lives in Tailwind
+   utilities on the JSX). Imported by GridWorkspace; referenced via Tailwind
+   arbitrary animate-[...] utilities. */
+
+@keyframes gg-dot-spin {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.75); }
+}
+
+@keyframes gg-dot-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255, 45, 120, 0.5); }
+  50% { opacity: 0.7; box-shadow: 0 0 0 6px rgba(255, 45, 120, 0); }
+}
+
+@keyframes gg-crit {
+  0% {
+    opacity: 1;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+}
+
+@keyframes gg-float-up {
+  0% {
+    opacity: 1;
+    translate: 0 0;
+  }
+  100% {
+    opacity: 0;
+    translate: 0 -70px;
+  }
+}
+
+@keyframes gg-hp-low {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes gg-pulse {
+  0%,
+  100% {
+    border-color: rgba(255, 45, 120, 0.7);
+  }
+  50% {
+    border-color: #ffb02e;
+  }
+}

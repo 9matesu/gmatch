@@ -9,3 +9,4 @@ orbit.snapshot.sqlite
 *.sqlite
 blobs/
 test-blobs-*/
+*.tsbuildinfo

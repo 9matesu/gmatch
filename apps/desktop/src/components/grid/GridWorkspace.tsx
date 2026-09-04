@@ -5,12 +5,12 @@ import StatsPanel from '../../ui/StatsPanel'
 import OfflineModal from '../../ui/OfflineModal'
 import { useToast } from '../Toast'
 import { useGame } from '../../game/store'
-import '../../ui/goongrid.css'
+import '../../ui/grid-animations.css'
 
 /**
  * "Babecock · Idle" workspace (plan D2/D5): the GoonGrid idle game as a view
- * inside the goonMatch shell. Layout + panels still use the legacy goongrid
- * stylesheet (scoped .goongrid-root) until the Tailwind restyle lands.
+ * inside the goonMatch shell. Panels are styled with Tailwind utilities
+ * (src/ui/styles.ts); only the game's keyframes live in a stylesheet.
  */
 export default function GridWorkspace() {
   const ageVerified = useGame((s) => s.ageVerified)
@@ -45,15 +45,13 @@ export default function GridWorkspace() {
   }, [ageVerified, setupComplete])
 
   return (
-    <div className="goongrid-root h-full min-h-0">
-      <div className="app-shell">
-        <main className="columns">
-          <StatsPanel />
-          <GoonPanel />
-          <ShopPanel />
-        </main>
-        <OfflineModal />
-      </div>
+    <div className="relative flex h-full min-h-0 flex-col gap-3 overflow-hidden bg-surface-canvas p-3">
+      <main className="grid min-h-0 flex-1 grid-cols-[280px_minmax(0,1fr)_360px] gap-3 max-[1100px]:block max-[1100px]:overflow-y-auto">
+        <StatsPanel />
+        <GoonPanel />
+        <ShopPanel />
+      </main>
+      <OfflineModal />
     </div>
   )
 }

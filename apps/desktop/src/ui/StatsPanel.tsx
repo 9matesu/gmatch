@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useGame } from '../game/store'
 import { clickPower, passiveGps } from '../game/economy'
 import { TITLES, tierForXp, titleForTier, xpForTier } from '../game/prestige'
 import { clearImageCache, imageCacheStats, type ImageCacheStats } from '../services/imageCache'
 import { formatNum } from './format'
+import { BTN, BTN_SMALL, DISPLAY, MONO, PANEL, PLATE } from './styles'
 import { IconBolt, IconCoin, IconCursor, IconImage, IconRefresh, IconShard } from './icons'
 
 function formatCacheMb(bytes: number): string {
@@ -39,46 +40,40 @@ export default function StatsPanel() {
     refreshCache()
   }, [refreshCache])
 
+  const statRow = (icon: ReactNode, label: string, value: ReactNode) => (
+    <div className="flex items-center justify-between border-b border-white/[0.06] py-[7px] text-[13px] text-retro-muted">
+      <span className="inline-flex items-center gap-[7px]">
+        {icon} {label}
+      </span>
+      <b className={`${MONO} text-sm text-retro-fg`}>{value}</b>
+    </div>
+  )
+
   return (
-    <aside className="plate panel stats">
-      <div className="gc-big mono">{formatNum(s.gc)}</div>
-      <div className="gc-label">g$</div>
-      <div className="stat-row">
-        <span>
-          <IconCoin size={13} /> g$/s
-        </span>
-        <b className="mono">{formatNum(gps)}</b>
+    <aside className={`${PLATE} ${PANEL}`}>
+      <div className={`${DISPLAY} text-[40px] font-bold leading-[1.1] break-all text-retro-fg [font-variant-numeric:tabular-nums]`}>
+        {formatNum(s.gc)}
       </div>
-      <div className="stat-row">
-        <span>
-          <IconBolt size={13} /> Click power
-        </span>
-        <b className="mono">{formatNum(cp)}</b>
-      </div>
-      <div className="stat-row">
-        <span>
-          <IconCursor size={13} /> Clicks / crits
-        </span>
-        <b className="mono">
+      <div className="mb-3.5 text-[11px] uppercase tracking-[2px] text-retro-muted">g$</div>
+      {statRow(<IconCoin size={13} />, 'g$/s', formatNum(gps))}
+      {statRow(<IconBolt size={13} />, 'Click power', formatNum(cp))}
+      {statRow(
+        <IconCursor size={13} />,
+        'Clicks / crits',
+        <>
           {s.clicks} / {s.crits}
-        </b>
-      </div>
-      <div className="stat-row">
-        <span>
-          <IconShard size={13} /> Corruption shards
-        </span>
-        <b className="mono">{s.shards}</b>
-      </div>
-      <div className="stat-row">
-        <span>
-          <IconImage size={13} /> Picture cache
-        </span>
-        <b className="mono">{cache ? `${cache.files} · ${formatCacheMb(cache.bytes)}` : '—'}</b>
-      </div>
+        </>,
+      )}
+      {statRow(<IconShard size={13} />, 'Corruption shards', s.shards)}
+      {statRow(
+        <IconImage size={13} />,
+        'Picture cache',
+        cache ? `${cache.files} · ${formatCacheMb(cache.bytes)}` : '—',
+      )}
       {cache && cache.files > 0 && (
         <button
           type="button"
-          className="btn small cache-clear"
+          className={`${BTN} ${BTN_SMALL} mt-2 w-full`}
           onClick={() => {
             void clearImageCache().then(refreshCache)
           }}
@@ -87,24 +82,42 @@ export default function StatsPanel() {
           <IconRefresh size={12} /> Clear cache
         </button>
       )}
-      <div className="ladder">
-        <div className="ladder-head">
-          <span className="ladder-title">Pornification</span>
-          <span className="tier-now">
-            <span className="tier-name">{titleForTier(tier)}</span>
-            <span className="mono tier-num">T{tier}</span>
+      <div className="mt-[18px]">
+        <div className="mb-2 flex items-baseline justify-between">
+          <span className="text-[11px] uppercase tracking-[2px] text-retro-muted">
+            Pornification
+          </span>
+          <span className="inline-flex items-baseline gap-1.5">
+            <span className={`${DISPLAY} font-bold text-[#ff2d78]`}>{titleForTier(tier)}</span>
+            <span className={`${MONO} text-[11px] text-retro-muted`}>T{tier}</span>
           </span>
         </div>
-        <div className="progress">
-          <div className="progress-fill" style={{ width: `${pct}%` }} />
+        <div className="mb-2.5 h-2 overflow-hidden rounded-full border border-white/[0.06] bg-[#05070a]">
+          <div
+            className="h-full rounded-full bg-[#ff2d78] transition-[width] duration-[400ms] ease-in-out"
+            style={{ width: `${pct}%` }}
+          />
         </div>
-        <ol className="tier-list">
+        <ol className="flex flex-col gap-[3px] text-xs">
           {TITLES.map((t, i) => (
             <li
               key={t}
-              className={i + 1 < tier ? 'reached' : i + 1 === tier ? 'current' : 'locked'}
+              className={
+                i + 1 < tier
+                  ? 'flex gap-2 text-retro-fg/75'
+                  : i + 1 === tier
+                    ? 'flex gap-2 font-bold text-retro-fg'
+                    : 'flex gap-2 text-retro-muted'
+              }
             >
-              <span className="mono">{i + 1}</span> {t}
+              <span
+                className={`${MONO} w-4 text-right ${
+                  i + 1 === tier ? 'text-[#ff2d78]' : 'opacity-60'
+                }`}
+              >
+                {i + 1}
+              </span>{' '}
+              {t}
             </li>
           ))}
         </ol>

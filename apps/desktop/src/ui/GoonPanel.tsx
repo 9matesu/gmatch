@@ -9,6 +9,23 @@ import { isVideoUrl } from '../services/postFilter'
 import { redgifsPlayable } from '../services/redgifs'
 import { CAP_SKINS } from './capSkins'
 import { formatNum } from './format'
+import {
+  BTN,
+  BTN_SMALL,
+  DISPLAY,
+  FLOAT_GC,
+  FLOAT_GC_CRIT,
+  GOON_IMAGE,
+  HP_BAR,
+  HP_FILL,
+  HP_FILL_LOW,
+  MONO,
+  MUTED,
+  PANEL,
+  PLATE,
+  SKIN,
+  STAGE_FRAME,
+} from './styles'
 import CachedImg from './CachedImg'
 import OfflineCard from './OfflineCard'
 import { IconChevronL, IconChevronR } from './icons'
@@ -127,11 +144,20 @@ export default function GoonPanel() {
   const hpPct = inBattle ? Math.max(0, (foeHp / foeMaxHp) * 100) : 0
   const isGrid = viewMode === 'grid'
 
+  const critFlashEl = critFlash && (
+    <div className="pointer-events-none absolute inset-0 z-[3] flex items-center justify-center bg-[rgba(255,45,120,0.28)] font-sans text-7xl font-bold tracking-[6px] text-white shadow-[inset_0_0_60px_rgba(255,45,120,0.5)] animate-[gg-crit_0.35s_ease-out_forwards]">
+      CRIT!
+    </div>
+  )
+
   return (
-    <section className="plate panel goon-panel">
+    <section className={`${PLATE} ${PANEL} flex flex-col gap-3 overflow-hidden`}>
       {isGrid ? (
-        <div className="grid-board" aria-label="3x3 goon grid">
-          {critFlash && <div className="crit-flash">CRIT!</div>}
+        <div
+          className={`${STAGE_FRAME} relative min-h-0 flex-1 grid auto-rows-fr grid-cols-3 gap-2 p-2`}
+          aria-label="3x3 goon grid"
+        >
+          {critFlashEl}
           {grid.map((cell, i) => {
             const motion =
               (cell.post.kind === 'video' || isVideoUrl(cell.post.url)) &&
@@ -141,13 +167,13 @@ export default function GoonPanel() {
               <button
                 key={`${cell.post.id}:${i}`}
                 type="button"
-                className="grid-cell"
+                className="relative min-h-0 cursor-pointer overflow-hidden rounded-lg border border-white/[0.06] bg-[#0a0a0f] p-0 text-left font-[inherit] text-[color:inherit] active:cursor-grabbing"
                 onClick={(e) => handleCellClick(i, e)}
                 aria-label={`Foe ${i + 1}: ${Math.ceil(cell.hp)} of ${cell.maxHp} HP — activate to attack`}
               >
                 {motion ? (
                   <video
-                    className="goon-image"
+                    className={GOON_IMAGE}
                     src={redgifsPlayable(cell.post.url)}
                     poster={cell.post.preview ? redgifsPlayable(cell.post.preview) : undefined}
                     autoPlay={!reduceMotion}
@@ -160,7 +186,7 @@ export default function GoonPanel() {
                   />
                 ) : (
                   <CachedImg
-                    className="goon-image"
+                    className={GOON_IMAGE}
                     src={cell.post.url}
                     alt="goon grid square"
                     referrerPolicy="no-referrer"
@@ -168,15 +194,22 @@ export default function GoonPanel() {
                     draggable={false}
                   />
                 )}
-                <span className="cell-hp">
-                  <span className="hp-bar">
-                    <span className={`hp-fill ${pct <= 30 ? 'low' : ''}`} style={{ width: `${pct}%` }} />
+                <span className="absolute bottom-1.5 left-1.5 right-1.5 z-[2]">
+                  <span className={`${HP_BAR} h-2`}>
+                    <span
+                      className={`${HP_FILL} ${pct <= 30 ? HP_FILL_LOW : ''}`}
+                      style={{ width: `${pct}%` }}
+                    />
                   </span>
                 </span>
                 {floats
                   .filter((f) => f.cell === i)
                   .map((f) => (
-                    <span key={f.id} className={`float-gc ${f.crit ? 'crit' : ''}`} style={{ left: f.x, top: f.y }}>
+                    <span
+                      key={f.id}
+                      className={`${FLOAT_GC} ${MONO} ${f.crit ? FLOAT_GC_CRIT : ''}`}
+                      style={{ left: f.x, top: f.y }}
+                    >
                       {f.text}
                     </span>
                   ))}
@@ -184,18 +217,29 @@ export default function GoonPanel() {
             )
           })}
           {Array.from({ length: Math.max(0, GRID_SIZE - grid.length) }, (_, k) => (
-            <div key={`empty-${k}`} className="grid-cell cell-empty">
-              <span className="cell-empty-label">{fetching ? '…' : 'empty'}</span>
+            <div
+              key={`empty-${k}`}
+              className="relative flex min-h-0 cursor-default items-center justify-center overflow-hidden rounded-lg border border-dashed border-white/[0.06] bg-[#0a0a0f]"
+            >
+              <span className={`${MONO} text-xl text-retro-muted`}>
+                {fetching ? '…' : 'empty'}
+              </span>
             </div>
           ))}
-          {feedOffline && <span className="offline-badge">OFFLINE</span>}
+          {feedOffline && (
+            <span
+              className={`${MONO} absolute right-2.5 top-2.5 rounded-lg border border-[#05070a] bg-[#ffb02e] px-2.5 py-1 text-xs font-bold tracking-[1px] text-[#1a1206]`}
+            >
+              OFFLINE
+            </span>
+          )}
           {grid.length === 0 && (
             <OfflineCard fetching={fetching} feedOffline={feedOffline} onRetry={() => void fetchFeed()} />
           )}
         </div>
       ) : (
         <div
-          className="image-stage"
+          className={`${STAGE_FRAME} relative min-h-0 flex-1 cursor-pointer active:cursor-grabbing max-[1100px]:min-h-[320px]`}
           onClick={handleClick}
           role="button"
           tabIndex={0}
@@ -207,10 +251,10 @@ export default function GoonPanel() {
             }
           }}
         >
-          {critFlash && <div className="crit-flash">CRIT!</div>}
+          {critFlashEl}
           {isMotion && current ? (
             <video
-              className="goon-image"
+              className={GOON_IMAGE}
               src={redgifsPlayable(current.url)}
               poster={current.preview ? redgifsPlayable(current.preview) : undefined}
               autoPlay={!reduceMotion}
@@ -223,7 +267,7 @@ export default function GoonPanel() {
             />
           ) : (
             <CachedImg
-              className="goon-image"
+              className={GOON_IMAGE}
               src={src}
               alt="goon feed"
               referrerPolicy="no-referrer"
@@ -231,14 +275,20 @@ export default function GoonPanel() {
               draggable={false}
             />
           )}
-          {showOffline && <span className="offline-badge">OFFLINE</span>}
+          {showOffline && (
+            <span
+              className={`${MONO} absolute right-2.5 top-2.5 rounded-lg border border-[#05070a] bg-[#ffb02e] px-2.5 py-1 text-xs font-bold tracking-[1px] text-[#1a1206]`}
+            >
+              OFFLINE
+            </span>
+          )}
           {showOffline && (
             <OfflineCard fetching={fetching} feedOffline={feedOffline} onRetry={() => void fetchFeed()} />
           )}
           {!showOffline && canGoBack && (
             <button
               type="button"
-              className="back-arrow"
+              className="absolute left-2.5 top-1/2 flex h-16 w-[46px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl border border-[#05070a] bg-surface-elevated text-retro-fg opacity-85 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_3px_0_#05070a] transition-[transform,box-shadow,border-color,opacity] duration-75 hover:opacity-100 hover:border-[#ff2d78] active:translate-y-[calc(-50%+2px)] active:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_0_#05070a]"
               aria-label="Previous image"
               title="Back to the skipped foe"
               onClick={(e) => {
@@ -252,7 +302,7 @@ export default function GoonPanel() {
           {!showOffline && (
             <button
               type="button"
-              className="skip-arrow"
+              className="absolute right-2.5 top-1/2 flex h-16 w-[46px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl border border-[#05070a] bg-surface-elevated text-retro-fg opacity-85 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_3px_0_#05070a] transition-[transform,box-shadow,border-color,opacity] duration-75 hover:opacity-100 hover:border-[#ff2d78] active:translate-y-[calc(-50%+2px)] active:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_0_#05070a]"
               aria-label="Next image"
               title="Skip this foe — no reward"
               onClick={(e) => {
@@ -266,17 +316,27 @@ export default function GoonPanel() {
           {floats
             .filter((f) => f.cell === null)
             .map((f) => (
-              <span key={f.id} className={`float-gc ${f.crit ? 'crit' : ''}`} style={{ left: f.x, top: f.y }}>
+              <span
+                key={f.id}
+                className={`${FLOAT_GC} ${MONO} ${f.crit ? FLOAT_GC_CRIT : ''}`}
+                style={{ left: f.x, top: f.y }}
+              >
                 {f.text}
               </span>
             ))}
         </div>
       )}
-      <div className="battle-row">
-        <div className="view-toggle" role="group" aria-label="Feed layout">
+      <div className="flex flex-none items-center gap-2.5 rounded-[10px] border border-white/[0.06] bg-[#05070a] px-3 py-2">
+        <div
+          className="inline-flex flex-none overflow-hidden rounded-lg border border-white/10"
+          role="group"
+          aria-label="Feed layout"
+        >
           <button
             type="button"
-            className={viewMode === 'single' ? 'active' : ''}
+            className={`${MONO} cursor-pointer border-0 bg-transparent px-2.5 py-1 text-xs font-bold ${
+              viewMode === 'single' ? 'bg-[#ff2d78] text-[#0a0a0f]' : 'text-retro-muted'
+            }`}
             aria-pressed={viewMode === 'single'}
             onClick={() => setViewMode('single')}
             title="Single foe view"
@@ -285,7 +345,9 @@ export default function GoonPanel() {
           </button>
           <button
             type="button"
-            className={viewMode === 'grid' ? 'active' : ''}
+            className={`${MONO} cursor-pointer border-0 bg-transparent px-2.5 py-1 text-xs font-bold ${
+              viewMode === 'grid' ? 'bg-[#ff2d78] text-[#0a0a0f]' : 'text-retro-muted'
+            }`}
             aria-pressed={viewMode === 'grid'}
             onClick={() => setViewMode('grid')}
             title="3×3 grid — nine foes at once"
@@ -294,25 +356,25 @@ export default function GoonPanel() {
           </button>
         </div>
         {isGrid ? (
-          <span className="muted">
+          <span className={MUTED}>
             {grid.length}/{GRID_SIZE} live{feedOffline ? ' · offline' : ''}
           </span>
         ) : inBattle ? (
-          <div className="hp-wrap" title={`${Math.ceil(foeHp)} / ${foeMaxHp} HP`}>
-            <div className="hp-bar">
-              <div className={`hp-fill ${hpPct <= 30 ? 'low' : ''}`} style={{ width: `${hpPct}%` }} />
+          <div className="flex min-w-0 flex-1 items-center gap-2" title={`${Math.ceil(foeHp)} / ${foeMaxHp} HP`}>
+            <div className={`${HP_BAR} flex-1`}>
+              <div className={`${HP_FILL} ${hpPct <= 30 ? HP_FILL_LOW : ''}`} style={{ width: `${hpPct}%` }} />
             </div>
-            <span className="hp-text mono">
+            <span className={`${MONO} whitespace-nowrap text-[11px] text-retro-muted`}>
               {formatNum(Math.ceil(foeHp))}/{formatNum(foeMaxHp)} HP
             </span>
           </div>
         ) : (
-          <span className="muted">No live foe — take your time.</span>
+          <span className={MUTED}>No live foe — take your time.</span>
         )}
         {feedOffline && (
           <button
             type="button"
-            className="btn small"
+            className={`${BTN} ${BTN_SMALL}`}
             disabled={fetching}
             aria-label="Retry the feed"
             onClick={() => void fetchFeed()}
@@ -321,12 +383,15 @@ export default function GoonPanel() {
             {fetching ? '…' : 'Retry'}
           </button>
         )}
-        <span className="ko-count mono" title="Lifetime KOs — each foe hits harder">
+        <span
+          className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-white/[0.08] bg-[#05070a] px-2.5 py-1 text-xs font-bold text-retro-fg [&_svg]:text-[#ff2d78]`}
+          title="Lifetime KOs — each foe hits harder"
+        >
           KOs: {formatNum(defeated)}
         </span>
       </div>
 
-      <div className="caps-bar">
+      <div className="grid flex-none grid-cols-4 gap-2">
         {CAP_ORDER.map((id) => {
           const def = CAPS[id]
           const st = capStacks(caps, id, now)
@@ -335,7 +400,11 @@ export default function GoonPanel() {
             <button
               key={id}
               type="button"
-              className={`cap has-skin ${isLive ? 'active' : ''}`}
+              className={`${SKIN} flex cursor-pointer flex-col gap-0.5 rounded-[10px] border border-[#05070a] bg-surface-elevated p-2 text-left text-retro-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_3px_0_#05070a] transition-[transform,box-shadow,border-color] duration-75 enabled:hover:border-[#ff2d78] enabled:active:translate-y-0.5 enabled:active:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_0_#05070a] disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none ${
+                isLive
+                  ? 'border-[#ff2d78] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_3px_0_#8f0e42,0_0_12px_rgba(255,45,120,0.35)]'
+                  : ''
+              }`}
               style={{
                 backgroundImage: `linear-gradient(rgba(5,5,12,0.72), rgba(5,5,12,0.72)), url("${CAP_SKINS[id]}")`,
               }}
@@ -343,13 +412,17 @@ export default function GoonPanel() {
               onClick={() => popCap(id)}
               title={`${def.name} — ${capEffectLabel(id)} — ${formatNum(def.cost)} g$ — permanent, pops stack${st.count > 0 ? ` (x${st.count} live)` : ''}`}
             >
-              <span className="cap-name">
+              <span className={`${DISPLAY} text-[11px] font-bold tracking-[0.5px]`}>
                 {def.name}
                 {st.count > 1 ? ` x${st.count}` : ''}
               </span>
-              <span className="cap-stats">{capEffectLabel(id)}</span>
-              <span className="cap-cost mono">{formatNum(def.cost)} g$</span>
-              <span className="cap-timer mono">{isLive ? '∞' : ''}</span>
+              <span className={`text-[10px] ${isLive ? 'text-retro-fg' : 'text-retro-muted'}`}>
+                {capEffectLabel(id)}
+              </span>
+              <span className={`${MONO} text-[11px] text-retro-muted`}>{formatNum(def.cost)} g$</span>
+              <span className={`${MONO} min-h-[14px] text-[11px] font-bold text-[#ff2d78]`}>
+                {isLive ? '∞' : ''}
+              </span>
             </button>
           )
         })}
