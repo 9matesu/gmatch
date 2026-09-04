@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { clickGain, clickPower, isCrit, passiveGps } from './economy'
 import type { EconomyInput } from './economy'
-import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, starterOffers, toggleTag as toggleTagLevel } from './tags'
+import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, starterOffers, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
 import { rankTags } from './tagFilter'
 import { pervertSeeds } from './pervertTags'
 import { KILL_XP, foeMaxHp, killBonusGp } from './battle'
@@ -73,6 +73,7 @@ export interface GameState {
   buyTag: (name: string) => boolean
   toggleTag: (name: string) => boolean
   refreshTagMarket: () => Promise<void>
+  addCustomTag: (raw: string) => Promise<{ added: boolean; message: string }>
   fetchFeed: () => Promise<void>
   advanceFeed: () => void
   goBack: () => boolean
@@ -226,6 +227,8 @@ function koFoe(s: GameState, now: number, clicksOnFoe: number) {
     clicks: clicksOnFoe,
     rarity: imageRarity(rarityBase, s.gallery.length, clicksOnFoe),
     boughtAt: now,
+    kind: post.kind,
+    preview: post.preview,
   }
   const current = s.queue[0] ?? null
   const queue = s.queue.slice(1)
@@ -371,6 +374,49 @@ export const useGame = create<GameState>((set, get) => ({
     return true
   },
 
+  addCustomTag: async (raw) => {
+    const verdict = validateCustomTag(raw)
+    if (!verdict.ok) {
+      const why =
+        verdict.reason === 'empty'
+          ? 'Type a tag first.'
+          : verdict.reason === 'too-short'
+            ? 'Tag too short.'
+            : verdict.reason === 'too-long'
+              ? 'Tag too long (40 max).'
+              : verdict.reason === 'noise'
+                ? 'That tag carries no content — try another.'
+                : 'That tag is blocked — try another.'
+      return { added: false, message: why }
+    }
+    const s = get()
+    if (s.tags.some((t) => t.name.toLowerCase() === verdict.name)) {
+      return { added: false, message: `Already have ${verdict.name}.` }
+    }
+    if (s.fetching) return { added: false, message: 'Hold on — feed is busy.' }
+    set({ fetching: true })
+    let probe: { ok: boolean; posts: { length: number } }
+    try {
+      probe = await fetchPosts({ tags: verdict.name, limit: 5 })
+    } finally {
+      set({ fetching: false })
+    }
+    if (!probe.ok || probe.posts.length === 0) {
+      return { added: false, message: `No live results for ${verdict.name} — check the spelling.` }
+    }
+    // Probing proved the feed serves it: own level 1 free, steering the feed.
+    const owned: OwnedTag = { name: verdict.name, level: 1, selected: true, ...deriveTagStats(verdict.name, 1) }
+    const snap = get()
+    const next = { ...snap, tags: [...snap.tags, owned] }
+    const prog = progress(next, s.xp)
+    set({
+      tags: next.tags,
+      achievements: prog.achievements,
+      toasts: [...prog.toasts, { id: toastSeq++, msg: `Custom tag added: ${verdict.name}` }],
+    })
+    return { added: true, message: `Added ${verdict.name} — steering the feed.` }
+  },
+
   refreshTagMarket: async () => {
     const s = get()
     if (s.fetching) return
@@ -488,7 +534,7 @@ export const useGame = create<GameState>((set, get) => ({
     if (!img) return
     // Already beaten: re-featuring shows it with no HP bar and no battle.
     set({
-      current: { id: img.id, url: img.url, tags: img.tags },
+      current: { id: img.id, url: img.url, tags: img.tags, kind: img.kind, preview: img.preview },
       foeHp: 0,
       foeMaxHp: 0,
       foeClicks: 0,

@@ -4,6 +4,7 @@ import { CAPS, capEffectLabel, capStacks } from '../game/caps'
 import type { CapId } from '../game/types'
 import { offlineSvg } from '../services/offlineSvg'
 import { prefetchImages } from '../services/imageCache'
+import { isVideoUrl } from '../services/postFilter'
 import { formatNum } from './format'
 import CachedImg from './CachedImg'
 import { IconChevronL, IconChevronR } from './icons'
@@ -66,6 +67,12 @@ export default function GoonPanel() {
 
   const showOffline = feedOffline || !current || failedUrl === current.url
   const src = showOffline ? offlineSvg(current?.tags ?? []) : current.url
+  // Motion posts (redgifs mp4/webm) play inline; gifs stay on <img>.
+  const isMotion =
+    !showOffline &&
+    !!current &&
+    (current.kind === 'video' || isVideoUrl(current.url)) &&
+    !/\.gif(?:[?#]|$)/i.test(current.url)
   const inBattle = !showOffline && foeMaxHp > 0
   const hpPct = inBattle ? Math.max(0, (foeHp / foeMaxHp) * 100) : 0
 
@@ -84,14 +91,27 @@ export default function GoonPanel() {
         }}
       >
         {critFlash && <div className="crit-flash">CRIT!</div>}
-        <CachedImg
-          className="goon-image"
-          src={src}
-          alt="goon feed"
-          referrerPolicy="no-referrer"
-          onError={onImageError}
-          draggable={false}
-        />
+        {isMotion && current ? (
+          <video
+            className="goon-image"
+            src={current.url}
+            poster={current.preview}
+            autoPlay
+            loop
+            muted
+            playsInline
+            onError={onImageError}
+          />
+        ) : (
+          <CachedImg
+            className="goon-image"
+            src={src}
+            alt="goon feed"
+            referrerPolicy="no-referrer"
+            onError={onImageError}
+            draggable={false}
+          />
+        )}
         {showOffline && <span className="offline-badge">OFFLINE</span>}
         {!showOffline && canGoBack && (
           <button

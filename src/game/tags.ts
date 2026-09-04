@@ -1,5 +1,34 @@
 import type { OwnedTag } from './types'
-import { rankTags } from './tagFilter'
+import { isNoise, isQueryBlocked, rankTags } from './tagFilter'
+
+/**
+ * Custom feed tags (user spec): free-form search → normalize → validity
+ * gate → probe the live feed before adding.
+ * Normalization: lowercase, spaces/dashes → underscores, [a-z0-9_] only.
+ */
+export function normalizeCustomTag(raw: string): string {
+  return raw
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_')
+    .replace(/[^a-z0-9_]/g, '')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '')
+}
+
+export type CustomTagVerdict =
+  | { ok: true; name: string }
+  | { ok: false; reason: 'empty' | 'too-short' | 'too-long' | 'blocked' | 'noise' }
+
+/** Validity gate for a custom tag — blocklist + noise, never the network. */
+export function validateCustomTag(raw: string): CustomTagVerdict {
+  const name = normalizeCustomTag(raw)
+  if (!name) return { ok: false, reason: 'empty' }
+  if (name.length < 2) return { ok: false, reason: 'too-short' }
+  if (name.length > 40) return { ok: false, reason: 'too-long' }
+  if (isQueryBlocked(name)) return { ok: false, reason: 'blocked' }
+  if (isNoise(name)) return { ok: false, reason: 'noise' }
+  return { ok: true, name }
+}
 
 export const MAX_TAG_LEVEL = 20
 export const TAG_COST_GROWTH = 1.15
@@ -35,6 +64,8 @@ export const STARTER_TAGS: readonly string[] = [
   'bulge',
   'deepthroat',
   'anal',
+  'bbc',
+  'skylar_vox',
 ]
 
 /** cost = base * 1.15^owned (SPEC §3). */

@@ -218,4 +218,92 @@ describe('fetchPosts (SPEC §6/§8)', () => {
     // tbib sat out its cooldown — xbooru was attempted first.
     expect(String(fetchMock.mock.calls[0][0]).startsWith('/booru/xbooru/')).toBe(true)
   })
+
+  it('drops text-overlay tags unless the query is a caption hunt', async () => {
+    vi.stubGlobal('window', {})
+    const post = {
+      id: 201,
+      file_url: 'https://x/cap-a.jpg',
+      width: 900,
+      height: 900,
+      rating: 'explicit',
+      tags: 'breeding speech_bubble english_text',
+    }
+    const fetchMock = vi.fn(async (url: string) => {
+      const u = String(url)
+      if (u.startsWith('/booru/tbib/') || u.startsWith('/booru/xbooru/')) {
+        return { ok: true, json: () => Promise.resolve([post]) }
+      }
+      return { ok: false }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const plain = await fetchPosts({ tags: 'breeding', limit: 5 })
+    expect(plain.ok).toBe(false)
+    const hunt = await fetchPosts({ tags: 'breeding caption', limit: 5 })
+    expect(hunt.ok).toBe(true)
+    expect(hunt.posts).toHaveLength(1)
+  })
+
+  it('browser mode searches redgifs (mp4/video) through the proxy', async () => {
+    vi.stubGlobal('window', {})
+    const gif = {
+      id: 'skylarvoxabc',
+      width: 1080,
+      height: 1920,
+      tags: ['Skylar Vox', 'BBC'],
+      niches: [],
+      urls: {
+        hd: 'https://media.redgifs.com/Skylarvoxabc.mp4',
+        poster: 'https://media.redgifs.com/Skylarvoxabc-poster.jpg',
+      },
+    }
+    const fetchMock = vi.fn(async (url: string, init?: { headers?: Record<string, string> }) => {
+      const u = String(url)
+      if (u.startsWith('/booru/tbib/') || u.startsWith('/booru/xbooru/')) {
+        return { ok: true, json: () => Promise.resolve([]) }
+      }
+      if (u.includes('/auth/temporary')) {
+        return { ok: true, json: () => Promise.resolve({ token: 'tok123' }) }
+      }
+      if (u.startsWith('/rg-auth/')) {
+        expect(init?.headers?.Authorization).toBe('Bearer tok123')
+        expect(decodeURIComponent(u)).toContain('skylar vox')
+        return { ok: true, json: () => Promise.resolve({ gifs: [gif] }) }
+      }
+      return { ok: false }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await fetchPosts({ tags: 'skylar_vox', limit: 10 })
+    expect(res.ok).toBe(true)
+    expect(res.source).toBe('redgifs-direct')
+    expect(res.posts[0].kind).toBe('video')
+    expect(res.posts[0].url).toMatch(/mp4$/)
+    expect(res.posts[0].tags).toContain('bbc')
+  })
+
+  it('browser mode scrapes imhentai covers through the proxy', async () => {
+    vi.stubGlobal('window', {})
+    const searchHtml =
+      '<div class="gallery"><a href="/gallery/999/"><img/></a></div>'
+    const galleryHtml =
+      '<h1>caption doujin</h1><img data-src="https://m1.imhentai.xxx/cov/1.jpg" />'
+    const fetchMock = vi.fn(async (url: string) => {
+      const u = String(url)
+      if (u.startsWith('/booru/imh/search')) {
+        return { ok: true, text: () => Promise.resolve(searchHtml) }
+      }
+      if (u.startsWith('/booru/imh/gallery')) {
+        return { ok: true, text: () => Promise.resolve(galleryHtml) }
+      }
+      if (u.startsWith('/booru/tbib/') || u.startsWith('/booru/xbooru/')) {
+        return { ok: true, json: () => Promise.resolve([]) }
+      }
+      return { ok: false }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await fetchPosts({ tags: 'goon_caption', limit: 5 })
+    expect(res.ok).toBe(true)
+    expect(res.source).toBe('imh-direct')
+    expect(res.posts[0].id).toBe('imh-999')
+  })
 })

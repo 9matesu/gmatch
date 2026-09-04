@@ -1,6 +1,21 @@
 import type { BooruPost } from '../game/types'
 import { isQueryBlocked } from '../game/tagFilter'
 import { allowOnly } from './postFilter'
+import {
+  REDGIFS_API,
+  parseRedgifs,
+  parseRedgifsToken,
+  redgifsAuthUrl,
+  redgifsSearchUrl,
+} from './redgifs'
+import {
+  IMHENTAI_ROOT,
+  imhentaiGalleryUrl,
+  imhentaiSearchUrl,
+  parseImhentaiCover,
+  parseImhentaiSearch,
+  toImhentaiPost,
+} from './imhentai'
 
 export interface BooruRequest {
   tags: string
@@ -81,6 +96,8 @@ export function __resetFeedState(): void {
   seenIds.clear()
   seenUrls.clear()
   seenLoaded = false
+  redgifsToken = null
+  redgifsTokenExp = 0
 }
 
 /** Filter out anything shown before (this session or past ones), memoize the rest. */
@@ -108,10 +125,12 @@ function remember(posts: BooruPost[]): BooruPost[] {
 
 /**
  * Feed quality gate: explicit-only, humans only, no AI/B&W/comic/furry slop
- * (user spec). Applied to every response path.
+ * (user spec). Applied to every response path. Caption hunts (query carries
+ * caption/goon_caption) keep text-overlay tags — mirrors electron/main.cjs.
  */
-function sanitize(posts: BooruPost[]): BooruPost[] {
-  return allowOnly(posts)
+function sanitize(posts: BooruPost[], query?: string): BooruPost[] {
+  const captions = typeof query === 'string' && /caption/i.test(query)
+  return allowOnly(posts, { captions })
 }
 
 /** Mirrors reachable through the Vite dev proxy (same-origin → no CORS). */
@@ -204,12 +223,37 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
       } catch {
         continue
       }
-      const clean = sanitize(toPosts(data, src.origin))
+      const clean = sanitize(toPosts(data, src.origin), variant)
       if (clean.length === 0) continue
       const fresh = remember(clean)
       if (fresh.length === 0) continue // all repeats — narrower pages may be new
       unhealthyUntil.delete(src.id)
       return { posts: fresh, source: src.id, ok: true }
+    }
+  }
+  // Redgifs (real/hardcore mp4s+gifs), then imhentai (gallery scrape),
+  // before the paheal single-tag fallback.
+  if (isHealthy('redgifs-direct')) {
+    const rg = await redgifsDirect(req.tags, req.limit)
+    if (rg) {
+      const fresh = remember(sanitize(rg, req.tags))
+      if (fresh.length > 0) {
+        unhealthyUntil.delete('redgifs-direct')
+        return { posts: fresh, source: 'redgifs-direct', ok: true }
+      }
+    } else {
+      markUnhealthy('redgifs-direct')
+    }
+  }
+  if (isHealthy('imh-direct')) {
+    try {
+      const fresh = remember(sanitize(await imhentaiDirect(req.tags, req.limit), req.tags))
+      if (fresh.length > 0) {
+        unhealthyUntil.delete('imh-direct')
+        return { posts: fresh, source: 'imh-direct', ok: true }
+      }
+    } catch {
+      markUnhealthy('imh-direct')
     }
   }
   // paheal only answers single tags — use the leading one.
@@ -221,7 +265,7 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
       if (!res.ok) {
         markUnhealthy('paheal-direct')
       } else {
-        const clean = sanitize(parsePaheal(await res.text()))
+        const clean = sanitize(parsePaheal(await res.text()), single)
         const fresh = remember(clean)
         if (fresh.length > 0) {
           unhealthyUntil.delete('paheal-direct')
@@ -235,7 +279,75 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
   throw new Error('no direct source returned usable posts')
 }
 
-/** Parse paheal's danbooru XML (`<tag id file_url width height tags …/>`). Regex-based (no DOM), same as electron/main.cjs. */
+/** Redgifs temp token, cached in memory (same flow as electron/main.cjs). */
+let redgifsToken: string | null = null
+let redgifsTokenExp = 0
+
+function toProxy(url: string, origin: string, prefix: string): string {
+  return url.startsWith(origin) ? prefix + url.slice(origin.length) : url
+}
+
+/**
+ * Real/hardcore porn via the Vite dev proxy: temp token → gif search.
+ * Null when unusable (caller moves to the next source). Never throws.
+ */
+async function redgifsDirect(query: string, limit: number): Promise<BooruPost[] | null> {
+  try {
+    if (!redgifsToken || Date.now() >= redgifsTokenExp) {
+      redgifsToken = null
+      const authRes = await fetch(toProxy(redgifsAuthUrl(), REDGIFS_API, '/rg-auth'), {
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      })
+      if (!authRes.ok) return null
+      redgifsToken = parseRedgifsToken(await authRes.json())
+      if (!redgifsToken) return null
+      redgifsTokenExp = Date.now() + 20 * 3600 * 1000
+    }
+    const page = 1 + Math.floor(Math.random() * 5)
+    const url = toProxy(redgifsSearchUrl(query, limit, page), REDGIFS_API, '/rg-auth')
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      headers: { Authorization: `Bearer ${redgifsToken}` },
+    })
+    if (!res.ok) return null
+    return parseRedgifs(await res.json())
+  } catch {
+    return null
+  }
+}
+
+/**
+ * imhentai via the Vite dev proxy: search page → gallery IDs → up to 3
+ * covers (gallery-dl shape). Never throws.
+ */
+async function imhentaiDirect(query: string, limit: number): Promise<BooruPost[]> {
+  try {
+    const searchRes = await fetch(toProxy(imhentaiSearchUrl(query), IMHENTAI_ROOT, '/booru/imh'), {
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    })
+    if (!searchRes.ok || typeof searchRes.text !== 'function') return []
+    const ids = parseImhentaiSearch(await searchRes.text(), 3)
+    const posts: BooruPost[] = []
+    for (const id of ids) {
+      if (posts.length >= limit) break
+      try {
+        const gRes = await fetch(toProxy(imhentaiGalleryUrl(id), IMHENTAI_ROOT, '/booru/imh'), {
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+        })
+        if (!gRes.ok || typeof gRes.text !== 'function') continue
+        const cover = parseImhentaiCover(await gRes.text())
+        if (!cover) continue
+        posts.push(toImhentaiPost(id, cover, query))
+      } catch {
+        /* one dead gallery never kills the round */
+      }
+    }
+    return posts
+  } catch {
+    return []
+  }
+}
+/** Parse paheal's danbooru XML. Regex-based (no DOM), same as electron/main.cjs. */
 function parsePaheal(xml: string): BooruPost[] {
   const out: BooruPost[] = []
   const elRe = /<tag\b([^>]*)>/g
@@ -269,7 +381,7 @@ export async function fetchPosts(req: BooruRequest): Promise<BooruResponse> {
     if (typeof window !== 'undefined' && window.goongrid?.booruFetch) {
       const res = await window.goongrid.booruFetch(req)
       if (res.ok && res.posts.length > 0) {
-        const fresh = remember(sanitize(res.posts))
+        const fresh = remember(sanitize(res.posts, req.tags))
         // All repeats → report offline so the caller rotates to the next tag.
         if (fresh.length > 0) return { ...res, posts: fresh }
       }

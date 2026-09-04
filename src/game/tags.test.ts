@@ -9,9 +9,11 @@ import {
   discoverTags,
   feedQuery,
   isTagSelected,
+  normalizeCustomTag,
   starterOffers,
   tagCost,
   toggleTag,
+  validateCustomTag,
 } from './tags'
 import type { OwnedTag } from './types'
 
@@ -58,6 +60,7 @@ describe('starter tags (user spec: pervert pool, no vanilla)', () => {
   it('seeds the pervert list', () => {
     expect([...STARTER_TAGS]).toEqual([
       'gangbang', 'creampie', 'ahegao', 'pregnant', 'veiny_penis', 'bulge', 'deepthroat', 'anal',
+      'bbc', 'skylar_vox',
     ])
     const offers = starterOffers()
     expect(offers.map((o) => o.name)).toEqual([...STARTER_TAGS])
@@ -152,5 +155,31 @@ describe('discoverTags (auto-generated as you progress)', () => {
     const out = discoverTags(tags, many)
     expect(out.map((t) => t.name)).toContain('keeper')
     expect(out.filter((t) => t.level === 0).length).toBeLessThanOrEqual(MAX_MARKET_OFFERS)
+  })
+})
+
+describe('validateCustomTag (custom search tags)', () => {
+  it('normalizes free-form input to snake_case', () => {
+    expect(normalizeCustomTag('Skylar Vox')).toBe('skylar_vox')
+    expect(normalizeCustomTag('  black-cock  ')).toBe('black_cock')
+    expect(normalizeCustomTag('BBC!')).toBe('bbc')
+  })
+
+  it('accepts real-porn tags the user asked for', () => {
+    for (const raw of ['skylar vox', 'BBC', 'black_cock', 'goon caption', 'gooncaps']) {
+      expect(validateCustomTag(raw).ok, raw).toBe(true)
+    }
+  })
+
+  it('rejects empty / too-short / too-long input', () => {
+    expect(validateCustomTag('')).toEqual({ ok: false, reason: 'empty' })
+    expect(validateCustomTag('x')).toEqual({ ok: false, reason: 'too-short' })
+    expect(validateCustomTag('a'.repeat(41))).toEqual({ ok: false, reason: 'too-long' })
+  })
+
+  it('rejects blocklisted and noise tags', () => {
+    expect(validateCustomTag('loli')).toEqual({ ok: false, reason: 'blocked' })
+    expect(validateCustomTag('schoolgirl uniform')).toEqual({ ok: false, reason: 'blocked' })
+    expect(validateCustomTag('highres')).toEqual({ ok: false, reason: 'noise' })
   })
 })

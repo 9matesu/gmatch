@@ -24,6 +24,10 @@ export interface GalleryImage {
   clicks: number
   rarity: Rarity
   boughtAt?: number
+  /** 'video' for mp4/webm posts (redgifs), so cells render <video>. */
+  kind?: 'image' | 'video'
+  /** Still preview for video items (redgifs poster). */
+  preview?: string
 }
 
 export interface ActiveCap {
@@ -36,4 +40,8 @@ export interface BooruPost {
   url: string
   tags: string[]
   rating?: string
+  /** Still/poster preview for video posts (redgifs poster). */
+  preview?: string
+  /** 'video' for mp4/webm/gif posts, else image. Inferred from URL when absent. */
+  kind?: 'image' | 'video'
 }

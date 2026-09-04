@@ -119,18 +119,29 @@ function isQueryBlocked(query) {
   return blocklist.some((bad) => q.includes(bad))
 }
 
-function hasBadTag(tags) {
+// Caption hunts (query carries caption/goon_caption) keep text-overlay tags
+// that the gate otherwise drops — mirrors src/services/postFilter.ts.
+const TEXT_OVERLAY = ['speech_bubble', 'english_text', 'translated', 'commentary']
+
+function isCaptionQuery(query) {
+  return /caption/i.test(String(query))
+}
+
+function hasBadTag(tags, captions) {
   return tags.some((t) => {
     const s = String(t).toLowerCase()
+    if (captions && (s.includes('caption') || s.includes('dialogue') || TEXT_OVERLAY.some((b) => s.includes(b)))) {
+      return false
+    }
     return BAD_TAG_FRAGMENTS.some((b) => s.includes(b))
   })
 }
 
-function httpGet(url) {
+function httpGet(url, headers) {
   return new Promise((resolve, reject) => {
     const req = https.get(
       url,
-      { headers: { 'User-Agent': UA, Accept: 'application/json, text/xml, */*' } },
+      { headers: { 'User-Agent': UA, Accept: 'application/json, text/xml, */*', ...(headers || {}) } },
       (res) => {
         if (res.statusCode >= 400) {
           res.resume()
@@ -151,7 +162,7 @@ function httpGet(url) {
 
 // --- source parsers -------------------------------------------------------
 
-function parseDanbooruJson(body, baseUrl) {
+function parseDanbooruJson(body, baseUrl, captions) {
   const data = JSON.parse(body)
   const raw = Array.isArray(data) ? data : (data.posts && (data.posts.post ?? data.posts)) ?? []
   const list = Array.isArray(raw) ? raw : [raw]
@@ -174,11 +185,11 @@ function parseDanbooruJson(body, baseUrl) {
         p.width >= MIN_WIDTH &&
         p.height >= MIN_HEIGHT &&
         p.width * p.height >= MIN_PIXELS &&
-        !hasBadTag(p.tags),
+        !hasBadTag(p.tags, captions),
     )
 }
 
-function parsePahealXml(body) {
+function parsePahealXml(body, captions) {
   const posts = []
   const elRe = /<tag\b([^>]*)>/g
   const attr = (attrs, name) => {
@@ -206,12 +217,176 @@ function parsePahealXml(body) {
       p.width >= MIN_WIDTH &&
       p.height >= MIN_HEIGHT &&
       p.width * p.height >= MIN_PIXELS &&
-      !hasBadTag(p.tags),
+      !hasBadTag(p.tags, captions),
   )
 }
 
+// --- redgifs (real/hardcore porn: pornstars, BBC, mp4s/gifs) ------------------
+// Public v2 API: temporary token (verified live) → gif search. Shape:
+// gifs[] with urls.hd (.mp4), urls.poster (.jpg), id, tags[], niches[].
+const REDGIFS_API = 'https://api.redgifs.com'
+let redgifsToken = null
+let redgifsTokenExp = 0
+
+function redgifsWords(query) {
+  return String(query).replace(/_/g, ' ').trim().replace(/\s+/g, ' ')
+}
+
+function normRedgifsTag(t) {
+  if (typeof t !== 'string') return null
+  const n = t
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_')
+    .replace(/[^a-z0-9_]/g, '')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '')
+  return n.length >= 2 ? n : null
+}
+
+async function redgifsAuth() {
+  if (redgifsToken && Date.now() < redgifsTokenExp) return redgifsToken
+  const body = await httpGet(`${REDGIFS_API}/v2/auth/temporary`)
+  const token = JSON.parse(body).token
+  if (typeof token !== 'string' || !token) throw new Error('redgifs auth failed')
+  redgifsToken = token
+  redgifsTokenExp = Date.now() + 20 * 3600 * 1000
+  return token
+}
+
+function parseRedgifsJson(body, captions) {
+  let data
+  try {
+    data = JSON.parse(body)
+  } catch {
+    return []
+  }
+  const list = Array.isArray(data.gifs) ? data.gifs : []
+  return list
+    .filter((g) => g && typeof g === 'object')
+    .map((g) => {
+      const urls = g.urls && typeof g.urls === 'object' ? g.urls : {}
+      const tags = []
+      for (const t of [...(g.tags || []), ...(g.niches || [])]) {
+        const n = normRedgifsTag(t)
+        if (n && !tags.includes(n)) tags.push(n)
+      }
+      return {
+        id: typeof g.id === 'string' ? `rg-${g.id}` : '',
+        url: typeof urls.hd === 'string' ? urls.hd : '',
+        tags,
+        rating: 'e',
+        preview: typeof urls.poster === 'string' ? urls.poster : undefined,
+        kind: 'video',
+        width: Number(g.width) || 0,
+        height: Number(g.height) || 0,
+      }
+    })
+    .filter(
+      (p) =>
+        p.id &&
+        p.url &&
+        /\.(mp4|webm|gif|webp)(?:[?#]|$)/i.test(p.url) &&
+        p.width >= MIN_WIDTH &&
+        p.height >= MIN_HEIGHT &&
+        !hasBadTag(p.tags, captions),
+    )
+}
+
+async function fetchRedgifs(variant, n, captions) {
+  const token = await redgifsAuth()
+  const page = 1 + Math.floor(Math.random() * 5)
+  const url =
+    `${REDGIFS_API}/v2/gifs/search?search_text=${encodeURIComponent(redgifsWords(variant))}` +
+    `&order=trending&count=${n}&page=${page}`
+  const body = await httpGet(url, { Authorization: `Bearer ${token}` })
+  return parseRedgifsJson(body, captions)
+}
+
+// --- imhentai (hentai galleries: captions, hardcore doujins) ------------------
+// No JSON API — scrape HTML like gallery-dl: search page → gallery IDs →
+// cover image per gallery (data-src base + $.parseJSON ext map).
+const IMHENTAI_ROOT = 'https://imhentai.xxx'
+const IMH_EXTS = { j: 'jpg', p: 'png', g: 'gif', w: 'webp', a: 'avif' }
+
+function parseImhentaiSearch(html, limit) {
+  const out = []
+  const re = /href="\/gallery\/(\d+)\/?"/g
+  let m
+  while ((m = re.exec(html))) {
+    if (!out.includes(m[1])) out.push(m[1])
+    if (out.length >= limit) break
+  }
+  return out
+}
+
+function parseImhentaiCover(html) {
+  const srcTag = 'data-src="'
+  const srcStart = html.indexOf(srcTag)
+  if (srcStart === -1) return null
+  const urlStart = srcStart + srcTag.length
+  const urlEnd = html.indexOf('"', urlStart)
+  if (urlEnd === -1) return null
+  const src = html.slice(urlStart, urlEnd)
+  if (!src) return null
+  const marker = 'parseJSON('
+  const mStart = html.indexOf(marker)
+  if (mStart !== -1) {
+    const q1 = html.indexOf("'", mStart + marker.length)
+    const q2 = q1 === -1 ? -1 : html.indexOf("'", q1 + 1)
+    if (q1 !== -1 && q2 !== -1) {
+      try {
+        const raw = html.slice(q1 + 1, q2).split(String.fromCharCode(92)).join('')
+        const first = JSON.parse(raw)['1']
+        if (typeof first === 'string') {
+          const parts = first.split(',')
+          const suffix = IMH_EXTS[parts[0]]
+          if (suffix) {
+            const slash = src.lastIndexOf('/')
+            const root = slash === -1 ? '' : src.slice(0, slash + 1)
+            return { url: root + '1.' + suffix, width: Number(parts[1]) || 0, height: Number(parts[2]) || 0 }
+          }
+        }
+      } catch {
+        /* fall through to raw data-src */
+      }
+    }
+  }
+  return { url: src, width: 0, height: 0 }
+}
+
+async function fetchImhentai(variant, n, captions) {
+  const key = redgifsWords(variant)
+  const searchBody = await httpGet(`${IMHENTAI_ROOT}/search/?key=${encodeURIComponent(key)}`)
+  const ids = parseImhentaiSearch(searchBody, 3)
+  const posts = []
+  for (const id of ids) {
+    if (posts.length >= n) break
+    try {
+      const galleryBody = await httpGet(`${IMHENTAI_ROOT}/gallery/${encodeURIComponent(id)}/`)
+      const cover = parseImhentaiCover(galleryBody)
+      if (!cover) continue
+      // Dims gate only when known — map-less covers skip it.
+      if (cover.width > 0 && cover.height > 0) {
+        if (cover.width < MIN_WIDTH || cover.height < MIN_HEIGHT) continue
+        if (cover.width * cover.height < MIN_PIXELS) continue
+      }
+      const tags = key
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter((t) => t.length >= 2)
+      if (hasBadTag(tags, captions)) continue
+      posts.push({ id: `imh-${id}`, url: cover.url, tags, rating: 'e', kind: 'image' })
+    } catch {
+      /* one dead gallery never kills the round */
+    }
+    if (posts.length >= 5) break
+  }
+  return posts
+}
+
 // Round-robin over sources with simple health tracking (SPEC §6).
-// Explicit-rated human sources only (user spec): tbib + xbooru + paheal.
+// Explicit-rated human sources only (user spec): tbib + xbooru + paheal
+// (boorus), redgifs (real/hardcore mp4s+gifs), imhentai (hentai galleries).
 // e621 (furry) and safebooru (safe-only) were removed on purpose.
 const SOURCES = [
   {
@@ -220,7 +395,7 @@ const SOURCES = [
       `https://tbib.org/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
         tags + ' rating:explicit ' + NEGATIVES,
       )}&limit=${limit}&json=1`,
-    parse: (body) => parseDanbooruJson(body, 'https://tbib.org'),
+    parse: (body, captions) => parseDanbooruJson(body, 'https://tbib.org', captions),
   },
   {
     id: 'xbooru',
@@ -228,7 +403,12 @@ const SOURCES = [
       `https://xbooru.com/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
         tags + ' rating:explicit ' + NEGATIVES,
       )}&limit=${limit}&json=1`,
-    parse: (body) => parseDanbooruJson(body, 'https://xbooru.com'),
+    parse: (body, captions) => parseDanbooruJson(body, 'https://xbooru.com', captions),
+  },
+  {
+    // Real/hardcore porn: pornstars (skylar vox), BBC, mp4s/gifs.
+    id: 'redgifs',
+    fetch: (variant, n, captions) => fetchRedgifs(variant, n, captions),
   },
   {
     // paheal combos return 0 results — query a single tag only.
@@ -238,6 +418,11 @@ const SOURCES = [
         tags.split(/\s+/)[0],
       )}&limit=${limit}`,
     parse: parsePahealXml,
+  },
+  {
+    // Slow (multi-fetch scrape) — last resort before giving up.
+    id: 'imhentai',
+    fetch: (variant, n, captions) => fetchImhentai(variant, n, captions),
   },
 ]
 
@@ -267,6 +452,7 @@ async function fetchBooru({ tags, limit }) {
     return { posts: hit, source: 'cache', ok: true, cached: true }
   }
   const variants = queryVariants(query)
+  const captions = isCaptionQuery(query)
   const ordered = SOURCES.map((_, i) => SOURCES[(rrIndex + i) % SOURCES.length])
   for (const source of ordered) {
     for (const variant of variants) {
@@ -276,8 +462,9 @@ async function fetchBooru({ tags, limit }) {
         return { posts: vhit, source: 'cache', ok: true, query: variant, cached: true }
       }
       try {
-        const body = await httpGet(source.url(variant, n))
-        const posts = source.parse(body)
+        const posts = source.fetch
+          ? await source.fetch(variant, n, captions)
+          : source.parse(await httpGet(source.url(variant, n)), captions)
         if (posts.length > 0) {
           rrIndex = (SOURCES.indexOf(source) + 1) % SOURCES.length
           imageCache.setFeedCache(variant, posts)

@@ -391,3 +391,35 @@ describe('save / load / offline earnings', () => {
     expect(useGame.getState().gp).toBe(42)
   })
 })
+
+describe('addCustomTag', () => {
+  const mocked = vi.mocked(fetchPosts)
+  const post = { id: 'c1', url: 'https://x/c1.mp4', tags: ['bimbo'], rating: 'e', kind: 'video' as const }
+
+  it('rejects blocked tags without probing the network', async () => {
+    mocked.mockClear()
+    const r = await useGame.getState().addCustomTag('loli')
+    expect(r.added).toBe(false)
+    expect(mocked).not.toHaveBeenCalled()
+  })
+
+  it('rejects tags with no live results', async () => {
+    mocked.mockClear()
+    mocked.mockResolvedValue({ posts: [], source: null, ok: false, offline: true })
+    const r = await useGame.getState().addCustomTag('zz_no_such_tag')
+    expect(r.added).toBe(false)
+    expect(r.message).toContain('No live results')
+  })
+
+  it('adds a probed tag owned + selected, dupes are refused', async () => {
+    mocked.mockClear()
+    mocked.mockResolvedValue({ posts: [post], source: 'redgifs', ok: true })
+    const r = await useGame.getState().addCustomTag('Bimbo')
+    expect(r.added).toBe(true)
+    const tag = useGame.getState().tags.find((t) => t.name === 'bimbo')
+    expect(tag?.level).toBe(1)
+    expect(tag?.selected).toBe(true)
+    const dupe = await useGame.getState().addCustomTag('bimbo')
+    expect(dupe.added).toBe(false)
+  })
+})

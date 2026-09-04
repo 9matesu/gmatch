@@ -39,7 +39,19 @@ function TagsTab() {
   const buyTag = useGame((s) => s.buyTag)
   const toggleTag = useGame((s) => s.toggleTag)
   const refreshTagMarket = useGame((s) => s.refreshTagMarket)
+  const addCustomTag = useGame((s) => s.addCustomTag)
   const owned = tags.filter((t) => t.level > 0).length
+  const [custom, setCustom] = useState('')
+  const [note, setNote] = useState<string | null>(null)
+  const submitCustom = () => {
+    const q = custom
+    if (!q.trim()) return
+    setNote(null)
+    void addCustomTag(q).then((r) => {
+      setNote(r.message)
+      if (r.added) setCustom('')
+    })
+  }
   return (
     <div className="tab-body">
       <div className="market-head">
@@ -56,6 +68,26 @@ function TagsTab() {
           <IconRefresh size={12} /> {fetching ? 'Parsing…' : 'Refresh'}
         </button>
       </div>
+      <div className="market-head custom-tag-row">
+        <input
+          className="custom-tag-input"
+          value={custom}
+          disabled={fetching}
+          placeholder="Custom tag — try skylar vox, bbc, goon caption…"
+          aria-label="Search a custom tag"
+          onChange={(e) => setCustom(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              submitCustom()
+            }
+          }}
+        />
+        <button type="button" className="btn small" disabled={fetching || !custom.trim()} onClick={submitCustom}>
+          Add
+        </button>
+      </div>
+      {note && <div className="muted custom-tag-note">{note}</div>}
       <div className="tag-pills">
         {tags.map((t) => {
           const isOwned = t.level > 0
@@ -128,6 +160,7 @@ function GalleryTab() {
       <div className="gallery-grid">
         {gallery.map((img) => {
           const isBackdrop = backgroundUrl === img.url
+          const isMotion = img.kind === 'video'
           return (
             <div key={img.id} className={`gallery-cell ${isBackdrop ? 'is-backdrop' : ''}`}>
               <button
@@ -136,13 +169,17 @@ function GalleryTab() {
                 title="Re-feature in the Goon Panel"
                 onClick={() => featureImage(img.id)}
               >
-                <CachedImg
-                  src={img.url || offlineSvg(img.tags)}
-                  fallbackSrc={offlineSvg(img.tags)}
-                  alt={img.tags.slice(0, 3).join(' ') || 'gallery image'}
-                  referrerPolicy="no-referrer"
-                  loading="lazy"
-                />
+                {isMotion ? (
+                  <video src={img.url} poster={img.preview} muted preload="metadata" playsInline />
+                ) : (
+                  <CachedImg
+                    src={img.url || offlineSvg(img.tags)}
+                    fallbackSrc={offlineSvg(img.tags)}
+                    alt={img.tags.slice(0, 3).join(' ') || 'gallery image'}
+                    referrerPolicy="no-referrer"
+                    loading="lazy"
+                  />
+                )}
               </button>
               <span className={`rarity-badge sm rarity-${img.rarity.toLowerCase()}`}>
                 {img.rarity}

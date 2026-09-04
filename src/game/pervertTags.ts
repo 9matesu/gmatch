@@ -45,6 +45,14 @@ export const PERVERT_TAGS: readonly { tag: string; weight: number }[] = [
   { tag: 'ovipositor', weight: 1 },
   { tag: 'mind_break', weight: 2 },
   { tag: 'eyes_rolling', weight: 2 },
+  { tag: 'bbc', weight: 5 },
+  { tag: 'black_cock', weight: 4 },
+  { tag: 'interracial', weight: 3 },
+  { tag: 'skylar_vox', weight: 3 },
+  { tag: 'bimbo', weight: 3 },
+  { tag: 'femdom', weight: 3 },
+  { tag: 'goon_caption', weight: 3 },
+  { tag: 'caption', weight: 2 },
 ]
 
 export function weightedPick<T extends { weight: number }>(items: readonly T[]): T {

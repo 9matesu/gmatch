@@ -26,6 +26,16 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/booru\/paheal/, ''),
       },
+      '^/booru/imh': {
+        target: 'https://imhentai.xxx',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/booru\/imh/, ''),
+      },
+      '^/rg-auth': {
+        target: 'https://api.redgifs.com',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/rg-auth/, ''),
+      },
     },
   },
 })

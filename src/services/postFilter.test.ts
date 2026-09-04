@@ -40,11 +40,18 @@ describe('isPostAllowed (feed quality gate)', () => {
     }
   })
 
-  it('rejects non-image urls (webm/gif/mp4)', () => {
-    expect(isPostAllowed(post({ url: 'https://x/1.webm' }))).toBe(false)
-    expect(isPostAllowed(post({ url: 'https://x/1.gif' }))).toBe(false)
-    expect(isPostAllowed(post({ url: 'https://x/1.mp4' }))).toBe(false)
+  it('allows motion urls (gif/mp4/webm) — kind is inferred at render', () => {
+    expect(isPostAllowed(post({ url: 'https://x/1.webm' }))).toBe(true)
+    expect(isPostAllowed(post({ url: 'https://x/1.gif' }))).toBe(true)
+    expect(isPostAllowed(post({ url: 'https://x/1.mp4' }))).toBe(true)
     expect(isPostAllowed(post({ url: 'https://x/1.png' }))).toBe(true)
+    expect(isPostAllowed(post({ url: 'https://x/1.swf' }))).toBe(false)
+  })
+
+  it('drops text-overlay tags unless it is a caption hunt', () => {
+    const captioned = post({ tags: ['goon_caption', 'english_text', 'speech_bubble'] })
+    expect(isPostAllowed(captioned)).toBe(false)
+    expect(isPostAllowed(captioned, { captions: true })).toBe(true)
   })
 })
 

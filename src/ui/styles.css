@@ -774,6 +774,36 @@ body {
   margin-bottom: 10px;
 }
 
+/* Custom-tag search row (SPEC §6c): input grows, Add button pins right. */
+.custom-tag-row {
+  justify-content: flex-start;
+}
+
+.custom-tag-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: var(--ink);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 6px 10px;
+  font-size: 13px;
+  outline: none;
+}
+
+.custom-tag-input:focus {
+  border-color: var(--pink);
+}
+
+.custom-tag-input:disabled {
+  opacity: 0.5;
+}
+
+.custom-tag-note {
+  margin: -4px 0 10px;
+  font-size: 12px;
+}
+
 .backdrop-row {
   display: flex;
   justify-content: space-between;
@@ -938,7 +968,8 @@ body {
   background: transparent;
 }
 
-.gallery-cell img {
+.gallery-cell img,
+.gallery-cell video {
   width: 100%;
   height: 100%;
   object-fit: cover;

@@ -60,13 +60,18 @@ All sources are explicit-rated humans-only imageboards. Every query gets
 -scalie -monochrome -greyscale -sketch -comic -manga -lineart -lowres
 -worst_quality -jpeg_artifacts -watermark -censored`) appended in main.cjs.
 Posts are double-gated (main.cjs + src/services/postFilter.ts): explicit only,
-jpg/png only (no webm/gif), min 700x700, tag-fragment blocklist (AI, furry,
-anthro, monochrome, sketch, comic, 3d, futa, yaoi, NTR, text overlays).
+images + motion (jpg/png/gif/webp/mp4/webm, kind inferred at render), min
+700x700, tag-fragment blocklist (AI, furry,
+anthro, monochrome, sketch, comic, 3d, futa, yaoi, NTR, text overlays —
+text overlays kept for caption hunts, §6).
 
 - tbib: `https://tbib.org/index.php?page=dapi&s=post&q=index&tags=<t>&limit=<n>&json=1` (JSON; full url = `https://tbib.org/images/<directory>/<image>`; DAPI rating field is the full word `explicit`)
 - xbooru: same DAPI shape, `https://xbooru.com/...` (explicit-rated, high volume)
 - paheal: `https://rule34.paheal.net/api/danbooru/find_posts?tags=<t>&limit=<n>` (XML `<tag file_url=...>`; query single tags only — combos return 0)
+- redgifs: real/hardcore porn (pornstars like skylar vox, BBC, mp4s/gifs) via the public v2 API — temp token (`GET /v2/auth/temporary`, cached ~20h) → `GET /v2/gifs/search?search_text=<words>&order=trending&count=<n>&page=<1-5>` with `Authorization: Bearer`; posts are `kind: video` with poster stills, min 700px enforced in the desktop app
+- imhentai: hentai galleries (captions, hardcore doujins), no JSON API — scrape like gallery-dl: `/search/?key=<words>` → gallery IDs (`href="/gallery/<id>"`) → cover per gallery (`data-src` base + `$.parseJSON` ext map, max 3 galleries/round, dims gate only when known)
 - Removed on purpose: e621 (furry), safebooru (safe-only), rule34.xxx (login wall).
+- Caption hunts: a query carrying `caption`/`goon_caption` keeps text-overlay tags (`speech_bubble`, `english_text`, …) that the double gate otherwise drops — same flag in main.cjs and postFilter; everything else filters identically on both sides.
 - AND-combos of narrow tags return 0 often → query variant ladder: full combo →
   top-2 tags → leading tag, per source, first non-empty wins.
 - Browser/dev mode: direct fetch may CORS-fail → offline SVG placeholder
@@ -84,9 +89,22 @@ anthro, monochrome, sketch, comic, 3d, futa, yaoi, NTR, text overlays).
 - Starter tags + market seeds come from `src/game/pervertTags.ts` — a weighted
   pool of 40+ hard tags (gangbang, pregnant, impregnation, breeding,
   veiny_penis, bulge, ahegao, deepthroat, double_penetration, anal, creampie,
-  ...). No vanilla tags (1girl/solo/romance) anywhere in the pipeline.
+  bbc, black_cock, interracial, skylar_vox, bimbo, femdom, goon_caption,
+  caption, ...). No vanilla tags (1girl/solo/romance) anywhere in the pipeline.
 - Feed/market query = top-3 owned tags + 2 weighted pervert seeds (3 seeds when
   nothing is owned). Seeded tags are never blocklisted (tested invariant).
+
+### 6c. Custom tags (user spec: free-form search → add when valid)
+
+- The Tags tab has a custom-tag box: input is normalized (lowercase,
+  spaces/dashes → underscores, `[a-z0-9_]` only) and gated by
+  `validateCustomTag` (blocklist + noise, 2–40 chars) — never the network.
+- Valid + not-a-dupe tags are probed live (`fetchPosts`, limit 5); with results
+  the tag joins owned at level 1, feed-selected, free. No results (or a blocked
+  tag) shows the reason inline and adds nothing.
+- Motion posts (`kind: video`, redgifs mp4/webm) play inline in the Goon Panel
+  with the poster still; gifs stay on `<img>`. Gallery cells render `<video>`
+  thumbs for video keepsakes and re-feature them with kind intact.
 
 ## 7. UI (modern dark glassy, BabecockPanel flavor)
 
