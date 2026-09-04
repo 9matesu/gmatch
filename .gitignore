@@ -8,3 +8,4 @@ tmp/
 orbit.snapshot.sqlite
 *.sqlite
 blobs/
+test-blobs-*/
