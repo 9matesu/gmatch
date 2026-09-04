@@ -20,8 +20,9 @@ with duels, lootboxes, hacks and trades — one wallet, one economy.
   `VITE_API_URL`. Identity = client Ed25519 keypair (`@orbit/crypto`); every
   request signed (`orbitFetch`).
 - UI authority: Orbit's retro-glass Tailwind design system (shell). The idle
-  game renders inside the shell's `grid` view with its legacy stylesheet
-  scoped under `.goongrid-root` (Tailwind restyle pending).
+  game renders inside the shell's `grid` view, restyled to Tailwind 4 with
+  shared recipes in `src/ui/styles.ts` (legacy goongrid.css deleted; only
+  keyframes remain in `src/ui/grid-animations.css`).
 - Single 18+ gate: the shell's `AgeGateModal` (mirrored into the idle store).
   Single onboarding: `firstRun/OnboardingFlow` includes the feed-tune step
   (pick exactly 4 starter tags + excludes). Excludes editor lives in the
