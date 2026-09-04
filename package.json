@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "workspaces": ["apps/*", "packages/*"],
+  "overrides": {
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
   "scripts": {
     "dev": "npm run dev -w @goongrid/desktop",
     "electron": "npm run electron -w @goongrid/desktop",
