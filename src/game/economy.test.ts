@@ -65,7 +65,7 @@ describe('click power', () => {
     expect(clickPower({ ...base, shards: 3, achievementsEarned: 4 }, NOW)).toBeCloseTo(1.56)
   })
 
-  it('Blue Cap doubles click, Brain Melt x10, expired caps do nothing', () => {
+  it('E-Girl Spit doubles click, Brain Drain x10, legacy timed caps prune', () => {
     expect(clickPower({ ...base, caps: caps(['blue', NOW + 1]) }, NOW)).toBe(2)
     expect(clickPower({ ...base, caps: caps(['melt', NOW + 1]) }, NOW)).toBe(10)
     expect(clickPower({ ...base, caps: caps(['blue', NOW - 1]) }, NOW)).toBe(1)
@@ -86,7 +86,7 @@ describe('passive GP/s (SPEC §3/§4)', () => {
     expect(galleryIncome([img('Common'), img('Copper'), img('Silver'), img('Gold'), img('Diamond')])).toBe(144)
   })
 
-  it('passive scales with shards and Hypno Drop, not with click caps', () => {
+  it('passive scales with shards and Pornmeat, not with click caps', () => {
     const input: EconomyInput = {
       ...base,
       tags: [tag('wet', 2, 5)],

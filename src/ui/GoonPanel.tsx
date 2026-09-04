@@ -6,6 +6,8 @@ import type { CapId } from '../game/types'
 import { offlineSvg } from '../services/offlineSvg'
 import { prefetchImages } from '../services/imageCache'
 import { isVideoUrl } from '../services/postFilter'
+import { redgifsPlayable } from '../services/redgifs'
+import { CAP_SKINS } from './capSkins'
 import { formatNum } from './format'
 import CachedImg from './CachedImg'
 import { IconChevronL, IconChevronR } from './icons'
@@ -130,8 +132,8 @@ export default function GoonPanel() {
                 {motion ? (
                   <video
                     className="goon-image"
-                    src={cell.post.url}
-                    poster={cell.post.preview}
+                    src={redgifsPlayable(cell.post.url)}
+                    poster={cell.post.preview ? redgifsPlayable(cell.post.preview) : undefined}
                     autoPlay
                     loop
                     muted
@@ -188,8 +190,8 @@ export default function GoonPanel() {
           {isMotion && current ? (
             <video
               className="goon-image"
-              src={current.url}
-              poster={current.preview}
+              src={redgifsPlayable(current.url)}
+              poster={current.preview ? redgifsPlayable(current.preview) : undefined}
               autoPlay
               loop
               muted
@@ -245,7 +247,6 @@ export default function GoonPanel() {
             ))}
         </div>
       )}
-
       <div className="battle-row">
         <div className="view-toggle" role="group" aria-label="Feed layout">
           <button
@@ -306,7 +307,10 @@ export default function GoonPanel() {
             <button
               key={id}
               type="button"
-              className={`cap ${isLive ? 'active' : ''}`}
+              className={`cap has-skin ${isLive ? 'active' : ''}`}
+              style={{
+                backgroundImage: `linear-gradient(rgba(5,5,12,0.72), rgba(5,5,12,0.72)), url("${CAP_SKINS[id]}")`,
+              }}
               disabled={gp < def.cost}
               onClick={() => popCap(id)}
               title={`${def.name} — ${capEffectLabel(id)} — ${formatNum(def.cost)} GP — permanent, pops stack${st.count > 0 ? ` (x${st.count} live)` : ''}`}

@@ -184,6 +184,15 @@ body {
   padding: 0 8px;
 }
 
+/* Powerup button gif skins (bundled static assets, zero load wait). */
+.cap.has-skin,
+.vend-row.has-skin {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  text-shadow: 0 1px 3px #000;
+}
+
 /* ---------- 3-column layout ---------- */
 
 .columns {
