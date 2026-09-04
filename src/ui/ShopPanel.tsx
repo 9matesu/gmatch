@@ -21,6 +21,7 @@ import {
 import { ACHIEVEMENTS } from '../game/achievements'
 import { offlineSvg } from '../services/offlineSvg'
 import { redgifsPlayable } from '../services/redgifs'
+import { CAP_SKINS } from './capSkins'
 import CachedImg from './CachedImg'
 import { formatNum } from './format'
 
@@ -257,7 +258,13 @@ function CapsTab() {
           const afford = gp >= def.cost
           const st = capStacks(caps, id, now)
           return (
-            <div key={id} className={`vend-row ${afford ? 'pulse' : ''}`}>
+            <div
+              key={id}
+              className={`vend-row has-skin ${afford ? 'pulse' : ''}`}
+              style={{
+                backgroundImage: `linear-gradient(rgba(5,5,12,0.78), rgba(5,5,12,0.78)), url("${CAP_SKINS[id]}")`,
+              }}
+            >
               <div>
                 <div className="cap-name">
                   {def.name}

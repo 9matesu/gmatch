@@ -16,10 +16,10 @@ const NOW = 10_000
 describe('cap definitions (SPEC §5)', () => {
   it('four permanent caps with correct costs/effects', () => {
     expect(ALL_CAP_IDS).toHaveLength(4)
-    expect(CAPS.blue).toMatchObject({ name: 'Blue Cap', cost: 150, clickMult: 2 })
-    expect(CAPS.filter).toMatchObject({ name: 'Goon Filter', cost: 900, autoClicksPerSec: 1 })
-    expect(CAPS.hypno).toMatchObject({ name: 'Hypno Drop', cost: 5_000, passiveMult: 2 })
-    expect(CAPS.melt).toMatchObject({ name: 'Brain Melt', cost: 50_000, clickMult: 10, passiveMult: 10 })
+    expect(CAPS.blue).toMatchObject({ name: 'E-Girl Spit', cost: 150, clickMult: 2 })
+    expect(CAPS.filter).toMatchObject({ name: 'Braceface', cost: 900, autoClicksPerSec: 1 })
+    expect(CAPS.hypno).toMatchObject({ name: 'Pornmeat', cost: 5_000, passiveMult: 2 })
+    expect(CAPS.melt).toMatchObject({ name: 'Brain Drain', cost: 50_000, clickMult: 10, passiveMult: 10 })
     for (const id of ALL_CAP_IDS) expect(CAPS[id]).not.toHaveProperty('durationMs')
   })
 })
@@ -48,14 +48,14 @@ describe('stacking rules (SPEC §5)', () => {
     expect(activeCaps(active, NOW + 1e12)).toHaveLength(1)
   })
 
-  it('Brain Melt multiplies everything x10 on top of other caps', () => {
+  it('Brain Drain multiplies everything x10 on top of other caps', () => {
     let active = popCap([], 'blue', NOW)
     active = popCap(active, 'melt', NOW)
     expect(capClickMult(active, NOW)).toBe(20)
     expect(capPassiveMult(active, NOW)).toBe(10)
   })
 
-  it('Goon Filter gives 1 auto-click/s, forever', () => {
+  it('Braceface gives 1 auto-click/s, forever', () => {
     const active = popCap([], 'filter', NOW)
     expect(capAutoClicksPerSec(active, NOW)).toBe(1)
     expect(capAutoClicksPerSec(active, NOW + 1e12)).toBe(1)

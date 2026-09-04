@@ -46,10 +46,10 @@ pop **GoonCaps** for temporary buffs, climb the **Pornification** ladder, and
 
 | Cap | Cost | Effect |
 |---|---|---|
-| Blue Cap | 150 GP | x2 click power, 60s |
-| Goon Filter | 900 GP | auto-click 1/s, permanent |
-| Hypno Drop | 5k GP | x2 passive GP/s, permanent |
-| Brain Melt | 50k GP | x10 everything, permanent |
+| E-Girl Spit | 150 GP | x2 click power, permanent |
+| Braceface | 900 GP | auto-click 1/s, permanent |
+| Pornmeat | 5k GP | x2 passive GP/s, permanent |
+| Brain Drain | 50k GP | x10 everything, permanent |
 
 Stacking: different caps stack; same-cap pops stack permanently (no timers, no wear).
 

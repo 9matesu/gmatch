@@ -6,6 +6,7 @@ import { offlineSvg } from '../services/offlineSvg'
 import { prefetchImages } from '../services/imageCache'
 import { isVideoUrl } from '../services/postFilter'
 import { redgifsPlayable } from '../services/redgifs'
+import { CAP_SKINS } from './capSkins'
 import { formatNum } from './format'
 import CachedImg from './CachedImg'
 import { IconChevronL, IconChevronR } from './icons'
@@ -187,7 +188,10 @@ export default function GoonPanel() {
             <button
               key={id}
               type="button"
-              className={`cap ${isLive ? 'active' : ''}`}
+              className={`cap has-skin ${isLive ? 'active' : ''}`}
+              style={{
+                backgroundImage: `linear-gradient(rgba(5,5,12,0.72), rgba(5,5,12,0.72)), url("${CAP_SKINS[id]}")`,
+              }}
               disabled={gp < def.cost}
               onClick={() => popCap(id)}
               title={`${def.name} — ${capEffectLabel(id)} — ${formatNum(def.cost)} GP — permanent, pops stack${st.count > 0 ? ` (x${st.count} live)` : ''}`}
