@@ -30,7 +30,7 @@ export default function OfflineCard({ fetching, feedOffline, onRetry }: OfflineC
         : 'No image — pull the feed'
   return (
     <div
-      className="pointer-events-auto absolute left-1/2 top-1/2 z-[4] flex -translate-x-1/2 -translate-y-1/2 items-center gap-2.5 rounded-xl border border-white/[0.12] bg-[rgba(5,5,12,0.88)] px-4 py-3"
+      className="pointer-events-auto absolute left-1/2 top-1/2 z-[4] flex -translate-x-1/2 -translate-y-1/2 items-center gap-2.5 rounded-xl border border-border-glass bg-glass-strong px-4 py-3"
       role="status"
       aria-live="polite"
       aria-label={label}

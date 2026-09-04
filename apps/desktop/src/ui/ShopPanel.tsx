@@ -19,6 +19,7 @@ import { ACHIEVEMENTS } from '../game/achievements'
 import { CAP_SKINS } from './capSkins'
 import { formatNum } from './format'
 import { Skeleton } from '../components/Skeleton'
+import { EmptyState } from '../components/EmptyState'
 import {
   BTN,
   BTN_DANGER,
@@ -115,6 +116,13 @@ function TagsTab() {
           <Skeleton className="h-9 w-28 rounded-full" />
           <Skeleton className="h-9 w-32 rounded-full" />
         </div>
+      )}
+      {tags.length === 0 && !fetching && (
+        <EmptyState
+          icon="🏷️"
+          title="Tag market is empty"
+          description="Hit Refresh to pull fresh pills from the boorus."
+        />
       )}
       <div className="flex flex-wrap gap-2">
         {tags.map((t) => {

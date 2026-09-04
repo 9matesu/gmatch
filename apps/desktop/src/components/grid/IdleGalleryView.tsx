@@ -92,8 +92,8 @@ export default function IdleGalleryView() {
           return (
             <div
               key={img.id}
-              className={`group relative aspect-square overflow-hidden rounded-[10px] border bg-black shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_4px_10px_rgba(0,0,0,0.5)] ${
-                isBackdrop ? 'border-[#ff2d78]' : 'border-[#05070a]'
+              className={`group relative aspect-square overflow-hidden rounded-[10px] border bg-black shadow-[0_4px_10px_rgba(0,0,0,0.5)] ${
+                isBackdrop ? 'border-retro-accent' : 'border-border-glass'
               }`}
             >
               <button
@@ -122,7 +122,7 @@ export default function IdleGalleryView() {
               </span>
               <button
                 type="button"
-                className="absolute right-1 top-1 flex h-[26px] w-[26px] cursor-pointer items-center justify-center rounded-lg border border-[#05070a] bg-[rgba(5,7,10,0.85)] p-0 text-retro-muted opacity-0 transition-[opacity,color,border-color] duration-150 hover:border-[#ff2d78] hover:text-[#ff2d78] focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-default disabled:opacity-100 disabled:border-[#ff2d78] disabled:text-[#ff2d78] [@media(hover:none)]:opacity-100"
+                className="glass-button absolute right-1 top-1 flex h-[26px] w-[26px] cursor-pointer items-center justify-center rounded-lg p-0 opacity-0 focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-default disabled:opacity-100 disabled:text-retro-accent [@media(hover:none)]:opacity-100"
                 title={isBackdrop ? 'This is the app backdrop' : 'Set as app backdrop'}
                 aria-label={isBackdrop ? 'Current app backdrop' : `Set ${img.tags.slice(0, 2).join(' ') || 'image'} as app backdrop`}
                 disabled={isBackdrop}
