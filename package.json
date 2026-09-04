@@ -1,40 +1,17 @@
 {
   "name": "goongrid",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "main": "electron/main.cjs",
+  "workspaces": ["apps/*", "packages/*"],
   "scripts": {
-    "dev": "vite",
-    "electron": "electron .",
-    "build": "vite build",
-    "lint": "eslint .",
-    "test": "vitest run",
-    "lint:ws": "npm run lint --workspaces --if-present",
-    "test:ws": "npm run test --workspaces --if-present",
-    "build:ws": "npm run build --workspaces --if-present"
-  },
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
-  "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "zustand": "^5.0.2"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.17.0",
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
-    "@vitejs/plugin-react": "^4.3.4",
-    "electron": "^33.2.0",
-    "eslint": "^9.17.0",
-    "globals": "^15.13.0",
-    "typescript": "^5.7.2",
-    "typescript-eslint": "^8.18.0",
-    "vite": "^6.0.0",
-    "vitest": "^2.1.8"
+    "dev": "npm run dev -w @goongrid/desktop",
+    "electron": "npm run electron -w @goongrid/desktop",
+    "build": "npm run build -w @goongrid/desktop",
+    "serve:api": "npm run serve -w @orbit/api",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "allowScripts": {
     "electron@33.4.11": true,

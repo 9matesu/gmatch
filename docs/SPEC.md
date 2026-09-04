@@ -1,10 +1,36 @@
-# GoonGrid — Game Design Spec
+# goonMatch · Grid — Product Spec
 
-A pervert idle/clicker game. You click pictures to earn **Goon Points (GP)**,
-buy **tags** (parsed live from booru sources) that generate passive GP and
-reshape your idle feed, buy the images themselves into your **Gallery**,
-pop **GoonCaps** for temporary buffs, climb the **Pornification** ladder, and
-**Brainmelt** (prestige) to become permanently more corrupt.
+One Electron desktop app, one multiplayer game. The **goonMatch shell** (feed,
+card duels, chat, P2P, hacks, moderation, admin — vendored from the orbit repo
+in the 2026-09 merge) wraps the **Babecock · Idle** game (ex-GoonGrid): click
+pictures to earn **g$**, buy **tags** (parsed live from booru sources) that
+generate passive income and reshape your idle feed, buy images into your
+**Gallery**, pop **GoonCaps**, climb the **Pornification** ladder, and
+**Brainmelt** (prestige). Idle earnings and spends share the server g$ ledger
+with duels, lootboxes, hacks and trades — one wallet, one economy.
+
+## 0. Architecture (merge plan D1–D9)
+
+- npm workspaces: `apps/desktop` (Vite + React 19 + Tailwind 4 renderer,
+  Electron 33 shell), `apps/api` (Orbit Hono API, vendored), `packages/{crypto,
+  protocol,shared}` (vendored verbatim).
+- The API runs as a **local Bun sidecar** spawned by Electron main
+  (`apps/desktop/electron/apiSidecar.cjs`): port 8790, SQLite snapshot + blob
+  store under `userData`. Renderer base: `window.__API_BASE__` (preload) or
+  `VITE_API_URL`. Identity = client Ed25519 keypair (`@orbit/crypto`); every
+  request signed (`orbitFetch`).
+- UI authority: Orbit's retro-glass Tailwind design system (shell). The idle
+  game renders inside the shell's `grid` view with its legacy stylesheet
+  scoped under `.goongrid-root` (Tailwind restyle pending).
+- Single 18+ gate: the shell's `AgeGateModal` (mirrored into the idle store).
+  Single onboarding: `firstRun/OnboardingFlow` includes the feed-tune step
+  (pick exactly 4 starter tags + excludes). Excludes editor lives in the
+  settings modal's Feed tab.
+- Two booru clients by design: idle feed via Electron IPC
+  (`apps/desktop/src/services/booru.ts`, SPEC §6) and social feed via the
+  server proxy (`apps/api/src/routes/booru.ts`) — different trust domains.
+- Excluded from the merge (documented, not silently dropped): `apps/discord`
+  bridge, fly.io infra, Rust `image-processor` (unused).
 
 ## 1. Core loop
 
@@ -18,7 +44,11 @@ pop **GoonCaps** for temporary buffs, climb the **Pornification** ladder, and
 
 ## 2. Currencies
 
-- **GP** — main currency (clicks + passive).
+- **g$** — the ONE currency (plan D4): idle clicks + passive income, duel
+  stakes, lootboxes, hacks, trades, tags/caps/gallery buys. Server ledger
+  (`EconomyService`) is authoritative; the idle game mirrors into it via
+  `POST /api/economy/idle-credit` / `idle-debit` (idempotent, 60s throttle).
+  Legacy GP was a 1:1 rename (GP retired; old saves migrate `gp`→`gc`).
 - **XP** — drives Pornification tier (never resets within a run).
 - **Corruption shards** — prestige currency, persists through Brainmelt.
 

@@ -240,7 +240,7 @@ export default function AdminPageClient() {
         case "cancel":
           await orbitFetch(`/api/admin/matches/${args[0]}`, { method: "DELETE" }, identity);
           break;
-        case "override":
+        case "override": {
           const result = await confirm({
             title: "Override match result?",
             description: `Force this duel to resolve as "${args[1]}". League points will be awarded to match the override.`,
@@ -255,6 +255,7 @@ export default function AdminPageClient() {
             }, identity);
           }
           break;
+        }
         case "forceMatchup":
           await orbitFetch("/api/admin/matches/force-all", { method: "POST" }, identity);
           break;
