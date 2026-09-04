@@ -139,13 +139,6 @@ export function SidebarNav({
       active: mainView === 'grid',
       action: () => setMainView?.('grid'),
     },
-    {
-      id: 'admin',
-      label: 'Admin',
-      icon: ShieldAlert,
-      active: mainView === 'admin',
-      action: () => setMainView?.('admin'),
-    },
     ...(onOpenStore
       ? [
         {
