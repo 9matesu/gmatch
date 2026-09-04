@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { clickGain, clickPower, isCrit, passiveGps } from './economy'
 import type { EconomyInput } from './economy'
-import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, starterOffers, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
+import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, soloTag as soloTagList, starterOffers, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
 import { rankTags } from './tagFilter'
 import { pervertSeeds } from './pervertTags'
 import { KILL_XP, foeMaxHp, killBonusGp } from './battle'
@@ -72,6 +72,7 @@ export interface GameState {
   clickImage: () => ClickResult
   buyTag: (name: string) => boolean
   toggleTag: (name: string) => boolean
+  soloTag: (name: string) => boolean
   refreshTagMarket: () => Promise<void>
   addCustomTag: (raw: string) => Promise<{ added: boolean; message: string }>
   fetchFeed: () => Promise<void>
@@ -87,6 +88,7 @@ export interface GameState {
   collectOffline: () => void
   verifyAge: () => void
   dismissToast: (id: number) => void
+  clearToasts: () => void
   resetGame: () => void
 }
 
@@ -144,7 +146,9 @@ function statsOf(s: GameState): AchievementStats {
 }
 
 function pushToast(s: GameState, msg: string): Toast[] {
-  return [...s.toasts, { id: toastSeq++, msg }]
+  const next = [...s.toasts, { id: toastSeq++, msg }]
+  // Cap the log so a long session can't bloat the save; header tab pages it.
+  return next.slice(-50)
 }
 
 /** Achievement + tier-up side effects, applied after any state change. */
@@ -374,6 +378,13 @@ export const useGame = create<GameState>((set, get) => ({
     return true
   },
 
+  soloTag: (name) => {
+    const next = soloTagList(get().tags, name)
+    if (!next) return false
+    set({ tags: next })
+    return true
+  },
+
   addCustomTag: async (raw) => {
     const verdict = validateCustomTag(raw)
     if (!verdict.ok) {
@@ -559,7 +570,7 @@ export const useGame = create<GameState>((set, get) => ({
     }
     next.toasts = pushToast(
       next,
-      `${def.name} popped — ${Math.round(def.durationMs / 1000)}s of chaos`,
+      `${def.name} popped — permanent`,
     )
     set({
       gp: next.gp,
@@ -712,7 +723,15 @@ export const useGame = create<GameState>((set, get) => ({
     const d = deserialize(readStorage()) ?? defaultSave()
     const now = Date.now()
     const tags = d.tags.length > 0 ? d.tags : starterOffers()
-    const caps = activeCaps(d.caps, now)
+    // JSON turns Infinity into null — restore permanent pops; legacy timed
+    // entries keep their expiry and prune via activeCaps as before.
+    const caps = activeCaps(
+      d.caps.map((c) => ({
+        ...c,
+        expiresAt: Number.isFinite(c.expiresAt) ? c.expiresAt : Number.POSITIVE_INFINITY,
+      })),
+      now,
+    )
     const gps = passiveGps(
       {
         shards: d.shards,
@@ -775,6 +794,7 @@ export const useGame = create<GameState>((set, get) => ({
   },
 
   dismissToast: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),
+  clearToasts: () => set({ toasts: [] }),
 
   resetGame: () => set({ ...freshData() }),
 }))

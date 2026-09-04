@@ -10,6 +10,7 @@ import {
   feedQuery,
   isTagSelected,
   normalizeCustomTag,
+  soloTag,
   starterOffers,
   tagCost,
   toggleTag,
@@ -155,6 +156,26 @@ describe('discoverTags (auto-generated as you progress)', () => {
     const out = discoverTags(tags, many)
     expect(out.map((t) => t.name)).toContain('keeper')
     expect(out.filter((t) => t.level === 0).length).toBeLessThanOrEqual(MAX_MARKET_OFFERS)
+  })
+})
+
+describe('soloTag (feed only one tag)', () => {
+  it('selects only the named owned tag', () => {
+    const tags = [
+      { ...tag('a', 2), selected: true },
+      { ...tag('b', 1), selected: true },
+      tag('c', 0),
+    ]
+    const next = soloTag(tags, 'b')!
+    expect(next.find((t) => t.name === 'a')!.selected).toBe(false)
+    expect(next.find((t) => t.name === 'b')!.selected).toBe(true)
+    expect(next.find((t) => t.name === 'c')!.selected).toBeUndefined()
+    expect(feedQuery(next)).toEqual(['b'])
+  })
+
+  it('null when target missing or unowned', () => {
+    expect(soloTag([tag('a', 1)], 'zzz')).toBeNull()
+    expect(soloTag([tag('a', 0)], 'a')).toBeNull()
   })
 })
 

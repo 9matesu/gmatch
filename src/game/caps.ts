@@ -4,19 +4,17 @@ export interface CapDef {
   id: CapId
   name: string
   cost: number
-  durationMs: number
   clickMult: number
   passiveMult: number
   autoClicksPerSec: number
 }
 
-/** GoonCaps vending machine (SPEC §5). */
+/** GoonCaps vending machine (SPEC §5). Pops are PERMANENT — no timers, no wear. */
 export const CAPS: Record<CapId, CapDef> = {
   blue: {
     id: 'blue',
     name: 'Blue Cap',
     cost: 150,
-    durationMs: 60_000,
     clickMult: 2,
     passiveMult: 1,
     autoClicksPerSec: 0,
@@ -25,7 +23,6 @@ export const CAPS: Record<CapId, CapDef> = {
     id: 'filter',
     name: 'Goon Filter',
     cost: 900,
-    durationMs: 120_000,
     clickMult: 1,
     passiveMult: 1,
     autoClicksPerSec: 1,
@@ -34,7 +31,6 @@ export const CAPS: Record<CapId, CapDef> = {
     id: 'hypno',
     name: 'Hypno Drop',
     cost: 5_000,
-    durationMs: 180_000,
     clickMult: 1,
     passiveMult: 2,
     autoClicksPerSec: 0,
@@ -43,7 +39,6 @@ export const CAPS: Record<CapId, CapDef> = {
     id: 'melt',
     name: 'Brain Melt',
     cost: 50_000,
-    durationMs: 30_000,
     clickMult: 10,
     passiveMult: 10,
     autoClicksPerSec: 0,
@@ -53,13 +48,14 @@ export const CAPS: Record<CapId, CapDef> = {
 export const ALL_CAP_IDS: readonly CapId[] = ['blue', 'filter', 'hypno', 'melt']
 
 /**
- * Pop a cap: EVERY pop stacks — same-id pops add another live entry so
- * multipliers compound (click/passive) and auto-click rates add up (SPEC §5).
- * Caller prunes expired entries (activeCaps) before/after; expiry is per pop.
+ * Pop a cap: EVERY pop stacks permanently — same-id pops add another live
+ * entry so multipliers compound (click/passive) and auto-click rates add up
+ * (SPEC §5). Nothing expires; activeCaps only prunes legacy timed entries
+ * from old saves.
  */
 export function popCap(active: ActiveCap[], capId: CapId, now: number): ActiveCap[] {
-  const def = CAPS[capId]
-  return [...active, { capId, expiresAt: now + def.durationMs }]
+  void now
+  return [...active, { capId, expiresAt: Number.POSITIVE_INFINITY }]
 }
 
 export function activeCaps(active: ActiveCap[], now: number): ActiveCap[] {
@@ -88,16 +84,12 @@ export function capEffectLabel(id: CapId): string {
   return parts.join(' · ')
 }
 
-/** Live stack count + longest remaining seconds for one cap id. */
+/** Live stack count for one cap id. Pops never expire, so no time math. */
 export function capStacks(
   active: ActiveCap[],
   capId: CapId,
   now: number,
-): { count: number; secsLeft: number } {
-  const live = active.filter((a) => a.capId === capId && a.expiresAt > now)
-  if (live.length === 0) return { count: 0, secsLeft: 0 }
-  return {
-    count: live.length,
-    secsLeft: Math.ceil((Math.max(...live.map((a) => a.expiresAt)) - now) / 1000),
-  }
+): { count: number } {
+  void now
+  return { count: active.filter((a) => a.capId === capId).length }
 }

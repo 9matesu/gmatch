@@ -91,6 +91,18 @@ export function toggleTag(tag: OwnedTag): OwnedTag | null {
   return { ...tag, selected: !(tag.selected !== false) }
 }
 
+/**
+ * Solo one owned tag: only `name` stays selected, every other owned tag goes
+ * OFF. Returns null when the target is missing/unowned.
+ */
+export function soloTag(tags: OwnedTag[], name: string): OwnedTag[] | null {
+  const target = tags.find((t) => t.name === name)
+  if (!target || target.level <= 0) return null
+  return tags.map((t) =>
+    t.level > 0 ? { ...t, selected: t.name === name } : t,
+  )
+}
+
 /** A tag feeds the round-robin only when owned AND selected. */
 export function isTagSelected(tag: OwnedTag): boolean {
   return tag.level > 0 && tag.selected !== false

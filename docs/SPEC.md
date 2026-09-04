@@ -47,11 +47,11 @@ pop **GoonCaps** for temporary buffs, climb the **Pornification** ladder, and
 | Cap | Cost | Effect |
 |---|---|---|
 | Blue Cap | 150 GP | x2 click power, 60s |
-| Goon Filter | 900 GP | auto-click 1/s, 120s |
-| Hypno Drop | 5k GP | x2 passive GP/s, 180s |
-| Brain Melt | 50k GP | x10 everything, 30s |
+| Goon Filter | 900 GP | auto-click 1/s, permanent |
+| Hypno Drop | 5k GP | x2 passive GP/s, permanent |
+| Brain Melt | 50k GP | x10 everything, permanent |
 
-Stacking: different caps stack; same cap refreshes duration.
+Stacking: different caps stack; same-cap pops stack permanently (no timers, no wear).
 
 ## 6. Booru sources (main-process fetch, 10s timeout, round-robin health)
 
@@ -81,7 +81,8 @@ text overlays kept for caption hunts, §6).
   cached per query for 10 min (`<userData>/feed-cache.json`, 100 queries max);
   picture bytes are cached on disk in `<userData>/image-cache/` (400 files /
   400 MB, LRU-evicted, `gooncache://` scheme) in Electron, or IndexedDB blobs
-  in browser dev mode. The queue is prefetched so skip/back is instant; cache
+  in browser dev mode. The 5-up/5-down window (past 5 + queue 5 + video
+  posters, images AND videos) is prefetched so skip/back is instant; cache
   stats + Clear live in the left stats panel.
 
 ### 6b. Feed/market queries (user spec: no vanilla)
@@ -116,7 +117,10 @@ text overlays kept for caption hunts, §6).
   gradient, monospace numbers, floating `+GP` texts, subtle pulse on affordable items.
 - Age-gate overlay on first launch (must tick "I am 18+"). NSFW blur toggle in
   header (blurs images until hover) — default ON.
-- Toasts for purchases/unlocks; offline-earnings modal on load.
+- Toasts for purchases/unlocks live in the header 🔔 tab (capped at 50, no
+  floating overlay spam); offline-earnings modal on load.
+- Tags tab: owned pills toggle ON/OFF plus SOLO (feed only that one tag).
+  Gallery tab: text box filters keepsakes by tag substring.
 
 ## 8. Hard blocklist (reject tag if ANY substring matches; case-insensitive)
 

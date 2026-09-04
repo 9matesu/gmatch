@@ -215,7 +215,7 @@ export async function resolveImage(url: string): Promise<string> {
       const res = await fetch(url, { referrerPolicy: 'no-referrer' })
       if (!res.ok) return
       const blob = await res.blob()
-      if (!blob.type.startsWith('image/')) return
+      if (!blob.type.startsWith('image/') && !blob.type.startsWith('video/')) return
       await idbPut(db, url, { blob, ts: Date.now(), bytes: blob.size })
     } catch {
       /* cache is best-effort */
@@ -224,10 +224,16 @@ export async function resolveImage(url: string): Promise<string> {
   return url
 }
 
-/** Best-effort prefetch so back/skip arrows show instantly. */
+/**
+ * Best-effort prefetch so back/skip arrows show instantly.
+ * Callers pass the 5-up/5-down window (past 5 + queue 5 + previews);
+ * capped at 11 so a long queue can't stampede the network.
+ */
 export function prefetchImages(urls: string[]): void {
   try {
-    for (const u of urls.slice(0, 9)) void resolveImage(u)
+    for (const u of urls.slice(0, 11)) {
+      if (u) void resolveImage(u)
+    }
   } catch {
     /* never break gameplay */
   }
