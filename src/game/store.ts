@@ -1,9 +1,8 @@
 import { create } from 'zustand'
 import { clickGain, clickPower, isCrit, passiveGps } from './economy'
 import type { EconomyInput } from './economy'
-import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, soloTag as soloTagList, starterOffers, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
-import { rankTags } from './tagFilter'
-import { pervertSeeds } from './pervertTags'
+import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, setupTag, soloTag as soloTagList, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
+import { getUserExcludes, rankTags, setUserExcludes } from './tagFilter'
 import { KILL_XP, foeMaxHp, killBonusGp } from './battle'
 import { CAPS, activeCaps, capAutoClicksPerSec, popCap as popCapList } from './caps'
 import { imageRarity } from './rarity'
@@ -77,6 +76,12 @@ export interface GameState {
   clickCell: (index: number) => ClickResult
   dropCell: (index: number) => void
   setViewMode: (mode: ViewMode) => void
+  /** Player-picked starter tags + extra excludes (setup screen, one shot). */
+  setupComplete: boolean
+  userExcludes: string[]
+  completeSetup: (tags: string[], excludes: string[]) => { ok: boolean; message: string }
+  addUserExclude: (raw: string) => boolean
+  removeUserExclude: (term: string) => boolean
   buyTag: (name: string) => boolean
   toggleTag: (name: string) => boolean
   soloTag: (name: string) => boolean
@@ -185,7 +190,9 @@ function freshData() {
     xp: 0,
     clicks: 0,
     crits: 0,
-    tags: starterOffers(),
+    tags: [] as OwnedTag[],
+    setupComplete: false,
+    userExcludes: [] as string[],
     gallery: [] as GalleryImage[],
     caps: [] as ActiveCap[],
     capsUsed: [] as CapId[],
@@ -221,6 +228,12 @@ function freshData() {
 
 /** Viewed-image history cap for the back arrow. */
 export const HISTORY_CAP = 50
+
+/** Setup screen: exactly this many starter tags, picked by the player. */
+export const SETUP_TAG_COUNT = 4
+
+/** Cap on player-excluded terms (setup screen + config tab). */
+export const MAX_USER_EXCLUDES = 100
 
 /**
  * Fisher-Yates shuffle (new array). Feed posts are randomized on receipt so
@@ -584,9 +597,14 @@ export const useGame = create<GameState>((set, get) => ({
     const s = get()
     if (s.fetching) return
     set({ fetching: true })
+    // Player-owned tags only — no hardcoded seeds. Nothing owned: the market
+    // waits for setup picks, custom tags, or drained-foe discovery.
     const owned = feedQuery(s.tags)
-    // Pervert seeds (user spec): always bias the market toward the hard pool.
-    const q = owned.length > 0 ? [...owned.slice(0, 3), ...pervertSeeds(2)] : pervertSeeds(2)
+    if (owned.length === 0) {
+      set({ fetching: false })
+      return
+    }
+    const q = owned.slice(0, 3)
     const res = await fetchPosts({ tags: q.join(' '), limit: 60 })
     const prev = new Map(s.tags.map((t) => [t.name, t]))
     let offers: OwnedTag[]
@@ -603,10 +621,8 @@ export const useGame = create<GameState>((set, get) => ({
           }
         })
     } else {
-      offers = starterOffers().map((t) => {
-        const old = prev.get(t.name)
-        return old ? { ...t, level: old.level, selected: old.selected } : t
-      })
+      // Feed down: keep the current market as-is (owned tags always kept below).
+      offers = s.tags.filter((t) => t.level === 0)
     }
     const keptOwned = s.tags.filter(
       (t) => t.level > 0 && !offers.some((o) => o.name === t.name),
@@ -619,10 +635,24 @@ export const useGame = create<GameState>((set, get) => ({
     if (s.fetching) return
     set({ fetching: true })
     const owned = feedQuery(s.tags)
-    // Round-robin: ONE tag per fetch, rotating through owned tags + fresh
-    // pervert seeds. Stacked AND-queries truncate on the mirrors and repeat
-    // the same top posts — rotation keeps the feed fresh and online.
-    const pool = owned.length > 0 ? [...owned.slice(0, 4), ...pervertSeeds(2)] : pervertSeeds(3)
+    // Round-robin: ONE player-owned tag per fetch, rotating. No owned tags
+    // (setup not done / melted): stay offline — setup picks drive the feed.
+    if (owned.length === 0) {
+      set({
+        current: null,
+        queue: [],
+        grid: [],
+        foeHp: 0,
+        foeMaxHp: 0,
+        foeClicks: 0,
+        feedOffline: true,
+        fetching: false,
+      })
+      return
+    }
+    // Stacked AND-queries truncate on the mirrors and repeat the same top
+    // posts — rotation keeps the feed fresh and online.
+    const pool = owned.slice(0, 4)
     const first = pool[s.feedCursor % pool.length]
     let res = await fetchPosts({ tags: first, limit: 10 })
     let cursor = s.feedCursor + 1
@@ -772,7 +802,7 @@ export const useGame = create<GameState>((set, get) => ({
       gp: 0,
       totalEarnedGP: 0,
       xp: 0,
-      tags: starterOffers(),
+      tags: [],
       caps: [],
       shards: out.shards,
       prestigeCount: out.prestigeCount,
@@ -782,7 +812,7 @@ export const useGame = create<GameState>((set, get) => ({
       gp: 0,
       totalEarnedGP: 0,
       xp: 0,
-      tags: starterOffers(),
+      tags: [],
       caps: [],
       shards: out.shards,
       prestigeCount: out.prestigeCount,
@@ -945,6 +975,8 @@ export const useGame = create<GameState>((set, get) => ({
       defeated: s.defeated,
       backgroundUrl: s.backgroundUrl,
       viewMode: s.viewMode,
+      setupComplete: s.setupComplete,
+      userExcludes: s.userExcludes,
       lastSeenAt: now,
     }
     writeStorage(serialize(data))
@@ -956,7 +988,10 @@ export const useGame = create<GameState>((set, get) => ({
     if (s.loaded) return
     const d = deserialize(readStorage()) ?? defaultSave()
     const now = Date.now()
-    const tags = d.tags.length > 0 ? d.tags : starterOffers()
+    // No fallback offers: the player's own picks (or nothing) drive the feed.
+    const tags = d.tags
+    const userExcludes = d.userExcludes
+    setUserExcludes(userExcludes)
     // JSON turns Infinity into null — restore permanent pops; legacy timed
     // entries keep their expiry and prune via activeCaps as before.
     const caps = activeCaps(
@@ -987,6 +1022,8 @@ export const useGame = create<GameState>((set, get) => ({
       shards: d.shards,
       prestigeCount: d.prestigeCount,
       tags,
+      setupComplete: d.setupComplete,
+      userExcludes,
       gallery: d.gallery,
       caps,
       capsUsed: d.capsUsed,
@@ -1028,8 +1065,63 @@ export const useGame = create<GameState>((set, get) => ({
     get().save()
   },
 
+  completeSetup: (names, excludes) => {
+    const s = get()
+    if (s.setupComplete) return { ok: false, message: 'Setup already done.' }
+    // Validity gate only (no network): exactly SETUP_TAG_COUNT unique live
+    // probing happens on the setup screen before this is called.
+    const clean: string[] = []
+    for (const raw of names) {
+      const verdict = validateCustomTag(raw)
+      if (!verdict.ok) return { ok: false, message: `“${raw}” is not usable — pick another.` }
+      if (!clean.includes(verdict.name)) clean.push(verdict.name)
+    }
+    if (clean.length !== SETUP_TAG_COUNT) {
+      return { ok: false, message: `Pick exactly ${SETUP_TAG_COUNT} tags.` }
+    }
+    const picked = clean.map(setupTag)
+    setUserExcludes(excludes.slice(0, MAX_USER_EXCLUDES))
+    const next = { ...s, tags: picked, setupComplete: true, userExcludes: getUserExcludes() }
+    const prog = progress(next, s.xp)
+    set({
+      tags: picked,
+      setupComplete: true,
+      userExcludes: next.userExcludes,
+      achievements: prog.achievements,
+      toasts: [...prog.toasts, { id: toastSeq++, msg: `Feed tuned: ${clean.join(', ')}` }],
+    })
+    get().save()
+    return { ok: true, message: `Feed tuned — ${clean.length} starters live.` }
+  },
+
+  addUserExclude: (raw) => {
+    const t = String(raw).toLowerCase().trim()
+    if (!t || t.length > 40) return false
+    const s = get()
+    if (s.userExcludes.includes(t) || s.userExcludes.length >= MAX_USER_EXCLUDES) return false
+    const next = [...s.userExcludes, t]
+    setUserExcludes(next)
+    set({ userExcludes: getUserExcludes() })
+    get().save()
+    return true
+  },
+
+  removeUserExclude: (term) => {
+    const t = String(term).toLowerCase().trim()
+    const s = get()
+    if (!s.userExcludes.includes(t)) return false
+    const next = s.userExcludes.filter((x) => x !== t)
+    setUserExcludes(next)
+    set({ userExcludes: getUserExcludes() })
+    get().save()
+    return true
+  },
+
   dismissToast: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),
   clearToasts: () => set({ toasts: [] }),
 
-  resetGame: () => set({ ...freshData() }),
+  resetGame: () => {
+    setUserExcludes([])
+    set({ ...freshData() })
+  },
 }))

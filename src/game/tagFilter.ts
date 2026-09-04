@@ -11,9 +11,48 @@ export const NOISE_TAGS: readonly string[] = blocklistData.noise
 
 const NOISE = new Set(NOISE_TAGS)
 
+/**
+ * User excludes: extra blocked terms the player adds on the setup screen or
+ * the config tab. Same substring rule as the hard blocklist, persisted in the
+ * save (see save.ts). Module-level so every pure gate picks them up; the
+ * store syncs them on load/setup/config change via setUserExcludes.
+ */
+let userExcludes: string[] = []
+
+/** Replace the user-exclude list (normalized: lowercase, trimmed, non-empty, unique). */
+export function setUserExcludes(list: readonly string[]): void {
+  const seen = new Set<string>()
+  userExcludes = []
+  for (const raw of list) {
+    const t = String(raw).toLowerCase().trim()
+    if (!t || seen.has(t)) continue
+    seen.add(t)
+    userExcludes.push(t)
+  }
+}
+
+/** Current user excludes (copy). */
+export function getUserExcludes(): string[] {
+  return [...userExcludes]
+}
+
+/** Test hook: clear user excludes. */
+export function __resetUserExcludes(): void {
+  userExcludes = []
+}
+
+function matchesAny(term: string, list: readonly string[]): boolean {
+  const t = term.toLowerCase()
+  return list.some((bad) => t.includes(bad))
+}
+
 export function isTagBlocked(tag: string): boolean {
-  const t = tag.toLowerCase()
-  return BLOCKLIST.some((bad) => t.includes(bad))
+  return matchesAny(tag, BLOCKLIST) || matchesAny(tag, userExcludes)
+}
+
+/** True when a tag hits the player's own exclude list (not the hard blocklist). */
+export function isUserExcluded(tag: string): boolean {
+  return matchesAny(tag, userExcludes)
 }
 
 export function isNoise(tag: string): boolean {

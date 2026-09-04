@@ -16,7 +16,8 @@ vi.stubGlobal('localStorage', {
 })
 
 import { defaultSave, serialize, SAVE_KEY } from './save'
-import { starterOffers } from './tags'
+import { setupTag } from './tags'
+import { getUserExcludes } from './tagFilter'
 import { fetchPosts } from '../services/booru'
 import type { BooruResponse } from '../services/booru'
 import { useGame, HISTORY_CAP, GRID_SIZE, shufflePosts } from './store'
@@ -47,29 +48,30 @@ describe('clickImage', () => {
 
 describe('buyTag', () => {
   it('levels a tag and deducts cost', () => {
-    useGame.setState({ gp: 10_000, tags: starterOffers() })
+    useGame.setState({ gp: 10_000, tags: [setupTag('gangbang')] })
     const before = useGame.getState().gp
     expect(useGame.getState().buyTag('gangbang')).toBe(true)
     const t = useGame.getState().tags.find((x) => x.name === 'gangbang')
-    expect(t?.level).toBe(1)
+    expect(t?.level).toBe(2)
     expect(useGame.getState().gp).toBeLessThan(before)
     expect(useGame.getState().achievements).toContain('first_tag')
   })
 
   it('refuses when broke', () => {
-    useGame.setState({ gp: 0, tags: starterOffers() })
+    useGame.setState({
+      gp: 0,
+      tags: [{ name: 'gangbang', level: 0, base: 100, income: 5, weight: 2 }],
+    })
     expect(useGame.getState().buyTag('gangbang')).toBe(false)
     expect(useGame.getState().tags.find((x) => x.name === 'gangbang')?.level).toBe(0)
   })
 })
 
 describe('refreshTagMarket', () => {
-  it('falls back to pervert starter tags when the feed is offline', async () => {
+  it('keeps the market empty with no owned tags (no hardcoded seeds)', async () => {
     useGame.setState({ tags: [] })
     await useGame.getState().refreshTagMarket()
-    const names = useGame.getState().tags.map((t) => t.name)
-    expect(names).toContain('gangbang')
-    expect(names).toContain('ahegao')
+    expect(useGame.getState().tags).toEqual([])
   })
 })
 
@@ -545,5 +547,40 @@ describe('3x3 grid mode', () => {
     const before = useGame.getState().grid[0].hp
     useGame.getState().tick(1000)
     expect(useGame.getState().grid[0].hp).toBeLessThan(before)
+  })
+})
+
+describe('setup + user excludes (no hardcoded tags)', () => {
+  it('completeSetup commits 4 picks owned+selected and syncs excludes', () => {
+    const r = useGame
+      .getState()
+      .completeSetup(['bimbo', 'creampie', 'ahegao', 'doggystyle'], ['feet'])
+    expect(r.ok).toBe(true)
+    const s = useGame.getState()
+    expect(s.setupComplete).toBe(true)
+    expect(s.tags.map((t) => t.name)).toEqual(['bimbo', 'creampie', 'ahegao', 'doggystyle'])
+    expect(s.tags.every((t) => t.level === 1 && t.selected === true)).toBe(true)
+    expect(s.userExcludes).toEqual(['feet'])
+    expect(getUserExcludes()).toEqual(['feet'])
+  })
+
+  it('completeSetup rejects wrong counts, dupes and blocked tags', () => {
+    expect(useGame.getState().completeSetup(['bimbo', 'creampie'], []).ok).toBe(false)
+    expect(
+      useGame.getState().completeSetup(['bimbo', 'bimbo', 'creampie', 'ahegao'], []).ok,
+    ).toBe(false)
+    expect(
+      useGame.getState().completeSetup(['bimbo', 'creampie', 'ahegao', 'loli'], []).ok,
+    ).toBe(false)
+    expect(useGame.getState().setupComplete).toBe(false)
+  })
+
+  it('add/removeUserExclude round-trips, dupes refused', () => {
+    expect(useGame.getState().addUserExclude(' Feet ')).toBe(true)
+    expect(useGame.getState().addUserExclude('feet')).toBe(false)
+    expect(useGame.getState().userExcludes).toEqual(['feet'])
+    expect(useGame.getState().removeUserExclude('FEET')).toBe(true)
+    expect(useGame.getState().removeUserExclude('feet')).toBe(false)
+    expect(useGame.getState().userExcludes).toEqual([])
   })
 })

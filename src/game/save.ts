@@ -1,7 +1,7 @@
 import type { ActiveCap, CapId, GalleryImage, OwnedTag, ViewMode } from './types'
 
 export const SAVE_KEY = 'goongrid.save.v1'
-export const SAVE_VERSION = 2
+export const SAVE_VERSION = 3
 export const OFFLINE_RATE = 0.5
 export const OFFLINE_CAP_MS = 8 * 60 * 60 * 1000
 
@@ -24,6 +24,9 @@ export interface SaveData {
   defeated: number
   backgroundUrl: string | null
   viewMode: ViewMode
+  /** Player's feed starter picks + extra excludes (setup screen / config tab). */
+  setupComplete: boolean
+  userExcludes: string[]
   lastSeenAt: number
 }
 
@@ -47,6 +50,8 @@ export function defaultSave(now = Date.now()): SaveData {
     defeated: 0,
     backgroundUrl: null,
     viewMode: 'single',
+    setupComplete: false,
+    userExcludes: [],
     lastSeenAt: now,
   }
 }
@@ -89,6 +94,8 @@ export function deserialize(raw: string | null | undefined): SaveData | null {
     defeated: num(d.defeated, 0),
     backgroundUrl: typeof d.backgroundUrl === 'string' ? d.backgroundUrl : null,
     viewMode: d.viewMode === 'grid' ? 'grid' : 'single',
+    setupComplete: d.setupComplete === true,
+    userExcludes: arr<string>(d.userExcludes),
     lastSeenAt: num(d.lastSeenAt, 0),
   }
 }

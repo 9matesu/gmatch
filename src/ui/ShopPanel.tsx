@@ -1,9 +1,11 @@
 import { useState, type ComponentType } from 'react'
 import { useGame } from '../game/store'
+import { MAX_USER_EXCLUDES } from '../game/store'
 import { MAX_TAG_LEVEL, tagCost } from '../game/tags'
 import { CAPS, capEffectLabel, capStacks } from '../game/caps'
 import type { CapId } from '../game/types'
 import {
+  IconBolt,
   IconFlask,
   IconImage,
   IconRefresh,
@@ -25,13 +27,14 @@ import { CAP_SKINS } from './capSkins'
 import CachedImg from './CachedImg'
 import { formatNum } from './format'
 
-type Tab = 'tags' | 'gallery' | 'caps' | 'prestige'
+type Tab = 'tags' | 'gallery' | 'caps' | 'prestige' | 'config'
 
 const TABS: { id: Tab; label: string; icon: ComponentType<{ size?: number }> }[] = [
   { id: 'tags', label: 'Tags', icon: IconTag },
   { id: 'gallery', label: 'Gallery', icon: IconImage },
   { id: 'caps', label: 'Caps', icon: IconFlask },
   { id: 'prestige', label: 'Prestige', icon: IconTrophy },
+  { id: 'config', label: 'Config', icon: IconBolt },
 ]
 
 function TagsTab() {
@@ -338,6 +341,80 @@ function PrestigeTab() {
   )
 }
 
+function ConfigTab() {
+  const tags = useGame((s) => s.tags)
+  const userExcludes = useGame((s) => s.userExcludes)
+  const addUserExclude = useGame((s) => s.addUserExclude)
+  const removeUserExclude = useGame((s) => s.removeUserExclude)
+  const owned = tags.filter((t) => t.level > 0)
+  const [draft, setDraft] = useState('')
+  const [note, setNote] = useState<string | null>(null)
+  const add = () => {
+    const parts = draft
+      .split(/[\s,]+/)
+      .map((t) => t.toLowerCase().trim())
+      .filter(Boolean)
+    if (parts.length === 0) return
+    let added = 0
+    for (const p of parts) {
+      if (addUserExclude(p)) added += 1
+    }
+    setNote(
+      added > 0
+        ? `Excluded ${added} term${added === 1 ? '' : 's'} — queries, posts and market respect it.`
+        : 'Nothing added (dupes, empty, or list full).',
+    )
+    setDraft('')
+  }
+  return (
+    <div className="tab-body">
+      <p className="muted">
+        Your starter picks: {owned.length > 0 ? owned.map((t) => t.name).join(', ') : 'none yet'}.
+        Excludes below add to the hard blocklist ({userExcludes.length}/{MAX_USER_EXCLUDES}).
+      </p>
+      <div className="market-head custom-tag-row">
+        <input
+          className="custom-tag-input"
+          value={draft}
+          placeholder="Exclude a tag — feet, watersports…"
+          aria-label="Add an excluded tag"
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              add()
+            }
+          }}
+        />
+        <button type="button" className="btn small" disabled={!draft.trim()} onClick={add}>
+          Add
+        </button>
+      </div>
+      {note && <div className="muted custom-tag-note">{note}</div>}
+      {userExcludes.length === 0 ? (
+        <div className="muted">No extra excludes — the hard blocklist still applies.</div>
+      ) : (
+        <div className="tag-pills">
+          {userExcludes.map((x) => (
+            <span key={x} className="tag-pill on">
+              <span className="pill-name">{x}</span>
+              <button
+                type="button"
+                className="pill-lv mono"
+                aria-label={`Remove exclude ${x}`}
+                title={`Stop excluding ${x}`}
+                onClick={() => removeUserExclude(x)}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function ShopPanel() {
   const [tab, setTab] = useState<Tab>('tags')
   return (
@@ -362,6 +439,7 @@ export default function ShopPanel() {
       {tab === 'gallery' && <GalleryTab />}
       {tab === 'caps' && <CapsTab />}
       {tab === 'prestige' && <PrestigeTab />}
+      {tab === 'config' && <ConfigTab />}
     </aside>
   )
 }

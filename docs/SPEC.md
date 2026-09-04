@@ -30,8 +30,9 @@ pop **GoonCaps** for temporary buffs, climb the **Pornification** ladder, and
 - Each tag: `cost = base * 1.15^owned`, `income` GP/s, `weight` (feed bias).
   base/income derived from tag length + frequency (rarer tag = pricier = better).
 - Max 20 owned levels per tag. Owned tags list = the feed query (top 5 by level).
-- A few evergreen starter tags always seeded so the market is never empty:
-  `1girl, solo, long_hair, smile, closed_eyes, wet, lingerie, cosplay`.
+- No hardcoded starter tags: the player picks exactly 4 on the setup screen
+  (validity-gated + live-probed); the market otherwise seeds from drained foes
+  (`discoverTags`), custom tags, and the Config tab.
 
 ## 4. Images & rarity (ORBIT card-valuation flavor)
 
@@ -94,15 +95,13 @@ text overlays kept for caption hunts, §6).
   posters, images AND videos) is prefetched so skip/back is instant; cache
   stats + Clear live in the left stats panel.
 
-### 6b. Feed/market queries (user spec: no vanilla)
+### 6b. Feed/market queries (user spec: player picks, no hardcodes)
 
-- Starter tags + market seeds come from `src/game/pervertTags.ts` — a weighted
-  pool of 40+ hard tags (gangbang, pregnant, impregnation, breeding,
-  veiny_penis, bulge, ahegao, deepthroat, double_penetration, anal, creampie,
-  bbc, black_cock, interracial, skylar_vox, bimbo, femdom, goon_caption,
-  caption, ...). No vanilla tags (1girl/solo/romance) anywhere in the pipeline.
-- Feed/market query = top-3 owned tags + 2 weighted pervert seeds (3 seeds when
-  nothing is owned). Seeded tags are never blocklisted (tested invariant).
+- No hardcoded/default tags anywhere: the setup screen collects exactly 4
+  starter picks (owned level 1, feed-selected, free). Feed query = top-4 owned
+  tags round-robin, one tag per fetch; market query = top-3 owned tags.
+  Nothing owned → feed stays offline, market stays empty until setup picks,
+  custom tags, or drained-foe discovery seed it.
 
 ### 6c. Custom tags (user spec: free-form search → add when valid)
 
@@ -130,8 +129,12 @@ text overlays kept for caption hunts, §6).
   floating overlay spam); offline-earnings modal on load.
 - Tags tab: owned pills toggle ON/OFF plus SOLO (feed only that one tag).
   Gallery tab: text box filters keepsakes by tag substring.
+  Config tab: starter picks recap + extra excludes (add/remove, 100 max).
 
 ## 8. Hard blocklist (reject tag if ANY substring matches; case-insensitive)
+
+Player excludes (setup screen + Config tab, 100 max, persisted) extend this
+list at runtime: queries, post tags, and market discovery all respect them.
 
 `loli, shota, child, kid, infant, baby, toddler, school, student, uniform-ish
 minor terms, ageplay, incest, bestiality, zoo, necro, rape, non-consent, gore,

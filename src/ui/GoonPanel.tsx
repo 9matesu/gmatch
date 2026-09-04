@@ -10,6 +10,7 @@ import { redgifsPlayable } from '../services/redgifs'
 import { CAP_SKINS } from './capSkins'
 import { formatNum } from './format'
 import CachedImg from './CachedImg'
+import OfflineCard from './OfflineCard'
 import { IconChevronL, IconChevronR } from './icons'
 
 interface Float {
@@ -172,6 +173,9 @@ export default function GoonPanel() {
             </div>
           ))}
           {feedOffline && <span className="offline-badge">OFFLINE</span>}
+          {grid.length === 0 && (
+            <OfflineCard fetching={fetching} feedOffline={feedOffline} onRetry={() => void fetchFeed()} />
+          )}
         </div>
       ) : (
         <div
@@ -210,6 +214,9 @@ export default function GoonPanel() {
             />
           )}
           {showOffline && <span className="offline-badge">OFFLINE</span>}
+          {showOffline && (
+            <OfflineCard fetching={fetching} feedOffline={feedOffline} onRetry={() => void fetchFeed()} />
+          )}
           {!showOffline && canGoBack && (
             <button
               type="button"

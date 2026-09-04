@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   MAX_MARKET_OFFERS,
   MAX_TAG_LEVEL,
-  STARTER_TAGS,
   buyTag,
   canBuyTag,
   deriveTagStats,
@@ -10,8 +9,8 @@ import {
   feedQuery,
   isTagSelected,
   normalizeCustomTag,
+  setupTag,
   soloTag,
-  starterOffers,
   tagCost,
   toggleTag,
   validateCustomTag,
@@ -57,21 +56,19 @@ describe('buyTag', () => {
   })
 })
 
-describe('starter tags (user spec: pervert pool, no vanilla)', () => {
-  it('seeds the pervert list', () => {
-    expect([...STARTER_TAGS]).toEqual([
-      'gangbang', 'creampie', 'ahegao', 'pregnant', 'veiny_penis', 'bulge', 'deepthroat', 'anal',
-      'bbc', 'skylar_vox',
-    ])
-    const offers = starterOffers()
-    expect(offers.map((o) => o.name)).toEqual([...STARTER_TAGS])
-    expect(offers.every((o) => o.level === 0 && o.base > 0 && o.income > 0)).toBe(true)
+describe('setup picks (user spec: no hardcoded default tags)', () => {
+  it('setupTag joins owned at level 1, feed-selected', () => {
+    const t = setupTag('gangbang')
+    expect(t).toMatchObject({ name: 'gangbang', level: 1, selected: true })
+    expect(t.base).toBeGreaterThan(0)
+    expect(isTagSelected(t)).toBe(true)
+    expect(feedQuery([t])).toEqual(['gangbang'])
   })
 
-  it('contains no vanilla tags', () => {
-    for (const t of ['1girl', 'solo', 'smile', 'long_hair', 'cosplay', 'lingerie']) {
-      expect(STARTER_TAGS).not.toContain(t)
-    }
+  it('exports no default tag list', async () => {
+    const mod = (await import('./tags')) as Record<string, unknown>
+    expect('STARTER_TAGS' in mod).toBe(false)
+    expect('starterOffers' in mod).toBe(false)
   })
 })
 

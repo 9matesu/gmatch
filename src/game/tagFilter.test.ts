@@ -1,13 +1,17 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import {
   BLOCKLIST,
+  __resetUserExcludes,
   filterTags,
+  getUserExcludes,
   isNoise,
   isQueryBlocked,
   isRatingAllowed,
   isTagBlocked,
+  isUserExcluded,
   parseTagField,
   rankTags,
+  setUserExcludes,
 } from './tagFilter'
 
 describe('hard blocklist (SPEC §8)', () => {
@@ -160,5 +164,31 @@ describe('isQueryBlocked', () => {
   it('rejects whole queries containing a blocked term', () => {
     expect(isQueryBlocked('gangbang loli')).toBe(true)
     expect(isQueryBlocked('gangbang wet')).toBe(false)
+  })
+})
+
+describe('user excludes (setup screen / config tab)', () => {
+  beforeEach(() => __resetUserExcludes())
+
+  it('normalizes, dedupes and exposes the list', () => {
+    setUserExcludes([' Feet ', 'FEET', '', '  ', 'latex'])
+    expect(getUserExcludes()).toEqual(['feet', 'latex'])
+    expect(isUserExcluded('feet')).toBe(true)
+    expect(isUserExcluded('soles')).toBe(false)
+  })
+
+  it('excluded terms block tags, queries, ranking and filtering', () => {
+    setUserExcludes(['feet'])
+    expect(isTagBlocked('feet')).toBe(true)
+    expect(isTagBlocked('foot_fetish')).toBe(false)
+    expect(isTagBlocked('bare_feet')).toBe(true)
+    expect(isQueryBlocked('gangbang feet')).toBe(true)
+    expect(filterTags(['feet', 'wet'])).toEqual(['wet'])
+    expect(rankTags(['feet', 'wet', 'feet']).map((r) => r.name)).toEqual(['wet'])
+  })
+
+  it('hard blocklist still applies with no excludes set', () => {
+    expect(isTagBlocked('loli')).toBe(true)
+    expect(isTagBlocked('gangbang')).toBe(false)
   })
 })

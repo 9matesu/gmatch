@@ -12,7 +12,7 @@ import {
 describe('save key + version (SPEC §11)', () => {
   it('uses goongrid.save.v1', () => {
     expect(SAVE_KEY).toBe('goongrid.save.v1')
-    expect(SAVE_VERSION).toBe(2)
+    expect(SAVE_VERSION).toBe(3)
   })
 })
 

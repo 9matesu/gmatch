@@ -54,19 +54,14 @@ export function deriveTagStats(name: string, frequency: number): TagStats {
   return { base, income, weight }
 }
 
-/** Pervert starter tags so the market is never empty (user spec: no vanilla). */
-export const STARTER_TAGS: readonly string[] = [
-  'gangbang',
-  'creampie',
-  'ahegao',
-  'pregnant',
-  'veiny_penis',
-  'bulge',
-  'deepthroat',
-  'anal',
-  'bbc',
-  'skylar_vox',
-]
+/**
+ * Setup picks (user spec): the player chooses their own starter tags on the
+ * setup screen — there are NO hardcoded default tags anywhere. A setup pick
+ * joins owned at level 1, feed-selected, free.
+ */
+export function setupTag(name: string): OwnedTag {
+  return { name, level: 1, selected: true, ...deriveTagStats(name, 1) }
+}
 
 /** cost = base * 1.15^owned (SPEC §3). */
 export function tagCost(base: number, owned: number): number {
@@ -108,15 +103,8 @@ export function isTagSelected(tag: OwnedTag): boolean {
   return tag.level > 0 && tag.selected !== false
 }
 
-/** Market offers seeded from the evergreen starter tags. */
-export function starterOffers(): OwnedTag[] {
-  return STARTER_TAGS.map((name) => ({
-    name,
-    level: 0,
-    selected: false,
-    ...deriveTagStats(name, STARTER_TAGS.length),
-  }))
-}
+/** Market offers are seeded from drained foes (discoverTags) and the player's
+ * own picks — never from a hardcoded list. */
 
 /**
  * Discover new market offers from a drained foe's tags (auto-generated as

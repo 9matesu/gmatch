@@ -7,10 +7,12 @@ import ShopPanel from './ui/ShopPanel'
 import Toasts from './ui/Toasts'
 import OfflineModal from './ui/OfflineModal'
 import AgeGate from './ui/AgeGate'
+import SetupScreen from './ui/SetupScreen'
 import './ui/styles.css'
 
 export default function App() {
   const ageVerified = useGame((s) => s.ageVerified)
+  const setupComplete = useGame((s) => s.setupComplete)
   const backgroundUrl = useGame((s) => s.backgroundUrl)
 
   useEffect(() => {
@@ -33,8 +35,8 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (ageVerified) void useGame.getState().fetchFeed()
-  }, [ageVerified])
+    if (ageVerified && setupComplete) void useGame.getState().fetchFeed()
+  }, [ageVerified, setupComplete])
 
   return (
     <div className={`app-shell ${backgroundUrl ? 'has-backdrop' : ''}`}>
@@ -54,6 +56,7 @@ export default function App() {
       <Toasts />
       <OfflineModal />
       {!ageVerified && <AgeGate />}
+      {ageVerified && !setupComplete && <SetupScreen />}
     </div>
   )
 }
