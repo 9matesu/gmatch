@@ -13,7 +13,7 @@ export interface CapDef {
 export const CAPS: Record<CapId, CapDef> = {
   blue: {
     id: 'blue',
-    name: 'Blue Cap',
+    name: 'E-Girl Spit',
     cost: 150,
     clickMult: 2,
     passiveMult: 1,
@@ -21,7 +21,7 @@ export const CAPS: Record<CapId, CapDef> = {
   },
   filter: {
     id: 'filter',
-    name: 'Goon Filter',
+    name: 'Braceface',
     cost: 900,
     clickMult: 1,
     passiveMult: 1,
@@ -29,7 +29,7 @@ export const CAPS: Record<CapId, CapDef> = {
   },
   hypno: {
     id: 'hypno',
-    name: 'Hypno Drop',
+    name: 'Pornmeat',
     cost: 5_000,
     clickMult: 1,
     passiveMult: 2,
@@ -37,7 +37,7 @@ export const CAPS: Record<CapId, CapDef> = {
   },
   melt: {
     id: 'melt',
-    name: 'Brain Melt',
+    name: 'Brain Drain',
     cost: 50_000,
     clickMult: 10,
     passiveMult: 10,

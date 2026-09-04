@@ -1,5 +1,5 @@
 import type { BooruPost } from '../game/types'
-import { isQueryBlocked } from '../game/tagFilter'
+import { isQueryBlocked, isUserExcluded } from '../game/tagFilter'
 import { allowOnly } from './postFilter'
 import {
   REDGIFS_API,
@@ -130,7 +130,9 @@ function remember(posts: BooruPost[]): BooruPost[] {
  */
 function sanitize(posts: BooruPost[], query?: string): BooruPost[] {
   const captions = typeof query === 'string' && /caption/i.test(query)
-  return allowOnly(posts, { captions })
+  // Player excludes win everywhere: drop posts carrying an excluded tag on
+  // both the IPC and direct paths (SPEC §8).
+  return allowOnly(posts, { captions }).filter((p) => !p.tags.some(isUserExcluded))
 }
 
 /** Mirrors reachable through the Vite dev proxy (same-origin → no CORS). */

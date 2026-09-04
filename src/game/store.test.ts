@@ -16,10 +16,11 @@ vi.stubGlobal('localStorage', {
 })
 
 import { defaultSave, serialize, SAVE_KEY } from './save'
-import { starterOffers } from './tags'
+import { setupTag } from './tags'
+import { getUserExcludes } from './tagFilter'
 import { fetchPosts } from '../services/booru'
 import type { BooruResponse } from '../services/booru'
-import { useGame, HISTORY_CAP } from './store'
+import { useGame, HISTORY_CAP, GRID_SIZE, shufflePosts } from './store'
 
 beforeEach(() => {
   mem.clear()
@@ -47,29 +48,30 @@ describe('clickImage', () => {
 
 describe('buyTag', () => {
   it('levels a tag and deducts cost', () => {
-    useGame.setState({ gp: 10_000, tags: starterOffers() })
+    useGame.setState({ gp: 10_000, tags: [setupTag('gangbang')] })
     const before = useGame.getState().gp
     expect(useGame.getState().buyTag('gangbang')).toBe(true)
     const t = useGame.getState().tags.find((x) => x.name === 'gangbang')
-    expect(t?.level).toBe(1)
+    expect(t?.level).toBe(2)
     expect(useGame.getState().gp).toBeLessThan(before)
     expect(useGame.getState().achievements).toContain('first_tag')
   })
 
   it('refuses when broke', () => {
-    useGame.setState({ gp: 0, tags: starterOffers() })
+    useGame.setState({
+      gp: 0,
+      tags: [{ name: 'gangbang', level: 0, base: 100, income: 5, weight: 2 }],
+    })
     expect(useGame.getState().buyTag('gangbang')).toBe(false)
     expect(useGame.getState().tags.find((x) => x.name === 'gangbang')?.level).toBe(0)
   })
 })
 
 describe('refreshTagMarket', () => {
-  it('falls back to pervert starter tags when the feed is offline', async () => {
+  it('keeps the market empty with no owned tags (no hardcoded seeds)', async () => {
     useGame.setState({ tags: [] })
     await useGame.getState().refreshTagMarket()
-    const names = useGame.getState().tags.map((t) => t.name)
-    expect(names).toContain('gangbang')
-    expect(names).toContain('ahegao')
+    expect(useGame.getState().tags).toEqual([])
   })
 })
 
@@ -303,6 +305,23 @@ describe('background backdrop', () => {
   })
 })
 
+describe('shufflePosts (never sequential)', () => {
+  it('preserves every post, returns a new array', () => {
+    const posts = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
+    const out = shufflePosts(posts)
+    expect(out).not.toBe(posts)
+    expect(out.map((p) => p.id).sort()).toEqual(['a', 'b', 'c'])
+    expect(posts.map((p) => p.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('actually reorders across rounds', () => {
+    const posts = Array.from({ length: 10 }, (_, i) => ({ id: `p${i}` }))
+    const same = posts.map((p) => p.id).join(',')
+    const varied = Array.from({ length: 20 }, () => shufflePosts(posts).map((p) => p.id).join(','))
+    expect(varied.some((v) => v !== same)).toBe(true)
+  })
+})
+
 describe('tick', () => {
   it('pays passive GP/s from owned tags', () => {
     useGame.setState({
@@ -424,5 +443,144 @@ describe('addCustomTag', () => {
     expect(tag?.selected).toBe(true)
     const dupe = await useGame.getState().addCustomTag('bimbo')
     expect(dupe.added).toBe(false)
+  })
+})
+
+describe('shufflePosts (never sequential)', () => {
+  it('preserves every post, returns a new array', () => {
+    const posts = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
+    const out = shufflePosts(posts)
+    expect(out).not.toBe(posts)
+    expect(out.map((p) => p.id).sort()).toEqual(['a', 'b', 'c'])
+    expect(posts.map((p) => p.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('actually reorders across rounds', () => {
+    const posts = Array.from({ length: 10 }, (_, i) => ({ id: `p${i}` }))
+    const same = posts.map((p) => p.id).join(',')
+    const varied = Array.from({ length: 20 }, () => shufflePosts(posts).map((p) => p.id).join(','))
+    expect(varied.some((v) => v !== same)).toBe(true)
+  })
+})
+
+describe('3x3 grid mode', () => {
+  const mocked = vi.mocked(fetchPosts)
+  const offline: BooruResponse = { posts: [], source: null, ok: false, offline: true }
+  const post = (id: string) => ({ id, url: `https://x/${id}.jpg`, tags: ['gangbang'] })
+  const dozen = () => Array.from({ length: 12 }, (_, i) => post(`g${i}`))
+
+  it('setViewMode fills 9 squares from the queue with full HP', () => {
+    mocked.mockResolvedValue(offline)
+    useGame.setState({ queue: dozen(), grid: [] })
+    useGame.getState().setViewMode('grid')
+    const s = useGame.getState()
+    expect(s.viewMode).toBe('grid')
+    expect(s.grid).toHaveLength(GRID_SIZE)
+    expect(s.queue).toHaveLength(3)
+    for (const c of s.grid) expect(c.hp).toBe(c.maxHp)
+  })
+
+  it('clickCell damages a square and banks GP', () => {
+    useGame.setState({ queue: dozen(), grid: [] })
+    useGame.getState().setViewMode('grid')
+    const before = useGame.getState().grid[0].hp
+    const r = useGame.getState().clickCell(0)
+    expect(r.killed).toBe(false)
+    expect(r.gain).toBeGreaterThan(0)
+    expect(useGame.getState().grid[0].hp).toBeLessThan(before)
+  })
+
+  it('clickCell KO keeps the gallery, counts the KO, slides a fresh foe in', () => {
+    useGame.setState({ queue: dozen(), grid: [] })
+    useGame.getState().setViewMode('grid')
+    let killed = false
+    for (let i = 0; i < 50 && !killed; i++) killed = useGame.getState().clickCell(0).killed
+    expect(killed).toBe(true)
+    const s = useGame.getState()
+    expect(s.gallery).toHaveLength(1)
+    expect(s.defeated).toBe(1)
+    expect(s.grid).toHaveLength(GRID_SIZE)
+  })
+
+  it('clickCell on an empty square is a dead click', () => {
+    useGame.setState({ grid: [], queue: [] })
+    const clicks = useGame.getState().clicks
+    const r = useGame.getState().clickCell(4)
+    expect(r).toEqual({ gain: 0, crit: false, killed: false })
+    expect(useGame.getState().clicks).toBe(clicks)
+  })
+
+  it('dropCell swaps a broken square with no reward', () => {
+    useGame.setState({ queue: dozen(), grid: [] })
+    useGame.getState().setViewMode('grid')
+    const gp = useGame.getState().gp
+    const firstId = useGame.getState().grid[0].post.id
+    useGame.getState().dropCell(0)
+    const s = useGame.getState()
+    expect(s.gp).toBe(gp)
+    expect(s.defeated).toBe(0)
+    expect(s.grid).toHaveLength(GRID_SIZE)
+    expect(s.grid.some((c) => c.post.id === firstId)).toBe(false)
+  })
+
+  it('fetchFeed in grid mode appends to the queue and tops up squares', async () => {
+    mocked.mockClear()
+    mocked.mockResolvedValue({ posts: [post('n1'), post('n2')], source: 't', ok: true })
+    useGame.setState({
+      tags: [{ name: 'aaa', level: 1, base: 10, income: 1, weight: 1 }],
+      feedCursor: 0,
+      viewMode: 'grid',
+      grid: [],
+      queue: [],
+    })
+    await useGame.getState().fetchFeed()
+    const s = useGame.getState()
+    expect(s.grid).toHaveLength(2)
+    expect(s.current).toBeNull()
+  })
+
+  it('tick auto-clicks batter the first square in grid mode', () => {
+    useGame.setState({ queue: dozen(), grid: [] })
+    useGame.getState().setViewMode('grid')
+    // Braceface (filter cap): permanent 1 auto-click/s.
+    useGame.setState({ caps: [{ capId: 'filter', expiresAt: Number.POSITIVE_INFINITY }] })
+    const before = useGame.getState().grid[0].hp
+    useGame.getState().tick(1000)
+    expect(useGame.getState().grid[0].hp).toBeLessThan(before)
+  })
+})
+
+describe('setup + user excludes (no hardcoded tags)', () => {
+  it('completeSetup commits 4 picks owned+selected and syncs excludes', () => {
+    const r = useGame
+      .getState()
+      .completeSetup(['bimbo', 'creampie', 'ahegao', 'doggystyle'], ['feet'])
+    expect(r.ok).toBe(true)
+    const s = useGame.getState()
+    expect(s.setupComplete).toBe(true)
+    expect(s.tags.map((t) => t.name)).toEqual(['bimbo', 'creampie', 'ahegao', 'doggystyle'])
+    expect(s.tags.every((t) => t.level === 1 && t.selected === true)).toBe(true)
+    expect(s.userExcludes).toEqual(['feet'])
+    expect(getUserExcludes()).toEqual(['feet'])
+  })
+
+  it('completeSetup rejects wrong counts, dupes and blocked tags', () => {
+    expect(useGame.getState().completeSetup(['bimbo', 'creampie'], []).ok).toBe(false)
+    expect(
+      useGame.getState().completeSetup(['bimbo', 'bimbo', 'creampie', 'ahegao'], []).ok,
+    ).toBe(false)
+    expect(
+      useGame.getState().completeSetup(['bimbo', 'creampie', 'ahegao', 'loli'], []).ok,
+    ).toBe(false)
+    expect(useGame.getState().setupComplete).toBe(false)
+  })
+
+  it('add/removeUserExclude round-trips, dupes refused', () => {
+    expect(useGame.getState().addUserExclude(' Feet ')).toBe(true)
+    expect(useGame.getState().addUserExclude('feet')).toBe(false)
+    expect(useGame.getState().userExcludes).toEqual(['feet'])
+    expect(useGame.getState().removeUserExclude('FEET')).toBe(true)
+    expect(useGame.getState().removeUserExclude('feet')).toBe(false)
+    expect(useGame.getState().userExcludes).toEqual([])
   })
 })

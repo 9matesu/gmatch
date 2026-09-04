@@ -30,8 +30,9 @@ pop **GoonCaps** for temporary buffs, climb the **Pornification** ladder, and
 - Each tag: `cost = base * 1.15^owned`, `income` GP/s, `weight` (feed bias).
   base/income derived from tag length + frequency (rarer tag = pricier = better).
 - Max 20 owned levels per tag. Owned tags list = the feed query (top 5 by level).
-- A few evergreen starter tags always seeded so the market is never empty:
-  `1girl, solo, long_hair, smile, closed_eyes, wet, lingerie, cosplay`.
+- No hardcoded starter tags: the player picks exactly 4 on the setup screen
+  (validity-gated + live-probed); the market otherwise seeds from drained foes
+  (`discoverTags`), custom tags, and the Config tab.
 
 ## 4. Images & rarity (ORBIT card-valuation flavor)
 
@@ -42,14 +43,23 @@ pop **GoonCaps** for temporary buffs, climb the **Pornification** ladder, and
   click any owned image in the gallery to re-feature it in the Goon Panel.
 - Gallery persists through Brainmelt (the "keepsakes").
 
+## 4b. Feed layout: single foe vs 3x3 grid
+
+- The Goon Panel toggles 1×1 (one foe, full HP bar) and 3×3 (nine live squares).
+- Every square is its own foe with its own HP bar: clicking a square damages only
+  that square; a drained square joins the gallery (rarity/bonus/discovery as usual)
+  and a fresh foe slides in from the queue. Broken squares drop reward-free.
+- Auto-click caps batter the first square (one KO per tick at most, as in 1×1).
+- Layout persists in the save; squares themselves are session-only.
+
 ## 5. GoonCaps (consumable buffs) — vending machine
 
 | Cap | Cost | Effect |
 |---|---|---|
-| Blue Cap | 150 GP | x2 click power, 60s |
-| Goon Filter | 900 GP | auto-click 1/s, permanent |
-| Hypno Drop | 5k GP | x2 passive GP/s, permanent |
-| Brain Melt | 50k GP | x10 everything, permanent |
+| E-Girl Spit | 150 GP | x2 click power, permanent |
+| Braceface | 900 GP | auto-click 1/s, permanent |
+| Pornmeat | 5k GP | x2 passive GP/s, permanent |
+| Brain Drain | 50k GP | x10 everything, permanent |
 
 Stacking: different caps stack; same-cap pops stack permanently (no timers, no wear).
 
@@ -69,7 +79,7 @@ text overlays kept for caption hunts, §6).
 - xbooru: same DAPI shape, `https://xbooru.com/...` (explicit-rated, high volume)
 - paheal: `https://rule34.paheal.net/api/danbooru/find_posts?tags=<t>&limit=<n>` (XML `<tag file_url=...>`; query single tags only — combos return 0)
 - redgifs: real/hardcore porn (pornstars like skylar vox, BBC, mp4s/gifs) via the public v2 API — temp token (`GET /v2/auth/temporary`, cached ~20h) → `GET /v2/gifs/search?search_text=<words>&order=trending&count=<n>&page=<1-5>` with `Authorization: Bearer`; posts are `kind: video` with poster stills, min 700px enforced in the desktop app
-- imhentai: hentai galleries (captions, hardcore doujins), no JSON API — scrape like gallery-dl: `/search/?key=<words>` → gallery IDs (`href="/gallery/<id>"`) → cover per gallery (`data-src` base + `$.parseJSON` ext map, max 3 galleries/round, dims gate only when known)
+- imhentai: hentai galleries (captions, hardcore doujins), no JSON API — scrape like gallery-dl: `/search/?key=<words>` → gallery IDs (`href="/gallery/<id>"`) → cover per gallery (`data-src` base + `$.parseJSON` ext map, max 3 galleries/round, dims gate only when known). Cloudflare challenges Node-TLS fetches, so the desktop app fetches these pages via Electron's Chromium net stack; plain-browser dev may 403 and falls back to offline placeholders.
 - Removed on purpose: e621 (furry), safebooru (safe-only), rule34.xxx (login wall).
 - Caption hunts: a query carrying `caption`/`goon_caption` keeps text-overlay tags (`speech_bubble`, `english_text`, …) that the double gate otherwise drops — same flag in main.cjs and postFilter; everything else filters identically on both sides.
 - AND-combos of narrow tags return 0 often → query variant ladder: full combo →
@@ -85,15 +95,13 @@ text overlays kept for caption hunts, §6).
   posters, images AND videos) is prefetched so skip/back is instant; cache
   stats + Clear live in the left stats panel.
 
-### 6b. Feed/market queries (user spec: no vanilla)
+### 6b. Feed/market queries (user spec: player picks, no hardcodes)
 
-- Starter tags + market seeds come from `src/game/pervertTags.ts` — a weighted
-  pool of 40+ hard tags (gangbang, pregnant, impregnation, breeding,
-  veiny_penis, bulge, ahegao, deepthroat, double_penetration, anal, creampie,
-  bbc, black_cock, interracial, skylar_vox, bimbo, femdom, goon_caption,
-  caption, ...). No vanilla tags (1girl/solo/romance) anywhere in the pipeline.
-- Feed/market query = top-3 owned tags + 2 weighted pervert seeds (3 seeds when
-  nothing is owned). Seeded tags are never blocklisted (tested invariant).
+- No hardcoded/default tags anywhere: the setup screen collects exactly 4
+  starter picks (owned level 1, feed-selected, free). Feed query = top-4 owned
+  tags round-robin, one tag per fetch; market query = top-3 owned tags.
+  Nothing owned → feed stays offline, market stays empty until setup picks,
+  custom tags, or drained-foe discovery seed it.
 
 ### 6c. Custom tags (user spec: free-form search → add when valid)
 
@@ -121,8 +129,12 @@ text overlays kept for caption hunts, §6).
   floating overlay spam); offline-earnings modal on load.
 - Tags tab: owned pills toggle ON/OFF plus SOLO (feed only that one tag).
   Gallery tab: text box filters keepsakes by tag substring.
+  Config tab: starter picks recap + extra excludes (add/remove, 100 max).
 
 ## 8. Hard blocklist (reject tag if ANY substring matches; case-insensitive)
+
+Player excludes (setup screen + Config tab, 100 max, persisted) extend this
+list at runtime: queries, post tags, and market discovery all respect them.
 
 `loli, shota, child, kid, infant, baby, toddler, school, student, uniform-ish
 minor terms, ageplay, incest, bestiality, zoo, necro, rape, non-consent, gore,

@@ -138,10 +138,16 @@ function hasBadTag(tags, captions) {
 }
 
 function httpGet(url, headers) {
+  // imhentai's Cloudflare front challenges bare-Node fetches — a site
+  // Referer makes gallery/search pages answer 200 like a real browser tab.
+  const ref =
+    typeof url === 'string' && url.includes('imhentai.xxx')
+      ? { Referer: 'https://imhentai.xxx/' }
+      : {}
   return new Promise((resolve, reject) => {
     const req = https.get(
       url,
-      { headers: { 'User-Agent': UA, Accept: 'application/json, text/xml, */*', ...(headers || {}) } },
+      { headers: { 'User-Agent': UA, Accept: 'application/json, text/xml, */*', ...ref, ...(headers || {}) } },
       (res) => {
         if (res.statusCode >= 400) {
           res.resume()
@@ -306,6 +312,31 @@ async function fetchRedgifs(variant, n, captions) {
 // No JSON API — scrape HTML like gallery-dl: search page → gallery IDs →
 // cover image per gallery (data-src base + $.parseJSON ext map).
 const IMHENTAI_ROOT = 'https://imhentai.xxx'
+
+/**
+ * imhentai HTML via Electron's net stack (Chromium TLS passes Cloudflare;
+ * plain https.get gets a 403 challenge). Falls back to httpGet outside
+ * Electron. Throws on bad status like httpGet.
+ */
+async function imhGet(url) {
+  try {
+    if (net && typeof net.fetch === 'function') {
+      const res = await net.fetch(url, {
+        headers: {
+          'User-Agent': UA,
+          Accept: 'text/html,application/xhtml+xml,*/*',
+          Referer: 'https://imhentai.xxx/',
+        },
+      })
+      if (res.status !== 200) throw new Error(`imh status ${res.status}`)
+      return await res.text()
+    }
+  } catch (e) {
+    if (e && /imh status/.test(e.message)) throw e
+    /* no Electron net — fall through to https */
+  }
+  return httpGet(url, { Referer: 'https://imhentai.xxx/' })
+}
 const IMH_EXTS = { j: 'jpg', p: 'png', g: 'gif', w: 'webp', a: 'avif' }
 
 function parseImhentaiSearch(html, limit) {
@@ -356,13 +387,16 @@ function parseImhentaiCover(html) {
 
 async function fetchImhentai(variant, n, captions) {
   const key = redgifsWords(variant)
-  const searchBody = await httpGet(`${IMHENTAI_ROOT}/search/?key=${encodeURIComponent(key)}`)
+  // Cloudflare challenges Node-TLS fetches (403 "Just a moment") — Electron's
+  // net stack is Chromium TLS and passes like a real browser tab. Plain-node
+  // fallback stays for contexts without Electron.
+  const searchBody = await imhGet(`${IMHENTAI_ROOT}/search/?key=${encodeURIComponent(key)}`)
   const ids = parseImhentaiSearch(searchBody, 3)
   const posts = []
   for (const id of ids) {
     if (posts.length >= n) break
     try {
-      const galleryBody = await httpGet(`${IMHENTAI_ROOT}/gallery/${encodeURIComponent(id)}/`)
+      const galleryBody = await imhGet(`${IMHENTAI_ROOT}/gallery/${encodeURIComponent(id)}/`)
       const cover = parseImhentaiCover(galleryBody)
       if (!cover) continue
       // Dims gate only when known — map-less covers skip it.
