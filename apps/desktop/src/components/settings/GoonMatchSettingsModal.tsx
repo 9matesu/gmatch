@@ -5,6 +5,7 @@ import type { AppSettings } from '../../hooks/useSettings';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { orbitFetch } from '../../utils/api';
 import { playPress, playChatMessage, playMsgReceive } from '../../utils/sounds';
+import { useGame, MAX_USER_EXCLUDES } from '../../game/store';
 import {
   Settings,
   User,
@@ -24,6 +25,7 @@ import {
   Moon,
   Upload,
   Send,
+  Rss,
 } from 'lucide-react';
 
 export type SettingsTabId =
@@ -32,6 +34,7 @@ export type SettingsTabId =
   | 'domination'
   | 'audio'
   | 'wallpaper'
+  | 'feed'
   | 'feedback'
   | 'legal';
 
@@ -52,6 +55,116 @@ const WALLPAPER_PRESETS = [
   { id: 'space', name: 'Deep Space Orbit', url: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=1920&q=80' },
   { id: 'minimal', name: 'Studio Gradient', url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1920&q=80' },
 ];
+
+/**
+ * Feed settings (moved from the legacy idle ShopPanel Config tab): recap of
+ * the starter picks + the user exclude editor backed by the idle store.
+ */
+function FeedSettingsTab({ toast }: { toast?: (msg: string, type?: string) => void }) {
+  const tags = useGame((s) => s.tags);
+  const userExcludes = useGame((s) => s.userExcludes);
+  const addUserExclude = useGame((s) => s.addUserExclude);
+  const removeUserExclude = useGame((s) => s.removeUserExclude);
+  const [draft, setDraft] = useState('');
+  const owned = tags.filter((t) => t.level > 0);
+
+  const add = () => {
+    const parts = draft
+      .split(/[\s,]+/)
+      .map((t) => t.toLowerCase().trim())
+      .filter(Boolean);
+    if (parts.length === 0) return;
+    let added = 0;
+    for (const p of parts) {
+      if (addUserExclude(p)) added += 1;
+    }
+    toast?.(
+      added > 0
+        ? `Excluded ${added} term${added === 1 ? '' : 's'} — queries, posts and market respect it.`
+        : 'Nothing added (dupes, empty, or list full).',
+      added > 0 ? 'success' : 'info',
+    );
+    setDraft('');
+  };
+
+  return (
+    <div className="space-y-6 animate-orbit-fade-in">
+      <div className="p-4 bg-surface-interactive border border-retro-border rounded-lg space-y-3">
+        <h4 className="text-xs font-medium text-retro-fg">Starter picks</h4>
+        {owned.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {owned.map((t) => (
+              <span
+                key={t.name}
+                className="inline-flex items-center rounded-full border border-border-glass bg-white/5 px-2.5 py-1 text-[11px] font-mono text-retro-fg"
+              >
+                {t.name}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[11px] text-retro-muted">
+            No starter tags yet — finish the “Tune your feed” setup step to pick 4.
+          </p>
+        )}
+        <p className="text-[11px] text-retro-muted">
+          Excludes below add to the hard blocklist ({userExcludes.length}/{MAX_USER_EXCLUDES}).
+        </p>
+      </div>
+
+      <div className="p-4 bg-surface-raised border border-border-glass rounded-2xl space-y-3">
+        <h4 className="text-xs font-medium text-retro-fg">Excluded tags</h4>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={draft}
+            placeholder="Exclude a tag — feet, watersports…"
+            aria-label="Add an excluded tag"
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                add();
+              }
+            }}
+            className="flex-1 bg-surface-interactive border border-border-glass rounded-xl px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent placeholder:text-retro-muted/60"
+          />
+          <button
+            type="button"
+            disabled={!draft.trim()}
+            onClick={add}
+            className="px-4 py-2 bg-retro-accent hover:bg-retro-accent-hover disabled:opacity-40 text-black rounded-xl text-xs font-bold cursor-pointer shrink-0"
+          >
+            Add
+          </button>
+        </div>
+        {userExcludes.length === 0 ? (
+          <p className="text-[11px] text-retro-muted">No extra excludes — the hard blocklist still applies.</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {userExcludes.map((x) => (
+              <span
+                key={x}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border-glass bg-white/5 px-2.5 py-1 text-[11px] font-mono text-retro-fg"
+              >
+                {x}
+                <button
+                  type="button"
+                  aria-label={`Remove exclude ${x}`}
+                  title={`Stop excluding ${x}`}
+                  onClick={() => removeUserExclude(x)}
+                  className="text-retro-muted hover:text-red-400 cursor-pointer"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function GoonMatchSettingsModal({
   isOpen,
@@ -195,6 +308,7 @@ export function GoonMatchSettingsModal({
     { id: 'domination', label: 'PC Domination', icon: Zap },
     { id: 'audio', label: 'Match Pacing', icon: Volume2 },
     { id: 'wallpaper', label: 'Wallpaper Background', icon: Image },
+    { id: 'feed', label: 'Feed', icon: Rss },
     { id: 'feedback', label: 'Feedback & Ideas', icon: MessageSquare },
     { id: 'legal', label: 'Guidelines & Terms', icon: FileText },
   ];
@@ -816,7 +930,10 @@ export function GoonMatchSettingsModal({
               </div>
             )}
 
-            {/* ──────── 6. FEEDBACK & SUGGESTIONS ──────── */}
+            {/* ──────── 6. FEED (idle store: starter picks + excludes) ──────── */}
+            {activeTab === 'feed' && <FeedSettingsTab toast={toast} />}
+
+            {/* ──────── 7. FEEDBACK & SUGGESTIONS ──────── */}
             {activeTab === 'feedback' && (
               <form onSubmit={handleFeedbackSubmit} className="space-y-4 animate-orbit-fade-in">
                 <div className="p-4 bg-surface-interactive border border-retro-border rounded-lg space-y-3">

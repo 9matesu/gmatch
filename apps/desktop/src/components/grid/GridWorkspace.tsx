@@ -3,7 +3,6 @@ import GoonPanel from '../../ui/GoonPanel'
 import ShopPanel from '../../ui/ShopPanel'
 import StatsPanel from '../../ui/StatsPanel'
 import OfflineModal from '../../ui/OfflineModal'
-import SetupScreen from '../../ui/SetupScreen'
 import { useToast } from '../Toast'
 import { useGame } from '../../game/store'
 import '../../ui/goongrid.css'
@@ -54,7 +53,6 @@ export default function GridWorkspace() {
           <ShopPanel />
         </main>
         <OfflineModal />
-        {ageVerified && !setupComplete && <SetupScreen />}
       </div>
     </div>
   )

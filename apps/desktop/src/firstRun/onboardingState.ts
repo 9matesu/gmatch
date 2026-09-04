@@ -4,6 +4,7 @@ export const ONBOARDING_STEPS = [
   'profile',
   'platform',
   'feed',
+  'tune',
   'cards',
   'economy',
   'games',

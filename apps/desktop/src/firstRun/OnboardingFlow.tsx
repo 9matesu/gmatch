@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { ArrowLeft, ArrowRight, Check, Sparkles } from 'lucide-react';
 import { saveUserProfile, profileIsComplete } from '../utils/profile';
+import { useGame } from '../game/store';
 import { ProfileSetupForm } from '../components/profile/ProfileSetupForm';
+import { FeedTuneStep } from './FeedTuneStep';
 import { GoonMatchLoginPage } from '../components/auth/GoonMatchLoginPage';
 import {
   ONBOARDING_STEPS,
@@ -38,6 +40,7 @@ const STEP_COPY: Record<OnboardingStep, { title: string; description: string }> 
   profile: { title: 'Make your profile yours', description: 'Choose a name and a few tags so the feed feels relevant.' },
   platform: { title: 'How goonMatch works', description: 'The feed is social, cards capture recognition, and games put your collection to work.' },
   feed: { title: 'The feed is your starting point', description: 'Share porn, discover other perverts, and react to posts you enjoy.' },
+  tune: { title: 'Tune your feed', description: 'Pick exactly 4 starter tags — they steer every fetch. Each one is checked live before you start, and you can add extra excludes.' },
   cards: { title: 'Likes build recognition', description: 'Likes show appreciation. Cards carry content into the game system. They are not the same as g$.' },
   economy: { title: 'g$ powers the game', description: 'Use g$ for supported cards, trades, and power-ups.' },
   games: { title: 'Bring your cards to games', description: 'Build a deck, enter a round, react to cards, and enjoy trading cards, you bastard!.' },
@@ -124,6 +127,9 @@ export function OnboardingFlow({
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
   const copy = STEP_COPY[step];
   const canBack = stepIndex > 0 && step !== 'auth' && step !== 'profile' && !busy;
+  // The tune step unlocks forward only once the idle store has the 4 live
+  // starter picks (mirrors the legacy SetupScreen's `ready` gate).
+  const feedTuned = useGame((s) => s.setupComplete);
 
   const advance = (stepToComplete: OnboardingStep = step) => {
     const next = completeStep(state, stepToComplete);
@@ -213,6 +219,7 @@ export function OnboardingFlow({
 
             {step === 'platform' && <div className="space-y-3 text-sm text-retro-muted"><p><strong className="text-retro-fg">Feed:</strong> your social space for sharing and discovering.</p><p><strong className="text-retro-fg">Cards:</strong> community content that can become part of your collection.</p><p><strong className="text-retro-fg">Games:</strong> use an eligible deck to play rounds and earn recognition.</p></div>}
             {step === 'feed' && <div className="rounded-md border border-border-glass bg-white/5 p-5 text-sm text-retro-muted">After setup, the Feed tab is where you will share images, browse Latest and Trending, and respond to the community.</div>}
+            {step === 'tune' && <FeedTuneStep onFinished={() => advance('tune')} />}
             {step === 'cards' && <div className="rounded-md border border-border-glass bg-white/5 p-5 text-sm text-retro-muted">Likes are appreciation. Cards are playable content. A like can help recognition, but it is never a replacement for g$.</div>}
             {step === 'economy' && <div className="rounded-md border border-border-glass bg-white/5 p-5 text-sm text-retro-muted">g$ can support card purchases, trades, and game power-ups. Your balance and transactions stay inside the product.</div>}
             {step === 'games' && <div className="rounded-md border border-border-glass bg-white/5 p-5 text-sm text-retro-muted">Games are played with decks. Reactions affect rounds, and rankings show cards and players getting noticed.</div>}
@@ -220,7 +227,7 @@ export function OnboardingFlow({
 
             <div className="flex items-center justify-between gap-3 pt-2">
               <button type="button" onClick={back} disabled={!canBack} className="px-4 py-2 rounded-md border border-border-glass text-sm font-semibold disabled:opacity-30"><ArrowLeft className="w-4 h-4 inline mr-2" />Back</button>
-              <button type="button" onClick={() => step === 'profile' ? saveProfile() : advance()} disabled={busy || (step === 'profile' && !profileIsComplete(name, tags, pfpUrl))} className="px-5 py-2 rounded-md chrome-accent text-sm font-black text-black disabled:opacity-40">{busy ? 'Saving...' : step === 'ready' ? 'Enter goonMatch' : 'Continue'} <ArrowRight className="w-4 h-4 inline ml-2" /></button>
+              <button type="button" onClick={() => step === 'profile' ? saveProfile() : advance()} disabled={busy || (step === 'profile' && !profileIsComplete(name, tags, pfpUrl)) || (step === 'tune' && !feedTuned)} className="px-5 py-2 rounded-md chrome-accent text-sm font-black text-black disabled:opacity-40">{busy ? 'Saving...' : step === 'ready' ? 'Enter goonMatch' : 'Continue'} <ArrowRight className="w-4 h-4 inline ml-2" /></button>
             </div>
           </section>
         )}

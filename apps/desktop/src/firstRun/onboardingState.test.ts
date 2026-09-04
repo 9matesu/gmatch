@@ -44,7 +44,7 @@ describe('onboarding state', () => {
   });
 
   it('marks the guide complete only after the ready step', () => {
-    const almostReady: OnboardingState = { ...initialOnboardingState(), current: 'ready', completed: ['welcome', 'auth', 'profile', 'platform', 'feed', 'cards', 'economy', 'games'] };
+    const almostReady: OnboardingState = { ...initialOnboardingState(), current: 'ready', completed: ['welcome', 'auth', 'profile', 'platform', 'feed', 'tune', 'cards', 'economy', 'games'] };
     const complete = completeStep(almostReady, 'ready');
     expect(complete.completed).toContain('ready');
     expect(nextIncompleteStep(complete)).toBeNull();
@@ -55,7 +55,7 @@ describe('onboarding state', () => {
   it('keeps completion persisted for the same identity', () => {
     const complete = completeStep({
       ...initialOnboardingState(),
-      completed: ['welcome', 'auth', 'profile', 'platform', 'feed', 'cards', 'economy', 'games'],
+      completed: ['welcome', 'auth', 'profile', 'platform', 'feed', 'tune', 'cards', 'economy', 'games'],
       current: 'ready',
     }, 'ready');
 

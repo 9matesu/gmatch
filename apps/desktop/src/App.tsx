@@ -60,6 +60,7 @@ import { GalleryView } from "./components/GalleryView";
 import { CreateCardModal } from "./components/CreateCardModal";
 import { BabecockPanel } from "./components/BabecockPanel";
 import GridWorkspace from "./components/grid/GridWorkspace";
+import AdminApp from "./admin/AdminApp";
 import { Leaderboard } from "./components/Leaderboard";
 import { StoreTab } from "./components/StoreTab";
 import { NotificationsPanel } from "./components/NotificationsPanel";
@@ -3441,6 +3442,13 @@ export default function Home() {
                   {mainView === 'grid' && (
                     <div className="flex-1 min-h-0 w-full">
                       <GridWorkspace />
+                    </div>
+                  )}
+
+                  {/* Admin dashboard (vendored orbit admin app, PIN-gated) */}
+                  {mainView === 'admin' && (
+                    <div className="flex-1 min-h-0 w-full overflow-y-auto">
+                      <AdminApp />
                     </div>
                   )}
 

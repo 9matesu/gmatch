@@ -9,8 +9,10 @@ import { EmptyState } from './EmptyState';
 import { DropZone } from './DropZone';
 import { CardDetailView } from './CardDetailView';
 import { SlideshowManager } from './slideshows/SlideshowManager';
+import IdleGalleryView from './grid/IdleGalleryView';
+import { useGame } from '@/game/store';
 import type { FeedPost } from './feed/GoonMatchFeed';
-import { Layers, Download, Trash2, CheckSquare, Search, Film, ImagePlus } from 'lucide-react';
+import { Layers, Download, Trash2, CheckSquare, Search, Film, ImagePlus, ImageIcon } from 'lucide-react';
 
 export interface GalleryViewProps {
   filteredItems: OrbitObject[];
@@ -85,10 +87,27 @@ export function GalleryView({
 }: GalleryViewProps) {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [showSlideshows, setShowSlideshows] = useState(false);
+  const idleKeepsakes = useGame((s) => s.gallery);
 
   return (
     <>
     <div id="gallery-section" className="space-y-4 font-sans select-none">
+      {idleKeepsakes.length > 0 && (
+        <div className="bg-surface-raised border border-border-glass rounded-2xl overflow-hidden shadow-xl">
+          <div className="p-4 border-b border-border-glass bg-surface-raised flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-surface-interactive border border-border-glass flex items-center justify-center text-retro-muted">
+              <ImageIcon className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-xs font-bold text-retro-fg uppercase tracking-wider">
+                Babecock keepsakes ({idleKeepsakes.length})
+              </h2>
+              <p className="text-[10px] text-retro-muted">Idle spoils from the Grid — re-feature them or set an app backdrop</p>
+            </div>
+          </div>
+          <IdleGalleryView />
+        </div>
+      )}
       <div className="bg-surface-raised border border-border-glass rounded-2xl overflow-hidden shadow-xl">
         <div className="p-4 border-b border-border-glass bg-surface-raised flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
