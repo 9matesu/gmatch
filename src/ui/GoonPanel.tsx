@@ -5,6 +5,7 @@ import type { CapId } from '../game/types'
 import { offlineSvg } from '../services/offlineSvg'
 import { prefetchImages } from '../services/imageCache'
 import { isVideoUrl } from '../services/postFilter'
+import { redgifsPlayable } from '../services/redgifs'
 import { formatNum } from './format'
 import CachedImg from './CachedImg'
 import { IconChevronL, IconChevronR } from './icons'
@@ -100,8 +101,8 @@ export default function GoonPanel() {
         {isMotion && current ? (
           <video
             className="goon-image"
-            src={current.url}
-            poster={current.preview}
+            src={redgifsPlayable(current.url)}
+            poster={current.preview ? redgifsPlayable(current.preview) : undefined}
             autoPlay
             loop
             muted

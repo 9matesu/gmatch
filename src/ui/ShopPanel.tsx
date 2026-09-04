@@ -20,6 +20,7 @@ import {
 } from '../game/prestige'
 import { ACHIEVEMENTS } from '../game/achievements'
 import { offlineSvg } from '../services/offlineSvg'
+import { redgifsPlayable } from '../services/redgifs'
 import CachedImg from './CachedImg'
 import { formatNum } from './format'
 
@@ -208,7 +209,7 @@ function GalleryTab() {
                 onClick={() => featureImage(img.id)}
               >
                 {isMotion ? (
-                  <video src={img.url} poster={img.preview} muted preload="metadata" playsInline />
+                  <video src={redgifsPlayable(img.url)} poster={img.preview ? redgifsPlayable(img.preview) : undefined} muted preload="metadata" playsInline />
                 ) : (
                   <CachedImg
                     src={img.url || offlineSvg(img.tags)}

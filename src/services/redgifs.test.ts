@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  REDGIFS_MEDIA,
   parseRedgifs,
   parseRedgifsToken,
   redgifsAuthUrl,
+  redgifsPlayable,
   redgifsQuery,
   redgifsSearchUrl,
 } from './redgifs'
@@ -60,5 +62,16 @@ describe('redgifs adapter', () => {
     expect(url).toContain('search_text=skylar%20vox')
     expect(url).toContain('count=10')
     expect(url).toContain('page=2')
+  })
+})
+
+describe('redgifsPlayable (dev same-origin media)', () => {
+  // Vitest runs with import.meta.env.DEV === true, i.e. the vite-dev branch.
+  it('rewrites media.redgifs.com bytes to /rg-media', () => {
+    expect(redgifsPlayable(`${REDGIFS_MEDIA}/Foo.mp4`)).toBe('/rg-media/Foo.mp4')
+  })
+
+  it('passes other hosts through untouched', () => {
+    expect(redgifsPlayable('https://tbib.org/images/1.jpg')).toBe('https://tbib.org/images/1.jpg')
   })
 })

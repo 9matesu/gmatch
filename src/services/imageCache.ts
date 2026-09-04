@@ -178,6 +178,39 @@ function revokeObjectUrls(): void {
 // --- public API ------------------------------------------------------------
 
 /**
+ * Same-origin dev URL for fetching a remote picture's bytes: vite dev serves
+ * known hosts through local proxies (no CORS block, no console spam).
+ * Null = no dev proxy for this host — skip the background fetch in DEV.
+ * Cache rows stay keyed by the ORIGINAL url, so hits work across restarts.
+ * Pure (exported for tests).
+ */
+export function devFetchable(url: string): string | null {
+  try {
+    const u = new URL(url)
+    if (u.protocol !== 'https:') return null
+    const path = `${u.pathname}${u.search}`
+    if (u.hostname === 'media.redgifs.com') return `/rg-media${path}`
+    if (u.hostname === 'tbib.org') return `/booru/tbib${path}`
+    if (u.hostname === 'xbooru.com') return `/booru/xbooru${path}`
+    if (u.hostname === 'rule34.paheal.net') return `/booru/paheal${path}`
+    if (u.hostname === 'imhentai.xxx' || u.hostname.endsWith('.imhentai.xxx')) {
+      return `/px?u=${encodeURIComponent(url)}`
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+function isDev(): boolean {
+  try {
+    return !!import.meta.env.DEV
+  } catch {
+    return false
+  }
+}
+
+/**
  * Resolve a remote picture URL to its cached form.
  * Electron → gooncache:// local file; browser → blob object URL on hit,
  * remote URL on miss (the miss is downloaded + stored in the background and
@@ -210,9 +243,14 @@ export async function resolveImage(url: string): Promise<string> {
     }
   }
   // Miss: store in the background for next time, show remote now.
+  // In vite dev, cross-origin byte fetches are CORS-blocked (console spam,
+  // zero bytes) — only fetch same-origin proxy URLs there; the <img> still
+  // shows the remote URL directly (no CORS needed for display).
+  const furl = isDev() ? devFetchable(url) : url
+  if (!furl) return url
   void (async () => {
     try {
-      const res = await fetch(url, { referrerPolicy: 'no-referrer' })
+      const res = await fetch(furl, { referrerPolicy: 'no-referrer' })
       if (!res.ok) return
       const blob = await res.blob()
       if (!blob.type.startsWith('image/') && !blob.type.startsWith('video/')) return

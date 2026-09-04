@@ -14,6 +14,25 @@ export function redgifsQuery(tag: string): string {
 
 export const REDGIFS_API = 'https://api.redgifs.com'
 
+/** Binary host for mp4s + posters (single host, verified live). */
+export const REDGIFS_MEDIA = 'https://media.redgifs.com'
+
+/**
+ * Dev-playable URL for RedGifs bytes: vite dev serves them same-origin via
+ * the /rg-media proxy (dodges host-based adblock ERR_FAILEDs). Pass-through
+ * everywhere else (packaged Electron loads file://, no DEV flag). Pure.
+ */
+export function redgifsPlayable(url: string): string {
+  try {
+    if (import.meta.env.DEV && typeof url === 'string' && url.startsWith(`${REDGIFS_MEDIA}/`)) {
+      return `/rg-media/${url.slice(REDGIFS_MEDIA.length + 1)}`
+    }
+  } catch {
+    /* env unavailable (tests without vite) — passthrough */
+  }
+  return url
+}
+
 /** Temporary-token endpoint (no credentials — per-device token). */
 export function redgifsAuthUrl(): string {
   return `${REDGIFS_API}/v2/auth/temporary`
