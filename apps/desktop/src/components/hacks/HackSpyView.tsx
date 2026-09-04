@@ -85,8 +85,15 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
           identity,
         );
         if (!res.ok) {
-          const j = await res.json().catch(() => ({ error: 'Link severed' }));
-          if (!cancelled) setFeedError(j.error || 'Link severed');
+          // Errors name the recovery: 403 means the hack lapsed (buy another);
+          // anything else keeps retrying on the 15s poll, so say that.
+          if (!cancelled) {
+            setFeedError(
+              res.status === 403
+                ? 'Hack expired — buy another to resume the intercept'
+                : 'Link severed — retrying automatically…',
+            )
+          }
           return;
         }
         const data = (await res.json()) as SpyFeed;
@@ -95,7 +102,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
           setFeedError(null);
         }
       } catch {
-        if (!cancelled) setFeedError('Intercept failed — target went dark');
+        if (!cancelled) setFeedError('Intercept failed — retrying automatically…');
       }
     };
     void load();

@@ -221,7 +221,15 @@ export function PCDominationTab({ identity, users }: Props) {
         const data = await res.json().catch(() => ({} as any));
         const cost = typeof data?.cost === 'number' ? data.cost : prices[action];
         const payout = typeof data?.victimReward === 'number' ? data.victimReward : 0;
-        showToast('success', `${ACTION_LABELS[action]?.label || action} sent — -${cost} g$ (target earned +${payout} g$)`);
+        // When neither the response nor /prices gave a number, drop the cost
+        // clause rather than render '-undefined g$'.
+        const money =
+          typeof cost === 'number' && payout > 0
+            ? ` — -${cost} g$ (target earned +${payout} g$)`
+            : typeof cost === 'number'
+              ? ` — -${cost} g$`
+              : '';
+        showToast('success', `${ACTION_LABELS[action]?.label || action} sent to ${selectedTarget.displayName}${money}`);
       } else {
         const err = await res.json().catch(() => ({ error: 'Unknown error' }));
         showToast('error', err.error || 'Failed to send action');

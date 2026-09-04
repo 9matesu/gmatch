@@ -28,6 +28,17 @@ interface DominationEvent {
   timestamp: string;
 }
 
+/** Real past-tense verbs — naive `+d` mangling reads like a bug (blurd, camerad). */
+const PAST_TENSE: Record<string, string> = {
+  wallpaper: 'papered',
+  game_bg: 'backgrounded',
+  popup_video: 'ambushed',
+  message: 'messaged',
+  text_overlay: 'tagged',
+  blur: 'blurred',
+  camera: 'filmed',
+}
+
 interface ActiveEffect {
   id: string;
   type: 'wallpaper' | 'game_bg' | 'popup_video' | 'message' | 'text_overlay' | 'blur';
@@ -211,7 +222,8 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
       // Consent-cut payout: the ledger credit lands on the next reconcile;
       // tell the player NOW so the loop feels connected.
       if (typeof payload.victimReward === 'number' && payload.victimReward > 0) {
-        useGame.getState().notify(`You were ${action.replace('_', ' ')}d — consent cut +${payload.victimReward} g$`);
+        const verb = PAST_TENSE[action] || 'hit';
+        useGame.getState().notify(`You were ${verb} — consent cut +${payload.victimReward} g$`);
       }
     };
 

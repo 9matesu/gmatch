@@ -381,7 +381,7 @@ export default function GoonPanel() {
         )}
         {heatLive && (
           <span
-            className={`${MONO} inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-[rgba(255,120,40,0.5)] bg-[rgba(255,80,0,0.15)] px-2 py-0.5 text-[11px] font-black text-[#ffb066]${reduceMotion ? '' : ' animate-pulse'}`}
+            className={`${MONO} inline-flex min-w-0 shrink items-center gap-1 whitespace-nowrap rounded-lg border border-[rgba(255,120,40,0.5)] bg-[rgba(255,80,0,0.15)] px-2 py-0.5 text-[11px] font-black text-[#ffb066]${reduceMotion ? '' : ' animate-pulse'}`}
             title={`Heat combo: ${heatStreak} rapid clicks — x${heat} click power`}
             aria-label={`Heat combo x${heat}`}
           >
