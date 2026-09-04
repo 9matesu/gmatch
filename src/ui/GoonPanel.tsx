@@ -32,6 +32,7 @@ export default function GoonPanel() {
   const goBack = useGame((s) => s.goBack)
   const canGoBack = useGame((s) => s.past.length > 0)
   const queue = useGame((s) => s.queue)
+  const past = useGame((s) => s.past)
   const popCap = useGame((s) => s.popCap)
 
   const [floats, setFloats] = useState<Float[]>([])
@@ -46,10 +47,15 @@ export default function GoonPanel() {
     advanceFeed()
   }, [advanceFeed, current])
 
-  // Warm the cache with the queued foes so skip/back arrows show instantly.
+  // Warm the cache 5 up / 5 down (past 5 + queue 5 + previews) so
+  // back/skip arrows show instantly for images AND videos.
   useEffect(() => {
-    prefetchImages(queue.map((p) => p.url))
-  }, [queue])
+    const urls = [
+      ...past.slice(-5).flatMap((p) => [p.url, ...(p.preview ? [p.preview] : [])]),
+      ...queue.slice(0, 5).flatMap((p) => [p.url, ...(p.preview ? [p.preview] : [])]),
+    ]
+    prefetchImages(urls)
+  }, [queue, past])
 
   const handleClick = (e: MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -100,6 +106,7 @@ export default function GoonPanel() {
             loop
             muted
             playsInline
+            preload="auto"
             onError={onImageError}
           />
         ) : (
@@ -182,7 +189,7 @@ export default function GoonPanel() {
               className={`cap ${isLive ? 'active' : ''}`}
               disabled={gp < def.cost}
               onClick={() => popCap(id)}
-              title={`${def.name} — ${capEffectLabel(id)} — ${formatNum(def.cost)} GP — ${Math.round(def.durationMs / 1000)}s each, pops stack${st.count > 0 ? ` (x${st.count} live)` : ''}`}
+              title={`${def.name} — ${capEffectLabel(id)} — ${formatNum(def.cost)} GP — permanent, pops stack${st.count > 0 ? ` (x${st.count} live)` : ''}`}
             >
               <span className="cap-name">
                 {def.name}
@@ -190,7 +197,7 @@ export default function GoonPanel() {
               </span>
               <span className="cap-stats">{capEffectLabel(id)}</span>
               <span className="cap-cost mono">{formatNum(def.cost)} GP</span>
-              <span className="cap-timer mono">{isLive ? `${st.secsLeft}s` : ''}</span>
+              <span className="cap-timer mono">{isLive ? '∞' : ''}</span>
             </button>
           )
         })}

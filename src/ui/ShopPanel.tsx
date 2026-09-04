@@ -38,6 +38,7 @@ function TagsTab() {
   const fetching = useGame((s) => s.fetching)
   const buyTag = useGame((s) => s.buyTag)
   const toggleTag = useGame((s) => s.toggleTag)
+  const soloTag = useGame((s) => s.soloTag)
   const refreshTagMarket = useGame((s) => s.refreshTagMarket)
   const addCustomTag = useGame((s) => s.addCustomTag)
   const owned = tags.filter((t) => t.level > 0).length
@@ -114,6 +115,16 @@ function TagsTab() {
                   {isOwned ? (on ? 'ON' : 'OFF') : `${formatNum(cost)} GP`}
                 </span>
               </button>
+              {isOwned && (
+                <button
+                  type="button"
+                  className="pill-lv mono"
+                  onClick={() => soloTag(t.name)}
+                  title={`Solo ${t.name} — feed ONLY this tag`}
+                >
+                  SOLO
+                </button>
+              )}
               {isOwned && !maxed && (
                 <button
                   type="button"
@@ -139,11 +150,38 @@ function GalleryTab() {
   const backgroundUrl = useGame((s) => s.backgroundUrl)
   const featureImage = useGame((s) => s.featureImage)
   const setBackground = useGame((s) => s.setBackground)
+  const [filter, setFilter] = useState('')
   if (gallery.length === 0) {
     return <div className="tab-body empty">No keepsakes yet. Drain feed images to keep them.</div>
   }
+  const q = filter.trim().toLowerCase()
+  const shown = q
+    ? gallery.filter((img) => img.tags.some((t) => t.toLowerCase().includes(q)))
+    : gallery
   return (
     <div className="tab-body">
+      <div className="market-head custom-tag-row">
+        <input
+          className="custom-tag-input"
+          value={filter}
+          placeholder="Filter gallery by tag…"
+          aria-label="Filter gallery by tag"
+          onChange={(e) => setFilter(e.target.value)}
+        />
+        {q && (
+          <button type="button" className="btn small" onClick={() => setFilter('')}>
+            Clear
+          </button>
+        )}
+      </div>
+      {q && (
+        <div className="muted custom-tag-note">
+          {shown.length} of {gallery.length} match “{filter.trim()}”
+        </div>
+      )}
+      {shown.length === 0 ? (
+        <div className="tab-body empty">No keepsakes match that tag.</div>
+      ) : null}
       {backgroundUrl && (
         <div className="backdrop-row">
           <span className="muted">Backdrop live</span>
@@ -158,7 +196,7 @@ function GalleryTab() {
         </div>
       )}
       <div className="gallery-grid">
-        {gallery.map((img) => {
+        {shown.map((img) => {
           const isBackdrop = backgroundUrl === img.url
           const isMotion = img.kind === 'video'
           return (
@@ -210,7 +248,7 @@ function CapsTab() {
   return (
     <div className="tab-body">
       <p className="muted">
-        GoonCap vending machine. Every pop stacks — repeats compound instead of refreshing.
+        GoonCap vending machine. Pops are permanent — every pop stacks forever, repeats compound.
       </p>
       <div className="vending">
         {(Object.keys(CAPS) as CapId[]).map((id) => {
@@ -225,8 +263,8 @@ function CapsTab() {
                   {st.count > 0 && <span className="mono"> x{st.count}</span>}
                 </div>
                 <div className="muted">
-                  {capEffectLabel(id)} · {Math.round(def.durationMs / 1000)}s
-                  {st.count > 0 && ` · ${st.secsLeft}s left`}
+                  {capEffectLabel(id)} · permanent
+                  {st.count > 0 && ` · x${st.count} stacked`}
                 </div>
               </div>
               <button

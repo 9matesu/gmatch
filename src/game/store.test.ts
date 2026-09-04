@@ -315,10 +315,13 @@ describe('tick', () => {
     expect(s.totalEarnedGP).toBeGreaterThanOrEqual(10)
   })
 
-  it('expires spent caps', () => {
+  it('legacy timed caps still prune, permanent pops persist', () => {
     useGame.setState({ caps: [{ capId: 'blue', expiresAt: Date.now() - 1 }] })
     useGame.getState().tick(1000)
     expect(useGame.getState().caps).toHaveLength(0)
+    useGame.setState({ caps: [{ capId: 'blue', expiresAt: Number.POSITIVE_INFINITY }] })
+    useGame.getState().tick(1000)
+    expect(useGame.getState().caps).toHaveLength(1)
   })
 })
 
