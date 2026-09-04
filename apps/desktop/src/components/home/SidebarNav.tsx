@@ -23,6 +23,7 @@ import {
   MessageCircle,
   Coffee,
   Monitor,
+  MousePointerClick,
 } from 'lucide-react';
 import type { MainViewType } from './HomeFooter';
 import { getApiBaseUrl } from '../../utils/api';
@@ -130,6 +131,13 @@ export function SidebarNav({
       icon: Gamepad2,
       active: mainView === 'games',
       action: () => setMainView?.('games'),
+    },
+    {
+      id: 'grid',
+      label: 'Babecock · Idle',
+      icon: MousePointerClick,
+      active: mainView === 'grid',
+      action: () => setMainView?.('grid'),
     },
     ...(onOpenStore
       ? [

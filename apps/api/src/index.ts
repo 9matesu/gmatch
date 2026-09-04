@@ -118,6 +118,7 @@ import { booru } from './routes/booru'
 import { moderation } from './routes/moderation'
 import { starterDeck } from './routes/starter-deck'
 import { economy } from './routes/economy'
+import { economyIdle } from './routes/economy-idle'
 import { cards } from './routes/cards'
 import { decks } from './routes/decks'
 import { slideshows } from './routes/slideshows'
@@ -157,6 +158,7 @@ app.route('/api/posts', posts)
 app.route('/api/booru', booru)
 app.route('/api/moderation', moderation)
 app.route('/api/economy', economy)
+app.route('/api/economy', economyIdle)
 app.route('/api/cards', cards)
 app.route('/api/decks', decks)
 app.route('/api/slideshows', slideshows)
