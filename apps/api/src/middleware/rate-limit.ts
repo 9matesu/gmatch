@@ -129,7 +129,7 @@ export async function rateLimit(c: Context, next: Next) {
   if (bucket.count > maxRequests) {
     c.header('Retry-After', String(resetSec))
     c.header('Access-Control-Allow-Origin', c.req.header('Origin') || '*')
-    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Orbit-Id, X-Orbit-Timestamp, X-Orbit-Signature, X-Orbit-PubKey, X-Orbit-PubKey-Enc, X-Orbit-Nonce')
+    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Orbit-Id, X-Orbit-Timestamp, X-Orbit-Signature, X-Orbit-PubKey, X-Orbit-PubKey-Enc, X-Orbit-Nonce, Idempotency-Key, X-Idempotency-Key')
     c.header('Access-Control-Allow-Methods', 'POST, GET, PATCH, DELETE, OPTIONS')
     return c.json({ error: 'Rate limit exceeded. Try again shortly.' }, 429)
   }

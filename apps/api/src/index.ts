@@ -51,6 +51,8 @@ app.use('*', cors({
     'x-orbit-pubkey-enc',
     'x-orbit-nonce',
     'X-Request-ID',
+    'Idempotency-Key',
+    'X-Idempotency-Key',
   ],
   allowMethods: [
     'GET',

@@ -47,7 +47,7 @@ function errorResponse(c: Context, message: string, status: ContentfulStatusCode
   const origin = c.req.header('Origin') || '*'
   return c.json({ error: message }, status, {
     'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Orbit-Id, X-Orbit-Timestamp, X-Orbit-Signature, X-Orbit-PubKey, X-Orbit-PubKey-Enc, X-Orbit-Nonce',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Orbit-Id, X-Orbit-Timestamp, X-Orbit-Signature, X-Orbit-PubKey, X-Orbit-PubKey-Enc, X-Orbit-Nonce, Idempotency-Key, X-Idempotency-Key',
     'Access-Control-Allow-Methods': 'POST, PUT, GET, PATCH, DELETE, OPTIONS',
   })
 }
