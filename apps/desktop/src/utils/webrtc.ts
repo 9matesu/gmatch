@@ -1,6 +1,7 @@
 import { OrbitIdentity } from '@orbit/crypto'
 import { orbitFetch } from './api'
 import { logger } from './logger';
+import { peerConnectionConfig, sanitizeCandidate, turnCredentials } from './ice-hygiene'
 
 export interface FileMeta {
   name: string
@@ -11,25 +12,15 @@ export interface FileMeta {
   encrypted: boolean
 }
 
-const STUN_SERVERS: RTCIceServer[] = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
-]
-
 function getIceServers(): RTCIceServer[] {
-  const servers = [...STUN_SERVERS]
-  const turnUrl = typeof process !== 'undefined' ? (process as any).env?.NEXT_PUBLIC_TURN_URL : (typeof window !== 'undefined' ? (window as any).__ENV?.NEXT_PUBLIC_TURN_URL : null)
-  const turnUsername = typeof process !== 'undefined' ? (process as any).env?.NEXT_PUBLIC_TURN_USERNAME : (typeof window !== 'undefined' ? (window as any).__ENV?.NEXT_PUBLIC_TURN_USERNAME : null)
-  const turnCredential = typeof process !== 'undefined' ? (process as any).env?.NEXT_PUBLIC_TURN_CREDENTIAL : (typeof window !== 'undefined' ? (window as any).__ENV?.NEXT_PUBLIC_TURN_CREDENTIAL : null)
-  if (turnUrl && turnUsername && turnCredential) {
-    servers.push({
-      urls: turnUrl,
-      username: turnUsername,
-      credential: turnCredential,
-    })
-  }
-  return servers
+  // Single privacy gate (ice-hygiene): STUN always; TURN relay-only when set.
+  return peerConnectionConfig(turnCredentials(readTurnEnv())).iceServers as RTCIceServer[]
+}
+
+function readTurnEnv(): Record<string, string | undefined> {
+  if (typeof process !== 'undefined' && process.env) return process.env as Record<string, string | undefined>
+  if (typeof window !== 'undefined') return (window as any).__ENV ?? {}
+  return {}
 }
 
 const CHUNK_SIZE = 64 * 1024 // 64KB
@@ -62,7 +53,7 @@ export class OrbitPeer {
 
   async initiate(recipientId: string, identity: OrbitIdentity): Promise<string> {
     logger.log('[ORBIT WebRTC] Initiating peer connection to:', recipientId)
-    this.pc = new RTCPeerConnection({ iceServers: this.iceServers })
+    this.pc = new RTCPeerConnection(peerConnectionConfig(turnCredentials(readTurnEnv())))
     this.channel = this.pc.createDataChannel('file-transfer')
     this.setupDataChannel(identity)
 
@@ -84,9 +75,11 @@ export class OrbitPeer {
 
     this.pc.onicecandidate = async (e) => {
       if (!e.candidate) return
+      const safe = sanitizeCandidate(e.candidate.toJSON())
+      if (!safe) return // raw-IP candidate — never leaves this machine
       await orbitFetch('/api/signal/ice', {
         method: 'POST',
-        body: JSON.stringify({ offer_id: offerId, candidate: e.candidate.toJSON() }),
+        body: JSON.stringify({ offer_id: offerId, candidate: safe }),
       }, identity).catch(() => {})
     }
 
@@ -187,7 +180,7 @@ export class OrbitPeer {
     if (!offerRes || !offerRes.ok) throw new Error('[phase:fetch-offer] Failed to fetch WebRTC offer')
     const { offer, sender_id } = await offerRes.json()
 
-    this.pc = new RTCPeerConnection({ iceServers: this.iceServers })
+    this.pc = new RTCPeerConnection(peerConnectionConfig(turnCredentials(readTurnEnv())))
     this.pc.ondatachannel = (e) => {
       logger.log('[ORBIT WebRTC] DataChannel established on receiver!')
       this.channel = e.channel
@@ -215,9 +208,11 @@ export class OrbitPeer {
 
     this.pc.onicecandidate = async (e) => {
       if (!e.candidate) return
+      const safe = sanitizeCandidate(e.candidate.toJSON())
+      if (!safe) return // raw-IP candidate — never leaves this machine
       await orbitFetch('/api/signal/ice', {
         method: 'POST',
-        body: JSON.stringify({ offer_id: offerId, candidate: e.candidate.toJSON() }),
+        body: JSON.stringify({ offer_id: offerId, candidate: safe }),
       }, identity).catch(() => {})
     }
 

@@ -1,6 +1,7 @@
 import Peer, { DataConnection } from 'peerjs'
 import { OrbitObject, User } from '@orbit/shared'
 import { logger } from './logger';
+import { peerConnectionConfig, turnCredentials } from './ice-hygiene'
 
 export interface P2PPayloadMessage {
   type: 'PRESENCE' | 'IMAGE_ANNOUNCE' | 'MESSAGE' | 'CHAT' | 'STORY_ANNOUNCE'
@@ -9,11 +10,11 @@ export interface P2PPayloadMessage {
   timestamp: number
 }
 
-const ICE_SERVERS: RTCIceServer[] = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
-]
+// Privacy gate: same ICE hygiene as the file-transfer peer (ice-hygiene.ts).
+const TURN = turnCredentials(
+  typeof process !== 'undefined' ? (process.env as Record<string, string | undefined>) : {},
+)
+const ICE_CFG = peerConnectionConfig(TURN)
 
 export class OrbitPeerRelay {
   private peer: Peer | null = null
@@ -33,7 +34,7 @@ export class OrbitPeerRelay {
     logger.log('[ORBIT PeerJS] Initializing WebRTC PeerJS relay with ID:', sanitizedId)
     try {
       this.peer = new Peer(sanitizedId, {
-        config: { iceServers: ICE_SERVERS },
+        config: ICE_CFG,
         debug: 0,
       })
 

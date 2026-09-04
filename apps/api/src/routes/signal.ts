@@ -17,6 +17,32 @@ function isParticipant(offer: { sender_id: string; receiver_id: string }, orbitI
   return offer.sender_id === orbitId || offer.receiver_id === orbitId
 }
 
+/**
+ * ICE hygiene (server-side gate, defense in depth): a candidate carrying a
+ * literal IPv4/IPv6 host/srflx/prflx address leaks the sender's IP to the
+ * peer. Only mDNS host candidates (.local) and TURN relay candidates pass.
+ * Mirrors apps/desktop/src/utils/ice-hygiene.ts (trust-domain boundary —
+ * the vendored API stays dependency-only, so the rule is duplicated).
+ */
+export function candidateLeaksIp(candidate: unknown): boolean {
+  try {
+    const sdp = (candidate as { candidate?: unknown })?.candidate
+    if (typeof sdp !== 'string' || sdp.length === 0) return false // end-of-candidates marker
+    const parts = sdp.trim().split(/\s+/)
+    const idx = parts.findIndex((x) => x.startsWith('candidate:'))
+    if (idx < 0) return true // unparseable — fail closed
+    const address = parts[idx + 4] ?? ''
+    const typIdx = parts.indexOf('typ')
+    const type = typIdx >= 0 ? parts[typIdx + 1] : ''
+    if (type === 'relay') return false
+    if (type === 'host') return !address.endsWith('.local')
+    if (type === 'srflx' || type === 'prflx') return true // public IPs by definition
+    return true
+  } catch {
+    return true
+  }
+}
+
 function isValidAnswer(answer: unknown): boolean {
   return !!answer && typeof answer === 'object' && !!(answer as any).type && !!(answer as any).sdp
 }
@@ -115,6 +141,10 @@ signal.post('/ice', orbitAuth, async (c) => {
 
   if (!isParticipant(offer, orbitId)) {
     return c.json({ error: 'Forbidden' }, 403)
+  }
+
+  if (candidateLeaksIp(candidate)) {
+    return c.json({ error: 'Candidate rejected: raw IP address (ICE hygiene)' }, 400)
   }
 
   const isSender = orbitId === offer.sender_id

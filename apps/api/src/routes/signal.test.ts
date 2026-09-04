@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import app from '../index'
 import { createTestIdentity, signRequestHeaders, createMockEnv } from '../test-utils'
+import { candidateLeaksIp } from './signal'
 
 function authHeaders(identity: ReturnType<typeof createTestIdentity>, method: string, url: string, body?: string) {
   return signRequestHeaders(identity, method, url, body)
@@ -250,7 +251,7 @@ describe('Signal API — ICE candidates', () => {
   })
 
   it('POST /api/signal/ice from sender stores candidate with is_sender=1', async () => {
-    const body = JSON.stringify({ offer_id: offerId, candidate: { candidate: 'a=candidate:1 ...', sdpMid: '0' } })
+    const body = JSON.stringify({ offer_id: offerId, candidate: { candidate: 'candidate:1 1 udp 2122260223 me.local 54321 typ host', sdpMid: '0' } })
     const res = await app.request('/api/signal/ice', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders(sender, 'POST', '/api/signal/ice', body) },
@@ -260,7 +261,7 @@ describe('Signal API — ICE candidates', () => {
   })
 
   it('POST /api/signal/ice from receiver stores candidate with is_sender=0', async () => {
-    const body = JSON.stringify({ offer_id: offerId, candidate: { candidate: 'a=candidate:2 ...', sdpMid: '0' } })
+    const body = JSON.stringify({ offer_id: offerId, candidate: { candidate: 'candidate:2 1 udp 2122260223 peer.local 54322 typ host', sdpMid: '0' } })
     const res = await app.request('/api/signal/ice', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders(receiver, 'POST', '/api/signal/ice', body) },
@@ -277,7 +278,7 @@ describe('Signal API — ICE candidates', () => {
     expect(senderRes.status).toBe(200)
     const senderData: any = await senderRes.json()
     expect(senderData.candidates.length).toBe(1)
-    expect(senderData.candidates[0].candidate).toBe('a=candidate:2 ...')
+    expect(senderData.candidates[0].candidate).toBe('candidate:2 1 udp 2122260223 peer.local 54322 typ host')
 
     // Receiver should see sender's candidates
     const receiverRes = await app.request(`/api/signal/ice/${offerId}`, {
@@ -286,7 +287,7 @@ describe('Signal API — ICE candidates', () => {
     expect(receiverRes.status).toBe(200)
     const receiverData: any = await receiverRes.json()
     expect(receiverData.candidates.length).toBe(1)
-    expect(receiverData.candidates[0].candidate).toBe('a=candidate:1 ...')
+    expect(receiverData.candidates[0].candidate).toBe('candidate:1 1 udp 2122260223 me.local 54321 typ host')
   })
 
   it('POST /api/signal/ice returns 404 for unknown offer', async () => {
@@ -388,5 +389,19 @@ describe('Signal API — authorization (only participants)', () => {
       headers: authHeaders(bystander, 'GET', `/api/signal/answer/${offerId}`),
     }, env)
     expect(res.status).toBe(403)
+  })
+})
+
+describe('candidateLeaksIp (ICE hygiene gate)', () => {
+  it('passes mDNS host + relay, drops literal-IP host + srflx', () => {
+    expect(candidateLeaksIp({ candidate: 'candidate:1 1 udp 100 me.local 54321 typ host' })).toBe(false)
+    expect(candidateLeaksIp({ candidate: 'candidate:3 1 udp 150 198.51.100.9 50000 typ relay' })).toBe(false)
+    expect(candidateLeaksIp({ candidate: 'candidate:1 1 udp 100 192.168.1.5 54321 typ host' })).toBe(true)
+    expect(candidateLeaksIp({ candidate: 'candidate:2 1 udp 100 203.0.113.7 41234 typ srflx' })).toBe(true)
+  })
+  it('end-of-candidates marker passes; junk fails closed', () => {
+    expect(candidateLeaksIp({ candidate: '' })).toBe(false)
+    expect(candidateLeaksIp({})).toBe(false)
+    expect(candidateLeaksIp({ candidate: 'garbage' })).toBe(true)
   })
 })
