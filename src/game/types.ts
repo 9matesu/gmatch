@@ -45,3 +45,14 @@ export interface BooruPost {
   /** 'video' for mp4/webm/gif posts, else image. Inferred from URL when absent. */
   kind?: 'image' | 'video'
 }
+
+/** Single/grid view for the feed stage. */
+export type ViewMode = 'single' | 'grid'
+
+/** One 3x3 grid square: its own foe with its own HP. */
+export interface GridCell {
+  post: BooruPost
+  hp: number
+  maxHp: number
+  clicks: number
+}

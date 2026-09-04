@@ -20,7 +20,7 @@ import {
 } from './save'
 import type { SaveData } from './save'
 import { fetchPosts } from '../services/booru'
-import type { ActiveCap, BooruPost, CapId, GalleryImage, OwnedTag } from './types'
+import type { ActiveCap, BooruPost, CapId, GalleryImage, GridCell, OwnedTag, ViewMode } from './types'
 
 export interface Toast {
   id: number
@@ -57,6 +57,10 @@ export interface GameState {
   past: BooruPost[]
   /** Gallery image used as the app backdrop (persisted). Null = flat steel. */
   backgroundUrl: string | null
+  /** Feed stage layout: single foe or 3x3 grid (persisted). Grid cells are session-only. */
+  viewMode: ViewMode
+  /** Live 3x3 grid squares (session-only, refilled from the queue). */
+  grid: GridCell[]
   /** Live foe: HP left / max, clicks landed, lifetime KOs. max 0 = no battle. */
   foeHp: number
   foeMaxHp: number
@@ -70,6 +74,9 @@ export interface GameState {
   offlineGain: number
 
   clickImage: () => ClickResult
+  clickCell: (index: number) => ClickResult
+  dropCell: (index: number) => void
+  setViewMode: (mode: ViewMode) => void
   buyTag: (name: string) => boolean
   toggleTag: (name: string) => boolean
   soloTag: (name: string) => boolean
@@ -193,6 +200,8 @@ function freshData() {
     queue: [] as BooruPost[],
     past: [] as BooruPost[],
     backgroundUrl: null as string | null,
+    viewMode: 'single' as ViewMode,
+    grid: [] as GridCell[],
     foeHp: 0,
     foeMaxHp: 0,
     foeClicks: 0,
@@ -218,8 +227,27 @@ function pushPast(past: BooruPost[], post: BooruPost | null): BooruPost[] {
   if (!post) return past
   return [...past, post].slice(-HISTORY_CAP)
 }
-function koFoe(s: GameState, now: number, clicksOnFoe: number) {
-  const post = s.current as BooruPost
+/** 3x3 grid size — nine live squares. */
+export const GRID_SIZE = 9
+
+/** Fill empty grid squares from the queue head (fresh HP per cell). Pure. */
+function fillGrid(
+  grid: GridCell[],
+  queue: BooruPost[],
+  defeated: number,
+): { grid: GridCell[]; queue: BooruPost[] } {
+  const g = [...grid]
+  const q = [...queue]
+  while (g.length < GRID_SIZE && q.length > 0) {
+    const post = q.shift() as BooruPost
+    const maxHp = foeMaxHp(defeated)
+    g.push({ post, hp: maxHp, maxHp, clicks: 0 })
+  }
+  return { grid: g, queue: q }
+}
+
+/** Shared drain reward: gallery keep + market discovery + past + KO count. */
+function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: number) {
   const defeated = s.defeated + 1
   const rarityBase = rarityBaseForPost(post.id)
   const bonus = killBonusGp(rarityBase)
@@ -234,10 +262,6 @@ function koFoe(s: GameState, now: number, clicksOnFoe: number) {
     kind: post.kind,
     preview: post.preview,
   }
-  const current = s.queue[0] ?? null
-  const queue = s.queue.slice(1)
-  // Harder with each KO: the next foe scales off the new lifetime total.
-  const foe = current ? foeMaxHp(defeated) : 0
   return {
     defeated,
     bonus,
@@ -247,6 +271,18 @@ function koFoe(s: GameState, now: number, clicksOnFoe: number) {
     tags: discoverTags(s.tags, post.tags),
     // The drained foe stays reachable via the back arrow (shown beaten, no HP).
     past: pushPast(s.past, post),
+  }
+}
+
+function koFoe(s: GameState, now: number, clicksOnFoe: number) {
+  const post = s.current as BooruPost
+  const spoil = gallerySpoils(s, post, clicksOnFoe, now)
+  const current = s.queue[0] ?? null
+  const queue = s.queue.slice(1)
+  // Harder with each KO: the next foe scales off the new lifetime total.
+  const foe = current ? foeMaxHp(spoil.defeated) : 0
+  return {
+    ...spoil,
     current,
     queue,
     foeHp: foe,
@@ -351,6 +387,109 @@ export const useGame = create<GameState>((set, get) => ({
     })
     if (!ko.current) void get().fetchFeed()
     return { gain, crit, killed: true }
+  },
+
+  clickCell: (index) => {
+    const s = get()
+    const now = Date.now()
+    const clickNumber = s.clicks + 1
+    const crit = isCrit(clickNumber)
+    const gain = clickGain(econ(s), clickNumber, now)
+    const clickXp = crit ? 5 : 1
+    const cell = s.grid[index]
+    // Empty square: dead click, no reward, no counters.
+    if (!cell) return { gain: 0, crit: false, killed: false }
+    const clicksOnCell = cell.clicks + 1
+    const hpLeft = cell.hp - gain
+    if (hpLeft > 0) {
+      const grid = s.grid.map((c, i) => (i === index ? { ...c, hp: hpLeft, clicks: clicksOnCell } : c))
+      const next: GameState = {
+        ...s,
+        gp: s.gp + gain,
+        totalEarnedGP: s.totalEarnedGP + gain,
+        clicks: clickNumber,
+        crits: s.crits + (crit ? 1 : 0),
+        xp: s.xp + clickXp,
+        grid,
+      }
+      set({
+        gp: next.gp,
+        totalEarnedGP: next.totalEarnedGP,
+        clicks: next.clicks,
+        crits: next.crits,
+        xp: next.xp,
+        grid: next.grid,
+        ...progress(next, s.xp),
+      })
+      return { gain, crit, killed: false }
+    }
+    // KO: the drained square joins the gallery; a fresh foe slides in.
+    const spoil = gallerySpoils(s, cell.post, clicksOnCell, now)
+    const filled = fillGrid(
+      s.grid.filter((_, i) => i !== index),
+      s.queue,
+      spoil.defeated,
+    )
+    const next: GameState = {
+      ...s,
+      gp: s.gp + gain + spoil.bonus,
+      totalEarnedGP: s.totalEarnedGP + gain + spoil.bonus,
+      clicks: clickNumber,
+      crits: s.crits + (crit ? 1 : 0),
+      xp: s.xp + clickXp + KILL_XP,
+      tags: spoil.tags,
+      past: spoil.past,
+      gallery: spoil.gallery,
+      defeated: spoil.defeated,
+      queue: filled.queue,
+      grid: filled.grid,
+    }
+    next.toasts = pushToast(next, `Drained ${spoil.img.rarity} square (+${spoil.bonus} GP) — kept in gallery`)
+    set({
+      gp: next.gp,
+      totalEarnedGP: next.totalEarnedGP,
+      clicks: next.clicks,
+      crits: next.crits,
+      xp: next.xp,
+      tags: next.tags,
+      past: next.past,
+      gallery: next.gallery,
+      defeated: next.defeated,
+      queue: next.queue,
+      grid: next.grid,
+      ...progress(next, s.xp),
+    })
+    if (filled.grid.length < GRID_SIZE) void get().fetchFeed()
+    return { gain, crit, killed: true }
+  },
+
+  dropCell: (index) => {
+    const s = get()
+    const cell = s.grid[index]
+    if (!cell) return
+    // Broken image: no reward, no KO — the square just slides a fresh foe in.
+    const filled = fillGrid(
+      s.grid.filter((_, i) => i !== index),
+      s.queue,
+      s.defeated,
+    )
+    set({
+      past: pushPast(s.past, cell.post),
+      queue: filled.queue,
+      grid: filled.grid,
+    })
+    if (filled.grid.length < GRID_SIZE && !get().fetching) void get().fetchFeed()
+  },
+
+  setViewMode: (mode) => {
+    const s = get()
+    if (mode !== 'grid') {
+      if (s.viewMode !== mode) set({ viewMode: mode })
+      return
+    }
+    const filled = fillGrid(s.grid, s.queue, s.defeated)
+    set({ viewMode: mode, queue: filled.queue, grid: filled.grid })
+    if (filled.grid.length < GRID_SIZE && !get().fetching) void get().fetchFeed()
   },
 
   buyTag: (name) => {
@@ -482,6 +621,19 @@ export const useGame = create<GameState>((set, get) => ({
     }
     if (res.ok && res.posts.length > 0) {
       const foe = foeMaxHp(s.defeated)
+      if (get().viewMode === 'grid') {
+        // Grid consumes the whole batch: append to the queue, top up squares.
+        const q = [...get().queue, ...res.posts]
+        const filled = fillGrid(get().grid, q, get().defeated)
+        set({
+          queue: filled.queue,
+          grid: filled.grid,
+          feedCursor: cursor,
+          feedOffline: false,
+          fetching: false,
+        })
+        return
+      }
       set({
         current: res.posts[0],
         queue: res.posts.slice(1),
@@ -493,7 +645,12 @@ export const useGame = create<GameState>((set, get) => ({
         fetching: false,
       })
     } else {
-      set({ current: null, queue: [], foeHp: 0, foeMaxHp: 0, foeClicks: 0, feedCursor: cursor, feedOffline: true, fetching: false })
+      if (get().viewMode === 'grid') {
+        // Offline in grid mode: keep live squares + remaining queue, just flag it.
+        set({ feedCursor: cursor, feedOffline: true, fetching: false })
+      } else {
+        set({ current: null, queue: [], foeHp: 0, foeMaxHp: 0, foeClicks: 0, feedCursor: cursor, feedOffline: true, fetching: false })
+      }
     }
   },
 
@@ -628,6 +785,67 @@ export const useGame = create<GameState>((set, get) => ({
     const auto = capAutoClicksPerSec(caps, now)
     const autoDmg = clickPower(input, now) * auto * (dtMs / 1000)
     const gain = (gps + clickPower(input, now) * auto) * (dtMs / 1000)
+    // Grid mode: auto-clicks batter the first square (one KO per tick at most).
+    if (s.viewMode === 'grid') {
+      const cell = s.grid[0]
+      if (cell && autoDmg > 0) {
+        if (cell.hp - autoDmg <= 0) {
+          const spoil = gallerySpoils(s, cell.post, cell.clicks, now)
+          const filled = fillGrid(s.grid.slice(1), s.queue, spoil.defeated)
+          const next: GameState = {
+            ...s,
+            caps,
+            gp: s.gp + gain + spoil.bonus,
+            totalEarnedGP: s.totalEarnedGP + gain + spoil.bonus,
+            xp: s.xp + gain * 0.01 + KILL_XP,
+            tags: spoil.tags,
+            past: spoil.past,
+            gallery: spoil.gallery,
+            defeated: spoil.defeated,
+            queue: filled.queue,
+            grid: filled.grid,
+            lastSeenAt: now,
+          }
+          next.toasts = pushToast(next, `Auto-drained ${spoil.img.rarity} square (+${spoil.bonus} GP)`)
+          set({
+            caps: next.caps,
+            gp: next.gp,
+            totalEarnedGP: next.totalEarnedGP,
+            xp: next.xp,
+            tags: next.tags,
+            past: next.past,
+            gallery: next.gallery,
+            defeated: next.defeated,
+            queue: next.queue,
+            grid: next.grid,
+            lastSeenAt: next.lastSeenAt,
+            ...progress(next, s.xp),
+          })
+          if (filled.grid.length < GRID_SIZE && !get().fetching) void get().fetchFeed()
+          return
+        }
+        const grid = s.grid.map((c, i) => (i === 0 ? { ...c, hp: c.hp - autoDmg } : c))
+        set({
+          caps,
+          gp: s.gp + gain,
+          totalEarnedGP: s.totalEarnedGP + gain,
+          xp: s.xp + gain * 0.01,
+          grid,
+          lastSeenAt: now,
+          ...progress({ ...s, gp: s.gp + gain }, s.xp),
+        })
+        return
+      }
+      set({
+        caps,
+        gp: s.gp + gain,
+        totalEarnedGP: s.totalEarnedGP + gain,
+        xp: s.xp + gain * 0.01,
+        lastSeenAt: now,
+        ...progress({ ...s, gp: s.gp + gain }, s.xp),
+      })
+      return
+    }
     // Auto-clicks also batter the live foe (one KO per tick at most).
     if (s.current && s.foeMaxHp > 0 && autoDmg > 0 && s.foeHp - autoDmg <= 0) {
       const ko = koFoe(s, now, s.foeClicks)
@@ -711,6 +929,7 @@ export const useGame = create<GameState>((set, get) => ({
       ageAccepted: s.ageVerified,
       defeated: s.defeated,
       backgroundUrl: s.backgroundUrl,
+      viewMode: s.viewMode,
       lastSeenAt: now,
     }
     writeStorage(serialize(data))
@@ -762,6 +981,7 @@ export const useGame = create<GameState>((set, get) => ({
       ageVerified: d.ageAccepted,
       defeated: d.defeated,
       backgroundUrl: d.backgroundUrl,
+      viewMode: d.viewMode,
       lastSeenAt: now,
       offlineGain: gain >= 1 ? gain : 0,
     })

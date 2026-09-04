@@ -1,4 +1,4 @@
-import type { ActiveCap, CapId, GalleryImage, OwnedTag } from './types'
+import type { ActiveCap, CapId, GalleryImage, OwnedTag, ViewMode } from './types'
 
 export const SAVE_KEY = 'goongrid.save.v1'
 export const SAVE_VERSION = 2
@@ -23,6 +23,7 @@ export interface SaveData {
   ageAccepted: boolean
   defeated: number
   backgroundUrl: string | null
+  viewMode: ViewMode
   lastSeenAt: number
 }
 
@@ -45,6 +46,7 @@ export function defaultSave(now = Date.now()): SaveData {
     ageAccepted: false,
     defeated: 0,
     backgroundUrl: null,
+    viewMode: 'single',
     lastSeenAt: now,
   }
 }
@@ -86,6 +88,7 @@ export function deserialize(raw: string | null | undefined): SaveData | null {
     ageAccepted: d.ageAccepted === true,
     defeated: num(d.defeated, 0),
     backgroundUrl: typeof d.backgroundUrl === 'string' ? d.backgroundUrl : null,
+    viewMode: d.viewMode === 'grid' ? 'grid' : 'single',
     lastSeenAt: num(d.lastSeenAt, 0),
   }
 }

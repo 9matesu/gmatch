@@ -42,6 +42,15 @@ pop **GoonCaps** for temporary buffs, climb the **Pornification** ladder, and
   click any owned image in the gallery to re-feature it in the Goon Panel.
 - Gallery persists through Brainmelt (the "keepsakes").
 
+## 4b. Feed layout: single foe vs 3x3 grid
+
+- The Goon Panel toggles 1×1 (one foe, full HP bar) and 3×3 (nine live squares).
+- Every square is its own foe with its own HP bar: clicking a square damages only
+  that square; a drained square joins the gallery (rarity/bonus/discovery as usual)
+  and a fresh foe slides in from the queue. Broken squares drop reward-free.
+- Auto-click caps batter the first square (one KO per tick at most, as in 1×1).
+- Layout persists in the save; squares themselves are session-only.
+
 ## 5. GoonCaps (consumable buffs) — vending machine
 
 | Cap | Cost | Effect |

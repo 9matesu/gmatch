@@ -19,7 +19,7 @@ import { defaultSave, serialize, SAVE_KEY } from './save'
 import { starterOffers } from './tags'
 import { fetchPosts } from '../services/booru'
 import type { BooruResponse } from '../services/booru'
-import { useGame, HISTORY_CAP } from './store'
+import { useGame, HISTORY_CAP, GRID_SIZE } from './store'
 
 beforeEach(() => {
   mem.clear()
@@ -424,5 +424,92 @@ describe('addCustomTag', () => {
     expect(tag?.selected).toBe(true)
     const dupe = await useGame.getState().addCustomTag('bimbo')
     expect(dupe.added).toBe(false)
+  })
+})
+
+describe('3x3 grid mode', () => {
+  const mocked = vi.mocked(fetchPosts)
+  const offline: BooruResponse = { posts: [], source: null, ok: false, offline: true }
+  const post = (id: string) => ({ id, url: `https://x/${id}.jpg`, tags: ['gangbang'] })
+  const dozen = () => Array.from({ length: 12 }, (_, i) => post(`g${i}`))
+
+  it('setViewMode fills 9 squares from the queue with full HP', () => {
+    mocked.mockResolvedValue(offline)
+    useGame.setState({ queue: dozen(), grid: [] })
+    useGame.getState().setViewMode('grid')
+    const s = useGame.getState()
+    expect(s.viewMode).toBe('grid')
+    expect(s.grid).toHaveLength(GRID_SIZE)
+    expect(s.queue).toHaveLength(3)
+    for (const c of s.grid) expect(c.hp).toBe(c.maxHp)
+  })
+
+  it('clickCell damages a square and banks GP', () => {
+    useGame.setState({ queue: dozen(), grid: [] })
+    useGame.getState().setViewMode('grid')
+    const before = useGame.getState().grid[0].hp
+    const r = useGame.getState().clickCell(0)
+    expect(r.killed).toBe(false)
+    expect(r.gain).toBeGreaterThan(0)
+    expect(useGame.getState().grid[0].hp).toBeLessThan(before)
+  })
+
+  it('clickCell KO keeps the gallery, counts the KO, slides a fresh foe in', () => {
+    useGame.setState({ queue: dozen(), grid: [] })
+    useGame.getState().setViewMode('grid')
+    let killed = false
+    for (let i = 0; i < 50 && !killed; i++) killed = useGame.getState().clickCell(0).killed
+    expect(killed).toBe(true)
+    const s = useGame.getState()
+    expect(s.gallery).toHaveLength(1)
+    expect(s.defeated).toBe(1)
+    expect(s.grid).toHaveLength(GRID_SIZE)
+  })
+
+  it('clickCell on an empty square is a dead click', () => {
+    useGame.setState({ grid: [], queue: [] })
+    const clicks = useGame.getState().clicks
+    const r = useGame.getState().clickCell(4)
+    expect(r).toEqual({ gain: 0, crit: false, killed: false })
+    expect(useGame.getState().clicks).toBe(clicks)
+  })
+
+  it('dropCell swaps a broken square with no reward', () => {
+    useGame.setState({ queue: dozen(), grid: [] })
+    useGame.getState().setViewMode('grid')
+    const gp = useGame.getState().gp
+    const firstId = useGame.getState().grid[0].post.id
+    useGame.getState().dropCell(0)
+    const s = useGame.getState()
+    expect(s.gp).toBe(gp)
+    expect(s.defeated).toBe(0)
+    expect(s.grid).toHaveLength(GRID_SIZE)
+    expect(s.grid.some((c) => c.post.id === firstId)).toBe(false)
+  })
+
+  it('fetchFeed in grid mode appends to the queue and tops up squares', async () => {
+    mocked.mockClear()
+    mocked.mockResolvedValue({ posts: [post('n1'), post('n2')], source: 't', ok: true })
+    useGame.setState({
+      tags: [{ name: 'aaa', level: 1, base: 10, income: 1, weight: 1 }],
+      feedCursor: 0,
+      viewMode: 'grid',
+      grid: [],
+      queue: [],
+    })
+    await useGame.getState().fetchFeed()
+    const s = useGame.getState()
+    expect(s.grid).toHaveLength(2)
+    expect(s.current).toBeNull()
+  })
+
+  it('tick auto-clicks batter the first square in grid mode', () => {
+    useGame.setState({ queue: dozen(), grid: [] })
+    useGame.getState().setViewMode('grid')
+    // Braceface (filter cap): permanent 1 auto-click/s.
+    useGame.setState({ caps: [{ capId: 'filter', expiresAt: Number.POSITIVE_INFINITY }] })
+    const before = useGame.getState().grid[0].hp
+    useGame.getState().tick(1000)
+    expect(useGame.getState().grid[0].hp).toBeLessThan(before)
   })
 })
