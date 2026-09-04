@@ -1,0 +1,262 @@
+import { createClient } from '@libsql/client'
+import { D1Turso, ensureSchema } from './db'
+import { restoreDb, snapshotDb } from './persistence'
+import { LocalBlobStore } from './blob'
+import app from './index'
+import { join, dirname, extname } from 'node:path'
+import { handleIncoming, conns, WsConn, broadcastToRoom } from './ws-bus'
+import { leaveLobby, advanceLobby } from './lobby'
+import { advanceBabecock } from './babecock'
+import { runPeriodicMaintenance } from './cleanup'
+
+declare const Bun: any
+
+// Single embedded in-memory SQLite engine. Row persistence (to gitignored
+// orbit.snapshot.sqlite) is handled by snapshotDb/restoreDb instead of an
+// external Turso instance.
+const client = createClient({ url: ':memory:' })
+const db = new D1Turso(client)
+
+const SNAPSHOT_PATH = process.env.SNAPSHOT_PATH || join(process.cwd(), 'orbit.snapshot.sqlite')
+const BLOB_STORE_DIR = process.env.BLOB_STORE_DIR || (process.env.SNAPSHOT_PATH ? join(dirname(process.env.SNAPSHOT_PATH), 'blobs') : './blobs')
+const SNAPSHOT_INTERVAL_MS = Math.max(
+  30000,
+  parseInt(process.env.SNAPSHOT_INTERVAL_MS || '30000', 10) || 30000,
+)
+const SNAPSHOT_INITIAL_DELAY_MS = Math.max(
+  10000,
+  parseInt(process.env.SNAPSHOT_INITIAL_DELAY_MS || '10000', 10) || 10000,
+)
+let snapshotInFlight = false
+
+async function takeSnapshot() {
+  if (snapshotInFlight) return
+  snapshotInFlight = true
+  try {
+    await snapshotDb(client, SNAPSHOT_PATH)
+    console.log(`[DB] snapshot written → ${SNAPSHOT_PATH}`)
+  } catch (err) {
+    console.warn('[DB] Snapshot failed:', (err as Error)?.message || err)
+  } finally {
+    snapshotInFlight = false
+  }
+}
+
+let dbReady = false
+let dbInitError: string | null = null
+const dbReadyPromise = (async () => {
+  try {
+    await ensureSchema(client)
+    // Boot-time durability diagnostics: log whether the snapshot file + blob
+    // store vimpy exist on disk before we try to load, so a deploy that lost
+    // the mounted volume (the most common root cause of "cards reset on
+    // update") is visible in logs immediately rather than discovered when
+    // a user later reports missing data.
+    const { access } = await import('node:fs/promises')
+    let snapshotExists = false
+    try {
+      await access(SNAPSHOT_PATH)
+      snapshotExists = true
+    } catch {
+      console.warn(`[DB] no snapshot found at ${SNAPSHOT_PATH} — first boot or missing volume mount`)
+    }
+    const restored = await restoreDb(client, SNAPSHOT_PATH)
+    console.log(`[DB] restore summary: file_present=${snapshotExists} rows_restored=${restored}`)
+    // Blob store sanity check — count objects recovered on disk.
+    let blobCount = -1
+    try {
+      const { readdir } = await import('node:fs/promises')
+      let entries: string[] = []
+      try { entries = await readdir(BLOB_STORE_DIR) } catch {}
+      blobCount = entries.length
+      console.log(`[DB] blob store at ${BLOB_STORE_DIR}: ${blobCount} top-level entries`)
+    } catch (err) {
+      console.warn(`[DB] blob store check failed: ${(err as Error)?.message}`)
+    }
+    dbReady = true
+  } catch (err) {
+    dbInitError = (err as Error)?.message || String(err)
+    console.error('[DB] Startup error:', dbInitError)
+  }
+})()
+
+setInterval(() => {
+  if (dbReady) takeSnapshot()
+}, SNAPSHOT_INTERVAL_MS)
+setTimeout(() => {
+  if (dbReady) takeSnapshot()
+}, SNAPSHOT_INITIAL_DELAY_MS)
+// On SIGTERM/SIGINT, persist a final snapshot before letting the process
+// exit. Bun's exit() is synchronous so we kick the snapshot synchronously
+// and rely on snapshotDb being awaitable. Fly.io's default stop_signal is
+// SIGTERM with a kill_timeout; verify fly.toml has kill_timeout >= 60s so
+// the VACUUM INTO completes.
+async function persistAndExit(code: number) {
+  try {
+    if (dbReady) await takeSnapshot()
+    console.log('[DB] shutdown snapshot complete')
+  } catch (err) {
+    console.warn('[DB] shutdown snapshot failed:', (err as Error)?.message || err)
+  }
+  process.exit(code)
+}
+process.once('SIGTERM', () => { void persistAndExit(0) })
+process.once('SIGINT', () => { void persistAndExit(0) })
+
+const bucket = new LocalBlobStore(BLOB_STORE_DIR)
+const env = { DB: db, BUCKET: bucket }
+const WEB_DIST = join((import.meta as any).dir || process.cwd(), '..', '..', 'web', 'out')
+
+// Maintenance cadence: continuous automatic expiration sweep every 60s,
+// 3-hour picture wipe window, and daily score reset at 00:00 UTC.
+setInterval(() => {
+  if (dbReady) runPeriodicMaintenance(db, bucket).catch((err) => console.warn('[MAINT] interval run failed:', err?.message || err))
+}, 60 * 1000)
+dbReadyPromise.then(() => {
+  if (dbReady) runPeriodicMaintenance(db, bucket).catch((err) => console.warn('[MAINT] initial run failed:', err?.message || err))
+})
+
+// Match tick: drive lobby->pick->reveal->decide transitions and timeouts for
+// AFK players even when nobody is polling the lobby endpoint.
+setInterval(() => {
+  if (dbReady) advanceLobby(db).catch((err) => console.warn('[LOBBY] match tick failed:', err?.message || err))
+}, 1000)
+
+// Babecock tick: close rounds when the 2-minute window lapses and park them in
+// the gallery, even when nobody is actively polling the Babecock endpoint.
+setInterval(() => {
+  if (dbReady) advanceBabecock(db).catch((err) => console.warn('[BABECOCK] advance tick failed:', err?.message || err))
+}, 1000)
+
+const MIME: Record<string, string> = {
+  '.html': 'text/html',
+  '.css': 'text/css',
+  '.js': 'application/javascript',
+  '.mjs': 'application/javascript',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.webp': 'image/webp',
+  '.txt': 'text/plain',
+  '.xml': 'text/xml',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+}
+
+const wsToConn = new WeakMap<object, WsConn>()
+
+Bun.serve({
+  hostname: '0.0.0.0',
+  port: parseInt(process.env.PORT || '8080', 10),
+  // Uploads can briefly contend with the remote database. The default 10s Bun
+  // idle timeout was cutting off otherwise recoverable inbox refreshes.
+  idleTimeout: 60,
+  async fetch(req: Request, server: any) {
+    const url = new URL(req.url)
+
+    // WebSocket upgrade
+    if (url.pathname === '/api/ws') {
+      const upgradeHeader = req.headers.get('Upgrade') || req.headers.get('upgrade')
+      if (upgradeHeader?.toLowerCase() === 'websocket' && server.upgrade(req)) return
+    }
+
+    // API & system routes
+    if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/.well-known/')) {
+      if (url.pathname === '/api/health') {
+        const status = dbReady ? 200 : dbInitError ? 500 : 503
+        return Response.json({
+          status: dbReady ? 'ok' : dbInitError ? 'error' : 'starting',
+          db_ready: dbReady,
+          error: dbInitError,
+          timestamp: new Date().toISOString(),
+        }, { status })
+      }
+      if (!dbReady) {
+        return Response.json({ error: 'API is starting. Try again shortly.' }, { status: 503 })
+      }
+      return app.fetch(req, env)
+    }
+
+    // Static frontend
+    let filePath = join(WEB_DIST, url.pathname === '/' ? 'index.html' : url.pathname)
+
+    let file = Bun.file(filePath)
+    if (!(await file.exists()) && !extname(filePath)) {
+      const htmlFile = Bun.file(filePath + '.html')
+      if (await htmlFile.exists()) {
+        file = htmlFile
+        filePath = filePath + '.html'
+      } else {
+        const dirIndex = Bun.file(join(filePath, 'index.html'))
+        if (await dirIndex.exists()) {
+          file = dirIndex
+          filePath = join(filePath, 'index.html')
+        }
+      }
+    }
+
+    if (await file.exists()) {
+      const ext = extname(filePath)
+      return new Response(file, {
+        headers: { 'Content-Type': MIME[ext] || 'application/octet-stream' },
+      })
+    }
+
+    // SPA fallback: serve index.html for unmatched routes
+    const indexFile = Bun.file(join(WEB_DIST, 'index.html'))
+    if (await indexFile.exists()) {
+      return new Response(indexFile, {
+        headers: { 'Content-Type': 'text/html' },
+      })
+    }
+
+    return new Response('Not Found', { status: 404 })
+  },
+  websocket: {
+    open(ws: any) {
+      const conn: WsConn = {
+        send: (data) => {
+          if (ws.readyState === 1 || ws.readyState === WebSocket.OPEN) {
+            ws.send(data)
+            return true
+          }
+          return false
+        },
+        rooms: new Set(['global']),
+      }
+      conns.add(conn)
+      wsToConn.set(ws, conn)
+    },
+    message(ws: any, message: any) {
+      const conn = wsToConn.get(ws)
+      if (!conn) return
+      handleIncoming(conn, typeof message === 'string' ? message : message.toString())
+    },
+    close(ws: any) {
+      const conn = wsToConn.get(ws)
+      if (conn) {
+        // WS6: Remove user from lobby queue on disconnect to prevent ghost entries
+        if (conn.userId && conn.rooms.has('lobby')) {
+          leaveLobby(db, conn.userId).catch((err) =>
+            console.warn('[WS] lobby leave on disconnect failed:', err?.message || err)
+          )
+          // Mark the user offline immediately so the roster drops them on the
+          // next poll, and nudge connected clients to refresh right away.
+          db.prepare("UPDATE Users SET last_seen = datetime('now','-10 minutes') WHERE id = ?")
+            .bind(conn.userId)
+            .run()
+            .then(() => broadcastToRoom('lobby', { type: 'lobby', action: 'refresh' }))
+            .catch((err) => console.warn('[WS] mark offline on disconnect failed:', err?.message || err))
+        }
+        conns.delete(conn)
+        wsToConn.delete(ws)
+      }
+    },
+  },
+})
+
+console.log(`[ORBIT API] server running on port ${process.env.PORT || 8080}`)

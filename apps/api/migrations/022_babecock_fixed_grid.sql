@@ -1,0 +1,2 @@
+ALTER TABLE BabecockRounds ADD COLUMN grid_size INTEGER NOT NULL DEFAULT 3;
+ALTER TABLE BabecockEntries ADD COLUMN grid_position INTEGER;
