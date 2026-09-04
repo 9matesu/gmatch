@@ -59,6 +59,7 @@ import { GlobalModals } from "./components/GlobalModals";
 import { GalleryView } from "./components/GalleryView";
 import { CreateCardModal } from "./components/CreateCardModal";
 import { BabecockPanel } from "./components/BabecockPanel";
+import GridWorkspace from "./components/grid/GridWorkspace";
 import { Leaderboard } from "./components/Leaderboard";
 import { StoreTab } from "./components/StoreTab";
 import { NotificationsPanel } from "./components/NotificationsPanel";
@@ -3434,6 +3435,13 @@ export default function Home() {
                       onOpenCollection={() => handleSetMainView('gallery')}
                       toast={toast}
                     />
+                  )}
+
+                  {/* Babecock · Idle — GoonGrid workspace (plan D2/D5) */}
+                  {mainView === 'grid' && (
+                    <div className="flex-1 min-h-0 w-full">
+                      <GridWorkspace />
+                    </div>
                   )}
 
                   {/* Fullscreen Store (mirrors the game store as an independent view) */}
