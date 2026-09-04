@@ -502,6 +502,28 @@ describe('3x3 grid mode', () => {
     expect(s.grid).toHaveLength(GRID_SIZE)
   })
 
+  it('skipGrid swaps the board for a fresh one and stacks history; undoGrid restores it', () => {
+    mocked.mockResolvedValue({ posts: dozen(), source: 'x', ok: false } as unknown as BooruResponse)
+    useGame.setState({ queue: dozen(), grid: [], gridPast: [] })
+    useGame.getState().setViewMode('grid')
+    const first = useGame.getState().grid.map((g) => g.post.id)
+    useGame.getState().skipGrid()
+    const s = useGame.getState()
+    expect(s.gridPast).toHaveLength(1)
+    // fresh squares came from the queue head (different ids than the first board)
+    expect(s.grid.map((g) => g.post.id)).not.toEqual(first)
+    expect(useGame.getState().undoGrid()).toBe(true)
+    expect(useGame.getState().grid.map((g) => g.post.id)).toEqual(first)
+    expect(useGame.getState().gridPast).toHaveLength(0)
+    expect(useGame.getState().undoGrid()).toBe(false)
+  })
+
+  it('skipGrid is a no-op outside grid mode / on an empty board', () => {
+    useGame.setState({ viewMode: 'single', grid: [], gridPast: [] })
+    useGame.getState().skipGrid()
+    expect(useGame.getState().gridPast).toHaveLength(0)
+  })
+
   it('clickCell on an empty square is a dead click', () => {
     useGame.setState({ grid: [], queue: [] })
     const clicks = useGame.getState().clicks

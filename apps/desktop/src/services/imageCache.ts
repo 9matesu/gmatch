@@ -9,6 +9,8 @@
  * Never throws — worst case returns the remote URL untouched.
  */
 
+import { isVideoUrl } from './postFilter'
+
 export interface ImageCacheStats {
   files: number
   bytes: number
@@ -34,7 +36,7 @@ function bridge(): Bridge | null {
 
 const IDB_NAME = 'goongrid-img'
 const IDB_STORE = 'blobs'
-const IDB_CAP = 400
+const IDB_CAP = 250
 
 interface BlobRow {
   blob: Blob
@@ -218,6 +220,9 @@ function isDev(): boolean {
  */
 export async function resolveImage(url: string): Promise<string> {
   if (!url) return url
+  // Lightweight policy: mp4/webm stream from source (often huge); only
+  // stills get cached to disk/IDB. Video posters cache as normal images.
+  if (isVideoUrl(url)) return url
   const b = bridge()
   if (b?.cacheImage) {
     try {

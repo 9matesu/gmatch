@@ -124,8 +124,10 @@ function TagsTab() {
           description="Hit Refresh to pull fresh pills from the boorus."
         />
       )}
-      <div className="flex flex-wrap gap-2">
-        {tags.map((t) => {
+      {(() => {
+        const ownedTags = tags.filter((t) => t.level > 0)
+        const marketTags = tags.filter((t) => t.level <= 0)
+        const renderPill = (t: (typeof tags)[number]) => {
           const isOwned = t.level > 0
           const on = isOwned && t.selected !== false
           const maxed = t.level >= MAX_TAG_LEVEL
@@ -191,8 +193,32 @@ function TagsTab() {
               )}
             </div>
           )
-        })}
-      </div>
+        }
+        return (
+          <div className="space-y-3">
+            {ownedTags.length > 0 && (
+              <section aria-label="Owned tags">
+                <h4 className={`${MONO} mb-1.5 text-[10px] font-bold uppercase tracking-wider text-retro-muted`}>
+                  Owned — steer the feed
+                </h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {ownedTags.map(renderPill)}
+                </div>
+              </section>
+            )}
+            {marketTags.length > 0 && (
+              <section aria-label="Tag market">
+                <h4 className={`${MONO} mb-1.5 text-[10px] font-bold uppercase tracking-wider text-retro-muted`}>
+                  Market — buy to earn
+                </h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {marketTags.map(renderPill)}
+                </div>
+              </section>
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 }

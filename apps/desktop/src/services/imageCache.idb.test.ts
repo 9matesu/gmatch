@@ -162,8 +162,8 @@ describe('resolveImage (IndexedDB path)', () => {
     }
   })
 
-  it('LRU cap drops the oldest rows past IDB_CAP (400)', async () => {
-    // Seed 400 rows directly (fast), then let one module idbPut cross the cap.
+  it('LRU cap drops the oldest rows past IDB_CAP (250)', async () => {
+    // Seed 250 rows directly (fast), then let one module idbPut cross the cap.
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
       const req = indexedDB.open('goongrid-img', 1)
       req.onupgradeneeded = () => req.result.createObjectStore('blobs')
@@ -173,7 +173,7 @@ describe('resolveImage (IndexedDB path)', () => {
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction('blobs', 'readwrite')
       const store = tx.objectStore('blobs')
-      for (let i = 0; i < 400; i++) {
+      for (let i = 0; i < 250; i++) {
         const key = `https://tbib.org/images/lru/${String(i).padStart(3, '0')}.png`
         store.put({ blob: imgBlob('x'), ts: i, bytes: 1 } as never, key)
       }
@@ -181,14 +181,14 @@ describe('resolveImage (IndexedDB path)', () => {
       tx.onerror = () => reject(tx.error)
     })
     db.close()
-    expect((await imageCacheStats()).files).toBe(400)
+    expect((await imageCacheStats()).files).toBe(250)
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(imgBlob('x'), { status: 200 })))
-    const fresh = 'https://tbib.org/images/lru/400.png'
+    const fresh = 'https://tbib.org/images/lru/250.png'
     await resolveImage(fresh)
     await settle()
-    // The 401st put evicted the lexicographically-first key (lru/000).
+    // The 251st put evicted the lexicographically-first key (lru/000).
     const s = await imageCacheStats()
-    expect(s.files).toBe(400)
+    expect(s.files).toBe(250)
     expect(s.backend).toBe('browser')
     await expect(resolveImage('https://tbib.org/images/lru/000.png')).resolves.toBe(
       'https://tbib.org/images/lru/000.png',

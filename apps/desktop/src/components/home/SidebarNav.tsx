@@ -134,7 +134,7 @@ export function SidebarNav({
     },
     {
       id: 'grid',
-      label: 'Babecock · Idle',
+      label: 'IDLE CLICKER',
       icon: MousePointerClick,
       active: mainView === 'grid',
       action: () => setMainView?.('grid'),

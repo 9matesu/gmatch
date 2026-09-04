@@ -59,6 +59,8 @@ export interface GameState {
   queue: BooruPost[]
   /** Viewed-image history for the back arrow (session-only, not saved). */
   past: BooruPost[]
+  /** Skipped-grid snapshots for the grid back arrow (session-only). */
+  gridPast: GridCell[][]
   /** Gallery image used as the app backdrop (persisted). Null = flat steel. */
   backgroundUrl: string | null
   /** Feed stage layout: single foe or 3x3 grid (persisted). Grid cells are session-only. */
@@ -100,6 +102,9 @@ export interface GameState {
   fetchFeed: () => Promise<void>
   advanceFeed: () => void
   goBack: () => boolean
+  /** Grid mode: swap the whole board for a fresh one (session-only history). */
+  skipGrid: () => void
+  undoGrid: () => boolean
   setBackground: (url: string | null) => void
   featureImage: (id: string) => void
   popCap: (capId: CapId) => boolean
@@ -240,6 +245,7 @@ function freshData() {
     current: null as BooruPost | null,
     queue: [] as BooruPost[],
     past: [] as BooruPost[],
+    gridPast: [] as GridCell[][],
     backgroundUrl: null as string | null,
     viewMode: 'single' as ViewMode,
     grid: [] as GridCell[],
@@ -290,6 +296,9 @@ function pushPast(past: BooruPost[], post: BooruPost | null): BooruPost[] {
   if (!post) return past
   return [...past, post].slice(-HISTORY_CAP)
 }
+/** Session-only snapshots of skipped grids (undo stack for the grid arrows). */
+export const GRID_HISTORY_CAP = 10
+
 /** 3x3 grid size — nine live squares. */
 export const GRID_SIZE = 9
 
@@ -795,6 +804,24 @@ export const useGame = create<GameState>((set, get) => ({
       foeClicks: 0,
       feedOffline: false,
     })
+    return true
+  },
+
+  skipGrid: () => {
+    const s = get()
+    if (s.viewMode !== 'grid' || s.grid.length === 0) return
+    const gridPast = [...s.gridPast, s.grid].slice(-GRID_HISTORY_CAP)
+    // Fresh board: every square refills from the queue head (fetch tops up).
+    const filled = fillGrid([], s.queue, s.defeated)
+    set({ grid: filled.grid, queue: filled.queue, gridPast, feedOffline: false })
+    if (filled.grid.length < GRID_SIZE && !s.fetching) void s.fetchFeed()
+  },
+
+  undoGrid: () => {
+    const s = get()
+    if (s.gridPast.length === 0) return false
+    const prev = s.gridPast[s.gridPast.length - 1]
+    set({ grid: prev, gridPast: s.gridPast.slice(0, -1), feedOffline: false })
     return true
   },
 

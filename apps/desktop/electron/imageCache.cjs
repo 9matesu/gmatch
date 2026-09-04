@@ -13,8 +13,9 @@ const http = require('http')
 const https = require('https')
 
 const SCHEME = 'gooncache'
-const MAX_FILES = 400
-const MAX_BYTES = 400 * 1024 * 1024
+// Lightweight footprint: ~150 MB / 250 files max on disk (LRU-evicted).
+const MAX_FILES = 250
+const MAX_BYTES = 150 * 1024 * 1024
 const MAX_SINGLE_BYTES = 25 * 1024 * 1024
 const FEED_TTL_MS = 10 * 60 * 1000
 const FEED_MAX_QUERIES = 100

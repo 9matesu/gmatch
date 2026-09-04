@@ -79,6 +79,9 @@ export default function GoonPanel() {
   const advanceFeed = useGame((s) => s.advanceFeed)
   const goBack = useGame((s) => s.goBack)
   const canGoBack = useGame((s) => s.past.length > 0)
+  const skipGrid = useGame((s) => s.skipGrid)
+  const undoGrid = useGame((s) => s.undoGrid)
+  const canGridBack = useGame((s) => s.gridPast.length > 0)
   const queue = useGame((s) => s.queue)
   const past = useGame((s) => s.past)
   const popCap = useGame((s) => s.popCap)
@@ -246,6 +249,29 @@ export default function GoonPanel() {
           {grid.length === 0 && (
             <OfflineCard fetching={fetching} feedOffline={feedOffline} onRetry={() => void fetchFeed()} />
           )}
+          {!feedOffline && grid.length > 0 && (
+            <>
+              <button
+                type="button"
+                className="glass-button absolute left-2.5 top-1/2 z-[4] flex h-16 w-[46px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-35"
+                aria-label="Previous image"
+                title={canGridBack ? 'Back to the previous board' : 'Nothing behind you yet'}
+                disabled={!canGridBack}
+                onClick={() => undoGrid()}
+              >
+                <IconChevronL size={26} />
+              </button>
+              <button
+                type="button"
+                className="glass-button absolute right-2.5 top-1/2 z-[4] flex h-16 w-[46px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100"
+                aria-label="Next image"
+                title="Skip this round — no reward"
+                onClick={() => skipGrid()}
+              >
+                <IconChevronR size={26} />
+              </button>
+            </>
+          )}
         </div>
       ) : (
         <div
@@ -293,12 +319,13 @@ export default function GoonPanel() {
           {showOffline && (
             <OfflineCard fetching={fetching} feedOffline={feedOffline} onRetry={() => void fetchFeed()} />
           )}
-          {!showOffline && canGoBack && (
+          {!showOffline && (
             <button
               type="button"
-              className="glass-button absolute left-2.5 top-1/2 flex h-16 w-[46px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100"
+              className="glass-button absolute left-2.5 top-1/2 flex h-16 w-[46px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-35"
               aria-label="Previous image"
-              title="Back to the skipped foe"
+              title={canGoBack ? 'Back to the skipped foe' : 'Nothing behind you yet'}
+              disabled={!canGoBack}
               onClick={(e) => {
                 e.stopPropagation()
                 goBack()
