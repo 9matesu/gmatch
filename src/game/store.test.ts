@@ -19,7 +19,7 @@ import { defaultSave, serialize, SAVE_KEY } from './save'
 import { starterOffers } from './tags'
 import { fetchPosts } from '../services/booru'
 import type { BooruResponse } from '../services/booru'
-import { useGame, HISTORY_CAP, GRID_SIZE } from './store'
+import { useGame, HISTORY_CAP, GRID_SIZE, shufflePosts } from './store'
 
 beforeEach(() => {
   mem.clear()
@@ -303,6 +303,23 @@ describe('background backdrop', () => {
   })
 })
 
+describe('shufflePosts (never sequential)', () => {
+  it('preserves every post, returns a new array', () => {
+    const posts = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
+    const out = shufflePosts(posts)
+    expect(out).not.toBe(posts)
+    expect(out.map((p) => p.id).sort()).toEqual(['a', 'b', 'c'])
+    expect(posts.map((p) => p.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('actually reorders across rounds', () => {
+    const posts = Array.from({ length: 10 }, (_, i) => ({ id: `p${i}` }))
+    const same = posts.map((p) => p.id).join(',')
+    const varied = Array.from({ length: 20 }, () => shufflePosts(posts).map((p) => p.id).join(','))
+    expect(varied.some((v) => v !== same)).toBe(true)
+  })
+})
+
 describe('tick', () => {
   it('pays passive GP/s from owned tags', () => {
     useGame.setState({
@@ -424,6 +441,23 @@ describe('addCustomTag', () => {
     expect(tag?.selected).toBe(true)
     const dupe = await useGame.getState().addCustomTag('bimbo')
     expect(dupe.added).toBe(false)
+  })
+})
+
+describe('shufflePosts (never sequential)', () => {
+  it('preserves every post, returns a new array', () => {
+    const posts = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
+    const out = shufflePosts(posts)
+    expect(out).not.toBe(posts)
+    expect(out.map((p) => p.id).sort()).toEqual(['a', 'b', 'c'])
+    expect(posts.map((p) => p.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('actually reorders across rounds', () => {
+    const posts = Array.from({ length: 10 }, (_, i) => ({ id: `p${i}` }))
+    const same = posts.map((p) => p.id).join(',')
+    const varied = Array.from({ length: 20 }, () => shufflePosts(posts).map((p) => p.id).join(','))
+    expect(varied.some((v) => v !== same)).toBe(true)
   })
 })
 
