@@ -53,6 +53,11 @@ function errorResponse(c: Context, message: string, status: ContentfulStatusCode
 }
 
 export async function orbitAuth(c: Context, next: Next) {
+  // Idempotency guard: /api/economy hosts two sub-apps (economy + economyIdle),
+  // each mounting this middleware — without the guard a POST's nonce is
+  // consumed by the first pass and the second pass rejects it as a replay
+  // (401 "Nonce already used"). If auth already ran for this request, pass.
+  if (c.get('orbitId')) return next()
   if (seenNonces.size + issuedNonces.size > 100) cleanupNonces()
   if (c.req.method === 'OPTIONS') {
     return next()
