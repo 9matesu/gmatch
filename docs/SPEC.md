@@ -55,13 +55,56 @@ Stacking: different caps stack; same cap refreshes duration.
 
 ## 6. Booru sources (main-process fetch, 10s timeout, round-robin health)
 
-- tbib: `https://tbib.org/index.php?page=dapi&s=post&q=index&tags=<t>&limit=<n>&json=1` (JSON; full url = `https://tbib.org/images/<directory>/<image>`)
-- safebooru: same DAPI shape, `https://safebooru.org/...` (JSON array, has `file_url`)
+All sources are explicit-rated humans-only imageboards. Every query gets
+`rating:explicit` + anti-slop negatives (`-ai_generated -furry -anthro -feral
+-scalie -monochrome -greyscale -sketch -comic -manga -lineart -lowres
+-worst_quality -jpeg_artifacts -watermark -censored`) appended in main.cjs.
+Posts are double-gated (main.cjs + src/services/postFilter.ts): explicit only,
+images + motion (jpg/png/gif/webp/mp4/webm, kind inferred at render), min
+700x700, tag-fragment blocklist (AI, furry,
+anthro, monochrome, sketch, comic, 3d, futa, yaoi, NTR, text overlays —
+text overlays kept for caption hunts, §6).
+
+- tbib: `https://tbib.org/index.php?page=dapi&s=post&q=index&tags=<t>&limit=<n>&json=1` (JSON; full url = `https://tbib.org/images/<directory>/<image>`; DAPI rating field is the full word `explicit`)
+- xbooru: same DAPI shape, `https://xbooru.com/...` (explicit-rated, high volume)
 - paheal: `https://rule34.paheal.net/api/danbooru/find_posts?tags=<t>&limit=<n>` (XML `<tag file_url=...>`; query single tags only — combos return 0)
-- e621: `https://e621.net/posts.json?tags=<t>+rating:explicit&limit=<n>` (JSON; `posts[].file.url`)
+- redgifs: real/hardcore porn (pornstars like skylar vox, BBC, mp4s/gifs) via the public v2 API — temp token (`GET /v2/auth/temporary`, cached ~20h) → `GET /v2/gifs/search?search_text=<words>&order=trending&count=<n>&page=<1-5>` with `Authorization: Bearer`; posts are `kind: video` with poster stills, min 700px enforced in the desktop app
+- imhentai: hentai galleries (captions, hardcore doujins), no JSON API — scrape like gallery-dl: `/search/?key=<words>` → gallery IDs (`href="/gallery/<id>"`) → cover per gallery (`data-src` base + `$.parseJSON` ext map, max 3 galleries/round, dims gate only when known)
+- Removed on purpose: e621 (furry), safebooru (safe-only), rule34.xxx (login wall).
+- Caption hunts: a query carrying `caption`/`goon_caption` keeps text-overlay tags (`speech_bubble`, `english_text`, …) that the double gate otherwise drops — same flag in main.cjs and postFilter; everything else filters identically on both sides.
+- AND-combos of narrow tags return 0 often → query variant ladder: full combo →
+  top-2 tags → leading tag, per source, first non-empty wins.
 - Browser/dev mode: direct fetch may CORS-fail → offline SVG placeholder
   (generated gradient + tag text + "OFFLINE" badge). Never crash on fetch error.
 - Dedupe by post id across a session; cache last 40 urls.
+- Picture + feed caching (no re-parse, no re-download): parsed post lists are
+  cached per query for 10 min (`<userData>/feed-cache.json`, 100 queries max);
+  picture bytes are cached on disk in `<userData>/image-cache/` (400 files /
+  400 MB, LRU-evicted, `gooncache://` scheme) in Electron, or IndexedDB blobs
+  in browser dev mode. The queue is prefetched so skip/back is instant; cache
+  stats + Clear live in the left stats panel.
+
+### 6b. Feed/market queries (user spec: no vanilla)
+
+- Starter tags + market seeds come from `src/game/pervertTags.ts` — a weighted
+  pool of 40+ hard tags (gangbang, pregnant, impregnation, breeding,
+  veiny_penis, bulge, ahegao, deepthroat, double_penetration, anal, creampie,
+  bbc, black_cock, interracial, skylar_vox, bimbo, femdom, goon_caption,
+  caption, ...). No vanilla tags (1girl/solo/romance) anywhere in the pipeline.
+- Feed/market query = top-3 owned tags + 2 weighted pervert seeds (3 seeds when
+  nothing is owned). Seeded tags are never blocklisted (tested invariant).
+
+### 6c. Custom tags (user spec: free-form search → add when valid)
+
+- The Tags tab has a custom-tag box: input is normalized (lowercase,
+  spaces/dashes → underscores, `[a-z0-9_]` only) and gated by
+  `validateCustomTag` (blocklist + noise, 2–40 chars) — never the network.
+- Valid + not-a-dupe tags are probed live (`fetchPosts`, limit 5); with results
+  the tag joins owned at level 1, feed-selected, free. No results (or a blocked
+  tag) shows the reason inline and adds nothing.
+- Motion posts (`kind: video`, redgifs mp4/webm) play inline in the Goon Panel
+  with the poster still; gifs stay on `<img>`. Gallery cells render `<video>`
+  thumbs for video keepsakes and re-feature them with kind intact.
 
 ## 7. UI (modern dark glassy, BabecockPanel flavor)
 
@@ -80,8 +123,12 @@ Stacking: different caps stack; same cap refreshes duration.
 `loli, shota, child, kid, infant, baby, toddler, school, student, uniform-ish
 minor terms, ageplay, incest, bestiality, zoo, necro, rape, non-consent, gore,
 scat, urine, blood, murder, death`. Also reject posts whose rating is not
-explicit/adult on e621. This list is enforced in `src/game/tagFilter.ts` with
-unit tests — it is the most important tested module in the repo.
+explicit/adult. The list lives in `shared/blocklist.json` (single source of
+truth; also imported by electron/main.cjs and required by src/game/tagFilter.ts)
+and additionally blocks: AI-generated (`ai_generated`), furry/anthro/feral/
+scalie, monochrome/greyscale/sketch/comic media, low-quality markers, and
+count-tag noise (`1girl`, `solo`, `2boys`, ...). Unit tests in
+src/game/tagFilter.ts — it is the most important tested module in the repo.
 
 ## 9. Prestige — Brainmelt
 
