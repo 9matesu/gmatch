@@ -993,6 +993,51 @@ users.get('/hacks/active', async (c) => {
   return c.json({ active_hacks: myDebuffs })
 })
 
+/**
+ * Spy feed: the payoff for a purchased hack. Only the ATTACKER of a still-
+ * active hack session may read the target's recent public posts and profile
+ * blurb — the server enforces the gate (client-side views are cosmetic).
+ */
+users.get('/hacks/spy-feed/:targetId', async (c) => {
+  const orbitId = c.get('orbitId')
+  const targetId = c.req.param('targetId') || ''
+  pruneExpiredHacks()
+  const now = Date.now()
+  const session = activeServerHacks.find(
+    (h) => h.attacker_id === orbitId && h.target_id === targetId && h.expires_at > now,
+  )
+  if (!session) return c.json({ error: 'No active hack session on that target' }, 403)
+
+  const db = c.env.DB
+  const target = await db.prepare('SELECT display_name, bio FROM Users WHERE id = ?')
+    .bind(targetId).first<{ display_name: string | null; bio: string | null }>().catch(() => null)
+  const posts = await db.prepare(`
+    SELECT id, COALESCE(post_caption, caption) as caption, like_count, created_at
+    FROM Objects
+    WHERE owner_id = ? AND is_public = 1 AND hidden_at IS NULL AND post_group IS NULL
+    ORDER BY created_at DESC LIMIT 8
+  `).bind(targetId).all<{ id: string; caption: string | null; like_count: number; created_at: string }>().catch(() => ({ results: [] as any[] }))
+  const pmPeeks = await db.prepare(`
+    SELECT body, created_at FROM PrivateMessages
+    WHERE (sender_id = ? OR recipient_id = ?) AND hidden_at IS NULL
+    ORDER BY created_at DESC LIMIT 5
+  `).bind(targetId, targetId).all<{ body: string; created_at: string }>().catch(() => ({ results: [] as any[] }))
+
+  return c.json({
+    hack: { type: session.type, expires_at: session.expires_at },
+    target: {
+      id: targetId,
+      display_name: target?.display_name || 'Unknown User',
+      bio: target?.bio || '',
+    },
+    posts: (posts.results || []).map((r) => ({
+      id: r.id, caption: r.caption || '', likes: Number(r.like_count || 0), created_at: r.created_at,
+    })),
+    intercepted: (pmPeeks.results || []).map((r) => ({
+      body: String(r.body || '').slice(0, 140), created_at: r.created_at,
+    })),
+  })
+})
 // The set of store items this user has already unlocked (used to restore the
 // "UNLOCKED" state across sessions and devices).
 users.get('/store/unlocks', async (c) => {

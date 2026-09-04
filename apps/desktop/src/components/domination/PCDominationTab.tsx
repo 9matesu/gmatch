@@ -83,7 +83,8 @@ export function PCDominationTab({ identity, users }: Props) {
   const [activeTab, setActiveTab] = useState<'consent' | 'control' | 'history'>('control');
   const [targets, setTargets] = useState<DominationTarget[]>([]);
   const [selectedTarget, setSelectedTarget] = useState<DominationTarget | null>(null);
-  const [sending, setSending] = useState<string | null>(null);
+  const [sending, setSending] = useState<string | null>(null);
+  const [prices, setPrices] = useState<Record<string, number>>({});
   const [history, setHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
@@ -110,6 +111,9 @@ export function PCDominationTab({ identity, users }: Props) {
         orbitFetch('/api/domination/targets', {}, identity),
         orbitFetch('/api/domination/settings', {}, identity),
       ]);
+      orbitFetch('/api/domination/prices', {}, identity).then(async (r) => {
+        if (r.ok) { const d = await r.json(); if (d?.prices) setPrices(d.prices) }
+      }).catch(() => {});
       if (targetsRes.ok) {
         const data = await targetsRes.json();
         const list = Array.isArray(data.targets) ? data.targets : [];
@@ -214,7 +218,10 @@ export function PCDominationTab({ identity, users }: Props) {
         }),
       }, identity);
       if (res.ok) {
-        showToast('success', `${ACTION_LABELS[action]?.label || action} sent to ${selectedTarget.displayName}`);
+        const data = await res.json().catch(() => ({} as any));
+        const cost = typeof data?.cost === 'number' ? data.cost : prices[action];
+        const payout = typeof data?.victimReward === 'number' ? data.victimReward : 0;
+        showToast('success', `${ACTION_LABELS[action]?.label || action} sent — -${cost} g$ (target earned +${payout} g$)`);
       } else {
         const err = await res.json().catch(() => ({ error: 'Unknown error' }));
         showToast('error', err.error || 'Failed to send action');
@@ -437,6 +444,9 @@ export function PCDominationTab({ identity, users }: Props) {
                           </div>
                           <div className="text-xs font-bold text-retro-fg leading-tight">{label}</div>
                           <div className="text-[10px] text-retro-muted mt-1 leading-snug">{description}</div>
+                          {prices[action] != null && (
+                            <div className="text-[10px] font-mono font-bold text-amber-300 mt-1.5">{prices[action]} g$</div>
+                          )}
                         </div>
 
                         {sending === action && (
