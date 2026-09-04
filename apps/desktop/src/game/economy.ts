@@ -35,9 +35,9 @@ export function clickPower(input: EconomyInput, now: number): number {
   )
 }
 
-/** g$ gained by click #clickNumber (applies x10 crit). */
-export function clickGain(input: EconomyInput, clickNumber: number, now: number): number {
-  return clickPower(input, now) * (isCrit(clickNumber) ? CRIT_MULT : 1)
+/** g$ gained by click #clickNumber (applies x10 crit and the heat combo). */
+export function clickGain(input: EconomyInput, clickNumber: number, now: number, heatStreak = 0): number {
+  return clickPower(input, now) * (isCrit(clickNumber) ? CRIT_MULT : 1) * heatMultiplier(heatStreak)
 }
 
 export function tagIncome(tags: OwnedTag[]): number {
@@ -55,4 +55,26 @@ export function passiveGps(input: EconomyInput, now: number): number {
     shardMultiplier(input.shards) *
     capPassiveMult(input.caps, now)
   )
+}
+
+/**
+ * Heat combo (addiction hook): clicks within HEAT_WINDOW_MS of each other
+ * stack heat; every HEAT_STACK clicks of streak adds +HEAT_STEP to the click
+ * multiplier, capped at HEAT_MAX. Idle past the window resets to 1x. Pure —
+ * the store persists only lastClickAt + heatStreak.
+ */
+export const HEAT_WINDOW_MS = 2_000
+export const HEAT_STACK = 10
+export const HEAT_STEP = 0.25
+export const HEAT_MAX = 3
+
+export function heatMultiplier(streak: number): number {
+  if (streak <= 0) return 1
+  return Math.min(HEAT_MAX, 1 + Math.floor(streak / HEAT_STACK) * HEAT_STEP)
+}
+
+/** Next streak given the previous click time; resets when the window lapsed. */
+export function heatStreakAfter(prevStreak: number, prevClickAt: number, now: number): number {
+  if (prevStreak > 0 && now - prevClickAt > HEAT_WINDOW_MS) return 1
+  return prevStreak + 1
 }

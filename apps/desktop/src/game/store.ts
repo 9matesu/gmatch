@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { clickGain, clickPower, isCrit, passiveGps } from './economy'
+import { clickGain, clickPower, heatMultiplier, heatStreakAfter, isCrit, passiveGps } from './economy'
 import type { EconomyInput } from './economy'
 import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, setupTag, soloTag as soloTagList, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
 import { getUserExcludes, rankTags, setUserExcludes } from './tagFilter'
@@ -30,6 +30,8 @@ export interface ClickResult {
   gain: number
   crit: boolean
   killed: boolean
+  /** Heat combo multiplier applied to this click (>=1). */
+  heat: number
 }
 
 export interface GameState {
@@ -67,6 +69,11 @@ export interface GameState {
   foeHp: number
   foeMaxHp: number
   foeClicks: number
+  /** Heat combo: current streak + timestamp of the last click (session-only). */
+  heatStreak: number
+  lastClickAt: number
+  /** Best heat streak ever banked (persisted, achievement stat). */
+  maxHeatStreak: number
   defeated: number
   /** Round-robin cursor over the tag pool — one tag per fetch, never stacked. */
   feedCursor: number
@@ -176,6 +183,7 @@ function statsOf(s: GameState): AchievementStats {
     shards: s.shards,
     tier: tierForXp(s.xp),
     collectedOfflineEarnings: s.collectedOfflineEarnings,
+    maxHeatStreak: s.maxHeatStreak,
   }
 }
 
@@ -236,6 +244,9 @@ function freshData() {
     foeHp: 0,
     foeMaxHp: 0,
     foeClicks: 0,
+    heatStreak: 0,
+    lastClickAt: 0,
+    maxHeatStreak: 0,
     defeated: 0,
     feedCursor: 0,
     feedOffline: false,
@@ -349,9 +360,12 @@ export const useGame = create<GameState>((set, get) => ({
     const now = Date.now()
     const clickNumber = s.clicks + 1
     const crit = isCrit(clickNumber)
+    // Heat combo: rapid clicks stack up to x3; idling past the window resets.
+    const streak = heatStreakAfter(s.heatStreak, s.lastClickAt, now)
+    const heat = heatMultiplier(streak)
     // Damage equals the click's g$ gain — store power-ups (caps, shards,
-    // achievements) hit harder, crits deal x10.
-    const gain = clickGain(econ(s), clickNumber, now)
+    // achievements) hit harder, crits deal x10, heat stacks on top.
+    const gain = clickGain(econ(s), clickNumber, now, streak)
     const clickXp = crit ? 5 : 1
     // No live foe (empty feed or re-featured gallery piece): clicks just pay g$.
     if (!s.current || s.foeMaxHp <= 0) {
@@ -369,9 +383,12 @@ export const useGame = create<GameState>((set, get) => ({
         clicks: next.clicks,
         crits: next.crits,
         xp: next.xp,
+        heatStreak: streak,
+        lastClickAt: now,
+        maxHeatStreak: Math.max(s.maxHeatStreak, streak),
         ...progress(next, s.xp),
       })
-      return { gain, crit, killed: false }
+      return { gain, crit, killed: false, heat }
     }
     const clicksOnFoe = s.foeClicks + 1
     const hpLeft = s.foeHp - gain
@@ -394,9 +411,12 @@ export const useGame = create<GameState>((set, get) => ({
         xp: next.xp,
         foeHp: next.foeHp,
         foeClicks: next.foeClicks,
+        heatStreak: streak,
+        lastClickAt: now,
+        maxHeatStreak: Math.max(s.maxHeatStreak, streak),
         ...progress(next, s.xp),
       })
-      return { gain, crit, killed: false }
+      return { gain, crit, killed: false, heat }
     }
     // KO: the drained foe joins the gallery with a g$ kill bonus.
     const ko = koFoe(s, now, clicksOnFoe)
@@ -433,10 +453,13 @@ export const useGame = create<GameState>((set, get) => ({
       foeHp: next.foeHp,
       foeMaxHp: next.foeMaxHp,
       foeClicks: next.foeClicks,
+      heatStreak: streak,
+      lastClickAt: now,
+      maxHeatStreak: Math.max(s.maxHeatStreak, streak),
       ...progress(next, s.xp),
     })
     if (!ko.current) void get().fetchFeed()
-    return { gain, crit, killed: true }
+    return { gain, crit, killed: true, heat }
   },
 
   clickCell: (index) => {
@@ -444,11 +467,13 @@ export const useGame = create<GameState>((set, get) => ({
     const now = Date.now()
     const clickNumber = s.clicks + 1
     const crit = isCrit(clickNumber)
-    const gain = clickGain(econ(s), clickNumber, now)
+    const streak = heatStreakAfter(s.heatStreak, s.lastClickAt, now)
+    const heat = heatMultiplier(streak)
+    const gain = clickGain(econ(s), clickNumber, now, streak)
     const clickXp = crit ? 5 : 1
     const cell = s.grid[index]
     // Empty square: dead click, no reward, no counters.
-    if (!cell) return { gain: 0, crit: false, killed: false }
+    if (!cell) return { gain: 0, crit: false, killed: false, heat: 1 }
     const clicksOnCell = cell.clicks + 1
     const hpLeft = cell.hp - gain
     if (hpLeft > 0) {
@@ -469,9 +494,12 @@ export const useGame = create<GameState>((set, get) => ({
         crits: next.crits,
         xp: next.xp,
         grid: next.grid,
+        heatStreak: streak,
+        lastClickAt: now,
+        maxHeatStreak: Math.max(s.maxHeatStreak, streak),
         ...progress(next, s.xp),
       })
-      return { gain, crit, killed: false }
+      return { gain, crit, killed: false, heat }
     }
     // KO: the drained square joins the gallery; a fresh foe slides in.
     const spoil = gallerySpoils(s, cell.post, clicksOnCell, now)
@@ -507,10 +535,13 @@ export const useGame = create<GameState>((set, get) => ({
       defeated: next.defeated,
       queue: next.queue,
       grid: next.grid,
+      heatStreak: streak,
+      lastClickAt: now,
+      maxHeatStreak: Math.max(s.maxHeatStreak, streak),
       ...progress(next, s.xp),
     })
     if (filled.grid.length < GRID_SIZE) void get().fetchFeed()
-    return { gain, crit, killed: true }
+    return { gain, crit, killed: true, heat }
   },
 
   dropCell: (index) => {
@@ -1003,6 +1034,7 @@ export const useGame = create<GameState>((set, get) => ({
       collectedOfflineEarnings: s.collectedOfflineEarnings,
       ageAccepted: s.ageVerified,
       defeated: s.defeated,
+      maxHeatStreak: Math.max(s.maxHeatStreak, s.heatStreak),
       backgroundUrl: s.backgroundUrl,
       viewMode: s.viewMode,
       setupComplete: s.setupComplete,
@@ -1064,6 +1096,7 @@ export const useGame = create<GameState>((set, get) => ({
       collectedOfflineEarnings: d.collectedOfflineEarnings,
       ageVerified: d.ageAccepted,
       defeated: d.defeated,
+      maxHeatStreak: d.maxHeatStreak,
       backgroundUrl: d.backgroundUrl,
       viewMode: d.viewMode,
       lastSeenAt: now,

@@ -42,6 +42,10 @@ with duels, lootboxes, hacks and trades — one wallet, one economy.
 4. Owned tags tick passive GP/s and bias which images appear.
 5. Reach Pornification tier thresholds → new titles, UI accents, unlocks.
 6. Brainmelt (prestige) resets GP/tags for Corruption shards (+10% global mult each).
+7. **Heat combo**: clicks within 2s of each other stack a streak; every 10
+   clicks adds +0.25x click power (cap x3). Idling past the window resets it.
+   Session-only streak; the best streak ever persists (`maxHeatStreak`) and
+   unlocks the Heat Demon achievement (80). Float texts show `+N xM`.
 
 ## 2. Currencies
 
@@ -183,13 +187,42 @@ src/game/tagFilter.ts — it is the most important tested module in the repo.
 - Shards = floor(sqrt(totalEarnedGP / 1e6)); each shard +10% global multiplier.
 - Resets: GP, XP/tier, tags, caps. Keeps: gallery images, shards, achievements.
 
-## 10. Achievements (small, spicy, 12 total)
+## 10. Achievements (small, spicy, 13 total)
 
 First Click, 100 Clicks, First Tag, Tag Collector (10 tags), Gallery of Sins
 (10 images), Diamond Hands, Crit Addict (50 crits), Cap Connoisseur (all 4),
 First Brainmelt, 10 Shards, Goon Master (tier 10), Offline Slut (collect
 offline earnings). Each +5% click power. Persist across prestige.
 
+## 10b. Domination economy & spy payoff (connected loops)
+
+- Every PC-Domination action costs g$ from the authoritative ledger (one
+  wallet, plan D4): wallpaper/game_bg 250, text_overlay 400, message 500,
+  blur 800, popup_video 1200, camera 2500. Debit happens BEFORE the action
+  is recorded/broadcast — broke dominators get 402 and nothing fires.
+- The victim is paid a consent cut (40-60% of the fee, scaled by
+  intrusiveness): being dominated earns you g$. Idempotency keys are the
+  actionId, so retries never double-charge or double-pay.
+- `GET /api/domination/prices` exposes the table; the UI shows the price on
+  every action card and the payout in the success toast.
+- **Spy feed is real**: `GET /api/users/hacks/spy-feed/:targetId` returns the
+  target's recent public posts + intercepted DM peeks, server-gated to the
+  ATTACKER of a still-active hack (403 otherwise). HackSpyView polls it every
+  15s and renders actual data — no hardcoded fake logs.
+
+## 10c. P2P privacy (ICE hygiene — non-negotiable)
+
+- Single source of truth: `apps/desktop/src/utils/ice-hygiene.ts` (client) +
+  `candidateLeaksIp` in `apps/api/src/routes/signal.ts` (server gate).
+- Outgoing ICE candidates are sanitized on both P2P stacks (file-transfer
+  OrbitPeer + PeerJS relay): literal-IP `host` candidates and ALL `srflx`/
+  `prflx` candidates are dropped — only mDNS `.local` hosts and TURN `relay`
+  candidates ever reach a peer. Unknown shapes fail closed.
+- The signal server re-validates every posted candidate (defense in depth
+  against a malicious peer) and 400s raw-IP ones.
+- TURN env (`NEXT_PUBLIC_TURN_URL/USERNAME/CREDENTIAL`) flips the config to
+  `iceTransportPolicy: 'relay'` — fully relayed calls, zero IP exposure.
+  Without TURN, STUN stays for connectivity but srflx never leaks onward.
 ## 11. Save
 
 - zustand state → localStorage `goongrid.save.v1`, autosave every 10s + on unload.

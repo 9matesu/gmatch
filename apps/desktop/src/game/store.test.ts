@@ -506,7 +506,7 @@ describe('3x3 grid mode', () => {
     useGame.setState({ grid: [], queue: [] })
     const clicks = useGame.getState().clicks
     const r = useGame.getState().clickCell(4)
-    expect(r).toEqual({ gain: 0, crit: false, killed: false })
+    expect(r).toEqual({ gain: 0, crit: false, killed: false, heat: 1 })
     expect(useGame.getState().clicks).toBe(clicks)
   })
 

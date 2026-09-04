@@ -341,7 +341,7 @@ describe('clickCell / dropCell edges', () => {
     useGame.getState().setViewMode('grid')
     useGame.setState({ grid: useGame.getState().grid.map((c, i) => (i === 0 ? { ...c, hp: 1 } : c)) })
     const r = useGame.getState().clickCell(0)
-    expect(r).toEqual({ gain: expect.any(Number), crit: true, killed: true })
+    expect(r).toEqual({ gain: expect.any(Number), crit: true, killed: true, heat: expect.any(Number) })
     const s = useGame.getState()
     expect(s.gallery).toHaveLength(1)
     expect(s.crits).toBe(1)

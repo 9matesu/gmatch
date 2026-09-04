@@ -26,6 +26,8 @@ export interface SaveData {
   collectedOfflineEarnings: boolean
   ageAccepted: boolean
   defeated: number
+  /** Best heat-combo streak ever (achievement stat; 0 on legacy saves). */
+  maxHeatStreak: number
   backgroundUrl: string | null
   viewMode: ViewMode
   /** Player's feed starter picks + extra excludes (setup screen / config tab). */
@@ -54,6 +56,7 @@ export function defaultSave(now = Date.now()): SaveData {
     collectedOfflineEarnings: false,
     ageAccepted: false,
     defeated: 0,
+    maxHeatStreak: 0,
     backgroundUrl: null,
     viewMode: 'single',
     setupComplete: false,
@@ -101,6 +104,7 @@ export function deserialize(raw: string | null | undefined): SaveData | null {
     collectedOfflineEarnings: d.collectedOfflineEarnings === true,
     ageAccepted: d.ageAccepted === true,
     defeated: num(d.defeated, 0),
+    maxHeatStreak: num(d.maxHeatStreak, 0),
     backgroundUrl: typeof d.backgroundUrl === 'string' ? d.backgroundUrl : null,
     viewMode: d.viewMode === 'grid' ? 'grid' : 'single',
     setupComplete: d.setupComplete === true,

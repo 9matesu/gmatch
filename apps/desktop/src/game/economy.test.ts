@@ -1,16 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  BASE_CLICK,
-  CRIT_EVERY,
-  clickGain,
-  clickPower,
-  galleryIncome,
-  isCrit,
-  passiveGps,
-  shardMultiplier,
-  tagIncome,
-  type EconomyInput,
-} from './economy'
+import { BASE_CLICK, CRIT_EVERY, clickGain, clickPower, galleryIncome, isCrit, passiveGps, shardMultiplier, tagIncome, type EconomyInput, heatMultiplier, heatStreakAfter, HEAT_WINDOW_MS } from './economy'
 import type { ActiveCap, GalleryImage, OwnedTag, Rarity } from './types'
 
 const NOW = 1_000_000
@@ -97,5 +86,28 @@ describe('passive g$/s (SPEC §3/§4)', () => {
     expect(passiveGps({ ...input, caps: caps(['hypno', NOW + 1]) }, NOW)).toBe(80)
     expect(passiveGps({ ...input, caps: caps(['blue', NOW + 1]) }, NOW)).toBe(40)
     expect(passiveGps({ ...input, caps: caps(['melt', NOW + 1]) }, NOW)).toBe(400)
+  })
+})
+
+describe('heat combo', () => {
+  it('stacks +0.25 per 10-click streak, capped at x3', () => {
+    expect(heatMultiplier(0)).toBe(1)
+    expect(heatMultiplier(9)).toBe(1)
+    expect(heatMultiplier(10)).toBe(1.25)
+    expect(heatMultiplier(30)).toBe(1.75)
+    expect(heatMultiplier(1000)).toBe(3)
+  })
+
+  it('streak resets after the window lapses, keeps counting inside it', () => {
+    expect(heatStreakAfter(15, NOW - HEAT_WINDOW_MS - 1, NOW)).toBe(1)
+    expect(heatStreakAfter(15, NOW - 500, NOW)).toBe(16)
+    expect(heatStreakAfter(0, 0, NOW)).toBe(1)
+  })
+
+  it('clickGain multiplies heat on top of crit', () => {
+    // base click 1; streak 25 -> x1.5; click 25 is also a crit (x10)
+    expect(clickGain(base, 25, NOW, 25)).toBeCloseTo(15)
+    expect(clickGain(base, 24, NOW, 24)).toBeCloseTo(1.5)
+    expect(clickGain(base, 24, NOW, 0)).toBe(1)
   })
 })

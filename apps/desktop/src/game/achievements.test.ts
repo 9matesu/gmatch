@@ -18,13 +18,14 @@ function stats(over: Partial<AchievementStats> = {}): AchievementStats {
     shards: 0,
     tier: 1,
     collectedOfflineEarnings: false,
+    maxHeatStreak: 0,
     ...over,
   }
 }
 
 describe('achievement list (SPEC §10)', () => {
   it('has exactly 12 achievements with the spec names', () => {
-    expect(ACHIEVEMENTS).toHaveLength(12)
+    expect(ACHIEVEMENTS).toHaveLength(13)
     expect(ACHIEVEMENTS.map((a) => a.name)).toEqual([
       'First Click',
       '100 Clicks',
@@ -37,8 +38,14 @@ describe('achievement list (SPEC §10)', () => {
       'First Brainmelt',
       '10 Shards',
       'Goon Master',
+      'Heat Demon',
       'Offline Slut',
     ])
+  })
+
+  it('Heat Demon unlocks at an 80-click heat streak', () => {
+    expect(newlyEarned([], stats({ maxHeatStreak: 79 }))).not.toContain('heat_demon')
+    expect(newlyEarned([], stats({ maxHeatStreak: 80 }))).toContain('heat_demon')
   })
 
   it('ids are unique', () => {

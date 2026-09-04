@@ -12,6 +12,7 @@ export interface AchievementStats {
   shards: number
   tier: number
   collectedOfflineEarnings: boolean
+  maxHeatStreak: number
 }
 
 export interface AchievementDef {
@@ -37,6 +38,7 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   { id: 'first_brainmelt', name: 'First Brainmelt', check: (s) => s.prestiges >= 1 },
   { id: 'ten_shards', name: '10 Shards', check: (s) => s.shards >= 10 },
   { id: 'goon_master', name: 'Goon Master', check: (s) => s.tier >= 10 },
+  { id: 'heat_demon', name: 'Heat Demon', check: (s) => s.maxHeatStreak >= 80 },
   {
     id: 'offline_slut',
     name: 'Offline Slut',

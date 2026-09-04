@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react
 import { useGame } from '../game/store'
 import { GRID_SIZE } from '../game/store'
 import { CAPS, capEffectLabel, capStacks } from '../game/caps'
+import { HEAT_WINDOW_MS, heatMultiplier } from '../game/economy'
 import type { CapId } from '../game/types'
 import { offlineSvg } from '../services/offlineSvg'
 import { prefetchImages } from '../services/imageCache'
@@ -68,6 +69,8 @@ export default function GoonPanel() {
   const caps = useGame((s) => s.caps)
   const viewMode = useGame((s) => s.viewMode)
   const grid = useGame((s) => s.grid)
+  const heatStreak = useGame((s) => s.heatStreak)
+  const lastClickAt = useGame((s) => s.lastClickAt)
   const clickImage = useGame((s) => s.clickImage)
   const clickCell = useGame((s) => s.clickCell)
   const dropCell = useGame((s) => s.dropCell)
@@ -112,9 +115,10 @@ export default function GoonPanel() {
     }
   }, [viewMode, grid.length, fetching, feedOffline, setViewMode])
 
-  const spawnFloat = (x: number, y: number, gain: number, crit: boolean, cell: number | null) => {
+  const spawnFloat = (x: number, y: number, gain: number, crit: boolean, cell: number | null, heatMult = 1) => {
     const id = ++floatId.current
-    setFloats((f) => [...f, { id, x, y, text: `+${formatNum(gain)}`, crit, cell }])
+    const heatTag = heatMult > 1 ? ` x${heatMult}` : ''
+    setFloats((f) => [...f, { id, x, y, text: `+${formatNum(gain)}${heatTag}`, crit, cell }])
     window.setTimeout(() => setFloats((f) => f.filter((fl) => fl.id !== id)), 900)
     if (crit) {
       setCritFlash(true)
@@ -124,14 +128,14 @@ export default function GoonPanel() {
 
   const handleClick = (e: MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
-    const { gain, crit } = clickImage()
-    spawnFloat(e.clientX - rect.left, e.clientY - rect.top, gain, crit, null)
+    const { gain, crit, heat } = clickImage()
+    spawnFloat(e.clientX - rect.left, e.clientY - rect.top, gain, crit, null, heat)
   }
 
   const handleCellClick = (index: number, e: MouseEvent<HTMLButtonElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
-    const { gain, crit } = clickCell(index)
-    if (gain > 0) spawnFloat(e.clientX - rect.left, e.clientY - rect.top, gain, crit, index)
+    const { gain, crit, heat } = clickCell(index)
+    if (gain > 0) spawnFloat(e.clientX - rect.left, e.clientY - rect.top, gain, crit, index, heat)
   }
 
   const showOffline = feedOffline || !current || failedUrl === current.url
@@ -144,6 +148,10 @@ export default function GoonPanel() {
     !/\.gif(?:[?#]|$)/i.test(current.url)
   const inBattle = !showOffline && foeMaxHp > 0
   const hpPct = inBattle ? Math.max(0, (foeHp / foeMaxHp) * 100) : 0
+  // Heat combo HUD: live multiplier + whether the streak is still inside the
+  // 2s window (goes cold visually the moment you stop clicking).
+  const heat = heatMultiplier(heatStreak)
+  const heatLive = heat > 1 && Date.now() - lastClickAt <= HEAT_WINDOW_MS
   const isGrid = viewMode === 'grid'
 
   const critFlashEl = critFlash && (
@@ -370,6 +378,15 @@ export default function GoonPanel() {
           </div>
         ) : (
           <span className={MUTED}>No live foe — take your time.</span>
+        )}
+        {heatLive && (
+          <span
+            className={`${MONO} inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-[rgba(255,120,40,0.5)] bg-[rgba(255,80,0,0.15)] px-2 py-0.5 text-[11px] font-black text-[#ffb066]${reduceMotion ? '' : ' animate-pulse'}`}
+            title={`Heat combo: ${heatStreak} rapid clicks — x${heat} click power`}
+            aria-label={`Heat combo x${heat}`}
+          >
+            🔥 x{heat}
+          </span>
         )}
         {feedOffline && (
           <button
