@@ -1,3 +1,6 @@
+// Idle feed booru client (SPEC §6): runs in the Electron main via IPC. The
+// social feed's parallel client is apps/api/src/routes/booru.ts (server-side
+// proxy) — different trust domains, intentionally not merged.
 import type { BooruPost } from '../game/types'
 import { isQueryBlocked, isUserExcluded } from '../game/tagFilter'
 import { allowOnly } from './postFilter'

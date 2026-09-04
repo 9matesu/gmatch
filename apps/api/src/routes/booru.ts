@@ -1,3 +1,6 @@
+// Social feed booru proxy (server-side, SPEC §6/§9): the idle game's parallel
+// client lives in apps/desktop/src/services/booru.ts (Electron IPC) —
+// different trust domains, intentionally not merged.
 import { Hono } from 'hono'
 import type { D1Turso } from '../db'
 import type { LocalBlobStore } from '../blob'
