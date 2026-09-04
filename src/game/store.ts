@@ -213,6 +213,19 @@ function freshData() {
 /** Viewed-image history cap for the back arrow. */
 export const HISTORY_CAP = 50
 
+/**
+ * Fisher-Yates shuffle (new array). Feed posts are randomized on receipt so
+ * the game never pushes API result order sequentially (SPEC §6).
+ */
+export function shufflePosts<T>(posts: readonly T[]): T[] {
+  const out = [...posts]
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[out[i], out[j]] = [out[j], out[i]]
+  }
+  return out
+}
+
 /** Push the leaving image onto the back-arrow history. */
 function pushPast(past: BooruPost[], post: BooruPost | null): BooruPost[] {
   if (!post) return past
@@ -482,9 +495,11 @@ export const useGame = create<GameState>((set, get) => ({
     }
     if (res.ok && res.posts.length > 0) {
       const foe = foeMaxHp(s.defeated)
+      // Random order every round — never push API sequence straight to the feed.
+      const shuffled = shufflePosts(res.posts)
       set({
-        current: res.posts[0],
-        queue: res.posts.slice(1),
+        current: shuffled[0],
+        queue: shuffled.slice(1),
         foeHp: foe,
         foeMaxHp: foe,
         foeClicks: 0,
