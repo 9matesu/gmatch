@@ -1,0 +1,125 @@
+"use client";
+
+import { getApiBaseUrl } from './api';
+import { logger } from './logger';
+
+/**
+ * Resolves any relative media endpoint (/api/objects/..., /api/lobby/images/...)
+ * to a full URL pointing to the API host, while keeping data:, blob:, and external URLs untouched.
+ */
+export function resolveMediaUrl(url?: string | null): string {
+  if (!url) return '';
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+  // Reject non-web / local schemes up front so a broken `file://` or
+  // `about:`/`javascript:` URL never fires a doomed request (the classic
+  // `net::ERR_FILE_NOT_FOUND` on the front page).
+  if (/^(file|about|javascript|chrome|chrome-extension|moz-extension|safari-web-extension):/i.test(trimmed)) {
+    return '';
+  }
+  if (
+    trimmed.startsWith('data:') ||
+    trimmed.startsWith('blob:') ||
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://')
+  ) {
+    return trimmed;
+  }
+  const base = getApiBaseUrl().replace(/\/+$/, '');
+  const path = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  return `${base}${path}`;
+}
+
+/**
+ * Detects if a URL points to a playable video (.mp4, .webm, .mov, .ogg, or video MIME).
+ */
+export function isMediaVideo(url?: string | null): boolean {
+  if (!url) return false;
+  const clean = url.split('?')[0].toLowerCase();
+  return (
+    clean.endsWith('.mp4') ||
+    clean.endsWith('.webm') ||
+    clean.endsWith('.mov') ||
+    clean.endsWith('.ogg') ||
+    url.includes('video/') ||
+    url.includes('twimg.com') && url.includes('.mp4')
+  );
+}
+
+/**
+ * Checks if a string is a Twitter/X status link.
+ */
+export function isTwitterUrl(url: string): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    return (
+      (host === 'twitter.com' ||
+        host === 'www.twitter.com' ||
+        host === 'x.com' ||
+        host === 'www.x.com' ||
+        host === 'vxtwitter.com' ||
+        host === 'fxtwitter.com' ||
+        host === 'fixupx.com') &&
+      parsed.pathname.includes('/status/')
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolves a Twitter/X URL to a playable direct video MP4 URL or image URL.
+ */
+export async function resolveTwitterMedia(url: string): Promise<string | null> {
+  try {
+    const parsed = new URL(url);
+    if (!isTwitterUrl(url)) return null;
+
+    const pathname = parsed.pathname;
+    const vxApiUrl = `https://api.vxtwitter.com${pathname}`;
+
+    const res = await fetch(vxApiUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(6000),
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json();
+
+    // 1. Direct video from media_extended
+    const video = data.media_extended?.find(
+      (m: { type: string; url?: string }) => m.type === 'video' || m.type === 'gif'
+    );
+    if (video?.url) {
+      return video.url;
+    }
+
+    // 2. First media from mediaURLs
+    if (Array.isArray(data.mediaURLs) && data.mediaURLs.length > 0) {
+      return data.mediaURLs[0];
+    }
+
+    return null;
+  } catch (err) {
+    logger.warn('Failed to resolve Twitter media:', err);
+    return null;
+  }
+}
+
+/**
+ * Computes a SHA-256 hex digest of a Blob/File's bytes. Used as a content
+ * fingerprint so the server can dedup byte-identical re-uploads by the same
+ * owner. Runs on the SubtleCrypto Web API available in browsers + workers.
+ */
+export async function contentHash(file: Blob): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const digest = await crypto.subtle.digest('SHA-256', buffer);
+  const bytes = new Uint8Array(digest);
+  let hex = '';
+  for (let i = 0; i < bytes.length; i += 1) {
+    hex += bytes[i].toString(16).padStart(2, '0');
+  }
+  return hex;
+}
