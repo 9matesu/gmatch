@@ -36,6 +36,7 @@ export default function SetupScreen() {
   const [excludes, setExcludes] = useState<string[]>([])
   const [note, setNote] = useState<string | null>(null)
   const [starting, setStarting] = useState(false)
+  const valuesKey = fields.map((f) => f.value).join('\n')
 
   // Debounced validity + live probe per field (cancelled on re-type/unmount).
   useEffect(() => {
@@ -117,7 +118,7 @@ export default function SetupScreen() {
     // Excludes must not blank the picks (substring rule both ways).
     const clash = excludes.find((x) => uniqueLive.some((n) => n.includes(x) || x.includes(n)))
     if (clash) {
-      setNote(`Exclude “${clash}” would block a starter tag — drop one of them.`)
+      setNote(`Exclude “${clash}” would block a starter tag — remove the exclude or change that tag.`)
       return
     }
     setNote(null)
@@ -207,12 +208,12 @@ export default function SetupScreen() {
         {note && <div className="muted custom-tag-note">{note}</div>}
         <button
           type="button"
-          className="btn btn-primary"
+          className="btn primary"
           disabled={!ready || starting}
           onClick={start}
           title={ready ? 'Start the grid' : 'All 4 tags must probe live first'}
         >
-          {starting ? 'Starting…' : `Start with ${uniqueLive.length}/${SETUP_TAG_COUNT} live`}
+          {starting ? 'Starting…' : 'Start'}
         </button>
       </div>
     </div>

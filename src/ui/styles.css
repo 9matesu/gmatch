@@ -45,6 +45,34 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Keyboard focus is always visible (inputs add a pink border on top). */
+:focus-visible {
+  outline: 2px solid var(--pink);
+  outline-offset: 2px;
+}
+
+/* Skip link: first focusable element, visible on focus only. */
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -48px;
+  z-index: 100;
+  background: var(--pink);
+  color: #0a0a0f;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+
+.skip-link:focus-visible {
+  top: 12px;
+  outline-color: #fff;
+}
+
 .muted {
   color: var(--muted);
   font-size: 12px;
@@ -140,6 +168,7 @@ body {
   top: calc(100% + 8px);
   z-index: 70;
   width: 320px;
+  max-width: calc(100vw - 24px);
   max-height: 320px;
   overflow: auto;
   padding: 10px 12px;
@@ -441,6 +470,11 @@ body {
   background: #0a0a0f;
   border: 1px solid rgba(255, 255, 255, 0.06);
   min-height: 0;
+  /* cells are <button>s — strip UA chrome, keep the image full-bleed */
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
 }
 
 .grid-cell:active {
@@ -638,7 +672,8 @@ body {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.35),
     0 3px 0 var(--pink-deep);
-  color: #fff;
+  /* Ink on pink (5.55:1) — white on pink fails AA for button text (3.56:1). */
+  color: #0a0a0f;
 }
 
 .btn.primary:active:not(:disabled) {
@@ -930,7 +965,7 @@ body {
 
 .tabs {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
   padding: 12px;
   background: var(--ink);
@@ -952,8 +987,15 @@ body {
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.5px;
-  padding: 8px 0;
+  padding: 8px 2px;
   transition: color 0.15s ease, background 0.15s ease;
+  min-width: 0;
+}
+
+.tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tab:hover {
@@ -1097,7 +1139,8 @@ body {
 
 .tag-pill.on .pill-name,
 .tag-pill.on .pill-stats {
-  color: #fff;
+  /* Ink on pink (5.55:1) — white on pink fails AA here (3.56:1). */
+  color: #0a0a0f;
 }
 
 .pill-lv {
@@ -1111,7 +1154,7 @@ body {
 }
 
 .tag-pill.on .pill-lv {
-  color: #fff;
+  color: #0a0a0f;
 }
 
 .pill-lv:disabled {
@@ -1217,6 +1260,13 @@ body {
 .gallery-cell:hover .gallery-bg,
 .gallery-bg:disabled {
   opacity: 1;
+}
+
+/* No hover on touch: keep the backdrop control reachable there. */
+@media (hover: none) {
+  .gallery-bg {
+    opacity: 1;
+  }
 }
 
 .gallery-bg:hover:not(:disabled) {
@@ -1342,6 +1392,7 @@ body {
   font-size: 26px;
   letter-spacing: 1px;
   text-transform: uppercase;
+  text-wrap: balance;
 }
 
 .setup-card p {
@@ -1400,6 +1451,7 @@ body {
   font-size: 26px;
   letter-spacing: 1px;
   text-transform: uppercase;
+  text-wrap: balance;
 }
 
 .age-card p,
@@ -1474,6 +1526,26 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--pink-deep);
+}
+
+/* ---------- motion & touch preferences ---------- */
+
+@media (pointer: coarse) {
+  /* iOS zooms the page when an input reads below 16px — hold it there. */
+  .custom-tag-input {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Decorative motion is opt-in: kill pulses, floats, flashes and
+     transitions. Autoplay videos are gated in GoonPanel via matchMedia. */
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 /* ---------- responsive collapse ---------- */
