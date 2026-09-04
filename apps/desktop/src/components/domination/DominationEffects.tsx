@@ -5,6 +5,7 @@ import { orbitFetch } from '../../utils/api';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { useSettings } from '../../hooks/useSettings';
 import { logger } from '../../utils/logger';
+import { useGame } from '../../game/store';
 
 interface DominationEvent {
   type: 'domination';
@@ -21,6 +22,8 @@ interface DominationEvent {
     color?: string;
     actionId?: string;
     intensityPreset?: string;
+    /** g$ the victim just earned from the consent cut (server-paid). */
+    victimReward?: number;
   };
   timestamp: string;
 }
@@ -203,6 +206,12 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
             await handleCameraRequest(from, payload);
           }
           break;
+      }
+
+      // Consent-cut payout: the ledger credit lands on the next reconcile;
+      // tell the player NOW so the loop feels connected.
+      if (typeof payload.victimReward === 'number' && payload.victimReward > 0) {
+        useGame.getState().notify(`You were ${action.replace('_', ' ')}d — consent cut +${payload.victimReward} g$`);
       }
     };
 

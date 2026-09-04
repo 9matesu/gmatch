@@ -115,6 +115,8 @@ export interface GameState {
   verifyAge: () => void
   dismissToast: (id: number) => void
   clearToasts: () => void
+  /** Push a message into the header toast log from outside the game loop (e.g. domination payout). */
+  notify: (msg: string) => void
   resetGame: () => void
 }
 
@@ -1182,6 +1184,10 @@ export const useGame = create<GameState>((set, get) => ({
     return true
   },
 
+  notify: (msg) => {
+    const s = get()
+    set({ toasts: pushToast(s, msg) })
+  },
   dismissToast: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),
   clearToasts: () => set({ toasts: [] }),
 

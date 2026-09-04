@@ -176,18 +176,8 @@ domination.post('/trigger', async (c) => {
     VALUES (?, ?, ?, ?, ?, 'sent', ?)
   `).bind(actionId, dominatorId, targetId, action, payload ? JSON.stringify(payload) : null, nowIso).run()
 
-  const { broadcastToUser } = await import('../ws-bus')
-  broadcastToUser(targetId, {
-    type: 'domination',
-    action,
-    from: dominatorId,
-    payload: { ...payload, actionId, intensity },
-    timestamp: nowIso
-  })
-
-  await logAdminAction(db, dominatorId, `domination_${action}`, { id: targetId, type: 'domination_target' }, JSON.stringify(payload))
-
-  // Consent cut: the victim earns a share of the fee for hosting the chaos.
+  // Consent cut FIRST: the victim earns a share of the fee for hosting the
+  // chaos, and the WS event carries the amount so the UI can celebrate it.
   const victimReward = Math.round(pricing.cost * pricing.victimCut)
   let paidVictim = false
   try {
@@ -200,6 +190,17 @@ domination.post('/trigger', async (c) => {
   } catch (err) {
     console.warn('[domination] victim payout failed:', err)
   }
+
+  const { broadcastToUser } = await import('../ws-bus')
+  broadcastToUser(targetId, {
+    type: 'domination',
+    action,
+    from: dominatorId,
+    payload: { ...payload, actionId, intensity, victimReward: paidVictim ? victimReward : 0 },
+    timestamp: nowIso
+  })
+
+  await logAdminAction(db, dominatorId, `domination_${action}`, { id: targetId, type: 'domination_target' }, JSON.stringify(payload))
 
   return c.json({ success: true, actionId, cost: pricing.cost, victimReward: paidVictim ? victimReward : 0 })
 })
