@@ -1,7 +1,7 @@
 /**
  * Feed battle: every feed image is a foe with HP. Clicks deal damage equal
- * to their GP gain (crits hit x10). Draining a foe sends it to the gallery
- * with a GP kill bonus. Skipping (Next image) gives nothing.
+ * to their g$ gain (crits hit x10). Draining a foe sends it to the gallery
+ * with a g$ kill bonus. Skipping (Next image) gives nothing.
  * HP scales with lifetime KOs so each image is harder than the last.
  */
 
@@ -15,7 +15,7 @@ export function foeMaxHp(defeated: number): number {
   return Math.max(1, Math.ceil(FOE_HP_BASE * Math.pow(FOE_HP_GROWTH, k)))
 }
 
-/** GP bonus for draining a foe, from its deterministic rarity base. */
+/** g$ bonus for draining a foe, from its deterministic rarity base. */
 export function killBonusGp(rarityBase: number): number {
   return Math.max(1, Math.floor(rarityBase))
 }

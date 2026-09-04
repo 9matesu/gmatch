@@ -17,7 +17,7 @@ export const RARITY_THRESHOLDS: Record<Rarity, number> = {
   Diamond: 5000,
 }
 
-/** Passive GP/s per owned image by rarity (SPEC §4). */
+/** Passive g$/s per owned image by rarity (SPEC §4). */
 export const RARITY_INCOME: Record<Rarity, number> = {
   Common: 1,
   Copper: 3,

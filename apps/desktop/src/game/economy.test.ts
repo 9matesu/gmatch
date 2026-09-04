@@ -54,7 +54,7 @@ describe('crits (SPEC §1)', () => {
 })
 
 describe('click power', () => {
-  it('base click is 1 GP', () => {
+  it('base click is 1 g$', () => {
     expect(clickPower(base, NOW)).toBe(1)
   })
 
@@ -77,7 +77,7 @@ describe('click power', () => {
   })
 })
 
-describe('passive GP/s (SPEC §3/§4)', () => {
+describe('passive g$/s (SPEC §3/§4)', () => {
   it('tags pay income * level', () => {
     expect(tagIncome([tag('wet', 3, 2), tag('solo', 1, 5)])).toBe(11)
   })

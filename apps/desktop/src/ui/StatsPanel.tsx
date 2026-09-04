@@ -41,11 +41,11 @@ export default function StatsPanel() {
 
   return (
     <aside className="plate panel stats">
-      <div className="gp-big mono">{formatNum(s.gp)}</div>
-      <div className="gp-label">Goon Points</div>
+      <div className="gc-big mono">{formatNum(s.gc)}</div>
+      <div className="gc-label">g$</div>
       <div className="stat-row">
         <span>
-          <IconCoin size={13} /> GP/s
+          <IconCoin size={13} /> g$/s
         </span>
         <b className="mono">{formatNum(gps)}</b>
       </div>

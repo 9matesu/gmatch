@@ -42,7 +42,7 @@ export default function GoonPanel() {
   const current = useGame((s) => s.current)
   const feedOffline = useGame((s) => s.feedOffline)
   const fetching = useGame((s) => s.fetching)
-  const gp = useGame((s) => s.gp)
+  const gc = useGame((s) => s.gc)
   const foeHp = useGame((s) => s.foeHp)
   const foeMaxHp = useGame((s) => s.foeMaxHp)
   const defeated = useGame((s) => s.defeated)
@@ -176,7 +176,7 @@ export default function GoonPanel() {
                 {floats
                   .filter((f) => f.cell === i)
                   .map((f) => (
-                    <span key={f.id} className={`float-gp ${f.crit ? 'crit' : ''}`} style={{ left: f.x, top: f.y }}>
+                    <span key={f.id} className={`float-gc ${f.crit ? 'crit' : ''}`} style={{ left: f.x, top: f.y }}>
                       {f.text}
                     </span>
                   ))}
@@ -266,7 +266,7 @@ export default function GoonPanel() {
           {floats
             .filter((f) => f.cell === null)
             .map((f) => (
-              <span key={f.id} className={`float-gp ${f.crit ? 'crit' : ''}`} style={{ left: f.x, top: f.y }}>
+              <span key={f.id} className={`float-gc ${f.crit ? 'crit' : ''}`} style={{ left: f.x, top: f.y }}>
                 {f.text}
               </span>
             ))}
@@ -339,16 +339,16 @@ export default function GoonPanel() {
               style={{
                 backgroundImage: `linear-gradient(rgba(5,5,12,0.72), rgba(5,5,12,0.72)), url("${CAP_SKINS[id]}")`,
               }}
-              disabled={gp < def.cost}
+              disabled={gc < def.cost}
               onClick={() => popCap(id)}
-              title={`${def.name} — ${capEffectLabel(id)} — ${formatNum(def.cost)} GP — permanent, pops stack${st.count > 0 ? ` (x${st.count} live)` : ''}`}
+              title={`${def.name} — ${capEffectLabel(id)} — ${formatNum(def.cost)} g$ — permanent, pops stack${st.count > 0 ? ` (x${st.count} live)` : ''}`}
             >
               <span className="cap-name">
                 {def.name}
                 {st.count > 1 ? ` x${st.count}` : ''}
               </span>
               <span className="cap-stats">{capEffectLabel(id)}</span>
-              <span className="cap-cost mono">{formatNum(def.cost)} GP</span>
+              <span className="cap-cost mono">{formatNum(def.cost)} g$</span>
               <span className="cap-timer mono">{isLive ? '∞' : ''}</span>
             </button>
           )

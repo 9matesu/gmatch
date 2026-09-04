@@ -39,7 +39,7 @@ const TABS: { id: Tab; label: string; icon: ComponentType<{ size?: number }> }[]
 
 function TagsTab() {
   const tags = useGame((s) => s.tags)
-  const gp = useGame((s) => s.gp)
+  const gc = useGame((s) => s.gc)
   const fetching = useGame((s) => s.fetching)
   const buyTag = useGame((s) => s.buyTag)
   const toggleTag = useGame((s) => s.toggleTag)
@@ -100,7 +100,7 @@ function TagsTab() {
           const on = isOwned && t.selected !== false
           const maxed = t.level >= MAX_TAG_LEVEL
           const cost = tagCost(t.base, t.level)
-          const afford = !maxed && gp >= cost
+          const afford = !maxed && gc >= cost
           return (
             <div key={t.name} className={`tag-pill ${on ? 'on' : ''} ${afford ? 'pulse' : ''}`}>
               <button
@@ -111,13 +111,13 @@ function TagsTab() {
                 title={
                   isOwned
                     ? `${t.name} — click to switch ${on ? 'OFF' : 'ON'} in the feed`
-                    : `Buy ${t.name} for ${formatNum(cost)} GP`
+                    : `Buy ${t.name} for ${formatNum(cost)} g$`
                 }
               >
                 <span className="pill-name">{t.name}</span>
                 <span className="pill-stats mono">
                   Lv {t.level} · +{formatNum(t.income)}/s ·{' '}
-                  {isOwned ? (on ? 'ON' : 'OFF') : `${formatNum(cost)} GP`}
+                  {isOwned ? (on ? 'ON' : 'OFF') : `${formatNum(cost)} g$`}
                 </span>
               </button>
               {isOwned && (
@@ -136,7 +136,7 @@ function TagsTab() {
                   className="pill-lv mono"
                   disabled={!afford}
                   onClick={() => buyTag(t.name)}
-                  title={`Level up ${t.name} — ${formatNum(cost)} GP`}
+                  title={`Level up ${t.name} — ${formatNum(cost)} g$`}
                 >
                   +{formatNum(cost)}
                 </button>
@@ -246,7 +246,7 @@ function GalleryTab() {
 }
 
 function CapsTab() {
-  const gp = useGame((s) => s.gp)
+  const gc = useGame((s) => s.gc)
   const caps = useGame((s) => s.caps)
   const popCap = useGame((s) => s.popCap)
   const now = Date.now()
@@ -258,7 +258,7 @@ function CapsTab() {
       <div className="vending">
         {(Object.keys(CAPS) as CapId[]).map((id) => {
           const def = CAPS[id]
-          const afford = gp >= def.cost
+          const afford = gc >= def.cost
           const st = capStacks(caps, id, now)
           return (
             <div
@@ -284,7 +284,7 @@ function CapsTab() {
                 disabled={!afford}
                 onClick={() => popCap(id)}
               >
-                {formatNum(def.cost)} GP
+                {formatNum(def.cost)} g$
               </button>
             </div>
           )
@@ -296,13 +296,13 @@ function CapsTab() {
 
 function PrestigeTab() {
   const xp = useGame((s) => s.xp)
-  const totalEarnedGP = useGame((s) => s.totalEarnedGP)
+  const totalEarnedGc = useGame((s) => s.totalEarnedGc)
   const shards = useGame((s) => s.shards)
   const achievements = useGame((s) => s.achievements)
   const brainmelt = useGame((s) => s.brainmelt)
   const tier = tierForXp(xp)
   const ready = canBrainmelt(tier)
-  const preview = shardsFromEarned(totalEarnedGP)
+  const preview = shardsFromEarned(totalEarnedGc)
   return (
     <div className="tab-body">
       <div className="prestige-box">
@@ -311,7 +311,7 @@ function PrestigeTab() {
           global multiplier.
         </p>
         <ul className="keep-reset">
-          <li className="resets">Resets: GP, XP/tier, tags, caps</li>
+          <li className="resets">Resets: g$, XP/tier, tags, caps</li>
           <li className="keeps">Keeps: gallery, shards, achievements</li>
         </ul>
         <div className="shard-preview mono">

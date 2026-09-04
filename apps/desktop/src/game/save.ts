@@ -7,8 +7,12 @@ export const OFFLINE_CAP_MS = 8 * 60 * 60 * 1000
 
 export interface SaveData {
   version: number
-  gp: number
-  totalEarnedGP: number
+  gc: number
+  /** Whole g$ already flushed to the server ledger (plan D4). */
+  credited: number
+  /** Whole g$ already mirrored as spend on the server ledger (plan D4). */
+  debited: number
+  totalEarnedGc: number
   xp: number
   clickCount: number
   critCount: number
@@ -33,8 +37,10 @@ export interface SaveData {
 export function defaultSave(now = Date.now()): SaveData {
   return {
     version: SAVE_VERSION,
-    gp: 0,
-    totalEarnedGP: 0,
+    gc: 0,
+    credited: 0,
+    debited: 0,
+    totalEarnedGc: 0,
     xp: 0,
     clickCount: 0,
     critCount: 0,
@@ -70,15 +76,18 @@ export function deserialize(raw: string | null | undefined): SaveData | null {
     return null
   }
   if (typeof parsed !== 'object' || parsed === null) return null
-  const d = parsed as Partial<SaveData>
+  const d = parsed as Partial<SaveData> & { gp?: unknown; totalEarnedGP?: unknown }
   if (d.version !== SAVE_VERSION) return null
   const num = (v: unknown, fallback: number): number =>
     typeof v === 'number' && Number.isFinite(v) ? v : fallback
   const arr = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
   return {
     version: SAVE_VERSION,
-    gp: num(d.gp, 0),
-    totalEarnedGP: num(d.totalEarnedGP, 0),
+    // 1:1 GP→g$ rename (plan D4): old saves carry `gp`/`totalEarnedGP`.
+    gc: num(d.gc, num(d.gp, 0)),
+    credited: num(d.credited, 0),
+    debited: num(d.debited, 0),
+    totalEarnedGc: num(d.totalEarnedGc, num(d.totalEarnedGP, 0)),
     xp: num(d.xp, 0),
     clickCount: num(d.clickCount, 0),
     critCount: num(d.critCount, 0),
@@ -101,7 +110,7 @@ export function deserialize(raw: string | null | undefined): SaveData | null {
 }
 
 /**
- * Offline earnings = elapsed * GP/s * 50%, capped at 8h (SPEC §11).
+ * Offline earnings = elapsed * g$/s * 50%, capped at 8h (SPEC §11).
  * elapsedMs is clamped to [0, capMs].
  */
 export function offlineEarnings(

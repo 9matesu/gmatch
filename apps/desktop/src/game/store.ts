@@ -34,8 +34,11 @@ export interface ClickResult {
 
 export interface GameState {
   loaded: boolean
-  gp: number
-  totalEarnedGP: number
+  gc: number
+  /** Ledger mirror markers (plan D4) — see game/wallet.ts. */
+  credited: number
+  debited: number
+  totalEarnedGc: number
   xp: number
   clicks: number
   crits: number
@@ -95,6 +98,10 @@ export interface GameState {
   popCap: (capId: CapId) => boolean
   brainmelt: () => boolean
   tick: (dtMs?: number) => void
+  /** Ledger mirror update from walletBridge (plan D4). gc is only set by
+   * reconcile (server truth); the sync tick writes markers alone so it can
+   * never roll back earnings made during the network round-trip. */
+  setWallet: (w: { gc?: number; credited: number; debited: number }) => void
   save: () => void
   load: () => void
   collectOffline: () => void
@@ -106,9 +113,24 @@ export interface GameState {
 
 let toastSeq = 1
 
+/**
+ * Save slot keyed by the active Orbit identity (plan 4.3): switching accounts
+ * on the same machine never leaks the idle run across wallets. Before an
+ * identity exists the plain SAVE_KEY slot is used (pre-login play).
+ */
+function saveKey(): string {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('orbit_identity') : null
+    const id = raw ? (JSON.parse(raw) as { orbitId?: string }).orbitId : null
+    return id ? `${SAVE_KEY}:${id}` : SAVE_KEY
+  } catch {
+    return SAVE_KEY
+  }
+}
+
 function readStorage(): string | null {
   try {
-    return typeof localStorage !== 'undefined' ? localStorage.getItem(SAVE_KEY) : null
+    return typeof localStorage !== 'undefined' ? localStorage.getItem(saveKey()) : null
   } catch {
     return null
   }
@@ -116,7 +138,7 @@ function readStorage(): string | null {
 
 function writeStorage(raw: string): void {
   try {
-    if (typeof localStorage !== 'undefined') localStorage.setItem(SAVE_KEY, raw)
+    if (typeof localStorage !== 'undefined') localStorage.setItem(saveKey(), raw)
   } catch {
     /* storage unavailable — game still runs in-memory */
   }
@@ -185,8 +207,10 @@ function progress(s: GameState, prevXp: number): Pick<GameState, 'achievements' 
 function freshData() {
   return {
     loaded: false,
-    gp: 0,
-    totalEarnedGP: 0,
+    gc: 0,
+    credited: 0,
+    debited: 0,
+    totalEarnedGc: 0,
     xp: 0,
     clicks: 0,
     crits: 0,
@@ -325,23 +349,23 @@ export const useGame = create<GameState>((set, get) => ({
     const now = Date.now()
     const clickNumber = s.clicks + 1
     const crit = isCrit(clickNumber)
-    // Damage equals the click's GP gain — store power-ups (caps, shards,
+    // Damage equals the click's g$ gain — store power-ups (caps, shards,
     // achievements) hit harder, crits deal x10.
     const gain = clickGain(econ(s), clickNumber, now)
     const clickXp = crit ? 5 : 1
-    // No live foe (empty feed or re-featured gallery piece): clicks just pay GP.
+    // No live foe (empty feed or re-featured gallery piece): clicks just pay g$.
     if (!s.current || s.foeMaxHp <= 0) {
       const next: GameState = {
         ...s,
-        gp: s.gp + gain,
-        totalEarnedGP: s.totalEarnedGP + gain,
+        gc: s.gc + gain,
+        totalEarnedGc: s.totalEarnedGc + gain,
         clicks: clickNumber,
         crits: s.crits + (crit ? 1 : 0),
         xp: s.xp + clickXp,
       }
       set({
-        gp: next.gp,
-        totalEarnedGP: next.totalEarnedGP,
+        gc: next.gc,
+        totalEarnedGc: next.totalEarnedGc,
         clicks: next.clicks,
         crits: next.crits,
         xp: next.xp,
@@ -354,8 +378,8 @@ export const useGame = create<GameState>((set, get) => ({
     if (hpLeft > 0) {
       const next: GameState = {
         ...s,
-        gp: s.gp + gain,
-        totalEarnedGP: s.totalEarnedGP + gain,
+        gc: s.gc + gain,
+        totalEarnedGc: s.totalEarnedGc + gain,
         clicks: clickNumber,
         crits: s.crits + (crit ? 1 : 0),
         xp: s.xp + clickXp,
@@ -363,8 +387,8 @@ export const useGame = create<GameState>((set, get) => ({
         foeClicks: clicksOnFoe,
       }
       set({
-        gp: next.gp,
-        totalEarnedGP: next.totalEarnedGP,
+        gc: next.gc,
+        totalEarnedGc: next.totalEarnedGc,
         clicks: next.clicks,
         crits: next.crits,
         xp: next.xp,
@@ -374,12 +398,12 @@ export const useGame = create<GameState>((set, get) => ({
       })
       return { gain, crit, killed: false }
     }
-    // KO: the drained foe joins the gallery with a GP kill bonus.
+    // KO: the drained foe joins the gallery with a g$ kill bonus.
     const ko = koFoe(s, now, clicksOnFoe)
     const next: GameState = {
       ...s,
-      gp: s.gp + gain + ko.bonus,
-      totalEarnedGP: s.totalEarnedGP + gain + ko.bonus,
+      gc: s.gc + gain + ko.bonus,
+      totalEarnedGc: s.totalEarnedGc + gain + ko.bonus,
       clicks: clickNumber,
       crits: s.crits + (crit ? 1 : 0),
       xp: s.xp + clickXp + KILL_XP,
@@ -393,10 +417,10 @@ export const useGame = create<GameState>((set, get) => ({
       foeMaxHp: ko.foeMaxHp,
       foeClicks: ko.foeClicks,
     }
-    next.toasts = pushToast(next, `Drained ${ko.img.rarity} foe (+${ko.bonus} GP) — kept in gallery`)
+    next.toasts = pushToast(next, `Drained ${ko.img.rarity} foe (+${ko.bonus} g$) — kept in gallery`)
     set({
-      gp: next.gp,
-      totalEarnedGP: next.totalEarnedGP,
+      gc: next.gc,
+      totalEarnedGc: next.totalEarnedGc,
       clicks: next.clicks,
       crits: next.crits,
       xp: next.xp,
@@ -431,16 +455,16 @@ export const useGame = create<GameState>((set, get) => ({
       const grid = s.grid.map((c, i) => (i === index ? { ...c, hp: hpLeft, clicks: clicksOnCell } : c))
       const next: GameState = {
         ...s,
-        gp: s.gp + gain,
-        totalEarnedGP: s.totalEarnedGP + gain,
+        gc: s.gc + gain,
+        totalEarnedGc: s.totalEarnedGc + gain,
         clicks: clickNumber,
         crits: s.crits + (crit ? 1 : 0),
         xp: s.xp + clickXp,
         grid,
       }
       set({
-        gp: next.gp,
-        totalEarnedGP: next.totalEarnedGP,
+        gc: next.gc,
+        totalEarnedGc: next.totalEarnedGc,
         clicks: next.clicks,
         crits: next.crits,
         xp: next.xp,
@@ -458,8 +482,8 @@ export const useGame = create<GameState>((set, get) => ({
     )
     const next: GameState = {
       ...s,
-      gp: s.gp + gain + spoil.bonus,
-      totalEarnedGP: s.totalEarnedGP + gain + spoil.bonus,
+      gc: s.gc + gain + spoil.bonus,
+      totalEarnedGc: s.totalEarnedGc + gain + spoil.bonus,
       clicks: clickNumber,
       crits: s.crits + (crit ? 1 : 0),
       xp: s.xp + clickXp + KILL_XP,
@@ -470,10 +494,10 @@ export const useGame = create<GameState>((set, get) => ({
       queue: filled.queue,
       grid: filled.grid,
     }
-    next.toasts = pushToast(next, `Drained ${spoil.img.rarity} square (+${spoil.bonus} GP) — kept in gallery`)
+    next.toasts = pushToast(next, `Drained ${spoil.img.rarity} square (+${spoil.bonus} g$) — kept in gallery`)
     set({
-      gp: next.gp,
-      totalEarnedGP: next.totalEarnedGP,
+      gc: next.gc,
+      totalEarnedGc: next.totalEarnedGc,
       clicks: next.clicks,
       crits: next.crits,
       xp: next.xp,
@@ -522,12 +546,12 @@ export const useGame = create<GameState>((set, get) => ({
     const s = get()
     const idx = s.tags.findIndex((t) => t.name === name)
     if (idx === -1) return false
-    const res = buyTagLevel(s.tags[idx], s.gp)
+    const res = buyTagLevel(s.tags[idx], s.gc)
     if (!res) return false
     const tags = [...s.tags]
     tags[idx] = res.tag
-    const next = { ...s, tags, gp: res.gp }
-    set({ tags, gp: res.gp, ...progress(next, s.xp) })
+    const next = { ...s, tags, gc: res.gc }
+    set({ tags, gc: res.gc, ...progress(next, s.xp) })
     return true
   },
 
@@ -762,11 +786,11 @@ export const useGame = create<GameState>((set, get) => ({
   popCap: (capId) => {
     const s = get()
     const def = CAPS[capId]
-    if (s.gp < def.cost) return false
+    if (s.gc < def.cost) return false
     const now = Date.now()
     const next: GameState = {
       ...s,
-      gp: s.gp - def.cost,
+      gc: s.gc - def.cost,
       caps: popCapList(activeCaps(s.caps, now), capId, now),
       capsUsed: s.capsUsed.includes(capId) ? s.capsUsed : [...s.capsUsed, capId],
     }
@@ -775,7 +799,7 @@ export const useGame = create<GameState>((set, get) => ({
       `${def.name} popped — permanent`,
     )
     set({
-      gp: next.gp,
+      gc: next.gc,
       caps: next.caps,
       capsUsed: next.capsUsed,
       ...progress(next, s.xp),
@@ -787,8 +811,8 @@ export const useGame = create<GameState>((set, get) => ({
     const s = get()
     if (!canBrainmelt(tierForXp(s.xp))) return false
     const out = applyBrainmelt({
-      gp: s.gp,
-      totalEarnedGP: s.totalEarnedGP,
+      gc: s.gc,
+      totalEarnedGc: s.totalEarnedGc,
       xp: s.xp,
       tags: s.tags,
       caps: s.caps,
@@ -799,8 +823,10 @@ export const useGame = create<GameState>((set, get) => ({
     })
     const next: GameState = {
       ...s,
-      gp: 0,
-      totalEarnedGP: 0,
+      gc: 0,
+      credited: 0,
+      debited: 0,
+      totalEarnedGc: 0,
       xp: 0,
       tags: [],
       caps: [],
@@ -809,8 +835,10 @@ export const useGame = create<GameState>((set, get) => ({
     }
     next.toasts = pushToast(next, `BRAINMELT — +${out.shardsGained} corruption shards`)
     set({
-      gp: 0,
-      totalEarnedGP: 0,
+      gc: 0,
+      credited: 0,
+      debited: 0,
+      totalEarnedGc: 0,
       xp: 0,
       tags: [],
       caps: [],
@@ -840,8 +868,8 @@ export const useGame = create<GameState>((set, get) => ({
           const next: GameState = {
             ...s,
             caps,
-            gp: s.gp + gain + spoil.bonus,
-            totalEarnedGP: s.totalEarnedGP + gain + spoil.bonus,
+            gc: s.gc + gain + spoil.bonus,
+            totalEarnedGc: s.totalEarnedGc + gain + spoil.bonus,
             xp: s.xp + gain * 0.01 + KILL_XP,
             tags: spoil.tags,
             past: spoil.past,
@@ -851,11 +879,11 @@ export const useGame = create<GameState>((set, get) => ({
             grid: filled.grid,
             lastSeenAt: now,
           }
-          next.toasts = pushToast(next, `Auto-drained ${spoil.img.rarity} square (+${spoil.bonus} GP)`)
+          next.toasts = pushToast(next, `Auto-drained ${spoil.img.rarity} square (+${spoil.bonus} g$)`)
           set({
             caps: next.caps,
-            gp: next.gp,
-            totalEarnedGP: next.totalEarnedGP,
+            gc: next.gc,
+            totalEarnedGc: next.totalEarnedGc,
             xp: next.xp,
             tags: next.tags,
             past: next.past,
@@ -872,22 +900,22 @@ export const useGame = create<GameState>((set, get) => ({
         const grid = s.grid.map((c, i) => (i === 0 ? { ...c, hp: c.hp - autoDmg } : c))
         set({
           caps,
-          gp: s.gp + gain,
-          totalEarnedGP: s.totalEarnedGP + gain,
+          gc: s.gc + gain,
+          totalEarnedGc: s.totalEarnedGc + gain,
           xp: s.xp + gain * 0.01,
           grid,
           lastSeenAt: now,
-          ...progress({ ...s, gp: s.gp + gain }, s.xp),
+          ...progress({ ...s, gc: s.gc + gain }, s.xp),
         })
         return
       }
       set({
         caps,
-        gp: s.gp + gain,
-        totalEarnedGP: s.totalEarnedGP + gain,
+        gc: s.gc + gain,
+        totalEarnedGc: s.totalEarnedGc + gain,
         xp: s.xp + gain * 0.01,
         lastSeenAt: now,
-        ...progress({ ...s, gp: s.gp + gain }, s.xp),
+        ...progress({ ...s, gc: s.gc + gain }, s.xp),
       })
       return
     }
@@ -897,8 +925,8 @@ export const useGame = create<GameState>((set, get) => ({
       const next: GameState = {
         ...s,
         caps,
-        gp: s.gp + gain + ko.bonus,
-        totalEarnedGP: s.totalEarnedGP + gain + ko.bonus,
+        gc: s.gc + gain + ko.bonus,
+        totalEarnedGc: s.totalEarnedGc + gain + ko.bonus,
         xp: s.xp + gain * 0.01 + KILL_XP,
         tags: ko.tags,
         past: ko.past,
@@ -911,11 +939,11 @@ export const useGame = create<GameState>((set, get) => ({
         foeClicks: ko.foeClicks,
         lastSeenAt: now,
       }
-      next.toasts = pushToast(next, `Auto-drained ${ko.img.rarity} foe (+${ko.bonus} GP)`)
+      next.toasts = pushToast(next, `Auto-drained ${ko.img.rarity} foe (+${ko.bonus} g$)`)
       set({
         caps: next.caps,
-        gp: next.gp,
-        totalEarnedGP: next.totalEarnedGP,
+        gc: next.gc,
+        totalEarnedGc: next.totalEarnedGc,
         xp: next.xp,
         tags: next.tags,
         past: next.past,
@@ -935,16 +963,16 @@ export const useGame = create<GameState>((set, get) => ({
     const next: GameState = {
       ...s,
       caps,
-      gp: s.gp + gain,
-      totalEarnedGP: s.totalEarnedGP + gain,
+      gc: s.gc + gain,
+      totalEarnedGc: s.totalEarnedGc + gain,
       xp: s.xp + gain * 0.01,
       foeHp: s.foeMaxHp > 0 ? Math.max(0, s.foeHp - autoDmg) : s.foeHp,
       lastSeenAt: now,
     }
     set({
       caps: next.caps,
-      gp: next.gp,
-      totalEarnedGP: next.totalEarnedGP,
+      gc: next.gc,
+      totalEarnedGc: next.totalEarnedGc,
       xp: next.xp,
       foeHp: next.foeHp,
       lastSeenAt: next.lastSeenAt,
@@ -958,8 +986,10 @@ export const useGame = create<GameState>((set, get) => ({
     const data: SaveData = {
       ...defaultSave(now),
       version: SAVE_VERSION,
-      gp: s.gp,
-      totalEarnedGP: s.totalEarnedGP,
+      gc: s.gc,
+      credited: s.credited,
+      debited: s.debited,
+      totalEarnedGc: s.totalEarnedGc,
       xp: s.xp,
       clickCount: s.clicks,
       critCount: s.crits,
@@ -1014,8 +1044,10 @@ export const useGame = create<GameState>((set, get) => ({
     const gain = d.ageAccepted ? offlineEarnings(gps, now - d.lastSeenAt) : 0
     set({
       loaded: true,
-      gp: d.gp,
-      totalEarnedGP: d.totalEarnedGP,
+      gc: d.gc,
+      credited: d.credited,
+      debited: d.debited,
+      totalEarnedGc: d.totalEarnedGc,
       xp: d.xp,
       clicks: d.clickCount,
       crits: d.critCount,
@@ -1044,15 +1076,15 @@ export const useGame = create<GameState>((set, get) => ({
     if (s.offlineGain <= 0) return
     const next: GameState = {
       ...s,
-      gp: s.gp + s.offlineGain,
-      totalEarnedGP: s.totalEarnedGP + s.offlineGain,
+      gc: s.gc + s.offlineGain,
+      totalEarnedGc: s.totalEarnedGc + s.offlineGain,
       xp: s.xp + s.offlineGain * 0.01,
       collectedOfflineEarnings: true,
       offlineGain: 0,
     }
     set({
-      gp: next.gp,
-      totalEarnedGP: next.totalEarnedGP,
+      gc: next.gc,
+      totalEarnedGc: next.totalEarnedGc,
       xp: next.xp,
       collectedOfflineEarnings: true,
       offlineGain: 0,
@@ -1123,5 +1155,9 @@ export const useGame = create<GameState>((set, get) => ({
   resetGame: () => {
     setUserExcludes([])
     set({ ...freshData() })
+  },
+
+  setWallet: (w) => {
+    set({ credited: w.credited, debited: w.debited, ...(w.gc !== undefined ? { gc: w.gc } : {}) })
   },
 }))

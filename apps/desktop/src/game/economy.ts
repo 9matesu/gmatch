@@ -35,7 +35,7 @@ export function clickPower(input: EconomyInput, now: number): number {
   )
 }
 
-/** GP gained by click #clickNumber (applies x10 crit). */
+/** g$ gained by click #clickNumber (applies x10 crit). */
 export function clickGain(input: EconomyInput, clickNumber: number, now: number): number {
   return clickPower(input, now) * (isCrit(clickNumber) ? CRIT_MULT : 1)
 }
@@ -48,7 +48,7 @@ export function galleryIncome(gallery: GalleryImage[]): number {
   return gallery.reduce((sum, img) => sum + rarityIncome(img.rarity), 0)
 }
 
-/** Passive GP/s from tags + gallery, scaled by shards and passive caps. */
+/** Passive g$/s from tags + gallery, scaled by shards and passive caps. */
 export function passiveGps(input: EconomyInput, now: number): number {
   return (
     (tagIncome(input.tags) + galleryIncome(input.gallery)) *

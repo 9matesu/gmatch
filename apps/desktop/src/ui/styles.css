@@ -240,7 +240,7 @@ body {
 
 /* ---------- stats (left) ---------- */
 
-.gp-big {
+.gc-big {
   font-family: var(--display);
   font-size: 40px;
   font-weight: 700;
@@ -249,7 +249,7 @@ body {
   word-break: break-all;
 }
 
-.gp-label {
+.gc-label {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 2px;
@@ -596,7 +596,7 @@ body {
   }
 }
 
-.float-gp {
+.float-gc {
   position: absolute;
   z-index: 2;
   font-family: var(--mono);
@@ -609,7 +609,7 @@ body {
   animation: float-up 0.9s ease-out forwards;
 }
 
-.float-gp.crit {
+.float-gc.crit {
   font-size: 28px;
   color: var(--gold);
 }

@@ -112,7 +112,8 @@ function signRequestHeaders(
 export async function orbitFetch(
   endpoint: string,
   options: RequestInit,
-  identity: OrbitIdentityLike
+  identity: OrbitIdentityLike,
+  fetchImpl: typeof globalThis.fetch = globalThis.fetch,
 ): Promise<Response> {
   const url = resolveEndpoint(endpoint)
   const method = (options.method || 'GET').toUpperCase();
@@ -148,7 +149,7 @@ export async function orbitFetch(
     const isUpload = options.body instanceof FormData
     const timeout = setTimeout(() => controller.abort(), isUpload ? 120000 : 30000)
     try {
-      const res = await fetch(url, { ...options, headers, signal: controller.signal })
+      const res = await fetchImpl(url, { ...options, headers, signal: controller.signal })
       clearTimeout(timeout)
       if (res.ok) {
         if (method === 'GET') {

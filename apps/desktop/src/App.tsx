@@ -25,6 +25,8 @@ import { enqueueableItems, isP2pLocal, shouldEnqueue } from "./utils/game";
 import { mergeMyCards, createCardFromMedia, type CanonicalCard } from "./utils/cardCollection";
 import { collectConfigBundle, applyConfigBundle, applyStashFromBundle, parseConfigBundle, configDownloadFilename, bundleToString } from "./utils/configBackup";
 import { runMigrations } from "./utils/migration";
+import { startWalletSync } from "./game/walletBridge";
+import { useGame as useIdleGame } from "./game/store";
 import { playChime, playPress, playMsgReceive } from "./utils/sounds";
 import { useLobby } from "./hooks/useLobby";
 import { LobbyPanel } from "./components/LobbyPanel";
@@ -110,6 +112,32 @@ export default function Home() {
   }, []);
 
   const { identity, isLoaded, createIdentity, exportIdentity, loginWithExportedId, clearIdentity } = useIdentity();
+  // Idle game loop (merged from goongrid App): load save, tick economy, autosave.
+  useEffect(() => {
+    useIdleGame.getState().load();
+    const t = setInterval(() => useIdleGame.getState().tick(1000), 1000);
+    const save = () => useIdleGame.getState().save();
+    const ts = setInterval(save, 10_000);
+    window.addEventListener('beforeunload', save);
+    return () => {
+      clearInterval(t);
+      clearInterval(ts);
+      window.removeEventListener('beforeunload', save);
+    };
+  }, []);
+  // Idle wallet <-> ledger mirror (plan D4): flush net deltas every 30s once
+  // an identity exists; reconcile server balance on identity change.
+  useEffect(() => {
+    if (!identity) return;
+    const stop = startWalletSync(
+      () => {
+        const s = useIdleGame.getState();
+        return { gc: s.gc, credited: s.credited, debited: s.debited, setWallet: s.setWallet };
+      },
+      identity,
+    );
+    return stop;
+  }, [identity]);
   const { peers, p2pItems, sendP2PItem, sendChatMessage, chatMessages, isWsConnected } = useP2P(identity);
   const { settings, update: updateSettings } = useSettings();
   const [users, setUsers] = useState<User[]>([]);

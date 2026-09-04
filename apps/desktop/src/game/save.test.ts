@@ -20,8 +20,8 @@ describe('serialize / deserialize round-trip', () => {
   it('preserves all fields', () => {
     const data = {
       ...defaultSave(123),
-      gp: 4200,
-      totalEarnedGP: 99_000,
+      gc: 4200,
+      totalEarnedGc: 99_000,
       xp: 1_600,
       clickCount: 300,
       critCount: 12,
@@ -49,16 +49,23 @@ describe('serialize / deserialize round-trip', () => {
   })
 
   it('fills missing fields with defaults', () => {
-    const back = deserialize(JSON.stringify({ version: SAVE_VERSION, gp: 7 }))
+    const back = deserialize(JSON.stringify({ version: SAVE_VERSION, gc: 7 }))
     expect(back).not.toBeNull()
-    expect(back!.gp).toBe(7)
+    expect(back!.gc).toBe(7)
     expect(back!.tags).toEqual([])
     expect(back!.defeated).toBe(0)
+  })
+
+  it('migrates legacy gp saves 1:1 to gc (plan D4)', () => {
+    const back = deserialize(JSON.stringify({ version: SAVE_VERSION, gp: 1500, totalEarnedGP: 9000 }))
+    expect(back).not.toBeNull()
+    expect(back!.gc).toBe(1500)
+    expect(back!.totalEarnedGc).toBe(9000)
   })
 })
 
 describe('offline earnings (SPEC §11)', () => {
-  it('elapsed * GP/s * 50%', () => {
+  it('elapsed * g$/s * 50%', () => {
     expect(offlineEarnings(10, 60_000)).toBe(300)
     expect(offlineEarnings(0, 60_000)).toBe(0)
   })
