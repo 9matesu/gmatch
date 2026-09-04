@@ -3,12 +3,60 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import path from 'node:path'
 
 // Hosts the dev /px byte-proxy may fetch (allowlist — no open proxy).
 const PX_ALLOW = /(^|\.)(imhentai\.xxx|paheal\.net|tbib\.org|xbooru\.com|redgifs\.com)$/
 
 const DEV_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36'
+
+/** Resolve the real bun exe (npm .cmd shims can't be spawned directly). */
+function bunBin(): string {
+  const candidates = [
+    path.join(process.env.APPDATA || '', 'npm', 'node_modules', 'bun', 'bin', 'bun.exe'),
+    path.join(process.env.USERPROFILE || '', '.bun', 'bin', 'bun.exe'),
+  ]
+  for (const c of candidates) if (existsSync(c)) return c
+  return 'bun'
+}
+
+/**
+ * Dev-mode API sidecar: `npm run dev` gets the same 8790 server Electron
+ * spawns, so the shell's fetches never hit ERR_CONNECTION_REFUSED. Adopts an
+ * already-running sidecar; uses apps/api default persistence (gitignored).
+ */
+function devApiPlugin(): Plugin {
+  let proc: ReturnType<typeof spawn> | null = null
+  return {
+    name: 'goongrid-dev-api',
+    configureServer(server) {
+      void (async () => {
+        try {
+          const r = await fetch('http://127.0.0.1:8790/api/health')
+          if (r.ok && (await r.json()).db_ready) {
+            console.log('[api] adopting existing sidecar on 8790')
+            return
+          }
+        } catch {
+          /* spawn below */
+        }
+        const apiDir = fileURLToPath(new URL('../api', import.meta.url))
+        proc = spawn(bunBin(), ['run', 'src/serve.ts'], {
+          cwd: apiDir,
+          env: { ...process.env, PORT: '8790' },
+          stdio: ['ignore', 'pipe', 'pipe'],
+        })
+        proc.stdout?.on('data', (d) => console.log('[api]', d.toString().trim()))
+        proc.stderr?.on('data', (d) => console.error('[api!]', d.toString().trim()))
+        proc.on('error', (err) => console.error('[api] dev sidecar spawn failed:', err.message))
+        server.httpServer?.on('close', () => proc?.kill())
+      })()
+    },
+  }
+}
 
 /**
  * Dev-only same-origin byte proxy: image hosts without ACAO headers
@@ -55,7 +103,7 @@ function devPxPlugin(): Plugin {
 // base './' so Electron can load dist/index.html over file://
 export default defineConfig({
   base: './',
-  plugins: [react(), tailwindcss(), devPxPlugin()],
+  plugins: [react(), tailwindcss(), devApiPlugin(), devPxPlugin()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

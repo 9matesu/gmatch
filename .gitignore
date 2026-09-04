@@ -10,3 +10,5 @@ orbit.snapshot.sqlite
 blobs/
 test-blobs-*/
 *.tsbuildinfo
+apps/api/orbit.snapshot.sqlite
+apps/api/blobs/

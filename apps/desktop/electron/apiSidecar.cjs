@@ -28,6 +28,17 @@ function bunBin() {
 }
 
 async function startApi() {
+  // Adopt an already-healthy sidecar (e.g. `npm run dev` started one, or a
+  // second Electron window) instead of spawning a doomed duplicate.
+  try {
+    const r = await fetch(`${API_BASE}/api/health`)
+    if (r.ok && (await r.json()).db_ready) {
+      console.log(`[api] adopting existing sidecar at ${API_BASE}`)
+      return true
+    }
+  } catch {
+    /* nothing listening — spawn below */
+  }
   const apiDir = path.join(__dirname, '..', '..', 'api')
   proc = spawn(bunBin(), ['run', 'src/serve.ts'], {
     cwd: apiDir,
