@@ -22,3 +22,4 @@ apps/api/test-blobs-*/
 api-stage/
 apps/desktop/release/
 .dev-storage.key
+apps/desktop/dist-log.txt
