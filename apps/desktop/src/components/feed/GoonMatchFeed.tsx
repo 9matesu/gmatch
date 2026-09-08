@@ -312,6 +312,20 @@ export function GoonMatchFeed({
   // Share Modal State
   const [sharingPost, setSharingPost] = useState<FeedPost | null>(null);
 
+  // Deep link: #/feed?post=<id> (from share/permalink) opens the post lightbox
+  // once the post is loaded. One-shot — later list changes don't reopen it.
+  const deepLinkDoneRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkDoneRef.current || posts.length === 0) return;
+    const m = /post=([\w-]+)/.exec(window.location.hash);
+    if (!m) return;
+    const target = posts.find((p) => p.id === m[1]);
+    if (target) {
+      deepLinkDoneRef.current = true;
+      setActiveLightboxPost(target);
+    }
+  }, [posts]);
+
   // Post Options Modal State
   const [optionsPost, setOptionsPost] = useState<FeedPost | null>(null);
   const [reportingPost, setReportingPost] = useState<FeedPost | null>(null);
@@ -1027,6 +1041,7 @@ export function GoonMatchFeed({
           onClose={() => setSharingPost(null)}
           followingIds={followingIds}
           profilePics={profilePics}
+          userNames={Object.fromEntries(users.map((u) => [u.id, u.display_name || '']))}
           identity={identity}
           toast={toast}
         />

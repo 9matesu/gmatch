@@ -1,13 +1,5 @@
 export const ONBOARDING_STEPS = [
   'welcome',
-  'auth',
-  'profile',
-  'platform',
-  'feed',
-  'tune',
-  'cards',
-  'economy',
-  'games',
   'ready',
 ] as const;
 
@@ -35,12 +27,25 @@ export function readOnboardingState(identityId?: string | null): OnboardingState
     const raw = localStorage.getItem(onboardingStorageKey(identityId));
     if (!raw) return initialOnboardingState();
     const parsed = JSON.parse(raw) as Partial<OnboardingState>;
-    const completed = Array.isArray(parsed.completed)
-      ? parsed.completed.filter((step): step is OnboardingStep => ONBOARDING_STEPS.includes(step as OnboardingStep))
-      : [];
+
+    // Backwards compatibility with legacy multi-step stores:
+    // If 'ready' was in the legacy completed array, consider the onboarding finished.
+    const legacyCompleted = Array.isArray(parsed.completed) ? parsed.completed : [];
+    const isLegacyDone = legacyCompleted.includes('ready');
+
+    const completed = legacyCompleted.filter((step): step is OnboardingStep =>
+      ONBOARDING_STEPS.includes(step as OnboardingStep)
+    );
+    if (isLegacyDone && !completed.includes('ready')) {
+      completed.push('ready');
+    }
+
     const current = ONBOARDING_STEPS.includes(parsed.current as OnboardingStep)
       ? (parsed.current as OnboardingStep)
+      : isLegacyDone
+      ? 'ready'
       : 'welcome';
+
     return { version: 1, current, completed: Array.from(new Set(completed)) };
   } catch {
     return initialOnboardingState();

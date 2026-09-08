@@ -28,9 +28,7 @@ describe('onboarding state', () => {
     let state = initialOnboardingState();
     expect(nextIncompleteStep(state)).toBe('welcome');
     state = completeStep(state, 'welcome');
-    expect(state.current).toBe('auth');
-    state = completeStep(state, 'auth');
-    expect(state.current).toBe('profile');
+    expect(state.current).toBe('ready');
   });
 
   it('persists progress per identity and resumes it', () => {
@@ -40,22 +38,22 @@ describe('onboarding state', () => {
 
     expect(readOnboardingState('orbit-a')).toEqual(state);
     expect(readOnboardingState('orbit-b').current).toBe('welcome');
-    expect(localStorage.getItem(onboardingStorageKey('orbit-a'))).toContain('auth');
+    expect(localStorage.getItem(onboardingStorageKey('orbit-a'))).toContain('ready');
   });
 
   it('marks the guide complete only after the ready step', () => {
-    const almostReady: OnboardingState = { ...initialOnboardingState(), current: 'ready', completed: ['welcome', 'auth', 'profile', 'platform', 'feed', 'tune', 'cards', 'economy', 'games'] };
-    const complete = completeStep(almostReady, 'ready');
+    const welcomeDone: OnboardingState = { ...initialOnboardingState(), current: 'ready', completed: ['welcome'] };
+    const complete = completeStep(welcomeDone, 'ready');
     expect(complete.completed).toContain('ready');
     expect(nextIncompleteStep(complete)).toBeNull();
     expect(isOnboardingComplete(complete)).toBe(true);
-    expect(isOnboardingComplete(almostReady)).toBe(false);
+    expect(isOnboardingComplete(welcomeDone)).toBe(false);
   });
 
   it('keeps completion persisted for the same identity', () => {
     const complete = completeStep({
       ...initialOnboardingState(),
-      completed: ['welcome', 'auth', 'profile', 'platform', 'feed', 'tune', 'cards', 'economy', 'games'],
+      completed: ['welcome'],
       current: 'ready',
     }, 'ready');
 
@@ -63,5 +61,21 @@ describe('onboarding state', () => {
 
     expect(isOnboardingComplete(readOnboardingState('orbit-a'))).toBe(true);
     expect(isOnboardingComplete(readOnboardingState('orbit-b'))).toBe(false);
+  });
+
+  it('preserves legacy multi-step completed states', () => {
+    // Simulate legacy storage format with 10 steps
+    localStorage.setItem(
+      onboardingStorageKey('legacy-user'),
+      JSON.stringify({
+        version: 1,
+        current: 'ready',
+        completed: ['welcome', 'auth', 'profile', 'platform', 'feed', 'tune', 'cards', 'economy', 'games', 'ready'],
+      })
+    );
+
+    const state = readOnboardingState('legacy-user');
+    expect(isOnboardingComplete(state)).toBe(true);
+    expect(state.completed).toContain('ready');
   });
 });

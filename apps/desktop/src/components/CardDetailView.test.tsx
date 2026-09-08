@@ -18,10 +18,10 @@ const card = {
   createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
 }
 
-const json = (v: unknown, ok = true) =>
-  Promise.resolve({ ok, status: ok ? 200 : 400, json: async () => v })
+const json = (v: unknown, ok = true): Response =>
+  ({ ok, status: ok ? 200 : 400, json: async () => v }) as unknown as Response
 
-function mockFetch(handlers: Record<string, () => Promise<Response>> = {}) {
+function mockFetch(handlers: Record<string, () => Response> = {}) {
   vi.mocked(orbitFetch).mockImplementation(async (url: string) => {
     for (const [pattern, fn] of Object.entries(handlers)) {
       if (url.includes(pattern)) return fn()

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ShieldAlert, CheckCircle2, XCircle, FileText } from 'lucide-react';
 import { playPress, playWin } from '../../utils/sounds';
+import { isOnboardingComplete, readOnboardingState } from '../../firstRun/onboardingState';
 
 export function AgeGateModal({
   onOpenTos,
@@ -13,6 +14,10 @@ export function AgeGateModal({
   const [isVerified, setIsVerified] = useState(() => {
     if (typeof window === 'undefined') return true;
     try {
+      // If onboarding is active (not complete), OnboardingFlow is the single unified gate
+      if (!isOnboardingComplete(readOnboardingState(null))) {
+        return true;
+      }
       return localStorage.getItem('goonMatch_age_verified') === 'true';
     } catch {
       return true;
@@ -35,43 +40,43 @@ export function AgeGateModal({
   if (isVerified) return null;
 
   return (
-    <div className="fixed inset-0 z-[99995] bg-black/75 backdrop-blur-md flex items-center justify-center p-4 font-sans animate-orbit-fade-in">
+    <div className="fixed inset-0 z-[99995] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in">
       <div
-        className="bg-surface-raised border border-border-glass rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl space-y-5 text-center flex flex-col items-center animate-orbit-slide-up"
+        className="bg-zinc-950 border border-zinc-800 rounded-xl max-w-md w-full p-6 sm:p-7 shadow-2xl space-y-5 text-center flex flex-col items-center animate-orbit-slide-up text-zinc-100"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Icon & Brand */}
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-500 via-teal-500 to-amber-500 text-white flex items-center justify-center shadow-lg shadow-cyan-900/20">
-          <ShieldAlert className="w-8 h-8" />
+        <div className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 flex items-center justify-center">
+          <ShieldAlert className="w-6 h-6 text-zinc-300" />
         </div>
 
         <div className="space-y-1.5">
-          <span className="text-[10px] font-black uppercase tracking-widest text-cyan-300 bg-cyan-500/10 px-2.5 py-1 rounded-full border border-cyan-500/30">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 bg-zinc-900 px-2.5 py-1 rounded-md border border-zinc-800">
             Age Verification
           </span>
-          <h2 className="text-xl font-black text-retro-fg tracking-tight">Are you 18 or older?</h2>
-          <p className="text-xs text-retro-muted leading-relaxed max-w-xs mx-auto">
-            goonMatch contains community-shared artwork and social media moments intended exclusively for mature audiences.
+          <h2 className="text-xl font-semibold text-white tracking-tight">Are you 18 or older?</h2>
+          <p className="text-xs text-zinc-400 leading-relaxed max-w-xs mx-auto">
+            GoonGrid contains adult media and community content intended exclusively for mature audiences (18+).
           </p>
         </div>
 
         {/* Buttons */}
-        <div className="w-full space-y-2.5 pt-1">
+        <div className="w-full space-y-2 pt-1">
           <button
             type="button"
             onClick={handleConfirmAge}
-            className="w-full py-3 px-4 rounded-2xl bg-black hover:bg-surface-elevated active:scale-95 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+            className="w-full py-2.5 px-4 rounded-lg bg-white hover:bg-zinc-200 active:scale-[0.99] text-black font-semibold text-xs shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2"
           >
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             <span>I am 18 or Older — Enter</span>
           </button>
 
           <button
             type="button"
             onClick={handleRejectAge}
-            className="w-full py-2.5 px-4 rounded-2xl bg-surface-interactive hover:bg-white/15 active:scale-95 text-retro-body font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-2"
+            className="w-full py-2 px-4 rounded-lg bg-zinc-900 hover:bg-zinc-800 active:scale-[0.99] text-zinc-300 font-medium text-xs border border-zinc-800 transition-all cursor-pointer flex items-center justify-center gap-2"
           >
-            <XCircle className="w-4 h-4 text-retro-muted" />
+            <XCircle className="w-4 h-4 text-zinc-500" />
             <span>Under 18 — Exit</span>
           </button>
         </div>
@@ -81,7 +86,7 @@ export function AgeGateModal({
           <button
             type="button"
             onClick={() => { playPress(700); onOpenTos(); }}
-            className="text-[11px] text-retro-muted hover:text-retro-body underline font-medium inline-flex items-center gap-1 cursor-pointer"
+            className="text-[11px] text-zinc-500 hover:text-zinc-300 underline font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
           >
             <FileText className="w-3 h-3" />
             <span>Terms of Service &amp; Privacy Policy</span>
