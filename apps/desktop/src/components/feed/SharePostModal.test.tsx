@@ -56,7 +56,7 @@ describe('SharePostModal (P3.4)', () => {
       )
     })
     const body = JSON.parse(vi.mocked(orbitFetch).mock.calls[0][1].body as string)
-    expect(body.body).toContain('/api/posts/p-9')
+    expect(body.body).toContain('/p/p-9')
     await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringMatching(/shared/i), 'success'))
     expect(screen.getByRole('button', { name: /sent/i })).toBeInTheDocument()
   })
@@ -90,7 +90,7 @@ describe('SharePostModal (P3.4)', () => {
     )
     await userEvent.click(await screen.findByRole('button', { name: /copy link/i }))
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-      expect.stringContaining('/api/posts/p-9'),
+      expect.stringContaining('/p/p-9'),
     )
     const copied = vi.mocked(navigator.clipboard.writeText).mock.calls[0][0]
     expect(copied).not.toBe('https://goonmatch.fly.dev')

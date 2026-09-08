@@ -30,7 +30,7 @@ import { LiveCameraModal } from '../camera/LiveCameraModal';
 import { ObjectImage } from '../ObjectImage';
 import { LazyVideo } from '../LazyVideo';
 import { isMediaVideo, resolveMediaUrl } from '../../utils/media';
-import { orbitFetch } from '../../utils/api';
+import { orbitFetch, postShareUrl } from '../../utils/api';
 import { GAME_AD_TEMPLATES } from '../../utils/gameAds';
 import { ExploreSearchModal } from './ExploreSearchModal';
 import { useNow } from '../../hooks/useNow';
@@ -544,7 +544,7 @@ export function GoonMatchFeed({
 
   const handleCopyLink = (post: FeedPost) => {
     playPress(800);
-    navigator.clipboard.writeText(`https://goonmatch.fly.dev`);
+    void navigator.clipboard.writeText(postShareUrl(post.id));
     toast?.('Post link copied to clipboard!', 'success');
     setOptionsPost(null);
   };

@@ -311,6 +311,43 @@ users.get('/online', async (c) => {
   return c.json({ users, ts: Date.now() })
 })
 
+// Canonical public profile by id (GET /api/users/:id) — the target of
+// share permalinks. Registered AFTER static routes so it shadows nothing;
+// returns only public fields.
+users.get('/:id', async (c) => {
+  const id = c.req.param('id')
+  const row = await c.env.DB.prepare(
+    `SELECT id, public_key, encryption_pub_key, display_name, bio, website,
+            tags, pfp_url, last_seen, score, followers_count,
+            following_count, posts_count, likes_received, is_private, is_admin, is_moderator
+     FROM Users WHERE id = ? AND hidden_at IS NULL`,
+  ).bind(id).first<Record<string, unknown>>()
+  if (!row) return c.json({ error: 'User not found' }, 404)
+  let tags: string[] = []
+  try { tags = row.tags ? JSON.parse(String(row.tags)) : [] } catch { tags = [] }
+  return c.json({
+    user: {
+      id: row.id,
+      public_key: row.public_key,
+      encryption_pub_key: row.encryption_pub_key || undefined,
+      display_name: row.display_name,
+      bio: row.bio || '',
+      website: row.website || '',
+      tags,
+      pfp_url: row.pfp_url || undefined,
+      last_seen: row.last_seen || undefined,
+      score: row.score ?? 0,
+      followers_count: row.followers_count ?? 0,
+      following_count: row.following_count ?? 0,
+      posts_count: row.posts_count ?? 0,
+      likes_received: row.likes_received ?? 0,
+      is_private: Number(row.is_private) === 1,
+      is_admin: Number(row.is_admin) === 1,
+      is_moderator: Number(row.is_moderator) === 1,
+    },
+  })
+})
+
 users.post('/attention', async (c) => {
   const orbitId = c.get('orbitId')
   const now = new Date()

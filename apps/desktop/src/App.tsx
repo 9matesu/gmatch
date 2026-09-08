@@ -4,7 +4,7 @@ import { useSettings } from "./hooks/useSettings";
 import { useIdle } from "./hooks/useIdle";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { orbitFetch } from "./utils/api";
+import { getApiBaseUrl, orbitFetch } from "./utils/api";
 import { OrbitPeer, pollOffers } from "./utils/webrtc";
 import { saveObject, getAllObjects, deleteObject } from "./utils/storage";
 import { SendPanel } from "./components/SendPanel";
@@ -681,7 +681,8 @@ export default function Home() {
   };
 
   const handleInviteShare = async () => {
-    const inviteUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    // Packaged Electron origin is file:// — the server URL is the real door.
+    const inviteUrl = getApiBaseUrl();
     const shareData = {
       title: 'Join me on goonMatch',
       text: 'Come hang out, share cards, and see what is happening on goonMatch.',
@@ -3068,7 +3069,7 @@ export default function Home() {
                                   </div>
                                   <div className="flex items-center gap-2 rounded-lg border border-retro-border bg-retro-bg/60 px-2.5 py-2">
                                     <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-retro-muted">
-                                      {typeof window !== 'undefined' ? window.location.origin : 'goonmatch'}
+                                      {getApiBaseUrl()}
                                     </span>
                                     <button
                                       type="button"
@@ -3587,7 +3588,8 @@ export default function Home() {
                   } catch { }
                 }}
                 onCopyImageLink={(id) => {
-                  navigator.clipboard.writeText(`${window.location.origin}/?view=${id}`)
+                  // Public share page for this object — openable anywhere.
+                  navigator.clipboard.writeText(`${getApiBaseUrl()}/p/${encodeURIComponent(id)}`)
                   toast('Image link copied', 'info')
                 }}
                 onToggleFavorite={toggleFavorite}

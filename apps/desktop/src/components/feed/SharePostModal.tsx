@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import type { FeedPost } from './GoonMatchFeed';
 import { ObjectImage } from '../ObjectImage';
-import { getApiBaseUrl, orbitFetch } from '../../utils/api';
+import { orbitFetch, postShareUrl } from '../../utils/api';
 import { userFacingError } from '../../utils/userError';
 
 type IdentityLike = {
@@ -39,7 +39,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
 
   // Resolvable permalink: GET /api/posts/:id serves the post (the desktop app
   // has no public web client in 1.0 — the API URL is the ONE honest target).
-  const permalink = `${getApiBaseUrl()}/api/posts/${post.id}`;
+  const permalink = postShareUrl(post.id);
 
   // Real DM send (P3.4): server-confirmed, never a fake success toast.
   const handleSendDirectShare = async (targetId: string, targetName: string) => {
