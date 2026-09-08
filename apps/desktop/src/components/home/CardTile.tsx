@@ -112,8 +112,8 @@ export function CardTile({
     <div
       data-rarity={rarity.rarity}
       data-frame={frameType}
-      className={`metallic-card-border group select-none cursor-pointer transition-all ${
-        selected ? 'ring-2 ring-zinc-100 shadow-2xl scale-[1.03] z-10' : ''
+      className={`group select-none cursor-pointer transition-all duration-150 active:scale-[0.96] rounded-lg border border-zinc-800/90 bg-zinc-950 overflow-hidden shadow-xs hover:border-zinc-700 ${
+        selected ? 'ring-2 ring-white shadow-xl scale-[1.02] z-10' : ''
       }`}
       onClick={() => {
         if (onSelect) onSelect(item.id)
@@ -126,7 +126,7 @@ export function CardTile({
         if (onSelect && dragActive && selected === false) onSelect(item.id)
       }}
     >
-      <div className="metallic-card flex flex-col h-full" style={{ boxShadow: `inset 0 0 0 2px ${accent}` }}>
+      <div className="flex flex-col h-full rounded-[6px] overflow-hidden" style={{ boxShadow: `inset 0 0 0 1.5px ${accent}66` }}>
         {/* Top Badges */}
         <div className="absolute top-2 left-2 z-20 flex flex-wrap items-center gap-1">
           <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md border shadow-md ${rarity.badgeClass}`}>
@@ -202,17 +202,17 @@ export function CardTile({
         </div>
 
         {/* Card Info Footer */}
-        <div className="p-2.5 bg-surface-canvas/95 border-t border-zinc-800/80 backdrop-blur-md flex flex-col gap-1">
+        <div className="p-2.5 bg-zinc-950 border-t border-zinc-800/80 flex flex-col gap-1">
           <div className="flex items-center justify-between gap-1.5">
-            <div className="min-w-0 flex-1 text-[11px] font-bold text-retro-fg truncate" title={cardTitle}>
+            <div className="min-w-0 flex-1 text-[11px] font-semibold text-zinc-200 truncate" title={cardTitle}>
               {cardTitle}
             </div>
-            <div className="shrink-0 text-[10px] font-mono font-black tabular-nums" style={{ color: accent }}>
+            <div className="shrink-0 text-[10px] font-mono font-bold tabular-nums tracking-tight" style={{ color: accent }}>
               {formatGc(cardValue)}
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-2 text-[9px] font-mono text-retro-muted">
+          <div className="flex items-center justify-between gap-2 text-[9px] font-mono text-zinc-400">
             <span className="truncate">
               by{' '}
               {onOpenOwnerProfile ? (
@@ -222,16 +222,16 @@ export function CardTile({
                     e.stopPropagation()
                     onOpenOwnerProfile(item.owner_id)
                   }}
-                  className="inline font-medium cursor-pointer hover:underline hover:text-retro-fg transition-colors"
+                  className="inline font-medium cursor-pointer hover:underline hover:text-zinc-200 transition-colors"
                   title={`View ${ownerLabel}`}
                 >
                   {ownerLabel}
                 </button>
               ) : (
-                <span className="font-medium text-retro-body">{ownerLabel}</span>
+                <span className="font-medium text-zinc-300">{ownerLabel}</span>
               )}
             </span>
-            <span className="shrink-0 flex items-center gap-1 font-bold text-retro-fg">
+            <span className="shrink-0 flex items-center gap-1 font-bold text-zinc-300">
               <Heart className="w-2.5 h-2.5 fill-rose-500 text-rose-400" />
               <span>{likes}</span>
             </span>
@@ -242,7 +242,7 @@ export function CardTile({
               {itemTags.map((tag) => (
                 <span
                   key={tag}
-                  className="text-[8px] font-mono font-bold px-1.5 py-0.2 rounded bg-surface-interactive border border-border-glass text-retro-muted truncate max-w-[90px]"
+                  className="text-[8px] font-mono font-medium px-1.5 py-0.2 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 truncate max-w-[90px]"
                   style={{ color: accent }}
                 >
                   #{tag}

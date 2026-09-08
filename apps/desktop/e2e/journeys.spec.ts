@@ -39,7 +39,8 @@ test('navigation round-trip preserves idle state', async ({ page }) => {
     .not.toBe('0')
   const afterClick = await page.getByTestId('gc-balance').textContent()
   await page.getByRole('button', { name: 'Porn Games' }).click()
-  await page.getByRole('button', { name: 'Babecock · Idle' }).click()
+  // Sidebar label renamed in 38fdf4a ("Babecock · Idle" -> "IDLE CLICKER").
+  await page.getByRole('button', { name: 'IDLE CLICKER' }).click()
   await expect(stage).toBeVisible()
   expect(await page.getByTestId('gc-balance').textContent()).toBe(afterClick)
 })
@@ -56,6 +57,12 @@ test('refresh preserves the route', async ({ page }) => {
   expect(page.url()).toContain('#/grid')
 })
 
+// The PWA service worker (useNotifications registers /sw.js) caches
+// same-origin GETs in this Chromium profile; block SWs for the whole file so
+// route-abort mocks and fresh state are deterministic (affects journey 5's
+// offline simulation; others never depended on SW).
+test.use({ contextOptions: { serviceWorkers: 'block' } })
+
 // Journey 5: sources down -> offline UI with Retry -> recovery.
 test('offline card shows and retry recovers', async ({ page }) => {
   await seedApp(page)
@@ -68,19 +75,22 @@ test('offline card shows and retry recovers', async ({ page }) => {
   // Either offline (all sources failed) or empty (feed not yet pulled) is a
   // valid "not playable" stage state; both carry the Retry affordance.
   await expect(page.getByText(/sources offline|no image/i)).toBeVisible({ timeout: 30_000 })
-  await page.getByRole('button', { name: /retry/i }).click()
+  // Two retry affordances exist (OfflineCard + header button) — scope to the card.
+  await page.getByRole('status').getByRole('button', { name: /retry/i }).click()
   await expect(page.getByRole('button', { name: /attack the current foe/i })).toBeVisible({
     timeout: 30_000,
   })
 })
 
 // Navigation: back/forward buttons move between views.
+// The Admin sidebar entry was removed in db66606; the #/admin route (PIN gate)
+// stays reachable — navigate by hash, which is exactly what this journey tests.
 test('browser back/forward navigate views', async ({ page }) => {
   await seedApp(page)
   await page.goto('/#/grid')
   const stage = page.getByRole('button', { name: /attack the current foe/i })
   await expect(stage).toBeVisible({ timeout: 20_000 })
-  await page.getByRole('button', { name: 'Admin' }).click()
+  await page.goto('/#/admin')
   await expect(page.getByText('Admin Operations')).toBeVisible({ timeout: 15_000 })
   await page.goBack()
   await expect(stage).toBeVisible()

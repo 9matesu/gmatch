@@ -1,20 +1,20 @@
 /* GoonGrid idle — keyframes only (all component styling lives in Tailwind
    utilities on the JSX). Imported by GridWorkspace; referenced via Tailwind
-   arbitrary animate-[...] utilities. Chrome colors follow the Orbit shell
-   tokens; pink remains only in game-semantic keyframes (crit, HP-low). */
+   arbitrary animate-[...] utilities. Game semantics (crit, float numbers, HP-low)
+   are retained with crisp telemetry highlights. */
 
 @keyframes gg-dot-spin {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.4; transform: scale(0.75); }
 }
 
-/* Offline status dot — shell error color (was legacy pink). */
+/* Offline status dot — desaturated error token */
 @keyframes gg-dot-pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255, 112, 106, 0.5); }
-  50% { opacity: 0.7; box-shadow: 0 0 0 6px rgba(255, 112, 106, 0); }
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  50% { opacity: 0.7; box-shadow: 0 0 0 5px rgba(239, 68, 68, 0); }
 }
 
-/* Crit flash — game semantics, pink kept. */
+/* Crit flash — game semantics retained */
 @keyframes gg-crit {
   0% {
     opacity: 1;
@@ -26,6 +26,7 @@
   }
 }
 
+/* Floating number popup — crisp game telemetry */
 @keyframes gg-float-up {
   0% {
     opacity: 1;
@@ -37,7 +38,7 @@
   }
 }
 
-/* Low HP blink — game semantics. */
+/* Low HP blink — game semantics */
 @keyframes gg-hp-low {
   0%,
   100% {
@@ -48,13 +49,13 @@
   }
 }
 
-/* Affordable highlight — shell chrome cyan ↔ warning amber (was pink). */
+/* Affordable highlight — crisp monochrome zinc highlight */
 @keyframes gg-pulse {
   0%,
   100% {
-    border-color: rgba(199, 228, 255, 0.7);
+    border-color: rgba(255, 255, 255, 0.3);
   }
   50% {
-    border-color: rgba(255, 200, 87, 0.9);
+    border-color: rgba(255, 255, 255, 0.85);
   }
 }
