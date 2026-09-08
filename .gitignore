@@ -21,3 +21,4 @@ test-blobs-*/
 apps/api/test-blobs-*/
 api-stage/
 apps/desktop/release/
+.dev-storage.key

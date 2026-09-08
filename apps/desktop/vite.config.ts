@@ -4,8 +4,9 @@ import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import path from 'node:path'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { randomBytes } from 'node:crypto'
+import path, { join } from 'node:path'
 
 // Hosts the dev /px byte-proxy may fetch (allowlist — no open proxy).
 const PX_ALLOW = /(^|\.)(imhentai\.xxx|paheal\.net|tbib\.org|xbooru\.com|redgifs\.com)$/
@@ -44,9 +45,25 @@ function devApiPlugin(): Plugin {
           /* spawn below */
         }
         const apiDir = fileURLToPath(new URL('../api', import.meta.url))
+        // At-rest encryption key (apps/api/src/crypto.ts hard-requires it or
+        // every upload/PM 500s). Generate once, persist in the gitignored
+        // apps/api dir — mirrors electron/apiSidecar.cjs for packaged mode.
+        let storageKey = process.env.STORAGE_ENCRYPTION_KEY || ''
+        const keyPath = join(apiDir, '.dev-storage.key')
+        if (!/^[0-9a-f]{64}$/i.test(storageKey)) {
+          try {
+            storageKey = readFileSync(keyPath, 'utf8').trim()
+          } catch {
+            /* generate below */
+          }
+        }
+        if (!/^[0-9a-f]{64}$/i.test(storageKey)) {
+          storageKey = randomBytes(32).toString('hex')
+          try { writeFileSync(keyPath, storageKey) } catch { /* ephemeral is fine in dev */ }
+        }
         proc = spawn(bunBin(), ['run', 'src/serve.ts'], {
           cwd: apiDir,
-          env: { ...process.env, PORT: '8790' },
+          env: { ...process.env, PORT: '8790', STORAGE_ENCRYPTION_KEY: storageKey },
           stdio: ['ignore', 'pipe', 'pipe'],
         })
         proc.stdout?.on('data', (d) => console.log('[api]', d.toString().trim()))

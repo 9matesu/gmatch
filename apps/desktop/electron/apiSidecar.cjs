@@ -28,6 +28,24 @@ function bunBin() {
 }
 
 async function startApi() {
+  // At-rest encryption key for blobs/PMs (apps/api/src/crypto.ts hard-requires
+  // a 64-hex key). Generate once per install and persist in userData so a raw
+  // DB dump never yields plaintext — and so packaged host mode can take
+  // uploads without the user installing anything.
+  let storageKey = process.env.STORAGE_ENCRYPTION_KEY
+  if (!storageKey) {
+    const fs = require('node:fs')
+    const keyPath = path.join(app.getPath('userData'), 'storage.key')
+    try {
+      storageKey = fs.readFileSync(keyPath, 'utf8').trim()
+    } catch {
+      /* generate below */
+    }
+    if (!/^[0-9a-f]{64}$/i.test(storageKey || '')) {
+      storageKey = require('node:crypto').randomBytes(32).toString('hex')
+      try { fs.writeFileSync(keyPath, storageKey) } catch (e) { console.warn('[api] could not persist storage key:', e.message) }
+    }
+  }
   // Packaged (1.0, no-central-server plan): the app IS the server. Spawn the
   // BUNDLED api-stage (bun.exe + self-contained server) so nothing needs to
   // be installed on the machine. Dev keeps the repo-local sidecar path.
@@ -59,6 +77,7 @@ async function startApi() {
     env: {
       ...process.env,
       PORT: String(PORT),
+      STORAGE_ENCRYPTION_KEY: storageKey,
       SNAPSHOT_PATH: path.join(app.getPath('userData'), 'orbit.sqlite'),
       BLOB_STORE_DIR: path.join(app.getPath('userData'), 'blobs'),
     },
