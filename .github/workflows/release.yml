@@ -1,0 +1,38 @@
+name: Release
+# 1.0 portable .exe (no central server — the bundle includes its own API).
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  portable-exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install bun (needed by stage-api to copy bun.exe into the app)
+        run: npm i -g --allow-scripts=bun bun
+      - name: Install (NODE_ENV unset so dev deps install)
+        run: npm ci
+      - name: Gate — lint / typecheck / unit tests
+        env:
+          NODE_ENV: test
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run test --workspaces --if-present
+      - name: Build portable exe (icon + stage api + vite + electron-builder)
+        working-directory: apps/desktop
+        env:
+          NODE_ENV: test
+        run: npm run dist
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: apps/desktop/release/goonMatch-Grid-*-portable.exe

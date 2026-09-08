@@ -48,6 +48,13 @@ writeFileSync(apiPkgPath, JSON.stringify(apiPkg, null, 2) + '\n')
 
 cpSync(findBunExe(), join(STAGE, 'bun.exe'))
 
+// Purge any runtime data (from a previous staged-server test run) — a release
+// bundle must boot with an EMPTY world. The copy filter above already skips
+// *.sqlite in the source; this covers files created inside STAGE itself.
+for (const junk of ['orbit.snapshot.sqlite', 'orbit.snapshot.sqlite.tmp', 'blobs']) {
+  rmSync(join(STAGE, 'apps', 'api', junk), { recursive: true, force: true })
+}
+
 console.log('[stage-api] installing production deps (this can take a minute)...')
 execFileSync('npm', ['install', '--omit=dev', '--no-audit', '--no-fund', '--ignore-scripts=false'], {
   cwd: join(STAGE, 'apps', 'api'),
