@@ -272,6 +272,45 @@ users.post('/heartbeat', async (c) => {
   return c.json({ ok: true })
 })
 
+// Discovery roster: who is online RIGHT NOW (last_seen within 60s, the same
+// window `GET /api/users` uses). A joining client seeds its peer map from
+// this instead of waiting passively for a swarm event.
+users.get('/online', async (c) => {
+  const callerId = c.get('orbitId')
+  const since = new Date(Date.now() - 60_000).toISOString()
+  let rows: any[] = []
+  try {
+    const res = await c.env.DB.prepare(
+      `SELECT id, public_key, encryption_pub_key, display_name, tags, pfp_url,
+              last_seen, score, maximum_gooner
+       FROM Users
+       WHERE hidden_at IS NULL AND last_seen >= ? AND id != ?
+       ORDER BY last_seen DESC LIMIT 100`,
+    ).bind(since, callerId).all()
+    rows = res.results || []
+  } catch (err) {
+    console.warn('[users] online roster failed:', err)
+    return c.json({ error: 'roster unavailable' }, 500)
+  }
+  const users = rows.map((u) => {
+    let tags: string[] = []
+    try { tags = u.tags ? JSON.parse(u.tags) : [] } catch { tags = [] }
+    return {
+      id: u.id,
+      public_key: u.public_key,
+      encryption_pub_key: u.encryption_pub_key || undefined,
+      display_name: u.display_name,
+      tags,
+      pfp_url: u.pfp_url || undefined,
+      last_seen: u.last_seen || undefined,
+      score: u.score ?? 0,
+      maximum_gooner: u.maximum_gooner ?? 0,
+      online: true,
+    }
+  })
+  return c.json({ users, ts: Date.now() })
+})
+
 users.post('/attention', async (c) => {
   const orbitId = c.get('orbitId')
   const now = new Date()

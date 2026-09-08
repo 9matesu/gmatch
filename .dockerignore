@@ -1,0 +1,19 @@
+# Remote docker build context = repo root (see fly.toml [build]).
+**/node_modules
+**/dist
+**/coverage
+**/test-results
+**/playwright-report
+**/test-blobs-*
+**/*.sqlite
+**/*.sqlite.tmp
+**/.split_scratch
+**/.tsbuildinfo
+.git
+.github
+.hermes
+docs
+apps/desktop
+apps/api/orbit.snapshot.sqlite*
+tmp
+dist
