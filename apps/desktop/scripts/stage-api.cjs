@@ -18,8 +18,20 @@ function findBunExe() {
   const candidates = [
     join(process.env.APPDATA || '', 'npm', 'node_modules', 'bun', 'bin', 'bun.exe'),
     join(process.env.USERPROFILE || '', '.bun', 'bin', 'bun.exe'),
+    // GitHub Actions windows-latest global npm prefix
+    'C:\\npm\\prefix\\node_modules\\bun\\bin\\bun.exe',
+    join(process.env.PREFIX || '', 'node_modules', 'bun', 'bin', 'bun.exe'),
   ]
   for (const c of candidates) if (existsSync(c)) return c
+  // Last resort: resolve `bun.exe` from PATH (npm -g shims may put it there).
+  try {
+    const out = execFileSync('where.exe', ['bun.exe'], { encoding: 'utf8' }).trim()
+    const NL = String.fromCharCode(10)
+    const first = out.includes(NL) ? out.split(NL)[0].trim() : out
+    if (first.toLowerCase().endsWith('bun.exe') && existsSync(first)) return first
+  } catch {
+    /* not on PATH */
+  }
   console.error('[stage-api] bun.exe not found in standard locations.')
   console.error('[stage-api] Install it first:  npm i -g --allow-scripts=bun bun   (or: powershell -c "irm bun.sh/install/npm | irsh")')
   process.exit(1)
