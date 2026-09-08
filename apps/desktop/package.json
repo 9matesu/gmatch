@@ -76,7 +76,11 @@
     "files": [
       "electron/**/*",
       "dist/**/*",
-      "package.json"
+      "package.json",
+      {
+        "from": "../../shared/blocklist.json",
+        "to": "shared/blocklist.json"
+      }
     ],
     "asar": true,
     "win": {
