@@ -6,6 +6,11 @@ const https = require('https')
 const path = require('path')
 const imageCache = require('./imageCache.cjs')
 const apiSidecar = require('./apiSidecar.cjs')
+const serverMode = require('./server-mode.cjs')
+
+// Packaged topology (1.0, no central server): either we HOST the bundled
+// server (default) or we're a CLIENT of a friend's. Decided once at startup.
+let packagedServer = null // { mode, url } when app.isPackaged
 
 // gooncache:// serves cached picture files from the user folder.
 // Privileged (standard+secure, fetchable) so sandboxed <img> tags can use it.
@@ -527,7 +532,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      additionalArguments: [`--api-base=${app.isPackaged ? require('./release-config.cjs').serverUrl : apiSidecar.API_BASE}`],
+      additionalArguments: [`--api-base=${app.isPackaged ? (packagedServer || serverMode.readServerMode()).url : apiSidecar.API_BASE}`],
     },
   })
   win.removeMenu()
@@ -548,9 +553,43 @@ app.whenReady().then(async () => {
   ipcMain.handle('cache:image', (_event, url) => imageCache.cacheImage(url).then((local) => ({ local })))
   ipcMain.handle('cache:stats', () => imageCache.cacheStats())
   ipcMain.handle('cache:clear', () => imageCache.clearCache())
-  // 1.0 topology (hosted-only): packaged builds talk to the official server
-  // (release-config.cjs) — never spawn a local sidecar that would need bun.
-  if (!app.isPackaged) {
+  // Server-mode bridge for the Settings UI (packaged topology control).
+  ipcMain.handle('server:state', () => ({
+    packaged: app.isPackaged,
+    ...(app.isPackaged
+      ? { ...serverMode.readServerMode(), lanUrls: serverMode.lanUrls() }
+      : { mode: 'host', url: apiSidecar.API_BASE, lanUrls: serverMode.lanUrls() }),
+  }))
+  // Persist host/client choice + hand the renderer the fresh state. Switching
+  // takes effect on next launch (relaunch button in Settings does that).
+  ipcMain.handle('server:set', (_event, payload) => {
+    const mode = payload?.mode === 'client' ? 'client' : 'host'
+    try {
+      serverMode.writeServerMode(mode, String(payload?.url || ''))
+    } catch (err) {
+      return { ok: false, error: err.message }
+    }
+    return { ok: true }
+  })
+  // Apply the new mode NOW: relaunch the app (used by the Settings button).
+  ipcMain.handle('server:relaunch', () => {
+    app.relaunch()
+    app.exit(0)
+  })
+  // 1.0 topology (no central server): packaged builds ALWAYS run the bundled
+  // server (host mode, default) unless the user configured client mode in
+  // Settings. Dev keeps the repo-local sidecar path unchanged.
+  if (app.isPackaged) {
+    packagedServer = serverMode.readServerMode()
+    if (packagedServer.mode === 'host') {
+      process.env.GOONGRID_HOST_MODE = '1'
+      try {
+        await apiSidecar.startApi()
+      } catch (err) {
+        console.error('[api] bundled server start failed:', err.message)
+      }
+    }
+  } else {
     try {
       await apiSidecar.startApi()
     } catch (err) {

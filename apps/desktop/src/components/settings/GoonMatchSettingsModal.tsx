@@ -5,6 +5,7 @@ import type { AppSettings } from '../../hooks/useSettings';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { playPress, playMsgReceive } from '../../utils/sounds';
 import { useGame, MAX_USER_EXCLUDES } from '../../game/store';
+import { ServerTab } from './ServerTab';
 import {
   Settings,
   User,
@@ -21,13 +22,15 @@ import {
   ChevronUp,
   Upload,
   Rss,
+  Server,
 } from 'lucide-react';
 
 export type SettingsTabId =
   | 'preferences'
   | 'account'
   | 'feed'
-  | 'wallpaper';
+  | 'wallpaper'
+  | 'server';
 
 interface GoonMatchSettingsModalProps {
   isOpen: boolean;
@@ -163,8 +166,8 @@ export function GoonMatchSettingsModal({
   toast,
   initialTab = 'preferences',
 }: GoonMatchSettingsModalProps) {
-  const [activeTab, setActiveTab] = useState<'preferences' | 'account' | 'feed'>(() => {
-    if (initialTab === 'account' || initialTab === 'feed') return initialTab;
+  const [activeTab, setActiveTab] = useState<'preferences' | 'account' | 'feed' | 'server'>(() => {
+    if (initialTab === 'account' || initialTab === 'feed' || initialTab === 'server') return initialTab as 'account' | 'feed' | 'server';
     return 'preferences';
   });
   const [wallpaperExpanded, setWallpaperExpanded] = useState(() => initialTab === 'wallpaper');
@@ -267,10 +270,11 @@ export function GoonMatchSettingsModal({
     toast?.('Wallpaper reset to default', 'info');
   };
 
-  const navItems: { id: 'preferences' | 'account' | 'feed'; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  const navItems: { id: 'preferences' | 'account' | 'feed' | 'server'; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'preferences', label: 'Preferences', icon: Settings },
     { id: 'account', label: 'Account & Security', icon: User },
     { id: 'feed', label: 'Feed & Tags', icon: Rss },
+    { id: 'server', label: 'Server', icon: Server },
   ];
 
   return (
@@ -766,6 +770,9 @@ export function GoonMatchSettingsModal({
 
             {/* ──────── 3. FEED & TAGS ──────── */}
             {activeTab === 'feed' && <FeedSettingsTab toast={toast} />}
+
+            {/* ──────── 4. SERVER (no central server topology) ──────── */}
+            {activeTab === 'server' && <ServerTab toast={toast} />}
           </div>
         </div>
       </div>

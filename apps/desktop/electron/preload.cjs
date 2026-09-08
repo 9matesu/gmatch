@@ -10,4 +10,7 @@ contextBridge.exposeInMainWorld('goongrid', {
   cacheImage: (url) => ipcRenderer.invoke('cache:image', url),
   cacheStats: () => ipcRenderer.invoke('cache:stats'),
   clearCache: () => ipcRenderer.invoke('cache:clear'),
+  serverState: () => ipcRenderer.invoke('server:state'),
+  serverSet: (payload) => ipcRenderer.invoke('server:set', payload),
+  serverRelaunch: () => ipcRenderer.invoke('server:relaunch'),
 })

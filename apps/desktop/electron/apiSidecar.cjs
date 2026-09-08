@@ -28,19 +28,33 @@ function bunBin() {
 }
 
 async function startApi() {
+  // Packaged (1.0, no-central-server plan): the app IS the server. Spawn the
+  // BUNDLED api-stage (bun.exe + self-contained server) so nothing needs to
+  // be installed on the machine. Dev keeps the repo-local sidecar path.
+  const resourcesApi = app.isPackaged
+    ? path.join(process.resourcesPath, 'api', 'apps', 'api')
+    : null
+  const bundledBun = app.isPackaged
+    ? path.join(process.resourcesPath, 'api', 'bun.exe')
+    : null
+
+  const adoptable = !app.isPackaged || !process.env.GOONGRID_HOST_MODE
   // Adopt an already-healthy sidecar (e.g. `npm run dev` started one, or a
-  // second Electron window) instead of spawning a doomed duplicate.
-  try {
-    const r = await fetch(`${API_BASE}/api/health`)
-    if (r.ok && (await r.json()).db_ready) {
-      console.log(`[api] adopting existing sidecar at ${API_BASE}`)
-      return true
+  // second Electron window) instead of spawning a doomed duplicate. Host-mode
+  // packaged instances must own their server — never adopt a foreign one.
+  if (adoptable) {
+    try {
+      const r = await fetch(`${API_BASE}/api/health`)
+      if (r.ok && (await r.json()).db_ready) {
+        console.log(`[api] adopting existing sidecar at ${API_BASE}`)
+        return true
+      }
+    } catch {
+      /* nothing listening — spawn below */
     }
-  } catch {
-    /* nothing listening — spawn below */
   }
-  const apiDir = path.join(__dirname, '..', '..', 'api')
-  proc = spawn(bunBin(), ['run', 'src/serve.ts'], {
+  const apiDir = resourcesApi || path.join(__dirname, '..', '..', 'api')
+  proc = spawn(bundledBun || bunBin(), ['run', 'src/serve.ts'], {
     cwd: apiDir,
     env: {
       ...process.env,

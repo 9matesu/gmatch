@@ -19,3 +19,5 @@ test-results/
 playwright-report/
 test-blobs-*/
 apps/api/test-blobs-*/
+api-stage/
+apps/desktop/release/
