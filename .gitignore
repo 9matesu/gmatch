@@ -17,3 +17,5 @@ apps/api/blobs/
 coverage/
 test-results/
 playwright-report/
+test-blobs-*/
+apps/api/test-blobs-*/
