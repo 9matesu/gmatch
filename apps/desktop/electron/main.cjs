@@ -527,7 +527,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      additionalArguments: [`--api-base=${apiSidecar.API_BASE}`],
+      additionalArguments: [`--api-base=${app.isPackaged ? require('./release-config.cjs').serverUrl : apiSidecar.API_BASE}`],
     },
   })
   win.removeMenu()
@@ -548,12 +548,16 @@ app.whenReady().then(async () => {
   ipcMain.handle('cache:image', (_event, url) => imageCache.cacheImage(url).then((local) => ({ local })))
   ipcMain.handle('cache:stats', () => imageCache.cacheStats())
   ipcMain.handle('cache:clear', () => imageCache.clearCache())
-  try {
-    await apiSidecar.startApi()
-  } catch (err) {
-    // Sidecar down (e.g. bun missing): the renderer still boots and shows
-    // offline states; Grid feed works via IPC booru.
-    console.error('[api] sidecar start failed:', err.message)
+  // 1.0 topology (hosted-only): packaged builds talk to the official server
+  // (release-config.cjs) — never spawn a local sidecar that would need bun.
+  if (!app.isPackaged) {
+    try {
+      await apiSidecar.startApi()
+    } catch (err) {
+      // Sidecar down (e.g. bun missing): the renderer still boots and shows
+      // offline states; Grid feed works via IPC booru.
+      console.error('[api] sidecar start failed:', err.message)
+    }
   }
   createWindow()
   app.on('activate', () => {
