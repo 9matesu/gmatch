@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   candidateLeaksIp,
+  defaultIceConfig,
+  defaultTurn,
   iceServersFor,
   isLiteralIp,
   parseCandidate,
@@ -96,5 +98,37 @@ describe('turnCredentials + config', () => {
     expect(cfg.iceServers).toHaveLength(4)
     expect(cfg.iceTransportPolicy).toBe('relay')
     expect(iceServersFor(turn)[3]).toMatchObject({ urls: 'turn:x' })
+  })
+
+  // P2.4: packaged builds have no TURN env — without a default, cross-NAT
+  // peers silently never connect (a dead end). defaultIceConfig() adds the
+  // community relay as a candidate source; explicit env keeps the forced
+  // zero-exposure posture (SPEC §10c).
+  it('defaultTurn() provides relay creds', () => {
+    const d = defaultTurn()
+    expect(d.url).toMatch(/^turns?:/)
+    expect(d.username).toBeTruthy()
+    expect(d.credential).toBeTruthy()
+  })
+
+  it('defaultIceConfig: no env → STUN+relay candidates, NOT forced relay', () => {
+    const cfg = defaultIceConfig({})
+    expect(cfg.iceServers).toHaveLength(4)
+    expect(cfg.iceServers![3].urls).toBe(defaultTurn().url)
+    expect(cfg.iceTransportPolicy).toBeUndefined()
+  })
+
+  it('defaultIceConfig: explicit env → forced relay (zero-exposure posture)', () => {
+    const cfg = defaultIceConfig({
+      NEXT_PUBLIC_TURN_URL: 'turn:x',
+      NEXT_PUBLIC_TURN_USERNAME: 'u',
+      NEXT_PUBLIC_TURN_CREDENTIAL: 'p',
+    })
+    expect(cfg.iceTransportPolicy).toBe('relay')
+    expect(cfg.iceServers![3].urls).toBe('turn:x')
+  })
+
+  it('env contract unchanged: turnCredentials({}) is still null', () => {
+    expect(turnCredentials({})).toBeNull()
   })
 })

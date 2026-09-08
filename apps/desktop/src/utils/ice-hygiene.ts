@@ -73,6 +73,36 @@ export function turnCredentials(env: Record<string, string | undefined> = {}): {
   return null
 }
 
+/**
+ * Packaged builds have no TURN env — without a relay fallback, cross-NAT
+ * peers silently never connect (a dead end). Public community TURN as the
+ * default relay candidate source; NEXT_PUBLIC_TURN_* env always wins.
+ * NOTE: third-party, rate-limited — see SPEC §10c / plan risk #1.
+ */
+export function defaultTurn(): { url: string; username: string; credential: string } {
+  return { url: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }
+}
+
+/** TURN for a connection: explicit env first, public default otherwise. */
+export function effectiveTurn(env: Record<string, string | undefined> = {}): { url: string; username: string; credential: string } {
+  return turnCredentials(env) ?? defaultTurn()
+}
+
+/**
+ * The config both P2P stacks use. Two modes (SPEC §10c semantics kept):
+ * - explicit NEXT_PUBLIC_TURN_* env → relay-forced, zero IP exposure posture.
+ * - otherwise → STUN + community default TURN as candidate sources WITHOUT
+ *   forcing relay: same-LAN pairs connect directly and a community-relay
+ *   outage cannot take all P2P down. Outgoing candidates are still
+ *   sanitized (no literal IPs, no srflx onward), so the peer never learns
+ *   anyone's public address either way.
+ */
+export function defaultIceConfig(env: Record<string, string | undefined> = {}): RTCConfiguration {
+  const envTurn = turnCredentials(env)
+  if (envTurn) return peerConnectionConfig(envTurn)
+  return { ...peerConnectionConfig(null), iceServers: iceServersFor(defaultTurn()) }
+}
+
 /** ICE server list: STUN always; TURN only when configured. */
 export function iceServersFor(turn: { url: string; username: string; credential: string } | null): RTCIceServer[] {
   const servers = [...STUN_SERVERS]
