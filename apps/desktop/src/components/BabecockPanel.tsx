@@ -549,16 +549,16 @@ export function BabecockPanel({
 
       {/* Invites Banner */}
       {invites.length > 0 && (
-        <div className="bg-cyan-500/10/80 border border-cyan-500/30 rounded-2xl p-3.5 space-y-2">
-          <div className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
-            <Mail className="w-3.5 h-3.5 text-cyan-300" />
+        <div className="bg-zinc-900/90 border border-zinc-800 rounded-lg p-3.5 space-y-2">
+          <div className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
+            <Mail className="w-3.5 h-3.5 text-zinc-400" />
             <span>Babecock Invitations ({invites.length})</span>
           </div>
           <div className="space-y-1.5">
             {invites.map((inv) => (
-              <div key={inv.id} className="flex items-center justify-between gap-2 p-2 bg-surface-raised border border-purple-100 rounded-xl text-xs shadow-xs">
-                <span className="text-retro-body">
-                  <strong className="text-retro-fg">{inv.host_name || 'Someone'}</strong> invited you to their round!
+              <div key={inv.id} className="flex items-center justify-between gap-2 p-2.5 bg-zinc-950 border border-zinc-800 rounded-md text-xs shadow-xs">
+                <span className="text-zinc-300">
+                  <strong className="text-zinc-100 font-medium">{inv.host_name || 'Someone'}</strong> invited you to their round!
                 </span>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
@@ -567,14 +567,14 @@ export function BabecockPanel({
                       void dismissInvite(inv.id)
                       openModal('join')
                     }}
-                    className="px-3 py-1 bg-cyan-500 text-white font-bold text-[11px] rounded-lg hover:bg-cyan-600 cursor-pointer shadow-xs"
+                    className="px-3 py-1 bg-white text-zinc-950 hover:bg-zinc-200 font-semibold text-[11px] rounded-md transition-all duration-150 active:scale-[0.96] shadow-xs cursor-pointer"
                   >
                     Join
                   </button>
                   <button
                     type="button"
                     onClick={() => dismissInvite(inv.id)}
-                    className="p-1 text-retro-muted hover:text-retro-body rounded-lg cursor-pointer"
+                    className="p-1 text-zinc-400 hover:text-zinc-200 rounded-md cursor-pointer transition-colors"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -586,15 +586,15 @@ export function BabecockPanel({
       )}
 
       {/* Live Round Section */}
-      <div className="bg-surface-raised border border-border-glass rounded-2xl overflow-hidden shadow-xs">
-        <div className="flex items-center justify-between px-4 py-3.5 bg-surface-interactive border-b border-border-glass">
+      <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg overflow-hidden shadow-xs">
+        <div className="flex items-center justify-between px-4 py-3 bg-zinc-900/80 border-b border-zinc-800">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center text-orange-600">
+            <div className="w-7 h-7 rounded-md bg-zinc-800 border border-zinc-700 flex items-center justify-center text-amber-400">
               <Flame className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-xs font-black text-retro-fg uppercase tracking-wider">Live Babecock</h2>
-              <p className="text-[10px] text-retro-muted font-sans">
+              <h2 className="text-xs font-semibold text-zinc-100">Live Babecock</h2>
+              <p className="text-[10px] text-zinc-400 font-sans">
                 {round
                   ? `Hosted by ${round.host_name || 'Anonymous'} — ${round.entries.length} entr${round.entries.length === 1 ? 'y' : 'ies'}`
                   : 'No round running right now'}
@@ -604,18 +604,18 @@ export function BabecockPanel({
 
           <div className="flex items-center gap-2">
             {round && (
-              <span className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg border flex items-center gap-1 ${secsLeft > 0 ? 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse' : 'text-retro-muted border-border-glass'
+              <span className={`px-2.5 py-1 text-xs font-mono font-semibold rounded-md border flex items-center gap-1 ${secsLeft > 0 ? 'bg-red-500/10 text-red-400 border-red-500/30' : 'text-zinc-500 border-zinc-800'
                 }`}>
                 <Clock className="w-3 h-3" />
                 <span>{secsLeft > 0 ? fmt(secsLeft) : 'CLOSED'}</span>
               </span>
             )}
             {round && round.entries.length > 1 && (
-              <div className="flex bg-surface-interactive p-0.5 rounded-lg border border-border-glass text-[10px] font-semibold">
+              <div className="flex bg-zinc-950 p-0.5 rounded-md border border-zinc-800 text-[10px] font-medium">
                 <button
                   type="button"
                   onClick={() => setViewLayout('collage')}
-                  className={`px-2 py-0.5 rounded-md cursor-pointer ${viewLayout === 'collage' ? 'bg-surface-raised text-retro-fg shadow-xs font-bold' : 'text-retro-muted'}`}
+                  className={`px-2 py-0.5 rounded cursor-pointer transition-all duration-150 active:scale-[0.96] ${viewLayout === 'collage' ? 'bg-zinc-800 text-zinc-100 shadow-xs font-semibold' : 'text-zinc-400 hover:text-zinc-200'}`}
                   title="Collage Grid"
                 >
                   <Grid className="w-3 h-3 inline mr-1" />
@@ -624,7 +624,7 @@ export function BabecockPanel({
                 <button
                   type="button"
                   onClick={() => setViewLayout('strip')}
-                  className={`px-2 py-0.5 rounded-md cursor-pointer ${viewLayout === 'strip' ? 'bg-surface-raised text-retro-fg shadow-xs font-bold' : 'text-retro-muted'}`}
+                  className={`px-2 py-0.5 rounded cursor-pointer transition-all duration-150 active:scale-[0.96] ${viewLayout === 'strip' ? 'bg-zinc-800 text-zinc-100 shadow-xs font-semibold' : 'text-zinc-400 hover:text-zinc-200'}`}
                   title="Strip View"
                 >
                   <Layers className="w-3 h-3 inline mr-1" />
@@ -635,7 +635,7 @@ export function BabecockPanel({
             <button
               type="button"
               onClick={() => setLiveOpen((v) => !v)}
-              className="p-1 text-retro-muted hover:text-retro-body cursor-pointer"
+              className="p-1 text-zinc-400 hover:text-zinc-200 rounded-md cursor-pointer transition-colors"
             >
               {liveOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             </button>
