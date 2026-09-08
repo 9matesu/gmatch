@@ -683,12 +683,9 @@ export function GoonMatchFeed({
                             type="button"
                             onClick={() => {
                               playPress(850);
-                              if (post.game_mode === 'patrol') onOpenModPatrol?.();
-                              else if (post.game_mode === 'duel') onOpenArcade?.();
-                              else if (post.game_mode === 'ranks') onOpenRanks?.();
-                              else if (post.game_mode === 'store') onOpenStore?.();
-                              else if (post.game_mode === 'coffee') window.open('https://buymeacoffee.com/stacksondeck', '_blank');
-                              else onOpenArcade?.();
+                              // Single router prop for game ads (restored after
+                              // the vercel-style refactor dropped these handlers).
+                              onOpenGameAd?.(post.game_mode || 'duel');
                             }}
                             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-zinc-950 font-bold text-xs uppercase tracking-wider hover:bg-zinc-100 transition-transform active:scale-95 shadow-lg"
                           >
