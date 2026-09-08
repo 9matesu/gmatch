@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Heart, Clock, User, Tag, TrendingUp, History, Coins, ChevronUp, ChevronDown } from 'lucide-react';
 import { orbitFetch } from '../utils/api';
+import { userFacingError } from '../utils/userError';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { computeCashoutPayout, clampCashoutRateBps, DEFAULT_CASHOUT_RATE_BPS, formatGc } from '@orbit/shared';
 
@@ -55,6 +56,11 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
   const [cashingOut, setCashingOut] = useState(false);
   const [confirmCashout, setConfirmCashout] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(true);
+  const [listPrice, setListPrice] = useState('');
+  const [marketBusy, setMarketBusy] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferUsers, setTransferUsers] = useState<Array<{ id: string; display_name?: string; online?: boolean }>>([]);
+  const [transferTarget, setTransferTarget] = useState<string | null>(null);
   const inflightRef = useRef(false);
 
   const refreshCardData = useCallback(async (initial: boolean) => {
@@ -148,6 +154,53 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
       cashed_out: 'text-amber-400',
     };
     return colors[event] || 'text-retro-muted';
+  };
+
+  // One mutation path for list/cancel/transfer (DRY): POST, honest toast,
+  // card + history reload from the server response. No fake success.
+  const mutateCard = async (
+    action: 'list' | 'cancel' | 'transfer',
+    body?: Record<string, unknown>,
+    okMsg?: string,
+  ): Promise<boolean> => {
+    if (!identity || !card || marketBusy) return false;
+    setMarketBusy(true);
+    try {
+      const res = await orbitFetch(`/api/cards/${card.id}/${action}`, {
+        method: 'POST',
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      }, identity);
+      const data = await res.json().catch(() => ({}) as { error?: string; card?: CardRecord });
+      if (!res.ok) {
+        toast?.(userFacingError(null, { status: res.status, fallback: data.error || 'Operation failed' }), 'error');
+        return false;
+      }
+      toast?.(okMsg || 'Done!', 'success');
+      if (data.card) setCard(data.card);
+      window.dispatchEvent(new CustomEvent('orbit-cards-refresh'));
+      window.dispatchEvent(new CustomEvent('orbit-score-refresh'));
+      return true;
+    } catch (e: unknown) {
+      toast?.(userFacingError(e, { fallback: 'Network error — try again' }), 'error');
+      return false;
+    } finally {
+      setMarketBusy(false);
+    }
+  };
+
+  const openTransferPicker = async () => {
+    if (!identity) return;
+    setTransferOpen(true);
+    setTransferTarget(null);
+    try {
+      const res = await orbitFetch('/api/users', {}, identity);
+      if (res.ok) {
+        const all = await res.json();
+        setTransferUsers((Array.isArray(all) ? all : []).filter((u: { id: string }) => u.id !== identity.orbitId));
+      }
+    } catch {
+      toast?.('Could not load players to transfer to', 'error');
+    }
   };
 
   const handleCashOut = async () => {
@@ -466,33 +519,49 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
                   <div className="flex gap-3">
                     {card.marketStatus === 'none' && (
                       <button
-                        onClick={() => {
-                          toast?.('List for sale feature coming soon', 'info');
-                        }}
-                        className="flex-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 font-semibold py-2 px-4 rounded-lg transition-colors"
+                        type="button"
+                        disabled={marketBusy || !/^\d+$/.test(listPrice) || Number(listPrice) <= 0}
+                        onClick={() => { void mutateCard('list', { price: Number(listPrice) }, `Listed for ${formatGc(Number(listPrice))} g$`) }}
+                        className="flex-1 bg-cyan-500/20 hover:bg-cyan-500/30 disabled:opacity-40 text-cyan-300 font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer"
                       >
                         List for Sale
                       </button>
                     )}
                     {card.marketStatus === 'listed' && (
                       <button
-                        onClick={() => {
-                          toast?.('Cancel listing feature coming soon', 'info');
-                        }}
-                        className="flex-1 bg-red-500/20 hover:bg-red-500/30 text-red-300 font-semibold py-2 px-4 rounded-lg transition-colors"
+                        type="button"
+                        disabled={marketBusy}
+                        onClick={() => { void mutateCard('cancel', undefined, 'Listing cancelled') }}
+                        className="flex-1 bg-red-500/20 hover:bg-red-500/30 disabled:opacity-40 text-red-300 font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer"
                       >
                         Cancel Listing
                       </button>
                     )}
                     <button
-                      onClick={() => {
-                        toast?.('Transfer feature coming soon', 'info');
-                      }}
-                      className="flex-1 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 font-semibold py-2 px-4 rounded-lg transition-colors"
+                      type="button"
+                      disabled={marketBusy}
+                      onClick={() => { void openTransferPicker() }}
+                      className="flex-1 bg-purple-500/20 hover:bg-purple-500/30 disabled:opacity-40 text-purple-300 font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer"
                     >
                       Transfer
                     </button>
                   </div>
+
+                  {card.marketStatus === 'none' && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-retro-muted" htmlFor="card-list-price">List price (g$)</label>
+                      <input
+                        id="card-list-price"
+                        name="list price"
+                        type="number"
+                        min={1}
+                        aria-label="List price in g$"
+                        value={listPrice}
+                        onChange={(e) => setListPrice(e.target.value)}
+                        className="flex-1 bg-surface-raised border border-border-glass focus:border-retro-accent/60 px-3 py-2 text-xs text-retro-fg rounded-lg outline-none font-mono"
+                      />
+                    </div>
+                  )}
 
                   {card.marketStatus === 'none' && (
                     <div className="bg-surface-elevated/50 rounded-lg p-4 border border-amber-500/20">
@@ -546,6 +615,59 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
           )}
         </div>
       </div>
+
+      {/* Transfer picker (P3.3) — pick a player, confirm, real API call. */}
+      {transferOpen && card && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setTransferOpen(false)}
+        >
+          <div
+            className="bg-surface-raised w-full max-w-sm rounded-2xl border border-border-glass p-4 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-bold text-retro-fg">Transfer “{card.name || 'card'}” to…</h3>
+            <div className="max-h-60 overflow-y-auto space-y-1">
+              {transferUsers.length === 0 && (
+                <p className="text-xs text-retro-muted">No other players found yet.</p>
+              )}
+              {transferUsers.map((u) => (
+                <button
+                  key={u.id}
+                  type="button"
+                  onClick={() => setTransferTarget(u.id)}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    transferTarget === u.id ? 'bg-purple-500/25 text-purple-200' : 'hover:bg-white/5 text-retro-fg'
+                  }`}
+                >
+                  {u.display_name || u.id.slice(0, 12)}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setTransferOpen(false)}
+                className="px-3 py-1.5 text-xs text-retro-muted hover:text-retro-fg"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!transferTarget || marketBusy}
+                onClick={async () => {
+                  if (!transferTarget) return
+                  const ok = await mutateCard('transfer', { to_user_id: transferTarget }, 'Card transferred')
+                  if (ok) setTransferOpen(false)
+                }}
+                className="px-3 py-1.5 rounded-lg bg-purple-500/30 hover:bg-purple-500/40 disabled:opacity-40 text-purple-200 text-xs font-bold"
+              >
+                Confirm transfer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
