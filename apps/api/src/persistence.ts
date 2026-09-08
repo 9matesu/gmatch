@@ -39,6 +39,10 @@ export async function snapshotDb(db: Client, path: string): Promise<void> {
   if (!path) return
   await mkdir(dirname(path), { recursive: true }).catch(() => {})
   const tmp = `${path}.tmp`
+  // A .tmp left by a crash would make VACUUM INTO fail FOREVER (it refuses
+  // existing files) — silently freezing persistence. Clear it first.
+  const { rm } = await import('node:fs/promises')
+  await rm(tmp, { force: true }).catch(() => {})
   await db.execute(`VACUUM INTO '${quotePath(tmp)}'`)
   await rename(tmp, path)
 }

@@ -49,6 +49,8 @@ async function publishPost(page: import('@playwright/test').Page, caption: strin
   await page.getByPlaceholder('Write a caption...').fill(caption)
   await page.getByRole('button', { name: 'Share', exact: true }).click()
   await expect(page.getByText('Post shared to goonMatch!')).toBeVisible({ timeout: 20_000 })
+  await page.waitForTimeout(3500) // outlast the 3s orbitFetch GET cache
+  await page.reload()
   await expect(page.getByText(caption).first()).toBeVisible({ timeout: 20_000 })
 }
 
@@ -62,8 +64,10 @@ test('journey 2: like + comment round trip on a post', async ({ page }) => {
   const caption = `comment target ${Date.now()}`
   await publishPost(page, caption)
   await page.locator('button[aria-label="Like post"]').first().click()
+  // Comment button opens the post lightbox; the lightbox carries its own
+  // comment composer (CommentsModal's placeholder lives in the DM/chat sheet).
   await page.locator('button[aria-label="Comment"]').first().click()
-  const box = page.getByPlaceholder('Add a comment for this post...')
+  const box = page.getByPlaceholder('Add a comment...')
   await expect(box).toBeVisible({ timeout: 15_000 })
   const text = `e2e comment ${Date.now()}`
   await box.fill(text)
@@ -104,10 +108,11 @@ test('journey 4: view a post author profile from the feed', async ({ page }) => 
   const caption = `profile probe ${Date.now()}`
   await publishPost(page, caption)
   await page.getByText(caption).first().click() // open the post lightbox
-  const author = page.getByRole('button', { name: /E2E Tester/i }).first()
+  // Author name comes from the server Users row (default-generated name).
+  const author = page.getByRole('button', { name: /User_|E2E Tester/i }).first()
   await expect(author).toBeVisible({ timeout: 15_000 })
   await author.click()
-  await expect(page.getByText(/@/).first()).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByText(/Follow|posts/i).first()).toBeVisible({ timeout: 15_000 })
 })
 
 test('journey 5: store renders priced items from the server', async ({ page }) => {
