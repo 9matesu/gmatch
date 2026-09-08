@@ -76,11 +76,7 @@
     "files": [
       "electron/**/*",
       "dist/**/*",
-      "package.json",
-      {
-        "from": "../../shared/blocklist.json",
-        "to": "shared/blocklist.json"
-      }
+      "package.json"
     ],
     "asar": true,
     "win": {
@@ -94,6 +90,10 @@
       {
         "from": "../../api-stage",
         "to": "api"
+      },
+      {
+        "from": "../../shared/blocklist.json",
+        "to": "shared/blocklist.json"
       }
     ]
   },

@@ -23,8 +23,13 @@ protocol.registerSchemesAsPrivileged([
 
 // Defense-in-depth: enforce the SPEC §8 blocklist on incoming queries too.
 // Single source of truth: shared/blocklist.json at the repo root (imported
-// by src/game/tagFilter.ts and the desktop electron main alike).
-const { blocklist } = require('../../../shared/blocklist.json')
+// by src/game/tagFilter.ts and the desktop electron main alike). Resolved at
+// runtime because in packaged builds it ships as extraResources (a relative
+// require from inside app.asar would escape the archive).
+const blocklistPath = app.isPackaged
+  ? path.join(process.resourcesPath, 'shared', 'blocklist.json')
+  : path.join(__dirname, '..', '..', '..', 'shared', 'blocklist.json')
+const { blocklist } = require(blocklistPath)
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
