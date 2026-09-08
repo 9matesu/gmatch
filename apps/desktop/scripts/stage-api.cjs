@@ -50,6 +50,11 @@ rmSync(STAGE, { recursive: true, force: true })
 mkdirSync(join(STAGE, 'apps'), { recursive: true })
 mkdirSync(join(STAGE, 'packages'), { recursive: true })
 
+// Stage-root marker package.json: stops npm's walk-up to the real workspace
+// root (which would make it reconcile this subdir against the monorepo's
+// lockfile and crash arborist on rewritten file: deps).
+writeFileSync(join(STAGE, 'package.json'), JSON.stringify({ name: 'goongrid-api-stage', private: true }, null, 2) + '\n')
+
 cpSync(join(ROOT, 'packages', 'crypto'), join(STAGE, 'packages', 'crypto'), { recursive: true, filter: (s) => !s.includes('node_modules') })
 cpSync(join(ROOT, 'packages', 'shared'), join(STAGE, 'packages', 'shared'), { recursive: true, filter: (s) => !s.includes('node_modules') })
 cpSync(join(ROOT, 'apps', 'api'), join(STAGE, 'apps', 'api'), {
@@ -66,6 +71,9 @@ for (const name of Object.keys(apiPkg.dependencies || {})) {
   }
 }
 writeFileSync(apiPkgPath, JSON.stringify(apiPkg, null, 2) + '\n')
+// The monorepo lockfile does not know about these rewritten file: links —
+// keeping it in the stage is what crashes npm 10 (arborist edgesOut).
+rmSync(join(STAGE, 'apps', 'api', 'package-lock.json'), { force: true })
 
 cpSync(findBunExe(), join(STAGE, 'bun.exe'))
 
