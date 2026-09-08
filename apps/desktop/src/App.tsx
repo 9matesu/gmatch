@@ -2755,6 +2755,7 @@ export default function Home() {
                 balance={myUser?.balance ?? 0}
                 score={myUser?.score ?? 0}
                 reputation={myUser?.reputation ?? 0}
+                wsConnected={isWsConnected}
               />
               <div
                 className={`hidden md:flex shrink-0 min-h-0 overflow-hidden transition-[width] duration-300 ease-out ${chatOpen ? 'w-[min(42rem,42vw)]' : 'w-0'}`}

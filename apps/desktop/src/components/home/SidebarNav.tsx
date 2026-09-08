@@ -59,6 +59,7 @@ export function SidebarNav({
   balance = 0,
   score = 0,
   reputation = 0,
+  wsConnected = false,
 }: {
   mainView?: MainViewType;
   setMainView?: (view: MainViewType) => void;
@@ -80,6 +81,8 @@ export function SidebarNav({
   balance?: number;
   score?: number;
   reputation?: number;
+  /** Live swarm-socket state — never silent: online / reconnecting always shows. */
+  wsConnected?: boolean;
 }) {
   const [now, setNow] = useState(() => Date.now());
   const [discordUrl, setDiscordUrl] = useState<string | null>(DEFAULT_DISCORD_URL);
@@ -332,6 +335,24 @@ export function SidebarNav({
               <span className="font-medium transition-colors">Support</span>
             )}
           </a>
+        </div>
+      </div>
+
+      {/* Connection state pill — the no-dead-end rule: the user always knows
+          whether the swarm socket is live or reconnecting (P2.3). */}
+      <div className="px-2 pt-2 shrink-0">
+        <div
+          role="status"
+          aria-label={wsConnected ? 'Connected' : 'Reconnecting'}
+          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[10px] font-medium ${
+            wsConnected
+              ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400'
+              : 'bg-amber-500/5 border-amber-500/20 text-amber-400'
+          } ${collapsed ? 'justify-center' : ''}`}
+          title={wsConnected ? 'Swarm connected' : 'Swarm reconnecting…'}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${wsConnected ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
+          {!collapsed && <span className="font-mono tracking-tight">{wsConnected ? 'ONLINE' : 'RECONNECTING…'}</span>}
         </div>
       </div>
 
