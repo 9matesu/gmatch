@@ -2,17 +2,22 @@
 
 import { useEffect, useState } from 'react';
 import type { OrbitIdentity } from '@orbit/crypto';
-import { ArrowLeft, ArrowRight, Check, Sparkles } from 'lucide-react';
-import { saveUserProfile, profileIsComplete } from '../utils/profile';
-import { useGame } from '../game/store';
-import { ProfileSetupForm } from '../components/profile/ProfileSetupForm';
-import { FeedTuneStep } from './FeedTuneStep';
-import { GoonMatchLoginPage } from '../components/auth/GoonMatchLoginPage';
 import {
-  ONBOARDING_STEPS,
+  ShieldAlert,
+  Lock,
+  Scale,
+  FileText,
+  Dices,
+  KeyRound,
+  ArrowRight,
+  Sparkles,
+  CheckCircle2,
+} from 'lucide-react';
+import { saveUserProfile } from '../utils/profile';
+import { useGame, SETUP_TAG_COUNT } from '../game/store';
+import { playPress, playWin } from '../utils/sounds';
+import {
   type OnboardingState,
-  type OnboardingStep,
-  completeStep,
   isOnboardingComplete,
   onboardingStorageKey,
   readOnboardingState,
@@ -30,22 +35,19 @@ interface Props {
   onProfileUpdated: (profile: Profile) => void;
   onComplete: () => void;
   onOpenTos: () => void;
-  /** Tag suggestions fed from the user's own in-game (post) tags. */
   tagSuggestions?: string[];
 }
 
-const STEP_COPY: Record<OnboardingStep, { title: string; description: string }> = {
-  welcome: { title: 'Share. Play. Goon. Edge.', description: 'goonMatch is our ~pornify~ everything microniche fetish. A social media for porn addicts, but as a game.' },
-  auth: { title: 'Assign a identity', description: 'Your identity keeps your profile, cards, and progress together.' },
-  profile: { title: 'Make your profile yours', description: 'Choose a name and a few tags so the feed feels relevant.' },
-  platform: { title: 'How goonMatch works', description: 'The feed is social, cards capture recognition, and games put your collection to work.' },
-  feed: { title: 'The feed is your starting point', description: 'Share porn, discover other perverts, and react to posts you enjoy.' },
-  tune: { title: 'Tune your feed', description: 'Pick exactly 4 starter tags — they steer every fetch. Each one is checked live before you start, and you can add extra excludes.' },
-  cards: { title: 'Likes build recognition', description: 'Likes show appreciation. Cards carry content into the game system. They are not the same as g$.' },
-  economy: { title: 'g$ powers the game', description: 'Use g$ for supported cards, trades, and power-ups.' },
-  games: { title: 'Bring your cards to games', description: 'Build a deck, enter a round, react to cards, and enjoy trading cards, you bastard!.' },
-  ready: { title: "You're ready", description: 'Your account is set up and your first game is waiting. Remember to keep it chill.' },
-};
+function generateRandomHandle(): string {
+  const prefixes = ['Cyber', 'Shadow', 'Neon', 'Velvet', 'Midnight', 'Pulse', 'Hyper', 'Ghost', 'Silk', 'Echo', 'Vortex', 'Static'];
+  const suffixes = ['Gooner', 'Voyeur', 'Phantom', 'Drifter', 'Rider', 'Specter', 'Seeker', 'Nomad', 'Gridder'];
+  const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+  const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
+  const num = Math.floor(100 + Math.random() * 900);
+  return `${prefix}${suffix}_${num}`;
+}
+
+const DEFAULT_STARTER_TAGS = ['solo', 'anal', 'milf', 'blowjob'];
 
 export function OnboardingFlow({
   identity,
@@ -55,182 +57,302 @@ export function OnboardingFlow({
   onProfileUpdated,
   onComplete,
   onOpenTos,
-  tagSuggestions = [],
 }: Props) {
   const identityId = identity?.orbitId || null;
-  const [state, setState] = useState<OnboardingState>(() => {
-    return readOnboardingState(identityId);
+  const [state, setState] = useState<OnboardingState>(() => readOnboardingState(identityId));
+
+  // Form states
+  const [name, setName] = useState(() => {
+    if (initialProfile.displayName && !isDefaultPeerName(initialProfile.displayName)) {
+      return initialProfile.displayName;
+    }
+    return generateRandomHandle();
   });
-  const [stateKey, setStateKey] = useState(onboardingStorageKey(identityId));
-  const [name, setName] = useState(initialProfile.displayName);
-  const [tags, setTags] = useState<string[]>(initialProfile.tags);
-  const [pfpUrl, setPfpUrl] = useState(initialProfile.pfpUrl || '');
+  const [isImporting, setIsImporting] = useState(false);
+  const [secretKey, setSecretKey] = useState('');
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
+  // Handle returning users / migration
   useEffect(() => {
     if (!identity) return;
-    const nextKey = onboardingStorageKey(identityId);
     const nextState = readOnboardingState(identityId);
     const anonymous = readOnboardingState(null);
     let migrated = nextState;
 
-    // Migrate anonymous progress when identity-scoped state is empty
-    if (nextState.completed.length === 0 && anonymous.completed.includes('welcome')) {
+    if (nextState.completed.length === 0 && anonymous.completed.includes('ready')) {
       migrated = {
-        ...nextState,
-        completed: Array.from(new Set([...anonymous.completed, 'auth'])) as OnboardingStep[],
-        current: 'profile',
+        version: 1,
+        completed: ['welcome', 'ready'],
+        current: 'ready',
       };
-    }
-    // Returning authenticated user with no onboarding history -> treat as complete only if not default peer name
-    else if (nextState.completed.length === 0 && anonymous.completed.length === 0) {
-      if (isDefaultPeerName(initialProfile.displayName)) {
+    } else if (nextState.completed.length === 0 && anonymous.completed.length === 0) {
+      if (!isDefaultPeerName(initialProfile.displayName)) {
         migrated = {
-          ...nextState,
-          completed: ['welcome', 'auth'],
-          current: 'profile',
-        };
-      } else {
-        migrated = {
-          ...nextState,
-          completed: [...ONBOARDING_STEPS] as OnboardingStep[],
+          version: 1,
+          completed: ['welcome', 'ready'],
           current: 'ready',
         };
       }
-    } else if (isDefaultPeerName(initialProfile.displayName) && isOnboardingComplete(nextState)) {
-      migrated = {
-        ...nextState,
-        completed: nextState.completed.filter((s) => s !== 'profile' && s !== 'ready'),
-        current: 'profile',
-      };
     }
 
     if (migrated !== nextState) {
       writeOnboardingState(identityId, migrated);
       setState(migrated);
     }
-    setStateKey(nextKey);
-  }, [identity, identityId]);
+  }, [identity, identityId, initialProfile.displayName]);
 
-  useEffect(() => {
-    setName(initialProfile.displayName);
-    setTags(initialProfile.tags);
-    setPfpUrl(initialProfile.pfpUrl || '');
-  }, [initialProfile.displayName, initialProfile.tags, initialProfile.pfpUrl]);
-
+  // Sync state changes to storage
   useEffect(() => {
     writeOnboardingState(identityId, state);
   }, [identityId, state]);
 
-  const step = state.current;
-  const stepIndex = ONBOARDING_STEPS.indexOf(step);
-  const copy = STEP_COPY[step];
-  const canBack = stepIndex > 0 && step !== 'auth' && step !== 'profile' && !busy;
-  // The tune step unlocks forward only once the idle store has the 4 live
-  // starter picks (mirrors the legacy SetupScreen's `ready` gate).
-  const feedTuned = useGame((s) => s.setupComplete);
+  if (isOnboardingComplete(state)) return null;
 
-  const advance = (stepToComplete: OnboardingStep = step) => {
-    const next = completeStep(state, stepToComplete);
-    setState(next);
-    if (next.current === 'ready' && next.completed.includes('ready')) {
-      writeOnboardingState(identityId, next);
-      onComplete();
-    }
+  const handleRandomize = () => {
+    playPress(500);
+    setName(generateRandomHandle());
   };
 
-  const back = () => {
-    if (!canBack) return;
-    const previous = ONBOARDING_STEPS[Math.max(0, stepIndex - 1)];
-    setState((current) => ({ ...current, current: previous }));
-  };
+  const handleEnter = async () => {
+    if (!ageConfirmed || busy) return;
+    const effectiveName = name.trim() || generateRandomHandle();
 
-  const saveProfile = async () => {
-    if (!identity || !profileIsComplete(name, tags, pfpUrl)) return;
     setBusy(true);
     setError('');
+
     try {
-      const res = await saveUserProfile(identity, {
-        display_name: name.trim(),
-        tags,
-        pfp_url: pfpUrl.trim() || undefined,
-      });
-      if (!res.ok) throw new Error('Profile could not be saved');
-      const nextProfile = { displayName: name.trim(), tags, pfpUrl: pfpUrl.trim() || undefined };
-      onProfileUpdated(nextProfile);
-      advance('profile');
+      // 1. Confirm age verification in localStorage
+      try {
+        localStorage.setItem('goonMatch_age_verified', 'true');
+      } catch {}
+
+      // 2. Ensure feed / game starter tags are provisioned
+      if (!useGame.getState().setupComplete) {
+        const userTags = initialProfile.tags.filter(Boolean);
+        const starterTags = Array.from(new Set([...userTags, ...DEFAULT_STARTER_TAGS])).slice(0, SETUP_TAG_COUNT);
+        useGame.getState().completeSetup(starterTags, []);
+      }
+
+      // 3. Authenticate or create account
+      if (isImporting) {
+        if (!secretKey.trim()) {
+          throw new Error('Please enter your exported secret key');
+        }
+        await onLogin(effectiveName, initialProfile.tags.join(','), secretKey.trim(), initialProfile.pfpUrl);
+      } else if (!identity) {
+        await onCreateAccount(effectiveName, initialProfile.tags.join(','), initialProfile.pfpUrl);
+      } else {
+        await saveUserProfile(identity, { display_name: effectiveName });
+        onProfileUpdated({ displayName: effectiveName, tags: initialProfile.tags, pfpUrl: initialProfile.pfpUrl });
+      }
+
+      playWin();
+
+      // 4. Mark complete
+      const nextState: OnboardingState = {
+        version: 1,
+        completed: ['welcome', 'ready'],
+        current: 'ready',
+      };
+      writeOnboardingState(identityId, nextState);
+      setState(nextState);
+      onComplete();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Profile could not be saved');
+      setError(cause instanceof Error ? cause.message : 'Could not complete setup');
     } finally {
       setBusy(false);
     }
   };
 
-  if (isOnboardingComplete(state)) return null;
-
   return (
-    <div className="fixed inset-0 z-[99990] overflow-y-auto bg-[#080A0D] text-retro-fg font-sans">
-      <div className="min-h-[100dvh] max-w-6xl mx-auto px-4 py-6 sm:py-10 flex flex-col justify-center">
-        <div className="mb-6 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
-            <Sparkles className="w-4 h-4 text-retro-accent" /> goonMatch setup
-          </div>
-          <span className="text-xs text-retro-muted">Step {Math.min(stepIndex + 1, ONBOARDING_STEPS.length)} of {ONBOARDING_STEPS.length}</span>
-        </div>
-
-        <div className="h-1 bg-white/10 rounded-full mb-6 overflow-hidden">
-          <div className="h-full bg-retro-accent transition-all" style={{ width: `${((stepIndex + 1) / ONBOARDING_STEPS.length) * 100}%` }} />
-        </div>
-
-        {step === 'auth' && !identity ? (
-          <GoonMatchLoginPage onLogin={onLogin} onCreateAccount={onCreateAccount} onOpenTos={onOpenTos} tagSuggestions={tagSuggestions} />
-        ) : step === 'auth' && identity ? (
-          null
-        ) : (
-          <section className="glass-panel p-6 sm:p-10 max-w-2xl w-full mx-auto space-y-6">
-            <div className="space-y-2">
-              <p className="text-xs font-bold uppercase tracking-widest text-retro-accent">{step === 'ready' ? 'Complete' : 'Getting started'}</p>
-              <h1 className="text-2xl sm:text-4xl font-black tracking-tight">{copy.title}</h1>
-              <p className="text-sm text-retro-muted leading-relaxed">{copy.description}</p>
+    <div className="fixed inset-0 z-[99990] overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-zinc-100">
+      <div className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-xl p-6 sm:p-8 shadow-2xl space-y-6 animate-orbit-slide-up">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-[10px] font-mono uppercase tracking-wider text-zinc-400">
+              <Sparkles className="w-3 h-3 text-zinc-300" />
+              <span>Decentralized Adult Network</span>
             </div>
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-white">
+              Welcome to GoonGrid
+            </h1>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Fast, privacy-preserving adult media and peer-to-peer card gaming.
+            </p>
+          </div>
+          <div className="w-10 h-10 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-200 shrink-0">
+            <ShieldAlert className="w-5 h-5" />
+          </div>
+        </div>
 
-            {error && <div role="alert" className="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">{error}</div>}
+        {/* Legal & Privacy Advisory Box */}
+        <div className="rounded-lg border border-zinc-800/90 bg-zinc-900/40 p-4 space-y-3">
+          <div className="flex items-start gap-2.5 text-xs">
+            <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-semibold text-white">18+ Mature Content Only</span>
+              <p className="text-zinc-400 text-[11px] leading-relaxed">
+                GoonGrid contains adult media and community content intended exclusively for adults. You must be at least 18 years old to access this platform.
+              </p>
+            </div>
+          </div>
 
-            {step === 'welcome' && (
-              <div className="grid sm:grid-cols-3 gap-3 text-sm">
-                {['Share what you like', 'Collect recognition', 'Play with your cards'].map((item) => <div key={item} className="rounded-md border border-border-glass bg-white/5 p-4 font-semibold">{item}</div>)}
+          <div className="flex items-start gap-2.5 text-xs">
+            <Lock className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-semibold text-white">Local-First &amp; P2P Privacy</span>
+              <p className="text-zinc-400 text-[11px] leading-relaxed">
+                Your cryptographic keys and preferences remain securely on your device. We do not sell your personal data or track your behavior across platforms.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2.5 text-xs">
+            <Scale className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-semibold text-white">Zero Tolerance Policy</span>
+              <p className="text-zinc-400 text-[11px] leading-relaxed">
+                Strict zero tolerance for non-consensual imagery, underage material, or illegal content.
+              </p>
+            </div>
+          </div>
+
+          <div className="pt-1 border-t border-zinc-800/60">
+            <button
+              type="button"
+              onClick={() => { playPress(700); onOpenTos(); }}
+              className="text-[11px] text-zinc-400 hover:text-white underline underline-offset-2 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Read Full Terms of Service &amp; Privacy Policy</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Form: Account & Identity */}
+        <div className="space-y-4">
+          {!isImporting ? (
+            <div className="space-y-1.5">
+              <label htmlFor="onboarding-display-name" className="text-xs font-medium text-zinc-300 flex items-center justify-between">
+                <span>Display Name</span>
+                <span className="text-[10px] text-zinc-500 font-normal">Public handle</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="onboarding-display-name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. AnonGooner"
+                  maxLength={30}
+                  className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-zinc-500 transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={handleRandomize}
+                  title="Generate random anonymous handle"
+                  className="p-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer shrink-0"
+                >
+                  <Dices className="w-4 h-4" />
+                </button>
               </div>
-            )}
-
-            {step === 'profile' && (
-              <div className="w-full max-w-md mx-auto">
-                <ProfileSetupForm
-                  name={name}
-                  onName={setName}
-                  tags={tags}
-                  onTags={setTags}
-                  pfpUrl={pfpUrl}
-                  onPfp={setPfpUrl}
-                  suggestions={tagSuggestions}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label htmlFor="onboarding-secret-key" className="text-xs font-medium text-zinc-300">
+                  Secret Key
+                </label>
+                <input
+                  id="onboarding-secret-key"
+                  type="password"
+                  value={secretKey}
+                  onChange={(e) => setSecretKey(e.target.value)}
+                  placeholder="Paste your exported secret key"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs font-mono text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-zinc-500 transition-colors"
                 />
               </div>
-            )}
-
-            {step === 'platform' && <div className="space-y-3 text-sm text-retro-muted"><p><strong className="text-retro-fg">Feed:</strong> your social space for sharing and discovering.</p><p><strong className="text-retro-fg">Cards:</strong> community content that can become part of your collection.</p><p><strong className="text-retro-fg">Games:</strong> use an eligible deck to play rounds and earn recognition.</p></div>}
-            {step === 'feed' && <div className="rounded-md border border-border-glass bg-white/5 p-5 text-sm text-retro-muted">After setup, the Feed tab is where you will share images, browse Latest and Trending, and respond to the community.</div>}
-            {step === 'tune' && <FeedTuneStep onFinished={() => advance('tune')} />}
-            {step === 'cards' && <div className="rounded-md border border-border-glass bg-white/5 p-5 text-sm text-retro-muted">Likes are appreciation. Cards are playable content. A like can help recognition, but it is never a replacement for g$.</div>}
-            {step === 'economy' && <div className="rounded-md border border-border-glass bg-white/5 p-5 text-sm text-retro-muted">g$ can support card purchases, trades, and game power-ups. Your balance and transactions stay inside the product.</div>}
-            {step === 'games' && <div className="rounded-md border border-border-glass bg-white/5 p-5 text-sm text-retro-muted">Games are played with decks. Reactions affect rounds, and rankings show cards and players getting noticed.</div>}
-            {step === 'ready' && <div className="rounded-md border border-retro-accent/40 bg-retro-accent/10 p-5 flex gap-3 text-sm"><Check className="w-5 h-5 text-retro-accent shrink-0" /> Your account is set up and your first game is waiting.</div>}
-
-            <div className="flex items-center justify-between gap-3 pt-2">
-              <button type="button" onClick={back} disabled={!canBack} className="px-4 py-2 rounded-md border border-border-glass text-sm font-semibold disabled:opacity-30"><ArrowLeft className="w-4 h-4 inline mr-2" />Back</button>
-              <button type="button" onClick={() => step === 'profile' ? saveProfile() : advance()} disabled={busy || (step === 'profile' && !profileIsComplete(name, tags, pfpUrl)) || (step === 'tune' && !feedTuned)} className="px-5 py-2 rounded-md chrome-accent text-sm font-black text-black disabled:opacity-40">{busy ? 'Saving...' : step === 'ready' ? 'Enter goonMatch' : 'Continue'} <ArrowRight className="w-4 h-4 inline ml-2" /></button>
+              <div className="space-y-1.5">
+                <label htmlFor="onboarding-import-name" className="text-xs font-medium text-zinc-300">
+                  Display Name (Optional)
+                </label>
+                <input
+                  id="onboarding-import-name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Leave blank to use existing name"
+                  maxLength={30}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-zinc-500 transition-colors"
+                />
+              </div>
             </div>
-          </section>
+          )}
+
+          {/* Toggle Import / Create */}
+          <button
+            type="button"
+            onClick={() => { playPress(400); setIsImporting(!isImporting); }}
+            className="text-[11px] text-zinc-500 hover:text-zinc-300 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+            <span>{isImporting ? 'Create new anonymous identity instead' : 'Returning user? Import secret key'}</span>
+          </button>
+        </div>
+
+        {/* Checkbox Gate */}
+        <label className="flex items-start gap-3 p-3 rounded-lg border border-zinc-800 bg-zinc-900/30 hover:bg-zinc-900/60 transition-colors cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={ageConfirmed}
+            onChange={(e) => { playPress(600); setAgeConfirmed(e.target.checked); }}
+            className="w-4 h-4 mt-0.5 rounded border-zinc-700 bg-zinc-900 text-white accent-white cursor-pointer"
+          />
+          <span className="text-xs text-zinc-300 leading-snug">
+            I confirm that I am at least <strong>18 years of age</strong>, and I agree to the{' '}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                playPress(700);
+                onOpenTos();
+              }}
+              className="text-white underline underline-offset-2 hover:text-zinc-200"
+            >
+              Terms of Service &amp; Privacy Policy
+            </button>
+            .
+          </span>
+        </label>
+
+        {error && (
+          <div role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">
+            {error}
+          </div>
         )}
+
+        {/* Submit / Enter Action */}
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={handleEnter}
+            disabled={busy || !ageConfirmed || (!name.trim() && !isImporting) || (isImporting && !secretKey.trim())}
+            className="w-full py-2.5 px-4 rounded-lg bg-white hover:bg-zinc-200 active:scale-[0.99] text-black font-semibold text-xs shadow-sm transition-all disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
+          >
+            {busy ? (
+              <span>Configuring Account...</span>
+            ) : (
+              <>
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>Enter GoonGrid</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

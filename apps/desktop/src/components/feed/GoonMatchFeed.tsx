@@ -30,7 +30,7 @@ import { LiveCameraModal } from '../camera/LiveCameraModal';
 import { ObjectImage } from '../ObjectImage';
 import { LazyVideo } from '../LazyVideo';
 import { isMediaVideo, resolveMediaUrl } from '../../utils/media';
-import { orbitFetch } from '../../utils/api';
+import { orbitFetch, postShareUrl } from '../../utils/api';
 import { GAME_AD_TEMPLATES } from '../../utils/gameAds';
 import { ExploreSearchModal } from './ExploreSearchModal';
 import { useNow } from '../../hooks/useNow';
@@ -312,6 +312,20 @@ export function GoonMatchFeed({
   // Share Modal State
   const [sharingPost, setSharingPost] = useState<FeedPost | null>(null);
 
+  // Deep link: #/feed?post=<id> (from share/permalink) opens the post lightbox
+  // once the post is loaded. One-shot — later list changes don't reopen it.
+  const deepLinkDoneRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkDoneRef.current || posts.length === 0) return;
+    const m = /post=([\w-]+)/.exec(window.location.hash);
+    if (!m) return;
+    const target = posts.find((p) => p.id === m[1]);
+    if (target) {
+      deepLinkDoneRef.current = true;
+      setActiveLightboxPost(target);
+    }
+  }, [posts]);
+
   // Post Options Modal State
   const [optionsPost, setOptionsPost] = useState<FeedPost | null>(null);
   const [reportingPost, setReportingPost] = useState<FeedPost | null>(null);
@@ -530,7 +544,7 @@ export function GoonMatchFeed({
 
   const handleCopyLink = (post: FeedPost) => {
     playPress(800);
-    navigator.clipboard.writeText(`https://goonmatch.fly.dev`);
+    void navigator.clipboard.writeText(postShareUrl(post.id));
     toast?.('Post link copied to clipboard!', 'success');
     setOptionsPost(null);
   };
@@ -594,16 +608,16 @@ export function GoonMatchFeed({
         </div>
 
         {/* Feed Sort / Filter Bar */}
-        <div className="flex items-center justify-between px-3 sm:px-6 py-2 gap-2 border-b border-retro-border bg-surface-raised sticky top-[57px] z-20">
+        <div className="flex items-center justify-between px-3 sm:px-6 py-2 gap-2 border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm sticky top-[57px] z-20">
           <div className="flex items-center gap-1 text-xs">
             {(['latest', 'trending'] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
                 onClick={() => { playPress(720); onFeedSortChange?.(mode); }}
-                className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer font-medium ${feedSort === mode
-                    ? 'bg-surface-interactive text-retro-fg'
-                    : 'text-retro-muted hover:text-retro-fg'
+                className={`px-3 py-1.5 rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer font-medium ${feedSort === mode
+                    ? 'bg-zinc-800 text-zinc-100 shadow-xs border border-zinc-700'
+                    : 'text-zinc-400 hover:text-zinc-200'
                   }`}
               >
                 {mode === 'latest' ? 'Latest' : 'Trending'}
@@ -611,18 +625,18 @@ export function GoonMatchFeed({
             ))}
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-retro-muted">
+            <span className="text-xs text-zinc-400">
               {displayPosts.length} posts
             </span>
-            <div className="flex items-center bg-surface-interactive border border-retro-border rounded-md p-0.5 text-xs">
+            <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-md p-0.5 text-xs">
               {(['1', '2', '3', '4', '5'] as const).map((cols) => (
                 <button
                   key={cols}
                   type="button"
                   onClick={() => { playPress(720); onFeedColsChange?.(cols); }}
-                  className={`px-2 py-1 rounded transition-colors cursor-pointer font-medium ${feedCols === cols
-                      ? 'bg-retro-accent text-black'
-                      : 'text-retro-muted hover:text-retro-fg'
+                  className={`px-2 py-1 rounded transition-all duration-150 active:scale-[0.96] cursor-pointer font-medium ${feedCols === cols
+                      ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
+                      : 'text-zinc-400 hover:text-zinc-200'
                     }`}
                   title={`${cols}-column feed`}
                   aria-label={`${cols}-column feed`}
@@ -652,13 +666,13 @@ export function GoonMatchFeed({
             return post.is_sponsored ? (
               <article
                 key={post.id}
-                className={`bg-surface-raised border-y sm:border sm:rounded-xl border-retro-border overflow-hidden flex flex-col [content-visibility:auto] [contain-intrinsic-size:0_560px] ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
+                className={`bg-zinc-900/60 border border-zinc-800 rounded-lg overflow-hidden flex flex-col [content-visibility:auto] [contain-intrinsic-size:0_560px] shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
                 {/* Sponsored Banner */}
-                <div className="bg-surface-canvas px-4 py-2 flex items-center gap-2 text-xs text-retro-muted border-b border-retro-border">
-                  <Sparkles className="w-3.5 h-3.5 text-retro-accent" />
+                <div className="bg-zinc-950 px-4 py-2 flex items-center gap-2 text-xs text-zinc-400 border-b border-zinc-800">
+                  <Sparkles className="w-3.5 h-3.5 text-zinc-300" />
                   <span>Sponsored</span>
-                  <span className="ml-auto text-retro-muted">
+                  <span className="ml-auto text-zinc-500">
                     {GAME_AD_TEMPLATES.find((t) => t.mode === post.game_mode)?.gameName || 'goonMatch Arcade'}
                   </span>
                 </div>
@@ -668,52 +682,46 @@ export function GoonMatchFeed({
                   className={`relative w-full aspect-square bg-gradient-to-br ${GAME_AD_TEMPLATES.find((t) => t.mode === post.game_mode)?.gradient || 'from-zinc-800 to-zinc-900'} flex flex-col items-center justify-center text-white overflow-hidden`}
                 >
                   {(() => {
-                    const Icon = AD_ICON_MAP[GAME_AD_TEMPLATES.find((t) => t.mode === post.game_mode)?.icon || ''] || Gamepad2
-                    return <Icon className="w-14 h-14 mb-3 opacity-90" />
+                    const AdIcon = (post.game_mode && AD_ICON_MAP[post.game_mode]) || Gamepad2;
+                    return (
+                      <>
+                        <AdIcon className="w-16 h-16 opacity-30 absolute -bottom-4 -right-4 pointer-events-none" />
+                        <div className="text-center p-6 space-y-3 z-10">
+                          <h3 className="text-xl font-black tracking-tight">{post.caption}</h3>
+                          {post.players_playing && (
+                            <p className="text-xs text-white/80 font-mono">
+                              ⚡ {post.players_playing.toLocaleString()} players online now
+                            </p>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              playPress(850);
+                              // Single router prop for game ads (restored after
+                              // the vercel-style refactor dropped these handlers).
+                              onOpenGameAd?.(post.game_mode || 'duel');
+                            }}
+                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-zinc-950 font-bold text-xs uppercase tracking-wider hover:bg-zinc-100 transition-transform active:scale-95 shadow-lg"
+                          >
+                            <span>{post.cta_label || 'Play Now'}</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </>
+                    );
                   })()}
-                  <h3 className="text-lg font-semibold px-6 text-center">
-                    {GAME_AD_TEMPLATES.find((t) => t.mode === post.game_mode)?.gameName || 'goonMatch Arcade'}
-                  </h3>
-                  <p className="text-xs text-white/80 px-6 mt-2 text-center max-w-xs leading-relaxed">
-                    {post.caption}
-                  </p>
-
-                  {/* Player count */}
-                  {post.players_playing && (
-                    <div className="mt-3 flex items-center gap-1.5 px-3 py-1 rounded-md bg-black/30 text-xs">
-                      <span className="w-1.5 h-1.5 rounded-full bg-retro-online" />
-                      <span>{post.players_playing.toLocaleString()} playing</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* CTA + Footer */}
-                <div className="p-3 sm:px-4 flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playPress(920);
-                      onOpenGameAd?.(post.game_mode || 'duel');
-                    }}
-                    className="w-full py-2.5 rounded-lg chrome-accent text-black text-sm font-medium transition-colors cursor-pointer"
-                  >
-                    {post.cta_label || 'Play Now'}
-                  </button>
-                  <p className="text-xs text-retro-muted text-center">
-                    Earn points and g$ while you play
-                  </p>
                 </div>
               </article>
             ) : (
               <article
                 key={post.id}
-                className={`bg-surface-raised border-y sm:border sm:rounded-xl border-retro-border overflow-hidden flex flex-col [content-visibility:auto] [contain-intrinsic-size:0_560px] ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
+                className={`bg-zinc-900/60 border border-zinc-800 rounded-lg overflow-hidden flex flex-col [content-visibility:auto] [contain-intrinsic-size:0_560px] shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
                 {/* Repost Header Banner */}
                 {post.is_reposted && (
-                  <div className="bg-surface-canvas border-b border-retro-border px-4 py-2 flex items-center gap-1.5 text-xs text-retro-muted">
-                    <Repeat className="w-3.5 h-3.5 text-retro-accent" />
-                    <span>Reposted by <strong className="text-retro-body font-medium">@{post.reposted_by || 'Peer'}</strong></span>
+                  <div className="bg-zinc-950 border-b border-zinc-800 px-4 py-2 flex items-center gap-1.5 text-xs text-zinc-400">
+                    <Repeat className="w-3.5 h-3.5 text-zinc-300" />
+                    <span>Reposted by <strong className="text-zinc-200 font-medium">@{post.reposted_by || 'Peer'}</strong></span>
                   </div>
                 )}
 
@@ -724,8 +732,8 @@ export function GoonMatchFeed({
                     onClick={() => handleAvatarClick(post.author_id)}
                     title={authorHasStory ? 'Watch story' : 'View profile'}
                   >
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#9fe3ff] via-[#d6c6ff] to-[#ffd6f0] p-[2px] flex-shrink-0">
-                      <div className="w-full h-full rounded-full bg-surface-raised overflow-hidden border border-white flex items-center justify-center text-xs font-bold text-retro-fg">
+                    <div className={`w-8 h-8 rounded-full p-[1.5px] flex-shrink-0 ${authorHasStory ? 'bg-gradient-to-tr from-zinc-300 to-zinc-600' : 'bg-zinc-800 border border-zinc-700'}`}>
+                      <div className="w-full h-full rounded-full bg-zinc-900 overflow-hidden flex items-center justify-center text-xs font-semibold text-zinc-200">
                         {profilePics[post.author_id] || post.author_avatar ? (
                           <img src={profilePics[post.author_id] || post.author_avatar!} alt="" className="w-full h-full object-cover" />
                         ) : (
@@ -735,13 +743,13 @@ export function GoonMatchFeed({
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-medium text-retro-fg group-hover:underline">{post.author_name}</span>
-                        <time className="text-[11px] text-retro-muted" dateTime={post.created_at}>
+                        <span className="text-xs font-semibold text-zinc-200 group-hover:underline">{post.author_name}</span>
+                        <time className="text-[11px] text-zinc-500" dateTime={post.created_at}>
                           {new Date(post.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                         </time>
                       </div>
                       {post.location && (
-                        <span className="text-[11px] text-retro-muted block">{post.location}</span>
+                        <span className="text-[11px] text-zinc-500 block">{post.location}</span>
                       )}
                     </div>
                   </div>
@@ -749,7 +757,7 @@ export function GoonMatchFeed({
                   <button
                     type="button"
                     onClick={() => setOptionsPost(post)}
-                    className="text-retro-muted hover:text-retro-body p-1.5 rounded-lg cursor-pointer hover:bg-surface-interactive transition-colors"
+                    className="text-zinc-400 hover:text-zinc-200 p-1.5 rounded-md cursor-pointer hover:bg-zinc-800 transition-colors"
                     aria-label="Post options"
                   >
                     <MoreHorizontal className="w-4 h-4" />
@@ -876,10 +884,10 @@ export function GoonMatchFeed({
                         type="button"
                         onClick={() => toggleLike(post)}
                         aria-label="Like post"
-                        className="cursor-pointer transition-transform active:scale-110"
+                        className="cursor-pointer transition-transform duration-150 active:scale-[0.92]"
                       >
                         <Heart
-                          className={`w-5 h-5 transition-colors ${isLiked ? 'text-rose-500 fill-rose-500' : 'text-retro-body hover:text-retro-fg'
+                          className={`w-4 h-4 transition-colors stroke-[1.75] ${isLiked ? 'text-rose-500 fill-rose-500' : 'text-zinc-400 hover:text-zinc-200'
                             }`}
                         />
                       </button>
@@ -891,18 +899,18 @@ export function GoonMatchFeed({
                           setActiveLightboxPost(post);
                         }}
                         aria-label="Comment"
-                        className="text-retro-body hover:text-retro-fg cursor-pointer"
+                        className="text-zinc-400 hover:text-zinc-200 cursor-pointer transition-transform duration-150 active:scale-[0.92]"
                       >
-                        <MessageCircle className="w-5 h-5" />
+                        <MessageCircle className="w-4 h-4 stroke-[1.75]" />
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setSharingPost(post)}
                         aria-label="Share post"
-                        className="text-retro-body hover:text-retro-fg cursor-pointer"
+                        className="text-zinc-400 hover:text-zinc-200 cursor-pointer transition-transform duration-150 active:scale-[0.92]"
                       >
-                        <Send className="w-5 h-5" />
+                        <Send className="w-4 h-4 stroke-[1.75]" />
                       </button>
                     </div>
 
@@ -910,10 +918,10 @@ export function GoonMatchFeed({
                       type="button"
                       onClick={() => toggleSave(post)}
                       aria-label="Save post"
-                      className="cursor-pointer transition-transform active:scale-110"
+                      className="cursor-pointer transition-transform duration-150 active:scale-[0.92]"
                     >
                       <Bookmark
-                        className={`w-5 h-5 transition-colors ${isSaved ? 'text-retro-accent fill-retro-accent' : 'text-retro-body hover:text-retro-fg'
+                        className={`w-4 h-4 transition-colors stroke-[1.75] ${isSaved ? 'text-zinc-100 fill-zinc-100' : 'text-zinc-400 hover:text-zinc-200'
                           }`}
                       />
                     </button>
@@ -921,16 +929,16 @@ export function GoonMatchFeed({
 
                   {/* Likes Count */}
                   {currentLikes > 0 && (
-                    <div className="text-xs font-medium text-retro-body">
+                    <div className="text-xs font-semibold text-zinc-300 font-mono tracking-tight">
                       {currentLikes.toLocaleString()} {currentLikes === 1 ? 'like' : 'likes'}
                     </div>
                   )}
 
                   {/* Caption & Tags */}
                   {post.caption && (
-                    <div className="text-xs text-retro-body leading-relaxed">
+                    <div className="text-xs text-zinc-300 leading-relaxed">
                       <span
-                        className="font-medium text-retro-fg mr-1.5 cursor-pointer hover:underline"
+                        className="font-semibold text-zinc-100 mr-1.5 cursor-pointer hover:underline"
                         onClick={() => onSelectUser?.(post.author_id)}
                       >
                         {post.author_name}
@@ -946,7 +954,7 @@ export function GoonMatchFeed({
                         <span
                           key={t}
                           onClick={() => boostTagAffinity([t])}
-                          className="text-[11px] text-retro-accent hover:underline cursor-pointer"
+                          className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800/70 text-zinc-400 hover:text-zinc-200 cursor-pointer transition-colors"
                         >
                           #{t.replace(/^#/, '')}
                         </span>
@@ -960,16 +968,16 @@ export function GoonMatchFeed({
                       <button
                         type="button"
                         onClick={() => { playPress(750); setActiveLightboxPost(post); }}
-                        className="text-left text-[11px] text-retro-muted hover:text-retro-body cursor-pointer font-medium block"
+                        className="text-left text-[11px] text-zinc-400 hover:text-zinc-200 cursor-pointer font-medium block"
                       >
                         View all {postComments.length} comments
                       </button>
 
                       {/* Show top recent comment snippet */}
-                      <div className="text-xs text-retro-body flex items-center justify-between">
+                      <div className="text-xs text-zinc-300 flex items-center justify-between">
                         <div className="truncate">
-                          <strong className="font-semibold text-retro-fg mr-1.5">{postComments[postComments.length - 1].author_name}</strong>
-                          <span className="text-retro-muted">{postComments[postComments.length - 1].text}</span>
+                          <strong className="font-semibold text-zinc-100 mr-1.5">{postComments[postComments.length - 1].author_name}</strong>
+                          <span className="text-zinc-400">{postComments[postComments.length - 1].text}</span>
                         </div>
                       </div>
                     </div>
@@ -977,7 +985,7 @@ export function GoonMatchFeed({
                     <button
                       type="button"
                       onClick={() => { playPress(750); setActiveLightboxPost(post); }}
-                      className="text-left text-[11px] text-retro-muted hover:text-retro-body cursor-pointer"
+                      className="text-left text-[11px] text-zinc-400 hover:text-zinc-200 cursor-pointer"
                     >
                       Add a comment...
                     </button>
@@ -988,12 +996,12 @@ export function GoonMatchFeed({
           })}
 
           {displayPosts.length === 0 && (
-            <div className="bg-surface-raised border border-border-glass rounded-2xl p-8 text-center space-y-3 shadow-xs my-4">
-              <div className="w-12 h-12 rounded-full bg-surface-raised/5 flex items-center justify-center mx-auto text-retro-muted">
-                <Camera className="w-6 h-6" />
+            <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-8 text-center space-y-3 shadow-xs my-4">
+              <div className="w-12 h-12 rounded-full bg-zinc-800/60 border border-zinc-700/60 flex items-center justify-center mx-auto text-zinc-400">
+                <Camera className="w-5 h-5 stroke-[1.75]" />
               </div>
-              <h4 className="text-sm font-bold text-retro-fg">No Posts Yet</h4>
-              <p className="text-xs text-retro-muted max-w-xs mx-auto leading-relaxed">
+              <h4 className="text-sm font-semibold text-zinc-100">No Posts Yet</h4>
+              <p className="text-xs text-zinc-400 max-w-xs mx-auto leading-relaxed">
                 Capture or upload your first photo or video post to start sharing with your friends!
               </p>
               <button
@@ -1002,9 +1010,9 @@ export function GoonMatchFeed({
                   if (onOpenPostCreator) onOpenPostCreator();
                   else setShowCustomPostCreator(true);
                 }}
-                 className="create-action px-4 py-2 text-[#160b0a] text-xs font-black uppercase tracking-wide rounded-xl transition-all shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+                 className="create-action px-4 py-2 text-xs font-semibold rounded-md transition-all duration-150 active:scale-[0.96] shadow-xs cursor-pointer inline-flex items-center gap-1.5"
               >
-                <PlusSquare className="w-4 h-4" />
+                <PlusSquare className="w-4 h-4 stroke-[2]" />
                  <span>Drop your first moment</span>
               </button>
             </div>
@@ -1014,8 +1022,8 @@ export function GoonMatchFeed({
           {displayPosts.length > 0 && hasMore !== false && (
             <div ref={sentinelRef} className="py-6 flex flex-col items-center justify-center gap-2">
               {(internalLoadingMore || isLoadingMore) ? (
-                <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-surface-raised border border-border-glass shadow-xs text-xs font-bold text-retro-body">
-                  <span className="w-3.5 h-3.5 border-2 border-border-glass border-t-purple-600 rounded-full animate-spin" />
+                <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-800 shadow-xs text-xs font-medium text-zinc-300">
+                  <span className="w-3.5 h-3.5 border-2 border-zinc-700 border-t-zinc-200 rounded-full animate-spin" />
                   <span>Loading more moments…</span>
                 </div>
               ) : (
@@ -1033,6 +1041,7 @@ export function GoonMatchFeed({
           onClose={() => setSharingPost(null)}
           followingIds={followingIds}
           profilePics={profilePics}
+          userNames={Object.fromEntries(users.map((u) => [u.id, u.display_name || '']))}
           identity={identity}
           toast={toast}
         />

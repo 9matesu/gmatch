@@ -17,6 +17,10 @@ function computeApiBase(): string {
 
 export const API_BASE = computeApiBase();
 
+/** Openable share links (P3.5): public HTML pages served by the API host. */
+export const postShareUrl = (id: string) => `${API_BASE}/p/${encodeURIComponent(id)}`
+export const profileShareUrl = (id: string) => `${API_BASE}/u/${encodeURIComponent(id)}`
+
 const inflightRequests = new Map<string, Promise<Response>>()
 const responseCache = new Map<string, { data: Response; expiry: number }>()
 const CACHE_TTL = 3_000

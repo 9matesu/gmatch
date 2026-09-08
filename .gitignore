@@ -17,3 +17,9 @@ apps/api/blobs/
 coverage/
 test-results/
 playwright-report/
+test-blobs-*/
+apps/api/test-blobs-*/
+api-stage/
+apps/desktop/release/
+.dev-storage.key
+apps/desktop/dist-log.txt

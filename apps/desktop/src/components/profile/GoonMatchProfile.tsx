@@ -26,6 +26,7 @@ import { InstagramPostModal } from '../feed/InstagramPostModal';
 import { ObjectImage } from '../ObjectImage';
 import { isMediaVideo, resolveMediaUrl } from '../../utils/media';
 import { saveUserProfile } from '../../utils/profile';
+import { profileShareUrl } from '../../utils/api';
 
 export function GoonMatchProfile({
   identity,
@@ -104,7 +105,8 @@ export function GoonMatchProfile({
 
   const handleShareProfile = async () => {
     playPress(800);
-    const profileUrl = 'https://goonmatch.fly.dev';
+    const profileUrl = identity ? profileShareUrl(identity.orbitId) : ''
+    if (!profileUrl) { toast?.('Sign in to share your profile', 'warning'); return }
     try {
       if (navigator.clipboard) {
         await navigator.clipboard.writeText(profileUrl);

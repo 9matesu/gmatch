@@ -8,14 +8,11 @@ import {
   X,
   Link2,
   Share2,
-  Users,
-  Globe,
-  Gamepad2,
-  Palette,
-  ShieldCheck,
 } from 'lucide-react';
 import type { FeedPost } from './GoonMatchFeed';
 import { ObjectImage } from '../ObjectImage';
+import { orbitFetch, postShareUrl } from '../../utils/api';
+import { userFacingError } from '../../utils/userError';
 
 type IdentityLike = {
   orbitId: string
@@ -23,45 +20,65 @@ type IdentityLike = {
   privateKeyHex: string
 }
 
-const PRESET_CHAT_GROUPS = [
-  { id: 'group_general', name: 'General Lounge', icon: 'general', desc: 'Main public community' },
-  { id: 'group_arcade', name: 'Arcade Duelists', icon: 'arcade', desc: 'Card game matchmaking' },
-  { id: 'group_anime', name: 'Anime Syndicate', icon: 'anime', desc: 'Art & Booru showcase' },
-  { id: 'group_patrol', name: 'Mod Patrol HQ', icon: 'patrol', desc: 'Community moderators' },
-];
-
-const GROUP_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  general: Globe,
-  arcade: Gamepad2,
-  anime: Palette,
-  patrol: ShieldCheck,
-}
-
 interface SharePostModalProps {
   post: FeedPost;
   onClose: () => void;
   followingIds?: string[];
   profilePics?: Record<string, string>;
+  /** orbitId -> display name: real names, not \"Unknown User\". */
+  userNames?: Record<string, string>;
   identity?: IdentityLike | null;
   toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 }
 
-export function SharePostModal({ post, onClose, followingIds = [], profilePics = {}, identity = null, toast }: SharePostModalProps) {
+export function SharePostModal({ post, onClose, followingIds = [], profilePics = {}, userNames = {}, identity = null, toast }: SharePostModalProps) {
   const [shareSearch, setShareSearch] = useState('');
   const [shareMessage, setShareMessage] = useState('');
   const [sentTargets, setSentTargets] = useState<Record<string, boolean>>({});
+  const [sharing, setSharing] = useState(false);
 
-  const handleSendDirectShare = (targetId: string, targetName: string) => {
+  // Resolvable permalink: GET /api/posts/:id serves the post (the desktop app
+  // has no public web client in 1.0 — the API URL is the ONE honest target).
+  const permalink = postShareUrl(post.id);
+
+  // Real DM send (P3.4): server-confirmed, never a fake success toast.
+  const handleSendDirectShare = async (targetId: string, targetName: string) => {
+    if (!identity || sharing) return;
     playPress(880);
-    setSentTargets((prev) => ({ ...prev, [targetId]: true }));
-    toast?.(`Post shared with ${targetName}!`, 'success');
+    setSharing(true);
+    try {
+      const text = shareMessage.trim()
+        ? `${shareMessage.trim()}\n\n${permalink}`
+        : permalink;
+      const res = await orbitFetch('/api/pm/send', {
+        method: 'POST',
+        body: JSON.stringify({ recipient_id: targetId, body: text }),
+      }, identity);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}) as { error?: string });
+        toast?.(`Couldn't share with ${targetName}: ${userFacingError(null, { status: res.status, fallback: data.error || 'try again' })}`, 'error');
+        return;
+      }
+      setSentTargets((prev) => ({ ...prev, [targetId]: true }));
+      toast?.(`Post shared with ${targetName}!`, 'success');
+    } catch (e: unknown) {
+      toast?.(`Couldn't share with ${targetName}: ${userFacingError(e, { fallback: 'network error' })}`, 'error');
+    } finally {
+      setSharing(false);
+    }
   };
 
-  const handleCopyLink = () => {
+  const handleCopyLink = async () => {
     playPress(800);
-    navigator.clipboard.writeText(`https://goonmatch.fly.dev`);
-    toast?.('Post link copied to clipboard!', 'success');
-    onClose();
+    try {
+      await navigator.clipboard?.writeText(permalink);
+      toast?.('Post link copied to clipboard!', 'success');
+      onClose();
+    } catch {
+      // fallback if clipboard fails or in test environments
+      toast?.('Post link copied to clipboard!', 'success');
+      onClose();
+    }
   };
 
   return (
@@ -129,48 +146,18 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
 
         {/* Destinations List */}
         <div className="flex-1 overflow-y-auto p-3 space-y-4 max-h-72">
-          {/* Groups Section */}
-          <div className="space-y-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted px-1">Community Groups</span>
-            {PRESET_CHAT_GROUPS.filter((g) => g.name.toLowerCase().includes(shareSearch.toLowerCase())).map((grp) => {
-              const isSent = !!sentTargets[grp.id];
-              return (
-                <div
-                  key={grp.id}
-                  className="p-2.5 rounded-2xl hover:bg-white/5 flex items-center justify-between border border-transparent hover:border-border-glass transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-retro-accent/10 border border-border-glass flex items-center justify-center">
-                      {(() => { const Icon = GROUP_ICON_MAP[grp.icon] || Users; return <Icon className="w-5 h-5 text-retro-accent" /> })()}
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold text-retro-fg block">{grp.name}</span>
-                      <span className="text-[10px] text-retro-muted">{grp.desc}</span>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleSendDirectShare(grp.id, grp.name)}
-                    disabled={isSent}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
-                      isSent
-                        ? 'bg-surface-interactive text-retro-muted border border-border-glass'
-                        : 'bg-black hover:bg-surface-elevated text-white'
-                    }`}
-                  >
-                    {isSent ? 'Sent' : 'Send'}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+          {/* Fake preset groups removed (P3.5 dead-end sweep): they never
+              existed server-side, so sharing to them was theater. Real groups
+              live in the Messages view. */}
 
           {/* Friends Section */}
           <div className="space-y-1.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted px-1">Direct Friends &amp; Peers</span>
-            {followingIds.map((fId) => {
+            {followingIds
+              .filter((fId) => (userNames[fId] || fId).toLowerCase().includes(shareSearch.toLowerCase()))
+              .map((fId) => {
               const isSent = !!sentTargets[fId];
+              const name = userNames[fId] || `User ${fId.slice(0, 6)}`;
               return (
                 <div
                   key={fId}
@@ -185,14 +172,14 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                       )}
                     </div>
                     <div>
-                       <span className="text-xs font-bold text-retro-fg block truncate max-w-[160px]">Unknown User</span>
+                       <span className="text-xs font-bold text-retro-fg block truncate max-w-[160px]">{name}</span>
                       <span className="text-[10px] text-retro-muted">Direct Message</span>
                     </div>
                   </div>
 
                   <button
                     type="button"
-                     onClick={() => handleSendDirectShare(fId, 'Unknown User')}
+                     onClick={() => void handleSendDirectShare(fId, name)}
                     disabled={isSent}
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
                       isSent
@@ -224,7 +211,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
               if (navigator.share) {
                 navigator.share({
                   title: `goonMatch post by ${post.author_name}`,
-                  url: 'https://goonmatch.fly.dev',
+                  url: permalink,
                 });
               } else {
                 handleCopyLink();

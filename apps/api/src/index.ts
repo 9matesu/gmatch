@@ -168,6 +168,10 @@ app.route('/api/groups', groups)
 app.route('/api/domination', domination)
 app.route('/api/report', reportRouter)
 
+// Public share pages (no /api prefix — mounted on the app root too).
+import { share } from './routes/share'
+app.route('/', share)
+
 import { handleWebSocketUpgrade } from './routes/ws'
 
 // Intercept WebSocket upgrades before standard middleware (CF Workers only)

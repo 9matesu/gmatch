@@ -7,6 +7,8 @@ import { purgeObjectLikes, addPoints } from '../game'
 import { deleteExpiredContent } from '../cleanup'
 import { PICTURE_TTL_SECONDS, STORY_TTL_SECONDS, checkBlacklistedTags } from '@orbit/shared'
 import { lookup } from 'node:dns/promises'
+import { sha256 } from '@noble/hashes/sha256'
+import { bytesToHex } from '@noble/hashes/utils'
 import { proxyAndStoreExternal } from '../proxy'
 
 type Bindings = {
@@ -114,14 +116,10 @@ export function detectMediaMime(bytes: Uint8Array, fallbackHint?: string | null)
 
 /**
  * SHA-256 hex digest of raw bytes, used to dedup byte-identical uploads per owner.
- * Relies on the Web Crypto API, available in Cloudflare Workers / Bun.
+ * Uses @noble/hashes (same as middleware/auth) — synchronous, no BufferSource typing churn.
  */
 async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', bytes)
-  const out = new Uint8Array(digest)
-  let hex = ''
-  for (let i = 0; i < out.length; i += 1) hex += out[i].toString(16).padStart(2, '0')
-  return hex
+  return bytesToHex(sha256(bytes))
 }
 
 /** Any object still alive (profile pics never expire, everything else has a future expires_at). */

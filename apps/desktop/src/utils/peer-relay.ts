@@ -1,7 +1,7 @@
 import Peer, { DataConnection } from 'peerjs'
 import { OrbitObject, User } from '@orbit/shared'
 import { logger } from './logger';
-import { peerConnectionConfig, turnCredentials } from './ice-hygiene'
+import { defaultIceConfig } from './ice-hygiene'
 
 export interface P2PPayloadMessage {
   type: 'PRESENCE' | 'IMAGE_ANNOUNCE' | 'MESSAGE' | 'CHAT' | 'STORY_ANNOUNCE'
@@ -11,10 +11,11 @@ export interface P2PPayloadMessage {
 }
 
 // Privacy gate: same ICE hygiene as the file-transfer peer (ice-hygiene.ts).
-const TURN = turnCredentials(
+// defaultIceConfig: env TURN forces relay (zero-exposure), otherwise the
+// community relay is added as candidate source without forcing transport.
+const ICE_CFG = defaultIceConfig(
   typeof process !== 'undefined' ? (process.env as Record<string, string | undefined>) : {},
 )
-const ICE_CFG = peerConnectionConfig(TURN)
 
 export class OrbitPeerRelay {
   private peer: Peer | null = null

@@ -227,3 +227,29 @@ offline earnings). Each +5% click power. Persist across prestige.
 
 - zustand state → localStorage `goongrid.save.v1`, autosave every 10s + on unload.
 - Offline earnings = elapsed * GP/s * 50%, capped 8h, shown in modal on load.
+
+## 12. Release 1.0 — server topology (no central server)
+
+- Every packaged copy bundles its OWN server: `apps/desktop/scripts/stage-api.cjs`
+  stages a self-contained API (`packages/{crypto,shared}` + `apps/api` + prod
+  deps + `bun.exe`) at `api-stage/`; electron-builder ships it as
+  `resources/api` (`extraResources`). Nothing must be installed on the machine.
+- Packaged startup (`electron/main.cjs` + `electron/server-mode.cjs`):
+  - **host** (default): spawn the bundled server on `:8790` (world data lives in
+    `userData/orbit.sqlite` + `userData/blobs`); Settings → Server lists this
+    machine's LAN URLs (`http://<ip>:8790`) to share with friends.
+  - **client**: skip the local server; the renderer points at a friend's URL
+    (validated `http(s)://host[:port]`, persisted in `userData/server-mode.json`,
+    applied on relaunch). `GOONGRID_SERVER_URL` env overrides both.
+- Discovery across machines = everyone on the SAME host's server: WS swarm
+  relays presence, `GET /api/users/online` (last_seen ≤ 60s, minus caller)
+  seeds a joining client's peer map immediately; WebRTC direct fanout uses
+  `defaultIceConfig` — env TURN keeps the forced-relay zero-exposure posture,
+  otherwise STUN + community relay candidates without forced transport (§10c
+  sanitization applies either way; the WS path is the guaranteed fallback).
+- Share links are real, openable URLs: public HTML pages `GET /p/:id` (post)
+  and `GET /u/:id` (profile), XSS-escaped, unauthenticated; `GET /api/users/:id`
+  serves sanitized profiles. Deep links `#/feed?post=<id>` open the lightbox.
+- Build: `cd apps/desktop && npm run dist`; CI: tag `v*` →
+  `.github/workflows/release.yml` (lint+typecheck+test gate → portable exe →
+  GitHub release). Unsigned exe → SmartScreen "More info → Run anyway".

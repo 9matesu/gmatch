@@ -164,8 +164,13 @@ Bun.serve({
       if (upgradeHeader?.toLowerCase() === 'websocket' && server.upgrade(req)) return
     }
 
-    // API & system routes
-    if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/.well-known/')) {
+    // API & system routes (+ public share pages /p/:id, /u/:id)
+    if (
+      url.pathname.startsWith('/api/') ||
+      url.pathname.startsWith('/.well-known/') ||
+      url.pathname.startsWith('/p/') ||
+      url.pathname.startsWith('/u/')
+    ) {
       if (url.pathname === '/api/health') {
         const status = dbReady ? 200 : dbInitError ? 500 : 503
         return Response.json({

@@ -41,6 +41,9 @@ declare global {
       cacheImage?: (url: string) => Promise<{ local: string | null }>
       cacheStats?: () => Promise<{ files: number; bytes: number }>
       clearCache?: () => Promise<{ files: number; bytes: number }>
+      serverState?: () => Promise<{ packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[] }>
+      serverSet?: (payload: { mode: 'host' | 'client'; url?: string }) => Promise<{ ok: boolean; error?: string }>
+      serverRelaunch?: () => Promise<void>
     }
   }
 }

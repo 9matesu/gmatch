@@ -3,7 +3,7 @@ import tseslint from 'typescript-eslint'
 import globals from 'globals'
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', 'public/**', 'tools/**'] },
+  { ignores: ['dist/**', 'release/**', '../../api-stage/**', 'node_modules/**', 'public/**', 'tools/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -21,7 +21,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['electron/**/*.cjs', 'src/**/*.cjs'],
+    files: ['electron/**/*.cjs', 'src/**/*.cjs', 'scripts/**/*.cjs'],
     languageOptions: {
       sourceType: 'commonjs',
       globals: { ...globals.node, ...globals.browser },

@@ -1,6 +1,6 @@
 {
   "name": "@goongrid/desktop",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -10,7 +10,10 @@
     "electron": "electron .",
     "lint": "eslint .",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "icon": "node scripts/make-icon.cjs",
+    "dist": "npm run icon && npm run stage:api && npm run build && electron-builder --win portable",
+    "stage:api": "node scripts/stage-api.cjs"
   },
   "dependencies": {
     "@orbit/crypto": "*",
@@ -40,6 +43,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.5",
     "@playwright/test": "^1.62.1",
+    "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/vite": "^4.1.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
@@ -49,13 +53,50 @@
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/coverage-v8": "~2.1.0",
     "electron": "^33.2.0",
+    "electron-builder": "^26.15.3",
     "fake-indexeddb": "^6.2.5",
     "globals": "^17.12.0",
     "jsdom": "^25.0.1",
+    "png-to-ico": "^3.0.2",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.69.0",
     "vite": "^6.0.0",
     "vitest": "^2.1.8"
-  }
+  },
+  "build": {
+    "appId": "dev.goonmatch.grid",
+    "productName": "goonMatch Grid",
+    "electronVersion": "33.4.11",
+    "artifactName": "goonMatch-Grid-${version}-portable.${ext}",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "dist/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": "portable",
+      "icon": "build/icon.ico"
+    },
+    "portable": {
+      "unicode": true
+    },
+    "extraResources": [
+      {
+        "from": "../../api-stage",
+        "to": "api"
+      },
+      {
+        "from": "../../shared/blocklist.json",
+        "to": "shared/blocklist.json"
+      }
+    ]
+  },
+  "description": "goonMatch Grid — adults-only (18+) idle game + social desktop app",
+  "author": "goonMatch"
 }

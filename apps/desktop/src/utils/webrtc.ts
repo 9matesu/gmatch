@@ -1,7 +1,7 @@
 import { OrbitIdentity } from '@orbit/crypto'
 import { orbitFetch } from './api'
 import { logger } from './logger';
-import { peerConnectionConfig, sanitizeCandidate, turnCredentials } from './ice-hygiene'
+import { defaultIceConfig, sanitizeCandidate } from './ice-hygiene'
 
 export interface FileMeta {
   name: string
@@ -14,7 +14,7 @@ export interface FileMeta {
 
 function getIceServers(): RTCIceServer[] {
   // Single privacy gate (ice-hygiene): STUN always; TURN relay-only when set.
-  return peerConnectionConfig(turnCredentials(readTurnEnv())).iceServers as RTCIceServer[]
+  return defaultIceConfig(readTurnEnv()).iceServers as RTCIceServer[]
 }
 
 function readTurnEnv(): Record<string, string | undefined> {
@@ -53,7 +53,7 @@ export class OrbitPeer {
 
   async initiate(recipientId: string, identity: OrbitIdentity): Promise<string> {
     logger.log('[ORBIT WebRTC] Initiating peer connection to:', recipientId)
-    this.pc = new RTCPeerConnection(peerConnectionConfig(turnCredentials(readTurnEnv())))
+    this.pc = new RTCPeerConnection(defaultIceConfig(readTurnEnv()))
     this.channel = this.pc.createDataChannel('file-transfer')
     this.setupDataChannel(identity)
 
@@ -180,7 +180,7 @@ export class OrbitPeer {
     if (!offerRes || !offerRes.ok) throw new Error('[phase:fetch-offer] Failed to fetch WebRTC offer')
     const { offer, sender_id } = await offerRes.json()
 
-    this.pc = new RTCPeerConnection(peerConnectionConfig(turnCredentials(readTurnEnv())))
+    this.pc = new RTCPeerConnection(defaultIceConfig(readTurnEnv()))
     this.pc.ondatachannel = (e) => {
       logger.log('[ORBIT WebRTC] DataChannel established on receiver!')
       this.channel = e.channel

@@ -5,6 +5,7 @@ import { User, OrbitObject } from '@orbit/shared';
 import { saveObject } from '../utils/storage';
 import { OrbitPeerRelay } from '../utils/peer-relay';
 import { getApiBaseUrl, orbitFetch } from '../utils/api';
+import { mergeRoster } from '../utils/peerRoster';
 import { CHAT_WIPE_SECONDS } from '@orbit/shared';
 import { logger } from '../utils/logger';
 
@@ -489,6 +490,21 @@ export function useP2P(identity: OrbitIdentity | null) {
     sendHeartbeat();
     const interval = setInterval(sendHeartbeat, 60_000);
 
+    // 4b. Discovery roster (plan P2.2): seed the peer map immediately from
+    // the server's current online set instead of waiting passively for the
+    // next swarm event. Refresh rides the same 60s cadence as presence.
+    const pullRoster = () => {
+      orbitFetch('/api/users/online', {}, identity)
+        .then((r) => (r.ok ? r.json() : { users: [] }))
+        .then(({ users }: { users?: User[] }) => {
+          if (!Array.isArray(users) || users.length === 0) return
+          if (mergeRoster(peerMapRef.current, users, selfUserRef.current.id)) updatePeersList()
+        })
+        .catch(() => {})
+    }
+    pullRoster()
+    const rosterInterval = setInterval(pullRoster, 60_000)
+
     // 5. Handle incoming local tab P2P swarm events
     channel.onmessage = (event: MessageEvent<P2PSwarmMessage>) => {
       const data = event.data;
@@ -540,6 +556,7 @@ export function useP2P(identity: OrbitIdentity | null) {
     return () => {
       cancelled = true;
       clearInterval(interval);
+      clearInterval(rosterInterval);
       channel.close();
       channelRef.current = null;
       if (wsRef.current) {
