@@ -2,6 +2,11 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath } from 'node:url'
 
+// Determinism: vitest only defaults NODE_ENV to 'test' when unset. A shell
+// exporting NODE_ENV=production would flip import.meta.env.DEV to false and
+// ship React's production build (no React.act) — pin it explicitly.
+process.env.NODE_ENV = 'test'
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -9,6 +14,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    env: { NODE_ENV: 'test' },
     globals: true,
     setupFiles: ['src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
