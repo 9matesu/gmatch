@@ -10,80 +10,79 @@
 
 @theme inline {
   /* Core canvas and surfaces */
-  --color-surface-canvas: #080A0D;
-  --color-surface-raised: #10141A;
-  --color-surface-elevated: #171C23;
+  --color-surface-canvas: #09090b;
+  --color-surface-raised: #121215;
+  --color-surface-elevated: #18181b;
   --color-surface-interactive: #27272a;
 
   /* Glass surfaces (used with backdrop-filter) */
-  --color-glass: rgba(23, 28, 35, 0.72);
-  --color-glass-strong: rgba(23, 28, 35, 0.90);
-  --color-glass-solid: #171C23;
+  --color-glass: rgba(18, 18, 21, 0.85);
+  --color-glass-strong: rgba(24, 24, 27, 0.95);
+  --color-glass-solid: #18181b;
 
   /* Borders and highlights */
-  --color-border-glass: rgba(245, 247, 250, 0.16);
-  --color-border-subtle: rgba(245, 247, 250, 0.08);
-  --color-border-strong: rgba(245, 247, 250, 0.24);
+  --color-border-glass: #27272a;
+  --color-border-subtle: #1f1f23;
+  --color-border-strong: #3f3f46;
 
-  /* Accent: Chrome Spark (Y2K liquid metal) */
-  --color-retro-accent: #C7E4FF;
-  --color-retro-accent-hover: #E4F3FF;
-  --color-retro-accent-text: #07121C;
-  --color-chrome-cyan: #9FE3FF;
-  --color-chrome-lav: #D6C6FF;
-  --color-chrome-pink: #FFD6F0;
-  --color-chrome-mint: #C9FFE2;
+  /* Accent: Clean high-contrast monochrome (Vercel style) */
+  --color-retro-accent: #ffffff;
+  --color-retro-accent-hover: #e4e4e7;
+  --color-retro-accent-text: #09090b;
+  --color-chrome-cyan: #38bdf8;
+  --color-chrome-lav: #a78bfa;
+  --color-chrome-pink: #f472b6;
+  --color-chrome-mint: #4ade80;
 
   /* Text hierarchy */
-  --color-retro-fg: #F5F7FA;
-  --color-retro-body: #D7DDE5;
-  --color-retro-muted: #AAB4C0;
-  --color-retro-faint: #7F8A98;
+  --color-retro-fg: #fafafa;
+  --color-retro-body: #d4d4d8;
+  --color-retro-muted: #71717a;
+  --color-retro-faint: #52525b;
 
   /* Status colors */
-  --color-retro-online: #6FD8FF;
-  --color-retro-warning: #FFC857;
-  --color-retro-error: #FF706A;
-  --color-retro-info: #7FE0FF;
-  --color-retro-selection: rgba(150, 210, 255, 0.22);
+  --color-retro-online: #22c55e;
+  --color-retro-warning: #eab308;
+  --color-retro-error: #ef4444;
+  --color-retro-info: #3b82f6;
+  --color-retro-selection: rgba(255, 255, 255, 0.15);
 
   /* Legacy aliases for backward compatibility */
-  --color-retro-bg: #080A0D;
-  --color-retro-panel: #10141A;
+  --color-retro-bg: #09090b;
+  --color-retro-panel: #121215;
   --color-retro-border: #27272a;
 
   /* Shadcn compatibility */
-  --background: #080A0D;
-  --foreground: #F5F7FA;
-  --card: #10141A;
-  --card-foreground: #F5F7FA;
-  --popover: #10141A;
-  --popover-foreground: #F5F7FA;
-  --primary: #C7E4FF;
-  --primary-foreground: #07121C;
+  --background: #09090b;
+  --foreground: #fafafa;
+  --card: #121215;
+  --card-foreground: #fafafa;
+  --popover: #121215;
+  --popover-foreground: #fafafa;
+  --primary: #ffffff;
+  --primary-foreground: #09090b;
   --secondary: #27272a;
-  --secondary-foreground: #F5F7FA;
-  --muted: #171C23;
-  --muted-foreground: #AAB4C0;
-  --accent: #C7E4FF;
-  --accent-foreground: #07121C;
-  --destructive: #FF706A;
-  --destructive-foreground: #080A0D;
-  --border: rgba(245, 247, 250, 0.16);
+  --secondary-foreground: #fafafa;
+  --muted: #18181b;
+  --muted-foreground: #71717a;
+  --accent: #ffffff;
+  --accent-foreground: #09090b;
+  --destructive: #ef4444;
+  --destructive-foreground: #fafafa;
+  --border: #27272a;
   --input: #27272a;
-  --ring: #C7E4FF;
+  --ring: #ffffff;
 
   /* Typography */
-  /* Fonts: next/font variables replaced by Google Fonts links in index.html. */
-  --font-sans: Outfit, Roboto, "Segoe UI", system-ui, sans-serif;
-  --font-heading: Merriweather, Georgia, serif;
+  --font-sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-heading: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-roboto: Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: var(--font-roboto), Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  /* Radius scale (Metro geometry) */
-  --radius: 4px;
-  --radius-sm: 2px;
-  --radius-md: 4px;
+  /* Radius scale (Concentric geometry) */
+  --radius: 6px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
   --radius-lg: 8px;
   --radius-xl: 12px;
   --radius-2xl: 16px;
@@ -101,37 +100,37 @@
   --space-12: 48px;
 
   /* Sidebar/chart stubs for shadcn compat */
-  --color-sidebar-ring: #C7E4FF;
-  --color-sidebar-border: rgba(245, 247, 250, 0.16);
-  --color-sidebar-accent-foreground: #07121C;
-  --color-sidebar-accent: #C7E4FF;
-  --color-sidebar-primary-foreground: #07121C;
-  --color-sidebar-primary: #C7E4FF;
-  --color-sidebar-foreground: #F5F7FA;
-  --color-sidebar: #10141A;
-  --color-chart-5: #C7E4FF;
-  --color-chart-4: #7FE0FF;
-  --color-chart-3: #FFC857;
-  --color-chart-2: #FF706A;
-  --color-chart-1: #C7E4FF;
-  --color-ring: #C7E4FF;
+  --color-sidebar-ring: #ffffff;
+  --color-sidebar-border: #27272a;
+  --color-sidebar-accent-foreground: #09090b;
+  --color-sidebar-accent: #ffffff;
+  --color-sidebar-primary-foreground: #09090b;
+  --color-sidebar-primary: #ffffff;
+  --color-sidebar-foreground: #fafafa;
+  --color-sidebar: #121215;
+  --color-chart-5: #a78bfa;
+  --color-chart-4: #38bdf8;
+  --color-chart-3: #eab308;
+  --color-chart-2: #ef4444;
+  --color-chart-1: #ffffff;
+  --color-ring: #ffffff;
   --color-input: #27272a;
-  --color-border: rgba(245, 247, 250, 0.16);
-  --color-destructive: #FF706A;
-  --color-accent-foreground: #07121C;
-  --color-accent: #C7E4FF;
-  --color-muted-foreground: #AAB4C0;
-  --color-muted: #171C23;
-  --color-secondary-foreground: #F5F7FA;
+  --color-border: #27272a;
+  --color-destructive: #ef4444;
+  --color-accent-foreground: #09090b;
+  --color-accent: #ffffff;
+  --color-muted-foreground: #71717a;
+  --color-muted: #18181b;
+  --color-secondary-foreground: #fafafa;
   --color-secondary: #27272a;
-  --color-primary-foreground: #07121C;
-  --color-primary: #C7E4FF;
-  --color-popover-foreground: #F5F7FA;
-  --color-popover: #10141A;
-  --color-card-foreground: #F5F7FA;
-  --color-card: #10141A;
-  --color-foreground: #F5F7FA;
-  --color-background: #080A0D;
+  --color-primary-foreground: #09090b;
+  --color-primary: #ffffff;
+  --color-popover-foreground: #fafafa;
+  --color-popover: #121215;
+  --color-card-foreground: #fafafa;
+  --color-card: #121215;
+  --color-foreground: #fafafa;
+  --color-background: #09090b;
 }
 
 @layer base {
