@@ -15,6 +15,10 @@ const ROOT = join(__dirname, '..', '..', '..')
 const STAGE = join(ROOT, 'api-stage')
 
 function findBunExe() {
+  // Explicit override (CI can pin it): GOONGRID_BUN_EXE=path/to/bun.exe
+  if (process.env.GOONGRID_BUN_EXE && existsSync(process.env.GOONGRID_BUN_EXE)) {
+    return process.env.GOONGRID_BUN_EXE
+  }
   const candidates = [
     join(process.env.APPDATA || '', 'npm', 'node_modules', 'bun', 'bin', 'bun.exe'),
     join(process.env.USERPROFILE || '', '.bun', 'bin', 'bun.exe'),
@@ -22,6 +26,11 @@ function findBunExe() {
     'C:\\npm\\prefix\\node_modules\\bun\\bin\\bun.exe',
     join(process.env.PREFIX || '', 'node_modules', 'bun', 'bin', 'bun.exe'),
   ]
+  // Authoritative global root (npm root -g works on runners + dev boxes).
+  try {
+    const globalRoot = execFileSync('npm', ['root', '-g'], { encoding: 'utf8', shell: true }).trim()
+    if (globalRoot) candidates.push(join(globalRoot, 'bun', 'bin', 'bun.exe'))
+  } catch { /* npm not on PATH */ }
   for (const c of candidates) if (existsSync(c)) return c
   // Last resort: resolve `bun.exe` from PATH (npm -g shims may put it there).
   try {

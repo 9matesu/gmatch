@@ -17,7 +17,10 @@ jobs:
           node-version: 22
           cache: npm
       - name: Install bun (needed by stage-api to copy bun.exe into the app)
-        run: npm i -g --allow-scripts=bun bun
+        shell: pwsh
+        run: |
+          npm i -g --allow-scripts=bun bun
+          echo "GOONGRID_BUN_EXE=$(npm root -g | ForEach-Object { $_.Trim() })\bun\bin\bun.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
       - name: Install (NODE_ENV unset so dev deps install)
         run: npm ci
       - name: Gate — lint / typecheck / unit tests
