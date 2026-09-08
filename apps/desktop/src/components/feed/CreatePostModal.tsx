@@ -252,45 +252,45 @@ export function CreatePostModal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 font-sans select-none animate-orbit-fade-in"
+      className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 font-sans select-none animate-orbit-fade-in"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-3xl bg-glass backdrop-blur-2xl border border-border-glass rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-retro-fg animate-orbit-pop"
+        className="w-full max-w-3xl bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-zinc-100 animate-orbit-pop"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-retro-muted hover:text-retro-body rounded-full cursor-pointer hover:bg-white/10 transition-colors"
+            className="p-1.5 text-zinc-400 hover:text-zinc-100 rounded-md cursor-pointer hover:bg-zinc-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
 
-          <span className="font-bold text-xs uppercase tracking-wider text-retro-fg">
-            Chrome Composer {mediaList.length > 0 ? `(${mediaList.length} pics)` : ''}
+          <span className="font-semibold text-xs text-zinc-200">
+            Create Post {mediaList.length > 0 ? `(${mediaList.length} media)` : ''}
           </span>
 
           <button
             type="button"
             onClick={handleShare}
             disabled={uploading || mediaList.length === 0}
-            className="text-xs font-bold text-black disabled:opacity-40 cursor-pointer transition-all px-4 py-1.5 chrome-accent rounded-lg shadow-[0_2px_10px_rgba(159,227,255,0.25)]"
+            className="text-xs font-semibold text-zinc-950 bg-white hover:bg-zinc-200 disabled:opacity-40 cursor-pointer transition-all duration-150 active:scale-[0.96] px-4 py-1.5 rounded-md shadow-xs"
           >
             {uploading ? 'Sharing...' : 'Share'}
           </button>
         </div>
 
         {/* Mode Selector Tabs */}
-        <div className="flex border-b border-border-glass px-3 pt-2 gap-2 text-xs font-bold">
+        <div className="flex border-b border-zinc-800 px-3 pt-2 gap-2 text-xs">
           <button
             type="button"
             onClick={() => { playPress(750); setActiveTab('upload'); }}
-            className={`flex items-center gap-1.5 px-3.5 py-2 border-b-2 transition-all cursor-pointer ${activeTab === 'upload'
-              ? 'border-retro-accent text-retro-accent bg-surface-raised rounded-t-xl'
-              : 'border-transparent text-retro-muted hover:text-retro-body'
+            className={`flex items-center gap-1.5 px-3.5 py-2 border-b-2 transition-all cursor-pointer font-medium ${activeTab === 'upload'
+              ? 'border-white text-white bg-zinc-800/40 rounded-t-md'
+              : 'border-transparent text-zinc-400 hover:text-zinc-200'
               }`}
           >
             <UploadCloud className="w-4 h-4" />
@@ -300,9 +300,9 @@ export function CreatePostModal({
           <button
             type="button"
             onClick={() => { playPress(750); setActiveTab('camera'); }}
-            className={`flex items-center gap-1.5 px-3.5 py-2 border-b-2 transition-all cursor-pointer ${activeTab === 'camera'
-              ? 'border-retro-accent text-retro-accent bg-surface-raised rounded-t-xl'
-              : 'border-transparent text-retro-muted hover:text-retro-body'
+            className={`flex items-center gap-1.5 px-3.5 py-2 border-b-2 transition-all cursor-pointer font-medium ${activeTab === 'camera'
+              ? 'border-white text-white bg-zinc-800/40 rounded-t-md'
+              : 'border-transparent text-zinc-400 hover:text-zinc-200'
               }`}
           >
             <Camera className="w-4 h-4" />
@@ -312,9 +312,9 @@ export function CreatePostModal({
           <button
             type="button"
             onClick={() => { playPress(750); setActiveTab('url'); }}
-            className={`flex items-center gap-1.5 px-3.5 py-2 border-b-2 transition-all cursor-pointer ${activeTab === 'url'
-              ? 'border-retro-accent text-retro-accent bg-surface-raised rounded-t-xl'
-              : 'border-transparent text-retro-muted hover:text-retro-body'
+            className={`flex items-center gap-1.5 px-3.5 py-2 border-b-2 transition-all cursor-pointer font-medium ${activeTab === 'url'
+              ? 'border-white text-white bg-zinc-800/40 rounded-t-md'
+              : 'border-transparent text-zinc-400 hover:text-zinc-200'
               }`}
           >
             <LinkIcon className="w-4 h-4" />
@@ -450,16 +450,16 @@ export function CreatePostModal({
 
               {/* Thumbnails & Reorder Bar */}
               {mediaList.length > 1 && (
-                <div className="flex items-center gap-2 overflow-x-auto p-1.5 styled-scrollbar bg-surface-interactive border border-border-glass rounded-2xl">
+                <div className="flex items-center gap-2 overflow-x-auto p-1.5 styled-scrollbar bg-zinc-950 border border-zinc-800 rounded-lg">
                   {mediaList.map((m, idx) => (
                     <div
                       key={m.id}
                       onClick={() => setActiveMediaIndex(idx)}
-                      className={`relative w-14 h-14 rounded-xl overflow-hidden shrink-0 border-2 cursor-pointer transition-all ${activeMediaIndex === idx ? 'border-retro-accent scale-105 shadow-md' : 'border-border-glass opacity-60 hover:opacity-100'
+                      className={`relative w-14 h-14 rounded-md overflow-hidden shrink-0 border cursor-pointer transition-all duration-150 active:scale-[0.96] ${activeMediaIndex === idx ? 'border-white ring-1 ring-white' : 'border-zinc-800 opacity-60 hover:opacity-100'
                         }`}
                     >
                       <img src={m.previewUrl} alt="" className="w-full h-full object-cover" />
-                      <span className="absolute bottom-0.5 right-0.5 px-1 bg-black/70 text-[8px] font-bold text-white rounded">
+                      <span className="absolute bottom-0.5 right-0.5 px-1 bg-black/70 text-[8px] font-mono font-bold text-white rounded">
                         #{idx + 1}
                       </span>
                     </div>
@@ -470,7 +470,7 @@ export function CreatePostModal({
                       type="button"
                       onClick={() => moveMedia(activeMediaIndex, activeMediaIndex - 1)}
                       disabled={activeMediaIndex === 0}
-                      className="px-2 py-1 bg-surface-raised border border-border-glass rounded-lg text-[10px] font-bold disabled:opacity-30 hover:bg-white/10 cursor-pointer"
+                      className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] font-mono font-semibold disabled:opacity-30 hover:bg-zinc-700 cursor-pointer transition-all duration-150 active:scale-[0.96]"
                       title="Move photo left"
                     >
                       ←
@@ -479,7 +479,7 @@ export function CreatePostModal({
                       type="button"
                       onClick={() => moveMedia(activeMediaIndex, activeMediaIndex + 1)}
                       disabled={activeMediaIndex === mediaList.length - 1}
-                      className="px-2 py-1 bg-surface-raised border border-border-glass rounded-lg text-[10px] font-bold disabled:opacity-30 hover:bg-white/10 cursor-pointer"
+                      className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] font-mono font-semibold disabled:opacity-30 hover:bg-zinc-700 cursor-pointer transition-all duration-150 active:scale-[0.96]"
                       title="Move photo right"
                     >
                       →
@@ -493,37 +493,37 @@ export function CreatePostModal({
                 <textarea
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
-                  placeholder="Write a caption... #goon #cock #perv"
+                  placeholder="Write a caption..."
                   rows={3}
                   maxLength={1000}
-                  className="w-full bg-surface-raised border border-border-glass rounded-xl p-3 text-xs text-retro-fg focus:outline-none focus:border-retro-accent focus:bg-surface-raised transition-all placeholder:text-retro-faint resize-none"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-xs text-zinc-100 focus:outline-none focus:border-zinc-600 transition-colors placeholder:text-zinc-500 resize-none"
                 />
-                <div className="text-right text-[10px] text-retro-muted mt-0.5">
+                <div className="text-right text-[10px] font-mono text-zinc-500 mt-0.5">
                   {caption.length}/1000
                 </div>
               </div>
 
               {/* Location & Tags inputs */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div className="flex items-center gap-2 bg-surface-raised border border-border-glass rounded-xl px-3 py-2 text-xs">
-                  <MapPin className="w-4 h-4 text-retro-muted shrink-0" />
+                <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs">
+                  <MapPin className="w-4 h-4 text-zinc-500 shrink-0" />
                   <input
                     type="text"
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                     placeholder="Add location"
-                    className="w-full bg-transparent focus:outline-none placeholder:text-retro-faint"
+                    className="w-full bg-transparent focus:outline-none placeholder:text-zinc-500 text-zinc-200"
                   />
                 </div>
 
-                <div className="flex items-center gap-2 bg-surface-raised border border-border-glass rounded-xl px-3 py-2 text-xs">
-                  <Tag className="w-4 h-4 text-retro-muted shrink-0" />
+                <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs">
+                  <Tag className="w-4 h-4 text-zinc-500 shrink-0" />
                   <input
                     type="text"
                     value={tags}
                     onChange={(e) => setTags(e.target.value)}
-                    placeholder="Tags (e.g. tiny, MILF, caption, bop)"
-                    className="w-full bg-transparent focus:outline-none placeholder:text-retro-faint"
+                    placeholder="Tags (e.g. anime, art, arcade)"
+                    className="w-full bg-transparent focus:outline-none placeholder:text-zinc-500 text-zinc-200"
                   />
                 </div>
               </div>
