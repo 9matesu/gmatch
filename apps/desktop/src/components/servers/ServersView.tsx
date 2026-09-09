@@ -9,6 +9,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Server, Lock, Globe, Radio, UserPlus, ShieldCheck } from 'lucide-react'
 import { getCentralApiUrl, hasCentral } from '../../utils/central'
 import { orbitFetch } from '../../utils/api'
+import { normalizeServerUrl } from '../../utils/serverUrl'
+import { rememberJoin } from '../../utils/server-join'
 import { playPress } from '../../utils/sounds'
 
 interface DirectoryServer {
@@ -115,7 +117,16 @@ export function ServersView({ identity, toast }: { identity: Parameters<typeof o
     const url = s.endpoint_hint
     if (!url) { toast('This server has no address to join (owner is offline?)', 'warning'); return }
     if (!window.gmatch?.serverSet) { toast('Joining servers works in the desktop app', 'warning'); return }
-    const res = await window.gmatch.serverSet({ mode: 'client', url })
+    let password: string | undefined
+    if (s.password_required) {
+      const entered = window.prompt(`"${s.name}" is password-protected. Enter the password:`)
+      if (entered === null) return
+      password = entered
+    }
+    // hand the password to the post-restart boot (one-shot, local only)
+    const target = normalizeServerUrl(url) || normalizeServerUrl('http://' + url) || url
+    if (password !== undefined) rememberJoin({ url: target, password })
+    const res = await window.gmatch.serverSet({ mode: 'client', url: target })
     if (res.ok) {
       toast(`Switching to ${s.name} — the app restarts`, 'success')
       window.gmatch.serverRelaunch?.()

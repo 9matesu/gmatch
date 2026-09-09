@@ -7,10 +7,13 @@ import { useEffect, useState } from 'react'
 import { Server, Wifi } from 'lucide-react'
 import { playPress } from '../../utils/sounds'
 import { isServerUrl, normalizeServerUrl } from '../../utils/serverUrl'
+import { ServerPasswordSection } from './ServerPasswordSection'
+import { useIdentity } from '../../hooks/useIdentity'
 
 type State = { packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[] }
 
 export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => void }) {
+  const { identity } = useIdentity()
   const [state, setState] = useState<State | null>(null)
   const [clientUrl, setClientUrl] = useState('')
   const [saving, setSaving] = useState(false)
@@ -44,6 +47,9 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
 
   return (
     <div className="space-y-4 animate-orbit-fade-in">
+      {state.mode === 'host' && identity && (
+        <ServerPasswordSection identity={identity as never} isHost toast={(m, t) => toast?.(m, t)} />
+      )}
       <div className="p-4 bg-surface-interactive border border-retro-border rounded-lg space-y-2">
         <div className="flex items-center gap-2">
           <Server className="w-4 h-4 text-retro-accent" />
