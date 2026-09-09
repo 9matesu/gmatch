@@ -122,11 +122,13 @@ text overlays kept for caption hunts, §6).
 - Browser/dev mode: direct fetch may CORS-fail → offline SVG placeholder
   (generated gradient + tag text + "OFFLINE" badge). Never crash on fetch error.
 - Dedupe by post id across a session; cache last 40 urls.
-- Picture + feed caching (no re-parse, no re-download): parsed post lists are
-  cached per query for 10 min (`<userData>/feed-cache.json`, 100 queries max);
-  picture bytes are cached on disk in `<userData>/image-cache/` (400 files /
-  400 MB, LRU-evicted, `gooncache://` scheme) in Electron, or IndexedDB blobs
-  in browser dev mode. The 5-up/5-down window (past 5 + queue 5 + video
+- Picture + feed caching (no re-parse, no re-download) — **RAM-only since the
+  F1 security fix**: nothing persists to disk. Parsed post lists live in the
+  main process for 10 min (100 queries max); picture bytes live in a
+  main-process LRU (256 MB budget, `gooncache://`) or a renderer session Map
+  in browser dev mode. `init()` destroys the legacy on-disk caches
+  (`<userData>/image-cache/`, `feed-cache.json`) and the legacy IndexedDB
+  store (`goongrid-img`). The 5-up/5-down window (past 5 + queue 5 + video
   posters, images AND videos) is prefetched so skip/back is instant; cache
   stats + Clear live in the left stats panel.
 

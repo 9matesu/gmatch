@@ -1,11 +1,12 @@
 /**
  * Pure cache policy helpers (SPEC §6 caching).
- * Shared naming/eviction rules used by the renderer blob cache
- * (src/services/imageCache.ts) and the Electron disk cache
- * (electron/imageCache.cjs, which mirrors cacheFileName — keep in sync).
+ * Shared naming/eviction rules used by the renderer session cache
+ * (src/services/imageCache.ts) and the Electron memory cache
+ * (electron/imageCacheMemory.cjs — cacheFileName is mirrored there; keep in sync).
+ * NOTE (F1 fix): both backends are RAM-only — nothing persists to disk.
  */
 
-/** Disk/blob cache caps: 400 files / 400 MB, LRU-evicted. */
+/** RAM cache budgets: 400 files / 400 MB, LRU-evicted. */
 export const IMAGE_CACHE_MAX_FILES = 400
 export const IMAGE_CACHE_MAX_BYTES = 400 * 1024 * 1024
 /** Single-file guard — a "picture" bigger than this is never cached. */

@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { __resetImageCache, clearImageCache, devFetchable, imageCacheStats, prefetchImages, resolveImage } from './imageCache'
+import { clearImageCache, devFetchable, imageCacheStats, prefetchImages, resolveImage, _test } from './imageCache'
 
 afterEach(() => {
   vi.unstubAllGlobals()
-  __resetImageCache()
+  _test.resetSessionCache()
 })
 
 describe('imageCache (no backends)', () => {
@@ -23,10 +23,10 @@ describe('imageCache (no backends)', () => {
     vi.stubGlobal('window', undefined)
     vi.stubGlobal('indexedDB', undefined)
     await expect(imageCacheStats()).resolves.toEqual({ files: 0, bytes: 0, backend: 'none' })
-    await expect(clearImageCache()).resolves.toBeUndefined()
+    await expect(clearImageCache()).resolves.toEqual({ files: 0, bytes: 0, backend: 'memory' })
   })
 
-  it('uses the Electron disk bridge when present', async () => {
+  it('uses the Electron memory bridge when present', async () => {
     const cacheImage = vi.fn().mockResolvedValue({ local: 'gooncache://f/abc.png' })
     vi.stubGlobal('window', { goongrid: { cacheImage } })
     await expect(resolveImage('https://x/1.png')).resolves.toBe('gooncache://f/abc.png')
@@ -38,7 +38,7 @@ describe('imageCache (no backends)', () => {
     const cacheStats = vi.fn().mockResolvedValue({ files: 3, bytes: 42 })
     vi.stubGlobal('window', { goongrid: { cacheImage, cacheStats } })
     await expect(resolveImage('https://x/1.png')).resolves.toBe('https://x/1.png')
-    await expect(imageCacheStats()).resolves.toEqual({ files: 3, bytes: 42, backend: 'disk' })
+    await expect(imageCacheStats()).resolves.toEqual({ files: 3, bytes: 42, backend: 'memory' })
   })
 })
 

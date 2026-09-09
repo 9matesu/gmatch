@@ -12,7 +12,7 @@ const serverMode = require('./server-mode.cjs')
 // server (default) or we're a CLIENT of a friend's. Decided once at startup.
 let packagedServer = null // { mode, url } when app.isPackaged
 
-// gooncache:// serves cached picture files from the user folder.
+// gooncache:// serves cached pictures from the MAIN-PROCESS RAM (never disk).
 // Privileged (standard+secure, fetchable) so sandboxed <img> tags can use it.
 protocol.registerSchemesAsPrivileged([
   {
