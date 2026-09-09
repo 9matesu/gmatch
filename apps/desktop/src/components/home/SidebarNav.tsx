@@ -295,27 +295,10 @@ export function SidebarNav({
         })}
       </nav>
 
-      {/* Connection state pill — the no-dead-end rule: the user always knows
-          whether the swarm socket is live or reconnecting (P2.3). */}
+      {/* Currency HUD — one compact, consistently-spaced row (UI-2):
+          repositioned right under the nav, gap-1.5 between indicators. */}
       <div className="px-2 pt-2 shrink-0">
-        <div
-          role="status"
-          aria-label={wsConnected ? 'Connected' : 'Reconnecting'}
-          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[10px] font-medium ${
-            wsConnected
-              ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400'
-              : 'bg-amber-500/5 border-amber-500/20 text-amber-400'
-          } ${collapsed ? 'justify-center' : ''}`}
-          title={wsConnected ? 'Swarm connected' : 'Swarm reconnecting…'}
-        >
-          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${wsConnected ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
-          {!collapsed && <span className="font-mono tracking-tight">{wsConnected ? 'ONLINE' : 'RECONNECTING…'}</span>}
-        </div>
-      </div>
-
-      {/* Currency HUD */}
-      <div className="px-2 pt-2 border-t border-zinc-800/80 shrink-0">
-        <div className={`flex flex-col gap-1 ${collapsed ? 'items-center' : ''}`}>
+        <div className={`flex gap-1.5 ${collapsed ? 'flex-col items-center' : 'flex-row'}`}>
           {[
             { icon: Coins, label: 'g$', value: balance, accent: 'text-amber-400' },
             { icon: Zap, label: 'XP', value: score, accent: 'text-sky-400' },
@@ -325,17 +308,14 @@ export function SidebarNav({
             return (
               <div
                 key={c.label}
-                className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-zinc-900/60 border border-zinc-800/80 ${collapsed ? 'justify-center' : ''}`}
                 title={c.label}
+                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-zinc-900/60 border border-zinc-800/80 min-w-0 ${collapsed ? 'justify-center' : 'flex-1 justify-center'}`}
               >
                 <Icon className={`w-3.5 h-3.5 shrink-0 ${c.accent} stroke-[1.75]`} />
                 {!collapsed && (
-                  <>
-                    <span className="text-[10px] font-medium text-zinc-400">{c.label}</span>
-                    <span className="ml-auto text-[11px] font-semibold text-zinc-200 font-mono tabular-nums tracking-tight">
-                      {c.value.toLocaleString()}
-                    </span>
-                  </>
+                  <span className="text-[11px] font-semibold text-zinc-200 font-mono tabular-nums tracking-tight truncate">
+                    {c.value.toLocaleString()}
+                  </span>
                 )}
               </div>
             );
@@ -366,9 +346,9 @@ export function SidebarNav({
               <div className={`text-xs font-medium truncate ${mainView === 'profile' ? 'text-zinc-100 font-semibold' : 'text-zinc-200'}`}>
                 {displayName || 'You'}
               </div>
-              <div className="text-[10px] text-zinc-400 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
-                <span>Online</span>
+              <div className="text-[10px] text-zinc-400 flex items-center gap-1.5" role="status" aria-label={wsConnected ? 'Connected' : 'Reconnecting'} title={wsConnected ? 'Swarm connected' : 'Swarm reconnecting…'}>
+                <span className={`w-1.5 h-1.5 rounded-full inline-block shrink-0 ${wsConnected ? 'bg-emerald-500' : 'bg-amber-400 animate-pulse'}`} />
+                <span>{wsConnected ? 'Online' : 'Connecting…'}</span>
               </div>
             </div>
           )}

@@ -260,9 +260,9 @@ export function GalleryView({
           </button>
         </div>
 
-        <div className="p-4">
+        <div className="p-4 sm:p-6">
           {itemsLoading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
               {Array.from({ length: 12 }).map((_, i) => <CardSkeleton key={i} />)}
             </div>
           ) : filteredItems.length === 0 ? (
@@ -270,7 +270,7 @@ export function GalleryView({
           ) : (
             <>
               <div
-                className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5 select-none"
+                className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 select-none"
                 onMouseDown={() => setDragActive(true)}
                 onMouseUp={() => { setDragActive(false); setDragAnchorId(null) }}
                 onMouseLeave={() => { setDragActive(false); setDragAnchorId(null) }}

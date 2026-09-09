@@ -83,7 +83,7 @@ export function PCDominationTab({ identity, users }: Props) {
   const [activeTab, setActiveTab] = useState<'consent' | 'control' | 'history'>('control');
   const [targets, setTargets] = useState<DominationTarget[]>([]);
   const [selectedTarget, setSelectedTarget] = useState<DominationTarget | null>(null);
-  const [sending, setSending] = useState<string | null>(null);
+  const [sending, setSending] = useState<string | null>(null);
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [history, setHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -416,7 +416,7 @@ export function PCDominationTab({ identity, users }: Props) {
                   <h3 className="text-xs font-black uppercase tracking-wider text-retro-fg">Available Actions</h3>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {Object.entries(ACTION_LABELS).map(([action, { label, icon: Icon, description }]) => {
                     const isConsented = Boolean(selectedTarget?.consents?.[`allow${action === 'wallpaper' ? 'DesktopBackgroundChange' : action === 'game_bg' ? 'GameBackgroundChange' : action === 'popup_video' ? 'PopupVideo' : action === 'message' ? 'PopupMessage' : action === 'text_overlay' ? 'TextOverlay' : action === 'blur' ? 'BlurEverything' : 'RemoteCamera'}`]);
                     const canSend = Boolean(selectedTarget && selectedTarget.enabled && settings.pcDominationEnabled);
@@ -517,7 +517,7 @@ export function PCDominationTab({ identity, users }: Props) {
                   Quick-apply consent profiles. Higher intensity unlocks more intrusive and powerful features.
                 </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {(['mild', 'medium', 'extreme'] as const).map((preset) => {
                     const isSelected = settings.dominationIntensity === preset;
                     return (
@@ -563,7 +563,7 @@ export function PCDominationTab({ identity, users }: Props) {
                   Toggle granular permissions for actions other trusted players can perform on your screen.
                 </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {consentSettings.map(({ key, label, desc }) => {
                     const value = Boolean(settings[key as keyof typeof settings]);
                     return (

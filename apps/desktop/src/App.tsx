@@ -42,6 +42,8 @@ import { GMatchDMs } from "./components/chat/GMatchDMs";
 import { AttachmentUploadModal } from "./components/AttachmentUploadModal";
 import { ProfileView } from "./components/views/ProfileView";
 import { MessagesView, DmMinimizedView } from "./components/views/MessagesView";
+import { useResizablePanel } from "./hooks/useResizablePanel";
+import { PanelResizer } from "./ui/PanelResizer";
 import { GameView } from "./components/views/GameView";
 import { AgeGateModal } from "./components/auth/AgeGateModal";
 import { LegalCenter, isLegalAccepted } from "./components/LegalCenter";
@@ -163,6 +165,9 @@ export default function Home() {
   }, [mainView]);
   const [dmMinimized, setDmMinimized] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  // UI-3: resizable messages sidebar (width persisted; smooth only when not dragging)
+  const chatPanel = useResizablePanel('chat')
+  const [chatResizing, setChatResizing] = useState(false)
   const [panelTab, setPanelTab] = useState<SocialPanelTab>('chat');
   const [gamesSubTab, setGamesSubTab] = useState<'duel' | 'cards' | 'decks' | 'babecock' | 'patrol' | 'ranks' | 'store'>('duel');
   const [collapsedModules, setCollapsedModules] = useState<Record<string, boolean>>({});
@@ -2839,7 +2844,8 @@ export default function Home() {
                 showRooms={courierActive}
               />
               <div
-                className={`hidden md:flex shrink-0 min-h-0 overflow-hidden transition-[width] duration-300 ease-out ${chatOpen ? 'w-[min(42rem,42vw)]' : 'w-0'}`}
+                className={`hidden md:flex shrink-0 min-h-0 overflow-hidden ${chatResizing ? '' : 'transition-[width] duration-300 ease-out'}`}
+                style={{ width: chatOpen ? `min(${chatPanel.width}px, 92vw)` : 0 }}
                 aria-hidden={!chatOpen}
               >
                 {chatOpen && (
@@ -2917,6 +2923,14 @@ export default function Home() {
                   </div>
                 )}
               </div>
+              {/* UI-3: drag handle between the messages panel and content */}
+              <PanelResizer
+                disabled={!chatOpen}
+                side="right"
+                onResizeStart={() => setChatResizing(true)}
+                onResizeEnd={() => setChatResizing(false)}
+                onDelta={chatPanel.dragBy}
+              />
               <div className="flex-1 min-h-0 flex flex-col">
                 <div ref={mainScrollRef} className="mobile-app-scroll flex-1 min-h-0 w-full flex flex-col relative z-10 overflow-y-auto styled-scrollbar">
 

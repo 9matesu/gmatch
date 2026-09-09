@@ -407,7 +407,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                 No cards in this deck yet. Click &quot;Add Cards&quot; to get started.
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 lg:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {getCardsInDeck().map(card => (
                   <div key={card.id} className="relative group">
                     <CardTile item={card} />
@@ -442,7 +442,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                   No available cards. All your cards are already in this deck.
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 lg:gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                   {availableCards.map(card => (
                     <div key={card.id} className="relative group">
                       <CardTile item={card} />

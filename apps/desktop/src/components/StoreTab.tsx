@@ -412,7 +412,7 @@ export function StoreTab({
       </section>
 
       {/* Economy Dashboard */}
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-surface-raised border border-retro-border rounded-lg p-3.5 col-span-2 lg:col-span-1">
           <div className="flex items-center gap-1.5 text-retro-muted text-[10px] font-semibold uppercase tracking-wider">
             <Coins className="w-3.5 h-3.5 text-retro-accent" />
@@ -544,7 +544,7 @@ export function StoreTab({
       </div>
 
       {/* Store Items Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredItems.map((item) => {
           const isOwned = unlocked.has(item.id);
           const count = inventory[item.id] || 0;

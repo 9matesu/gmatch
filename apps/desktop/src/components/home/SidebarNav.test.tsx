@@ -8,14 +8,20 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: async () => ({}) }))
 })
 
-describe('SidebarNav connection pill', () => {
-  it('shows ONLINE when the swarm socket is connected', () => {
+// UI-2: exactly ONE online indicator — the profile pill (the old top
+// connection pill was redundant). It stays honest: live vs reconnecting.
+describe('SidebarNav presence indicator', () => {
+  it('shows a single status indicator, wired to the socket state', () => {
     render(<SidebarNav wsConnected />)
-    expect(screen.getByRole('status', { name: 'Connected' })).toHaveTextContent('ONLINE')
+    const status = screen.getByRole('status', { name: 'Connected' })
+    expect(status).toHaveTextContent(/Online/)
+    // no second "RECONNECTING"-style pill anywhere else
+    expect(screen.getAllByRole('status')).toHaveLength(1)
   })
 
-  it('shows RECONNECTING when it is not — never silent', () => {
+  it('never claims Online while the swarm socket is down', () => {
     render(<SidebarNav wsConnected={false} />)
-    expect(screen.getByRole('status', { name: 'Reconnecting' })).toHaveTextContent(/RECONNECTING/i)
+    const status = screen.getByRole('status', { name: 'Reconnecting' })
+    expect(status.textContent).not.toMatch(/Online/)
   })
 })
