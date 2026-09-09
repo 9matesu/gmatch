@@ -1,0 +1,39 @@
+import { useEffect } from 'react'
+import { getCentralApiUrl } from '../utils/central'
+import { orbitFetch } from '../utils/api'
+
+// Host heartbeat (plan T3.5, docs/ADR-002-servers.md). While this install
+// HOSTS a server that was registered from it, keep its directory row fresh.
+// The directory prunes rows silent for 24h; a 15min cadence is plenty.
+// Only the HOST replays the registration (a joiner POSTing the same body
+// would create a different entry under their own pubkey), and browser/dev
+// builds without the bridge no-op.
+const REG_KEY = 'gmatch.server.register'
+
+export function useServerHeartbeat(identity: Parameters<typeof orbitFetch>[2] | null): void {
+  useEffect(() => {
+    if (!identity) return
+    let alive = true
+    const tick = async () => {
+      const st = await window.gmatch?.serverState?.().catch(() => null)
+      if (!alive || st?.mode !== 'host') return
+      const central = getCentralApiUrl()
+      if (!central) return
+      let raw: string | null = null
+      try { raw = localStorage.getItem(REG_KEY) } catch { /* session-only */ }
+      if (!raw) return
+      let body: Record<string, unknown>
+      try { body = JSON.parse(raw) } catch { return }
+      try {
+        await orbitFetch(central + '/api/servers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }, identity)
+      } catch { /* offline; retried next tick */ }
+    }
+    void tick()
+    const timer = setInterval(() => void tick(), 15 * 60 * 1000)
+    return () => { alive = false; clearInterval(timer) }
+  }, [identity])
+}

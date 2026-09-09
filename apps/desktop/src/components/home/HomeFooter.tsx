@@ -17,7 +17,7 @@ import {
   Monitor,
 } from 'lucide-react';
 
-export type MainViewType = 'feed' | 'games' | 'create' | 'messages' | 'profile' | 'game' | 'gallery' | 'store' | 'pc_domination' | 'grid' | 'rooms' | 'admin';
+export type MainViewType = 'feed' | 'games' | 'create' | 'messages' | 'profile' | 'game' | 'gallery' | 'store' | 'pc_domination' | 'grid' | 'rooms' | 'servers' | 'admin';
 
 export interface ActiveHackSession {
   itemId: string;

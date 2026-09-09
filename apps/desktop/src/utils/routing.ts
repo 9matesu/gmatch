@@ -16,6 +16,7 @@ export const ROUTE_VIEWS = [
   'pc_domination',
   'grid',
   'rooms',
+  'servers',
   'admin',
 ] as const
 
