@@ -6,7 +6,6 @@ import {
   MessageSquare,
   Users,
   Settings,
-  Coffee,
   Share2,
   Image,
 } from 'lucide-react';
@@ -134,30 +133,9 @@ export function RightUtilityDock({
         );
       })}
 
+      {/* Buy Me a Coffee / Discord buttons removed in 1.0.1 (user setup: the
+          app ships no promotion links or hardcoded third-party URLs). */}
       <div className="w-6 h-[1px] bg-surface-elevated/80 mx-auto my-0.5 shrink-0" />
-
-      {/* 4. Buy Me a Coffee Button */}
-      <div className="relative flex items-center justify-center">
-        {hoveredBtn === 'coffee' && (
-          <div className="absolute right-full mr-2.5 px-2.5 py-1 rounded-xl bg-amber-950/95 border border-amber-500/50 text-amber-200 text-xs font-bold shadow-2xl shadow-amber-950/80 backdrop-blur-xl whitespace-nowrap pointer-events-none z-50 animate-orbit-slide-up flex items-center gap-1">
-            <span>Buy Me a Coffee</span>
-            <div className="absolute -right-1 top-1/2 -translate-y-1/2 w-2 h-2 rotate-45 bg-amber-950 border-r border-t border-amber-500/50" />
-          </div>
-        )}
-
-        <a
-          href="https://buymeacoffee.com/stacksondeck"
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => playPress(960)}
-          onMouseEnter={() => setHoveredBtn('coffee')}
-          onMouseLeave={() => setHoveredBtn(null)}
-          aria-label="Buy Me a Coffee"
-          className="p-0 m-0 w-11 h-11 aspect-square rounded-xl inline-flex items-center justify-center transition-all duration-150 cursor-pointer overflow-hidden active:scale-90 bg-gradient-to-r from-amber-500/20 to-amber-600/10 hover:from-amber-500/30 hover:to-amber-600/20 border border-amber-500/40 text-amber-300 hover:text-amber-200 shadow-md shadow-amber-950/40"
-        >
-          <Coffee className="w-4.5 h-4.5 shrink-0 block m-auto transition-transform duration-150 hover:scale-110" />
-        </a>
-      </div>
 
       {/* 5. Share Button */}
       {onShare && (

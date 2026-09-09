@@ -74,33 +74,28 @@ export function turnCredentials(env: Record<string, string | undefined> = {}): {
 }
 
 /**
- * Packaged builds have no TURN env — without a relay fallback, cross-NAT
- * peers silently never connect (a dead end). Public community TURN as the
- * default relay candidate source; NEXT_PUBLIC_TURN_* env always wins.
- * NOTE: third-party, rate-limited — see SPEC §10c / plan risk #1.
+ * TURN is opt-in (user setup): NEXT_PUBLIC_TURN_URL/USERNAME/CREDENTIAL.
+ * No community relay creds are baked into the bundle — the old defaultTurn()
+ * shipped a hardcoded third-party OpenRelay credential the user never chose
+ * (and that could not be removed by config). Returns null when nothing is
+ * configured; the caller then uses STUN-only.
  */
-export function defaultTurn(): { url: string; username: string; credential: string } {
-  return { url: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }
-}
-
-/** TURN for a connection: explicit env first, public default otherwise. */
-export function effectiveTurn(env: Record<string, string | undefined> = {}): { url: string; username: string; credential: string } {
-  return turnCredentials(env) ?? defaultTurn()
+export function effectiveTurn(env: Record<string, string | undefined> = {}): { url: string; username: string; credential: string } | null {
+  return turnCredentials(env)
 }
 
 /**
  * The config both P2P stacks use. Two modes (SPEC §10c semantics kept):
  * - explicit NEXT_PUBLIC_TURN_* env → relay-forced, zero IP exposure posture.
- * - otherwise → STUN + community default TURN as candidate sources WITHOUT
- *   forcing relay: same-LAN pairs connect directly and a community-relay
- *   outage cannot take all P2P down. Outgoing candidates are still
- *   sanitized (no literal IPs, no srflx onward), so the peer never learns
- *   anyone's public address either way.
+ * - otherwise → STUN only: same-LAN and same-server pairs connect directly;
+ *   symmetric-NAT pairs rely on the WS-relay swarm (server/peer-hosted) as
+ *   the no-dead-end fallback. Outgoing candidates are always sanitized (no
+ *   literal IPs, no srflx onward), so the peer never learns anyone's address.
  */
 export function defaultIceConfig(env: Record<string, string | undefined> = {}): RTCConfiguration {
   const envTurn = turnCredentials(env)
   if (envTurn) return peerConnectionConfig(envTurn)
-  return { ...peerConnectionConfig(null), iceServers: iceServersFor(defaultTurn()) }
+  return peerConnectionConfig(null)
 }
 
 /** ICE server list: STUN always; TURN only when configured. */

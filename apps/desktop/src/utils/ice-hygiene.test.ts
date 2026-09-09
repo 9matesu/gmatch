@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   candidateLeaksIp,
   defaultIceConfig,
-  defaultTurn,
+  effectiveTurn,
   iceServersFor,
   isLiteralIp,
   parseCandidate,
@@ -100,22 +100,29 @@ describe('turnCredentials + config', () => {
     expect(iceServersFor(turn)[3]).toMatchObject({ urls: 'turn:x' })
   })
 
-  // P2.4: packaged builds have no TURN env — without a default, cross-NAT
-  // peers silently never connect (a dead end). defaultIceConfig() adds the
-  // community relay as a candidate source; explicit env keeps the forced
-  // zero-exposure posture (SPEC §10c).
-  it('defaultTurn() provides relay creds', () => {
-    const d = defaultTurn()
-    expect(d.url).toMatch(/^turns?:/)
-    expect(d.username).toBeTruthy()
-    expect(d.credential).toBeTruthy()
+  // Fix 1.0.1 #4: no hardcoded API keys/credentials. The old defaultTurn()
+  // shipped baked-in OpenRelay creds (a third-party relay the user never
+  // chose). With no TURN configured, the config is STUN-only and does NOT
+  // force relay; a user who wants cross-NAT relay sets NEXT_PUBLIC_TURN_*.
+  it('no defaultTurn export — credentials are never hardcoded', async () => {
+    const mod = await import('./ice-hygiene')
+    expect((mod as Record<string, unknown>).defaultTurn).toBeUndefined()
   })
 
-  it('defaultIceConfig: no env → STUN+relay candidates, NOT forced relay', () => {
+  it('defaultIceConfig: no env → STUN only (3 servers), NOT forced relay', () => {
     const cfg = defaultIceConfig({})
-    expect(cfg.iceServers).toHaveLength(4)
-    expect(cfg.iceServers![3].urls).toBe(defaultTurn().url)
+    expect(cfg.iceServers).toHaveLength(3)
+    expect(cfg.iceServers!.every((s) => String(s.urls).startsWith('stun:'))).toBe(true)
     expect(cfg.iceTransportPolicy).toBeUndefined()
+  })
+
+  it('effectiveTurn: null without env, the user config when set', () => {
+    expect(effectiveTurn({})).toBeNull()
+    expect(effectiveTurn({
+      NEXT_PUBLIC_TURN_URL: 'turn:y',
+      NEXT_PUBLIC_TURN_USERNAME: 'u2',
+      NEXT_PUBLIC_TURN_CREDENTIAL: 'p2',
+    })).toEqual({ url: 'turn:y', username: 'u2', credential: 'p2' })
   })
 
   it('defaultIceConfig: explicit env → forced relay (zero-exposure posture)', () => {

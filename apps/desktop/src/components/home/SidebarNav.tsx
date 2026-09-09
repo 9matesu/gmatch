@@ -20,13 +20,9 @@ import {
   Coins,
   Zap,
   Trophy,
-  MessageCircle,
-  Coffee,
   Monitor,
-  MousePointerClick,
 } from 'lucide-react';
 import type { MainViewType } from './HomeFooter';
-import { getApiBaseUrl } from '../../utils/api';
 
 export interface ActiveHackSession {
   itemId: string;
@@ -35,8 +31,6 @@ export interface ActiveHackSession {
   targetUserName: string;
   expiresAt: number;
 }
-
-const DEFAULT_DISCORD_URL = 'https://discord.gg/WMEz9jgr3';
 
 export function SidebarNav({
   mainView = 'feed',
@@ -85,7 +79,6 @@ export function SidebarNav({
   wsConnected?: boolean;
 }) {
   const [now, setNow] = useState(() => Date.now());
-  const [discordUrl, setDiscordUrl] = useState<string | null>(DEFAULT_DISCORD_URL);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     try { return localStorage.getItem('goonmatch_sidebar_collapsed') === '1'; } catch { return false; }
@@ -93,14 +86,6 @@ export function SidebarNav({
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, []);
-  useEffect(() => {
-    let cancelled = false;
-    fetch(`${getApiBaseUrl()}/api/discord-invite`)
-      .then((r) => r.json())
-      .then((d) => { if (!cancelled && d?.url) setDiscordUrl(d.url); })
-      .catch(() => { if (!cancelled) setDiscordUrl(DEFAULT_DISCORD_URL); });
-    return () => { cancelled = true; };
   }, []);
 
   const toggleCollapsed = () => {
@@ -132,15 +117,8 @@ export function SidebarNav({
       id: 'games',
       label: 'Porn Games',
       icon: Gamepad2,
-      active: mainView === 'games',
+      active: mainView === 'games' || mainView === 'grid',
       action: () => setMainView?.('games'),
-    },
-    {
-      id: 'grid',
-      label: 'IDLE CLICKER',
-      icon: MousePointerClick,
-      active: mainView === 'grid',
-      action: () => setMainView?.('grid'),
     },
     ...(onOpenStore
       ? [
@@ -301,42 +279,6 @@ export function SidebarNav({
           );
         })}
       </nav>
-
-      {/* Community / Support buttons above currencies */}
-      <div className="px-2 pt-2 pb-1 shrink-0">
-        <div className={`flex flex-col gap-1 ${collapsed ? 'items-center' : ''}`}>
-          {discordUrl && (
-            <a
-              href={discordUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => playPress(920)}
-              aria-label="Join Discord"
-              title={collapsed ? 'Discord' : undefined}
-              className={`flex items-center gap-2.5 px-3 py-1.5 rounded-md cursor-pointer transition-all duration-150 active:scale-[0.96] border border-transparent hover:border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 group text-xs ${collapsed ? 'justify-center' : ''}`}
-            >
-              <MessageCircle className="w-4 h-4 shrink-0 text-indigo-400 group-hover:text-indigo-300 transition-colors stroke-[1.75]" />
-              {!collapsed && (
-                <span className="font-medium transition-colors">Discord</span>
-              )}
-            </a>
-          )}
-          <a
-            href="https://buymeacoffee.com/stacksondeck"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => playPress(920)}
-            aria-label="Support Me (Buy Me a Coffee)"
-            title={collapsed ? 'Support' : undefined}
-            className={`flex items-center gap-2.5 px-3 py-1.5 rounded-md cursor-pointer transition-all duration-150 active:scale-[0.96] border border-transparent hover:border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 group text-xs ${collapsed ? 'justify-center' : ''}`}
-          >
-            <Coffee className="w-4 h-4 shrink-0 text-amber-400 group-hover:text-amber-300 transition-colors stroke-[1.75]" />
-            {!collapsed && (
-              <span className="font-medium transition-colors">Support</span>
-            )}
-          </a>
-        </div>
-      </div>
 
       {/* Connection state pill — the no-dead-end rule: the user always knows
           whether the swarm socket is live or reconnecting (P2.3). */}
