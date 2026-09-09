@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { bytesToHex, hexToBytes } from '../hexio'
 import { Context, Next } from 'hono'
 import { scrypt } from '@noble/hashes/scrypt'
 import { hmac } from '@noble/hashes/hmac'
@@ -31,14 +32,6 @@ type Bindings = { DB: D1Turso }
 export const SETTINGS_KEY = ['server', 'passwo' + 'rd_v1'].join('_')
 const SCRYPT_PARAMS = { N: 1 << 15, r: 8, p: 1, dkLen: 32 } as const
 
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('')
-}
-function hexToBytes(hex: string): Uint8Array {
-  const out = new Uint8Array(hex.length / 2)
-  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
-  return out
-}
 function timingSafeEqualHex(a: string, b: string): boolean {
   if (a.length !== b.length) return false
   let diff = 0

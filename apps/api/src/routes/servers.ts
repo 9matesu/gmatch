@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { bytesToHex, hexToBytes } from '../hexio'
 import { sha256 } from '@noble/hashes/sha256'
 import { orbitAuth } from '../middleware/auth'
 import type { D1Turso } from '../db'
@@ -30,9 +31,6 @@ const MAX_HINT = 120
 const MAX_PER_OWNER = 5
 const STALE_MS = 24 * 60 * 60 * 1000
 
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('')
-}
 
 function serverId(ownerPubHex: string, name: string): string {
   return bytesToHex(sha256(new TextEncoder().encode(`${ownerPubHex}|${name}`)))
