@@ -14,6 +14,11 @@ for (const file of ['index.html', 'en.html']) {
   // version marker + filename mentions
   html = html.replace(/(<strong id="version">)[^<]+(<\/strong>)/, `$1${rel.version}$2`)
   html = html.replace(/goonMatch-Grid-\d+\.\d+\.\d+-portable\.exe/g, rel.file)
+  // Publish link: prefer the canonical GitHub Release URL (Pages artifact
+  // stays binary-free); local dev without downloadUrl keeps releases/<file>.
+  if (rel.downloadUrl) {
+    html = html.replace(/href="releases\/[^"]+-portable\.exe"/, `href="${rel.downloadUrl}"`)
+  }
   if (html !== before) {
     writeFileSync(file, html)
     touched++

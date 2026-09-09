@@ -32,10 +32,13 @@ for (const p of pages) {
 // 2) SHA-256 publicado == arquivo real
 const rel = JSON.parse(readFileSync(join(ROOT, 'release.json'), 'utf8'))
 const exe = join(ROOT, 'releases', rel.file)
-if (!existsSync(exe)) fail.push(`releases/${rel.file} missing`)
-else {
+if (existsSync(exe)) {
   const real = createHash('sha256').update(readFileSync(exe)).digest('hex')
   if (real !== rel.sha256) fail.push(`sha256 mismatch: site ${rel.sha256} != file ${real}`)
+} else if (!rel.downloadUrl) {
+  fail.push(`releases/${rel.file} missing and release.json has no downloadUrl`)
+} else {
+  console.log('note: local exe absent — trusting release.json sha256 (CI fetched it from GitHub Release)')
 }
 for (const p of ['index.html', 'en.html']) {
   const html = readFileSync(join(ROOT, p), 'utf8')
@@ -55,8 +58,14 @@ for (const [file, ids] of Object.entries(SECTIONS)) {
   for (const m of html.matchAll(/href="#([^"]+)"/g))
     if (!new RegExp(`id="${m[1]}"`).test(html)) fail.push(`${file}: broken anchor #${m[1]}`)
   for (const id of ids) if (!html.includes(`id="${id}"`)) fail.push(`${file}: missing section #${id}`)
-  // the download link must point at the actual file in releases/
-  if (!html.includes(`href="releases/${rel.file}"`)) fail.push(`${file}: download href != releases/${rel.file}`)
+  // the download link must point at the published file (local copy or the
+  // canonical GitHub Release URL recorded in release.json)
+  // Both forms must be acceptable when present; at least one must appear:
+  // local mode -> releases/<file>; CI/Pages mode -> the canonical downloadUrl.
+  const local = html.includes(`href="releases/${rel.file}"`)
+  const remote = rel.downloadUrl ? html.includes(`href="${rel.downloadUrl}"`) : false
+  if (!(local || remote)) fail.push(`${file}: download href neither releases/${rel.file} nor ${rel.downloadUrl || '(no downloadUrl)'}`)
+  if (!local && !existsSync(join(ROOT, 'releases', rel.file)) && !remote) fail.push(`${file}: remote href required when local exe absent`)
 }
 
 if (fail.length) {

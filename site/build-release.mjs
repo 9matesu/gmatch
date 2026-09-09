@@ -18,8 +18,9 @@ if (!/-portable\.exe$/.test(name)) {
 copyFileSync(src, join('releases', name))
 const sha = createHash('sha256').update(readFileSync(join('releases', name))).digest('hex')
 const version = name.match(/(\d+\.\d+\.\d+)/)[1]
+const downloadUrl = process.env.GH_DOWNLOAD_URL || `https://github.com/9matesu/goongrid/releases/download/v${version}/${name}`
 writeFileSync(
   'release.json',
-  JSON.stringify({ file: name, version, sha256: sha, sizeBytes: readFileSync(join('releases', name)).length }, null, 2) + '\n',
+  JSON.stringify({ file: name, version, sha256: sha, sizeBytes: readFileSync(join('releases', name)).length, downloadUrl }, null, 2) + '\n',
 )
 console.log('release.json written:', name, sha)
