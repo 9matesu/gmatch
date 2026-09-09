@@ -1,5 +1,7 @@
 # goonMatch Grid — Landing page 100% texto ("plain trust"): download do .exe + transparência total
 
+> **STATUS DE EXECUÇÃO (2026-09-09, branch `security/audit-hardening`):** Fase B do plano de segurança em andamento (B.1 runtime-only cache em verde-partial). Este plano permanece na ordem: **B.2-B.7 → Fase C (legal) → L1-L3 (landing)**. Ao executar L1.4/L2.2, atualizar a versão do exe e o hash via `build-release.mjs` a partir do rebuild pós-segurança (v1.1.0), não do 1.0.1.
+
 > **Para a Hermes:** executar task-por-task; gate em cada commit: `cd /i/goongrid && npm run lint` (0 erros) + `npm run test` (todos verdes) + `node site/check.mjs` (exit 0). Branch: `feat/landing-page` a partir de `feat/secure-p2p-phase1`.
 
 **Goal:** Landing estática em HTML puro (zero CSS/JS/fontes externas) hospedada no site oficial, que explica o app, expõe segurança/criptografia/termos/privacidade e serve o download do `.exe` portable com SHA-256 verificável — maximizando confiança de quem baixa um executável não-assinado.
