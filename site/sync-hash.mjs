@@ -16,9 +16,8 @@ for (const file of ['index.html', 'en.html']) {
   html = html.replace(/goonMatch-Grid-\d+\.\d+\.\d+-portable\.exe/g, rel.file)
   // Publish link: prefer the canonical GitHub Release URL (Pages artifact
   // stays binary-free); local dev without downloadUrl keeps releases/<file>.
-  if (rel.downloadUrl) {
-    html = html.replace(/href="releases\/[^"]+-portable\.exe"/, `href="${rel.downloadUrl}"`)
-  }
+  const want = rel.downloadUrl || `releases/${rel.file}`
+  html = html.replace(/href="(?:releases\/[^"]+|https:\/\/github\.com\/9matesu\/goongrid\/releases\/download\/[^"]+)-portable\.exe"/g, `href="${want}"`)
   if (html !== before) {
     writeFileSync(file, html)
     touched++
