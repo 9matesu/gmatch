@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { playPress } from '../../utils/sounds';
 import { Search, X, MessageCircle, Users, Image as ImageIcon, Hash } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
-import type { FeedPost } from './GoonMatchFeed';
+import type { FeedPost } from './GMatchFeed';
 import { ObjectImage } from '../ObjectImage';
 
 interface PeerUser {
@@ -95,7 +95,7 @@ export function ExploreSearchModal({
         <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between bg-surface-raised shrink-0">
           <div className="flex items-center gap-2">
             <Search className="w-5 h-5 text-retro-fg" />
-            <h3 className="text-sm font-black tracking-tight">Explore goonMatch</h3>
+            <h3 className="text-sm font-black tracking-tight">Explore gMatch</h3>
           </div>
           <button
             type="button"
@@ -268,7 +268,7 @@ export function ExploreSearchModal({
               </div>
               <p className="text-sm font-bold text-retro-fg">Discover the network</p>
               <p className="text-xs text-retro-muted max-w-xs mx-auto">
-                Search players, posts and tags across goonMatch to find your next match, card or obsession.
+                Search players, posts and tags across gMatch to find your next match, card or obsession.
               </p>
             </div>
           )}

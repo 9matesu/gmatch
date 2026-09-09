@@ -30,7 +30,7 @@ function page(opts: { title: string; image?: string; bodyHtml: string }): string
 ${opts.image ? `<meta property="og:image" content="${opts.image}"><img src="${opts.image}" alt="" style="max-width:90vw;max-height:80vh;display:block;margin:24px auto;border-radius:12px">` : ''}
 <style>body{background:#080A0D;color:#fafafa;font-family:system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;padding:40px 16px;text-align:center}a{color:#7dd3fc}.tag{font-size:12px;opacity:.6;margin-top:8px}</style>
 </head><body>${opts.bodyHtml}
-<p class="tag">goonMatch · Grid — open in the desktop app</p>
+<p class="tag">gMatch — open in the desktop app</p>
 </body></html>`
 }
 
@@ -54,7 +54,7 @@ share.get('/u/:id', async (c) => {
     'SELECT display_name, bio, pfp_url FROM Users WHERE id = ? AND hidden_at IS NULL',
   ).bind(id).first<{ display_name: string | null; bio: string | null; pfp_url: string | null }>()
   if (!row) return c.text('Not found', 404)
-  const name = row.display_name || 'A goonMatch player'
+  const name = row.display_name || 'A gMatch player'
   const body = `<h1>${esc(name)}</h1>${row.bio ? `<p>${esc(row.bio.slice(0, 200))}</p>` : ''}`
-  return c.html(page({ title: `${name} · goonMatch`, image: safeUrl(row.pfp_url), bodyHtml: body }))
+  return c.html(page({ title: `${name} · gMatch`, image: safeUrl(row.pfp_url), bodyHtml: body }))
 })

@@ -1,4 +1,4 @@
-import type { FeedPost } from '../components/feed/GoonMatchFeed';
+import type { FeedPost } from '../components/feed/GMatchFeed';
 
 export type GameMode = 'duel' | 'babecock' | 'patrol' | 'ranks' | 'store' | 'discord' | 'coffee';
 
@@ -32,7 +32,7 @@ export const GAME_AD_TEMPLATES: GameAdTemplate[] = [
   {
     mode: 'coffee',
     gameName: 'Buy Me A Coffee',
-    tagline: 'Support goonMatch development and unlock exclusive supporter badges & perks.',
+    tagline: 'Support gMatch development and unlock exclusive supporter badges & perks.',
     ctaLabel: 'Buy a Coffee',
     gradient: 'from-amber-400 via-yellow-500 to-amber-600',
     icon: 'coffee',
@@ -106,12 +106,12 @@ export function buildSponsoredPost(seed: number): SponsoredFeedPost {
   const players = 340 + Math.floor(seededRandom(seed + 7)() * 2480);
   return {
     id: `${IDS[GAME_AD_TEMPLATES.indexOf(template)]}_${seed}`,
-    author_id: 'goonMatch_ads',
-    author_name: 'goonMatch Arcade',
+    author_id: 'gMatch_ads',
+    author_name: 'gMatch Arcade',
     author_avatar: null,
     url: '',
     caption: `${template.tagline} #${template.badge.toLowerCase().replace(/[^a-z0-9]+/g, '')}`,
-    location: 'goonMatch Arcade',
+    location: 'gMatch Arcade',
     tags: ['sponsored', 'games', template.mode],
     created_at: new Date().toISOString(),
     like_count: 0,

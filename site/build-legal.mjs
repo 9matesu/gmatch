@@ -92,7 +92,7 @@ function page(title, bodyHtml, note) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(title)} — goonMatch Grid</title>
+<title>${esc(title)} — gMatch</title>
 </head>
 <body>
 <p><a href="../index.html#termos">← voltar para a página principal</a></p>
@@ -150,7 +150,7 @@ mkdirSync(EN_OUT, { recursive: true })
 for (const [html, [md, , ]] of Object.entries(mapped)) {
   const src = readFileSync(join(MD, 'en', md), 'utf8')
   const title = /^# (.*)$/m.exec(src)?.[1] ?? md
-  writeFileSync(join(EN_OUT, html), `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>${esc(title)} — goonMatch Grid</title>\n</head>\n<body>\n<p><a href="../../en.html#terms">← back to the main page</a></p>\n<p><em>Informational translation — the PT-BR text binds. Generated from the canonical in-app source — do not edit here.</em></p>\n${mdToHtml(src)}\n<hr>\n<p>Contact: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · This page uses no JavaScript, CSS, cookies or analytics.</p>\n</body>\n</html>\n`)
+  writeFileSync(join(EN_OUT, html), `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>${esc(title)} — gMatch</title>\n</head>\n<body>\n<p><a href="../../en.html#terms">← back to the main page</a></p>\n<p><em>Informational translation — the PT-BR text binds. Generated from the canonical in-app source — do not edit here.</em></p>\n${mdToHtml(src)}\n<hr>\n<p>Contact: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · This page uses no JavaScript, CSS, cookies or analytics.</p>\n</body>\n</html>\n`)
 }
 console.log(`build-legal: ${n} PT pages + ${Object.keys(mapped).length} EN mirrors -> legal/`)
 console.log('legal files now:', readdirSync(OUT).sort().join(' '))

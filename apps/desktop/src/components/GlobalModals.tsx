@@ -12,7 +12,7 @@ import { FlashModal } from './FlashModal';
 import { FlashOverlay } from './FlashOverlay';
 import { MobileVirusOverlay } from './hacks/MobileVirusOverlay';
 import { CreatePostModal } from './feed/CreatePostModal';
-import { GoonMatchSettingsModal } from './settings/GoonMatchSettingsModal';
+import { GMatchSettingsModal } from './settings/GMatchSettingsModal';
 import { FollowersFollowingModal } from './profile/FollowersFollowingModal';
 import { CoffeeModal } from './CoffeeModal';
 import { RecommendationModal } from './RecommendationModal';
@@ -335,7 +335,7 @@ export function GlobalModals(props: GlobalModalsProps) {
       )}
 
       {showSettingsModal && (
-        <GoonMatchSettingsModal
+        <GMatchSettingsModal
           isOpen={showSettingsModal}
           onClose={() => setShowSettingsModal(false)}
           settings={settings}

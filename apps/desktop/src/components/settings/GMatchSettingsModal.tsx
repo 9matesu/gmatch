@@ -32,7 +32,7 @@ export type SettingsTabId =
   | 'wallpaper'
   | 'server';
 
-interface GoonMatchSettingsModalProps {
+interface GMatchSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   settings: AppSettings;
@@ -156,7 +156,7 @@ function FeedSettingsTab({ toast }: { toast?: (msg: string, type?: string) => vo
   );
 }
 
-export function GoonMatchSettingsModal({
+export function GMatchSettingsModal({
   isOpen,
   onClose,
   settings,
@@ -165,7 +165,7 @@ export function GoonMatchSettingsModal({
   onOpenIdentityModal,
   toast,
   initialTab = 'preferences',
-}: GoonMatchSettingsModalProps) {
+}: GMatchSettingsModalProps) {
   const [activeTab, setActiveTab] = useState<'preferences' | 'account' | 'feed' | 'server'>(() => {
     if (initialTab === 'account' || initialTab === 'feed' || initialTab === 'server') return initialTab as 'account' | 'feed' | 'server';
     return 'preferences';

@@ -2,7 +2,7 @@
  * Renderer-side picture cache — SESSION MEMORY ONLY (security plan B.1/F1).
  *
  * Resolution order per URL:
- *   1. Electron bridge → gooncache:// served from the MAIN-process RAM LRU
+ *   1. Electron bridge → gmcache:// served from the MAIN-process RAM LRU
  *      (imageCacheMemory.cjs) — never disk.
  *   2. This module's in-memory Map (browser dev mode): blobs live only for
  *      the page session; a reload/quit leaves NOTHING on disk.
@@ -30,7 +30,7 @@ interface Bridge {
 
 function bridge(): Bridge | null {
   try {
-    const g = (typeof window !== 'undefined' ? window.goongrid : undefined) as Bridge | undefined
+    const g = (typeof window !== 'undefined' ? window.gmatch : undefined) as Bridge | undefined
     return g ?? null
   } catch {
     return null
@@ -120,7 +120,7 @@ function isDev(): boolean {
 
 /**
  * Resolve a remote picture URL to its cached form (RAM only).
- * Electron → gooncache:// (main-process RAM); browser → blob: object URL on
+ * Electron → gmcache:// (main-process RAM); browser → blob: object URL on
  * session hit, remote URL on miss (the miss is downloaded into RAM in the
  * background and served from cache on the next view THIS session).
  */

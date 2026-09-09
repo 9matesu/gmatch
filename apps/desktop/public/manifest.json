@@ -1,6 +1,6 @@
 {
-  "name": "goonMatch",
-  "short_name": "goonMatch",
+  "name": "gMatch",
+  "short_name": "gMatch",
   "description": "Social card game with AI opponents and live matches",
   "start_url": "/",
   "display": "standalone",

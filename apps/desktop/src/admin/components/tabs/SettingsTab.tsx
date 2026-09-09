@@ -263,7 +263,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-xs font-bold text-amber-300 uppercase tracking-wider">Migrate Lobby → Posts</h3>
-                  <p className="text-[10px] text-zinc-500 mt-1">Transfers all lobby board images into user goonMatch profiles under Posts, preserving likes and metadata.</p>
+                  <p className="text-[10px] text-zinc-500 mt-1">Transfers all lobby board images into user gMatch profiles under Posts, preserving likes and metadata.</p>
                 </div>
                 <button
                   type="button"
@@ -308,7 +308,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
           onClose={() => setShowMigrateConfirm(false)}
           onConfirm={handleMigrate}
           title="Migrate Lobby Board Images to User Posts?"
-          description="This transfers all images uploaded to the lobby board into each user's goonMatch profile under Posts, preserving their likes and metadata."
+          description="This transfers all images uploaded to the lobby board into each user's gMatch profile under Posts, preserving their likes and metadata."
           confirmLabel="Migrate Now"
           variant="primary"
         />

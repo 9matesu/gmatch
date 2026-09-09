@@ -58,7 +58,7 @@ const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
 type OpenTarget = 'group' | 'lobby' | 'queue' | 'peer' | null;
 
-export function GoonMatchDMs({
+export function GMatchDMs({
   identity,
   chatMessages = [],
   pmMessages = [],

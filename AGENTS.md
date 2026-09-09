@@ -1,7 +1,7 @@
-# GoonGrid — Babecock Idle
+# gMatch — Babecock Idle
 
 Adults-only (18+) desktop idle-clicker game. Electron + Vite + React + TypeScript.
-Inspired by the `babecock` module and game-registry patterns of the ORBIT/goonMatch
+Inspired by the `babecock` module and game-registry patterns of the ORBIT/gMatch
 platform (see docs/reference/). This repo is standalone — ORBIT is NOT a dependency.
 
 > **18+ / SAFETY (non-negotiable):** the app gates on an age confirmation screen at

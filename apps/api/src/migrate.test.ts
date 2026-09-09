@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { createClient } from '@libsql/client'
 import { migrate } from './migrate'
 
-// Verifies the goonMatch Phase 1 migrations (014-017) bring an existing
-// pre-goonMatch database up to the current canonical schema, and that the
+// Verifies the gMatch Phase 1 migrations (014-017) bring an existing
+// pre-gMatch database up to the current canonical schema, and that the
 // migration runner is idempotent on fresh AND previously-migrated DBs.
 
 async function columnExists(client: Awaited<ReturnType<typeof createClient>>, table: string, column: string): Promise<boolean> {
@@ -26,7 +26,7 @@ async function userVersion(client: Awaited<ReturnType<typeof createClient>>): Pr
   return Number(rows?.[0]?.user_version ?? 0)
 }
 
-describe('goonMatch Phase 1 migrations', () => {
+describe('gMatch Phase 1 migrations', () => {
   it('migrates a fresh in-memory DB to user_version 44 with all new tables/columns', async () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)
@@ -234,12 +234,12 @@ describe('goonMatch Phase 1 migrations', () => {
     expect(await columnExists(client, 'Users', 'is_moderator')).toBe(true)
   })
 
-  it('upgrades a pre-goonMatch snapshot (user_version 13) by applying 014-044', async () => {
+  it('upgrades a pre-gMatch snapshot (user_version 13) by applying 014-044', async () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)
     expect(await userVersion(client)).toBe(44)
 
-    // Tear down goonMatch additions so we're effectively at pre-014 state.
+    // Tear down gMatch additions so we're effectively at pre-014 state.
     await client.execute('DROP TABLE IF EXISTS Saves')
     await client.execute('DROP TABLE IF EXISTS CommentLikes')
     await client.execute('DROP TABLE IF EXISTS Comments')
@@ -257,7 +257,7 @@ describe('goonMatch Phase 1 migrations', () => {
     ]) {
       await client.execute(`DROP INDEX IF EXISTS ${idx}`)
     }
-    // Pretend we're still on the pre-goonMatch migration version.
+    // Pretend we're still on the pre-gMatch migration version.
     await client.execute('PRAGMA user_version = 13')
 
     // Re-run migrate — it should detect user_version=13 and apply 014-044 in order

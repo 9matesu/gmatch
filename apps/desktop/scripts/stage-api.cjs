@@ -1,6 +1,6 @@
 // Stages a SELF-CONTAINED API server for packaging (1.0: no central server —
 // every copy ships the server; friends connect to one chosen host).
-// Output: I:/goongrid/api-stage/
+// Output: I:/gmatch/api-stage/
 //   apps/api/          source + package.json (deps rewritten to file: links)
 //   packages/crypto/   + packages/shared/ (vendored @orbit/* sources)
 //   bun.exe            the runtime (copied from the local bun install)
@@ -15,9 +15,9 @@ const ROOT = join(__dirname, '..', '..', '..')
 const STAGE = join(ROOT, 'api-stage')
 
 function findBunExe() {
-  // Explicit override (CI can pin it): GOONGRID_BUN_EXE=path/to/bun.exe
-  if (process.env.GOONGRID_BUN_EXE && existsSync(process.env.GOONGRID_BUN_EXE)) {
-    return process.env.GOONGRID_BUN_EXE
+  // Explicit override (CI can pin it): GMATCH_BUN_EXE=path/to/bun.exe
+  if (process.env.GMATCH_BUN_EXE && existsSync(process.env.GMATCH_BUN_EXE)) {
+    return process.env.GMATCH_BUN_EXE
   }
   const candidates = [
     join(process.env.APPDATA || '', 'npm', 'node_modules', 'bun', 'bin', 'bun.exe'),
@@ -53,7 +53,7 @@ mkdirSync(join(STAGE, 'packages'), { recursive: true })
 // Stage-root marker package.json: stops npm's walk-up to the real workspace
 // root (which would make it reconcile this subdir against the monorepo's
 // lockfile and crash arborist on rewritten file: deps).
-writeFileSync(join(STAGE, 'package.json'), JSON.stringify({ name: 'goongrid-api-stage', private: true }, null, 2) + '\n')
+writeFileSync(join(STAGE, 'package.json'), JSON.stringify({ name: 'gmatch-api-stage', private: true }, null, 2) + '\n')
 
 cpSync(join(ROOT, 'packages', 'crypto'), join(STAGE, 'packages', 'crypto'), { recursive: true, filter: (s) => !s.includes('node_modules') })
 cpSync(join(ROOT, 'packages', 'shared'), join(STAGE, 'packages', 'shared'), { recursive: true, filter: (s) => !s.includes('node_modules') })

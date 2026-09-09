@@ -5,11 +5,11 @@ Jurisdição: Brazil (LGPD); GDPR applies additionally where applicable
 
 ## 1. Eligibility and age
 
-goonMatch Grid is an adults-only application. You must be at least 18 years old (or the age of majority in your jurisdiction, if higher) to access, download or use the software. By accepting these Terms you represent and warrant that you meet this requirement. We perform no age verification: the declaration is yours and its falsity is your liability.
+gMatch is an adults-only application. You must be at least 18 years old (or the age of majority in your jurisdiction, if higher) to access, download or use the software. By accepting these Terms you represent and warrant that you meet this requirement. We perform no age verification: the declaration is yours and its falsity is your liability.
 
 ## 2. What the software is
 
-goonMatch Grid is open-source, self-hostable software for an adult social network with gameplay (cards, duel, idle) and end-to-end-encrypted peer-to-peer communication. Whoever distributes the binary provides the SOFTWARE; it does not administer, edit or host the content you publish or exchange.
+gMatch is open-source, self-hostable software for an adult social network with gameplay (cards, duel, idle) and end-to-end-encrypted peer-to-peer communication. Whoever distributes the binary provides the SOFTWARE; it does not administer, edit or host the content you publish or exchange.
 
 ## 3. Accounts, keys and self-custody
 

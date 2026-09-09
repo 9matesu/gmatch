@@ -217,10 +217,10 @@ export function SidebarNav({
           <button
             type="button"
             onClick={() => { playPress(700); onOpenHome?.(); }}
-            aria-label="Go to goonMatch home"
+            aria-label="Go to gMatch home"
             className="text-sm font-bold text-zinc-100 tracking-tight leading-none hover:text-white transition-colors cursor-pointer"
           >
-            goonMatch
+            gMatch
           </button>
         )}
         <button

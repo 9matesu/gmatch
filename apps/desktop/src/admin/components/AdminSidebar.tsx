@@ -51,7 +51,7 @@ export function AdminSidebar({
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-retro-accent shadow-[0_0_8px_rgba(159,227,255,0.4)]" />
           <div className="min-w-0">
-            <div className="text-xs font-black tracking-tight text-retro-fg uppercase truncate">goonMatch Admin</div>
+            <div className="text-xs font-black tracking-tight text-retro-fg uppercase truncate">gMatch Admin</div>
             <div className="text-[9px] font-mono text-retro-muted">Moderation Console</div>
           </div>
         </div>

@@ -8,8 +8,8 @@ import { useGame } from '../../game/store'
 import '../../ui/grid-animations.css'
 
 /**
- * "Babecock · Idle" workspace (plan D2/D5): the GoonGrid idle game as a view
- * inside the goonMatch shell. Panels are styled with Tailwind utilities
+ * "Babecock · Idle" workspace (plan D2/D5): the gMatch idle game as a view
+ * inside the gMatch shell. Panels are styled with Tailwind utilities
  * (src/ui/styles.ts); only the game's keyframes live in a stylesheet.
  */
 export default function GridWorkspace() {

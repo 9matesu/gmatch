@@ -9,7 +9,7 @@ function escapeXml(s: string): string {
 }
 
 export function offlineSvg(tags: string[]): string {
-  const label = (tags.slice(0, 3).join(' ') || 'goongrid').slice(0, 60)
+  const label = (tags.slice(0, 3).join(' ') || 'gmatch').slice(0, 60)
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
 <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
 <stop offset="0" stop-color="#1a0b2e"/><stop offset="0.5" stop-color="#ff2d78" stop-opacity="0.35"/><stop offset="1" stop-color="#7b2ff7"/>

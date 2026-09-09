@@ -39,7 +39,7 @@ function mockBridge() {
     secureSet: vi.fn(async (k: string, v: string) => { store.set(k, v) }),
     secureDelete: vi.fn(async (k: string) => { store.delete(k) }),
   }
-  vi.stubGlobal('window', Object.assign(window, { goongrid: bridge }))
+  vi.stubGlobal('window', Object.assign(window, { gmatch: bridge }))
   return { store, bridge }
 }
 
@@ -48,7 +48,7 @@ beforeEach(() => {
   vi.stubGlobal('localStorage', localStore)
   localStore.clear()
   _test.reset()
-  try { delete (window as { goongrid?: unknown }).goongrid } catch { /* */ }
+  try { delete (window as { gmatch?: unknown }).gmatch } catch { /* */ }
 })
 
 describe('secure-storage (Electron path)', () => {
@@ -91,7 +91,7 @@ describe('secure-storage (Electron path)', () => {
     removeSecureItem('orbit_identity')
     expect(getSecureItem('orbit_identity')).toBeNull()
     await new Promise((r) => setTimeout(r, 0))
-    const b = (window as unknown as { goongrid: { secureDelete: ReturnType<typeof vi.fn> } }).goongrid
+    const b = (window as unknown as { gmatch: { secureDelete: ReturnType<typeof vi.fn> } }).gmatch
     expect(b.secureDelete.mock.calls.some(([k]) => k === 'orbit_identity')).toBe(true)
   })
 
@@ -114,7 +114,7 @@ describe('secure-storage (Electron path)', () => {
 
 describe('secure-storage (browser fallback)', () => {
   it('without the bridge it behaves exactly like localStorage', async () => {
-    await initSecureStorage() // no window.goongrid — plain mode
+    await initSecureStorage() // no window.gmatch — plain mode
     localStorage.setItem('orbit_identity', 'X')
     expect(getSecureItem('orbit_identity')).toBe('X')
     setSecureItem('orbit_identity', 'Y')

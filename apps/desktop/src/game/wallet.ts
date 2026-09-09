@@ -1,5 +1,5 @@
 /**
- * Unified g$ wallet (plan D4). GoonGrid's GP and Orbit's g$ turned out to be
+ * Unified g$ wallet (plan D4). gMatch's GP and Orbit's g$ turned out to be
  * the SAME order of magnitude (idle caps 150–50k vs hacks 800–4500), and the
  * server ledger only accepts integer amounts — so the merge is a rename, not
  * a rescale: 1 GP = 1 g$, everything stays integer, one unit everywhere.

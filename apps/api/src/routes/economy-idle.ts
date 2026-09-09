@@ -7,7 +7,7 @@ import { badRequest, toDomainError } from '../common/errors'
 type Bindings = { DB: D1Turso }
 
 /**
- * Idle-credit endpoint (GoonGrid merge, plan §4.4): the desktop idle game
+ * Idle-credit endpoint (gMatch merge, plan §4.4): the desktop idle game
  * flushes offline-earned g$ into the authoritative server ledger. One credit
  * per 60s per identity; idempotent via Idempotency-Key so a retry after a
  * dropped response never double-pays.

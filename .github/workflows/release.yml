@@ -20,7 +20,7 @@ jobs:
         shell: pwsh
         run: |
           npm i -g --allow-scripts=bun bun
-          echo "GOONGRID_BUN_EXE=$(npm root -g | ForEach-Object { $_.Trim() })\bun\bin\bun.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "GMATCH_BUN_EXE=$(npm root -g | ForEach-Object { $_.Trim() })\bun\bin\bun.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
       - name: Install (NODE_ENV unset so dev deps install)
         run: npm ci
       - name: Gate — lint / typecheck / unit tests
@@ -38,21 +38,21 @@ jobs:
       - name: Compute artifact SHA-256 (published in the release body + summary)
         shell: pwsh
         run: |
-          $exe = Get-ChildItem apps/desktop/release/goonMatch-Grid-*-portable.exe | Select-Object -First 1
+          $exe = Get-ChildItem apps/desktop/release/gMatch-*-portable.exe | Select-Object -First 1
           $hash = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLower()
-          "GOONGRID_SHA256=$hash" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "GMATCH_SHA256=$hash" | Out-File -FilePath $env:GITHUB_ENV -Append
           Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "## Artifact integrity`n- ``$($exe.Name)`` SHA-256: ``$hash``"
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          files: apps/desktop/release/goonMatch-Grid-*-portable.exe
+          files: apps/desktop/release/gMatch-*-portable.exe
           append_body: true
           body: |
             **Verify before running (Windows PowerShell):**
             ~~~
-            Get-FileHash "$env:USERPROFILE\Downloads\goonMatch-Grid-*-portable.exe" -Algorithm SHA256
+            Get-FileHash "$env:USERPROFILE\Downloads\gMatch-*-portable.exe" -Algorithm SHA256
             ~~~
-            Expected SHA-256: ``${{ env.GOONGRID_SHA256 }}``
+            Expected SHA-256: ``${{ env.GMATCH_SHA256 }}``
             Unsigned binary => SmartScreen warns; that is normal, not a virus.
             Public scan: https://www.virustotal.com (paste the file or hash).
             Reproducible: clone this repo at tag ${{ github.ref_name }} and run npm ci && npm run dist.

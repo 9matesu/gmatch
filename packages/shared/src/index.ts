@@ -154,7 +154,7 @@ export interface User {
    *  public directory payload for the leaderboard UI. */
   matches_won?: number;
   matches_lost?: number;
-  /** goonMatch profile extras (migration 017) */
+  /** gMatch profile extras (migration 017) */
   bio?: string;
   website?: string;
   followers_count?: number;

@@ -33,9 +33,9 @@ export const LEGAL_DOCS: Record<LegalId, LegalDoc> = {
     jurisdiction: 'Brasil (LGPD) — usuários internacionais também sujeitos ao GDPR onde aplicável',
     body: [
       '## 1. Elegibilidade e idade',
-      'O goonMatch Grid é um aplicativo para adultos. Você deve ter pelo menos 18 anos (ou a maioridade na sua jurisdição, se superior) para acessar, baixar ou usar o software. Ao aceitar estes Termos você declara e garante que cumpre esse requisito. Não fazemos verificação de idade: a declaração é sua, e a falsidade dela é responsabilidade sua.',
+      'O gMatch é um aplicativo para adultos. Você deve ter pelo menos 18 anos (ou a maioridade na sua jurisdição, se superior) para acessar, baixar ou usar o software. Ao aceitar estes Termos você declara e garante que cumpre esse requisito. Não fazemos verificação de idade: a declaração é sua, e a falsidade dela é responsabilidade sua.',
       '## 2. O que é o software',
-      'O goonMatch Grid é um software de código aberto, auto-hospedável, para rede social adulta com jogabilidade (cartas, duelo, sala de ocioso) e comunicação ponto a ponto com criptografia de ponta a ponta. Quem distribui o binário fornece o SOFTWARE; não administra, não edita e não hospeda o conteúdo que você publica ou troca.',
+      'O gMatch é um software de código aberto, auto-hospedável, para rede social adulta com jogabilidade (cartas, duelo, sala de ocioso) e comunicação ponto a ponto com criptografia de ponta a ponta. Quem distribui o binário fornece o SOFTWARE; não administra, não edita e não hospeda o conteúdo que você publica ou troca.',
       '## 3. Conta, chaves e autocustódia',
       '- Sua conta é um par de chaves criptográficas gerado e mantido NO SEU DISPOSITIVO.',
       '- Ninguém — nem os autores do software — pode redefinir sua senha, recuperar sua conta ou acessar seus dados sem a sua chave.',

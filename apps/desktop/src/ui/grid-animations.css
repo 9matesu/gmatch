@@ -1,4 +1,4 @@
-/* GoonGrid idle — keyframes only (all component styling lives in Tailwind
+/* gMatch idle — keyframes only (all component styling lives in Tailwind
    utilities on the JSX). Imported by GridWorkspace; referenced via Tailwind
    arbitrary animate-[...] utilities. Game semantics (crit, float numbers, HP-low)
    are retained with crisp telemetry highlights. */

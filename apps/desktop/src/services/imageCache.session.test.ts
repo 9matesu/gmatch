@@ -24,7 +24,7 @@ beforeEach(() => {
   vi.unstubAllGlobals()
   // Object.assign(window, ...) in the bridge test mutates the real window —
   // scrub it so no backend bleeds across tests.
-  try { delete (window as { goongrid?: unknown }).goongrid } catch { /* frozen env */ }
+  try { delete (window as { gmatch?: unknown }).gmatch } catch { /* frozen env */ }
   _test.resetSessionCache()
 })
 
@@ -37,14 +37,14 @@ describe('resolveImage (session-only)', () => {
     expect(await resolveImage('https://cdn.example/clip.mp4')).toBe('https://cdn.example/clip.mp4')
   })
 
-  it('Electron bridge wins when present (gooncache://)', async () => {
+  it('Electron bridge wins when present (gmcache://)', async () => {
     vi.stubGlobal('window', Object.assign(window, {
-      goongrid: { cacheImage: vi.fn(async () => ({ local: 'gooncache://f/abc.png' })) },
+      gmatch: { cacheImage: vi.fn(async () => ({ local: 'gmcache://f/abc.png' })) },
     }))
-    expect(await resolveImage('https://x.test/a.png')).toBe('gooncache://f/abc.png')
+    expect(await resolveImage('https://x.test/a.png')).toBe('gmcache://f/abc.png')
   })
 
-  it('no bridge + no window.goongrid: fetches once into the SESSION cache; a second resolve serves the blob: URL (RAM, same object)', async () => {
+  it('no bridge + no window.gmatch: fetches once into the SESSION cache; a second resolve serves the blob: URL (RAM, same object)', async () => {
     const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' })
     const fetchMock = vi.fn(async () => ({ ok: true, blob: async () => blob }))
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch)

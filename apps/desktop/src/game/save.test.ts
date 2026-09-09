@@ -10,8 +10,8 @@ import {
 } from './save'
 
 describe('save key + version (SPEC §11)', () => {
-  it('uses goongrid.save.v1', () => {
-    expect(SAVE_KEY).toBe('goongrid.save.v1')
+  it('uses gmatch.save.v1', () => {
+    expect(SAVE_KEY).toBe('gmatch.save.v1')
     expect(SAVE_VERSION).toBe(3)
   })
 })

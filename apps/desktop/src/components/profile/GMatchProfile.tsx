@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject as StoredCard } from '@orbit/shared';
-import type { FeedPost } from '../feed/GoonMatchFeed';
+import type { FeedPost } from '../feed/GMatchFeed';
 import { ProfileEditorModal } from './ProfileEditorModal';
 import { ProfilePicModal } from './ProfilePicModal';
 import { InstagramPostModal } from '../feed/InstagramPostModal';
@@ -28,7 +28,7 @@ import { isMediaVideo, resolveMediaUrl } from '../../utils/media';
 import { saveUserProfile } from '../../utils/profile';
 import { profileShareUrl } from '../../utils/api';
 
-export function GoonMatchProfile({
+export function GMatchProfile({
   identity,
   myUser,
   profilePic,

@@ -6,7 +6,7 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject, User } from '@orbit/shared';
 import { GalleryView } from '../GalleryView';
 import { DeckBuilder } from '../games/DeckBuilder';
-import type { FeedPost } from '../feed/GoonMatchFeed';
+import type { FeedPost } from '../feed/GMatchFeed';
 
 type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 

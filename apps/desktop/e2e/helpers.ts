@@ -52,8 +52,8 @@ export async function seedApp(
       // peer names as "never onboarded" and reopens the profile step.
       localStorage.setItem('orbit_display_name', 'E2E Tester')
       localStorage.setItem('orbit_tags', JSON.stringify(['e2e']))
-      localStorage.setItem(`goongrid.save.v1:${id.orbitId}`, JSON.stringify(save))
-      localStorage.setItem('goongrid.save.v1', JSON.stringify(save))
+      localStorage.setItem(`gmatch.save.v1:${id.orbitId}`, JSON.stringify(save))
+      localStorage.setItem('gmatch.save.v1', JSON.stringify(save))
       // lastSeenAt must be load-time or the offline-earnings modal pops on
       // every journey (passive income accrues between seed and page load).
       save.lastSeenAt = Date.now()

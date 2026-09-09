@@ -16,7 +16,7 @@ const TAG_INPUT =
  * picker, re-feature button and rarity badges over the zustand gallery.
  *
  * Mounted inside the shell's GalleryView (Cards), restyled to Tailwind
- * utilities — no legacy goongrid stylesheet needed.
+ * utilities — no legacy gmatch stylesheet needed.
  */
 export default function IdleGalleryView() {
   const gallery = useGame((s) => s.gallery)

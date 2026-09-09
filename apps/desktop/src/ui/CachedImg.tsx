@@ -9,7 +9,7 @@ interface CachedImgProps extends ImgHTMLAttributes<HTMLImageElement> {
 
 /**
  * <img> that serves the picture from the local cache when available
- * (Electron main-process RAM cache — gooncache://, never disk; session Map
+ * (Electron main-process RAM cache — gmcache://, never disk; session Map
  * in browser dev mode) and falls back to the remote URL otherwise.
  */
 export default function CachedImg({ src, fallbackSrc, onError, ...rest }: CachedImgProps) {

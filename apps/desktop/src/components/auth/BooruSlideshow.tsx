@@ -172,7 +172,7 @@ export function BooruSlideshow({ className = '' }: { className?: string }) {
             <img
               key={img.url + idx}
               src={resolveMediaUrl(img.url)}
-              alt={img.caption || 'goonMatch feed'}
+              alt={img.caption || 'gMatch feed'}
               loading={idx === 0 ? 'eager' : 'lazy'}
               className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
                 idx === activeIndex ? 'opacity-100' : 'opacity-0 pointer-events-none'

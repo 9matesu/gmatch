@@ -1,4 +1,4 @@
-# goonMatch Grid — Auditoria de Segurança (static pentest)
+# gMatch — Auditoria de Segurança (static pentest)
 
 **Escopo:** white-box do fonte na branch `security/audit-hardening` (base `feat/secure-p2p-phase1` @ `e9414ed`+), app desktop Electron + API Hono/Bun + `@orbit/crypto|protocol`. Não houve alvo deployed para teste dinâmico — toda afirmação abaixo cita código verificável; os comandos "Provar" reproduzem cada achado.
 
@@ -60,7 +60,7 @@
 
 ```bash
 # 1) nada de imagem em disco após rodar o app:
-ls "$APPDATA/@goongrid/desktop/image-cache" 2>/dev/null; echo "exit=$?"   # esperado: não existe / exit≠0
+ls "$APPDATA/@gmatch/desktop/image-cache" 2>/dev/null; echo "exit=$?"   # esperado: não existe / exit≠0
 # 2) respostas sem cache:
 curl -sI "$API_BASE/api/objects/<own-id>" | grep -i cache-control          # no-store
 # 3) sem chave no localStorage:

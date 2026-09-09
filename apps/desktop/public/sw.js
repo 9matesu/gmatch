@@ -1,5 +1,5 @@
 /**
- * goonMatch Service Worker
+ * gMatch Service Worker
  * Handles push notifications, background SFX, and offline support
  */
 
@@ -105,7 +105,7 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Try to find existing goonMatch tab
+      // Try to find existing gMatch tab
       for (const client of clientList) {
         if (client.url.includes(self.location.origin) && 'focus' in client) {
           // Navigate to match if specified

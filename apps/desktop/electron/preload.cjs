@@ -5,7 +5,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 const apiArg = process.argv.find((a) => a.startsWith('--api-base='))
 if (apiArg) contextBridge.exposeInMainWorld('__API_BASE__', apiArg.slice('--api-base='.length))
 
-contextBridge.exposeInMainWorld('goongrid', {
+contextBridge.exposeInMainWorld('gmatch', {
   booruFetch: (request) => ipcRenderer.invoke('booru:fetch', request),
   cacheImage: (url) => ipcRenderer.invoke('cache:image', url),
   cacheStats: () => ipcRenderer.invoke('cache:stats'),

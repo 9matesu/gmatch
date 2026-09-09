@@ -46,7 +46,7 @@ interface SecureBridge {
 function bridge(): SecureBridge | null {
   try {
     const g = (typeof window !== 'undefined'
-      ? (window as unknown as { goongrid?: Partial<SecureBridge> }).goongrid
+      ? (window as unknown as { gmatch?: Partial<SecureBridge> }).gmatch
       : undefined)
     if (g && g.secureGet && g.secureSet && g.secureDelete && g.secureAvailable) {
       return g as SecureBridge

@@ -40,7 +40,7 @@ export function FeedHeader({
         </button>
 
         <span className="font-sans font-semibold text-base text-retro-fg select-none">
-          goonMatch
+          gMatch
         </span>
       </div>
 

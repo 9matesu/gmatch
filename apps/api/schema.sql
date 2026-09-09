@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS FriendRequests (
   UNIQUE(sender_id, receiver_id)
 );
 
--- goonMatch asymmetric follow graph. Unlike Friends (bidirectional accepted
+-- gMatch asymmetric follow graph. Unlike Friends (bidirectional accepted
 -- pairs), a Follow is one-directional: follower_id subscribed to followee_id.
 -- For public accounts `accepted=1` immediately; for private accounts it
 -- starts at 0 and the followee approves it. Self-follows rejected in app code.
@@ -651,7 +651,7 @@ CREATE INDEX IF NOT EXISTS idx_match_archive_user_a ON MatchArchive(user_a, ende
 CREATE INDEX IF NOT EXISTS idx_match_archive_user_b ON MatchArchive(user_b, ended_at);
 CREATE INDEX IF NOT EXISTS idx_match_archive_result ON MatchArchive(result, ended_at);
 
--- goonMatch post engagement: generalized comments ledger (works for any Object,
+-- gMatch post engagement: generalized comments ledger (works for any Object,
 -- not just lobby board images), per-comment likes, and per-user saves.
 CREATE TABLE IF NOT EXISTS Comments (
   id TEXT PRIMARY KEY,

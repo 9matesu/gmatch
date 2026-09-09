@@ -36,9 +36,9 @@ import { UserProfileModal } from "./components/UserProfileModal";
 import { MIN_GAME_CARDS, type User, type OrbitObject, isDefaultPeerName, parseTags } from "@orbit/shared";
 import { areItemsStructurallyEqual, areUsersStructurallyEqual, areAnnouncementsStructurallyEqual } from "./utils/compare";
 import { OnboardingFlow } from "./firstRun/OnboardingFlow";
-import { GoonMatchFeed, type FeedPost } from "./components/feed/GoonMatchFeed";
+import { GMatchFeed, type FeedPost } from "./components/feed/GMatchFeed";
 import { ModPatrolWidget } from "./components/feed/ModPatrolWidget";
-import { GoonMatchDMs } from "./components/chat/GoonMatchDMs";
+import { GMatchDMs } from "./components/chat/GMatchDMs";
 import { AttachmentUploadModal } from "./components/AttachmentUploadModal";
 import { ProfileView } from "./components/views/ProfileView";
 import { MessagesView, DmMinimizedView } from "./components/views/MessagesView";
@@ -86,7 +86,7 @@ export default function Home() {
   }, []);
 
   const { identity, isLoaded, createIdentity, exportIdentity, loginWithExportedId, clearIdentity } = useIdentity();
-  // Idle game loop (merged from goongrid App): load save, tick economy, autosave.
+  // Idle game loop (merged from gmatch App): load save, tick economy, autosave.
   useEffect(() => {
     useIdleGame.getState().load();
     const t = setInterval(() => useIdleGame.getState().tick(1000), 1000);
@@ -695,8 +695,8 @@ export default function Home() {
     // Packaged Electron origin is file:// — the server URL is the real door.
     const inviteUrl = getApiBaseUrl();
     const shareData = {
-      title: 'Join me on goonMatch',
-      text: 'Come hang out, share cards, and see what is happening on goonMatch.',
+      title: 'Join me on gMatch',
+      text: 'Come hang out, share cards, and see what is happening on gMatch.',
       url: inviteUrl,
     };
 
@@ -1349,7 +1349,7 @@ export default function Home() {
 
       if (typeof document !== 'undefined' && document.hidden) {
         const oldTitle = document.title
-        document.title = '🔔 (1) New Interaction · goonMatch'
+        document.title = '🔔 (1) New Interaction · gMatch'
         const restore = () => {
           document.title = oldTitle
           window.removeEventListener('focus', restore)
@@ -2391,7 +2391,7 @@ export default function Home() {
     'Ctrl+Shift+C': () => {
       if (identity) {
         navigator.clipboard.writeText(identity.orbitId)
-        toast('GoonMatch ID copied to clipboard', 'info')
+        toast('GMatch ID copied to clipboard', 'info')
       }
     },
   });
@@ -2762,7 +2762,7 @@ export default function Home() {
                   }
                   setMyProfile({ displayName: effectiveName, tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [], isAdmin: false, pfpUrl: pfpUrl || '' });
                 }
-                toast('Logged in to goonMatch!', 'success');
+                toast('Logged in to gMatch!', 'success');
                 loadUsers();
                 loadGallery();
               }}
@@ -2790,7 +2790,7 @@ export default function Home() {
                     },
                   );
                 }
-                toast(`Welcome to goonMatch, ${name}!`, 'success');
+                toast(`Welcome to gMatch, ${name}!`, 'success');
                 loadUsers();
                 loadGallery();
               }}
@@ -2851,7 +2851,7 @@ export default function Home() {
                       chatUnread={pmUnreadCount}
                       notificationUnread={lobby.unreadCount}
                       dm={
-                        <GoonMatchDMs
+                        <GMatchDMs
                           identity={identity}
                           chatMessages={chatMessages}
                           pmMessages={pmPeer ? pmMessagesByPeer[pmPeer.id || (pmPeer as any).orbitId || ''] || [] : []}
@@ -2938,7 +2938,7 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* goonMatch Main Feed View */}
+                  {/* gMatch Main Feed View */}
                   {mainView === 'feed' && (
                     <div className={isVisionJammed ? "relative" : ""}>
                       {isVisionJammed && (
@@ -3122,7 +3122,7 @@ export default function Home() {
                                         Gooning gets better with more people.
                                       </h3>
                                       <p className="max-w-lg text-xs leading-relaxed text-retro-muted">
-                                        Send a friend straight to goonMatch and give them a reason to stay: porn everywhere, anywhere.
+                                        Send a friend straight to gMatch and give them a reason to stay: porn everywhere, anywhere.
                                       </p>
                                     </div>
                                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -3145,7 +3145,7 @@ export default function Home() {
                                       <Link2 className="h-3.5 w-3.5 text-retro-accent" />
                                       <span>Invite link</span>
                                     </div>
-                                    <p className="text-[11px] leading-relaxed text-retro-muted">Copy the front door to goonMatch or share it from your device.</p>
+                                    <p className="text-[11px] leading-relaxed text-retro-muted">Copy the front door to gMatch or share it from your device.</p>
                                   </div>
                                   <div className="flex items-center gap-2 rounded-lg border border-retro-border bg-retro-bg/60 px-2.5 py-2">
                                     <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-retro-muted">
@@ -3223,7 +3223,7 @@ export default function Home() {
                               </button>
                             </div>
                             {!collapsedModules.feed && (
-                              <GoonMatchFeed
+                              <GMatchFeed
                                 identity={identity}
                                 posts={feedPosts}
                                 stories={stories}
@@ -3309,7 +3309,7 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* goonMatch Direct Messages View */}
+                  {/* gMatch Direct Messages View */}
                   {mainView === 'messages' && !chatOpen && !dmMinimized && (
                     <MessagesView
                       panelTab={panelTab}
@@ -3356,7 +3356,7 @@ export default function Home() {
                     <DmMinimizedView pmPeer={pmPeer} profilePics={profilePics} />
                   )}
 
-                  {/* goonMatch Profile View */}
+                  {/* gMatch Profile View */}
                   {mainView === 'profile' && (
                     <ProfileView
                       identity={identity}
@@ -3380,7 +3380,7 @@ export default function Home() {
                     />
                   )}
 
-                  {/* goonMatch Games & Arcade Hub */}
+                  {/* gMatch Games & Arcade Hub */}
                   {mainView === 'games' && (
                     <GamesView
                       gamesSubTab={gamesSubTab}
@@ -3420,7 +3420,7 @@ export default function Home() {
                       toast={toast}
                     />
                   )}
-                  {/* Babecock · Idle — GoonGrid workspace (plan D2/D5) */}
+                  {/* Babecock · Idle — gMatch workspace (plan D2/D5) */}
                   {mainView === 'grid' && (
                     <div className="flex-1 min-h-0 w-full">
                       <GridWorkspace />
@@ -3663,7 +3663,7 @@ export default function Home() {
                 onSendCard={(userId) => setSelectedIds(new Set([userId]))}
                 onCopyId={(id) => {
                   navigator.clipboard.writeText(id)
-                  toast('GoonMatch ID copied', 'info')
+                  toast('GMatch ID copied', 'info')
                 }}
                 onSendPm={(user) => setPmPeer(user)}
                 onBlockUser={blockUser}

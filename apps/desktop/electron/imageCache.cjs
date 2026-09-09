@@ -1,7 +1,7 @@
-// GoonGrid image + feed-response cache (main process) — MEMORY ONLY (F1 fix).
+// gMatch image + feed-response cache (main process) — MEMORY ONLY (F1 fix).
 // Security plan B.1: content must never cross a session on disk. Images are
 // held in an LRU byte-budget Map (apps/desktop/electron/imageCacheMemory.cjs)
-// and served over the same privileged gooncache:// scheme; feed query
+// and served over the same privileged gmcache:// scheme; feed query
 // responses are cached in RAM with the same 10-minute TTL.
 // init() destroys the legacy on-disk caches left by pre-1.1 installs
 // (image-cache/ + meta.json + feed-cache.json) — one-time, force, silent.
@@ -11,7 +11,7 @@ const http = require('http')
 const https = require('https')
 const mem = require('./imageCacheMemory.cjs')
 
-const SCHEME = 'gooncache'
+const SCHEME = 'gmcache'
 const MAX_SINGLE_BYTES = 25 * 1024 * 1024
 const FEED_TTL_MS = 10 * 60 * 1000
 const FEED_MAX_QUERIES = 100
@@ -122,7 +122,7 @@ function fetchBinary(url, redirects = 3) {
 }
 
 /**
- * Resolve a remote picture URL to a gooncache:// local URL.
+ * Resolve a remote picture URL to a gmcache:// local URL.
  * Hit → touch (LRU) + return. Miss → download into RAM, return.
  * Returns null on any failure (renderer falls back to the remote URL).
  */
@@ -179,7 +179,7 @@ function setFeedCache(query, posts) {
 }
 
 /**
- * protocol.handle('gooncache') handler — serves RAM buffers keyed by the
+ * protocol.handle('gmcache') handler — serves RAM buffers keyed by the
  * sanitized filename. Unknown/evicted key → 404 (renderer falls back remote).
  */
 async function serveImage(request) {

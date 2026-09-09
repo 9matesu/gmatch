@@ -8,7 +8,7 @@ import { playPress } from '../utils/sounds';
 import { resolveMediaUrl } from '../utils/media';
 import { ObjectImage } from './ObjectImage';
 import { InstagramPostModal } from './feed/InstagramPostModal';
-import type { FeedPost } from './feed/GoonMatchFeed';
+import type { FeedPost } from './feed/GMatchFeed';
 import { orbitFetch } from '../utils/api';
 
 interface UserProfileModalProps {

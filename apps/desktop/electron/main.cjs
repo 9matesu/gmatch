@@ -1,4 +1,4 @@
-// GoonGrid Electron main process.
+// gMatch Electron main process.
 // All booru HTTP happens HERE (renderer never touches the network directly).
 // Endpoints per docs/SPEC.md §6. 10s timeout, browser UA, round-robin health.
 const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage } = require('electron')
@@ -34,7 +34,30 @@ function initSecureKV() {
 // server (default) or we're a CLIENT of a friend's. Decided once at startup.
 let packagedServer = null // { mode, url } when app.isPackaged
 
-// gooncache:// serves cached pictures from the MAIN-PROCESS RAM (never disk).
+// Brand migration (goonMatch -> gMatch): the app name feeds userData
+// (%APPDATA%/@gmatch/desktop). For existing installs, move the old profile
+// ONCE before anything reads it — keys (DPAPI), snapshot DB, blobs and local
+// storage all live under this folder and must survive the rename.
+;(function migrateUserData() {
+  const fs = require('fs')
+  try {
+    const newPath = app.getPath('userData')
+    const oldPath = path.join(path.dirname(newPath), '@goongrid', path.basename(newPath))
+    if (oldPath !== newPath && fs.existsSync(oldPath) && !fs.existsSync(newPath)) {
+      fs.mkdirSync(path.dirname(newPath), { recursive: true })
+      try {
+        fs.renameSync(oldPath, newPath)
+      } catch {
+        // cross-drive or locked: copy the essentials, keep the old folder
+        fs.cpSync(oldPath, newPath, { recursive: true })
+      }
+    }
+  } catch {
+    /* first run or locked — the default path just works */
+  }
+})()
+
+// gmcache:// serves cached pictures from the MAIN-PROCESS RAM (never disk).
 // Privileged (standard+secure, fetchable) so sandboxed <img> tags can use it.
 protocol.registerSchemesAsPrivileged([
   {
@@ -553,7 +576,7 @@ function createWindow() {
     height: 900,
     minWidth: 1200,
     backgroundColor: '#080A0D',
-    title: 'goonMatch · Grid',
+    title: 'gMatch',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -631,7 +654,7 @@ app.whenReady().then(async () => {
   if (app.isPackaged) {
     packagedServer = serverMode.readServerMode()
     if (packagedServer.mode === 'host') {
-      process.env.GOONGRID_HOST_MODE = '1'
+      process.env.GMATCH_HOST_MODE = '1'
       try {
         await apiSidecar.startApi()
       } catch (err) {

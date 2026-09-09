@@ -1,7 +1,7 @@
 /**
  * Universal API Image Feeder
  * 
- * Provides robust, multi-source image feeds for goonMatch features:
+ * Provides robust, multi-source image feeds for gMatch features:
  * - Simulated Moderation Minigame
  * - Discovery & explore feeds
  * - Slideshow streams
@@ -189,7 +189,7 @@ export async function fetchUniversalFeed(options: FeederOptions = {}): Promise<F
               url: item.url,
               source: 'local_api',
               caption: item.caption || '',
-              author: item.author || 'goonMatch Bot',
+              author: item.author || 'gMatch Bot',
               category: tags[0] || 'anime',
               tags: Array.isArray(item.tags) ? item.tags : tags,
                rating: item.rating || 'unknown',

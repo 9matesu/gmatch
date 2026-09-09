@@ -107,7 +107,7 @@ export function ContextOverlay({
               }}
               className="w-full text-left px-3 py-2 hover:bg-retro-bg text-retro-muted transition-colors"
             >
-              Copy GoonMatch ID
+              Copy GMatch ID
             </button>
             <button
               type="button"

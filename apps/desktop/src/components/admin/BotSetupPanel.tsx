@@ -1388,7 +1388,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
             </div>
 
             <p className="text-[11px] text-zinc-500 leading-relaxed">
-              When a newcomer registers on goonMatch, a pre-defined starter deck of 5 unique cards is automatically minted for their account so they can immediately participate in duels.
+              When a newcomer registers on gMatch, a pre-defined starter deck of 5 unique cards is automatically minted for their account so they can immediately participate in duels.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

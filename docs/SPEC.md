@@ -1,6 +1,6 @@
-# goonMatch · Grid — Product Spec
+# gMatch — Product Spec
 
-One Electron desktop app, one multiplayer game. The **goonMatch shell** (feed,
+One Electron desktop app, one multiplayer game. The **gMatch shell** (feed,
 card duels, chat, P2P, hacks, moderation, admin — vendored from the orbit repo
 in the 2026-09 merge) wraps the **Babecock · Idle** game (ex-GoonGrid): click
 pictures to earn **g$**, buy **tags** (parsed live from booru sources) that
@@ -125,7 +125,7 @@ text overlays kept for caption hunts, §6).
 - Picture + feed caching (no re-parse, no re-download) — **RAM-only since the
   F1 security fix**: nothing persists to disk. Parsed post lists live in the
   main process for 10 min (100 queries max); picture bytes live in a
-  main-process LRU (256 MB budget, `gooncache://`) or a renderer session Map
+  main-process LRU (256 MB budget, `gmcache://`) or a renderer session Map
   in browser dev mode. `init()` destroys the legacy on-disk caches
   (`<userData>/image-cache/`, `feed-cache.json`) and the legacy IndexedDB
   store (`goongrid-img`). The 5-up/5-down window (past 5 + queue 5 + video
@@ -227,7 +227,7 @@ offline earnings). Each +5% click power. Persist across prestige.
   Without TURN, STUN stays for connectivity but srflx never leaks onward.
 ## 11. Save
 
-- zustand state → localStorage `goongrid.save.v1`, autosave every 10s + on unload.
+- zustand state → localStorage `gmatch.save.v1`, autosave every 10s + on unload.
 - Offline earnings = elapsed * GP/s * 50%, capped 8h, shown in modal on load.
 
 ## 12. Release 1.0 — server topology (no central server)
@@ -242,7 +242,7 @@ offline earnings). Each +5% click power. Persist across prestige.
     machine's LAN URLs (`http://<ip>:8790`) to share with friends.
   - **client**: skip the local server; the renderer points at a friend's URL
     (validated `http(s)://host[:port]`, persisted in `userData/server-mode.json`,
-    applied on relaunch). `GOONGRID_SERVER_URL` env overrides both.
+    applied on relaunch). `GMATCH_SERVER_URL` env overrides both.
 - Discovery across machines = everyone on the SAME host's server: WS swarm
   relays presence, `GET /api/users/online` (last_seen ≤ 60s, minus caller)
   seeds a joining client's peer map immediately; WebRTC direct fanout uses

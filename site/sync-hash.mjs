@@ -13,7 +13,7 @@ for (const file of ['index.html', 'en.html']) {
   html = html.replace(/<pre id="sha256">[0-9a-f]{64}<\/pre>/, `<pre id="sha256">${rel.sha256}</pre>`)
   // version marker + filename mentions
   html = html.replace(/(<strong id="version">)[^<]+(<\/strong>)/, `$1${rel.version}$2`)
-  html = html.replace(/goonMatch-Grid-\d+\.\d+\.\d+-portable\.exe/g, rel.file)
+  html = html.replace(/gMatch-\d+\.\d+\.\d+-portable\.exe/g, rel.file)
   // Publish link: prefer the canonical GitHub Release URL (Pages artifact
   // stays binary-free); local dev without downloadUrl keeps releases/<file>.
   const want = rel.downloadUrl || `releases/${rel.file}`

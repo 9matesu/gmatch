@@ -1,14 +1,14 @@
 "use client";
 
 // Extracted verbatim from App.tsx `mainView === 'messages'` branches:
-// the full DM panel (SocialPanel + GoonMatchDMs + NotificationsPanel) and the
+// the full DM panel (SocialPanel + GMatchDMs + NotificationsPanel) and the
 // minimized placeholder. `handleSetMainView`/setters threaded as props.
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { User } from '@orbit/shared';
 import type { ChatMessage } from '../../hooks/useP2P';
 import type { useLobby } from '../../hooks/useLobby';
 import { SocialPanel, type SocialPanelTab } from '../chat/SocialPanel';
-import { GoonMatchDMs, type PeerInfo, type ThreadItem, type GroupInfo } from '../chat/GoonMatchDMs';
+import { GMatchDMs, type PeerInfo, type ThreadItem, type GroupInfo } from '../chat/GMatchDMs';
 import { NotificationsPanel } from '../NotificationsPanel';
 import type { MainViewType } from '../home/HomeFooter';
 
@@ -101,7 +101,7 @@ export function MessagesView({
         chatUnread={pmUnreadCount}
         notificationUnread={lobby.unreadCount}
         dm={
-          <GoonMatchDMs
+          <GMatchDMs
             identity={identity}
             chatMessages={chatMessages}
             pmMessages={pmPeer ? pmMessagesByPeer[pmPeer.id || (pmPeer as any).orbitId || ''] || [] : []}

@@ -11,7 +11,7 @@ export function SecurityWarning({ className = '' }: { className?: string }) {
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-retro-fg leading-tight">Security Notice</p>
         <p className="text-[11px] text-retro-muted mt-0.5 leading-relaxed">
-          Never paste code, keys, or tokens into your browser console. goonMatch will never ask you to do this. Pasting into DevTools can expose your account.
+          Never paste code, keys, or tokens into your browser console. gMatch will never ask you to do this. Pasting into DevTools can expose your account.
         </p>
       </div>
       <button

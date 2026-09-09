@@ -64,7 +64,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
           {tab === 'getting-started' && (
             <div className="space-y-4">
               <section className="space-y-1.5">
-                <h3 className="text-xs font-medium text-retro-fg">What is GoonMatch?</h3>
+                <h3 className="text-xs font-medium text-retro-fg">What is GMatch?</h3>
                 <p className="text-xs text-retro-muted leading-relaxed">
                   A decentralized P2P card matching and image sharing network. Your identity is a cryptographic keypair generated locally in your browser. Files travel directly between peers via WebRTC and encrypted blobs.
                 </p>
@@ -72,7 +72,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
               <section className="space-y-1.5">
                 <h3 className="text-xs font-medium text-retro-fg">Your Identity</h3>
                 <p className="text-xs text-retro-muted leading-relaxed">
-                  When you launch GoonMatch, a signing keypair and an encryption keypair are created in your browser. Your GoonMatch ID is derived from your public key. Back up your export keys to restore your identity across devices.
+                  When you launch GMatch, a signing keypair and an encryption keypair are created in your browser. Your GMatch ID is derived from your public key. Back up your export keys to restore your identity across devices.
                 </p>
               </section>
               <section className="space-y-1.5">

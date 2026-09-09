@@ -1,4 +1,4 @@
--- goonMatch followers: asymmetric follow graph (Instagram-style). Unlike the
+-- gMatch followers: asymmetric follow graph (Instagram-style). Unlike the
 -- existing Friends table which is a symmetric bidirectional accepted pair, a
 -- Follow is one-directional: follower_id subscribed to followee_id's posts.
 -- `accepted` is 1 for public follows; for private accounts (Users.is_private)

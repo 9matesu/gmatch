@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { seedApp } from './helpers'
-import { generateIdentity } from '../src/identity.cjs'
+import { generateIdentity } from '../src/identity.cjs'
+
 import { legalVersionKey } from '../src/legal/documents'
 
 // Release-1.0 social-suite journeys (plan P4.1).
@@ -22,8 +23,10 @@ async function newPeerContext(page: import('@playwright/test').Page, name: strin
   await p.addInitScript(
     ([i, n, legalKey]: [Record<string, unknown>, string, string]) => {
       localStorage.setItem('orbit_identity', JSON.stringify(i))
-      localStorage.setItem('goonMatch_age_verified', 'true')
-      localStorage.setItem('orbit_legal_accepted', legalKey)
+      localStorage.setItem('goonMatch_age_verified', 'true')
+
+      localStorage.setItem('orbit_legal_accepted', legalKey)
+
       localStorage.setItem('orbit_display_name', n)
       localStorage.setItem('orbit_tags', JSON.stringify(['e2e']))
       localStorage.setItem(
@@ -50,7 +53,7 @@ async function publishPost(page: import('@playwright/test').Page, caption: strin
   await chooser.setFiles({ name: 'e2e-post.png', mimeType: 'image/png', buffer: PNG_1x1 })
   await page.getByPlaceholder('Write a caption...').fill(caption)
   await page.getByRole('button', { name: 'Share', exact: true }).click()
-  await expect(page.getByText('Post shared to goonMatch!')).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText('Post shared to gMatch!')).toBeVisible({ timeout: 20_000 })
   await page.waitForTimeout(3500) // outlast the 3s orbitFetch GET cache
   await page.reload()
   await expect(page.getByText(caption).first()).toBeVisible({ timeout: 20_000 })

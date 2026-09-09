@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject as StoryItem } from '@orbit/shared';
-import { GoonMatchStories } from '../GoonMatchStories';
+import { GMatchStories } from '../GMatchStories';
 import { InstagramPostModal } from './InstagramPostModal';
 import { LiveCameraModal } from '../camera/LiveCameraModal';
 import { ObjectImage } from '../ObjectImage';
@@ -164,7 +164,7 @@ function SignedPostImage({
   )
 }
 
-export function GoonMatchFeed({
+export function GMatchFeed({
   identity,
   posts,
   stories,
@@ -594,7 +594,7 @@ export function GoonMatchFeed({
       <div className="w-full max-w-[1400px] mx-auto flex flex-col px-2 sm:px-4 py-2 space-y-4">
         {/* Stories Tray Carousel */}
         <div className="bg-transparent border-b border-border-glass py-3 px-1">
-          <GoonMatchStories
+          <GMatchStories
             stories={stories}
             loading={storiesLoading}
             currentUserId={identity?.orbitId || ''}
@@ -673,7 +673,7 @@ export function GoonMatchFeed({
                   <Sparkles className="w-3.5 h-3.5 text-zinc-300" />
                   <span>Sponsored</span>
                   <span className="ml-auto text-zinc-500">
-                    {GAME_AD_TEMPLATES.find((t) => t.mode === post.game_mode)?.gameName || 'goonMatch Arcade'}
+                    {GAME_AD_TEMPLATES.find((t) => t.mode === post.game_mode)?.gameName || 'gMatch Arcade'}
                   </span>
                 </div>
 

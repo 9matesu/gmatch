@@ -6,7 +6,7 @@ import { ShieldAlert, CheckCircle2, XCircle, Flame, Trophy, Sparkles, AlertTrian
 import { fetchUniversalFeed, isExplicitFeederImage, type FeederImage } from '../../utils/universalImageFeeder';
 import { orbitFetch } from '../../utils/api';
 import type { OrbitIdentity } from '@orbit/crypto';
-import type { FeedPost } from './GoonMatchFeed';
+import type { FeedPost } from './GMatchFeed';
 import { ObjectImage } from '../ObjectImage';
 
 interface ModPatrolWidgetProps {

@@ -36,7 +36,7 @@ export interface BooruResponse {
 
 declare global {
   interface Window {
-    goongrid?: {
+    gmatch?: {
       booruFetch?: (req: BooruRequest) => Promise<BooruResponse>
       cacheImage?: (url: string) => Promise<{ local: string | null }>
       cacheStats?: () => Promise<{ files: number; bytes: number }>
@@ -53,7 +53,7 @@ const TIMEOUT_MS = 10_000
 // No-repeat memory: ids + file URLs seen this session AND in past sessions
 // (localStorage), capped so it can't grow forever. Same file under a
 // different mirror id still counts as seen via its URL.
-const SEEN_KEY = 'goongrid.seen.v1'
+const SEEN_KEY = 'gmatch.seen.v1'
 const SEEN_CAP = 500
 const seenIds = new Set<string>()
 const seenUrls = new Set<string>()
@@ -392,8 +392,8 @@ export async function fetchPosts(req: BooruRequest): Promise<BooruResponse> {
   const offline: BooruResponse = { posts: [], source: null, ok: false, offline: true }
   if (!req.tags.trim() || isQueryBlocked(req.tags)) return offline
   try {
-    if (typeof window !== 'undefined' && window.goongrid?.booruFetch) {
-      const res = await window.goongrid.booruFetch(req)
+    if (typeof window !== 'undefined' && window.gmatch?.booruFetch) {
+      const res = await window.gmatch.booruFetch(req)
       if (res.ok && res.posts.length > 0) {
         const fresh = remember(sanitize(res.posts, req.tags))
         // All repeats → report offline so the caller rotates to the next tag.

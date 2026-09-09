@@ -8,7 +8,7 @@ const path = require('node:path')
 const fs = require('node:fs')
 const os = require('node:os')
 
-const PORT = Number(process.env.GOONGRID_API_PORT || 8790)
+const PORT = Number(process.env.GMATCH_API_PORT || 8790)
 
 function configPath() {
   return path.join(app.getPath('userData'), 'server-mode.json')
@@ -17,7 +17,7 @@ function configPath() {
 /** @returns {{mode:'host'|'client', url:string}} */
 function readServerMode() {
   // Env override first (QA / power users).
-  const envUrl = process.env.GOONGRID_SERVER_URL
+  const envUrl = process.env.GMATCH_SERVER_URL
   if (envUrl && /^https?:\/\//.test(envUrl)) {
     return { mode: 'client', url: envUrl.replace(/\/+$/, '') }
   }

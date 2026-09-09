@@ -9,7 +9,7 @@ import {
   Link2,
   Share2,
 } from 'lucide-react';
-import type { FeedPost } from './GoonMatchFeed';
+import type { FeedPost } from './GMatchFeed';
 import { ObjectImage } from '../ObjectImage';
 import { orbitFetch, postShareUrl } from '../../utils/api';
 import { userFacingError } from '../../utils/userError';
@@ -210,7 +210,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
             onClick={() => {
               if (navigator.share) {
                 navigator.share({
-                  title: `goonMatch post by ${post.author_name}`,
+                  title: `gMatch post by ${post.author_name}`,
                   url: permalink,
                 });
               } else {

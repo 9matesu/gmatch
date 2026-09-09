@@ -1,4 +1,4 @@
--- goonMatch profile extras: bio + external link, plus denormalized followers /
+-- gMatch profile extras: bio + external link, plus denormalized followers /
 -- following / posts counts so profile headers can render without three-table
 -- joins. These counters are kept in sync by app code on every follower/
 -- post-create/delete event.</p>

@@ -1,6 +1,6 @@
 {
-  "name": "goonMatch",
-  "short_name": "goonMatch",
+  "name": "gMatch",
+  "short_name": "gMatch",
   "description": "Instagram-inspired peer-to-peer social media with feeds, stories, cards, arcade games, and direct messaging.",
   "start_url": "/",
   "display": "standalone",

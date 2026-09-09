@@ -32,7 +32,7 @@ function bunBin(): string {
 function devApiPlugin(): Plugin {
   let proc: ReturnType<typeof spawn> | null = null
   return {
-    name: 'goongrid-dev-api',
+    name: 'gmatch-dev-api',
     configureServer(server) {
       void (async () => {
         try {
@@ -83,7 +83,7 @@ function devApiPlugin(): Plugin {
  */
 function devPxPlugin(): Plugin {
   return {
-    name: 'goongrid-dev-px',
+    name: 'gmatch-dev-px',
     configureServer(server) {
       server.middlewares.use('/px', async (req: IncomingMessage, res: ServerResponse) => {
         try {
@@ -128,7 +128,7 @@ export default defineConfig({
   },
   server: {
     // Dev-only CORS bypass for the Grid feed's booru mirrors (kept from the
-    // pre-merge goongrid config). Never used in packaged builds — Electron
+    // pre-merge gmatch config). Never used in packaged builds — Electron
     // does these fetches in main via IPC.
     proxy: {
       '^/booru/tbib': {

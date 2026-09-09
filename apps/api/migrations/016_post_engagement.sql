@@ -1,8 +1,8 @@
--- goonMatch post engagement: a generalized comment ledger (reusable across any
+-- gMatch post engagement: a generalized comment ledger (reusable across any
 -- Object/Posts row, not just lobby board images), per-comment likes (IG-style
 -- heart on a reply), and the per-user bookmark Saves table. The existing
 -- LobbyComments table is intentionally preserved untouched so the lobby image
--- board keeps its independent ledger during the goonMatch pivot.</p>
+-- board keeps its independent ledger during the gMatch pivot.</p>
 
 CREATE TABLE IF NOT EXISTS Comments (
   id TEXT PRIMARY KEY,

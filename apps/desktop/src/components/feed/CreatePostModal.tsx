@@ -221,7 +221,7 @@ export function CreatePostModal({
       }
 
       playWin();
-      toast?.('Post shared to goonMatch!', 'success');
+      toast?.('Post shared to gMatch!', 'success');
 
       onPostCreated?.({
         id: objectId,

@@ -1,4 +1,4 @@
--- goonMatch post likes: Instagram-style single tap like on a public post.
+-- gMatch post likes: Instagram-style single tap like on a public post.
 -- Kept separate from the matchmaking Likes table (like/reject/pass decisions)
 -- so feed engagement never collides with duel decision bookkeeping. The
 -- denormalized Objects.like_count is kept in sync by app code.

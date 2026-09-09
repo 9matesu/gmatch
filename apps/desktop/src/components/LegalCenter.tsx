@@ -105,7 +105,7 @@ export function LegalCenter({
               <Scale className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-sm font-semibold text-white truncate">Centro Legal — goonMatch Grid</h2>
+              <h2 className="text-sm font-semibold text-white truncate">Centro Legal — gMatch</h2>
               <p className="text-[11px] text-zinc-400">
                 {doc.title} · v{doc.version}
               </p>

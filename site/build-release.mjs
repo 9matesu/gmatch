@@ -1,4 +1,4 @@
-// Run from site/: node build-release.mjs ../../apps/desktop/release/goonMatch-Grid-<ver>-portable.exe
+// Run from site/: node build-release.mjs ../../apps/desktop/release/gMatch-<ver>-portable.exe
 // Copies the artifact into releases/ and writes release.json FROM THE FILE —
 // the published hash is never hand-typed.
 import { copyFileSync, writeFileSync, readFileSync, existsSync } from 'node:fs'

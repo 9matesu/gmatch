@@ -9,7 +9,7 @@ import {
   Flag,
   X,
 } from 'lucide-react';
-import type { FeedPost } from './GoonMatchFeed';
+import type { FeedPost } from './GMatchFeed';
 
 interface PostOptionsModalProps {
   post: FeedPost;

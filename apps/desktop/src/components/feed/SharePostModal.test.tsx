@@ -12,7 +12,7 @@ vi.mock('../../utils/sounds', () => ({ playPress: vi.fn() }))
 
 import { orbitFetch } from '../../utils/api'
 import { SharePostModal } from './SharePostModal'
-import type { FeedPost } from './GoonMatchFeed'
+import type { FeedPost } from './GMatchFeed'
 
 const identity = { orbitId: 'me-1' } as OrbitIdentity
 const post = {

@@ -1,6 +1,6 @@
 import type { ActiveCap, CapId, GalleryImage, OwnedTag, ViewMode } from './types'
 
-export const SAVE_KEY = 'goongrid.save.v1'
+export const SAVE_KEY = 'gmatch.save.v1'
 export const SAVE_VERSION = 3
 export const OFFLINE_RATE = 0.5
 export const OFFLINE_CAP_MS = 8 * 60 * 60 * 1000

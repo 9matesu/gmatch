@@ -16,7 +16,7 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    window.goongrid?.serverState?.().then((s) => {
+    window.gmatch?.serverState?.().then((s) => {
       setState(s)
       if (s?.mode === 'client') setClientUrl(s.url)
     }).catch(() => setState(null))
@@ -31,14 +31,14 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
   }
 
   const save = async (mode: 'host' | 'client', url: string) => {
-    if (!window.goongrid?.serverSet) return
+    if (!window.gmatch?.serverSet) return
     setSaving(true)
-    const res = await window.goongrid.serverSet({ mode, url })
+    const res = await window.gmatch.serverSet({ mode, url })
     setSaving(false)
     if (!res.ok) { toast?.(res.error || 'Could not save', 'error'); return }
     toast?.(mode === 'host' ? 'Now hosting — restart to apply' : 'Connecting to friend — restart to apply', 'success')
-    if (window.goongrid.serverRelaunch && state.packaged) {
-      window.goongrid.serverRelaunch()
+    if (window.gmatch.serverRelaunch && state.packaged) {
+      window.gmatch.serverRelaunch()
     }
   }
 
@@ -58,7 +58,7 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
         {state.packaged && (
           <p className="text-[11px] text-retro-muted">
             {state.mode === 'host'
-              ? 'Friends running goonMatch Grid can enter one of the addresses below in their Settings → Server to join your world. Keep the app open and your firewall allows the port.'
+              ? 'Friends running gMatch can enter one of the addresses below in their Settings → Server to join your world. Keep the app open and your firewall allows the port.'
               : 'All social data lives on the server you connected to. Switch back to Host anytime.'}
           </p>
         )}

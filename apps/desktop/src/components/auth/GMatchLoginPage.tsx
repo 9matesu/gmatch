@@ -14,7 +14,7 @@ import { userFacingError } from '../../utils/userError';
 import { ProfileSetupForm } from '../profile/ProfileSetupForm';
 import { profileIsComplete } from '../../utils/profile';
 
-export function GoonMatchLoginPage({
+export function GMatchLoginPage({
   onLogin,
   onCreateAccount,
   onOpenTos,
@@ -42,7 +42,7 @@ export function GoonMatchLoginPage({
 
     if (mode === 'key') {
       if (!keyInput.trim()) {
-        setErrorMsg('Please enter a valid goonMatch secret key or JSON export');
+        setErrorMsg('Please enter a valid gMatch secret key or JSON export');
         return;
       }
       setLoading(true);
@@ -188,7 +188,7 @@ export function GoonMatchLoginPage({
                 ) : (
                   <>
                     <span>
-                      {mode === 'signup' ? 'Enter goonMatch' : 'Authenticate with Key'}
+                      {mode === 'signup' ? 'Enter gMatch' : 'Authenticate with Key'}
                     </span>
                     <ArrowRight className="w-4 h-4" />
                   </>

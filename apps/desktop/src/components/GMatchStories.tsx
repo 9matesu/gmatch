@@ -20,7 +20,7 @@ import {
   MessageCircle,
 } from 'lucide-react';
 
-interface GoonMatchStoriesProps {
+interface GMatchStoriesProps {
   stories: OrbitObject[];
   loading?: boolean;
   relationships?: Relationship[];
@@ -42,7 +42,7 @@ interface GroupedUserStories {
   lastCreatedAt: string;
 }
 
-export function GoonMatchStories({
+export function GMatchStories({
   stories,
   loading = false,
   relationships = [],
@@ -53,7 +53,7 @@ export function GoonMatchStories({
   onCloseActiveUser,
   onAddStory,
   onStartPm,
-}: GoonMatchStoriesProps) {
+}: GMatchStoriesProps) {
   const { toast } = useToast();
   const [seenStoryIds, setSeenStoryIds] = useState<Set<string>>(() => {
     if (typeof window === 'undefined') return new Set();

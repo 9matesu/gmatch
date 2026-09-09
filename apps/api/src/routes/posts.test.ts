@@ -69,7 +69,7 @@ async function createPublicPost(env: any, identity: ReturnType<typeof createTest
   return json.id as string
 }
 
-describe('Posts API (goonMatch feed engagement)', () => {
+describe('Posts API (gMatch feed engagement)', () => {
   let env: Awaited<ReturnType<typeof createMockEnv>>
   let postId: string
 

@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Auditoria de Segurança — goonMatch Grid</title>
+<title>Auditoria de Segurança — gMatch</title>
 </head>
 <body>
 <p><a href="../index.html#termos">← voltar para a página principal</a></p>
 <p><em>Gerado de docs/SECURITY-AUDIT.md (white-box).</em></p>
-<h1>goonMatch Grid — Auditoria de Segurança (static pentest)</h1>
+<h1>gMatch — Auditoria de Segurança (static pentest)</h1>
 <p><strong>Escopo:</strong> white-box do fonte na branch <code>security/audit-hardening</code> (base <code>feat/secure-p2p-phase1</code> @ <code>e9414ed</code>+), app desktop Electron + API Hono/Bun + <code>@orbit/crypto|protocol</code>. Não houve alvo deployed para teste dinâmico — toda afirmação abaixo cita código verificável; os comandos "Provar" reproduzem cada achado.</p>
 <p><strong>Metodologia:</strong> superfícies de persistência (disco, localStorage/LS leveldb, IndexedDB, cache Chromium, snapshot SQLite do servidor), transporte (REST assinado, WS swarm, WS correio, WebRTC/ICE, TURN), autenticação e controle de acesso, primitivas criptográficas e protocolo de envelope, modelo de ameaças (a) forense do disco do usuário, (b) malware user-level, (c) operador do servidor, (d) MITM de rede, (e) abuso do painel admin.</p>
 <h2>Achados</h2>
@@ -83,7 +83,7 @@
 <h2>Checklist de runtime-only (como verificar hoje)</h2>
 <pre>
 # 1) nada de imagem em disco após rodar o app:
-ls "$APPDATA/@goongrid/desktop/image-cache" 2&gt;/dev/null; echo "exit=$?"   # esperado: não existe / exit≠0
+ls "$APPDATA/@gmatch/desktop/image-cache" 2&gt;/dev/null; echo "exit=$?"   # esperado: não existe / exit≠0
 # 2) respostas sem cache:
 curl -sI "$API_BASE/api/objects/&lt;own-id&gt;" | grep -i cache-control          # no-store
 # 3) sem chave no localStorage:

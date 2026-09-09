@@ -56,7 +56,7 @@ export function AgeGateModal({
           </span>
           <h2 className="text-xl font-semibold text-white tracking-tight">Are you 18 or older?</h2>
           <p className="text-xs text-zinc-400 leading-relaxed max-w-xs mx-auto">
-            GoonGrid contains adult media and community content intended exclusively for mature audiences (18+).
+            gMatch contains adult media and community content intended exclusively for mature audiences (18+).
           </p>
         </div>
 

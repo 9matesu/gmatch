@@ -1707,7 +1707,7 @@ admin.post('/database/clean-posts', async (c) => {
   return c.json({ success: true, message: 'All posts and comments have been cleaned' })
 })
 
-// Migrate all lobby images to user posts under their goonMatch profile
+// Migrate all lobby images to user posts under their gMatch profile
 admin.post('/database/migrate-lobby-to-posts', async (c) => {
   const orbitId = c.get('orbitId')
   const migratedCount = await promoteLobbyImagesToPosts(c.env.DB, c.env.BUCKET)

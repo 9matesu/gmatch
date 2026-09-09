@@ -1,6 +1,6 @@
-# goonMatch · Grid
+# gMatch
 
-Adults-only (18+) desktop app — one multiplayer idle game. The goonMatch
+Adults-only (18+) desktop app — one multiplayer idle game. The gMatch
 social/gaming shell (feed, card duels, chat, P2P, hacks, moderation, admin
 dashboard) wrapping **Babecock · Idle** (ex-GoonGrid): click booru pictures to
 earn g$, buy tags that steer your feed, collect a gallery, pop GoonCaps,
@@ -27,7 +27,7 @@ npm run dev             # terminal 2
 cd apps/desktop
 npm run dist            # icon -> stage api (bun.exe + self-contained server) ->
                         # vite build -> electron-builder portable
-# artifact: release/goonMatch-Grid-<version>-portable.exe  (single file, runs straight)
+# artifact: release/gMatch-<version>-portable.exe  (single file, runs straight)
 ```
 
 Every copy bundles its own server: **host** mode (default) runs it locally and

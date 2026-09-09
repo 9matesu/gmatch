@@ -75,7 +75,7 @@ export function RoomsView({
       (u) => (u.display_name || '').toLowerCase() === invitePeer.trim().toLowerCase() || u.id === invitePeer.trim(),
     );
     if (!target) {
-      toast('No contact with that name/id — share a GoonMatch ID or DM them once first', 'error');
+      toast('No contact with that name/id — share a GMatch ID or DM them once first', 'error');
       return;
     }
     const ok = await onInvite(activeRoom.id, target.id);

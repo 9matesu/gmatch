@@ -10,7 +10,7 @@ import { CardDetailView } from './CardDetailView';
 import { SlideshowManager } from './slideshows/SlideshowManager';
 import IdleGalleryView from './grid/IdleGalleryView';
 import { useGame } from '@/game/store';
-import type { FeedPost } from './feed/GoonMatchFeed';
+import type { FeedPost } from './feed/GMatchFeed';
 import { Layers, Download, Trash2, CheckSquare, Search, Film, ImagePlus, ImageIcon } from 'lucide-react';
 
 export interface GalleryViewProps {
