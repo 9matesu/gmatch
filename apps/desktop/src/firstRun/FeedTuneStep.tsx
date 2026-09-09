@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useGame, SETUP_TAG_COUNT } from '../game/store';
 import { normalizeCustomTag, validateCustomTag } from '../game/tags';
+import { SUGGESTED_EXCLUDES } from '../game/tagFilter';
 import { fetchPosts } from '../services/booru';
 
 /**
@@ -41,9 +42,15 @@ const inputCls =
 
 export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
   const alreadyDone = useGame((s) => s.setupComplete);
-  const [fields, setFields] = useState<Field[]>(() =>
-    Array.from({ length: SETUP_TAG_COUNT }, () => ({ ...BLANK })),
-  );
+  const [editing, setEditing] = useState(false);
+  const [fields, setFields] = useState<Field[]>(() => {
+    const owned = useGame
+      .getState()
+      .tags.filter((t) => t.selected !== false)
+      .map((t) => t.name)
+      .slice(0, SETUP_TAG_COUNT);
+    return Array.from({ length: SETUP_TAG_COUNT }, (_, i) => ({ ...BLANK, value: owned[i] ?? '' }));
+  });
   const [excludeInput, setExcludeInput] = useState('');
   const [excludes, setExcludes] = useState<string[]>([]);
   const [note, setNote] = useState<string | null>(null);
@@ -126,8 +133,10 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
     fields.every((f) => f.status === 'live') && new Set(names).size === SETUP_TAG_COUNT;
 
   const start = () => {
-    // Already tuned (e.g. resumed after finishing elsewhere) -> just move on.
-    if (useGame.getState().setupComplete) {
+    const tuned = useGame.getState().setupComplete;
+    // Already tuned and not re-editing (e.g. resumed after finishing elsewhere)
+    // -> just move on.
+    if (tuned && !editing) {
       onFinished();
       return;
     }
@@ -139,7 +148,8 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
     }
     setNote(null);
     setStarting(true);
-    const r = useGame.getState().completeSetup(uniqueLive, excludes);
+    const g = useGame.getState();
+    const r = tuned ? g.updateSetup(uniqueLive, excludes) : g.completeSetup(uniqueLive, excludes);
     if (!r.ok) {
       setNote(r.message);
       setStarting(false);
@@ -148,11 +158,29 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
     onFinished();
   };
 
-  if (alreadyDone) {
+  if (alreadyDone && !editing) {
     return (
-      <div className="rounded-md border border-retro-accent/40 bg-retro-accent/10 p-5 text-sm text-retro-muted">
-        Your feed is already tuned — {SETUP_TAG_COUNT} starter tags steer every fetch. Adjust
-        excludes any time in <strong className="text-retro-fg">Settings → Feed</strong>.
+      <div className="space-y-3">
+        <div className="rounded-md border border-retro-accent/40 bg-retro-accent/10 p-5 text-sm text-retro-muted">
+          Your feed is already tuned — {SETUP_TAG_COUNT} starter tags steer every fetch. Adjust
+          excludes any time in <strong className="text-retro-fg">Settings → Feed</strong>.
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="flex-1 px-3 py-2 rounded-md border border-border-glass text-xs font-bold text-retro-fg hover:bg-surface-interactive cursor-pointer"
+          >
+            Change starter tags
+          </button>
+          <button
+            type="button"
+            onClick={onFinished}
+            className="flex-1 px-5 py-2.5 rounded-md chrome-accent text-sm font-black text-black cursor-pointer"
+          >
+            Continue
+          </button>
+        </div>
       </div>
     );
   }
@@ -231,6 +259,24 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
           ))}
         </div>
       )}
+
+      <div className="space-y-1.5">
+        <p className="text-[10px] uppercase tracking-wider text-retro-muted">
+          One-tap excludes &mdash; only the illegal core is blocked for everyone; these are yours to decide
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {SUGGESTED_EXCLUDES.filter((x) => !excludes.includes(x)).map((x) => (
+            <button
+              key={x}
+              type="button"
+              onClick={() => setExcludes((prev) => [...prev, x].slice(0, 100))}
+              className="rounded-full border border-border-glass px-2 py-0.5 text-[10px] font-mono text-retro-muted hover:text-retro-fg hover:border-retro-accent cursor-pointer"
+            >
+              + {x}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {note && (
         <div role="alert" className="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">

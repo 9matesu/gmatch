@@ -14,7 +14,8 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { saveUserProfile } from '../utils/profile';
-import { useGame, SETUP_TAG_COUNT } from '../game/store';
+import { useGame } from '../game/store';
+import { FeedTuneStep } from './FeedTuneStep';
 import { playPress, playWin } from '../utils/sounds';
 import {
   type OnboardingState,
@@ -46,8 +47,6 @@ function generateRandomHandle(): string {
   const num = Math.floor(100 + Math.random() * 900);
   return `${prefix}${suffix}_${num}`;
 }
-
-const DEFAULT_STARTER_TAGS = ['solo', 'anal', 'milf', 'blowjob'];
 
 export function OnboardingFlow({
   identity,
@@ -82,18 +81,14 @@ export function OnboardingFlow({
     let migrated = nextState;
 
     if (nextState.completed.length === 0 && anonymous.completed.includes('ready')) {
-      migrated = {
-        version: 1,
-        completed: ['welcome', 'ready'],
-        current: 'ready',
-      };
+      migrated = useGame.getState().setupComplete
+        ? { version: 1, completed: ['welcome', 'ready'], current: 'ready' }
+        : { version: 1, completed: ['welcome'], current: 'feed' };
     } else if (nextState.completed.length === 0 && anonymous.completed.length === 0) {
       if (!isDefaultPeerName(initialProfile.displayName)) {
-        migrated = {
-          version: 1,
-          completed: ['welcome', 'ready'],
-          current: 'ready',
-        };
+        migrated = useGame.getState().setupComplete
+          ? { version: 1, completed: ['welcome', 'ready'], current: 'ready' }
+          : { version: 1, completed: ['welcome'], current: 'feed' };
       }
     }
 
@@ -128,14 +123,7 @@ export function OnboardingFlow({
         localStorage.setItem('goonMatch_age_verified', 'true');
       } catch {}
 
-      // 2. Ensure feed / game starter tags are provisioned
-      if (!useGame.getState().setupComplete) {
-        const userTags = initialProfile.tags.filter(Boolean);
-        const starterTags = Array.from(new Set([...userTags, ...DEFAULT_STARTER_TAGS])).slice(0, SETUP_TAG_COUNT);
-        useGame.getState().completeSetup(starterTags, []);
-      }
-
-      // 3. Authenticate or create account
+      // 2. Authenticate or create account
       if (isImporting) {
         if (!secretKey.trim()) {
           throw new Error('Please enter your exported secret key');
@@ -150,21 +138,53 @@ export function OnboardingFlow({
 
       playWin();
 
-      // 4. Mark complete
-      const nextState: OnboardingState = {
-        version: 1,
-        completed: ['welcome', 'ready'],
-        current: 'ready',
-      };
+      // 3. Account done — the feed step (tag picks) comes next; the game
+      //    only runs with the player's own starter tags.
+      const alreadyTuned = useGame.getState().setupComplete;
+      const nextState: OnboardingState = alreadyTuned
+        ? { version: 1, completed: ['welcome', 'feed', 'ready'], current: 'ready' }
+        : { version: 1, completed: ['welcome'], current: 'feed' };
       writeOnboardingState(identityId, nextState);
       setState(nextState);
-      onComplete();
+      if (alreadyTuned) onComplete();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not complete setup');
     } finally {
       setBusy(false);
     }
   };
+
+  const handleFeedFinished = () => {
+    const nextState: OnboardingState = {
+      version: 1,
+      completed: ['welcome', 'feed', 'ready'],
+      current: 'ready',
+    };
+    writeOnboardingState(identityId, nextState);
+    setState(nextState);
+    onComplete();
+  };
+
+  if (state.current === 'feed') {
+    return (
+      <div className="fixed inset-0 z-[99990] overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-zinc-100">
+        <div className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-xl p-6 sm:p-8 shadow-2xl space-y-5 animate-orbit-slide-up">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-[10px] font-mono uppercase tracking-wider text-zinc-400">
+              <span>gMatch · Setup</span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-white">
+              Set up your game
+            </h1>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Pick the tags that steer your idle feed. The game fetches nothing before you do.
+            </p>
+          </div>
+          <FeedTuneStep onFinished={handleFeedFinished} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[99990] overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-zinc-100">
@@ -347,7 +367,7 @@ export function OnboardingFlow({
             ) : (
               <>
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>Enter gMatch</span>
+                <span>Continue</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}

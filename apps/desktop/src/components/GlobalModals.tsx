@@ -362,6 +362,17 @@ export function GlobalModals(props: GlobalModalsProps) {
           }}
           toast={toast}
           initialTab={settingsInitialTab}
+          onAccountDeleted={() => {
+            // Server + device already wiped by the section; drop the shell back
+            // to the register-again screen (same teardown as logout, below).
+            clearIdentity();
+            setMyProfile({ displayName: '', tags: [], isAdmin: false, pfpUrl: '' });
+            setSelectedIds(new Set());
+            setMainView('feed');
+            setDmMinimized(false);
+            setShowSettingsModal(false);
+            setActiveHacks([]);
+          }}
         />
       )}
 

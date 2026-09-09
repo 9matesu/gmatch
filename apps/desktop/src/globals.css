@@ -15,9 +15,12 @@
   --color-surface-elevated: #18181b;
   --color-surface-interactive: #27272a;
 
-  /* Glass surfaces (used with backdrop-filter) */
-  --color-glass: rgba(18, 18, 21, 0.85);
-  --color-glass-strong: rgba(24, 24, 27, 0.95);
+  /* Glass surfaces (used with backdrop-filter). --panel-alpha is set from the
+     user's "Panel opacity" preference (0.35–1); it scales the glass fills so
+     the whole chrome dims uniformly while borders/highlights stay put. */
+  --panel-alpha: 1;
+  --color-glass: rgba(18, 18, 21, calc(0.85 * var(--panel-alpha)));
+  --color-glass-strong: rgba(24, 24, 27, calc(0.95 * var(--panel-alpha)));
   --color-glass-solid: #18181b;
 
   /* Borders and highlights */
@@ -281,8 +284,8 @@
    the central app surfaces. */
 .glass-surface {
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.11), transparent 34%),
-    linear-gradient(180deg, rgba(23, 28, 35, 0.76), rgba(8, 10, 13, 0.84));
+    linear-gradient(145deg, rgba(255, 255, 255, calc(0.11 * var(--panel-alpha))), transparent 34%),
+    linear-gradient(180deg, rgba(23, 28, 35, calc(0.76 * var(--panel-alpha))), rgba(8, 10, 13, calc(0.84 * var(--panel-alpha))));
   border: 1px solid rgba(245, 247, 250, 0.16);
   box-shadow:
     0 20px 48px rgba(0, 0, 0, 0.34),
@@ -302,8 +305,8 @@
   position: relative;
   isolation: isolate;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.025)),
-    rgba(23, 28, 35, 0.58);
+    linear-gradient(180deg, rgba(255, 255, 255, calc(0.10 * var(--panel-alpha))), rgba(255, 255, 255, calc(0.025 * var(--panel-alpha)))),
+    rgba(23, 28, 35, calc(0.58 * var(--panel-alpha)));
   border: 1px solid rgba(245, 247, 250, 0.15);
   color: var(--color-retro-muted);
   box-shadow:

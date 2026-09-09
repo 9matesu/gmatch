@@ -37,7 +37,7 @@ export function HacksPanel({
   const expireHack = () => {
     setActiveHack(null);
     try { localStorage.removeItem('orbit_active_hack'); } catch { }
-    toast('Active cyber hack payload expired', 'info');
+    toast('The spy session ran out of time.', 'info');
   };
 
   return (
@@ -52,13 +52,13 @@ export function HacksPanel({
       ) : (
         <div className="glass-panel p-4 rounded-2xl border border-border-glass bg-surface-raised/40">
           <p className="text-xs text-retro-muted">
-            No active hack. Deploy one from the arsenal below — the live spy feed opens here.
+            No hack running. Buy one below to open a spy session on a player.
           </p>
         </div>
       )}
 
       <div>
-        <h3 className="text-xs font-black uppercase tracking-wider text-retro-fg mb-3">Hack arsenal</h3>
+        <h3 className="text-xs font-black uppercase tracking-wider text-retro-fg mb-3">Hacks</h3>
         <StoreTab
           arsenalOnly
           points={points}

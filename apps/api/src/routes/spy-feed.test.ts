@@ -51,9 +51,9 @@ describe('GET /api/users/hacks/spy-feed/:targetId', () => {
     await new EconomyService(env.DB).credit(attacker.orbitId, 50_000, {
       idempotencyKey: 'fund-spy-test', kind: 'reward', reference: 'test',
     })
-    // victim must be "online" (last_seen within 60s) for hack targeting
-    await env.DB.prepare('UPDATE Users SET last_seen = ? WHERE id = ?')
-      .bind(new Date().toISOString(), victim.orbitId).run()
+    // victim must be "online" (last_seen within 60s) and opted in to hacks
+    await env.DB.prepare('UPDATE Users SET last_seen = ?, pc_domination_settings = ? WHERE id = ?')
+      .bind(new Date().toISOString(), JSON.stringify({ allowHacks: true }), victim.orbitId).run()
     const buyBody = JSON.stringify({ item_id: 'item-hack-deny', target_id: victim.orbitId, idempotency_key: 'spy-buy-1' })
     const buy = await app.request('/api/users/store/purchase', {
       method: 'POST',

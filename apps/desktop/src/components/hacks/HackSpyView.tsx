@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Flame, ShieldAlert, ArrowLeft, Clock, MessageSquare, Image as ImageIcon } from 'lucide-react';
+import { Flame, ShieldAlert, ArrowLeft, Clock, MessageSquare, Image as ImageIcon, Heart } from 'lucide-react';
 import { playPress, playMatchFound } from '../../utils/sounds';
 import { orbitFetch } from '../../utils/api';
 import type { OrbitIdentity } from '@orbit/crypto';
@@ -52,7 +52,6 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
   const [feedError, setFeedError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Initial white flash transition
     playMatchFound();
     const flashTimer = setTimeout(() => {
       setFlashWhite(false);
@@ -72,8 +71,8 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
     return () => clearInterval(timer);
   }, [session.expiresAt, onExpire]);
 
-  // Real intercept: the server only answers while OUR hack on this target is
-  // active — a stale/expired session gets a 403 and the view says so.
+  // The server only answers while OUR session on this target is active —
+  // a stale/expired one gets a 403 and the view says so plainly.
   useEffect(() => {
     if (!identity) return;
     let cancelled = false;
@@ -85,13 +84,11 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
           identity,
         );
         if (!res.ok) {
-          // Errors name the recovery: 403 means the hack lapsed (buy another);
-          // anything else keeps retrying on the 15s poll, so say that.
           if (!cancelled) {
             setFeedError(
               res.status === 403
-                ? 'Hack expired — buy another to resume the intercept'
-                : 'Link severed — retrying automatically…',
+                ? 'Your session ended — buy another to keep looking.'
+                : 'Connection dropped — retrying…',
             )
           }
           return;
@@ -102,7 +99,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
           setFeedError(null);
         }
       } catch {
-        if (!cancelled) setFeedError('Intercept failed — retrying automatically…');
+        if (!cancelled) setFeedError('Could not load — retrying…');
       }
     };
     void load();
@@ -123,89 +120,89 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
   const IconComponent = HACK_ICONS[iconKey];
 
   return (
-    <div className="relative w-full h-full flex flex-col font-sans select-none overflow-hidden bg-surface-canvas text-white">
-      {/* Rapid White Flash Overlay */}
+    <div className="relative w-full h-full flex flex-col font-sans select-none overflow-hidden bg-surface-canvas text-retro-fg">
       {flashWhite && (
-        <div className="fixed inset-0 z-[99999] bg-surface-raised transition-opacity duration-300 pointer-events-none opacity-100 animate-out fade-out" />
+        <div className="fixed inset-0 z-[99999] bg-white/20 pointer-events-none" />
       )}
 
-      {/* Red Inner Shadow Vignette Overlay */}
-      <div className="pointer-events-none absolute inset-0 z-20 shadow-[inset_0_0_80px_rgba(239,68,68,0.7)] sm:shadow-[inset_0_0_120px_rgba(239,68,68,0.8)] border border-red-500/30" />
-
-      {/* Top Hack HUD Bar */}
-      <div className="relative z-30 flex items-center justify-between px-4 py-3 bg-red-950/80 backdrop-blur-md border-b border-red-500/40 shrink-0">
+      {/* Session header */}
+      <div className="relative z-30 flex items-center justify-between px-4 py-3 bg-retro-panel border-b border-border-glass shrink-0">
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => { playPress(750); onBack(); }}
-            className="px-2.5 py-1 rounded-xl bg-red-900/60 hover:bg-red-800 text-red-100 flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer border border-red-500/50"
+            className="px-2.5 py-1 rounded-xl bg-surface-interactive hover:border-retro-accent/40 text-retro-fg flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer border border-border-glass"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Return</span>
+            <span>Back</span>
           </button>
 
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
-            <span className="text-xs font-black tracking-widest uppercase text-red-400 flex items-center gap-1">
-              <IconComponent className="w-3.5 h-3.5 inline text-red-400" />
-              <span>SPY FEED: {feed?.target?.display_name || session.targetUserName}</span>
+            <span className={`w-2.5 h-2.5 rounded-full ${feedError ? 'bg-zinc-500' : 'bg-retro-online'}`} />
+            <span className="text-xs font-bold tracking-wide text-retro-fg flex items-center gap-1.5">
+              <IconComponent className="w-3.5 h-3.5 inline text-retro-accent" />
+              <span>{feed?.target?.display_name || session.targetUserName}</span>
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 bg-red-900/80 px-3 py-1 rounded-xl border border-red-500 text-xs font-mono font-black text-red-200">
-          <Clock className="w-3.5 h-3.5 text-red-400" />
+        <div className={`flex items-center gap-2 px-3 py-1 rounded-xl border text-xs font-mono font-bold tabular-nums ${
+          secondsRemaining < 30 ? 'bg-red-950/40 border-red-500/40 text-red-300' : 'bg-surface-interactive border-border-glass text-retro-fg'
+        }`}>
+          <Clock className="w-3.5 h-3.5" />
           <span>{formatTimer(secondsRemaining)}</span>
         </div>
       </div>
 
-      {/* Main Infiltrated Content Area */}
+      {/* Content */}
       <div className="relative z-10 flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 styled-scrollbar">
-        {/* Hacker Intercept Header Card */}
-        <div className="bg-surface-canvas/90 border border-red-500/40 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4">
-          <div className="flex items-center justify-between border-b border-red-900/50 pb-3">
+        <div className="glass-surface border border-border-glass rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4">
+          <div className="flex items-center justify-between border-b border-border-glass pb-3">
             <div>
-              <span className="text-[10px] font-mono font-bold text-red-400 uppercase tracking-widest">Active Penetration Payload</span>
-              <h2 className="text-base font-black text-white">{session.itemName}</h2>
+              <span className="text-[10px] font-mono text-retro-muted uppercase tracking-wider">In session</span>
+              <h2 className="text-base font-bold text-retro-fg">{session.itemName}</h2>
             </div>
-            <span className={`px-3 py-1 rounded-full font-mono text-xs font-black tracking-wider border ${feedError ? 'bg-zinc-500/20 border-zinc-500 text-zinc-400' : 'bg-red-500/20 border-red-500 text-red-400'}`}>
-              {feedError ? 'LINK LOST' : 'TARGET PWNED'}
+            <span className={`px-3 py-1 rounded-full font-mono text-[10px] font-bold tracking-wider border ${
+              feedError
+                ? 'bg-zinc-500/10 border-zinc-600 text-zinc-400'
+                : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+            }`}>
+              {feedError ? 'OFFLINE' : 'LIVE'}
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
-            <div className="bg-black/60 p-3.5 rounded-2xl border border-red-900/40 space-y-1">
-              <span className="text-retro-muted block text-[10px] uppercase font-bold">Target Identity:</span>
-              <p className="text-red-300 font-bold truncate">{feed?.target?.display_name || session.targetUserName}</p>
-              <p className="text-[10px] text-retro-muted font-mono">{session.targetUserId}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div className="bg-black/40 p-3.5 rounded-2xl border border-border-glass space-y-1">
+              <span className="text-retro-muted block text-[10px] uppercase font-bold">Player</span>
+              <p className="text-retro-fg font-bold truncate">{feed?.target?.display_name || session.targetUserName}</p>
               {feed?.target?.bio ? (
                 <p className="text-[10px] text-retro-body italic mt-1 line-clamp-2">&quot;{feed.target.bio}&quot;</p>
               ) : null}
             </div>
 
-            <div className="bg-black/60 p-3.5 rounded-2xl border border-red-900/40 space-y-1">
-              <span className="text-retro-muted block text-[10px] uppercase font-bold">Infiltration Status:</span>
-              <p className={feedError ? 'text-red-400 font-bold' : 'text-emerald-400 font-bold'}>
-                {feedError || 'STREAM SYNCHRONIZED'}
+            <div className="bg-black/40 p-3.5 rounded-2xl border border-border-glass space-y-1">
+              <span className="text-retro-muted block text-[10px] uppercase font-bold">Session</span>
+              <p className={feedError ? 'text-amber-300 font-bold' : 'text-emerald-300 font-bold'}>
+                {feedError || 'Live'}
               </p>
-              <p className="text-[10px] text-retro-muted">Full read &amp; spy stream unlocked</p>
+              <p className="text-[10px] text-retro-muted">Their posts and recent messages are visible while the timer runs</p>
             </div>
           </div>
         </div>
 
-        {/* Intercepted DMs (real, server-gated) */}
-        <div className="bg-surface-canvas/90 border border-red-500/40 rounded-3xl p-5 space-y-4 shadow-2xl">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase text-red-400 tracking-wider">
-            <MessageSquare className="w-4 h-4" />
-            <span>Intercepted Direct Messages</span>
+        {/* Recent messages (real, server-gated) */}
+        <div className="glass-surface border border-border-glass rounded-3xl p-5 space-y-4 shadow-2xl">
+          <div className="flex items-center gap-2 text-xs font-bold text-retro-fg tracking-wide">
+            <MessageSquare className="w-4 h-4 text-retro-muted" />
+            <span>Recent messages</span>
           </div>
 
           {feed && feed.intercepted.length > 0 ? (
-            <div className="space-y-3 font-mono text-xs">
+            <div className="space-y-3 text-xs">
               {feed.intercepted.map((m, i) => (
-                <div key={`${m.created_at}-${i}`} className="p-3 rounded-2xl bg-black/60 border border-zinc-800 space-y-1">
+                <div key={`${m.created_at}-${i}`} className="p-3 rounded-2xl bg-black/40 border border-border-glass space-y-1">
                   <div className="flex items-center justify-between text-[10px] text-retro-muted">
-                    <span className="font-bold text-red-400">{feed.target.display_name}</span>
+                    <span className="font-bold text-retro-fg">{feed.target.display_name}</span>
                     <span>{timeAgo(m.created_at)}</span>
                   </div>
                   <p className="text-retro-body break-words">&quot;{m.body}&quot;</p>
@@ -213,36 +210,38 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
               ))}
             </div>
           ) : (
-            <p className="text-xs text-retro-muted font-mono">
-              {feed ? 'No traffic on the wire — target is quiet.' : 'Decrypting packet capture…'}
+            <p className="text-xs text-retro-muted">
+              {feed ? 'Nothing new from them right now.' : 'Loading…'}
             </p>
           )}
         </div>
 
-        {/* Stolen post feed (real) */}
-        <div className="bg-surface-canvas/90 border border-red-500/40 rounded-3xl p-5 space-y-4 shadow-2xl">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase text-red-400 tracking-wider">
-            <ImageIcon className="w-4 h-4" />
-            <span>Exfiltrated Posts</span>
+        {/* Their posts (real) */}
+        <div className="glass-surface border border-border-glass rounded-3xl p-5 space-y-4 shadow-2xl">
+          <div className="flex items-center gap-2 text-xs font-bold text-retro-fg tracking-wide">
+            <ImageIcon className="w-4 h-4 text-retro-muted" />
+            <span>Their posts</span>
           </div>
 
           {feed && feed.posts.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {feed.posts.map((p) => (
-                <div key={p.id} className="p-3 rounded-2xl bg-black/60 border border-zinc-800 space-y-1">
+                <div key={p.id} className="p-3 rounded-2xl bg-black/40 border border-border-glass space-y-1">
                   <p className="text-xs text-retro-body line-clamp-2 break-words">
                     {p.caption || <span className="text-retro-muted italic">(no caption)</span>}
                   </p>
-                  <div className="flex items-center justify-between text-[10px] text-retro-muted font-mono">
-                    <span>♥ {p.likes}</span>
+                  <div className="flex items-center justify-between text-[10px] text-retro-muted">
+                    <span className="inline-flex items-center gap-1">
+                      <Heart className="w-3 h-3" /> {p.likes}
+                    </span>
                     <span>{timeAgo(p.created_at)}</span>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-xs text-retro-muted font-mono">
-              {feed ? 'Target has nothing public on the board.' : 'Scraping target uploads…'}
+            <p className="text-xs text-retro-muted">
+              {feed ? 'They have nothing posted yet.' : 'Loading…'}
             </p>
           )}
         </div>

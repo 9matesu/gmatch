@@ -83,6 +83,11 @@ export interface GameState {
   feedCursor: number
   feedOffline: boolean
   fetching: boolean
+  /** True only while the CURRENT stage image is resolved + decoded. Clicks
+   *  are dead until it flips — the game never runs on a missing/uncached
+   *  picture (session RAM cache only, nothing hits disk). */
+  imageReady: boolean
+  setImageReady: (ready: boolean) => void
   toasts: Toast[]
   offlineGain: number
 
@@ -100,6 +105,8 @@ export interface GameState {
   removeCustomSource: (id: string) => void
   toggleCustomSource: (id: string) => void
   completeSetup: (tags: string[], excludes: string[]) => { ok: boolean; message: string }
+  /** Re-run the setup picks after the first one (Settings → Feed / onboarding edit). */
+  updateSetup: (tags: string[], excludes: string[]) => { ok: boolean; message: string }
   addUserExclude: (raw: string) => boolean
   removeUserExclude: (term: string) => boolean
   buyTag: (name: string) => boolean
@@ -268,6 +275,7 @@ function freshData() {
     feedCursor: 0,
     feedOffline: false,
     fetching: false,
+    imageReady: false,
     toasts: [] as Toast[],
     offlineGain: 0,
   }
@@ -375,9 +383,14 @@ function koFoe(s: GameState, now: number, clicksOnFoe: number) {
 export const useGame = create<GameState>((set, get) => ({
   ...freshData(),
 
+  setImageReady: (ready) => set({ imageReady: ready }),
+
   clickImage: () => {
     const s = get()
     const now = Date.now()
+    // The game never runs blind: no current post or its picture is not
+    // cached + decoded yet — click is dead (no g$, no counters).
+    if (!s.current || !s.imageReady) return { gain: 0, crit: false, killed: false, heat: 1 }
     const clickNumber = s.clicks + 1
     const crit = isCrit(clickNumber)
     // Heat combo: rapid clicks stack up to x3; idling past the window resets.
@@ -387,8 +400,8 @@ export const useGame = create<GameState>((set, get) => ({
     // achievements) hit harder, crits deal x10, heat stacks on top.
     const gain = clickGain(econ(s), clickNumber, now, streak)
     const clickXp = crit ? 5 : 1
-    // No live foe (empty feed or re-featured gallery piece): clicks just pay g$.
-    if (!s.current || s.foeMaxHp <= 0) {
+    // No live foe (re-featured gallery piece): clicks just pay g$.
+    if (s.foeMaxHp <= 0) {
       const next: GameState = {
         ...s,
         gc: s.gc + gain,
@@ -1001,8 +1014,9 @@ export const useGame = create<GameState>((set, get) => ({
       })
       return
     }
-    // Auto-clicks also batter the live foe (one KO per tick at most).
-    if (s.current && s.foeMaxHp > 0 && autoDmg > 0 && s.foeHp - autoDmg <= 0) {
+    // Auto-clicks also batter the live foe (one KO per tick at most) — but
+    // only while its picture is cached + on screen (no blind farming).
+    if (s.imageReady && s.current && s.foeMaxHp > 0 && autoDmg > 0 && s.foeHp - autoDmg <= 0) {
       const ko = koFoe(s, now, s.foeClicks)
       const next: GameState = {
         ...s,
@@ -1184,8 +1198,12 @@ export const useGame = create<GameState>((set, get) => ({
   },
 
   completeSetup: (names, excludes) => {
+    if (get().setupComplete) return { ok: false, message: 'Setup already done.' }
+    return get().updateSetup(names, excludes)
+  },
+
+  updateSetup: (names, excludes) => {
     const s = get()
-    if (s.setupComplete) return { ok: false, message: 'Setup already done.' }
     // Validity gate only (no network): exactly SETUP_TAG_COUNT unique live
     // probing happens on the setup screen before this is called.
     const clean: string[] = []

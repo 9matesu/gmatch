@@ -113,6 +113,12 @@ export default function Home() {
   const { settings, update: updateSettings } = useSettings();
   const [users, setUsers] = useState<User[]>([]);
 
+  // Panel opacity preference drives the glass chrome through a CSS variable.
+  useEffect(() => {
+    const alpha = Math.min(1, Math.max(0.35, settings.panelOpacity ?? 1));
+    document.documentElement.style.setProperty('--panel-alpha', String(alpha));
+  }, [settings.panelOpacity]);
+
   const game = useGame({ users, identity });
   const {
     relationships,
@@ -2989,8 +2995,8 @@ export default function Home() {
                   {mainView === 'feed' && (
                     <div className={isVisionJammed ? "relative" : ""}>
                       {isVisionJammed && (
-                        <div className="mb-3 p-3 bg-red-950/90 border border-red-500/50 rounded-xl text-center text-xs font-bold text-red-200 uppercase tracking-wider animate-pulse flex items-center justify-center gap-2">
-                          <span>⚠️ VISION JAMMED (Deny hack active) — Images blurred for a few minutes</span>
+                        <div className="mb-3 p-3 bg-red-950/90 border border-red-500/50 rounded-xl text-center text-xs font-bold text-red-200 uppercase tracking-wider flex items-center justify-center gap-2">
+                          <span>Your images are blurred &mdash; someone paid for a vision jam. It expires shortly.</span>
                         </div>
                       )}
                       <div className={isVisionJammed ? "blur-md select-none pointer-events-none transition-all duration-300" : ""}>

@@ -59,10 +59,9 @@ export function PointsHelpModal({ onClose }: { onClose: () => void }) {
             </h3>
             <div className="bg-surface-interactive border border-retro-border rounded-lg p-3 space-y-1.5">
               {[
-                ['Deny: Vision Jammer', '−800 g$'],
-                ['Intercept DMs', '−1,000 g$'],
-                ['Profile Takeover', '−3,500 g$'],
-                ['Mobile Cyber Virus', '−4,500 g$'],
+                ['Vision Jam', '\u2212800 g$'],
+                ['Flash Drop', '\u22121,000 g$'],
+                ['Screen Lock', '\u22124,500 g$'],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-center justify-between text-xs py-0.5">
                   <span className="text-retro-body">{label}</span>

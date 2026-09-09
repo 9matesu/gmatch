@@ -306,8 +306,8 @@ export interface ActiveHackDebuff {
 }
 
 export const STORE_ITEMS: StoreItem[] = [
-  { id: 'item-hack-mobile', name: 'Mobile Cyber Virus', desc: 'Locks the target\'s screen for 1 minute with a full-screen flashing slideshow + audio. Only works against a player who is online right now.', category: 'hack', cost: 4500, icon: 'Flame', badge: 'VIRUS', consumable: true },
-  { id: 'item-hack-deny', name: 'Deny: Vision Jammer', desc: 'Blurs the target player\'s feed images for 5 minutes (Vision Jammed banner). Only works against a player who is online right now.', category: 'hack', cost: 800, icon: 'EyeOff', badge: 'HACK', consumable: true },
+  { id: 'item-hack-mobile', name: 'Screen Lock', desc: 'Locks their screen behind a takeover image for one minute. Only lands while they are online.', category: 'hack', cost: 4500, icon: 'Flame', badge: 'LOCK', consumable: true },
+  { id: 'item-hack-deny', name: 'Vision Jam', desc: 'Blurs their feed images for five minutes. Only lands while they are online.', category: 'hack', cost: 800, icon: 'EyeOff', badge: 'JAM', consumable: true },
   { id: 'item-flash-drop', name: 'Flash Drop Broadcast', desc: 'Instantly broadcasts your chosen photo to everyone online for 5 seconds. Liking one counts as a normal like.', category: 'hack', cost: 1000, icon: 'Zap', badge: 'ABILITY', consumable: true },
   { id: 'item-lootbox-celebrity', name: 'Celebrity Stars Mystery Box', desc: 'Opens a celebrity-tier luxury lootbox containing rare pop-culture, idol, and celebrity cards.', category: 'pack', cost: 350, icon: 'Sparkles', badge: 'CELEB', consumable: true },
   { id: 'item-pack-rare', name: 'Holo Rare Vault Pack', desc: 'Opens a 3-card pack guaranteed to contain Rare or Epic holographic cards with high trade valuation.', category: 'pack', cost: 250, icon: 'Sparkles', badge: 'HOLO', consumable: true },

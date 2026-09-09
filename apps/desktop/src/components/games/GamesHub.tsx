@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { playPress } from '../../utils/sounds';
-import { Trophy, MousePointerClick, Maximize, Minimize2, Images } from 'lucide-react';
+import { Maximize, Minimize2, Images } from 'lucide-react';
 import { BabecockPanel } from '../BabecockPanel';
-import { Leaderboard } from '../Leaderboard';
+import { RankingsPanel } from './RankingsPanel';
 import { DeckBuilder } from './DeckBuilder';
 import { CardTile } from '../home/CardTile';
 import GridWorkspace from '../grid/GridWorkspace';
@@ -18,7 +18,7 @@ export function GamesHub({
   cards,
   users = [],
   onSelectUser,
-  initialSubTab = 'duel',
+  initialSubTab = 'idle',
   renderDuelContent,
   toast,
   onOpenSources,
@@ -34,7 +34,7 @@ export function GamesHub({
   /** Open the custom image-sources manager (idle clicker). */
   onOpenSources?: () => void;
 }) {
-  const initial = (initialSubTab === 'store' ? 'duel' : initialSubTab) as GamesTab;
+  const initial = (initialSubTab === 'store' ? 'idle' : initialSubTab) as GamesTab;
   const [subTab, setSubTab] = useState<GamesTab>(initial);
 
   // Idle Clicker fullscreen: Fullscreen API on the workspace box, with an
@@ -59,40 +59,11 @@ export function GamesHub({
     }
   };
 
-  const tabs: { id: GamesTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-    { id: 'idle', label: 'Idle Clicker', icon: MousePointerClick },
-    { id: 'ranks', label: 'Rankings', icon: Trophy },
-  ];
-
   return (
-    <div className="w-full max-w-6xl mx-auto flex flex-col font-sans select-none pb-24 text-retro-fg animate-orbit-fade-in">
-      {/* Tab Navigation — Fully Colored Active Tabs */}
-      <div className="glass-surface metro-rule px-3 sm:px-4 flex items-center gap-1.5 overflow-x-auto styled-scrollbar py-2">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = subTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => {
-                playPress(800);
-                setSubTab(tab.id);
-              }}
-              className={`glass-tab py-2 px-3.5 font-medium text-xs flex items-center gap-1.5 whitespace-nowrap rounded-md transition-all cursor-pointer ${isActive
-                  ? 'glass-tab-active'
-                  : ''
-                }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
+    <div className={`w-full max-w-6xl mx-auto flex flex-col font-sans select-none ${subTab === 'idle' ? 'pb-2' : 'pb-24'} text-retro-fg animate-orbit-fade-in`}>
+      {/* Tab bar removed — every game is reachable from the sidebar. */}
       {/* Content */}
-      <div className="p-3 sm:p-4">
+      <div className={subTab === 'idle' ? 'p-2' : 'p-3 sm:p-4'}>
         {subTab === 'duel' && (
           <div className="space-y-4">
             {renderDuelContent()}
@@ -142,13 +113,11 @@ export function GamesHub({
           </div>
         )}
 
-        {/* Idle Clicker (was the top-level "IDLE CLICKER" sidebar item —
-            moved inside Porn Games, normal capitalization). The workspace
-            fills the available height with wide margins for big panels. */}
+        {/* Idle Clicker — fills the content column; entry is the sidebar. */}
         {subTab === 'idle' && (
           <div
             ref={idleBoxRef}
-            className={`relative rounded-lg overflow-hidden bg-surface-canvas ${idleFullscreen ? 'h-dvh p-4' : 'h-[calc(100dvh-210px)] min-h-[560px]'}`}
+            className={`relative rounded-lg overflow-hidden bg-surface-canvas ${idleFullscreen ? 'h-dvh p-4' : 'h-[calc(100dvh-160px)] min-h-[520px]'}`}
           >
             <div className="absolute right-2 top-2 z-20 flex items-center gap-1.5">
               {onOpenSources && (
@@ -178,9 +147,10 @@ export function GamesHub({
         )}
 
         {subTab === 'ranks' && (
-          <div className="glass-surface rounded-lg p-4">
-            <Leaderboard users={users} onSelectUser={onSelectUser || (() => { })} />
-          </div>
+          <RankingsPanel
+            users={users}
+            onSelectUser={(uId) => onSelectUser?.(uId)}
+          />
         )}
       </div>
     </div>

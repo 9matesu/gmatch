@@ -5,7 +5,9 @@ import type { AppSettings } from '../../hooks/useSettings';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { playPress, playMsgReceive } from '../../utils/sounds';
 import { useGame, MAX_USER_EXCLUDES } from '../../game/store';
+import { FeedTuneStep } from '../../firstRun/FeedTuneStep';
 import { ServerTab } from './ServerTab';
+import { DeleteAccountSection } from './DeleteAccountSection';
 import {
   Settings,
   User,
@@ -39,6 +41,8 @@ interface GMatchSettingsModalProps {
   updateSettings: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
   identity: OrbitIdentity | null;
   onOpenIdentityModal?: (mode: 'export' | 'login' | 'logout') => void;
+  /** Called after the account + every local trace is deleted — shell logs out. */
+  onAccountDeleted?: () => void;
   toast?: (msg: string, type?: 'error' | 'success' | 'info' | 'warning' | any) => void;
   initialTab?: SettingsTabId;
 }
@@ -56,7 +60,8 @@ function FeedSettingsTab({ toast }: { toast?: (msg: string, type?: string) => vo
   const addUserExclude = useGame((s) => s.addUserExclude);
   const removeUserExclude = useGame((s) => s.removeUserExclude);
   const [draft, setDraft] = useState('');
-  const owned = tags.filter((t) => t.level > 0);
+  const [showPicksEditor, setShowPicksEditor] = useState(false);
+  const owned = tags.filter((t) => t.level === 0 && t.selected !== false);
 
   const add = () => {
     const parts = draft
@@ -100,6 +105,17 @@ function FeedSettingsTab({ toast }: { toast?: (msg: string, type?: string) => vo
         <p className="text-[11px] text-retro-muted">
           Active excluded tags ({userExcludes.length}/{MAX_USER_EXCLUDES}).
         </p>
+        {showPicksEditor ? (
+          <FeedTuneStep onFinished={() => setShowPicksEditor(false)} />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowPicksEditor(true)}
+            className="px-3 py-1.5 rounded-xl border border-border-glass text-[11px] font-bold text-retro-fg hover:bg-surface-raised cursor-pointer"
+          >
+            Change starter tags
+          </button>
+        )}
       </div>
 
       <div className="p-4 bg-surface-raised border border-border-glass rounded-2xl space-y-3">
@@ -163,6 +179,7 @@ export function GMatchSettingsModal({
   updateSettings,
   identity,
   onOpenIdentityModal,
+  onAccountDeleted,
   toast,
   initialTab = 'preferences',
 }: GMatchSettingsModalProps) {
@@ -373,6 +390,25 @@ export function GMatchSettingsModal({
                 {/* Display & Layout */}
                 <div className="p-4 bg-surface-interactive border border-retro-border rounded-lg space-y-4">
                   <h4 className="text-xs font-medium text-retro-fg">Display &amp; Layout</h4>
+
+                  {/* Panel opacity */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label htmlFor="panel-opacity" className="text-[11px] text-retro-muted">Panel opacity</label>
+                      <span className="text-[11px] font-mono text-retro-fg tabular-nums">{Math.round((settings.panelOpacity ?? 1) * 100)}%</span>
+                    </div>
+                    <input
+                      id="panel-opacity"
+                      type="range"
+                      min={35}
+                      max={100}
+                      step={5}
+                      value={Math.round((settings.panelOpacity ?? 1) * 100)}
+                      onChange={(e) => updateSettings('panelOpacity', Number(e.target.value) / 100)}
+                      className="w-full accent-retro-accent cursor-pointer"
+                    />
+                    <p className="text-[10px] text-retro-muted">Makes panels and cards more see-through. Text keeps its backing.</p>
+                  </div>
 
                   {/* Feed Columns */}
                   <div className="flex items-center justify-between gap-4">
@@ -765,6 +801,15 @@ export function GMatchSettingsModal({
                     </button>
                   </div>
                 </div>
+
+                <DeleteAccountSection
+                  identity={identity}
+                  displayName={(() => {
+                    try { return localStorage.getItem('orbit_display_name') || ''; } catch { return ''; }
+                  })()}
+                  toast={(msg, type) => toast?.(msg, type)}
+                  onDeleted={() => onAccountDeleted?.()}
+                />
               </div>
             )}
 

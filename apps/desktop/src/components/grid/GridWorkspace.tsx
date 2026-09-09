@@ -3,6 +3,7 @@ import GoonPanel from '../../ui/GoonPanel'
 import ShopPanel from '../../ui/ShopPanel'
 import StatsPanel from '../../ui/StatsPanel'
 import OfflineModal from '../../ui/OfflineModal'
+import { FeedTuneStep } from '../../firstRun/FeedTuneStep'
 import { useToast } from '../Toast'
 import { useGame } from '../../game/store'
 import '../../ui/grid-animations.css'
@@ -43,6 +44,22 @@ export default function GridWorkspace() {
   useEffect(() => {
     if (ageVerified && setupComplete) void useGame.getState().fetchFeed()
   }, [ageVerified, setupComplete])
+
+  if (!setupComplete) {
+    return (
+      <div className="relative flex h-full min-h-0 items-start justify-center overflow-y-auto styled-scrollbar bg-surface-canvas p-6">
+        <div className="w-full max-w-md rounded-lg border border-border-glass bg-retro-panel p-5 space-y-4 shadow-[0_12px_28px_rgba(0,0,0,0.5)]">
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-wider text-retro-fg">Set up your feed</h2>
+            <p className="text-xs text-retro-muted mt-1">
+              The clicker stays asleep until you pick your starter tags. Nothing is fetched before that.
+            </p>
+          </div>
+          <FeedTuneStep onFinished={() => { /* fetchFeed fires off the setupComplete effect */ }} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex h-full min-h-0 flex-col gap-4 overflow-hidden bg-surface-canvas p-4">

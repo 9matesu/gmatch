@@ -91,7 +91,7 @@ describe('domination routes', () => {
 
   it('POST /api/domination/trigger blocks if victim lacks specific action consent', async () => {
     // Enable for victim B, but only for wallpaper
-    await env.DB.prepare("UPDATE Users SET pc_domination_enabled = 1, pc_domination_settings = ? WHERE id = ?")
+    await env.DB.prepare("UPDATE Users SET pc_domination_enabled = 1, pc_domination_settings = ?, last_seen = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?")
       .bind(JSON.stringify({ allowDesktopBackgroundChange: true }), userB.orbitId).run()
 
     const res = await app.request('/api/domination/trigger', {
@@ -105,7 +105,7 @@ describe('domination routes', () => {
   })
 
   it('POST /api/domination/trigger succeeds when target consents', async () => {
-    await env.DB.prepare("UPDATE Users SET pc_domination_enabled = 1, pc_domination_settings = ? WHERE id = ?")
+    await env.DB.prepare("UPDATE Users SET pc_domination_enabled = 1, pc_domination_settings = ?, last_seen = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?")
       .bind(JSON.stringify({ allowDesktopBackgroundChange: true, allowBlurEverything: true }), userB.orbitId).run()
 
     // trigger now costs g$ — fund the dominator first
@@ -149,7 +149,7 @@ describe('domination routes', () => {
   })
 
   it('GET /api/domination/targets returns list with consent metadata', async () => {
-    await env.DB.prepare("UPDATE Users SET pc_domination_enabled = 1, pc_domination_settings = ? WHERE id = ?")
+    await env.DB.prepare("UPDATE Users SET pc_domination_enabled = 1, pc_domination_settings = ?, last_seen = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?")
       .bind(JSON.stringify({ allowPopupVideo: true }), userB.orbitId).run()
 
     const res = await app.request('/api/domination/targets', {
@@ -201,7 +201,7 @@ describe('domination economy (cost + victim payout)', () => {
   }
 
   it('trigger debits the dominator and pays the victim a consent cut', async () => {
-    await env.DB.prepare('UPDATE Users SET pc_domination_enabled = 1, pc_domination_settings = ? WHERE id = ?')
+    await env.DB.prepare("UPDATE Users SET pc_domination_enabled = 1, pc_domination_settings = ?, last_seen = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?")
       .bind(JSON.stringify({ allowPopupMessage: true }), userB.orbitId).run()
     await fund(userA, 10_000)
     const before = await balance(userA)
@@ -218,7 +218,7 @@ describe('domination economy (cost + victim payout)', () => {
   })
 
   it('trigger fails with 402 when the dominator cannot pay', async () => {
-    await env.DB.prepare('UPDATE Users SET pc_domination_enabled = 1, pc_domination_settings = ? WHERE id = ?')
+    await env.DB.prepare("UPDATE Users SET pc_domination_enabled = 1, pc_domination_settings = ?, last_seen = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?")
       .bind(JSON.stringify({ allowPopupMessage: true }), userB.orbitId).run()
     const body = JSON.stringify({ targetId: userB.orbitId, action: 'message', payload: { text: 'hi' } })
     const res = await app.request('/api/domination/trigger', {

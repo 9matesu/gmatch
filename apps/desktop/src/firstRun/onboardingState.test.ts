@@ -28,21 +28,23 @@ describe('onboarding state', () => {
     let state = initialOnboardingState();
     expect(nextIncompleteStep(state)).toBe('welcome');
     state = completeStep(state, 'welcome');
+    expect(state.current).toBe('feed');
+    state = completeStep(state, 'feed');
     expect(state.current).toBe('ready');
   });
 
   it('persists progress per identity and resumes it', () => {
-    const state = completeStep(initialOnboardingState(), 'welcome');
+    const state = completeStep(completeStep(initialOnboardingState(), 'welcome'), 'feed');
     writeOnboardingState('orbit-a', state);
     writeOnboardingState('orbit-b', initialOnboardingState());
 
     expect(readOnboardingState('orbit-a')).toEqual(state);
     expect(readOnboardingState('orbit-b').current).toBe('welcome');
-    expect(localStorage.getItem(onboardingStorageKey('orbit-a'))).toContain('ready');
+    expect(localStorage.getItem(onboardingStorageKey('orbit-a'))).toContain('feed');
   });
 
   it('marks the guide complete only after the ready step', () => {
-    const welcomeDone: OnboardingState = { ...initialOnboardingState(), current: 'ready', completed: ['welcome'] };
+    const welcomeDone: OnboardingState = { ...initialOnboardingState(), current: 'ready', completed: ['welcome', 'feed'] };
     const complete = completeStep(welcomeDone, 'ready');
     expect(complete.completed).toContain('ready');
     expect(nextIncompleteStep(complete)).toBeNull();

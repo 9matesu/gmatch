@@ -5,7 +5,7 @@ import { CAPS, capEffectLabel, capStacks } from '../game/caps'
 import { HEAT_WINDOW_MS, heatMultiplier } from '../game/economy'
 import type { CapId } from '../game/types'
 import { offlineSvg } from '../services/offlineSvg'
-import { prefetchImages } from '../services/imageCache'
+import { prefetchImages, resolveImage } from '../services/imageCache'
 import { isVideoUrl } from '../services/postFilter'
 import { redgifsPlayable } from '../services/redgifs'
 import { CAP_SKINS } from './capSkins'
@@ -85,10 +85,13 @@ export default function GoonPanel() {
   const queue = useGame((s) => s.queue)
   const past = useGame((s) => s.past)
   const popCap = useGame((s) => s.popCap)
+  const imageReady = useGame((s) => s.imageReady)
+  const setImageReady = useGame((s) => s.setImageReady)
 
   const [floats, setFloats] = useState<Float[]>([])
   const [critFlash, setCritFlash] = useState(false)
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
+  const [shownUrl, setShownUrl] = useState<string | null>(null)
   const floatId = useRef(0)
   const reduceMotion = useReducedMotion()
 
@@ -150,6 +153,43 @@ export default function GoonPanel() {
     (current.kind === 'video' || isVideoUrl(current.url)) &&
     !/\.gif(?:[?#]|$)/i.test(current.url)
   const inBattle = !showOffline && foeMaxHp > 0
+
+  // Verified stage swap: keep the last decoded picture on screen until the
+  // next one is cached + decoded successfully — arrows never show a blank
+  // frame, and scoring stays locked (store.imageReady) until it is visible.
+  useEffect(() => {
+    if (showOffline || !current) {
+      setImageReady(false)
+      return
+    }
+    if (isMotion) {
+      // Videos stream from source; the <video> element's own events gate it.
+      setShownUrl(null)
+      setImageReady(true)
+      return
+    }
+    let live = true
+    setImageReady(false)
+    const url = current.url
+    void (async () => {
+      try {
+        const resolved = await resolveImage(url)
+        const probe = new Image()
+        probe.referrerPolicy = 'no-referrer'
+        probe.src = resolved
+        await probe.decode()
+        if (!live) return
+        setShownUrl(resolved)
+        setImageReady(true)
+      } catch {
+        if (!live) return
+        onImageError()
+      }
+    })()
+    return () => {
+      live = false
+    }
+  }, [current, showOffline, isMotion, setImageReady, onImageError])
   const hpPct = inBattle ? Math.max(0, (foeHp / foeMaxHp) * 100) : 0
   // Heat combo HUD: live multiplier + whether the streak is still inside the
   // 2s window (goes cold visually the moment you stop clicking).
@@ -275,7 +315,7 @@ export default function GoonPanel() {
         </div>
       ) : (
         <div
-          className={`${STAGE_FRAME} relative min-h-0 flex-1 cursor-pointer active:cursor-grabbing max-[1100px]:min-h-[320px]`}
+          className={`${STAGE_FRAME} relative min-h-0 flex-1 ${imageReady ? 'cursor-pointer active:cursor-grabbing' : 'cursor-progress'} max-[1100px]:min-h-[320px]`}
           onClick={handleClick}
           role="button"
           tabIndex={0}
@@ -292,15 +332,15 @@ export default function GoonPanel() {
               letterbox — the foreground stays 100% visible (object-contain). */}
           {!showOffline && (
             <img
-              src={src}
+              src={shownUrl ?? src}
               alt=""
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl select-none"
+              className="pointer-events-none absolute inset-0 z-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl select-none"
             />
           )}
           {isMotion && current ? (
             <video
-              className={GOON_IMAGE}
+              className={`${GOON_IMAGE} relative z-[1]`}
               src={redgifsPlayable(current.url)}
               poster={current.preview ? redgifsPlayable(current.preview) : undefined}
               autoPlay={!reduceMotion}
@@ -312,14 +352,22 @@ export default function GoonPanel() {
               onError={onImageError}
             />
           ) : (
-            <CachedImg
-              className={GOON_IMAGE}
-              src={src}
+            <img
+              className={`${GOON_IMAGE} relative z-[1]`}
+              src={shownUrl ?? src}
               alt="goon feed"
               referrerPolicy="no-referrer"
               onError={onImageError}
               draggable={false}
             />
+          )}
+          {!imageReady && !showOffline && !isMotion && (
+            <span
+              className={`${MONO} absolute left-1/2 top-1/2 z-[2] -translate-x-1/2 -translate-y-1/2 rounded-lg bg-black/60 px-3 py-1.5 text-xs text-retro-muted`}
+              role="status"
+            >
+              Loading…
+            </span>
           )}
           {showOffline && (
             <Badge variant="warning" className={`${MONO} absolute right-2.5 top-2.5`}>

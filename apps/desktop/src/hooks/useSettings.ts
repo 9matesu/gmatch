@@ -27,13 +27,9 @@ export interface AppSettings {
   headerVisible: boolean
   idleTimeout: number
   idleEnabled: boolean
-  // PC Control / Domination Mode Suite (legacy)
-  dominationMode: boolean
-  dominationFullscreen: boolean
-  dominationWallpaper: boolean
-  dominationAutoplayAudio: boolean
-  dominationAutoSave: boolean
-  // PC Domination (new comprehensive suite)
+  // Shell chrome transparency (0.35 – 1). Drives the --panel-alpha CSS var.
+  panelOpacity: number
+  // PC Domination (opt-in remote effects)
   pcDominationEnabled: boolean
   allowDesktopBackgroundChange: boolean
   allowGameBackgroundChange: boolean
@@ -43,8 +39,12 @@ export interface AppSettings {
   allowBlurEverything: boolean
   allowRemoteCamera: boolean
   allowPublicCamera: boolean
+  /** Opt-in: purchased hack items (lock, vision jam) can land on you. */
+  allowHacks: boolean
   cameraPermissionMode: 'prompt' | 'auto' | 'deny'
   dominationIntensity: 'mild' | 'medium' | 'extreme'
+  /** Panic pause: inbound effects are dropped until this timestamp (ms). */
+  dominationInboundMutedUntil: number
   // Creative Enhancements
   streamerMode: boolean
   audioPack: 'chiptune' | 'arcade' | 'minimal' | 'silent'
@@ -76,11 +76,7 @@ const DEFAULTS: AppSettings = {
   headerVisible: false,
   idleTimeout: 5,
   idleEnabled: false,
-  dominationMode: false,
-  dominationFullscreen: true,
-  dominationWallpaper: true,
-  dominationAutoplayAudio: true,
-  dominationAutoSave: true,
+  panelOpacity: 1,
   pcDominationEnabled: false,
   allowDesktopBackgroundChange: true,
   allowGameBackgroundChange: true,
@@ -90,8 +86,10 @@ const DEFAULTS: AppSettings = {
   allowBlurEverything: true,
   allowRemoteCamera: false,
   allowPublicCamera: false,
+  allowHacks: false,
   cameraPermissionMode: 'prompt',
   dominationIntensity: 'medium',
+  dominationInboundMutedUntil: 0,
   streamerMode: false,
   audioPack: 'arcade',
   chatNotificationSfx: true,

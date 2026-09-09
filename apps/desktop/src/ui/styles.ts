@@ -60,7 +60,7 @@ export const FLOAT_GC =
 export const FLOAT_GC_CRIT = 'text-[28px] text-[#ffd75e]'
 
 /** Full-bleed feed image (was .goon-image). */
-export const GOON_IMAGE = 'block h-full w-full object-contain [content-visibility:auto]'
+export const GOON_IMAGE = 'block h-full w-full object-contain'
 
 /** Rarity badge palette (was .rarity-*) — game semantics, kept as content colors. */
 export const RARITY: Record<string, string> = {
