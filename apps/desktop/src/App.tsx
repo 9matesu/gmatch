@@ -1121,7 +1121,7 @@ export default function Home() {
     }
     setPmMessagesByPeer(prev => ({ ...prev, [peerId]: [...(prev[peerId] || []), optimistic] }))
     try {
-      await orbitFetch('/api/pm', {
+      const res = await orbitFetch('/api/pm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1131,13 +1131,25 @@ export default function Home() {
           attachment_id: attachment?.id || null,
         }),
       }, identity)
+      if (!res.ok) {
+        // No silent failure: a dead bundled server or a 4xx must be visible,
+        // and the optimistic bubble rolled back (1.0.1 bug: DMs appeared to
+        // vanish with no feedback).
+        setPmMessagesByPeer(prev => ({ ...prev, [peerId]: (prev[peerId] || []).filter(m => m.id !== optimisticId) }))
+        const detail = await res.json().catch(() => ({}) as { error?: string })
+        toast(detail.error || `Could not send message (HTTP ${res.status})`, 'error')
+        return
+      }
       // Drop the optimistic copy now the server has confirmed it — the fresh
       // (cache-busted) refetch carries the authoritative row under its real id.
       setPmMessagesByPeer(prev => ({ ...prev, [peerId]: (prev[peerId] || []).filter(m => m.id !== optimisticId) }))
       loadPmMessages(peerId)
       loadPmThreads()
-    } catch { }
-  }, [identity, myProfile.displayName, loadPmMessages, loadPmThreads])
+    } catch {
+      setPmMessagesByPeer(prev => ({ ...prev, [peerId]: (prev[peerId] || []).filter(m => m.id !== optimisticId) }))
+      toast('Could not send message — the server is unreachable', 'error')
+    }
+  }, [identity, myProfile.displayName, loadPmMessages, loadPmThreads, toast])
 
   useEffect(() => {
     if (!identity) return

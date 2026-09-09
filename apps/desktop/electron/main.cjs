@@ -1,7 +1,7 @@
 // GoonGrid Electron main process.
 // All booru HTTP happens HERE (renderer never touches the network directly).
 // Endpoints per docs/SPEC.md §6. 10s timeout, browser UA, round-robin health.
-const { app, BrowserWindow, ipcMain, protocol, net } = require('electron')
+const { app, BrowserWindow, ipcMain, protocol, net, dialog } = require('electron')
 const https = require('https')
 const path = require('path')
 const imageCache = require('./imageCache.cjs')
@@ -541,6 +541,22 @@ function createWindow() {
     },
   })
   win.removeMenu()
+  // The renderer's beforeunload key-save gate must NEVER silently block the
+  // close button (1.0.1 bug: "cant close app" — in Electron, a prevented
+  // unload just cancels the window close). Surface the page's message as a
+  // real native dialog instead: Stay saves nothing, Leave closes.
+  win.webContents.on('will-prevent-unload', (event) => {
+    const choice = dialog.showMessageBoxSync(win, {
+      type: 'warning',
+      buttons: ['Stay', 'Leave anyway'],
+      defaultId: 0,
+      cancelId: 0,
+      title: 'Save your secret key first?',
+      message: 'Your account is only recoverable with your secret key.',
+      detail: 'Open Settings → Identity & Keys to copy or download it. If you already backed it up, you can close safely.',
+    })
+    if (choice === 1) event.preventDefault()
+  })
   // Only use the dev server when explicitly requested — never guess a port,
   // another app may be listening there.
   const devUrl = process.env.VITE_DEV_SERVER_URL

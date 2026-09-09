@@ -25,10 +25,12 @@ test('games: hub reachable with sub-tabs', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Babecock', exact: true })).toBeVisible()
 })
 
-// Journey 3: Idle -> Games -> back to Idle; game state preserved.
+// Journey 3: Games hub -> Idle Clicker tab -> play -> duel tab -> back; state preserved.
+// (Idle Clicker moved from the top-level sidebar into Porn Games in 1.0.1.)
 test('navigation round-trip preserves idle state', async ({ page }) => {
   await seedApp(page, { gc: 0 })
-  await page.goto('/#/grid')
+  await page.goto('/#/games')
+  await page.getByRole('button', { name: 'Idle Clicker' }).click()
   const stage = page.getByRole('button', { name: /attack the current foe/i })
   await expect(stage).toBeVisible({ timeout: 20_000 })
   await expect
@@ -38,9 +40,8 @@ test('navigation round-trip preserves idle state', async ({ page }) => {
     }, { timeout: 15_000 })
     .not.toBe('0')
   const afterClick = await page.getByTestId('gc-balance').textContent()
-  await page.getByRole('button', { name: 'Porn Games' }).click()
-  // Sidebar label renamed in 38fdf4a ("Babecock · Idle" -> "IDLE CLICKER").
-  await page.getByRole('button', { name: 'IDLE CLICKER' }).click()
+  await page.getByRole('button', { name: 'Play', exact: true }).click()
+  await page.getByRole('button', { name: 'Idle Clicker' }).click()
   await expect(stage).toBeVisible()
   expect(await page.getByTestId('gc-balance').textContent()).toBe(afterClick)
 })

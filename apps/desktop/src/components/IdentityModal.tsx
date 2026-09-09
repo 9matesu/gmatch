@@ -71,6 +71,10 @@ export function IdentityModal({
   const handleCopyKey = async (textToCopy: string, label: string) => {
     try {
       await navigator.clipboard.writeText(textToCopy);
+      // Real key-save evidence: silence the beforeunload exit gate (1.0.1 —
+      // orbit_key_saved was previously read but never written, so EVERY user
+      // was gated forever and the app felt uncloseable).
+      try { localStorage.setItem('orbit_key_saved', 'true'); } catch {}
       setCopied(true);
       toast(`${label} copied to clipboard!`, "success");
       setTimeout(() => setCopied(false), 2000);

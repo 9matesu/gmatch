@@ -57,9 +57,9 @@ export async function migrate(client: Client): Promise<void> {
     currentVersion = version
   }
 
-  // 3. Seed default community settings (idempotent). Admins can change or
-  //    clear these later via the admin panel Settings tab.
-  await client.execute("INSERT OR IGNORE INTO SystemMeta (key, value) VALUES ('discord_invite_url', 'https://discord.gg/WMEz9jgr3')")
+  // 3. Seed default community settings (idempotent). The discord invite is
+  //    NOT seeded anymore (1.0.1: no hardcoded third-party links shipped) —
+  //    admins set it themselves via the admin panel Settings tab.
   await client.execute("INSERT OR IGNORE INTO SystemMeta (key, value) VALUES ('economy_cashout_rate_bps', '12500')")
 
   // 4. One-time g$ wallet seed: carry each user's accumulated legacy score over

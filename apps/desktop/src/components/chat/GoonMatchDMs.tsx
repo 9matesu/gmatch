@@ -877,6 +877,15 @@ export function GoonMatchDMs({
                   type="text"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={(e) => {
+                    // Enter sends explicitly — do not rely on implicit form
+                    // submit: with focus left on the (type=button) attach
+                    // control, Enter re-opened the image picker instead.
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      handleSend()
+                    }
+                  }}
                   placeholder={openTarget === 'group' ? 'Message group...' : isLobbyGroup ? 'Message Lobby Lounge...' : isQueueGroup ? 'Message Card Queue...' : activePmPeer ? `Message ${displayNameFor(activePmPeer.orbitId, activePmPeer.name)}...` : 'Message...'}
                   className="w-full bg-transparent focus:outline-none placeholder:text-retro-muted text-retro-fg border-none"
                 />

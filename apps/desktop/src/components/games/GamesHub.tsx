@@ -2,16 +2,17 @@
 
 import { useState } from 'react';
 import { playPress } from '../../utils/sounds';
-import { Swords, Flame, Trophy, ShieldAlert, Layers, LayoutGrid } from 'lucide-react';
+import { Swords, Flame, Trophy, ShieldAlert, Layers, LayoutGrid, MousePointerClick } from 'lucide-react';
 import { ModPatrolWidget } from '../feed/ModPatrolWidget';
 import { BabecockPanel } from '../BabecockPanel';
 import { Leaderboard } from '../Leaderboard';
 import { DeckBuilder } from './DeckBuilder';
 import { CardTile } from '../home/CardTile';
+import GridWorkspace from '../grid/GridWorkspace';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject as StoredCard, User } from '@orbit/shared';
 
-type GamesTab = 'duel' | 'cards' | 'decks' | 'babecock' | 'ranks' | 'patrol';
+type GamesTab = 'duel' | 'cards' | 'decks' | 'babecock' | 'ranks' | 'patrol' | 'idle';
 
 export function GamesHub({
   identity,
@@ -43,6 +44,7 @@ export function GamesHub({
     { id: 'cards', label: 'Cards', icon: Layers },
     { id: 'decks', label: 'Decks', icon: LayoutGrid },
     { id: 'babecock', label: 'Babecock', icon: Flame },
+    { id: 'idle', label: 'Idle Clicker', icon: MousePointerClick },
     { id: 'ranks', label: 'Rankings', icon: Trophy },
     { id: 'patrol', label: 'Patrol', icon: ShieldAlert },
   ];
@@ -129,6 +131,15 @@ export function GamesHub({
         {subTab === 'babecock' && (
           <div className="glass-surface rounded-lg p-4">
             <BabecockPanel identity={identity} />
+          </div>
+        )}
+
+        {/* Idle Clicker (was the top-level "IDLE CLICKER" sidebar item —
+            moved inside Porn Games, normal capitalization). The workspace is
+            h-full by design, so the tab body gives it a viewport-tall box. */}
+        {subTab === 'idle' && (
+          <div className="h-[calc(100vh-260px)] min-h-[560px] rounded-lg overflow-hidden">
+            <GridWorkspace />
           </div>
         )}
 
