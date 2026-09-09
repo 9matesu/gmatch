@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test'
-import { seedApp } from './helpers'
+import { seedApp, mockBooruFeed } from './helpers'
 
 // Journey 1: open -> navigate to Idle -> play -> state updates.
 test('idle: click the stage, g$ balance grows', async ({ page }) => {
   await seedApp(page, { gc: 0 })
+  await mockBooruFeed(page)
   await page.goto('/#/grid')
   const stage = page.getByRole('button', { name: /attack the current foe/i })
   await expect(stage).toBeVisible({ timeout: 20_000 })
@@ -20,15 +21,18 @@ test('idle: click the stage, g$ balance grows', async ({ page }) => {
 test('games: hub reachable with sub-tabs', async ({ page }) => {
   await seedApp(page)
   await page.goto('/#/games')
-  await expect(page.getByRole('heading', { name: /porn games/i })).toBeVisible({ timeout: 20_000 })
-  await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Babecock', exact: true })).toBeVisible()
+  // 1.1 layout: games opens on the default tab and the sidebar exposes the
+  // sub-tabs; the old page heading was removed with the games-group nav.
+  await expect(page.getByRole('button', { name: 'Idle Clicker' }).first()).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByRole('button', { name: 'Play', exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Babecock', exact: true }).first()).toBeVisible()
 })
 
 // Journey 3: Games hub -> Idle Clicker tab -> play -> duel tab -> back; state preserved.
 // (Idle Clicker moved from the top-level sidebar into Porn Games in 1.0.1.)
 test('navigation round-trip preserves idle state', async ({ page }) => {
   await seedApp(page, { gc: 0 })
+  await mockBooruFeed(page)
   await page.goto('/#/games')
   await page.getByRole('button', { name: 'Idle Clicker' }).click()
   const stage = page.getByRole('button', { name: /attack the current foe/i })

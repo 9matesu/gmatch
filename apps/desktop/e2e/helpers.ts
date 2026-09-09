@@ -71,3 +71,30 @@ export async function seedApp(
   )
   return identity
 }
+
+/**
+ * Deterministic idle-feed mock: intercepts the booru DAPI proxies used by
+ * fetchFeed (browser mode) and serves synthetic posts whose images answer
+ * under /__e2e__/. Without this, idle journeys ride the health of external
+ * mirrors (tbib/xbooru) — flaky in CI and slow to gate `imageReady`.
+ */
+export async function mockBooruFeed(page: import('@playwright/test').Page): Promise<void> {
+  let n = 0
+  const PNG = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64',
+  )
+  await page.route('**/booru/**', async (route) => {
+    n += 1
+    const post = {
+      id: 900000 + n,
+      file_url: `http://localhost:5273/__e2e__/foe-${n}.png`,
+      tags: '1girl rating_explicit',
+      rating: 'e',
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([post]) })
+  })
+  await page.route('**/__e2e__/**', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'image/png', body: PNG })
+  })
+}
