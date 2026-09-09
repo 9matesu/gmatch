@@ -6,31 +6,31 @@ import { deliveryToken, tokenMatches } from './mail'
 describe('delivery tokens (blind-courier addressing)', () => {
   it('token is deterministic, 64-hex, and NOT the pubkey itself', () => {
     const alice = generateIdentity()
-    const t = deliveryToken(alice.encryptionPubHex)
+    const t = deliveryToken(alice.publicKeyHex)
     expect(t).toMatch(/^[0-9a-f]{64}$/)
-    expect(t).not.toBe(alice.encryptionPubHex.toLowerCase())
-    expect(deliveryToken(alice.encryptionPubHex)).toBe(t)
+    expect(t).not.toBe(alice.publicKeyHex.toLowerCase())
+    expect(deliveryToken(alice.publicKeyHex)).toBe(t)
   })
 
   it('different keys -> different tokens', () => {
-    expect(deliveryToken(generateIdentity().encryptionPubHex)).not.toBe(
-      deliveryToken(generateIdentity().encryptionPubHex),
+    expect(deliveryToken(generateIdentity().publicKeyHex)).not.toBe(
+      deliveryToken(generateIdentity().publicKeyHex),
     )
   })
 
   it('token is verifiably derived from the encPub (courier learns nothing more)', () => {
     const bob = generateIdentity()
-    const t = deliveryToken(bob.encryptionPubHex)
-    expect(tokenMatches(bob.encryptionPubHex, t)).toBe(true)
-    expect(tokenMatches(generateIdentity().encryptionPubHex, t)).toBe(false)
+    const t = deliveryToken(bob.publicKeyHex)
+    expect(tokenMatches(bob.publicKeyHex, t)).toBe(true)
+    expect(tokenMatches(generateIdentity().publicKeyHex, t)).toBe(false)
   })
 
   it('sanity: blake3 hex matches our derivation (test mirrors impl for one vector)', () => {
     const bob = generateIdentity()
     const expected = Buffer.from(
-      blake3(hexToBytes(bob.encryptionPubHex)),
+      blake3(hexToBytes(bob.publicKeyHex)),
     ).toString('hex')
-    expect(deliveryToken(bob.encryptionPubHex)).toBe(expected)
+    expect(deliveryToken(bob.publicKeyHex)).toBe(expected)
   })
 })
 

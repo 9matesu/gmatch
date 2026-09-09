@@ -660,11 +660,11 @@ describe('Admin API — discord invite settings', () => {
     }, { ...env, ADMIN_PIN: 'test-pin' })
   })
 
-  it('public GET /api/discord-invite is reachable without auth', async () => {
+  it('public GET /api/discord-invite is reachable without auth (null = unset; no seeded link since 1.0.1)', async () => {
     const res = await app.request('/api/discord-invite', {}, env)
     expect(res.status).toBe(200)
     const body: any = await res.json()
-    expect(typeof body.url).toBe('string')
+    expect(body.url).toBeNull() // the bundle ships no community link until an admin sets one
   })
 
   it('GET /api/admin/settings/discord-invite returns 403 for a non-admin', async () => {

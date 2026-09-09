@@ -71,16 +71,18 @@ Mecanismos que implementam a Lei 2:
 - 0.1 ✅ merge `fix/1.0.1-bugs` (6 fixes) + exe rebuilt com servidor empacotado vivo; smoke: upload, DM, fechar.
 - 0.2 tag `v1.0.1` + GH release.
 
-### Phase 1 — Envelope + protocolo de correio (packages/protocol)
-1. **1.1** `envelope.ts`: `Envelope{v:2,kind:'mail|signal|announce|room_invite|report',to_token,sealed,ttl?}` + `seal1to1/open1to1` (encryptPayload), `sealGroup/openGroup` (DEK+encryptWithDek), `signEnvelope/verify` (Ed25519 sobre `sealed`). RED→GREEN: round-trip, tamper, versão.
-2. **1.2** `mail.ts`: derivar `deliveryToken(encPub, epoch)` (`blake3`), `deriveMailKey` (chave de leitura da caixa = encPriv do dono — o dono DESENCRIPTA tudo que chegou ao token dele; token é derivável da encPub → qualquer um pode enviar, só o dono lê: estilo Session ID, sem registro). Teste: A acha token de B via encPub local; B lê caixa com a própria encPriv; sem a chave → nada.
-3. **1.3** `packages/protocol` index exports + lint/typecheck.
+### Phase 1 — Envelope + protocolo de correio (packages/protocol) ✅ IMPLEMENTADO (ac83ddb+)
+> Decisões travadas no código: token = **blake3(Ed25519 pubkey)** (a pubkey que assina — permite ao correio verificar o ACK sem nunca ver identidade em claro no wire; token ≠ orbitId → não-oficialmente desassociável). Semântica de fila = **Session swarm**: `list` é idempotente (não drena), `ack {ids,pubkey,sig}` prova posse (token=blake3(pubkey) + Ed25519 sobre `token|ids`) e só então apaga — quem chuta um token não consegue fazer DoS deletando a caixa alheia. `open1to1` exige `fromEph` (encPub do sender, ECIES input — material público sem nome).
 
-### Phase 2 — Servidor: correio anônimo (apps/api)
-2.1 `routes/mail.ts` (TDD): WS `/api/mail` (sem auth de identidade; frame `{put|pull, token?, env?, cursor?}`) — mapa `token→[envelopes]` com TTL, `pull token` exige prova `HMAC(encPub-derived-key)`? NÃO: simplificação 1.1 = pull exige conhecer o token (deriva da encPub; segredo = encPub+epoch). Servidor só guarda `(token, opaque-blob, ts)`. Asserts: blob byte-identico; sem token → 404; expira.
-2.2 `routes/turn.ts`: creds efêmeras HMAC (TDD: formato `<rand>:<exp>`, TTL, reuso bloqueado); resposta nunca logada com origem.
-2.3 SITE_SERVICES gate em `serve.ts`/`index.ts`: no modo site, rotas `/api/pm`, `/api/posts`, `/api/objects` etc. → 404; ws-bus legado `LEGACY_SWARM=off`.
-2.4 `GET /api/users/online` REMOVIDO do modo site (code-path atrás de gate; self-host mantém).
+1. **1.1** ✅ `packages/protocol/src/envelope.ts`: `Envelope{v:2,kind:'mail|signal|announce|invite|report',to,id,sealed,fromEph?,exp?}` + `seal1to1/open1to1`, `sealGroup/openGroup` (DEK XChaCha nonce||ct), `signEnvelope/verify` embutidos no inner (binding `v2|kind|id|to|body`). 13 testes (round-trip, tamper, rebinding kind/to, versão, dedupe de id, binary-safe).
+2. **1.2** ✅ `packages/protocol/src/mail.ts`: `deliveryToken(pubKeyHex)`, `tokenMatches`. Teste do vetor blake3 incluso.
+3. **1.3** ✅ exports no index + gate do pacote.
+
+### Phase 2 — Servidor: correio anônimo (apps/api) — EM ANDAMENTO
+2.1 ✅ (parcial) `apps/api/src/mail-store.ts` + `routes/mail.ts`: store em memória (in-memory de propósito: opacos não-puxados morrem no restart — ver comentário), shape-validation, TTL+caps (per-token 256/global 50k), sweep 60s; REST `PUT/GET /api/mail/:token`, `POST /api/mail/:token/ack`; WS anônimo `/api/mail/ws` (watch/unwatch/pull por token, sem auth/identidade; notices `{type:'mail',to,id}` sem conteúdo). 17+9 testes (REST, WS, injeção de forma, verbatim-bytes, no-plaintext-on-wire).
+2.2 ✅ `apps/api/src/turn-creds.ts` + `routes/turn.ts`: `GET /api/turn/credentials` (orbitAuth; username=`<rand16hex>:<exp>` RANDOM — nunca orbitId → logs coturn não atribuem a ninguém; HMAC-SHA256 padrão coturn use-auth-secret; `TURN_SECRET` unset → `{enabled:false}` e o cliente cai p/ STUN/LAN, sem dead-end). 10 testes.
+2.3 ⬜ SITE_SERVICES gate em `serve.ts`/`index.ts`: modo site = só mail+turn+health+estáticos; demais rotas → 404 (config-driven).
+2.4 ⬜ `GET /api/users/online` atrás do gate (fora do modo site).
 
 ### Phase 3 — Cliente: caixa, mesh e salas (apps/desktop)
 3.1 `utils/mail-client.ts`: conexão WS anônima + pull periódico no boot/foreground, push p/ caixa de um peer, retry+jitter, fila local IndexedDB (`storage.ts`), padding+jitter p/ anti-correlação. Unit (mock socket).

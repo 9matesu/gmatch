@@ -6,6 +6,7 @@ import { resolveStorageKey } from './storage-key'
 import app from './index'
 import { join, dirname, extname } from 'node:path'
 import { handleIncoming, conns, WsConn, broadcastToRoom } from './ws-bus'
+import { mailWatchers, handleMailSocketMessage } from './routes/mail'
 import { leaveLobby, advanceLobby } from './lobby'
 import { advanceBabecock } from './babecock'
 import { runPeriodicMaintenance } from './cleanup'
@@ -170,6 +171,14 @@ Bun.serve({
       if (upgradeHeader?.toLowerCase() === 'websocket' && server.upgrade(req)) return
     }
 
+    // Blind-courier push channel: ANONYMOUS upgrade (no ticket, no identity).
+    // The socket may only watch opaque delivery tokens; the courier never
+    // learns who it is.
+    if (url.pathname === '/api/mail/ws') {
+      const upgradeHeader = req.headers.get('Upgrade') || req.headers.get('upgrade')
+      if (upgradeHeader?.toLowerCase() === 'websocket' && server.upgrade(req, { data: { mail: true } })) return
+    }
+
     // API & system routes (+ public share pages /p/:id, /u/:id)
     if (
       url.pathname.startsWith('/api/') ||
@@ -229,6 +238,12 @@ Bun.serve({
   },
   websocket: {
     open(ws: any) {
+      // Blind-courier sockets: anonymous, token-watch only, never join the
+      // legacy swarm rooms (no presence, no identity).
+      if (ws.data?.mail) {
+        mailWatchers.set(ws, new Set())
+        return
+      }
       const conn: WsConn = {
         send: (data) => {
           if (ws.readyState === 1 || ws.readyState === WebSocket.OPEN) {
@@ -243,11 +258,19 @@ Bun.serve({
       wsToConn.set(ws, conn)
     },
     message(ws: any, message: any) {
+      if (ws.data?.mail) {
+        handleMailSocketMessage(ws, typeof message === 'string' ? message : message.toString())
+        return
+      }
       const conn = wsToConn.get(ws)
       if (!conn) return
       handleIncoming(conn, typeof message === 'string' ? message : message.toString())
     },
     close(ws: any) {
+      if (ws.data?.mail) {
+        unwatchMailSocket(ws)
+        return
+      }
       const conn = wsToConn.get(ws)
       if (conn) {
         // WS6: Remove user from lobby queue on disconnect to prevent ghost entries

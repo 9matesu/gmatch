@@ -31,7 +31,7 @@ describe('sealed envelope v2 (blind-courier protocol)', () => {
   it('1:1 round-trip: recipient opens, learns sender pubkey + orbitId', () => {
     const alice = generateIdentity()
     const bob = generateIdentity()
-    const env = seal1to1('hello bob', 'mail', alice, bob.encryptionPubHex)
+    const env = seal1to1('hello bob', 'mail', alice, bob)
 
     // Wire shape: the courier sees ONLY routing metadata — never content.
     expect(env.v).toBe(2)
@@ -50,14 +50,14 @@ describe('sealed envelope v2 (blind-courier protocol)', () => {
     const alice = generateIdentity()
     const bob = generateIdentity()
     const eve = generateIdentity()
-    const env = seal1to1('secret', 'mail', alice, bob.encryptionPubHex)
+    const env = seal1to1('secret', 'mail', alice, bob)
     expect(() => open1to1(env, eve.encryptionPrivHex)).toThrow()
   })
 
   it('tampered sealed bytes fail the AEAD tag', () => {
     const alice = generateIdentity()
     const bob = generateIdentity()
-    const env = seal1to1('integrity', 'mail', alice, bob.encryptionPubHex)
+    const env = seal1to1('integrity', 'mail', alice, bob)
     const raw = base64ToBytes(env.sealed)
     raw[raw.length - 1] ^= 0x01
     expect(() => open1to1({ ...env, sealed: bytesToBase64(raw) }, bob.encryptionPrivHex)).toThrow()
@@ -66,28 +66,28 @@ describe('sealed envelope v2 (blind-courier protocol)', () => {
   it('rebinding attacks fail: flipping kind or to is covered by the signature', () => {
     const alice = generateIdentity()
     const bob = generateIdentity()
-    const env = seal1to1('bound', 'mail', alice, bob.encryptionPubHex)
+    const env = seal1to1('bound', 'mail', alice, bob)
     expect(() =>
       open1to1({ ...env, kind: 'report' as EnvelopeKind }, bob.encryptionPrivHex),
     ).toThrow(/signature/i)
     const other = generateIdentity()
     expect(() =>
-      open1to1({ ...env, to: deliveryToken(other.encryptionPubHex) }, bob.encryptionPrivHex),
+      open1to1({ ...env, to: deliveryToken(other.publicKeyHex) }, bob.encryptionPrivHex),
     ).toThrow(/signature/i)
   })
 
   it('unknown version is rejected', () => {
     const alice = generateIdentity()
     const bob = generateIdentity()
-    const env = seal1to1('v3?', 'mail', alice, bob.encryptionPubHex)
+    const env = seal1to1('v3?', 'mail', alice, bob)
     expect(() => open1to1({ ...env, v: 99 as 2 }, bob.encryptionPrivHex)).toThrow(/version/i)
   })
 
   it('ids are unique per envelope', () => {
     const alice = generateIdentity()
     const bob = generateIdentity()
-    expect(seal1to1('x', 'mail', alice, bob.encryptionPubHex).id).not.toBe(
-      seal1to1('x', 'mail', alice, bob.encryptionPubHex).id,
+    expect(seal1to1('x', 'mail', alice, bob).id).not.toBe(
+      seal1to1('x', 'mail', alice, bob).id,
     )
   })
 
@@ -114,7 +114,7 @@ describe('sealed envelope v2 (blind-courier protocol)', () => {
     const alice = generateIdentity()
     const bob = generateIdentity()
     const bin = new Uint8Array([0, 255, 128, 1, 7])
-    const env = seal1to1(bytesToBase64(bin), 'signal', alice, bob.encryptionPubHex)
+    const env = seal1to1(bytesToBase64(bin), 'signal', alice, bob)
     const opened = open1to1(env, bob.encryptionPrivHex)
     expect(Array.from(base64ToBytes(opened.body))).toEqual(Array.from(bin))
     expect(opened.kind).toBe('signal')

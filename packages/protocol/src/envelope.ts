@@ -115,17 +115,19 @@ function assertVersion(env: Envelope): void {
 
 // ---------------------------------------------------------------- 1:1 (mail)
 
-/** X25519 ECIES seal: only the holder of the encPriv behind `to` opens it. */
+/** X25519 ECIES seal: only the holder of the recipient encPriv opens it.
+ * `to` defaults to the recipient's delivery token = blake3(Ed25519 pubkey),
+ * which is also the key the courier checks ack signatures against. */
 export function seal1to1(
   body: string,
   kind: EnvelopeKind,
   sender: SenderKeys,
-  recipientEncPubHex: string,
+  recipient: { publicKeyHex: string; encryptionPubHex: string },
   opts?: { id?: string; exp?: number; to?: string },
 ): Envelope {
   const id = opts?.id ?? newId()
-  const to = opts?.to ?? deliveryToken(recipientEncPubHex)
-  const sealedBytes = encryptPayload(enc.encode(sealInner(body, kind, to, id, sender)), sender.encryptionPrivHex, recipientEncPubHex)
+  const to = opts?.to ?? deliveryToken(recipient.publicKeyHex)
+  const sealedBytes = encryptPayload(enc.encode(sealInner(body, kind, to, id, sender)), sender.encryptionPrivHex, recipient.encryptionPubHex)
   const env: Envelope = { v: 2, kind, to, id, sealed: bytesToBase64(sealedBytes), fromEph: sender.encryptionPubHex }
   if (opts?.exp) env.exp = opts.exp
   return env

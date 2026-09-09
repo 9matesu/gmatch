@@ -1,6 +1,8 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { auth } from './routes/auth'
+import { mail } from './routes/mail'
+import { turn } from './routes/turn'
 import { securityHeaders } from './middleware/security-headers'
 import { rateLimit } from './middleware/rate-limit'
 import { bodySizeLimit } from './middleware/body-size-limit'
@@ -133,6 +135,8 @@ app.use('/api/*', rateLimit)
 app.use('/.well-known/*', rateLimit)
 
 app.route('/api/auth', auth)
+app.route('/api/mail', mail)
+app.route('/api/turn', turn)
 app.route('/api/objects', objects)
 app.route('/api/stories', objects)
 app.route('/api/friends', friends)
