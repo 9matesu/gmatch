@@ -3,6 +3,7 @@ import { D1Turso, ensureSchema } from './db'
 import { restoreDb, snapshotDb } from './persistence'
 import { LocalBlobStore } from './blob'
 import { resolveStorageKey } from './storage-key'
+import { resolveNodeKey } from './node-key'
 import app from './index'
 import { join, dirname, extname } from 'node:path'
 import { handleIncoming, conns, WsConn, broadcastToRoom } from './ws-bus'
@@ -114,11 +115,15 @@ process.once('SIGINT', () => { void persistAndExit(0) })
 const bucket = new LocalBlobStore(BLOB_STORE_DIR)
 // ADMIN_PIN / ADMIN_PIN_HASH must reach routes via c.env — pre-B.4 neither was
 // wired here, so verify-pin silently ran on the hardcoded fallback forever.
+const nodeKey = resolveNodeKey(SNAPSHOT_PATH)
 const env = {
   DB: db,
   BUCKET: bucket,
+  NODE_PRIV_HEX: nodeKey.privHex,
+  NODE_PUB_HEX: nodeKey.pubHex,
   ...(process.env.ADMIN_PIN ? { ADMIN_PIN: process.env.ADMIN_PIN } : {}),
   ...(process.env.ADMIN_PIN_HASH ? { ADMIN_PIN_HASH: process.env.ADMIN_PIN_HASH } : {}),
+  ...(process.env.API_SEALED_ONLY ? { API_SEALED_ONLY: process.env.API_SEALED_ONLY } : {}),
 }
 const WEB_DIST = join((import.meta as any).dir || process.cwd(), '..', '..', 'web', 'out')
 

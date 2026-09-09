@@ -22,6 +22,12 @@ export function parseSiteServices(env: Record<string, string | undefined> = proc
 
 export function siteAllows(services: Set<string>, pathname: string): boolean {
   if (pathname === '/api/health') return true
+  // Node identity (sealed-request pubkey) is static public capability data —
+  // clients need it before any request can be sealed, even at the site.
+  if (pathname === '/api/identity') return true
+  // Server directory (docs/ADR-002): this route only EXISTS usefully on the
+  // central node (which runs in site mode) and holds public metadata only.
+  if (pathname === '/api/servers' || pathname.startsWith('/api/servers/')) return true
   if (services.has('mail') && pathname.startsWith('/api/mail')) return true
   if (services.has('turn') && pathname.startsWith('/api/turn')) return true
   return false

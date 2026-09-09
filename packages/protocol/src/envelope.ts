@@ -25,7 +25,7 @@ import { sha256Hex } from './hash'
  * unrelated to the Ed25519 signing key, so it maps to no identity by itself;
  * tampering with it just makes the envelope undecryptable.
  */
-export type EnvelopeKind = 'mail' | 'signal' | 'announce' | 'invite' | 'report'
+export type EnvelopeKind = 'mail' | 'signal' | 'announce' | 'invite' | 'report' | 'api_req'
 
 export interface Envelope {
   v: 2
@@ -137,6 +137,40 @@ export function open1to1(env: Envelope, recipientEncPrivHex: string): OpenedEnve
   if (!env.fromEph) throw new Error('Envelope missing sender encryption pubkey (fromEph)')
   const plain = decryptPayload(base64ToBytes(env.sealed), recipientEncPrivHex, env.fromEph)
   return openInner(dec.decode(base64ToBytes(dec.decode(plain))), env)
+}
+
+// ------------------------------------------------------- sealed API requests
+
+/**
+ * Sealed-request transport (security plan T2): the signed auth headers + the
+ * JSON body travel inside an ECIES envelope addressed to the NODE's X25519
+ * key, so mutation payloads are ciphertext even on plain-HTTP LAN self-hosts.
+ * Wire format: base64(env) — the Envelope itself (kind=api_req).
+ */
+export interface SealedApiRequest {
+  headers: Record<string, string>
+  body: string
+}
+
+export function sealApiRequest(
+  req: SealedApiRequest,
+  sender: SenderKeys,
+  nodeEncryptionPubHex: string,
+  opts?: { id?: string; exp?: number },
+): string {
+  const env = seal1to1(JSON.stringify(req), 'api_req', sender, { publicKeyHex: sender.publicKeyHex, encryptionPubHex: nodeEncryptionPubHex }, { to: 'api', ...opts })
+  return bytesToBase64(enc.encode(JSON.stringify(env)))
+}
+
+export function openApiRequest(header: string, nodeEncryptionPrivHex: string): SealedApiRequest {
+  const env = JSON.parse(dec.decode(base64ToBytes(header))) as Envelope
+  const opened = open1to1(env, nodeEncryptionPrivHex)
+  if (opened.kind !== 'api_req') throw new Error(`not an api_req envelope (kind=${opened.kind})`)
+  const parsed = JSON.parse(opened.body) as SealedApiRequest
+  if (!parsed || typeof parsed !== 'object' || typeof parsed.body !== 'string' || typeof parsed.headers !== 'object') {
+    throw new Error('malformed sealed api request')
+  }
+  return parsed
 }
 
 // --------------------------------------------------------------- group (DEK)
