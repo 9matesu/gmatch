@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>goonMatch Grid — rede P2P adulta com criptografia de ponta a ponta</title>
+<meta name="description" content="Aplicativo Windows (arquivo único) para rede social e jogos de cartas entre adultos. Todo conteúdo é criptografado entre você e o destinatário: o servidor não lê nada. Baixe, verifique o hash e rode.">
+</head>
+<body>
+<header>
+<h1>goonMatch Grid</h1>
+<p><strong>Conteúdo adulto: somente maiores de 18 anos.</strong> Ao baixar e usar, você declara ser maior de idade na sua jurisdição.</p>
+<nav aria-label="Seções">
+<a href="#o-que-e">O que é</a> ·
+<a href="#seguranca">Segurança</a> ·
+<a href="#criptografia">Criptografia</a> ·
+<a href="#download">Download</a> ·
+<a href="#verificar">Verificar o arquivo</a> ·
+<a href="#termos">Termos de Serviço</a> ·
+<a href="#privacidade">Privacidade</a> ·
+<a href="en.html">English</a>
+</nav>
+</header>
+
+<main>
+<section id="o-que-e">
+<h2>O que é este aplicativo</h2>
+<p>goonMatch Grid é um programa para Windows (um único arquivo <code>.exe</code>, sem instalação) que funciona como uma rede social + arcade de jogos de cartas para adultos. Ele reúne:</p>
+<ul>
+<li>Feed com fotos/vídeos que VOCÊ publica e escolhe com quem compartilha;</li>
+<li>Chat privado e salas de grupo com criptografia de ponta a ponta;</li>
+<li>Um idle-clicker adulto e um jogo de cartas 1v1 com baralhos, loja interna e mercado entre jogadores;</li>
+<li>Moderação por denúncia: quem recebe uma mensagem ofensiva pode denunciar e, só então, revelar a mensagem ao moderador.</li>
+</ul>
+<p>Não há cadastro, e-mail ou telefone. Sua "conta" é um par de chaves criptográficas gerado no seu computador. Você é o único responsável por guardar a chave secreta (o app oferece cópia de segurança em arquivo).</p>
+</section>
+
+<section id="seguranca">
+<h2>Segurança: o que o servidor pode e não pode ver</h2>
+<p>O servidor desta página hospeda apenas o download e um "correio" mínimo. Por design (auditado — veja os links abaixo):</p>
+<ul>
+<li>Todo conteúdo (mensagens, fotos, legendas, salas) viaja <strong>cifrado</strong>. O servidor encaminha envelopes opacos endereçados a tokens: ele não sabe quem envia, para quem, nem o que contém.</li>
+<li>O servidor <strong>não mantém lista de quem está online</strong>: conexões são anônimas; presença existe apenas entre os seus contatos.</li>
+<li>Nada é armazenado em cache no seu disco pelo app: imagens do feed vivem só na memória da sessão; toda resposta do servidor vem marcada <code>no-store</code>.</li>
+<li>Suas chaves privadas ficam no seu Windows protegidas pelo cripto-sistema do próprio Windows (DPAPI) — nunca em texto puro, nunca no servidor.</li>
+<li>Endereços IP não são registrados em logs de aplicação; o relay TURN usa credenciais temporárias aleatórias, sem ligação com sua identidade.</li>
+<li>Você também pode não usar nosso servidor: o app aceita apontar para um servidor próprio (self-host), mantendo tudo dentro da sua rede.</li>
+</ul>
+<p>Leia o relatório completo de segurança: <a href="legal/security.html">Auditoria de segurança</a>. O código é aberto: <a href="https://github.com/9matesu/goongrid">github.com/9matesu/goongrid</a>.</p>
+</section>
+
+<section id="criptografia">
+<h2>Criptografia e funcionamento (sem mistério)</h2>
+<ul>
+<li><strong>Identidade:</strong> ao iniciar, o app gera dois pares de chaves — Ed25519 (para assinar suas ações) e X25519 (para cifrar conteúdo). O seu "ID" é um resumo criptográfico (SHA-256) da chave pública. A chave privada nunca sai do seu dispositivo.</li>
+<li><strong>Mensagens 1:1:</strong> criptografia ECIES (X25519 + BLAKE3 + XChaCha20-Poly1305). Matematicamente, só quem tem a sua chave privada abre o que te enviaram — nem o servidor, nem o autor depois.</li>
+<li><strong>Salas de grupo:</strong> um segredo compartilhado (DEK) circula cifrado de convidado em convidado; quando alguém sai, o segredo é trocado (epoch) e o que foi dito antes continua legível, mas nada novo abre com a chave antiga.</li>
+<li><strong>Autenticação de pedidos:</strong> toda chamada à API vem assinada e carimbadada no tempo; reuso de requisição (replay) é rejeitado.</li>
+<li><strong>Privacidade no P2P:</strong> candidatos ICE com IP literal são descartados antes de sair do app; o relay é opcional e rotulado aleatoriamente.</li>
+<li><strong>Limite honesto:</strong> criptografia protege conteúdo contra terceiros; NÃO protege contra alguém que roube seu computador desbloqueado ou sua chave exportada. Guarde a cópia da chave em lugar seguro.</li>
+</ul>
+</section>
+
+<section id="download">
+<h2>Download (Windows x64, arquivo único)</h2>
+<p>Versão <strong id="version">1.0.1</strong> · arquivo <code>goonMatch-Grid-1.0.1-portable.exe</code> · 114 MB ·</p>
+<p><a href="releases/goonMatch-Grid-1.0.1-portable.exe" download>Baixar goonMatch-Grid-1.0.1-portable.exe</a></p>
+<p>SHA-256 esperado (copie o valor abaixo e confira com o passo a passo da próxima seção):</p>
+<pre id="sha256">f880ad99c6b508123ec585628cdc6251c00b99425a19d83e07e40df2ef57d444</pre>
+<p><em>(O hash real é publicado automaticamente na página e em <code>release.json</code> a cada release.)</em></p>
+<h3>"O Windows disse que pode ser perigo" — por que e o que fazer</h3>
+<p>O aviso <strong>SmartScreen</strong> aparece para QUALQUER programa legítimo não-assinado — não indica vírus. Este executável não tem assinatura comercial (custa centenas de dólares por ano e pagamos com doação, não com venda de dados). Para confiar de forma independente:</p>
+<ol>
+<li>Verifique o SHA-256 (abaixo) — prova que o arquivo baixado é exatamente o que publicamos;</li>
+<li>Cole o hash ou envie o arquivo para análise no <a href="https://www.virustotal.com">VirusTotal</a> (verificação pública por ~70 antivírus);</li>
+<li>Ou não baixe o .exe: clone o código aberto e compile você mesmo: <a href="https://github.com/9matesu/goongrid">github.com/9matesu/goongrid</a> (comandos em <code>README.md</code> — <code>npm install</code>, <code>npm run dist</code>).</li>
+</ol>
+</section>
+
+<section id="verificar">
+<h2>Verificar o hash no Windows (20 segundos, sem instalar nada)</h2>
+<p>Abra o menu Iniciar, digite <code>PowerShell</code>, abra e rode (ajuste o caminho se salvou em outro lugar):</p>
+<pre>Get-FileHash "$env:USERPROFILE\Downloads\goonMatch-Grid-1.0.1-portable.exe" -Algorithm SHA256</pre>
+<p>Compare o valor <code>Hash</code> com o publicado acima. Se diferir em UM caractere, NÃO execute: apague e reporte em <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a>.</p>
+</section>
+
+<section id="termos">
+<h2>Termos de Serviço e Privacidade (todos os documentos)</h2>
+<ul>
+<li><a href="legal/terms.html">Termos de Serviço</a> — elegibilidade (18+), chaves autocustodadas, conduta proibida, responsabilidade por conteúdo, encerramento.</li>
+<li><a href="legal/privacy.html">Política de Privacidade (LGPD)</a> — exatamente quais dados existem, base legal, seus direitos (art. 18) e como exercê-los.</li>
+<li><a href="legal/community.html">Regras da comunidade</a> — o que é bloqueado tecnicamente pelo app.</li>
+<li><a href="legal/abuse.html">Denúncias e abuso</a> — como reportar conteúdo e como funciona a revelação opcional para moderação.</li>
+<li><a href="legal/records.html">Registros de conteúdo adulto</a> — quem é o publisher das suas mídias (você) e o que isso significa.</li>
+<li><a href="legal/e2e.html">Aviso sobre criptografia e autocustódia</a> — limites do que podemos fazer por você.</li>
+</ul>
+<p>Versão vigente destes documentos: <code>2026-09-09.1</code>. Alterações são registradas em <a href="legal/changelog.html">legal/changelog.html</a>. Dentro do app (Settings → Legal), o usuário logado lê e confirma aceite da versão vigente.</p>
+</section>
+
+<section id="privacidade">
+<h2>Privacidade em uma olhada</h2>
+<ul>
+<li>Esta página: zero JavaScript, zero CSS, zero fontes externas, zero cookies, zero analytics. Nada aqui te rastreia.</li>
+<li>O app: nenhum dado pessoal é coletado (não existe cadastro). O que circula pela internet são apenas envelopes cifrados com prazo de validade (máx. 7 dias no servidor oficial).</li>
+<li>No seu computador: chaves e histórico ficam cifrados pelo Windows (DPAPI); imagens nunca são gravadas em disco; ao fechar o app, nada de conteúdo permanece.</li>
+<li>Seus direitos LGPD (acesso, eliminação, portabilidade) são exercitados LOCALMENTE no app — exportando e apagando a sua identidade. Explicação completa em <a href="legal/privacy.html">legal/privacy.html</a>.</li>
+</ul>
+</section>
+
+<section id="faq">
+<h2>Perguntas que você faria</h2>
+<h3>Por que um .exe em vez de um site?</h3><p>Para que o conteúdo adulto nunca passe nem fique em um servidor web de terceiros: o app roda na sua máquina e só trafega envelope cifrado. Um site comum não tem como esconder do hospedeiro o que ele mostra.</p>
+<h3>Posso recuperar minha conta se perder a chave?</h3><p>Não — e isso é proposital (ninguém, nem nós, entra na sua conta). Por isso o app obriga backup/export da chave.</p>
+<h3>Tem telemetria, anúncios, cadastro?</h3><p>Não. Zero analytics, zero cookies na página, zero cadastro.</p>
+<h3>O que o servidor guarda mesmo?</h3><p>No modo oficial: envelopes cifrados com prazo de expiração (até 7 dias até o destinatário buscar) e um token de entrega que é um resumo matemático da chave pública do destinatário. Nada que aponte a uma pessoa.</p>
+</section>
+</main>
+
+<footer>
+<p>Contato: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · Código: <a href="https://github.com/9matesu/goongrid">MIT/ver LICENSE no repositório</a> · Esta página não usa JavaScript, CSS, fontes externas, cookies ou analytics.</p>
+</footer>
+</body>
+</html>

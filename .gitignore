@@ -23,3 +23,5 @@ api-stage/
 apps/desktop/release/
 .dev-storage.key
 apps/desktop/dist-log.txt
+site/releases/*.exe
+!site/releases/.gitkeep

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de Privacidade — goonMatch Grid</title>
+</head>
+<body>
+<p><a href="../index.html#termos">← voltar para a página principal</a></p>
+<p><em>Documento gerado a partir do fonte canônico do aplicativo — não editar aqui.</em></p>
+<h1>Política de Privacidade (LGPD/GDPR)</h1>
+<p>_Versão vinculante (PT-BR)_: <strong>2026-09-09.1</strong> · atualizado/updated: 2026-09-09</p>
+<p>Jurisdição: LGPD (Lei 13.709/2018); GDPR para usuários da UE</p>
+<h2>1. Quem é o controlador</h2>
+<p>Para o SITE OFICIAL (carteiro cego + TURN): os mantenedores do repositório 9matesu/goongrid, contato via GitHub do projeto. Para FULL-NODES: o administrador daquele servidor é o controlador dos dados que nele existem; o software apenas implementa o que o host rodou.</p>
+<h2>2. Base legal</h2>
+<p>Execução de contrato (entregar o serviço que você pediu) + legítimo interesse (segurança/anti-abuso) + consentimento (ao aceitar os Termos e ao ativar funcionalidades opcionais como upload).</p>
+<h2>3. O que NÃO coletamos (declaração de minimização)</h2>
+<ul>
+<li>Nada de conteúdo: o carteiro oficial recebe apenas envelopes cifrados (XChaCha20-Poly1305) e o endereço de entrega = hash BLAKE3 da sua chave pública. Ele não sabe quem envia, o que, nem quando você leu.</li>
+</ul>
+<ul>
+<li>Nada de presença: o modo site não expõe quem está online, grafo social, perfis ou posts.</li>
+</ul>
+<ul>
+<li>Nada de IP: pedidos de credencial TURN usam identidade aleatória efêmera por sessão; logs de servidor registram IP redigido (último octeto cortado).</li>
+</ul>
+<ul>
+<li>Nada de telemetria: o aplicativo não faz nenhuma requisição de analytics, crash report ou beacon para terceiros.</li>
+</ul>
+<ul>
+<li>Nada de cookies: o software desktop não usa cookies; não há rastreadores.</li>
+</ul>
+<ul>
+<li>Nada no disco do usuário além da sessão: imagens ficam SOMENTE em memória (cache RAM expirável ao fechar); chaves e histórico ficam cifrados pelo DPAPI do Windows; respostas HTTP de conteúdo usam Cache-Control: no-store.</li>
+</ul>
+<h2>4. O que É tratado, e por quem</h2>
+<ul>
+<li><strong>Site oficial:</strong> endereço de entrega (hash), tamanho dos envelopes, timestamps, TTL/limite por caixa (anti-flood). Finalidade: rotear. Retenção: até 7 dias (expiração) ou imediato após ack assinado.</li>
+</ul>
+<ul>
+<li><strong>Sua máquina:</strong> identidade completa, chaves, threads, salas, configurações, save do jogo. Nunca sobem ao site.</li>
+</ul>
+<ul>
+<li><strong>Full-node (se você usar):</strong> ali existem postagens, perfis, DMs legadas (criptografadas com chave do SERVIDOR — o host consegue ler), economias e logs administrativos. Verifique a política do seu host.</li>
+</ul>
+<h2>5. Direitos do titular (art. 18 LGPD / arts. 15-22 GDPR)</h2>
+<p>Confirmação, acesso, correção, portabilidade, eliminação e revogação de consentimento exercita-se LOCALMENTE: exporte sua identidade no app (portabilidade) e apague-a (eliminação no seu dispositivo); no modo correio, seus envelopes expiram sozinhos sem intervenção. Para o site oficial, como os dados são apenas hashes e bytes cifrados, não há como associá-los a você — eliminação já está embutida na arquitetura. Para full-nodes, fale com o administrador do host.</p>
+<h2>6. Segurança</h2>
+<p>Assinatura Ed25519 em mutações com nonce anti-replay; ECIES (X25519 + XChaCha20-Poly1305 + BLAKE3 KDF); credenciais TURN HMAC de vida curta; validação de forma sem leitura de conteúdo; CSP estrita; sanitização de candidatos ICE que vazariam seu IP (mDNS/relay). Auditoria completa pública em docs/SECURITY-AUDIT.md no repositório.</p>
+<h2>7. Transferências internacionais e subprocessadores</h2>
+<p>O site oficial pode estar hospedado em nuvem fora do Brasil; o único dado processado por ela são envelopes opacos e hashes, sem chave de decifragem. Há TURN auto-hospedado; não usamos redes de terceiros para conteúdo.</p>
+<h2>8. Menores</h2>
+<p>O serviço é para maiores de 18 anos. Não coletamos dados de menores intencionalmente; não há verificação de idade.</p>
+<h2>9. Alterações</h2>
+<p>Alterações substanciais desta política exigem novo aceite no aplicativo. Versão atual: indicada acima e na tela do Centro Legal.</p>
+<hr>
+<p>Contato: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · Esta página não usa JavaScript, CSS, cookies ou analytics.</p>
+</body>
+</html>
