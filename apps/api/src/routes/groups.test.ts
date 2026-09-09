@@ -104,4 +104,54 @@ describe('Group Chat Messages API', () => {
     }, env)
     expect(res.status).toBe(403)
   })
+  it('lists group members (name + id) for a member; 403 for outsiders', async () => {
+    const createBody = JSON.stringify({ name: 'Members View', member_ids: [member.orbitId] })
+    const createRes = await app.request('/api/groups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(sender, 'POST', '/api/groups', createBody) },
+      body: createBody,
+    }, env)
+    const created: any = await createRes.json()
+    const groupId = created.group?.id
+
+    const res = await app.request(`/api/groups/${groupId}/members`, { headers: authHeaders(member, 'GET', `/api/groups/${groupId}/members`) }, env)
+    expect(res.status).toBe(200)
+    const data: any = await res.json()
+    const ids = (data.members as any[]).map((m) => m.id).sort()
+    expect(ids).toEqual([member.orbitId, sender.orbitId].sort())
+    expect((data.members as any[]).every((m) => typeof m.display_name === 'string')).toBe(true)
+    // owner flag present
+    expect((data.members as any[]).find((m) => m.id === sender.orbitId)?.is_owner).toBe(1)
+
+    const outsiderRes = await app.request(`/api/groups/${groupId}/members`, { headers: authHeaders(outsider, 'GET', `/api/groups/${groupId}/members`) }, env)
+    expect(outsiderRes.status).toBe(403)
+  })
+
+  it('owner can add a member after creation (join flow)', async () => {
+    const createBody = JSON.stringify({ name: 'Grow Group', member_ids: [] })
+    const createRes = await app.request('/api/groups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(sender, 'POST', '/api/groups', createBody) },
+      body: createBody,
+    }, env)
+    const created: any = await createRes.json()
+    const groupId = created.group?.id
+
+    const addBody = JSON.stringify({ member_ids: [outsider.orbitId] })
+    const addRes = await app.request(`/api/groups/${groupId}/members`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(sender, 'POST', `/api/groups/${groupId}/members`, addBody) },
+      body: addBody,
+    }, env)
+    expect(addRes.status).toBe(200)
+
+    // outsider can now post messages (member)
+    const msgBody = JSON.stringify({ body: 'now member' })
+    const postRes = await app.request(`/api/groups/${groupId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(outsider, 'POST', `/api/groups/${groupId}/messages`, msgBody) },
+      body: msgBody,
+    }, env)
+    expect(postRes.status).toBe(200)
+  })
 })

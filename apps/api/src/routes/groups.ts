@@ -134,6 +134,22 @@ groups.post('/:id/messages', async (c) => {
   return c.json({ message: msg })
 })
 
+groups.get('/:id/members', async (c) => {
+  const userId = c.get('orbitId')
+  const groupId = c.req.param('id')
+  if (!(await isMember(c.env.DB, groupId, userId))) return c.json({ error: 'Not a member' }, 403)
+  const { results } = await c.env.DB.prepare(`
+    SELECT u.id, u.display_name, CASE WHEN g.owner_id = u.id THEN 1 ELSE 0 END as is_owner
+    FROM ChatGroupMembers m
+    JOIN Users u ON u.id = m.user_id
+    JOIN ChatGroups g ON g.id = m.group_id
+    WHERE m.group_id = ?
+    ORDER BY is_owner DESC, u.display_name ASC
+    LIMIT 50
+  `).bind(groupId).all<{ id: string; display_name: string | null; is_owner: number }>()
+  return c.json({ members: (results || []).map((r) => ({ ...r, display_name: r.display_name?.trim() || 'Unknown User' })) })
+})
+
 groups.post('/:id/members', async (c) => {
   const userId = c.get('orbitId')
   const groupId = c.req.param('id')
