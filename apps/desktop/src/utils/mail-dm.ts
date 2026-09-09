@@ -39,6 +39,12 @@ export interface PeerKeys {
   displayName?: string
 }
 
+/** Scope a base key to one identity: two accounts on one device must not
+ * share threads/peer-key caches (or the courier rooms). */
+export function scopedKey(base: string, orbitId: string): string {
+  return `${base}:${orbitId.slice(0, 16)}`
+}
+
 function readJson<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key)
@@ -57,21 +63,27 @@ function writeJson(key: string, value: unknown): void {
 }
 
 export class DmStore {
-  constructor(private readonly identity: OrbitIdentity) {}
+  private readonly threadsKey: string
+  private readonly keysKey: string
+
+  constructor(private readonly identity: OrbitIdentity) {
+    this.threadsKey = scopedKey(THREADS_KEY, identity.orbitId)
+    this.keysKey = scopedKey(KEYS_KEY, identity.orbitId)
+  }
 
   /** Peer pubkey registry (contacts + every opened envelope feeds it). */
   rememberPeer(orbitId: string, keys: PeerKeys): void {
-    const map = readJson<Record<string, PeerKeys>>(KEYS_KEY, {})
+    const map = readJson<Record<string, PeerKeys>>(this.keysKey, {})
     map[orbitId] = keys
-    writeJson(KEYS_KEY, map)
+    writeJson(this.keysKey, map)
   }
 
   peerKeys(orbitId: string): PeerKeys | undefined {
-    return readJson<Record<string, PeerKeys>>(KEYS_KEY, {})[orbitId]
+    return readJson<Record<string, PeerKeys>>(this.keysKey, {})[orbitId]
   }
 
   threads(): Record<string, DmMessage[]> {
-    return readJson(THREADS_KEY, {})
+    return readJson(this.threadsKey, {})
   }
 
   thread(peerId: string): DmMessage[] {
@@ -81,7 +93,7 @@ export class DmStore {
   private save(thread: DmMessage[], peerId: string): void {
     const all = this.threads()
     all[peerId] = thread.slice(-MAX_PER_THREAD)
-    writeJson(THREADS_KEY, all)
+    writeJson(this.threadsKey, all)
   }
 
   appendLocal(msg: DmMessage): void {
@@ -167,10 +179,12 @@ export class DmManager {
     return msg
   }
 
-  /** Inbound hook wired to MailClient.onMail (opened envelopes only). */
-  handleOpened(opened: OpenedEnvelope, env: Envelope): void {
+  /** Inbound hook wired to MailClient.onMail (opened envelopes only).
+   * Returns true when the body was a DM/ack (consumed); room wires and
+   * foreign kinds return false so the caller can route on. */
+  handleOpened(opened: OpenedEnvelope, env: Envelope): boolean {
     const body = decodeBody(opened.body)
-    if (!body) return
+    if (!body) return false
     const peerId = opened.senderOrbitId
     // Trust-on-first-use: cache the sealing peer's pubkey material. The
     // sender's X25519 enc pub rides the wire as env.fromEph (ECIES input),
@@ -185,11 +199,11 @@ export class DmManager {
         this.deps.store.setStatus(peerId, body.id, 'delivered')
         this.deps.onThreadChanged(peerId)
       }
-      return
+      return true
     }
     if (this.deps.store.hasMessage(peerId, body.id)) {
       // Already have it (our own echo) — skip; send the ack only for new.
-      return
+      return true
     }
     const inbound: DmMessage = {
       id: body.id,
@@ -213,5 +227,6 @@ export class DmManager {
         })
         .catch(() => { /* best-effort receipt */ })
     }
+    return true
   }
 }
