@@ -57,6 +57,7 @@ writeFileSync(join(STAGE, 'package.json'), JSON.stringify({ name: 'goongrid-api-
 
 cpSync(join(ROOT, 'packages', 'crypto'), join(STAGE, 'packages', 'crypto'), { recursive: true, filter: (s) => !s.includes('node_modules') })
 cpSync(join(ROOT, 'packages', 'shared'), join(STAGE, 'packages', 'shared'), { recursive: true, filter: (s) => !s.includes('node_modules') })
+cpSync(join(ROOT, 'packages', 'protocol'), join(STAGE, 'packages', 'protocol'), { recursive: true, filter: (s) => !s.includes('node_modules') })
 cpSync(join(ROOT, 'apps', 'api'), join(STAGE, 'apps', 'api'), {
   recursive: true,
   filter: (s) => !s.includes('node_modules') && !s.includes('test-blobs-') && !s.includes('coverage') && !s.endsWith('.sqlite') && !s.endsWith('.sqlite.tmp'),

@@ -7,6 +7,7 @@ import app from './index'
 import { join, dirname, extname } from 'node:path'
 import { handleIncoming, conns, WsConn, broadcastToRoom } from './ws-bus'
 import { mailWatchers, handleMailSocketMessage } from './routes/mail'
+import { isApiPath, parseSiteServices, siteAllows } from './site-services'
 import { leaveLobby, advanceLobby } from './lobby'
 import { advanceBabecock } from './babecock'
 import { runPeriodicMaintenance } from './cleanup'
@@ -156,6 +157,9 @@ const MIME: Record<string, string> = {
 
 const wsToConn = new WeakMap<object, WsConn>()
 
+// null => full node (self-host/dev); Set => official site, courier-only.
+const siteServices = parseSiteServices()
+
 Bun.serve({
   hostname: '0.0.0.0',
   port: parseInt(process.env.PORT || '8080', 10),
@@ -165,11 +169,20 @@ Bun.serve({
   async fetch(req: Request, server: any) {
     const url = new URL(req.url)
 
-    // WebSocket upgrade
-    if (url.pathname === '/api/ws') {
-      const upgradeHeader = req.headers.get('Upgrade') || req.headers.get('upgrade')
-      if (upgradeHeader?.toLowerCase() === 'websocket' && server.upgrade(req)) return
-    }
+        // SITE_SERVICES gate (plan P2.3): the official site = blind courier only.
+        // Everything not in the allow-list 404s at the edge, including the legacy
+        // identity-bound swarm WS (presence/rooms) — the courier never learns who
+        // enters or leaves.
+        if (siteServices && isApiPath(url.pathname) && !siteAllows(siteServices, url.pathname)) {
+          return new Response('Not Found', { status: 404 })
+        }
+
+        // WebSocket upgrade
+        if (url.pathname === '/api/ws') {
+          if (siteServices) return new Response('Not Found', { status: 404 })
+          const upgradeHeader = req.headers.get('Upgrade') || req.headers.get('upgrade')
+          if (upgradeHeader?.toLowerCase() === 'websocket' && server.upgrade(req)) return
+        }
 
     // Blind-courier push channel: ANONYMOUS upgrade (no ticket, no identity).
     // The socket may only watch opaque delivery tokens; the courier never
