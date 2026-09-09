@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Radio, Skull, Flame, ShieldAlert, ArrowLeft, Clock, MessageSquare, Image as ImageIcon } from 'lucide-react';
+import { Flame, ShieldAlert, ArrowLeft, Clock, MessageSquare, Image as ImageIcon } from 'lucide-react';
 import { playPress, playMatchFound } from '../../utils/sounds';
 import { orbitFetch } from '../../utils/api';
 import type { OrbitIdentity } from '@orbit/crypto';
@@ -31,7 +31,7 @@ interface SpyFeed {
   intercepted: SpyPeek[];
 }
 
-const HACK_ICONS = { dms: Radio, takeover: Skull, mobile: Flame, default: ShieldAlert };
+const HACK_ICONS = { mobile: Flame, default: ShieldAlert };
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -119,11 +119,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
     return `${mins}:${s.toString().padStart(2, '0')}`;
   };
 
-  const iconKey = session.itemId.includes('takeover')
-      ? 'takeover'
-      : session.itemId.includes('mobile')
-        ? 'mobile'
-        : 'default';
+  const iconKey = session.itemId.includes('mobile') ? 'mobile' : 'default';
   const IconComponent = HACK_ICONS[iconKey];
 
   return (

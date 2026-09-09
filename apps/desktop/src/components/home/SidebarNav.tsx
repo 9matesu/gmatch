@@ -102,8 +102,7 @@ export function SidebarNav({
 
   const getHackIcon = () => {
     if (!activeHack) return ShieldAlert;
-    if (activeHack.itemId.includes('takeover')) return Skull;
-    if (activeHack.itemId.includes('mobile')) return Flame;
+        if (activeHack.itemId.includes('mobile')) return Flame;
     return ShieldAlert;
   };
 

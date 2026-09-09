@@ -1,6 +1,6 @@
 import type { FeedPost } from '../components/feed/GMatchFeed';
 
-export type GameMode = 'duel' | 'babecock' | 'patrol' | 'ranks' | 'store' | 'discord' | 'coffee';
+export type GameMode = 'duel' | 'babecock' | 'ranks' | 'store' | 'discord' | 'coffee';
 
 export interface GameAdTemplate {
   mode: GameMode;
@@ -57,15 +57,6 @@ export const GAME_AD_TEMPLATES: GameAdTemplate[] = [
     badge: 'LIVE NOW',
   },
   {
-    mode: 'patrol',
-    gameName: 'Mod Patrol',
-    tagline: 'Speed-run content review shifts and earn double clout multipliers.',
-    ctaLabel: 'Join the Shift',
-    gradient: 'from-sky-500 via-blue-600 to-indigo-700',
-    icon: 'patrol',
-    badge: '2x CLOUT WEEKEND',
-  },
-  {
     mode: 'ranks',
     gameName: 'Rankings',
     tagline: 'Climb the global leaderboard. Only the obsessed stay on top.',
@@ -99,7 +90,7 @@ function seededRandom(seed: number): () => number {
   };
 }
 
-const IDS = ['post_ad_discord', 'post_ad_coffee', 'post_ad_duel', 'post_ad_babecock', 'post_ad_patrol', 'post_ad_ranks', 'post_ad_store'];
+const IDS = ['post_ad_discord', 'post_ad_coffee', 'post_ad_duel', 'post_ad_babecock', 'post_ad_ranks', 'post_ad_store'];
 
 export function buildSponsoredPost(seed: number): SponsoredFeedPost {
   const template = pickRandomTemplate(seed);

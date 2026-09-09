@@ -823,7 +823,7 @@ users.post('/:id/report', async (c) => {
 // Active in-memory hack debuffs with expiration
 interface ServerHackDebuff {
   id: string
-  type: 'deny' | 'takeover' | 'mobile_virus'
+  type: 'deny' | 'mobile_virus'
   attacker_id: string
   attacker_name: string
   target_id: string
@@ -975,14 +975,11 @@ if (baseItem.id === 'item-flash-drop') {
     const attackerName = me?.display_name?.trim() || 'Unknown User'
 
     let durationMs = 5 * 60 * 1000
-    let hackType: 'deny' | 'takeover' | 'mobile_virus' = 'deny'
+    let hackType: 'deny' | 'mobile_virus' = 'deny'
 
     if (baseItem.id === 'item-hack-deny') {
       hackType = 'deny'
       durationMs = 5 * 60 * 1000
-    } else if (baseItem.id === 'item-hack-takeover') {
-      hackType = 'takeover'
-      durationMs = 15 * 60 * 1000
     } else if (baseItem.id === 'item-hack-mobile') {
       hackType = 'mobile_virus'
       durationMs = 60 * 1000

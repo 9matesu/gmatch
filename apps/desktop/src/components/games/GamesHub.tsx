@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import { playPress } from '../../utils/sounds';
-import { Swords, Flame, Trophy, ShieldAlert, Layers, LayoutGrid, MousePointerClick } from 'lucide-react';
-import { ModPatrolWidget } from '../feed/ModPatrolWidget';
+import { Swords, Flame, Trophy, Layers, MousePointerClick } from 'lucide-react';
 import { BabecockPanel } from '../BabecockPanel';
 import { Leaderboard } from '../Leaderboard';
 import { DeckBuilder } from './DeckBuilder';
@@ -12,7 +11,7 @@ import GridWorkspace from '../grid/GridWorkspace';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject as StoredCard, User } from '@orbit/shared';
 
-type GamesTab = 'duel' | 'cards' | 'decks' | 'babecock' | 'ranks' | 'patrol' | 'idle';
+type GamesTab = 'duel' | 'cards' | 'babecock' | 'ranks' | 'idle';
 
 export function GamesHub({
   identity,
@@ -42,11 +41,9 @@ export function GamesHub({
   const tabs: { id: GamesTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'duel', label: 'Play', icon: Swords },
     { id: 'cards', label: 'Cards', icon: Layers },
-    { id: 'decks', label: 'Decks', icon: LayoutGrid },
     { id: 'babecock', label: 'Babecock', icon: Flame },
     { id: 'idle', label: 'Idle Clicker', icon: MousePointerClick },
     { id: 'ranks', label: 'Rankings', icon: Trophy },
-    { id: 'patrol', label: 'Patrol', icon: ShieldAlert },
   ];
 
   return (
@@ -103,17 +100,6 @@ export function GamesHub({
           </div>
         )}
 
-        {subTab === 'decks' && (
-          <div className="glass-surface rounded-lg p-4">
-            <DeckBuilder
-              identity={identity}
-              cards={cards}
-              onEnterArena={() => setSubTab('duel')}
-              toast={toast}
-            />
-          </div>
-        )}
-
         {subTab === 'cards' && (
           <div className="glass-surface rounded-lg p-4">
             {cards.length === 0 ? (
@@ -125,6 +111,16 @@ export function GamesHub({
                 ))}
               </div>
             )}
+            {/* Deck (Games -> Cards -> Deck): collection manager lives inside Cards */}
+            <div className="mt-6 border-t border-border-glass pt-6">
+              <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider mb-3">Deck</h3>
+              <DeckBuilder
+                identity={identity}
+                cards={cards}
+                onEnterArena={() => setSubTab('duel')}
+                toast={toast}
+              />
+            </div>
           </div>
         )}
 
@@ -140,12 +136,6 @@ export function GamesHub({
         {subTab === 'idle' && (
           <div className="h-[calc(100vh-260px)] min-h-[560px] rounded-lg overflow-hidden">
             <GridWorkspace />
-          </div>
-        )}
-
-        {subTab === 'patrol' && (
-          <div className="space-y-3 max-w-xl mx-auto">
-            <ModPatrolWidget onAddScore={(pts) => toast?.(`+${pts} points awarded`, 'success')} />
           </div>
         )}
 

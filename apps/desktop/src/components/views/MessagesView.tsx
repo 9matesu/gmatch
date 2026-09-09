@@ -13,7 +13,7 @@ import { NotificationsPanel } from '../NotificationsPanel';
 import type { MainViewType } from '../home/HomeFooter';
 
 type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
-type GamesSubTab = 'duel' | 'cards' | 'decks' | 'babecock' | 'patrol' | 'ranks' | 'store';
+type GamesSubTab = 'duel' | 'cards' | 'babecock' | 'ranks' | 'store';
 
 export function MessagesView({
   panelTab,

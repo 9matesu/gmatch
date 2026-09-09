@@ -16,9 +16,6 @@ import {
   Coins,
   Sparkles,
   Box,
-  Shield,
-  Crown,
-  Award,
   Layers,
   Skull,
   EyeOff,
@@ -66,7 +63,7 @@ export function StoreTab({
   profilePics?: Record<string, string>;
   toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 }) {
-  const [activeCategory, setActiveCategory] = useState<'all' | 'hack' | 'pack' | 'perk' | 'badge' | 'title' | 'inventory'>('all');
+  const [activeCategory, setActiveCategory] = useState<'all' | 'hack' | 'pack' | 'inventory'>('all');
   const [storeItems, setStoreItems] = useState<StoreItem[]>(STORE_ITEMS);
   const [targetModalItem, setTargetModalItem] = useState<StoreItem | null>(null);
   const [unlocked, setUnlocked] = useState<Set<string>>(() => {
@@ -399,7 +396,7 @@ export function StoreTab({
           <div>
             <h2 className="text-sm font-medium text-retro-fg">Store</h2>
             <p className="text-xs text-retro-muted">
-              Unlock packs, perks, titles, and cosmetics with g$.
+              Card packs and in-game hacks, bought with g$.
             </p>
           </div>
         </div>
@@ -511,9 +508,6 @@ export function StoreTab({
           { id: 'all', label: 'All', icon: ShoppingBag },
           { id: 'hack', label: 'Hacks', icon: ShieldAlert },
           { id: 'pack', label: 'Packs', icon: Package },
-          { id: 'perk', label: 'Perks', icon: Zap },
-          { id: 'badge', label: 'Badges', icon: Shield },
-          { id: 'title', label: 'Titles', icon: Award },
           { id: 'inventory', label: 'Inventory', icon: Box, count: Object.values(inventory).reduce((a, b) => a + b, 0) },
         ].map((tab) => {
           const Icon = tab.icon;
@@ -566,13 +560,9 @@ export function StoreTab({
                 <div className="flex items-start justify-between">
                   <div className={`p-2.5 rounded-lg border ${isHack ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' : 'bg-surface-interactive border-retro-border text-retro-body'}`}>
                     {item.id === 'item-hack-deny' && <EyeOff className="w-5 h-5" />}
-                    {item.id === 'item-hack-takeover' && <Skull className="w-5 h-5" />}
                     {item.id === 'item-hack-mobile' && <Flame className="w-5 h-5" />}
                     {item.category === 'pack' && <Package className="w-5 h-5 text-retro-accent" />}
-                    {item.category === 'perk' && item.id.includes('flash') && <Zap className="w-5 h-5 text-retro-warning" />}
-                    {item.category === 'perk' && !item.id.includes('flash') && <Sparkles className="w-5 h-5 text-retro-accent" />}
-                    {item.category === 'badge' && <Crown className="w-5 h-5 text-retro-warning" />}
-                    {item.category === 'title' && <Award className="w-5 h-5 text-retro-accent" />}
+                    {item.id === 'item-flash-drop' && <Zap className="w-5 h-5 text-retro-warning" />}
                   </div>
 
                   {item.badge && (

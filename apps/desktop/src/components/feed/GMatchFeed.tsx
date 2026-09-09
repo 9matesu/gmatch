@@ -16,7 +16,6 @@ import {
   Swords,
   Trophy,
   ShoppingBag,
-  Shield,
   Flame,
   Gamepad2,
   ChevronLeft,
@@ -75,7 +74,7 @@ export interface FeedPost {
   is_archived?: boolean;
   comments?: PostComment[];
   is_sponsored?: boolean;
-  game_mode?: 'duel' | 'babecock' | 'patrol' | 'ranks' | 'store' | 'discord' | 'coffee';
+  game_mode?: 'duel' | 'babecock' | 'ranks' | 'store' | 'discord' | 'coffee';
   players_playing?: number;
   cta_label?: string;
 }
@@ -84,7 +83,6 @@ export const PRESET_CHAT_GROUPS = [
   { id: 'group_general', name: 'General Lounge', icon: 'general', desc: 'Main public community' },
   { id: 'group_arcade', name: 'Arcade Duelists', icon: 'arcade', desc: 'Card game matchmaking' },
   { id: 'group_anime', name: 'Anime Syndicate', icon: 'anime', desc: 'Art & Booru showcase' },
-  { id: 'group_patrol', name: 'Mod Patrol HQ', icon: 'patrol', desc: 'Community moderators' },
 ];
 
 const AD_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -92,7 +90,6 @@ const AD_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> =
   coffee: Coffee,
   duel: Swords,
   babecock: Flame,
-  patrol: Shield,
   ranks: Trophy,
   store: ShoppingBag,
 }
@@ -220,7 +217,7 @@ export function GMatchFeed({
   onOpenPostCreator?: () => void;
   onSelectUser?: (userId: string) => void;
   onToggleTools?: () => void;
-  onOpenGameAd?: (mode: 'duel' | 'babecock' | 'patrol' | 'ranks' | 'store' | 'discord' | 'coffee') => void;
+  onOpenGameAd?: (mode: 'duel' | 'babecock' | 'ranks' | 'store' | 'discord' | 'coffee') => void;
   onStartPm?: (user: { id: string; display_name?: string }) => void;
   onPersistLike?: (postId: string, liked: boolean) => Promise<number | undefined>;
   onPersistSave?: (postId: string, saved: boolean) => void;
@@ -648,7 +645,6 @@ export function GMatchFeed({
           </div>
         </div>
 
-        {/* Embedded Mod Patrol Minigame Quick Action Card */}
         {/* Feed Posts List with Sharp Square Images */}
         <div className={`mt-3 ${feedCols === '1' ? 'space-y-4' : 'grid grid-cols-1 sm:grid-cols-2 gap-4' + (feedCols === '3' ? ' lg:grid-cols-3' : feedCols === '4' ? ' lg:grid-cols-3 xl:grid-cols-4' : feedCols === '5' ? ' lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5' : '')}`}>
           {displayPosts.map((post, idx) => {

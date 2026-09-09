@@ -37,7 +37,6 @@ import { MIN_GAME_CARDS, type User, type OrbitObject, isDefaultPeerName, parseTa
 import { areItemsStructurallyEqual, areUsersStructurallyEqual, areAnnouncementsStructurallyEqual } from "./utils/compare";
 import { OnboardingFlow } from "./firstRun/OnboardingFlow";
 import { GMatchFeed, type FeedPost } from "./components/feed/GMatchFeed";
-import { ModPatrolWidget } from "./components/feed/ModPatrolWidget";
 import { GMatchDMs } from "./components/chat/GMatchDMs";
 import { AttachmentUploadModal } from "./components/AttachmentUploadModal";
 import { ProfileView } from "./components/views/ProfileView";
@@ -169,7 +168,7 @@ export default function Home() {
   const chatPanel = useResizablePanel('chat')
   const [chatResizing, setChatResizing] = useState(false)
   const [panelTab, setPanelTab] = useState<SocialPanelTab>('chat');
-  const [gamesSubTab, setGamesSubTab] = useState<'duel' | 'cards' | 'decks' | 'babecock' | 'patrol' | 'ranks' | 'store'>('duel');
+  const [gamesSubTab, setGamesSubTab] = useState<'duel' | 'cards' | 'babecock' | 'ranks' | 'store'>('duel');
   const [collapsedModules, setCollapsedModules] = useState<Record<string, boolean>>({});
   const toggleModule = (key: string) => setCollapsedModules((prev) => ({ ...prev, [key]: !prev[key] }));
   const [nowTick, setNowTick] = useState<number>(() => Date.now());
@@ -394,7 +393,7 @@ export default function Home() {
   }, [items, canonicalCards, identity, activeDeckId, userDecks])
 
   const navigateToDeckBuilder = useCallback(() => {
-    setGamesSubTab('decks');
+    setGamesSubTab('cards');
     setMainView('games');
   }, []);
 
@@ -2957,7 +2956,7 @@ export default function Home() {
                     <div className={isVisionJammed ? "relative" : ""}>
                       {isVisionJammed && (
                         <div className="mb-3 p-3 bg-red-950/90 border border-red-500/50 rounded-xl text-center text-xs font-bold text-red-200 uppercase tracking-wider animate-pulse flex items-center justify-center gap-2">
-                          <span>⚠️ VISION JAMMED (Deny Perk Active) — Images blurred for 2 minutes</span>
+                          <span>⚠️ VISION JAMMED (Deny hack active) — Images blurred for a few minutes</span>
                         </div>
                       )}
                       <div className={isVisionJammed ? "blur-md select-none pointer-events-none transition-all duration-300" : ""}>
@@ -2970,8 +2969,8 @@ export default function Home() {
                                 <span className="module-title">Games</span>
                               </div>
                               <div className="flex items-center gap-1.5 overflow-x-auto styled-scrollbar">
-                                {(['duel', 'cards', 'decks', 'babecock', 'ranks', 'patrol'] as const).map((tab) => {
-                                  const Icon = tab === 'duel' ? Swords : tab === 'cards' ? Layers : tab === 'decks' ? Coins : tab === 'babecock' ? Flame : tab === 'ranks' ? Trophy : ShieldAlert;
+                                {(['duel', 'cards', 'babecock', 'ranks'] as const).map((tab) => {
+                                  const Icon = tab === 'duel' ? Swords : tab === 'cards' ? Layers : tab === 'babecock' ? Flame : Trophy;
                                   return (
                                     <button
                                       key={tab}
@@ -3077,13 +3076,16 @@ export default function Home() {
                                     )}
                                   </div>
                                 )}
-                                {gamesSubTab === 'decks' && (
-                                  <DeckBuilder
-                                    identity={identity}
-                                    cards={myCards as any}
-                                    onEnterArena={() => setGamesSubTab('duel')}
-                                    toast={toast}
-                                  />
+                                {gamesSubTab === 'cards' && (
+                                  <div className="mt-6 border-t border-border-glass pt-6">
+                                    <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider mb-3">Decks</h3>
+                                    <DeckBuilder
+                                      identity={identity}
+                                      cards={myCards as any}
+                                      onEnterArena={() => setGamesSubTab('duel')}
+                                      toast={toast}
+                                    />
+                                  </div>
                                 )}
                                 {gamesSubTab === 'babecock' && (
                                   <BabecockPanel identity={identity} users={users} onOpenProfile={(id) => {
@@ -3096,11 +3098,6 @@ export default function Home() {
                                     const target = users.find((u) => u.id === uId || (u as any).orbitId === uId);
                                     if (target) setSelectedProfileUser(target);
                                   }} />
-                                )}
-                                {gamesSubTab === 'patrol' && (
-                                  <div className="max-w-xl mx-auto">
-                                    <ModPatrolWidget onAddScore={(pts) => toast(`+${pts} points awarded`, 'success')} />
-                                  </div>
                                 )}
                               </div>
                             )}

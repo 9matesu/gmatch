@@ -296,7 +296,7 @@ export interface StoreItem {
 
 export interface ActiveHackDebuff {
   id: string;
-  type: 'deny' | 'takeover' | 'mobile_virus';
+  type: 'deny' | 'mobile_virus';
   attacker_id: string;
   attacker_name?: string;
   target_id: string;
@@ -306,9 +306,8 @@ export interface ActiveHackDebuff {
 }
 
 export const STORE_ITEMS: StoreItem[] = [
-  { id: 'item-hack-takeover', name: 'Profile Takeover', desc: 'Overwrites the target player\'s profile with your custom hacker banner, title, and status for 15 minutes.', category: 'hack', cost: 3500, icon: 'Skull', badge: 'TAKEOVER', consumable: true },
-  { id: 'item-hack-mobile', name: 'Mobile Cyber Virus', desc: 'Triggers a chaotic 1-minute full-screen flashing slideshow virus lock with audio on the target player.', category: 'hack', cost: 4500, icon: 'Flame', badge: 'VIRUS', consumable: true },
-  { id: 'item-hack-deny', name: 'Deny: Vision Jammer', desc: 'Blurs all image cards on the page for the target player for 5 minutes.', category: 'hack', cost: 800, icon: 'EyeOff', badge: 'HACK', consumable: true },
+  { id: 'item-hack-mobile', name: 'Mobile Cyber Virus', desc: 'Locks the target\'s screen for 1 minute with a full-screen flashing slideshow + audio. Only works against a player who is online right now.', category: 'hack', cost: 4500, icon: 'Flame', badge: 'VIRUS', consumable: true },
+  { id: 'item-hack-deny', name: 'Deny: Vision Jammer', desc: 'Blurs the target player\'s feed images for 5 minutes (Vision Jammed banner). Only works against a player who is online right now.', category: 'hack', cost: 800, icon: 'EyeOff', badge: 'HACK', consumable: true },
   { id: 'item-flash-drop', name: 'Flash Drop Broadcast', desc: 'Instantly broadcasts your chosen photo to everyone online for 5 seconds. Liking one counts as a normal like.', category: 'hack', cost: 1000, icon: 'Zap', badge: 'ABILITY', consumable: true },
   { id: 'item-lootbox-celebrity', name: 'Celebrity Stars Mystery Box', desc: 'Opens a celebrity-tier luxury lootbox containing rare pop-culture, idol, and celebrity cards.', category: 'pack', cost: 350, icon: 'Sparkles', badge: 'CELEB', consumable: true },
   { id: 'item-pack-rare', name: 'Holo Rare Vault Pack', desc: 'Opens a 3-card pack guaranteed to contain Rare or Epic holographic cards with high trade valuation.', category: 'pack', cost: 250, icon: 'Sparkles', badge: 'HOLO', consumable: true },
