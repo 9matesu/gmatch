@@ -212,7 +212,7 @@ export function ServersView({ identity, toast }: { identity: Parameters<typeof o
             </label>
             <label className="flex items-center gap-2 text-[11px] text-retro-muted cursor-pointer">
               <input type="checkbox" checked={needsPassword} onChange={(e) => setNeedsPassword(e.target.checked)} />
-              Ask visitors for a password (you set it on your own server under Settings → Server)
+              Ask visitors for a password (set it under Settings → Server → "Open server")
             </label>
             <p className="text-[10px] text-retro-muted">
               Only this public metadata goes to the central directory. All game/social data stays on YOUR machine —

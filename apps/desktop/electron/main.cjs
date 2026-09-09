@@ -1,11 +1,15 @@
 // gMatch Electron main process.
 // All booru HTTP happens HERE (renderer never touches the network directly).
 // Endpoints per docs/SPEC.md §6. 10s timeout, browser UA, round-robin health.
-const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage } = require('electron')
+const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage, session } = require('electron')
 const https = require('https')
 const path = require('path')
 const imageCache = require('./imageCache.cjs')
 const customFolders = require('./customFolders.cjs')
+const wallpaperWin = require('./wallpaperWin.cjs')
+
+// One-shot camera permission consumed by setPermissionRequestHandler.
+let cameraGrantOnce = false
 const { createSecureStore } = require('./secureStore.cjs')
 const apiSidecar = require('./apiSidecar.cjs')
 const serverMode = require('./server-mode.cjs')
@@ -632,6 +636,21 @@ app.whenReady().then(async () => {
   ipcMain.handle('cache:image', (_event, url) => imageCache.cacheImage(url).then((local) => ({ local })))
   ipcMain.handle('cache:stats', () => imageCache.cacheStats())
   ipcMain.handle('cache:clear', () => imageCache.clearCache())
+  // OS wallpaper swap for consented domination effects (Windows; no-op else).
+  ipcMain.handle('wallpaper:set-data', (_event, buf, mime) => wallpaperWin.setWallpaperFromBuffer(Buffer.from(buf), String(mime || '')))
+  ipcMain.handle('wallpaper:restore', () => wallpaperWin.restoreWallpaper())
+  ipcMain.handle('wallpaper:cleanup-files', () => { wallpaperWin.cleanupWallpaperFiles(); return { ok: true } })
+  // Camera stays denied by default; the renderer consumes a one-shot grant
+  // only AFTER the victim clicks "Allow once" on the in-app prompt.
+  ipcMain.handle('camera:grant-once', () => { cameraGrantOnce = true; return { ok: true } })
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
+    if (permission === 'media' && cameraGrantOnce) {
+      cameraGrantOnce = false
+      callback(true)
+      return
+    }
+    callback(false)
+  })
   // Server-mode bridge for the Settings UI (packaged topology control).
   ipcMain.handle('server:state', () => ({
     packaged: app.isPackaged,

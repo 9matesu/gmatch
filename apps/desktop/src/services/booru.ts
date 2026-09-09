@@ -47,6 +47,10 @@ declare global {
       serverState?: () => Promise<{ packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[] }>
       serverSet?: (payload: { mode: 'host' | 'client'; url?: string }) => Promise<{ ok: boolean; error?: string }>
       serverRelaunch?: () => Promise<void>
+      wallpaperSetData?: (buf: ArrayBuffer, mime: string) => Promise<{ ok: boolean; hadPrevious?: boolean }>
+      wallpaperRestore?: () => Promise<{ ok: boolean }>
+      wallpaperCleanupFiles?: () => Promise<{ ok: boolean }>
+      grantCameraOnce?: () => Promise<{ ok: boolean }>
     }
   }
 }

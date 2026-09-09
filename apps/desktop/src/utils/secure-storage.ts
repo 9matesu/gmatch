@@ -208,6 +208,22 @@ export function setSecureItem(key: string, value: string): void {
   }
 }
 
+/**
+ * Remove every secure entry whose key equals a SECURE_KEYS base or a scoped
+ * variant of one (`base:<id>`) — used by account deletion so scoped threads /
+ * rooms / wallpaper prefs can never survive a purge.
+ */
+export function removeAllScopedSecureItems(): void {
+  const doomed: string[] = []
+  for (const key of mirror.keys()) {
+    if (isSecureKey(key)) doomed.push(key)
+  }
+  for (const key of doomed) {
+    mirror.set(key, null)
+    queueWrite(key, null)
+  }
+}
+
 export function removeSecureItem(key: string): void {
   if (secureMode && isSecureKey(key)) {
     mirror.set(key, null)

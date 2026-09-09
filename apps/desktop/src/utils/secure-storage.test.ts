@@ -5,6 +5,7 @@ import {
   getSecureItem,
   setSecureItem,
   removeSecureItem,
+  removeAllScopedSecureItems,
   SECURE_KEYS,
   _test,
 } from './secure-storage'
@@ -104,11 +105,29 @@ describe('secure-storage (Electron path)', () => {
     expect(bridge.secureSet).toHaveBeenCalledWith('orbit_identity', 'LAST')
   })
 
-  it('SECURE_KEYS covers identity, admin identity, courier threads, pfps', () => {
+  it('SECURE_KEYS covers identity, admin identity, courier threads, pfps, join password', () => {
     expect(SECURE_KEYS).toContain('orbit_identity')
     expect(SECURE_KEYS).toContain('orbit_admin_identity')
     expect(SECURE_KEYS).toContain('orbit_mail_threads_v1')
     expect(SECURE_KEYS).toContain('goonmatch_pfps')
+    expect(SECURE_KEYS).toContain('gmatch.server.join')
+  })
+
+  it('removeAllScopedSecureItems wipes base AND scoped (base:<id>) variants', async () => {
+    mockBridge()
+    await initSecureStorage()
+    setSecureItem('orbit_rooms_v1', 'base')
+    setSecureItem('orbit_rooms_v1:some-orbit-id', 'scoped')
+    setSecureItem('gmatch.server.join', '{"password":"***"}')
+    setSecureItem('not_a_secure_key', 'keep-me') // must NOT be touched
+    removeAllScopedSecureItems()
+    expect(getSecureItem('orbit_rooms_v1')).toBeNull()
+    expect(getSecureItem('orbit_rooms_v1:some-orbit-id')).toBeNull()
+    expect(getSecureItem('gmatch.server.join')).toBeNull()
+    // flush reached the KV for each secure key
+    await new Promise((r) => setTimeout(r, 0))
+    const b = (window as unknown as { gmatch: { secureDelete: ReturnType<typeof vi.fn> } }).gmatch
+    expect(b.secureDelete.mock.calls.some(([k]) => k === 'orbit_rooms_v1:some-orbit-id')).toBe(true)
   })
 })
 
