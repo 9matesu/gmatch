@@ -125,6 +125,8 @@ export interface DmManagerDeps {
   store: DmStore
   identity: OrbitIdentity
   onThreadChanged: (peerId: string) => void
+  /** Fired once per NEW inbound dm after it was stored (UI notification). */
+  onIncoming?: (msg: DmMessage) => void
 }
 
 export class DmManager {
@@ -189,7 +191,7 @@ export class DmManager {
       // Already have it (our own echo) — skip; send the ack only for new.
       return
     }
-    this.deps.store.appendLocal({
+    const inbound: DmMessage = {
       id: body.id,
       peerId,
       own: false,
@@ -197,8 +199,10 @@ export class DmManager {
       ts: body.ts || Date.now(),
       status: 'delivered',
       envelopeId: opened.id,
-    })
+    }
+    this.deps.store.appendLocal(inbound)
     this.deps.onThreadChanged(peerId)
+    this.deps.onIncoming?.(inbound)
     // Receipt rides the same sealed channel back to the sender's box.
     const peerKeys = this.deps.store.peerKeys(peerId)
     if (peerKeys?.encryptionPubHex) {

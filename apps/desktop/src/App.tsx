@@ -70,6 +70,7 @@ import { NotificationsPanel } from "./components/NotificationsPanel";
 import { SocialPanel, type SocialPanelTab } from "./components/chat/SocialPanel";
 import { logger } from './utils/logger';
 import { useNotifications } from './hooks/useNotifications';
+import { useCourierDms } from './hooks/useCourierDms';
 import { OfflineWarningBanner } from "./components/OfflineWarningBanner";
 import { dataUrlToBlob, localObjectBlobUrl } from "./utils/mediaData";
 
@@ -1040,6 +1041,32 @@ export default function Home() {
   }[]>([])
   const [pmUnreadCount, setPmUnreadCount] = useState(0)
 
+  // Blind-courier DM path (plan P3.3): inert on full nodes (legacy inbox),
+  // active only when the API 404s /api/pm (official SITE).
+  const courier = useCourierDms(identity, {
+    onNotify: (msg) => {
+      if (settings.chatNotificationSfx) playMsgReceive()
+      const name = usersRef.current.find((u) => u.id === msg.peerId)?.display_name || 'Someone'
+      toast(`${name} sent you a message`, 'info')
+    },
+  })
+  // Keep the courier's TOFU key registry stocked from the user directory.
+  // Destructured stable members: the hook returns a fresh object each render,
+  // so never put `courier` itself in a dependency array.
+  const courierActive = courier.courierActive
+  const registerCourierKeys = courier.registerPeerKeys
+  const courierPull = courier.pull
+  const courierThreadFor = courier.threadFor
+  const courierSend = courier.send
+  useEffect(() => {
+    if (!courierActive) return
+    for (const u of users) {
+      if (u.publicKey && u.encryptionPubKey) {
+        registerCourierKeys(u.id, u.publicKey, u.encryptionPubKey)
+      }
+    }
+  }, [users, courierActive, registerCourierKeys])
+
   const loadPmThreads = useCallback(() => {
     if (!identity) return Promise.resolve()
     return orbitFetch(`/api/pm/threads?_t=${Date.now()}`, {}, identity)
@@ -1066,6 +1093,22 @@ export default function Home() {
 
   const loadPmMessages = useCallback((peerId: string) => {
     if (!identity) return Promise.resolve()
+    // Courier mode: the thread lives in our local store; a "load" is a pull.
+    if (courier.courierActive) {
+      return (async () => {
+        await courier.pull()
+        const msgs = (courier.threadFor(peerId) || []).map((m) => ({
+          id: m.id,
+          senderId: m.own ? identity.orbitId : peerId,
+          senderName: m.own ? (myProfile.displayName || 'You') : (users.find((u) => u.id === peerId)?.display_name || 'Unknown User'),
+          text: m.text,
+          timestamp: m.ts,
+          readByRecipient: m.status === 'delivered',
+          courierStatus: m.status,
+        }))
+        setPmMessagesByPeer((prev) => ({ ...prev, [peerId]: msgs }))
+      })()
+    }
     if (peerId !== 'global_lobby' && peerId !== 'card_queue') {
       orbitFetch('/api/pm/read', {
         method: 'POST',
@@ -1103,11 +1146,25 @@ export default function Home() {
         }
       })
       .catch(() => { })
-  }, [identity, users, myProfile.displayName, loadPmUnreadCount])
+  }, [identity, users, myProfile.displayName, loadPmUnreadCount, courierActive, courierPull, courierThreadFor])
 
   const sendPm = useCallback(async (peerId: string, text: string, replyToId?: string, attachment?: { id: string; url: string }) => {
     if (!identity) return
     if (!text.trim() && !attachment) return
+    // Blind-courier mode (official SITE): sealed envelope to the peer's box,
+    // never a server inbox. Attachments ride the sealed body as object refs.
+    if (courier.courierActive) {
+      if (replyToId || attachment) {
+        toast('Replies/attachments over the courier need a direct connection — send text for now', 'warning')
+      }
+      const msg = await courier.send(peerId, text.trim())
+      if (!msg || msg.status === 'failed') {
+        toast('Peer key unknown — message held locally. It will NOT deliver until you meet their key.', 'error')
+      }
+      void loadPmMessages(peerId)
+      loadPmThreads()
+      return
+    }
     const optimisticId = `local_${Date.now()}`
     const optimistic: ChatMessage = {
       id: optimisticId,
@@ -1149,7 +1206,7 @@ export default function Home() {
       setPmMessagesByPeer(prev => ({ ...prev, [peerId]: (prev[peerId] || []).filter(m => m.id !== optimisticId) }))
       toast('Could not send message — the server is unreachable', 'error')
     }
-  }, [identity, myProfile.displayName, loadPmMessages, loadPmThreads, toast])
+  }, [identity, myProfile.displayName, loadPmMessages, loadPmThreads, toast, courierActive, courierSend])
 
   useEffect(() => {
     if (!identity) return
