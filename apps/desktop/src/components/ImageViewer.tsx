@@ -251,37 +251,39 @@ export function ImageViewer({
 
         {/* Zoom & View Controls */}
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-          <button
-            type="button"
-            onClick={() => handleZoom(0.25)}
-            className="w-8 h-8 btn-skeuo rounded-xl text-retro-body hover:text-white flex items-center justify-center cursor-pointer transition-all active:scale-95"
-            title="Zoom In (+)"
-          >
-            <ZoomIn className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => handleZoom(-0.25)}
-            className="w-8 h-8 btn-skeuo rounded-xl text-retro-body hover:text-white flex items-center justify-center cursor-pointer transition-all active:scale-95"
-            title="Zoom Out (-)"
-          >
-            <ZoomOut className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={resetView}
-            className="w-8 h-8 btn-skeuo rounded-xl text-retro-body hover:text-white flex items-center justify-center cursor-pointer transition-all active:scale-95"
-            title="Reset Zoom (0)"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex items-center gap-1 sm:gap-1.5 rounded-xl border border-zinc-800/70 bg-surface-canvas/50 px-1 py-1">
+            <button
+              type="button"
+              onClick={() => handleZoom(0.25)}
+              className="w-8 h-8 btn-skeuo rounded-lg text-retro-body hover:text-white flex items-center justify-center cursor-pointer transition-all active:scale-95"
+              title="Zoom In (+)"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleZoom(-0.25)}
+              className="w-8 h-8 btn-skeuo rounded-lg text-retro-body hover:text-white flex items-center justify-center cursor-pointer transition-all active:scale-95"
+              title="Zoom Out (-)"
+            >
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={resetView}
+              className="w-8 h-8 btn-skeuo rounded-lg text-retro-body hover:text-white flex items-center justify-center cursor-pointer transition-all active:scale-95"
+              title="Reset Zoom (0)"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => {
               playPress(680)
               onClose()
             }}
-            className="w-8 h-8 btn-skeuo rounded-xl text-retro-muted hover:text-red-400 flex items-center justify-center cursor-pointer transition-all active:scale-95 ml-1"
+            className="w-8 h-8 btn-skeuo rounded-lg text-retro-muted hover:text-red-400 flex items-center justify-center cursor-pointer transition-all active:scale-95"
             title="Close (Esc)"
           >
             <X className="w-4 h-4" />
@@ -445,7 +447,7 @@ export function ImageViewer({
               playPress(620)
               onDelete(activeItem)
             }}
-            className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-red-950/40 text-red-300 border border-red-500/40 hover:bg-red-900/60 hover:text-white text-xs font-bold transition-all cursor-pointer ml-auto flex items-center gap-1.5 active:scale-95"
+            className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-red-950/40 text-red-300 border border-red-500/40 hover:bg-red-900/60 hover:text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 shrink-0"
           >
             <Trash2 className="w-3.5 h-3.5 text-red-400" />
             <span>Delete</span>

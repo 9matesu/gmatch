@@ -1,20 +1,17 @@
 "use client";
 
 import { useMemo, useState } from 'react'
-import { X, Scale, Download, Check, FileText, Globe2 } from 'lucide-react'
+import { X, Scale, Download, Check, FileText } from 'lucide-react'
 import { LEGAL_DOCS, LEGAL_IDS, legalVersionKey, type LegalDoc, type LegalId } from '../legal/documents'
-import { LEGAL_DOCS_EN } from '../legal/documents.en'
 import { playPress } from '../utils/sounds'
 
 // The storage key assembled at runtime: writing the plain literal here
 // gets mangled by secret scrubbers (KEY = 'literal' pattern). Keep the join.
 const ACCEPT_KEY = ['orbit', 'legal', 'accepted'].join('_')
 
-export type LegalLang = 'pt' | 'en'
-
 /** Docs as markdown (the single canonical render — used for download + gate). */
 export function legalMarkdown(doc: LegalDoc): string {
-  const lines = [`# ${doc.title}`, '', `**Versão / Version:** ${doc.version}`, '', ...doc.body.map((l) => (l.startsWith('## ') ? `\n${l}` : l))]
+  const lines = [`# ${doc.title}`, '', `**Version:** ${doc.version}`, '', ...doc.body.map((l) => (l.startsWith('## ') ? `\n${l}` : l))]
   return lines.join('\n')
 }
 
@@ -34,14 +31,14 @@ export function markLegalAccepted(): void {
   }
 }
 
-/** Short nav labels (binding PT). */
+/** Short nav labels (English-only corpus). */
 const NAV_LABELS: Record<LegalId, string> = {
-  terms: 'Termos de Uso',
-  privacy: 'Privacidade',
-  community: 'Comunidade',
-  abuse: 'Denúncias (Abuse)',
-  records: 'Registros Adultos',
-  'e2e-disclaimer': 'Criptografia (E2E)',
+  terms: 'Terms of Use',
+  privacy: 'Privacy',
+  community: 'Community',
+  abuse: 'Abuse Reports',
+  records: 'Adult Records',
+  'e2e-disclaimer': 'Encryption (E2E)',
 }
 
 export function LegalCenter({
@@ -63,10 +60,8 @@ export function LegalCenter({
   requireAccept?: boolean
 }) {
   const [active, setActive] = useState<LegalId>(initialDoc)
-  const [lang, setLang] = useState<LegalLang>('pt')
 
-  const docs = lang === 'pt' ? LEGAL_DOCS : LEGAL_DOCS_EN
-  const doc = docs[active]
+  const doc = LEGAL_DOCS[active]
   const toc = useMemo(() => doc.body.filter((l) => l.startsWith('## ')), [doc])
 
   if (!isOpen) return null
@@ -92,7 +87,7 @@ export function LegalCenter({
       onClick={requireAccept ? undefined : onClose}
       role="dialog"
       aria-modal="true"
-      aria-label="Centro Legal"
+      aria-label="Legal Center"
     >
       <div
         className="bg-zinc-950 border border-zinc-800 rounded-xl max-w-3xl w-full max-h-[88vh] shadow-2xl flex flex-col animate-orbit-slide-up text-zinc-100"
@@ -105,27 +100,19 @@ export function LegalCenter({
               <Scale className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-sm font-semibold text-white truncate">Centro Legal — gMatch</h2>
+              <h2 className="text-sm font-semibold text-white truncate">Legal Center — gMatch</h2>
               <p className="text-[11px] text-zinc-400">
                 {doc.title} · v{doc.version}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => { playPress(700); setLang((l) => (l === 'pt' ? 'en' : 'pt')) }}
-              className="px-2 py-1 rounded-lg text-[10px] font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 border border-zinc-800 transition-colors cursor-pointer flex items-center gap-1"
-              title="PT-BR é o texto vinculante / EN is informational"
-            >
-              <Globe2 className="w-3 h-3" /> {lang === 'pt' ? 'English' : 'Português'}
-            </button>
             {!requireAccept && (
               <button
                 type="button"
                 onClick={() => { playPress(700); onClose() }}
                 className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors cursor-pointer"
-                aria-label="Fechar"
+                aria-label="Close"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -145,7 +132,7 @@ export function LegalCenter({
                   active === id ? 'bg-zinc-900 text-white border border-zinc-700' : 'text-zinc-400 hover:text-white hover:bg-zinc-900/50 border border-transparent'
                 }`}
               >
-                {lang === 'pt' ? NAV_LABELS[id] : id}
+                {NAV_LABELS[id]}
               </button>
             ))}
           </nav>
@@ -171,10 +158,7 @@ export function LegalCenter({
             <p className="text-[11px] text-zinc-500 border border-zinc-800/70 rounded-lg px-3 py-2 flex items-start gap-2">
               <FileText className="w-3.5 h-3.5 mt-0.5 shrink-0" />
               <span>
-                {lang === 'pt'
-                  ? 'Texto vinculante em PT-BR. Última atualização: '
-                  : 'Binding text is the PT-BR version. Last updated: '}
-                {doc.updated} · {doc.jurisdiction}.
+                Binding English text. Last updated: {doc.updated} · {doc.jurisdiction}.
               </span>
             </p>
 
@@ -216,7 +200,7 @@ export function LegalCenter({
             onClick={() => { playPress(750); markLegalAccepted(); onAccept?.(); if (!onAccept) onClose() }}
             className="px-4 py-2 bg-white hover:bg-zinc-200 text-black font-semibold text-xs rounded-lg transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
           >
-            <Check className="w-3.5 h-3.5" /> Aceito os Termos
+            <Check className="w-3.5 h-3.5" /> I Accept the Terms
           </button>
         </div>
       </div>

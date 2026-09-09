@@ -1,28 +1,28 @@
-# Regras da Comunidade
+# Community Rules
 
-_Versão vinculante (PT-BR)_: **2026-09-09.1** · atualizado/updated: 2026-09-09
-Jurisdição: Aplicadas tecnicamente no cliente e por hosts de full-node
+_Binding text (EN)_: **2026-09-09.2** · updated: 2026-09-09
+Jurisdiction: Enforced technically client-side and by full-node hosts
 
-## 1. Idade e consentimento
+## 1. Age and consent
 
-18+. Todo conteúdo deve retratar ou simular consentimento. Proibido: menores, aparentar menores, não-consensual, incesto real, bestialismo, morte/necrofilia, coerção real. A lista técnica de bloqueio (tags) vale para todos os feeds e uploads.
+18+. All content must depict or simulate consent. Prohibited: minors, apparent minors, non-consent, real incest, bestiality, death/necrophilia, real coercion. The technical tag blocklist applies to all feeds and uploads.
 
-## 2. Privacidade alheia
+## 2. Others' privacy
 
-Nunca publique imagem íntima de outra pessoa sem consentimento dela. Revenge porn é crime no Brasil (Lei 13.718/2018) e motivo de expulsão de qualquer full-node.
+Never publish intimate imagery of another person without their consent. Revenge porn is a crime in Brazil (Lei 13.718/2018) and grounds for removal from any full-node.
 
-## 3. Respeito
+## 3. Respect
 
-Sem assédio, perseguição, discurso de ódio, tentativas de desanonimizar ("outing") ou caçar IP de outros usuários.
+No harassment, doxxing, hate speech, de-anonymization attempts ("outing") or IP hunting against other users.
 
-## 4. Conteúdo gerado por IA
+## 4. AI-generated content
 
-Permitido, desde que não viole as regras 1-3 e não represente pessoa real sem consentimento.
+Allowed, as long as it violates no rule above and does not depict real people without consent.
 
-## 5. Moeda do jogo
+## 5. In-game currency
 
-Economia interna (g$) não tem valor real, não é conversível, não é negociável fora do app. Explorar bugs = perda de saldo.
+The internal economy (g$) has no real value, is not convertible and not tradable outside the app. Exploiting bugs = balance loss.
 
-## 6. Aplicações
+## 6. Enforcement
 
-No modo correio oficial, NINGUÉM modera: não lemos o que você recebe. Suas ferramentas são bloqueio silencioso, exportação de chave (ver documento Abuso) e o filtro técnico do cliente. Em full-nodes, cada host aplica estas regras por conta própria.
+In official courier mode NOBODY moderates: we do not read what you receive. Your tools are silent blocking, key disclosure (see the Abuse document) and the client-side technical filter. On full-nodes each host applies these rules on its own.

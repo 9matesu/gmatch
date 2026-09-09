@@ -41,6 +41,9 @@ declare global {
       cacheImage?: (url: string) => Promise<{ local: string | null }>
       cacheStats?: () => Promise<{ files: number; bytes: number }>
       clearCache?: () => Promise<{ files: number; bytes: number }>
+      customPickFolder?: () => Promise<{ ok: boolean; id?: string; path?: string; error?: string }>
+      customListFolder?: (id: string) => Promise<{ ok: boolean; files?: { name: string; url: string }[]; error?: string }>
+      customRemoveFolder?: (id: string) => Promise<{ ok: boolean }>
       serverState?: () => Promise<{ packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[] }>
       serverSet?: (payload: { mode: 'host' | 'client'; url?: string }) => Promise<{ ok: boolean; error?: string }>
       serverRelaunch?: () => Promise<void>

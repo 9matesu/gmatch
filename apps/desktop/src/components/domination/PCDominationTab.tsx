@@ -19,15 +19,29 @@ import {
   UserCheck,
   Radio,
   History,
+  ShieldAlert,
 } from 'lucide-react';
 import { orbitFetch } from '../../utils/api';
 import { useSettings } from '../../hooks/useSettings';
 import type { OrbitIdentity } from '@orbit/crypto';
+import type { User } from '@orbit/shared';
 import { ActionModal } from './ActionModal';
+import { HacksPanel } from './HacksPanel';
+import type { ActiveHackSession } from '../home/HomeFooter';
+
+type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 
 interface Props {
   identity: OrbitIdentity | null;
   users: Array<{ id: string; orbitId: string; display_name: string; pfp_url?: string }>;
+  /** Full user list for hack targeting (unmapped). */
+  allUsers: User[];
+  profilePics: Record<string, string>;
+  points: number;
+  toast: ToastFn;
+  activeHack: ActiveHackSession | null;
+  setActiveHack: React.Dispatch<React.SetStateAction<ActiveHackSession | null>>;
+  onOpenFlash: () => void;
 }
 
 interface DominationTarget {
@@ -78,9 +92,9 @@ export const INTENSITY_PRESETS: Record<string, Record<string, boolean>> = {
   },
 };
 
-export function PCDominationTab({ identity, users }: Props) {
+export function PCDominationTab({ identity, users, allUsers, profilePics, points, toast: toastFn, activeHack, setActiveHack, onOpenFlash }: Props) {
   const { settings, update } = useSettings();
-  const [activeTab, setActiveTab] = useState<'consent' | 'control' | 'history'>('control');
+  const [activeTab, setActiveTab] = useState<'consent' | 'control' | 'history' | 'hacks'>('control');
   const [targets, setTargets] = useState<DominationTarget[]>([]);
   const [selectedTarget, setSelectedTarget] = useState<DominationTarget | null>(null);
   const [sending, setSending] = useState<string | null>(null);
@@ -323,6 +337,7 @@ export function PCDominationTab({ identity, users }: Props) {
             { id: 'control', label: 'Send Commands', icon: Send },
             { id: 'consent', label: 'Consent & Presets', icon: Shield },
             { id: 'history', label: 'Action History', icon: History },
+            { id: 'hacks', label: 'Hacks', icon: ShieldAlert },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -669,6 +684,21 @@ export function PCDominationTab({ identity, users }: Props) {
                 </div>
               )}
             </div>
+          )}
+
+          {/* TAB 4: HACKS (fused cyber-hack arsenal + live spy feed) */}
+          {activeTab === 'hacks' && (
+            <HacksPanel
+              identity={identity}
+              users={allUsers}
+              profilePics={profilePics}
+              points={points}
+              toast={toastFn}
+              activeHack={activeHack}
+              setActiveHack={setActiveHack}
+              onOpenFlash={onOpenFlash}
+              onExitSpy={() => setActiveTab('control')}
+            />
           )}
         </div>
       </div>

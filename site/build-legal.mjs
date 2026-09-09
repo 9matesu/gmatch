@@ -2,7 +2,7 @@
 // Renders the legal .md corpus (generated from the canonical TS source by
 // apps/desktop/scripts/gen-legal.cjs) into plain-text HTML in legal/.
 // NO styling, NO scripts — the honesty gate (check.mjs) enforces that.
-import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -88,18 +88,18 @@ function inline(s) {
 
 function page(title, bodyHtml, note) {
   return `<!doctype html>
-<html lang="pt-br">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)} — gMatch</title>
 </head>
 <body>
-<p><a href="../index.html#termos">← voltar para a página principal</a></p>
+<p><a href="../index.html#terms">← back to the main page</a></p>
 ${note ? `<p><em>${esc(note)}</em></p>` : ''}
 ${bodyHtml}
 <hr>
-<p>Contato: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · Esta página não usa JavaScript, CSS, cookies ou analytics.</p>
+<p>Contact: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · This page uses no JavaScript, CSS, cookies or analytics.</p>
 </body>
 </html>
 `
@@ -111,46 +111,36 @@ if (!existsSync(MD)) {
 }
 
 const mapped = {
-  'terms.html': ['terms.md', 'Termos de Uso', null],
-  'privacy.html': ['privacy.md', 'Política de Privacidade', null],
-  'community.html': ['community.md', 'Regras da Comunidade', null],
-  'abuse.html': ['abuse.md', 'Denúncias e Notice-and-Takedown', null],
-  'records.html': ['records.md', 'Conteúdo Adulto e Registros', null],
-  'e2e.html': ['e2e-disclaimer.md', 'Declaração sobre Criptografia e Autocustódia', null],
+  'terms.html': ['terms.md', 'Terms of Use', null],
+  'privacy.html': ['privacy.md', 'Privacy Policy', null],
+  'community.html': ['community.md', 'Community Rules', null],
+  'abuse.html': ['abuse.md', 'Abuse Reports & Notice-and-Takedown', null],
+  'records.html': ['records.md', 'Adult Content & Records', null],
+  'e2e.html': ['e2e-disclaimer.md', 'Encryption & Self-Custody Disclaimer', null],
 }
 let n = 0
 for (const [html, [md, title, note]] of Object.entries(mapped)) {
   const src = readFileSync(join(MD, md), 'utf8')
-  writeFileSync(join(OUT, html), page(title, mdToHtml(src), note ?? 'Documento gerado a partir do fonte canônico do aplicativo — não editar aqui.'))
+  writeFileSync(join(OUT, html), page(title, mdToHtml(src), note ?? 'Generated from the canonical in-app source — do not edit here.'))
   n++
 }
 
 // changelog: version registry from version.json + per-doc section anchors
 const version = JSON.parse(readFileSync(join(MD, 'version.json'), 'utf8'))
 const cl = [
-  '<h1>Changelog jurídico</h1>',
-  `<p>Corrente / current suite: <strong>${esc(version.version)}</strong></p>`,
-  '<table><tr><th>documento</th><th>versão</th></tr>' +
+  '<h1>Legal changelog</h1>',
+  `<p>Current suite: <strong>${esc(version.version)}</strong></p>`,
+  `<table><tr><th>document</th><th>version</th></tr>` +
     version.docs.map((d) => `<tr><td><a href="${d === 'e2e-disclaimer' ? 'e2e' : d}.html">${esc(d)}</a></td><td>${esc(version.version)}</td></tr>`).join('') +
     '</table>',
-  '<p>2026-09-09.1 — versão inicial pública do pacote jurídico (termos, privacidade LGPD/GDPR, comunidade, denúncias, registros adultos, aviso E2E), alinhada ao relatório de segurança abaixo.</p>',
+  '<p>2026-09-09.2 — English-only binding corpus (terms, LGPD/GDPR privacy, community, abuse reports, adult records, E2E notice).</p>',
 ].join('\n')
-writeFileSync(join(OUT, 'changelog.html'), page('Changelog jurídico', cl, 'Gerado de legal/version.json — fonte canônico: apps/desktop/src/legal/documents.ts.'))
+writeFileSync(join(OUT, 'changelog.html'), page('Legal changelog', cl, 'Generated from legal/version.json — canonical source: apps/desktop/src/legal/documents.ts.'))
 n++
 
 // security page: the audit report itself
 const auditPath = join(ROOT, '..', 'docs', 'SECURITY-AUDIT.md')
 const audit = readFileSync(auditPath, 'utf8')
-writeFileSync(join(OUT, 'security.html'), page('Auditoria de Segurança', mdToHtml(audit), 'Gerado de docs/SECURITY-AUDIT.md (white-box).'))
+writeFileSync(join(OUT, 'security.html'), page('Security Audit', mdToHtml(audit), 'Generated from docs/SECURITY-AUDIT.md (white-box).'))
 n++
-
-// EN mirrors (informational)
-const EN_OUT = join(OUT, 'en')
-mkdirSync(EN_OUT, { recursive: true })
-for (const [html, [md, , ]] of Object.entries(mapped)) {
-  const src = readFileSync(join(MD, 'en', md), 'utf8')
-  const title = /^# (.*)$/m.exec(src)?.[1] ?? md
-  writeFileSync(join(EN_OUT, html), `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>${esc(title)} — gMatch</title>\n</head>\n<body>\n<p><a href="../../en.html#terms">← back to the main page</a></p>\n<p><em>Informational translation — the PT-BR text binds. Generated from the canonical in-app source — do not edit here.</em></p>\n${mdToHtml(src)}\n<hr>\n<p>Contact: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · This page uses no JavaScript, CSS, cookies or analytics.</p>\n</body>\n</html>\n`)
-}
-console.log(`build-legal: ${n} PT pages + ${Object.keys(mapped).length} EN mirrors -> legal/`)
-console.log('legal files now:', readdirSync(OUT).sort().join(' '))
+console.log(`build-legal: ${n} EN pages -> legal/`)

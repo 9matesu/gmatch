@@ -1,54 +1,54 @@
-# Política de Privacidade (LGPD/GDPR)
+# Privacy Policy (LGPD/GDPR)
 
-_Versão vinculante (PT-BR)_: **2026-09-09.1** · atualizado/updated: 2026-09-09
-Jurisdição: LGPD (Lei 13.709/2018); GDPR para usuários da UE
+_Binding text (EN)_: **2026-09-09.2** · updated: 2026-09-09
+Jurisdiction: LGPD (Lei 13.709/2018); GDPR for EU users
 
-## 1. Quem é o controlador
+## 1. Who is the controller
 
-Para o SITE OFICIAL (carteiro cego + TURN): os mantenedores do repositório 9matesu/goongrid, contato via GitHub do projeto. Para FULL-NODES: o administrador daquele servidor é o controlador dos dados que nele existem; o software apenas implementa o que o host rodou.
+For the OFFICIAL SITE (blind courier + TURN): the maintainers of the 9matesu/goongrid repository, contactable via the GitHub project. For FULL-NODES: the administrator of that server is the controller of the data it holds; the software only implements what the host runs.
 
-## 2. Base legal
+## 2. Legal bases
 
-Execução de contrato (entregar o serviço que você pediu) + legítimo interesse (segurança/anti-abuso) + consentimento (ao aceitar os Termos e ao ativar funcionalidades opcionais como upload).
+Contract performance (delivering the service you asked for) + legitimate interest (security/anti-abuse) + consent (accepting the Terms and enabling optional features such as uploads).
 
-## 3. O que NÃO coletamos (declaração de minimização)
+## 3. What we do NOT collect (minimisation statement)
 
-- Nada de conteúdo: o carteiro oficial recebe apenas envelopes cifrados (XChaCha20-Poly1305) e o endereço de entrega = hash BLAKE3 da sua chave pública. Ele não sabe quem envia, o que, nem quando você leu.
+- No content: the official courier receives only sealed envelopes (XChaCha20-Poly1305) and the delivery address = BLAKE3 hash of your public key. It cannot know who sent, what, or when you read.
 
-- Nada de presença: o modo site não expõe quem está online, grafo social, perfis ou posts.
+- No presence: site mode exposes nothing about who is online, the social graph, profiles or posts.
 
-- Nada de IP: pedidos de credencial TURN usam identidade aleatória efêmera por sessão; logs de servidor registram IP redigido (último octeto cortado).
+- No IP: TURN credential requests use an ephemeral random identity per session; server logs record redacted IPs (last octet removed).
 
-- Nada de telemetria: o aplicativo não faz nenhuma requisição de analytics, crash report ou beacon para terceiros.
+- No telemetry: the application makes zero analytics, crash-report or beacon requests to third parties.
 
-- Nada de cookies: o software desktop não usa cookies; não há rastreadores.
+- No cookies: the desktop software uses no cookies and no trackers.
 
-- Nada no disco do usuário além da sessão: imagens ficam SOMENTE em memória (cache RAM expirável ao fechar); chaves e histórico ficam cifrados pelo DPAPI do Windows; respostas HTTP de conteúdo usam Cache-Control: no-store.
+- Nothing on your disk beyond the session: images live ONLY in memory (RAM cache, gone at exit); keys and history are encrypted by the Windows DPAPI; content HTTP responses use Cache-Control: no-store.
 
-## 4. O que É tratado, e por quem
+## 4. What IS processed, and by whom
 
-- **Site oficial:** endereço de entrega (hash), tamanho dos envelopes, timestamps, TTL/limite por caixa (anti-flood). Finalidade: rotear. Retenção: até 7 dias (expiração) ou imediato após ack assinado.
+- **Official site:** delivery address (hash), envelope size, timestamps, TTL/per-box caps (anti-flood). Purpose: routing. Retention: up to 7 days (expiry) or immediately after a signed ack.
 
-- **Sua máquina:** identidade completa, chaves, threads, salas, configurações, save do jogo. Nunca sobem ao site.
+- **Your machine:** the full identity, keys, threads, rooms, settings, game save. It never leaves to the site.
 
-- **Full-node (se você usar):** ali existem postagens, perfis, DMs legadas (criptografadas com chave do SERVIDOR — o host consegue ler), economias e logs administrativos. Verifique a política do seu host.
+- **Full-node (if you use one):** it stores posts, profiles, legacy DMs (encrypted with the SERVER key — the host can read them), economies and admin logs. Check your host's policy.
 
-## 5. Direitos do titular (art. 18 LGPD / arts. 15-22 GDPR)
+## 5. Data subject rights (art. 18 LGPD / arts. 15-22 GDPR)
 
-Confirmação, acesso, correção, portabilidade, eliminação e revogação de consentimento exercita-se LOCALMENTE: exporte sua identidade no app (portabilidade) e apague-a (eliminação no seu dispositivo); no modo correio, seus envelopes expiram sozinhos sem intervenção. Para o site oficial, como os dados são apenas hashes e bytes cifrados, não há como associá-los a você — eliminação já está embutida na arquitetura. Para full-nodes, fale com o administrador do host.
+Confirmation, access, rectification, portability, deletion and consent withdrawal are exercised LOCALLY: export your identity in the app (portability) and delete it (deletion on your device); in courier mode envelopes expire by themselves. For the official site, since data is only hashes and sealed bytes, it cannot be linked to you — deletion is baked into the architecture. For full-nodes, contact the host administrator.
 
-## 6. Segurança
+## 6. Security
 
-Assinatura Ed25519 em mutações com nonce anti-replay; ECIES (X25519 + XChaCha20-Poly1305 + BLAKE3 KDF); credenciais TURN HMAC de vida curta; validação de forma sem leitura de conteúdo; CSP estrita; sanitização de candidatos ICE que vazariam seu IP (mDNS/relay). Auditoria completa pública em docs/SECURITY-AUDIT.md no repositório.
+Ed25519 signatures on every mutation with anti-replay nonces; ECIES (X25519 + XChaCha20-Poly1305 + BLAKE3 KDF); short-lived HMAC TURN credentials; shape-only validation without content reads; strict CSP; ICE candidate sanitisation against IP leaks (mDNS/relay). Full public audit at docs/SECURITY-AUDIT.md in the repository.
 
-## 7. Transferências internacionais e subprocessadores
+## 7. International transfers and subprocessors
 
-O site oficial pode estar hospedado em nuvem fora do Brasil; o único dado processado por ela são envelopes opacos e hashes, sem chave de decifragem. Há TURN auto-hospedado; não usamos redes de terceiros para conteúdo.
+The official site may be hosted on cloud outside Brazil; the only data processed there are opaque envelopes and hashes, without any decryption key. Self-hosted TURN is optional; we never use third-party clouds for content.
 
-## 8. Menores
+## 8. Minors
 
-O serviço é para maiores de 18 anos. Não coletamos dados de menores intencionalmente; não há verificação de idade.
+The service is for adults (18+). We do not intentionally collect minors' data; there is no age verification.
 
-## 9. Alterações
+## 9. Changes
 
-Alterações substanciais desta política exigem novo aceite no aplicativo. Versão atual: indicada acima e na tela do Centro Legal.
+Substantial changes require fresh in-app acceptance. Current version: above and in the Legal Center screen.

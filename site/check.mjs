@@ -48,10 +48,10 @@ for (const p of ['index.html', 'en.html']) {
   if (ver !== rel.version) fail.push(`${p}: published version ${ver} != release.json ${rel.version}`)
 }
 
-// 3) âncoras internas resolvem + 4) seções obrigatórias (PT e EN espelhos)
+// 3) âncoras internas resolvem + 4) seções obrigatórias (EN default, PT mirror)
 const SECTIONS = {
-  'index.html': ['o-que-e', 'seguranca', 'criptografia', 'download', 'verificar', 'termos', 'privacidade'],
-  'en.html': ['what-it-is', 'security', 'crypto', 'download', 'verify', 'terms', 'privacy'],
+  'index.html': ['what-it-is', 'security', 'crypto', 'download', 'verify', 'terms', 'privacy'],
+  'en.html': ['o-que-e', 'seguranca', 'criptografia', 'download', 'verificar', 'termos', 'privacidade'],
 }
 for (const [file, ids] of Object.entries(SECTIONS)) {
   const html = readFileSync(join(ROOT, file), 'utf8')

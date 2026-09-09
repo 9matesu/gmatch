@@ -14,7 +14,6 @@ interface QueueControlsProps {
   autoQueueEnabled: boolean
   soundEnabled: boolean
   myCardsCount: number
-  mergedPlayersCount: number
   queuedSinceMs: number
   showLeagueTab: boolean
   onToggleAutoQueue: (enabled: boolean) => Promise<{ ok: boolean; error?: string }>
@@ -33,7 +32,6 @@ export function QueueControls({
   autoQueueEnabled,
   soundEnabled,
   myCardsCount,
-  mergedPlayersCount,
   queuedSinceMs,
   showLeagueTab,
   onToggleAutoQueue,
@@ -48,18 +46,6 @@ export function QueueControls({
 
   return (
     <div className="flex items-center gap-2 flex-nowrap ml-auto">
-      {onOpenDeckBuilder && !match && (
-        <button
-          type="button"
-          onClick={onOpenDeckBuilder}
-          className="border border-retro-border px-2.5 py-1.5 text-xs font-medium text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors flex items-center gap-1.5"
-          title="Manage and select your active duel deck"
-        >
-          <LayoutGrid className="w-3.5 h-3.5 text-cyan-300" />
-          Decks
-        </button>
-      )}
-
       <button
         type="button"
         onClick={onOpenCardChat}
@@ -109,29 +95,18 @@ export function QueueControls({
         </button>
       )}
 
-      <div className="flex items-center border border-retro-border rounded-lg overflow-hidden">
-        <button
-          type="button"
-          onClick={() => onShowLeagueTab(false)}
-          className={`px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${!showLeagueTab
-            ? 'bg-surface-interactive text-retro-fg'
-            : 'bg-transparent text-retro-muted hover:text-retro-fg'
-            }`}
-        >
-          Gooners ({mergedPlayersCount})
-        </button>
-        <div className="w-px h-4 bg-retro-border" />
-        <button
-          type="button"
-          onClick={() => onShowLeagueTab(true)}
-          className={`px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${showLeagueTab
-            ? 'bg-surface-interactive text-retro-fg'
-            : 'bg-transparent text-retro-muted hover:text-retro-fg'
-            }`}
-        >
-          League
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => onShowLeagueTab(!showLeagueTab)}
+        aria-pressed={showLeagueTab}
+        title={showLeagueTab ? 'Back to player roster' : 'View league standings'}
+        className={`px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap border border-retro-border rounded-lg ${showLeagueTab
+          ? 'bg-surface-interactive text-retro-fg'
+          : 'bg-transparent text-retro-muted hover:text-retro-fg'
+          }`}
+      >
+        League
+      </button>
     </div>
   )
 }

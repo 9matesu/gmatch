@@ -1,60 +1,60 @@
 <!doctype html>
-<html lang="pt-br">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Política de Privacidade — gMatch</title>
+<title>Privacy Policy — gMatch</title>
 </head>
 <body>
-<p><a href="../index.html#termos">← voltar para a página principal</a></p>
-<p><em>Documento gerado a partir do fonte canônico do aplicativo — não editar aqui.</em></p>
-<h1>Política de Privacidade (LGPD/GDPR)</h1>
-<p>_Versão vinculante (PT-BR)_: <strong>2026-09-09.1</strong> · atualizado/updated: 2026-09-09</p>
-<p>Jurisdição: LGPD (Lei 13.709/2018); GDPR para usuários da UE</p>
-<h2>1. Quem é o controlador</h2>
-<p>Para o SITE OFICIAL (carteiro cego + TURN): os mantenedores do repositório 9matesu/goongrid, contato via GitHub do projeto. Para FULL-NODES: o administrador daquele servidor é o controlador dos dados que nele existem; o software apenas implementa o que o host rodou.</p>
-<h2>2. Base legal</h2>
-<p>Execução de contrato (entregar o serviço que você pediu) + legítimo interesse (segurança/anti-abuso) + consentimento (ao aceitar os Termos e ao ativar funcionalidades opcionais como upload).</p>
-<h2>3. O que NÃO coletamos (declaração de minimização)</h2>
+<p><a href="../index.html#terms">← back to the main page</a></p>
+<p><em>Generated from the canonical in-app source — do not edit here.</em></p>
+<h1>Privacy Policy (LGPD/GDPR)</h1>
+<p>_Binding text (EN)_: <strong>2026-09-09.2</strong> · updated: 2026-09-09</p>
+<p>Jurisdiction: LGPD (Lei 13.709/2018); GDPR for EU users</p>
+<h2>1. Who is the controller</h2>
+<p>For the OFFICIAL SITE (blind courier + TURN): the maintainers of the 9matesu/goongrid repository, contactable via the GitHub project. For FULL-NODES: the administrator of that server is the controller of the data it holds; the software only implements what the host runs.</p>
+<h2>2. Legal bases</h2>
+<p>Contract performance (delivering the service you asked for) + legitimate interest (security/anti-abuse) + consent (accepting the Terms and enabling optional features such as uploads).</p>
+<h2>3. What we do NOT collect (minimisation statement)</h2>
 <ul>
-<li>Nada de conteúdo: o carteiro oficial recebe apenas envelopes cifrados (XChaCha20-Poly1305) e o endereço de entrega = hash BLAKE3 da sua chave pública. Ele não sabe quem envia, o que, nem quando você leu.</li>
+<li>No content: the official courier receives only sealed envelopes (XChaCha20-Poly1305) and the delivery address = BLAKE3 hash of your public key. It cannot know who sent, what, or when you read.</li>
 </ul>
 <ul>
-<li>Nada de presença: o modo site não expõe quem está online, grafo social, perfis ou posts.</li>
+<li>No presence: site mode exposes nothing about who is online, the social graph, profiles or posts.</li>
 </ul>
 <ul>
-<li>Nada de IP: pedidos de credencial TURN usam identidade aleatória efêmera por sessão; logs de servidor registram IP redigido (último octeto cortado).</li>
+<li>No IP: TURN credential requests use an ephemeral random identity per session; server logs record redacted IPs (last octet removed).</li>
 </ul>
 <ul>
-<li>Nada de telemetria: o aplicativo não faz nenhuma requisição de analytics, crash report ou beacon para terceiros.</li>
+<li>No telemetry: the application makes zero analytics, crash-report or beacon requests to third parties.</li>
 </ul>
 <ul>
-<li>Nada de cookies: o software desktop não usa cookies; não há rastreadores.</li>
+<li>No cookies: the desktop software uses no cookies and no trackers.</li>
 </ul>
 <ul>
-<li>Nada no disco do usuário além da sessão: imagens ficam SOMENTE em memória (cache RAM expirável ao fechar); chaves e histórico ficam cifrados pelo DPAPI do Windows; respostas HTTP de conteúdo usam Cache-Control: no-store.</li>
+<li>Nothing on your disk beyond the session: images live ONLY in memory (RAM cache, gone at exit); keys and history are encrypted by the Windows DPAPI; content HTTP responses use Cache-Control: no-store.</li>
 </ul>
-<h2>4. O que É tratado, e por quem</h2>
+<h2>4. What IS processed, and by whom</h2>
 <ul>
-<li><strong>Site oficial:</strong> endereço de entrega (hash), tamanho dos envelopes, timestamps, TTL/limite por caixa (anti-flood). Finalidade: rotear. Retenção: até 7 dias (expiração) ou imediato após ack assinado.</li>
-</ul>
-<ul>
-<li><strong>Sua máquina:</strong> identidade completa, chaves, threads, salas, configurações, save do jogo. Nunca sobem ao site.</li>
+<li><strong>Official site:</strong> delivery address (hash), envelope size, timestamps, TTL/per-box caps (anti-flood). Purpose: routing. Retention: up to 7 days (expiry) or immediately after a signed ack.</li>
 </ul>
 <ul>
-<li><strong>Full-node (se você usar):</strong> ali existem postagens, perfis, DMs legadas (criptografadas com chave do SERVIDOR — o host consegue ler), economias e logs administrativos. Verifique a política do seu host.</li>
+<li><strong>Your machine:</strong> the full identity, keys, threads, rooms, settings, game save. It never leaves to the site.</li>
 </ul>
-<h2>5. Direitos do titular (art. 18 LGPD / arts. 15-22 GDPR)</h2>
-<p>Confirmação, acesso, correção, portabilidade, eliminação e revogação de consentimento exercita-se LOCALMENTE: exporte sua identidade no app (portabilidade) e apague-a (eliminação no seu dispositivo); no modo correio, seus envelopes expiram sozinhos sem intervenção. Para o site oficial, como os dados são apenas hashes e bytes cifrados, não há como associá-los a você — eliminação já está embutida na arquitetura. Para full-nodes, fale com o administrador do host.</p>
-<h2>6. Segurança</h2>
-<p>Assinatura Ed25519 em mutações com nonce anti-replay; ECIES (X25519 + XChaCha20-Poly1305 + BLAKE3 KDF); credenciais TURN HMAC de vida curta; validação de forma sem leitura de conteúdo; CSP estrita; sanitização de candidatos ICE que vazariam seu IP (mDNS/relay). Auditoria completa pública em docs/SECURITY-AUDIT.md no repositório.</p>
-<h2>7. Transferências internacionais e subprocessadores</h2>
-<p>O site oficial pode estar hospedado em nuvem fora do Brasil; o único dado processado por ela são envelopes opacos e hashes, sem chave de decifragem. Há TURN auto-hospedado; não usamos redes de terceiros para conteúdo.</p>
-<h2>8. Menores</h2>
-<p>O serviço é para maiores de 18 anos. Não coletamos dados de menores intencionalmente; não há verificação de idade.</p>
-<h2>9. Alterações</h2>
-<p>Alterações substanciais desta política exigem novo aceite no aplicativo. Versão atual: indicada acima e na tela do Centro Legal.</p>
+<ul>
+<li><strong>Full-node (if you use one):</strong> it stores posts, profiles, legacy DMs (encrypted with the SERVER key — the host can read them), economies and admin logs. Check your host's policy.</li>
+</ul>
+<h2>5. Data subject rights (art. 18 LGPD / arts. 15-22 GDPR)</h2>
+<p>Confirmation, access, rectification, portability, deletion and consent withdrawal are exercised LOCALLY: export your identity in the app (portability) and delete it (deletion on your device); in courier mode envelopes expire by themselves. For the official site, since data is only hashes and sealed bytes, it cannot be linked to you — deletion is baked into the architecture. For full-nodes, contact the host administrator.</p>
+<h2>6. Security</h2>
+<p>Ed25519 signatures on every mutation with anti-replay nonces; ECIES (X25519 + XChaCha20-Poly1305 + BLAKE3 KDF); short-lived HMAC TURN credentials; shape-only validation without content reads; strict CSP; ICE candidate sanitisation against IP leaks (mDNS/relay). Full public audit at docs/SECURITY-AUDIT.md in the repository.</p>
+<h2>7. International transfers and subprocessors</h2>
+<p>The official site may be hosted on cloud outside Brazil; the only data processed there are opaque envelopes and hashes, without any decryption key. Self-hosted TURN is optional; we never use third-party clouds for content.</p>
+<h2>8. Minors</h2>
+<p>The service is for adults (18+). We do not intentionally collect minors' data; there is no age verification.</p>
+<h2>9. Changes</h2>
+<p>Substantial changes require fresh in-app acceptance. Current version: above and in the Legal Center screen.</p>
 <hr>
-<p>Contato: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · Esta página não usa JavaScript, CSS, cookies ou analytics.</p>
+<p>Contact: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · This page uses no JavaScript, CSS, cookies or analytics.</p>
 </body>
 </html>

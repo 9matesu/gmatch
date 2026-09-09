@@ -33,23 +33,17 @@ describe('LegalCenter', () => {
   it('renders the 6-doc nav and the terms doc first', () => {
     render(<LegalCenter isOpen onClose={() => {}} initialDoc="terms" />)
     // terms selected: header subtitle shows its full title
-    expect(screen.getAllByText(/Termos de Uso/i).length).toBeGreaterThanOrEqual(2) // nav + header
-    for (const t of ['Privacidade', 'Comunidade', 'Denúncias', 'Registros', 'Criptografia']) {
+    expect(screen.getAllByText(/Terms of Use/i).length).toBeGreaterThanOrEqual(2) // nav + header
+    for (const t of ['Privacy', 'Community', 'Abuse', 'Records', 'Encryption']) {
       expect(screen.getAllByText(new RegExp(t, 'i')).length).toBeGreaterThan(0)
     }
   })
 
   it('switching nav selects another doc', () => {
     render(<LegalCenter isOpen onClose={() => {}} initialDoc="terms" />)
-    const btns = screen.getAllByRole('button', { name: /comunidade/i })
+    const btns = screen.getAllByRole('button', { name: /community/i })
     fireEvent.click(btns[0])
-    expect(screen.getByText(/Regras da Comunidade/)).toBeInTheDocument()
-  })
-
-  it('PT/EN language toggle swaps the body', () => {
-    render(<LegalCenter isOpen onClose={() => {}} initialDoc="terms" />)
-    fireEvent.click(screen.getAllByRole('button', { name: /english/i })[0])
-    expect(screen.getByText(/Terms of Use/)).toBeInTheDocument()
+    expect(screen.getByText(/Age and consent/)).toBeInTheDocument()
   })
 
   it('download emits the markdown for the active doc', () => {
@@ -62,7 +56,7 @@ describe('LegalCenter', () => {
   it('accept persists the FULL version key', async () => {
     const onAccept = vi.fn()
     render(<LegalCenter isOpen onAccept={onAccept} onClose={() => {}} initialDoc="terms" />)
-    fireEvent.click(screen.getAllByRole('button', { name: /aceito/i })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: /i accept/i })[0])
     await waitFor(() => expect(onAccept).toHaveBeenCalled())
     // The app's own gate predicate is the contract (storage-object identity
     // in jsdom varies between bare-global and window refs).
@@ -73,9 +67,9 @@ describe('LegalCenter', () => {
     // accept now, then simulate an unseen future version
     const onAccept = vi.fn()
     render(<LegalCenter isOpen onAccept={onAccept} onClose={() => {}} initialDoc="terms" />)
-    fireEvent.click(screen.getAllByRole('button', { name: /aceito/i })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: /i accept/i })[0])
     expect(isLegalAccepted()).toBe(true)
-    expect(legalVersionKey()).toContain('@2026-09-09.1')
+    expect(legalVersionKey()).toContain('@2026-09-09.2')
   })
 
   it('closed renders nothing', () => {

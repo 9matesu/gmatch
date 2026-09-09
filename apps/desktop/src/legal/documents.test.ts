@@ -1,9 +1,9 @@
 // Phase C: the legal corpus must be complete, versioned and consistent.
+// English-only binding corpus (no PT-BR anywhere in-app).
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { LEGAL_DOCS, LEGAL_IDS, LEGAL_VERSION, legalVersionKey, type LegalId } from './documents'
-import { LEGAL_DOCS_EN, EN_LEGAL_IDS } from './documents.en'
 
 describe('legal corpus (canonical source)', () => {
   const ids: LegalId[] = ['terms', 'privacy', 'community', 'abuse', 'records', 'e2e-disclaimer']
@@ -12,7 +12,7 @@ describe('legal corpus (canonical source)', () => {
     expect([...LEGAL_IDS].sort()).toEqual([...ids].sort())
   })
 
-  it('each PT doc: current version, ISO date, jurisdiction, >=4 sections', () => {
+  it('each doc: current version, ISO date, jurisdiction, >=4 sections', () => {
     for (const id of ids) {
       const d = LEGAL_DOCS[id]
       expect(d.version, id).toBe(LEGAL_VERSION)
@@ -30,23 +30,15 @@ describe('legal corpus (canonical source)', () => {
     }
   })
 
-  it('EN mirror covers the same ids with the same section counts', () => {
-    expect([...EN_LEGAL_IDS].sort()).toEqual([...LEGAL_IDS].sort())
-    for (const id of ids) {
-      const pt = LEGAL_DOCS[id].body.filter((l) => l.startsWith('## ')).length
-      const en = LEGAL_DOCS_EN[id].body.filter((l) => l.startsWith('## ')).length
-      expect(en, `${id} EN sections`).toBe(pt)
-      expect(LEGAL_DOCS_EN[id].version).toBe(LEGAL_VERSION)
-    }
-  })
-
-  it('no English-only leakage in binding PT text (smoke: most chars are PT/ASCII)', () => {
-    // crude but catches copy-paste accidents: the terms doc must mention the
-    // core Brazilian anchors
+  it('binding text is English (smoke: core anchors, no PT-BR body)', () => {
     const t = LEGAL_DOCS.terms.body.join(' ')
-    expect(t).toContain('18 anos')
-    expect(t).toContain('República Federativa do Brasil')
+    expect(t).toContain('18 years old')
+    expect(t).toContain('Federative Republic of Brazil')
     expect(LEGAL_DOCS.privacy.body.join(' ')).toContain('LGPD')
+    const all = Object.values(LEGAL_DOCS).map((d) => `${d.title} ${d.body.join(' ')}`).join(' ')
+    for (const pt of ['Você', 'Não fazemos', 'Termos de Uso', 'Política de Privacidade', 'você declara']) {
+      expect(all).not.toContain(pt)
+    }
   })
 
   it('generated public/legal/version.json mirrors the canonical key (anti-drift)', () => {

@@ -838,3 +838,21 @@ CREATE INDEX IF NOT EXISTS idx_market_status ON MarketListings(status, created_a
 -- At most one *open* listing per card; historical sold/cancelled rows do not
 -- block a future re-list.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_market_open_card ON MarketListings(card_id) WHERE status = 'open';
+
+-- ServerDirectory (plan T3, docs/ADR-002-servers.md): PUBLIC SERVER DIRECTORY —
+-- metadata only, never content. Lives on the central node; every listed server
+-- is a separate full node with its own DB. endpoint_hint is served to
+-- authenticated callers only (routes/servers.ts softAuth).
+CREATE TABLE IF NOT EXISTS ServerDirectory (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  owner_id TEXT NOT NULL,
+  owner_pubkey TEXT NOT NULL,
+  endpoint_hint TEXT NOT NULL DEFAULT '',
+  password_required INTEGER NOT NULL DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_server_dir_owner ON ServerDirectory(owner_id);
+CREATE INDEX IF NOT EXISTS idx_server_dir_seen ON ServerDirectory(last_seen);

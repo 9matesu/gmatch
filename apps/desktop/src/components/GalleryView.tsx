@@ -47,6 +47,10 @@ export interface GalleryViewProps {
   onOpenOwnerProfile?: (ownerId: string) => void;
   onOpenProfile?: (userId: string) => void;
   onOpenCreateCard?: () => void;
+  onCreateCardFromMedia?: (media: { url: string; tags: string[]; name: string }) => void;
+  /** Right-click on a collection card → shared context menu. */
+  onItemContextMenu?: (e: React.MouseEvent, item: OrbitObject) => void;
+  onSetWallpaper?: (url: string) => void;
 }
 
 export function GalleryView({
@@ -83,6 +87,9 @@ export function GalleryView({
   onOpenOwnerProfile,
   onOpenProfile,
   onOpenCreateCard,
+  onCreateCardFromMedia,
+  onItemContextMenu,
+  onSetWallpaper,
 }: GalleryViewProps) {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [showSlideshows, setShowSlideshows] = useState(false);
@@ -99,12 +106,12 @@ export function GalleryView({
             </div>
             <div>
               <h2 className="text-xs font-bold text-retro-fg uppercase tracking-wider">
-                Babecock keepsakes ({idleKeepsakes.length})
+                Gallery ({idleKeepsakes.length})
               </h2>
-              <p className="text-[10px] text-retro-muted">Idle spoils from the Grid — re-feature them or set an app backdrop</p>
+              <p className="text-[10px] text-retro-muted">Idle spoils from the Grid — view them, set a backdrop, or turn them into cards</p>
             </div>
           </div>
-          <IdleGalleryView />
+          <IdleGalleryView onCreateCard={onCreateCardFromMedia} onSetWallpaper={onSetWallpaper} />
         </div>
       )}
       <div className="bg-surface-raised border border-border-glass rounded-2xl overflow-hidden shadow-xl">
@@ -260,17 +267,19 @@ export function GalleryView({
           </button>
         </div>
 
-        <div className="p-4 sm:p-6">
+      </div>
+
+      <div className="bg-surface-raised border border-border-glass rounded-lg p-4">
           {itemsLoading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {Array.from({ length: 12 }).map((_, i) => <CardSkeleton key={i} />)}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {Array.from({ length: 10 }).map((_, i) => <CardSkeleton key={i} />)}
             </div>
           ) : filteredItems.length === 0 ? (
             <EmptyState title="No cards found" description="Upload images, battle in the duel arena, or open lootboxes to expand your deck!" />
           ) : (
             <>
               <div
-                className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 select-none"
+                className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 select-none"
                 onMouseDown={() => setDragActive(true)}
                 onMouseUp={() => { setDragActive(false); setDragAnchorId(null) }}
                 onMouseLeave={() => { setDragActive(false); setDragAnchorId(null) }}
@@ -279,43 +288,47 @@ export function GalleryView({
                 }}
               >
                 {paginatedItems.map(item => (
-                  <CardTile
+                  <div
                     key={item.id}
-                    item={item as any}
-                    dragActive={dragActive}
-                    selected={selectedGalleryIds.has(item.id)}
-                    onClick={() => {
-                      const cardId = cardByMedia?.get(item.id)
-                      if (cardId) setSelectedCardId(cardId)
-                    }}
-                    onDoubleClick={() => setExpandedItemId(item.id)}
-                    onSelect={(id) => {
-                      if (dragAnchorId) {
-                        const ids = paginatedItems.map(i => i.id)
-                        const ai = ids.indexOf(dragAnchorId)
-                        const bi = ids.indexOf(id)
-                        if (ai > -1 && bi > -1) {
-                          const lo = Math.min(ai, bi)
-                          const hi = Math.max(ai, bi)
-                          const next = new Set<string>(selectedGalleryIds)
-                          for (let i = lo; i <= hi; i++) next.add(ids[i])
-                          setSelectedGalleryIds(next)
-                          setDragAnchorId(id)
-                          return
+                    onContextMenu={(e) => { if (onItemContextMenu) { e.preventDefault(); onItemContextMenu(e, item) } }}
+                  >
+                    <CardTile
+                      item={item as any}
+                      dragActive={dragActive}
+                      selected={selectedGalleryIds.has(item.id)}
+                      onClick={() => {
+                        const cardId = cardByMedia?.get(item.id)
+                        if (cardId) setSelectedCardId(cardId)
+                      }}
+                      onDoubleClick={() => setExpandedItemId(item.id)}
+                      onSelect={(id) => {
+                        if (dragAnchorId) {
+                          const ids = paginatedItems.map(i => i.id)
+                          const ai = ids.indexOf(dragAnchorId)
+                          const bi = ids.indexOf(id)
+                          if (ai > -1 && bi > -1) {
+                            const lo = Math.min(ai, bi)
+                            const hi = Math.max(ai, bi)
+                            const next = new Set<string>(selectedGalleryIds)
+                            for (let i = lo; i <= hi; i++) next.add(ids[i])
+                            setSelectedGalleryIds(next)
+                            setDragAnchorId(id)
+                            return
+                          }
                         }
-                      }
-                      setDragAnchorId(id)
-                      setSelectedGalleryIds((prev) => {
-                        const next = new Set(prev)
-                        if (next.has(id)) next.delete(id)
-                        else next.add(id)
-                        return next
-                      })
-                    }}
-                    users={users}
-                    identity={identity}
-                    onOpenOwnerProfile={onOpenOwnerProfile}
-                  />
+                        setDragAnchorId(id)
+                        setSelectedGalleryIds((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(id)) next.delete(id)
+                          else next.add(id)
+                          return next
+                        })
+                      }}
+                      users={users}
+                      identity={identity}
+                      onOpenOwnerProfile={onOpenOwnerProfile}
+                    />
+                  </div>
                 ))}
               </div>
 
@@ -363,7 +376,6 @@ export function GalleryView({
               </div>
             </>
           )}
-        </div>
       </div>
     </div>
 

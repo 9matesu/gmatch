@@ -5,6 +5,8 @@ import type { User, OrbitObject, ActiveHackDebuff } from '@orbit/shared';
 import type { AppSettings } from '../hooks/useSettings';
 import { Modal } from './Modal';
 import { DropZone } from './DropZone';
+import { useCropper } from '../hooks/useCropper';
+import { isCropableImage } from './CropModal';
 import { IdentityModal } from './IdentityModal';
 import { HelpModal } from './HelpModal';
 import { PointsHelpModal } from './PointsHelpModal';
@@ -168,6 +170,18 @@ export function GlobalModals(props: GlobalModalsProps) {
     lobby,
   } = props;
 
+  const { crop, cropper } = useCropper();
+
+  // Stories are shown in a 9:16 tray — crop up front, like Instagram.
+  const handleAddStoryCropped = async (file: File) => {
+    if (isCropableImage(file)) {
+      const res = await crop(file, { aspect: '9:16', title: 'Crop story' });
+      if (!res) return;
+      if (res.file) { handleAddStory(res.file); return; }
+    }
+    handleAddStory(file);
+  };
+
   return (
     <>
       <IdentityModal
@@ -228,7 +242,7 @@ export function GlobalModals(props: GlobalModalsProps) {
           </p>
           <DropZone
             compact
-            onFiles={(list) => { if (list[0]) handleAddStory(list[0]) }}
+            onFiles={(list) => { if (list[0]) void handleAddStoryCropped(list[0]) }}
           >
             <div className="text-[11px] text-retro-fg flex items-center justify-center gap-2">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-retro-accent"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
@@ -241,7 +255,7 @@ export function GlobalModals(props: GlobalModalsProps) {
             accept="image/*"
             onChange={(e) => {
               const file = e.target.files?.[0]
-              if (file) handleAddStory(file)
+              if (file) void handleAddStoryCropped(file)
             }}
             className="hidden"
           />
@@ -408,6 +422,7 @@ export function GlobalModals(props: GlobalModalsProps) {
           toast={toast}
         />
       )}
+      {cropper}
     </>
   );
 }

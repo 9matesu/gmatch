@@ -164,7 +164,7 @@ export default function GoonPanel() {
   )
 
   return (
-    <section className={`${PLATE} ${PANEL} flex flex-col gap-3 overflow-hidden`}>
+    <section className={`${PLATE} ${PANEL} flex flex-col gap-2 overflow-hidden`}>
       {isGrid ? (
         <div
           className={`${STAGE_FRAME} relative min-h-0 flex-1 grid auto-rows-fr grid-cols-3 gap-2 p-2`}
@@ -249,11 +249,11 @@ export default function GoonPanel() {
           {grid.length === 0 && (
             <OfflineCard fetching={fetching} feedOffline={feedOffline} onRetry={() => void fetchFeed()} />
           )}
-          {!feedOffline && grid.length > 0 && (
+          {grid.length > 0 && (
             <>
               <button
                 type="button"
-                className="glass-button absolute left-2.5 top-1/2 z-[4] flex h-16 w-[46px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-35"
+                className="glass-button absolute left-2.5 top-1/2 z-[4] flex h-20 w-12 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-35"
                 aria-label="Previous image"
                 title={canGridBack ? 'Back to the previous board' : 'Nothing behind you yet'}
                 disabled={!canGridBack}
@@ -263,7 +263,7 @@ export default function GoonPanel() {
               </button>
               <button
                 type="button"
-                className="glass-button absolute right-2.5 top-1/2 z-[4] flex h-16 w-[46px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100"
+                className="glass-button absolute right-2.5 top-1/2 z-[4] flex h-20 w-12 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100"
                 aria-label="Next image"
                 title="Skip this round — no reward"
                 onClick={() => skipGrid()}
@@ -288,6 +288,16 @@ export default function GoonPanel() {
           }}
         >
           {critFlashEl}
+          {/* Blurred cover fill so the stage reads as an image, not a
+              letterbox — the foreground stays 100% visible (object-contain). */}
+          {!showOffline && (
+            <img
+              src={src}
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl select-none"
+            />
+          )}
           {isMotion && current ? (
             <video
               className={GOON_IMAGE}
@@ -319,25 +329,22 @@ export default function GoonPanel() {
           {showOffline && (
             <OfflineCard fetching={fetching} feedOffline={feedOffline} onRetry={() => void fetchFeed()} />
           )}
-          {!showOffline && (
-            <button
-              type="button"
-              className="glass-button absolute left-2.5 top-1/2 flex h-16 w-[46px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-35"
-              aria-label="Previous image"
-              title={canGoBack ? 'Back to the skipped foe' : 'Nothing behind you yet'}
-              disabled={!canGoBack}
-              onClick={(e) => {
-                e.stopPropagation()
-                goBack()
-              }}
-            >
-              <IconChevronL size={26} />
-            </button>
-          )}
-          {!showOffline && (
-            <button
-              type="button"
-              className="glass-button absolute right-2.5 top-1/2 flex h-16 w-[46px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100"
+          <button
+            type="button"
+            className="glass-button absolute left-2.5 top-1/2 z-[5] flex h-20 w-12 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-35"
+            aria-label="Previous image"
+            title={canGoBack ? 'Back to the skipped foe' : 'Nothing behind you yet'}
+            disabled={!canGoBack}
+            onClick={(e) => {
+              e.stopPropagation()
+              goBack()
+            }}
+          >
+            <IconChevronL size={26} />
+          </button>
+          <button
+            type="button"
+            className="glass-button absolute right-2.5 top-1/2 z-[5] flex h-20 w-12 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100"
               aria-label="Next image"
               title="Skip this foe — no reward"
               onClick={(e) => {
@@ -346,8 +353,7 @@ export default function GoonPanel() {
               }}
             >
               <IconChevronR size={26} />
-            </button>
-          )}
+          </button>
           {floats
             .filter((f) => f.cell === null)
             .map((f) => (
@@ -361,7 +367,7 @@ export default function GoonPanel() {
             ))}
         </div>
       )}
-      <div className="flex flex-none items-center gap-2.5 rounded-[10px] border border-border-glass bg-retro-bg px-3 py-2">
+      <div className="flex flex-none items-center gap-2 rounded-[10px] border border-border-glass bg-retro-bg px-2 py-1.5">
         <div
           className="inline-flex flex-none overflow-hidden rounded-lg border border-border-glass"
           role="group"
@@ -399,7 +405,7 @@ export default function GoonPanel() {
             <div className={`${HP_BAR} flex-1`}>
               <div className={`${HP_FILL} ${hpPct <= 30 ? HP_FILL_LOW : ''}`} style={{ width: `${hpPct}%` }} />
             </div>
-            <span className={`${MONO} whitespace-nowrap text-[11px] text-retro-muted`}>
+            <span className={`${MONO} whitespace-nowrap text-[10px] text-retro-muted`}>
               {formatNum(Math.ceil(foeHp))}/{formatNum(foeMaxHp)} HP
             </span>
           </div>
@@ -428,7 +434,7 @@ export default function GoonPanel() {
           </button>
         )}
         <span
-          className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border-glass bg-retro-bg px-2.5 py-1 text-xs font-bold text-retro-fg [&_svg]:text-retro-accent`}
+          className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border-glass bg-retro-bg px-2 py-0.5 text-[11px] font-bold text-retro-fg [&_svg]:text-retro-accent`}
           title="Lifetime KOs — each foe hits harder"
         >
           KOs: {formatNum(defeated)}
@@ -444,7 +450,7 @@ export default function GoonPanel() {
             <button
               key={id}
               type="button"
-              className={`${SKIN} flex cursor-pointer flex-col gap-0.5 rounded-[10px] border border-border-glass bg-surface-elevated p-2 text-left text-retro-fg shadow-sm transition-[transform,box-shadow,border-color] duration-75 enabled:hover:border-retro-accent enabled:active:translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none ${
+              className={`${SKIN} flex cursor-pointer flex-col gap-0 rounded-[10px] border border-border-glass bg-surface-elevated p-1.5 text-left text-retro-fg shadow-sm transition-[transform,box-shadow,border-color] duration-75 enabled:hover:border-retro-accent enabled:active:translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none ${
                 isLive
                   ? 'border-[#ff2d78] shadow-[0_0_12px_rgba(255,45,120,0.35)]'
                   : ''
@@ -456,15 +462,15 @@ export default function GoonPanel() {
               onClick={() => popCap(id)}
               title={`${def.name} — ${capEffectLabel(id)} — ${formatNum(def.cost)} g$ — permanent, pops stack${st.count > 0 ? ` (x${st.count} live)` : ''}`}
             >
-              <span className={`${DISPLAY} text-[11px] font-bold tracking-[0.5px]`}>
+              <span className={`${DISPLAY} text-[10px] font-bold tracking-[0.5px]`}>
                 {def.name}
                 {st.count > 1 ? ` x${st.count}` : ''}
               </span>
-              <span className={`text-[10px] ${isLive ? 'text-retro-fg' : 'text-retro-muted'}`}>
+              <span className={`text-[9px] leading-tight ${isLive ? 'text-retro-fg' : 'text-retro-muted'}`}>
                 {capEffectLabel(id)}
               </span>
-              <span className={`${MONO} text-[11px] text-retro-muted`}>{formatNum(def.cost)} g$</span>
-              <span className={`${MONO} min-h-[14px] text-[11px] font-bold text-[#ff2d78]`}>
+              <span className={`${MONO} text-[10px] text-retro-muted`}>{formatNum(def.cost)} g$</span>
+              <span className={`${MONO} min-h-[12px] text-[10px] font-bold text-[#ff2d78]`}>
                 {isLive ? '∞' : ''}
               </span>
             </button>

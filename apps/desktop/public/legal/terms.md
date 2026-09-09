@@ -1,58 +1,58 @@
-# Termos de Uso
+# Terms of Use
 
-_Versão vinculante (PT-BR)_: **2026-09-09.1** · atualizado/updated: 2026-09-09
-Jurisdição: Brasil (LGPD) — usuários internacionais também sujeitos ao GDPR onde aplicável
+_Binding text (EN)_: **2026-09-09.2** · updated: 2026-09-09
+Jurisdiction: Brazil (LGPD); GDPR applies additionally where applicable
 
-## 1. Elegibilidade e idade
+## 1. Eligibility and age
 
-O gMatch é um aplicativo para adultos. Você deve ter pelo menos 18 anos (ou a maioridade na sua jurisdição, se superior) para acessar, baixar ou usar o software. Ao aceitar estes Termos você declara e garante que cumpre esse requisito. Não fazemos verificação de idade: a declaração é sua, e a falsidade dela é responsabilidade sua.
+gMatch is an adults-only application. You must be at least 18 years old (or the age of majority in your jurisdiction, if higher) to access, download or use the software. By accepting these Terms you represent and warrant that you meet this requirement. We perform no age verification: the declaration is yours and its falsity is your liability.
 
-## 2. O que é o software
+## 2. What the software is
 
-O gMatch é um software de código aberto, auto-hospedável, para rede social adulta com jogabilidade (cartas, duelo, sala de ocioso) e comunicação ponto a ponto com criptografia de ponta a ponta. Quem distribui o binário fornece o SOFTWARE; não administra, não edita e não hospeda o conteúdo que você publica ou troca.
+gMatch is open-source, self-hostable software for an adult social network with gameplay (cards, duel, idle) and end-to-end-encrypted peer-to-peer communication. Whoever distributes the binary provides the SOFTWARE; it does not administer, edit or host the content you publish or exchange.
 
-## 3. Conta, chaves e autocustódia
+## 3. Accounts, keys and self-custody
 
-- Sua conta é um par de chaves criptográficas gerado e mantido NO SEU DISPOSITIVO.
+- Your account is a cryptographic keypair generated and held ON YOUR DEVICE.
 
-- Ninguém — nem os autores do software — pode redefinir sua senha, recuperar sua conta ou acessar seus dados sem a sua chave.
+- Nobody — not even the authors — can reset your password, recover your account or access your data without your key.
 
-- Perdeu o backup da chave? A conta e o histórico local estão perdidos. Isto é um recurso de privacidade, não um defeito, e não há suporte que o reverta.
+- Lose the key backup and the account and local history are gone. This is a privacy feature, not a bug, and no support flow can reverse it.
 
-- Você é o único responsável por guardar suas chaves e por manter seu dispositivo seguro.
+- You are solely responsible for safeguarding your keys and your device.
 
-## 4. Modos de operação e confiança
+## 4. Operating modes and trust
 
-O app funciona em dois modos com modelos de confiança diferentes:
+The app runs in two modes with different trust models:
 
-- **Site oficial / correio (courier):** o servidor público funciona apenas como carteiro cego. Ele encaminha envelopes cifrados que NÃO consegue abrir e nunca vê conteúdo, identidade de conversa, presença ou grafo social.
+- **Official site / courier:** the public server works only as a blind postman. It forwards encrypted envelopes it CANNOT open and never sees content, conversation identities, presence or the social graph.
 
-- **Full-node (servidor próprio ou de terceiros):** você conecta a um servidor completo que VOCÊ (ou quem o hospeda) administra. Nesse modo, o administrador do servidor pode ler mensagens privadas legadas e dados de post conforme a arquitetura descrita na Política de Privacidade. Conectar-se ao full-node de um terceiro é escolha sua e cria uma relação de confiança entre você e esse host.
+- **Full-node (your own or a third-party server):** you connect to a complete server that YOU (or whoever hosts it) administer. In this mode the server operator can read legacy private messages and post data as described in the Privacy Policy. Connecting to a third-party full-node is your choice and creates a trust relationship with that host.
 
-## 5. Conduta
+## 5. Conduct
 
-É proibido usar o software para: conteúdo ilegal (incluindo material de abuso sexual infantil, conteúdo envolvendo menores ou pessoas que não possam consentir, zoofilia, incesto real não-consensual e violência não-consensual); assédio, stalking ou intimidação; spam ou automação abusiva; tentativa de desanonimizar outros usuários; exploração do sistema de reputação/moeda para fraude.
+The software may not be used for: illegal content (including child sexual abuse material, content involving minors or persons unable to consent, bestiality, real non-consensual incest and non-consensual violence); harassment, stalking or intimidation; spam or abusive automation; attempts to de-anonymize other users; exploiting the reputation/currency system for fraud.
 
-O cliente aplica uma lista técnica de bloqueio de tags de conteúdo. Isso é mitigação, não garantia: o controle final do que entra no seu dispositivo é seu.
+The client enforces a technical content-tag blocklist. It is a mitigation, not a guarantee: what reaches your device is ultimately your control.
 
-## 6. Conteúdo do usuário e licenças
+## 6. User content and licenses
 
-Você mantém a titularidade do que publica. Ao publicar, você concede aos demais usuários a licença pessoal, não-exclusiva e revogável de visualizar o conteúdo DENTRO do aplicativo, e aos destinatários de DMs a licença de armazenar cópias locais (o app não controla o que um receptor faz com o que recebeu — não existe DRM de ponta a ponta que o faça).
+You keep ownership of what you publish. By publishing you grant other users a personal, non-exclusive, revocable license to view the content WITHIN the application, and DM recipients a license to keep local copies (the app cannot control what a recipient does with what it received — no end-to-end DRM exists).
 
-Você declara que tem o direito de publicar o que envia (inclusive autorizações das pessoas retratadas quando a lei exigir).
+You declare you have the right to publish what you send (including model releases where the law requires them).
 
-## 7. Encerramento
+## 7. Termination
 
-Você pode sair a qualquer momento: apague o aplicativo e a conta desaparece do seu lado; no modo correio, envelopes não consumidos expiram por TTL e somem. Não podemos "excluir você de um servidor" que não é nosso nem apagar dados que nunca tivemos.
+You may leave at any time: delete the app and the account disappears from your side; in courier mode un-consumed envelopes expire by TTL and vanish. We cannot "delete you from a server" that is not ours, nor purge data we never had.
 
-## 8. Limitação de responsabilidade
+## 8. Limitation of liability
 
-O software é fornecido "no estado em que se encontra", sem garantias de qualquer tipo, na máxima extensão permitida pela lei brasileira. Os autores e distribuidores NÃO respondem por: (a) conteúdo gerado ou compartilhado por usuários; (b) perda de dados por falha de backup do usuário; (c) indisponibilidade ou mau funcionamento de servidores de terceiros; (d) danos indiretos, lucros cessantes ou conteúdo ofensivo visto em full-nodes de terceiros. Em nenhuma hipótese a responsabilidade dos autores excede o valor pago pelo software (zero).
+The software is provided "as is" and "as available" without warranties of any kind, to the maximum extent permitted by Brazilian law. The authors and distributors are NOT liable for: (a) content generated or shared by users; (b) data loss due to missing user backups; (c) unavailability or misbehaviour of third-party servers; (d) indirect damages, lost profits or offensive content seen on third-party full-nodes. In no event shall the authors' liability exceed the price paid for the software (zero).
 
-## 9. Alterações
+## 9. Changes
 
-Estes Termos têm versão publicada (acima). Alterações substanciais exigirão novo aceite no aplicativo da sua conta no próximo login após a mudança. A versão aceita fica registrada localmente.
+These Terms carry a published version (above). Substantial changes require a fresh in-app acceptance by your account on the first login after the change. The accepted version is recorded locally.
 
-## 10. Foro e lei aplicável
+## 10. Governing law and venue
 
-Estes Termos são regidos pela legislação da República Federativa do Brasil. Fica eleito o foro da comarca do domicílio do usuário para controvérsias, respeitados os direitos do consumidor.
+These Terms are governed by the laws of the Federative Republic of Brazil. The venue is the domicile of the user, respecting consumer rights.

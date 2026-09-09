@@ -36,6 +36,9 @@ export function GalleryTabView({
   dragAnchorId,
   setDragAnchorId,
   onOpenCreateCard,
+  onCreateCardFromMedia,
+  onItemContextMenu,
+  onSetWallpaper,
   users,
   identity,
   setExpandedItemId,
@@ -71,6 +74,9 @@ export function GalleryTabView({
   dragAnchorId: string | null;
   setDragAnchorId: (id: string | null) => void;
   onOpenCreateCard: () => void;
+  onCreateCardFromMedia?: (media: { url: string; tags: string[]; name: string }) => void;
+  onItemContextMenu?: (e: React.MouseEvent, item: OrbitObject) => void;
+  onSetWallpaper?: (url: string) => void;
   users: User[];
   identity: OrbitIdentity;
   setExpandedItemId: (id: string | null) => void;
@@ -82,7 +88,7 @@ export function GalleryTabView({
   onEnterArena: () => void;
 }) {
   return (
-    <div className="space-y-4">
+    <div className="p-3 sm:p-4 max-w-6xl mx-auto w-full space-y-4">
       <GalleryView
         filteredItems={filteredItems}
         itemsLoading={itemsLoading}
@@ -109,6 +115,9 @@ export function GalleryTabView({
         dragAnchorId={dragAnchorId}
         setDragAnchorId={setDragAnchorId}
         onOpenCreateCard={onOpenCreateCard}
+        onCreateCardFromMedia={onCreateCardFromMedia}
+        onItemContextMenu={onItemContextMenu}
+        onSetWallpaper={onSetWallpaper}
         users={users}
         identity={identity}
         setExpandedItemId={setExpandedItemId}

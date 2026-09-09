@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { useCropper } from '../../hooks/useCropper';
 import { playPress, playWin, playMsgReceive } from '../../utils/sounds';
 import {
   Heart,
@@ -201,6 +203,7 @@ export function GMatchFeed({
   onRefreshNotifications,
   onOpenNotifications,
   onOpenNetwork,
+  onUserContext,
 }: {
   identity: OrbitIdentity | null;
   posts: FeedPost[];
@@ -241,6 +244,7 @@ export function GMatchFeed({
   onRefreshNotifications?: () => void;
   onOpenNotifications?: () => void;
   onOpenNetwork?: (userId: string) => void;
+  onUserContext?: (e: React.MouseEvent, userId: string, displayName: string) => void;
 }) {
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [savedPosts, setSavedPosts] = useState<Record<string, boolean>>({});
@@ -288,6 +292,7 @@ export function GMatchFeed({
 
   // Post Creator State (Multi-media + optional tags)
   const [postCreatorMedia, setPostCreatorMedia] = useState<string[]>([]);
+  const { crop: cropCameraShot, cropper: cameraCropper } = useCropper();
   const [postCreatorCaption, setPostCreatorCaption] = useState('');
   const [postCreatorTags, setPostCreatorTags] = useState<string[]>([]);
 
@@ -570,6 +575,21 @@ export function GMatchFeed({
 
   return (
     <div className="w-full flex flex-col font-sans select-none pb-12 text-retro-fg">
+      {/* Stories Tray Carousel — topmost section of the feed */}
+      <div className="bg-transparent border-b border-border-glass py-3 px-1">
+        <GMatchStories
+          stories={stories}
+          loading={storiesLoading}
+          currentUserId={identity?.orbitId || ''}
+          identity={identity}
+          activeUserId={activeStoryUserId}
+          onCloseActiveUser={onActiveStoryClose || (() => {})}
+          onAddStory={onAddStory || (() => setShowCameraModal(true))}
+          profilePics={profilePics}
+          onStartPm={onStartPm}
+        />
+      </div>
+
       {/* Feed Top Header - Seamless, 0 upper gap, sticky with navigation */}
       <FeedHeader
         unreadCount={unreadCount}
@@ -587,23 +607,8 @@ export function GMatchFeed({
         onOpenDMs={onOpenDMs}
       />
 
-      {/* Feed Content Column (Stories + Posts) */}
+      {/* Feed Content Column (Posts) */}
       <div className="w-full max-w-[1400px] mx-auto flex flex-col px-2 sm:px-4 py-2 space-y-4">
-        {/* Stories Tray Carousel */}
-        <div className="bg-transparent border-b border-border-glass py-3 px-1">
-          <GMatchStories
-            stories={stories}
-            loading={storiesLoading}
-            currentUserId={identity?.orbitId || ''}
-            identity={identity}
-            activeUserId={activeStoryUserId}
-            onCloseActiveUser={onActiveStoryClose || (() => {})}
-            onAddStory={onAddStory || (() => setShowCameraModal(true))}
-            profilePics={profilePics}
-            onStartPm={onStartPm}
-          />
-        </div>
-
         {/* Feed Sort / Filter Bar */}
         <div className="flex items-center justify-between px-3 sm:px-6 py-2 gap-2 border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm sticky top-[57px] z-20">
           <div className="flex items-center gap-1 text-xs">
@@ -675,7 +680,7 @@ export function GMatchFeed({
 
                 {/* Ad Visual */}
                 <div
-                  className={`relative w-full aspect-square bg-gradient-to-br ${GAME_AD_TEMPLATES.find((t) => t.mode === post.game_mode)?.gradient || 'from-zinc-800 to-zinc-900'} flex flex-col items-center justify-center text-white overflow-hidden`}
+                  className={`relative w-full aspect-[4/5] max-h-[65vh] bg-gradient-to-br ${GAME_AD_TEMPLATES.find((t) => t.mode === post.game_mode)?.gradient || 'from-zinc-800 to-zinc-900'} flex flex-col items-center justify-center text-white overflow-hidden`}
                 >
                   {(() => {
                     const AdIcon = (post.game_mode && AD_ICON_MAP[post.game_mode]) || Gamepad2;
@@ -726,6 +731,7 @@ export function GMatchFeed({
                   <div
                     className="flex items-center gap-2.5 cursor-pointer group"
                     onClick={() => handleAvatarClick(post.author_id)}
+                    onContextMenu={(e) => onUserContext?.(e, post.author_id, post.author_name)}
                     title={authorHasStory ? 'Watch story' : 'View profile'}
                   >
                     <div className={`w-8 h-8 rounded-full p-[1.5px] flex-shrink-0 ${authorHasStory ? 'bg-gradient-to-tr from-zinc-300 to-zinc-600' : 'bg-zinc-800 border border-zinc-700'}`}>
@@ -762,7 +768,7 @@ export function GMatchFeed({
 
                 {/* Post Media with Click to Lightbox & Double Tap Like */}
                 <div
-                  className="relative w-full aspect-square bg-surface-canvas flex items-center justify-center overflow-hidden cursor-pointer rounded-none"
+                  className="relative w-full aspect-[4/5] max-h-[65vh] bg-surface-canvas flex items-center justify-center overflow-hidden cursor-pointer rounded-none"
                   onClick={() => {
                     playPress(700);
                     setActiveLightboxPost(post);
@@ -1030,8 +1036,8 @@ export function GMatchFeed({
         </div>
       </div>
 
-      {/* ─── MODAL 1: Share Post to DMs or Groups ─── */}
-      {sharingPost && (
+      {/* ─── MODAL 1: Share Post to DMs or Groups (portaled: immune to ancestor filters) ─── */}
+      {sharingPost && createPortal(
         <SharePostModal
           post={sharingPost}
           onClose={() => setSharingPost(null)}
@@ -1040,11 +1046,12 @@ export function GMatchFeed({
           userNames={Object.fromEntries(users.map((u) => [u.id, u.display_name || '']))}
           identity={identity}
           toast={toast}
-        />
+        />,
+        document.body,
       )}
 
-      {/* ─── MODAL 2: Comments Slide-Up Sheet ─── */}
-      {activeCommentsPost && (
+      {/* ─── MODAL 2: Comments Slide-Up Sheet (portaled) ─── */}
+      {activeCommentsPost && createPortal(
 <CommentsModal
             post={activeCommentsPost}
             onClose={() => setActiveCommentsPostId(null)}
@@ -1055,11 +1062,12 @@ export function GMatchFeed({
             onAvatarClick={handleAvatarClick}
             onReportComment={onReportComment}
             toast={toast}
-          />
+          />,
+        document.body,
       )}
 
-      {/* ─── MODAL 3: Post Options Action Sheet ─── */}
-      {optionsPost && (
+      {/* ─── MODAL 3: Post Options Action Sheet (portaled) ─── */}
+      {optionsPost && createPortal(
         <PostOptionsModal
           post={optionsPost}
           onClose={() => setOptionsPost(null)}
@@ -1071,17 +1079,19 @@ export function GMatchFeed({
           onDelete={(id) => { onDeletePostApi?.(id); onDeletePost?.(id); }}
           onReport={(p) => setReportingPost(p)}
           toast={toast}
-        />
+        />,
+        document.body,
       )}
 
-      {/* ─── MODAL 4: Report Post Category Selection ─── */}
-      {reportingPost && (
+      {/* ─── MODAL 4: Report Post Category Selection (portaled) ─── */}
+      {reportingPost && createPortal(
         <ReportPostModal
           post={reportingPost}
           onClose={() => setReportingPost(null)}
           onReport={onPersistReport}
           toast={toast}
-        />
+        />,
+        document.body,
       )}
 
       {/* ─── MODAL 5: 2-Column Instagram Lightbox Post Modal with Zoom & Real Comments ─── */}
@@ -1119,18 +1129,24 @@ export function GMatchFeed({
         toast={toast}
       />
 
-      {/* ─── MODAL 6: Live Camera Snapshot Modal ─── */}
+      {/* ─── MODAL 6: Live Camera Snapshot Modal (portaled) ─── */}
+      {createPortal(
       <LiveCameraModal
         isOpen={showCameraModal}
         onClose={() => setShowCameraModal(false)}
-        onCapture={(dataUrl) => {
-          setPostCreatorMedia((prev) => (prev.length < 5 ? [...prev, dataUrl] : prev));
+        onCapture={async (dataUrl) => {
+          const res = await cropCameraShot(dataUrl, { aspect: '4:5', title: 'Crop post image' });
+          if (!res) return;
+          setPostCreatorMedia((prev) => (prev.length < 5 ? [...prev, res.dataUrl] : prev));
           setShowCustomPostCreator(true);
         }}
         toast={toast}
-      />
+      />,
+      document.body,
+      )}
 
-      {/* ─── MODAL 6b: Explore / Search ─── */}
+      {/* ─── MODAL 6b: Explore / Search (portaled) ─── */}
+      {createPortal(
       <ExploreSearchModal
         isOpen={showExploreSearch}
         onClose={() => setShowExploreSearch(false)}
@@ -1148,9 +1164,12 @@ export function GMatchFeed({
         }}
         onStartPm={onStartPm}
         toast={toast}
-      />
+      />,
+      document.body,
+      )}
 
-      {/* ─── MODAL 7: Multi-Media Post Creator with Mandatory Tags ─── */}
+      {/* ─── MODAL 7: Multi-Media Post Creator with Mandatory Tags (portaled) ─── */}
+      {createPortal(
       <PostCreatorModal
         isOpen={showCustomPostCreator}
         onClose={() => setShowCustomPostCreator(false)}
@@ -1163,7 +1182,10 @@ export function GMatchFeed({
         onOpenCamera={() => setShowCameraModal(true)}
         onPublish={onPublishPost}
         toast={toast}
-      />
+      />,
+      document.body,
+      )}
+      {cameraCropper && createPortal(cameraCropper, document.body)}
     </div>
   );
 }

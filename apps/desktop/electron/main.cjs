@@ -5,6 +5,7 @@ const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage } = requ
 const https = require('https')
 const path = require('path')
 const imageCache = require('./imageCache.cjs')
+const customFolders = require('./customFolders.cjs')
 const { createSecureStore } = require('./secureStore.cjs')
 const apiSidecar = require('./apiSidecar.cjs')
 const serverMode = require('./server-mode.cjs')
@@ -62,6 +63,11 @@ let packagedServer = null // { mode, url } when app.isPackaged
 protocol.registerSchemesAsPrivileged([
   {
     scheme: imageCache.SCHEME,
+    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
+  },
+  {
+    // Player-owned idle folders: <img>/<video> + fetch (mint re-upload).
+    scheme: customFolders.SCHEME,
     privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
   },
 ])
@@ -616,6 +622,7 @@ app.whenReady().then(async () => {
   const secureAvailable = initSecureKV()
   imageCache.init(app.getPath('userData'), UA)
   protocol.handle(imageCache.SCHEME, (request) => imageCache.serveImage(request))
+  customFolders.init(app.getPath('userData'), { ipcMain, BrowserWindow })
   ipcMain.handle('booru:fetch', (_event, payload) => fetchBooru(payload ?? {}))
   // Secure KV bridge (B.3): renderer proxies designated localStorage keys here.
   ipcMain.handle('secure:available', () => secureAvailable)

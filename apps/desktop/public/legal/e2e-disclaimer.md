@@ -1,32 +1,32 @@
-# Declaração sobre Criptografia e Autocustódia
+# Encryption & Self-Custody Disclaimer
 
-_Versão vinculante (PT-BR)_: **2026-09-09.1** · atualizado/updated: 2026-09-09
-Jurisdição: Explicação técnica vinculada ao art. 8 dos Termos
+_Binding text (EN)_: **2026-09-09.2** · updated: 2026-09-09
+Jurisdiction: Technical explanation tied to Terms §8
 
-## 1. O que o servidor oficial NUNCA vê
+## 1. What the official server NEVER sees
 
-Conteúdo de DMs, posts, salas ou nomes; quem conversa com quem (o carteiro roteia hashes, você conecta seu ID à sua caixa localmente); quem está online; a sua imagem, seu texto, seu histórico.
+DM/post/room content or names; who talks to whom (the courier routes hashes — you map IDs to your box locally); who is online; your images, text or history.
 
-## 2. O que ele vê
+## 2. What it DOES see
 
-O endereço de entrega (hash da sua chave pública) com metadados mínimos (tamanho, hora, TTL) e pedidos anônimos de credencial TURN.
+The delivery address (hash of your public key) with minimal metadata (size, time, TTL) and anonymous TURN credential requests.
 
-## 3. Chaves: o que autocustódia significa
+## 3. Keys: what self-custody means
 
-Suas chaves privadas vivem apenas no seu dispositivo (cifradas pelo DPAPI do Windows quando disponível). Não há servidor com "esqueci minha senha". Quem perde o backup perde a conta — sem exceção.
+Private keys live only on your device (DPAPI-encrypted on Windows when available). No server can "reset my password". Lose the backup, lose the account — no exceptions.
 
-## 4. TOFU (web-of-trust por primeira aparição)
+## 4. TOFU (trust-on-first-use)
 
-Ao cifrar a primeira conversa, o app FIXA a chave pública do contato. Se a chave mudar, você é avisado explicitamente antes de enviar. Não há diretório de identidade confiável a auditar — a verificação fora do app (por exemplo, conferir o hash num canal que ambos confiam) é a única defesa contra homem-no-meio de troca de chave.
+The app FIXES a contact's public key when you first encrypt a conversation. If the key changes you are warned explicitly before sending. There is no trusted identity directory to audit — out-of-band verification (e.g. comparing the hash in a channel both sides trust) is the only defence against a key-swap MITM.
 
-## 5. Limites honestos
+## 5. Honest limits
 
-- Metadados temporais do carteiro podem correlacionar tráfego sob vigilância forte (não há padding/onion por padrão).
+- Courier timing metadata can correlate traffic under strong surveillance (no padding/onion by default).
 
-- Um full-node de terceiros tem o poder de ler o que passar por ele (modelo "o host É o servidor").
+- A third-party full-node can read everything passing through it ("the host IS the server").
 
-- Malware rodando como o seu usuário de sessão pode ler dados em memória — proteção é do seu ambiente.
+- Malware running as your session user can read memory — that threat is your environment's.
 
-## 6. Sem suporte de recuperação
+## 6. No recovery support
 
-Pedidos de suporte do tipo "redefina minha conta" são recusados por princípio: não temos como cumpri-los sem quebrar a promessa deste documento.
+"Reset my account" support requests are refused by principle: fulfilling them would break the promise of this document.

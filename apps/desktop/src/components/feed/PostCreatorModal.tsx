@@ -2,6 +2,8 @@
 
 import { useRef } from 'react';
 import { playPress, playWin } from '../../utils/sounds';
+import { useCropper } from '../../hooks/useCropper';
+import { isCropableImage } from '../CropModal';
 import { PlusSquare, X, Upload, Camera } from 'lucide-react';
 
 interface PostCreatorModalProps {
@@ -33,20 +35,30 @@ export function PostCreatorModal({
 }: PostCreatorModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tagInputRef = useRef<HTMLInputElement>(null);
+  const { crop, cropper } = useCropper();
 
   if (!isOpen) return null;
 
-  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []).slice(0, 5 - media.length);
-    files.forEach((file) => {
+  const addMediaFile = async (file: File): Promise<string> => {
+    if (isCropableImage(file)) {
+      const res = await crop(file, { aspect: '4:5', title: 'Crop post image' });
+      return res?.dataUrl ?? '';
+    }
+    return new Promise<string>((resolve) => {
       const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          setMedia(media.length < 5 ? [...media, reader.result as string] : media);
-        }
-      };
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
       reader.readAsDataURL(file);
     });
+  };
+
+  const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []).slice(0, 5 - media.length);
+    const acc = [...media];
+    for (const file of files) {
+      const dataUrl = await addMediaFile(file);
+      if (dataUrl && acc.length < 5) acc.push(dataUrl);
+    }
+    setMedia(acc);
   };
 
   const handleAddTag = () => {
@@ -266,6 +278,7 @@ export function PostCreatorModal({
           </button>
         </div>
       </div>
+      {cropper}
     </div>
   );
 }

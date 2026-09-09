@@ -9,6 +9,7 @@ import type { ChatMessage } from '../../hooks/useP2P';
 import type { useLobby } from '../../hooks/useLobby';
 import { SocialPanel, type SocialPanelTab } from '../chat/SocialPanel';
 import { GMatchDMs, type PeerInfo, type ThreadItem, type GroupInfo } from '../chat/GMatchDMs';
+import type { GroupMember } from '../chat/GroupMembersPopover';
 import { NotificationsPanel } from '../NotificationsPanel';
 import type { MainViewType } from '../home/HomeFooter';
 
@@ -44,6 +45,8 @@ export function MessagesView({
   createGroup,
   leaveGroup,
   loadGroupMessages,
+  loadGroupMembers,
+  addGroupMembers,
   setPmPeer,
   setSelectedProfileUser,
   setViewerMessage,
@@ -82,6 +85,8 @@ export function MessagesView({
   createGroup: (name: string, memberIds: string[]) => Promise<string | null>;
   leaveGroup: (groupId: string) => Promise<void> | void;
   loadGroupMessages: (groupId: string) => void;
+  loadGroupMembers?: (groupId: string) => Promise<GroupMember[]>;
+  addGroupMembers?: (groupId: string, ids: string[]) => Promise<boolean> | void;
   setPmPeer: React.Dispatch<React.SetStateAction<User | null>>;
   setSelectedProfileUser: (user: User) => void;
   setViewerMessage: (msg: ChatMessage | null) => void;
@@ -152,11 +157,12 @@ export function MessagesView({
             }}
             onLeaveGroup={leaveGroup}
             onLoadGroupMessages={loadGroupMessages}
+            onLoadGroupMembers={loadGroupMembers}
+            onAddGroupMembers={addGroupMembers}
             onOpenProfile={(userId) => {
               const t = users.find((u) => u.id === userId || (u as any).orbitId === userId);
               if (t) setSelectedProfileUser(t);
             }}
-            onMinimize={() => setDmMinimized(true)}
             onOpenImage={(msg) => setViewerMessage(msg)}
             onDeleteThread={deleteThread}
             onBackToThreads={() => { setPmPeer(null); loadPmThreads(); }}

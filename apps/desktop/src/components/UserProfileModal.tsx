@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { parseTags, type User, type OrbitObject } from '@orbit/shared';
-import { X, Copy, Check, Star, Ban, Send, Grid, MessageCircle, Play, Swords } from 'lucide-react';
+import { X, Copy, Check, Star, Ban, Send, Grid, MessageCircle, Play, Swords, Flag } from 'lucide-react';
 import { playPress } from '../utils/sounds';
 import { resolveMediaUrl } from '../utils/media';
 import { ObjectImage } from './ObjectImage';
@@ -30,6 +30,7 @@ interface UserProfileModalProps {
   onStartPm?: (user: { id: string; display_name?: string }) => void;
   onInviteToGame?: (userId: string) => void;
   onOpenFollowers?: (tab: 'followers' | 'following') => void;
+  onReportUser?: (userId: string, name: string) => void;
 }
 
 export function UserProfileModal({
@@ -51,6 +52,7 @@ export function UserProfileModal({
   onStartPm,
   onInviteToGame,
   onOpenFollowers,
+  onReportUser,
 }: UserProfileModalProps) {
   const [showPic, setShowPic] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -308,6 +310,20 @@ export function UserProfileModal({
                 >
                   <Ban className="w-3.5 h-3.5" />
                   <span>Block</span>
+                </button>
+              )}
+              {onReportUser && user.id !== identity?.orbitId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onReportUser(user.id, user.display_name?.trim() || 'Unknown User');
+                    onClose();
+                  }}
+                  className="py-2 px-3 border border-red-500/25 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-medium rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
+                  title="Report this user"
+                >
+                  <Flag className="w-3.5 h-3.5" />
+                  <span>Report</span>
                 </button>
               )}
             </div>

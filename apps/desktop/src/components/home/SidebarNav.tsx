@@ -8,9 +8,6 @@ import {
   PlusSquare,
   Send,
   User,
-  Skull,
-  Flame,
-  ShieldAlert,
   LayoutGrid,
   Settings,
   ShoppingBag,
@@ -22,8 +19,13 @@ import {
   Trophy,
   Monitor,
   Users,
+  MousePointerClick,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import type { MainViewType } from './HomeFooter';
+
+export type GamesNavTab = 'duel' | 'cards' | 'babecock' | 'ranks' | 'idle';
 
 export interface ActiveHackSession {
   itemId: string;
@@ -50,12 +52,14 @@ export function SidebarNav({
   profilePic,
   displayName = 'You',
   activeHack = null,
-  onOpenHackView,
   balance = 0,
   score = 0,
   reputation = 0,
   wsConnected = false,
   showRooms = false,
+  gamesSubTab = 'duel',
+  onOpenGamesTab,
+  onlineBadge = 0,
 }: {
   mainView?: MainViewType;
   setMainView?: (view: MainViewType) => void;
@@ -73,7 +77,6 @@ export function SidebarNav({
   profilePic?: string;
   displayName?: string;
   activeHack?: ActiveHackSession | null;
-  onOpenHackView?: () => void;
   balance?: number;
   score?: number;
   reputation?: number;
@@ -81,6 +84,12 @@ export function SidebarNav({
   wsConnected?: boolean;
   /** SITE mode: blind-courier Rooms view is available. */
   showRooms?: boolean;
+  /** Current Porn Games sub-tab (drives child highlight). */
+  gamesSubTab?: string;
+  /** Navigate into Porn Games on a specific sub-tab. */
+  onOpenGamesTab?: (tab: GamesNavTab) => void;
+  /** Online-players badge shown on the Porn Games group. */
+  onlineBadge?: number;
 }) {
   const [now, setNow] = useState(() => Date.now());
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -100,15 +109,56 @@ export function SidebarNav({
     });
   };
 
-  const getHackIcon = () => {
-    if (!activeHack) return ShieldAlert;
-        if (activeHack.itemId.includes('mobile')) return Flame;
-    return ShieldAlert;
+  const [expandedGroups, setExpandedGroups] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return ['games'];
+    try {
+      const raw = localStorage.getItem('goonmatch_sidebar_groups');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.filter((g) => typeof g === 'string');
+      }
+    } catch { }
+    return ['games'];
+  });
+
+  const toggleGroup = (id: string) => {
+    playPress(700);
+    setExpandedGroups((prev) => {
+      const next = prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id];
+      try { localStorage.setItem('goonmatch_sidebar_groups', JSON.stringify(next)); } catch { }
+      return next;
+    });
   };
 
-  const HackIcon = getHackIcon();
+  interface NavLeaf {
+    id: string;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    active: boolean;
+    action: () => void;
+    badge?: number;
+    isHack?: boolean;
+  }
 
-  const navItems = [
+  interface NavGroup {
+    id: string;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    active: boolean;
+    action: () => void;
+    badge?: number;
+    children: NavLeaf[];
+  }
+
+  type NavEntry = NavLeaf | NavGroup;
+  const isGroup = (e: NavEntry): e is NavGroup => 'children' in e;
+
+  const openGamesTab = (tab: GamesNavTab) => {
+    if (onOpenGamesTab) onOpenGamesTab(tab);
+    else setMainView?.('games');
+  };
+
+  const navItems: NavEntry[] = [
     {
       id: 'feed',
       label: 'Home',
@@ -121,7 +171,46 @@ export function SidebarNav({
       label: 'Porn Games',
       icon: Gamepad2,
       active: mainView === 'games' || mainView === 'grid',
-      action: () => setMainView?.('games'),
+      action: () => openGamesTab('idle'),
+      badge: onlineBadge,
+      children: [
+        ...(onOpenStore
+          ? [
+            {
+              id: 'games-store',
+              label: 'Store',
+              icon: ShoppingBag,
+              active: mainView === 'store',
+              action: () => onOpenStore(),
+            },
+          ]
+          : []),
+        ...(onOpenGallery
+          ? [
+            {
+              id: 'games-cards',
+              label: 'Cards',
+              icon: LayoutGrid,
+              active: mainView === 'gallery',
+              action: () => onOpenGallery(),
+            },
+          ]
+          : []),
+        {
+          id: 'games-idle',
+          label: 'Idle Clicker',
+          icon: MousePointerClick,
+          active: (mainView === 'games' && gamesSubTab === 'idle') || mainView === 'grid',
+          action: () => openGamesTab('idle'),
+        },
+        {
+          id: 'games-ranks',
+          label: 'Rankings',
+          icon: Trophy,
+          active: mainView === 'games' && gamesSubTab === 'ranks',
+          action: () => openGamesTab('ranks'),
+        },
+      ],
     },
     ...(showRooms
       ? [
@@ -131,17 +220,6 @@ export function SidebarNav({
           icon: Users,
           active: mainView === 'rooms',
           action: () => setMainView?.('rooms'),
-        },
-      ]
-      : []),
-    ...(onOpenStore
-      ? [
-        {
-          id: 'store',
-          label: 'Store',
-          icon: ShoppingBag,
-          active: mainView === 'store',
-          action: () => (onOpenStore ? onOpenStore() : setMainView?.('store')),
         },
       ]
       : []),
@@ -165,17 +243,15 @@ export function SidebarNav({
         },
       ]
       : []),
-    ...(onOpenGallery
-      ? [
-        {
-          id: 'gallery',
-          label: 'Cards',
-          icon: LayoutGrid,
-          active: mainView === 'gallery',
-          action: () => onOpenGallery(),
-        },
-      ]
-      : []),
+    {
+      id: 'pc_domination',
+      label: 'PC Domination',
+      icon: Monitor,
+      active: mainView === 'pc_domination',
+      action: () => setMainView?.('pc_domination'),
+      // Fused hacks: glow rose while a hack session is live (was Spy entry).
+      isHack: Boolean(activeHack && activeHack.expiresAt > now),
+    },
     ...(onOpenSettings
       ? [
         {
@@ -184,25 +260,6 @@ export function SidebarNav({
           icon: Settings,
           active: false,
           action: () => onOpenSettings(),
-        },
-      ]
-      : []),
-    {
-      id: 'pc_domination',
-      label: 'PC Domination',
-      icon: Monitor,
-      active: mainView === 'pc_domination',
-      action: () => setMainView?.('pc_domination'),
-    },
-    ...(activeHack && activeHack.expiresAt > now
-      ? [
-        {
-          id: 'hack_spy',
-          label: 'Spy',
-          icon: HackIcon,
-          active: mainView === 'hack_spy',
-          action: () => (onOpenHackView ? onOpenHackView() : setMainView?.('hack_spy')),
-          isHack: true,
         },
       ]
       : []),
@@ -254,6 +311,74 @@ export function SidebarNav({
         <div className="border-t border-zinc-800/60 my-1" />
 
         {navItems.map((item) => {
+          if (isGroup(item)) {
+            const GroupIcon = item.icon;
+            const expanded = expandedGroups.includes(item.id);
+            return (
+              <div key={item.id} className="space-y-0.5">
+                <div
+                  className={`w-full flex items-center gap-1 pl-3 pr-1.5 py-0.5 rounded-md border transition-all duration-150 ${collapsed ? 'justify-center px-0' : ''} ${item.active
+                    ? 'bg-zinc-800/90 text-zinc-100 font-medium border-zinc-700/80 shadow-xs'
+                    : 'bg-transparent text-zinc-400 border-transparent'
+                    }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => { playPress(780); item.action(); if (!expanded) toggleGroup(item.id); }}
+                    aria-label={item.label}
+                    title={collapsed ? item.label : undefined}
+                    className={`flex-1 min-w-0 flex items-center gap-2.5 py-1.5 rounded-md text-left cursor-pointer text-xs ${collapsed ? 'justify-center' : ''} ${item.active ? '' : 'hover:text-zinc-200'}`}
+                  >
+                    <GroupIcon className={`w-4 h-4 shrink-0 transition-colors stroke-[1.75] ${item.active ? 'text-zinc-100' : 'text-zinc-400'}`} />
+                    {!collapsed && <span className="truncate">{item.label}</span>}
+                    {!collapsed && Boolean(item.badge && item.badge > 0) && (
+                      <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-emerald-400 text-[9px] font-bold text-zinc-950 tabular-nums">
+                        {item.badge! > 99 ? '99+' : item.badge}
+                      </span>
+                    )}
+                  </button>
+                  {!collapsed && (
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(item.id)}
+                      aria-label={expanded ? `Collapse ${item.label}` : `Expand ${item.label}`}
+                      aria-expanded={expanded}
+                      className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/60 transition-colors cursor-pointer shrink-0"
+                    >
+                      {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
+                </div>
+                {expanded && !collapsed && (
+                  <div className="ml-4 pl-2 border-l border-zinc-800/80 space-y-0.5">
+                    {item.children.map((child) => {
+                      const ChildIcon = child.icon;
+                      return (
+                        <button
+                          key={child.id}
+                          type="button"
+                          onClick={() => { playPress(780); child.action(); }}
+                          aria-label={child.label}
+                          className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-left cursor-pointer border transition-all duration-150 active:scale-[0.96] group text-xs ${child.active
+                            ? 'bg-zinc-800/90 text-zinc-100 font-medium border-zinc-700/80 shadow-xs'
+                            : 'bg-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 border-transparent'
+                            }`}
+                        >
+                          <ChildIcon className={`w-3.5 h-3.5 shrink-0 transition-colors stroke-[1.75] ${child.active ? 'text-zinc-100' : 'text-zinc-400 group-hover:text-zinc-200'}`} />
+                          <span className="truncate">{child.label}</span>
+                          {Boolean(child.badge && child.badge > 0) && (
+                            <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-zinc-100 text-[9px] font-bold text-zinc-950 tabular-nums">
+                              {child.badge! > 9 ? '9+' : child.badge}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
           const Icon = item.icon;
           return (
             <button
@@ -294,34 +419,6 @@ export function SidebarNav({
         })}
       </nav>
 
-      {/* Currency HUD — one compact, consistently-spaced row (UI-2):
-          repositioned right under the nav, gap-1.5 between indicators. */}
-      <div className="px-2 pt-2 shrink-0">
-        <div className={`flex gap-1.5 ${collapsed ? 'flex-col items-center' : 'flex-row'}`}>
-          {[
-            { icon: Coins, label: 'g$', value: balance, accent: 'text-amber-400' },
-            { icon: Zap, label: 'XP', value: score, accent: 'text-sky-400' },
-            { icon: Trophy, label: 'Rep', value: reputation, accent: 'text-violet-400' },
-          ].map((c) => {
-            const Icon = c.icon;
-            return (
-              <div
-                key={c.label}
-                title={c.label}
-                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-zinc-900/60 border border-zinc-800/80 min-w-0 ${collapsed ? 'justify-center' : 'flex-1 justify-center'}`}
-              >
-                <Icon className={`w-3.5 h-3.5 shrink-0 ${c.accent} stroke-[1.75]`} />
-                {!collapsed && (
-                  <span className="text-[11px] font-semibold text-zinc-200 font-mono tabular-nums tracking-tight truncate">
-                    {c.value.toLocaleString()}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
       {/* User panel: avatar + name, click to open profile */}
       <div className="p-2 border-t border-zinc-800/80 shrink-0">
         <button
@@ -352,6 +449,33 @@ export function SidebarNav({
             </div>
           )}
         </button>
+      </div>
+
+      {/* Currency HUD — compact row under the user panel (g$ / XP / Rep). */}
+      <div className="px-2 pb-2 shrink-0">
+        <div className={`flex gap-1.5 ${collapsed ? 'flex-col items-center' : 'flex-row'}`}>
+          {[
+            { icon: Coins, label: 'g$', value: balance, accent: 'text-amber-400' },
+            { icon: Zap, label: 'XP', value: score, accent: 'text-sky-400' },
+            { icon: Trophy, label: 'Rep', value: reputation, accent: 'text-violet-400' },
+          ].map((c) => {
+            const Icon = c.icon;
+            return (
+              <div
+                key={c.label}
+                title={c.label}
+                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-zinc-900/60 border border-zinc-800/80 min-w-0 ${collapsed ? 'justify-center' : 'flex-1 justify-center'}`}
+              >
+                <Icon className={`w-3.5 h-3.5 shrink-0 ${c.accent} stroke-[1.75]`} />
+                {!collapsed && (
+                  <span className="text-[11px] font-semibold text-zinc-200 font-mono tabular-nums tracking-tight truncate">
+                    {c.value.toLocaleString()}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </aside>
   );

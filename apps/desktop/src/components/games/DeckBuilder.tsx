@@ -7,6 +7,7 @@ import type { OrbitObject } from '@orbit/shared';
 import { orbitFetch } from '../../utils/api';
 import { logger } from '../../utils/logger';
 import { CardTile } from '../home/CardTile';
+import { DND_CARD } from '../DropZone';
 
 export const ACTIVE_DECK_STORAGE_KEY = 'orbit_active_deck_id';
 
@@ -69,6 +70,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
   const [newDeckName, setNewDeckName] = useState('');
   const [validation, setValidation] = useState<DeckValidation | null>(null);
   const [addingCards, setAddingCards] = useState(false);
+  const [deckDropOver, setDeckDropOver] = useState(false);
   const [search, setSearch] = useState('');
   const [editingName, setEditingName] = useState('');
 
@@ -400,11 +402,29 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
             </div>
           )}
 
-          <div>
-            <h3 className="text-sm font-bold text-retro-body mb-2">Cards in Deck</h3>
+          <div
+            onDragOver={(e) => {
+              if (!Array.from(e.dataTransfer.types).includes(DND_CARD)) return;
+              e.preventDefault();
+              setDeckDropOver(true);
+            }}
+            onDragLeave={(e) => { if (e.currentTarget.contains(e.relatedTarget as Node)) return; setDeckDropOver(false); }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDeckDropOver(false);
+              const raw = e.dataTransfer.getData(DND_CARD);
+              if (!raw) return;
+              try {
+                const payload = JSON.parse(raw) as { cardId?: string };
+                if (payload.cardId) void addCardToDeck(payload.cardId);
+              } catch { /* malformed */ }
+            }}
+            className={`rounded-xl border-2 border-dashed transition-colors p-2 -m-2 ${deckDropOver ? 'border-cyan-400/70 bg-cyan-500/10' : 'border-transparent'}`}
+          >
+            <h3 className="text-sm font-bold text-retro-body mb-2">Cards in Deck{deckDropOver && <span className="ml-2 text-xs font-semibold text-cyan-300 animate-pulse">Drop to add</span>}</h3>
             {getCardsInDeck().length === 0 ? (
               <div className="text-center py-8 text-retro-muted text-xs">
-                No cards in this deck yet. Click &quot;Add Cards&quot; to get started.
+                No cards in this deck yet. Click &quot;Add Cards&quot; — or drag a card here.
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -444,12 +464,20 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                   {availableCards.map(card => (
-                    <div key={card.id} className="relative group">
+                    <div
+                      key={card.id}
+                      className="relative group cursor-grab active:cursor-grabbing"
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData(DND_CARD, JSON.stringify({ cardId: canonicalId(card) }));
+                        e.dataTransfer.effectAllowed = 'copy';
+                      }}
+                    >
                       <CardTile item={card} />
                       <button
                         onClick={() => addCardToDeck(canonicalId(card))}
                         className="absolute top-2 right-2 bg-cyan-500/80 hover:bg-cyan-500 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Add to deck"
+                        title="Add to deck (or drag into the deck above)"
                       >
                         <Plus className="w-3 h-3" />
                       </button>

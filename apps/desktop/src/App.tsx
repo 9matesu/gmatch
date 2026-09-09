@@ -8,10 +8,8 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { getApiBaseUrl, orbitFetch } from "./utils/api";
 import { OrbitPeer, pollOffers } from "./utils/webrtc";
 import { saveObject, getAllObjects, deleteObject } from "./utils/storage";
-import { SendPanel } from "./components/SendPanel";
 import type { SendPanelHandle } from "./components/SendPanel";
 import { PageSkeleton } from "./components/Skeleton";
-import { EmptyState } from "./components/EmptyState";
 import { useToast } from "./components/Toast";
 import { useConfirm } from "./components/ConfirmDialog";
 import { usePlaytime, useCoffeeGate } from "./hooks/usePlaytime";
@@ -23,7 +21,7 @@ import { useP2P } from "./hooks/useP2P";
 import type { ChatMessage } from "./hooks/useP2P";
 import { useGame } from "./hooks/useGame";
 import { enqueueableItems, isP2pLocal, shouldEnqueue } from "./utils/game";
-import { mergeMyCards, createCardFromMedia, type CanonicalCard } from "./utils/cardCollection";
+import { mergeMyCards, type CanonicalCard } from "./utils/cardCollection";
 import { collectConfigBundle, applyConfigBundle, applyStashFromBundle, parseConfigBundle, configDownloadFilename, bundleToString } from "./utils/configBackup";
 import { runMigrations } from "./utils/migration";
 import { startWalletSync } from "./game/walletBridge";
@@ -31,13 +29,13 @@ import { useGame as useIdleGame } from "./game/store";
 import { ROUTE_VIEWS, hashForView, viewFromHash, type RoutedView } from "./utils/routing";
 import { playChime, playPress, playMsgReceive } from "./utils/sounds";
 import { useLobby } from "./hooks/useLobby";
-import { LobbyPanel } from "./components/LobbyPanel";
 import { UserProfileModal } from "./components/UserProfileModal";
-import { MIN_GAME_CARDS, type User, type OrbitObject, isDefaultPeerName, parseTags } from "@orbit/shared";
+import { MIN_GAME_CARDS, type User, type OrbitObject, parseTags } from "@orbit/shared";
 import { areItemsStructurallyEqual, areUsersStructurallyEqual, areAnnouncementsStructurallyEqual } from "./utils/compare";
 import { OnboardingFlow } from "./firstRun/OnboardingFlow";
 import { GMatchFeed, type FeedPost } from "./components/feed/GMatchFeed";
 import { GMatchDMs } from "./components/chat/GMatchDMs";
+import type { GroupMember } from "./components/chat/GroupMembersPopover";
 import { AttachmentUploadModal } from "./components/AttachmentUploadModal";
 import { ProfileView } from "./components/views/ProfileView";
 import { MessagesView, DmMinimizedView } from "./components/views/MessagesView";
@@ -49,26 +47,21 @@ import { LegalCenter, isLegalAccepted } from "./components/LegalCenter";
 import { legalDocFromHash, isLegalDocId, type LegalDocId } from "./utils/legal-route";
 import { saveUserProfile, deriveProfileTags } from "./utils/profile";
 import { GamesView } from "./components/views/GamesView";
-import { DeckBuilder, getStoredActiveDeckId, type Deck } from "./components/games/DeckBuilder";
+import { getStoredActiveDeckId, type Deck } from "./components/games/DeckBuilder";
 import { HomeFooter, type MainViewType, type ActiveHackSession } from "./components/home/HomeFooter";
 import { SidebarNav } from "./components/home/SidebarNav";
 import { RoomsView } from "./components/rooms/RoomsView";
-import { HackSpyTabView } from "./components/views/HackSpyTabView";
 import { PCDominationView } from "./components/views/PCDominationView";
 import { DominationEffects } from "./components/domination/DominationEffects";
-import { CardTile } from "./components/home/CardTile";
 import type { ActiveHackDebuff } from "@orbit/shared";
-import { contentHash } from "./utils/media";
-import { Camera, ImagePlus, Coins, ChevronDown, ChevronRight, Gamepad2, Swords, Trophy, Flame, ShoppingBag, Shield, Layers, ShieldAlert, MessageSquare, X, Image as ImageIcon, Share2, Link2, Send, Copy } from "lucide-react";
+import { ChevronDown, ChevronRight, MessageSquare, X, Image as ImageIcon } from "lucide-react";
 import { WallpaperBackground } from "./components/WallpaperBackground";
 import { ContextOverlay, ReportModal } from "./components/ContextOverlay";
 import { GlobalModals } from "./components/GlobalModals";
 import { GalleryTabView } from "./components/views/GalleryTabView";
 import { CreateCardModal } from "./components/CreateCardModal";
-import { BabecockPanel } from "./components/BabecockPanel";
 import GridWorkspace from "./components/grid/GridWorkspace";
 import AdminApp from "./admin/AdminApp";
-import { Leaderboard } from "./components/Leaderboard";
 import { StoreView } from "./components/views/StoreView";
 import { NotificationsPanel } from "./components/NotificationsPanel";
 import { SocialPanel, type SocialPanelTab } from "./components/chat/SocialPanel";
@@ -168,7 +161,7 @@ export default function Home() {
   const chatPanel = useResizablePanel('chat')
   const [chatResizing, setChatResizing] = useState(false)
   const [panelTab, setPanelTab] = useState<SocialPanelTab>('chat');
-  const [gamesSubTab, setGamesSubTab] = useState<'duel' | 'cards' | 'babecock' | 'ranks' | 'store'>('duel');
+  const [gamesSubTab, setGamesSubTab] = useState<'duel' | 'cards' | 'babecock' | 'ranks' | 'store' | 'idle'>('duel');
   const [collapsedModules, setCollapsedModules] = useState<Record<string, boolean>>({});
   const toggleModule = (key: string) => setCollapsedModules((prev) => ({ ...prev, [key]: !prev[key] }));
   const [nowTick, setNowTick] = useState<number>(() => Date.now());
@@ -399,6 +392,13 @@ export default function Home() {
 
   const openCreateCardModal = () => {
     setCreateCardNeeded(Math.max(0, MIN_GAME_CARDS - myCards.length))
+    setCardPrefill(null)
+    setShowCreateCardModal(true)
+  }
+
+  const openCreateCardWithMedia = (media: { url: string; tags: string[]; name: string }) => {
+    setCreateCardNeeded(0)
+    setCardPrefill(media)
     setShowCreateCardModal(true)
   }
 
@@ -501,6 +501,12 @@ export default function Home() {
     type: 'user' | 'item'
     data: any
   } | null>(null)
+
+  // Opens the shared right-click menu (see ContextOverlay below).
+  const openContextMenu = useCallback((type: 'user' | 'item', data: any) => (e: React.MouseEvent) => {
+    e.preventDefault()
+    setContextMenu({ x: e.clientX, y: e.clientY, type, data })
+  }, [])
 
   const [blockedIds, setBlockedIds] = useState<string[]>(() => {
     if (typeof window === 'undefined') return []
@@ -695,28 +701,6 @@ export default function Home() {
     }
   };
 
-  const handleInviteShare = async () => {
-    // Packaged Electron origin is file:// — the server URL is the real door.
-    const inviteUrl = getApiBaseUrl();
-    const shareData = {
-      title: 'Join me on gMatch',
-      text: 'Come hang out, share cards, and see what is happening on gMatch.',
-      url: inviteUrl,
-    };
-
-    try {
-      if (typeof navigator !== 'undefined' && navigator.share) {
-        await navigator.share(shareData);
-        toast('Invite shared', 'success');
-        return;
-      }
-      await navigator.clipboard.writeText(inviteUrl);
-      toast('Invite link copied to clipboard', 'success');
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
-      toast('Could not share the invite link', 'error');
-    }
-  };
   const [showRecommendations, setShowRecommendations] = useState(false);
   const lastSavedProfileRef = useRef<{ displayName: string; tags: string[] } | null>(null)
   const [lobbyLightboxUrl, setLobbyLightboxUrl] = useState<string | null>(null)
@@ -740,6 +724,7 @@ export default function Home() {
   const [showStoryModal, setShowStoryModal] = useState(false)
   const [showCreateCardModal, setShowCreateCardModal] = useState(false)
   const [createCardNeeded, setCreateCardNeeded] = useState(0)
+  const [cardPrefill, setCardPrefill] = useState<{ url: string; tags: string[]; name: string } | null>(null)
   const [dragAnchorId, setDragAnchorId] = useState<string | null>(null)
   const [dragActive, setDragActive] = useState(false)
   const [profilePics, setProfilePics] = useState<Record<string, string>>(() => {
@@ -1485,6 +1470,35 @@ export default function Home() {
       })
       .catch(() => { })
   }, [identity, myProfile.displayName])
+
+  const loadGroupMembers = useCallback(async (groupId: string): Promise<GroupMember[]> => {
+    if (!identity) return []
+    const res = await orbitFetch(`/api/groups/${groupId}/members`, {}, identity)
+    if (!res.ok) throw new Error(`Could not load members (${res.status})`)
+    const data = await res.json()
+    return Array.isArray(data?.members) ? data.members : []
+  }, [identity])
+
+  const addGroupMembers = useCallback(async (groupId: string, ids: string[]) => {
+    if (!identity || ids.length === 0) return false
+    try {
+      const res = await orbitFetch(`/api/groups/${groupId}/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ member_ids: ids }),
+      }, identity)
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        toast(data?.error || `Could not add members (${res.status})`, 'error')
+        return false
+      }
+      loadChatGroups()
+      return true
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not add members', 'error')
+      return false
+    }
+  }, [identity, loadChatGroups, toast])
 
   const createGroup = useCallback(async (name: string, memberIds: string[]) => {
     if (!identity || !name.trim()) return null
@@ -2336,6 +2350,17 @@ export default function Home() {
   // so the count never lists stale/idle users as "online".
   const onlineCount = useMemo(() => users.filter(u => u.online).length, [users])
 
+  // Sidebar "Porn Games" badge: deduped headcount of the lobby game room —
+  // queued players + live online users + self. Mirrors the roster merge in
+  // LobbyPanel without pulling the whole merge in.
+  const lobbyRoomCount = useMemo(() => {
+    const ids = new Set<string>();
+    for (const p of lobby.state?.players || []) if (p.user_id) ids.add(p.user_id);
+    for (const u of lobby.onlineUsers || []) if (u.id) ids.add(u.id);
+    if (identity?.orbitId) ids.add(identity.orbitId);
+    return ids.size;
+  }, [lobby.state?.players, lobby.onlineUsers, identity?.orbitId])
+
   // Hold Space to fade the interface while keeping the wallpaper visible.
   // Editable controls keep their native spacebar behavior.
   useEffect(() => {
@@ -2828,6 +2853,9 @@ export default function Home() {
                 onOpenGallery={() => handleSetMainView('gallery')}
                 onOpenSettings={() => setShowSettingsModal(true)}
                 onOpenStore={() => handleSetMainView('store')}
+                gamesSubTab={gamesSubTab}
+                onOpenGamesTab={(tab) => { handleSetMainView('games'); setGamesSubTab(tab); }}
+                onlineBadge={lobbyRoomCount}
                 unreadMessagesCount={pmUnreadCount}
                 notificationUnreadCount={lobby.unreadCount}
                 onOpenNotifications={toggleNotifications}
@@ -2835,7 +2863,6 @@ export default function Home() {
                 profilePic={profilePics[identity?.orbitId || '']}
                 displayName={myProfile.displayName || myUser?.display_name || 'You'}
                 activeHack={activeHack}
-                onOpenHackView={() => handleSetMainView('hack_spy')}
                 balance={myUser?.balance ?? 0}
                 score={myUser?.score ?? 0}
                 reputation={myUser?.reputation ?? 0}
@@ -2896,11 +2923,12 @@ export default function Home() {
                           }}
                           onLeaveGroup={leaveGroup}
                           onLoadGroupMessages={loadGroupMessages}
+                          onLoadGroupMembers={loadGroupMembers}
+                          onAddGroupMembers={addGroupMembers}
                           onOpenProfile={(userId) => {
                             const t = users.find((u) => u.id === userId || (u as any).orbitId === userId);
                             if (t) setSelectedProfileUser(t);
                           }}
-                          onMinimize={() => setChatOpen(false)}
                           onOpenImage={(msg) => setViewerMessage(msg)}
                           onDeleteThread={deleteThread}
                           onBackToThreads={() => { setPmPeer(null); loadPmThreads(); }}
@@ -2961,264 +2989,8 @@ export default function Home() {
                       )}
                       <div className={isVisionJammed ? "blur-md select-none pointer-events-none transition-all duration-300" : ""}>
                         <div className="w-full max-w-5xl mx-auto px-3 sm:px-4 flex flex-col gap-4 pb-24 lg:pb-16">
-                          {/* ── 1. Games module: switchable, lowkey ── */}
-                          <section id="games-section" className="module module-primary module-glass glass-surface overflow-visible order-3 lg:order-1">
-                            <div className="module-header flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Gamepad2 className="w-4 h-4 text-retro-muted" />
-                                <span className="module-title">Games</span>
-                              </div>
-                              <div className="flex items-center gap-1.5 overflow-x-auto styled-scrollbar">
-                                {(['duel', 'cards', 'babecock', 'ranks'] as const).map((tab) => {
-                                  const Icon = tab === 'duel' ? Swords : tab === 'cards' ? Layers : tab === 'babecock' ? Flame : Trophy;
-                                  return (
-                                    <button
-                                      key={tab}
-                                      type="button"
-                                      onClick={() => { playPress(720); setGamesSubTab(tab); }}
-                                      className={`glass-tab py-1.5 px-2.5 rounded-md text-xs font-medium capitalize transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap ${gamesSubTab === tab
-                                        ? 'glass-tab-active'
-                                        : ''
-                                        }`}
-                                    >
-                                      <Icon className="w-3.5 h-3.5" />
-                                      <span className="hidden sm:inline">{tab === 'ranks' ? 'Ranks' : tab}</span>
-                                    </button>
-                                  );
-                                })}
-                                <button
-                                  type="button"
-                                  onClick={() => toggleModule('games')}
-                                  aria-label={collapsedModules.games ? 'Expand Games' : 'Collapse Games'}
-                                  className="glass-button p-1.5 rounded-lg text-retro-muted hover:text-retro-fg hover:bg-surface-interactive transition-colors cursor-pointer"
-                                >
-                                  {collapsedModules.games ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                </button>
-                              </div>
-                            </div>
-                            {!collapsedModules.games && (
-                              <div className="module-body">
-                                  {gamesSubTab === 'duel' && (
-                                    <LobbyPanel
-                                      lobby={lobby}
-                                      toggleAutoQueue={toggleAutoQueue}
-                                      sendInvite={sendInvite}
-                                      identity={identity}
-                                    myCards={myCards}
-                                    soundEnabled={settings.soundEffects}
-                                    onOpenImage={(url) => setLobbyLightboxUrl(url)}
-                                    onExpandItem={(id) => setExpandedItemId(id)}
-                                    onOpenHelp={() => setShowHelpModal(true)}
-                                    onOpenProfile={(user) => setSelectedProfileUser(user)}
-                                    onOpenCardChat={() => {
-                                      setPmPeer({ id: 'card_queue', display_name: 'Card Game Queue' } as any)
-                                      setDmMinimized(false)
-                                      setMainView('messages')
-                                    }}
-                                    onOpenCreateCard={openCreateCardModal}
-                                    onOpenDeckBuilder={navigateToDeckBuilder}
-                                    onOpenSpectateItem={(items, initialId) => {
-                                      setSpectateViewerItems(items)
-                                      setExpandedItemId(initialId)
-                                    }}
-                                    users={users}
-                                  />
-                                )}
-                                {gamesSubTab === 'cards' && (
-                                  <div id="collection-section" className="space-y-4">
-                                    <div className="glass-surface rounded-xl p-3 flex items-center justify-between gap-3">
-                                      <div>
-                                        <div className="text-xs font-bold text-retro-fg">Forge a card</div>
-                                        <div className="text-[10px] text-retro-muted">Build a unique card with a live preview, tags, and your favorite porn.</div>
-                                      </div>
-                                      <button type="button" onClick={openCreateCardModal} className="accent-control px-3 py-2 rounded-lg text-[10px] font-black whitespace-nowrap">Create Card</button>
-                                    </div>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => setShowCreateCardModal(true)}
-                                        className="create-action px-4 py-2 text-xs font-black uppercase tracking-wide rounded-lg flex items-center gap-1.5 cursor-pointer transition-all"
-                                      >
-                                        <ImagePlus className="w-3.5 h-3.5 text-current" />
-                                        <span>Create Card</span>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setMainView('gallery')}
-                                        className="px-3 py-2 text-xs font-medium border border-retro-border text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors whitespace-nowrap"
-                                      >
-                                        View All
-                                      </button>
-                                    </div>
-
-                                    {itemsLoading ? (
-                                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                                        {Array.from({ length: 8 }).map((_, i) => (
-                                          <div key={i} className="metallic-card-border"><div className="metallic-card"><div className="skeleton h-full min-h-32 w-full" /></div></div>
-                                        ))}
-                                      </div>
-                                    ) : filteredItems.length === 0 ? (
-                                      <EmptyState title="No cards yet" description="Upload images above, or battle in the duel arena to expand your deck!" />
-                                    ) : (
-                                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 select-none">
-                                        {filteredItems.slice(0, 18).map((item) => (
-                                          <CardTile
-                                            key={item.id}
-                                            item={item as any}
-                                            onDoubleClick={() => setExpandedItemId(item.id)}
-                                            users={users}
-                                            identity={identity}
-                                            now={nowTick}
-                                            onOpenOwnerProfile={openProfileById}
-                                          />
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                                {gamesSubTab === 'cards' && (
-                                  <div className="mt-6 border-t border-border-glass pt-6">
-                                    <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider mb-3">Decks</h3>
-                                    <DeckBuilder
-                                      identity={identity}
-                                      cards={myCards as any}
-                                      onEnterArena={() => setGamesSubTab('duel')}
-                                      toast={toast}
-                                    />
-                                  </div>
-                                )}
-                                {gamesSubTab === 'babecock' && (
-                                  <BabecockPanel identity={identity} users={users} onOpenProfile={(id) => {
-                                    const target = users.find((u) => u.id === id || (u as any).orbitId === id);
-                                    if (target) setSelectedProfileUser(target);
-                                  }} />
-                                )}
-                                {gamesSubTab === 'ranks' && (
-                                  <Leaderboard users={users} onSelectUser={(uId) => {
-                                    const target = users.find((u) => u.id === uId || (u as any).orbitId === uId);
-                                    if (target) setSelectedProfileUser(target);
-                                  }} />
-                                )}
-                              </div>
-                            )}
-                          </section>
-
-                          {/* ── 2. Share / invite hub ── */}
-                          <section className="module module-primary module-glass glass-surface overflow-hidden order-2 lg:order-2">
-                            <div className="module-header flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span className="module-title">SEND THIS EVERYWHERE YOU GO!</span>
-                                <span className="module-subtitle">Bring friends, strangers, and any addict to goon with us.</span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => toggleModule('share')}
-                                aria-label={collapsedModules.share ? 'Expand Share' : 'Collapse Share'}
-                                className="p-1.5 rounded-lg text-retro-muted hover:text-retro-fg hover:bg-surface-interactive transition-colors cursor-pointer"
-                              >
-                                {collapsedModules.share ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                              </button>
-                            </div>
-                            {!collapsedModules.share && (
-                              <div className="module-body grid gap-4 lg:grid-cols-[1.25fr_0.75fr] lg:items-stretch">
-                                <div className="relative overflow-hidden rounded-xl border border-retro-accent/30 bg-gradient-to-br from-retro-accent/15 via-surface-interactive to-surface-interactive p-4 sm:p-5">
-                                  <div className="pointer-events-none absolute -right-8 -top-10 text-[120px] font-black leading-none text-retro-accent/10">↗</div>
-                                  <div className="relative flex h-full flex-col justify-between gap-5">
-                                    <div className="space-y-2">
-                                      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-retro-accent">
-                                        <Share2 className="h-3.5 w-3.5" />
-                                        <span>HELP BUILD THIS COMMUNITY</span>
-                                      </div>
-                                      <h3 className="max-w-md text-lg font-black tracking-tight text-retro-fg sm:text-xl">
-                                        Gooning gets better with more people.
-                                      </h3>
-                                      <p className="max-w-lg text-xs leading-relaxed text-retro-muted">
-                                        Send a friend straight to gMatch and give them a reason to stay: porn everywhere, anywhere.
-                                      </p>
-                                    </div>
-                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                                      <button
-                                        type="button"
-                                        onClick={() => void handleInviteShare()}
-                                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-retro-accent px-4 py-2.5 text-xs font-black uppercase tracking-wider text-black shadow-md transition-colors hover:bg-retro-accent-hover cursor-pointer"
-                                      >
-                                        <Send className="h-3.5 w-3.5" />
-                                        Invite a player
-                                      </button>
-                                      <span className="text-[10px] font-medium text-retro-muted">No account link required</span>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="flex flex-col justify-between gap-3 rounded-xl border border-retro-border bg-surface-interactive p-3.5">
-                                  <div>
-                                    <div className="mb-1 flex items-center gap-2 text-xs font-bold text-retro-fg">
-                                      <Link2 className="h-3.5 w-3.5 text-retro-accent" />
-                                      <span>Invite link</span>
-                                    </div>
-                                    <p className="text-[11px] leading-relaxed text-retro-muted">Copy the front door to gMatch or share it from your device.</p>
-                                  </div>
-                                  <div className="flex items-center gap-2 rounded-lg border border-retro-border bg-retro-bg/60 px-2.5 py-2">
-                                    <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-retro-muted">
-                                      {getApiBaseUrl()}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => void handleInviteShare()}
-                                      aria-label="Copy invite link"
-                                      className="shrink-0 rounded-md p-1.5 text-retro-muted transition-colors hover:bg-surface-raised hover:text-retro-accent cursor-pointer"
-                                    >
-                                      <Copy className="h-3.5 w-3.5" />
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </section>
-
-                          {/* ── 3. Post Composer quick suite ── */}
-                          <section className="module module-primary module-glass glass-surface overflow-hidden order-3 lg:order-2">
-                            <div className="module-header flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span className="module-title">Send more porn</span>
-                                <span className="module-subtitle">Story, post, or card</span>
-                              </div>
-                            </div>
-                            <div className="module-body flex flex-wrap items-center gap-2 sm:gap-3">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setShowStoryModal(true)}
-                                  title="Post a Story"
-                                  className="px-3 py-2 text-xs font-medium text-retro-body bg-surface-interactive border border-retro-border hover:border-zinc-500 rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors"
-                                >
-                                  <Camera className="w-3.5 h-3.5 text-retro-muted" />
-                                  Story
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setShowCreatePostModal(true)}
-                                  title="Create Post"
-                                  className="create-action px-3 py-2 text-xs font-black uppercase tracking-wide rounded-lg flex items-center gap-1.5 cursor-pointer transition-all"
-                                >
-                                  <ImagePlus className="w-3.5 h-3.5 text-current" />
-                                  Post
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setGamesSubTab('cards')}
-                                  title="Add to Card Collection"
-                                  className="px-3 py-2 text-xs font-medium text-retro-body bg-surface-interactive border border-retro-border hover:border-zinc-500 rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors"
-                                >
-                                  <Coins className="w-3.5 h-3.5 text-retro-muted" />
-                                  Card
-                                </button>
-                              </div>
-                            </div>
-                          </section>
-
-                          {/* ── 4. Feed ── */}
-                          <section className="module module-primary module-glass glass-surface overflow-visible order-1 lg:order-4">
+                          {/* ── Feed ── */}
+                          <section className="module module-primary module-glass glass-surface overflow-visible order-1">
                             <div className="module-header flex items-center justify-between sticky top-0 z-20">
                               <div className="flex items-center gap-2">
                                 <span className="module-title">Timeline</span>
@@ -3281,6 +3053,10 @@ export default function Home() {
                                 onRefreshNotifications={() => lobby.refreshNotifications()}
                                 onOpenNotifications={openNotifications}
                                 onOpenNetwork={(userId) => openUserNetwork(userId)}
+                                onUserContext={(e, userId, displayName) => {
+                                  const u = users.find((x) => x.id === userId)
+                                  openContextMenu('user', u || { id: userId, display_name: displayName })(e)
+                                }}
                                 onArchivePost={(id) => {
                                   setArchivedPostIds((prev) => new Set(prev).add(id));
                                   toast('Post archived', 'info');
@@ -3351,6 +3127,8 @@ export default function Home() {
                       createGroup={createGroup}
                       leaveGroup={leaveGroup}
                       loadGroupMessages={loadGroupMessages}
+                      loadGroupMembers={loadGroupMembers}
+                      addGroupMembers={addGroupMembers}
                       setPmPeer={setPmPeer}
                       setSelectedProfileUser={setSelectedProfileUser}
                       setViewerMessage={setViewerMessage}
@@ -3396,7 +3174,6 @@ export default function Home() {
                     <GamesView
                       gamesSubTab={gamesSubTab}
                       identity={identity}
-                      myUser={myUser}
                       myCards={myCards}
                       users={users}
                       lobby={lobby}
@@ -3489,6 +3266,9 @@ export default function Home() {
                       dragAnchorId={dragAnchorId}
                       setDragAnchorId={setDragAnchorId}
                       onOpenCreateCard={() => setShowCreateCardModal(true)}
+                      onCreateCardFromMedia={openCreateCardWithMedia}
+                      onItemContextMenu={(e, item) => openContextMenu('item', item)(e)}
+                      onSetWallpaper={handleSetWallpaper}
                       users={users}
                       identity={identity!}
                       setExpandedItemId={setExpandedItemId}
@@ -3532,20 +3312,18 @@ export default function Home() {
                     />
                   )}
 
-                  {/* Active Cyber Hack Spy Infiltration Feed */}
-                  {mainView === 'hack_spy' && activeHack && (
-                    <HackSpyTabView
-                      activeHack={activeHack}
-                      identity={identity}
-                      toast={toast}
-                      onSetMainView={handleSetMainView}
-                      setActiveHack={setActiveHack}
-                    />
-                  )}
-
-                  {/* PC Domination Control Panel */}
+                  {/* PC Domination Control Panel (fused cyber hacks live here) */}
                   {mainView === 'pc_domination' && (
-                    <PCDominationView identity={identity} users={users} />
+                    <PCDominationView
+                      identity={identity}
+                      users={users}
+                      profilePics={profilePics}
+                      points={myUser?.balance ?? 0}
+                      toast={toast}
+                      activeHack={activeHack}
+                      setActiveHack={setActiveHack}
+                      onOpenFlash={() => setShowFlashModal(true)}
+                    />
                   )}
 
                   {/* Stories & Store live inside the feed tray and Games Hub — removed as standalone views */}
@@ -3654,6 +3432,7 @@ export default function Home() {
                     isFollowing={followingIds.includes(selectedProfileUser.id)}
                     onToggleFollow={selectedProfileUser.id === identity?.orbitId ? undefined : toggleFollowUser}
                     onBlockUser={selectedProfileUser.id === identity?.orbitId ? undefined : blockUser}
+                    onReportUser={selectedProfileUser.id === identity?.orbitId ? undefined : (id, name) => openReportModal(id, name)}
                     onOpenFollowers={(tab) => setFollowersModalState({ isOpen: true, initialTab: tab, targetUserId: null, targetName: null })}
                     onCopyId={(id) => {
                       navigator.clipboard.writeText(id)
@@ -3918,8 +3697,6 @@ export default function Home() {
                 unreadMessagesCount={pmUnreadCount}
                 unreadNotificationsCount={lobby.unreadCount}
                 profilePic={profilePics[identity?.orbitId || '']}
-                activeHack={activeHack}
-                onOpenHackView={() => handleSetMainView('hack_spy')}
               />
             </div>
           </ErrorBoundary>
@@ -3930,7 +3707,8 @@ export default function Home() {
         <CreateCardModal
           identity={identity}
           cardsNeeded={createCardNeeded}
-          onClose={() => setShowCreateCardModal(false)}
+          initialMedia={cardPrefill}
+          onClose={() => { setShowCreateCardModal(false); setCardPrefill(null); }}
           onCreated={() => {
             setCreateCardNeeded(Math.max(0, MIN_GAME_CARDS - (myCards.length + 1)))
             toast('Unique card created!', 'success')

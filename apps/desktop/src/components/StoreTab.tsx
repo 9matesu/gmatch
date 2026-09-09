@@ -5,31 +5,20 @@ import { STORE_ITEMS, type StoreItem, type User, formatGc, computeCashoutPayout,
 import { orbitFetch } from '../utils/api';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { ActiveHackSession } from './home/HomeFooter';
-import { playPress, playLike, playMatch } from '../utils/sounds';
+import { playPress, playLike } from '../utils/sounds';
 import { TargetSelectorModal } from './hacks/TargetSelectorModal';
 import { ObjectImage } from './ObjectImage';
+import { CardDetailView } from './CardDetailView';
 import {
   ShoppingBag,
-  Package,
   Zap,
-  Check,
   Coins,
   Sparkles,
-  Box,
   Layers,
-  Skull,
   EyeOff,
   Flame,
   ShieldAlert,
 } from 'lucide-react';
-
-interface OpenedCard {
-  id: string;
-  title: string;
-  rarity: string;
-  score: number;
-  content_url: string;
-}
 
 interface PortfolioCard {
   id: string;
@@ -51,6 +40,7 @@ export function StoreTab({
   users = [],
   profilePics = {},
   toast,
+  arsenalOnly = false,
 }: {
   points: number;
   onPurchase?: (item: StoreItem) => void;
@@ -62,27 +52,62 @@ export function StoreTab({
   users?: User[];
   profilePics?: Record<string, string>;
   toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
+  /** Hack-arsenal embed (PC Domination): only hack items, no dashboard/tabs. */
+  arsenalOnly?: boolean;
 }) {
-  const [activeCategory, setActiveCategory] = useState<'all' | 'hack' | 'pack' | 'inventory'>('all');
   const [storeItems, setStoreItems] = useState<StoreItem[]>(STORE_ITEMS);
   const [targetModalItem, setTargetModalItem] = useState<StoreItem | null>(null);
-  const [unlocked, setUnlocked] = useState<Set<string>>(() => {
-    if (typeof window === 'undefined') return new Set();
-    try {
-      return new Set(JSON.parse(localStorage.getItem('orbit_unlocked_store') || '[]'));
-    } catch {
-      return new Set();
-    }
-  });
   const [inventory, setInventory] = useState<Record<string, number>>({});
   const [buying, setBuying] = useState<string | null>(null);
-  const [openingPack, setOpeningPack] = useState<string | null>(null);
-  const [unboxedCards, setUnboxedCards] = useState<OpenedCard[] | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioCard[]>([]);
   const [cashoutRate, setCashoutRate] = useState<number>(DEFAULT_CASHOUT_RATE_BPS);
   const [confirmCashoutAll, setConfirmCashoutAll] = useState(false);
   const [cashingOutAll, setCashingOutAll] = useState(false);
   const [cashoutProgress, setCashoutProgress] = useState<{ done: number; total: number } | null>(null);
+  const [marketListings, setMarketListings] = useState<Array<{ listingId: string; cardId: string; price: number; sellerId: string; card: any }>>([]);
+  const [buyingCardId, setBuyingCardId] = useState<string | null>(null);
+  const [marketCardId, setMarketCardId] = useState<string | null>(null);
+
+  // Community market (Steam-style): open listings, newest first.
+  const refreshMarket = () => {
+    if (!identity) return;
+    orbitFetch('/api/cards/market?limit=24', {}, identity)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (Array.isArray(data?.listings)) setMarketListings(data.listings); })
+      .catch(() => { });
+  };
+
+  useEffect(() => {
+    if (arsenalOnly) return;
+    refreshMarket();
+    const onCards = () => refreshMarket();
+    window.addEventListener('orbit-cards-refresh', onCards);
+    return () => window.removeEventListener('orbit-cards-refresh', onCards);
+  }, [identity, arsenalOnly]);
+
+  const buyListing = async (listing: { cardId: string; price: number }) => {
+    if (!identity || buyingCardId) return;
+    setBuyingCardId(listing.cardId);
+    try {
+      const res = await orbitFetch(`/api/cards/${listing.cardId}/buy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idempotency_key: crypto.randomUUID() }),
+      }, identity);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast?.(data?.error || 'Could not buy this card', 'error');
+        return;
+      }
+      toast?.(`Bought for ${formatGc(listing.price)} g$ — it's in your collection`, 'success');
+      refreshMarket();
+      window.dispatchEvent(new CustomEvent('orbit-score-refresh'));
+    } catch {
+      toast?.('Network error while buying', 'error');
+    } finally {
+      setBuyingCardId(null);
+    }
+  };
 
   // Fetch dynamic store items and pricing from backend
   useEffect(() => {
@@ -214,30 +239,6 @@ export function StoreTab({
     setCashoutProgress(null);
   };
 
-  // Restore unlocks
-  useEffect(() => {
-    if (!identity) return;
-    let cancelled = false;
-    orbitFetch('/api/users/store/unlocks', {}, identity)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((ids: string[]) => {
-        if (cancelled || !Array.isArray(ids)) return;
-        const next = new Set(ids);
-        setUnlocked((prev) => {
-          for (const id of ids) next.add(id);
-          for (const id of prev) next.add(id);
-          return next;
-        });
-        try {
-          localStorage.setItem('orbit_unlocked_store', JSON.stringify(Array.from(next)));
-        } catch { }
-      })
-      .catch(() => { });
-    return () => {
-      cancelled = true;
-    };
-  }, [identity]);
-
   const refreshInventory = () => {
     if (!identity) return;
     orbitFetch('/api/users/store/inventory', {}, identity)
@@ -312,14 +313,6 @@ export function StoreTab({
 
         if (item.consumable) {
           refreshInventory();
-        } else {
-          setUnlocked((prev) => {
-            const next = new Set(prev).add(item.id);
-            try {
-              localStorage.setItem('orbit_unlocked_store', JSON.stringify(Array.from(next)));
-            } catch { }
-            return next;
-          });
         }
       } else {
         const err = await res.json().catch(() => ({ error: 'Purchase failed' }));
@@ -332,43 +325,7 @@ export function StoreTab({
     }
   };
 
-  const handleOpenPack = async (item: StoreItem) => {
-    if (!identity || (inventory[item.id] || 0) <= 0 || openingPack) return;
-
-    setOpeningPack(item.id);
-    playPress(920);
-    try {
-      const res = await orbitFetch(
-        '/api/users/store/open-pack',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ item_id: item.id, idempotency_key: crypto.randomUUID() }),
-        },
-        identity
-      );
-      if (res.ok) {
-        const data = await res.json();
-        playMatch();
-        setUnboxedCards(data.cards || []);
-        refreshInventory();
-        window.dispatchEvent(new CustomEvent('orbit-cards-refresh'));
-        toast?.(`Opened ${item.name}! Check your collection.`, 'success');
-      } else {
-        toast?.('Failed to open pack', 'error');
-      }
-    } catch {
-      toast?.('Network error opening pack', 'error');
-    } finally {
-      setOpeningPack(null);
-    }
-  };
-
-  const filteredItems = storeItems.filter((item) => {
-    if (activeCategory === 'all') return true;
-    if (activeCategory === 'inventory') return (inventory[item.id] || 0) > 0;
-    return item.category === activeCategory;
-  });
+  const filteredItems = storeItems.filter((item) => item.category === 'hack');
 
   // Keep the portfolio dashboard in sync when cards change elsewhere.
   useEffect(() => {
@@ -387,6 +344,8 @@ export function StoreTab({
   }, {} as Record<string, number>);
   return (
     <div className="w-full space-y-4 font-sans select-none text-retro-fg">
+      {!arsenalOnly && (
+      <>
       {/* Header */}
       <section className="w-full bg-surface-raised border border-retro-border rounded-lg p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -396,7 +355,9 @@ export function StoreTab({
           <div>
             <h2 className="text-sm font-medium text-retro-fg">Store</h2>
             <p className="text-xs text-retro-muted">
-              Card packs and in-game hacks, bought with g$.
+              {arsenalOnly
+                ? 'Deploy cyber hacks with g$.'
+                : 'Cash out your collection — buying retired; hacks live under PC Domination.'}
             </p>
           </div>
         </div>
@@ -501,75 +462,146 @@ export function StoreTab({
           </div>
         </div>
       </section>
+      </>
+      )}
 
-      {/* Category Tabs */}
-      <div className="flex items-center gap-1.5 p-1.5 bg-surface-interactive border border-retro-border rounded-lg overflow-x-auto styled-scrollbar">
-        {[
-          { id: 'all', label: 'All', icon: ShoppingBag },
-          { id: 'hack', label: 'Hacks', icon: ShieldAlert },
-          { id: 'pack', label: 'Packs', icon: Package },
-          { id: 'inventory', label: 'Inventory', icon: Box, count: Object.values(inventory).reduce((a, b) => a + b, 0) },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeCategory === tab.id;
-          return (
+      {!arsenalOnly && (
+      <>
+      {/* Most valuable cards */}
+      <section className="bg-surface-raised border border-retro-border rounded-lg p-4">
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Most valuable cards</h3>
+          {onOpenCardCollection && (
             <button
-              key={tab.id}
               type="button"
-              onClick={() => {
-                playPress(750);
-                setActiveCategory(tab.id as any);
-              }}
-              className={`h-8 px-2.5 text-xs font-medium flex items-center gap-1.5 rounded transition-colors cursor-pointer whitespace-nowrap ${isActive
-                  ? 'bg-surface-raised text-retro-fg border border-retro-border'
-                  : 'text-retro-muted hover:text-retro-fg'
-                }`}
+              onClick={onOpenCardCollection}
+              className="px-2.5 py-1.5 text-[11px] font-medium border border-retro-border text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors whitespace-nowrap"
             >
-              <Icon className="w-3.5 h-3.5" />
-              <span>{tab.label}</span>
-              {tab.count !== undefined && tab.count > 0 && (
-                <span className="text-[9px] px-1 py-0 rounded bg-retro-accent/10 text-retro-accent tabular-nums">
-                  {tab.count}
-                </span>
-              )}
+              View collection
             </button>
-          );
-        })}
-      </div>
+          )}
+        </div>
+        {portfolio.length === 0 ? (
+          <p className="text-xs text-retro-muted">No cards yet — forge, trade or win some to build value.</p>
+        ) : (
+          <div className="space-y-1.5">
+            {[...portfolio].sort((a, b) => b.value - a.value).slice(0, 8).map((c, i) => {
+              const tier = RARITY_TIERS[c.rarity as keyof typeof RARITY_TIERS];
+              return (
+                <div key={c.id} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-surface-interactive border border-retro-border">
+                  <span className="text-[11px] font-mono text-retro-muted tabular-nums w-5 shrink-0">#{i + 1}</span>
+                  {tier && (
+                    <span
+                      className="text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide shrink-0"
+                      style={{ color: tier.accentColor, borderColor: `${tier.accentColor}66`, backgroundColor: `${tier.accentColor}14` }}
+                    >
+                      {tier.label}
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-retro-muted">{c.id.slice(0, 12)}…</span>
+                  <span className="text-xs font-bold font-mono tabular-nums text-retro-fg shrink-0">{formatGc(c.value)}</span>
+                  <span className="text-[10px] font-mono tabular-nums text-amber-300 shrink-0">→ {formatGc(computeCashoutPayout(c.value, cashoutRate))}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
-      {/* Store Items Grid */}
+      {/* Inventory (read-only) */}
+      <section className="bg-surface-raised border border-retro-border rounded-lg p-4">
+        <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider mb-3">Inventory</h3>
+        {(() => {
+          const owned = storeItems.filter((item) => (inventory[item.id] || 0) > 0);
+          if (owned.length === 0) return <p className="text-xs text-retro-muted">Empty — nothing owned.</p>;
+          return (
+            <div className="space-y-1.5">
+              {owned.map((item) => (
+                <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-surface-interactive border border-retro-border">
+                  <span className="min-w-0 flex-1 truncate text-xs text-retro-body">{item.name}</span>
+                  <span className="text-[11px] font-mono tabular-nums text-retro-muted shrink-0">×{inventory[item.id]}</span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+      </section>
+
+      {/* Community Market — Steam-style buy/sell between players */}
+      <section className="bg-surface-raised border border-retro-border rounded-lg p-4">
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Community Market</h3>
+          <span className="text-[10px] text-retro-muted">{marketListings.length} open listing{marketListings.length === 1 ? '' : 's'}</span>
+        </div>
+        {marketListings.length === 0 ? (
+          <p className="text-xs text-retro-muted">Nothing listed yet — open one of your cards and list it for g$.</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {marketListings.map((l) => (
+              <div key={l.listingId} className="rounded-lg border border-retro-border bg-surface-interactive overflow-hidden flex flex-col">
+                <button
+                  type="button"
+                  onClick={() => setMarketCardId(l.cardId)}
+                  className="block w-full text-left cursor-pointer"
+                  aria-label={`View card ${l.card?.name || l.cardId.slice(0, 8)}`}
+                >
+                  <div className="aspect-square bg-black">
+                    <ObjectImage
+                      objectId={l.card?.mediaObjectId}
+                      contentUrl={l.card?.contentUrl}
+                      mimeType={l.card?.mimeType}
+                      identity={identity ?? null}
+                      alt={l.card?.name || 'market card'}
+                      className="w-full h-full object-cover"
+                      videoClassName="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="p-2">
+                    <div className="text-[11px] font-bold text-retro-fg truncate">{l.card?.name || 'Unnamed Card'}</div>
+                    <div className="text-[9px] capitalize text-retro-muted">{l.card?.rarity}</div>
+                  </div>
+                </button>
+                <div className="flex items-center justify-between gap-1.5 px-2 pb-2">
+                  <span className="text-[11px] font-mono font-bold text-cyan-300 tabular-nums">{formatGc(l.price)} g$</span>
+                  <button
+                    type="button"
+                    disabled={buyingCardId !== null}
+                    onClick={() => void buyListing(l)}
+                    className="px-2 py-1 rounded bg-cyan-500/20 hover:bg-cyan-500/30 disabled:opacity-40 text-cyan-300 text-[10px] font-bold cursor-pointer transition-colors"
+                  >
+                    {buyingCardId === l.cardId ? '…' : 'Buy'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+      </>
+      )}
+
+      {/* Store Items Grid (arsenal mode only: hack buy/deploy) */}
+      {arsenalOnly && (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredItems.map((item) => {
-          const isOwned = unlocked.has(item.id);
           const count = inventory[item.id] || 0;
           const canAfford = points >= item.cost;
-          const isPack = item.category === 'pack';
-          const isHack = item.category === 'hack';
 
           return (
             <div
               key={item.id}
-              className={`relative bg-surface-raised border rounded-lg p-4 flex flex-col justify-between transition-colors ${isHack
-                  ? 'border-rose-500/30'
-                  : isOwned && !item.consumable
-                    ? 'border-retro-online/30'
-                    : 'border-retro-border hover:border-zinc-500'
-                }`}
+              className="relative bg-surface-raised border rounded-lg p-4 flex flex-col justify-between transition-colors border-rose-500/30"
             >
               <div className="space-y-2">
                 <div className="flex items-start justify-between">
-                  <div className={`p-2.5 rounded-lg border ${isHack ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' : 'bg-surface-interactive border-retro-border text-retro-body'}`}>
+                  <div className="p-2.5 rounded-lg border bg-rose-500/10 border-rose-500/20 text-rose-400">
                     {item.id === 'item-hack-deny' && <EyeOff className="w-5 h-5" />}
                     {item.id === 'item-hack-mobile' && <Flame className="w-5 h-5" />}
-                    {item.category === 'pack' && <Package className="w-5 h-5 text-retro-accent" />}
                     {item.id === 'item-flash-drop' && <Zap className="w-5 h-5 text-retro-warning" />}
                   </div>
 
                   {item.badge && (
-                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded border ${isHack
-                        ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                        : 'bg-surface-interactive text-retro-muted border-retro-border'
-                      }`}>
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded border bg-rose-500/10 text-rose-400 border-rose-500/20">
                       {item.badge}
                     </span>
                   )}
@@ -582,65 +614,28 @@ export function StoreTab({
               </div>
 
               <div className="pt-3 border-t border-retro-border mt-3 flex items-center justify-between gap-2">
-                <span className={`text-sm font-medium font-mono tabular-nums ${isHack ? 'text-rose-400' : 'text-retro-body'}`}>
+                <span className="text-sm font-medium font-mono tabular-nums text-rose-400">
                   g$ {item.cost.toLocaleString()}
                 </span>
 
-                {isHack ? (
-                  <button
-                    type="button"
-                    onClick={() => handleBuy(item)}
-                    disabled={!canAfford || buying === item.id}
-                    className="px-3 py-1.5 bg-rose-500/15 hover:bg-rose-500/20 disabled:opacity-40 text-rose-400 text-xs font-medium rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
-                  >
-                    <ShieldAlert className="w-3.5 h-3.5" />
-                    <span>{buying === item.id ? 'Deploying...' : (item.id === 'item-flash-drop' && count > 0 ? 'Fire' : 'Deploy')}</span>
-                  </button>
-                ) : isPack ? (
-                  <div className="flex items-center gap-2">
-                    {count > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => handleOpenPack(item)}
-                        disabled={Boolean(openingPack)}
-                        className="px-3 py-1.5 bg-retro-accent/15 hover:bg-retro-accent/20 text-retro-accent text-xs font-medium rounded-lg transition-colors cursor-pointer flex items-center gap-1"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>Open ({count})</span>
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleBuy(item)}
-                      disabled={!canAfford || buying === item.id}
-                      className="px-3 py-1.5 bg-retro-accent hover:bg-retro-accent-hover disabled:opacity-40 text-black text-xs font-medium rounded-lg transition-colors cursor-pointer"
-                    >
-                      {buying === item.id ? 'Buying...' : 'Buy Pack'}
-                    </button>
-                  </div>
-                ) : isOwned ? (
-                  <div className="flex items-center gap-1 text-retro-online text-xs font-medium">
-                    <Check className="w-3.5 h-3.5" />
-                    <span>Owned</span>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleBuy(item)}
-                    disabled={!canAfford || buying === item.id}
-                    className="px-3 py-1.5 bg-retro-accent hover:bg-retro-accent-hover disabled:opacity-40 text-black text-xs font-medium rounded-lg transition-colors cursor-pointer"
-                  >
-                    {buying === item.id ? 'Buying...' : 'Purchase'}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => handleBuy(item)}
+                  disabled={!canAfford || buying === item.id}
+                  className="px-3 py-1.5 bg-rose-500/15 hover:bg-rose-500/20 disabled:opacity-40 text-rose-400 text-xs font-medium rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  <span>{buying === item.id ? 'Deploying...' : (item.id === 'item-flash-drop' && count > 0 ? 'Fire' : 'Deploy')}</span>
+                </button>
               </div>
             </div>
           );
         })}
       </div>
+      )}
 
-      {/* Target Selector Modal for Hacking Services */}
-      {targetModalItem && (
+      {/* Target Selector Modal for Hacking Services (arsenal only) */}
+      {arsenalOnly && targetModalItem && (
         <TargetSelectorModal
           isOpen={Boolean(targetModalItem)}
           onClose={() => setTargetModalItem(null)}
@@ -655,55 +650,14 @@ export function StoreTab({
           }}
         />
       )}
-
-      {/* Unboxed Cards Modal */}
-      {unboxedCards && (
-        <div
-          className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-orbit-fade-in"
-          onClick={() => setUnboxedCards(null)}
-        >
-          <div
-            className="bg-surface-raised border border-retro-border rounded-lg p-5 max-w-sm w-full text-center space-y-3 shadow-xl animate-orbit-pop"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-10 h-10 rounded-lg bg-retro-accent/10 border border-retro-accent/20 flex items-center justify-center mx-auto text-retro-accent">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-sm font-medium text-retro-fg">Pack Opened</h3>
-              <p className="text-xs text-retro-muted">New card added to your collection</p>
-            </div>
-            <div className="space-y-2">
-              {unboxedCards.map((card, idx) => (
-                <div key={idx} className="bg-surface-interactive border border-retro-border rounded-lg p-3 flex items-center gap-3 text-left">
-                  <div className="w-10 h-10 rounded bg-surface-canvas overflow-hidden shrink-0 border border-retro-border">
-                    {card.content_url ? (
-                      <ObjectImage contentUrl={card.content_url} objectId={card.id} identity={identity ?? null} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <Box className="w-5 h-5 text-retro-muted m-auto mt-2.5" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-xs text-retro-body truncate">{card.title}</div>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-retro-accent/10 text-retro-accent">
-                        {card.rarity}
-                      </span>
-                      <span className="text-[10px] font-medium text-retro-accent font-mono">+{card.score} g$</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => setUnboxedCards(null)}
-              className="w-full py-2.5 bg-retro-accent hover:bg-retro-accent-hover text-black font-medium text-xs rounded-lg cursor-pointer transition-colors"
-            >
-              Continue
-            </button>
-          </div>
-        </div>
+      {/* Community Market listing detail (Steam-style card modal) */}
+      {!arsenalOnly && marketCardId && (
+        <CardDetailView
+          cardId={marketCardId}
+          identity={identity ?? null}
+          onClose={() => { setMarketCardId(null); refreshMarket(); }}
+          toast={toast}
+        />
       )}
     </div>
   );

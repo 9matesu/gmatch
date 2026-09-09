@@ -1,14 +1,9 @@
-import { useState, type ComponentType } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useGame } from '../game/store'
 import { MAX_TAG_LEVEL, tagCost } from '../game/tags'
 import { CAPS, capEffectLabel, capStacks } from '../game/caps'
 import type { CapId } from '../game/types'
-import {
-  IconFlask,
-  IconRefresh,
-  IconTag,
-  IconTrophy,
-} from './icons'
+import { IconRefresh, IconChevronR } from './icons'
 import {
   PRESTIGE_MIN_TIER,
   canBrainmelt,
@@ -32,16 +27,60 @@ import {
   SKIN,
 } from './styles'
 
-type Tab = 'tags' | 'caps' | 'prestige'
+/** Tab body content (stacked under fold headers; outer column scrolls). */
+const TAB_BODY = 'space-y-2.5'
 
-const TABS: { id: Tab; label: string; icon: ComponentType<{ size?: number }> }[] = [
-  { id: 'tags', label: 'Tags', icon: IconTag },
-  { id: 'caps', label: 'Caps', icon: IconFlask },
-  { id: 'prestige', label: 'Prestige', icon: IconTrophy },
-]
+const FOLD_KEY = 'gmatch.shop.folded.v1'
 
-/** Scrollable tab body (was .tab-body). */
-const TAB_BODY = 'min-h-0 flex-1 overflow-y-auto p-3.5'
+function loadFolded(): Record<string, boolean> {
+  try {
+    if (typeof localStorage === 'undefined') return {}
+    const raw = localStorage.getItem(FOLD_KEY)
+    if (!raw) return {}
+    const d = JSON.parse(raw) as unknown
+    if (typeof d === 'object' && d !== null) return d as Record<string, boolean>
+  } catch {
+    /* corrupt — start expanded */
+  }
+  return {}
+}
+
+/** Collapsible section (persisted): header toggles, body hides. */
+function FoldSection({ id, title, count, wrap = true, children }: { id: string; title: string; count?: number; wrap?: boolean; children: ReactNode }) {
+  const [foldedMap, setFoldedMap] = useState<Record<string, boolean>>(loadFolded)
+  const folded = foldedMap[id] === true
+  const toggle = () => {
+    setFoldedMap((prev) => {
+      const next = { ...prev, [id]: !prev[id] }
+      try {
+        if (typeof localStorage !== 'undefined') localStorage.setItem(FOLD_KEY, JSON.stringify(next))
+      } catch {
+        /* storage unavailable */
+      }
+      return next
+    })
+  }
+  return (
+    <section aria-label={title} className={folded ? '' : 'border-b border-border-glass pb-3 last:border-0'}>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={!folded}
+        aria-label={`${folded ? 'Expand' : 'Collapse'} ${title}`}
+        className="flex w-full cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-left"
+      >
+        <span className={`inline-block transition-transform ${folded ? '' : 'rotate-90'}`}>
+          <IconChevronR size={11} />
+        </span>
+        <h4 className={`${MONO} m-0 flex-1 text-[10px] font-bold uppercase tracking-wider text-retro-muted`}>
+          {title}
+          {typeof count === 'number' ? ` (${count})` : ''}
+        </h4>
+      </button>
+      {!folded && (wrap ? <div className="mt-1.5 flex flex-wrap gap-1.5">{children}</div> : <div className="mt-1.5">{children}</div>)}
+    </section>
+  )
+}
 
 /** Tag search / filter input — shell glass tokens (was .custom-tag-input). */
 const TAG_INPUT =
@@ -197,24 +236,14 @@ function TagsTab() {
         return (
           <div className="space-y-3">
             {ownedTags.length > 0 && (
-              <section aria-label="Owned tags">
-                <h4 className={`${MONO} mb-1.5 text-[10px] font-bold uppercase tracking-wider text-retro-muted`}>
-                  Owned — steer the feed
-                </h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {ownedTags.map(renderPill)}
-                </div>
-              </section>
+              <FoldSection id="owned" title="Owned — steer the feed" count={ownedTags.length}>
+                {ownedTags.map(renderPill)}
+              </FoldSection>
             )}
             {marketTags.length > 0 && (
-              <section aria-label="Tag market">
-                <h4 className={`${MONO} mb-1.5 text-[10px] font-bold uppercase tracking-wider text-retro-muted`}>
-                  Market — buy to earn
-                </h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {marketTags.map(renderPill)}
-                </div>
-              </section>
+              <FoldSection id="market" title="Market — buy to earn" count={marketTags.length}>
+                {marketTags.map(renderPill)}
+              </FoldSection>
             )}
           </div>
         )
@@ -327,31 +356,17 @@ function PrestigeTab() {
 }
 
 export default function ShopPanel() {
-  const [tab, setTab] = useState<Tab>('tags')
   return (
-    <aside className={`${PLATE} ${PANEL} flex flex-col overflow-hidden p-0`}>
-      <nav className="grid flex-none grid-cols-3 gap-1.5 border-b border-border-glass bg-retro-bg p-3">
-        {TABS.map((t) => {
-          const Icon = t.icon
-          return (
-            <button
-              key={t.id}
-              type="button"
-              className={`glass-tab ${DISPLAY} flex min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-0.5 py-2 text-xs font-semibold tracking-[0.5px] ${
-                tab === t.id ? 'glass-tab-active' : ''
-              }`}
-              aria-pressed={tab === t.id}
-              onClick={() => setTab(t.id)}
-            >
-              <Icon size={14} />
-              <span className="truncate">{t.label}</span>
-            </button>
-          )
-        })}
-      </nav>
-      {tab === 'tags' && <TagsTab />}
-      {tab === 'caps' && <CapsTab />}
-      {tab === 'prestige' && <PrestigeTab />}
+    <aside className={`${PLATE} ${PANEL} flex flex-col gap-3`}>
+      <FoldSection id="shop-tags" title="Tags" wrap={false}>
+        <TagsTab />
+      </FoldSection>
+      <FoldSection id="shop-caps" title="Caps" wrap={false}>
+        <CapsTab />
+      </FoldSection>
+      <FoldSection id="shop-prestige" title="Prestige" wrap={false}>
+        <PrestigeTab />
+      </FoldSection>
     </aside>
   )
 }

@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { playPress } from '../../utils/sounds';
+import { GroupMembersPopover, type GroupMember } from './GroupMembersPopover';
 import {
   Send,
   Search,
   ChevronLeft,
-  Minimize2,
   MessageSquare,
   Users,
   Gamepad2,
@@ -73,7 +73,6 @@ export function GMatchDMs({
   onSendPm,
   onSelectPeer,
   onBackToThreads,
-  onMinimize,
   onReportMessage,
   onReportUser,
   onDeleteMessage,
@@ -83,6 +82,8 @@ export function GMatchDMs({
   onSendGroupMessage,
   onLeaveGroup,
   onLoadGroupMessages,
+  onLoadGroupMembers,
+  onAddGroupMembers,
   onSelectGroup,
   onOpenProfile,
   activeGroupId,
@@ -105,7 +106,6 @@ export function GMatchDMs({
   onOpenAttachment?: (target: 'pm' | 'group', peerId?: string, groupId?: string, replyToId?: string) => void;
   onSelectPeer: (peer: PeerInfo | null) => void;
   onBackToThreads?: () => void;
-  onMinimize?: () => void;
   onReportMessage?: (messageId: string) => void;
   onReportUser?: (userId: string) => void;
   onDeleteMessage?: (messageId: string, peerId: string) => void;
@@ -114,6 +114,8 @@ export function GMatchDMs({
   onSendGroupMessage?: (groupId: string, text: string, replyToId?: string, attachment?: { id: string; url: string; isVideo?: boolean }) => void;
   onLeaveGroup?: (groupId: string) => void;
   onLoadGroupMessages?: (groupId: string) => void;
+  onLoadGroupMembers?: (groupId: string) => Promise<GroupMember[]>;
+  onAddGroupMembers?: (groupId: string, ids: string[]) => Promise<boolean> | void;
   onSelectGroup?: (groupId: string | null) => void;
   onOpenProfile?: (userId: string) => void;
   onOpenImage?: (message: ChatMessage) => void;
@@ -136,6 +138,7 @@ export function GMatchDMs({
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [actionFor, setActionFor] = useState<string | null>(null);
   const [showNewGroup, setShowNewGroup] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupMembers, setNewGroupMembers] = useState<Set<string>>(new Set());
   const [editingMessage, setEditingMessage] = useState<{ id: string; text: string } | null>(null);
@@ -353,6 +356,7 @@ export function GMatchDMs({
   const openGroup = (g: GroupInfo) => {
     playPress(800);
     setListMode(false);
+    setShowMembers(false);
     onSelectGroup?.(g.id);
     setReplyingTo(null);
     onLoadGroupMessages?.(g.id);
@@ -390,6 +394,9 @@ export function GMatchDMs({
       ? 'Queue chat'
       : 'Direct message';
 
+  const activeGroup = openTarget === 'group' ? groups.find((g) => g.id === activeGroupId) : undefined;
+  const canShowMembers = openTarget === 'group' && !!activeGroupId && !!onLoadGroupMembers;
+
   return (
     <div className="flex-1 min-h-[480px] h-full w-full solid-panel overflow-hidden flex flex-col md:flex-row font-sans text-retro-fg animate-orbit-fade-in">
       {/* Left Column */}
@@ -410,17 +417,6 @@ export function GMatchDMs({
             >
               <Plus className="w-4 h-4" />
             </button>
-            {onMinimize && (
-              <button
-                type="button"
-                onClick={() => { playPress(800); onMinimize(); }}
-                title="Minimize"
-                aria-label="Minimize"
-                className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
-              >
-                <Minimize2 className="w-4 h-4" />
-              </button>
-            )}
           </div>
         </div>
 
@@ -654,6 +650,18 @@ export function GMatchDMs({
               </div>
 
               <div className="flex items-center gap-2 text-retro-muted shrink-0">
+                {canShowMembers && (
+                  <button
+                    type="button"
+                    onClick={() => { playPress(700); setShowMembers((v) => !v); }}
+                    title="Group members"
+                    aria-label="Group members"
+                    aria-expanded={showMembers}
+                    className={`p-1.5 rounded-md transition-colors cursor-pointer ${showMembers ? 'text-retro-accent bg-retro-accent/10' : 'text-retro-muted hover:text-retro-fg'}`}
+                  >
+                    <Users className="w-4 h-4" />
+                  </button>
+                )}
                 {openTarget === 'group' && activeGroupId && onLeaveGroup && (
                   <button
                     type="button"
@@ -664,15 +672,23 @@ export function GMatchDMs({
                     <X className="w-4 h-4" />
                   </button>
                 )}
-                {onMinimize && (
-                  <button type="button" onClick={() => { playPress(800); onMinimize(); }} title="Minimize" className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg transition-colors cursor-pointer">
-                    <Minimize2 className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            </div>
+                </div>
+             </div>
 
-            <div ref={messageStreamRef} className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-3 styled-scrollbar select-text">
+             {canShowMembers && showMembers && (
+               <div className="metro-rule max-h-72 overflow-y-auto styled-scrollbar bg-surface-canvas/60 shrink-0">
+                 <GroupMembersPopover
+                   groupId={activeGroupId as string}
+                   loadMembers={onLoadGroupMembers}
+                   meId={identity?.orbitId}
+                   isOwner={!!activeGroup && !!identity && activeGroup.owner_id === identity.orbitId}
+                   peers={peers.filter((p) => p.orbitId !== 'global_lobby' && p.orbitId !== 'card_queue').map((p) => ({ orbitId: p.orbitId, name: p.name || 'User' }))}
+                   onAddMembers={onAddGroupMembers}
+                 />
+               </div>
+             )}
+
+             <div ref={messageStreamRef} className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-3 styled-scrollbar select-text">
               {displayedMessages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-2 text-retro-muted my-auto select-none">
                   <MessageSquare className="w-6 h-6" />

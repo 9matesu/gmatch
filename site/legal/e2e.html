@@ -1,37 +1,37 @@
 <!doctype html>
-<html lang="pt-br">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Declaração sobre Criptografia e Autocustódia — gMatch</title>
+<title>Encryption &amp; Self-Custody Disclaimer — gMatch</title>
 </head>
 <body>
-<p><a href="../index.html#termos">← voltar para a página principal</a></p>
-<p><em>Documento gerado a partir do fonte canônico do aplicativo — não editar aqui.</em></p>
-<h1>Declaração sobre Criptografia e Autocustódia</h1>
-<p>_Versão vinculante (PT-BR)_: <strong>2026-09-09.1</strong> · atualizado/updated: 2026-09-09</p>
-<p>Jurisdição: Explicação técnica vinculada ao art. 8 dos Termos</p>
-<h2>1. O que o servidor oficial NUNCA vê</h2>
-<p>Conteúdo de DMs, posts, salas ou nomes; quem conversa com quem (o carteiro roteia hashes, você conecta seu ID à sua caixa localmente); quem está online; a sua imagem, seu texto, seu histórico.</p>
-<h2>2. O que ele vê</h2>
-<p>O endereço de entrega (hash da sua chave pública) com metadados mínimos (tamanho, hora, TTL) e pedidos anônimos de credencial TURN.</p>
-<h2>3. Chaves: o que autocustódia significa</h2>
-<p>Suas chaves privadas vivem apenas no seu dispositivo (cifradas pelo DPAPI do Windows quando disponível). Não há servidor com "esqueci minha senha". Quem perde o backup perde a conta — sem exceção.</p>
-<h2>4. TOFU (web-of-trust por primeira aparição)</h2>
-<p>Ao cifrar a primeira conversa, o app FIXA a chave pública do contato. Se a chave mudar, você é avisado explicitamente antes de enviar. Não há diretório de identidade confiável a auditar — a verificação fora do app (por exemplo, conferir o hash num canal que ambos confiam) é a única defesa contra homem-no-meio de troca de chave.</p>
-<h2>5. Limites honestos</h2>
+<p><a href="../index.html#terms">← back to the main page</a></p>
+<p><em>Generated from the canonical in-app source — do not edit here.</em></p>
+<h1>Encryption &amp; Self-Custody Disclaimer</h1>
+<p>_Binding text (EN)_: <strong>2026-09-09.2</strong> · updated: 2026-09-09</p>
+<p>Jurisdiction: Technical explanation tied to Terms §8</p>
+<h2>1. What the official server NEVER sees</h2>
+<p>DM/post/room content or names; who talks to whom (the courier routes hashes — you map IDs to your box locally); who is online; your images, text or history.</p>
+<h2>2. What it DOES see</h2>
+<p>The delivery address (hash of your public key) with minimal metadata (size, time, TTL) and anonymous TURN credential requests.</p>
+<h2>3. Keys: what self-custody means</h2>
+<p>Private keys live only on your device (DPAPI-encrypted on Windows when available). No server can "reset my password". Lose the backup, lose the account — no exceptions.</p>
+<h2>4. TOFU (trust-on-first-use)</h2>
+<p>The app FIXES a contact's public key when you first encrypt a conversation. If the key changes you are warned explicitly before sending. There is no trusted identity directory to audit — out-of-band verification (e.g. comparing the hash in a channel both sides trust) is the only defence against a key-swap MITM.</p>
+<h2>5. Honest limits</h2>
 <ul>
-<li>Metadados temporais do carteiro podem correlacionar tráfego sob vigilância forte (não há padding/onion por padrão).</li>
+<li>Courier timing metadata can correlate traffic under strong surveillance (no padding/onion by default).</li>
 </ul>
 <ul>
-<li>Um full-node de terceiros tem o poder de ler o que passar por ele (modelo "o host É o servidor").</li>
+<li>A third-party full-node can read everything passing through it ("the host IS the server").</li>
 </ul>
 <ul>
-<li>Malware rodando como o seu usuário de sessão pode ler dados em memória — proteção é do seu ambiente.</li>
+<li>Malware running as your session user can read memory — that threat is your environment's.</li>
 </ul>
-<h2>6. Sem suporte de recuperação</h2>
-<p>Pedidos de suporte do tipo "redefina minha conta" são recusados por princípio: não temos como cumpri-los sem quebrar a promessa deste documento.</p>
+<h2>6. No recovery support</h2>
+<p>"Reset my account" support requests are refused by principle: fulfilling them would break the promise of this document.</p>
 <hr>
-<p>Contato: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · Esta página não usa JavaScript, CSS, cookies ou analytics.</p>
+<p>Contact: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · This page uses no JavaScript, CSS, cookies or analytics.</p>
 </body>
 </html>

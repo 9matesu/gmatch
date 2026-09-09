@@ -20,6 +20,7 @@ import { LazyVideo } from './LazyVideo'
 import { LeagueBoard } from './lobby/LeagueBoard'
 import { PlayerRoster } from './lobby/PlayerRoster'
 import { QueueControls } from './lobby/QueueControls'
+import { CardTile } from './home/CardTile'
 
 interface LobbyTileProps {
   img: LobbyImage
@@ -1020,7 +1021,6 @@ const selfId = identity?.orbitId || ''
                 autoQueueEnabled={autoQueueEnabled}
                 soundEnabled={soundEnabled}
                 myCardsCount={myCards.length}
-                mergedPlayersCount={mergedPlayers.length}
                 queuedSinceMs={queuedSinceMs}
                 showLeagueTab={showLeagueTab}
                 onToggleAutoQueue={effectiveToggleAutoQueue}
@@ -1047,6 +1047,55 @@ const selfId = identity?.orbitId || ''
                   loading={loading}
                   state={state}
                 />
+              )}
+            </div>
+          </section>
+
+          {/* 02 — Your Cards: collection strip right below the player cards */}
+          <section className="module">
+            <div className="module-header flex flex-wrap items-center gap-2 justify-between">
+              <div className="flex items-center gap-2">
+                <span className="module-title">Your Cards</span>
+                <span className="module-subtitle">
+                  {myCards.length} in collection
+                </span>
+              </div>
+              {onOpenDeckBuilder && (
+                <button
+                  type="button"
+                  onClick={onOpenDeckBuilder}
+                  className="border border-retro-border px-2.5 py-1.5 text-xs font-medium text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors"
+                >
+                  Open collection
+                </button>
+              )}
+            </div>
+            <div className="module-body">
+              {myCards.length === 0 ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <p className="text-xs text-retro-muted">No cards yet — forge one or win duels to build your deck.</p>
+                  {onOpenCreateCard && (
+                    <button
+                      type="button"
+                      onClick={onOpenCreateCard}
+                      className="px-3 py-1.5 text-xs font-bold bg-retro-accent text-black hover:bg-retro-accent-hover transition-colors cursor-pointer rounded-lg whitespace-nowrap"
+                    >
+                      Create Card
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 select-none">
+                  {myCards.slice(0, 10).map((card) => (
+                    <CardTile
+                      key={card.id}
+                      item={card as any}
+                      users={users}
+                      identity={identity}
+                      onDoubleClick={() => onExpandItem?.(card.id)}
+                    />
+                  ))}
+                </div>
               )}
             </div>
           </section>

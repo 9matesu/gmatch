@@ -1,0 +1,12 @@
+API_TSC=0
+ Test Files  74 passed (74)
+      Tests  793 passed (793)
+DESKTOP_TSC=0
+[2m Test Files [22m [1m[32m61 passed[39m[22m[90m (61)[39m
+[2m      Tests [22m [1m[32m464 passed[39m[22m[90m (464)[39m
+  222:28  warning  'identity' is defined but never used. Allowed unused args must match /^_/u            @typescript-eslint/no-unused-vars
+
+✖ 95 problems (0 errors, 95 warnings)
+  0 errors and 1 warning potentially fixable with the `--fix` option.
+
+GATE_DONE

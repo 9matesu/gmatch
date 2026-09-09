@@ -1,4 +1,5 @@
 import { signMessage } from '@orbit/crypto';
+import { sealApiRequest } from '@orbit/protocol';
 import { logger } from './logger';
 
 function computeApiBase(): string {
@@ -76,7 +77,33 @@ function resolveEndpoint(endpoint: string): string {
   return `${API_BASE}${endpoint}`
 }
 
-type OrbitIdentityLike = { orbitId: string; publicKeyHex: string; privateKeyHex: string; encryptionPubHex?: string }
+type OrbitIdentityLike = { orbitId: string; publicKeyHex: string; privateKeyHex: string; encryptionPubHex?: string; encryptionPrivHex?: string }
+
+// ---- sealed-request support (security plan T2) -----------------------------
+/** Node X25519 transport pubkey, cached per API base (TTL 1h). */
+let nodeKeyCache: { base: string; pubHex: string | null; at: number } | null = null
+const NODE_KEY_TTL_MS = 60 * 60 * 1000
+
+export function _resetNodeKeyCache(): void { nodeKeyCache = null }
+
+async function getNodePubkey(fetchImpl: typeof globalThis.fetch): Promise<string | null> {
+  const base = API_BASE
+  if (nodeKeyCache && nodeKeyCache.base === base && Date.now() - nodeKeyCache.at < NODE_KEY_TTL_MS) {
+    return nodeKeyCache.pubHex
+  }
+  let pubHex: string | null = null
+  try {
+    const res = await fetchImpl(`${base}/api/identity`)
+    if (res.ok) {
+      const data = (await res.json()) as { server_pubkey?: string | null; sealed_available?: boolean }
+      pubHex = data.sealed_available ? (data.server_pubkey || null) : null
+    }
+  } catch {
+    /* offline/legacy node: plain signed path stands */
+  }
+  nodeKeyCache = { base, pubHex, at: Date.now() }
+  return pubHex
+}
 
 /**
  * Builds signed auth headers for a request. Timestamp + nonce are generated
@@ -131,7 +158,40 @@ export async function orbitFetch(
 
   // Use only the pathname for signature computation (server uses new URL().pathname)
   const pathname = new URL(url).pathname;
-  const headers = signRequestHeaders(method, pathname, bodyForSig, identity, options.headers);
+  const isFormUpload = typeof FormData !== 'undefined' && options.body instanceof FormData
+
+  async function buildHeaders(): Promise<Headers> {
+    const signed = signRequestHeaders(method, pathname, bodyForSig, identity, options.headers)
+    // Sealed mutation (security plan T2): signed headers + JSON body travel
+    // ECIES-encrypted to the node key; only X-Orbit-Sealed is visible on the
+    // wire. GET and multipart uploads stay as-is (idempotent reads / binary).
+    if (method !== 'GET' && !isFormUpload && identity.encryptionPrivHex && identity.encryptionPubHex) {
+      const nodePub = await getNodePubkey(fetchImpl)
+      if (nodePub) {
+        const headersRecord: Record<string, string> = {}
+        signed.forEach((v, k) => { headersRecord[k] = v })
+        const contentType = signed.get('Content-Type') || (bodyForSig ? 'application/json' : null)
+        const seal = sealApiRequest(
+          { headers: headersRecord, body: bodyForSig || '' },
+          {
+            privateKeyHex: identity.privateKeyHex,
+            publicKeyHex: identity.publicKeyHex,
+            encryptionPrivHex: identity.encryptionPrivHex!,
+            encryptionPubHex: identity.encryptionPubHex!,
+          },
+          nodePub,
+        )
+        const out = new Headers(options.headers)
+        for (const k of ['X-Orbit-Id', 'X-Orbit-Timestamp', 'X-Orbit-Signature', 'X-Orbit-PubKey', 'X-Orbit-PubKey-Enc', 'X-Orbit-Nonce']) out.delete(k)
+        out.set('X-Orbit-Sealed', seal)
+        if (contentType) out.set('Content-Type', contentType)
+        return out
+      }
+    }
+    return signed
+  }
+  const headers = await buildHeaders()
+  const sealedBody = headers.has('X-Orbit-Sealed') ? 'sealed' : bodyForSig
   const ck = cacheKey(method, endpoint, identity.orbitId)
 
   // In-flight dedup for GET requests
@@ -153,7 +213,7 @@ export async function orbitFetch(
     const isUpload = options.body instanceof FormData
     const timeout = setTimeout(() => controller.abort(), isUpload ? 120000 : 30000)
     try {
-      const res = await fetchImpl(url, { ...options, headers, signal: controller.signal })
+      const res = await fetchImpl(url, { ...options, headers, ...(headers.has('X-Orbit-Sealed') ? { body: sealedBody } : {}), signal: controller.signal })
       clearTimeout(timeout)
       if (res.ok) {
         if (method === 'GET') {
@@ -171,8 +231,8 @@ export async function orbitFetch(
       // freshly signed header (the most common case: the client sat idle a
       // while and the X-Orbit-Timestamp expired before the request arrived).
       if (res.status === 401 && !isUpload) {
-        const retryHeaders = signRequestHeaders(method, pathname, bodyForSig, identity, options.headers)
-        const retryRes = await fetch(url, { ...options, headers: retryHeaders, signal: controller.signal })
+        const retryHeaders = await buildHeaders()
+        const retryRes = await fetch(url, { ...options, headers: retryHeaders, ...(retryHeaders.has('X-Orbit-Sealed') ? { body: 'sealed' } : {}), signal: controller.signal })
         if (retryRes.ok) {
           if (method === 'GET') {
             responseCache.set(ck, { data: retryRes.clone(), expiry: Date.now() + CACHE_TTL })
@@ -186,8 +246,8 @@ export async function orbitFetch(
         const retryAfter = parseInt(res.headers.get('Retry-After') || '5', 10)
         await new Promise(r => setTimeout(r, Math.min(retryAfter * 1000, 10000)))
         // Re-sign with a fresh timestamp so the retry is not rejected as expired.
-        const retryHeaders = signRequestHeaders(method, pathname, bodyForSig, identity, options.headers)
-        const retryRes = await fetch(url, { ...options, headers: retryHeaders, signal: controller.signal })
+        const retryHeaders = await buildHeaders()
+        const retryRes = await fetch(url, { ...options, headers: retryHeaders, ...(retryHeaders.has('X-Orbit-Sealed') ? { body: 'sealed' } : {}), signal: controller.signal })
         if (retryRes.ok) {
           if (method === 'GET') {
             responseCache.set(ck, { data: retryRes.clone(), expiry: Date.now() + CACHE_TTL })

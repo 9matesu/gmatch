@@ -5,6 +5,8 @@ import { orbitFetch } from '../utils/api'
 import { CameraCapture } from './CameraCapture'
 import { DropZone } from './DropZone'
 import { contentHash } from '../utils/media'
+import { useCropper } from '../hooks/useCropper'
+import { isCropableImage } from './CropModal'
 import { UploadCloud, Camera, Link as LinkIcon, X, Check, Loader2, ImagePlus } from 'lucide-react'
 
 interface IdentityLike {
@@ -47,6 +49,7 @@ export function AttachmentUploadModal({
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const fileRef = useRef<File | null>(null)
+  const { crop, cropper } = useCropper()
 
   useEffect(() => {
     if (!isOpen) {
@@ -59,9 +62,14 @@ export function AttachmentUploadModal({
     }
   }, [isOpen])
 
-  const handleFile = useCallback((files: FileList | File[]) => {
-    const file = Array.from(files)[0]
+  const handleFile = useCallback(async (files: FileList | File[]) => {
+    let file = Array.from(files)[0]
     if (!file) return
+    if (isCropableImage(file)) {
+      const res = await crop(file, { aspect: 'free', title: 'Crop attachment' })
+      if (!res) return
+      if (res.file) file = res.file
+    }
     fileRef.current = file
     setHasFile(true)
     setError(null)
@@ -73,7 +81,7 @@ export function AttachmentUploadModal({
       reader.onload = () => setPreview(typeof reader.result === 'string' ? reader.result : null)
       reader.readAsDataURL(file)
     }
-  }, [])
+  }, [crop])
 
   const handleCameraFile = useCallback((file: File) => handleFile([file]), [handleFile])
 
@@ -284,6 +292,7 @@ export function AttachmentUploadModal({
           </button>
         </div>
       </div>
+      {cropper}
     </div>
   )
 }

@@ -45,11 +45,13 @@ export default function GridWorkspace() {
   }, [ageVerified, setupComplete])
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col gap-3 overflow-hidden bg-surface-canvas p-3">
-      <main className="grid min-h-0 flex-1 grid-cols-[280px_minmax(0,1fr)_360px] gap-3 max-[1100px]:block max-[1100px]:overflow-y-auto">
-        <StatsPanel />
+    <div className="relative flex h-full min-h-0 flex-col gap-4 overflow-hidden bg-surface-canvas p-4">
+      <main className="grid min-h-0 flex-1 grid-cols-[minmax(280px,320px)_minmax(0,1fr)] gap-4 max-[1024px]:grid-cols-1 max-[1024px]:overflow-y-auto">
+        <div className="flex min-h-0 flex-col gap-4 overflow-y-auto styled-scrollbar">
+          <StatsPanel />
+          <ShopPanel />
+        </div>
         <GoonPanel />
-        <ShopPanel />
       </main>
       <OfflineModal />
     </div>

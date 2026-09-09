@@ -1,13 +1,13 @@
 <!doctype html>
-<html lang="pt-br">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Auditoria de Segurança — gMatch</title>
+<title>Security Audit — gMatch</title>
 </head>
 <body>
-<p><a href="../index.html#termos">← voltar para a página principal</a></p>
-<p><em>Gerado de docs/SECURITY-AUDIT.md (white-box).</em></p>
+<p><a href="../index.html#terms">← back to the main page</a></p>
+<p><em>Generated from docs/SECURITY-AUDIT.md (white-box).</em></p>
 <h1>gMatch — Auditoria de Segurança (static pentest)</h1>
 <p><strong>Escopo:</strong> white-box do fonte na branch <code>security/audit-hardening</code> (base <code>feat/secure-p2p-phase1</code> @ <code>e9414ed</code>+), app desktop Electron + API Hono/Bun + <code>@orbit/crypto|protocol</code>. Não houve alvo deployed para teste dinâmico — toda afirmação abaixo cita código verificável; os comandos "Provar" reproduzem cada achado.</p>
 <p><strong>Metodologia:</strong> superfícies de persistência (disco, localStorage/LS leveldb, IndexedDB, cache Chromium, snapshot SQLite do servidor), transporte (REST assinado, WS swarm, WS correio, WebRTC/ICE, TURN), autenticação e controle de acesso, primitivas criptográficas e protocolo de envelope, modelo de ameaças (a) forense do disco do usuário, (b) malware user-level, (c) operador do servidor, (d) MITM de rede, (e) abuso do painel admin.</p>
@@ -92,6 +92,6 @@ curl -sI "$API_BASE/api/objects/&lt;own-id&gt;" | grep -i cache-control         
 # 4) admin sem env desabilitado: POST /api/admin/verify-pin → 503 sem ADMIN_PIN_HASH
 </pre>
 <hr>
-<p>Contato: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · Esta página não usa JavaScript, CSS, cookies ou analytics.</p>
+<p>Contact: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · This page uses no JavaScript, CSS, cookies or analytics.</p>
 </body>
 </html>

@@ -1,40 +1,75 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ImagePlus, Loader2, Plus, Sparkles, Tag, X } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
-import { DropZone } from './DropZone';
+import { DropZone, DND_KEEPSAKE } from './DropZone';
 import { orbitFetch, uploadWithProgress } from '../utils/api';
 import { createCardFromMedia, type CanonicalCard, type CardCreationMetadata } from '../utils/cardCollection';
+import { useCropper } from '../hooks/useCropper';
+import { isCropableImage } from './CropModal';
+import { playPress } from '../utils/sounds';
 
-const FRAME_OPTIONS = [
-  { id: 'chrome', label: 'Chrome', description: 'Polished silver edge' },
-  { id: 'holo', label: 'Holo', description: 'Prismatic light finish' },
-  { id: 'carbon', label: 'Carbon', description: 'Dark forged texture' },
-  { id: 'neon', label: 'Neon', description: 'Electric arcade edge' },
-] as const;
+const MAX_TAGS = 8;
 
 interface CreateCardModalProps {
   identity: OrbitIdentity | null;
   onClose: () => void;
   onCreated?: (card: CanonicalCard) => void;
   cardsNeeded?: number;
+  /** Prefill from an existing image (e.g. idle gallery keepsake). */
+  initialMedia?: { url: string; tags?: string[]; name?: string } | null;
 }
 
-export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0 }: CreateCardModalProps) {
+export interface CardPrefill {
+  url: string;
+  tags: string[];
+  name: string;
+}
+
+export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0, initialMedia = null }: CreateCardModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
-  const [frame, setFrame] = useState('chrome');
-  const [accentColor, setAccentColor] = useState('#9FE3FF');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewMime, setPreviewMime] = useState('');
   const [creating, setCreating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const { crop, cropper } = useCropper();
+
+  // One-shot prefill (fresh mount per open): name/tags go straight in;
+  // local-scheme media (idle-file://, blob:, data:) is fetched to a File
+  // because the server can't fetch those URLs itself.
+  useEffect(() => {
+    if (!initialMedia) return;
+    if (initialMedia.name) setName(initialMedia.name.slice(0, 80));
+    if (initialMedia.tags?.length) {
+      setTags(initialMedia.tags.map((t) => t.trim().toLowerCase().replace(/^#/, '').slice(0, 24)).filter(Boolean).slice(0, 8));
+    }
+    const mediaUrl = initialMedia.url;
+    if (!/^(idle-file|blob|data):/.test(mediaUrl)) {
+      setUrl(mediaUrl);
+      return;
+    }
+    let cancelled = false;
+    fetch(mediaUrl)
+      .then((r) => (r.ok ? r.blob() : Promise.reject(new Error('fetch failed'))))
+      .then((blob) => {
+        if (cancelled || !blob.size) return;
+        const ext = (blob.type.split('/')[1] || 'jpg').split('+')[0];
+        setFile(new File([blob], `keepsake-${Date.now()}.${ext}`, { type: blob.type || 'image/jpeg' }));
+      })
+      .catch(() => {
+        if (!cancelled) setUrl(mediaUrl);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!file) {
@@ -48,29 +83,62 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0 
     return () => URL.revokeObjectURL(objectUrl);
   }, [file, url]);
 
-  const selectedFrame = FRAME_OPTIONS.find((option) => option.id === frame) || FRAME_OPTIONS[0];
   const isVideo = previewMime.startsWith('video/');
   const canCreate = Boolean((file || url.trim()) && name.trim() && !creating);
-  const metadata: CardCreationMetadata = useMemo(() => ({
-    tags,
-    description,
-    frame,
-    accentColor,
-  }), [tags, description, frame, accentColor]);
+  const metadata: CardCreationMetadata = { tags, description };
 
-  const addTag = () => {
-    const next = tagInput.trim().toLowerCase().replace(/^#/, '');
-    if (!next || tags.includes(next) || tags.length >= 8) return;
-    setTags((current) => [...current, next.slice(0, 24)]);
+  // Commit one or many tags from a comma/space separated entry.
+  const commitTags = (raw: string) => {
+    const parts = raw.split(/[\s,]+/).map((t) => t.trim().toLowerCase().replace(/^#/, '')).filter(Boolean);
+    if (parts.length === 0) return;
+    setTags((current) => {
+      const next = [...current];
+      for (const t of parts) {
+        if (next.length >= MAX_TAGS) break;
+        const clean = t.slice(0, 24);
+        if (clean && !next.includes(clean)) next.push(clean);
+      }
+      return next;
+    });
     setTagInput('');
   };
 
-  const handleFiles = (files: FileList | File[]) => {
+  const addTag = () => commitTags(tagInput);
+
+  const handleFiles = async (files: FileList | File[]) => {
     const next = Array.from(files)[0]
     if (!next) return
-    setFile(next)
+    if (isCropableImage(next)) {
+      const res = await crop(next, { aspect: 'free', title: 'Crop card image' })
+      if (!res) return
+      setFile(res.file || next)
+    } else {
+      setFile(next)
+    }
     setUrl('')
     setError(null)
+  };
+
+  // Drag a keepsake from the idle Gallery panel straight into the forge.
+  const handlePayloadDrop = (type: string, payload: Record<string, unknown>) => {
+    if (type !== DND_KEEPSAKE) return
+    const mediaUrl = typeof payload.url === 'string' ? payload.url : ''
+    if (!mediaUrl) return
+    const tagList = Array.isArray(payload.tags) ? (payload.tags as string[]) : []
+    const nameVal = typeof payload.name === 'string' ? payload.name : ''
+    if (nameVal && !name) setName(nameVal.slice(0, 80))
+    if (tagList.length) commitTags(tagList.join(','))
+    if (/^(idle-file|blob|data):/.test(mediaUrl)) {
+      void fetch(mediaUrl).then((r) => r.ok ? r.blob() : Promise.reject()).then((blob) => {
+        const ext = (blob.type.split('/')[1] || 'jpg').split('+')[0]
+        setFile(new File([blob], `keepsake-${Date.now()}.${ext}`, { type: blob.type || 'image/jpeg' }))
+        setUrl('')
+      }).catch(() => setUrl(mediaUrl))
+    } else {
+      setUrl(mediaUrl)
+      setFile(null)
+    }
+    playPress(820)
   };
 
   const handlePasteUrl = (value: string) => {
@@ -156,7 +224,7 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0 
 
         <div className="grid lg:grid-cols-[minmax(220px,0.7fr)_minmax(0,1.3fr)] gap-5">
           <div className="flex flex-col items-center gap-3">
-            <div className="w-full max-w-[270px] aspect-[3/4.2] rounded-2xl p-1.5 transition-all" style={{ background: `linear-gradient(135deg, ${accentColor}, rgba(255,255,255,.55), ${accentColor})`, boxShadow: `0 18px 50px ${accentColor}44` }}>
+            <div className="w-full max-w-[270px] aspect-[3/4.2] rounded-2xl p-1.5 transition-all" style={{ background: `linear-gradient(135deg, #9FE3FF, rgba(255,255,255,.55), #9FE3FF)`, boxShadow: '0 18px 50px #9FE3FF44' }}>
               <div className="relative w-full h-full overflow-hidden rounded-xl bg-surface-canvas flex flex-col">
                 <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-white/20 via-transparent to-transparent z-10" />
                 <div className="aspect-[3/3.1] bg-black/30 overflow-hidden flex items-center justify-center">
@@ -164,15 +232,15 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0 
                 </div>
                 <div className="p-3 flex-1 flex flex-col justify-between">
                   <div>
-                    <div className="text-[9px] uppercase tracking-[0.18em] text-retro-muted">{selectedFrame.label} edition</div>
+                    <div className="text-[9px] uppercase tracking-[0.18em] text-retro-muted">Chrome edition</div>
                     <div className="text-base font-black truncate mt-1">{name.trim() || 'Your Card Name'}</div>
                     <div className="flex flex-wrap gap-1 mt-2">
-                      {(tags.length ? tags : ['your-tags']).map((tag) => <span key={tag} className="text-[9px] rounded-full border px-1.5 py-0.5" style={{ borderColor: `${accentColor}88`, color: accentColor }}>#{tag}</span>)}
+                      {(tags.length ? tags : ['your-tags']).map((tag) => <span key={tag} className="text-[9px] rounded-full border px-1.5 py-0.5" style={{ borderColor: '#9FE3FF88', color: '#9FE3FF' }}>#{tag}</span>)}
                     </div>
                   </div>
                   <div className="mt-4 flex items-end justify-between gap-2">
-                    <span className="text-[9px] text-retro-muted line-clamp-2">{description.trim() || selectedFrame.description}</span>
-                    <span className="text-[10px] font-mono font-bold" style={{ color: accentColor }}>VALUE TBD</span>
+                    <span className="text-[9px] text-retro-muted line-clamp-2">{description.trim() || 'Polished silver edge'}</span>
+                    <span className="text-[10px] font-mono font-bold" style={{ color: '#9FE3FF' }}>VALUE TBD</span>
                   </div>
                 </div>
               </div>
@@ -181,11 +249,11 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0 
           </div>
 
           <div className="space-y-4">
-            <DropZone onFiles={handleFiles} onPasteUrl={handlePasteUrl} compact={false} accept="image/jpeg, image/png, image/webp, image/avif, image/gif, video/mp4, video/webm, video/quicktime, video/ogg, video/*" multiple={false}>
+            <DropZone onFiles={handleFiles} onPasteUrl={handlePasteUrl} onPayloadDrop={handlePayloadDrop} compact={false} accept="image/jpeg, image/png, image/webp, image/avif, image/gif, video/mp4, video/webm, video/quicktime, video/ogg, video/*" multiple={false}>
               <div className="space-y-2 py-2">
                 <ImagePlus className="w-7 h-7 mx-auto text-retro-accent" />
                 <p className="text-sm text-retro-body">Drop an image or video, browse, or paste a URL</p>
-                <p className="text-[10px] text-retro-muted">The original media stays private until you share or play it.</p>
+                <p className="text-[10px] text-retro-muted">Or drag a keepsake in from the Gallery panel. The original media stays private until you share or play it.</p>
               </div>
             </DropZone>
 
@@ -199,21 +267,13 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0 
                 <textarea value={description} onChange={(event) => setDescription(event.target.value.slice(0, 240))} placeholder="What's all that about? Describe your gooning material if you feel like so." rows={3} className="w-full px-3 py-2.5 text-sm resize-none" />
               </label>
               <div className="sm:col-span-2 space-y-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">Tags</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">Tags <span className="normal-case font-normal">({tags.length}/{MAX_TAGS}) — comma or space separated</span></span>
                 <div className="flex gap-2">
-                  <div className="relative flex-1"><Tag className="absolute left-3 top-3 w-4 h-4 text-retro-muted" /><input value={tagInput} onChange={(event) => setTagInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addTag(); } }} placeholder="futa, bbc, BWNO, hentai" className="w-full pl-9 pr-3 py-2.5 text-sm" /></div>
-                  <button type="button" onClick={addTag} className="glass-button px-3 rounded-xl" aria-label="Add tag"><Plus className="w-4 h-4" /></button>
+                  <div className="relative flex-1"><Tag className="absolute left-3 top-3 w-4 h-4 text-retro-muted" /><input value={tagInput} maxLength={MAX_TAGS * 25} onChange={(event) => setTagInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ',') { event.preventDefault(); addTag(); } }} onBlur={() => { if (tagInput.trim()) addTag(); }} placeholder="futa, bbc, BWNO, hentai" className="w-full pl-9 pr-3 py-2.5 text-sm" /></div>
+                  <button type="button" onClick={addTag} disabled={tags.length >= MAX_TAGS || !tagInput.trim()} className="glass-button px-3 rounded-xl disabled:opacity-40" aria-label="Add tag"><Plus className="w-4 h-4" /></button>
                 </div>
                 <div className="flex flex-wrap gap-1.5 min-h-6">{tags.map((tag) => <button type="button" key={tag} onClick={() => setTags((current) => current.filter((item) => item !== tag))} className="glass-button rounded-full px-2 py-1 text-[10px] text-retro-body">#{tag} x</button>)}</div>
               </div>
-              <div className="space-y-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">Frame</span>
-                <select value={frame} onChange={(event) => setFrame(event.target.value)} className="w-full px-3 py-2.5 text-sm">{FRAME_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label} - {option.description}</option>)}</select>
-              </div>
-              <label className="space-y-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">Accent</span>
-                <div className="flex items-center gap-2"><input type="color" value={accentColor} onChange={(event) => setAccentColor(event.target.value)} className="w-11 h-10 p-1 cursor-pointer" /><input value={accentColor} onChange={(event) => setAccentColor(event.target.value)} className="flex-1 px-3 py-2.5 text-sm font-mono uppercase" /></div>
-              </label>
             </div>
 
             {creating && <div className="space-y-1"><div className="flex justify-between text-[10px] text-retro-muted"><span>Forging card...</span><span>{progress}%</span></div><div className="h-1.5 rounded-full bg-black/30 overflow-hidden"><div className="h-full bg-retro-accent transition-all" style={{ width: `${progress}%` }} /></div></div>}
@@ -225,6 +285,7 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0 
           </div>
         </div>
       </div>
+      {cropper}
     </div>
   );
 }

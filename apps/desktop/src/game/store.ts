@@ -20,7 +20,8 @@ import {
 } from './save'
 import type { SaveData } from './save'
 import { fetchPosts } from '../services/booru'
-import type { ActiveCap, BooruPost, CapId, GalleryImage, GridCell, OwnedTag, ViewMode } from './types'
+import { isCustomMediaUrl, sampleCustomSources } from '../services/customSources'
+import type { ActiveCap, BooruPost, CapId, CustomSource, GalleryImage, GridCell, OwnedTag, ViewMode } from './types'
 
 export interface Toast {
   id: number
@@ -92,6 +93,12 @@ export interface GameState {
   /** Player-picked starter tags + extra excludes (setup screen, one shot). */
   setupComplete: boolean
   userExcludes: string[]
+  /** Player-owned feed sources (custom URLs / local folders, tried first). */
+  customSources: CustomSource[]
+  addUrlSource: (label: string, rawUrls: string[]) => { added: boolean; message: string }
+  addFolderSource: (folderId: string, folderPath: string, label?: string) => { added: boolean; message: string }
+  removeCustomSource: (id: string) => void
+  toggleCustomSource: (id: string) => void
   completeSetup: (tags: string[], excludes: string[]) => { ok: boolean; message: string }
   addUserExclude: (raw: string) => boolean
   removeUserExclude: (term: string) => boolean
@@ -233,6 +240,7 @@ function freshData() {
     tags: [] as OwnedTag[],
     setupComplete: false,
     userExcludes: [] as string[],
+    customSources: [] as CustomSource[],
     gallery: [] as GalleryImage[],
     caps: [] as ActiveCap[],
     capsUsed: [] as CapId[],
@@ -701,41 +709,54 @@ export const useGame = create<GameState>((set, get) => ({
     const s = get()
     if (s.fetching) return
     set({ fetching: true })
-    const owned = feedQuery(s.tags)
-    // Round-robin: ONE player-owned tag per fetch, rotating. No owned tags
-    // (setup not done / melted): stay offline — setup picks drive the feed.
-    if (owned.length === 0) {
-      set({
-        current: null,
-        queue: [],
-        grid: [],
-        foeHp: 0,
-        foeMaxHp: 0,
-        foeClicks: 0,
-        feedOffline: true,
-        fetching: false,
-      })
-      return
+    let cursor = s.feedCursor
+    let posts: BooruPost[] | null = null
+    // Player-owned sources first: custom URLs / local folders need no tags,
+    // so they also feed fresh setups. Built-ins stay as the fallback.
+    const customs = (s.customSources || []).filter((c) => c.enabled)
+    if (customs.length > 0) {
+      const customPosts = await sampleCustomSources(customs, 10)
+      if (customPosts.length > 0) posts = customPosts
     }
-    // Stacked AND-queries truncate on the mirrors and repeat the same top
-    // posts — rotation keeps the feed fresh and online.
-    const pool = owned.slice(0, 4)
-    const first = pool[s.feedCursor % pool.length]
-    let res = await fetchPosts({ tags: first, limit: 10 })
-    let cursor = s.feedCursor + 1
-    if (!res.ok || res.posts.length === 0) {
-      // Flaky round — retry once with the NEXT tag, never the same one.
-      const second = pool[cursor % pool.length]
-      res = await fetchPosts({ tags: second, limit: 10 })
-      cursor += 1
+    if (!posts) {
+      const owned = feedQuery(s.tags)
+      // Round-robin: ONE player-owned tag per fetch, rotating. No owned tags
+      // (setup not done / melted): stay offline — setup picks drive the feed.
+      if (owned.length === 0) {
+        set({
+          current: null,
+          queue: [],
+          grid: [],
+          foeHp: 0,
+          foeMaxHp: 0,
+          foeClicks: 0,
+          feedOffline: true,
+          fetching: false,
+        })
+        return
+      }
+      // Stacked AND-queries truncate on the mirrors and repeat the same top
+      // posts — rotation keeps the feed fresh and online.
+      const pool = owned.slice(0, 4)
+      const first = pool[s.feedCursor % pool.length]
+      let res = await fetchPosts({ tags: first, limit: 10 })
+      cursor = s.feedCursor + 1
+      if (!res.ok || res.posts.length === 0) {
+        // Flaky round — retry once with the NEXT tag, never the same one.
+        const second = pool[cursor % pool.length]
+        res = await fetchPosts({ tags: second, limit: 10 })
+        cursor += 1
+      }
+      if (res.ok && res.posts.length > 0) {
+        // Random order every round — never push API sequence straight to the feed.
+        posts = shufflePosts(res.posts)
+      }
     }
-    if (res.ok && res.posts.length > 0) {
+    if (posts && posts.length > 0) {
       const foe = foeMaxHp(s.defeated)
-      // Random order every round — never push API sequence straight to the feed.
-      const shuffled = shufflePosts(res.posts)
       if (get().viewMode === 'grid') {
         // Grid consumes the whole batch: append to the queue, top up squares.
-        const q = [...get().queue, ...shuffled]
+        const q = [...get().queue, ...posts]
         const filled = fillGrid(get().grid, q, get().defeated)
         set({
           queue: filled.queue,
@@ -747,8 +768,8 @@ export const useGame = create<GameState>((set, get) => ({
         return
       }
       set({
-        current: shuffled[0],
-        queue: shuffled.slice(1),
+        current: posts[0],
+        queue: posts.slice(1),
         foeHp: foe,
         foeMaxHp: foe,
         foeClicks: 0,
@@ -1069,6 +1090,7 @@ export const useGame = create<GameState>((set, get) => ({
       viewMode: s.viewMode,
       setupComplete: s.setupComplete,
       userExcludes: s.userExcludes,
+      customSources: s.customSources,
       lastSeenAt: now,
     }
     writeStorage(serialize(data))
@@ -1118,6 +1140,7 @@ export const useGame = create<GameState>((set, get) => ({
       tags,
       setupComplete: d.setupComplete,
       userExcludes,
+      customSources: d.customSources,
       gallery: d.gallery,
       caps,
       capsUsed: d.capsUsed,
@@ -1210,6 +1233,65 @@ export const useGame = create<GameState>((set, get) => ({
     set({ userExcludes: getUserExcludes() })
     get().save()
     return true
+  },
+
+  /** Cap: 20 sources, 500 URLs each (enforced again at load). */
+  addUrlSource: (label, rawUrls) => {
+    const clean = [...new Set(rawUrls.map((u) => String(u).trim()).filter((u) => u && isCustomMediaUrl(u)))].slice(0, 500)
+    if (clean.length === 0) return { added: false, message: 'No usable image/video links — paste direct http(s) media URLs.' }
+    const s = get()
+    if (s.customSources.length >= 20) return { added: false, message: 'Source limit reached (20) — remove one first.' }
+    const source: CustomSource = {
+      id: `u${Date.now().toString(36)}`,
+      label: label.trim().slice(0, 60) || 'Custom links',
+      kind: 'urls',
+      enabled: true,
+      urls: clean,
+      folderId: null,
+      folderPath: null,
+      addedAt: Date.now(),
+    }
+    set({ customSources: [...s.customSources, source] })
+    get().save()
+    return { added: true, message: `Added “${source.label}” (${clean.length} links).` }
+  },
+
+  addFolderSource: (folderId, folderPath, label) => {
+    const s = get()
+    if (s.customSources.some((c) => c.kind === 'folder' && c.folderId === folderId)) {
+      return { added: false, message: 'That folder is already a source.' }
+    }
+    if (s.customSources.length >= 20) return { added: false, message: 'Source limit reached (20) — remove one first.' }
+    const base = String(folderPath).split(/[/\\]/).filter(Boolean).pop() || 'Local folder'
+    const source: CustomSource = {
+      id: `f${Date.now().toString(36)}`,
+      label: (label || '').trim().slice(0, 60) || base.slice(0, 60),
+      kind: 'folder',
+      enabled: true,
+      urls: [],
+      folderId,
+      folderPath: String(folderPath),
+      addedAt: Date.now(),
+    }
+    set({ customSources: [...s.customSources, source] })
+    get().save()
+    return { added: true, message: `Added folder “${source.label}”.` }
+  },
+
+  removeCustomSource: (id) => {
+    const s = get()
+    const doomed = s.customSources.find((c) => c.id === id)
+    set({ customSources: s.customSources.filter((c) => c.id !== id) })
+    if (doomed?.kind === 'folder' && doomed.folderId && typeof window !== 'undefined') {
+      void window.gmatch?.customRemoveFolder?.(doomed.folderId).catch(() => {})
+    }
+    get().save()
+  },
+
+  toggleCustomSource: (id) => {
+    const s = get()
+    set({ customSources: s.customSources.map((c) => (c.id === id ? { ...c, enabled: !c.enabled } : c)) })
+    get().save()
   },
 
   notify: (msg) => {

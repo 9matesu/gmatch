@@ -1,4 +1,4 @@
-import type { ActiveCap, CapId, GalleryImage, OwnedTag, ViewMode } from './types'
+import type { ActiveCap, CapId, CustomSource, GalleryImage, OwnedTag, ViewMode } from './types'
 
 export const SAVE_KEY = 'gmatch.save.v1'
 export const SAVE_VERSION = 3
@@ -33,6 +33,8 @@ export interface SaveData {
   /** Player's feed starter picks + extra excludes (setup screen / config tab). */
   setupComplete: boolean
   userExcludes: string[]
+  /** Player-owned idle feed sources (custom URLs / local folders). */
+  customSources: CustomSource[]
   lastSeenAt: number
 }
 
@@ -61,6 +63,7 @@ export function defaultSave(now = Date.now()): SaveData {
     viewMode: 'single',
     setupComplete: false,
     userExcludes: [],
+    customSources: [],
     lastSeenAt: now,
   }
 }
@@ -109,8 +112,33 @@ export function deserialize(raw: string | null | undefined): SaveData | null {
     viewMode: d.viewMode === 'grid' ? 'grid' : 'single',
     setupComplete: d.setupComplete === true,
     userExcludes: arr<string>(d.userExcludes),
+    customSources: sanitizeCustomSources((d as Partial<SaveData>).customSources),
     lastSeenAt: num(d.lastSeenAt, 0),
   }
+}
+
+/** Tolerant loader: keeps well-formed sources, drops anything else. */
+function sanitizeCustomSources(v: unknown): CustomSource[] {
+  if (!Array.isArray(v)) return []
+  const out: CustomSource[] = []
+  for (const s of v) {
+    if (typeof s !== 'object' || s === null) continue
+    const c = s as Partial<CustomSource>
+    if (typeof c.id !== 'string' || !c.id) continue
+    if (c.kind !== 'urls' && c.kind !== 'folder') continue
+    out.push({
+      id: c.id,
+      label: typeof c.label === 'string' && c.label.trim() ? c.label.slice(0, 60) : 'Custom source',
+      kind: c.kind,
+      enabled: c.enabled !== false,
+      urls: Array.isArray(c.urls) ? c.urls.filter((u): u is string => typeof u === 'string').slice(0, 500) : [],
+      folderId: typeof c.folderId === 'string' ? c.folderId : null,
+      folderPath: typeof c.folderPath === 'string' ? c.folderPath : null,
+      addedAt: typeof c.addedAt === 'number' && Number.isFinite(c.addedAt) ? c.addedAt : 0,
+    })
+    if (out.length >= 20) break
+  }
+  return out
 }
 
 /**

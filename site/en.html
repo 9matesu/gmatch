@@ -1,123 +1,123 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-br">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>gMatch — adult P2P network with end-to-end encryption</title>
-<meta name="description" content="Single-file Windows app: an adult social network + card games between consenting adults. All content is encrypted between you and the recipient — the server reads nothing. Download, verify the hash, run.">
+<title>gMatch — rede P2P adulta com criptografia de ponta a ponta</title>
+<meta name="description" content="Aplicativo Windows (arquivo único) para rede social e jogos de cartas entre adultos. Todo conteúdo é criptografado entre você e o destinatário: o servidor não lê nada. Baixe, verifique o hash e rode.">
 </head>
 <body>
 <header>
 <h1>gMatch</h1>
-<p><strong>Adult content: 18+ only.</strong> By downloading and using it you declare you are an adult in your jurisdiction.</p>
-<nav aria-label="Sections">
-<a href="#what-it-is">What it is</a> ·
-<a href="#security">Security</a> ·
-<a href="#crypto">Cryptography</a> ·
+<p><strong>Conteúdo adulto: somente maiores de 18 anos.</strong> Ao baixar e usar, você declara ser maior de idade na sua jurisdição.</p>
+<nav aria-label="Seções">
+<a href="#o-que-e">O que é</a> ·
+<a href="#seguranca">Segurança</a> ·
+<a href="#criptografia">Criptografia</a> ·
 <a href="#download">Download</a> ·
-<a href="#verify">Verify the file</a> ·
-<a href="#terms">Terms of Service</a> ·
-<a href="#privacy">Privacy</a> ·
-<a href="index.html">Português</a>
+<a href="#verificar">Verificar o arquivo</a> ·
+<a href="#termos">Termos de Serviço</a> ·
+<a href="#privacidade">Privacidade</a> ·
+<a href="index.html">English</a>
 </nav>
 </header>
 
 <main>
-<section id="what-it-is">
-<h2>What this application is</h2>
-<p>gMatch is a Windows program (a single <code>.exe</code>, no installation) that works as an adult social network + card-game arcade. It combines:</p>
+<section id="o-que-e">
+<h2>O que é este aplicativo</h2>
+<p>gMatch é um programa para Windows (um único arquivo <code>.exe</code>, sem instalação) que funciona como uma rede social + arcade de jogos de cartas para adultos. Ele reúne:</p>
 <ul>
-<li>A feed of photos/videos YOU publish, with per-post sharing choices;</li>
-<li>Private chat and group rooms with end-to-end encryption;</li>
-<li>An adult idle-clicker and a 1v1 card game with decks, an internal store and a player market;</li>
-<li>Denunciation-based moderation: whoever receives an offensive message can report it and only then reveal it to a moderator.</li>
+<li>Feed com fotos/vídeos que VOCÊ publica e escolhe com quem compartilha;</li>
+<li>Chat privado e salas de grupo com criptografia de ponta a ponta;</li>
+<li>Um idle-clicker adulto e um jogo de cartas 1v1 com baralhos, loja interna e mercado entre jogadores;</li>
+<li>Moderação por denúncia: quem recebe uma mensagem ofensiva pode denunciar e, só então, revelar a mensagem ao moderador.</li>
 </ul>
-<p>No sign-up, no e-mail, no phone. Your "account" is a cryptographic keypair generated on your computer. You are the only one responsible for keeping the secret key safe (the app offers a file backup).</p>
+<p>Não há cadastro, e-mail ou telefone. Sua "conta" é um par de chaves criptográficas gerado no seu computador. Você é o único responsável por guardar a chave secreta (o app oferece cópia de segurança em arquivo).</p>
 </section>
 
-<section id="security">
-<h2>Security: what the server can and cannot see</h2>
-<p>The server hosting this page runs only the download and a minimal "blind courier". By design (audited — links below):</p>
+<section id="seguranca">
+<h2>Segurança: o que o servidor pode e não pode ver</h2>
+<p>O servidor desta página hospeda apenas o download e um "correio" mínimo. Por design (auditado — veja os links abaixo):</p>
 <ul>
-<li>All content (messages, photos, captions, rooms) travels <strong>encrypted</strong>. The server forwards opaque envelopes addressed to tokens: it does not know who sends, to whom, or what is inside.</li>
-<li>The server <strong>keeps no list of who is online</strong>: connections are anonymous; presence exists only among your contacts.</li>
-<li>The app caches nothing to your disk: feed images live only in session memory; every server response is marked <code>no-store</code>.</li>
-<li>Your private keys stay on your Windows protected by Windows' own crypto system (DPAPI) — never in plaintext, never on the server.</li>
-<li>IP addresses are not recorded in application logs; the TURN relay uses random short-lived credentials unlinked to your identity.</li>
-<li>You can skip our server entirely: the app can point to a server you (or a friend) run, keeping everything inside your network.</li>
+<li>Todo conteúdo (mensagens, fotos, legendas, salas) viaja <strong>cifrado</strong>. O servidor encaminha envelopes opacos endereçados a tokens: ele não sabe quem envia, para quem, nem o que contém.</li>
+<li>O servidor <strong>não mantém lista de quem está online</strong>: conexões são anônimas; presença existe apenas entre os seus contatos.</li>
+<li>Nada é armazenado em cache no seu disco pelo app: imagens do feed vivem só na memória da sessão; toda resposta do servidor vem marcada <code>no-store</code>.</li>
+<li>Suas chaves privadas ficam no seu Windows protegidas pelo cripto-sistema do próprio Windows (DPAPI) — nunca em texto puro, nunca no servidor.</li>
+<li>Endereços IP não são registrados em logs de aplicação; o relay TURN usa credenciais temporárias aleatórias, sem ligação com sua identidade.</li>
+<li>Você também pode não usar nosso servidor: o app aceita apontar para um servidor próprio (self-host), mantendo tudo dentro da sua rede.</li>
 </ul>
-<p>Read the full security report: <a href="legal/security.html">security audit</a>. The code is open: <a href="https://github.com/9matesu/goongrid">github.com/9matesu/goongrid</a>.</p>
+<p>Leia o relatório completo de segurança: <a href="legal/security.html">Auditoria de segurança</a>. O código é aberto: <a href="https://github.com/9matesu/goongrid">github.com/9matesu/goongrid</a>.</p>
 </section>
 
-<section id="crypto">
-<h2>Cryptography and how it works (no mystery)</h2>
+<section id="criptografia">
+<h2>Criptografia e funcionamento (sem mistério)</h2>
 <ul>
-<li><strong>Identity:</strong> on first start the app generates two keypairs — Ed25519 (signs your actions) and X25519 (encrypts content). Your "ID" is a cryptographic digest (SHA-256) of the public key. The private key never leaves your device.</li>
-<li><strong>1:1 messages:</strong> ECIES (X25519 + BLAKE3 + XChaCha20-Poly1305). Mathematically, only the holder of your private key can open what was sent to you — not the server, not even the sender afterwards.</li>
-<li><strong>Group rooms:</strong> a shared secret (DEK) circulates encrypted between invitees; when someone leaves, the secret rotates (epoch) — past messages stay readable to members, nothing new opens with the old key.</li>
-<li><strong>Request authentication:</strong> every API call is signed and timestamped; replayed requests are rejected.</li>
-<li><strong>P2P privacy:</strong> ICE candidates containing literal IPs are dropped before leaving the app; the relay is optional and randomly labelled.</li>
-<li><strong>Honest limit:</strong> cryptography protects content from third parties; it does NOT protect against someone stealing your unlocked computer or your exported key. Keep your key backup somewhere safe.</li>
+<li><strong>Identidade:</strong> ao iniciar, o app gera dois pares de chaves — Ed25519 (para assinar suas ações) e X25519 (para cifrar conteúdo). O seu "ID" é um resumo criptográfico (SHA-256) da chave pública. A chave privada nunca sai do seu dispositivo.</li>
+<li><strong>Mensagens 1:1:</strong> criptografia ECIES (X25519 + BLAKE3 + XChaCha20-Poly1305). Matematicamente, só quem tem a sua chave privada abre o que te enviaram — nem o servidor, nem o autor depois.</li>
+<li><strong>Salas de grupo:</strong> um segredo compartilhado (DEK) circula cifrado de convidado em convidado; quando alguém sai, o segredo é trocado (epoch) e o que foi dito antes continua legível, mas nada novo abre com a chave antiga.</li>
+<li><strong>Autenticação de pedidos:</strong> toda chamada à API vem assinada e carimbadada no tempo; reuso de requisição (replay) é rejeitado.</li>
+<li><strong>Privacidade no P2P:</strong> candidatos ICE com IP literal são descartados antes de sair do app; o relay é opcional e rotulado aleatoriamente.</li>
+<li><strong>Limite honesto:</strong> criptografia protege conteúdo contra terceiros; NÃO protege contra alguém que roube seu computador desbloqueado ou sua chave exportada. Guarde a cópia da chave em lugar seguro.</li>
 </ul>
 </section>
 
 <section id="download">
-<h2>Download (Windows x64, single file)</h2>
-<p>Version <strong id="version">1.1.0</strong> · file <code>gMatch-1.1.0-portable.exe</code> · 114 MB ·</p>
-<p><a href="https://github.com/9matesu/goongrid/releases/download/v1.1.0/gMatch-1.1.0-portable.exe" download>Download gMatch-1.1.0-portable.exe</a></p>
-<p>Expected SHA-256 (copy the value below and check it against the next section):</p>
+<h2>Download (Windows x64, arquivo único)</h2>
+<p>Versão <strong id="version">1.1.0</strong> · arquivo <code>gMatch-1.1.0-portable.exe</code> · 114 MB ·</p>
+<p><a href="https://github.com/9matesu/goongrid/releases/download/v1.1.0/gMatch-1.1.0-portable.exe" download>Baixar gMatch-1.1.0-portable.exe</a></p>
+<p>SHA-256 esperado (copie o valor abaixo e confira com o passo a passo da próxima seção):</p>
 <pre id="sha256">f7608ffa2ece37f5d23fc772699a3a989e3c915d95600a4fcc904b6fba11a4e7</pre>
-<p><em>(The real hash is published to the page and <code>release.json</code> automatically on every release.)</em></p>
-<h3>"Windows said it might be dangerous" — why, and what to do</h3>
-<p>The <strong>SmartScreen</strong> warning appears for ANY legitimate unsigned program — it is not a virus indicator. This executable has no commercial signature (it costs hundreds of dollars per year and we fund the project with donations, not data sales). To trust it independently:</p>
+<p><em>(O hash real é publicado automaticamente na página e em <code>release.json</code> a cada release.)</em></p>
+<h3>"O Windows disse que pode ser perigo" — por que e o que fazer</h3>
+<p>O aviso <strong>SmartScreen</strong> aparece para QUALQUER programa legítimo não-assinado — não indica vírus. Este executável não tem assinatura comercial (custa centenas de dólares por ano e pagamos com doação, não com venda de dados). Para confiar de forma independente:</p>
 <ol>
-<li>Verify the SHA-256 (below) — proof the downloaded file is exactly what we published;</li>
-<li>Paste the hash or upload the file for analysis at <a href="https://www.virustotal.com">VirusTotal</a> (public scan by ~70 antivirus engines);</li>
-<li>Or skip the .exe: clone the open-source code and build it yourself: <a href="https://github.com/9matesu/goongrid">github.com/9matesu/goongrid</a> (commands in <code>README.md</code> — <code>npm install</code>, <code>npm run dist</code>).</li>
+<li>Verifique o SHA-256 (abaixo) — prova que o arquivo baixado é exatamente o que publicamos;</li>
+<li>Cole o hash ou envie o arquivo para análise no <a href="https://www.virustotal.com">VirusTotal</a> (verificação pública por ~70 antivírus);</li>
+<li>Ou não baixe o .exe: clone o código aberto e compile você mesmo: <a href="https://github.com/9matesu/goongrid">github.com/9matesu/goongrid</a> (comandos em <code>README.md</code> — <code>npm install</code>, <code>npm run dist</code>).</li>
 </ol>
 </section>
 
-<section id="verify">
-<h2>Verify the hash on Windows (20 seconds, no install)</h2>
-<p>Open the Start menu, type <code>PowerShell</code>, open it and run (adjust the path if you saved elsewhere):</p>
+<section id="verificar">
+<h2>Verificar o hash no Windows (20 segundos, sem instalar nada)</h2>
+<p>Abra o menu Iniciar, digite <code>PowerShell</code>, abra e rode (ajuste o caminho se salvou em outro lugar):</p>
 <pre>Get-FileHash "$env:USERPROFILE\Downloads\gMatch-1.1.0-portable.exe" -Algorithm SHA256</pre>
-<p>Compare the <code>Hash</code> value with the one published above. If it differs by ONE character, do NOT run it: delete the file and report at <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a>.</p>
+<p>Compare o valor <code>Hash</code> com o publicado acima. Se diferir em UM caractere, NÃO execute: apague e reporte em <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a>.</p>
 </section>
 
-<section id="terms">
-<h2>Terms of Service &amp; Privacy (all documents)</h2>
+<section id="termos">
+<h2>Termos de Serviço e Privacidade (todos os documentos)</h2>
 <ul>
-<li><a href="legal/terms.html">Terms of Service</a> — eligibility (18+), self-custodied keys, prohibited conduct, content responsibility, termination.</li>
-<li><a href="legal/privacy.html">Privacy Policy (LGPD)</a> — exactly which data exists, legal bases, your rights (art. 18) and how to exercise them.</li>
-<li><a href="legal/community.html">Community rules</a> — what the app blocks technically.</li>
-<li><a href="legal/abuse.html">Abuse &amp; reports</a> — how reporting works and how optional key disclosure for moderation works.</li>
-<li><a href="legal/records.html">Adult content records</a> — who the publisher of your media is (you) and what that means.</li>
-<li><a href="legal/e2e.html">Encryption &amp; self-custody disclaimer</a> — the limits of what we can do for you.</li>
+<li><a href="legal/terms.html">Termos de Serviço</a> — elegibilidade (18+), chaves autocustodadas, conduta proibida, responsabilidade por conteúdo, encerramento.</li>
+<li><a href="legal/privacy.html">Política de Privacidade (LGPD)</a> — exatamente quais dados existem, base legal, seus direitos (art. 18) e como exercê-los.</li>
+<li><a href="legal/community.html">Regras da comunidade</a> — o que é bloqueado tecnicamente pelo app.</li>
+<li><a href="legal/abuse.html">Denúncias e abuso</a> — como reportar conteúdo e como funciona a revelação opcional para moderação.</li>
+<li><a href="legal/records.html">Registros de conteúdo adulto</a> — quem é o publisher das suas mídias (você) e o que isso significa.</li>
+<li><a href="legal/e2e.html">Aviso sobre criptografia e autocustódia</a> — limites do que podemos fazer por você.</li>
 </ul>
-<p>Current document version: <code>2026-09-09.1</code>. Changes are recorded in <a href="legal/changelog.html">legal/changelog.html</a>. Inside the app (Settings → Legal) logged-in users read and confirm acceptance of the current version.</p>
+<p>Versão vigente destes documentos: <code>2026-09-09.1</code>. Alterações são registradas em <a href="legal/changelog.html">legal/changelog.html</a>. Dentro do app (Settings → Legal), o usuário logado lê e confirma aceite da versão vigente.</p>
 </section>
 
-<section id="privacy">
-<h2>Privacy at a glance</h2>
+<section id="privacidade">
+<h2>Privacidade em uma olhada</h2>
 <ul>
-<li>This page: zero JavaScript, zero CSS, zero external fonts, zero cookies, zero analytics. Nothing here tracks you.</li>
-<li>The app: no personal data is collected (there is no sign-up). What crosses the internet is only encrypted envelopes with an expiry (max. 7 days on the official server).</li>
-<li>On your computer: keys and history are encrypted by Windows (DPAPI); images are never written to disk; when the app closes, no content remains.</li>
-<li>Your LGPD/GDPR rights (access, deletion, portability) are exercised LOCALLY in the app — by exporting and deleting your identity. Full explanation at <a href="legal/privacy.html">legal/privacy.html</a>.</li>
+<li>Esta página: zero JavaScript, zero CSS, zero fontes externas, zero cookies, zero analytics. Nada aqui te rastreia.</li>
+<li>O app: nenhum dado pessoal é coletado (não existe cadastro). O que circula pela internet são apenas envelopes cifrados com prazo de validade (máx. 7 dias no servidor oficial).</li>
+<li>No seu computador: chaves e histórico ficam cifrados pelo Windows (DPAPI); imagens nunca são gravadas em disco; ao fechar o app, nada de conteúdo permanece.</li>
+<li>Seus direitos LGPD (acesso, eliminação, portabilidade) são exercitados LOCALMENTE no app — exportando e apagando a sua identidade. Explicação completa em <a href="legal/privacy.html">legal/privacy.html</a>.</li>
 </ul>
 </section>
 
 <section id="faq">
-<h2>Questions you would ask</h2>
-<h3>Why an .exe instead of a website?</h3><p>So adult content never passes through nor sits on a third-party web host: the app runs on your machine and only ever sends encrypted envelopes. A normal website cannot hide from its host what it displays.</p>
-<h3>Can I recover my account if I lose the key?</h3><p>No — and that is on purpose (nobody, not even us, can get into your account). That is why the app insists on a key backup/export.</p>
-<h3>Any telemetry, ads, sign-up?</h3><p>No. Zero analytics, zero cookies on this page, zero sign-up.</p>
-<h3>What does the server actually store?</h3><p>In official mode: encrypted envelopes with an expiry (up to 7 days until the recipient fetches them) and a delivery token that is a mathematical digest of the recipient's public key. Nothing that points to a person.</p>
+<h2>Perguntas que você faria</h2>
+<h3>Por que um .exe em vez de um site?</h3><p>Para que o conteúdo adulto nunca passe nem fique em um servidor web de terceiros: o app roda na sua máquina e só trafega envelope cifrado. Um site comum não tem como esconder do hospedeiro o que ele mostra.</p>
+<h3>Posso recuperar minha conta se perder a chave?</h3><p>Não — e isso é proposital (ninguém, nem nós, entra na sua conta). Por isso o app obriga backup/export da chave.</p>
+<h3>Tem telemetria, anúncios, cadastro?</h3><p>Não. Zero analytics, zero cookies na página, zero cadastro.</p>
+<h3>O que o servidor guarda mesmo?</h3><p>No modo oficial: envelopes cifrados com prazo de expiração (até 7 dias até o destinatário buscar) e um token de entrega que é um resumo matemático da chave pública do destinatário. Nada que aponte a uma pessoa.</p>
 </section>
 </main>
 
 <footer>
-<p>Contact: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · Code: <a href="https://github.com/9matesu/goongrid">MIT/see LICENSE in the repository</a> · This page uses no JavaScript, CSS, external fonts, cookies or analytics.</p>
+<p>Contato: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · Código: <a href="https://github.com/9matesu/goongrid">MIT/ver LICENSE no repositório</a> · Esta página não usa JavaScript, CSS, fontes externas, cookies ou analytics.</p>
 </footer>
 </body>
 </html>

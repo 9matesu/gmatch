@@ -10,6 +10,10 @@ contextBridge.exposeInMainWorld('gmatch', {
   cacheImage: (url) => ipcRenderer.invoke('cache:image', url),
   cacheStats: () => ipcRenderer.invoke('cache:stats'),
   clearCache: () => ipcRenderer.invoke('cache:clear'),
+  // Player-owned idle folders (dialog-picked, served over idle-file://).
+  customPickFolder: () => ipcRenderer.invoke('custom:pick-folder'),
+  customListFolder: (id) => ipcRenderer.invoke('custom:list-folder', id),
+  customRemoveFolder: (id) => ipcRenderer.invoke('custom:remove-folder', id),
   // Secure KV (B.3): DPAPI-backed storage for identity keys/threads/pfps.
   secureAvailable: () => ipcRenderer.invoke('secure:available'),
   secureGet: (key) => ipcRenderer.invoke('secure:get', key),

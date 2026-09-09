@@ -1,8 +1,7 @@
 // Generate the public legal corpus from the CANONICAL TS source (plan C.3).
 // node apps/desktop/scripts/gen-legal.mjs
 // Outputs (relative to apps/desktop/):
-//   public/legal/<id>.md          — PT-BR binding text, downloadable/indexable
-//   public/legal/en/<id>.md       — EN informational mirror
+//   public/legal/<id>.md          — EN binding text, downloadable/indexable
 //   public/legal/version.json     — { key, docs } the acceptance key mirrors
 // CI gate (anti-drift): `node scripts/gen-legal.mjs && git diff --exit-code public/legal/`
 const fs = require('fs')
@@ -38,11 +37,10 @@ const versionLine = fs.readFileSync(path.join(ROOT, 'src', 'legal', 'documents.t
 if (!versionLine) throw new Error('LEGAL_VERSION not found in documents.ts')
 const VERSION = versionLine[1]
 
-const pt = parseDocs('documents.ts')
-const en = parseDocs('documents.en.ts')
+const corpus = parseDocs('documents.ts')
 
 function markdown(d, header) {
-  const out = [`# ${d.title}`, '', `_${header}_: **${VERSION}** · atualizado/updated: ${d.updated}`, `Jurisdição: ${d.jurisdiction}`, '']
+  const out = [`# ${d.title}`, '', `_${header}_: **${VERSION}** · updated: ${d.updated}`, `Jurisdiction: ${d.jurisdiction}`, '']
   for (const line of d.body) {
     out.push(line, '')
   }
@@ -50,14 +48,13 @@ function markdown(d, header) {
 }
 
 fs.rmSync(OUT, { recursive: true, force: true })
-fs.mkdirSync(path.join(OUT, 'en'), { recursive: true })
-const ids = Object.keys(pt).sort()
+fs.mkdirSync(OUT, { recursive: true })
+const ids = Object.keys(corpus).sort()
 for (const id of ids) {
-  if (!pt[id] || !en[id]) throw new Error(`corpus mismatch for ${id}`)
-  fs.writeFileSync(path.join(OUT, `${id}.md`), markdown(pt[id], 'Versão vinculante (PT-BR)'))
-  fs.writeFileSync(path.join(OUT, 'en', `${id}.md`), markdown(en[id], 'Informational translation (EN) — PT-BR binds'))
+  if (!corpus[id]) throw new Error(`corpus mismatch for ${id}`)
+  fs.writeFileSync(path.join(OUT, `${id}.md`), markdown(corpus[id], 'Binding text (EN)'))
 }
 // acceptance key MUST mirror legalVersionKey(): `${id}@${version}` sorted, ';'
 const key = ids.map((id) => `${id}@${VERSION}`).sort().join(';')
 fs.writeFileSync(path.join(OUT, 'version.json'), JSON.stringify({ key, version: VERSION, docs: ids }, null, 2) + '\n')
-console.log(`gen-legal: ${ids.length} docs x2 langs -> public/legal/ (key ${key.length} chars)`)
+console.log(`gen-legal: ${ids.length} docs (EN binding) -> public/legal/ (key ${key.length} chars)`)

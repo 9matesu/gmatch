@@ -1,28 +1,28 @@
-# Denúncias e Notice-and-Takedown
+# Abuse Reports & Notice-and-Takedown
 
-_Versão vinculante (PT-BR)_: **2026-09-09.1** · atualizado/updated: 2026-09-09
-Jurisdição: MGA 512 (EUA) como referência; LGPD/CC Brasil para remoção
+_Binding text (EN)_: **2026-09-09.2** · updated: 2026-09-09
+Jurisdiction: MGA 512 (US) as reference; LGPD/CC Brazil for removal
 
-## 1. O problema honesto do E2EE
+## 1. The honest E2EE problem
 
-No modo correio oficial, NÃO LEEMOS conteúdo — e por isso NÃO PODEMOS moderar preventivamente, avaliar denúncia sobre o que não vimos, nem apagar de forma seletiva o que não armazenamos. Isto é deliberado.
+In official courier mode we DO NOT read content — and therefore cannot pre-moderate, judge reports about what we never saw, or selectively delete what we do not store. This is deliberate.
 
-## 2. O que a arquitetura permite
+## 2. What the architecture allows
 
-- **Divulgação de chave pela vítima:** quem recebeu um envelope pode exportar a chave DESSA conversa/sala. Com a chave pública da conversa + o envelope, um moderador humano pode abrí-lo e validá-lo contra a assinatura. Isso só é possível para conteúdo a que a vítima tem acesso.
+- **Victim key disclosure:** whoever received an envelope can export the key FOR THAT conversation/room. With the conversation key + the envelope, a human moderator can open and verify it against the signature. This only works for content the victim can access.
 
-- **Endereço de entrega:** é público e verificável por quem tem a chave privada correspondente. Uma ordem judicial que identifique a chave-privada de um endereço de entrega pode, se cumprida pelo usuário, revelar seu conteúdo.
+- **Delivery address:** public and verifiable by whoever holds the matching private key. A court order that identifies a private key may, if the user complies, reveal its content.
 
-- **Full-nodes:** o host pode ler o que você publica nele; denúncias vão ao host.
+- **Full-nodes:** the host can read what you publish on it; reports go to the host.
 
-## 3. Como denunciar
+## 3. How to report
 
-Contato público no repositório. Envie: a) sua relação com o fato (vítima/procurador/interessado), b) descrição e, se possível, os envelopes e as chaves divulgadas, c) URL/identificador concreto (endereço de entrega), d) declaração sob pena de perjury de boa-fé.
+Public contact in the repository. Include: a) your relationship to the case (victim/agent/stakeholder), b) description and, if possible, the envelopes and disclosed keys, c) a concrete identifier (delivery address), d) a good-faith statement under penalty of perjury.
 
-## 4. O que NÃO podemos atender
+## 4. What we CANNOT do
 
-Ordens genéricas de vigilância ("me mostre os usuários"), pedidos sem chave divulgada ou sem base legal, e remoção de conteúdo armazenado por terceiros após entrega — não controlamos os dispositivos de quem recebe.
+Generic surveillance orders ("show me the users"), requests without disclosed keys or legal basis, and removal of content from recipients' devices after delivery — we do not control receivers.
 
-## 5. Transparência
+## 5. Transparency
 
-Receberemos ordens governamentais apenas conforme lei aplicável e as publicaremos em relatório de transparência se permitido; nenhuma chave de servidor oficial dá acesso a conteúdo de usuários porque o servidor nunca as teve.
+Government requests will be honoured only under applicable law and published in a transparency report where allowed; no official-site key can decrypt user content because the site never held one.

@@ -1,20 +1,20 @@
-# Conteúdo Adulto e Registros (18 U.S.C. §2257 adjacente)
+# Adult Content & Records (18 U.S.C. §2257-adjacent)
 
-_Versão vinculante (PT-BR)_: **2026-09-09.1** · atualizado/updated: 2026-09-09
-Jurisdição: EUA (para quem publica conteúdo sexual explícito sob jurisdição dos EUA); análogas locais aplicáveis
+_Binding text (EN)_: **2026-09-09.2** · updated: 2026-09-09
+Jurisdiction: US (for publishers of explicit content under US jurisdiction); analogous local laws
 
-## 1. Quem é o "publisher"
+## 1. Who is the "publisher"
 
-No modelo courier/P2P, NÃO há editor central: quem envia é o publisher de seu conteúdo e o guardião de seus registros. Quem publica conteúdo sexual explícito nos EUA está sujeito à 18 U.S.C. §2257 e precisa manter registros de idade/identidade dos performers; fora dos EUA, leis análogas podem aplicar.
+In the courier/P2P model there is NO central publisher: whoever submits is the publisher of their content and the custodian of their records. Publishing sexually explicit content in the US triggers 18 U.S.C. §2257 record-keeping duties; analogous laws may apply elsewhere.
 
-## 2. Onde ficam os registros
+## 2. Where records live
 
-Com o publisher — no dispositivo dele. Os distribuidores do software não recebem, não veem e não armazenam seus registros. Não oferecemos serviço de custódia de registros e não devemos ser tratados como tal.
+With the publisher — on their device. The software distributors receive, see and store none of your records. We offer no records-custody service and must not be treated as one.
 
-## 3. Ferramentas do app
+## 3. App tooling
 
-O app registra localmente a data/hora e a chave do autor de cada envio (assinatura dentro do envelope cifrado) — evidência de proveniência que fica NA MÃO DE QUEM POSSUI A CHAVE, útil para você provar autoria/data.
+The app records locally the timestamp and signing key of every submission (signature inside the sealed envelope) — provenance evidence that stays IN THE KEY HOLDER'S HANDS, useful to prove authorship/date.
 
-## 4. Isenção de aviso
+## 4. No licence for illegality
 
-Nenhum aviso legal aqui autoriza conteúdo ilegal. A regra 1 do documento Comunidade prevalece: o software não pode ser usado para conteúdo com menores ou não-consentido sob qualquer lei.
+Nothing here authorises illegal content. Community rule 1 prevails: the software may not be used for content involving minors or non-consent under any law.
