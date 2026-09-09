@@ -255,3 +255,23 @@ offline earnings). Each +5% click power. Persist across prestige.
 - Build: `cd apps/desktop && npm run dist`; CI: tag `v*` →
   `.github/workflows/release.yml` (lint+typecheck+test gate → portable exe →
   GitHub release). Unsigned exe → SmartScreen "More info → Run anyway".
+
+## 13. Servers (directory, federation, admin) — v1.1+
+
+ADR-002 (`docs/ADR-002-servers.md`) é canônico; resumo de operação:
+
+- **Criar**: Settings/Servers → "+ Create server" → publica nome/descrição/hint
+  no diretório do central (metadados assinados; conteúdo NUNCA sai do seu PC).
+  Heartbeat de 15 min mantém o listing vivo (24h sem ping = some da lista).
+- **Entrar**: aba Servers → "Join" → `serverSet({mode:'client'})` + relaunch.
+  Servidor com 🔒 pede a senha uma vez; ela é verificada NO HOST (scrypt,
+  lockout 5/15min) e a allowlist fica no SQLite do host — sem token forjável.
+- **Admin**: quem HOSTEIA o nó vê o botão Admin no rodapé da sidebar (PIN da
+  suíte admin existente). A suíte de moderação funciona igual em qualquer nó.
+- **Dashboard**: `GET /api/servers/dashboard` no nó atual → userlist (ids
+  truncados, boolean online 60s), posts/24h, membros. Anônimos veem só números.
+- **Snapshot**: admin exporta/importa o JSON do mundo (`/api/snapshot`), o
+  mecanismo honesto de handoff v1. Tabelas de segurança/transporte do nó
+  (SystemMeta, Sessions, ServerDirectory…) são excluídas por design.
+- **Central** (`VITE_CENTRAL_URL` / Settings→Server): diretório + nada mais;
+  o central não consegue ler conteúdo de nenhum servidor federado.

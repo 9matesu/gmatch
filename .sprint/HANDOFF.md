@@ -32,3 +32,21 @@ Arquivos novos NÃO-rastreados que não são meus:
 ## Perguntas em aberto para o usuário
 - "≥1 player segura a info do servidor" → replicação automática real é pesquisa (fora de escopo); Fase 6 entrega snapshot manual admin. Confirma que snapshot manual basta?
 - Senha do servidor: recomendar senha longa na UI (lockout já cobre brute-force). OK?
+
+
+---
+## Atualizacao 18:20 (Hermes, branch feat/encrypted-api-servers)
+
+- OpenCode retomou a edicao (store.ts/GamesHub/GoonPanel ~18:08-18:15).
+- Commitados por MIM agora: `6176ec8` ServersView + heartbeat + rota 'servers'
+  (arquivos-leaf proprios). **App.tsx / SidebarNav.tsx continuam com EDICAO
+  DELAS (OpenCode) + MINHA EDICAO pendente (botao Admin + entrada Servers)**
+  no working tree — NAO facam checkout dessas duas linhas.
+- CONTRATO p/ OpenCode: `MainViewType` agora inclui `'servers'`;
+  `ROUTE_VIEWS` tambem. Se voces tocarem SidebarNav/App, NAO apaguem os
+  blocos `{mainView === 'servers' && ...}` nem o botao Admin (`isHost`).
+- Cor (UI): "Cards" -> "Keepsakes" (rename feito pelo OpenCode) ja esta no
+  working tree; mantenha.
+
+## Pendencia da Hermes (fazer quando OpenCode parar)
+- commit conjunto App/SidebarNav (wiring Servers + Admin) apos gate

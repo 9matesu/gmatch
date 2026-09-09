@@ -68,3 +68,18 @@ curl -sI "$API_BASE/api/objects/<own-id>" | grep -i cache-control          # no-
 #    arquivo cifrado: <userData>/identity.bin (DPAPI)
 # 4) admin sem env desabilitado: POST /api/admin/verify-pin → 503 sem ADMIN_PIN_HASH
 ```
+
+## Rodada 2 (2026-09-09, v1.1+ / branch feat/encrypted-api-servers)
+
+| # | Sev | Achado | Repro | Status |
+|---|-----|--------|-------|--------|
+| F11 | ALTA | Mutação assinada viajava com body JSON + headers em **texto puro** — qualquer MITM/observador da rede via corpo, path e a rota-alvo do usuário. | `grep -n "X-Orbit-Signature" apps/desktop/src/utils/api.ts` | ✅ fix T2 — ECIES para a X25519 key do nó (`GET /api/identity`), header `X-Orbit-Sealed`; body/headers legíveis só no nó (testes `packages/protocol/src/api-seal.test.ts`, `apps/api/src/middleware/unseal.test.ts`, `apps/desktop/src/utils/api.seal.test.ts`) |
+| F12 | MÉDIA | Nenhum controle de acesso ao **criar/entrar** em servidores: qualquer key poderia poluir o diretório ou se fingir host. | novo `apps/api/src/routes/servers.test.ts` | ✅ T3 — registro exige orbitAuth Ed25519; hint de endpoint revelado só a chamados assinados; 5/max-dono; stale 24h |
+| F13 | BAIXA | Userlist do nó exporia last_seen preciso. | `GET /api/servers/dashboard` anônimo | ✅ T4 — anônimo = só contagens; membros = id truncado (8) + boolean 60s |
+| F14 | MÉDIA | Servidores privados sem senha = qualquer key descoberta podia escrever (orbitAuth auto-cria Users!). | novo `apps/api/src/routes/password.test.ts` | ✅ T5 — scrypt no SystemMeta do host + gate de escrita p/ newcomers (allowlist assinada, epoch grandfathered, lockout 5/15) |
+| F15 | BAIXA | Handoff de servidor sem mecanismo seguro de backup. | novo `apps/api/src/routes/snapshot.test.ts` | ✅ T6 — `/api/snapshot` admin-only, allowlist de conteúdo, nunca exporta SystemMeta/Sessions/ServerDirectory |
+
+Pendências honestas da rodada 2: replicação automática multi-réplica NÃO
+implementada (export/import manual cobre v1; ver ADR-002). Kill-switch
+`API_SEALED_ONLY` ainda aceita legado assinado (mitigação de suporte,
+documentada). B.7 (signed URLs) permanece fechado na rodada 1.
