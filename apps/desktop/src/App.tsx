@@ -49,6 +49,7 @@ import { GamesView } from "./components/views/GamesView";
 import { DeckBuilder, getStoredActiveDeckId, type Deck } from "./components/games/DeckBuilder";
 import { HomeFooter, type MainViewType, type ActiveHackSession } from "./components/home/HomeFooter";
 import { SidebarNav } from "./components/home/SidebarNav";
+import { RoomsView } from "./components/rooms/RoomsView";
 import { HackSpyTabView } from "./components/views/HackSpyTabView";
 import { PCDominationView } from "./components/views/PCDominationView";
 import { DominationEffects } from "./components/domination/DominationEffects";
@@ -2826,6 +2827,7 @@ export default function Home() {
                 score={myUser?.score ?? 0}
                 reputation={myUser?.reputation ?? 0}
                 wsConnected={isWsConnected}
+                showRooms={courierActive}
               />
               <div
                 className={`hidden md:flex shrink-0 min-h-0 overflow-hidden transition-[width] duration-300 ease-out ${chatOpen ? 'w-[min(42rem,42vw)]' : 'w-0'}`}
@@ -3396,6 +3398,19 @@ export default function Home() {
                     />
                   )}
 
+                  {mainView === 'rooms' && courierActive && (
+                    <RoomsView
+                      rooms={courier.rooms}
+                      roomMessages={courier.roomMessages}
+                      users={users}
+                      myOrbitId={identity?.orbitId || ''}
+                      onCreateRoom={courier.createRoom}
+                      onInvite={courier.inviteToRoom}
+                      onSay={courier.sayInRoom}
+                      onLeave={courier.leaveRoom}
+                      toast={toast}
+                    />
+                  )}
                   {/* Babecock · Idle — GoonGrid workspace (plan D2/D5) */}
                   {mainView === 'grid' && (
                     <div className="flex-1 min-h-0 w-full">

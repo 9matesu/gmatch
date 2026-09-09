@@ -21,6 +21,7 @@ import {
   Zap,
   Trophy,
   Monitor,
+  Users,
 } from 'lucide-react';
 import type { MainViewType } from './HomeFooter';
 
@@ -54,6 +55,7 @@ export function SidebarNav({
   score = 0,
   reputation = 0,
   wsConnected = false,
+  showRooms = false,
 }: {
   mainView?: MainViewType;
   setMainView?: (view: MainViewType) => void;
@@ -77,6 +79,8 @@ export function SidebarNav({
   reputation?: number;
   /** Live swarm-socket state — never silent: online / reconnecting always shows. */
   wsConnected?: boolean;
+  /** SITE mode: blind-courier Rooms view is available. */
+  showRooms?: boolean;
 }) {
   const [now, setNow] = useState(() => Date.now());
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -120,6 +124,17 @@ export function SidebarNav({
       active: mainView === 'games' || mainView === 'grid',
       action: () => setMainView?.('games'),
     },
+    ...(showRooms
+      ? [
+        {
+          id: 'rooms',
+          label: 'Rooms',
+          icon: Users,
+          active: mainView === 'rooms',
+          action: () => setMainView?.('rooms'),
+        },
+      ]
+      : []),
     ...(onOpenStore
       ? [
         {

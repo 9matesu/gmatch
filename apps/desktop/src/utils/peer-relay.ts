@@ -11,11 +11,45 @@ export interface P2PPayloadMessage {
 }
 
 // Privacy gate: same ICE hygiene as the file-transfer peer (ice-hygiene.ts).
-// defaultIceConfig: env TURN forces relay (zero-exposure), otherwise the
-// community relay is added as candidate source without forcing transport.
+// defaultIceConfig: env TURN forces relay (zero-exposure), otherwise STUN only.
 const ICE_CFG = defaultIceConfig(
   typeof process !== 'undefined' ? (process.env as Record<string, string | undefined>) : {},
 )
+
+/**
+ * Self-hosted PeerServer only (plan P3.5 + no-third-party rule): the bundled
+ * app must NEVER dial the public `0.peerjs.com` cloud (it would hand
+ * connection metadata — our sanitized ids, timing, peer graph — to a third
+ * party nobody chose). When the user has not configured
+ * NEXT_PUBLIC_PEERJS_HOST/PORT, this returns undefined and the caller keeps
+ * the relay DISABLED: WS swarm + blind courier still carry all traffic
+ * (no dead end; the fan-out is simply direct-only).
+ */
+export interface PeerRelayServer {
+  host: string
+  port: number
+  path: string
+  secure: boolean
+}
+
+export function peerRelayConfig(
+  env: Record<string, string | undefined> = typeof process !== 'undefined' ? (process.env as Record<string, string | undefined>) : {},
+): PeerRelayServer | undefined {
+  const host = (env.NEXT_PUBLIC_PEERJS_HOST || peerRelayOverride?.host || '').trim()
+  const port = Number(env.NEXT_PUBLIC_PEERJS_PORT || peerRelayOverride?.port || 0)
+  if (!host || !Number.isInteger(port) || port <= 0 || port > 65535) return undefined
+  const path = (env.NEXT_PUBLIC_PEERJS_PATH || peerRelayOverride?.path || '').trim() || '/'
+  const secure = env.NEXT_PUBLIC_PEERJS_SECURE !== undefined
+    ? env.NEXT_PUBLIC_PEERJS_SECURE === '1' || env.NEXT_PUBLIC_PEERJS_SECURE === 'true'
+    : (peerRelayOverride ? peerRelayOverride.secure ?? port === 443 : port === 443)
+  return { host, port, path, secure }
+}
+
+/** Explicit runtime setup (Settings / server-mode UI): never the cloud. */
+let peerRelayOverride: Partial<PeerRelayServer> | null = null
+export function setPeerRelayServer(cfg: Partial<PeerRelayServer> | null): void {
+  peerRelayOverride = cfg
+}
 
 export class OrbitPeerRelay {
   private peer: Peer | null = null
@@ -32,15 +66,28 @@ export class OrbitPeerRelay {
     const sanitizedId = `orbit-${orbitId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 16)}`
     this.peerId = sanitizedId
 
-    logger.log('[ORBIT PeerJS] Initializing WebRTC PeerJS relay with ID:', sanitizedId)
+    const serverCfg = peerRelayConfig()
+    if (!serverCfg) {
+      // No self-hosted PeerServer configured: DO NOT dial the public cloud.
+      // The relay stays disabled (canDial false) — WS swarm + courier carry
+      // everything; direct WebRTC fan-out is opt-in by the user's setup.
+      logger.log('[ORBIT PeerJS] relay disabled (no NEXT_PUBLIC_PEERJS_HOST configured; public cloud not dialed)')
+      return
+    }
+
+    logger.log('[ORBIT PeerJS] Initializing WebRTC PeerJS relay with ID:', sanitizedId, 'via', serverCfg.host)
     try {
       this.peer = new Peer(sanitizedId, {
+        host: serverCfg.host,
+        port: serverCfg.port,
+        path: serverCfg.path,
+        secure: serverCfg.secure,
         config: ICE_CFG,
         debug: 0,
       })
 
       this.peer.on('open', (id) => {
-        logger.log('[ORBIT PeerJS] WebRTC peer registered on public relay network! Registered ID:', id)
+        logger.log('[ORBIT PeerJS] WebRTC peer registered on self-hosted relay! Registered ID:', id)
       })
 
       this.peer.on('connection', (conn) => {
@@ -90,6 +137,7 @@ export class OrbitPeerRelay {
   private DIAL_COOLDOWN_MS = 30_000
 
   public canDial(targetOrbitId: string): boolean {
+    if (!this.peer || this.peer.destroyed || this.peer.disconnected) return false
     const targetPeerId = `orbit-${targetOrbitId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 16)}`
     if (targetPeerId === this.peerId) return false
     const conn = this.activeConnections.get(targetPeerId)
