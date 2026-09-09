@@ -1,0 +1,213 @@
+import type { OpenedEnvelope, Envelope } from '@orbit/protocol'
+import type { MailClient } from './mail-client'
+import type { OrbitIdentity } from '@orbit/crypto'
+import { logger } from './logger'
+
+/**
+ * Courier-backed DM layer (plan P3.2). Source of truth is LOCAL
+ * (localStorage thread store); the courier only carries sealed envelopes —
+ * there is no server inbox anymore. Delivery status per message:
+ *   'sent'    -> envelope accepted by the courier (queued for the peer)
+ *   'delivered' -> opened and acked by the recipient (best-effort: inferred
+ *                  from read receipts exchanged INSIDE sealed dm_ack bodies)
+ *   'failed'  -> courier rejected the PUT (dead server / bad token)
+ *
+ * Peer pubkey resolution: an incoming envelope's senderOrbitId is trusted
+ * ONLY together with the pubkey that sealed it (open1to1 already verified the
+ * Ed25519 signature over kind|id|to|body). We cache orbitId -> {pubkey,
+ * encPub} from contact lists and from every opened envelope, so replies can
+ * seal to a peer we have never met via the old server roster.
+ */
+
+export interface DmMessage {
+  id: string
+  peerId: string
+  own: boolean
+  text: string
+  ts: number
+  status: 'sending' | 'sent' | 'delivered' | 'failed'
+  envelopeId?: string
+}
+
+const THREADS_KEY = 'orbit_mail_threads_v1'
+const KEYS_KEY = 'orbit_mail_peerkeys_v1'
+const MAX_PER_THREAD = 500
+
+export interface PeerKeys {
+  publicKeyHex: string
+  encryptionPubHex: string
+  displayName?: string
+}
+
+function readJson<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? (JSON.parse(raw) as T) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function writeJson(key: string, value: unknown): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    /* quota: threads are capped; ignore */
+  }
+}
+
+export class DmStore {
+  constructor(private readonly identity: OrbitIdentity) {}
+
+  /** Peer pubkey registry (contacts + every opened envelope feeds it). */
+  rememberPeer(orbitId: string, keys: PeerKeys): void {
+    const map = readJson<Record<string, PeerKeys>>(KEYS_KEY, {})
+    map[orbitId] = keys
+    writeJson(KEYS_KEY, map)
+  }
+
+  peerKeys(orbitId: string): PeerKeys | undefined {
+    return readJson<Record<string, PeerKeys>>(KEYS_KEY, {})[orbitId]
+  }
+
+  threads(): Record<string, DmMessage[]> {
+    return readJson(THREADS_KEY, {})
+  }
+
+  thread(peerId: string): DmMessage[] {
+    return this.threads()[peerId] || []
+  }
+
+  private save(thread: DmMessage[], peerId: string): void {
+    const all = this.threads()
+    all[peerId] = thread.slice(-MAX_PER_THREAD)
+    writeJson(THREADS_KEY, all)
+  }
+
+  appendLocal(msg: DmMessage): void {
+    const t = this.thread(msg.peerId)
+    t.push(msg)
+    this.save(t, msg.peerId)
+  }
+
+  setStatus(peerId: string, id: string, status: DmMessage['status']): void {
+    const t = this.thread(peerId)
+    const m = t.find((x) => x.id === id)
+    if (m) {
+      m.status = status
+      this.save(t, peerId)
+    }
+  }
+
+  hasMessage(peerId: string, id: string): boolean {
+    return this.thread(peerId).some((m) => m.id === id)
+  }
+}
+
+/** Body format for DM envelopes + receipts (all sealed end-to-end). */
+export function encodeDmBody(msg: DmMessage): string {
+  return JSON.stringify({ t: 'dm', id: msg.id, text: msg.text, ts: msg.ts })
+}
+export function encodeAckBody(refId: string): string {
+  return JSON.stringify({ t: 'dm_ack', id: refId })
+}
+
+export function decodeBody(json: string): { t: 'dm' | 'dm_ack'; id: string; text?: string; ts?: number } | null {
+  try {
+    const parsed = JSON.parse(json)
+    if ((parsed.t === 'dm' || parsed.t === 'dm_ack') && typeof parsed.id === 'string') return parsed
+  } catch { /* foreign envelope kind (signal/announce) — not a DM */ }
+  return null
+}
+
+export interface DmManagerDeps {
+  mail: MailClient
+  store: DmStore
+  identity: OrbitIdentity
+  onThreadChanged: (peerId: string) => void
+}
+
+export class DmManager {
+  constructor(private readonly deps: DmManagerDeps) {}
+
+  /** Outgoing DM: optimistic append -> seal+PUT to courier via MailClient. */
+  async send(peerId: string, text: string): Promise<DmMessage> {
+    const keys = this.deps.store.peerKeys(peerId)
+    const msg: DmMessage = {
+      id: `dm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      peerId,
+      own: true,
+      text,
+      ts: Date.now(),
+      status: 'sending',
+    }
+    this.deps.store.appendLocal(msg)
+    this.deps.onThreadChanged(peerId)
+    if (!keys) {
+      msg.status = 'failed'
+      this.deps.store.setStatus(peerId, msg.id, 'failed')
+      this.deps.onThreadChanged(peerId)
+      logger.warn('[dm] no pubkey known for peer — message held locally (will not deliver)')
+      return msg
+    }
+    try {
+      const env = await this.deps.mail.send(encodeDmBody(msg), 'mail', {
+        publicKeyHex: keys.publicKeyHex,
+        encryptionPubHex: keys.encryptionPubHex,
+      })
+      msg.status = 'sent'
+      msg.envelopeId = env.id
+    } catch {
+      msg.status = 'failed'
+    }
+    this.deps.store.setStatus(peerId, msg.id, msg.status)
+    this.deps.onThreadChanged(peerId)
+    return msg
+  }
+
+  /** Inbound hook wired to MailClient.onMail (opened envelopes only). */
+  handleOpened(opened: OpenedEnvelope, env: Envelope): void {
+    const body = decodeBody(opened.body)
+    if (!body) return
+    const peerId = opened.senderOrbitId
+    // Trust-on-first-use: cache the sealing peer's pubkey material. The
+    // sender's X25519 enc pub rides the wire as env.fromEph (ECIES input),
+    // so replies/acks can be sealed back without a prior contact entry.
+    this.deps.store.rememberPeer(peerId, {
+      publicKeyHex: opened.senderPubHex,
+      encryptionPubHex: env.fromEph || '',
+    })
+    if (body.t === 'dm_ack') {
+      const own = this.deps.store.thread(peerId).find((m) => m.id === body.id)
+      if (own) {
+        this.deps.store.setStatus(peerId, body.id, 'delivered')
+        this.deps.onThreadChanged(peerId)
+      }
+      return
+    }
+    if (this.deps.store.hasMessage(peerId, body.id)) {
+      // Already have it (our own echo) — skip; send the ack only for new.
+      return
+    }
+    this.deps.store.appendLocal({
+      id: body.id,
+      peerId,
+      own: false,
+      text: body.text || '',
+      ts: body.ts || Date.now(),
+      status: 'delivered',
+      envelopeId: opened.id,
+    })
+    this.deps.onThreadChanged(peerId)
+    // Receipt rides the same sealed channel back to the sender's box.
+    const peerKeys = this.deps.store.peerKeys(peerId)
+    if (peerKeys?.encryptionPubHex) {
+      void this.deps.mail
+        .send(encodeAckBody(body.id), 'mail', {
+          publicKeyHex: peerKeys.publicKeyHex,
+          encryptionPubHex: peerKeys.encryptionPubHex,
+        })
+        .catch(() => { /* best-effort receipt */ })
+    }
+  }
+}

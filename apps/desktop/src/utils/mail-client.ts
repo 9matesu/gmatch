@@ -40,8 +40,10 @@ export interface MailClientDeps {
   webSocketFactory?: (url: string) => MailSocket
   fetchImpl?: typeof fetch
   now?: () => number
-  /** Side effect for each successfully opened envelope (dedup by id here). */
-  onMail: (opened: OpenedEnvelope) => void
+  /** Side effect for each successfully opened envelope (dedup by id here).
+   * Receives the wire envelope too — `env.fromEph` (the sender's X25519 pub)
+   * is needed to seal replies/acks back without a prior contact entry. */
+  onMail: (opened: OpenedEnvelope, env: Envelope) => void
   log?: (msg: string) => void
 }
 
@@ -204,7 +206,7 @@ export class MailClient {
         const o = open1to1(env, this.deps.identity.encryptionPrivHex)
         opened.push(o)
         consumed.push(env.id)
-        this.deps.onMail(o)
+        this.deps.onMail(o, env)
       } catch {
         // Not openable by us (token collision/corruption) — leave it; the
         // courier TTL collects it. Never ack what we cannot open.
