@@ -44,7 +44,7 @@
 <li>Nada é armazenado em cache no seu disco pelo app: imagens do feed vivem só na memória da sessão; toda resposta do servidor vem marcada <code>no-store</code>.</li>
 <li>Suas chaves privadas ficam no seu Windows protegidas pelo cripto-sistema do próprio Windows (DPAPI) — nunca em texto puro, nunca no servidor.</li>
 <li>Endereços IP não são registrados em logs de aplicação; o relay TURN usa credenciais temporárias aleatórias, sem ligação com sua identidade.</li>
-<li>Você também pode não usar nosso servidor: o app aceita apontar para um servidor próprio (self-host), mantendo tudo dentro da sua rede.</li>
+<li>Você também pode não usar nosso servidor: o app hospeda o próprio servidor (a sua máquina guarda todos os dados) ou entra no de um amigo. O diretório público — mantido no central — lista só nomes e descrições; conteúdo e listas de usuários nunca passam por ele. Servidor com senha verifica a senha NA MÁQUINA DO HOST (scrypt, bloqueio por tentativas), nunca no central.</li>
 </ul>
 <p>Leia o relatório completo de segurança: <a href="legal/security.html">Auditoria de segurança</a>. O código é aberto: <a href="https://github.com/9matesu/goongrid">github.com/9matesu/goongrid</a>.</p>
 </section>
@@ -55,7 +55,7 @@
 <li><strong>Identidade:</strong> ao iniciar, o app gera dois pares de chaves — Ed25519 (para assinar suas ações) e X25519 (para cifrar conteúdo). O seu "ID" é um resumo criptográfico (SHA-256) da chave pública. A chave privada nunca sai do seu dispositivo.</li>
 <li><strong>Mensagens 1:1:</strong> criptografia ECIES (X25519 + BLAKE3 + XChaCha20-Poly1305). Matematicamente, só quem tem a sua chave privada abre o que te enviaram — nem o servidor, nem o autor depois.</li>
 <li><strong>Salas de grupo:</strong> um segredo compartilhado (DEK) circula cifrado de convidado em convidado; quando alguém sai, o segredo é trocado (epoch) e o que foi dito antes continua legível, mas nada novo abre com a chave antiga.</li>
-<li><strong>Autenticação de pedidos:</strong> toda chamada à API vem assinada e carimbadada no tempo; reuso de requisição (replay) é rejeitado.</li>
+<li><strong>Selamento de pedidos:</strong> toda chamada à API vem assinada e carimbadada no tempo (replay rejeitado); quando o nó anuncia uma chave de transporte, corpo e cabeçalhos viajam cifrados por ECIES até ele — quem vigia sua rede vê texto cifrado, não quem você seguiu nem o que curtiu.</li>
 <li><strong>Privacidade no P2P:</strong> candidatos ICE com IP literal são descartados antes de sair do app; o relay é opcional e rotulado aleatoriamente.</li>
 <li><strong>Limite honesto:</strong> criptografia protege conteúdo contra terceiros; NÃO protege contra alguém que roube seu computador desbloqueado ou sua chave exportada. Guarde a cópia da chave em lugar seguro.</li>
 </ul>

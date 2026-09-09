@@ -44,7 +44,7 @@
 <li>The app caches nothing to your disk: feed images live only in session memory; every server response is marked <code>no-store</code>.</li>
 <li>Your private keys stay on your Windows protected by Windows' own crypto system (DPAPI) — never in plaintext, never on the server.</li>
 <li>IP addresses are not recorded in application logs; the TURN relay uses random short-lived credentials unlinked to your identity.</li>
-<li>You can skip our server entirely: the app can point to a server you (or a friend) run, keeping everything inside your network.</li>
+<li>You can skip our server entirely: the app can host its own server (your machine holds all data) or join a friend's. The public directory — hosted centrally — lists only server names and public descriptions; content and user lists never touch it. Password-protected servers verify the password on the HOST machine (scrypt, attempt lockout), never centrally.</li>
 </ul>
 <p>Read the full security report: <a href="legal/security.html">security audit</a>. The code is open: <a href="https://github.com/9matesu/goongrid">github.com/9matesu/goongrid</a>.</p>
 </section>
@@ -55,7 +55,7 @@
 <li><strong>Identity:</strong> on first start the app generates two keypairs — Ed25519 (signs your actions) and X25519 (encrypts content). Your "ID" is a cryptographic digest (SHA-256) of the public key. The private key never leaves your device.</li>
 <li><strong>1:1 messages:</strong> ECIES (X25519 + BLAKE3 + XChaCha20-Poly1305). Mathematically, only the holder of your private key can open what was sent to you — not the server, not even the sender afterwards.</li>
 <li><strong>Group rooms:</strong> a shared secret (DEK) circulates encrypted between invitees; when someone leaves, the secret rotates (epoch) — past messages stay readable to members, nothing new opens with the old key.</li>
-<li><strong>Request authentication:</strong> every API call is signed and timestamped; replayed requests are rejected.</li>
+<li><strong>Request sealing:</strong> every API call is signed, timestamped (replays rejected) and, when the node advertises a transport key, the request body and headers travel ECIES-encrypted to that node — an observer on your network sees ciphertext, not which post you liked or whom you followed.</li>
 <li><strong>P2P privacy:</strong> ICE candidates containing literal IPs are dropped before leaving the app; the relay is optional and randomly labelled.</li>
 <li><strong>Honest limit:</strong> cryptography protects content from third parties; it does NOT protect against someone stealing your unlocked computer or your exported key. Keep your key backup somewhere safe.</li>
 </ul>

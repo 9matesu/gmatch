@@ -5,6 +5,11 @@ import type { D1Turso } from '../db'
 /**
  * Server SNAPSHOT export/import (plan T6, docs/ADR-002-servers.md).
  *
+ * Not to be confused with serve.ts's snapshotDb/restoreDb (SIGTERM →
+ * orbit.snapshot.sqlite): that is LOCAL crash-persistence of one node's own
+ * file and never crosses the wire. THIS module is the portable, selective,
+ * admin-authenticated handoff format for moving a world between machines.
+ *
  * The honest v1 of "every player holds a piece of the server": the HOST (or
  * an admin on the central) exports the node's content as a JSON snapshot and
  * hands it to a successor host out-of-band; that host imports it before
