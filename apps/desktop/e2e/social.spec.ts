@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { seedApp } from './helpers'
-import { generateIdentity } from '../src/identity.cjs'
+import { generateIdentity } from '../src/identity.cjs'
+import { legalVersionKey } from '../src/legal/documents'
 
 // Release-1.0 social-suite journeys (plan P4.1).
 // SWs blocked: service-worker caching breaks route mocks + identity seeding
@@ -19,9 +20,10 @@ async function newPeerContext(page: import('@playwright/test').Page, name: strin
   const ctx = await page.context().browser()!.newContext({ serviceWorkers: 'block' })
   const p = await ctx.newPage()
   await p.addInitScript(
-    ([i, n]) => {
+    ([i, n, legalKey]: [Record<string, unknown>, string, string]) => {
       localStorage.setItem('orbit_identity', JSON.stringify(i))
-      localStorage.setItem('goonMatch_age_verified', 'true')
+      localStorage.setItem('goonMatch_age_verified', 'true')
+      localStorage.setItem('orbit_legal_accepted', legalKey)
       localStorage.setItem('orbit_display_name', n)
       localStorage.setItem('orbit_tags', JSON.stringify(['e2e']))
       localStorage.setItem(
@@ -29,7 +31,7 @@ async function newPeerContext(page: import('@playwright/test').Page, name: strin
         JSON.stringify({ version: 1, current: 'ready', completed: ['welcome', 'auth', 'profile', 'platform', 'feed', 'tune', 'cards', 'economy', 'games', 'ready'] }),
       )
     },
-    [id, name],
+    [id, name, legalVersionKey()],
   )
   return { ctx, p, id }
 }

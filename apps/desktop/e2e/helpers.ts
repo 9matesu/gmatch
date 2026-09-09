@@ -1,4 +1,5 @@
 import { generateIdentity } from '../src/identity.cjs'
+import { legalVersionKey } from '../src/legal/documents'
 
 /**
  * Seed a returning-user state so E2E skips onboarding deterministically:
@@ -41,9 +42,12 @@ export async function seedApp(
     lastSeenAt: Date.now(),
   }
   await page.addInitScript(
-    ([id, save]) => {
+    ([id, save, LEGAL_KEY]: [Record<string, unknown>, Record<string, unknown>, string]) => {
       localStorage.setItem('orbit_identity', JSON.stringify(id))
       localStorage.setItem('goonMatch_age_verified', 'true')
+      // Legal acceptance gate (C.2): seeded with the CURRENT canonical key
+      // (computed node-side; the browser context can't call our modules).
+      localStorage.setItem('orbit_legal_accepted', LEGAL_KEY)
       // Non-default display name: the onboarding migration treats default
       // peer names as "never onboarded" and reopens the profile step.
       localStorage.setItem('orbit_display_name', 'E2E Tester')
@@ -63,7 +67,7 @@ export async function seedApp(
         }),
       )
     },
-    [identity, idleSave],
+    [identity, idleSave, legalVersionKey()],
   )
   return identity
 }
