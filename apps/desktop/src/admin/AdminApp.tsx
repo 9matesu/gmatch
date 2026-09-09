@@ -1,6 +1,7 @@
 "use client";
 
 import { generateIdentity } from "@orbit/crypto";
+import { getSecureItem, setSecureItem, removeSecureItem } from '../utils/secure-storage'
 import { useEffect, useState, useCallback, useMemo } from "react";
 
 import { orbitFetch } from "../utils/api";
@@ -27,7 +28,7 @@ export default function AdminPageClient() {
   const [identity, setIdentity] = useState<OrbitIdentity | null>(() => {
     if (typeof window === "undefined") return null;
     try {
-      const raw = localStorage.getItem("orbit_admin_identity");
+      const raw = getSecureItem("orbit_admin_identity");
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       return parsed && parsed.orbitId && parsed.privateKeyHex ? parsed : null;
@@ -148,7 +149,7 @@ export default function AdminPageClient() {
     if (!adminId) {
       adminId = generateIdentity();
       if (typeof window !== "undefined") {
-        try { localStorage.setItem("orbit_admin_identity", JSON.stringify(adminId)); } catch {}
+        try { setSecureItem("orbit_admin_identity", JSON.stringify(adminId)); } catch {}
       }
       setIdentity(adminId);
     }
@@ -181,7 +182,7 @@ export default function AdminPageClient() {
   const handleAuthError = useCallback((status?: number) => {
     if (typeof window !== "undefined") {
       sessionStorage.removeItem("orbit_admin_verified");
-      localStorage.removeItem("orbit_admin_identity");
+      removeSecureItem("orbit_admin_identity");
     }
     setIdentity(null);
     setPinVerified(false);

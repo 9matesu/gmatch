@@ -2,6 +2,7 @@
 
 // Extracted verbatim from App.tsx `mainView === 'profile'` branch.
 import type { OrbitIdentity } from '@orbit/crypto';
+import { getSecureItem, setSecureItem } from '../../utils/secure-storage'
 import type { OrbitObject, User } from '@orbit/shared';
 import { GoonMatchProfile } from '../profile/GoonMatchProfile';
 import type { FeedPost } from '../feed/GoonMatchFeed';
@@ -76,7 +77,7 @@ export function ProfileView({
           if (updated.pfpUrl) {
             setProfilePics((prev) => {
               const next = { ...prev, [identity?.orbitId || '']: updated.pfpUrl as string };
-              try { localStorage.setItem('goonmatch_pfps', JSON.stringify(next)); } catch { }
+              try { setSecureItem('goonmatch_pfps', JSON.stringify(next)); } catch { }
               return next;
             });
             try { localStorage.setItem('orbit_pfp_url', updated.pfpUrl); } catch { }

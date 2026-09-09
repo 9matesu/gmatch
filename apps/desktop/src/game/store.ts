@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { getSecureItem } from '../utils/secure-storage'
 import { clickGain, clickPower, heatMultiplier, heatStreakAfter, isCrit, passiveGps } from './economy'
 import type { EconomyInput } from './economy'
 import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, setupTag, soloTag as soloTagList, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
@@ -134,7 +135,7 @@ let toastSeq = 1
  */
 function saveKey(): string {
   try {
-    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('orbit_identity') : null
+    const raw = getSecureItem('orbit_identity')
     const id = raw ? (JSON.parse(raw) as { orbitId?: string }).orbitId : null
     return id ? `${SAVE_KEY}:${id}` : SAVE_KEY
   } catch {

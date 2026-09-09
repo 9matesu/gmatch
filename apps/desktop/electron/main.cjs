@@ -1,12 +1,34 @@
 // GoonGrid Electron main process.
 // All booru HTTP happens HERE (renderer never touches the network directly).
 // Endpoints per docs/SPEC.md §6. 10s timeout, browser UA, round-robin health.
-const { app, BrowserWindow, ipcMain, protocol, net, dialog } = require('electron')
+const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage } = require('electron')
 const https = require('https')
 const path = require('path')
 const imageCache = require('./imageCache.cjs')
+const { createSecureStore } = require('./secureStore.cjs')
 const apiSidecar = require('./apiSidecar.cjs')
 const serverMode = require('./server-mode.cjs')
+
+// Secure KV (security plan B.3): renderer's sensitive localStorage keys are
+// backed here, encrypted with DPAPI (safeStorage) when available.
+let secureKV = null
+function initSecureKV() {
+  const available = (() => {
+    try { return safeStorage.isEncryptionAvailable() } catch { return false }
+  })()
+  secureKV = createSecureStore({
+    userDataPath: app.getPath('userData'),
+    available,
+    encryptString: (s, iv) => {
+      // safeStorage has no IV parameter; per-value random salt key derivation:
+      // encrypt(s) with the DPAPI master — we store iv only as a format tag.
+      void iv
+      return safeStorage.encryptString(s)
+    },
+    decryptString: (buf) => safeStorage.decryptString(buf),
+  })
+  return available
+}
 
 // Packaged topology (1.0, no central server): either we HOST the bundled
 // server (default) or we're a CLIENT of a friend's. Decided once at startup.
@@ -568,9 +590,15 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  const secureAvailable = initSecureKV()
   imageCache.init(app.getPath('userData'), UA)
-  protocol.handle(imageCache.SCHEME, (request) => imageCache.serveImage(request, net))
+  protocol.handle(imageCache.SCHEME, (request) => imageCache.serveImage(request))
   ipcMain.handle('booru:fetch', (_event, payload) => fetchBooru(payload ?? {}))
+  // Secure KV bridge (B.3): renderer proxies designated localStorage keys here.
+  ipcMain.handle('secure:available', () => secureAvailable)
+  ipcMain.handle('secure:get', (_event, key) => secureKV.get(String(key)))
+  ipcMain.handle('secure:set', (_event, key, value) => secureKV.set(String(key), String(value)))
+  ipcMain.handle('secure:delete', (_event, key) => secureKV.delete(String(key)))
   ipcMain.handle('cache:image', (_event, url) => imageCache.cacheImage(url).then((local) => ({ local })))
   ipcMain.handle('cache:stats', () => imageCache.cacheStats())
   ipcMain.handle('cache:clear', () => imageCache.clearCache())
@@ -625,7 +653,7 @@ app.whenReady().then(async () => {
   })
 })
 
-app.on('before-quit', () => apiSidecar.stopApi())
+app.on('before-quit', () => { apiSidecar.stopApi(); try { if (secureKV) secureKV.flush() } catch { /* best effort */ } })
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

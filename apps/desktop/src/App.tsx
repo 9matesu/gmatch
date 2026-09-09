@@ -1,5 +1,6 @@
 
 import { useIdentity } from "./hooks/useIdentity";
+import { getSecureItem, setSecureItem } from './utils/secure-storage'
 import { useSettings } from "./hooks/useSettings";
 import { useIdle } from "./hooks/useIdle";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
@@ -731,7 +732,7 @@ export default function Home() {
   const [dragActive, setDragActive] = useState(false)
   const [profilePics, setProfilePics] = useState<Record<string, string>>(() => {
     if (typeof window === 'undefined') return {}
-    try { return JSON.parse(localStorage.getItem('goonmatch_pfps') || '{}') } catch { return {} }
+    try { return JSON.parse(getSecureItem('goonmatch_pfps') || '{}') } catch { return {} }
   })
   const pfpInputRef = useRef<HTMLInputElement>(null)
 
@@ -1626,7 +1627,7 @@ export default function Home() {
       // 2. Optimistically apply locally right away
       setProfilePics(prev => {
         const next = { ...prev, [identity.orbitId]: thumbDataUrl }
-        try { localStorage.setItem('goonmatch_pfps', JSON.stringify(next)) } catch { }
+        try { setSecureItem('goonmatch_pfps', JSON.stringify(next)) } catch { }
         return next
       })
 
@@ -1749,7 +1750,7 @@ export default function Home() {
           }
           if (updated) {
             const capped = Object.fromEntries(Object.entries(next).slice(-MAX_PROFILE_PICS_IN_MEMORY))
-            try { localStorage.setItem('goonmatch_pfps', JSON.stringify(capped)) } catch { }
+            try { setSecureItem('goonmatch_pfps', JSON.stringify(capped)) } catch { }
             return capped
           }
           return prev
@@ -2765,7 +2766,7 @@ export default function Home() {
                   if (pfpUrl && newId?.orbitId) {
                     const nextPfps = { [newId.orbitId]: pfpUrl };
                     setProfilePics((prev) => ({ ...prev, ...nextPfps }));
-                    localStorage.setItem('goonmatch_pfps', JSON.stringify(nextPfps));
+                    setSecureItem('goonmatch_pfps', JSON.stringify(nextPfps));
                     try { localStorage.setItem('orbit_pfp_url', pfpUrl); } catch { }
                   }
                   setMyProfile({ displayName: name, tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [], isAdmin: false, pfpUrl: pfpUrl || '' });

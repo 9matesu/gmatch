@@ -7,6 +7,7 @@ import {
 } from '@orbit/protocol'
 import { MailClient } from './mail-client'
 import { scopedKey, type DmStore } from './mail-dm'
+import { getSecureItem, setSecureItem } from './secure-storage'
 import type { OrbitIdentity } from '@orbit/crypto'
 
 /**
@@ -58,7 +59,7 @@ type RoomWire =
 
 function readJson<T>(key: string, fb: T): T {
   try {
-    const raw = localStorage.getItem(key)
+    const raw = getSecureItem(key)
     return raw ? (JSON.parse(raw) as T) : fb
   } catch {
     return fb
@@ -66,7 +67,7 @@ function readJson<T>(key: string, fb: T): T {
 }
 function writeJson(key: string, v: unknown): void {
   try {
-    localStorage.setItem(key, JSON.stringify(v))
+    setSecureItem(key, JSON.stringify(v))
   } catch { /* capped; tolerate quota */ }
 }
 function toHex(bytes: Uint8Array): string {

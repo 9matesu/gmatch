@@ -1,4 +1,5 @@
 import type { OpenedEnvelope, Envelope } from '@orbit/protocol'
+import { getSecureItem, setSecureItem } from './secure-storage'
 import type { MailClient } from './mail-client'
 import type { OrbitIdentity } from '@orbit/crypto'
 import { logger } from './logger'
@@ -47,7 +48,7 @@ export function scopedKey(base: string, orbitId: string): string {
 
 function readJson<T>(key: string, fallback: T): T {
   try {
-    const raw = localStorage.getItem(key)
+    const raw = getSecureItem(key)
     return raw ? (JSON.parse(raw) as T) : fallback
   } catch {
     return fallback
@@ -56,7 +57,7 @@ function readJson<T>(key: string, fallback: T): T {
 
 function writeJson(key: string, value: unknown): void {
   try {
-    localStorage.setItem(key, JSON.stringify(value))
+    setSecureItem(key, JSON.stringify(value))
   } catch {
     /* quota: threads are capped; ignore */
   }
