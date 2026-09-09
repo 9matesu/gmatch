@@ -19,7 +19,10 @@ describe('makeSyncCtx', () => {
     expect(res.ok).toBe(true)
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ balance: 1 })
-    const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit & { headers: Headers }]
+    // orbitFetch may probe GET /api/identity first (sealed-request support);
+    // find the actual mutation call.
+    const calls = fetchFn.mock.calls as unknown as Array<[string, RequestInit & { headers: Headers }]>
+    const [url, init] = calls.find(([u]) => String(u).includes('/api/economy/idle-credit'))!
     expect(String(url)).toContain('/api/economy/idle-credit')
     expect(init.headers.get('Idempotency-Key')).toBe('x')
     expect(init.headers.get('X-Orbit-Id')).toBe(identity.orbitId)

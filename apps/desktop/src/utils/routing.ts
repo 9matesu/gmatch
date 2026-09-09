@@ -12,7 +12,6 @@ export const ROUTE_VIEWS = [
   'profile',
   'game',
   'gallery',
-  'hack_spy',
   'store',
   'pc_domination',
   'grid',
