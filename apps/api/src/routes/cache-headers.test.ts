@@ -46,8 +46,8 @@ describe('B.2 — content responses are no-store', () => {
   })
 
   it('GET object via signed token → no-store (HMAC-URL streaming must not cache either)', async () => {
-    const { sig, exp } = createSignedObjectToken(objId, 900)
-    const res = await app.request(`/api/objects/${objId}?sig=${sig}&exp=${exp}`, { method: 'GET' })
+    const { sig, exp, jti } = createSignedObjectToken(objId, 900)
+    const res = await app.request(`/api/objects/${objId}?sig=${sig}&exp=${exp}&jti=${jti}`, { method: 'GET' })
     expect(res.status).toBe(200)
     expect(res.headers.get('cache-control')).toBe(NO_STORE)
   })

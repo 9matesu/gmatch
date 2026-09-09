@@ -512,18 +512,19 @@ objects.get('/:id/signed-url', orbitAuth, async (c) => {
     }
   }
 
-  const { sig, exp } = createSignedObjectToken(id)
-  return c.json({ object_id: id, sig, exp, url: `/api/objects/${id}?sig=${sig}&exp=${exp}` })
+  const { sig, exp, jti } = createSignedObjectToken(id)
+  return c.json({ object_id: id, sig, exp, jti, url: `/api/objects/${id}?sig=${sig}&exp=${exp}&jti=${jti}` })
 })
 
 objects.get('/:id', async (c, next) => {
   const id = c.req.param('id') || ''
   const sig = c.req.query('sig')
   const expStr = c.req.query('exp')
+  const jti = c.req.query('jti')
   const exp = expStr ? parseInt(expStr, 10) : 0
 
   if (sig || expStr) {
-    if (!sig || !exp || !verifySignedObjectToken(id, sig, exp)) {
+    if (!sig || !exp || !verifySignedObjectToken(id, sig, exp, jti || '')) {
       return c.json({ error: 'Invalid or expired signature' }, 401)
     }
     c.set('isSignedToken', true)
