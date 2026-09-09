@@ -115,4 +115,34 @@ describe('ServersView', () => {
     render(<ServersView identity={identity} toast={() => {}} />)
     await waitFor(() => expect(screen.getByText(/no central/i)).toBeInTheDocument())
   })
+
+  it('password-protected server prompts and stores the join handoff', async () => {
+    const KEY = ['gmatch', 'server', 'join'].join('.')
+    stubLocalStorage({ 'gmatch.central.url': 'https://central.test' })
+    ;(window as unknown as { gmatch: unknown }).gmatch = {
+      serverSet: vi.fn().mockResolvedValue({ ok: true }),
+      serverRelaunch: vi.fn().mockResolvedValue(undefined),
+      serverState: vi.fn().mockResolvedValue({ packaged: true, mode: 'host', url: 'http://127.0.0.1:8790', lanUrls: [] }),
+    }
+    vi.spyOn(window, 'prompt').mockReturnValue('s3cret')
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 'ddd', name: 'Locked World', description: '', owner_id: 'owner3', password_required: 1, endpoint_hint: 'https://locked.test:8790', last_seen: 'x' },
+      ] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    const joinBtn = await screen.findByRole('button', { name: /join/i })
+    fireEvent.click(joinBtn)
+    await waitFor(() => expect(window.prompt).toHaveBeenCalled())
+    await waitFor(() => expect((window as unknown as { gmatch: { serverSet: ReturnType<typeof vi.fn> } }).gmatch.serverSet)
+      .toHaveBeenCalledWith({ mode: 'client', url: 'https://locked.test:8790' }))
+    // one-shot handoff persisted locally for the post-restart verify
+    const raw = localStorage.getItem(KEY)
+    expect(raw).toBeTruthy()
+    expect(JSON.parse(raw!).password).toBe('s3cret')
+    delete (window as unknown as { gmatch?: unknown }).gmatch
+    vi.restoreAllMocks()
+  })
 })

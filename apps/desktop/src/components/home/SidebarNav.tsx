@@ -20,8 +20,13 @@ import {
   Monitor,
   Users,
   MousePointerClick,
+  Swords,
+  Layers,
+  Flame,
   ChevronDown,
   ChevronRight,
+  Server,
+  ShieldCheck,
 } from 'lucide-react';
 import type { MainViewType } from './HomeFooter';
 
@@ -92,6 +97,16 @@ export function SidebarNav({
   onlineBadge?: number;
 }) {
   const [now, setNow] = useState(() => Date.now());
+  // HOST installs expose the admin suite in the sidebar (plan T4). Dev/browser
+  // builds have no bridge — the hash route #/admin still works there.
+  const [isHost, setIsHost] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    window.gmatch?.serverState?.()
+      .then((st) => { if (alive) setIsHost(st?.mode === 'host'); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     try { return localStorage.getItem('goonmatch_sidebar_collapsed') === '1'; } catch { return false; }
@@ -189,7 +204,7 @@ export function SidebarNav({
           ? [
             {
               id: 'games-cards',
-              label: 'Cards',
+              label: 'Keepsakes',
               icon: LayoutGrid,
               active: mainView === 'gallery',
               action: () => onOpenGallery(),
@@ -197,11 +212,32 @@ export function SidebarNav({
           ]
           : []),
         {
+          id: 'games-play',
+          label: 'Play',
+          icon: Swords,
+          active: mainView === 'games' && gamesSubTab === 'duel',
+          action: () => openGamesTab('duel'),
+        },
+        {
+          id: 'games-deck',
+          label: 'Deck',
+          icon: Layers,
+          active: mainView === 'games' && gamesSubTab === 'cards',
+          action: () => openGamesTab('cards'),
+        },
+        {
           id: 'games-idle',
           label: 'Idle Clicker',
           icon: MousePointerClick,
           active: (mainView === 'games' && gamesSubTab === 'idle') || mainView === 'grid',
           action: () => openGamesTab('idle'),
+        },
+        {
+          id: 'games-babecock',
+          label: 'Babecock',
+          icon: Flame,
+          active: mainView === 'games' && gamesSubTab === 'babecock',
+          action: () => openGamesTab('babecock'),
         },
         {
           id: 'games-ranks',
@@ -243,6 +279,13 @@ export function SidebarNav({
         },
       ]
       : []),
+    {
+      id: 'servers',
+      label: 'Servers',
+      icon: Server,
+      active: mainView === 'servers',
+      action: () => setMainView?.('servers'),
+    },
     {
       id: 'pc_domination',
       label: 'PC Domination',
@@ -418,6 +461,23 @@ export function SidebarNav({
           );
         })}
       </nav>
+
+      {/* Admin entry (plan T4): this install HOSTS the server you're looking at,
+          so you are its admin — moderation suite lives under the PIN gate. */}
+      {isHost && (
+        <div className="px-2 pb-1 shrink-0">
+          <button
+            type="button"
+            onClick={() => { playPress(600); setMainView?.('admin'); }}
+            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] cursor-pointer transition-all active:scale-[0.96] border ${collapsed ? 'justify-center' : ''} ${mainView === 'admin' ? 'bg-amber-500/10 border-amber-500/30 text-amber-300' : 'border-zinc-800 text-zinc-500 hover:text-amber-300 hover:border-amber-500/20'}`}
+            title="You host this server — open the admin suite"
+            aria-label="Open the admin suite"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+            {!collapsed && <span>Admin</span>}
+          </button>
+        </div>
+      )}
 
       {/* User panel: avatar + name, click to open profile */}
       <div className="p-2 border-t border-zinc-800/80 shrink-0">

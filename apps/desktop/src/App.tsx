@@ -51,6 +51,7 @@ import { getStoredActiveDeckId, type Deck } from "./components/games/DeckBuilder
 import { HomeFooter, type MainViewType, type ActiveHackSession } from "./components/home/HomeFooter";
 import { SidebarNav } from "./components/home/SidebarNav";
 import { RoomsView } from "./components/rooms/RoomsView";
+import { ServersView } from "./components/servers/ServersView";
 import { PCDominationView } from "./components/views/PCDominationView";
 import { DominationEffects } from "./components/domination/DominationEffects";
 import type { ActiveHackDebuff } from "@orbit/shared";
@@ -68,6 +69,8 @@ import { SocialPanel, type SocialPanelTab } from "./components/chat/SocialPanel"
 import { logger } from './utils/logger';
 import { useNotifications } from './hooks/useNotifications';
 import { useCourierDms } from './hooks/useCourierDms';
+import { useServerHeartbeat } from './hooks/useServerHeartbeat';
+import { usePendingJoinVerify } from './hooks/usePendingJoinVerify';
 import { OfflineWarningBanner } from "./components/OfflineWarningBanner";
 import { dataUrlToBlob, localObjectBlobUrl } from "./utils/mediaData";
 
@@ -161,7 +164,7 @@ export default function Home() {
   const chatPanel = useResizablePanel('chat')
   const [chatResizing, setChatResizing] = useState(false)
   const [panelTab, setPanelTab] = useState<SocialPanelTab>('chat');
-  const [gamesSubTab, setGamesSubTab] = useState<'duel' | 'cards' | 'babecock' | 'ranks' | 'store' | 'idle'>('duel');
+  const [gamesSubTab, setGamesSubTab] = useState<'duel' | 'cards' | 'babecock' | 'ranks' | 'store' | 'idle'>('idle');
   const [collapsedModules, setCollapsedModules] = useState<Record<string, boolean>>({});
   const toggleModule = (key: string) => setCollapsedModules((prev) => ({ ...prev, [key]: !prev[key] }));
   const [nowTick, setNowTick] = useState<number>(() => Date.now());
@@ -1042,6 +1045,9 @@ export default function Home() {
 
   // Blind-courier DM path (plan P3.3): inert on full nodes (legacy inbox),
   // active only when the API 404s /api/pm (official SITE).
+  useServerHeartbeat(identity ?? null);
+  usePendingJoinVerify(identity, toast);
+
   const courier = useCourierDms(identity, {
     onNotify: (msg) => {
       if (settings.chatNotificationSfx) playMsgReceive()
@@ -3193,6 +3199,16 @@ export default function Home() {
                       navigateToDeckBuilder={navigateToDeckBuilder}
                       handleSetMainView={handleSetMainView}
                     />
+                  )}
+
+                  {mainView === 'servers' && (
+                    <div className="flex-1 min-h-0 w-full overflow-y-auto">
+                      {identity ? (
+                        <ServersView identity={identity as never} toast={toast} />
+                      ) : (
+                        <div className="p-6 text-xs text-retro-muted">Sign in to browse servers.</div>
+                      )}
+                    </div>
                   )}
 
                   {mainView === 'rooms' && courierActive && (
