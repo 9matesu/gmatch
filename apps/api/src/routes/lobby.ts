@@ -520,7 +520,7 @@ lobby.get('/images/:id/content', async (c) => {
     return new Response(buf, {
       headers: {
         'Content-Type': mime,
-        'Cache-Control': 'public, max-age=10800',
+        'Cache-Control': 'no-store',
         'Content-Length': String(buf.length),
         'Access-Control-Allow-Origin': '*',
       },
@@ -557,7 +557,7 @@ lobby.get('/images/:id/content', async (c) => {
     return new Response(Buffer.from(bytes), {
       headers: {
         'Content-Type': mime,
-        'Cache-Control': 'public, max-age=10800',
+        'Cache-Control': 'no-store',
         'Content-Length': String(bytes.length),
         'Access-Control-Allow-Origin': '*',
       },

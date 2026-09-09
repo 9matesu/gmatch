@@ -38,7 +38,7 @@ users.get('/:id/pfp', async (c) => {
       return new Response(buf, {
         headers: {
           'Content-Type': mimeType,
-          'Cache-Control': 'public, max-age=86400',
+          'Cache-Control': 'no-store',
           'Access-Control-Allow-Origin': '*',
         },
       })

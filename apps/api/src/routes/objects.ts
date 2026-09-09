@@ -615,7 +615,7 @@ objects.get('/:id', async (c, next) => {
       const headers = new Headers()
       headers.set('Content-Type', mimeType)
       headers.set('Content-Length', String(bytes.length))
-      headers.set('Cache-Control', 'public, max-age=31536000, immutable')
+      headers.set('Cache-Control', 'no-store')
       headers.set('Access-Control-Allow-Origin', '*')
       headers.set('Access-Control-Allow-Credentials', 'true')
       return new Response(bytes, { headers })
@@ -641,7 +641,7 @@ objects.get('/:id', async (c, next) => {
       const contentType = proxyRes.headers.get('content-type') || mimeType
       const headers = new Headers()
       headers.set('Content-Type', contentType)
-      headers.set('Cache-Control', 'public, max-age=31536000, immutable')
+      headers.set('Cache-Control', 'no-store')
       headers.set('Access-Control-Allow-Origin', '*')
       headers.set('Access-Control-Allow-Credentials', 'true')
       return new Response(proxyRes.body, { headers })
@@ -714,7 +714,7 @@ objects.get('/:id', async (c, next) => {
   // CORS headers for cross-origin image loading
   headers.set('Access-Control-Allow-Origin', '*')
   headers.set('Access-Control-Allow-Credentials', 'true')
-  headers.set('Cache-Control', 'public, max-age=31536000, immutable')
+  headers.set('Cache-Control', 'no-store')
 
   return new Response(Buffer.from(plaintext), { headers })
 })

@@ -61,7 +61,7 @@ babecock.get('/entries/:id/content', async (c) => {
   return new Response(Buffer.from(finalBytes), {
     headers: {
       'Content-Type': mime,
-      'Cache-Control': 'public, max-age=86400',
+      'Cache-Control': 'no-store',
       'Content-Length': String(finalBytes.length),
       'Access-Control-Allow-Origin': '*',
     },
