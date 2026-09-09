@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { Hono } from 'hono'
 import { orbitAuth } from '../middleware/auth'
 import { adminAuth } from '../middleware/admin'
@@ -50,9 +51,7 @@ function sha256hexSync(text: string): string | null {
   // Bun/Node both expose node:crypto here; keep it sync to avoid an await
   // race with the lockout bookkeeping below.
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const nc = require('node:crypto') as typeof import('node:crypto')
-    return nc.createHash('sha256').update(text, 'utf8').digest('hex')
+    return createHash('sha256').update(text, 'utf8').digest('hex')
   } catch {
     return null
   }

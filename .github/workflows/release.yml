@@ -35,7 +35,24 @@ jobs:
         env:
           NODE_ENV: test
         run: npm run dist
+      - name: Compute artifact SHA-256 (published in the release body + summary)
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem apps/desktop/release/goonMatch-Grid-*-portable.exe | Select-Object -First 1
+          $hash = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLower()
+          "GOONGRID_SHA256=$hash" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "## Artifact integrity`n- ``$($exe.Name)`` SHA-256: ``$hash``"
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           files: apps/desktop/release/goonMatch-Grid-*-portable.exe
+          append_body: true
+          body: |
+            **Verify before running (Windows PowerShell):**
+            ~~~
+            Get-FileHash "$env:USERPROFILE\Downloads\goonMatch-Grid-*-portable.exe" -Algorithm SHA256
+            ~~~
+            Expected SHA-256: ``${{ env.GOONGRID_SHA256 }}``
+            Unsigned binary => SmartScreen warns; that is normal, not a virus.
+            Public scan: https://www.virustotal.com (paste the file or hash).
+            Reproducible: clone this repo at tag ${{ github.ref_name }} and run npm ci && npm run dist.

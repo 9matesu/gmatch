@@ -17,7 +17,7 @@ function parseDocs(tsFile) {
   const src = fs.readFileSync(path.join(ROOT, 'src', 'legal', tsFile), 'utf8')
   const docs = {}
   // match blocks:  id: { ... title: '...', version: LEGAL_VERSION, updated: '...', jurisdiction: '...', body: [ ... ] }
-  const docRe = /\n\s{2}(?:'([a-z][a-z0-9-]*)'|([a-z][a-z0-9-]*))\s*:\s*\{[\s\S]*?title:\s*'((?:[^'\\]|\\.)*)',[\s\S]*?updated:\s*'((?:[^'\\]|\\.)*)',[\s\S]*?jurisdiction:\s*'((?:[^'\\]|\\.)*)',[\s\S]*?body:\s*\[([\s\S]*?)\n    \],/g
+  const docRe = /\n\s{2}(?:'([a-z][a-z0-9-]*)'|([a-z][a-z0-9-]*))\s*:\s*\{[\s\S]*?title:\s*'((?:[^'\\]|\\.)*)',[\s\S]*?updated:\s*'((?:[^'\\]|\\.)*)',[\s\S]*?jurisdiction:\s*'((?:[^'\\]|\\.)*)',[\s\S]*?body:\s*\[([\s\S]*?)\n {4}\],/g
   let m
   while ((m = docRe.exec(src))) {
     const [, gQuoted, gPlain, title, updated, jurisdiction, bodyRaw] = m
