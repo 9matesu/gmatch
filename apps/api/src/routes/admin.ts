@@ -23,6 +23,7 @@ type Bindings = {
   DB: D1Turso
   BUCKET?: LocalBlobStore
   ADMIN_PIN?: string
+  ADMIN_PIN_HASH?: string
 }
 
 const admin = new Hono<{ Bindings: Bindings, Variables: { orbitId: string, publicKeyHex: string } }>()
@@ -32,6 +33,38 @@ admin.use('*', orbitAuth)
 announcements.use('*', orbitAuth)
 
 // Verify secret admin passcode/PIN - accessible to any authenticated Orbit user
+// Security plan B.4: NO hardcoded default — with neither ADMIN_PIN_HASH nor
+// ADMIN_PIN configured the feature returns 503 (disabled). Prefer
+// ADMIN_PIN_HASH = sha256(pin) hex (constant-time compare); plaintext
+// ADMIN_PIN remains for dev/self-host convenience. Per-identity lockout:
+// 5 wrong attempts in 15 min → 429.
+const PIN_WINDOW_MS = 15 * 60 * 1000
+const PIN_MAX_FAILS = 5
+const pinFails = new Map<string, number[]>() // orbitId -> failure timestamps
+
+export function _resetPinLockout(): void {
+  pinFails.clear()
+}
+
+function sha256hexSync(text: string): string | null {
+  // Bun/Node both expose node:crypto here; keep it sync to avoid an await
+  // race with the lockout bookkeeping below.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const nc = require('node:crypto') as typeof import('node:crypto')
+    return nc.createHash('sha256').update(text, 'utf8').digest('hex')
+  } catch {
+    return null
+  }
+}
+
+function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
+
 admin.post('/verify-pin', async (c) => {
   const orbitId = c.get('orbitId')
   let pin = ''
@@ -40,10 +73,29 @@ admin.post('/verify-pin', async (c) => {
     if (body?.pin) pin = String(body.pin).trim()
   } catch { }
 
-  const expectedPin = c.env.ADMIN_PIN || 'Ionwarehouse1'
-  if (pin !== expectedPin) {
+  const configuredHash = (c.env.ADMIN_PIN_HASH || '').trim().toLowerCase()
+  const configuredPlain = c.env.ADMIN_PIN
+  if (!configuredHash && !configuredPlain) {
+    return c.json({ error: 'Admin console disabled: set ADMIN_PIN_HASH (sha256 hex of the PIN) or ADMIN_PIN' }, 503)
+  }
+
+  // lockout check (sliding window)
+  const now = Date.now()
+  const fails = (pinFails.get(orbitId) || []).filter((t) => now - t < PIN_WINDOW_MS)
+  if (fails.length >= PIN_MAX_FAILS) {
+    pinFails.set(orbitId, fails)
+    return c.json({ error: 'Too many failed attempts — try again in 15 minutes' }, 429)
+  }
+
+  const presentedHash = sha256hexSync(pin)
+  const okHash = configuredHash && presentedHash ? constantTimeEqual(presentedHash, configuredHash) : false
+  const okPlain = configuredPlain ? constantTimeEqual(pin, configuredPlain) : false
+  if (!(okHash || okPlain)) {
+    fails.push(now)
+    pinFails.set(orbitId, fails)
     return c.json({ error: 'Invalid secret admin passcode' }, 401)
   }
+  pinFails.delete(orbitId)
 
   // Exactly one admin: revoke the flag everywhere, then grant it to the
   // identity that presented the passcode. Subsequent panel logins mint their

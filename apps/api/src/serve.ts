@@ -112,7 +112,14 @@ process.once('SIGTERM', () => { void persistAndExit(0) })
 process.once('SIGINT', () => { void persistAndExit(0) })
 
 const bucket = new LocalBlobStore(BLOB_STORE_DIR)
-const env = { DB: db, BUCKET: bucket }
+// ADMIN_PIN / ADMIN_PIN_HASH must reach routes via c.env — pre-B.4 neither was
+// wired here, so verify-pin silently ran on the hardcoded fallback forever.
+const env = {
+  DB: db,
+  BUCKET: bucket,
+  ...(process.env.ADMIN_PIN ? { ADMIN_PIN: process.env.ADMIN_PIN } : {}),
+  ...(process.env.ADMIN_PIN_HASH ? { ADMIN_PIN_HASH: process.env.ADMIN_PIN_HASH } : {}),
+}
 const WEB_DIST = join((import.meta as any).dir || process.cwd(), '..', '..', 'web', 'out')
 
 // Maintenance cadence: continuous automatic expiration sweep every 60s,

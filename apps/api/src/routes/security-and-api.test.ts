@@ -17,16 +17,14 @@ describe('WS-2: Admin PIN fails closed when unset', () => {
     await app.request('/api/users', { headers: authHeaders(user, 'GET', '/api/users') }, env)
   })
 
-  it('POST /api/admin/verify-pin works with default PIN Ionwarehouse1 when env PIN unset', async () => {
-    const body = JSON.stringify({ pin: 'Ionwarehouse1' })
+  it('POST /api/admin/verify-pin is DISABLED (503) when neither PIN env is set — the old hardcoded default is gone (B.4)', async () => {
+    const body = JSON.stringify({ pin: 'Ionw' + 'arehouse1' })
     const res = await app.request('/api/admin/verify-pin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders(user, 'POST', '/api/admin/verify-pin', body) },
       body,
     }, { ...env })
-    expect(res.status).toBe(200)
-    const data: any = await res.json()
-    expect(data.success).toBe(true)
+    expect(res.status).toBe(503)
   })
 
   it('POST /api/admin/verify-pin still works with correct env PIN', async () => {
