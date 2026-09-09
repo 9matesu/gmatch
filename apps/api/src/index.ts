@@ -5,6 +5,7 @@ import { mail } from './routes/mail'
 import { turn } from './routes/turn'
 import { servers } from './routes/servers'
 import { passwordRoutes, passwordGate } from './routes/password'
+import { snapshot } from './routes/snapshot'
 import { securityHeaders } from './middleware/security-headers'
 import { rateLimit } from './middleware/rate-limit'
 import { bodySizeLimit } from './middleware/body-size-limit'
@@ -162,6 +163,7 @@ app.route('/api/mail', mail)
 app.route('/api/turn', turn)
 app.route('/api/servers', servers)
 app.route('/api/server', passwordRoutes)
+app.route('/api/snapshot', snapshot)
 app.route('/api/objects', objects)
 app.route('/api/stories', objects)
 app.route('/api/friends', friends)

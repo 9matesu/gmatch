@@ -8,6 +8,7 @@ import { Server, Wifi } from 'lucide-react'
 import { playPress } from '../../utils/sounds'
 import { isServerUrl, normalizeServerUrl } from '../../utils/serverUrl'
 import { ServerPasswordSection } from './ServerPasswordSection'
+import { SnapshotSection } from './SnapshotSection'
 import { useIdentity } from '../../hooks/useIdentity'
 
 type State = { packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[] }
@@ -48,7 +49,10 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
   return (
     <div className="space-y-4 animate-orbit-fade-in">
       {state.mode === 'host' && identity && (
-        <ServerPasswordSection identity={identity as never} isHost toast={(m, t) => toast?.(m, t)} />
+        <>
+          <ServerPasswordSection identity={identity as never} isHost toast={(m, t) => toast?.(m, t)} />
+          <SnapshotSection identity={identity as never} isHost toast={(m, t) => toast?.(m, t)} />
+        </>
       )}
       <div className="p-4 bg-surface-interactive border border-retro-border rounded-lg space-y-2">
         <div className="flex items-center gap-2">
