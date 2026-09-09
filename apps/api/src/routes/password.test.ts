@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import app from '../index'
 import { createTestIdentity, signRequestHeaders, createMockEnv } from '../test-utils'
-import { resetPasswordStateForTests } from '../routes/password'
+import { resetPasswordStateForTests, SETTINGS_KEY } from '../routes/password'
 
 const host = createTestIdentity()
 const newcomer = createTestIdentity()

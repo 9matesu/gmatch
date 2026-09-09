@@ -94,4 +94,25 @@ describe('orbitFetch request sealing', () => {
     expect(res.status).toBe(200)
     expect(n).toBe(1)
   })
+
+  it('seals a CROSS-ORIGIN request to the TARGET node key, not the local node', async () => {
+    const centralKey = generateIdentity()
+    const calls: Array<{ url: string; init?: RequestInit }> = []
+    const fetchImpl = vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url: String(url), init })
+      if (String(url) === 'https://central.test/api/identity') {
+        return new Response(JSON.stringify({ server_pubkey: centralKey.encryptionPubHex, sealed_available: true }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200 })
+    }) as unknown as typeof globalThis.fetch
+
+    const res = await orbitFetch('https://central.test/api/servers', { method: 'POST', body: JSON.stringify({ name: 'X' }) }, identityLike(), fetchImpl)
+    expect(res.status).toBe(200)
+    // the identity probe used for sealing must target central.test, not the local API_BASE
+    expect(calls.some((c) => c.url === 'https://central.test/api/identity')).toBe(true)
+    const post = calls.find((c) => c.url === 'https://central.test/api/servers')!
+    const headers = new Headers(post.init!.headers as HeadersInit)
+    expect(headers.get('X-Orbit-Sealed')).toBeTruthy()
+  })
+
 })

@@ -86,8 +86,13 @@ const NODE_KEY_TTL_MS = 60 * 60 * 1000
 
 export function _resetNodeKeyCache(): void { nodeKeyCache = null }
 
-async function getNodePubkey(fetchImpl: typeof globalThis.fetch): Promise<string | null> {
-  const base = API_BASE
+function originOf(u: string): string {
+  try { return new URL(u).origin } catch { return API_BASE }
+}
+
+async function getNodePubkey(fetchImpl: typeof globalThis.fetch, targetUrl: string = API_BASE): Promise<string | null> {
+  // Seal to the node that will READ the request — its origin, not ours.
+  const base = originOf(targetUrl)
   if (nodeKeyCache && nodeKeyCache.base === base && Date.now() - nodeKeyCache.at < NODE_KEY_TTL_MS) {
     return nodeKeyCache.pubHex
   }
@@ -166,7 +171,7 @@ export async function orbitFetch(
     // ECIES-encrypted to the node key; only X-Orbit-Sealed is visible on the
     // wire. GET and multipart uploads stay as-is (idempotent reads / binary).
     if (method !== 'GET' && !isFormUpload && identity.encryptionPrivHex && identity.encryptionPubHex) {
-      const nodePub = await getNodePubkey(fetchImpl)
+      const nodePub = await getNodePubkey(fetchImpl, url)
       if (nodePub) {
         const headersRecord: Record<string, string> = {}
         signed.forEach((v, k) => { headersRecord[k] = v })

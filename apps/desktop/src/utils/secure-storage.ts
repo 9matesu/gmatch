@@ -26,6 +26,7 @@ export const SECURE_KEYS = [
   'orbit_rooms_v1',
   'orbit_room_messages_v1',
   'goonmatch_pfps',
+  'gmatch.server.join', // one-shot join password handoff (plan T5) — never plaintext
 ] as const
 
 export type SecureKey = (typeof SECURE_KEYS)[number]

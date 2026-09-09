@@ -59,7 +59,8 @@ servers.get('/', softAuth, async (c) => {
      WHERE last_seen >= datetime('now', ?)
      ORDER BY last_seen DESC LIMIT 100`,
   ).bind(`-${STALE_MS / 1000} seconds`).all<Record<string, unknown>>()
-  // Host addresses go to signed-in callers only (anti-scraper, anti-mapping).
+  // Host addresses go to signed-in callers only (anti-scraper, anti-mapping):
+  // anonymous directory browsers see name/description, never coordinates.
   const authed = !!c.get('orbitId')
   return c.json({ servers: (results || []).map((r) => (authed ? r : { ...r, endpoint_hint: undefined })) })
 })

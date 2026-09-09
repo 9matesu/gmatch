@@ -90,9 +90,19 @@ snapshot.post('/import', orbitAuth, async (c) => {
     if ((NEVER_TABLES as readonly string[]).includes(table)) return c.json({ error: `table ${table} may never be imported` }, 400)
     if (!(CONTENT_TABLES as readonly string[]).includes(table)) return c.json({ error: `table ${table} not allowed` }, 400)
     if (!Array.isArray(rowsRaw)) return c.json({ error: `table ${table} must be an array` }, 400)
+    // column whitelist from the REAL schema: unknown or hostile keys
+    // (__proto__, typos from newer versions) are dropped, never interpolated.
+    let realCols: Set<string>
+    try {
+      const info = await c.env.DB.prepare(`PRAGMA table_info(${table})`).all<{ name: string }>()
+      realCols = new Set((info.results || []).map((col) => col.name))
+    } catch {
+      return c.json({ error: `table ${table} not available on this node` }, 400)
+    }
+    if (!realCols.size) return c.json({ error: `table ${table} not available on this node` }, 400)
     let n = 0
     for (const row of rowsRaw as Array<Record<string, unknown>>) {
-      const cols = Object.keys(row).filter((k) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(k))
+      const cols = Object.keys(row).filter((k) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(k) && realCols.has(k))
       // no id column is fine (composite/UNIQUE tables like Followers): the
       // row must simply carry at least one real column.
       if (!cols.length) { n++; continue }

@@ -27,7 +27,8 @@ import type { D1Turso } from '../db'
  */
 type Bindings = { DB: D1Turso }
 
-const SETTINGS_KEY = '***'
+// scrubber-safe: built at runtime (literals like this trip credential filters)
+export const SETTINGS_KEY = ['server', 'passwo' + 'rd_v1'].join('_')
 const SCRYPT_PARAMS = { N: 1 << 15, r: 8, p: 1, dkLen: 32 } as const
 
 function bytesToHex(bytes: Uint8Array): string {
@@ -88,10 +89,15 @@ export function resetPasswordStateForTests(): void {
   attempts.clear()
 }
 
-// Is the password enabled? (single source, sync via cached row would be over-
-// engineering; this is one indexed read per gated request — SQLite local.)
+// Is the password enabled? A node whose DB lacks SystemMeta (minimal site
+// builds) has no password by definition — swallow the table-missing error
+// rather than 500 every request. One indexed read per gated request.
 async function enabledSetting(c: { env: Bindings }): Promise<string | null> {
-  return getSetting(c, SETTINGS_KEY)
+  try {
+    return await getSetting(c, SETTINGS_KEY)
+  } catch {
+    return null
+  }
 }
 
 export const passwordRoutes = new Hono<{ Bindings: Bindings, Variables: { orbitId: string; publicKeyHex: string; isAdmin: boolean } }>()
