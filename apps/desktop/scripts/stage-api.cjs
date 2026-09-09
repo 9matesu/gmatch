@@ -63,12 +63,24 @@ cpSync(join(ROOT, 'apps', 'api'), join(STAGE, 'apps', 'api'), {
 })
 
 // Deps -> file: links (bun resolves these without a workspace root).
+// NOTE: npm's arborist silently DROPS the transitive deps of a file:-linked
+// package that lives outside the project root (@orbit/crypto's
+// @noble/ciphers/@noble/curves were never installed in the stage, so the
+// bundled server crashed on boot with "Cannot find module
+// '@noble/curves/ed25519'" and every upload/PM failed). Pin them as direct
+// deps of the staged API so the install is deterministic either way.
 const apiPkgPath = join(STAGE, 'apps', 'api', 'package.json')
 const apiPkg = JSON.parse(readFileSync(apiPkgPath, 'utf8'))
 for (const name of Object.keys(apiPkg.dependencies || {})) {
   if (name.startsWith('@orbit/')) {
     apiPkg.dependencies[name] = `file:../../packages/${name.split('/')[1]}`
   }
+}
+apiPkg.dependencies = {
+  ...apiPkg.dependencies,
+  '@noble/ciphers': '^2.2.0',
+  '@noble/curves': '^1.3.0',
+  '@noble/hashes': '^1.3.3',
 }
 writeFileSync(apiPkgPath, JSON.stringify(apiPkg, null, 2) + '\n')
 // The monorepo lockfile does not know about these rewritten file: links —
@@ -91,5 +103,24 @@ execFileSync('npm', ['install', '--omit=dev', '--no-audit', '--no-fund', '--igno
   shell: true, // npm is a .cmd shim on Windows
   env: { ...process.env, NODE_ENV: 'development' },
 })
+
+// Smoke check: the staged server's module graph must fully resolve. bun build
+// imports nothing at runtime — it only walks the dependency graph — so the
+// noble-drop regression ("Cannot find module '@noble/curves/ed25519'", which
+// only surfaced at first upload/PM) fails the BUILD instead.
+console.log('[stage-api] verifying staged server modules resolve...')
+const smokeOut = join(STAGE, 'apps', 'api', '.stage-smoke.js')
+try {
+  execFileSync(join(STAGE, 'bun.exe'), ['build', 'src/serve.ts', '--target=bun', '--outfile', '.stage-smoke.js'], {
+    cwd: join(STAGE, 'apps', 'api'),
+    stdio: 'inherit',
+    timeout: 120_000,
+  })
+} catch {
+  console.error('[stage-api] staged server has unresolved modules — refusing to package a dead bundle')
+  process.exit(1)
+} finally {
+  rmSync(smokeOut, { force: true })
+}
 
 console.log('[stage-api] done →', STAGE)

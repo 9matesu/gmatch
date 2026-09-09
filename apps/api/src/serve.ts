@@ -2,6 +2,7 @@ import { createClient } from '@libsql/client'
 import { D1Turso, ensureSchema } from './db'
 import { restoreDb, snapshotDb } from './persistence'
 import { LocalBlobStore } from './blob'
+import { resolveStorageKey } from './storage-key'
 import app from './index'
 import { join, dirname, extname } from 'node:path'
 import { handleIncoming, conns, WsConn, broadcastToRoom } from './ws-bus'
@@ -18,6 +19,11 @@ const client = createClient({ url: ':memory:' })
 const db = new D1Turso(client)
 
 const SNAPSHOT_PATH = process.env.SNAPSHOT_PATH || join(process.cwd(), 'orbit.snapshot.sqlite')
+// crypto.ts hard-requires a non-zero 64-hex STORAGE_ENCRYPTION_KEY; the server
+// can also be started bare (`bun run serve:api`, packaged api-stage). Resolve
+// env → persisted keyfile → fresh generated key so uploads/PMs never 500 on a
+// missing key.
+process.env.STORAGE_ENCRYPTION_KEY = resolveStorageKey(process.env.STORAGE_ENCRYPTION_KEY, SNAPSHOT_PATH)
 const BLOB_STORE_DIR = process.env.BLOB_STORE_DIR || (process.env.SNAPSHOT_PATH ? join(dirname(process.env.SNAPSHOT_PATH), 'blobs') : './blobs')
 const SNAPSHOT_INTERVAL_MS = Math.max(
   30000,
