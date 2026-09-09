@@ -4,6 +4,7 @@ import { auth } from './routes/auth'
 import { mail } from './routes/mail'
 import { turn } from './routes/turn'
 import { servers } from './routes/servers'
+import { passwordRoutes, passwordGate } from './routes/password'
 import { securityHeaders } from './middleware/security-headers'
 import { rateLimit } from './middleware/rate-limit'
 import { bodySizeLimit } from './middleware/body-size-limit'
@@ -150,10 +151,17 @@ import { reportRouter } from './routes/reports'
 app.use('/api/*', rateLimit)
 app.use('/.well-known/*', rateLimit)
 
+// Server-password gate (T5): rejects unverified newcomers on protected paths
+// (reads + server/health/identity/directory exempt). Registered BEFORE all
+// route mounts so Hono dispatches it first; a forged X-Orbit-Id that slips
+// past still dies at orbitAuth signature verification downstream.
+app.use('/api/*', passwordGate())
+
 app.route('/api/auth', auth)
 app.route('/api/mail', mail)
 app.route('/api/turn', turn)
 app.route('/api/servers', servers)
+app.route('/api/server', passwordRoutes)
 app.route('/api/objects', objects)
 app.route('/api/stories', objects)
 app.route('/api/friends', friends)
