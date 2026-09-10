@@ -411,6 +411,25 @@ export function GMatchSettingsModal({
                     <p className="text-[10px] text-retro-muted">Makes panels and cards more see-through. Text keeps its backing.</p>
                   </div>
 
+                  {/* Glass blur */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label htmlFor="glass-blur" className="text-[11px] text-retro-muted">Glass blur</label>
+                      <span className="text-[11px] font-mono text-retro-fg tabular-nums">{Math.round((settings.glassBlur ?? 0.7) * 100)}%</span>
+                    </div>
+                    <input
+                      id="glass-blur"
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={10}
+                      value={Math.round((settings.glassBlur ?? 0.7) * 100)}
+                      onChange={(e) => updateSettings('glassBlur', Number(e.target.value) / 100)}
+                      className="w-full accent-retro-accent cursor-pointer"
+                    />
+                    <p className="text-[10px] text-retro-muted">Backdrop frost strength. Lower is faster on weak GPUs; 0% disables it entirely.</p>
+                  </div>
+
                   {/* Feed Columns */}
                   <div className="flex items-center justify-between gap-4">
                     <div>

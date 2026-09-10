@@ -375,6 +375,20 @@ export function SidebarNav({
     <aside className={`desktop-sidebar glass-sidebar shrink-0 flex flex-col font-sans select-none h-full min-h-0 transition-[width] duration-200 ${collapsed ? 'w-[3.75rem]' : 'w-48'}`}>
       {/* Header: brand + collapse toggle */}
       <div className="flex items-center justify-between gap-1 px-3 py-3 border-b border-white/10 shrink-0">
+        {collapsed ? (
+          // Collapsed rail is 60px: three history buttons + padding overflow it
+          // and the expand toggle lands outside the visible box (dead click).
+          // In rail mode only the toggle is rendered, centered.
+          <button
+            type="button"
+            onClick={() => { playPress(700); toggleCollapsed(); }}
+            aria-label="Expand sidebar"
+            title="Expand sidebar"
+            className="icon-btn p-1.5 mx-auto"
+          >
+            <PanelLeftOpen className="w-4 h-4" />
+          </button>
+        ) : (<>
         {!collapsed && (
           <button
             type="button"
@@ -392,7 +406,7 @@ export function SidebarNav({
             onClick={() => { playPress(700); window.history.back(); }}
             aria-label="Back"
             title="Back"
-            className="glass-action p-1.5 rounded-md text-retro-muted hover:text-retro-fg cursor-pointer"
+            className="icon-btn p-1.5"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
@@ -401,7 +415,7 @@ export function SidebarNav({
             onClick={() => { playPress(700); window.history.forward(); }}
             aria-label="Forward"
             title="Forward"
-            className="glass-action p-1.5 rounded-md text-retro-muted hover:text-retro-fg cursor-pointer"
+            className="icon-btn p-1.5"
           >
             <ArrowRight className="w-4 h-4" />
           </button>
@@ -410,11 +424,12 @@ export function SidebarNav({
             onClick={() => { playPress(700); toggleCollapsed(); }}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className="glass-action p-1.5 rounded-md text-retro-muted hover:text-retro-fg cursor-pointer"
+            className="icon-btn p-1.5"
           >
             {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
           </button>
         </div>
+        </>)}
       </div>
 
       <nav className="flex-1 min-h-0 overflow-y-auto styled-scrollbar p-2 space-y-1">

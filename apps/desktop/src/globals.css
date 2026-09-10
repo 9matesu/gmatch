@@ -147,7 +147,11 @@
 }
 
 :root {
-  --glass-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.012'/%3E%3C/svg%3E");
+
+  /* Glass blur multiplier (Settings → Glass blur): 0 = off, 1 = full.
+     Applied to every backdrop-filter blur site via calc. */
+  --glass-blur: 0.7;
+ --glass-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.012'/%3E%3C/svg%3E");
 }
 
 @layer base {
@@ -275,8 +279,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .glass-panel {
-    -webkit-backdrop-filter: blur(18px) saturate(115%);
-    backdrop-filter: blur(18px) saturate(115%);
+    -webkit-backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7))) saturate(115%);
+    backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7))) saturate(115%);
   }
 }
 
@@ -309,8 +313,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .glass-surface {
-    -webkit-backdrop-filter: blur(22px) saturate(135%);
-    backdrop-filter: blur(22px) saturate(135%);
+    -webkit-backdrop-filter: blur(calc(22px * var(--glass-blur, 0.7))) saturate(135%);
+    backdrop-filter: blur(calc(22px * var(--glass-blur, 0.7))) saturate(135%);
   }
 }
 
@@ -398,8 +402,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .glass-toolbar {
-    -webkit-backdrop-filter: blur(14px) saturate(110%);
-    backdrop-filter: blur(14px) saturate(110%);
+    -webkit-backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7))) saturate(110%);
+    backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7))) saturate(110%);
   }
 }
 
@@ -414,8 +418,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .glass-sidebar {
-    -webkit-backdrop-filter: blur(24px) saturate(125%);
-    backdrop-filter: blur(24px) saturate(125%);
+    -webkit-backdrop-filter: blur(calc(24px * var(--glass-blur, 0.7))) saturate(125%);
+    backdrop-filter: blur(calc(24px * var(--glass-blur, 0.7))) saturate(125%);
   }
 }
 
@@ -435,8 +439,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .glass-card {
-    -webkit-backdrop-filter: blur(20px) saturate(120%);
-    backdrop-filter: blur(20px) saturate(120%);
+    -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7))) saturate(120%);
+    backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7))) saturate(120%);
   }
 }
 
@@ -567,6 +571,26 @@
   transform: none;
 }
 
+/* Loose-icon style (user: prefer bare icons over encapsulated buttons for
+   small controls): no border, no shadow, hover tint only. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--color-retro-muted);
+  border-radius: 6px;
+  transition: background 120ms ease, color 120ms ease;
+  cursor: pointer;
+}
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-retro-fg);
+}
+.icon-btn:active { background: rgba(255, 255, 255, 0.12); }
+.icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
 .glass-action-primary {
   background: linear-gradient(180deg, #ffffff, #d4d4d8);
   border-color: rgba(255, 255, 255, 0.86);
@@ -627,8 +651,8 @@
   .app-glass .bg-surface-interactive,
   .app-glass .bg-surface-elevated,
   .app-glass .bg-surface-elevated\/50 {
-    -webkit-backdrop-filter: blur(18px) saturate(115%);
-    backdrop-filter: blur(18px) saturate(115%);
+    -webkit-backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7))) saturate(115%);
+    backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7))) saturate(115%);
   }
 }
 
@@ -646,8 +670,8 @@
 @supports (backdrop-filter: blur(1px)) {
   .module,
   .module-primary {
-    -webkit-backdrop-filter: blur(20px) saturate(120%);
-    backdrop-filter: blur(20px) saturate(120%);
+    -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7))) saturate(120%);
+    backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7))) saturate(120%);
   }
 }
 
@@ -786,8 +810,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .solid-panel {
-    -webkit-backdrop-filter: blur(18px) saturate(115%);
-    backdrop-filter: blur(18px) saturate(115%);
+    -webkit-backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7))) saturate(115%);
+    backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7))) saturate(115%);
   }
 }
 

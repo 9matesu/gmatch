@@ -121,6 +121,12 @@ export default function Home() {
     document.documentElement.style.setProperty('--panel-alpha', String(alpha));
   }, [settings.panelOpacity]);
 
+  // Glass blur preference (Settings → Glass blur): 0 disables backdrop blur.
+  useEffect(() => {
+    const b = Math.min(1, Math.max(0, settings.glassBlur ?? 0.7));
+    document.documentElement.style.setProperty('--glass-blur', String(b));
+  }, [settings.glassBlur]);
+
   const game = useGame({ users, identity });
   const {
     relationships,
