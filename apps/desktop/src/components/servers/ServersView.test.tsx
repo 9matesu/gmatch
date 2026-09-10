@@ -63,6 +63,9 @@ describe('ServersView', () => {
     expect(screen.getByLabelText('password required')).toBeInTheDocument()
     // dashboard section present with the central node userlist
     expect(await screen.findByText('Alice')).toBeInTheDocument()
+    // hero is ONE row: counts live under the name, not in a duplicate header
+    expect(await screen.findByText('9 members · 3 posts/24h')).toBeInTheDocument()
+    expect(screen.queryByText('This server')).not.toBeInTheDocument()
   })
 
   it('register form posts name and shows created server', async () => {

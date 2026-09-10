@@ -286,22 +286,18 @@ export function ServersView({
   return (
     <div className="h-full overflow-y-auto p-4 space-y-4 animate-orbit-fade-in">
       {/* current-node dashboard */}
+      {/* Hero: one row — status dot, name, counts, actions. No duplicate headers. */}
       <section className="glass-card p-4 space-y-3" aria-label="Server dashboard">
-        <div className="flex flex-wrap items-center gap-2">
-          <Radio className="w-4 h-4 text-retro-accent shrink-0" />
-          <span className="text-xs font-medium text-retro-fg">This server</span>
-          {dash && (
-            <span className="ml-auto text-[10px] font-mono text-retro-muted">
-              {dash.members_total} members · {dash.posts_24h} posts/24h
-            </span>
-          )}
-        </div>
-
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="truncate text-base font-bold text-retro-fg">{serverName || 'gmatch'}</h2>
-              {serverDescription && <p className="truncate text-[11px] text-retro-muted">{serverDescription}</p>}
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Radio className="w-4 h-4 text-retro-accent shrink-0" aria-hidden />
+              <div className="min-w-0">
+                <h2 className="truncate text-base font-bold text-retro-fg">{serverName || 'gmatch'}</h2>
+                <p className="truncate text-[11px] text-retro-muted">
+                  {dash ? `${dash.members_total} members · ${dash.posts_24h} posts/24h` : (serverDescription || 'Loading…')}
+                </p>
+              </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {serverMode === 'client' && (
@@ -375,18 +371,19 @@ export function ServersView({
           )}
         </div>
 
-        {dash ? (
-          <ul className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-40 overflow-y-auto" aria-label="User list">
-            {dash.users.length === 0 && <li className="text-[11px] text-retro-muted col-span-full">No other users here yet.</li>}
-            {dash.users.map((u) => (
-              <li key={u.id} className="flex items-center gap-1.5 text-[11px] text-retro-fg truncate">
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${u.online ? 'bg-emerald-400' : 'bg-zinc-600'}`} aria-hidden />
-                <span className="truncate">{u.display_name || u.id}</span>
-              </li>
+        {dash && (
+          <div className="flex flex-wrap items-center gap-1.5" aria-label="User list">
+            {dash.users.length === 0 && <span className="text-[11px] text-retro-muted">No other users here yet.</span>}
+            {dash.users.slice(0, 12).map((u) => (
+              <span key={u.id} className={`inline-flex items-center gap-1 rounded-full border border-border-glass px-2 py-0.5 text-[10px] ${u.online ? 'text-retro-fg' : 'text-retro-muted'}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${u.online ? 'bg-emerald-400' : 'bg-zinc-600'}`} aria-hidden />
+                <span className="max-w-[10ch] truncate">{u.display_name || u.id}</span>
+              </span>
             ))}
-          </ul>
-        ) : (
-          <p className="text-[11px] text-retro-muted">Loading…</p>
+            {dash.users.length > 12 && (
+              <span className="text-[10px] font-mono text-retro-muted">+{dash.users.length - 12}</span>
+            )}
+          </div>
         )}
       </section>
 
@@ -401,7 +398,7 @@ export function ServersView({
                 type="button"
                 onClick={() => { playPress(760); setShowAdmin((v) => !v) }}
                 aria-expanded={showAdmin}
-                className="glass-action px-3 py-1.5 rounded-lg text-[11px] font-bold text-retro-muted hover:text-retro-fg cursor-pointer"
+                className="glass-action h-9 px-3 rounded-lg text-[11px] font-bold text-retro-muted hover:text-retro-fg cursor-pointer"
               >
                 Central admin
               </button>
@@ -409,7 +406,7 @@ export function ServersView({
                 type="button"
                 onClick={() => { playPress(880); setShowCreate((v) => !v) }}
                 aria-expanded={showCreate}
-                className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer"
+                className="glass-action glass-action-primary h-9 px-3 rounded-lg text-[11px] font-bold cursor-pointer"
               >
                 + Create server
               </button>

@@ -608,7 +608,7 @@ export function GMatchFeed({
       />
 
       {/* Feed Content Column (Posts) */}
-      <div className="w-full max-w-[1400px] mx-auto flex flex-col px-2 sm:px-4 py-2 space-y-4">
+      <div className="w-full max-w-[1400px] mx-auto flex flex-col px-2 sm:px-4 py-2 space-y-3">
         {/* Feed Sort / Filter Bar */}
         <div className="flex items-center justify-between px-3 sm:px-6 py-2 gap-2 border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm sticky top-[57px] z-20">
           <div className="flex items-center gap-1 text-xs">
@@ -651,7 +651,7 @@ export function GMatchFeed({
         </div>
 
         {/* Feed Posts List with Sharp Square Images */}
-        <div className={`mt-3 ${feedCols === '1' ? 'space-y-4' : 'grid grid-cols-1 sm:grid-cols-2 gap-4' + (feedCols === '3' ? ' lg:grid-cols-3' : feedCols === '4' ? ' lg:grid-cols-3 xl:grid-cols-4' : feedCols === '5' ? ' lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5' : '')}`}>
+        <div className={`mt-3 ${feedCols === '1' ? 'space-y-3' : 'grid grid-cols-1 sm:grid-cols-2 gap-3' + (feedCols === '3' ? ' lg:grid-cols-3' : feedCols === '4' ? ' lg:grid-cols-3 xl:grid-cols-4' : feedCols === '5' ? ' lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5' : '')}`}>
           {displayPosts.map((post, idx) => {
             const isLiked = !!likedPosts[post.id];
             const isSaved = !!savedPosts[post.id];
@@ -680,7 +680,7 @@ export function GMatchFeed({
 
                 {/* Ad Visual */}
                 <div
-                  className={`relative w-full aspect-[4/5] max-h-[65vh] bg-gradient-to-br ${GAME_AD_TEMPLATES.find((t) => t.mode === post.game_mode)?.gradient || 'from-zinc-800 to-zinc-900'} flex flex-col items-center justify-center text-white overflow-hidden`}
+                  className={`relative w-full aspect-[4/5] max-h-[min(420px,60vh)] bg-gradient-to-br ${GAME_AD_TEMPLATES.find((t) => t.mode === post.game_mode)?.gradient || 'from-zinc-800 to-zinc-900'} flex flex-col items-center justify-center text-white overflow-hidden`}
                 >
                   {(() => {
                     const AdIcon = (post.game_mode && AD_ICON_MAP[post.game_mode]) || Gamepad2;
@@ -768,7 +768,7 @@ export function GMatchFeed({
 
                 {/* Post Media with Click to Lightbox & Double Tap Like */}
                 <div
-                  className="relative w-full aspect-[4/5] max-h-[65vh] bg-surface-canvas flex items-center justify-center overflow-hidden cursor-pointer rounded-none"
+                  className="relative w-full aspect-[4/5] max-h-[min(420px,60vh)] bg-surface-canvas flex items-center justify-center overflow-hidden cursor-pointer rounded-none"
                   onClick={() => {
                     playPress(700);
                     setActiveLightboxPost(post);
