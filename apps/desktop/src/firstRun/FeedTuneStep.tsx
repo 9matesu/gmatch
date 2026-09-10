@@ -12,7 +12,7 @@ import { fetchPosts } from '../services/booru';
  * excludes are collected here and editable later in Settings → Feed.
  */
 
-type FieldStatus = 'empty' | 'invalid' | 'checking' | 'live' | 'dead';
+type FieldStatus = 'empty' | 'invalid' | 'checking' | 'live' | 'unverified';
 
 interface Field {
   value: string;
@@ -27,7 +27,7 @@ const DOT_STYLE: Record<FieldStatus, string> = {
   invalid: 'bg-red-500',
   checking: 'bg-amber-400 animate-pulse',
   live: 'bg-emerald-500',
-  dead: 'bg-red-500',
+  unverified: 'bg-zinc-500',
 };
 
 function splitExcludes(raw: string): string[] {
@@ -52,7 +52,10 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
     return Array.from({ length: SETUP_TAG_COUNT }, (_, i) => ({ ...BLANK, value: owned[i] ?? '' }));
   });
   const [excludeInput, setExcludeInput] = useState('');
-  const [excludes, setExcludes] = useState<string[]>([]);
+  const [excludes, setExcludes] = useState<string[]>(() => {
+    const stored = useGame.getState().userExcludes;
+    return Array.isArray(stored) ? [...stored] : [];
+  });
   const [note, setNote] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const valuesKey = fields.map((f) => f.value).join('\n');
@@ -91,9 +94,9 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
           probeJobs.map(async (job) => {
             try {
               const res = await fetchPosts({ tags: job.name, limit: 3 });
-              return { ...job, live: res.ok && res.posts.length > 0 };
+              return { ...job, ok: res.ok, count: res.posts.length };
             } catch {
-              return { ...job, live: false };
+              return { ...job, ok: false, count: 0 };
             }
           }),
         );
@@ -102,10 +105,11 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
           prev.map((f, i) => {
             const r = results.find((x) => x.index === i);
             if (!r || f.status !== 'checking') return f;
+            const live = r.ok && r.count > 0;
             return {
               ...f,
-              status: r.live ? 'live' : 'dead',
-              detail: r.live ? 'live' : 'no results',
+              status: live ? 'live' : 'unverified',
+              detail: live ? 'live' : r.ok ? 'no results' : 'offline',
             };
           }),
         );
@@ -127,10 +131,14 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
     setExcludeInput('');
   };
 
-  const names = fields.map((f) => normalizeCustomTag(f.value)).filter(Boolean);
-  const uniqueLive = fields.filter((f) => f.status === 'live').map((f) => normalizeCustomTag(f.value));
-  const ready =
-    fields.every((f) => f.status === 'live') && new Set(names).size === SETUP_TAG_COUNT;
+  const isValid = (f: Field) =>
+    f.status === 'live' || f.status === 'unverified' || f.status === 'checking';
+  // Commit every syntactically-valid pick (live or merely unverified).
+  const uniqueValid = [...new Set(fields.filter(isValid).map((f) => normalizeCustomTag(f.value)))];
+  const allLive = fields.every((f) => f.status === 'live');
+  // Validity gate (plan §7): exactly N distinct valid tags. Probe failures
+  // (mirror offline / no results) only warn — they must never block progress.
+  const ready = fields.every(isValid) && uniqueValid.length === SETUP_TAG_COUNT;
 
   const start = () => {
     const tuned = useGame.getState().setupComplete;
@@ -140,8 +148,10 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
       onFinished();
       return;
     }
+    // Enter must obey the exact same gate as the Start button.
+    if (!ready) return;
     // Excludes must not blank the picks (substring rule both ways).
-    const clash = excludes.find((x) => uniqueLive.some((n) => n.includes(x) || x.includes(n)));
+    const clash = excludes.find((x) => uniqueValid.some((n) => n.includes(x) || x.includes(n)));
     if (clash) {
       setNote(`Exclude “${clash}” would block a starter tag — remove the exclude or change that tag.`);
       return;
@@ -149,7 +159,7 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
     setNote(null);
     setStarting(true);
     const g = useGame.getState();
-    const r = tuned ? g.updateSetup(uniqueLive, excludes) : g.completeSetup(uniqueLive, excludes);
+    const r = tuned ? g.updateSetup(uniqueValid, excludes) : g.completeSetup(uniqueValid, excludes);
     if (!r.ok) {
       setNote(r.message);
       setStarting(false);
@@ -284,14 +294,28 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
         </div>
       )}
 
+      {ready && !allLive && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
+          Some starter tags couldn&apos;t be verified live (mirror offline or no
+          results). You can start anyway &mdash; the grid falls back to offline
+          placeholders until they resolve.
+        </div>
+      )}
+
       <button
         type="button"
         disabled={!ready || starting}
         onClick={start}
-        title={ready ? 'Start the grid' : `All ${SETUP_TAG_COUNT} tags must probe live first`}
+        title={
+          !ready
+            ? `Enter ${SETUP_TAG_COUNT} distinct, valid starter tags`
+            : allLive
+              ? 'Start the grid'
+              : 'Tags not verified live — start anyway'
+        }
         className="w-full px-5 py-2.5 rounded-md chrome-accent text-sm font-black text-black disabled:opacity-40 cursor-pointer"
       >
-        {starting ? 'Starting…' : 'Start'}
+        {starting ? 'Starting…' : allLive ? 'Start' : 'Start anyway'}
       </button>
     </div>
   );

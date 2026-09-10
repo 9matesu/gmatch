@@ -323,8 +323,8 @@
   color: var(--color-retro-fg);
   border-color: rgba(199, 228, 255, 0.42);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(159, 227, 255, 0.06)),
-    rgba(23, 28, 35, 0.72);
+    linear-gradient(180deg, rgba(255, 255, 255, calc(0.16 * var(--panel-alpha))), rgba(159, 227, 255, calc(0.06 * var(--panel-alpha)))),
+    rgba(23, 28, 35, calc(0.72 * var(--panel-alpha)));
   box-shadow:
     0 9px 22px rgba(0, 0, 0, 0.42),
     0 0 18px rgba(159, 227, 255, 0.08),

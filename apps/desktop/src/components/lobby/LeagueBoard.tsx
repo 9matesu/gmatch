@@ -33,7 +33,7 @@ export function LeagueBoard({ league, users, onOpenProfile }: LeagueBoardProps) 
             <span className={`text-xs font-black font-mono w-6 text-center ${
               rank === 0 ? 'text-yellow-400' : rank === 1 ? 'text-retro-body' : rank === 2 ? 'text-amber-600' : 'text-retro-muted'
             }`}>
-              {rank === 0 ? '🥇' : rank === 1 ? '🥈' : rank === 2 ? '🥉' : `#${rank + 1}`}
+              {rank === 0 ? '①' : rank === 1 ? '②' : rank === 2 ? '③' : `#${rank + 1}`}
             </span>
             <Avatar id={entry.user_id} size={28} />
             <div className="min-w-0 truncate">

@@ -30,7 +30,8 @@ import { ROUTE_VIEWS, hashForView, viewFromHash, type RoutedView } from "./utils
 import { playChime, playPress, playMsgReceive } from "./utils/sounds";
 import { useLobby } from "./hooks/useLobby";
 import { UserProfileModal } from "./components/UserProfileModal";
-import { MIN_GAME_CARDS, type User, type OrbitObject, parseTags } from "@orbit/shared";
+import { MIN_GAME_CARDS, type User, type OrbitObject } from "@orbit/shared";
+import { applyCanonicalCard } from "./game/galleryMapping";
 import { areItemsStructurallyEqual, areUsersStructurallyEqual, areAnnouncementsStructurallyEqual } from "./utils/compare";
 import { OnboardingFlow } from "./firstRun/OnboardingFlow";
 import { GMatchFeed, type FeedPost } from "./components/feed/GMatchFeed";
@@ -61,6 +62,7 @@ import { ContextOverlay, ReportModal } from "./components/ContextOverlay";
 import { GlobalModals } from "./components/GlobalModals";
 import { GalleryTabView } from "./components/views/GalleryTabView";
 import { CreateCardModal } from "./components/CreateCardModal";
+import { CardDetailView } from "./components/CardDetailView";
 import GridWorkspace from "./components/grid/GridWorkspace";
 import AdminApp from "./admin/AdminApp";
 import { StoreView } from "./components/views/StoreView";
@@ -736,6 +738,17 @@ export default function Home() {
   const [cardPrefill, setCardPrefill] = useState<{ url: string; tags: string[]; name: string } | null>(null)
   const [dragAnchorId, setDragAnchorId] = useState<string | null>(null)
   const [dragActive, setDragActive] = useState(false)
+  // Root card-detail host (plan §12): any view dispatches 'gmatch:open-card'
+  // with a canonical card id and this single modal opens.
+  const [globalCardId, setGlobalCardId] = useState<string | null>(null)
+  useEffect(() => {
+    const onOpenCard = (e: Event) => {
+      const id = (e as CustomEvent<{ cardId?: string }>).detail?.cardId
+      if (typeof id === 'string' && id) setGlobalCardId(id)
+    }
+    window.addEventListener('gmatch:open-card', onOpenCard)
+    return () => window.removeEventListener('gmatch:open-card', onOpenCard)
+  }, [])
   const [profilePics, setProfilePics] = useState<Record<string, string>>(() => {
     if (typeof window === 'undefined') return {}
     try { return JSON.parse(getSecureItem('goonmatch_pfps') || '{}') } catch { return {} }
@@ -2478,26 +2491,7 @@ export default function Home() {
       canonicalMap.set(c.mediaObjectId, c)
     }
 
-    const mapped = deduped.map((item: any) => {
-      const canonical = canonicalMap.get(item.id)
-      if (!canonical) return item
-      const parsedTags = Array.isArray(canonical.tags) ? canonical.tags : parseTags(canonical.tags)
-      return {
-        ...item,
-        card_id: canonical.id,
-        name: canonical.name ?? item.caption ?? undefined,
-        caption: canonical.name ?? item.caption ?? undefined,
-        value: canonical.value ?? item.gacha_downloads_count ?? 0,
-        gacha_downloads_count: canonical.value ?? item.gacha_downloads_count ?? 0,
-        rarity: canonical.rarity,
-        frame: canonical.frame,
-        accent_color: canonical.accentColor,
-        tags: parsedTags.length > 0 ? parsedTags : item.tags,
-        description: canonical.description ?? item.description,
-        likes_count: canonical.likeCount ?? item.likes_count ?? 0,
-        like_count: canonical.likeCount ?? item.like_count ?? 0,
-      }
-    })
+    const mapped = deduped.map((item: any) => applyCanonicalCard(item, canonicalMap.get(item.id)))
 
     return mapped.sort((a: any, b: any) => {
       if (gallerySort === 'oldest') {
@@ -3735,6 +3729,16 @@ export default function Home() {
             setCreateCardNeeded(Math.max(0, MIN_GAME_CARDS - (myCards.length + 1)))
             toast('Unique card created!', 'success')
           }}
+        />
+      )}
+
+      {/* Global card-info modal (opened via 'gmatch:open-card' from Play/Deck/Lobby). */}
+      {globalCardId && identity && (
+        <CardDetailView
+          cardId={globalCardId}
+          identity={identity}
+          onClose={() => setGlobalCardId(null)}
+          toast={toast}
         />
       )}
 

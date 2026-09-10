@@ -101,3 +101,74 @@ describe('Server directory API', () => {
     expect(list.servers.some((s) => s.id === id)).toBe(false)
   })
 })
+
+// plan §5: central-node master admin over the directory (is_admin gate).
+describe('Server directory admin API', () => {
+  const master = createTestIdentity()
+  const member = createTestIdentity()
+  let env: Awaited<ReturnType<typeof createMockEnv>>
+
+  async function hide(env: any, id: string, hidden: boolean) {
+    const raw = JSON.stringify({ hidden })
+    return app.request(`/api/servers/admin/directory/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...headers(master, 'PATCH', `/api/servers/admin/directory/${id}`, raw) },
+      body: raw,
+    }, env)
+  }
+
+  beforeAll(async () => {
+    env = await createMockEnv()
+    await app.request('/api/users', { headers: headers(master, 'GET', '/api/users') }, env)
+    await app.request('/api/users', { headers: headers(member, 'GET', '/api/users') }, env)
+    await env.DB.prepare('UPDATE Users SET is_admin = 1 WHERE id = ?').bind(master.orbitId).run()
+    await register(env, member, { name: 'Admin Probe', description: 'd', endpoint_hint: 'probe.test:8790', password_required: false })
+  })
+
+  it('rejects unauthenticated and non-admin callers', async () => {
+    const anon = await app.request('/api/servers/admin/dashboard', {}, env)
+    expect([401, 403]).toContain(anon.status)
+    const asMember = await app.request('/api/servers/admin/dashboard', { headers: headers(member, 'GET', '/api/servers/admin/dashboard') }, env)
+    expect(asMember.status).toBe(403)
+  })
+
+  it('master sees the dashboard totals', async () => {
+    const res = await app.request('/api/servers/admin/dashboard', { headers: headers(master, 'GET', '/api/servers/admin/dashboard') }, env)
+    expect(res.status).toBe(200)
+    const json = await res.json() as any
+    expect(json.totals.total).toBeGreaterThanOrEqual(1)
+    expect(Array.isArray(json.recent)).toBe(true)
+  })
+
+  it('directory listing exposes endpoint hints to the master', async () => {
+    const res = await app.request('/api/servers/admin/directory', { headers: headers(master, 'GET', '/api/servers/admin/directory') }, env)
+    const json = await res.json() as any
+    expect(json.servers.length).toBeGreaterThanOrEqual(1)
+    expect(JSON.stringify(json.servers)).toContain('probe.test')
+    const probe = json.servers.find((s: any) => s.name === 'Admin Probe')
+    expect('hidden' in probe).toBe(true)
+    expect('blocked' in probe).toBe(true)
+  })
+
+  it('hiding an entry removes it from the public directory but not the admin one', async () => {
+    const dir = (await (await app.request('/api/servers/admin/directory', { headers: headers(master, 'GET', '/api/servers/admin/directory') }, env)).json()) as any
+    const id = dir.servers.find((s: any) => s.name === 'Admin Probe').id
+    const patch = await hide(env, id, true)
+    expect(patch.status).toBe(200)
+    expect((await patch.json()).server.hidden).toBe(1)
+
+    const pub = (await (await app.request('/api/servers', {}, env)).json()) as any
+    expect(pub.servers.some((s: any) => s.id === id)).toBe(false)
+    const adm = (await (await app.request('/api/servers/admin/directory', { headers: headers(master, 'GET', '/api/servers/admin/directory') }, env)).json()) as any
+    expect(adm.servers.some((s: any) => s.id === id)).toBe(true)
+  })
+
+  it('master can force-unregister any entry', async () => {
+    const dir = (await (await app.request('/api/servers/admin/directory', { headers: headers(master, 'GET', '/api/servers/admin/directory') }, env)).json()) as any
+    const id = dir.servers.find((s: any) => s.name === 'Admin Probe').id
+    const del = await app.request(`/api/servers/admin/directory/${id}`, { method: 'DELETE', headers: headers(master, 'DELETE', `/api/servers/admin/directory/${id}`) }, env)
+    expect(del.status).toBe(200)
+    const after = (await (await app.request('/api/servers/admin/directory', { headers: headers(master, 'GET', '/api/servers/admin/directory') }, env)).json()) as any
+    expect(after.servers.some((s: any) => s.id === id)).toBe(false)
+  })
+})

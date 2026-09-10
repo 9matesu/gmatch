@@ -162,6 +162,26 @@ describe('domination routes', () => {
     expect(json.targets[0].enabled).toBe(true)
     expect(json.targets[0].consents.allowPopupVideo).toBe(true)
   })
+
+  it('drops blank / default-placeholder ("Unknown") names from /targets', async () => {
+    const blank = createTestIdentity()
+    const placeholder = createTestIdentity()
+    const sql = "INSERT INTO Users (id, public_key, display_name, pc_domination_enabled, last_seen) VALUES (?, ?, ?, 1, strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
+    await env.DB.prepare(sql).bind(blank.orbitId, blank.publicKeyHex, '   ').run()
+    await env.DB.prepare(sql).bind(placeholder.orbitId, placeholder.publicKeyHex, 'Unknown User').run()
+    await env.DB.prepare("UPDATE Users SET pc_domination_enabled = 1, last_seen = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?")
+      .bind(userB.orbitId).run()
+
+    const res = await app.request('/api/domination/targets', {
+      headers: auth(userA, 'GET', '/api/domination/targets'),
+    })
+    expect(res.status).toBe(200)
+    const json = await res.json() as any
+    const ids = json.targets.map((t: any) => t.id)
+    expect(ids).toContain(userB.orbitId)
+    expect(ids).not.toContain(blank.orbitId)
+    expect(ids).not.toContain(placeholder.orbitId)
+  })
 })
 describe('domination economy (cost + victim payout)', () => {
   let app: Hono

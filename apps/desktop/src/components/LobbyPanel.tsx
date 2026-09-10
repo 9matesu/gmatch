@@ -21,6 +21,7 @@ import { LeagueBoard } from './lobby/LeagueBoard'
 import { PlayerRoster } from './lobby/PlayerRoster'
 import { QueueControls } from './lobby/QueueControls'
 import { CardTile } from './home/CardTile'
+import { openCardDetail } from '../utils/openCard'
 
 interface LobbyTileProps {
   img: LobbyImage
@@ -1092,6 +1093,7 @@ const selfId = identity?.orbitId || ''
                       item={card as any}
                       users={users}
                       identity={identity}
+                      onClick={() => openCardDetail(card)}
                       onDoubleClick={() => onExpandItem?.(card.id)}
                     />
                   ))}

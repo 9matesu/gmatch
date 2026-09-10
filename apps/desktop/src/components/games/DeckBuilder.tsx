@@ -8,6 +8,7 @@ import { orbitFetch } from '../../utils/api';
 import { logger } from '../../utils/logger';
 import { CardTile } from '../home/CardTile';
 import { DND_CARD } from '../DropZone';
+import { openCardDetail } from '../../utils/openCard';
 
 export const ACTIVE_DECK_STORAGE_KEY = 'orbit_active_deck_id';
 
@@ -430,7 +431,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {getCardsInDeck().map(card => (
                   <div key={card.id} className="relative group">
-                    <CardTile item={card} />
+                    <CardTile item={card} onClick={() => openCardDetail(card)} />
                     <button
                       onClick={() => removeCardFromDeck(canonicalId(card))}
                       className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-500 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
@@ -473,7 +474,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                         e.dataTransfer.effectAllowed = 'copy';
                       }}
                     >
-                      <CardTile item={card} />
+                      <CardTile item={card} onClick={() => openCardDetail(card)} />
                       <button
                         onClick={() => addCardToDeck(canonicalId(card))}
                         className="absolute top-2 right-2 bg-cyan-500/80 hover:bg-cyan-500 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"

@@ -4,6 +4,7 @@ import { orbitAuth } from '../middleware/auth'
 import { logAdminAction } from '../admin-audit'
 import { EconomyService } from '../economy'
 import type { DominationAction } from '@orbit/shared'
+import { isDefaultPeerName } from '@orbit/shared'
 
 type Bindings = {
   DB: D1Turso
@@ -246,19 +247,30 @@ domination.get('/targets', async (c) => {
     LIMIT 100
   `).bind(userId).all<{ id: string; display_name: string | null; pfp_url: string | null; pc_domination_enabled: number; pc_domination_settings: string }>()
 
-  const targets = (rows.results || []).map((u) => {
+  // Only offer real, named players as targets — drop blank / whitespace / default
+  // placeholder ("Unknown") accounts so they never appear in the picker.
+  const targets: {
+    id: string
+    displayName: string
+    pfpUrl: string | null
+    enabled: boolean
+    consents: Record<string, boolean>
+  }[] = []
+  for (const u of rows.results || []) {
+    const name = (u.display_name || '').trim()
+    if (!name || isDefaultPeerName(name)) continue
     let settingsObj: Record<string, boolean> = {}
     try {
       settingsObj = JSON.parse(u.pc_domination_settings || '{}')
     } catch {}
-    return {
+    targets.push({
       id: u.id,
-      displayName: u.display_name?.trim() || 'Unknown',
+      displayName: name,
       pfpUrl: u.pfp_url,
       enabled: Boolean(u.pc_domination_enabled),
       consents: settingsObj,
-    }
-  })
+    })
+  }
 
   return c.json({ targets })
 })

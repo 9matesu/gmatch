@@ -7,6 +7,7 @@ import { BabecockPanel } from '../BabecockPanel';
 import { RankingsPanel } from './RankingsPanel';
 import { DeckBuilder } from './DeckBuilder';
 import { CardTile } from '../home/CardTile';
+import { openCardDetail } from '../../utils/openCard';
 import GridWorkspace from '../grid/GridWorkspace';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject as StoredCard, User } from '@orbit/shared';
@@ -88,7 +89,7 @@ export function GamesHub({
                         e.dataTransfer.effectAllowed = 'copy';
                       }}
                     >
-                      <CardTile item={card as any} users={users} identity={identity} />
+                      <CardTile item={card as any} users={users} identity={identity} onClick={() => openCardDetail(card)} />
                     </div>
                   ))}
                 </div>

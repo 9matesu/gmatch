@@ -139,7 +139,7 @@ export function RankingsPanel({
                 aria-pressed={socialMetric === m}
                 className={`px-2.5 py-1 rounded transition-colors cursor-pointer capitalize font-medium ${socialMetric === m ? 'bg-surface-raised text-retro-fg' : 'text-retro-muted hover:text-retro-fg'}`}
               >
-                {m === 'all' ? 'Reputation' : 'Today'}
+                {m === 'all' ? 'XP' : 'Today'}
               </button>
             ))}
           </div>

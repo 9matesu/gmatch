@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { playPress } from '../../utils/sounds';
+import {
+  readSidebarOrder,
+  reconcileSidebarOrder,
+  reorderSidebarIds,
+  writeSidebarOrder,
+} from '../../utils/sidebarOrder';
 import {
   Home,
   Gamepad2,
@@ -136,6 +142,57 @@ export function SidebarNav({
     return ['games'];
   });
 
+  // Top-level nav order (plan §2). Global key, matching collapse/groups.
+  const [order, setOrder] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [...readSidebarOrder(undefined)];
+    return readSidebarOrder();
+  });
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  // Guards against a navigation firing when a drag ends on the source entry.
+  const justDragged = useRef(false);
+
+  const commitOrder = (dragged: string, target: string) => {
+    setOrder((prev) => {
+      const next = reorderSidebarIds(prev, dragged, target);
+      if (next !== prev) writeSidebarOrder(next);
+      return next;
+    });
+  };
+
+  const dragHandlers = (id: string) => ({
+    onDragStart: (e: React.DragEvent) => {
+      if (collapsed) { e.preventDefault(); return; }
+      justDragged.current = true;
+      setDragId(id);
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', id); } catch { /* Safari */ }
+    },
+    onDragEnter: () => {
+      if (dragId && dragId !== id) setOverId(id);
+    },
+    onDragOver: (e: React.DragEvent) => {
+      if (dragId && dragId !== id) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+    },
+    onDrop: (e: React.DragEvent) => {
+      if (!dragId || dragId === id) return;
+      e.preventDefault();
+      commitOrder(dragId, id);
+      setDragId(null);
+      setOverId(null);
+    },
+    onDragEnd: () => {
+      setDragId(null);
+      setOverId(null);
+      window.setTimeout(() => { justDragged.current = false; }, 0);
+    },
+  });
+
+  const navClickGuard = (fn: () => void) => () => {
+    if (justDragged.current) return;
+    fn();
+  };
+
   const toggleGroup = (id: string) => {
     playPress(700);
     setExpandedGroups((prev) => {
@@ -204,7 +261,7 @@ export function SidebarNav({
           ? [
             {
               id: 'games-cards',
-              label: 'Keepsakes',
+              label: 'Gallery & Cards',
               icon: LayoutGrid,
               active: mainView === 'gallery',
               action: () => onOpenGallery(),
@@ -308,8 +365,20 @@ export function SidebarNav({
       : []),
   ];
 
+  // Reorder-aware view of the nav: saved order reconciled against what's
+  // currently visible (conditional entries like Rooms/Settings slot gracefully).
+  const byId = new Map<string, NavEntry>(navItems.map((n) => [n.id, n]));
+  const orderedItems = reconcileSidebarOrder(order, navItems.map((n) => n.id))
+    .map((id) => byId.get(id))
+    .filter((n): n is NavEntry => Boolean(n));
+
+  const dropIndicator = (id: string) =>
+    overId === id && dragId && dragId !== id
+      ? ' outline outline-1 -outline-offset-1 outline-zinc-500/70'
+      : '';
+
   return (
-    <aside className={`desktop-sidebar shrink-0 flex flex-col font-sans select-none h-full min-h-0 transition-[width] duration-200 bg-[#09090b] border-r border-zinc-800/80 ${collapsed ? 'w-[3.75rem]' : 'w-48'}`}>
+    <aside className={`desktop-sidebar shrink-0 flex flex-col font-sans select-none h-full min-h-0 transition-[width] duration-200 bg-[color:var(--color-glass)] border-r border-zinc-800/80 ${collapsed ? 'w-[3.75rem]' : 'w-48'}`}>
       {/* Header: brand + collapse toggle */}
       <div className="flex items-center justify-between gap-1 px-3 py-3 border-b border-zinc-800/80 shrink-0">
         {!collapsed && (
@@ -353,21 +422,23 @@ export function SidebarNav({
 
         <div className="border-t border-zinc-800/60 my-1" />
 
-        {navItems.map((item) => {
+        {orderedItems.map((item) => {
           if (isGroup(item)) {
             const GroupIcon = item.icon;
             const expanded = expandedGroups.includes(item.id);
             return (
               <div key={item.id} className="space-y-0.5">
                 <div
+                  draggable={!collapsed}
+                  {...dragHandlers(item.id)}
                   className={`w-full flex items-center gap-1 pl-3 pr-1.5 py-0.5 rounded-md border transition-all duration-150 ${collapsed ? 'justify-center px-0' : ''} ${item.active
                     ? 'bg-zinc-800/90 text-zinc-100 font-medium border-zinc-700/80 shadow-xs'
                     : 'bg-transparent text-zinc-400 border-transparent'
-                    }`}
+                    }${dropIndicator(item.id)}`}
                 >
                   <button
                     type="button"
-                    onClick={() => { playPress(780); item.action(); if (!expanded) toggleGroup(item.id); }}
+                    onClick={navClickGuard(() => { playPress(780); item.action(); if (!expanded) toggleGroup(item.id); })}
                     aria-label={item.label}
                     title={collapsed ? item.label : undefined}
                     className={`flex-1 min-w-0 flex items-center gap-2.5 py-1.5 rounded-md text-left cursor-pointer text-xs ${collapsed ? 'justify-center' : ''} ${item.active ? '' : 'hover:text-zinc-200'}`}
@@ -427,7 +498,9 @@ export function SidebarNav({
             <button
               key={item.id}
               type="button"
-              onClick={() => { playPress(item.isHack ? 800 : 780); item.action(); }}
+              draggable={!collapsed}
+              {...dragHandlers(item.id)}
+              onClick={navClickGuard(() => { playPress(item.isHack ? 800 : 780); item.action(); })}
               aria-label={item.label}
               title={collapsed ? item.label : undefined}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-left cursor-pointer border transition-all duration-150 active:scale-[0.96] group text-xs ${collapsed ? 'justify-center' : ''} ${item.isHack
@@ -437,7 +510,7 @@ export function SidebarNav({
                 : item.active
                   ? 'bg-zinc-800/90 text-zinc-100 font-medium border-zinc-700/80 shadow-xs'
                   : 'bg-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 border-transparent'
-                }`}
+                }${dropIndicator(item.id)}`}
             >
               <Icon className={`w-4 h-4 shrink-0 transition-colors stroke-[1.75] ${item.isHack
                 ? 'text-rose-400'
@@ -511,19 +584,19 @@ export function SidebarNav({
         </button>
       </div>
 
-      {/* Currency HUD — compact row under the user panel (g$ / XP / Rep). */}
+      {/* Currency HUD — g$ + a single lifetime XP tile (today's gain in the
+          tooltip). Reputation and XP are one progression now (plan §3). */}
       <div className="px-2 pb-2 shrink-0">
         <div className={`flex gap-1.5 ${collapsed ? 'flex-col items-center' : 'flex-row'}`}>
           {[
-            { icon: Coins, label: 'g$', value: balance, accent: 'text-amber-400' },
-            { icon: Zap, label: 'XP', value: score, accent: 'text-sky-400' },
-            { icon: Trophy, label: 'Rep', value: reputation, accent: 'text-violet-400' },
+            { icon: Coins, label: 'g$', value: balance, accent: 'text-amber-400', title: 'Balance (g$)' },
+            { icon: Zap, label: 'XP', value: reputation, accent: 'text-sky-400', title: `${reputation.toLocaleString()} lifetime XP · +${score.toLocaleString()} today` },
           ].map((c) => {
             const Icon = c.icon;
             return (
               <div
                 key={c.label}
-                title={c.label}
+                title={c.title}
                 className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-zinc-900/60 border border-zinc-800/80 min-w-0 ${collapsed ? 'justify-center' : 'flex-1 justify-center'}`}
               >
                 <Icon className={`w-3.5 h-3.5 shrink-0 ${c.accent} stroke-[1.75]`} />

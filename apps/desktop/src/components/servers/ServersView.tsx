@@ -6,12 +6,13 @@
 // Privacy: endpoint hints are fetched signed; the directory never sees content.
 
 import { useCallback, useEffect, useState } from 'react'
-import { Server, Lock, Globe, Radio, UserPlus, ShieldCheck } from 'lucide-react'
-import { getCentralApiUrl, hasCentral } from '../../utils/central'
+import { Server, Lock, Globe, Radio, UserPlus, ShieldCheck, RefreshCw } from 'lucide-react'
+import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
 import { orbitFetch } from '../../utils/api'
 import { normalizeServerUrl } from '../../utils/serverUrl'
 import { rememberJoin } from '../../utils/server-join'
 import { playPress } from '../../utils/sounds'
+import { CentralAdminPanel } from './CentralAdminPanel'
 
 interface DirectoryServer {
   id: string
@@ -33,7 +34,7 @@ interface Dashboard {
 type Toast = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void
 
 export function ServersView({ identity, toast }: { identity: Parameters<typeof orbitFetch>[2]; toast: Toast }) {
-  const central = getCentralApiUrl()
+  const [central, setCentral] = useState(() => getCentralApiUrl())
   const [servers, setServers] = useState<DirectoryServer[]>([])
   const [dash, setDash] = useState<Dashboard | null>(null)
   const [showCreate, setShowCreate] = useState(false)
@@ -42,37 +43,53 @@ export function ServersView({ identity, toast }: { identity: Parameters<typeof o
   const [hint, setHint] = useState('')
   const [needsPassword, setNeedsPassword] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [dirError, setDirError] = useState(false)
+  const [setupUrl, setSetupUrl] = useState('')
+  const [setupError, setSetupError] = useState('')
+  const [showAdmin, setShowAdmin] = useState(false)
 
   const refresh = useCallback(async () => {
+    // Local node dashboard — always available, even with no central (plan §4).
+    try {
+      const d = await orbitFetch('/api/servers/dashboard', { method: 'GET' }, identity)
+      if (d.ok) {
+        const dj = (await d.json()) as Dashboard
+        if (Array.isArray(dj?.users)) setDash(dj)
+      }
+    } catch { /* node without dashboard route — fine */ }
+
+    if (!central) { setServers([]); setDirError(false); return }
     try {
       // cache-bust: orbitFetch dedups/caches GETs; the list must be fresh
       const res = await orbitFetch(`${central}/api/servers?_ts=${Date.now()}`, { method: 'GET' }, identity)
       if (res.ok) {
         const data = (await res.json()) as { servers: DirectoryServer[] }
         setServers(Array.isArray(data.servers) ? data.servers : [])
+        setDirError(false)
+      } else {
+        setDirError(true)
       }
-    } catch { /* offline — keep last list */ }
-    try {
-      // dashboard of the node the client is actually pointed at
-      const d = await orbitFetch('/api/servers/dashboard', { method: 'GET' }, identity)
-      if (d.ok) setDash((await d.json()) as Dashboard)
-    } catch { /* node without directory routes — fine */ }
-  }, [identity])
+    } catch {
+      // Configured central is unreachable: surface it rather than fake "none online".
+      setDirError(true)
+    }
+  }, [identity, central])
 
   useEffect(() => { void refresh() }, [refresh])
 
-  if (!hasCentral()) {
-    return (
-      <div className="p-6 max-w-lg mx-auto space-y-2 animate-orbit-fade-in">
-        <h2 className="text-sm font-semibold text-retro-fg">Servers</h2>
-        <p className="text-xs text-retro-muted">
-          No central node configured, so there is nothing to discover yet.
-          Ask your administrator for the central address (Settings → Server),
-          or share your LAN address directly — your friends connect through
-          Settings → Server too.
-        </p>
-      </div>
-    )
+  const saveCentral = () => {
+    const raw = setupUrl.trim()
+    if (!raw) { setSetupError('Enter your central node address.'); return }
+    const normalized = normalizeServerUrl(raw) || normalizeServerUrl(`http://${raw}`)
+    if (!normalized) {
+      setSetupError('That does not look like an http(s) address (e.g. https://central.example).')
+      return
+    }
+    setCentralApiUrl(normalized)
+    setCentral(normalized)
+    setSetupError('')
+    setSetupUrl('')
+    toast('Central node saved', 'success')
   }
 
   const create = async () => {
@@ -182,16 +199,68 @@ export function ServersView({ identity, toast }: { identity: Parameters<typeof o
       <section className="space-y-2">
         <div className="flex items-center gap-2">
           <Server className="w-4 h-4 text-retro-muted" />
-          <span className="text-xs font-medium text-retro-fg">Server network</span>
-          <button
-            type="button"
-            onClick={() => { playPress(880); setShowCreate((v) => !v) }}
-            className="ml-auto px-2 py-1 rounded bg-retro-accent text-black text-[11px] font-bold cursor-pointer"
-            aria-expanded={showCreate}
-          >
-            + Create server
-          </button>
+          <span className="text-xs font-medium text-retro-fg">Central directory</span>
+          {central && (
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { playPress(760); setShowAdmin((v) => !v) }}
+                aria-expanded={showAdmin}
+                className="px-2 py-1 rounded border border-retro-border text-retro-muted text-[11px] font-bold cursor-pointer hover:text-retro-fg"
+              >
+                Central admin
+              </button>
+              <button
+                type="button"
+                onClick={() => { playPress(880); setShowCreate((v) => !v) }}
+                aria-expanded={showCreate}
+                className="px-2 py-1 rounded bg-retro-accent text-black text-[11px] font-bold cursor-pointer"
+              >
+                + Create server
+              </button>
+            </div>
+          )}
         </div>
+
+        {!central ? (
+          <div className="p-4 bg-surface-raised border border-border-glass rounded-lg space-y-2">
+            <p className="text-[11px] text-retro-muted">
+              No central node is configured yet, so there is no server network to
+              discover. Your own server still works above &mdash; point it at a
+              central address to list yours and explore others.
+            </p>
+            <label className="block text-[11px] text-retro-muted">
+              Central node URL
+              <input
+                aria-label="Central node URL"
+                value={setupUrl}
+                onChange={(e) => setSetupUrl(e.target.value)}
+                placeholder="https://central.example"
+                maxLength={120}
+                className="mt-1 w-full bg-surface-interactive border border-border-glass px-2 py-1.5 text-xs text-retro-fg rounded outline-none font-mono focus:border-retro-accent/60"
+              />
+            </label>
+            {setupError && <p role="alert" className="text-[11px] text-rose-400">{setupError}</p>}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => saveCentral()}
+                disabled={!setupUrl.trim()}
+                className="px-3 py-1.5 rounded bg-retro-accent text-black text-xs font-bold disabled:opacity-40 cursor-pointer"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSetupUrl(''); setSetupError('') }}
+                className="px-3 py-1.5 rounded text-xs text-retro-muted hover:text-retro-fg cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
 
         {showCreate && (
           <div className="p-4 bg-surface-raised border border-border-glass rounded-lg space-y-2">
@@ -228,7 +297,22 @@ export function ServersView({ identity, toast }: { identity: Parameters<typeof o
           </div>
         )}
 
-        <ul className="space-y-2">
+        {dirError ? (
+          <div className="p-3 text-[11px] text-retro-muted border border-dashed border-retro-border rounded-lg space-y-2">
+            <p>
+              Could not reach the central directory at <span className="font-mono">{central}</span>.
+              It may be offline, or the address is wrong.
+            </p>
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              className="px-2.5 py-1 rounded bg-sky-500/15 text-sky-300 text-[11px] font-bold flex items-center gap-1 cursor-pointer hover:bg-sky-500/25"
+            >
+              <RefreshCw className="w-3 h-3" /> Retry
+            </button>
+          </div>
+        ) : (
+          <ul className="space-y-2">
           {servers.length === 0 && (
             <li className="p-3 text-[11px] text-retro-muted border border-dashed border-retro-border rounded-lg">
               No other servers online right now. A server appears here while its host (or any player holding it) is running gMatch.
@@ -257,11 +341,17 @@ export function ServersView({ identity, toast }: { identity: Parameters<typeof o
               </div>
             </li>
           ))}
-        </ul>
+          </ul>
+        )}
         <p className="text-[10px] text-retro-muted flex items-center gap-1.5">
           <ShieldCheck className="w-3 h-3" />
           Private servers stay private: the directory only mirrors name, description and address — never content.
         </p>
+
+        {/* Central master admin — self-hides unless this caller is the central ADMIN_PIN holder. */}
+        {showAdmin && <CentralAdminPanel central={central} identity={identity} toast={toast} />}
+          </>
+        )}
       </section>
     </div>
   )

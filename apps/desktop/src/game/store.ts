@@ -1215,7 +1215,19 @@ export const useGame = create<GameState>((set, get) => ({
     if (clean.length !== SETUP_TAG_COUNT) {
       return { ok: false, message: `Pick exactly ${SETUP_TAG_COUNT} tags.` }
     }
-    const picked = clean.map(setupTag)
+    // Re-select starter tags without discarding purchased levels: keep any
+    // already-owned tag's level/stats (flipping feed selection), add fresh
+    // picks at level 1, and retain previously-owned (leveled) tags that are no
+    // longer starters as owned-but-unselected so income is never lost.
+    const prevTags = new Map(s.tags.map((t) => [t.name, t]))
+    const pickedNames = new Set(clean)
+    const picked: OwnedTag[] = clean.map((name) => {
+      const existing = prevTags.get(name)
+      return existing ? { ...existing, selected: true } : setupTag(name)
+    })
+    for (const t of s.tags) {
+      if (!pickedNames.has(t.name) && t.level > 0) picked.push({ ...t, selected: false })
+    }
     setUserExcludes(excludes.slice(0, MAX_USER_EXCLUDES))
     const next = { ...s, tags: picked, setupComplete: true, userExcludes: getUserExcludes() }
     const prog = progress(next, s.xp)
@@ -1227,7 +1239,7 @@ export const useGame = create<GameState>((set, get) => ({
       toasts: [...prog.toasts, { id: toastSeq++, msg: `Feed tuned: ${clean.join(', ')}` }],
     })
     get().save()
-    return { ok: true, message: `Feed tuned — ${clean.length} starters live.` }
+    return { ok: true, message: `Feed tuned — ${clean.length} starters set.` }
   },
 
   addUserExclude: (raw) => {

@@ -25,6 +25,7 @@ import { orbitFetch } from '../../utils/api';
 import { useSettings } from '../../hooks/useSettings';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { User } from '@orbit/shared';
+import { isDefaultPeerName } from '@orbit/shared';
 import { ActionModal } from './ActionModal';
 import { HacksPanel } from './HacksPanel';
 import type { ActiveHackSession } from '../home/HomeFooter';
@@ -134,7 +135,13 @@ export function PCDominationTab({ identity, users, allUsers, profilePics, points
       }).catch(() => {});
       if (targetsRes.ok) {
         const data = await targetsRes.json();
-        const list = Array.isArray(data.targets) ? data.targets : [];
+        const rawList = Array.isArray(data.targets) ? data.targets : [];
+        // Defensive: never surface blank / "Unknown" placeholder players in the
+        // picker even if a node still returns them (plan §8).
+        const list = rawList.filter((t: DominationTarget) => {
+          const name = (t.displayName || '').trim();
+          return Boolean(name) && !isDefaultPeerName(name);
+        });
         setTargets(list);
         if (list.length > 0) {
           setSelectedTarget((prev) => {

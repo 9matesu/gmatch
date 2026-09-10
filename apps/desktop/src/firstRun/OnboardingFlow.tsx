@@ -14,8 +14,6 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { saveUserProfile } from '../utils/profile';
-import { useGame } from '../game/store';
-import { FeedTuneStep } from './FeedTuneStep';
 import { playPress, playWin } from '../utils/sounds';
 import {
   type OnboardingState,
@@ -80,16 +78,14 @@ export function OnboardingFlow({
     const anonymous = readOnboardingState(null);
     let migrated = nextState;
 
-    if (nextState.completed.length === 0 && anonymous.completed.includes('ready')) {
-      migrated = useGame.getState().setupComplete
-        ? { version: 1, completed: ['welcome', 'ready'], current: 'ready' }
-        : { version: 1, completed: ['welcome'], current: 'feed' };
-    } else if (nextState.completed.length === 0 && anonymous.completed.length === 0) {
-      if (!isDefaultPeerName(initialProfile.displayName)) {
-        migrated = useGame.getState().setupComplete
-          ? { version: 1, completed: ['welcome', 'ready'], current: 'ready' }
-          : { version: 1, completed: ['welcome'], current: 'feed' };
-      }
+    // Returning account holder (finished onboarding under the anonymous key, or
+    // already has a real display name): login-onboarding is complete. Idle
+    // starter tags are handled by the clicker itself, so don't re-show the wall.
+    if (
+      nextState.completed.length === 0 &&
+      (anonymous.completed.includes('ready') || !isDefaultPeerName(initialProfile.displayName))
+    ) {
+      migrated = { version: 1, completed: ['welcome', 'ready'], current: 'ready' };
     }
 
     if (migrated !== nextState) {
@@ -138,53 +134,20 @@ export function OnboardingFlow({
 
       playWin();
 
-      // 3. Account done — the feed step (tag picks) comes next; the game
-      //    only runs with the player's own starter tags.
-      const alreadyTuned = useGame.getState().setupComplete;
-      const nextState: OnboardingState = alreadyTuned
-        ? { version: 1, completed: ['welcome', 'feed', 'ready'], current: 'ready' }
-        : { version: 1, completed: ['welcome'], current: 'feed' };
+      // 3. Account ready — onboarding ends here. Idle starter tags are asked
+      //    for the first time the player opens the idle clicker (GridWorkspace
+      //    gates itself on setupComplete), so the rest of gMatch is usable
+      //    immediately instead of blocking login on a tag wall.
+      const nextState: OnboardingState = { version: 1, completed: ['welcome', 'ready'], current: 'ready' };
       writeOnboardingState(identityId, nextState);
       setState(nextState);
-      if (alreadyTuned) onComplete();
+      onComplete();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not complete setup');
     } finally {
       setBusy(false);
     }
   };
-
-  const handleFeedFinished = () => {
-    const nextState: OnboardingState = {
-      version: 1,
-      completed: ['welcome', 'feed', 'ready'],
-      current: 'ready',
-    };
-    writeOnboardingState(identityId, nextState);
-    setState(nextState);
-    onComplete();
-  };
-
-  if (state.current === 'feed') {
-    return (
-      <div className="fixed inset-0 z-[99990] overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-zinc-100">
-        <div className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-xl p-6 sm:p-8 shadow-2xl space-y-5 animate-orbit-slide-up">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-[10px] font-mono uppercase tracking-wider text-zinc-400">
-              <span>gMatch · Setup</span>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-white">
-              Set up your game
-            </h1>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              Pick the tags that steer your idle feed. The game fetches nothing before you do.
-            </p>
-          </div>
-          <FeedTuneStep onFinished={handleFeedFinished} />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="fixed inset-0 z-[99990] overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-zinc-100">

@@ -2,6 +2,8 @@ import { Hono } from 'hono'
 import { bytesToHex, hexToBytes } from '../hexio'
 import { sha256 } from '@noble/hashes/sha256'
 import { orbitAuth } from '../middleware/auth'
+import { adminAuth } from '../middleware/admin'
+import { logAdminAction } from '../admin-audit'
 import type { D1Turso } from '../db'
 
 /**
@@ -55,6 +57,7 @@ servers.get('/', softAuth, async (c) => {
     `SELECT id, name, description, owner_id, password_required, endpoint_hint, created_at, last_seen
      FROM ServerDirectory
      WHERE last_seen >= datetime('now', ?)
+       AND COALESCE(hidden, 0) = 0 AND COALESCE(blocked, 0) = 0
      ORDER BY last_seen DESC LIMIT 100`,
   ).bind(`-${STALE_MS / 1000} seconds`).all<Record<string, unknown>>()
   // Host addresses go to signed-in callers only (anti-scraper, anti-mapping):
@@ -150,3 +153,88 @@ servers.delete('/:id', orbitAuth, async (c) => {
   await c.env.DB.prepare('DELETE FROM ServerDirectory WHERE id = ?').bind(id).run()
   return c.json({ ok: true })
 })
+
+// ---- central-node master admin (plan §5) ----------------------------------
+// Only meaningful on the central node (the one that runs this directory). The
+// central master is the ADMIN_PIN holder who verified via /api/admin/verify-pin
+// and therefore carries Users.is_admin — so this reuses adminAuth (is_admin).
+const adminServers = new Hono<{ Bindings: Bindings, Variables: { orbitId: string; publicKeyHex: string } }>()
+adminServers.use('*', orbitAuth, adminAuth)
+
+const MAX_NOTE = 500
+
+// Overview: totals + online/stale + hidden/blocked + recent registrations.
+adminServers.get('/dashboard', async (c) => {
+  const stale = `-${STALE_MS / 1000} seconds`
+  const totals = await c.env.DB.prepare(`
+    SELECT
+      COUNT(*) AS total,
+      SUM(CASE WHEN datetime(last_seen) >= datetime('now', ?) THEN 1 ELSE 0 END) AS online,
+      SUM(CASE WHEN datetime(last_seen) <  datetime('now', ?) THEN 1 ELSE 0 END) AS stale,
+      SUM(COALESCE(hidden, 0)) AS hidden,
+      SUM(COALESCE(blocked, 0)) AS blocked
+    FROM ServerDirectory`,
+  ).bind(stale, stale).first<Record<string, number | null>>()
+  const recent = await c.env.DB.prepare(
+    `SELECT id, name, owner_id, endpoint_hint, created_at, last_seen
+     FROM ServerDirectory ORDER BY created_at DESC LIMIT 10`,
+  ).all<Record<string, unknown>>()
+  return c.json({
+    totals: {
+      total: totals?.total ?? 0,
+      online: totals?.online ?? 0,
+      stale: totals?.stale ?? 0,
+      hidden: totals?.hidden ?? 0,
+      blocked: totals?.blocked ?? 0,
+    },
+    recent: recent.results || [],
+  })
+})
+
+// Full directory including stale/hidden/blocked + endpoint hints (admin only).
+adminServers.get('/directory', async (c) => {
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, name, description, owner_id, endpoint_hint, password_required,
+            COALESCE(hidden, 0) AS hidden, COALESCE(blocked, 0) AS blocked, master_note,
+            created_at, last_seen, updated_at
+     FROM ServerDirectory ORDER BY last_seen DESC LIMIT 500`,
+  ).all<Record<string, unknown>>()
+  return c.json({ servers: results || [] })
+})
+
+// Patch moderation flags / note on one entry.
+adminServers.patch('/directory/:id', async (c) => {
+  const id = c.req.param('id')
+  const orbitId = c.get('orbitId')
+  let body: Record<string, unknown> = {}
+  try { body = (await c.req.json()) as Record<string, unknown> } catch { return c.json({ error: 'invalid json' }, 400) }
+  const sets: string[] = []
+  const args: (number | string)[] = []
+  if (typeof body.hidden === 'boolean') { sets.push('hidden = ?'); args.push(body.hidden ? 1 : 0) }
+  if (typeof body.blocked === 'boolean') { sets.push('blocked = ?'); args.push(body.blocked ? 1 : 0) }
+  if (typeof body.master_note === 'string') { sets.push('master_note = ?'); args.push(body.master_note.slice(0, MAX_NOTE)) }
+  if (sets.length === 0) return c.json({ error: 'no fields to update' }, 400)
+  sets.push("updated_at = datetime('now')")
+  args.push(id)
+  await c.env.DB.prepare(`UPDATE ServerDirectory SET ${sets.join(', ')} WHERE id = ?`).bind(...args).run()
+  const row = await c.env.DB.prepare(
+    `SELECT id, name, COALESCE(hidden, 0) AS hidden, COALESCE(blocked, 0) AS blocked, master_note, updated_at
+     FROM ServerDirectory WHERE id = ?`,
+  ).bind(id).first<Record<string, unknown>>()
+  if (!row) return c.json({ error: 'not found' }, 404)
+  await logAdminAction(c.env.DB, orbitId, 'servers_admin_patch', { id, type: 'server_directory' }, JSON.stringify(body))
+  return c.json({ server: row })
+})
+
+// Force-unregister any entry from the directory.
+adminServers.delete('/directory/:id', async (c) => {
+  const id = c.req.param('id')
+  const orbitId = c.get('orbitId')
+  const row = await c.env.DB.prepare('SELECT id, owner_id FROM ServerDirectory WHERE id = ?').bind(id).first<{ id: string; owner_id: string }>()
+  if (!row) return c.json({ error: 'not found' }, 404)
+  await c.env.DB.prepare('DELETE FROM ServerDirectory WHERE id = ?').bind(id).run()
+  await logAdminAction(c.env.DB, orbitId, 'servers_admin_delete', { id, type: 'server_directory' }, JSON.stringify({ owner_id: row.owner_id }))
+  return c.json({ ok: true })
+})
+
+servers.route('/admin', adminServers)
