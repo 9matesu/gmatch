@@ -103,7 +103,12 @@ export function devFetchable(url: string): string | null {
     if (u.hostname === 'xbooru.com') return `/booru/xbooru${path}`
     if (u.hostname === 'rule34.paheal.net') return `/booru/paheal${path}`
     if (u.hostname === 'konachan.com') return `/booru/kona${path}`
-    if (u.hostname === 'yande.re' || u.hostname === 'files.yande.re') return `/booru/yand${path}`
+    if (u.hostname === 'yande.re' || u.hostname === 'files.yande.re') {
+      // yande.re 302s image bytes to files.yande.re; vite proxy passes the
+      // 302 through and the browser then dies on CORS. /px fetches
+      // server-side (follows redirect) and streams bytes same-origin.
+      return `/px?u=${encodeURIComponent(url)}`
+    }
     if (u.hostname === 'imhentai.xxx' || u.hostname.endsWith('.imhentai.xxx')) {
       return `/px?u=${encodeURIComponent(url)}`
     }

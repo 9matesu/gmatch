@@ -50,6 +50,11 @@ describe('devFetchable (vite-dev same-origin bytes)', () => {
     expect(devFetchable('https://m11.imhentai.xxx/1728478/1.jpg')).toBe(
       '/px?u=https%3A%2F%2Fm11.imhentai.xxx%2F1728478%2F1.jpg',
     )
+    // yande.re 302s to files.yande.re — /px follows server-side (vite proxy passes the 302 to the browser, which dies on CORS)
+    expect(devFetchable('https://yande.re/image/abc/x.jpg')).toBe('/px?u=https%3A%2F%2Fyande.re%2Fimage%2Fabc%2Fx.jpg')
+    expect(devFetchable('https://files.yande.re/image/abc/x.jpg')).toBe(
+      '/px?u=https%3A%2F%2Ffiles.yande.re%2Fimage%2Fabc%2Fx.jpg',
+    )
   })
 
   it('null for unknown hosts and junk', () => {

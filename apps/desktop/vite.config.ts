@@ -181,6 +181,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/booru\/yand/, ''),
       },
+      '^/booru/yandimg': {
+        target: 'https://files.yande.re',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/booru\/yandimg/, ''),
+      },
       '^/booru/real': {
         target: 'https://realbooru.com',
         changeOrigin: true,
