@@ -46,7 +46,7 @@ jobs:
             F=$(node -e "process.stdout.write(JSON.parse(process.argv[1]).file||'')" "$RJ" 2>/dev/null) || F=""
             if [ -n "$F" ]; then curl -fsS -o "releases/$F" "https://gmatch.fly.dev/releases/$F" || echo "WARN: fly-hosted $F not fetched"; fi
           fi
-          for E in releases/gMatch-*-portable.exe; do [ -f "$E" ] && node build-release.mjs "$E"; done
+          for E in releases/gMatch-*-portable.exe; do [ -f "$E" ] && GH_DOWNLOAD_URL="https://gmatch.fly.dev/releases/$(basename $E)" node build-release.mjs "$E"; done
           ls releases/gMatch-*-portable.exe >/dev/null 2>&1 || echo "WARN: no portable exe — publishing text-only"
       - name: Render legal pages + sync hash
         run: cd site && node build-legal.mjs && node sync-hash.mjs

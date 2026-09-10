@@ -17,7 +17,7 @@ if (pages.length < 2 + legalPages.length) {
 const fail = []
 
 // 1) nenhum recurso/destino externo além dos allowlisted
-const ALLOW = /^https:\/\/(github\.com\/9matesu\/goongrid|www\.virustotal\.com)(\/|$)/
+const ALLOW = /^https:\/\/(github\.com\/9matesu\/goongrid|www\.virustotal\.com|gmatch\.fly\.dev)(\/|$)/
 for (const p of pages) {
   const html = readFileSync(join(ROOT, p), 'utf8')
   for (const m of html.matchAll(/(?:src|href|action)="(https?:[^"]+)"/g))
