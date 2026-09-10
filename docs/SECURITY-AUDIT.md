@@ -83,3 +83,18 @@ Pendências honestas da rodada 2: replicação automática multi-réplica NÃO
 implementada (export/import manual cobre v1; ver ADR-002). Kill-switch
 `API_SEALED_ONLY` ainda aceita legado assinado (mitigação de suporte,
 documentada). B.7 (signed URLs) permanece fechado na rodada 1.
+
+## Rodada 3 (2026-09-10, v1.1.3+ / branch fix/logic-consistency-sweep)
+
+| # | Sev | Achado | Repro | Status |
+|---|-----|--------|-------|--------|
+| F16 | ALTA | `idle-credit` aceitava QUALQUER inteiro 1..1M por throttle de 60s — a SPEC dizia ledger "autoritativo", mas a validação de taxa de ganho só existia no cliente (jogador mal-intencionado forjava g$ em nós compartilhados/federados; rankings viravam ficção). | histórico `economy-idle.ts` (sem gate) | ✅ envelope server-side: `idleEnvelope` = 1.5× taxa registrada × elapsed + 5 (claim com crescimento limitado 2x+100/crédito, teto 50k/s); primeiro flush pós-boot do nó é confiável por design. Testes `economy-idle.test.ts` (16). Escopo honesto: no SEU nó disciplina crashes; protege leaderboards alheios. |
+| F17 | BAIXA | `buyCard` bloqueia auto-compra de listing próprio desde o scaffold (guard + teste existentes) — mas o StoreTab oferecia botão Buy ativo no próprio listing (403 confuso ao clicar). | `grep "own card" apps/api/src/cards.test.ts` | ✅ badge "Yours" no lugar do botão (UI honesta; server já estava certo). |
+| F18 | MÉDIA | Debuffs de hack pagos viviam em ARRAY EM MEMÓRIA — reiniciar o sidecar (todo relaunch do app!) comia o efeito ativo da vítima e a sessão de spy-feed do atacante já cobrada em g$. | `grep -n "activeServerHacks" apps/api/src/routes/users.ts` (histórico) | ✅ tabela `HackDebuffs` (migração 048): INSERT via lote atômico do débito (gate `changes()`), prune/leituras via DB; cleanup de conta + allowlist de snapshot ligados. Teste "survives module re-init" (`spy-feed.test.ts`). |
+| F19 | BAIXA | Ações de Domination nunca-acked (vítima fechou o app; câmera bloqueada pelo SO) ficavam `sent` para sempre — UI honesta ("awaiting") mas estado terminal inexistente. | `SELECT count(*) FROM DominationActions WHERE status='sent'` antigo | ✅ sweep 30min `sent→expired` no `deleteExpiredContent` (3d) + chips "fizzled/skipped" com explicação do reembolso-zero e nota no modal de câmera. |
+
+Admin (refactor de privacidade, mesma semana): leitura em massa de DMs e
+analytics de referrer REMOVIDAS do software; disclosure agora é report-scoped
+(`GET /api/admin/cases/:id` — a linha "(e) key-disclosure fase futura" da
+rodada 1 torna-se realidade implementada). Ledger completo em
+`docs/ADMIN-SUITE.md`.

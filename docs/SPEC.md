@@ -259,9 +259,12 @@ offline earnings). Each +5% click power. Persist across prestige.
 - Share links are real, openable URLs: public HTML pages `GET /p/:id` (post)
   and `GET /u/:id` (profile), XSS-escaped, unauthenticated; `GET /api/users/:id`
   serves sanitized profiles. Deep links `#/feed?post=<id>` open the lightbox.
-- Build: `cd apps/desktop && npm run dist`; CI: tag `v*` →
-  `.github/workflows/release.yml` (lint+typecheck+test gate → portable exe →
-  GitHub release). Unsigned exe → SmartScreen "More info → Run anyway".
+- Build: `cd apps/desktop && npm run dist`. The canonical download is the
+  fly-hosted site (`https://gmatch.fly.dev/releases/gMatch-<version>-portable.exe`
+  + hash in release.json, see site/build-release.mjs); tagging `v*` also fires
+  `.github/workflows/release.yml` (lint+typecheck+test gate → GitHub Release
+  asset), used for mirrors, not the primary link. Unsigned exe → SmartScreen
+  "More info → Run anyway".
 
 ## 13. Servers (directory, federation, admin) — v1.1+
 
