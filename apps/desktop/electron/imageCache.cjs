@@ -14,7 +14,7 @@ const mem = require('./imageCacheMemory.cjs')
 const SCHEME = 'gmcache'
 const MAX_SINGLE_BYTES = 25 * 1024 * 1024
 const FEED_TTL_MS = 10 * 60 * 1000
-const FEED_MAX_QUERIES = 100
+const FEED_MAX_QUERIES = 40
 const IMG_TIMEOUT_MS = 15_000
 
 const EXT_MIME = {

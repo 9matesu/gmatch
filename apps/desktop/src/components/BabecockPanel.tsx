@@ -141,7 +141,8 @@ export function BabecockPanel({
     void refresh()
     const timer = setInterval(() => {
       setNow(Date.now())
-      void refresh()
+      // The 3-fetch refresh is network+DB; skip while hidden (clock stays).
+      if (!document.hidden) void refresh()
     }, 4000)
     return () => clearInterval(timer)
   }, [refresh, babecockVersion])
@@ -387,6 +388,8 @@ export function BabecockPanel({
         }
         ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight)
       }
+      // Blob URLs existed only to feed the canvas — release them now.
+      for (const img of images) if (img && img.src.startsWith('blob:')) URL.revokeObjectURL(img.src)
 
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92))
       if (!blob) {

@@ -42,13 +42,21 @@ export function IdleOverlay({ items, identity, onExit }: {
   useEffect(() => {
     if (imageItems.length === 0) return
     let cancelled = false
-    fetchWithConcurrencyLimit(imageItems, 3).then((urls) => {
-      if (!cancelled) {
-        setImageUrls(urls)
-        setLoaded(true)
+    let urls: Map<string, string> | null = null
+    fetchWithConcurrencyLimit(imageItems, 3).then((u) => {
+      if (cancelled) {
+        for (const b of u.values()) URL.revokeObjectURL(b)
+        return
       }
+      urls = u
+      setImageUrls(u)
+      setLoaded(true)
     })
-    return () => { cancelled = true }
+    // Slideshow blobs are session-only: revoke on unmount (perf checkup).
+    return () => {
+      cancelled = true
+      if (urls) for (const b of urls.values()) URL.revokeObjectURL(b)
+    }
   }, [imageItems.length > 0 ? imageItems.map(i => i.id).join(',') : 'empty', identity])
 
   useEffect(() => {

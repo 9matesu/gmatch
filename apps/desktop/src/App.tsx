@@ -639,7 +639,9 @@ export default function Home() {
     };
 
     pollHacks();
-    const interval = setInterval(pollHacks, 8000);
+    // DB read; the browser throttles hidden tabs, but be explicit (same law
+    // as the App heartbeat/sync pollers): skip while nobody is looking.
+    const interval = setInterval(() => { if (!document.hidden) pollHacks(); }, 8000);
     return () => {
       cancelled = true;
       clearInterval(interval);

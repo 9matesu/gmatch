@@ -103,7 +103,9 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
       }
     };
     void load();
-    const poll = setInterval(load, 15_000);
+    // Skip the 15s spy-feed pull while the window is hidden (same law as
+    // the App heartbeat/sync pollers).
+    const poll = setInterval(() => { if (!document.hidden) void load(); }, 15_000);
     return () => {
       cancelled = true;
       clearInterval(poll);
