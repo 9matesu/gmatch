@@ -31,7 +31,8 @@ one-command hardening: `fly secrets set SITE_SERVICES=mail,turn -a gmatch`.
 | **Bulk DM reader** | GET /private-messages (no-filter decrypts 500), pm hide/delete, phantom pm/:id/unhide (no server route — 404 bug) | **violates denunciation model** | **DELETE** |
 | **Cross-DM chat sweep** | GET /chat/messages dm+all sections | bulk private surveillance | **DELETE DM section** (lobby/match/group stay) |
 | **Referrer analytics** | GET /traffic-sources + POST /api/stats/referrer + client ReferrerTracker | contradicts zero-tracking claims | **DELETE** |
-| Dead tail | GET/PUT /settings/store-prices, POST /cards/backfill, GET /decks/:id, GET /chat (legacy 100-row) | nothing calls them | **DELETE** |
+| Dead tail | POST /cards/backfill, GET /decks/:id, GET /chat (legacy 100-row) | nothing calls them | **DELETE** |
+| Store prices | GET/PUT /settings/store-prices | server reader is LIVE (users.ts prices /users/store/items from store_prices) but no admin UI calls the route — keep route, drop dead client method; UI wiring = follow-up | keep route |
 | Discord config | GET/PUT /settings/discord-invite | live feature (feed ads + right dock) | keep |
 
 Follow-up candidates (logged, not in scope): GroupMessages stored plaintext

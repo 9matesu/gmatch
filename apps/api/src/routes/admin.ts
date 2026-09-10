@@ -16,7 +16,7 @@ import { getBotConfig, saveBotConfig, testBotApi, refreshBotImageCache, getBotPr
 import { validateProviderUrl } from '../bots/provider-pool'
 import { listLootboxes, getLootbox, normalizeTags, normalizeDrawConfig, stateTransition, isValidState, type LootboxState } from '../lootboxes/service'
 import { EconomyService } from '../economy'
-import { CardService, getCashoutRateBps } from '../cards'
+import { getCashoutRateBps } from '../cards'
 import { resolveReport, ReportError } from '../reports'
 import crypto from 'crypto'
 
@@ -365,14 +365,9 @@ admin.post('/babecock/:id/close', async (c) => {
   return c.json({ ok: true, id })
 })
 
-// Non-canonical -> canonical migration: mint canonical Cards for existing
-// self-uploaded media objects that are not yet carded. Idempotent.
-admin.post('/cards/backfill', async (c) => {
-  const service = new CardService(c.env.DB)
-  const result = await service.backfillFromObjects()
-  await logAdminAction(c.env.DB, c.get('orbitId'), 'cards.backfill', { type: 'cards' }, `created=${result.created} skipped=${result.skipped}`)
-  return c.json(result)
-})
+// (POST /cards/backfill removed — nothing in the client calls it; the
+//  one-time media→card migration stays available from git history if ever
+//  needed again. Canonical-card minting runs live on upload.)
 
 // Live active lobby players & online users status
 admin.get('/live', async (c) => {
