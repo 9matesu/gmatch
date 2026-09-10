@@ -680,6 +680,36 @@ const SOURCES = [
       return parseBooruOrgHtml(html, 'rule34', captions).slice(0, n)
     },
   },
+  {
+    id: 'qoh',
+    fetch: async (variant, n, captions) => {
+      const firstTag = variant.split(/\s+/).filter(Boolean)[0] || ''
+      const html = await httpGet(
+        `https://qoh.booru.org/index.php?page=post&s=list&tags=${encodeURIComponent(firstTag)}`
+      )
+      return parseBooruOrgHtml(html, 'qoh', captions).slice(0, n)
+    },
+  },
+  {
+    id: 'celeb',
+    fetch: async (variant, n, captions) => {
+      const firstTag = variant.split(/\s+/).filter(Boolean)[0] || ''
+      const html = await httpGet(
+        `https://celeb.booru.org/index.php?page=post&s=list&tags=${encodeURIComponent(firstTag)}`
+      )
+      return parseBooruOrgHtml(html, 'celeb', captions).slice(0, n)
+    },
+  },
+  {
+    id: 'footfetish',
+    fetch: async (variant, n, captions) => {
+      const firstTag = variant.split(/\s+/).filter(Boolean)[0] || ''
+      const html = await httpGet(
+        `https://footfetishbooru.booru.org/index.php?page=post&s=list&tags=${encodeURIComponent(firstTag)}`
+      )
+      return parseBooruOrgHtml(html, 'footfetishbooru', captions).slice(0, n)
+    },
+  },
 ]
 
 // AND-combos of narrow pervert tags often return 0 on DAPI mirrors, so each

@@ -246,10 +246,10 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
       if (!reachable) break
       let url: string
       let kind: 'dapi' | 'moe' = 'dapi'
-      if (src.type === 'moebooru' || src.id === 'konachan-direct' || src.id === 'yandere-direct') {
+      if (src.type === 'moebooru' || (src as { id: string }).id === 'konachan-direct' || (src as { id: string }).id === 'yandere-direct') {
         kind = 'moe'
         const page = 1 + Math.floor(Math.random() * 5)
-        const tags = src.id === 'konachan-direct' ? `${variant} rating:explicit` : variant
+        const tags = (src as { id: string }).id === 'konachan-direct' ? `${variant} rating:explicit` : variant
         url = `${src.proxy}/post.json?tags=${encodeURIComponent(tags)}&limit=${req.limit}&page=${page}`
       } else {
         url = `${src.proxy}/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(

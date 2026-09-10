@@ -178,13 +178,12 @@ export async function resolveImage(url: string): Promise<string> {
 }
 
 /**
- * Best-effort prefetch so back/skip arrows show instantly.
- * Callers pass the 5-up/5-down window; capped at 11 so a long queue can't
- * stampede the network.
+ * Best-effort prefetch so back/skip arrows and 3x3 grids show instantly.
+ * Default cap is 11 for legacy tests; caller can request up to 27 for full 3x3 ahead.
  */
-export function prefetchImages(urls: string[]): void {
+export function prefetchImages(urls: string[], limit = 11): void {
   try {
-    for (const u of urls.slice(0, 11)) {
+    for (const u of urls.slice(0, limit)) {
       if (u) void resolveImage(u)
     }
   } catch {
