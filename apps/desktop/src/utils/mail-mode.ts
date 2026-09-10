@@ -13,6 +13,7 @@
 export type MailMode = 'courier' | 'legacy'
 
 const cache = new Map<string, MailMode>()
+const inflight = new Map<string, Promise<MailMode>>()
 
 export function cachedMailMode(apiBase: string): MailMode | undefined {
   return cache.get(apiBase.replace(/\/+$/, ''))
@@ -25,17 +26,26 @@ export async function detectMailMode(
   const base = apiBase.replace(/\/+$/, '')
   const known = cache.get(base)
   if (known) return known
-  try {
-    const res = await fetchImpl(`${base}/api/pm`, { method: 'GET' })
-    const mode: MailMode = res.status === 404 ? 'courier' : 'legacy'
-    cache.set(base, mode)
-    return mode
-  } catch {
-    return known ?? 'legacy'
-  }
+  const ongoing = inflight.get(base)
+  if (ongoing) return ongoing
+  const p = (async (): Promise<MailMode> => {
+    try {
+      const res = await fetchImpl(`${base}/api/pm`, { method: 'GET' })
+      const mode: MailMode = res.status === 404 ? 'courier' : 'legacy'
+      cache.set(base, mode)
+      return mode
+    } catch {
+      return cache.get(base) ?? 'legacy'
+    } finally {
+      inflight.delete(base)
+    }
+  })()
+  inflight.set(base, p)
+  return p
 }
 
 /** test seam */
 export function _resetMailModeCache(): void {
   cache.clear()
+  inflight.clear()
 }

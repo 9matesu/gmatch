@@ -105,7 +105,7 @@ economyIdle.post('/idle-credit', async (c) => {
   // fails loudly; a zero claim (client's first sample window) keeps the
   // registered rate — measured beats estimated, never jamming honest flows.
   let effectiveGps: number
-  if (!prev) {
+  if (!prev || prev.gps === 0) {
     effectiveGps = claimGps === null ? 0 : Math.min(Math.max(claimGps, 0), MAX_CLAIMED_GPS)
   } else {
     if (claimGps === null && !isReplay) {

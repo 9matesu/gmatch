@@ -147,6 +147,18 @@ describe('POST /api/economy/idle-credit', () => {
     __setIdleCooldown(60_000)
   })
 
+  it('credit after a gps:0 registration is not envelope-rejected', async () => {
+    __setIdleCooldown(50)
+    // First credit registers gps:0 (trusted flush)
+    const first = await credit(10, 'env-zero-a', 'key-zero-1', 0)
+    expect(first.status).toBe(200)
+    await new Promise((r) => setTimeout(r, 60))
+    // Second credit with real gps rate is not blocked by the 0 rate
+    const second = await credit(50, 'env-zero-b', 'key-zero-2', 100)
+    expect(second.status).toBe(200)
+    __setIdleCooldown(60_000)
+  })
+
   it('idleEnvelope caps claimed gps at 50k and floors elapsed earnings', async () => {
     const { idleEnvelope } = await import('./economy-idle')
     expect(idleEnvelope(10, 1_100, false)).toBe(21)

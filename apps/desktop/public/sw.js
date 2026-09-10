@@ -46,8 +46,8 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const networkFetch = fetch(event.request)
+    caches.match(event.request).then((cachedResponse) =>
+      fetch(event.request)
         .then((networkResponse) => {
           // Cache successful responses
           if (networkResponse.ok) {
@@ -58,10 +58,11 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         })
-        .catch(() => cachedResponse);
-
-      return networkFetch || cachedResponse;
-    })
+        .catch(() => {
+          if (cachedResponse) return cachedResponse;
+          return new Response('offline', { status: 503, statusText: 'Service Unavailable' });
+        }),
+    ),
   );
 });
 
