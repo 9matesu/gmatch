@@ -13,7 +13,7 @@ In official courier mode we DO NOT read content — and therefore cannot pre-mod
 
 - **Delivery address:** public and verifiable by whoever holds the matching private key. A court order that identifies a private key may, if the user complies, reveal its content.
 
-- **Full-nodes:** the host can read what you publish on it; reports go to the host.
+- **Full-nodes:** the host can read what you publish on it; reports go to the host and open as a CASE: the moderator sees the reported item and its disclosed evidence, nothing else.
 
 ## 3. How to report
 

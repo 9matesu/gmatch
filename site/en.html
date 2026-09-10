@@ -33,7 +33,7 @@
 <li>Feed com fotos/vídeos que VOCÊ publica, escolhendo quem vê cada post;</li>
 <li>Chat privado e salas de grupo com criptografia de ponta a ponta;</li>
 <li>Um idle-clicker adulto e um jogo de cartas 1v1 com baralhos, loja e mercado entre jogadores;</li>
-<li>Moderação por denúncia: quem recebe algo ofensivo denuncia e SÓ ENTÃO revela aquela mensagem ao moderador.</li>
+<li>Moderação por denúncia: quem recebe algo ofensivo denuncia e SÓ ENTÃO revela aquela mensagem ao moderador. O painel de administração implementa exatamente isso: casos abertos por denúncias — nunca navegação em massa por mensagens privadas de ninguém.</li>
 </ul>
 <p>Não há cadastro, e-mail ou telefone. Sua "conta" é um par de chaves gerado no seu computador. Ninguém redefine sua senha porque não existe senha — de propósito; o app obriga você a exportar backup da chave.</p>
 </section>
@@ -81,12 +81,12 @@
 
 <section id="download">
 <h2>Download (Windows x64, arquivo único)</h2>
-<p>Versão <strong id="version">1.1.2</strong> · arquivo <code>gMatch-1.1.2-portable.exe</code> · 114.146.607 bytes (108,9 MiB) · compilado em <span id="build-date">2026-09-10T09:29:38.511Z</span> (UTC).</p>
-<p><a href="releases/gMatch-1.1.2-portable.exe" download>Baixar gMatch-1.1.2-portable.exe</a></p>
+<p>Versão <strong id="version">1.1.3</strong> · arquivo <code>gMatch-1.1.3-portable.exe</code> · 114.146.607 bytes (108,9 MiB) · compilado em <span id="build-date">2026-09-10T13:13:50.630Z</span> (UTC).</p>
+<p><a href="releases/gMatch-1.1.3-portable.exe" download>Baixar gMatch-1.1.3-portable.exe</a></p>
 <p><strong>SHA-256</strong> esperado — copie o valor abaixo e confira na próxima seção antes de rodar:</p>
-<pre id="sha256">85144043c3daa9137521c33868f1740b88f88e5f58a08e690b337b95e0be10f2</pre>
+<pre id="sha256">f5d5ffd80d863d94004c43b7e292eae67e401f2c4312ed61c912ac491938d7ca</pre>
 <p><strong>SHA-512</strong> esperado (paranoia extra é virtude com um arquivo de 109 MB):</p>
-<pre id="sha512">f1e1bbfad573e6f41f5bb3f504f0652345c005ec81a3cddb16ac58df6b06f6a073a9948ba1b2e5a9005dd318b18f7cc5b8379667e9ce4fbeca0a0a831c5431b9</pre>
+<pre id="sha512">cf0b512b5199a924d0e255763e374a95b3afcab3552a6602252dd6828d0a57395dd6003ba4a26a4a52be343bce1aea9c7d7282b29b1bc6d74c1cf1f3b7865339</pre>
 <p><em>(Os dois hashes, a data de compilação e o tamanho saem MECANICAMENTE do arquivo publicado, nunca digitados à mão. Os mesmos dados estão em <code>release.json</code> neste servidor.)</em></p>
 <h3>Assinatura de código: o que temos e o que não temos</h3>
 <p>Este binário NÃO tem assinatura Authenticode comercial — custa centenas de dólares por ano e pagamos o projeto com doação, não com venda de dados. Em vez disso publicamos a integridade criptográfica que você verifica sozinho: SHA-256 e SHA-512 derivados dos bytes exatos servidos nesta página. Ainda não há build para macOS/Linux.</p>
@@ -102,7 +102,7 @@
 <section id="verificar">
 <h2>Verificar o hash no Windows (20 segundos, sem instalar nada)</h2>
 <p>Abra o menu Iniciar, digite <code>PowerShell</code> e rode (ajuste o caminho se salvou em outro lugar):</p>
-<pre>Get-FileHash "$env:USERPROFILE\Downloads\gMatch-1.1.2-portable.exe" -Algorithm SHA256</pre>
+<pre>Get-FileHash "$env:USERPROFILE\Downloads\gMatch-1.1.3-portable.exe" -Algorithm SHA256</pre>
 <p>Compare o valor <code>Hash</code> com o publicado acima. Se diferir em UM caractere, NÃO execute: apague e reporte em <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a>.</p>
 <p>Mesma ideia, qualquer algoritmo: <code>Get-FileHash ... -Algorithm SHA512</code> deve bater com o bloco SHA-512 acima.</p>
 </section>

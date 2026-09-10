@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client'
 import App from './App'
 import { ToastProvider } from './components/Toast'
 import { ConfirmProvider } from './components/ConfirmDialog'
-import { ReferrerTracker } from './components/ReferrerTracker'
 
 /** Render the app — called by main.tsx only after initSecureStorage() settled. */
 export function mount(): void {
@@ -19,7 +18,6 @@ export function mount(): void {
         </a>
         <ConfirmProvider>
           <ToastProvider>
-            <ReferrerTracker />
             <div className="flex-grow">
               <App />
             </div>

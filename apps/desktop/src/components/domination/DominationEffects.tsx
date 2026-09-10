@@ -157,6 +157,10 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
       formData.append('is_public', makePublic ? '1' : '0');
       if (!makePublic) formData.append('recipients', from);
       await orbitFetch('/api/objects', { method: 'POST', body: formData }, identity);
+      // A delivered photo IS the receipt for a camera action.
+      if (payload.actionId) {
+        void orbitFetch(`/api/domination/ack/${payload.actionId}`, { method: 'POST' }, identity).catch(() => { });
+      }
     } catch (e) {
       logger.error('Camera capture declined or failed:', e);
     }
@@ -173,10 +177,14 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
       if ((settingsRef.current.dominationInboundMutedUntil || 0) > Date.now()) return;
 
       const { action, payload, from } = detail;
+      // Track whether something actually rendered, so the sender's history
+      // shows delivered truth instead of a fabricated status.
+      let applied = false;
 
       switch (action) {
         case 'wallpaper':
           if (settings.allowDesktopBackgroundChange && payload.url) {
+            applied = true;
             addEffect({
               id: payload.actionId || crypto.randomUUID(),
               type: 'wallpaper',
@@ -191,6 +199,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
 
         case 'game_bg':
           if (settings.allowGameBackgroundChange && payload.url) {
+            applied = true;
             addEffect({
               id: payload.actionId || crypto.randomUUID(),
               type: 'game_bg',
@@ -202,6 +211,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
 
         case 'popup_video':
           if (settings.allowPopupVideo && payload.url) {
+            applied = true;
             setVideoUnmuted(false);
             addEffect({
               id: payload.actionId || crypto.randomUUID(),
@@ -214,6 +224,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
 
         case 'message':
           if (settings.allowPopupMessage && payload.text) {
+            applied = true;
             addEffect({
               id: payload.actionId || crypto.randomUUID(),
               type: 'message',
@@ -225,6 +236,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
 
         case 'text_overlay':
           if (settings.allowTextOverlay && payload.text) {
+            applied = true;
             addEffect({
               id: payload.actionId || crypto.randomUUID(),
               type: 'text_overlay',
@@ -241,6 +253,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
 
         case 'blur':
           if (settings.allowBlurEverything) {
+            applied = true;
             addEffect({
               id: payload.actionId || crypto.randomUUID(),
               type: 'blur',
@@ -256,6 +269,11 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
             setCameraAsk({ from, payload });
           }
           break;
+      }
+
+      if (applied && payload.actionId && identity) {
+        // Tell the relay it really rendered (sender sees executed vs sent).
+        void orbitFetch(`/api/domination/ack/${payload.actionId}`, { method: 'POST' }, identity).catch(() => { });
       }
 
       if (typeof payload.victimReward === 'number' && payload.victimReward > 0) {

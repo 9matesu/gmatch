@@ -240,12 +240,12 @@ domination.get('/targets', async (c) => {
   const db = c.env.DB
 
   const rows = await db.prepare(`
-    SELECT id, display_name, pfp_url, pc_domination_enabled, pc_domination_settings
+    SELECT id, display_name, pfp_url, pc_domination_enabled, pc_domination_settings, last_seen
     FROM Users
     WHERE id != ?
     ORDER BY last_seen DESC
     LIMIT 100
-  `).bind(userId).all<{ id: string; display_name: string | null; pfp_url: string | null; pc_domination_enabled: number; pc_domination_settings: string }>()
+  `).bind(userId).all<{ id: string; display_name: string | null; pfp_url: string | null; pc_domination_enabled: number; pc_domination_settings: string; last_seen: string | null }>()
 
   // Only offer real, named players as targets — drop blank / whitespace / default
   // placeholder ("Unknown") accounts so they never appear in the picker.
@@ -254,6 +254,8 @@ domination.get('/targets', async (c) => {
     displayName: string
     pfpUrl: string | null
     enabled: boolean
+    online: boolean
+    last_seen: string | null
     consents: Record<string, boolean>
   }[] = []
   for (const u of rows.results || []) {
@@ -268,11 +270,33 @@ domination.get('/targets', async (c) => {
       displayName: name,
       pfpUrl: u.pfp_url,
       enabled: Boolean(u.pc_domination_enabled),
+      // Same 10-min freshness rule the trigger gate enforces — the picker
+      // must not offer people the server would refuse anyway.
+      online: u.last_seen ? Date.now() - Date.parse(u.last_seen) < 10 * 60_000 : false,
+      last_seen: u.last_seen ?? null,
       consents: settingsObj,
     })
   }
 
   return c.json({ targets })
+})
+
+/**
+ * POST /api/domination/ack/:actionId - the VICTIM confirms an inbound effect
+ * actually rendered. Until then the sender only sees "sent" (delivered to the
+ * relay), never a fabricated "executed". Best-effort on the victim side.
+ */
+domination.post('/ack/:actionId', async (c) => {
+  const userId = c.get('orbitId')
+  const id = c.req.param('actionId')
+  const row = await c.env.DB.prepare('SELECT victim_id, status FROM DominationActions WHERE id = ?')
+    .bind(id).first<{ victim_id: string; status: string }>()
+  if (!row) return c.json({ error: 'Action not found' }, 404)
+  if (row.victim_id !== userId) return c.json({ error: 'Forbidden' }, 403)
+  if (row.status !== 'sent') return c.json({ ok: true, already: true })
+  await c.env.DB.prepare("UPDATE DominationActions SET status = 'executed', executed_at = ? WHERE id = ?")
+    .bind(new Date().toISOString(), id).run()
+  return c.json({ ok: true })
 })
 
 /** GET /api/domination/history - Get domination action history for current user (as victim) */

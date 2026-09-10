@@ -10,7 +10,6 @@ import type {
   AdminReport,
   AdminRecommendation,
   AdminLobbyComment,
-  AdminPrivateMessage,
   AdminPost,
   AdminChatMessage,
   AdminCard,
@@ -201,14 +200,6 @@ export const adminApi = {
   lobbyComments: (identity: OrbitIdentity) =>
     fetchArray<AdminLobbyComment>(`${ADMIN_BASE}/lobby-comments`, identity),
 
-  privateMessages: (identity: OrbitIdentity, params: TableParams) => {
-    const searchParams = new URLSearchParams();
-    searchParams.set("limit", String(params.pageSize));
-    searchParams.set("offset", String((params.page - 1) * params.pageSize));
-    if (params.filters?.userId) searchParams.set("user_id", String(params.filters.userId));
-    return fetchTable<AdminPrivateMessage>(`${ADMIN_BASE}/private-messages?${searchParams}`, identity, params);
-  },
-
   chat: (identity: OrbitIdentity, params: TableParams) => {
     const searchParams = new URLSearchParams();
     searchParams.set("limit", String(params.pageSize));
@@ -264,9 +255,6 @@ export const adminApi = {
 
   dailyStats: (identity: OrbitIdentity, days = 30) =>
     fetchArray<AdminDailyStat>(`${ADMIN_BASE}/daily-stats?days=${days}`, identity),
-
-  trafficSources: (identity: OrbitIdentity) =>
-    fetchJson<{ sources: Array<{ source: string; visits: number; last_seen: string; first_seen: string }>; total: number }>(`${ADMIN_BASE}/traffic-sources`, identity),
 
   banUser: (identity: OrbitIdentity, userId: string, reason: string, wipe = true, scope = "all") =>
     fetchJson<{ success: boolean; banId: string }>(`${ADMIN_BASE}/users/${userId}/ban`, identity, {
@@ -377,6 +365,10 @@ export const adminApi = {
       body: JSON.stringify({ action }),
     }),
 
+  /** Case = one report, seen legally: report + disclosed evidence + parties. */
+  caseDetail: (identity: OrbitIdentity, reportId: string) =>
+    fetchJson<Record<string, any>>(`${ADMIN_BASE}/cases/${reportId}`, identity),
+
   hideLobbyComment: (identity: OrbitIdentity, commentId: string) =>
     fetchJson<{ ok: boolean }>(`${ADMIN_BASE}/lobby-comments/${commentId}/hide`, identity, { method: "POST" }),
 
@@ -385,12 +377,6 @@ export const adminApi = {
 
   deleteLobbyComment: (identity: OrbitIdentity, commentId: string) =>
     fetchJson<{ ok: boolean }>(`${ADMIN_BASE}/lobby-comments/${commentId}`, identity, { method: "DELETE" }),
-
-  hidePrivateMessage: (identity: OrbitIdentity, messageId: string) =>
-    fetchJson<{ ok: boolean }>(`${ADMIN_BASE}/private-messages/${messageId}/hide`, identity, { method: "POST" }),
-
-  deletePrivateMessage: (identity: OrbitIdentity, messageId: string) =>
-    fetchJson<{ ok: boolean }>(`${ADMIN_BASE}/private-messages/${messageId}`, identity, { method: "DELETE" }),
 
   closeRoom: (identity: OrbitIdentity, roomId: string) =>
     fetchJson<{ ok: boolean }>(`${ADMIN_BASE}/rooms/${roomId}/close`, identity, { method: "POST" }),

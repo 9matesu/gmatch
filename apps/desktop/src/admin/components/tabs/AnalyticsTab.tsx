@@ -3,7 +3,7 @@
 import { AdminEmptyState, AdminLoadingState, Badge } from "../../../components/admin/primitives";
 import { adminApi } from "../../../utils/adminApi";
 import { useState, useCallback, useEffect } from "react";
-import { BarChart2, ListChecks, TrendingUp, Users, Activity, Flag, GitCompare, Share2 } from "lucide-react";
+import { BarChart2, ListChecks, TrendingUp, Users, Activity, Flag, GitCompare } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import type { AdminAuditEntry, AdminDailyStat, OrbitIdentity } from "../../../utils/adminTypes";
 
@@ -16,7 +16,6 @@ interface AnalyticsTabProps {
 const subTabs = [
   { id: "audit", label: "Audit Log", icon: ListChecks },
   { id: "daily", label: "Daily Stats", icon: BarChart2 },
-  { id: "traffic", label: "Traffic & Sources", icon: Share2 },
 ] as const;
 
 type SubTab = typeof subTabs[number]["id"];
@@ -48,7 +47,6 @@ export function AnalyticsTab({ identity, pinVerified }: AnalyticsTabProps) {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>("audit");
   const [auditLog, setAuditLog] = useState<AdminAuditEntry[]>([]);
   const [dailyStats, setDailyStats] = useState<AdminDailyStat[]>([]);
-  const [traffic, setTraffic] = useState<{ sources: Array<{ source: string; visits: number; last_seen: string; first_seen: string }>; total: number }>({ sources: [], total: 0 });
   const [isLoading, setIsLoading] = useState(false);
 
   const fetchAuditLog = useCallback(async () => {
@@ -72,23 +70,11 @@ export function AnalyticsTab({ identity, pinVerified }: AnalyticsTabProps) {
     }
   }, [identity, pinVerified]);
 
-  const fetchTraffic = useCallback(async () => {
-    if (!identity || !pinVerified) return;
-    setIsLoading(true);
-    try {
-      const data = await adminApi.trafficSources(identity);
-      setTraffic(data);
-    } catch {
-    } finally {
-      setIsLoading(false);
-    }
-  }, [identity, pinVerified]);
 
   useEffect(() => {
     if (activeSubTab === "audit") fetchAuditLog();
-    else if (activeSubTab === "daily") fetchDailyStats();
-    else fetchTraffic();
-  }, [activeSubTab, fetchAuditLog, fetchDailyStats, fetchTraffic]);
+    else fetchDailyStats();
+  }, [activeSubTab, fetchAuditLog, fetchDailyStats]);
 
   const renderAuditRow = (entry: AdminAuditEntry) => (
     <div key={entry.id} className="border-b border-border-subtle last:border-0 p-3 hover:bg-glass-w5 transition-colors">
@@ -150,9 +136,8 @@ export function AnalyticsTab({ identity, pinVerified }: AnalyticsTabProps) {
     },
   ];
 
-  const trafficMax = Math.max(...traffic.sources.map((s) => s.visits), 1);
 
-  if (isLoading && dailyStats.length === 0 && auditLog.length === 0 && traffic.total === 0) {
+  if (isLoading && dailyStats.length === 0 && auditLog.length === 0) {
     return <AdminLoadingState rows={5} columns={4} />;
   }
 
@@ -161,7 +146,7 @@ export function AnalyticsTab({ identity, pinVerified }: AnalyticsTabProps) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-bold text-retro-fg">Analytics & Audit</h1>
-          <p className="text-xs text-retro-muted mt-1">Audit log, daily activity statistics, and inbound traffic attribution</p>
+          <p className="text-xs text-retro-muted mt-1">Admin audit log and aggregate daily activity</p>
         </div>
       </div>
 
@@ -314,69 +299,6 @@ export function AnalyticsTab({ identity, pinVerified }: AnalyticsTabProps) {
         </div>
       )}
 
-      {activeSubTab === "traffic" && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="rounded-xl border border-border-glass bg-surface-raised p-4 bg-cyan-500/5">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">Total Tracked Visits</p>
-              <p className="text-2xl font-black mt-1 text-cyan-400">{(traffic.total || 0).toLocaleString()}</p>
-            </div>
-            <div className="rounded-xl border border-border-glass bg-surface-raised p-4 bg-emerald-500/5">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">Traffic Sources</p>
-              <p className="text-2xl font-black mt-1 text-emerald-400">{traffic.sources.length}</p>
-            </div>
-            <div className="rounded-xl border border-border-glass bg-surface-raised p-4 bg-amber-500/5">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">Top Source</p>
-              <p className="text-lg font-black mt-1 text-amber-400 truncate">{traffic.sources[0]?.source || "—"}</p>
-            </div>
-            <div className="rounded-xl border border-border-glass bg-surface-raised p-4 bg-violet-500/5">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">Top Source Share</p>
-              <p className="text-2xl font-black mt-1 text-violet-400">
-                {traffic.total > 0 && traffic.sources[0] ? Math.round((traffic.sources[0].visits / traffic.total) * 100) : 0}%
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
-            <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between">
-              <h2 className="text-xs font-bold uppercase tracking-wider">Where Visitors Come From</h2>
-              <Badge variant="info" size="sm">referrer + utm</Badge>
-            </div>
-            {traffic.sources.length === 0 ? (
-              <AdminEmptyState
-                title="No traffic data yet"
-                description="Sources are attributed once per browser from referrer headers or ?ref=/?source=/utm_source= parameters"
-                illustration="chart"
-              />
-            ) : (
-              <div className="p-4 space-y-3">
-                {traffic.sources.map((s) => {
-                  const pct = traffic.total > 0 ? Math.round((s.visits / traffic.total) * 100) : 0;
-                  return (
-                    <div key={s.source} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-bold text-retro-fg capitalize">{s.source}</span>
-                        <span className="text-retro-muted font-mono">
-                          {s.visits.toLocaleString()} · {pct}%
-                        </span>
-                      </div>
-                      <div className="h-2 rounded-full bg-surface-canvas overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-cyan-400/80 transition-all"
-                          style={{ width: `${(s.visits / trafficMax) * 100}%` }}
-                        />
-                      </div>
-                      <p className="text-[9px] text-retro-muted font-mono">
-                        First seen {s.first_seen} · Last seen {s.last_seen}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

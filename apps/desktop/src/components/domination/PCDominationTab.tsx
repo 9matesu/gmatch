@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   Monitor,
   Shield,
@@ -12,14 +12,15 @@ import {
   Paintbrush,
   Gamepad2,
   AlertTriangle,
-  CheckCircle2,
-  Settings as SettingsIcon,
   Send,
   Loader2,
-  UserCheck,
   Target,
   History,
   ShieldAlert,
+  RefreshCw,
+  WifiOff,
+  Inbox,
+  Radio,
 } from 'lucide-react';
 import { orbitFetch } from '../../utils/api';
 import { useSettings } from '../../hooks/useSettings';
@@ -48,20 +49,43 @@ interface Props {
 interface DominationTarget {
   id: string;
   displayName: string;
-  pfpUrl?: string;
+  pfpUrl?: string | null;
   enabled: boolean;
+  online?: boolean;
+  last_seen?: string | null;
   consents?: Record<string, boolean>;
 }
 
-const ACTION_LABELS: Record<string, { label: string; icon: React.ComponentType<{ className?: string }>; description: string }> = {
-  wallpaper: { label: 'Wallpaper', icon: Paintbrush, description: 'Replaces their desktop background until they undo it' },
-  game_bg: { label: 'Game background', icon: Gamepad2, description: 'Covers the app behind your image or clip' },
-  popup_video: { label: 'Video', icon: Volume2, description: 'Full-screen clip on their side, starts muted' },
-  message: { label: 'Message', icon: AlertTriangle, description: 'A short note shown on their screen' },
-  text_overlay: { label: 'Banner text', icon: Layers, description: 'Large text sitting on their screen for a moment' },
-  blur: { label: 'Blur', icon: Eye, description: 'Blurs their whole view until it ends' },
-  camera: { label: 'Photo request', icon: Camera, description: 'Asks their camera for one photo, they approve each time' },
-} as const;
+/** Every consent key the server stores. Presets spread over this base so a
+ * preset tap can never silently drop keys (PUT replaces the whole map). */
+export const CONSENT_KEYS = [
+  'allowDesktopBackgroundChange',
+  'allowGameBackgroundChange',
+  'allowPopupVideo',
+  'allowPopupMessage',
+  'allowTextOverlay',
+  'allowBlurEverything',
+  'allowRemoteCamera',
+  'allowPublicCamera',
+  'allowHacks',
+] as const;
+
+const ACTION_LABELS: Record<string, {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  description: string;
+  consent: string;
+}> = {
+  wallpaper: { label: 'Wallpaper', icon: Paintbrush, description: 'Swaps their desktop background for a while.', consent: 'allowDesktopBackgroundChange' },
+  game_bg: { label: 'Game background', icon: Gamepad2, description: 'Covers the app behind them with your image or clip.', consent: 'allowGameBackgroundChange' },
+  popup_video: { label: 'Video popup', icon: Volume2, description: 'Full-screen clip on their side. Always starts muted.', consent: 'allowPopupVideo' },
+  message: { label: 'Message', icon: AlertTriangle, description: 'A short note pops on their screen.', consent: 'allowPopupMessage' },
+  text_overlay: { label: 'Banner text', icon: Layers, description: 'Large text sitting over their screen.', consent: 'allowTextOverlay' },
+  blur: { label: 'Blur', icon: Eye, description: 'Blurs their whole view until they dismiss it.', consent: 'allowBlurEverything' },
+  camera: { label: 'Photo request', icon: Camera, description: 'Asks their camera for one photo — they approve every request.', consent: 'allowRemoteCamera' },
+};
+
+const ACTION_ORDER = Object.keys(ACTION_LABELS);
 
 export const INTENSITY_PRESETS: Record<string, Record<string, boolean>> = {
   mild: {
@@ -96,147 +120,195 @@ export const INTENSITY_PRESETS: Record<string, Record<string, boolean>> = {
   },
 };
 
-export function PCDominationTab({ identity, users, allUsers, profilePics, points, toast: toastFn, activeHack, setActiveHack, onOpenFlash }: Props) {
+const CONSENT_ROWS: Array<{ key: string; label: string; desc: string }> = [
+  { key: 'allowDesktopBackgroundChange', label: 'Wallpaper', desc: 'Others may replace your desktop background.' },
+  { key: 'allowGameBackgroundChange', label: 'Game background', desc: 'Others may cover the app behind you.' },
+  { key: 'allowPopupVideo', label: 'Video popup', desc: 'Full-screen clip (muted, dismissible) may appear.' },
+  { key: 'allowPopupMessage', label: 'Message', desc: 'A short note may pop on your screen.' },
+  { key: 'allowTextOverlay', label: 'Banner text', desc: 'Large text may sit over your screen.' },
+  { key: 'allowBlurEverything', label: 'Blur', desc: 'Your whole view may blur for a moment.' },
+  { key: 'allowRemoteCamera', label: 'Camera request', desc: 'Others may ask for one photo. You approve every request.' },
+  { key: 'allowPublicCamera', label: 'Public photos', desc: 'Camera photos may be posted publicly. Off: they go only to the sender.' },
+  { key: 'allowHacks', label: 'Hacks', desc: 'Purchased hacks (screen lock, vision jam) may land on you.' },
+];
+
+function currentConsentMap(settings: object): Record<string, boolean> {
+  const s = settings as Record<string, unknown>;
+  const map: Record<string, boolean> = {};
+  for (const k of CONSENT_KEYS) map[k] = Boolean(s[k]);
+  return map;
+}
+
+function timeAgo(iso: string | null | undefined): string {
+  if (!iso) return 'unknown';
+  const ms = Date.now() - Date.parse(iso);
+  if (!Number.isFinite(ms) || ms < 0) return 'just now';
+  const m = Math.floor(ms / 60_000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+/** Human one-liner for a stored payload, instead of raw JSON. */
+function payloadSummary(action: string, payload: any): string {
+  if (!payload || typeof payload !== 'object') return '';
+  if (payload.text) return `"${String(payload.text).slice(0, 80)}"`;
+  if (payload.url) {
+    try {
+      const u = new URL(payload.url, 'http://x');
+      const file = u.pathname.split('/').pop() || 'media';
+      return `media: ${file.slice(0, 48)}`;
+    } catch {
+      return 'media';
+    }
+  }
+  if (action === 'blur' && payload.intensity != null) return `intensity ${payload.intensity}`;
+  if (action === 'camera') return payload.isPublic ? 'public photo request' : 'private photo request';
+  return '';
+}
+
+type LoadState = 'idle' | 'loading' | 'ready' | 'error';
+
+export function PCDominationTab({ identity, allUsers, profilePics, points, toast: toastFn, activeHack, setActiveHack, onOpenFlash }: Props) {
   const { settings, update } = useSettings();
-  const [activeTab, setActiveTab] = useState<'consent' | 'control' | 'history' | 'hacks'>('control');
+  const [activeTab, setActiveTab] = useState<'send' | 'consent' | 'history' | 'hacks'>('send');
   const [targets, setTargets] = useState<DominationTarget[]>([]);
+  const [targetsState, setTargetsState] = useState<LoadState>('idle');
   const [selectedTarget, setSelectedTarget] = useState<DominationTarget | null>(null);
+  const [search, setSearch] = useState('');
   const [sending, setSending] = useState<string | null>(null);
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [history, setHistory] = useState<any[]>([]);
   const [outgoing, setOutgoing] = useState<any[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const [toast, setToast] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const [historyState, setHistoryState] = useState<LoadState>('idle');
+  const [historyPane, setHistoryPane] = useState<'incoming' | 'outgoing'>('outgoing');
   const [actionModal, setActionModal] = useState<{ action: string; title: string } | null>(null);
 
-  const syncSettingsToServer = useCallback(async (enabled: boolean, consentMap: Record<string, any>) => {
-    if (!identity) return;
-    try {
-      await orbitFetch('/api/domination/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          enabled,
-          settings: consentMap,
-        }),
-      }, identity);
-    } catch {}
-  }, [identity]);
+  const receiving = Boolean(settings.pcDominationEnabled);
+  const mutedUntil = settings.dominationInboundMutedUntil || 0;
+  const paused = mutedUntil > Date.now();
 
-  const loadServerTargets = useCallback(async () => {
+  // ── data loading (explicit state + retry, no silent catch) ────────────
+  const loadTargets = useCallback(async () => {
     if (!identity) return;
+    setTargetsState('loading');
     try {
-      const [targetsRes, settingsRes] = await Promise.all([
+      const [targetsRes, settingsRes, pricesRes] = await Promise.all([
         orbitFetch('/api/domination/targets', {}, identity),
         orbitFetch('/api/domination/settings', {}, identity),
+        orbitFetch('/api/domination/prices', {}, identity),
       ]);
-      orbitFetch('/api/domination/prices', {}, identity).then(async (r) => {
-        if (r.ok) { const d = await r.json(); if (d?.prices) setPrices(d.prices) }
-      }).catch(() => {});
-      if (targetsRes.ok) {
-        const data = await targetsRes.json();
-        const rawList = Array.isArray(data.targets) ? data.targets : [];
-        // Defensive: never surface blank / "Unknown" placeholder players in the
-        // picker even if a node still returns them (plan §8).
-        const list = rawList.filter((t: DominationTarget) => {
-          const name = (t.displayName || '').trim();
-          return Boolean(name) && !isDefaultPeerName(name);
-        });
-        setTargets(list);
-        if (list.length > 0) {
-          setSelectedTarget((prev) => {
-            if (!prev) return list[0];
-            const updated = list.find((t: DominationTarget) => t.id === prev.id);
-            return updated || list[0];
-          });
-        }
+      if (!targetsRes.ok) throw new Error(`targets ${targetsRes.status}`);
+      const data = await targetsRes.json();
+      const rawList = Array.isArray(data.targets) ? data.targets : [];
+      const list: DominationTarget[] = rawList.filter((t: DominationTarget) => {
+        const name = (t.displayName || '').trim();
+        return Boolean(name) && !isDefaultPeerName(name);
+      });
+      setTargets(list);
+      setSelectedTarget((prev) => {
+        if (!prev) return list[0] || null;
+        return list.find((t) => t.id === prev.id) || list[0] || null;
+      });
+      if (pricesRes.ok) {
+        const d = await pricesRes.json().catch(() => null);
+        if (d?.prices) setPrices(d.prices);
       }
       if (settingsRes.ok) {
-        const serverConfig = await settingsRes.json();
+        const serverConfig = await settingsRes.json().catch(() => null);
         if (typeof serverConfig?.enabled === 'boolean' && serverConfig.enabled !== settings.pcDominationEnabled) {
           update('pcDominationEnabled', serverConfig.enabled);
         }
       }
-    } catch {}
+      setTargetsState('ready');
+    } catch {
+      setTargetsState('error');
+    }
   }, [identity, settings.pcDominationEnabled, update]);
 
   useEffect(() => {
-    loadServerTargets();
-  }, [loadServerTargets]);
+    loadTargets();
+  }, [identity]);
 
-  const handleUpdateConsent = (key: string, value: boolean) => {
-    update(key as any, value);
-    const updatedSettings = {
-      allowDesktopBackgroundChange: key === 'allowDesktopBackgroundChange' ? value : settings.allowDesktopBackgroundChange,
-      allowGameBackgroundChange: key === 'allowGameBackgroundChange' ? value : settings.allowGameBackgroundChange,
-      allowPopupVideo: key === 'allowPopupVideo' ? value : settings.allowPopupVideo,
-      allowPopupMessage: key === 'allowPopupMessage' ? value : settings.allowPopupMessage,
-      allowTextOverlay: key === 'allowTextOverlay' ? value : settings.allowTextOverlay,
-      allowBlurEverything: key === 'allowBlurEverything' ? value : settings.allowBlurEverything,
-      allowRemoteCamera: key === 'allowRemoteCamera' ? value : settings.allowRemoteCamera,
-      allowPublicCamera: key === 'allowPublicCamera' ? value : settings.allowPublicCamera,
-      allowHacks: key === 'allowHacks' ? value : settings.allowHacks,
-    };
-    void syncSettingsToServer(settings.pcDominationEnabled, updatedSettings);
-  };
-
-  const handleUpdateMaster = (enabled: boolean) => {
-    update('pcDominationEnabled', enabled);
-    const currentConsents = {
-      allowDesktopBackgroundChange: settings.allowDesktopBackgroundChange,
-      allowGameBackgroundChange: settings.allowGameBackgroundChange,
-      allowPopupVideo: settings.allowPopupVideo,
-      allowPopupMessage: settings.allowPopupMessage,
-      allowTextOverlay: settings.allowTextOverlay,
-      allowBlurEverything: settings.allowBlurEverything,
-      allowRemoteCamera: settings.allowRemoteCamera,
-      allowPublicCamera: settings.allowPublicCamera,
-      allowHacks: settings.allowHacks,
-    };
-    void syncSettingsToServer(enabled, currentConsents);
-  };
+  // Light auto-refresh so the online dots don't go stale while you browse.
+  useEffect(() => {
+    if (!identity || activeTab !== 'send') return;
+    const t = window.setInterval(() => {
+      if (!document.hidden) void loadTargets();
+    }, 60_000);
+    return () => window.clearInterval(t);
+  }, [identity, activeTab, loadTargets]);
 
   const loadHistory = useCallback(async () => {
     if (!identity) return;
-    setLoadingHistory(true);
+    setHistoryState('loading');
     try {
       const [inRes, outRes] = await Promise.all([
         orbitFetch('/api/domination/history?limit=100', {}, identity),
         orbitFetch('/api/domination/outgoing?limit=100', {}, identity),
       ]);
-      if (inRes.ok) {
-        const data = await inRes.json();
-        setHistory(data.actions || []);
-      }
-      if (outRes.ok) {
-        const data = await outRes.json();
-        setOutgoing(data.actions || []);
-      }
-    } catch {}
-    setLoadingHistory(false);
+      if (!inRes.ok || !outRes.ok) throw new Error('history fetch');
+      setHistory(((await inRes.json()).actions) || []);
+      setOutgoing(((await outRes.json()).actions) || []);
+      setHistoryState('ready');
+    } catch {
+      setHistoryState('error');
+    }
   }, [identity]);
 
   useEffect(() => {
-    if (activeTab === 'history') {
-      loadHistory();
-    }
-  }, [activeTab, loadHistory]);
+    if (activeTab === 'history' && historyState === 'idle') void loadHistory();
+  }, [activeTab, historyState, loadHistory]);
 
-  const showToast = (type: 'success' | 'error' | 'info', message: string) => {
-    setToast({ type, message });
-    setTimeout(() => setToast(null), 3000);
+  // ── consent sync (full map, never partial — server replaces the JSON) ──
+  const syncSettingsToServer = useCallback(async (enabled: boolean, consentMap: Record<string, boolean>) => {
+    if (!identity) return;
+    try {
+      await orbitFetch('/api/domination/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled, settings: consentMap }),
+      }, identity);
+    } catch {
+      toastFn('Settings saved locally but did not reach the server. Toggle again to retry.', 'warning');
+    }
+  }, [identity, toastFn]);
+
+  const handleUpdateConsent = (key: string, value: boolean) => {
+    update(key as any, value);
+    const map = currentConsentMap({ ...settings, [key]: value });
+    void syncSettingsToServer(receiving, map);
+  };
+
+  const handleUpdateMaster = (enabled: boolean) => {
+    update('pcDominationEnabled', enabled);
+    void syncSettingsToServer(enabled, currentConsentMap(settings));
   };
 
   const applyIntensityPreset = (preset: 'mild' | 'medium' | 'extreme') => {
-    const newSettings = INTENSITY_PRESETS[preset];
-    Object.entries(newSettings).forEach(([key, value]) => {
-      update(key as any, value);
-    });
+    const newMap = { ...currentConsentMap(settings), ...INTENSITY_PRESETS[preset] };
+    for (const [key, value] of Object.entries(newMap)) {
+      if (key !== 'allowPublicCamera') update(key as any, value);
+    }
     update('dominationIntensity', preset);
-    void syncSettingsToServer(settings.pcDominationEnabled, newSettings);
-    showToast('success', `Applied ${preset} intensity preset`);
+    void syncSettingsToServer(receiving, newMap);
+    toastFn(`Preset applied: ${preset}`, 'success');
   };
 
+  const togglePause = () => {
+    if (paused) {
+      update('dominationInboundMutedUntil', 0);
+      toastFn('Inbound effects resumed.', 'success');
+      return;
+    }
+    update('dominationInboundMutedUntil', Date.now() + 15 * 60_000);
+    window.dispatchEvent(new CustomEvent('gmatch:domination-panic'));
+    toastFn('Paused for 15 minutes. Anything sent to you now is dropped.', 'info');
+  };
+
+  // ── sending ────────────────────────────────────────────────────────────
   const sendAction = async (action: string, payload: any) => {
     if (!identity || !selectedTarget) return;
     setSending(action);
@@ -251,570 +323,489 @@ export function PCDominationTab({ identity, users, allUsers, profilePics, points
           intensity: settings.dominationIntensity,
         }),
       }, identity);
+      const label = ACTION_LABELS[action]?.label || action;
       if (res.ok) {
-        const data = await res.json().catch(() => ({} as any));
+        const data = await res.json().catch(() => ({}) as any);
         const cost = typeof data?.cost === 'number' ? data.cost : prices[action];
         const payout = typeof data?.victimReward === 'number' ? data.victimReward : 0;
-        // When neither the response nor /prices gave a number, drop the cost
-        // clause rather than render '-undefined g$'.
-        const money =
-          typeof cost === 'number' && payout > 0
-            ? ` — -${cost} g$ (target earned +${payout} g$)`
-            : typeof cost === 'number'
-              ? ` — -${cost} g$`
-              : '';
-        showToast('success', `${ACTION_LABELS[action]?.label || action} sent to ${selectedTarget.displayName}${money}`);
+        const money = typeof cost === 'number' ? ` · -${cost} g$${payout > 0 ? `, they earned +${payout}` : ''}` : '';
+        toastFn(`${label} sent to ${selectedTarget.displayName}${money}. Landed status shows in Outbox.`, 'success');
+        void loadHistory();
       } else {
-        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
-        showToast('error', err.error || 'Failed to send action');
+        const err = await res.json().catch(() => ({ error: '' }));
+        const msg = String(err?.error || '');
+        if (res.status === 402) {
+          toastFn(msg || `Not enough g$ for ${label}.`, 'error');
+        } else if (res.status === 409) {
+          toastFn(`${selectedTarget.displayName} just went offline — nothing was charged. Pick someone online.`, 'warning');
+          void loadTargets();
+        } else if (res.status === 403) {
+          toastFn(msg || `${selectedTarget.displayName} has that effect turned off.`, 'warning');
+        } else if (res.status === 429) {
+          toastFn(msg || 'Slow down — that one was just sent.', 'warning');
+        } else {
+          toastFn(msg || `Could not send ${label}.`, 'error');
+        }
       }
     } catch {
-      showToast('error', 'Network error');
+      // We do NOT know if the server processed it. Blind retry could double
+      // charge — point the user at the authoritative Outbox instead.
+      toastFn('Connection dropped before the server answered. Check Outbox before sending again — you may already have been charged.', 'warning');
+      void loadHistory();
     } finally {
       setSending(null);
     }
   };
 
-  const handleOpenActionModal = (action: string) => {
-    const meta = ACTION_LABELS[action];
-    setActionModal({ action, title: meta?.label || action });
-  };
-
   const handleModalSubmit = async (payload: any) => {
     if (!actionModal) return;
-    await sendAction(actionModal.action, payload);
     setActionModal(null);
+    await sendAction(actionModal.action, payload);
   };
 
+  // ── derived ────────────────────────────────────────────────────────────
+  const onlineCount = useMemo(() => targets.filter((t) => t.enabled && t.online).length, [targets]);
+  const filteredTargets = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const list = q
+      ? targets.filter((t) => t.displayName.toLowerCase().includes(q))
+      : targets;
+    return [...list].sort((a, b) => {
+      const rank = (t: DominationTarget) => (t.enabled && t.online ? 0 : t.enabled ? 1 : 2);
+      return rank(a) - rank(b) || a.displayName.localeCompare(b.displayName);
+    });
+  }, [targets, search]);
+
+  const consentCountOf = (t: DominationTarget) =>
+    ACTION_ORDER.filter((a) => Boolean(t.consents?.[ACTION_LABELS[a].consent])).length;
+
+  // ── unauthenticated shell ─────────────────────────────────────────────
   if (!identity) {
     return (
-      <div className="w-full max-w-4xl mx-auto px-4 py-12 flex flex-col items-center justify-center text-center">
-        <div className="w-16 h-16 rounded-3xl glass-panel border border-border-glass flex items-center justify-center mb-4 text-purple-400">
-          <Monitor className="w-8 h-8" />
+      <div className="w-full max-w-3xl mx-auto px-4 py-16 flex flex-col items-center text-center">
+        <div className="w-12 h-12 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-4">
+          <Monitor className="w-6 h-6 text-zinc-400" />
         </div>
-        <h2 className="text-lg font-black text-retro-fg uppercase tracking-wider mb-2">PC Domination</h2>
-        <p className="text-xs text-retro-muted max-w-md leading-relaxed">
-          Log in to use Domination. Turn it on under Consent to receive effects, or send to players who have.
+        <h2 className="text-base font-semibold tracking-tight">PC Domination</h2>
+        <p className="text-sm text-zinc-500 mt-2 max-w-md leading-relaxed">
+          Log in to use Domination. Switch on <span className="text-zinc-300">Receive</span> to let opted-in
+          effects land on your screen, or send effects to players who have.
         </p>
       </div>
     );
   }
 
-  const consentSettings = [
-    { key: 'allowDesktopBackgroundChange', label: 'Wallpaper', desc: 'Can replace your desktop background' },
-    { key: 'allowGameBackgroundChange', label: 'Game background', desc: 'Can cover the app behind your image or clip' },
-    { key: 'allowPopupVideo', label: 'Video', desc: 'Can show a full-screen clip (starts muted, you can dismiss)' },
-    { key: 'allowPopupMessage', label: 'Message', desc: 'Can show a short note on your screen' },
-    { key: 'allowTextOverlay', label: 'Banner text', desc: 'Can put large text over your screen' },
-    { key: 'allowBlurEverything', label: 'Blur', desc: 'Can blur your whole view for a moment' },
-    { key: 'allowRemoteCamera', label: 'Camera', desc: 'Can ask your camera for one photo. You approve every request.' },
-    { key: 'allowPublicCamera', label: 'Public photos', desc: 'Camera photos may be posted publicly. Off: they go only to the sender.' },
-    { key: 'allowHacks', label: 'Hacks', desc: 'Purchased hacks (screen lock, vision jam) can land on you. Off: nothing does.' },
-  ];
+  const tabBtn = (id: typeof activeTab, label: string, Icon: React.ComponentType<{ className?: string }>) => (
+    <button
+      type="button"
+      onClick={() => setActiveTab(id)}
+      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+        activeTab === id ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
+      }`}
+    >
+      <Icon className="w-3.5 h-3.5" />
+      {label}
+    </button>
+  );
+
+  const statusChip = (t: DominationTarget) => {
+    if (!t.enabled) return { text: 'blocked', cls: 'text-zinc-500 border-zinc-800' };
+    if (t.online) return { text: 'online', cls: 'text-emerald-400 border-emerald-500/30' };
+    return { text: `seen ${timeAgo(t.last_seen)}`, cls: 'text-amber-400/80 border-amber-500/20' };
+  };
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6 flex flex-col gap-4 font-sans select-none text-retro-fg pb-24 lg:pb-16 animate-orbit-fade-in">
-      {/* Centered Master Glass Container */}
-      <div className="module module-primary module-glass glass-surface rounded-3xl overflow-hidden border border-border-glass shadow-2xl flex flex-col">
-        {/* Header Bar with Gradient Accent */}
-        <div className="p-4 sm:p-6 border-b border-border-glass flex flex-wrap items-center justify-between gap-4 bg-surface-canvas/40 backdrop-blur-md">
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-500/20 via-indigo-500/20 to-purple-600/30 border border-purple-500/30 flex items-center justify-center shadow-md">
-              <Monitor className="w-5 h-5 text-purple-300" />
-            </div>
-            <div>
-              <h1 className="text-base sm:text-lg font-black tracking-tight text-retro-fg">Domination</h1>
-              <p className="text-xs text-retro-muted">Send short visual effects to players who opted in &mdash; and control what you allow on your own screen</p>
-            </div>
+    <div className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-6 flex flex-col gap-5 font-sans select-none pb-24 lg:pb-16">
+      {/* Header */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+            <Monitor className="w-4 h-4 text-zinc-400" />
+            PC Domination
+          </h1>
+          <p className="text-sm text-zinc-500 mt-1 max-w-xl leading-relaxed">
+            Playful screen pranks between friends who opted in. Every effect costs g$, needs the
+            target's consent, and shows up in their history. Nothing lands without a switch you control.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2">
+          <Radio className={`w-3.5 h-3.5 ${receiving && !paused ? 'text-emerald-400' : 'text-zinc-600'}`} />
+          <div className="text-xs leading-tight">
+            <div className="font-medium">{receiving ? (paused ? 'Receiving — paused' : 'Receiving effects') : 'Not receiving'}</div>
+            <div className="text-zinc-500">Sending is always available</div>
           </div>
-
-          {/* Master Enable Switch */}
-          <div className="flex items-center gap-3 p-1.5 px-3.5 rounded-2xl glass-panel border border-border-glass bg-surface-interactive/60">
-            <label className="flex items-center gap-2.5 text-xs font-bold cursor-pointer text-retro-fg">
-              <input
-                type="checkbox"
-                checked={settings.pcDominationEnabled}
-                onChange={(e) => handleUpdateMaster(e.target.checked)}
-                className="w-4 h-4 accent-purple-500 rounded cursor-pointer"
-              />
-              <span>Allow effects from others</span>
-            </label>
-            {(() => {
-              const mutedUntil = settings.dominationInboundMutedUntil || 0;
-              const muted = mutedUntil > Date.now();
-              return (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (muted) {
-                      update('dominationInboundMutedUntil', 0);
-                      showToast('success', 'Inbound effects resumed');
-                      return;
-                    }
-                    update('dominationInboundMutedUntil', Date.now() + 15 * 60_000);
-                    window.dispatchEvent(new CustomEvent('gmatch:domination-panic'));
-                    showToast('info', 'Paused for 15 minutes. Anything sent now is dropped.');
-                  }}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border cursor-pointer transition-colors ${
-                    muted
-                      ? 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10'
-                      : 'border-border-glass text-retro-muted hover:text-retro-fg'
-                  }`}
-                >
-                  {muted ? 'Paused \u2014 resume now' : 'Pause 15 min'}
-                </button>
-              );
-            })()}
-            <span
-              className={`w-2.5 h-2.5 rounded-full ${
-                settings.pcDominationEnabled ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]' : 'bg-zinc-600'
+          <button
+            type="button"
+            role="switch"
+            aria-checked={receiving}
+            onClick={() => handleUpdateMaster(!receiving)}
+            className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer ml-1 ${receiving ? 'bg-emerald-500' : 'bg-zinc-700'}`}
+          >
+            <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${receiving ? 'left-4' : 'left-0.5'}`} />
+          </button>
+          {receiving && (
+            <button
+              type="button"
+              onClick={togglePause}
+              className={`ml-1 px-2 py-1 rounded-md text-[11px] font-medium border cursor-pointer transition-colors ${
+                paused ? 'border-emerald-500/30 text-emerald-400' : 'border-zinc-800 text-zinc-500 hover:text-zinc-300'
               }`}
-            />
-          </div>
-        </div>
-
-        {/* Tab Selection Navigation */}
-        <div className="flex items-center gap-2 px-4 sm:px-6 py-2.5 border-b border-border-glass bg-surface-raised/40 overflow-x-auto styled-scrollbar">
-          {[
-            { id: 'control', label: 'Send Commands', icon: Send },
-            { id: 'consent', label: 'Consent & Presets', icon: Shield },
-            { id: 'history', label: 'Action History', icon: History },
-            { id: 'hacks', label: 'Hacks', icon: ShieldAlert },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`glass-tab px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
-                  isActive ? 'glass-tab-active' : ''
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Module Content Body with Generous Gaps */}
-        <div className="p-4 sm:p-7 space-y-6">
-          {/* TAB 1: SEND COMMANDS */}
-          {activeTab === 'control' && (
-            <div className="space-y-6">
-              {/* Target Selection Card */}
-              <div className="glass-panel p-5 rounded-2xl border border-border-glass bg-surface-raised/40 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Target className="w-4 h-4 text-purple-400" />
-                    <h3 className="text-xs font-black uppercase tracking-wider text-retro-fg">Pick someone</h3>
-                  </div>
-                  <span className="text-[10px] text-retro-muted font-mono">{targets.length} available</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                  <div>
-                    <label className="block text-[11px] font-bold text-retro-muted mb-1.5">Target Player</label>
-                    <select
-                      value={selectedTarget?.id || ''}
-                      onChange={(e) => {
-                        const target = targets.find((t) => t.id === e.target.value);
-                        setSelectedTarget(target || null);
-                      }}
-                      className="w-full bg-surface-interactive border border-border-glass rounded-xl px-3.5 py-2.5 text-xs text-retro-fg outline-none focus:border-retro-accent transition-colors"
-                      disabled={targets.length === 0}
-                    >
-                      <option value="">Select a player...</option>
-                      {targets.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.displayName} {t.enabled ? '\u00b7 on' : '\u00b7 off'}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {selectedTarget ? (
-                    <div className="flex items-center gap-3 p-2.5 rounded-xl bg-surface-canvas/60 border border-border-glass">
-                      {selectedTarget.pfpUrl ? (
-                        <img src={selectedTarget.pfpUrl} alt="" className="w-9 h-9 rounded-full object-cover border border-border-glass" />
-                      ) : (
-                        <div className="w-9 h-9 rounded-full bg-surface-interactive flex items-center justify-center text-xs font-black text-retro-fg">
-                          {selectedTarget.displayName.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs font-bold text-retro-fg truncate">{selectedTarget.displayName}</div>
-                        <div className="text-[10px] flex items-center gap-1.5 mt-0.5">
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${
-                              selectedTarget.enabled ? 'bg-emerald-400 shadow-xs' : 'bg-zinc-600'
-                            }`}
-                          />
-                          <span className={selectedTarget.enabled ? 'text-emerald-400 font-semibold' : 'text-retro-muted'}>
-                            {selectedTarget.enabled ? 'Receives effects' : 'Blocked'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-3 rounded-xl border border-dashed border-border-glass text-center text-xs text-retro-muted">
-                      No target selected
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Action Buttons Grid */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-amber-400" />
-                  <h3 className="text-xs font-black uppercase tracking-wider text-retro-fg">Effects</h3>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {Object.entries(ACTION_LABELS).map(([action, { label, icon: Icon, description }]) => {
-                    const isConsented = Boolean(selectedTarget?.consents?.[`allow${action === 'wallpaper' ? 'DesktopBackgroundChange' : action === 'game_bg' ? 'GameBackgroundChange' : action === 'popup_video' ? 'PopupVideo' : action === 'message' ? 'PopupMessage' : action === 'text_overlay' ? 'TextOverlay' : action === 'blur' ? 'BlurEverything' : 'RemoteCamera'}`]);
-                    const canSend = Boolean(selectedTarget && selectedTarget.enabled && settings.pcDominationEnabled);
-
-                    return (
-                      <button
-                        key={action}
-                        type="button"
-                        onClick={() => handleOpenActionModal(action)}
-                        disabled={!canSend || sending === action}
-                        className={`p-4 rounded-2xl border transition-all text-left group relative flex flex-col justify-between min-h-[105px] cursor-pointer ${
-                          sending === action
-                            ? 'border-purple-500 bg-purple-500/10'
-                            : isConsented && canSend
-                            ? 'glass-panel border-border-glass hover:border-purple-400/60 hover:shadow-lg hover:translate-y-[-1px]'
-                            : 'glass-panel border-border-glass/40 opacity-50 cursor-not-allowed'
-                        }`}
-                      >
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="w-7 h-7 rounded-lg bg-surface-interactive flex items-center justify-center text-retro-muted group-hover:text-purple-300 transition-colors">
-                              <Icon className="w-4 h-4" />
-                            </div>
-                            {isConsented ? (
-                              <span className="text-[9px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
-                                Ready
-                              </span>
-                            ) : (
-                              <span className="text-[9px] font-mono text-retro-muted bg-surface-interactive px-1.5 py-0.5 rounded">
-                                No Consent
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs font-bold text-retro-fg leading-tight">{label}</div>
-                          <div className="text-[10px] text-retro-muted mt-1 leading-snug">{description}</div>
-                          {prices[action] != null && (
-                            <div className="text-[10px] font-mono font-bold text-amber-300 mt-1.5">{prices[action]} g$</div>
-                          )}
-                        </div>
-
-                        {sending === action && (
-                          <div className="absolute inset-0 bg-black/60 backdrop-blur-xs rounded-2xl flex items-center justify-center">
-                            <Loader2 className="w-5 h-5 animate-spin text-purple-400" />
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Target Consent Inspection */}
-              {selectedTarget && (
-                <div className="glass-panel p-5 rounded-2xl border border-border-glass bg-surface-canvas/40 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <UserCheck className="w-4 h-4 text-emerald-400" />
-                    <h4 className="text-xs font-black uppercase tracking-wider text-retro-fg">
-                      {selectedTarget.displayName} allows
-                    </h4>
-                  </div>
-                  <p className="text-[11px] text-retro-muted leading-relaxed">
-                    Actions require the target player to have explicit consent enabled in their settings.
-                  </p>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-                    {consentSettings.map(({ key, label }) => {
-                      const hasConsent = Boolean(selectedTarget.consents?.[key]);
-                      return (
-                        <div
-                          key={key}
-                          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] border font-medium ${
-                            hasConsent
-                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                              : 'bg-surface-interactive border-border-glass text-retro-muted opacity-60'
-                          }`}
-                        >
-                          <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${hasConsent ? 'text-emerald-400' : 'text-zinc-600'}`} />
-                          <span className="truncate">{label}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 2: CONSENT & PRESETS */}
-          {activeTab === 'consent' && (
-            <div className="space-y-6">
-              {/* Intensity Presets Card */}
-              <div className="glass-panel p-5 sm:p-6 rounded-2xl border border-border-glass bg-surface-raised/40 space-y-4">
-                <div className="flex items-center gap-2">
-                  <SettingsIcon className="w-4 h-4 text-cyan-400" />
-                  <h3 className="text-xs font-black uppercase tracking-wider text-retro-fg">Presets</h3>
-                </div>
-                <p className="text-xs text-retro-muted leading-relaxed">
-                  One-tap starting points for the toggles below. Everything stays opt-in.
-                </p>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {(['mild', 'medium', 'extreme'] as const).map((preset) => {
-                    const isSelected = settings.dominationIntensity === preset;
-                    return (
-                      <button
-                        key={preset}
-                        type="button"
-                        onClick={() => applyIntensityPreset(preset)}
-                        disabled={!settings.pcDominationEnabled}
-                        className={`p-4 rounded-2xl border transition-all text-left cursor-pointer flex flex-col justify-between ${
-                          isSelected
-                            ? 'border-purple-400 bg-purple-500/15 shadow-md'
-                            : 'glass-panel border-border-glass hover:border-retro-fg/40 disabled:opacity-40'
-                        }`}
-                      >
-                        <div>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-xs font-black uppercase tracking-wider text-retro-fg">{preset}</span>
-                            {isSelected && (
-                              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-purple-400 text-black">
-                                ACTIVE
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-retro-muted leading-snug">
-                            {preset === 'mild' && 'Wallpaper, messages, text overlays only.'}
-                            {preset === 'medium' && 'Wallpaper, game canvas, video popup, blur, messages.'}
-                            {preset === 'extreme' && 'All effects including full remote camera snapshot.'}
-                          </p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Granular Consent Checkboxes */}
-              <div className="glass-panel p-5 sm:p-6 rounded-2xl border border-border-glass bg-surface-raised/40 space-y-4">
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-emerald-400" />
-                  <h3 className="text-xs font-black uppercase tracking-wider text-retro-fg">What others can send you</h3>
-                </div>
-                <p className="text-xs text-retro-muted leading-relaxed">
-                  Each effect is separate. Off means nobody can trigger it on your screen, no matter who pays.
-                </p>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {consentSettings.map(({ key, label, desc }) => {
-                    const value = Boolean(settings[key as keyof typeof settings]);
-                    return (
-                      <label
-                        key={key}
-                        className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
-                          value && settings.pcDominationEnabled
-                            ? 'bg-purple-500/10 border-purple-500/30'
-                            : 'bg-surface-interactive/60 border-border-glass'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={value}
-                          onChange={(e) => handleUpdateConsent(key, e.target.checked)}
-                          disabled={!settings.pcDominationEnabled}
-                          className="mt-1 w-4 h-4 accent-purple-500 rounded cursor-pointer shrink-0"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xs font-bold text-retro-fg">{label}</div>
-                          <div className="text-[11px] text-retro-muted leading-tight mt-0.5">{desc}</div>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: ACTION HISTORY */}
-          {activeTab === 'history' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <History className="w-4 h-4 text-cyan-400" />
-                  <h3 className="text-xs font-black uppercase tracking-wider text-retro-fg">Recent Actions</h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={loadHistory}
-                  disabled={loadingHistory}
-                  className="px-3 py-1.5 text-xs font-bold text-retro-fg bg-surface-interactive border border-border-glass rounded-xl hover:bg-surface-raised transition-colors cursor-pointer flex items-center gap-1.5"
-                >
-                  <Loader2 className={`w-3 h-3 ${loadingHistory ? 'animate-spin' : ''}`} />
-                  <span>Refresh</span>
-                </button>
-              </div>
-
-              {history.length === 0 ? (
-                <div className="text-center py-12 glass-panel border border-border-glass rounded-2xl space-y-2">
-                  <Monitor className="w-8 h-8 mx-auto text-retro-muted opacity-40" />
-                  <p className="text-xs font-bold text-retro-muted">Nothing so far</p>
-                </div>
-              ) : (
-                <div className="space-y-2.5">
-                  {history.map((action: any) => {
-                    const actionMeta = ACTION_LABELS[action.action];
-                    const Icon = actionMeta?.icon || Monitor;
-                    return (
-                      <div key={action.id} className="glass-panel p-4 rounded-2xl border border-border-glass bg-surface-raised/40 space-y-2">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
-                              <Icon className="w-4 h-4" />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-xs font-bold text-retro-fg capitalize truncate">
-                                {actionMeta?.label || action.action}
-                              </div>
-                              <div className="text-[10px] text-retro-muted truncate">
-                                {action.dominator_name ? `From ${action.dominator_name}` : 'Triggered'}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="text-right shrink-0">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
-                                action.status === 'executed' || action.status === 'sent'
-                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                  : action.status === 'denied'
-                                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                  : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                              }`}
-                            >
-                              {action.status}
-                            </span>
-                            <div className="text-[9px] font-mono text-retro-muted mt-1">
-                              {new Date(action.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </div>
-                          </div>
-                        </div>
-
-                        {action.payload && (
-                          <div className="p-2.5 bg-black/40 border border-border-glass rounded-xl text-[10px] font-mono text-retro-muted overflow-x-auto">
-                            {JSON.stringify(action.payload)}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="flex items-center gap-2 pt-2">
-                <Send className="w-4 h-4 text-cyan-400" />
-                <h3 className="text-xs font-black uppercase tracking-wider text-retro-fg">Sent by you</h3>
-              </div>
-              {outgoing.length === 0 ? (
-                <div className="text-center py-8 glass-panel border border-border-glass rounded-2xl">
-                  <p className="text-xs font-bold text-retro-muted">You have not sent anything yet</p>
-                </div>
-              ) : (
-                <div className="space-y-2.5">
-                  {outgoing.map((action: any) => {
-                    const actionMeta = ACTION_LABELS[action.action];
-                    const Icon = actionMeta?.icon || Monitor;
-                    return (
-                      <div key={action.id} className="glass-panel p-4 rounded-2xl border border-border-glass bg-surface-raised/40">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
-                              <Icon className="w-4 h-4" />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-xs font-bold text-retro-fg capitalize truncate">
-                                {actionMeta?.label || action.action}
-                              </div>
-                              <div className="text-[10px] text-retro-muted truncate">
-                                To {action.victim_name || 'unknown'}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
-                                action.status === 'executed' || action.status === 'sent'
-                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                  : action.status === 'denied'
-                                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                  : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                              }`}
-                            >
-                              {action.status}
-                            </span>
-                            <div className="text-[9px] font-mono text-retro-muted mt-1">
-                              {new Date(action.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 4: HACKS (fused cyber-hack arsenal + live spy feed) */}
-          {activeTab === 'hacks' && (
-            <HacksPanel
-              identity={identity}
-              users={allUsers}
-              profilePics={profilePics}
-              points={points}
-              toast={toastFn}
-              activeHack={activeHack}
-              setActiveHack={setActiveHack}
-              onOpenFlash={onOpenFlash}
-              onExitSpy={() => setActiveTab('control')}
-            />
+            >
+              {paused ? 'Resume' : 'Pause 15m'}
+            </button>
           )}
         </div>
       </div>
 
-      {toast && (
-        <div
-          className={`fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl shadow-2xl animate-orbit-slide-up text-xs font-bold border flex items-center gap-2 ${
-            toast.type === 'success'
-              ? 'bg-emerald-950/90 text-emerald-200 border-emerald-500/50'
-              : toast.type === 'error'
-              ? 'bg-rose-950/90 text-rose-200 border-rose-500/50'
-              : 'bg-surface-raised/95 text-retro-fg border-border-glass'
-          }`}
-        >
-          {toast.message}
+      {/* Tabs */}
+      <div className="flex items-center gap-1 border-b border-zinc-800/80 pb-2 overflow-x-auto">
+        {tabBtn('send', 'Send', Send)}
+        {tabBtn('consent', 'My consent', Shield)}
+        {tabBtn('history', 'History', History)}
+        {tabBtn('hacks', 'Hacks', ShieldAlert)}
+      </div>
+
+      {/* ── SEND ── */}
+      {activeTab === 'send' && (
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+          {/* Target column */}
+          <div className="lg:col-span-2 rounded-lg border border-zinc-800 bg-zinc-900/40 flex flex-col overflow-hidden">
+            <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between gap-2">
+              <div className="text-xs font-medium flex items-center gap-1.5">
+                <Target className="w-3.5 h-3.5 text-zinc-400" /> Target
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-mono text-zinc-500">{onlineCount} online</span>
+                <button
+                  type="button"
+                  onClick={() => void loadTargets()}
+                  className="p-1 rounded hover:bg-zinc-800 text-zinc-500 cursor-pointer"
+                  aria-label="Refresh targets"
+                >
+                  <RefreshCw className={`w-3 h-3 ${targetsState === 'loading' ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+            <div className="p-3 border-b border-zinc-800/60">
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search players…"
+                className="w-full bg-zinc-950/60 border border-zinc-800 rounded-md px-3 py-1.5 text-xs outline-none focus:border-zinc-600 placeholder:text-zinc-600"
+              />
+            </div>
+            <div className="max-h-[420px] overflow-y-auto">
+              {targetsState === 'loading' && targets.length === 0 && (
+                <div className="p-6 text-center text-xs text-zinc-500 flex items-center justify-center gap-2">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading players…
+                </div>
+              )}
+              {targetsState === 'error' && (
+                <div className="p-6 text-center space-y-3">
+                  <p className="text-xs text-rose-400">Couldn't load the player list.</p>
+                  <button
+                    type="button"
+                    onClick={() => void loadTargets()}
+                    className="px-3 py-1.5 rounded-md bg-zinc-100 text-zinc-900 text-xs font-semibold hover:bg-white cursor-pointer"
+                  >
+                    Try again
+                  </button>
+                </div>
+              )}
+              {targetsState === 'ready' && filteredTargets.length === 0 && (
+                <div className="p-6 text-center space-y-2">
+                  <WifiOff className="w-5 h-5 mx-auto text-zinc-600" />
+                  <p className="text-xs text-zinc-500">
+                    {search ? 'No player matches that name.' : 'Nobody has Domination switched on yet. Tell friends to enable it in their consent tab.'}
+                  </p>
+                </div>
+              )}
+              {filteredTargets.map((t) => {
+                const chip = statusChip(t);
+                const isSel = selectedTarget?.id === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setSelectedTarget(t)}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left border-b border-zinc-800/40 transition-colors cursor-pointer ${
+                      isSel ? 'bg-zinc-800/60' : 'hover:bg-zinc-800/30'
+                    }`}
+                  >
+                    {t.pfpUrl ? (
+                      <img src={t.pfpUrl} alt="" className="w-7 h-7 rounded-md object-cover border border-zinc-800" />
+                    ) : (
+                      <div className="w-7 h-7 rounded-md bg-zinc-800 flex items-center justify-center text-[11px] font-semibold">
+                        {t.displayName.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-medium truncate">{t.displayName}</div>
+                      <div className="text-[10px] text-zinc-500">{consentCountOf(t)}/7 effects allowed</div>
+                    </div>
+                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.text}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Effects column */}
+          <div className="lg:col-span-3 space-y-3">
+            {!selectedTarget ? (
+              <div className="rounded-lg border border-dashed border-zinc-800 p-10 text-center text-sm text-zinc-500">
+                Pick a target on the left to start.
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-2.5">
+                  <div className="text-xs">
+                    Effects for <span className="font-semibold">{selectedTarget.displayName}</span>
+                    {selectedTarget.enabled && !selectedTarget.online && (
+                      <span className="text-amber-400/80"> · offline, sends will be refused (free)</span>
+                    )}
+                  </div>
+                  <div className="text-xs font-mono text-zinc-500">{points.toLocaleString()} g$</div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {ACTION_ORDER.map((action) => {
+                    const { label, icon: Icon, description, consent } = ACTION_LABELS[action];
+                    const allowed = Boolean(selectedTarget.consents?.[consent]);
+                    const sendable = allowed && Boolean(selectedTarget.enabled) && selectedTarget.online !== false;
+                    const price = prices[action];
+                    return (
+                      <button
+                        key={action}
+                        type="button"
+                        onClick={() => setActionModal({ action, title: label })}
+                        disabled={!sendable || sending === action}
+                        title={
+                          !selectedTarget.enabled ? 'They have Domination switched off'
+                            : !selectedTarget.online ? 'They are offline — nothing would be charged'
+                              : !allowed ? `They have "${label}" turned off in their consent`
+                                : undefined
+                        }
+                        className={`rounded-lg border p-4 text-left transition-colors relative ${
+                          sending === action
+                            ? 'border-zinc-500 bg-zinc-800/60 cursor-wait'
+                            : sendable
+                              ? 'border-zinc-800 bg-zinc-900/40 hover:border-zinc-600 cursor-pointer'
+                              : 'border-zinc-800/50 bg-zinc-900/20 opacity-45 cursor-not-allowed'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <Icon className="w-4 h-4 text-zinc-400" />
+                          {price != null ? (
+                            <span className="text-[11px] font-mono text-zinc-400">{price} g$</span>
+                          ) : (
+                            <Zap className="w-3.5 h-3.5 text-zinc-700" />
+                          )}
+                        </div>
+                        <div className="text-xs font-semibold">{label}</div>
+                        <div className="text-[11px] text-zinc-500 mt-1 leading-snug">{description}</div>
+                        <div className={`mt-2 text-[10px] font-mono ${allowed ? 'text-emerald-400/80' : 'text-zinc-600'}`}>
+                          {sending === action ? 'sending…' : allowed ? 'consented' : 'no consent'}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-zinc-600 leading-relaxed px-1">
+                  Charged only when the server accepts the send. If the connection drops mid-send, check
+                  History → Outbox before retrying.
+                </p>
+              </>
+            )}
+          </div>
         </div>
+      )}
+
+      {/* ── CONSENT ── */}
+      {activeTab === 'consent' && (
+        <div className="space-y-5">
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 space-y-3">
+            <div className="text-xs font-medium flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-zinc-400" /> Preset
+            </div>
+            <p className="text-[11px] text-zinc-500">
+              One-tap starting points for the switches below. Your public-photo setting is never touched.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {(['mild', 'medium', 'extreme'] as const).map((preset) => {
+                const selected = settings.dominationIntensity === preset;
+                return (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => applyIntensityPreset(preset)}
+                    className={`px-3.5 py-1.5 rounded-md text-xs font-medium border capitalize cursor-pointer transition-colors ${
+                      selected ? 'bg-zinc-100 text-zinc-900 border-zinc-100' : 'border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 overflow-hidden">
+            <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-1.5">
+              <Shield className="w-3.5 h-3.5 text-zinc-400" />
+              <span className="text-xs font-medium">What others may send you</span>
+              {!receiving && <span className="text-[10px] text-zinc-600 ml-2">(saved — inactive while Receiving is off)</span>}
+            </div>
+            <div className="divide-y divide-zinc-800/60">
+              {CONSENT_ROWS.map(({ key, label, desc }) => {
+                const value = Boolean((settings as any)[key]);
+                return (
+                  <label key={key} className="flex items-start gap-3 px-4 py-3 hover:bg-zinc-800/20 cursor-pointer transition-colors">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={value}
+                      aria-label={label}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleUpdateConsent(key, !value);
+                      }}
+                      className={`relative w-9 h-5 rounded-full shrink-0 mt-0.5 transition-colors cursor-pointer ${value ? 'bg-emerald-500' : 'bg-zinc-700'}`}
+                    >
+                      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${value ? 'left-4' : 'left-0.5'}`} />
+                    </button>
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium">{label}</div>
+                      <div className="text-[11px] text-zinc-500 leading-snug mt-0.5">{desc}</div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── HISTORY ── */}
+      {activeTab === 'history' && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1">
+              {(['outgoing', 'incoming'] as const).map((pane) => (
+                <button
+                  key={pane}
+                  type="button"
+                  onClick={() => setHistoryPane(pane)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium capitalize cursor-pointer transition-colors ${
+                    historyPane === pane ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  {pane === 'outgoing' ? 'Sent by you' : 'Received'}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadHistory()}
+              disabled={historyState === 'loading'}
+              className="px-2.5 py-1.5 rounded-md text-xs font-medium border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 cursor-pointer flex items-center gap-1.5 transition-colors"
+            >
+              <RefreshCw className={`w-3 h-3 ${historyState === 'loading' ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
+
+          {historyState === 'loading' && history.length === 0 && outgoing.length === 0 && (
+            <div className="py-12 text-center text-xs text-zinc-500 flex items-center justify-center gap-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…
+            </div>
+          )}
+          {historyState === 'error' && (
+            <div className="py-10 text-center space-y-3">
+              <p className="text-xs text-rose-400">Couldn't load history.</p>
+              <button
+                type="button"
+                onClick={() => void loadHistory()}
+                className="px-3 py-1.5 rounded-md bg-zinc-100 text-zinc-900 text-xs font-semibold cursor-pointer"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+          {historyState === 'ready' && (historyPane === 'outgoing' ? outgoing : history).length === 0 && (
+            <div className="py-12 text-center space-y-2 rounded-lg border border-dashed border-zinc-800">
+              <Inbox className="w-5 h-5 mx-auto text-zinc-600" />
+              <p className="text-xs text-zinc-500">
+                {historyPane === 'outgoing' ? 'You have not sent anything yet.' : 'Nothing has landed on your screen yet.'}
+              </p>
+            </div>
+          )}
+          <div className="space-y-2">
+            {(historyPane === 'outgoing' ? outgoing : history).map((action: any) => {
+              const meta = ACTION_LABELS[action.action];
+              const Icon = meta?.icon || Monitor;
+              const st: string = action.status || 'sent';
+              const summary = payloadSummary(action.action, typeof action.payload === 'string' ? (() => { try { return JSON.parse(action.payload); } catch { return null; } })() : action.payload);
+              const other = historyPane === 'outgoing' ? action.victim_name : action.dominator_name;
+              return (
+                <div key={action.id} className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-3">
+                  <Icon className="w-4 h-4 text-zinc-400 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-medium truncate">
+                      {meta?.label || action.action}
+                      {summary && <span className="text-zinc-500 font-normal"> — {summary}</span>}
+                    </div>
+                    <div className="text-[11px] text-zinc-500 truncate">
+                      {historyPane === 'outgoing' ? `to ${other || 'unknown'}` : `from ${other || 'unknown'}`}
+                      {' · '}{new Date(action.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                  <span
+                    className={`shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                      st === 'executed'
+                        ? 'text-emerald-400 border-emerald-500/30'
+                        : st === 'sent'
+                          ? 'text-zinc-400 border-zinc-700'
+                          : 'text-rose-400 border-rose-500/30'
+                    }`}
+                    title={st === 'sent' ? 'Accepted by the server, waiting for their screen to confirm' : st === 'executed' ? 'Confirmed on their screen' : st}
+                  >
+                    {st === 'executed' ? 'landed' : st === 'sent' ? (historyPane === 'outgoing' ? 'awaiting' : 'received') : st}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          {historyPane === 'outgoing' && historyState === 'ready' && outgoing.length > 0 && (
+            <p className="text-[11px] text-zinc-600 px-1">
+              <span className="font-mono">awaiting</span> = charged and relayed; it flips to{' '}
+              <span className="font-mono text-emerald-400/80">landed</span> once their client confirms.
+              Camera requests stay <span className="font-mono">awaiting</span> until they approve the photo.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ── HACKS ── */}
+      {activeTab === 'hacks' && (
+        <HacksPanel
+          identity={identity}
+          users={allUsers}
+          profilePics={profilePics}
+          points={points}
+          toast={toastFn}
+          activeHack={activeHack}
+          setActiveHack={setActiveHack}
+          onOpenFlash={onOpenFlash}
+          onExitSpy={() => setActiveTab('send')}
+        />
       )}
 
       {actionModal && (
         <ActionModal
           action={actionModal.action}
           actionTitle={actionModal.title}
+          targetName={selectedTarget?.displayName}
+          price={prices[actionModal.action]}
           isOpen={Boolean(actionModal)}
           onClose={() => setActionModal(null)}
           onSubmit={handleModalSubmit}

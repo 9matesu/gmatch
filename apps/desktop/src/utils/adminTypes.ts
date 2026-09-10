@@ -186,20 +186,6 @@ export interface AdminLobbyComment {
   image_caption?: string | null;
 }
 
-export interface AdminPrivateMessage {
-  id: string;
-  sender_id: string;
-  recipient_id: string;
-  body: string;
-  created_at: string;
-  deleted_by?: string | null;
-  hidden_at?: string | null;
-  sender_name?: string | null;
-  recipient_name?: string | null;
-  attachment_id?: string | null;
-  attachment_url?: string | null;
-  attachment_mime?: string | null;
-}
 
 export interface AdminPost {
   id: string;
@@ -336,7 +322,6 @@ export type TabId =
   | "announcements"
   | "recommendations"
   | "lobby_comments"
-  | "private_messages"
   | "chat"
   | "cards_economy"
   | "audit_log"
@@ -389,7 +374,6 @@ export interface AdminState {
   announcementsList: Announcement[];
   recommendations: AdminRecommendation[];
   lobbyComments: AdminLobbyComment[];
-  privateMessages: AdminPrivateMessage[];
   chatMessages: AdminChatMessage[];
   adminCards: AdminCard[];
   cardsTotal: number;

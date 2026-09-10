@@ -540,6 +540,29 @@ describe('Admin API — content-report resolution (instant-hide triage)', () => 
     expect(r.reported_is_banned).toBe(false)
   })
 
+  it('GET /api/admin/cases/:id returns the case with disclosed evidence + parties', async () => {
+    const r = await findOpenReport(reportedUser.orbitId)
+    const res = await app.request(`/api/admin/cases/${r.id}`, {
+      headers: authHeaders(adminId, 'GET', `/api/admin/cases/${r.id}`),
+    }, env)
+    expect(res.status).toBe(200)
+    const data: any = await res.json()
+    expect(data.id).toBe(r.id)
+    expect(data.reporter_id).toBe(regularId.orbitId)
+    expect(data.evidence?.id).toBe('report-evidence-obj')
+    expect(data.evidence?.content_path).toBe('/api/objects/report-evidence-obj/content')
+    const log = await env.DB.prepare("SELECT 1 FROM AdminAuditLog WHERE action = 'view_case' AND target_id = ?").bind(r.id).first()
+    expect(log).toBeTruthy()
+  })
+
+  it('GET /api/admin/cases/:id 404s for unknown case and requires auth', async () => {
+    const missing = await app.request('/api/admin/cases/nope', {
+      headers: authHeaders(adminId, 'GET', '/api/admin/cases/nope'),
+    }, env)
+    expect(missing.status).toBe(404)
+    const anon = await app.request('/api/admin/cases/nope', {}, env)
+    expect([401, 403]).toContain(anon.status)
+  })
   it('POST resolve with ban marks resolved + bans user + wipes their content', async () => {
     const r = await findOpenReport(reportedUser.orbitId)
     expect(r).toBeDefined()
@@ -777,5 +800,22 @@ describe('Admin API — Lobby Images & Matches Moderation', () => {
     const match = await env.DB.prepare('SELECT status, result FROM GameMatches WHERE id = ?').bind('test-match-mod').first<any>()
     expect(match.status).toBe('ended')
     expect(match.result).toBe('admin_cancelled')
+  })
+})
+
+describe('pagedQuery helper', () => {
+  it('clamps limit/offset and trims q', async () => {
+    const { pagedQuery } = await import('./admin')
+    const fake = (u: string) => ({ req: { url: `http://x${u}` } })
+    const a = pagedQuery(fake('/?q=%20hi%20&limit=9999&offset=-5'), 50, 200)
+    expect(a.q).toBe('hi')
+    expect(a.limit).toBe(200)
+    expect(a.offset).toBe(0)
+    const b = pagedQuery(fake('/'), 100, 500)
+    expect(b.limit).toBe(100)
+    expect(b.offset).toBe(0)
+    expect(b.param('missing')).toBe('')
+    const c = pagedQuery(fake('/?limit=abc'), 50, 200)
+    expect(c.limit).toBe(50)
   })
 })

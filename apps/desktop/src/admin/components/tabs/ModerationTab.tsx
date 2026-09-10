@@ -3,11 +3,11 @@
 import {  AdminFilterBar, AdminEmptyState, AdminLoadingState, Badge, StatusBadge } from "../../../components/admin/primitives";
 import { adminApi } from "../../../utils/adminApi";
 import { useState, useCallback, useEffect } from "react";
-import { Flag, MessageSquare, Mail, Hash, Trash2,  Shield, Ban,  Check,  ChevronDown, ChevronUp, Maximize2, ShieldAlert } from "lucide-react";
+import { Flag, MessageSquare, Hash, Trash2,  Shield, Ban,  Check,  ChevronDown, ChevronUp, Maximize2, ShieldAlert } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { AdminMediaThumbnail } from "../AdminMediaThumbnail";
 import { resolveMediaUrl } from "../../../utils/media";
-import type { AdminReport, AdminLobbyComment, AdminPrivateMessage, AdminChatMessage, TableParams,  OrbitIdentity } from "../../../utils/adminTypes";
+import type { AdminReport, AdminLobbyComment, AdminChatMessage, TableParams,  OrbitIdentity } from "../../../utils/adminTypes";
 
 interface ModerationTabProps {
   identity: OrbitIdentity | null;
@@ -17,9 +17,8 @@ interface ModerationTabProps {
 }
 
 const subTabs = [
-  { id: "reports", label: "Content Reports", icon: Flag },
+  { id: "reports", label: "Cases (Reports)", icon: Flag },
   { id: "comments", label: "Lobby Comments", icon: MessageSquare },
-  { id: "pms", label: "Private Messages", icon: Mail },
   { id: "chat", label: "Chat Messages", icon: Hash },
 ] as const;
 
@@ -34,7 +33,6 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [reportsTotal, setReportsTotal] = useState(0);
   const [comments, setComments] = useState<AdminLobbyComment[]>([]);
-  const [pms, setPms] = useState<AdminPrivateMessage[]>([]);
   const [chatMessages, setChatMessages] = useState<AdminChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [reportsParams, setReportsParams] = useState<TableParams>({ page: 1, pageSize: 50, filters: { status: "open" } });
@@ -42,9 +40,18 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
   const [selectedReport, setSelectedReport] = useState<AdminReport | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Case detail (report-scoped evidence + parties) fetched on expand —
+  // the only door to disclosed private content, per docs/ADMIN-SUITE.md.
+  const [caseDetail, setCaseDetail] = useState<Record<string, any>>({});
 
   const toggleExpand = (id: string) => {
-    setExpandedId(prev => (prev === id ? null : id));
+    setExpandedId(prev => {
+      const next = prev === id ? null : id;
+      if (next && identity && !caseDetail[next]) {
+        adminApi.caseDetail(identity, next).then(d => setCaseDetail(prev2 => ({ ...prev2, [next]: d }))).catch(() => { });
+      }
+      return next;
+    });
   };
 
   const fetchReports = useCallback(async () => {
@@ -67,14 +74,6 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
     }
   }, [identity, pinVerified]);
 
-  const fetchPms = useCallback(async () => {
-    if (!identity || !pinVerified) return;
-    try {
-      const response = await adminApi.privateMessages(identity, { page: 1, pageSize: 200 });
-      setPms(asArray(response.data));
-    } catch {
-    }
-  }, [identity, pinVerified]);
 
   const fetchChat = useCallback(async () => {
     if (!identity || !pinVerified) return;
@@ -93,9 +92,6 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
     if (activeSubTab === "comments") fetchComments();
   }, [activeSubTab, fetchComments]);
 
-  useEffect(() => {
-    if (activeSubTab === "pms") fetchPms();
-  }, [activeSubTab, fetchPms]);
 
   useEffect(() => {
     if (activeSubTab === "chat") fetchChat();
@@ -252,6 +248,27 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                   <span className="text-retro-fg font-mono">{new Date(report.created_at).toLocaleString()}</span>
                 </div>
               </div>
+              {(() => {
+                const cd = caseDetail[report.id];
+                const parties = cd?.dm_parties;
+                const evidence = cd?.evidence;
+                if (!parties && !evidence) return null;
+                return (
+                  <div className="text-xs bg-surface-canvas/40 p-2.5 rounded border border-border-glass space-y-1.5">
+                    <span className="text-retro-muted text-[10px] block">Disclosed with the report:</span>
+                    {parties && (
+                      <div className="text-retro-fg">
+                        DM parties: {parties.sender_name || parties.sender_id.slice(0, 8)} → {parties.recipient_name || parties.recipient_id.slice(0, 8)}
+                      </div>
+                    )}
+                    {evidence && (
+                      <div className="text-retro-fg font-mono text-[10px] break-all">
+                        evidence object {String(evidence.id).slice(0, 12)} · {evidence.mime_type} · {(evidence.size_bytes / 1024).toFixed(0)} KiB
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               {report.preview && (
                 <div className="text-xs bg-surface-canvas/40 p-2.5 rounded border border-border-glass">
                   <span className="text-retro-muted text-[10px] block mb-0.5">Content Preview / Text:</span>
@@ -462,169 +479,6 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
     );
   };
 
-  const renderPmRow = (pm: AdminPrivateMessage) => {
-    const isExpanded = expandedId === pm.id;
-    const hasAttachment = Boolean(pm.attachment_url || pm.attachment_id);
-    const attachmentUrl = pm.attachment_url ? resolveMediaUrl(pm.attachment_url) : pm.attachment_id ? resolveMediaUrl(`/api/objects/${pm.attachment_id}/content`) : null;
-
-    return (
-      <div key={pm.id} className="border-b border-border-subtle last:border-0 hover:bg-glass-w5 transition-colors">
-        <div className="p-3 flex items-start gap-3">
-          <button
-            type="button"
-            onClick={() => toggleExpand(pm.id)}
-            className="text-retro-muted hover:text-retro-fg transition-transform shrink-0 mt-0.5"
-            title={isExpanded ? "Collapse" : "Expand PM"}
-          >
-            {isExpanded ? <ChevronUp className="w-4 h-4 text-cyan-300" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
-          {attachmentUrl && (
-            <AdminMediaThumbnail
-              objectId={pm.attachment_id}
-              directUrl={pm.attachment_url}
-              identity={identity}
-              mimeType={pm.attachment_mime}
-              title="PM Attachment"
-              subtitle={pm.sender_name || pm.sender_id}
-              className="w-10 h-10 shrink-0"
-              onZoom={onZoom}
-            />
-          )}
-          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggleExpand(pm.id)}>
-            <div className="flex items-center gap-2">
-              <StatusBadge status={pm.hidden_at ? "hidden" : "active"} size="sm" />
-              <span className="text-xs font-semibold text-retro-fg">{pm.sender_name || pm.sender_id.slice(0, 8)} → {pm.recipient_name || pm.recipient_id.slice(0, 8)}</span>
-            </div>
-            <p className="text-xs text-retro-body mt-1">{pm.body}</p>
-            <p className="text-[10px] text-retro-muted mt-1">{new Date(pm.created_at).toLocaleString()}</p>
-          </div>
-          <div className="flex flex-col gap-1.5 shrink-0">
-            {pm.hidden_at ? (
-              <button
-                type="button"
-                onClick={() => onAction("unhidePm", pm.id)}
-                className="px-2 py-1 text-[10px] rounded border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
-              >
-                Unhide
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => onAction("hidePm", pm.id)}
-                className="px-2 py-1 text-[10px] rounded border border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
-              >
-                Hide
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => onAction("deletePm", pm.id)}
-              className="px-2 py-1 text-[10px] rounded border border-red-500/30 text-red-300 hover:bg-red-500/10"
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-
-        {isExpanded && (
-          <div className="px-4 pb-4 pt-1 bg-surface-elevated/40 border-t border-border-subtle/50 flex flex-col md:flex-row gap-4 items-start animate-orbit-fade-in">
-            {attachmentUrl && (
-              <div className="relative group shrink-0">
-                <AdminMediaThumbnail
-                  objectId={pm.attachment_id}
-                  directUrl={pm.attachment_url}
-                  identity={identity}
-                  mimeType={pm.attachment_mime}
-                  title="PM Attachment"
-                  subtitle={pm.sender_name || pm.sender_id}
-                  className="w-48 h-48 md:w-56 md:h-56 rounded-lg cursor-zoom-in"
-                  onZoom={onZoom}
-                />
-                <button
-                  type="button"
-                  onClick={() => onZoom(attachmentUrl, Boolean(pm.attachment_mime?.startsWith("video/")), "PM Attachment", pm.sender_name || pm.sender_id)}
-                  className="absolute bottom-2 right-2 px-2 py-1 bg-black/70 hover:bg-black text-white text-[10px] rounded flex items-center gap-1 border border-border-glass opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Maximize2 className="w-3 h-3" /> Full View
-                </button>
-              </div>
-            )}
-            <div className="flex-1 min-w-0 space-y-2.5">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
-                <div>
-                  <span className="text-retro-muted block text-[10px]">Message ID</span>
-                  <span className="font-mono text-retro-fg break-all text-[10px]">{pm.id}</span>
-                </div>
-                <div>
-                  <span className="text-retro-muted block text-[10px]">Sender</span>
-                  <span className="font-semibold text-retro-fg">{pm.sender_name || pm.sender_id.slice(0, 10)}</span>
-                  <span className="font-mono text-cyan-300 block text-[9px] break-all">{pm.sender_id}</span>
-                </div>
-                <div>
-                  <span className="text-retro-muted block text-[10px]">Recipient</span>
-                  <span className="font-semibold text-retro-fg">{pm.recipient_name || pm.recipient_id.slice(0, 10)}</span>
-                  <span className="font-mono text-retro-muted block text-[9px] break-all">{pm.recipient_id}</span>
-                </div>
-                <div>
-                  <span className="text-retro-muted block text-[10px]">Created At</span>
-                  <span className="text-retro-fg font-mono">{new Date(pm.created_at).toLocaleString()}</span>
-                </div>
-                <div>
-                  <span className="text-retro-muted block text-[10px]">Status</span>
-                  <StatusBadge status={pm.hidden_at ? "hidden" : "active"} size="sm" />
-                </div>
-                <div>
-                  <span className="text-retro-muted block text-[10px]">Deleted By</span>
-                  <span className="text-retro-muted">{pm.deleted_by || "None"}</span>
-                </div>
-              </div>
-              <div className="text-xs bg-surface-canvas/40 p-2.5 rounded border border-border-glass">
-                <span className="text-retro-muted text-[10px] block mb-0.5">Private Message Content:</span>
-                <p className="text-retro-fg font-sans whitespace-pre-wrap">{pm.body}</p>
-              </div>
-              <div className="pt-2 flex flex-wrap gap-2 items-center">
-                {pm.hidden_at ? (
-                  <button
-                    type="button"
-                    onClick={() => onAction("unhidePm", pm.id)}
-                    className="px-2.5 py-1.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 flex items-center gap-1.5 transition-colors"
-                  >
-                    <Shield className="w-3.5 h-3.5" />
-                    Unhide PM
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => onAction("hidePm", pm.id)}
-                    className="px-2.5 py-1.5 rounded text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 flex items-center gap-1.5 transition-colors"
-                  >
-                    <ShieldAlert className="w-3.5 h-3.5" />
-                    Hide PM
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => onAction("deletePm", pm.id)}
-                  className="px-2.5 py-1.5 rounded text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 flex items-center gap-1.5 transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Delete PM
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onAction("banUser", pm.sender_id, "Inappropriate private message: " + pm.body.slice(0, 40))}
-                  className="px-2.5 py-1.5 rounded text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30 flex items-center gap-1.5 transition-colors"
-                >
-                  <Ban className="w-3.5 h-3.5" />
-                  Ban Sender
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
 
   const renderChatRow = (msg: AdminChatMessage) => {
     const isExpanded = expandedId === `${msg.channel}:${msg.id}`;
@@ -749,7 +603,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
     );
   };
 
-  if (isLoading && reports.length === 0 && comments.length === 0 && pms.length === 0 && chatMessages.length === 0) {
+  if (isLoading && reports.length === 0 && comments.length === 0 && chatMessages.length === 0) {
     return <AdminLoadingState rows={5} columns={4} />;
   }
 
@@ -843,20 +697,6 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
         </div>
       )}
 
-      {activeSubTab === "pms" && (
-        <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
-          <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between">
-            <h2 className="text-xs font-bold uppercase tracking-wider">Private Messages ({pms.length})</h2>
-          </div>
-          {pms.length === 0 ? (
-            <AdminEmptyState title="No private messages" description="Private messages will appear here" illustration="folder" />
-          ) : (
-            <div className="divide-y divide-border-subtle">
-              {pms.map(renderPmRow)}
-            </div>
-          )}
-        </div>
-      )}
 
       {activeSubTab === "chat" && (
         <div className="space-y-4">
@@ -867,7 +707,6 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
               { key: "channel", label: "Channel", type: "select", options: [
                 { value: "all", label: "All Channels" },
                 { value: "lobby", label: "Lobby" },
-                { value: "dm", label: "Direct Messages" },
                 { value: "group", label: "Group Chat" },
                 { value: "match", label: "Match Chat" },
               ]},

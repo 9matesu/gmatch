@@ -27,7 +27,7 @@ The app runs in two modes with different trust models:
 
 - **Official site / courier:** the public server works only as a blind postman. It forwards encrypted envelopes it CANNOT open and never sees content, conversation identities, presence or the social graph.
 
-- **Full-node (your own or a third-party server):** you connect to a complete server that YOU (or whoever hosts it) administer. In this mode the server operator can read legacy private messages and post data as described in the Privacy Policy. Connecting to a third-party full-node is your choice and creates a trust relationship with that host.
+- **Full-node (your own or a third-party server):** you connect to a complete server that YOU (or whoever hosts it) administer. In this mode the server operator can read legacy private messages and post data as described in the Privacy Policy. Note what the SOFTWARE does and does not offer: the admin suite moderates reported cases, public content and in-game chat — it contains no bulk private-message browsing. A host with database access can always do more than its software exposes. Connecting to a third-party full-node is your choice and creates a trust relationship with that host.
 
 ## 5. Conduct
 
