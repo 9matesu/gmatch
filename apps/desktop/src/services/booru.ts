@@ -259,7 +259,7 @@ function parseRealbooruHtml(html: string): BooruPost[] {
   return posts
 }
 
-function parseBooruOrgHtml(html: string, sub: string): BooruPost[] {
+function parseBooruOrgHtml(html: string): BooruPost[] {
   const posts: BooruPost[] = []
   const imgRegex =
     /<img\s+[^>]*src="https:\/\/thumbs\.booru\.org\/([^/]+)\/thumbnails\/\/([^/]+)\/thumbnail_([^."]+)\.([^"]+)"[^>]*title="([^"]*)"/gi
@@ -313,7 +313,9 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
         // Preserve multi-word tags with underscores (e.g. skylar_vox),
         // don't drop the rest of the query with split(/\s+/)[0].
         const tagParam = variant.trim().replace(/\s+/g, '_')
-        url = `${src.proxy}/index.php?page=post&s=list&tags=${encodeURIComponent(tagParam)}`
+        // Random page like electron/main.cjs — page 0 alone dedupes to empty.
+        const realPid = Math.floor(Math.random() * 5)
+        url = `${src.proxy}/index.php?page=post&s=list&tags=${encodeURIComponent(tagParam)}&pid=${realPid}`
       } else if (src.type === 'booruorg') {
         // booru.org Cloudflare WAF challenges `tags=` queries with 403;
         // omitting `tags=` and paginating via random `pid` bypasses WAF (200 OK).
@@ -352,7 +354,7 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
         parsed =
           src.type === 'realhtml'
             ? parseRealbooruHtml(html).slice(0, req.limit)
-            : parseBooruOrgHtml(html, (src as { sub: string }).sub).slice(0, req.limit)
+            : parseBooruOrgHtml(html).slice(0, req.limit)
       } else {
         let data: unknown
         try {
