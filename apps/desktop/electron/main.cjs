@@ -3,10 +3,34 @@
 // Endpoints per docs/SPEC.md §6. 10s timeout, browser UA, round-robin health.
 const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage, session, shell } = require('electron')
 const https = require('https')
-const path = require('path')
+const fs = require('node:fs')
+const path = require('node:path')
 const imageCache = require('./imageCache.cjs')
 const customFolders = require('./customFolders.cjs')
 const wallpaperWin = require('./wallpaperWin.cjs')
+
+// A portable exe can run twice from one double-click (and did: two sidecars
+// fight over :8790 and the second window never appeared). One install, one
+// process — the second launch just focuses the first window.
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+  app.exit(0)
+}
+
+// Never die silently: "app doesn't open" was unsolvable without this. Every
+// fatal lands in %APPDATA%/gMatch/main.log AND a native dialog.
+function mainLog(line) {
+  try { fs.appendFileSync(path.join(app.getPath('userData'), 'main.log'), `[${new Date().toISOString()}] ${line}\r\n`) } catch { /* last resort only */ }
+}
+process.on('uncaughtException', (err) => {
+  mainLog(`uncaught: ${err?.stack || err}`)
+  try { dialog.showErrorBox('gMatch hit an unexpected error', `${String(err?.message || err)}\n\nDetails were written to:\n%APPDATA%\\gMatch\\main.log`) } catch { /* headless edge */ }
+})
+process.on('unhandledRejection', (reason) => mainLog(`unhandledRejection: ${reason?.stack || reason}`))
+
+// Update handoff: once the swap script is spawned, quitting must not be
+// blocked by the renderer's save-your-keys unload gate.
+let updateHandoff = false
 
 // One-shot camera permission consumed by setPermissionRequestHandler.
 let cameraGrantOnce = false
@@ -640,73 +664,61 @@ const SOURCES = [
   },
   {
     // booru.org subdomains — same engine, shared parse:
-    // hgoon (goon hentai), blacked (interracial), allgirl, rule34.
+    // hgoon (goon hentai), blacked (interracial), allgirl, rule34, qoh, celeb, footfetish.
+    // Cloudflare WAF challenges `tags=` with 403; omitting `tags=` and paginating
+    // via random `pid` returns 200 OK. Each sub is dedicated to its niche theme.
     id: 'hgoon',
-    fetch: async (variant, n, captions) => {
-      const firstTag = variant.split(/\s+/).filter(Boolean)[0] || ''
-      const html = await httpGet(
-        `https://hgoon.booru.org/index.php?page=post&s=list&tags=${encodeURIComponent(firstTag)}`
-      )
+    fetch: async (_variant, n, captions) => {
+      const pid = Math.floor(Math.random() * 5) * 20
+      const html = await httpGet(`https://hgoon.booru.org/index.php?page=post&s=list&pid=${pid}`)
       return parseBooruOrgHtml(html, 'hgoon', captions).slice(0, n)
     },
   },
   {
     id: 'blacked',
-    fetch: async (variant, n, captions) => {
-      const firstTag = variant.split(/\s+/).filter(Boolean)[0] || ''
-      const html = await httpGet(
-        `https://blacked.booru.org/index.php?page=post&s=list&tags=${encodeURIComponent(firstTag)}`
-      )
+    fetch: async (_variant, n, captions) => {
+      const pid = Math.floor(Math.random() * 5) * 20
+      const html = await httpGet(`https://blacked.booru.org/index.php?page=post&s=list&pid=${pid}`)
       return parseBooruOrgHtml(html, 'blacked', captions).slice(0, n)
     },
   },
   {
     id: 'allgirl',
-    fetch: async (variant, n, captions) => {
-      const firstTag = variant.split(/\s+/).filter(Boolean)[0] || ''
-      const html = await httpGet(
-        `https://allgirl.booru.org/index.php?page=post&s=list&tags=${encodeURIComponent(firstTag)}`
-      )
+    fetch: async (_variant, n, captions) => {
+      const pid = Math.floor(Math.random() * 5) * 20
+      const html = await httpGet(`https://allgirl.booru.org/index.php?page=post&s=list&pid=${pid}`)
       return parseBooruOrgHtml(html, 'allgirl', captions).slice(0, n)
     },
   },
   {
     id: 'rule34-org',
-    fetch: async (variant, n, captions) => {
-      const firstTag = variant.split(/\s+/).filter(Boolean)[0] || ''
-      const html = await httpGet(
-        `https://rule34.booru.org/index.php?page=post&s=list&tags=${encodeURIComponent(firstTag)}`
-      )
+    fetch: async (_variant, n, captions) => {
+      const pid = Math.floor(Math.random() * 5) * 20
+      const html = await httpGet(`https://rule34.booru.org/index.php?page=post&s=list&pid=${pid}`)
       return parseBooruOrgHtml(html, 'rule34', captions).slice(0, n)
     },
   },
   {
     id: 'qoh',
-    fetch: async (variant, n, captions) => {
-      const firstTag = variant.split(/\s+/).filter(Boolean)[0] || ''
-      const html = await httpGet(
-        `https://qoh.booru.org/index.php?page=post&s=list&tags=${encodeURIComponent(firstTag)}`
-      )
+    fetch: async (_variant, n, captions) => {
+      const pid = Math.floor(Math.random() * 5) * 20
+      const html = await httpGet(`https://qoh.booru.org/index.php?page=post&s=list&pid=${pid}`)
       return parseBooruOrgHtml(html, 'qoh', captions).slice(0, n)
     },
   },
   {
     id: 'celeb',
-    fetch: async (variant, n, captions) => {
-      const firstTag = variant.split(/\s+/).filter(Boolean)[0] || ''
-      const html = await httpGet(
-        `https://celeb.booru.org/index.php?page=post&s=list&tags=${encodeURIComponent(firstTag)}`
-      )
+    fetch: async (_variant, n, captions) => {
+      const pid = Math.floor(Math.random() * 5) * 20
+      const html = await httpGet(`https://celeb.booru.org/index.php?page=post&s=list&pid=${pid}`)
       return parseBooruOrgHtml(html, 'celeb', captions).slice(0, n)
     },
   },
   {
     id: 'footfetish',
-    fetch: async (variant, n, captions) => {
-      const firstTag = variant.split(/\s+/).filter(Boolean)[0] || ''
-      const html = await httpGet(
-        `https://footfetishbooru.booru.org/index.php?page=post&s=list&tags=${encodeURIComponent(firstTag)}`
-      )
+    fetch: async (_variant, n, captions) => {
+      const pid = Math.floor(Math.random() * 5) * 20
+      const html = await httpGet(`https://footfetishbooru.booru.org/index.php?page=post&s=list&pid=${pid}`)
       return parseBooruOrgHtml(html, 'footfetishbooru', captions).slice(0, n)
     },
   },
@@ -786,6 +798,7 @@ function createWindow() {
   // unload just cancels the window close). Surface the page's message as a
   // real native dialog instead: Stay saves nothing, Leave closes.
   win.webContents.on('will-prevent-unload', (event) => {
+    if (updateHandoff) { event.preventDefault(); return }
     const choice = dialog.showMessageBoxSync(win, {
       type: 'warning',
       buttons: ['Stay', 'Leave anyway'],
@@ -866,6 +879,23 @@ app.whenReady().then(async () => {
     app.relaunch()
     app.exit(0)
   })
+  // Portable self-update (GitHub Releases): check + auto-download in main,
+  // the renderer's "Install & Restart" triggers the exe swap + relaunch.
+  let updater = null
+  if (app.isPackaged) {
+    updater = require('./updater.cjs').createUpdater({
+      app,
+      webContents: () => BrowserWindow.getAllWindows().map((w) => w.webContents),
+      log: mainLog,
+    })
+  }
+  ipcMain.handle('update:check', () => (updater ? updater.check(true) : { phase: 'unsupported', current: app.getVersion() }))
+  ipcMain.handle('update:state', () => (updater ? updater.getState() : { phase: 'unsupported', current: app.getVersion() }))
+  ipcMain.handle('update:install', () => {
+    if (!updater) return { ok: false, error: 'updates only work in packaged builds' }
+    updateHandoff = true
+    return updater.install()
+  })
   // 1.0 topology (no central server): packaged builds ALWAYS run the bundled
   // server (host mode, default) unless the user configured client mode in
   // Settings. Dev keeps the repo-local sidecar path unchanged.
@@ -889,9 +919,26 @@ app.whenReady().then(async () => {
     }
   }
   createWindow()
+  updater?.schedule()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+  .catch((err) => {
+    // A fatal during boot used to leave a windowless zombie: no window, no
+    // error. Log it, show it, and let the process exit.
+    mainLog(`boot failed: ${err?.stack || err}`)
+    try { dialog.showErrorBox('gMatch could not start', `${String(err?.message || err)}\n\nDetails were written to:\n%APPDATA%\\gMatch\\main.log`) } catch { /* headless edge */ }
+  })
+
+// Portable double-launch (or a stale lock): focus the running window instead
+// of starting a second sidecar fight.
+app.on('second-instance', () => {
+  const w = BrowserWindow.getAllWindows()[0]
+  if (w) {
+    if (w.isMinimized()) w.restore()
+    w.focus()
+  }
 })
 
 app.on('before-quit', () => { apiSidecar.stopApi(); try { if (secureKV) secureKV.flush() } catch { /* best effort */ } })

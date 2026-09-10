@@ -162,9 +162,17 @@ export default defineConfig({
       '^/rg-media': {
         // Same-origin RedGifs bytes: dodges host-based adblockers that
         // ERR_FAILED media.redgifs.com <video> loads in dev browsers.
+        // CDN77-Turbo 403s on foreign localhost Origin — strip it and set redgifs Referer.
         target: 'https://media.redgifs.com',
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/rg-media/, ''),
+        headers: { Referer: 'https://www.redgifs.com/' },
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.removeHeader('origin')
+            proxyReq.setHeader('referer', 'https://www.redgifs.com/')
+          })
+        },
       },
       '^/rg-auth': {
         target: 'https://api.redgifs.com',

@@ -333,4 +333,35 @@ describe('fetchPosts (SPEC §6/§8)', () => {
     const galleryHits2 = fetchMock.mock.calls.filter((a) => String(a[0]).startsWith('/booru/imh/gallery')).length
     expect(galleryHits2).toBe(2)
   })
+
+  it('browser mode scrapes booru.org sub without tags query to dodge Cloudflare 403 WAF', async () => {
+    vi.stubGlobal('window', {})
+    const booruHtml = `
+      <img src="https://thumbs.booru.org/blacked/thumbnails//105/thumbnail_ecc2af25bfbdf61e9eb509839676dcc53553c731.png" alt="post" border="0" title=" 1girl big_breasts cum interracial score:0 rating:Explicit"/>
+    `
+    const fetchMock = vi.fn(async (url: string) => {
+      const u = String(url)
+      if (u.startsWith('/booru/blacked')) {
+        expect(u).not.toContain('tags=')
+        expect(u).toMatch(/[?&]pid=\d+/)
+        return { ok: true, text: () => Promise.resolve(booruHtml) }
+      }
+      if (
+        u.startsWith('/booru/tbib/') ||
+        u.startsWith('/booru/xbooru/') ||
+        u.startsWith('/booru/kona') ||
+        u.startsWith('/booru/yand') ||
+        u.startsWith('/booru/real')
+      ) {
+        return { ok: true, json: () => Promise.resolve([]), text: () => Promise.resolve('') }
+      }
+      return { ok: false }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await fetchPosts({ tags: 'interracial', limit: 5 })
+    expect(res.ok).toBe(true)
+    expect(res.posts[0].url).toContain(
+      'img.booru.org/blacked//images/105/ecc2af25bfbdf61e9eb509839676dcc53553c731.png',
+    )
+  })
 })

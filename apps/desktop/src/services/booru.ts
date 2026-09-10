@@ -34,28 +34,8 @@ export interface BooruResponse {
   cached?: boolean
 }
 
-declare global {
-  interface Window {
-    gmatch?: {
-      booruFetch?: (req: BooruRequest) => Promise<BooruResponse>
-      cacheImage?: (url: string) => Promise<{ local: string | null }>
-      cacheStats?: () => Promise<{ files: number; bytes: number }>
-      clearCache?: () => Promise<{ files: number; bytes: number }>
-      customPickFolder?: () => Promise<{ ok: boolean; id?: string; path?: string; error?: string }>
-      customListFolder?: (id: string) => Promise<{ ok: boolean; files?: { name: string; url: string }[]; error?: string }>
-      customRemoveFolder?: (id: string) => Promise<{ ok: boolean }>
-      serverState?: () => Promise<{ packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[] }>
-      appVersion?: () => Promise<string>
-      openExternal?: (url: string) => Promise<void>
-      serverSet?: (payload: { mode: 'host' | 'client'; url?: string }) => Promise<{ ok: boolean; error?: string }>
-      serverRelaunch?: () => Promise<void>
-      wallpaperSetData?: (buf: ArrayBuffer, mime: string) => Promise<{ ok: boolean; hadPrevious?: boolean }>
-      wallpaperRestore?: () => Promise<{ ok: boolean }>
-      wallpaperCleanupFiles?: () => Promise<{ ok: boolean }>
-      grantCameraOnce?: () => Promise<{ ok: boolean }>
-    }
-  }
-}
+// The preload bridge surface (window.gmatch) — including update types — is
+// declared once, centrally, in src/types/gmatch-bridge.ts.
 
 const TIMEOUT_MS = 10_000
 
@@ -299,10 +279,17 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
         const page = 1 + Math.floor(Math.random() * 5)
         const tags = src.id === 'konachan-direct' ? `${variant} rating:explicit` : variant
         url = `${src.proxy}/post.json?tags=${encodeURIComponent(tags)}&limit=${req.limit}&page=${page}`
-      } else if (src.type === 'realhtml' || src.type === 'booruorg') {
+      } else if (src.type === 'realhtml') {
         kind = 'html'
         const firstTag = variant.split(/\s+/).filter(Boolean)[0] || ''
         url = `${src.proxy}/index.php?page=post&s=list&tags=${encodeURIComponent(firstTag)}`
+      } else if (src.type === 'booruorg') {
+        // booru.org Cloudflare WAF challenges `tags=` queries with 403;
+        // omitting `tags=` and paginating via random `pid` bypasses WAF (200 OK).
+        // Each booru.org sub is already dedicated to its niche theme.
+        kind = 'html'
+        const booruPid = Math.floor(Math.random() * 5) * 20
+        url = `${src.proxy}/index.php?page=post&s=list&pid=${booruPid}`
       } else {
         url = `${src.proxy}/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
           `${variant} rating:explicit ${neg}`,
