@@ -112,7 +112,7 @@ export function CardTile({
     <div
       data-rarity={rarity.rarity}
       data-frame={frameType}
-      className={`group select-none cursor-pointer transition-all duration-150 active:scale-[0.96] rounded-lg border border-zinc-800/90 bg-zinc-950 overflow-hidden shadow-xs hover:border-zinc-700 ${
+      className={`group relative select-none cursor-pointer transition-all duration-150 active:scale-[0.96] rounded-lg border border-zinc-800/90 bg-zinc-950 overflow-hidden shadow-xs hover:border-zinc-700 ${
         selected ? 'ring-2 ring-white shadow-xl scale-[1.02] z-10' : ''
       }`}
       onClick={() => {

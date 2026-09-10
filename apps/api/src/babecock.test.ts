@@ -361,3 +361,24 @@ describe('flash consumable inventory', () => {
     expect(Number(row?.quantity ?? 0)).toBe(2)
   })
 })
+
+describe('babecock start broadcast', () => {
+  beforeAll(async () => {
+    env = await createMockEnv()
+  })
+
+  it('notifies online users when a round starts', async () => {
+    await env._client.execute('DELETE FROM Notifications').catch(() => {})
+    const host = uid(40)
+    const other = uid(41)
+    await seedUser(host, 'Host')
+    await seedUser(other, 'Other')
+    await startRound(env.DB, host, 'data:image/jpeg;base64,x', 'image/jpeg')
+    const rows = await env.DB.prepare(
+      "SELECT user_id FROM Notifications WHERE type = 'babecock_start'"
+    ).all<{ user_id: string }>()
+    const notified = (rows.results || []).map((r) => r.user_id)
+    expect(notified).toContain(other)
+    expect(notified).not.toContain(host)
+  })
+})

@@ -82,7 +82,7 @@ function AdminActionMenu<T>({ actions, row }: { actions: RowAction<T>[]; row: T 
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="p-1.5 rounded hover:bg-white/10 text-retro-muted hover:text-retro-fg transition-colors"
+        className="p-1.5 rounded hover:bg-glass-w10 text-retro-muted hover:text-retro-fg transition-colors"
         aria-label="Row actions"
         aria-expanded={open}
       >
@@ -108,8 +108,8 @@ function AdminActionMenu<T>({ actions, row }: { actions: RowAction<T>[]; row: T 
                     "w-full px-3 py-2 text-left text-xs flex items-center gap-2 transition-colors",
                     actionVariant === "danger" && "text-red-300 hover:bg-red-500/10",
                     actionVariant === "primary" && "text-cyan-300 hover:bg-cyan-500/10",
-                    actionVariant === "ghost" && "text-retro-muted hover:text-retro-fg hover:bg-white/5",
-                    (!actionVariant || actionVariant === "default") && "text-retro-fg hover:bg-white/10",
+                    actionVariant === "ghost" && "text-retro-muted hover:text-retro-fg hover:bg-glass-w5",
+                    (!actionVariant || actionVariant === "default") && "text-retro-fg hover:bg-glass-w10",
                     "disabled:opacity-40 disabled:cursor-not-allowed"
                   )}
                 >
@@ -363,8 +363,8 @@ export function AdminTable<T extends Record<string, unknown>>({
                 <tr
                   key={rowId}
                   className={cn(
-                    "transition-colors hover:bg-white/5",
-                    rowSelection[rowId] && "bg-retro-accent/10"
+                    "transition-colors hover:bg-glass-w5",
+                    rowSelection[rowId] && "bg-glass-w10"
                   )}
                 >
                   {config.columns.map(col => (
@@ -422,7 +422,7 @@ export function AdminTable<T extends Record<string, unknown>>({
                     "px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors",
                     action.variant === "danger" && "bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30",
                     action.variant === "primary" && "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/30",
-                    action.variant !== "danger" && action.variant !== "primary" && "bg-surface-interactive text-retro-fg border border-border-glass hover:bg-white/10"
+                    action.variant !== "danger" && action.variant !== "primary" && "bg-surface-interactive text-retro-fg border border-border-glass hover:bg-glass-w10"
                   )}
                 >
                   {action.icon && <action.icon className="w-3.5 h-3.5 mr-1" />}

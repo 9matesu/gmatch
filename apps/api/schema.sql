@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS FriendRequests (
   UNIQUE(sender_id, receiver_id)
 );
 
--- goonMatch asymmetric follow graph. Unlike Friends (bidirectional accepted
+-- gMatch asymmetric follow graph. Unlike Friends (bidirectional accepted
 -- pairs), a Follow is one-directional: follower_id subscribed to followee_id.
 -- For public accounts `accepted=1` immediately; for private accounts it
 -- starts at 0 and the followee approves it. Self-follows rejected in app code.
@@ -651,7 +651,7 @@ CREATE INDEX IF NOT EXISTS idx_match_archive_user_a ON MatchArchive(user_a, ende
 CREATE INDEX IF NOT EXISTS idx_match_archive_user_b ON MatchArchive(user_b, ended_at);
 CREATE INDEX IF NOT EXISTS idx_match_archive_result ON MatchArchive(result, ended_at);
 
--- goonMatch post engagement: generalized comments ledger (works for any Object,
+-- gMatch post engagement: generalized comments ledger (works for any Object,
 -- not just lobby board images), per-comment likes, and per-user saves.
 CREATE TABLE IF NOT EXISTS Comments (
   id TEXT PRIMARY KEY,
@@ -838,3 +838,27 @@ CREATE INDEX IF NOT EXISTS idx_market_status ON MarketListings(status, created_a
 -- At most one *open* listing per card; historical sold/cancelled rows do not
 -- block a future re-list.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_market_open_card ON MarketListings(card_id) WHERE status = 'open';
+
+-- ServerDirectory (plan T3, docs/ADR-002-servers.md): PUBLIC SERVER DIRECTORY —
+-- metadata only, never content. Lives on the central node; every listed server
+-- is a separate full node with its own DB. endpoint_hint is served to
+-- authenticated callers only (routes/servers.ts softAuth).
+CREATE TABLE IF NOT EXISTS ServerDirectory (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  owner_id TEXT NOT NULL,
+  owner_pubkey TEXT NOT NULL,
+  endpoint_hint TEXT NOT NULL DEFAULT '',
+  password_required INTEGER NOT NULL DEFAULT 0,
+  user_count INTEGER,
+  online_count INTEGER,
+  hidden INTEGER NOT NULL DEFAULT 0,
+  blocked INTEGER NOT NULL DEFAULT 0,
+  master_note TEXT,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_server_dir_owner ON ServerDirectory(owner_id);
+CREATE INDEX IF NOT EXISTS idx_server_dir_seen ON ServerDirectory(last_seen);

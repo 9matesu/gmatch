@@ -4,6 +4,8 @@ import { useRef, useState } from 'react';
 import { Camera, User, X, Plus, Tag } from 'lucide-react';
 import { normalizeTags, MAX_TAG_LENGTH } from '@orbit/shared';
 import { fileToThumbDataUrl, MAX_DISPLAY_NAME_LENGTH } from '../../utils/profile';
+import { useCropper } from '../../hooks/useCropper';
+import { isCropableImage } from '../CropModal';
 import { playPress } from '../../utils/sounds';
 
 /**
@@ -33,6 +35,7 @@ export function ProfileSetupForm({
   const [tagInput, setTagInput] = useState('');
   const [pfpError, setPfpError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { crop, cropper } = useCropper();
 
   const addTag = (raw: string) => {
     const cleaned = raw.trim().toLowerCase().replace(/^#/, '');
@@ -47,8 +50,14 @@ export function ProfileSetupForm({
     .filter((t) => t && !tags.includes(t));
 
   const handlePfpUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    let file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
+    if (isCropableImage(file)) {
+      const res = await crop(file, { aspect: '1:1', title: 'Crop profile photo' });
+      if (!res) return;
+      if (res.file) file = res.file;
+    }
     if (file.size > 3 * 1024 * 1024) {
       setPfpError('Profile picture must be under 3MB');
       return;
@@ -60,7 +69,6 @@ export function ProfileSetupForm({
     } catch {
       setPfpError('Could not read that image — try a JPG or PNG');
     }
-    e.target.value = '';
   };
 
   return (
@@ -203,6 +211,7 @@ export function ProfileSetupForm({
           </div>
         )}
       </div>
+      {cropper}
     </div>
   );
 }

@@ -36,14 +36,23 @@ export interface BooruResponse {
 
 declare global {
   interface Window {
-    goongrid?: {
+    gmatch?: {
       booruFetch?: (req: BooruRequest) => Promise<BooruResponse>
       cacheImage?: (url: string) => Promise<{ local: string | null }>
       cacheStats?: () => Promise<{ files: number; bytes: number }>
       clearCache?: () => Promise<{ files: number; bytes: number }>
+      customPickFolder?: () => Promise<{ ok: boolean; id?: string; path?: string; error?: string }>
+      customListFolder?: (id: string) => Promise<{ ok: boolean; files?: { name: string; url: string }[]; error?: string }>
+      customRemoveFolder?: (id: string) => Promise<{ ok: boolean }>
       serverState?: () => Promise<{ packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[] }>
+      appVersion?: () => Promise<string>
+      openExternal?: (url: string) => Promise<void>
       serverSet?: (payload: { mode: 'host' | 'client'; url?: string }) => Promise<{ ok: boolean; error?: string }>
       serverRelaunch?: () => Promise<void>
+      wallpaperSetData?: (buf: ArrayBuffer, mime: string) => Promise<{ ok: boolean; hadPrevious?: boolean }>
+      wallpaperRestore?: () => Promise<{ ok: boolean }>
+      wallpaperCleanupFiles?: () => Promise<{ ok: boolean }>
+      grantCameraOnce?: () => Promise<{ ok: boolean }>
     }
   }
 }
@@ -53,7 +62,7 @@ const TIMEOUT_MS = 10_000
 // No-repeat memory: ids + file URLs seen this session AND in past sessions
 // (localStorage), capped so it can't grow forever. Same file under a
 // different mirror id still counts as seen via its URL.
-const SEEN_KEY = 'goongrid.seen.v1'
+const SEEN_KEY = 'gmatch.seen.v1'
 const SEEN_CAP = 500
 const seenIds = new Set<string>()
 const seenUrls = new Set<string>()
@@ -392,8 +401,8 @@ export async function fetchPosts(req: BooruRequest): Promise<BooruResponse> {
   const offline: BooruResponse = { posts: [], source: null, ok: false, offline: true }
   if (!req.tags.trim() || isQueryBlocked(req.tags)) return offline
   try {
-    if (typeof window !== 'undefined' && window.goongrid?.booruFetch) {
-      const res = await window.goongrid.booruFetch(req)
+    if (typeof window !== 'undefined' && window.gmatch?.booruFetch) {
+      const res = await window.gmatch.booruFetch(req)
       if (res.ok && res.posts.length > 0) {
         const fresh = remember(sanitize(res.posts, req.tags))
         // All repeats → report offline so the caller rotates to the next tag.

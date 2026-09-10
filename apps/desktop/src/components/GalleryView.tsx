@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { User, OrbitObject } from '@orbit/shared';
 import { CardTile } from './home/CardTile';
@@ -10,8 +10,9 @@ import { CardDetailView } from './CardDetailView';
 import { SlideshowManager } from './slideshows/SlideshowManager';
 import IdleGalleryView from './grid/IdleGalleryView';
 import { useGame } from '@/game/store';
-import type { FeedPost } from './feed/GoonMatchFeed';
-import { Layers, Download, Trash2, CheckSquare, Search, Film, ImagePlus, ImageIcon } from 'lucide-react';
+import type { FeedPost } from './feed/GMatchFeed';
+import { Layers, Download, Trash2, CheckSquare, Search, Film, ImagePlus, ImageIcon, Tag } from 'lucide-react';
+import { DND_KEEPSAKE } from './DropZone';
 
 export interface GalleryViewProps {
   filteredItems: OrbitObject[];
@@ -47,6 +48,10 @@ export interface GalleryViewProps {
   onOpenOwnerProfile?: (ownerId: string) => void;
   onOpenProfile?: (userId: string) => void;
   onOpenCreateCard?: () => void;
+  onCreateCardFromMedia?: (media: { url: string; tags: string[]; name: string }) => void;
+  /** Right-click on a collection card → shared context menu. */
+  onItemContextMenu?: (e: React.MouseEvent, item: OrbitObject) => void;
+  onSetWallpaper?: (url: string) => void;
 }
 
 export function GalleryView({
@@ -83,34 +88,60 @@ export function GalleryView({
   onOpenOwnerProfile,
   onOpenProfile,
   onOpenCreateCard,
+  onCreateCardFromMedia,
+  onItemContextMenu,
+  onSetWallpaper,
 }: GalleryViewProps) {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [showSlideshows, setShowSlideshows] = useState(false);
+  const [dndCardHover, setDndCardHover] = useState(false);
   const idleKeepsakes = useGame((s) => s.gallery);
+
+  // Tag pills: union of tags on the visible collection, most frequent first.
+  const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
+  const tagCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of filteredItems) {
+      const tags = (item as { tags?: string[] }).tags;
+      if (Array.isArray(tags)) for (const t of tags) counts.set(t, (counts.get(t) || 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20);
+  }, [filteredItems]);
+  const toggleTag = (t: string) => setActiveTags(prev => {
+    const next = new Set(prev);
+    if (next.has(t)) next.delete(t); else next.add(t);
+    return next;
+  });
+  const shownItems = activeTags.size === 0
+    ? paginatedItems
+    : filteredItems.filter((item) => {
+        const tags = (item as { tags?: string[] }).tags;
+        return Array.isArray(tags) && [...activeTags].every((t) => tags.includes(t));
+      });
 
   return (
     <>
     <div id="gallery-section" className="space-y-4 font-sans select-none">
       {idleKeepsakes.length > 0 && (
-        <div className="bg-surface-raised border border-border-glass rounded-2xl overflow-hidden shadow-xl">
-          <div className="p-4 border-b border-border-glass bg-surface-raised flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-surface-interactive border border-border-glass flex items-center justify-center text-retro-muted">
+        <div className="glass-card overflow-hidden">
+          <div className="glass-header p-4 flex items-center gap-2">
+            <div className="glass-inset w-7 h-7 rounded-lg flex items-center justify-center text-retro-muted">
               <ImageIcon className="w-4 h-4" />
             </div>
             <div>
               <h2 className="text-xs font-bold text-retro-fg uppercase tracking-wider">
-                Babecock keepsakes ({idleKeepsakes.length})
+                Gallery ({idleKeepsakes.length})
               </h2>
-              <p className="text-[10px] text-retro-muted">Idle spoils from the Grid — re-feature them or set an app backdrop</p>
+              <p className="text-[10px] text-retro-muted">Idle spoils from the Grid — view them, set a backdrop, or turn them into cards</p>
             </div>
           </div>
-          <IdleGalleryView />
+          <IdleGalleryView onCreateCard={onCreateCardFromMedia} onSetWallpaper={onSetWallpaper} />
         </div>
       )}
-      <div className="bg-surface-raised border border-border-glass rounded-2xl overflow-hidden shadow-xl">
-        <div className="p-4 border-b border-border-glass bg-surface-raised flex flex-wrap items-center justify-between gap-3">
+      <div className="glass-card overflow-hidden">
+        <div className="glass-header p-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-surface-interactive border border-border-glass flex items-center justify-center text-retro-muted">
+            <div className="glass-inset w-7 h-7 rounded-lg flex items-center justify-center text-retro-muted">
               <Layers className="w-4 h-4" />
             </div>
             <div>
@@ -122,7 +153,7 @@ export function GalleryView({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap text-xs">
-            <div className="flex bg-surface-interactive p-0.5 rounded-lg border border-border-glass text-[11px] font-semibold">
+            <div className="glass-inset flex p-0.5 rounded-lg text-[11px] font-semibold">
               {(['all', 'received', 'sent', 'starred'] as const).map(t => (
                 <button
                   key={t}
@@ -132,7 +163,7 @@ export function GalleryView({
                     setGalleryPage(0)
                   }}
                   className={`px-2.5 py-1 rounded-md cursor-pointer uppercase transition-colors ${
-                    galleryFilter === t ? 'bg-surface-raised text-retro-fg font-bold shadow-sm' : 'text-retro-muted hover:text-retro-body'
+                    galleryFilter === t ? 'bg-white/14 text-retro-fg font-bold shadow-sm' : 'text-retro-muted hover:text-retro-body'
                   }`}
                 >
                   {t}
@@ -140,7 +171,7 @@ export function GalleryView({
               ))}
             </div>
 
-            <div className="flex items-center gap-1 bg-surface-interactive px-2 py-1 rounded-lg border border-border-glass text-[11px]">
+            <div className="glass-field flex items-center gap-1 px-2 py-1 text-[11px]">
               <span className="text-retro-muted font-semibold text-[10px] uppercase">Sort:</span>
               <select
                 value={gallerySort}
@@ -157,7 +188,7 @@ export function GalleryView({
               </select>
             </div>
 
-            <div className="flex items-center gap-1 bg-surface-interactive px-2 py-1 rounded-lg border border-border-glass text-[11px]">
+            <div className="glass-field flex items-center gap-1 px-2 py-1 text-[11px]">
               <Search className="w-3.5 h-3.5 text-retro-muted" />
               <input
                 type="text"
@@ -168,14 +199,14 @@ export function GalleryView({
               />
             </div>
 
-            <div className="flex bg-surface-interactive p-0.5 rounded-lg border border-border-glass text-[11px] font-semibold">
+            <div className="glass-inset flex p-0.5 rounded-lg text-[11px] font-semibold">
               {(['all', 'image', 'video'] as const).map(t => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => { setCardTypeFilter(t); setGalleryPage(0) }}
                   className={`px-2.5 py-1 rounded-md cursor-pointer uppercase transition-colors ${
-                    cardTypeFilter === t ? 'bg-surface-raised text-retro-fg font-bold shadow-sm' : 'text-retro-muted hover:text-retro-body'
+                    cardTypeFilter === t ? 'bg-white/14 text-retro-fg font-bold shadow-sm' : 'text-retro-muted hover:text-retro-body'
                   }`}
                 >
                   {t}
@@ -187,7 +218,7 @@ export function GalleryView({
               type="button"
               disabled={batchDownloading || filteredItems.length === 0}
               onClick={handleDownloadAll}
-              className="px-3 py-1 bg-surface-raised hover:bg-surface-interactive text-retro-body border border-border-glass rounded-lg font-semibold text-[11px] flex items-center gap-1.5 cursor-pointer disabled:opacity-40 transition-colors shadow-sm"
+              className="glass-action px-3 py-1 rounded-lg font-semibold text-[11px] flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
               title="Download all cards in current filter"
             >
               <Download className="w-3.5 h-3.5" />
@@ -197,9 +228,7 @@ export function GalleryView({
             <button
               type="button"
               onClick={() => setShowSlideshows((v) => !v)}
-              className={`px-3 py-1 border rounded-lg font-semibold text-[11px] flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm ${
-                showSlideshows ? 'bg-surface-interactive text-retro-fg border-zinc-600' : 'bg-surface-raised hover:bg-surface-interactive text-retro-body border-border-glass'
-              }`}
+              className={`glass-action ${showSlideshows ? 'glass-nav-active' : ''} px-3 py-1 rounded-lg font-semibold text-[11px] flex items-center gap-1.5 cursor-pointer`}
               title="Create and play slideshows"
             >
               <Film className="w-3.5 h-3.5" />
@@ -209,7 +238,7 @@ export function GalleryView({
         </div>
 
         {selectedGalleryIds.size > 0 && (
-          <div className="px-4 py-2.5 bg-surface-raised border-b border-border-glass flex items-center justify-between gap-3 text-xs animate-orbit-fade-in">
+          <div className="glass-header px-4 py-2.5 flex items-center justify-between gap-3 text-xs animate-orbit-fade-in">
             <div className="flex items-center gap-2 text-retro-fg font-bold">
               <CheckSquare className="w-4 h-4 text-emerald-600" />
               <span>{selectedGalleryIds.size} cards selected</span>
@@ -218,7 +247,7 @@ export function GalleryView({
               <button
                 type="button"
                 onClick={handleBatchDownload}
-                className="px-3 py-1 bg-black hover:bg-surface-elevated text-white font-bold text-[11px] rounded-md transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
+                className="glass-action glass-action-primary px-3 py-1.5 rounded-lg font-bold text-[11px] cursor-pointer flex items-center gap-1"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Download Selected</span>
@@ -226,7 +255,7 @@ export function GalleryView({
               <button
                 type="button"
                 onClick={handleBatchDelete}
-                className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-[11px] rounded-md transition-colors cursor-pointer flex items-center gap-1"
+                className="glass-action glass-action-danger px-3 py-1.5 rounded-lg font-bold text-[11px] cursor-pointer flex items-center gap-1"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Delete</span>
@@ -242,7 +271,7 @@ export function GalleryView({
           </div>
         )}
 
-        <div className="p-4 border-b border-border-glass bg-surface-canvas/60 space-y-2">
+        <div className="p-4 border-b border-white/10 bg-glass-w5 space-y-2">
           <div className="flex items-center justify-between text-xs font-bold text-retro-body">
             <span className="flex items-center gap-1.5 text-retro-fg">
               <Layers className="w-4 h-4 text-retro-muted" />
@@ -253,24 +282,62 @@ export function GalleryView({
           <button
             type="button"
             onClick={onOpenCreateCard}
-            className="w-full sm:w-auto px-4 py-2 bg-retro-accent text-black font-bold text-xs uppercase tracking-wider rounded-lg transition-colors cursor-pointer shadow-md hover:bg-retro-accent-hover flex items-center gap-2"
+            onDragOver={(e) => { if (onCreateCardFromMedia) { e.preventDefault(); setDndCardHover(true) } }}
+            onDragLeave={() => setDndCardHover(false)}
+            onDrop={(e) => {
+              if (!onCreateCardFromMedia) return
+              e.preventDefault()
+              setDndCardHover(false)
+              try {
+                const raw = e.dataTransfer.getData(DND_KEEPSAKE)
+                if (raw) onCreateCardFromMedia(JSON.parse(raw))
+              } catch { /* malformed payload — ignore */ }
+            }}
+            className={`glass-action glass-action-primary w-full sm:w-auto px-4 py-2 font-bold text-xs uppercase tracking-wider rounded-lg cursor-pointer flex items-center gap-2 ${dndCardHover ? 'ring-2 ring-retro-accent' : ''}`}
           >
             <ImagePlus className="w-3.5 h-3.5" />
-            <span>Create Card</span>
+            <span>{dndCardHover ? 'Drop to forge card' : 'Create Card'}</span>
           </button>
         </div>
 
-        <div className="p-4">
+      </div>
+
+      <div className="glass-card p-4">
+          {tagCounts.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 pb-3 -mt-1">
+              <Tag className="w-3.5 h-3.5 text-retro-muted" />
+              {tagCounts.map(([t, n]) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => toggleTag(t)}
+                  aria-pressed={activeTags.has(t)}
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border cursor-pointer transition-colors ${activeTags.has(t) ? 'bg-glass-w20 border-retro-fg/70' : 'border-white/10 text-retro-muted hover:text-retro-body'}`}
+                >
+                  {t} <span className="opacity-60">{n}</span>
+                </button>
+              ))}
+              {activeTags.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTags(new Set())}
+                  className="text-[10px] text-retro-muted hover:text-retro-fg cursor-pointer underline"
+                >
+                  clear ({activeTags.size})
+                </button>
+              )}
+            </div>
+          )}
           {itemsLoading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5">
-              {Array.from({ length: 12 }).map((_, i) => <CardSkeleton key={i} />)}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {Array.from({ length: 10 }).map((_, i) => <CardSkeleton key={i} />)}
             </div>
           ) : filteredItems.length === 0 ? (
             <EmptyState title="No cards found" description="Upload images, battle in the duel arena, or open lootboxes to expand your deck!" />
           ) : (
             <>
               <div
-                className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5 select-none"
+                className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 select-none"
                 onMouseDown={() => setDragActive(true)}
                 onMouseUp={() => { setDragActive(false); setDragAnchorId(null) }}
                 onMouseLeave={() => { setDragActive(false); setDragAnchorId(null) }}
@@ -278,44 +345,53 @@ export function GalleryView({
                   if (!dragActive && e.buttons !== 0) setDragActive(true)
                 }}
               >
-                {paginatedItems.map(item => (
-                  <CardTile
+                {shownItems.map(item => (
+                  <div
                     key={item.id}
-                    item={item as any}
-                    dragActive={dragActive}
-                    selected={selectedGalleryIds.has(item.id)}
-                    onClick={() => {
-                      const cardId = cardByMedia?.get(item.id)
-                      if (cardId) setSelectedCardId(cardId)
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(DND_KEEPSAKE, JSON.stringify({ url: `/api/objects/${item.id}`, tags: (item as { tags?: string[] }).tags || [], name: (item as { caption?: string }).caption || 'Card' }))
+                      e.dataTransfer.effectAllowed = 'copy'
                     }}
-                    onDoubleClick={() => setExpandedItemId(item.id)}
-                    onSelect={(id) => {
-                      if (dragAnchorId) {
-                        const ids = paginatedItems.map(i => i.id)
-                        const ai = ids.indexOf(dragAnchorId)
-                        const bi = ids.indexOf(id)
-                        if (ai > -1 && bi > -1) {
-                          const lo = Math.min(ai, bi)
-                          const hi = Math.max(ai, bi)
-                          const next = new Set<string>(selectedGalleryIds)
-                          for (let i = lo; i <= hi; i++) next.add(ids[i])
-                          setSelectedGalleryIds(next)
-                          setDragAnchorId(id)
-                          return
+                    onContextMenu={(e) => { if (onItemContextMenu) { e.preventDefault(); onItemContextMenu(e, item) } }}
+                  >
+                    <CardTile
+                      item={item as any}
+                      dragActive={dragActive}
+                      selected={selectedGalleryIds.has(item.id)}
+                      onClick={() => {
+                        const cardId = cardByMedia?.get(item.id)
+                        if (cardId) setSelectedCardId(cardId)
+                      }}
+                      onDoubleClick={() => setExpandedItemId(item.id)}
+                      onSelect={(id) => {
+                        if (dragAnchorId) {
+                          const ids = paginatedItems.map(i => i.id)
+                          const ai = ids.indexOf(dragAnchorId)
+                          const bi = ids.indexOf(id)
+                          if (ai > -1 && bi > -1) {
+                            const lo = Math.min(ai, bi)
+                            const hi = Math.max(ai, bi)
+                            const next = new Set<string>(selectedGalleryIds)
+                            for (let i = lo; i <= hi; i++) next.add(ids[i])
+                            setSelectedGalleryIds(next)
+                            setDragAnchorId(id)
+                            return
+                          }
                         }
-                      }
-                      setDragAnchorId(id)
-                      setSelectedGalleryIds((prev) => {
-                        const next = new Set(prev)
-                        if (next.has(id)) next.delete(id)
-                        else next.add(id)
-                        return next
-                      })
-                    }}
-                    users={users}
-                    identity={identity}
-                    onOpenOwnerProfile={onOpenOwnerProfile}
-                  />
+                        setDragAnchorId(id)
+                        setSelectedGalleryIds((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(id)) next.delete(id)
+                          else next.add(id)
+                          return next
+                        })
+                      }}
+                      users={users}
+                      identity={identity}
+                      onOpenOwnerProfile={onOpenOwnerProfile}
+                    />
+                  </div>
                 ))}
               </div>
 
@@ -340,7 +416,7 @@ export function GalleryView({
                         setGalleryPage(p => Math.max(0, p - 1))
                         document.getElementById('gallery-section')?.scrollIntoView({ behavior: 'smooth' })
                       }}
-                      className="px-2.5 py-1 text-xs font-semibold text-retro-muted border border-border-glass hover:bg-surface-interactive rounded-lg disabled:opacity-30 cursor-pointer transition-colors"
+                      className="glass-action px-3 py-1.5 text-xs font-semibold rounded-lg disabled:opacity-30 cursor-pointer"
                     >
                       ← Prev
                     </button>
@@ -354,7 +430,7 @@ export function GalleryView({
                         setGalleryPage(p => Math.min(totalPages - 1, p + 1))
                         document.getElementById('gallery-section')?.scrollIntoView({ behavior: 'smooth' })
                       }}
-                      className="px-2.5 py-1 text-xs font-semibold text-retro-muted border border-border-glass hover:bg-surface-interactive rounded-lg disabled:opacity-30 cursor-pointer transition-colors"
+                      className="glass-action px-3 py-1.5 text-xs font-semibold rounded-lg disabled:opacity-30 cursor-pointer"
                     >
                       Next →
                     </button>
@@ -363,7 +439,6 @@ export function GalleryView({
               </div>
             </>
           )}
-        </div>
       </div>
     </div>
 

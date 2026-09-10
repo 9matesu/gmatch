@@ -28,6 +28,7 @@ describe('view routing (hash <-> view)', () => {
 
   it('isRoutedView guards the union', () => {
     expect(isRoutedView('admin')).toBe(true)
+    expect(isRoutedView('rooms')).toBe(true) // courier rooms (plan P3.4)
     expect(isRoutedView('settings')).toBe(false)
   })
 

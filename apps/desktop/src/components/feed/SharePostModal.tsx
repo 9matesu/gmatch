@@ -9,7 +9,7 @@ import {
   Link2,
   Share2,
 } from 'lucide-react';
-import type { FeedPost } from './GoonMatchFeed';
+import type { FeedPost } from './GMatchFeed';
 import { ObjectImage } from '../ObjectImage';
 import { orbitFetch, postShareUrl } from '../../utils/api';
 import { userFacingError } from '../../utils/userError';
@@ -161,7 +161,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
               return (
                 <div
                   key={fId}
-                  className="p-2.5 rounded-2xl hover:bg-white/5 flex items-center justify-between border border-transparent hover:border-border-glass transition-colors"
+                  className="p-2.5 rounded-2xl hover:bg-glass-w5 flex items-center justify-between border border-transparent hover:border-border-glass transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-zinc-700 overflow-hidden border border-border-glass flex items-center justify-center text-xs font-bold">
@@ -210,7 +210,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
             onClick={() => {
               if (navigator.share) {
                 navigator.share({
-                  title: `goonMatch post by ${post.author_name}`,
+                  title: `gMatch post by ${post.author_name}`,
                   url: permalink,
                 });
               } else {

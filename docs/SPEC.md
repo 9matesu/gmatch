@@ -1,6 +1,6 @@
-# goonMatch · Grid — Product Spec
+# gMatch — Product Spec
 
-One Electron desktop app, one multiplayer game. The **goonMatch shell** (feed,
+One Electron desktop app, one multiplayer game. The **gMatch shell** (feed,
 card duels, chat, P2P, hacks, moderation, admin — vendored from the orbit repo
 in the 2026-09 merge) wraps the **Babecock · Idle** game (ex-GoonGrid): click
 pictures to earn **g$**, buy **tags** (parsed live from booru sources) that
@@ -122,11 +122,13 @@ text overlays kept for caption hunts, §6).
 - Browser/dev mode: direct fetch may CORS-fail → offline SVG placeholder
   (generated gradient + tag text + "OFFLINE" badge). Never crash on fetch error.
 - Dedupe by post id across a session; cache last 40 urls.
-- Picture + feed caching (no re-parse, no re-download): parsed post lists are
-  cached per query for 10 min (`<userData>/feed-cache.json`, 100 queries max);
-  picture bytes are cached on disk in `<userData>/image-cache/` (400 files /
-  400 MB, LRU-evicted, `gooncache://` scheme) in Electron, or IndexedDB blobs
-  in browser dev mode. The 5-up/5-down window (past 5 + queue 5 + video
+- Picture + feed caching (no re-parse, no re-download) — **RAM-only since the
+  F1 security fix**: nothing persists to disk. Parsed post lists live in the
+  main process for 10 min (100 queries max); picture bytes live in a
+  main-process LRU (256 MB budget, `gmcache://`) or a renderer session Map
+  in browser dev mode. `init()` destroys the legacy on-disk caches
+  (`<userData>/image-cache/`, `feed-cache.json`) and the legacy IndexedDB
+  store (`goongrid-img`). The 5-up/5-down window (past 5 + queue 5 + video
   posters, images AND videos) is prefetched so skip/back is instant; cache
   stats + Clear live in the left stats panel.
 
@@ -225,7 +227,7 @@ offline earnings). Each +5% click power. Persist across prestige.
   Without TURN, STUN stays for connectivity but srflx never leaks onward.
 ## 11. Save
 
-- zustand state → localStorage `goongrid.save.v1`, autosave every 10s + on unload.
+- zustand state → localStorage `gmatch.save.v1`, autosave every 10s + on unload.
 - Offline earnings = elapsed * GP/s * 50%, capped 8h, shown in modal on load.
 
 ## 12. Release 1.0 — server topology (no central server)
@@ -240,7 +242,7 @@ offline earnings). Each +5% click power. Persist across prestige.
     machine's LAN URLs (`http://<ip>:8790`) to share with friends.
   - **client**: skip the local server; the renderer points at a friend's URL
     (validated `http(s)://host[:port]`, persisted in `userData/server-mode.json`,
-    applied on relaunch). `GOONGRID_SERVER_URL` env overrides both.
+    applied on relaunch). `GMATCH_SERVER_URL` env overrides both.
 - Discovery across machines = everyone on the SAME host's server: WS swarm
   relays presence, `GET /api/users/online` (last_seen ≤ 60s, minus caller)
   seeds a joining client's peer map immediately; WebRTC direct fanout uses
@@ -253,3 +255,23 @@ offline earnings). Each +5% click power. Persist across prestige.
 - Build: `cd apps/desktop && npm run dist`; CI: tag `v*` →
   `.github/workflows/release.yml` (lint+typecheck+test gate → portable exe →
   GitHub release). Unsigned exe → SmartScreen "More info → Run anyway".
+
+## 13. Servers (directory, federation, admin) — v1.1+
+
+ADR-002 (`docs/ADR-002-servers.md`) é canônico; resumo de operação:
+
+- **Criar**: Settings/Servers → "+ Create server" → publica nome/descrição/hint
+  no diretório do central (metadados assinados; conteúdo NUNCA sai do seu PC).
+  Heartbeat de 15 min mantém o listing vivo (24h sem ping = some da lista).
+- **Entrar**: aba Servers → "Join" → `serverSet({mode:'client'})` + relaunch.
+  Servidor com 🔒 pede a senha uma vez; ela é verificada NO HOST (scrypt,
+  lockout 5/15min) e a allowlist fica no SQLite do host — sem token forjável.
+- **Admin**: quem HOSTEIA o nó vê o botão Admin no rodapé da sidebar (PIN da
+  suíte admin existente). A suíte de moderação funciona igual em qualquer nó.
+- **Dashboard**: `GET /api/servers/dashboard` no nó atual → userlist (ids
+  truncados, boolean online 60s), posts/24h, membros. Anônimos veem só números.
+- **Snapshot**: admin exporta/importa o JSON do mundo (`/api/snapshot`), o
+  mecanismo honesto de handoff v1. Tabelas de segurança/transporte do nó
+  (SystemMeta, Sessions, ServerDirectory…) são excluídas por design.
+- **Central** (`VITE_CENTRAL_URL` / Settings→Server): diretório + nada mais;
+  o central não consegue ler conteúdo de nenhum servidor federado.

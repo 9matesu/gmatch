@@ -28,7 +28,14 @@ beforeEach(() => {
 })
 
 describe('clickImage', () => {
+  const stageReady = () => useGame.setState({
+    current: { id: 't1', url: 'https://x/t1.jpg', tags: [] },
+    imageReady: true,
+    foeHp: 0,
+    foeMaxHp: 0,
+  })
   it('every 25th click is a CRIT and banks g$/XP', () => {
+    stageReady()
     const g = useGame.getState()
     for (let i = 0; i < 25; i++) g.clickImage()
     const s = useGame.getState()
@@ -41,8 +48,26 @@ describe('clickImage', () => {
   })
 
   it('reports crit on the 25th click', () => {
+    stageReady()
     for (let i = 0; i < 24; i++) expect(useGame.getState().clickImage().crit).toBe(false)
     expect(useGame.getState().clickImage().crit).toBe(true)
+  })
+
+  it('pays nothing while the stage image is not loaded (no blind clicks)', () => {
+    useGame.setState({
+      current: { id: 't2', url: 'https://x/t2.jpg', tags: [] },
+      imageReady: false,
+      gc: 0,
+    })
+    expect(useGame.getState().clickImage().gain).toBe(0)
+    expect(useGame.getState().gc).toBe(0)
+    expect(useGame.getState().clicks).toBe(0)
+  })
+
+  it('pays nothing with no current post at all', () => {
+    useGame.setState({ current: null, imageReady: true, gc: 0 })
+    expect(useGame.getState().clickImage().gain).toBe(0)
+    expect(useGame.getState().gc).toBe(0)
   })
 })
 
@@ -127,6 +152,7 @@ describe('feed battle', () => {
   it('drains foe HP and sends the KO to the gallery with a bonus', () => {
     useGame.setState({
       current: foe('b1'),
+      imageReady: true,
       queue: [foe('b2')],
       foeHp: 8,
       foeMaxHp: 8,
@@ -148,7 +174,7 @@ describe('feed battle', () => {
 
   it('KO auto-discovers the foe tags as buyable market offers', () => {
     useGame.setState({
-      current: { id: 'd1', url: 'https://x/d1.jpg', tags: ['gangbang', 'huge_breasts'] },
+      current: { id: 'd1', url: 'https://x/d1.jpg', tags: ['gangbang', 'huge_breasts'] }, imageReady: true,
       queue: [],
       foeHp: 8,
       foeMaxHp: 8,
@@ -209,6 +235,7 @@ describe('feed battle', () => {
   it('back after a KO shows the beaten foe with no battle', () => {
     useGame.setState({
       current: foe('b1'),
+      imageReady: true,
       queue: [foe('b2')],
       past: [],
       foeHp: 8,
@@ -268,6 +295,7 @@ describe('feed battle', () => {
     useGame.setState({
       gc: 100_000,
       current: foe('42'),
+      imageReady: true,
       queue: [],
       foeHp: 8,
       foeMaxHp: 8,

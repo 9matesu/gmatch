@@ -1,6 +1,11 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { auth } from './routes/auth'
+import { mail } from './routes/mail'
+import { turn } from './routes/turn'
+import { servers } from './routes/servers'
+import { passwordRoutes, passwordGate } from './routes/password'
+import { snapshot } from './routes/snapshot'
 import { securityHeaders } from './middleware/security-headers'
 import { rateLimit } from './middleware/rate-limit'
 import { bodySizeLimit } from './middleware/body-size-limit'
@@ -53,6 +58,7 @@ app.use('*', cors({
     'X-Request-ID',
     'Idempotency-Key',
     'X-Idempotency-Key',
+    'X-Orbit-Sealed',
   ],
   allowMethods: [
     'GET',
@@ -73,6 +79,8 @@ app.use('*', cors({
 
 app.use('*', securityHeaders)
 app.use('*', bodySizeLimit)
+import { unsealRequest } from './middleware/unseal'
+app.use('*', unsealRequest)
 
 app.get('/api/health', rateLimit, (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() })
@@ -87,6 +95,18 @@ app.get('/api/discord-invite', rateLimit, async (c) => {
   } catch {
     return c.json({ url: null })
   }
+})
+
+// Node identity (security plan T2): public half of the node X25519 transport
+// key. Clients cache this and seal mutation bodies to it (X-Orbit-Sealed).
+// No auth, no user data — a static-ish capability advertisement.
+app.get('/api/identity', (c) => {
+  const pubHex = (c.env as { NODE_PUB_HEX?: string })?.NODE_PUB_HEX || null
+  return c.json({
+    server_pubkey: pubHex,
+    sealed_available: !!pubHex,
+    sealed_required: !!(c.env as { API_SEALED_ONLY?: string })?.API_SEALED_ONLY,
+  })
 })
 
 app.get('/.well-known/security.txt', (c) => {
@@ -132,7 +152,18 @@ import { reportRouter } from './routes/reports'
 app.use('/api/*', rateLimit)
 app.use('/.well-known/*', rateLimit)
 
+// Server-password gate (T5): rejects unverified newcomers on protected paths
+// (reads + server/health/identity/directory exempt). Registered BEFORE all
+// route mounts so Hono dispatches it first; a forged X-Orbit-Id that slips
+// past still dies at orbitAuth signature verification downstream.
+app.use('/api/*', passwordGate())
+
 app.route('/api/auth', auth)
+app.route('/api/mail', mail)
+app.route('/api/turn', turn)
+app.route('/api/servers', servers)
+app.route('/api/server', passwordRoutes)
+app.route('/api/snapshot', snapshot)
 app.route('/api/objects', objects)
 app.route('/api/stories', objects)
 app.route('/api/friends', friends)

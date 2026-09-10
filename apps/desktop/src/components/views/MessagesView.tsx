@@ -1,19 +1,20 @@
 "use client";
 
 // Extracted verbatim from App.tsx `mainView === 'messages'` branches:
-// the full DM panel (SocialPanel + GoonMatchDMs + NotificationsPanel) and the
+// the full DM panel (SocialPanel + GMatchDMs + NotificationsPanel) and the
 // minimized placeholder. `handleSetMainView`/setters threaded as props.
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { User } from '@orbit/shared';
 import type { ChatMessage } from '../../hooks/useP2P';
 import type { useLobby } from '../../hooks/useLobby';
 import { SocialPanel, type SocialPanelTab } from '../chat/SocialPanel';
-import { GoonMatchDMs, type PeerInfo, type ThreadItem, type GroupInfo } from '../chat/GoonMatchDMs';
+import { GMatchDMs, type PeerInfo, type ThreadItem, type GroupInfo } from '../chat/GMatchDMs';
+import type { GroupMember } from '../chat/GroupMembersPopover';
 import { NotificationsPanel } from '../NotificationsPanel';
 import type { MainViewType } from '../home/HomeFooter';
 
 type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
-type GamesSubTab = 'duel' | 'cards' | 'decks' | 'babecock' | 'patrol' | 'ranks' | 'store';
+type GamesSubTab = 'duel' | 'cards' | 'babecock' | 'ranks' | 'store';
 
 export function MessagesView({
   panelTab,
@@ -44,6 +45,8 @@ export function MessagesView({
   createGroup,
   leaveGroup,
   loadGroupMessages,
+  loadGroupMembers,
+  addGroupMembers,
   setPmPeer,
   setSelectedProfileUser,
   setViewerMessage,
@@ -82,6 +85,8 @@ export function MessagesView({
   createGroup: (name: string, memberIds: string[]) => Promise<string | null>;
   leaveGroup: (groupId: string) => Promise<void> | void;
   loadGroupMessages: (groupId: string) => void;
+  loadGroupMembers?: (groupId: string) => Promise<GroupMember[]>;
+  addGroupMembers?: (groupId: string, ids: string[]) => Promise<boolean> | void;
   setPmPeer: React.Dispatch<React.SetStateAction<User | null>>;
   setSelectedProfileUser: (user: User) => void;
   setViewerMessage: (msg: ChatMessage | null) => void;
@@ -101,7 +106,7 @@ export function MessagesView({
         chatUnread={pmUnreadCount}
         notificationUnread={lobby.unreadCount}
         dm={
-          <GoonMatchDMs
+          <GMatchDMs
             identity={identity}
             chatMessages={chatMessages}
             pmMessages={pmPeer ? pmMessagesByPeer[pmPeer.id || (pmPeer as any).orbitId || ''] || [] : []}
@@ -152,11 +157,12 @@ export function MessagesView({
             }}
             onLeaveGroup={leaveGroup}
             onLoadGroupMessages={loadGroupMessages}
+            onLoadGroupMembers={loadGroupMembers}
+            onAddGroupMembers={addGroupMembers}
             onOpenProfile={(userId) => {
               const t = users.find((u) => u.id === userId || (u as any).orbitId === userId);
               if (t) setSelectedProfileUser(t);
             }}
-            onMinimize={() => setDmMinimized(true)}
             onOpenImage={(msg) => setViewerMessage(msg)}
             onDeleteThread={deleteThread}
             onBackToThreads={() => { setPmPeer(null); loadPmThreads(); }}

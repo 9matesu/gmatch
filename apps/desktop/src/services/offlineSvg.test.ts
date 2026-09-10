@@ -18,6 +18,6 @@ describe('offlineSvg (SPEC §6)', () => {
   })
 
   it('handles empty tag list', () => {
-    expect(offlineSvg([])).toContain('goongrid')
+    expect(offlineSvg([])).toContain('gmatch')
   })
 })

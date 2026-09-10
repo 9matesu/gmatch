@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { getSecureItem, setSecureItem, removeSecureItem } from '../utils/secure-storage';
 import { OrbitIdentity, generateIdentity, restoreIdentity } from '@orbit/crypto';
 import { clearObjects } from '../utils/storage';
 import { logger } from '../utils/logger';
@@ -48,7 +49,7 @@ export function useIdentity() {
     if (typeof window === 'undefined') return;
     let stored: string | null = null;
     try {
-      stored = localStorage.getItem('orbit_identity');
+      stored = getSecureItem('orbit_identity');
     } catch {
       // Storage unavailable — never block on it; show the landing/login.
       setIsLoaded(true);
@@ -81,11 +82,12 @@ export function useIdentity() {
       for (const key of USER_STORAGE_KEYS) {
         if (key !== 'orbit_identity') {
           try { localStorage.removeItem(key); } catch {}
+          removeSecureItem(key)
         }
       }
     }
     const newIdentity = generateIdentity();
-    localStorage.setItem('orbit_identity', JSON.stringify(newIdentity));
+    setSecureItem('orbit_identity', JSON.stringify(newIdentity));
     setIdentity(newIdentity);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('orbit-identity-changed', { detail: newIdentity }));
@@ -121,7 +123,7 @@ export function useIdentity() {
     try {
       const encKey = encryptionPrivHex && encryptionPrivHex.trim() ? encryptionPrivHex.trim() : privateKeyHex.trim();
       const newIdentity = restoreIdentity(privateKeyHex.trim(), encKey);
-      localStorage.setItem('orbit_identity', JSON.stringify(newIdentity));
+      setSecureItem('orbit_identity', JSON.stringify(newIdentity));
       setIdentity(newIdentity);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('orbit-identity-changed', { detail: newIdentity }));
@@ -186,7 +188,7 @@ export function useIdentity() {
       const restored = restoreIdentity(privKey.trim(), encPrivKey.trim());
 
       // Save restored identity
-      localStorage.setItem('orbit_identity', JSON.stringify(restored));
+      setSecureItem('orbit_identity', JSON.stringify(restored));
 
       // Restore profile name and tags if present in the export payload
       if (typeof parsed.displayName === 'string' && parsed.displayName.trim()) {
@@ -213,6 +215,7 @@ export function useIdentity() {
     if (typeof window !== 'undefined') {
       for (const key of USER_STORAGE_KEYS) {
         try { localStorage.removeItem(key); } catch {}
+        removeSecureItem(key)
       }
       try { sessionStorage.clear(); } catch {}
       void clearObjects();

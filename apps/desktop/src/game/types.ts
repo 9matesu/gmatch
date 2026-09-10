@@ -49,6 +49,23 @@ export interface BooruPost {
 /** Single/grid view for the feed stage. */
 export type ViewMode = 'single' | 'grid'
 
+/**
+ * Player-owned idle-clicker image source. `urls` = pasted direct media
+ * links (used as-is — only add sources you trust); `folder` = a
+ * dialog-picked local directory served by the main process over
+ * idle-file:// (grant id + display path persisted, never file content).
+ */
+export interface CustomSource {
+  id: string
+  label: string
+  kind: 'urls' | 'folder'
+  enabled: boolean
+  urls: string[]
+  folderId: string | null
+  folderPath: string | null
+  addedAt: number
+}
+
 /** One 3x3 grid square: its own foe with its own HP. */
 export interface GridCell {
   post: BooruPost

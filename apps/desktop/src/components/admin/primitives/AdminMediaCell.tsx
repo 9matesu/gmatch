@@ -1,6 +1,7 @@
 "use client";
 
 import { useObjectImage } from "../../../hooks/useObjectImage";
+import { getSecureItem } from '../../../utils/secure-storage'
 import { resolveMediaUrl, isMediaVideo } from "../../../utils/media";
 import { useState, useMemo } from "react";
 import { ZoomIn } from "lucide-react";
@@ -36,7 +37,7 @@ export function AdminMediaCell({
     if (identity) return identity;
     if (typeof window === 'undefined') return null;
     try {
-      const raw = localStorage.getItem('orbit_admin_identity') || localStorage.getItem('orbit_identity');
+      const raw = getSecureItem('orbit_admin_identity') || getSecureItem('orbit_identity');
       return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
@@ -114,7 +115,7 @@ export function AdminMediaCell({
           <button
             type="button"
             onClick={e => { e.stopPropagation(); handleClick(); }}
-            className="p-1.5 bg-surface-elevated border border-border-glass rounded text-retro-fg hover:bg-white/10 transition-colors"
+            className="p-1.5 bg-surface-elevated border border-border-glass rounded text-retro-fg hover:bg-glass-w10 transition-colors"
             aria-label="Zoom"
           >
             <ZoomIn className="w-4 h-4" />

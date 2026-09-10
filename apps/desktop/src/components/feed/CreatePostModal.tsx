@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { playPress, playWin } from '../../utils/sounds';
+import { useCropper } from '../../hooks/useCropper';
+import { isCropableImage } from '../CropModal';
 import {
   X,
   MapPin,
@@ -50,6 +53,7 @@ export function CreatePostModal({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { crop, cropper } = useCropper();
 
   const startCamera = async () => {
     setCameraError(null);
@@ -100,35 +104,36 @@ export function CreatePostModal({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+    const shotDataUrl = canvas.toDataURL('image/jpeg', 0.9);
 
-    canvas.toBlob((blob) => {
-      if (blob) {
-        const file = new File([blob], `camera_${Date.now()}.jpg`, { type: 'image/jpeg' });
-        const newItem: PostMediaItem = {
-          id: 'cam_' + Date.now(),
-          file,
-          previewUrl: dataUrl,
-        };
-        setMediaList((prev) => [...prev, newItem]);
-        setActiveMediaIndex(mediaList.length);
-        playPress(880);
-      }
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      let file = new File([blob], `camera_${Date.now()}.jpg`, { type: 'image/jpeg' });
+      let previewUrl = shotDataUrl;
+      const res = await crop(file, { aspect: '4:5', title: 'Crop post image' });
+      if (!res) return;
+      if (res.file) file = res.file;
+      previewUrl = res.dataUrl;
+      const newItem: PostMediaItem = { id: 'cam_' + Date.now(), file, previewUrl };
+      setMediaList((prev) => { setActiveMediaIndex(prev.length); return [...prev, newItem]; });
+      playPress(880);
     }, 'image/jpeg', 0.9);
   };
 
-  const handleFilesSelected = (files: FileList | null) => {
+  const handleFilesSelected = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const newItems: PostMediaItem[] = [];
     for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      newItems.push({
-        id: 'file_' + Date.now() + '_' + i,
-        file,
-        previewUrl: URL.createObjectURL(file),
-      });
+      let file = files[i];
+      let previewUrl = URL.createObjectURL(file);
+      if (isCropableImage(file)) {
+        const res = await crop(file, { aspect: '4:5', title: 'Crop post image' });
+        if (!res) continue;
+        if (res.file) file = res.file;
+        previewUrl = res.dataUrl;
+      }
+      const newItem: PostMediaItem = { id: 'file_' + Date.now() + '_' + i, file, previewUrl };
+      setMediaList((prev) => [...prev, newItem]);
     }
-    setMediaList((prev) => [...prev, ...newItems]);
     playPress(800);
   };
 
@@ -221,7 +226,7 @@ export function CreatePostModal({
       }
 
       playWin();
-      toast?.('Post shared to goonMatch!', 'success');
+      toast?.('Post shared to gMatch!', 'success');
 
       onPostCreated?.({
         id: objectId,
@@ -328,7 +333,7 @@ export function CreatePostModal({
           {activeTab === 'upload' && (
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-border-glass hover:border-retro-accent rounded-2xl bg-surface-interactive hover:bg-retro-accent/10 p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all text-center group"
+              className="border-2 border-dashed border-border-glass hover:border-retro-accent rounded-2xl bg-surface-interactive hover:bg-glass-w10 p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all text-center group"
             >
               <UploadCloud className="w-8 h-8 text-retro-muted group-hover:text-retro-accent group-hover:scale-110 transition-transform" />
               <p className="text-xs font-bold text-retro-body">Drag &amp; drop photos or click to browse</p>
@@ -531,6 +536,7 @@ export function CreatePostModal({
           )}
         </div>
       </div>
+      {cropper && createPortal(cropper, document.body)}
     </div>
   );
 }

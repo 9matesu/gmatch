@@ -2,9 +2,10 @@
 
 // Extracted verbatim from App.tsx `mainView === 'profile'` branch.
 import type { OrbitIdentity } from '@orbit/crypto';
+import { getSecureItem, setSecureItem } from '../../utils/secure-storage'
 import type { OrbitObject, User } from '@orbit/shared';
-import { GoonMatchProfile } from '../profile/GoonMatchProfile';
-import type { FeedPost } from '../feed/GoonMatchFeed';
+import { GMatchProfile } from '../profile/GMatchProfile';
+import type { FeedPost } from '../feed/GMatchFeed';
 
 type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 type MyProfileState = { displayName: string; tags: string[]; isAdmin: boolean; pfpUrl: string };
@@ -55,7 +56,7 @@ export function ProfileView({
 }) {
   return (
     <div className="p-2 sm:p-6 max-w-4xl mx-auto w-full">
-      <GoonMatchProfile
+      <GMatchProfile
         identity={identity}
         myUser={myUser}
         profilePic={profilePics[identity?.orbitId || '']}
@@ -76,7 +77,7 @@ export function ProfileView({
           if (updated.pfpUrl) {
             setProfilePics((prev) => {
               const next = { ...prev, [identity?.orbitId || '']: updated.pfpUrl as string };
-              try { localStorage.setItem('goonmatch_pfps', JSON.stringify(next)); } catch { }
+              try { setSecureItem('goonmatch_pfps', JSON.stringify(next)); } catch { }
               return next;
             });
             try { localStorage.setItem('orbit_pfp_url', updated.pfpUrl); } catch { }

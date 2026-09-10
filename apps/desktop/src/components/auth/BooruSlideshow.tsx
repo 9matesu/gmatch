@@ -165,14 +165,14 @@ export function BooruSlideshow({ className = '' }: { className?: string }) {
           </div>
 
           {/* Bottom Home Indicator Bar */}
-          <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 z-30 w-24 h-1 bg-white/20 rounded-full backdrop-blur-sm pointer-events-none" />
+          <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 z-30 w-24 h-1 bg-glass-w20 rounded-full backdrop-blur-sm pointer-events-none" />
 
           {/* Stack of Slides */}
           {images.map((img, idx) => (
             <img
               key={img.url + idx}
               src={resolveMediaUrl(img.url)}
-              alt={img.caption || 'goonMatch feed'}
+              alt={img.caption || 'gMatch feed'}
               loading={idx === 0 ? 'eager' : 'lazy'}
               className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
                 idx === activeIndex ? 'opacity-100' : 'opacity-0 pointer-events-none'

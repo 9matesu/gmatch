@@ -1,6 +1,6 @@
-import type { FeedPost } from '../components/feed/GoonMatchFeed';
+import type { FeedPost } from '../components/feed/GMatchFeed';
 
-export type GameMode = 'duel' | 'babecock' | 'patrol' | 'ranks' | 'store' | 'discord' | 'coffee';
+export type GameMode = 'duel' | 'babecock' | 'ranks' | 'store' | 'discord' | 'coffee';
 
 export interface GameAdTemplate {
   mode: GameMode;
@@ -32,7 +32,7 @@ export const GAME_AD_TEMPLATES: GameAdTemplate[] = [
   {
     mode: 'coffee',
     gameName: 'Buy Me A Coffee',
-    tagline: 'Support goonMatch development and unlock exclusive supporter badges & perks.',
+    tagline: 'Support gMatch development and unlock exclusive supporter badges & perks.',
     ctaLabel: 'Buy a Coffee',
     gradient: 'from-amber-400 via-yellow-500 to-amber-600',
     icon: 'coffee',
@@ -55,15 +55,6 @@ export const GAME_AD_TEMPLATES: GameAdTemplate[] = [
     gradient: 'from-amber-400 via-orange-500 to-rose-600',
     icon: 'babecock',
     badge: 'LIVE NOW',
-  },
-  {
-    mode: 'patrol',
-    gameName: 'Mod Patrol',
-    tagline: 'Speed-run content review shifts and earn double clout multipliers.',
-    ctaLabel: 'Join the Shift',
-    gradient: 'from-sky-500 via-blue-600 to-indigo-700',
-    icon: 'patrol',
-    badge: '2x CLOUT WEEKEND',
   },
   {
     mode: 'ranks',
@@ -99,19 +90,19 @@ function seededRandom(seed: number): () => number {
   };
 }
 
-const IDS = ['post_ad_discord', 'post_ad_coffee', 'post_ad_duel', 'post_ad_babecock', 'post_ad_patrol', 'post_ad_ranks', 'post_ad_store'];
+const IDS = ['post_ad_discord', 'post_ad_coffee', 'post_ad_duel', 'post_ad_babecock', 'post_ad_ranks', 'post_ad_store'];
 
 export function buildSponsoredPost(seed: number): SponsoredFeedPost {
   const template = pickRandomTemplate(seed);
   const players = 340 + Math.floor(seededRandom(seed + 7)() * 2480);
   return {
     id: `${IDS[GAME_AD_TEMPLATES.indexOf(template)]}_${seed}`,
-    author_id: 'goonMatch_ads',
-    author_name: 'goonMatch Arcade',
+    author_id: 'gMatch_ads',
+    author_name: 'gMatch Arcade',
     author_avatar: null,
     url: '',
     caption: `${template.tagline} #${template.badge.toLowerCase().replace(/[^a-z0-9]+/g, '')}`,
-    location: 'goonMatch Arcade',
+    location: 'gMatch Arcade',
     tags: ['sponsored', 'games', template.mode],
     created_at: new Date().toISOString(),
     like_count: 0,

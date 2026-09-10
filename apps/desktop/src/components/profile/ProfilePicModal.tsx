@@ -4,6 +4,9 @@ import { useState } from 'react';
 import { Camera, UploadCloud, Link as LinkIcon, X, Check } from 'lucide-react';
 import { CameraCapture } from '../CameraCapture';
 import { DropZone } from '../DropZone';
+import { useCropper } from '../../hooks/useCropper';
+import { isCropableImage } from '../CropModal';
+import { fileToThumbDataUrl } from '../../utils/profile';
 import { playPress, playWin } from '../../utils/sounds';
 
 interface ProfilePicModalProps {
@@ -25,17 +28,24 @@ export function ProfilePicModal({
   const [preview, setPreview] = useState<string>(currentPfp);
   const [urlInput, setUrlInput] = useState('');
   const [rawFile, setRawFile] = useState<File | null>(null);
+  const { crop, cropper } = useCropper();
 
   if (!isOpen) return null;
 
-  const handleFiles = (files: FileList | File[]) => {
-    if (files.length > 0) {
-      const file = files[0];
+  const handleFiles = async (files: FileList | File[]) => {
+    if (files.length === 0) return;
+    let file = files[0];
+    if (isCropableImage(file)) {
+      const res = await crop(file, { aspect: '1:1', title: 'Crop profile photo' });
+      if (!res) return;
+      if (res.file) file = res.file;
       setRawFile(file);
-      const url = URL.createObjectURL(file);
-      setPreview(url);
-      playPress(750);
+      setPreview(res.dataUrl);
+    } else {
+      setRawFile(file);
+      setPreview(URL.createObjectURL(file));
     }
+    playPress(750);
   };
 
   const handleUrlChange = (val: string) => {
@@ -46,21 +56,52 @@ export function ProfilePicModal({
     }
   };
 
-  const handleCameraCapture = (file: File) => {
-    setRawFile(file);
-    const url = URL.createObjectURL(file);
-    setPreview(url);
+  const handleCameraCapture = async (file: File) => {
+    let target = file;
+    let previewOut = URL.createObjectURL(file);
+    if (isCropableImage(file)) {
+      const res = await crop(file, { aspect: '1:1', title: 'Crop profile photo' });
+      if (!res) return;
+      if (res.file) target = res.file;
+      previewOut = res.dataUrl;
+    }
+    setRawFile(target);
+    setPreview(previewOut);
     setTab('upload');
     playPress(800);
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!preview) {
       toast?.('Please select a profile photo', 'warning');
       return;
     }
+    let finalUrl = preview;
+    // Crop remote URLs too (falls back to the original when CORS taints).
+    if (/^https?:\/\//i.test(preview)) {
+      const res = await crop(preview, { aspect: '1:1', title: 'Crop profile photo' });
+      if (!res) return;
+      finalUrl = res.dataUrl;
+    }
+    // Persist a compact 256px JPEG thumbnail (same helper onboarding uses):
+    // blob: dies on reload and MB-scale data URLs bloat every lobby/users
+    // payload — both were the "pfp not appearing in lobby" bug.
+    if (rawFile) {
+      try {
+        finalUrl = await fileToThumbDataUrl(rawFile);
+      } catch {
+        /* keep the cropped preview if thumbnailing fails */
+      }
+    } else if (/^(data:|blob:)/.test(finalUrl)) {
+      try {
+        const blob = await fetch(finalUrl).then((r) => r.blob());
+        finalUrl = await fileToThumbDataUrl(new File([blob], 'pfp.jpg', { type: blob.type }));
+      } catch {
+        /* keep the original when conversion fails */
+      }
+    }
     playWin();
-    onSave(preview);
+    onSave(finalUrl);
     toast?.('Profile photo updated', 'success');
     onClose();
   };
@@ -181,6 +222,7 @@ export function ProfilePicModal({
           </button>
         </div>
       </div>
+      {cropper}
     </div>
   );
 }

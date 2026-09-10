@@ -38,7 +38,7 @@ users.get('/:id/pfp', async (c) => {
       return new Response(buf, {
         headers: {
           'Content-Type': mimeType,
-          'Cache-Control': 'public, max-age=86400',
+          'Cache-Control': 'no-store',
           'Access-Control-Allow-Origin': '*',
         },
       })
@@ -608,50 +608,60 @@ users.get('/:id/following', async (c) => {
 })
 
 /** Cascading-account deletion shared by the self-service DELETE /account and
- * the admin moderation flow. Purges every row that references the user and all
- * objects they ever sent, then recomputes affected peers' counters. */
+ * the admin moderation flow. Purges every row the account ever touched —
+ * content first (shared with wipeUserContent), then the remaining
+ * user-scoped rows, then the account itself. Safety records (bans, report
+ * history) are retained but anonymized. Returns peers needing recompute. */
 export async function deleteUserCascade(
   db: D1Turso,
   userId: string,
   opts: { BUCKET?: LocalBlobStore }
 ): Promise<string[]> {
-  const owned = await db.prepare('SELECT id FROM Objects WHERE owner_id = ?').bind(userId).all()
-  const objectIds = (owned.results as any[]).map(o => o.id)
-
-  // Users who liked the deleted account's objects need their counters recomputed
-  let affectedUsers: string[] = []
-  if (objectIds.length > 0) {
-    const likers = await db.prepare(
-      `SELECT DISTINCT user_id FROM Likes WHERE object_id IN (${objectIds.map(() => '?').join(',')})`
-    ).bind(...objectIds).all<{ user_id: string }>()
-    affectedUsers = likers.results.map(r => r.user_id).filter(Boolean)
-  }
-
-  if (opts.BUCKET && objectIds.length > 0) {
-    const deletePromises = objectIds.map((id: string) =>
-      opts.BUCKET!.delete(`objects/${id}`).catch(() => {})
-    )
-    await Promise.all(deletePromises)
-  }
+  // Objects/likes/PMs/chats/cards/decks/groups/notifications (bucket blobs too).
+  const affectedUsers = await wipeUserContent(db, userId, opts)
 
   const stmts: Array<{ run: () => Promise<any> }> = []
-  stmts.push(db.prepare('DELETE FROM Recipients WHERE recipient_id = ?').bind(userId))
-  if (objectIds.length > 0) {
-    stmts.push(db.prepare(`DELETE FROM Recipients WHERE object_id IN (${objectIds.map(() => '?').join(',')})`).bind(...objectIds))
+  const del = (sql: string, ...args: unknown[]) => {
+    stmts.push(db.prepare(sql).bind(...args as never[]))
   }
-  stmts.push(db.prepare('DELETE FROM Favorites WHERE user_id = ?').bind(userId))
-  stmts.push(db.prepare('DELETE FROM Likes WHERE user_id = ?').bind(userId))
-  if (objectIds.length > 0) {
-    stmts.push(db.prepare(`DELETE FROM Likes WHERE object_id IN (${objectIds.map(() => '?').join(',')})`).bind(...objectIds))
-  }
-  stmts.push(db.prepare('DELETE FROM FriendRequests WHERE sender_id = ? OR receiver_id = ?').bind(userId, userId))
-  stmts.push(db.prepare('DELETE FROM Friends WHERE user_id = ? OR friend_id = ?').bind(userId, userId))
-  stmts.push(db.prepare('DELETE FROM Devices WHERE user_id = ?').bind(userId))
-  stmts.push(db.prepare('DELETE FROM Sessions WHERE user_id = ?').bind(userId))
-  if (objectIds.length > 0) {
-    stmts.push(db.prepare(`DELETE FROM Objects WHERE id IN (${objectIds.map(() => '?').join(',')})`).bind(...objectIds))
-  }
-  stmts.push(db.prepare('DELETE FROM Users WHERE id = ?').bind(userId))
+  del('DELETE FROM Followers WHERE follower_id = ? OR followee_id = ?', userId, userId)
+  del('DELETE FROM UserBlocks WHERE blocker_id = ? OR blocked_id = ?', userId, userId)
+  del('DELETE FROM ChatGroupMembers WHERE user_id = ?', userId)
+  del('DELETE FROM Recommendations WHERE user_id = ?', userId)
+  del('DELETE FROM MatchPairs WHERE user_a = ? OR user_b = ?', userId, userId)
+  del('DELETE FROM TierMatches WHERE user_a = ? OR user_b = ?', userId, userId)
+  del('DELETE FROM GameMatches WHERE user_a = ? OR user_b = ?', userId, userId)
+  del('DELETE FROM MatchArchive WHERE user_a = ? OR user_b = ?', userId, userId)
+  del('DELETE FROM MatchCards WHERE owner_id = ?', userId)
+  del('DELETE FROM MatchRoomPlayers WHERE user_id = ?', userId)
+  del('DELETE FROM MatchRooms WHERE owner_id = ?', userId)
+  del('DELETE FROM LeagueRank WHERE user_id = ?', userId)
+  del('DELETE FROM Playtime WHERE user_id = ?', userId)
+  del('DELETE FROM StoreUnlocks WHERE user_id = ?', userId)
+  del('DELETE FROM UserInventory WHERE user_id = ?', userId)
+  del('DELETE FROM Wallets WHERE user_id = ?', userId)
+  del('DELETE FROM LedgerTransactions WHERE user_id = ?', userId)
+  del('DELETE FROM EconomicOperations WHERE user_id = ?', userId)
+  del('DELETE FROM CardOwnership WHERE owner_id = ?', userId)
+  del('DELETE FROM Comments WHERE author_id = ?', userId)
+  del('DELETE FROM CommentLikes WHERE user_id = ?', userId)
+  del('DELETE FROM Saves WHERE user_id = ?', userId)
+  del('DELETE FROM DominationActions WHERE dominator_id = ? OR victim_id = ?', userId, userId)
+  del('DELETE FROM BabecockEntries WHERE user_id = ?', userId)
+  del('DELETE FROM BabecockInvites WHERE host_id = ? OR invitee_id = ?', userId, userId)
+  del('DELETE FROM BabecockRounds WHERE host_id = ?', userId)
+  del('DELETE FROM ModerationPatrolRewards WHERE user_id = ?', userId)
+  del('DELETE FROM SessionEvents WHERE user_id = ?', userId)
+  del('DELETE FROM ServerDirectory WHERE owner_id = ?', userId)
+  del('DELETE FROM Devices WHERE user_id = ?', userId)
+  del('DELETE FROM Sessions WHERE user_id = ?', userId)
+  // Safety records stay (zero-tolerance enforcement outlives the account) but
+  // lose their link to this identity — the orbit id no longer resolves.
+  del(`UPDATE UserReports SET reporter_id = 'deleted' WHERE reporter_id = ?`, userId)
+  del(`UPDATE UserReports SET reported_id = 'deleted' WHERE reported_id = ?`, userId)
+  del(`UPDATE ContentReports SET reporter_id = 'deleted' WHERE reporter_id = ?`, userId)
+  del(`UPDATE ReportedImages SET reporter_id = 'deleted' WHERE reporter_id = ?`, userId)
+  del('DELETE FROM Users WHERE id = ?', userId)
 
   await db.batch(stmts)
 
@@ -823,7 +833,7 @@ users.post('/:id/report', async (c) => {
 // Active in-memory hack debuffs with expiration
 interface ServerHackDebuff {
   id: string
-  type: 'deny' | 'takeover' | 'mobile_virus'
+  type: 'deny' | 'mobile_virus'
   attacker_id: string
   attacker_name: string
   target_id: string
@@ -966,23 +976,26 @@ if (baseItem.id === 'item-flash-drop') {
     if (!targetId) return c.json({ error: 'Target player required for hacking service' }, 400)
 
     // Hacks can only be deployed against players online right now (strict 60s
-    // last_seen window, matching the roster + duel-invite gate).
+    // last_seen window, matching the roster + duel-invite gate) who explicitly
+    // opted in to hack payloads (allowHacks, default off).
     const onlineCutoff = new Date(Date.now() - 60_000).toISOString()
-    const target = await db.prepare("SELECT display_name FROM Users WHERE id = ? AND last_seen IS NOT NULL AND datetime(last_seen) >= datetime(?)").bind(targetId, onlineCutoff).first<{ display_name: string | null }>()
+    const target = await db.prepare("SELECT display_name, pc_domination_settings FROM Users WHERE id = ? AND last_seen IS NOT NULL AND datetime(last_seen) >= datetime(?)").bind(targetId, onlineCutoff).first<{ display_name: string | null; pc_domination_settings: string | null }>()
     if (!target) return c.json({ error: 'That player is not online right now' }, 409)
+    let targetConsent: Record<string, unknown> = {}
+    try { targetConsent = JSON.parse(target.pc_domination_settings || '{}') } catch { /* deny */ }
+    if (targetConsent.allowHacks !== true) {
+      return c.json({ error: 'That player has not allowed hacks on their account' }, 403)
+    }
     const me = await db.prepare('SELECT display_name FROM Users WHERE id = ?').bind(orbitId).first<{ display_name: string | null }>()
     const targetName = target?.display_name?.trim() || 'Unknown User'
     const attackerName = me?.display_name?.trim() || 'Unknown User'
 
     let durationMs = 5 * 60 * 1000
-    let hackType: 'deny' | 'takeover' | 'mobile_virus' = 'deny'
+    let hackType: 'deny' | 'mobile_virus' = 'deny'
 
     if (baseItem.id === 'item-hack-deny') {
       hackType = 'deny'
       durationMs = 5 * 60 * 1000
-    } else if (baseItem.id === 'item-hack-takeover') {
-      hackType = 'takeover'
-      durationMs = 15 * 60 * 1000
     } else if (baseItem.id === 'item-hack-mobile') {
       hackType = 'mobile_virus'
       durationMs = 60 * 1000

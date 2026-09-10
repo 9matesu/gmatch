@@ -57,12 +57,12 @@ export function TargetSelectorModal({
         {/* Header */}
         <div className="p-4 border-b border-border-glass flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-rose-100 border border-rose-200 flex items-center justify-center text-rose-600">
+            <div className="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400">
               <ShieldAlert className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-retro-fg">Select Hacking Target</h3>
-              <p className="text-[10px] text-retro-muted">Deploy {item.name} for g$ {item.cost.toLocaleString()}</p>
+              <h3 className="text-sm font-black text-retro-fg">Pick a player</h3>
+              <p className="text-[10px] text-retro-muted">Use {item.name} on them for {item.cost.toLocaleString()} g$</p>
             </div>
           </div>
           <button
@@ -82,7 +82,7 @@ export function TargetSelectorModal({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search active players..."
+              placeholder="Search players..."
               className="w-full bg-surface-raised border border-border-glass rounded-xl pl-9 pr-3 py-2 text-xs text-retro-fg outline-none focus:border-rose-500 transition-colors placeholder:text-[#8e8e8e]"
             />
           </div>
@@ -131,7 +131,7 @@ export function TargetSelectorModal({
 
           {filteredPeers.length === 0 && (
             <div className="py-8 text-center text-xs text-[#8e8e8e] italic">
-              No online players found in lobby.
+              Nobody is online to target right now.
             </div>
           )}
         </div>
@@ -151,7 +151,7 @@ export function TargetSelectorModal({
             disabled={!selectedTarget}
             className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer shadow-xs transition-colors"
           >
-            Deploy Hack
+            Use it
           </button>
         </div>
       </div>

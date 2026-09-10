@@ -91,7 +91,7 @@ export function AnalyticsTab({ identity, pinVerified }: AnalyticsTabProps) {
   }, [activeSubTab, fetchAuditLog, fetchDailyStats, fetchTraffic]);
 
   const renderAuditRow = (entry: AdminAuditEntry) => (
-    <div key={entry.id} className="border-b border-border-subtle last:border-0 p-3 hover:bg-white/5 transition-colors">
+    <div key={entry.id} className="border-b border-border-subtle last:border-0 p-3 hover:bg-glass-w5 transition-colors">
       <div className="flex items-center gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -275,7 +275,7 @@ export function AnalyticsTab({ identity, pinVerified }: AnalyticsTabProps) {
             ) : (
               <div className="divide-y divide-border-subtle">
                 {dailyStats.map((stat) => (
-                  <div key={stat.date} className="p-3 hover:bg-white/5 transition-colors">
+                  <div key={stat.date} className="p-3 hover:bg-glass-w5 transition-colors">
                     <div className="grid grid-cols-2 md:grid-cols-7 gap-3 text-center">
                       <div>
                         <p className="text-xs font-bold text-retro-fg">{stat.date}</p>

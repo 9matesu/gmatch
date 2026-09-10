@@ -347,7 +347,7 @@ export function IdentityModal({
                     if (files[0]) void handleFullConfigRestore(files[0]);
                   }}
                 >
-                  <div className={`p-3 text-center border rounded-lg ${configRestoring ? "border-retro-accent/30 bg-retro-accent/5" : "border-retro-border"}`}>
+                  <div className={`p-3 text-center border rounded-lg ${configRestoring ? "border-retro-accent/30 bg-glass-w5" : "border-retro-border"}`}>
                     <div className="text-xs font-medium text-retro-accent">
                       {configRestoring ? "Restoring..." : "Drop .goon-config.json here"}
                     </div>

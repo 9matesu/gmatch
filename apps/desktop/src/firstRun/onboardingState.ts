@@ -1,5 +1,6 @@
 export const ONBOARDING_STEPS = [
   'welcome',
+  'feed',
   'ready',
 ] as const;
 

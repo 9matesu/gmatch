@@ -200,6 +200,9 @@ describe('store purchase uses the g$ wallet', () => {
 
     const target = createTestIdentity()
     await app.request('/api/users', { headers: authHeaders(target, 'GET', '/api/users') }, env)
+    // hacks only land on players who opted in (allowHacks)
+    await env.DB.prepare('UPDATE Users SET pc_domination_settings = ? WHERE id = ?')
+      .bind(JSON.stringify({ allowHacks: true }), target.orbitId).run()
 
     const body = JSON.stringify({ item_id: 'item-hack-deny', target_id: target.orbitId, idempotency_key: 'hack-online-01' })
     const res = await app.request('/api/users/store/purchase', {

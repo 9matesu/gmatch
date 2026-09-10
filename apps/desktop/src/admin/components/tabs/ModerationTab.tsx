@@ -134,7 +134,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
     const directUrl = report.content_url && !report.content_url.startsWith("/api/objects/") ? report.content_url : null;
 
     return (
-      <div key={report.id} className="border-b border-border-subtle last:border-0 hover:bg-white/5 transition-colors">
+      <div key={report.id} className="border-b border-border-subtle last:border-0 hover:bg-glass-w5 transition-colors">
         <div className="p-3 flex items-start gap-3">
           <button
             type="button"
@@ -312,7 +312,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
     const mediaUrl = comment.image_content_url ? resolveMediaUrl(comment.image_content_url) : comment.image_id ? resolveMediaUrl(`/api/lobby/images/${comment.image_id}/content`) : null;
 
     return (
-      <div key={comment.id} className="border-b border-border-subtle last:border-0 hover:bg-white/5 transition-colors">
+      <div key={comment.id} className="border-b border-border-subtle last:border-0 hover:bg-glass-w5 transition-colors">
         <div className="p-3 flex items-start gap-3">
           <button
             type="button"
@@ -468,7 +468,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
     const attachmentUrl = pm.attachment_url ? resolveMediaUrl(pm.attachment_url) : pm.attachment_id ? resolveMediaUrl(`/api/objects/${pm.attachment_id}/content`) : null;
 
     return (
-      <div key={pm.id} className="border-b border-border-subtle last:border-0 hover:bg-white/5 transition-colors">
+      <div key={pm.id} className="border-b border-border-subtle last:border-0 hover:bg-glass-w5 transition-colors">
         <div className="p-3 flex items-start gap-3">
           <button
             type="button"
@@ -632,7 +632,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
     const attachmentUrl = msg.attachment_url ? resolveMediaUrl(msg.attachment_url) : msg.attachment_id ? resolveMediaUrl(`/api/objects/${msg.attachment_id}/content`) : null;
 
     return (
-      <div key={`${msg.channel}:${msg.id}`} className="border-b border-border-subtle last:border-0 hover:bg-white/5 transition-colors">
+      <div key={`${msg.channel}:${msg.id}`} className="border-b border-border-subtle last:border-0 hover:bg-glass-w5 transition-colors">
         <div className="p-3 flex items-start gap-3">
           <button
             type="button"

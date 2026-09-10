@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { ZoomIn, ZoomOut, RotateCcw, X, ExternalLink } from 'lucide-react';
 import { isMediaVideo, resolveMediaUrl } from '../utils/media';
 import { orbitFetch } from '../utils/api';
 import { MediaBadge } from './MediaBadge';
@@ -151,11 +152,10 @@ export function CardZoomModal({
     >
       {/* Top Header Bar */}
       <div
-        className="flex items-center justify-between z-10 bg-retro-panel/80 border border-retro-border p-2.5 sm:px-4 rounded-lg text-retro-fg"
+        className="glass-card flex items-center justify-between z-10 p-2.5 sm:px-4 rounded-xl text-retro-fg"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center gap-2.5 min-w-0">
-          <span className="text-retro-accent font-bold text-sm">🔍</span>
           <div className="truncate">
             <h3 className="text-xs font-bold tracking-wide uppercase text-retro-fg truncate">{title}</h3>
             {subtitle && <p className="text-[10px] text-retro-muted truncate">{subtitle}</p>}
@@ -163,37 +163,37 @@ export function CardZoomModal({
         </div>
 
         {/* Zoom Controls & Close Button */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <div className="flex items-center bg-retro-bg border border-retro-border rounded px-1">
+        <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+          <div className="glass-inset flex items-center gap-1 rounded-lg p-1">
             <button
               type="button"
               onClick={handleZoomOut}
               disabled={scale <= 1}
-              className="px-2 py-1 text-xs font-bold text-retro-fg hover:text-retro-accent disabled:opacity-30 cursor-pointer"
+              className="glass-action h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer disabled:opacity-30"
               title="Zoom Out (-)"
             >
-              −
+              <ZoomOut className="w-3.5 h-3.5" />
             </button>
-            <span className="text-[10px] font-mono px-1.5 text-retro-muted min-w-[36px] text-center">
+            <span className="text-[10px] font-mono px-1 text-retro-muted min-w-[36px] text-center tabular-nums">
               {Math.round(scale * 100)}%
             </span>
             <button
               type="button"
               onClick={handleZoomIn}
               disabled={scale >= 4}
-              className="px-2 py-1 text-xs font-bold text-retro-fg hover:text-retro-accent disabled:opacity-30 cursor-pointer"
+              className="glass-action h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer disabled:opacity-30"
               title="Zoom In (+)"
             >
-              +
+              <ZoomIn className="w-3.5 h-3.5" />
             </button>
             {scale !== 1 && (
               <button
                 type="button"
                 onClick={handleResetZoom}
-                className="px-2 py-1 text-[10px] font-bold text-retro-accent hover:underline border-l border-retro-border cursor-pointer"
+                className="glass-action h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer"
                 title="Reset Zoom (0)"
               >
-                Reset
+                <RotateCcw className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
@@ -213,10 +213,10 @@ export function CardZoomModal({
                   } catch { }
                 })()
               }}
-              className="px-2.5 py-1 text-[10px] font-bold bg-retro-panel hover:bg-retro-bg border border-retro-border text-retro-fg rounded transition-colors hidden sm:inline-block"
+              className="glass-action h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer"
               title="Open original image in new tab"
             >
-              Open Full
+              <ExternalLink className="w-3.5 h-3.5" />
             </button>
           ) : (
             <a
@@ -224,20 +224,20 @@ export function CardZoomModal({
               target="_blank"
               rel="noopener noreferrer"
               download="orbit-card.jpg"
-              className="px-2.5 py-1 text-[10px] font-bold bg-retro-panel hover:bg-retro-bg border border-retro-border text-retro-fg rounded transition-colors hidden sm:inline-block"
+              className="glass-action h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer"
               title="Open original image in new tab"
             >
-              Open Full
+              <ExternalLink className="w-3.5 h-3.5" />
             </a>
           )}
 
           <button
             type="button"
             onClick={onClose}
-            className="px-2.5 py-1 text-xs font-bold bg-retro-fg text-retro-bg hover:bg-retro-accent hover:text-retro-fg rounded transition-colors cursor-pointer"
+            className="glass-action glass-action-danger h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer"
             title="Close (Esc)"
           >
-            ✕ Close
+            <X className="w-4 h-4" />
           </button>
         </div>
       </div>

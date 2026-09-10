@@ -110,7 +110,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
                 const directUrl = obj.content_url && !obj.content_url.startsWith("/api/objects/") ? obj.content_url : null;
 
                 return (
-                  <div key={obj.id} className="flex items-center gap-3 p-3 hover:bg-white/5 transition-colors">
+                  <div key={obj.id} className="flex items-center gap-3 p-3 hover:bg-glass-w5 transition-colors">
                     <AdminMediaThumbnail
                       objectId={objectId}
                       directUrl={directUrl}
@@ -163,7 +163,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
                     }
                   }}
                   className={cn(
-                    "p-3 rounded-lg border border-border-glass bg-surface-canvas hover:bg-white/5 transition-colors text-left group cursor-pointer",
+                    "p-3 rounded-lg border border-border-glass bg-surface-canvas hover:bg-glass-w5 transition-colors text-left group cursor-pointer",
                     action.variant === "primary" && "border-cyan-500/30 bg-cyan-500/10"
                   )}
                 >

@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { playPress } from '../../utils/sounds';
 import { Search, X, MessageCircle, Users, Image as ImageIcon, Hash } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
-import type { FeedPost } from './GoonMatchFeed';
+import type { FeedPost } from './GMatchFeed';
 import { ObjectImage } from '../ObjectImage';
 
 interface PeerUser {
@@ -95,12 +95,12 @@ export function ExploreSearchModal({
         <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between bg-surface-raised shrink-0">
           <div className="flex items-center gap-2">
             <Search className="w-5 h-5 text-retro-fg" />
-            <h3 className="text-sm font-black tracking-tight">Explore goonMatch</h3>
+            <h3 className="text-sm font-black tracking-tight">Explore gMatch</h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full text-retro-muted hover:text-retro-fg hover:bg-white/10 cursor-pointer transition-colors"
+            className="p-1.5 rounded-full text-retro-muted hover:text-retro-fg hover:bg-glass-w10 cursor-pointer transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -145,7 +145,7 @@ export function ExploreSearchModal({
                 return (
                   <div
                     key={id}
-                    className="flex items-center justify-between p-2 rounded-2xl hover:bg-white/5 transition-colors group"
+                    className="flex items-center justify-between p-2 rounded-2xl hover:bg-glass-w5 transition-colors group"
                   >
                     <div
                       className="flex items-center gap-3 cursor-pointer min-w-0 flex-1"
@@ -179,7 +179,7 @@ export function ExploreSearchModal({
                           onStartPm({ id, display_name: u.display_name });
                           onClose();
                         }}
-                        className="p-2 text-retro-muted hover:text-retro-fg rounded-xl hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+                        className="p-2 text-retro-muted hover:text-retro-fg rounded-xl hover:bg-glass-w10 transition-colors cursor-pointer shrink-0"
                         title="Message"
                       >
                         <MessageCircle className="w-4 h-4" />
@@ -200,7 +200,7 @@ export function ExploreSearchModal({
               {matchedPosts.slice(0, 8).map((p) => (
                 <div
                   key={p.id}
-                  className="flex items-center gap-3 p-2 rounded-2xl hover:bg-white/5 transition-colors cursor-pointer"
+                  className="flex items-center gap-3 p-2 rounded-2xl hover:bg-glass-w5 transition-colors cursor-pointer"
                   onClick={() => {
                     playPress(700);
                     onOpenPost?.(p);
@@ -268,7 +268,7 @@ export function ExploreSearchModal({
               </div>
               <p className="text-sm font-bold text-retro-fg">Discover the network</p>
               <p className="text-xs text-retro-muted max-w-xs mx-auto">
-                Search players, posts and tags across goonMatch to find your next match, card or obsession.
+                Search players, posts and tags across gMatch to find your next match, card or obsession.
               </p>
             </div>
           )}

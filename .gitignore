@@ -22,4 +22,8 @@ apps/api/test-blobs-*/
 api-stage/
 apps/desktop/release/
 .dev-storage.key
+apps/api/node.key
+node.key
 apps/desktop/dist-log.txt
+site/releases/*.exe
+!site/releases/.gitkeep

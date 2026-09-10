@@ -90,7 +90,7 @@ describe('storage edge paths (saveKey / read / write)', () => {
 
 describe('progress side effects', () => {
   it('announces a tier-up when a click crosses the XP threshold', () => {
-    useGame.setState({ xp: 99, clicks: 0, toasts: [] })
+    useGame.setState({ xp: 99, clicks: 0, toasts: [], current: foe('xp1'), imageReady: true, foeHp: 0, foeMaxHp: 0 })
     useGame.getState().clickImage()
     const s = useGame.getState()
     expect(s.xp).toBe(100)
@@ -426,6 +426,7 @@ describe('tick auto-battle paths', () => {
       tags: [setupTag('aaa')],
       caps: filterCap,
       current: foe('t1'),
+      imageReady: true,
       queue: [],
       foeHp: 1,
       foeMaxHp: 8,

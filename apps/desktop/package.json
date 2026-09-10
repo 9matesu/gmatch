@@ -1,6 +1,6 @@
 {
-  "name": "@goongrid/desktop",
-  "version": "1.0.1",
+  "name": "@gmatch/desktop",
+  "version": "1.1.1",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -66,9 +66,9 @@
   },
   "build": {
     "appId": "dev.goonmatch.grid",
-    "productName": "goonMatch Grid",
+    "productName": "gMatch",
     "electronVersion": "33.4.11",
-    "artifactName": "goonMatch-Grid-${version}-portable.${ext}",
+    "artifactName": "gMatch-${version}-portable.${ext}",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -97,6 +97,6 @@
       }
     ]
   },
-  "description": "goonMatch Grid — adults-only (18+) idle game + social desktop app",
-  "author": "goonMatch"
+  "description": "gMatch — adults-only (18+) idle game + social desktop app",
+  "author": "gMatch"
 }

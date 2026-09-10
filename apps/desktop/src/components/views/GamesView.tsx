@@ -3,20 +3,21 @@
 // Extracted verbatim from App.tsx `mainView === 'games'` branch: the GamesHub
 // wrapper plus the `renderDuelContent` closure that renders LobbyPanel.
 // All state setters/callbacks are threaded as explicit props; no logic changed.
+import { useState } from 'react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject, User } from '@orbit/shared';
 import type { useLobby } from '../../hooks/useLobby';
 import { GamesHub } from '../games/GamesHub';
 import { LobbyPanel } from '../LobbyPanel';
+import CustomSourcesModal from '../grid/CustomSourcesModal';
 import type { MainViewType } from '../home/HomeFooter';
 
 type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
-type GamesSubTab = 'duel' | 'cards' | 'decks' | 'babecock' | 'patrol' | 'ranks' | 'store';
+type GamesSubTab = 'duel' | 'cards' | 'babecock' | 'ranks' | 'store' | 'idle';
 
 export function GamesView({
   gamesSubTab,
   identity,
-  myUser,
   myCards,
   users,
   lobby,
@@ -38,7 +39,6 @@ export function GamesView({
 }: {
   gamesSubTab: GamesSubTab;
   identity: OrbitIdentity | null;
-  myUser: User | undefined;
   myCards: OrbitObject[];
   users: User[];
   lobby: ReturnType<typeof useLobby>;
@@ -58,11 +58,12 @@ export function GamesView({
   navigateToDeckBuilder: () => void;
   handleSetMainView: (view: MainViewType) => void;
 }) {
+  const [showSources, setShowSources] = useState(false);
   return (
+    <>
     <GamesHub
       key={`games-${gamesSubTab}`}
       identity={identity}
-      myUser={myUser}
       cards={myCards as any}
       users={users}
       onSelectUser={(uId) => {
@@ -97,8 +98,10 @@ export function GamesView({
         />
       )}
       onOpenStore={() => handleSetMainView('store')}
-      onOpenCollection={() => handleSetMainView('gallery')}
+      onOpenSources={() => setShowSources(true)}
       toast={toast}
     />
+    {showSources && <CustomSourcesModal onClose={() => setShowSources(false)} />}
+    </>
   );
 }

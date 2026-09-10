@@ -75,7 +75,7 @@ export function AdminHeader({
           <button
             type="button"
             onClick={onToggleSidebar}
-            className="p-1.5 rounded hover:bg-white/10 text-retro-fg transition-colors lg:hidden"
+            className="p-1.5 rounded hover:bg-glass-w10 text-retro-fg transition-colors lg:hidden"
             aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
             aria-expanded={sidebarOpen}
           >
@@ -105,7 +105,7 @@ export function AdminHeader({
             type="button"
             onClick={onRefresh}
             disabled={isLoading}
-            className="p-2 rounded border border-border-glass bg-surface-interactive hover:bg-white/10 text-retro-fg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="p-2 rounded border border-border-glass bg-surface-interactive hover:bg-glass-w10 text-retro-fg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             aria-label="Refresh data"
             aria-busy={isLoading}
           >
@@ -117,7 +117,7 @@ export function AdminHeader({
           <button
             type="button"
             onClick={() => setUserMenuOpen(!userMenuOpen)}
-            className="flex items-center gap-2 p-1.5 rounded hover:bg-white/10 transition-colors"
+            className="flex items-center gap-2 p-1.5 rounded hover:bg-glass-w10 transition-colors"
             aria-expanded={userMenuOpen}
             aria-haspopup="true"
           >
@@ -146,7 +146,7 @@ export function AdminHeader({
                   setUserMenuOpen(false);
                   onNavigateTab?.("settings");
                 }}
-                className="w-full px-3 py-2 text-left text-xs text-retro-fg hover:bg-white/10 transition-colors flex items-center gap-2"
+                className="w-full px-3 py-2 text-left text-xs text-retro-fg hover:bg-glass-w10 transition-colors flex items-center gap-2"
               >
                 <Settings className="w-3.5 h-3.5" />
                 Settings

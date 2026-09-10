@@ -7,14 +7,13 @@ import { Play, Pause, MessageSquare, LayoutGrid } from 'lucide-react'
 
 type LobbyState = ReturnType<typeof useLobby>
 
-interface QueueControlsProps {
+export interface QueueControlsProps {
   state: LobbyState['state']
   match: ReturnType<LobbyState['state'] extends infer S ? S extends null ? never : () => void : never> | null
   matchRoundInfo: { seq: number; max: number; deadline: number } | null
   autoQueueEnabled: boolean
   soundEnabled: boolean
   myCardsCount: number
-  mergedPlayersCount: number
   queuedSinceMs: number
   showLeagueTab: boolean
   onToggleAutoQueue: (enabled: boolean) => Promise<{ ok: boolean; error?: string }>
@@ -33,7 +32,6 @@ export function QueueControls({
   autoQueueEnabled,
   soundEnabled,
   myCardsCount,
-  mergedPlayersCount,
   queuedSinceMs,
   showLeagueTab,
   onToggleAutoQueue,
@@ -48,18 +46,6 @@ export function QueueControls({
 
   return (
     <div className="flex items-center gap-2 flex-nowrap ml-auto">
-      {onOpenDeckBuilder && !match && (
-        <button
-          type="button"
-          onClick={onOpenDeckBuilder}
-          className="border border-retro-border px-2.5 py-1.5 text-xs font-medium text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors flex items-center gap-1.5"
-          title="Manage and select your active duel deck"
-        >
-          <LayoutGrid className="w-3.5 h-3.5 text-cyan-300" />
-          Decks
-        </button>
-      )}
-
       <button
         type="button"
         onClick={onOpenCardChat}
@@ -89,15 +75,28 @@ export function QueueControls({
           Leave Queue
         </button>
       ) : myCardsCount < MIN_GAME_CARDS ? (
-        <button
-          type="button"
-          title={`Build a 5-card deck to play — you need at least ${MIN_GAME_CARDS} cards in your active deck.`}
-          onClick={() => onOpenDeckBuilder ? onOpenDeckBuilder() : onOpenCreateCard?.()}
-          className="px-4 py-1.5 text-xs font-bold bg-surface-interactive text-cyan-300 border border-cyan-500/40 rounded-lg whitespace-nowrap cursor-pointer hover:bg-cyan-500/10 flex items-center gap-1.5"
+        <div
+          className="flex items-stretch rounded-lg border border-cyan-500/40 overflow-hidden whitespace-nowrap"
+          title={`Quick Play needs ${MIN_GAME_CARDS} cards in your active deck — you have ${myCardsCount}. Build one to continue.`}
         >
-          <LayoutGrid className="w-3.5 h-3.5" />
-          Build Deck ({myCardsCount}/5)
-        </button>
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            className="px-4 py-1.5 text-xs font-medium bg-surface-interactive text-retro-muted/60 cursor-not-allowed flex items-center gap-1.5"
+          >
+            <Play className="w-3.5 h-3.5" />
+            Quick Play
+          </button>
+          <button
+            type="button"
+            onClick={() => onOpenDeckBuilder ? onOpenDeckBuilder() : onOpenCreateCard?.()}
+            className="px-4 py-1.5 text-xs font-bold bg-cyan-500/10 text-cyan-300 border-l border-cyan-500/40 hover:bg-cyan-500/20 cursor-pointer transition-colors flex items-center gap-1.5"
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            Build Deck ({myCardsCount}/{MIN_GAME_CARDS})
+          </button>
+        </div>
       ) : (
         <button
           type="button"
@@ -109,29 +108,18 @@ export function QueueControls({
         </button>
       )}
 
-      <div className="flex items-center border border-retro-border rounded-lg overflow-hidden">
-        <button
-          type="button"
-          onClick={() => onShowLeagueTab(false)}
-          className={`px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${!showLeagueTab
-            ? 'bg-surface-interactive text-retro-fg'
-            : 'bg-transparent text-retro-muted hover:text-retro-fg'
-            }`}
-        >
-          Gooners ({mergedPlayersCount})
-        </button>
-        <div className="w-px h-4 bg-retro-border" />
-        <button
-          type="button"
-          onClick={() => onShowLeagueTab(true)}
-          className={`px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${showLeagueTab
-            ? 'bg-surface-interactive text-retro-fg'
-            : 'bg-transparent text-retro-muted hover:text-retro-fg'
-            }`}
-        >
-          League
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => onShowLeagueTab(!showLeagueTab)}
+        aria-pressed={showLeagueTab}
+        title={showLeagueTab ? 'Back to player roster' : 'View league standings'}
+        className={`px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap border border-retro-border rounded-lg ${showLeagueTab
+          ? 'bg-surface-interactive text-retro-fg'
+          : 'bg-transparent text-retro-muted hover:text-retro-fg'
+          }`}
+      >
+        League
+      </button>
     </div>
   )
 }

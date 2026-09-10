@@ -3,9 +3,12 @@ import { D1Turso, ensureSchema } from './db'
 import { restoreDb, snapshotDb } from './persistence'
 import { LocalBlobStore } from './blob'
 import { resolveStorageKey } from './storage-key'
+import { resolveNodeKey } from './node-key'
 import app from './index'
 import { join, dirname, extname } from 'node:path'
 import { handleIncoming, conns, WsConn, broadcastToRoom } from './ws-bus'
+import { mailWatchers, handleMailSocketMessage } from './routes/mail'
+import { isApiPath, parseSiteServices, siteAllows } from './site-services'
 import { leaveLobby, advanceLobby } from './lobby'
 import { advanceBabecock } from './babecock'
 import { runPeriodicMaintenance } from './cleanup'
@@ -23,7 +26,7 @@ const SNAPSHOT_PATH = process.env.SNAPSHOT_PATH || join(process.cwd(), 'orbit.sn
 // can also be started bare (`bun run serve:api`, packaged api-stage). Resolve
 // env → persisted keyfile → fresh generated key so uploads/PMs never 500 on a
 // missing key.
-process.env.STORAGE_ENCRYPTION_KEY = resolveStorageKey(process.env.STORAGE_ENCRYPTION_KEY, SNAPSHOT_PATH)
+process.env.STORAGE_ENCRYPTION_KEY = resolveStorageKey(SNAPSHOT_PATH, process.env)
 const BLOB_STORE_DIR = process.env.BLOB_STORE_DIR || (process.env.SNAPSHOT_PATH ? join(dirname(process.env.SNAPSHOT_PATH), 'blobs') : './blobs')
 const SNAPSHOT_INTERVAL_MS = Math.max(
   30000,
@@ -110,8 +113,19 @@ process.once('SIGTERM', () => { void persistAndExit(0) })
 process.once('SIGINT', () => { void persistAndExit(0) })
 
 const bucket = new LocalBlobStore(BLOB_STORE_DIR)
-const env = { DB: db, BUCKET: bucket }
-const WEB_DIST = join((import.meta as any).dir || process.cwd(), '..', '..', 'web', 'out')
+// ADMIN_PIN / ADMIN_PIN_HASH must reach routes via c.env — pre-B.4 neither was
+// wired here, so verify-pin silently ran on the hardcoded fallback forever.
+const nodeKey = resolveNodeKey(SNAPSHOT_PATH)
+const env = {
+  DB: db,
+  BUCKET: bucket,
+  NODE_PRIV_HEX: nodeKey.privHex,
+  NODE_PUB_HEX: nodeKey.pubHex,
+  ...(process.env.ADMIN_PIN ? { ADMIN_PIN: process.env.ADMIN_PIN } : {}),
+  ...(process.env.ADMIN_PIN_HASH ? { ADMIN_PIN_HASH: process.env.ADMIN_PIN_HASH } : {}),
+  ...(process.env.API_SEALED_ONLY ? { API_SEALED_ONLY: process.env.API_SEALED_ONLY } : {}),
+}
+const WEB_DIST = process.env.WEB_DIST_DIR || join((import.meta as any).dir || process.cwd(), '..', '..', 'web', 'out')
 
 // Maintenance cadence: continuous automatic expiration sweep every 60s,
 // 3-hour picture wipe window, and daily score reset at 00:00 UTC.
@@ -151,9 +165,13 @@ const MIME: Record<string, string> = {
   '.xml': 'text/xml',
   '.woff2': 'font/woff2',
   '.woff': 'font/woff',
+  '.exe': 'application/octet-stream',
 }
 
 const wsToConn = new WeakMap<object, WsConn>()
+
+// null => full node (self-host/dev); Set => official site, courier-only.
+const siteServices = parseSiteServices()
 
 Bun.serve({
   hostname: '0.0.0.0',
@@ -164,10 +182,27 @@ Bun.serve({
   async fetch(req: Request, server: any) {
     const url = new URL(req.url)
 
-    // WebSocket upgrade
-    if (url.pathname === '/api/ws') {
+        // SITE_SERVICES gate (plan P2.3): the official site = blind courier only.
+        // Everything not in the allow-list 404s at the edge, including the legacy
+        // identity-bound swarm WS (presence/rooms) — the courier never learns who
+        // enters or leaves.
+        if (siteServices && isApiPath(url.pathname) && !siteAllows(siteServices, url.pathname)) {
+          return new Response('Not Found', { status: 404 })
+        }
+
+        // WebSocket upgrade
+        if (url.pathname === '/api/ws') {
+          if (siteServices) return new Response('Not Found', { status: 404 })
+          const upgradeHeader = req.headers.get('Upgrade') || req.headers.get('upgrade')
+          if (upgradeHeader?.toLowerCase() === 'websocket' && server.upgrade(req)) return
+        }
+
+    // Blind-courier push channel: ANONYMOUS upgrade (no ticket, no identity).
+    // The socket may only watch opaque delivery tokens; the courier never
+    // learns who it is.
+    if (url.pathname === '/api/mail/ws') {
       const upgradeHeader = req.headers.get('Upgrade') || req.headers.get('upgrade')
-      if (upgradeHeader?.toLowerCase() === 'websocket' && server.upgrade(req)) return
+      if (upgradeHeader?.toLowerCase() === 'websocket' && server.upgrade(req, { data: { mail: true } })) return
     }
 
     // API & system routes (+ public share pages /p/:id, /u/:id)
@@ -229,6 +264,12 @@ Bun.serve({
   },
   websocket: {
     open(ws: any) {
+      // Blind-courier sockets: anonymous, token-watch only, never join the
+      // legacy swarm rooms (no presence, no identity).
+      if (ws.data?.mail) {
+        mailWatchers.set(ws, new Set())
+        return
+      }
       const conn: WsConn = {
         send: (data) => {
           if (ws.readyState === 1 || ws.readyState === WebSocket.OPEN) {
@@ -243,11 +284,19 @@ Bun.serve({
       wsToConn.set(ws, conn)
     },
     message(ws: any, message: any) {
+      if (ws.data?.mail) {
+        handleMailSocketMessage(ws, typeof message === 'string' ? message : message.toString())
+        return
+      }
       const conn = wsToConn.get(ws)
       if (!conn) return
       handleIncoming(conn, typeof message === 'string' ? message : message.toString())
     },
     close(ws: any) {
+      if (ws.data?.mail) {
+        unwatchMailSocket(ws)
+        return
+      }
       const conn = wsToConn.get(ws)
       if (conn) {
         // WS6: Remove user from lobby queue on disconnect to prevent ghost entries

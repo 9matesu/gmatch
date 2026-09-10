@@ -1,13 +1,17 @@
 import blocklistData from '../../../../shared/blocklist.json'
 
 /**
- * HARD blocklist (SPEC §8) — the most important tested module in the repo.
- * A tag is rejected if ANY blocklist term appears as a case-insensitive
- * substring. Single source of truth: shared/blocklist.json (also required
- * by electron/main.cjs, which cannot import TS).
+ * HARD blocklist (SPEC §8) — the illegal-content line only (minors,
+ * bestiality, necrophilia, non-consent). A tag is rejected if ANY blocklist
+ * term appears as a case-insensitive substring. Single source of truth:
+ * shared/blocklist.json (also required by electron/main.cjs, which cannot
+ * import TS). Everything legal-but-polarising lives in SUGGESTED_EXCLUDES
+ * and is blocked only when the player adds it to their own exclude list.
  */
 export const BLOCKLIST: readonly string[] = blocklistData.blocklist
 export const NOISE_TAGS: readonly string[] = blocklistData.noise
+/** Legal-but-polarising categories offered as one-tap excludes (off by default). */
+export const SUGGESTED_EXCLUDES: readonly string[] = blocklistData.suggested ?? []
 
 const NOISE = new Set(NOISE_TAGS)
 

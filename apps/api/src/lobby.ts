@@ -384,7 +384,7 @@ async function snapshotForUser(db: D1Turso, match: GameMatch, userId: string): P
  * Build a server-authoritative card valuation summary for a resolved match.
  * Each card is individually valued: every vote cast on it during the duel adds
  * a persistent point delta (VOTE_POINTS) to that card's reputation score, which
- * feeds the goonMatch economy (rarity tiers, deck value, discovery influence).
+ * feeds the gMatch economy (rarity tiers, deck value, discovery influence).
  */
 async function buildValuationSummary(
   db: D1Turso,

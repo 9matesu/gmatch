@@ -27,6 +27,8 @@ interface ContextOverlayProps {
   onCopyImageLink: (id: string) => void;
   onToggleFavorite: (item: OrbitObject) => Promise<boolean>;
   onDeleteItem: (item: OrbitObject) => void;
+  onRepostItem?: (item: OrbitObject) => void;
+  onAddToStory?: (item: OrbitObject) => void;
   onRemoveFromInbox: (item: OrbitObject) => void;
   onReportUser: (id: string, name: string, objectId?: string) => void;
   onReportItem: (ownerId: string, ownerName: string, objectId: string) => void;
@@ -49,6 +51,8 @@ export function ContextOverlay({
   onCopyImageLink,
   onToggleFavorite,
   onDeleteItem,
+  onRepostItem,
+  onAddToStory,
   onRemoveFromInbox,
   onReportUser,
   onReportItem,
@@ -107,7 +111,7 @@ export function ContextOverlay({
               }}
               className="w-full text-left px-3 py-2 hover:bg-retro-bg text-retro-muted transition-colors"
             >
-              Copy GoonMatch ID
+              Copy GMatch ID
             </button>
             <button
               type="button"
@@ -185,6 +189,30 @@ export function ContextOverlay({
             >
               Star / Favorite
             </button>
+            {contextMenu.data.owner_id === identity?.orbitId && onRepostItem && (
+              <button
+                type="button"
+                onClick={() => {
+                  onRepostItem(contextMenu.data)
+                  onDismiss()
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-retro-bg text-retro-fg transition-colors"
+              >
+                Repost to Feed
+              </button>
+            )}
+            {contextMenu.data.owner_id === identity?.orbitId && onAddToStory && (
+              <button
+                type="button"
+                onClick={() => {
+                  onAddToStory(contextMenu.data)
+                  onDismiss()
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-retro-bg text-retro-fg transition-colors"
+              >
+                Add to Story
+              </button>
+            )}
             {contextMenu.data.owner_id === identity?.orbitId ? (
               <button
                 type="button"

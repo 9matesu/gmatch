@@ -3,13 +3,14 @@ import GoonPanel from '../../ui/GoonPanel'
 import ShopPanel from '../../ui/ShopPanel'
 import StatsPanel from '../../ui/StatsPanel'
 import OfflineModal from '../../ui/OfflineModal'
+import { FeedTuneStep } from '../../firstRun/FeedTuneStep'
 import { useToast } from '../Toast'
 import { useGame } from '../../game/store'
 import '../../ui/grid-animations.css'
 
 /**
- * "Babecock · Idle" workspace (plan D2/D5): the GoonGrid idle game as a view
- * inside the goonMatch shell. Panels are styled with Tailwind utilities
+ * "Babecock · Idle" workspace (plan D2/D5): the gMatch idle game as a view
+ * inside the gMatch shell. Panels are styled with Tailwind utilities
  * (src/ui/styles.ts); only the game's keyframes live in a stylesheet.
  */
 export default function GridWorkspace() {
@@ -44,12 +45,30 @@ export default function GridWorkspace() {
     if (ageVerified && setupComplete) void useGame.getState().fetchFeed()
   }, [ageVerified, setupComplete])
 
+  if (!setupComplete) {
+    return (
+      <div className="relative flex h-full min-h-0 items-stretch justify-center overflow-hidden bg-surface-canvas p-6">
+        <div className="glass-card flex h-full w-full max-w-md flex-col rounded-lg p-5 space-y-4">
+          <div className="shrink-0">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-retro-fg">Set up your feed</h2>
+            <p className="text-xs text-retro-muted mt-1">
+              The clicker stays asleep until you pick your starter tags. Nothing is fetched before that.
+            </p>
+          </div>
+          <FeedTuneStep onFinished={() => { /* fetchFeed fires off the setupComplete effect */ }} />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="relative flex h-full min-h-0 flex-col gap-3 overflow-hidden bg-surface-canvas p-3">
-      <main className="grid min-h-0 flex-1 grid-cols-[280px_minmax(0,1fr)_360px] gap-3 max-[1100px]:block max-[1100px]:overflow-y-auto">
-        <StatsPanel />
+    <div className="relative flex h-full min-h-0 flex-col gap-4 overflow-hidden bg-surface-canvas p-4">
+      <main className="grid min-h-0 flex-1 grid-cols-[minmax(280px,320px)_minmax(0,1fr)] gap-4 max-[1024px]:grid-cols-1 max-[1024px]:overflow-y-auto">
+        <div className="flex min-h-0 flex-col gap-4 overflow-y-auto styled-scrollbar">
+          <StatsPanel />
+          <ShopPanel />
+        </div>
         <GoonPanel />
-        <ShopPanel />
       </main>
       <OfflineModal />
     </div>

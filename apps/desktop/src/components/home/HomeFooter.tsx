@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { playPress } from '../../utils/sounds';
 import {
   Home,
@@ -8,9 +8,6 @@ import {
   PlusSquare,
   Send,
   User,
-  Skull,
-  Flame,
-  ShieldAlert,
   ShoppingBag,
   Bell,
   Ellipsis,
@@ -20,7 +17,7 @@ import {
   Monitor,
 } from 'lucide-react';
 
-export type MainViewType = 'feed' | 'games' | 'create' | 'messages' | 'profile' | 'game' | 'gallery' | 'hack_spy' | 'store' | 'pc_domination' | 'grid' | 'admin';
+export type MainViewType = 'feed' | 'games' | 'create' | 'messages' | 'profile' | 'game' | 'gallery' | 'store' | 'pc_domination' | 'grid' | 'rooms' | 'servers' | 'admin';
 
 export interface ActiveHackSession {
   itemId: string;
@@ -39,8 +36,6 @@ export function HomeFooter({
   unreadMessagesCount = 0,
   unreadNotificationsCount = 0,
   profilePic,
-  activeHack = null,
-  onOpenHackView,
   onOpenGallery,
   onOpenSettings,
   onOpenPlayers,
@@ -53,8 +48,6 @@ export function HomeFooter({
   unreadMessagesCount?: number;
   unreadNotificationsCount?: number;
   profilePic?: string;
-  activeHack?: ActiveHackSession | null;
-  onOpenHackView?: () => void;
   onOpenGallery?: () => void;
   onOpenSettings?: () => void;
   onOpenPlayers?: () => void;
@@ -64,21 +57,6 @@ export function HomeFooter({
     playPress(freq);
     cb?.();
   };
-
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const getHackIcon = () => {
-    if (!activeHack) return ShieldAlert;
-    if (activeHack.itemId.includes('takeover')) return Skull;
-    if (activeHack.itemId.includes('mobile')) return Flame;
-    return ShieldAlert;
-  };
-
-  const HackIcon = getHackIcon();
 
   const navItems = [
     {
@@ -141,9 +119,8 @@ interface FooterSecondaryItem {
   if (onOpenGallery) secondaryItems.push({ id: 'gallery', label: 'Cards', icon: LayoutGrid, action: onOpenGallery });
   if (onOpenNotifications) secondaryItems.push({ id: 'alerts', label: 'Alerts', icon: Bell, action: onOpenNotifications, badge: unreadNotificationsCount });
   if (onOpenPlayers) secondaryItems.push({ id: 'players', label: 'Players', icon: Users, action: onOpenPlayers });
-  if (onOpenSettings) secondaryItems.push({ id: 'settings', label: 'Settings', icon: Settings, action: onOpenSettings });
   secondaryItems.push({ id: 'pc_domination', label: 'PC Domination', icon: Monitor, action: () => setMainView?.('pc_domination') });
-  if (activeHack && activeHack.expiresAt > now && onOpenHackView) secondaryItems.push({ id: 'spy', label: 'Spy', icon: HackIcon, action: onOpenHackView });
+  if (onOpenSettings) secondaryItems.push({ id: 'settings', label: 'Settings', icon: Settings, action: onOpenSettings });
 
   return (
      <footer className="relative shrink-0 w-full glass-surface border-0 border-t border-border-glass rounded-none px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] flex items-center justify-center font-sans select-none z-30">
@@ -189,12 +166,12 @@ interface FooterSecondaryItem {
                     : 'bg-transparent text-rose-400 hover:bg-rose-500/10 border-transparent'
                   : item.active
                    ? 'glass-tab-active text-retro-accent-text border-transparent shadow-[0_0_12px_rgba(159,227,255,0.1)]'
-                  : 'bg-transparent text-retro-muted hover:text-retro-fg hover:bg-white/5 border-transparent'
+                  : 'bg-transparent text-retro-muted hover:text-retro-fg hover:bg-glass-w5 border-transparent'
               }`}
             >
               {item.id === 'profile' ? (
                 <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden flex items-center justify-center text-[10px] font-medium border shrink-0 transition-colors ${
-                  item.active ? 'border-retro-accent bg-retro-accent/10 text-retro-accent' : 'border-border-glass bg-white/8 text-retro-muted group-hover:border-white/24'
+                  item.active ? 'border-retro-accent bg-glass-w10 text-retro-accent' : 'border-border-glass bg-glass-w8 text-retro-muted group-hover:border-white/24'
                 }`}>
                   {profilePic ? (
                     <img src={profilePic} alt="" className="w-full h-full object-cover" />

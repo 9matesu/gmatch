@@ -123,7 +123,7 @@ export function EconomyTab({ identity, pinVerified, onZoom, onAction }: EconomyT
     const isExpanded = expandedId === card.id;
 
     return (
-      <div key={card.id} className="border-b border-border-subtle last:border-0 hover:bg-white/5 transition-colors">
+      <div key={card.id} className="border-b border-border-subtle last:border-0 hover:bg-glass-w5 transition-colors">
         <div className="p-3 flex items-center gap-3">
           <button
             type="button"
@@ -157,7 +157,7 @@ export function EconomyTab({ identity, pinVerified, onZoom, onAction }: EconomyT
             <button
               type="button"
               onClick={() => { setSelectedCard(card); }}
-              className="p-1.5 rounded hover:bg-white/10 text-retro-muted hover:text-cyan-300"
+              className="p-1.5 rounded hover:bg-glass-w10 text-retro-muted hover:text-cyan-300"
               title="Inspect Details"
             >
               <Eye className="w-3.5 h-3.5" />
@@ -268,7 +268,7 @@ export function EconomyTab({ identity, pinVerified, onZoom, onAction }: EconomyT
   };
 
   const renderWalletRow = (wallet: { user_id: string; display_name?: string | null; balance: number; transaction_count: number }) => (
-    <div key={wallet.user_id} className="border-b border-border-subtle last:border-0 p-3 hover:bg-white/5 transition-colors">
+    <div key={wallet.user_id} className="border-b border-border-subtle last:border-0 p-3 hover:bg-glass-w5 transition-colors">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-7 h-7 rounded-full bg-surface-interactive border border-border-glass flex items-center justify-center">
@@ -288,7 +288,7 @@ export function EconomyTab({ identity, pinVerified, onZoom, onAction }: EconomyT
   );
 
   const renderLedgerRow = (entry: { id: string; user_id: string; display_name?: string | null; kind: string; delta: number; balance_after: number; created_at: string }) => (
-    <div key={entry.id} className="border-b border-border-subtle last:border-0 p-3 hover:bg-white/5 transition-colors">
+    <div key={entry.id} className="border-b border-border-subtle last:border-0 p-3 hover:bg-glass-w5 transition-colors">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-7 h-7 rounded-full bg-surface-interactive border border-border-glass flex items-center justify-center">
@@ -311,7 +311,7 @@ export function EconomyTab({ identity, pinVerified, onZoom, onAction }: EconomyT
   );
 
   const renderMarketRow = (listing: { id: string; card_id: string; seller_name?: string | null; price: number; status: string; name?: string | null }) => (
-    <div key={listing.id} className="border-b border-border-subtle last:border-0 p-3 hover:bg-white/5 transition-colors">
+    <div key={listing.id} className="border-b border-border-subtle last:border-0 p-3 hover:bg-glass-w5 transition-colors">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-7 h-7 rounded-full bg-surface-interactive border border-border-glass flex items-center justify-center">
@@ -331,7 +331,7 @@ export function EconomyTab({ identity, pinVerified, onZoom, onAction }: EconomyT
   );
 
   const renderDeckRow = (deck: { id: string; owner_name?: string | null; name: string; game_id: string; card_count: number }) => (
-    <div key={deck.id} className="border-b border-border-subtle last:border-0 p-3 hover:bg-white/5 transition-colors">
+    <div key={deck.id} className="border-b border-border-subtle last:border-0 p-3 hover:bg-glass-w5 transition-colors">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-7 h-7 rounded-full bg-surface-interactive border border-border-glass flex items-center justify-center">

@@ -34,13 +34,13 @@ export function FeedHeader({
           onClick={() => { playPress(800); onOpenCamera?.(); }}
           title="Open Camera"
           aria-label="Open Camera"
-           className="create-action p-2 rounded-xl text-current hover:bg-white/8 transition-all cursor-pointer"
+           className="create-action p-2 rounded-xl text-current hover:bg-glass-w8 transition-all cursor-pointer"
         >
           <Camera className="w-5 h-5" />
         </button>
 
         <span className="font-sans font-semibold text-base text-retro-fg select-none">
-          goonMatch
+          gMatch
         </span>
       </div>
 
@@ -51,7 +51,7 @@ export function FeedHeader({
           onClick={() => { playPress(800); onCreatePost?.(); }}
           title="Create Post"
           aria-label="Create Post"
-          className="p-2 rounded-md text-retro-body hover:bg-white/8 transition-colors cursor-pointer"
+          className="p-2 rounded-md text-retro-body hover:bg-glass-w8 transition-colors cursor-pointer"
         >
           <PlusSquare className="w-5 h-5" />
         </button>
@@ -62,7 +62,7 @@ export function FeedHeader({
             onClick={() => setToolsDropdownOpen((v) => !v)}
             title="Tools"
             aria-label="Tools"
-            className="p-2 rounded-md text-retro-body hover:bg-white/8 transition-colors cursor-pointer"
+            className="p-2 rounded-md text-retro-body hover:bg-glass-w8 transition-colors cursor-pointer"
           >
             <Layers className="w-5 h-5" />
           </button>
@@ -78,7 +78,7 @@ export function FeedHeader({
                   setToolsDropdownOpen(false);
                   onToggleTools?.();
                 }}
-                className="w-full px-2.5 py-2 text-left text-xs text-retro-body hover:bg-white/8 rounded-md flex items-center gap-2 cursor-pointer"
+                className="w-full px-2.5 py-2 text-left text-xs text-retro-body hover:bg-glass-w8 rounded-md flex items-center gap-2 cursor-pointer"
               >
                 <Shield className="w-4 h-4 text-retro-muted" />
                 <span>System Drawer</span>
@@ -92,7 +92,7 @@ export function FeedHeader({
           onClick={() => { playPress(800); onOpenSearch?.(); }}
           title="Search"
           aria-label="Search"
-          className="p-2 rounded-md text-retro-body hover:bg-white/8 transition-colors cursor-pointer"
+          className="p-2 rounded-md text-retro-body hover:bg-glass-w8 transition-colors cursor-pointer"
         >
           <Search className="w-5 h-5" />
         </button>
@@ -102,7 +102,7 @@ export function FeedHeader({
           onClick={() => { playPress(800); onOpenNotifications?.(); }}
           title="Notifications"
           aria-label="Notifications"
-          className="relative p-2 rounded-md text-retro-body hover:bg-white/8 transition-colors cursor-pointer"
+          className="relative p-2 rounded-md text-retro-body hover:bg-glass-w8 transition-colors cursor-pointer"
         >
           <Heart className="w-5 h-5" />
           {unreadCount > 0 && (
@@ -115,7 +115,7 @@ export function FeedHeader({
           onClick={() => { playPress(800); onOpenDMs?.(); }}
           title="Messages"
           aria-label="Messages"
-          className="relative p-2 rounded-md text-retro-body hover:bg-white/8 transition-colors cursor-pointer"
+          className="relative p-2 rounded-md text-retro-body hover:bg-glass-w8 transition-colors cursor-pointer"
         >
           <Send className="w-5 h-5" />
         </button>

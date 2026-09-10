@@ -1,22 +1,77 @@
-// GoonGrid Electron main process.
+// gMatch Electron main process.
 // All booru HTTP happens HERE (renderer never touches the network directly).
 // Endpoints per docs/SPEC.md §6. 10s timeout, browser UA, round-robin health.
-const { app, BrowserWindow, ipcMain, protocol, net, dialog } = require('electron')
+const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage, session, shell } = require('electron')
 const https = require('https')
 const path = require('path')
 const imageCache = require('./imageCache.cjs')
+const customFolders = require('./customFolders.cjs')
+const wallpaperWin = require('./wallpaperWin.cjs')
+
+// One-shot camera permission consumed by setPermissionRequestHandler.
+let cameraGrantOnce = false
+const { createSecureStore } = require('./secureStore.cjs')
 const apiSidecar = require('./apiSidecar.cjs')
 const serverMode = require('./server-mode.cjs')
+
+// Secure KV (security plan B.3): renderer's sensitive localStorage keys are
+// backed here, encrypted with DPAPI (safeStorage) when available.
+let secureKV = null
+function initSecureKV() {
+  const available = (() => {
+    try { return safeStorage.isEncryptionAvailable() } catch { return false }
+  })()
+  secureKV = createSecureStore({
+    userDataPath: app.getPath('userData'),
+    available,
+    encryptString: (s, iv) => {
+      // safeStorage has no IV parameter; per-value random salt key derivation:
+      // encrypt(s) with the DPAPI master — we store iv only as a format tag.
+      void iv
+      return safeStorage.encryptString(s)
+    },
+    decryptString: (buf) => safeStorage.decryptString(buf),
+  })
+  return available
+}
 
 // Packaged topology (1.0, no central server): either we HOST the bundled
 // server (default) or we're a CLIENT of a friend's. Decided once at startup.
 let packagedServer = null // { mode, url } when app.isPackaged
 
-// gooncache:// serves cached picture files from the user folder.
+// Brand migration (goonMatch -> gMatch): the app name feeds userData
+// (%APPDATA%/@gmatch/desktop). For existing installs, move the old profile
+// ONCE before anything reads it — keys (DPAPI), snapshot DB, blobs and local
+// storage all live under this folder and must survive the rename.
+;(function migrateUserData() {
+  const fs = require('fs')
+  try {
+    const newPath = app.getPath('userData')
+    const oldPath = path.join(path.dirname(newPath), '@goongrid', path.basename(newPath))
+    if (oldPath !== newPath && fs.existsSync(oldPath) && !fs.existsSync(newPath)) {
+      fs.mkdirSync(path.dirname(newPath), { recursive: true })
+      try {
+        fs.renameSync(oldPath, newPath)
+      } catch {
+        // cross-drive or locked: copy the essentials, keep the old folder
+        fs.cpSync(oldPath, newPath, { recursive: true })
+      }
+    }
+  } catch {
+    /* first run or locked — the default path just works */
+  }
+})()
+
+// gmcache:// serves cached pictures from the MAIN-PROCESS RAM (never disk).
 // Privileged (standard+secure, fetchable) so sandboxed <img> tags can use it.
 protocol.registerSchemesAsPrivileged([
   {
     scheme: imageCache.SCHEME,
+    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
+  },
+  {
+    // Player-owned idle folders: <img>/<video> + fetch (mint re-upload).
+    scheme: customFolders.SCHEME,
     privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
   },
 ])
@@ -531,7 +586,7 @@ function createWindow() {
     height: 900,
     minWidth: 1200,
     backgroundColor: '#080A0D',
-    title: 'goonMatch · Grid',
+    title: 'gMatch',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -568,12 +623,40 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  const secureAvailable = initSecureKV()
   imageCache.init(app.getPath('userData'), UA)
-  protocol.handle(imageCache.SCHEME, (request) => imageCache.serveImage(request, net))
+  protocol.handle(imageCache.SCHEME, (request) => imageCache.serveImage(request))
+  customFolders.init(app.getPath('userData'), { ipcMain, BrowserWindow })
   ipcMain.handle('booru:fetch', (_event, payload) => fetchBooru(payload ?? {}))
+  // Secure KV bridge (B.3): renderer proxies designated localStorage keys here.
+  ipcMain.handle('secure:available', () => secureAvailable)
+  ipcMain.handle('secure:get', (_event, key) => secureKV.get(String(key)))
+  ipcMain.handle('secure:set', (_event, key, value) => secureKV.set(String(key), String(value)))
+  ipcMain.handle('secure:delete', (_event, key) => secureKV.delete(String(key)))
   ipcMain.handle('cache:image', (_event, url) => imageCache.cacheImage(url).then((local) => ({ local })))
   ipcMain.handle('cache:stats', () => imageCache.cacheStats())
   ipcMain.handle('cache:clear', () => imageCache.clearCache())
+  // Update check (Settings): installed version + open the download in the OS browser.
+  ipcMain.handle('app:version', () => app.getVersion())
+  ipcMain.handle('shell:open', (_event, url) => {
+    if (typeof url === 'string' && /^https?:\/\//i.test(url)) return shell.openExternal(url)
+    return Promise.reject(new Error('only http(s) URLs'))
+  })
+  // OS wallpaper swap for consented domination effects (Windows; no-op else).
+  ipcMain.handle('wallpaper:set-data', (_event, buf, mime) => wallpaperWin.setWallpaperFromBuffer(Buffer.from(buf), String(mime || '')))
+  ipcMain.handle('wallpaper:restore', () => wallpaperWin.restoreWallpaper())
+  ipcMain.handle('wallpaper:cleanup-files', () => { wallpaperWin.cleanupWallpaperFiles(); return { ok: true } })
+  // Camera stays denied by default; the renderer consumes a one-shot grant
+  // only AFTER the victim clicks "Allow once" on the in-app prompt.
+  ipcMain.handle('camera:grant-once', () => { cameraGrantOnce = true; return { ok: true } })
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
+    if (permission === 'media' && cameraGrantOnce) {
+      cameraGrantOnce = false
+      callback(true)
+      return
+    }
+    callback(false)
+  })
   // Server-mode bridge for the Settings UI (packaged topology control).
   ipcMain.handle('server:state', () => ({
     packaged: app.isPackaged,
@@ -603,7 +686,7 @@ app.whenReady().then(async () => {
   if (app.isPackaged) {
     packagedServer = serverMode.readServerMode()
     if (packagedServer.mode === 'host') {
-      process.env.GOONGRID_HOST_MODE = '1'
+      process.env.GMATCH_HOST_MODE = '1'
       try {
         await apiSidecar.startApi()
       } catch (err) {
@@ -625,7 +708,7 @@ app.whenReady().then(async () => {
   })
 })
 
-app.on('before-quit', () => apiSidecar.stopApi())
+app.on('before-quit', () => { apiSidecar.stopApi(); try { if (secureKV) secureKV.flush() } catch { /* best effort */ } })
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

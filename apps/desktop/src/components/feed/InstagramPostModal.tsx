@@ -15,7 +15,7 @@ import {
   ZoomOut,
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
-import type { FeedPost, PostComment } from './GoonMatchFeed';
+import type { FeedPost, PostComment } from './GMatchFeed';
 import { ObjectImage } from '../ObjectImage';
 
 export function InstagramPostModal({

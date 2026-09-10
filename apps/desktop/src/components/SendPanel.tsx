@@ -433,7 +433,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
       </div>
 
       <div className="p-4 space-y-4">
-        <div className="border border-retro-accent/60 bg-retro-accent/10 px-3 py-2 flex items-start gap-2">
+        <div className="border border-retro-accent/60 bg-glass-w10 px-3 py-2 flex items-start gap-2">
           <span className="text-retro-accent font-bold" aria-hidden="true">➜</span>
           <div className="min-w-0">
             <div className="text-[10px] font-medium text-retro-accent">Sending to</div>

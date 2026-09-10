@@ -2,11 +2,12 @@
 
 // Extracted verbatim from App.tsx `mainView === 'gallery'` branch
 // (GalleryView + the DeckBuilder block that lives on the same page).
+import { useState } from 'react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject, User } from '@orbit/shared';
 import { GalleryView } from '../GalleryView';
 import { DeckBuilder } from '../games/DeckBuilder';
-import type { FeedPost } from '../feed/GoonMatchFeed';
+import type { FeedPost } from '../feed/GMatchFeed';
 
 type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 
@@ -36,6 +37,9 @@ export function GalleryTabView({
   dragAnchorId,
   setDragAnchorId,
   onOpenCreateCard,
+  onCreateCardFromMedia,
+  onItemContextMenu,
+  onSetWallpaper,
   users,
   identity,
   setExpandedItemId,
@@ -71,6 +75,9 @@ export function GalleryTabView({
   dragAnchorId: string | null;
   setDragAnchorId: (id: string | null) => void;
   onOpenCreateCard: () => void;
+  onCreateCardFromMedia?: (media: { url: string; tags: string[]; name: string }) => void;
+  onItemContextMenu?: (e: React.MouseEvent, item: OrbitObject) => void;
+  onSetWallpaper?: (url: string) => void;
   users: User[];
   identity: OrbitIdentity;
   setExpandedItemId: (id: string | null) => void;
@@ -81,53 +88,77 @@ export function GalleryTabView({
   myCards: OrbitObject[];
   onEnterArena: () => void;
 }) {
+  const [subTab, setSubTab] = useState<'cards' | 'deck'>('cards');
+  const tab = (id: 'cards' | 'deck', label: string) => (
+    <button
+      type="button"
+      onClick={() => setSubTab(id)}
+      aria-pressed={subTab === id}
+      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
+        subTab === id
+          ? 'bg-surface-interactive text-retro-fg border-retro-border'
+          : 'bg-transparent text-retro-muted border-transparent hover:text-retro-fg'
+      }`}
+    >
+      {label}
+    </button>
+  );
   return (
-    <div className="space-y-4">
-      <GalleryView
-        filteredItems={filteredItems}
-        itemsLoading={itemsLoading}
-        galleryFilter={galleryFilter}
-        setGalleryFilter={setGalleryFilter}
-        gallerySort={gallerySort}
-        setGallerySort={setGallerySort}
-        cardSearch={cardSearch}
-        setCardSearch={setCardSearch}
-        cardTypeFilter={cardTypeFilter}
-        setCardTypeFilter={setCardTypeFilter}
-        galleryPage={galleryPage}
-        setGalleryPage={setGalleryPage}
-        selectedGalleryIds={selectedGalleryIds}
-        setSelectedGalleryIds={setSelectedGalleryIds}
-        totalPages={totalPages}
-        paginatedItems={paginatedItems}
-        batchDownloading={batchDownloading}
-        handleDownloadAll={handleDownloadAll}
-        handleBatchDownload={handleBatchDownload}
-        handleBatchDelete={handleBatchDelete}
-        dragActive={dragActive}
-        setDragActive={setDragActive}
-        dragAnchorId={dragAnchorId}
-        setDragAnchorId={setDragAnchorId}
-        onOpenCreateCard={onOpenCreateCard}
-        users={users}
-        identity={identity}
-        setExpandedItemId={setExpandedItemId}
-        posts={posts}
-        toast={toast}
-        cardByMedia={cardByMedia}
-        onOpenOwnerProfile={onOpenOwnerProfile}
-        onOpenProfile={onOpenOwnerProfile}
-      />
-
-      {/* Decks live on the same page as the card gallery */}
-      <div className="bg-surface-raised border border-retro-border rounded-xl p-4">
-        <DeckBuilder
-          identity={identity}
-          cards={myCards as any}
-          onEnterArena={onEnterArena}
-          toast={toast}
-        />
+    <div className="p-3 sm:p-4 max-w-6xl mx-auto w-full space-y-4">
+      <div className="flex items-center gap-1" role="tablist" aria-label="Gallery & Cards">
+        {tab('cards', 'Cards')}
+        {tab('deck', 'Deck')}
       </div>
+
+      {subTab === 'cards' ? (
+        <GalleryView
+          filteredItems={filteredItems}
+          itemsLoading={itemsLoading}
+          galleryFilter={galleryFilter}
+          setGalleryFilter={setGalleryFilter}
+          gallerySort={gallerySort}
+          setGallerySort={setGallerySort}
+          cardSearch={cardSearch}
+          setCardSearch={setCardSearch}
+          cardTypeFilter={cardTypeFilter}
+          setCardTypeFilter={setCardTypeFilter}
+          galleryPage={galleryPage}
+          setGalleryPage={setGalleryPage}
+          selectedGalleryIds={selectedGalleryIds}
+          setSelectedGalleryIds={setSelectedGalleryIds}
+          totalPages={totalPages}
+          paginatedItems={paginatedItems}
+          batchDownloading={batchDownloading}
+          handleDownloadAll={handleDownloadAll}
+          handleBatchDownload={handleBatchDownload}
+          handleBatchDelete={handleBatchDelete}
+          dragActive={dragActive}
+          setDragActive={setDragActive}
+          dragAnchorId={dragAnchorId}
+          setDragAnchorId={setDragAnchorId}
+          onOpenCreateCard={onOpenCreateCard}
+          onCreateCardFromMedia={onCreateCardFromMedia}
+          onItemContextMenu={onItemContextMenu}
+          onSetWallpaper={onSetWallpaper}
+          users={users}
+          identity={identity}
+          setExpandedItemId={setExpandedItemId}
+          posts={posts}
+          toast={toast}
+          cardByMedia={cardByMedia}
+          onOpenOwnerProfile={onOpenOwnerProfile}
+          onOpenProfile={onOpenOwnerProfile}
+        />
+      ) : (
+        <div className="bg-surface-raised border border-retro-border rounded-xl p-4">
+          <DeckBuilder
+            identity={identity}
+            cards={myCards as any}
+            onEnterArena={onEnterArena}
+            toast={toast}
+          />
+        </div>
+      )}
     </div>
   );
 }

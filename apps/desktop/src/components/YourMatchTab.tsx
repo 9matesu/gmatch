@@ -213,7 +213,7 @@ export function YourMatchTab({
         {/* Celebration */}
         {celebrate && (
           <div
-            className={`p-4 text-center space-y-2 animate-orbit-tier-flash rounded-lg ${celebrate.final ? 'bg-retro-warning/10 border border-retro-warning/30' : 'bg-retro-accent/5 border border-retro-accent/20'}`}
+            className={`p-4 text-center space-y-2 animate-orbit-tier-flash rounded-lg ${celebrate.final ? 'bg-retro-warning/10 border border-retro-warning/30' : 'bg-glass-w5 border border-retro-accent/20'}`}
           >
             <div className={`text-sm font-medium ${celebrate.final ? 'text-retro-warning' : 'text-retro-accent'}`}>
               {celebrate.final ? 'Match complete' : specialTierLine(celebrate.tier)}
@@ -245,12 +245,12 @@ export function YourMatchTab({
 
         {st.phase !== 'ended' && (
           <div className="grid grid-cols-2 gap-2">
-            {cardSlot('You', myCardImg, needCard ? 'Send a card' : 'Your card', st.myCardId ? 'border-retro-accent bg-retro-accent/5' : 'border-retro-border border-dashed', needCard)}
+            {cardSlot('You', myCardImg, needCard ? 'Send a card' : 'Your card', st.myCardId ? 'border-retro-accent bg-glass-w5' : 'border-retro-border border-dashed', needCard)}
             {cardSlot(
               opponentName,
               oppCardImg,
               'Waiting...',
-              opponentHidden ? 'border-retro-border border-dashed' : st.opponentCardId ? 'border-retro-accent bg-retro-accent/5' : 'border-retro-border border-dashed',
+              opponentHidden ? 'border-retro-border border-dashed' : st.opponentCardId ? 'border-retro-accent bg-glass-w5' : 'border-retro-border border-dashed',
               !st.opponentCardId,
               opponentHidden,
               opponentUser

@@ -95,7 +95,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
     const isExpanded = expandedId === obj.id;
 
     return (
-      <div key={obj.id} className="border-b border-border-subtle last:border-0 hover:bg-white/5 transition-colors">
+      <div key={obj.id} className="border-b border-border-subtle last:border-0 hover:bg-glass-w5 transition-colors">
         <div className="p-3 flex items-center gap-3">
           <button
             type="button"
@@ -133,7 +133,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
             <button
               type="button"
               onClick={() => onAction("inspectOwner", obj.owner_id)}
-              className="p-1.5 rounded hover:bg-white/10 text-retro-muted hover:text-cyan-300 transition-colors"
+              className="p-1.5 rounded hover:bg-glass-w10 text-retro-muted hover:text-cyan-300 transition-colors"
               title="Inspect owner"
             >
               <Eye className="w-3.5 h-3.5" />
@@ -141,7 +141,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
             <button
               type="button"
               onClick={() => onAction("deleteObject", obj.id)}
-              className="p-1.5 rounded hover:bg-white/10 text-retro-muted hover:text-red-300 transition-colors"
+              className="p-1.5 rounded hover:bg-glass-w10 text-retro-muted hover:text-red-300 transition-colors"
               title="Delete object"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -242,7 +242,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
     const isExpanded = expandedId === post.id;
 
     return (
-      <div key={post.id} className="border-b border-border-subtle last:border-0 hover:bg-white/5 transition-colors">
+      <div key={post.id} className="border-b border-border-subtle last:border-0 hover:bg-glass-w5 transition-colors">
         <div className="p-3 flex items-center gap-3">
           <button
             type="button"
@@ -396,7 +396,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
       : resolveMediaUrl(`/api/lobby/images/${img.id}/content`);
 
     return (
-      <div key={img.id} className="border-b border-border-subtle last:border-0 hover:bg-white/5 transition-colors">
+      <div key={img.id} className="border-b border-border-subtle last:border-0 hover:bg-glass-w5 transition-colors">
         <div className="p-3 flex items-center gap-3">
           <button
             type="button"

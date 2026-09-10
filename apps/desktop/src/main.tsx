@@ -1,29 +1,12 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import App from './App'
-import { ToastProvider } from './components/Toast'
-import { ConfirmProvider } from './components/ConfirmDialog'
-import { ReferrerTracker } from './components/ReferrerTracker'
+// Boot entry (security plan B.3): the app renders only after the secure-KV
+// migration settles, so no module in App's graph reads localStorage while
+// plaintext keys still sit in it. Browser/dev mode resolves immediately
+// (localStorage passthrough).
+import { initSecureStorage } from './utils/secure-storage'
 import './globals.css'
 
-// Root markup mirrors orbit's layout.tsx (fonts moved to index.html links).
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <div className="dark antialiased grain-overlay font-sans" style={{ colorScheme: 'dark' }}>
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[999] focus:bg-retro-panel focus:text-retro-accent focus:px-4 focus:py-2 focus:text-xs focus:font-bold focus:border focus:border-border-glass focus:rounded-lg"
-      >
-        Skip to main content
-      </a>
-      <ConfirmProvider>
-        <ToastProvider>
-          <ReferrerTracker />
-          <div className="flex-grow">
-            <App />
-          </div>
-        </ToastProvider>
-      </ConfirmProvider>
-    </div>
-  </StrictMode>,
-)
+initSecureStorage()
+  .catch(() => { /* falls back to localStorage mode */ })
+  .finally(() => {
+    void import('./boot').then((m) => m.mount())
+  })

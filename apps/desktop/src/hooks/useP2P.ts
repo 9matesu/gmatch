@@ -25,6 +25,8 @@ export interface ChatMessage {
   attachmentMime?: string;
   editedAt?: string;
   readByRecipient?: boolean;
+  /** Blind-courier DM lifecycle (absent on legacy server-inbox messages). */
+  courierStatus?: 'sending' | 'sent' | 'delivered' | 'failed';
 }
 
 export interface P2PSwarmMessage {

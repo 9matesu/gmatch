@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useGame } from '../game/store'
 import { clickPower, passiveGps } from '../game/economy'
-import { TITLES, tierForXp, titleForTier, xpForTier } from '../game/prestige'
 import { clearImageCache, imageCacheStats, type ImageCacheStats } from '../services/imageCache'
 import { formatNum } from './format'
 import { BTN, BTN_SMALL, DISPLAY, MONO, PANEL, PLATE } from './styles'
@@ -25,11 +24,6 @@ export default function StatsPanel() {
   }
   const gps = passiveGps(input, now)
   const cp = clickPower(input, now)
-  const tier = tierForXp(s.xp)
-  const cur = xpForTier(tier)
-  const next = xpForTier(tier + 1)
-  const pct =
-    tier >= TITLES.length ? 100 : Math.min(100, Math.max(0, ((s.xp - cur) / (next - cur)) * 100))
 
   const [cache, setCache] = useState<ImageCacheStats | null>(null)
   const refreshCache = useCallback(() => {
@@ -86,46 +80,6 @@ export default function StatsPanel() {
           <IconRefresh size={12} /> Clear cache
         </button>
       )}
-      <div className="mt-[18px]">
-        <div className="mb-2 flex items-baseline justify-between">
-          <span className="text-[11px] uppercase tracking-[2px] text-retro-muted">
-            Pornification
-          </span>
-          <span className="inline-flex items-baseline gap-1.5">
-            <span className={`${DISPLAY} font-bold text-retro-accent`}>{titleForTier(tier)}</span>
-            <span className={`${MONO} text-[11px] text-retro-muted`}>T{tier}</span>
-          </span>
-        </div>
-        <div className="mb-2.5 h-2 overflow-hidden rounded-full border border-border-glass bg-retro-bg">
-          <div
-            className="h-full rounded-full bg-retro-accent transition-[width] duration-[400ms] ease-in-out"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-        <ol className="flex flex-col gap-[3px] text-xs">
-          {TITLES.map((t, i) => (
-            <li
-              key={t}
-              className={
-                i + 1 < tier
-                  ? 'flex gap-2 text-retro-fg/75'
-                  : i + 1 === tier
-                    ? 'flex gap-2 font-bold text-retro-fg'
-                    : 'flex gap-2 text-retro-muted'
-              }
-            >
-              <span
-                className={`${MONO} w-4 text-right ${
-                  i + 1 === tier ? 'text-retro-accent' : 'opacity-60'
-                }`}
-              >
-                {i + 1}
-              </span>{' '}
-              {t}
-            </li>
-          ))}
-        </ol>
-      </div>
     </aside>
   )
 }

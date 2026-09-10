@@ -17,17 +17,32 @@ import {
   Send,
   Loader2,
   UserCheck,
-  Radio,
+  Target,
   History,
+  ShieldAlert,
 } from 'lucide-react';
 import { orbitFetch } from '../../utils/api';
 import { useSettings } from '../../hooks/useSettings';
 import type { OrbitIdentity } from '@orbit/crypto';
+import type { User } from '@orbit/shared';
+import { isDefaultPeerName } from '@orbit/shared';
 import { ActionModal } from './ActionModal';
+import { HacksPanel } from './HacksPanel';
+import type { ActiveHackSession } from '../home/HomeFooter';
+
+type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 
 interface Props {
   identity: OrbitIdentity | null;
   users: Array<{ id: string; orbitId: string; display_name: string; pfp_url?: string }>;
+  /** Full user list for hack targeting (unmapped). */
+  allUsers: User[];
+  profilePics: Record<string, string>;
+  points: number;
+  toast: ToastFn;
+  activeHack: ActiveHackSession | null;
+  setActiveHack: React.Dispatch<React.SetStateAction<ActiveHackSession | null>>;
+  onOpenFlash: () => void;
 }
 
 interface DominationTarget {
@@ -39,13 +54,13 @@ interface DominationTarget {
 }
 
 const ACTION_LABELS: Record<string, { label: string; icon: React.ComponentType<{ className?: string }>; description: string }> = {
-  wallpaper: { label: 'Desktop Wallpaper', icon: Paintbrush, description: 'Change victim\'s desktop background' },
-  game_bg: { label: 'Game Background', icon: Gamepad2, description: 'Override game canvas background' },
-  popup_video: { label: 'Popup Video', icon: Volume2, description: 'Force-play fullscreen video popup' },
-  message: { label: 'Popup Message', icon: AlertTriangle, description: 'Display a custom message overlay' },
-  text_overlay: { label: 'Text Overlay', icon: Layers, description: 'Render glowing text on victim\'s screen' },
-  blur: { label: 'Blur Everything', icon: Eye, description: 'Apply blur filter to victim\'s app' },
-  camera: { label: 'Remote Camera', icon: Camera, description: 'Request snapshot from victim\'s camera' },
+  wallpaper: { label: 'Wallpaper', icon: Paintbrush, description: 'Replaces their desktop background until they undo it' },
+  game_bg: { label: 'Game background', icon: Gamepad2, description: 'Covers the app behind your image or clip' },
+  popup_video: { label: 'Video', icon: Volume2, description: 'Full-screen clip on their side, starts muted' },
+  message: { label: 'Message', icon: AlertTriangle, description: 'A short note shown on their screen' },
+  text_overlay: { label: 'Banner text', icon: Layers, description: 'Large text sitting on their screen for a moment' },
+  blur: { label: 'Blur', icon: Eye, description: 'Blurs their whole view until it ends' },
+  camera: { label: 'Photo request', icon: Camera, description: 'Asks their camera for one photo, they approve each time' },
 } as const;
 
 export const INTENSITY_PRESETS: Record<string, Record<string, boolean>> = {
@@ -57,6 +72,7 @@ export const INTENSITY_PRESETS: Record<string, Record<string, boolean>> = {
     allowTextOverlay: true,
     allowBlurEverything: false,
     allowRemoteCamera: false,
+    allowHacks: false,
   },
   medium: {
     allowDesktopBackgroundChange: true,
@@ -66,6 +82,7 @@ export const INTENSITY_PRESETS: Record<string, Record<string, boolean>> = {
     allowTextOverlay: true,
     allowBlurEverything: true,
     allowRemoteCamera: false,
+    allowHacks: false,
   },
   extreme: {
     allowDesktopBackgroundChange: true,
@@ -75,17 +92,19 @@ export const INTENSITY_PRESETS: Record<string, Record<string, boolean>> = {
     allowTextOverlay: true,
     allowBlurEverything: true,
     allowRemoteCamera: true,
+    allowHacks: true,
   },
 };
 
-export function PCDominationTab({ identity, users }: Props) {
+export function PCDominationTab({ identity, users, allUsers, profilePics, points, toast: toastFn, activeHack, setActiveHack, onOpenFlash }: Props) {
   const { settings, update } = useSettings();
-  const [activeTab, setActiveTab] = useState<'consent' | 'control' | 'history'>('control');
+  const [activeTab, setActiveTab] = useState<'consent' | 'control' | 'history' | 'hacks'>('control');
   const [targets, setTargets] = useState<DominationTarget[]>([]);
   const [selectedTarget, setSelectedTarget] = useState<DominationTarget | null>(null);
-  const [sending, setSending] = useState<string | null>(null);
+  const [sending, setSending] = useState<string | null>(null);
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [history, setHistory] = useState<any[]>([]);
+  const [outgoing, setOutgoing] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
   const [actionModal, setActionModal] = useState<{ action: string; title: string } | null>(null);
@@ -116,7 +135,13 @@ export function PCDominationTab({ identity, users }: Props) {
       }).catch(() => {});
       if (targetsRes.ok) {
         const data = await targetsRes.json();
-        const list = Array.isArray(data.targets) ? data.targets : [];
+        const rawList = Array.isArray(data.targets) ? data.targets : [];
+        // Defensive: never surface blank / "Unknown" placeholder players in the
+        // picker even if a node still returns them (plan §8).
+        const list = rawList.filter((t: DominationTarget) => {
+          const name = (t.displayName || '').trim();
+          return Boolean(name) && !isDefaultPeerName(name);
+        });
         setTargets(list);
         if (list.length > 0) {
           setSelectedTarget((prev) => {
@@ -150,6 +175,7 @@ export function PCDominationTab({ identity, users }: Props) {
       allowBlurEverything: key === 'allowBlurEverything' ? value : settings.allowBlurEverything,
       allowRemoteCamera: key === 'allowRemoteCamera' ? value : settings.allowRemoteCamera,
       allowPublicCamera: key === 'allowPublicCamera' ? value : settings.allowPublicCamera,
+      allowHacks: key === 'allowHacks' ? value : settings.allowHacks,
     };
     void syncSettingsToServer(settings.pcDominationEnabled, updatedSettings);
   };
@@ -165,6 +191,7 @@ export function PCDominationTab({ identity, users }: Props) {
       allowBlurEverything: settings.allowBlurEverything,
       allowRemoteCamera: settings.allowRemoteCamera,
       allowPublicCamera: settings.allowPublicCamera,
+      allowHacks: settings.allowHacks,
     };
     void syncSettingsToServer(enabled, currentConsents);
   };
@@ -173,10 +200,17 @@ export function PCDominationTab({ identity, users }: Props) {
     if (!identity) return;
     setLoadingHistory(true);
     try {
-      const res = await orbitFetch('/api/domination/history?limit=100', {}, identity);
-      if (res.ok) {
-        const data = await res.json();
+      const [inRes, outRes] = await Promise.all([
+        orbitFetch('/api/domination/history?limit=100', {}, identity),
+        orbitFetch('/api/domination/outgoing?limit=100', {}, identity),
+      ]);
+      if (inRes.ok) {
+        const data = await inRes.json();
         setHistory(data.actions || []);
+      }
+      if (outRes.ok) {
+        const data = await outRes.json();
+        setOutgoing(data.actions || []);
       }
     } catch {}
     setLoadingHistory(false);
@@ -260,21 +294,22 @@ export function PCDominationTab({ identity, users }: Props) {
         </div>
         <h2 className="text-lg font-black text-retro-fg uppercase tracking-wider mb-2">PC Domination</h2>
         <p className="text-xs text-retro-muted max-w-md leading-relaxed">
-          Log in to access PC Domination controls. Enable the feature in consent settings, then select a target to send commands.
+          Log in to use Domination. Turn it on under Consent to receive effects, or send to players who have.
         </p>
       </div>
     );
   }
 
   const consentSettings = [
-    { key: 'allowDesktopBackgroundChange', label: 'Desktop Background', desc: 'Allow changing desktop wallpaper' },
-    { key: 'allowGameBackgroundChange', label: 'Game Background', desc: 'Allow overriding in-game canvas background' },
-    { key: 'allowPopupVideo', label: 'Popup Videos', desc: 'Allow forced video popup playback' },
-    { key: 'allowPopupMessage', label: 'Popup Messages', desc: 'Allow message overlays on screen' },
-    { key: 'allowTextOverlay', label: 'Text Overlays', desc: 'Allow glowing text HUD on screen' },
-    { key: 'allowBlurEverything', label: 'Blur Effects', desc: 'Allow blurring the entire view' },
-    { key: 'allowRemoteCamera', label: 'Remote Camera', desc: 'Allow camera snapshot requests' },
-    { key: 'allowPublicCamera', label: 'Public Camera Uploads', desc: 'Allow camera snapshots to be public (otherwise private to dominator)' },
+    { key: 'allowDesktopBackgroundChange', label: 'Wallpaper', desc: 'Can replace your desktop background' },
+    { key: 'allowGameBackgroundChange', label: 'Game background', desc: 'Can cover the app behind your image or clip' },
+    { key: 'allowPopupVideo', label: 'Video', desc: 'Can show a full-screen clip (starts muted, you can dismiss)' },
+    { key: 'allowPopupMessage', label: 'Message', desc: 'Can show a short note on your screen' },
+    { key: 'allowTextOverlay', label: 'Banner text', desc: 'Can put large text over your screen' },
+    { key: 'allowBlurEverything', label: 'Blur', desc: 'Can blur your whole view for a moment' },
+    { key: 'allowRemoteCamera', label: 'Camera', desc: 'Can ask your camera for one photo. You approve every request.' },
+    { key: 'allowPublicCamera', label: 'Public photos', desc: 'Camera photos may be posted publicly. Off: they go only to the sender.' },
+    { key: 'allowHacks', label: 'Hacks', desc: 'Purchased hacks (screen lock, vision jam) can land on you. Off: nothing does.' },
   ];
 
   return (
@@ -288,13 +323,8 @@ export function PCDominationTab({ identity, users }: Props) {
               <Monitor className="w-5 h-5 text-purple-300" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-black tracking-tight text-retro-fg">PC DOMINATION</h1>
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/30">
-                  SUITE
-                </span>
-              </div>
-              <p className="text-xs text-retro-muted">Remote visual &amp; audio effects for consenting partners</p>
+              <h1 className="text-base sm:text-lg font-black tracking-tight text-retro-fg">Domination</h1>
+              <p className="text-xs text-retro-muted">Send short visual effects to players who opted in &mdash; and control what you allow on your own screen</p>
             </div>
           </div>
 
@@ -307,8 +337,34 @@ export function PCDominationTab({ identity, users }: Props) {
                 onChange={(e) => handleUpdateMaster(e.target.checked)}
                 className="w-4 h-4 accent-purple-500 rounded cursor-pointer"
               />
-              <span>Master Enabled</span>
+              <span>Allow effects from others</span>
             </label>
+            {(() => {
+              const mutedUntil = settings.dominationInboundMutedUntil || 0;
+              const muted = mutedUntil > Date.now();
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (muted) {
+                      update('dominationInboundMutedUntil', 0);
+                      showToast('success', 'Inbound effects resumed');
+                      return;
+                    }
+                    update('dominationInboundMutedUntil', Date.now() + 15 * 60_000);
+                    window.dispatchEvent(new CustomEvent('gmatch:domination-panic'));
+                    showToast('info', 'Paused for 15 minutes. Anything sent now is dropped.');
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border cursor-pointer transition-colors ${
+                    muted
+                      ? 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10'
+                      : 'border-border-glass text-retro-muted hover:text-retro-fg'
+                  }`}
+                >
+                  {muted ? 'Paused \u2014 resume now' : 'Pause 15 min'}
+                </button>
+              );
+            })()}
             <span
               className={`w-2.5 h-2.5 rounded-full ${
                 settings.pcDominationEnabled ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]' : 'bg-zinc-600'
@@ -323,6 +379,7 @@ export function PCDominationTab({ identity, users }: Props) {
             { id: 'control', label: 'Send Commands', icon: Send },
             { id: 'consent', label: 'Consent & Presets', icon: Shield },
             { id: 'history', label: 'Action History', icon: History },
+            { id: 'hacks', label: 'Hacks', icon: ShieldAlert },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -351,8 +408,8 @@ export function PCDominationTab({ identity, users }: Props) {
               <div className="glass-panel p-5 rounded-2xl border border-border-glass bg-surface-raised/40 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Radio className="w-4 h-4 text-purple-400" />
-                    <h3 className="text-xs font-black uppercase tracking-wider text-retro-fg">Select Target</h3>
+                    <Target className="w-4 h-4 text-purple-400" />
+                    <h3 className="text-xs font-black uppercase tracking-wider text-retro-fg">Pick someone</h3>
                   </div>
                   <span className="text-[10px] text-retro-muted font-mono">{targets.length} available</span>
                 </div>
@@ -372,7 +429,7 @@ export function PCDominationTab({ identity, users }: Props) {
                       <option value="">Select a player...</option>
                       {targets.map((t) => (
                         <option key={t.id} value={t.id}>
-                          {t.displayName} {t.enabled ? '✓ (Domination On)' : '✗ (Disabled)'}
+                          {t.displayName} {t.enabled ? '\u00b7 on' : '\u00b7 off'}
                         </option>
                       ))}
                     </select>
@@ -396,7 +453,7 @@ export function PCDominationTab({ identity, users }: Props) {
                             }`}
                           />
                           <span className={selectedTarget.enabled ? 'text-emerald-400 font-semibold' : 'text-retro-muted'}>
-                            {selectedTarget.enabled ? 'PC Domination Enabled' : 'PC Domination Disabled'}
+                            {selectedTarget.enabled ? 'Receives effects' : 'Blocked'}
                           </span>
                         </div>
                       </div>
@@ -413,10 +470,10 @@ export function PCDominationTab({ identity, users }: Props) {
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Zap className="w-4 h-4 text-amber-400" />
-                  <h3 className="text-xs font-black uppercase tracking-wider text-retro-fg">Available Actions</h3>
+                  <h3 className="text-xs font-black uppercase tracking-wider text-retro-fg">Effects</h3>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {Object.entries(ACTION_LABELS).map(([action, { label, icon: Icon, description }]) => {
                     const isConsented = Boolean(selectedTarget?.consents?.[`allow${action === 'wallpaper' ? 'DesktopBackgroundChange' : action === 'game_bg' ? 'GameBackgroundChange' : action === 'popup_video' ? 'PopupVideo' : action === 'message' ? 'PopupMessage' : action === 'text_overlay' ? 'TextOverlay' : action === 'blur' ? 'BlurEverything' : 'RemoteCamera'}`]);
                     const canSend = Boolean(selectedTarget && selectedTarget.enabled && settings.pcDominationEnabled);
@@ -474,7 +531,7 @@ export function PCDominationTab({ identity, users }: Props) {
                   <div className="flex items-center gap-2">
                     <UserCheck className="w-4 h-4 text-emerald-400" />
                     <h4 className="text-xs font-black uppercase tracking-wider text-retro-fg">
-                      {selectedTarget.displayName}&apos;s Live Permissions
+                      {selectedTarget.displayName} allows
                     </h4>
                   </div>
                   <p className="text-[11px] text-retro-muted leading-relaxed">
@@ -511,13 +568,13 @@ export function PCDominationTab({ identity, users }: Props) {
               <div className="glass-panel p-5 sm:p-6 rounded-2xl border border-border-glass bg-surface-raised/40 space-y-4">
                 <div className="flex items-center gap-2">
                   <SettingsIcon className="w-4 h-4 text-cyan-400" />
-                  <h3 className="text-xs font-black uppercase tracking-wider text-retro-fg">Intensity Bundles</h3>
+                  <h3 className="text-xs font-black uppercase tracking-wider text-retro-fg">Presets</h3>
                 </div>
                 <p className="text-xs text-retro-muted leading-relaxed">
-                  Quick-apply consent profiles. Higher intensity unlocks more intrusive and powerful features.
+                  One-tap starting points for the toggles below. Everything stays opt-in.
                 </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {(['mild', 'medium', 'extreme'] as const).map((preset) => {
                     const isSelected = settings.dominationIntensity === preset;
                     return (
@@ -557,13 +614,13 @@ export function PCDominationTab({ identity, users }: Props) {
               <div className="glass-panel p-5 sm:p-6 rounded-2xl border border-border-glass bg-surface-raised/40 space-y-4">
                 <div className="flex items-center gap-2">
                   <Shield className="w-4 h-4 text-emerald-400" />
-                  <h3 className="text-xs font-black uppercase tracking-wider text-retro-fg">My Inbound Consents</h3>
+                  <h3 className="text-xs font-black uppercase tracking-wider text-retro-fg">What others can send you</h3>
                 </div>
                 <p className="text-xs text-retro-muted leading-relaxed">
-                  Toggle granular permissions for actions other trusted players can perform on your screen.
+                  Each effect is separate. Off means nobody can trigger it on your screen, no matter who pays.
                 </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {consentSettings.map(({ key, label, desc }) => {
                     const value = Boolean(settings[key as keyof typeof settings]);
                     return (
@@ -616,7 +673,7 @@ export function PCDominationTab({ identity, users }: Props) {
               {history.length === 0 ? (
                 <div className="text-center py-12 glass-panel border border-border-glass rounded-2xl space-y-2">
                   <Monitor className="w-8 h-8 mx-auto text-retro-muted opacity-40" />
-                  <p className="text-xs font-bold text-retro-muted">No domination actions recorded yet</p>
+                  <p className="text-xs font-bold text-retro-muted">Nothing so far</p>
                 </div>
               ) : (
                 <div className="space-y-2.5">
@@ -668,7 +725,74 @@ export function PCDominationTab({ identity, users }: Props) {
                   })}
                 </div>
               )}
+
+              <div className="flex items-center gap-2 pt-2">
+                <Send className="w-4 h-4 text-cyan-400" />
+                <h3 className="text-xs font-black uppercase tracking-wider text-retro-fg">Sent by you</h3>
+              </div>
+              {outgoing.length === 0 ? (
+                <div className="text-center py-8 glass-panel border border-border-glass rounded-2xl">
+                  <p className="text-xs font-bold text-retro-muted">You have not sent anything yet</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {outgoing.map((action: any) => {
+                    const actionMeta = ACTION_LABELS[action.action];
+                    const Icon = actionMeta?.icon || Monitor;
+                    return (
+                      <div key={action.id} className="glass-panel p-4 rounded-2xl border border-border-glass bg-surface-raised/40">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
+                              <Icon className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold text-retro-fg capitalize truncate">
+                                {actionMeta?.label || action.action}
+                              </div>
+                              <div className="text-[10px] text-retro-muted truncate">
+                                To {action.victim_name || 'unknown'}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
+                                action.status === 'executed' || action.status === 'sent'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                  : action.status === 'denied'
+                                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                  : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                              }`}
+                            >
+                              {action.status}
+                            </span>
+                            <div className="text-[9px] font-mono text-retro-muted mt-1">
+                              {new Date(action.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
+          )}
+
+          {/* TAB 4: HACKS (fused cyber-hack arsenal + live spy feed) */}
+          {activeTab === 'hacks' && (
+            <HacksPanel
+              identity={identity}
+              users={allUsers}
+              profilePics={profilePics}
+              points={points}
+              toast={toastFn}
+              activeHack={activeHack}
+              setActiveHack={setActiveHack}
+              onOpenFlash={onOpenFlash}
+              onExitSpy={() => setActiveTab('control')}
+            />
           )}
         </div>
       </div>

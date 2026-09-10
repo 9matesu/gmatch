@@ -7,16 +7,20 @@ import { useEffect, useState } from 'react'
 import { Server, Wifi } from 'lucide-react'
 import { playPress } from '../../utils/sounds'
 import { isServerUrl, normalizeServerUrl } from '../../utils/serverUrl'
+import { ServerPasswordSection } from './ServerPasswordSection'
+import { SnapshotSection } from './SnapshotSection'
+import { useIdentity } from '../../hooks/useIdentity'
 
 type State = { packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[] }
 
 export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => void }) {
+  const { identity } = useIdentity()
   const [state, setState] = useState<State | null>(null)
   const [clientUrl, setClientUrl] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    window.goongrid?.serverState?.().then((s) => {
+    window.gmatch?.serverState?.().then((s) => {
       setState(s)
       if (s?.mode === 'client') setClientUrl(s.url)
     }).catch(() => setState(null))
@@ -31,26 +35,32 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
   }
 
   const save = async (mode: 'host' | 'client', url: string) => {
-    if (!window.goongrid?.serverSet) return
+    if (!window.gmatch?.serverSet) return
     setSaving(true)
-    const res = await window.goongrid.serverSet({ mode, url })
+    const res = await window.gmatch.serverSet({ mode, url })
     setSaving(false)
     if (!res.ok) { toast?.(res.error || 'Could not save', 'error'); return }
     toast?.(mode === 'host' ? 'Now hosting — restart to apply' : 'Connecting to friend — restart to apply', 'success')
-    if (window.goongrid.serverRelaunch && state.packaged) {
-      window.goongrid.serverRelaunch()
+    if (window.gmatch.serverRelaunch && state.packaged) {
+      window.gmatch.serverRelaunch()
     }
   }
 
   return (
     <div className="space-y-4 animate-orbit-fade-in">
-      <div className="p-4 bg-surface-interactive border border-retro-border rounded-lg space-y-2">
+      {state.mode === 'host' && identity && (
+        <>
+          <ServerPasswordSection identity={identity as never} isHost toast={(m, t) => toast?.(m, t)} />
+          <SnapshotSection identity={identity as never} isHost toast={(m, t) => toast?.(m, t)} />
+        </>
+      )}
+      <div className="glass-card p-4 space-y-2">
         <div className="flex items-center gap-2">
           <Server className="w-4 h-4 text-retro-accent" />
           <span className="text-xs font-medium text-retro-fg">
             {state.mode === 'host' ? 'This computer hosts the server' : 'Connected to a friend’s server'}
           </span>
-          <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full font-mono ${state.mode === 'host' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-sky-500/10 text-sky-300'}`}>
+          <span className={`glass-inset ml-auto text-[10px] px-2 py-0.5 rounded-full font-mono ${state.mode === 'host' ? 'text-emerald-200' : 'text-retro-fg'}`}>
             {state.mode.toUpperCase()}
           </span>
         </div>
@@ -58,7 +68,7 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
         {state.packaged && (
           <p className="text-[11px] text-retro-muted">
             {state.mode === 'host'
-              ? 'Friends running goonMatch Grid can enter one of the addresses below in their Settings → Server to join your world. Keep the app open and your firewall allows the port.'
+              ? 'Friends running gMatch can enter one of the addresses below in their Settings → Server to join your world. Keep the app open and your firewall allows the port.'
               : 'All social data lives on the server you connected to. Switch back to Host anytime.'}
           </p>
         )}
@@ -89,13 +99,13 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
               onChange={(e) => setClientUrl(e.target.value)}
               placeholder="http://192.168.0.42:8790"
               aria-label="Friend server address"
-              className="flex-1 bg-surface-raised border border-border-glass focus:border-retro-accent/60 px-3 py-2 text-xs text-retro-fg rounded-lg outline-none font-mono"
+              className="glass-field flex-1 px-3 py-2 text-xs font-mono"
             />
             <button
               type="button"
               disabled={saving || !isServerUrl(clientUrl)}
               onClick={() => { playPress(880); void save('client', normalizeServerUrl(clientUrl)!) }}
-              className="px-3 py-2 rounded-lg bg-retro-accent text-black text-xs font-bold disabled:opacity-40 cursor-pointer"
+              className="glass-action glass-action-primary px-3 py-2 rounded-lg text-xs font-bold cursor-pointer"
             >
               Connect
             </button>

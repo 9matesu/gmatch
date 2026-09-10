@@ -14,7 +14,6 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { saveUserProfile } from '../utils/profile';
-import { useGame, SETUP_TAG_COUNT } from '../game/store';
 import { playPress, playWin } from '../utils/sounds';
 import {
   type OnboardingState,
@@ -46,8 +45,6 @@ function generateRandomHandle(): string {
   const num = Math.floor(100 + Math.random() * 900);
   return `${prefix}${suffix}_${num}`;
 }
-
-const DEFAULT_STARTER_TAGS = ['solo', 'anal', 'milf', 'blowjob'];
 
 export function OnboardingFlow({
   identity,
@@ -81,20 +78,14 @@ export function OnboardingFlow({
     const anonymous = readOnboardingState(null);
     let migrated = nextState;
 
-    if (nextState.completed.length === 0 && anonymous.completed.includes('ready')) {
-      migrated = {
-        version: 1,
-        completed: ['welcome', 'ready'],
-        current: 'ready',
-      };
-    } else if (nextState.completed.length === 0 && anonymous.completed.length === 0) {
-      if (!isDefaultPeerName(initialProfile.displayName)) {
-        migrated = {
-          version: 1,
-          completed: ['welcome', 'ready'],
-          current: 'ready',
-        };
-      }
+    // Returning account holder (finished onboarding under the anonymous key, or
+    // already has a real display name): login-onboarding is complete. Idle
+    // starter tags are handled by the clicker itself, so don't re-show the wall.
+    if (
+      nextState.completed.length === 0 &&
+      (anonymous.completed.includes('ready') || !isDefaultPeerName(initialProfile.displayName))
+    ) {
+      migrated = { version: 1, completed: ['welcome', 'ready'], current: 'ready' };
     }
 
     if (migrated !== nextState) {
@@ -128,14 +119,7 @@ export function OnboardingFlow({
         localStorage.setItem('goonMatch_age_verified', 'true');
       } catch {}
 
-      // 2. Ensure feed / game starter tags are provisioned
-      if (!useGame.getState().setupComplete) {
-        const userTags = initialProfile.tags.filter(Boolean);
-        const starterTags = Array.from(new Set([...userTags, ...DEFAULT_STARTER_TAGS])).slice(0, SETUP_TAG_COUNT);
-        useGame.getState().completeSetup(starterTags, []);
-      }
-
-      // 3. Authenticate or create account
+      // 2. Authenticate or create account
       if (isImporting) {
         if (!secretKey.trim()) {
           throw new Error('Please enter your exported secret key');
@@ -150,12 +134,11 @@ export function OnboardingFlow({
 
       playWin();
 
-      // 4. Mark complete
-      const nextState: OnboardingState = {
-        version: 1,
-        completed: ['welcome', 'ready'],
-        current: 'ready',
-      };
+      // 3. Account ready — onboarding ends here. Idle starter tags are asked
+      //    for the first time the player opens the idle clicker (GridWorkspace
+      //    gates itself on setupComplete), so the rest of gMatch is usable
+      //    immediately instead of blocking login on a tag wall.
+      const nextState: OnboardingState = { version: 1, completed: ['welcome', 'ready'], current: 'ready' };
       writeOnboardingState(identityId, nextState);
       setState(nextState);
       onComplete();
@@ -177,7 +160,7 @@ export function OnboardingFlow({
               <span>Decentralized Adult Network</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-white">
-              Welcome to GoonGrid
+              Welcome to gMatch
             </h1>
             <p className="text-xs text-zinc-400 leading-relaxed">
               Fast, privacy-preserving adult media and peer-to-peer card gaming.
@@ -195,7 +178,7 @@ export function OnboardingFlow({
             <div>
               <span className="font-semibold text-white">18+ Mature Content Only</span>
               <p className="text-zinc-400 text-[11px] leading-relaxed">
-                GoonGrid contains adult media and community content intended exclusively for adults. You must be at least 18 years old to access this platform.
+                gMatch contains adult media and community content intended exclusively for adults. You must be at least 18 years old to access this platform.
               </p>
             </div>
           </div>
@@ -347,7 +330,7 @@ export function OnboardingFlow({
             ) : (
               <>
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>Enter GoonGrid</span>
+                <span>Continue</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}

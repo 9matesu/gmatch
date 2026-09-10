@@ -5,7 +5,7 @@ import { CAPS, capEffectLabel, capStacks } from '../game/caps'
 import { HEAT_WINDOW_MS, heatMultiplier } from '../game/economy'
 import type { CapId } from '../game/types'
 import { offlineSvg } from '../services/offlineSvg'
-import { prefetchImages } from '../services/imageCache'
+import { prefetchImages, resolveImage } from '../services/imageCache'
 import { isVideoUrl } from '../services/postFilter'
 import { redgifsPlayable } from '../services/redgifs'
 import { CAP_SKINS } from './capSkins'
@@ -85,10 +85,13 @@ export default function GoonPanel() {
   const queue = useGame((s) => s.queue)
   const past = useGame((s) => s.past)
   const popCap = useGame((s) => s.popCap)
+  const imageReady = useGame((s) => s.imageReady)
+  const setImageReady = useGame((s) => s.setImageReady)
 
   const [floats, setFloats] = useState<Float[]>([])
   const [critFlash, setCritFlash] = useState(false)
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
+  const [shownUrl, setShownUrl] = useState<string | null>(null)
   const floatId = useRef(0)
   const reduceMotion = useReducedMotion()
 
@@ -150,6 +153,43 @@ export default function GoonPanel() {
     (current.kind === 'video' || isVideoUrl(current.url)) &&
     !/\.gif(?:[?#]|$)/i.test(current.url)
   const inBattle = !showOffline && foeMaxHp > 0
+
+  // Verified stage swap: keep the last decoded picture on screen until the
+  // next one is cached + decoded successfully — arrows never show a blank
+  // frame, and scoring stays locked (store.imageReady) until it is visible.
+  useEffect(() => {
+    if (showOffline || !current) {
+      setImageReady(false)
+      return
+    }
+    if (isMotion) {
+      // Videos stream from source; the <video> element's own events gate it.
+      setShownUrl(null)
+      setImageReady(true)
+      return
+    }
+    let live = true
+    setImageReady(false)
+    const url = current.url
+    void (async () => {
+      try {
+        const resolved = await resolveImage(url)
+        const probe = new Image()
+        probe.referrerPolicy = 'no-referrer'
+        probe.src = resolved
+        await probe.decode()
+        if (!live) return
+        setShownUrl(resolved)
+        setImageReady(true)
+      } catch {
+        if (!live) return
+        onImageError()
+      }
+    })()
+    return () => {
+      live = false
+    }
+  }, [current, showOffline, isMotion, setImageReady, onImageError])
   const hpPct = inBattle ? Math.max(0, (foeHp / foeMaxHp) * 100) : 0
   // Heat combo HUD: live multiplier + whether the streak is still inside the
   // 2s window (goes cold visually the moment you stop clicking).
@@ -164,7 +204,7 @@ export default function GoonPanel() {
   )
 
   return (
-    <section className={`${PLATE} ${PANEL} flex flex-col gap-3 overflow-hidden`}>
+    <section className={`${PLATE} ${PANEL} flex flex-col gap-2 overflow-hidden`}>
       {isGrid ? (
         <div
           className={`${STAGE_FRAME} relative min-h-0 flex-1 grid auto-rows-fr grid-cols-3 gap-2 p-2`}
@@ -249,11 +289,11 @@ export default function GoonPanel() {
           {grid.length === 0 && (
             <OfflineCard fetching={fetching} feedOffline={feedOffline} onRetry={() => void fetchFeed()} />
           )}
-          {!feedOffline && grid.length > 0 && (
+          {grid.length > 0 && (
             <>
               <button
                 type="button"
-                className="glass-button absolute left-2.5 top-1/2 z-[4] flex h-16 w-[46px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-35"
+                className="glass-button absolute left-2.5 top-1/2 z-[4] flex h-20 w-12 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-35"
                 aria-label="Previous image"
                 title={canGridBack ? 'Back to the previous board' : 'Nothing behind you yet'}
                 disabled={!canGridBack}
@@ -263,7 +303,7 @@ export default function GoonPanel() {
               </button>
               <button
                 type="button"
-                className="glass-button absolute right-2.5 top-1/2 z-[4] flex h-16 w-[46px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100"
+                className="glass-button absolute right-2.5 top-1/2 z-[4] flex h-20 w-12 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100"
                 aria-label="Next image"
                 title="Skip this round — no reward"
                 onClick={() => skipGrid()}
@@ -275,7 +315,7 @@ export default function GoonPanel() {
         </div>
       ) : (
         <div
-          className={`${STAGE_FRAME} relative min-h-0 flex-1 cursor-pointer active:cursor-grabbing max-[1100px]:min-h-[320px]`}
+          className={`${STAGE_FRAME} relative min-h-0 flex-1 ${imageReady ? 'cursor-pointer active:cursor-grabbing' : 'cursor-progress'} max-[1100px]:min-h-[320px]`}
           onClick={handleClick}
           role="button"
           tabIndex={0}
@@ -288,9 +328,19 @@ export default function GoonPanel() {
           }}
         >
           {critFlashEl}
+          {/* Blurred cover fill so the stage reads as an image, not a
+              letterbox — the foreground stays 100% visible (object-contain). */}
+          {!showOffline && (
+            <img
+              src={shownUrl ?? src}
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 z-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl select-none"
+            />
+          )}
           {isMotion && current ? (
             <video
-              className={GOON_IMAGE}
+              className={`${GOON_IMAGE} relative z-[1]`}
               src={redgifsPlayable(current.url)}
               poster={current.preview ? redgifsPlayable(current.preview) : undefined}
               autoPlay={!reduceMotion}
@@ -302,14 +352,22 @@ export default function GoonPanel() {
               onError={onImageError}
             />
           ) : (
-            <CachedImg
-              className={GOON_IMAGE}
-              src={src}
+            <img
+              className={`${GOON_IMAGE} relative z-[1]`}
+              src={shownUrl ?? src}
               alt="goon feed"
               referrerPolicy="no-referrer"
               onError={onImageError}
               draggable={false}
             />
+          )}
+          {!imageReady && !showOffline && !isMotion && (
+            <span
+              className={`${MONO} absolute left-1/2 top-1/2 z-[2] -translate-x-1/2 -translate-y-1/2 rounded-lg bg-black/60 px-3 py-1.5 text-xs text-retro-muted`}
+              role="status"
+            >
+              Loading…
+            </span>
           )}
           {showOffline && (
             <Badge variant="warning" className={`${MONO} absolute right-2.5 top-2.5`}>
@@ -319,25 +377,22 @@ export default function GoonPanel() {
           {showOffline && (
             <OfflineCard fetching={fetching} feedOffline={feedOffline} onRetry={() => void fetchFeed()} />
           )}
-          {!showOffline && (
-            <button
-              type="button"
-              className="glass-button absolute left-2.5 top-1/2 flex h-16 w-[46px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-35"
-              aria-label="Previous image"
-              title={canGoBack ? 'Back to the skipped foe' : 'Nothing behind you yet'}
-              disabled={!canGoBack}
-              onClick={(e) => {
-                e.stopPropagation()
-                goBack()
-              }}
-            >
-              <IconChevronL size={26} />
-            </button>
-          )}
-          {!showOffline && (
-            <button
-              type="button"
-              className="glass-button absolute right-2.5 top-1/2 flex h-16 w-[46px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100"
+          <button
+            type="button"
+            className="glass-button absolute left-2.5 top-1/2 z-[5] flex h-20 w-12 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-35"
+            aria-label="Previous image"
+            title={canGoBack ? 'Back to the skipped foe' : 'Nothing behind you yet'}
+            disabled={!canGoBack}
+            onClick={(e) => {
+              e.stopPropagation()
+              goBack()
+            }}
+          >
+            <IconChevronL size={26} />
+          </button>
+          <button
+            type="button"
+            className="glass-button absolute right-2.5 top-1/2 z-[5] flex h-20 w-12 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100"
               aria-label="Next image"
               title="Skip this foe — no reward"
               onClick={(e) => {
@@ -346,8 +401,7 @@ export default function GoonPanel() {
               }}
             >
               <IconChevronR size={26} />
-            </button>
-          )}
+          </button>
           {floats
             .filter((f) => f.cell === null)
             .map((f) => (
@@ -361,7 +415,7 @@ export default function GoonPanel() {
             ))}
         </div>
       )}
-      <div className="flex flex-none items-center gap-2.5 rounded-[10px] border border-border-glass bg-retro-bg px-3 py-2">
+      <div className="flex flex-none items-center gap-2 rounded-[10px] border border-border-glass bg-retro-bg px-2 py-1.5">
         <div
           className="inline-flex flex-none overflow-hidden rounded-lg border border-border-glass"
           role="group"
@@ -399,7 +453,7 @@ export default function GoonPanel() {
             <div className={`${HP_BAR} flex-1`}>
               <div className={`${HP_FILL} ${hpPct <= 30 ? HP_FILL_LOW : ''}`} style={{ width: `${hpPct}%` }} />
             </div>
-            <span className={`${MONO} whitespace-nowrap text-[11px] text-retro-muted`}>
+            <span className={`${MONO} whitespace-nowrap text-[10px] text-retro-muted`}>
               {formatNum(Math.ceil(foeHp))}/{formatNum(foeMaxHp)} HP
             </span>
           </div>
@@ -428,7 +482,7 @@ export default function GoonPanel() {
           </button>
         )}
         <span
-          className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border-glass bg-retro-bg px-2.5 py-1 text-xs font-bold text-retro-fg [&_svg]:text-retro-accent`}
+          className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border-glass bg-retro-bg px-2 py-0.5 text-[11px] font-bold text-retro-fg [&_svg]:text-retro-accent`}
           title="Lifetime KOs — each foe hits harder"
         >
           KOs: {formatNum(defeated)}
@@ -444,7 +498,7 @@ export default function GoonPanel() {
             <button
               key={id}
               type="button"
-              className={`${SKIN} flex cursor-pointer flex-col gap-0.5 rounded-[10px] border border-border-glass bg-surface-elevated p-2 text-left text-retro-fg shadow-sm transition-[transform,box-shadow,border-color] duration-75 enabled:hover:border-retro-accent enabled:active:translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none ${
+              className={`${SKIN} flex cursor-pointer flex-col gap-0 rounded-[10px] border border-border-glass bg-surface-elevated p-1.5 text-left text-retro-fg shadow-sm transition-[transform,box-shadow,border-color] duration-75 enabled:hover:border-retro-accent enabled:active:translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none ${
                 isLive
                   ? 'border-[#ff2d78] shadow-[0_0_12px_rgba(255,45,120,0.35)]'
                   : ''
@@ -456,15 +510,15 @@ export default function GoonPanel() {
               onClick={() => popCap(id)}
               title={`${def.name} — ${capEffectLabel(id)} — ${formatNum(def.cost)} g$ — permanent, pops stack${st.count > 0 ? ` (x${st.count} live)` : ''}`}
             >
-              <span className={`${DISPLAY} text-[11px] font-bold tracking-[0.5px]`}>
+              <span className={`${DISPLAY} text-[10px] font-bold tracking-[0.5px]`}>
                 {def.name}
                 {st.count > 1 ? ` x${st.count}` : ''}
               </span>
-              <span className={`text-[10px] ${isLive ? 'text-retro-fg' : 'text-retro-muted'}`}>
+              <span className={`text-[9px] leading-tight ${isLive ? 'text-retro-fg' : 'text-retro-muted'}`}>
                 {capEffectLabel(id)}
               </span>
-              <span className={`${MONO} text-[11px] text-retro-muted`}>{formatNum(def.cost)} g$</span>
-              <span className={`${MONO} min-h-[14px] text-[11px] font-bold text-[#ff2d78]`}>
+              <span className={`${MONO} text-[10px] text-retro-muted`}>{formatNum(def.cost)} g$</span>
+              <span className={`${MONO} min-h-[12px] text-[10px] font-bold text-[#ff2d78]`}>
                 {isLive ? '∞' : ''}
               </span>
             </button>

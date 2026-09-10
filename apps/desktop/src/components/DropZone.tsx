@@ -2,9 +2,13 @@
 
 import { useState, useRef } from 'react'
 
+export const DND_KEEPSAKE = 'application/x-gmatch-keepsake'
+export const DND_CARD = 'application/x-gmatch-card'
+
 export function DropZone({
   onFiles,
   onPasteUrl,
+  onPayloadDrop,
   accept = 'image/jpeg, image/png, image/webp, image/avif, image/gif, video/mp4, video/webm, video/quicktime, video/ogg, video/*',
   multiple = true,
   disabled = false,
@@ -13,6 +17,8 @@ export function DropZone({
 }: {
   onFiles: (files: FileList | File[]) => void
   onPasteUrl?: (url: string) => void
+  /** Custom in-app drag payloads (keepsake/card ids dropped from galleries). */
+  onPayloadDrop?: (type: string, payload: Record<string, unknown>) => void
   accept?: string
   multiple?: boolean
   disabled?: boolean
@@ -23,12 +29,26 @@ export function DropZone({
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  const hasCustomPayload = (e: React.DragEvent) =>
+    Array.from(e.dataTransfer.types).some((t) => t === DND_KEEPSAKE || t === DND_CARD)
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setDragOver(false)
     if (disabled) return
     if (e.dataTransfer.files.length > 0) {
       onFiles(e.dataTransfer.files)
+      return
+    }
+    if (onPayloadDrop) {
+      for (const type of [DND_KEEPSAKE, DND_CARD]) {
+        const raw = e.dataTransfer.getData(type)
+        if (!raw) continue
+        try {
+          onPayloadDrop(type, JSON.parse(raw) as Record<string, unknown>)
+          return
+        } catch { /* malformed payload — ignore */ }
+      }
     }
   }
 
@@ -71,7 +91,7 @@ export function DropZone({
     <div
       ref={containerRef}
       tabIndex={0}
-      onDragOver={(e) => { e.preventDefault(); if (!disabled) setDragOver(true) }}
+      onDragOver={(e) => { if (!disabled && (e.dataTransfer.types.length > 0 || hasCustomPayload(e))) { e.preventDefault(); setDragOver(true) } }}
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
       onPaste={handlePasteEvent}

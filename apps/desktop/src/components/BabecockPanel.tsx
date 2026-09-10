@@ -754,7 +754,7 @@ export function BabecockPanel({
                       type="button"
                       onClick={addMoreImages}
                       disabled={addingImages}
-                      className="px-3 py-2 text-xs font-bold text-retro-body border border-border-glass hover:bg-white/10 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-40"
+                      className="px-3 py-2 text-xs font-bold text-retro-body border border-border-glass hover:bg-glass-w10 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-40"
                     >
                       <ImagePlus className="w-3.5 h-3.5" />
                       <span>{addingImages ? 'Adding...' : 'Add images'}</span>
@@ -782,7 +782,7 @@ export function BabecockPanel({
                       <button
                         type="button"
                         onClick={() => setInvitePickerOpen((v) => !v)}
-                        className="px-3.5 py-2 text-xs font-bold text-retro-body border border-border-glass hover:bg-white/10 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
+                        className="px-3.5 py-2 text-xs font-bold text-retro-body border border-border-glass hover:bg-glass-w10 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
                       >
                         <Mail className="w-3.5 h-3.5 text-cyan-300" />
                         <span>{invitePickerOpen ? 'Close Picker' : 'Invite a Friend'}</span>
@@ -799,7 +799,7 @@ export function BabecockPanel({
                                 type="button"
                                 disabled={sendingInvite !== null}
                                 onClick={() => sendInvite(u.id)}
-                                className="w-full flex items-center gap-2 p-1.5 rounded-xl hover:bg-white/10 disabled:opacity-40 text-left cursor-pointer transition-colors"
+                                className="w-full flex items-center gap-2 p-1.5 rounded-xl hover:bg-glass-w10 disabled:opacity-40 text-left cursor-pointer transition-colors"
                               >
                                 <div className="w-7 h-7 rounded-full bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-xs font-bold text-cyan-300 shrink-0">
                                   {(u.display_name?.trim() || 'Unknown User').slice(0, 1).toUpperCase()}
@@ -829,7 +829,7 @@ export function BabecockPanel({
         <button
           type="button"
           onClick={() => setGalleryOpen((v) => !v)}
-          className="w-full flex items-center justify-between px-4 py-3.5 bg-surface-raised hover:bg-white/10 transition-colors cursor-pointer text-left border-b border-border-glass"
+          className="w-full flex items-center justify-between px-4 py-3.5 bg-surface-raised hover:bg-glass-w10 transition-colors cursor-pointer text-left border-b border-border-glass"
         >
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-retro-muted" />

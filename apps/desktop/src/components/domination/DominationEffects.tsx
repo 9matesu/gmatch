@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { X, Camera } from 'lucide-react';
 import { orbitFetch } from '../../utils/api';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { useSettings } from '../../hooks/useSettings';
@@ -22,21 +23,11 @@ interface DominationEvent {
     color?: string;
     actionId?: string;
     intensityPreset?: string;
+    isPublic?: boolean;
     /** g$ the victim just earned from the consent cut (server-paid). */
     victimReward?: number;
   };
   timestamp: string;
-}
-
-/** Real past-tense verbs — naive `+d` mangling reads like a bug (blurd, camerad). */
-const PAST_TENSE: Record<string, string> = {
-  wallpaper: 'papered',
-  game_bg: 'backgrounded',
-  popup_video: 'ambushed',
-  message: 'messaged',
-  text_overlay: 'tagged',
-  blur: 'blurred',
-  camera: 'filmed',
 }
 
 interface ActiveEffect {
@@ -47,15 +38,31 @@ interface ActiveEffect {
   duration?: number;
 }
 
+/**
+ * Renders inbound domination effects for the player who opted in.
+ * Safety rules: every effect is dismissed by Esc or a visible close control,
+ * videos start muted, camera asks before capturing, and the 15-minute
+ * inbound pause (settings.dominationInboundMutedUntil) drops everything.
+ */
 export function DominationEffects({ identity }: { identity: OrbitIdentity | null }) {
   const { settings, update } = useSettings();
   const [activeEffects, setActiveEffects] = useState<ActiveEffect[]>([]);
-  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [cameraAsk, setCameraAsk] = useState<{ from: string; payload: any } | null>(null);
+  const [videoUnmuted, setVideoUnmuted] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+
+  const clearAll = useCallback(() => {
+    setActiveEffects([]);
+    setCameraAsk(null);
+    setVideoUnmuted(false);
+  }, []);
 
   const addEffect = useCallback((effect: Omit<ActiveEffect, 'startTime'>) => {
     const newEffect = { ...effect, startTime: Date.now() };
     setActiveEffects(prev => [...prev, newEffect]);
-    
+
     if (effect.duration) {
       setTimeout(() => {
         setActiveEffects(prev => prev.filter(e => e.id !== effect.id));
@@ -67,64 +74,91 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
     setActiveEffects(prev => prev.filter(e => e.id !== id));
   }, []);
 
-  async function handleCameraRequest(from: string, payload: any) {
-    if (!navigator.mediaDevices?.getUserMedia) return;
+  // Esc clears whatever is on screen. Panic event from the Domination tab
+  // does the same and additionally drops the in-app wallpaper swap.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') clearAll();
+    };
+    const onPanic = () => {
+      clearAll();
+      update('wallpaperPreset', 'default');
+      update('wallpaperUrl', '');
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('gmatch:domination-panic', onPanic);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('gmatch:domination-panic', onPanic);
+    };
+  }, [clearAll, update]);
 
+  // OS-level wallpaper swap (Windows). Applies for the effect duration, then
+  // restores the previous wallpaper. No-ops in the browser.
+  useEffect(() => {
+    const wp = activeEffects.find(e => e.type === 'wallpaper');
+    if (!wp || !wp.data?.url) return;
+    let cancelled = false;
+    let restoreTimer = 0;
+    void (async () => {
+      try {
+        const res = await fetch(wp.data.url, { referrerPolicy: 'no-referrer' });
+        if (!res.ok) return;
+        const blob = await res.blob();
+        if (!blob.type.startsWith('image/')) return;
+        const buf = await blob.arrayBuffer();
+        const out = await window.gmatch?.wallpaperSetData?.(buf, blob.type);
+        if (cancelled || !out?.ok) return;
+        const ms = Number(wp.duration) || 60_000;
+        restoreTimer = window.setTimeout(() => {
+          void window.gmatch?.wallpaperRestore?.();
+        }, ms);
+      } catch {
+        /* desktop swap is best-effort; the in-app wallpaper still applied */
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (restoreTimer) window.clearTimeout(restoreTimer);
+    };
+  }, [activeEffects]);
+
+  async function captureAndSend(from: string, payload: any) {
+    if (!navigator.mediaDevices?.getUserMedia) return;
     try {
+      // Consume the one-shot desktop permission before prompting the camera.
+      await window.gmatch?.grantCameraOnce?.();
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          facingMode: 'user',
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       });
 
-      setCameraStream(stream);
-
       const video = document.createElement('video');
       video.srcObject = stream;
-      video.play();
-
-      await new Promise<void>((resolve) => {
-        video.onloadeddata = () => resolve();
-      });
+      await video.play();
+      await new Promise<void>((resolve) => { video.onloadeddata = () => resolve(); });
 
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(video, 0, 0);
-        const dataUrl = canvas.toDataURL('image/jpeg', payload.quality || 0.8);
-        
-        stream.getTracks().forEach(t => t.stop());
-        setCameraStream(null);
+      stream.getTracks().forEach(t => t.stop());
+      if (!ctx || !identity) return;
+      ctx.drawImage(video, 0, 0);
+      const dataUrl = canvas.toDataURL('image/jpeg', payload.quality || 0.8);
 
-        if (identity) {
-          try {
-            // Check if user (victim) allows public camera and if dominator requested public or private
-            const isPublicConsent = Boolean(settings.allowPublicCamera);
-            const isPublicRequested = payload.isPublic !== undefined ? Boolean(payload.isPublic) : true;
-            const makePublic = isPublicConsent && isPublicRequested;
+      const isPublicConsent = Boolean(settingsRef.current.allowPublicCamera);
+      const isPublicRequested = payload.isPublic !== undefined ? Boolean(payload.isPublic) : true;
+      const makePublic = isPublicConsent && isPublicRequested;
 
-            const formData = new FormData();
-            formData.append('image', dataUrl);
-            formData.append('caption', `Camera capture from domination request by ${from}`);
-            formData.append('is_public', makePublic ? '1' : '0');
-            if (!makePublic) {
-              formData.append('recipients', from);
-            }
-
-            await orbitFetch('/api/objects', {
-              method: 'POST',
-              body: formData,
-            }, identity);
-          } catch {}
-        }
-      }
+      const formData = new FormData();
+      formData.append('image', dataUrl);
+      formData.append('caption', `Photo sent to ${from}`);
+      formData.append('is_public', makePublic ? '1' : '0');
+      if (!makePublic) formData.append('recipients', from);
+      await orbitFetch('/api/objects', { method: 'POST', body: formData }, identity);
     } catch (e) {
-      logger.error('Camera request failed:', e);
+      logger.error('Camera capture declined or failed:', e);
     }
   }
 
@@ -134,6 +168,9 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
     const handleDomination = async (e: Event) => {
       const detail = (e as CustomEvent<DominationEvent>).detail;
       if (!detail || detail.type !== 'domination') return;
+
+      // Panic pause: drop everything silently until the timer runs out.
+      if ((settingsRef.current.dominationInboundMutedUntil || 0) > Date.now()) return;
 
       const { action, payload, from } = detail;
 
@@ -165,10 +202,11 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
 
         case 'popup_video':
           if (settings.allowPopupVideo && payload.url) {
+            setVideoUnmuted(false);
             addEffect({
               id: payload.actionId || crypto.randomUUID(),
               type: 'popup_video',
-              data: { url: payload.url, autoPlay: true, muted: false },
+              data: { url: payload.url, autoPlay: true, muted: true },
               duration: payload.duration,
             });
           }
@@ -213,26 +251,23 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
           break;
 
         case 'camera':
+          // Every capture needs a fresh in-app approval, no silent prompts.
           if (settings.allowRemoteCamera && settings.cameraPermissionMode !== 'deny') {
-            await handleCameraRequest(from, payload);
+            setCameraAsk({ from, payload });
           }
           break;
       }
 
-      // Consent-cut payout: the ledger credit lands on the next reconcile;
-      // tell the player NOW so the loop feels connected.
       if (typeof payload.victimReward === 'number' && payload.victimReward > 0) {
-        const verb = PAST_TENSE[action] || 'hit';
-        useGame.getState().notify(`You were ${verb} — consent cut +${payload.victimReward} g$`);
+        useGame.getState().notify(`Effect from a player — you earned +${payload.victimReward} g$ for putting up with it`);
       }
     };
 
     window.addEventListener('orbit-domination', handleDomination as EventListener);
     return () => window.removeEventListener('orbit-domination', handleDomination as EventListener);
-  }, [identity, settings, addEffect]);
+  }, [identity, settings, addEffect, update]);
 
   const blurEffect = activeEffects.find(e => e.type === 'blur');
-  const wallpaperEffect = activeEffects.find(e => e.type === 'wallpaper');
   const gameBgEffect = activeEffects.find(e => e.type === 'game_bg');
   const popupVideoEffect = activeEffects.find(e => e.type === 'popup_video');
   const messageEffect = activeEffects.find(e => e.type === 'message');
@@ -242,13 +277,14 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
     <>
       {blurEffect && (
         <div
-          className="fixed inset-0 z-50 pointer-events-none"
-          style={{ 
+          className="fixed inset-0 z-50 cursor-pointer"
+          style={{
             backdropFilter: `blur(${blurEffect.data.intensity}px)`,
             backgroundColor: 'rgba(0,0,0,0.1)',
-            animation: 'fadeIn 0.3s ease-out',
           }}
           onClick={() => removeEffect(blurEffect.id)}
+          role="button"
+          aria-label="Clear blur"
         />
       )}
 
@@ -274,10 +310,10 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
           <div className="absolute inset-0 bg-black/40 pointer-events-none" />
           <button
             type="button"
-            className="pointer-events-auto absolute top-4 left-4 text-[10px] font-mono font-bold px-2 py-1 bg-black/75 border border-purple-500/40 text-purple-300 rounded hover:bg-black transition-colors"
+            className="pointer-events-auto absolute top-4 left-4 text-[10px] font-mono font-bold px-2 py-1 bg-black/75 border border-zinc-700 text-zinc-300 rounded hover:bg-black transition-colors cursor-pointer"
             onClick={() => removeEffect(gameBgEffect.id)}
           >
-            Clear Game BG
+            Clear background
           </button>
         </div>
       )}
@@ -285,17 +321,36 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
       {popupVideoEffect && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90" onClick={() => removeEffect(popupVideoEffect.id)}>
           <video
+            ref={videoRef}
             src={popupVideoEffect.data.url}
             autoPlay
             loop
+            muted={!videoUnmuted}
+            playsInline
             className="max-w-full max-h-full object-contain"
             onClick={(e) => e.stopPropagation()}
           />
-          <button 
-            className="absolute top-4 right-4 p-2 bg-zinc-900/80 rounded-full text-zinc-300 hover:text-white"
+          <button
+            type="button"
+            className="absolute top-4 right-4 p-2 bg-zinc-900/80 rounded-full text-zinc-300 hover:text-white cursor-pointer"
             onClick={() => removeEffect(popupVideoEffect.id)}
+            aria-label="Close video"
           >
-            ✕
+            <X className="w-5 h-5" />
+          </button>
+          <button
+            type="button"
+            className="absolute bottom-6 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-zinc-700 text-zinc-200 text-xs font-bold cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              setVideoUnmuted((v) => {
+                const next = !v;
+                if (videoRef.current) videoRef.current.muted = !next;
+                return next;
+              });
+            }}
+          >
+            {videoUnmuted ? 'Mute' : 'Unmute'}
           </button>
         </div>
       )}
@@ -310,22 +365,21 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
       )}
 
       {textOverlayEffect && (
-        <div 
-          className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none"
+        <div
+          className="fixed inset-0 z-40 flex pointer-events-none"
           style={{
-            display: 'flex',
-            alignItems: textOverlayEffect.data.position === 'top' ? 'flex-start' : 
-                       textOverlayEffect.data.position === 'bottom' ? 'flex-end' : 'center',
-            justifyContent: textOverlayEffect.data.position === 'left' ? 'flex-start' : 
-                           textOverlayEffect.data.position === 'right' ? 'flex-end' : 'center',
+            alignItems: textOverlayEffect.data.position === 'top' ? 'flex-start'
+              : textOverlayEffect.data.position === 'bottom' ? 'flex-end' : 'center',
+            justifyContent: textOverlayEffect.data.position === 'left' ? 'flex-start'
+              : textOverlayEffect.data.position === 'right' ? 'flex-end' : 'center',
             padding: '2rem',
           }}
         >
           <div
-            className="pointer-events-auto bg-black/70 px-6 py-4 rounded-xl border border-zinc-700 shadow-2xl animate-fade-in"
+            className="pointer-events-auto bg-black/70 px-6 py-4 rounded-xl border border-zinc-700 shadow-2xl animate-fade-in cursor-pointer"
             style={{
-              fontSize: textOverlayEffect.data.size === 'small' ? '1.5rem' : 
-                       textOverlayEffect.data.size === 'medium' ? '3rem' : '5rem',
+              fontSize: textOverlayEffect.data.size === 'small' ? '1.5rem'
+                : textOverlayEffect.data.size === 'medium' ? '3rem' : '5rem',
               color: textOverlayEffect.data.color,
               fontWeight: '900',
               textShadow: '0 0 20px currentColor, 0 0 40px currentColor',
@@ -336,6 +390,42 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
             onClick={() => removeEffect(textOverlayEffect.id)}
           >
             {textOverlayEffect.data.text}
+          </div>
+        </div>
+      )}
+
+      {cameraAsk && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4">
+          <div className="max-w-sm w-full glass-surface rounded-2xl border border-border-glass bg-zinc-950 p-6 space-y-4 text-center">
+            <div className="w-12 h-12 mx-auto rounded-2xl bg-surface-interactive flex items-center justify-center">
+              <Camera className="w-6 h-6 text-retro-fg" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-retro-fg">{cameraAsk.from} is asking for a photo</h3>
+              <p className="text-xs text-retro-muted mt-1 leading-relaxed">
+                Your camera turns on for one frame, and the photo goes to them. Nothing is captured unless you allow it.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setCameraAsk(null)}
+                className="flex-1 px-4 py-2 rounded-lg border border-border-glass text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer"
+              >
+                Decline
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const ask = cameraAsk;
+                  setCameraAsk(null);
+                  if (ask) void captureAndSend(ask.from, ask.payload);
+                }}
+                className="flex-1 px-4 py-2 rounded-lg bg-white text-black text-xs font-bold hover:bg-zinc-200 cursor-pointer"
+              >
+                Allow once
+              </button>
+            </div>
           </div>
         </div>
       )}

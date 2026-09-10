@@ -2,7 +2,7 @@
 
 import { playPress } from '../../utils/sounds';
 import { Flag, X } from 'lucide-react';
-import type { FeedPost } from './GoonMatchFeed';
+import type { FeedPost } from './GMatchFeed';
 
 const REPORT_REASONS = [
   'Spam or Scam',

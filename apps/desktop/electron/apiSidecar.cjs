@@ -4,7 +4,7 @@ const { spawn } = require('node:child_process')
 const { app } = require('electron')
 const path = require('node:path')
 
-const PORT = Number(process.env.GOONGRID_API_PORT || 8790)
+const PORT = Number(process.env.GMATCH_API_PORT || 8790)
 const API_BASE = `http://127.0.0.1:${PORT}`
 
 let proc = null
@@ -56,7 +56,7 @@ async function startApi() {
     ? path.join(process.resourcesPath, 'api', 'bun.exe')
     : null
 
-  const adoptable = !app.isPackaged || !process.env.GOONGRID_HOST_MODE
+  const adoptable = !app.isPackaged || !process.env.GMATCH_HOST_MODE
   // Adopt an already-healthy sidecar (e.g. `npm run dev` started one, or a
   // second Electron window) instead of spawning a doomed duplicate. Host-mode
   // packaged instances must own their server — never adopt a foreign one.

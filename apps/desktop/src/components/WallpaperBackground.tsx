@@ -55,7 +55,7 @@ export function WallpaperBackground({ wallpaperBg, wallpaperFit = 'cover', wallp
       {hideUiForWallpaper && (
         <div
           onClick={onRestore}
-          className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] glass-toolbar text-retro-fg rounded-full shadow-2xl px-5 py-2.5 text-xs font-bold hover:bg-white/12 cursor-pointer transition-colors"
+          className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] glass-toolbar text-retro-fg rounded-full shadow-2xl px-5 py-2.5 text-xs font-bold hover:bg-glass-w12 cursor-pointer transition-colors"
         >
           Background View Mode Active (Click to restore UI)
         </div>

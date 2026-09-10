@@ -1,4 +1,4 @@
--- goonMatch posts: public-by-default content flag and denormalized engagement
+-- gMatch posts: public-by-default content flag and denormalized engagement
 -- counters (like / comment / share). Posts reuse the existing Objects table —
 -- a "post" is an Objects row with is_public=1 — so the entire blob storage,
 -- signed-URL fetcher, magic-byte validation, content-hash dedup, and the

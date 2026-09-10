@@ -25,7 +25,7 @@ describe('release loops (P4 gaps)', () => {
     await env.DB.prepare('INSERT INTO Users (id, public_key, display_name) VALUES (?, ?, ?)')
       .bind(victim.orbitId, victim.publicKeyHex, 'Victim').run()
     // victim consents to blur + enables domination (keys per routes/domination.ts)
-    await env.DB.prepare('UPDATE Users SET pc_domination_enabled = 1, pc_domination_settings = ? WHERE id = ?')
+    await env.DB.prepare("UPDATE Users SET pc_domination_enabled = 1, pc_domination_settings = ?, last_seen = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?")
       .bind(JSON.stringify({ allowBlurEverything: true }), victim.orbitId).run()
     await new EconomyService(env.DB).credit(attacker.orbitId, 10_000, {
       idempotencyKey: 'seed-attacker-p4', kind: 'grant',

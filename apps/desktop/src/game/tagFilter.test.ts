@@ -20,7 +20,6 @@ describe('hard blocklist (SPEC §8)', () => {
       'loli',
       'loli_ta',
       'shota',
-      'school_uniform',
       'schoolgirl',
       'kindergarten',
       'underage',
@@ -33,8 +32,6 @@ describe('hard blocklist (SPEC §8)', () => {
       'toddler',
       'minor',
       'juvenile',
-      'young_girl',
-      'student',
     ]) {
       expect(isTagBlocked(tag), tag).toBe(true)
     }
@@ -44,8 +41,6 @@ describe('hard blocklist (SPEC §8)', () => {
     for (const tag of [
       'ageplay',
       'age_play',
-      'incest',
-      'stepsister',
       'bestiality',
       'zoo_philia',
       'necrophilia',
@@ -53,13 +48,6 @@ describe('hard blocklist (SPEC §8)', () => {
       'non-con',
       'noncon',
       'non_consensual',
-      'dubcon',
-      'gore',
-      'scat',
-      'urine',
-      'blood',
-      'murder',
-      'death_note',
     ]) {
       expect(isTagBlocked(tag), tag).toBe(true)
     }
@@ -67,7 +55,7 @@ describe('hard blocklist (SPEC §8)', () => {
 
   it('is case-insensitive', () => {
     expect(isTagBlocked('LOLI')).toBe(true)
-    expect(isTagBlocked('School_Uniform')).toBe(true)
+    expect(isTagBlocked('Schoolgirl_KINDERGARTEN')).toBe(true)
     expect(isTagBlocked('Bestiality')).toBe(true)
   })
 
@@ -94,15 +82,33 @@ describe('hard blocklist (SPEC §8)', () => {
     }
   })
 
-  it('blocklist covers every SPEC §8 term', () => {
+  it('blocklist covers every illegal-core term (SPEC §8 child-safety line)', () => {
     for (const term of [
       'loli', 'shota', 'child', 'kid', 'infant', 'baby', 'toddler',
-      'school', 'student', 'ageplay', 'incest', 'bestiality', 'zoo',
-      'necro', 'rape', 'non-consent', 'gore', 'scat', 'urine', 'blood',
-      'murder', 'death',
+      'minor', 'underage', 'juvenile', 'preteen', 'schoolgirl',
+      'ageplay', 'bestiality', 'zoo', 'necro', 'rape', 'noncon',
+      'non_consensual',
     ]) {
       expect(BLOCKLIST.some((b) => term.includes(b) || b.includes(term)), term).toBe(true)
     }
+  })
+
+  it('allows legal kinks by default — the player owns these choices', () => {
+    for (const tag of [
+      'feet', 'futanari', 'yuri', 'yaoi', 'tentacle', 'kissing', 'solo',
+      '1girl', 'incest', 'gore', 'netorare', 'crossdressing', 'school_uniform',
+    ]) {
+      expect(isTagBlocked(tag), tag).toBe(false)
+    }
+  })
+
+  it('blocks suggested categories only after the player adds them', () => {
+    setUserExcludes(['feet', 'incest'])
+    expect(isTagBlocked('feet_worship')).toBe(true)
+    expect(isTagBlocked('incest')).toBe(true)
+    expect(isUserExcluded('incest')).toBe(true)
+    expect(isTagBlocked('loli')).toBe(true) // hard line unaffected by user list
+    __resetUserExcludes()
   })
 })
 
@@ -135,7 +141,7 @@ describe('noise filtering', () => {
 describe('filterTags', () => {
   it('drops blocked, noise, empty and duplicate tags', () => {
     const out = filterTags([
-      'gangbang', 'loli', 'wet', 'highres', 'gangbang', '', 'pregnant', 'school_uniform',
+      'gangbang', 'loli', 'wet', 'highres', 'gangbang', '', 'pregnant', 'schoolboy',
     ])
     expect(out).toEqual(['gangbang', 'wet', 'pregnant'])
   })

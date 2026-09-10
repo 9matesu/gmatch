@@ -66,39 +66,65 @@ export function decryptText(value: string): string {
 }
 
 /**
- * Generate a time-limited HMAC-SHA256 signature for streaming object media without headers.
+ * Generate a time-limited HMAC-SHA256 signature for streaming object media
+ * without headers (security plan B.7: short TTL + single-use jti).
  */
+export const DEFAULT_SIGNED_TTL_SECONDS = 15 * 60
+
+/** Consumed jtis -> expiry (unix s). Pruned opportunistically. */
+const usedJtis = new Map<string, number>()
+
+export function _resetUsedJtis(): void {
+  usedJtis.clear()
+}
+
+function consumeJti(jti: string, exp: number): boolean {
+  const now = Math.floor(Date.now() / 1000)
+  // prune expired entries (they can no longer be replayed anyway)
+  if (usedJtis.size > 512) {
+    for (const [k, e] of usedJtis) if (e < now) usedJtis.delete(k)
+  }
+  if (usedJtis.has(jti)) return false
+  usedJtis.set(jti, exp)
+  return true
+}
+
 export function createSignedObjectToken(
   objectId: string,
-  ttlSeconds: number = 7 * 3600
-): { sig: string; exp: number } {
+  ttlSeconds: number = DEFAULT_SIGNED_TTL_SECONDS
+): { sig: string; exp: number; jti: string } {
   const key = getKey()
   const exp = Math.floor(Date.now() / 1000) + ttlSeconds
-  const payload = `obj:${objectId}:${exp}`
+  const jti = randomBytes(8).toString('hex')
+  const payload = `obj:${objectId}:${exp}:${jti}`
   const sig = createHmac('sha256', key).update(payload).digest('hex')
-  return { sig, exp }
+  return { sig, exp, jti }
 }
 
 /**
- * Verify a time-limited HMAC-SHA256 signature token.
+ * Verify a time-limited HMAC-SHA256 signature token (B.7: jti is part of the
+ * signed payload AND single-use — an old-style URL without jti fails closed).
  */
 export function verifySignedObjectToken(
   objectId: string,
   sig: string,
-  exp: number
+  exp: number,
+  jti: string
 ): boolean {
   if (!objectId || !sig || !exp) return false
+  if (!jti || !/^[0-9a-f]{16}$/.test(jti)) return false
   const nowSec = Math.floor(Date.now() / 1000)
   if (nowSec > exp) return false // Expired
 
   try {
     const key = getKey()
-    const payload = `obj:${objectId}:${exp}`
+    const payload = `obj:${objectId}:${exp}:${jti}`
     const expectedSig = createHmac('sha256', key).update(payload).digest('hex')
     const sigBuf = Buffer.from(sig, 'hex')
     const expectedBuf = Buffer.from(expectedSig, 'hex')
     if (sigBuf.length !== expectedBuf.length) return false
-    return timingSafeEqual(sigBuf, expectedBuf)
+    if (!timingSafeEqual(sigBuf, expectedBuf)) return false
+    return consumeJti(jti, exp) // single-use: consume only after a valid MAC
   } catch {
     return false
   }

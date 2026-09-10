@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test'
 import { seedApp } from './helpers'
 import { generateIdentity } from '../src/identity.cjs'
 
+import { legalVersionKey } from '../src/legal/documents'
+
 // Release-1.0 social-suite journeys (plan P4.1).
 // SWs blocked: service-worker caching breaks route mocks + identity seeding
 // determinism (same reason as journeys.spec.ts).
@@ -19,9 +21,12 @@ async function newPeerContext(page: import('@playwright/test').Page, name: strin
   const ctx = await page.context().browser()!.newContext({ serviceWorkers: 'block' })
   const p = await ctx.newPage()
   await p.addInitScript(
-    ([i, n]) => {
+    ([i, n, legalKey]: [Record<string, unknown>, string, string]) => {
       localStorage.setItem('orbit_identity', JSON.stringify(i))
       localStorage.setItem('goonMatch_age_verified', 'true')
+
+      localStorage.setItem('orbit_legal_accepted', legalKey)
+
       localStorage.setItem('orbit_display_name', n)
       localStorage.setItem('orbit_tags', JSON.stringify(['e2e']))
       localStorage.setItem(
@@ -29,7 +34,7 @@ async function newPeerContext(page: import('@playwright/test').Page, name: strin
         JSON.stringify({ version: 1, current: 'ready', completed: ['welcome', 'auth', 'profile', 'platform', 'feed', 'tune', 'cards', 'economy', 'games', 'ready'] }),
       )
     },
-    [id, name],
+    [id, name, legalVersionKey()],
   )
   return { ctx, p, id }
 }
@@ -46,9 +51,13 @@ async function publishPost(page: import('@playwright/test').Page, caption: strin
     drop.click(),
   ])
   await chooser.setFiles({ name: 'e2e-post.png', mimeType: 'image/png', buffer: PNG_1x1 })
+  // The 1.0.x composer crops every upload: apply the default crop first.
+  const apply = page.getByRole('button', { name: 'Apply', exact: true })
+  await expect(apply).toBeVisible({ timeout: 10_000 })
+  await apply.click()
   await page.getByPlaceholder('Write a caption...').fill(caption)
   await page.getByRole('button', { name: 'Share', exact: true }).click()
-  await expect(page.getByText('Post shared to goonMatch!')).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText('Post shared to gMatch!')).toBeVisible({ timeout: 20_000 })
   await page.waitForTimeout(3500) // outlast the 3s orbitFetch GET cache
   await page.reload()
   await expect(page.getByText(caption).first()).toBeVisible({ timeout: 20_000 })
@@ -108,11 +117,12 @@ test('journey 4: view a post author profile from the feed', async ({ page }) => 
   const caption = `profile probe ${Date.now()}`
   await publishPost(page, caption)
   await page.getByText(caption).first().click() // open the post lightbox
-  // Author name comes from the server Users row (default-generated name).
-  const author = page.getByRole('button', { name: /User_|E2E Tester/i }).first()
+  // The 1.1 lightbox header exposes the author as a clickable avatar strip
+  // titled "View profile" (a div, not a button) — open the profile via that.
+  const author = page.getByTitle(/View profile|Watch story/i).first()
   await expect(author).toBeVisible({ timeout: 15_000 })
   await author.click()
-  await expect(page.getByText(/Follow|posts/i).first()).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByText(/Follow|posts|Following/i).first()).toBeVisible({ timeout: 15_000 })
 })
 
 test('journey 5: store renders priced items from the server', async ({ page }) => {

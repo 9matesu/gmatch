@@ -6,6 +6,7 @@ import type { OrbitIdentity } from '@orbit/crypto'
 
 vi.mock('../utils/api', () => ({ orbitFetch: vi.fn() }))
 vi.mock('../utils/sounds', () => ({ playPress: vi.fn() }))
+vi.mock('./ObjectImage', () => ({ ObjectImage: ({ alt }: { alt?: string }) => <img alt={alt || 'card'} /> }))
 
 import { orbitFetch } from '../utils/api'
 import { CardDetailView } from './CardDetailView'
@@ -67,19 +68,28 @@ describe('CardDetailView marketplace actions (P3.1–3.3)', () => {
     })
   })
 
-  it('transfer: opens picker, POSTs /api/cards/:id/transfer with to_user_id', async () => {
-    render(<CardDetailView cardId="c-1" identity={identity} onClose={() => {}} toast={vi.fn()} />)
-    await userEvent.click(await screen.findByRole('button', { name: /^transfer$/i }))
-    const row = await screen.findByRole('button', { name: /bob/i })
-    await userEvent.click(row)
-    await userEvent.click(await screen.findByRole('button', { name: /confirm transfer/i }))
+  it('buy: non-owner sees market price and POSTs /api/cards/:id/buy with idempotency key', async () => {
+    mockFetch({
+      '/api/cards/c-1': () => json({ card: { ...card, ownerId: 'bob', creatorId: 'bob', marketStatus: 'listed' } }),
+      '/api/cards/market': () => json({ listings: [{ listingId: 'l-1', cardId: 'c-1', price: 750, sellerId: 'bob', listedAt: '2026-01-01T00:00:00Z' }] }),
+    })
+    const toast = vi.fn()
+    render(<CardDetailView cardId="c-1" identity={identity} onClose={() => {}} toast={toast} />)
+    const buy = await screen.findByRole('button', { name: /buy now/i })
+    await userEvent.click(buy)
     await waitFor(() => {
       expect(orbitFetch).toHaveBeenCalledWith(
-        '/api/cards/c-1/transfer',
-        expect.objectContaining({ method: 'POST', body: JSON.stringify({ to_user_id: 'bob' }) }),
+        '/api/cards/c-1/buy',
+        expect.objectContaining({ method: 'POST', body: expect.stringMatching(/idempotency_key/) }),
         identity,
       )
     })
+  })
+
+  it('owners get list/cancel/cash-out — no transfer picker anymore', async () => {
+    render(<CardDetailView cardId="c-1" identity={identity} onClose={() => {}} toast={vi.fn()} />)
+    await screen.findByRole('button', { name: /list for sale/i })
+    expect(screen.queryByRole('button', { name: /^transfer$/i })).toBeNull()
   })
 
   it('server error surfaces an error toast and does NOT fake success', async () => {

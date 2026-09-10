@@ -1,0 +1,72 @@
+name: Deploy site
+# Plain-text trust landing: built from source, gated by site/check.mjs (the
+# page cannot ship lying), published to GitHub Pages. The 114MB .exe is NEVER
+# part of the Pages artifact — the page links the GitHub Release directly.
+# Note: `gh` uses the automatic GITHUB_TOKEN injected into every run step.
+on:
+  push:
+    branches: [main]
+    paths: ['site/**', 'apps/desktop/src/legal/**', 'apps/desktop/public/legal/**', 'apps/desktop/scripts/gen-legal.cjs', 'docs/SECURITY-AUDIT.md', '.github/workflows/deploy-site.yml']
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Legal anti-drift gate (public/legal must equal canonical TS source)
+        run: |
+          cd apps/desktop
+          node scripts/gen-legal.cjs
+          git diff --exit-code public/legal/ || { echo "::error::public/legal/ is stale — run: node apps/desktop/scripts/gen-legal.cjs and commit"; exit 1; }
+      - name: Fetch latest release exe + build release.json
+        run: |
+          cd site
+          V=$(gh release list --limit 1 --json tagName --jq '.[0].tagName') || V=""
+          F="gMatch-${V#v}-portable.exe"
+          gh release download "$V" -p "$F" -D releases/ 2>/dev/null || true
+          # No GitHub Release (private repo era): the canonical artifact is the
+          # copy hosted on the fly homepage — hash what we actually fetch.
+          if ! ls releases/gMatch-*-portable.exe >/dev/null 2>&1; then
+            RJ=$(curl -fsS https://gmatch.fly.dev/release.json || echo "")
+            F=$(node -e "process.stdout.write(JSON.parse(process.argv[1]).file||'')" "$RJ" 2>/dev/null) || F=""
+            if [ -n "$F" ]; then curl -fsS -o "releases/$F" "https://gmatch.fly.dev/releases/$F" || echo "WARN: fly-hosted $F not fetched"; fi
+          fi
+          for E in releases/gMatch-*-portable.exe; do [ -f "$E" ] && node build-release.mjs "$E"; done
+          ls releases/gMatch-*-portable.exe >/dev/null 2>&1 || echo "WARN: no portable exe — publishing text-only"
+      - name: Render legal pages + sync hash
+        run: cd site && node build-legal.mjs && node sync-hash.mjs
+      - name: HONESTY GATE (page may not claim what the files do not back)
+        run: cd site && node check.mjs
+      - name: Strip the exe (Pages payload stays binary-free; href is the release URL)
+        run: rm -f site/releases/*.exe
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.out.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - id: out
+        uses: actions/deploy-pages@v4

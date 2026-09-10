@@ -51,7 +51,7 @@ export function AdminSidebar({
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-retro-accent shadow-[0_0_8px_rgba(159,227,255,0.4)]" />
           <div className="min-w-0">
-            <div className="text-xs font-black tracking-tight text-retro-fg uppercase truncate">goonMatch Admin</div>
+            <div className="text-xs font-black tracking-tight text-retro-fg uppercase truncate">gMatch Admin</div>
             <div className="text-[9px] font-mono text-retro-muted">Moderation Console</div>
           </div>
         </div>
@@ -59,7 +59,7 @@ export function AdminSidebar({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded hover:bg-white/10 text-retro-muted hover:text-retro-fg transition-colors lg:hidden"
+            className="p-1.5 rounded hover:bg-glass-w10 text-retro-muted hover:text-retro-fg transition-colors lg:hidden"
             aria-label="Close sidebar"
           >
             <X className="w-4 h-4" />
@@ -87,7 +87,7 @@ export function AdminSidebar({
                       "w-full flex items-center justify-between px-3 py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer",
                       active
                         ? "bg-retro-accent/15 text-retro-accent border border-retro-accent/30"
-                        : "text-retro-muted hover:text-retro-fg hover:bg-white/5 border border-transparent"
+                        : "text-retro-muted hover:text-retro-fg hover:bg-glass-w5 border border-transparent"
                     )}
                     role="listitem"
                     aria-current={active ? "page" : undefined}
@@ -99,7 +99,7 @@ export function AdminSidebar({
                     {tab.badge && (
                       <span className={cn(
                         "text-[9px] px-1.5 py-0.5 rounded-full font-mono font-bold",
-                        active ? "bg-black/25 text-retro-accent" : "bg-white/8 text-retro-muted",
+                        active ? "bg-black/25 text-retro-accent" : "bg-glass-w8 text-retro-muted",
                         tab.id === "reports" && tab.badge && Number(tab.badge) > 0 && "bg-red-500 text-white"
                       )}>
                         {tab.badge}
@@ -119,7 +119,7 @@ export function AdminSidebar({
         </div>
         <a
           href="/"
-          className="w-full block text-center py-2 bg-surface-interactive hover:bg-white/10 text-retro-fg rounded font-bold text-xs transition-colors"
+          className="w-full block text-center py-2 bg-surface-interactive hover:bg-glass-w10 text-retro-fg rounded font-bold text-xs transition-colors"
         >
           Return to App
         </a>

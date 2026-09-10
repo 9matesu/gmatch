@@ -14,7 +14,7 @@ describe('fetchPosts (SPEC §6/§8)', () => {
       source: 'tbib',
       ok: true,
     })
-    vi.stubGlobal('window', { goongrid: { booruFetch } })
+    vi.stubGlobal('window', { gmatch: { booruFetch } })
     const res = await fetchPosts({ tags: 'gangbang', limit: 10 })
     expect(booruFetch).toHaveBeenCalledWith({ tags: 'gangbang', limit: 10 })
     expect(res.ok).toBe(true)
@@ -23,7 +23,7 @@ describe('fetchPosts (SPEC §6/§8)', () => {
 
   it('returns offline:true when the bridge reports failure', async () => {
     vi.stubGlobal('window', {
-      goongrid: { booruFetch: vi.fn().mockResolvedValue({ posts: [], source: null, ok: false }) },
+      gmatch: { booruFetch: vi.fn().mockResolvedValue({ posts: [], source: null, ok: false }) },
     })
     const res = await fetchPosts({ tags: '1girl', limit: 10 })
     expect(res.offline).toBe(true)
@@ -39,7 +39,7 @@ describe('fetchPosts (SPEC §6/§8)', () => {
 
   it('never even asks for a blocked query', async () => {
     const booruFetch = vi.fn()
-    vi.stubGlobal('window', { goongrid: { booruFetch } })
+    vi.stubGlobal('window', { gmatch: { booruFetch } })
     const res = await fetchPosts({ tags: '1girl loli', limit: 10 })
     expect(booruFetch).not.toHaveBeenCalled()
     expect(res.offline).toBe(true)
@@ -48,7 +48,7 @@ describe('fetchPosts (SPEC §6/§8)', () => {
   it('dedupes post ids across a session', async () => {
     const post = { id: 'dup', url: 'https://x/dup.png', tags: [], rating: 'e' }
     const booruFetch = vi.fn().mockResolvedValue({ posts: [post], source: 'tbib', ok: true })
-    vi.stubGlobal('window', { goongrid: { booruFetch } })
+    vi.stubGlobal('window', { gmatch: { booruFetch } })
     const first = await fetchPosts({ tags: 'wet', limit: 5 })
     const second = await fetchPosts({ tags: 'wet', limit: 5 })
     expect(first.posts).toHaveLength(1)

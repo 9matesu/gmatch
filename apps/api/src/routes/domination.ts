@@ -4,6 +4,7 @@ import { orbitAuth } from '../middleware/auth'
 import { logAdminAction } from '../admin-audit'
 import { EconomyService } from '../economy'
 import type { DominationAction } from '@orbit/shared'
+import { isDefaultPeerName } from '@orbit/shared'
 
 type Bindings = {
   DB: D1Turso
@@ -118,12 +119,29 @@ domination.post('/trigger', async (c) => {
     return c.json({ error: 'Cannot target yourself' }, 400)
   }
 
-  const victim = await db.prepare('SELECT id, pc_domination_enabled, pc_domination_settings FROM Users WHERE id = ?')
+  const victim = await db.prepare('SELECT id, last_seen, pc_domination_enabled, pc_domination_settings FROM Users WHERE id = ?')
     .bind(targetId)
-    .first<{ id: string; pc_domination_enabled: number; pc_domination_settings: string }>()
+    .first<{ id: string; last_seen: string | null; pc_domination_enabled: number; pc_domination_settings: string }>()
 
   if (!victim) return c.json({ error: 'Target user not found' }, 404)
   if (!victim.pc_domination_enabled) return c.json({ error: 'Target has not enabled PC Domination' }, 403)
+
+  // Fire-and-forget over WS means an offline victim silently eats the fee —
+  // refuse before charging anything instead.
+  const lastSeenMs = victim.last_seen ? Date.parse(victim.last_seen) : 0
+  if (Date.now() - lastSeenMs > 10 * 60_000) {
+    return c.json({ error: 'They are offline right now — nothing was charged' }, 409)
+  }
+
+  // Per-action cooldown so a funded account cannot spam one player's screen.
+  const recent = await db.prepare(`
+    SELECT COUNT(*) as n FROM DominationActions
+    WHERE dominator_id = ? AND victim_id = ? AND action = ? AND created_at > ?
+  `).bind(dominatorId, targetId, action, new Date(Date.now() - 30_000).toISOString())
+    .first<{ n: number }>()
+  if (Number(recent?.n ?? 0) > 0) {
+    return c.json({ error: 'Slow down — you just sent that one. Try again in half a minute.' }, 429)
+  }
 
   const victimSettings = JSON.parse(victim.pc_domination_settings || '{}')
 
@@ -171,10 +189,21 @@ domination.post('/trigger', async (c) => {
     throw err
   }
 
-  await db.prepare(`
-    INSERT INTO DominationActions (id, dominator_id, victim_id, action, payload, status, created_at)
-    VALUES (?, ?, ?, ?, ?, 'sent', ?)
-  `).bind(actionId, dominatorId, targetId, action, payload ? JSON.stringify(payload) : null, nowIso).run()
+  try {
+    await db.prepare(`
+      INSERT INTO DominationActions (id, dominator_id, victim_id, action, payload, status, created_at)
+      VALUES (?, ?, ?, ?, ?, 'sent', ?)
+    `).bind(actionId, dominatorId, targetId, action, payload ? JSON.stringify(payload) : null, nowIso).run()
+  } catch (err) {
+    // Never keep the money when the action was not recorded.
+    await economy.credit(dominatorId, pricing.cost, {
+      idempotencyKey: `dom-refund-${actionId}`,
+      kind: 'refund',
+      reference: `domination-refund:${action}`,
+    }).catch(() => { /* ledger alert below */ })
+    console.error('[domination] insert failed, refunded', err)
+    return c.json({ error: 'Could not record the action — your g$ were refunded' }, 500)
+  }
 
   // Consent cut FIRST: the victim earns a share of the fee for hosting the
   // chaos, and the WS event carries the amount so the UI can celebrate it.
@@ -218,19 +247,30 @@ domination.get('/targets', async (c) => {
     LIMIT 100
   `).bind(userId).all<{ id: string; display_name: string | null; pfp_url: string | null; pc_domination_enabled: number; pc_domination_settings: string }>()
 
-  const targets = (rows.results || []).map((u) => {
+  // Only offer real, named players as targets — drop blank / whitespace / default
+  // placeholder ("Unknown") accounts so they never appear in the picker.
+  const targets: {
+    id: string
+    displayName: string
+    pfpUrl: string | null
+    enabled: boolean
+    consents: Record<string, boolean>
+  }[] = []
+  for (const u of rows.results || []) {
+    const name = (u.display_name || '').trim()
+    if (!name || isDefaultPeerName(name)) continue
     let settingsObj: Record<string, boolean> = {}
     try {
       settingsObj = JSON.parse(u.pc_domination_settings || '{}')
     } catch {}
-    return {
+    targets.push({
       id: u.id,
-      displayName: u.display_name?.trim() || 'Unknown',
+      displayName: name,
       pfpUrl: u.pfp_url,
       enabled: Boolean(u.pc_domination_enabled),
       consents: settingsObj,
-    }
-  })
+    })
+  }
 
   return c.json({ targets })
 })

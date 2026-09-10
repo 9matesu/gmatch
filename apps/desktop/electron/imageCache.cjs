@@ -1,33 +1,31 @@
-// GoonGrid image + feed-response cache (main process).
-// Pictures live on disk under the OS user folder:
-//   <userData>/image-cache/<fnv1a(url)>.<ext>  +  meta.json
-// (<userData> on Windows = C:\Users\<user>\AppData\Roaming\goongrid.)
-// Feed responses (parsed post lists per normalized query) live in
-// <userData>/feed-cache.json with a 10-minute TTL, so repeat tag queries
-// never re-hit the booru APIs. Served to the renderer over IPC +
-// the privileged gooncache:// scheme. Best-effort: every failure returns
-// null so the renderer falls back to the remote URL.
+// gMatch image + feed-response cache (main process) — MEMORY ONLY (F1 fix).
+// Security plan B.1: content must never cross a session on disk. Images are
+// held in an LRU byte-budget Map (apps/desktop/electron/imageCacheMemory.cjs)
+// and served over the same privileged gmcache:// scheme; feed query
+// responses are cached in RAM with the same 10-minute TTL.
+// init() destroys the legacy on-disk caches left by pre-1.1 installs
+// (image-cache/ + meta.json + feed-cache.json) — one-time, force, silent.
 const fs = require('fs')
 const path = require('path')
 const http = require('http')
 const https = require('https')
+const mem = require('./imageCacheMemory.cjs')
 
-const SCHEME = 'gooncache'
-// Lightweight footprint: ~150 MB / 250 files max on disk (LRU-evicted).
-const MAX_FILES = 250
-const MAX_BYTES = 150 * 1024 * 1024
+const SCHEME = 'gmcache'
 const MAX_SINGLE_BYTES = 25 * 1024 * 1024
 const FEED_TTL_MS = 10 * 60 * 1000
 const FEED_MAX_QUERIES = 100
 const IMG_TIMEOUT_MS = 15_000
 
+const EXT_MIME = {
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif',
+  webp: 'image/webp', mp4: 'video/mp4', webm: 'video/webm', img: 'application/octet-stream',
+}
+
 let UA = 'Mozilla/5.0'
-let cacheDir = null
-let metaPath = null
-let feedPath = null
-/** url -> { file, bytes, addedAt, lastUsed } */
+/** url -> { key, mime, bytes } (RAM only) */
 let meta = {}
-/** normQuery -> { posts, ts } */
+/** normQuery -> { posts, ts } (RAM only) */
 let feed = {}
 
 function fnv1a(str) {
@@ -52,73 +50,21 @@ function normalizeQuery(q) {
     .toLowerCase()
 }
 
-function readJson(file, fallback) {
-  try {
-    if (!fs.existsSync(file)) return fallback
-    return JSON.parse(fs.readFileSync(file, 'utf8'))
-  } catch {
-    return fallback
-  }
-}
-
-function writeJson(file, data) {
-  try {
-    fs.writeFileSync(file, JSON.stringify(data))
-  } catch {
-    /* cache is best-effort */
-  }
+/** Destroy legacy on-disk caches (pre-memory builds). */
+function destroyDiskCaches(userDataPath) {
+  try { fs.rmSync(path.join(userDataPath, 'image-cache'), { recursive: true, force: true }) } catch { /* already clean */ }
+  try { fs.rmSync(path.join(userDataPath, 'feed-cache.json'), { force: true }) } catch { /* already clean */ }
 }
 
 function init(userDataPath, userAgent) {
   if (userAgent) UA = userAgent
-  cacheDir = path.join(userDataPath, 'image-cache')
-  metaPath = path.join(cacheDir, 'meta.json')
-  feedPath = path.join(userDataPath, 'feed-cache.json')
-  try {
-    fs.mkdirSync(cacheDir, { recursive: true })
-  } catch {
-    /* without a dir every op below degrades to null */
-  }
-  const m = readJson(metaPath, {})
-  meta = m && typeof m === 'object' ? m : {}
-  const f = readJson(feedPath, {})
-  feed = f && typeof f === 'object' ? f : {}
-}
-
-function persistMeta() {
-  if (metaPath) writeJson(metaPath, meta)
-}
-
-function persistFeed() {
-  if (feedPath) writeJson(feedPath, feed)
+  destroyDiskCaches(userDataPath)
+  meta = {}
+  feed = {}
 }
 
 function stats() {
-  let files = 0
-  let bytes = 0
-  for (const e of Object.values(meta)) {
-    files += 1
-    bytes += Number(e.bytes) || 0
-  }
-  return { files, bytes }
-}
-
-/** Delete oldest-lastUsed entries until both caps fit. */
-function evictIfNeeded() {
-  const keys = Object.keys(meta).sort((a, b) => (meta[a].lastUsed || 0) - (meta[b].lastUsed || 0))
-  let { files, bytes } = stats()
-  for (const k of keys) {
-    if (files <= MAX_FILES && bytes <= MAX_BYTES) break
-    try {
-      fs.unlinkSync(path.join(cacheDir, meta[k].file))
-    } catch {
-      /* already gone */
-    }
-    bytes -= Number(meta[k].bytes) || 0
-    files -= 1
-    delete meta[k]
-  }
-  persistMeta()
+  return { files: mem.size(), bytes: mem.totalBytes() }
 }
 
 function fetchBinary(url, redirects = 3) {
@@ -166,7 +112,7 @@ function fetchBinary(url, redirects = 3) {
           }
           chunks.push(c)
         })
-        res.on('end', () => resolve(Buffer.concat(chunks)))
+        res.on('end', () => resolve({ buf: Buffer.concat(chunks), mime: type }))
         res.on('error', reject)
       },
     )
@@ -176,53 +122,33 @@ function fetchBinary(url, redirects = 3) {
 }
 
 /**
- * Resolve a remote picture URL to a gooncache:// local URL.
- * Hit → touch + return. Miss → download, store, evict, return.
- * Returns null on any failure (renderer uses the remote URL).
+ * Resolve a remote picture URL to a gmcache:// local URL.
+ * Hit → touch (LRU) + return. Miss → download into RAM, return.
+ * Returns null on any failure (renderer falls back to the remote URL).
  */
 async function cacheImage(url) {
   try {
-    if (!url || !cacheDir) return null
-    const now = Date.now()
+    if (!url) return null
     const hit = meta[url]
-    if (hit && hit.file) {
-      const abs = path.join(cacheDir, path.basename(hit.file))
-      if (fs.existsSync(abs)) {
-        hit.lastUsed = now
-        persistMeta()
-        return `${SCHEME}://f/${path.basename(hit.file)}`
-      }
-      delete meta[url]
-    }
-    const buf = await fetchBinary(url)
-    const file = cacheFileName(url)
-    fs.writeFileSync(path.join(cacheDir, file), buf)
-    meta[url] = { file, bytes: buf.length, addedAt: now, lastUsed: now }
-    evictIfNeeded()
-    return `${SCHEME}://f/${file}`
+    if (hit && mem.get(hit.key)) return `${SCHEME}://f/${hit.key}`
+    const { buf, mime } = await fetchBinary(url)
+    const key = cacheFileName(url)
+    if (!mem.put(key, buf)) return null // over budget: no local copy, remote URL stands
+    meta[url] = { key, mime: mime || EXT_MIME[key.split('.').pop()] || 'application/octet-stream', bytes: buf.length }
+    return `${SCHEME}://f/${key}`
   } catch {
     return null
   }
 }
 
 function clear() {
-  try {
-    for (const e of Object.values(meta)) {
-      try {
-        fs.unlinkSync(path.join(cacheDir, path.basename(e.file)))
-      } catch {
-        /* ignore */
-      }
-    }
-  } catch {
-    /* ignore */
-  }
+  mem.clear()
   meta = {}
-  persistMeta()
+  feed = {}
   return stats()
 }
 
-/** Feed-response cache: parsed posts per query, 10-minute TTL. */
+/** Feed-response cache: parsed posts per query, 10-minute TTL, RAM only. */
 function getFeedCache(query) {
   try {
     const key = normalizeQuery(query)
@@ -230,7 +156,6 @@ function getFeedCache(query) {
     if (!hit || !Array.isArray(hit.posts)) return null
     if (Date.now() - hit.ts >= FEED_TTL_MS) {
       delete feed[key]
-      persistFeed()
       return null
     }
     return hit.posts
@@ -248,26 +173,24 @@ function setFeedCache(query, posts) {
     while (keys.length > FEED_MAX_QUERIES) {
       delete feed[keys.shift()]
     }
-    persistFeed()
   } catch {
     /* ignore */
   }
 }
 
 /**
- * protocol.handle('gooncache') handler. Only serves files inside the cache
- * dir (basename check) — never arbitrary paths.
+ * protocol.handle('gmcache') handler — serves RAM buffers keyed by the
+ * sanitized filename. Unknown/evicted key → 404 (renderer falls back remote).
  */
-async function serveImage(request, net) {
+async function serveImage(request) {
   try {
     const u = new URL(request.url)
-    const file = path.basename(u.pathname || u.host || '')
-    if (!file || file.includes('..')) return new Response('bad file', { status: 400 })
-    const abs = path.join(cacheDir, file)
-    const real = path.resolve(abs)
-    if (!real.startsWith(path.resolve(cacheDir))) return new Response('forbidden', { status: 403 })
-    if (!fs.existsSync(real)) return new Response('miss', { status: 404 })
-    return net.fetch(`file:///${real.replace(/\\/g, '/')}`)
+    const key = path.basename(u.pathname || u.host || '')
+    if (!key || key.includes('..')) return new Response('bad file', { status: 400 })
+    const buf = mem.get(key)
+    if (!buf) return new Response('miss', { status: 404 })
+    const mime = Object.values(meta).find((m) => m.key === key)?.mime || EXT_MIME[key.split('.').pop()] || 'application/octet-stream'
+    return new Response(buf, { headers: { 'Content-Type': mime, 'Cache-Control': 'no-store' } })
   } catch {
     return new Response('cache error', { status: 500 })
   }
@@ -283,5 +206,5 @@ module.exports = {
   setFeedCache,
   serveImage,
   // Test seam (pure-ish helpers; heavy IO stays in cacheImage/serveImage).
-  _test: { fnv1a, cacheFileName, normalizeQuery },
+  _test: { fnv1a, cacheFileName, normalizeQuery, destroyDiskCaches },
 }

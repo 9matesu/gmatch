@@ -5,7 +5,7 @@ import { orbitFetch } from '../../utils/api';
 import { playPress } from '../../utils/sounds';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject } from '@orbit/shared';
-import type { FeedPost } from '../feed/GoonMatchFeed';
+import type { FeedPost } from '../feed/GMatchFeed';
 import { SlideshowPlayer, type ResolvedItem } from './SlideshowPlayer';
 import {
   Play,

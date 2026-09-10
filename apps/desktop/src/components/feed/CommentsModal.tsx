@@ -11,7 +11,7 @@ import {
   Crown,
   Flag,
 } from 'lucide-react';
-import type { FeedPost, PostComment } from './GoonMatchFeed';
+import type { FeedPost, PostComment } from './GMatchFeed';
 
 interface CommentsModalProps {
   post: FeedPost;

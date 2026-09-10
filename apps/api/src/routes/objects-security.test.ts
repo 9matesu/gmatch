@@ -98,26 +98,34 @@ describe('Objects API — Security & Access Control (GAPs A/B)', () => {
   });
 
   it('GAP-A: allows direct media streaming via valid signed HMAC token URL without headers', async () => {
-    const { sig, exp } = createSignedObjectToken(testObjectId, 3600);
-    const res = await app.request(`/api/objects/${testObjectId}?sig=${sig}&exp=${exp}`, {
+    const { sig, exp, jti } = createSignedObjectToken(testObjectId, 900);
+    const res = await app.request(`/api/objects/${testObjectId}?sig=${sig}&exp=${exp}&jti=${jti}`, {
       method: 'GET',
     });
     expect(res.status).toBe(200);
   });
 
-  it('GAP-A: rejects tampered or expired HMAC tokens without headers', async () => {
-    const { sig } = createSignedObjectToken(testObjectId, 3600);
+  it('GAP-A: rejects tampered, expired or jti-less HMAC tokens without headers', async () => {
+    const { sig, exp, jti } = createSignedObjectToken(testObjectId, 900);
     // Tampered signature
-    const resBadSig = await app.request(`/api/objects/${testObjectId}?sig=bad${sig.slice(3)}&exp=${Math.floor(Date.now() / 1000) + 3600}`, {
+    const resBadSig = await app.request(`/api/objects/${testObjectId}?sig=bad${sig.slice(3)}&exp=${exp}&jti=${jti}`, {
       method: 'GET',
     });
     expect(resBadSig.status).toBe(401);
 
-    // Expired token
-    const resExpired = await app.request(`/api/objects/${testObjectId}?sig=${sig}&exp=${Math.floor(Date.now() / 1000) - 10}`, {
+    // Expired token (fresh jti so only expiry can fail it)
+    const e2 = createSignedObjectToken(testObjectId, 900)
+    const resExpired = await app.request(`/api/objects/${testObjectId}?sig=${e2.sig}&exp=${Math.floor(Date.now() / 1000) - 10}&jti=${e2.jti}`, {
       method: 'GET',
     });
     expect(resExpired.status).toBe(401);
+
+    // B.7: legacy-style URL without jti is dead
+    const legacy = createSignedObjectToken(testObjectId, 900)
+    const resNoJti = await app.request(`/api/objects/${testObjectId}?sig=${legacy.sig}&exp=${legacy.exp}`, {
+      method: 'GET',
+    });
+    expect(resNoJti.status).toBe(401);
   });
 
   it('GAP-B: rejects unauthenticated requests to GET /api/objects/stories with 401', async () => {
