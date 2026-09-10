@@ -830,7 +830,9 @@ users.post('/:id/report', async (c) => {
 })
 
 // Purchase a store item with the user's live score. Deducts points and records
-// Active in-memory hack debuffs with expiration
+// Active hack debuffs (paid, server-enforced). Durable in HackDebuffs so a
+// sidecar restart (every app relaunch) cannot eat a victim's effect or the
+// attacker's spy session whose purchase already charged g$.
 interface ServerHackDebuff {
   id: string
   type: 'deny' | 'mobile_virus'
@@ -842,15 +844,21 @@ interface ServerHackDebuff {
   expires_at: number
 }
 
-const activeServerHacks: ServerHackDebuff[] = []
+async function pruneExpiredHacks(db: D1Turso) {
+  await db.prepare('DELETE FROM HackDebuffs WHERE expires_at <= ?').bind(Date.now()).run()
+}
 
-function pruneExpiredHacks() {
-  const now = Date.now()
-  for (let i = activeServerHacks.length - 1; i >= 0; i--) {
-    if (activeServerHacks[i].expires_at <= now) {
-      activeServerHacks.splice(i, 1)
-    }
-  }
+async function listHacksFor(db: D1Turso, userId: string): Promise<ServerHackDebuff[]> {
+  const { results } = await db.prepare(
+    'SELECT id, type, attacker_id, attacker_name, target_id, target_name, created_at, expires_at FROM HackDebuffs WHERE (target_id = ? OR attacker_id = ?) AND expires_at > ?',
+  ).bind(userId, userId, Date.now()).all<ServerHackDebuff>()
+  return results || []
+}
+
+async function findActiveHack(db: D1Turso, attackerId: string, targetId: string): Promise<ServerHackDebuff | null> {
+  return await db.prepare(
+    'SELECT id, type, attacker_id, attacker_name, target_id, target_name, created_at, expires_at FROM HackDebuffs WHERE attacker_id = ? AND target_id = ? AND expires_at > ?',
+  ).bind(attackerId, targetId, Date.now()).first<ServerHackDebuff>() ?? null
 }
 
 async function getDynamicItemPrices(db: any): Promise<Record<string, number>> {
@@ -892,8 +900,8 @@ users.get('/store/items', async (c) => {
 })
 
 // Purchase a store item with g$ from the authoritative economy wallet. The
-// debit and the item effect (inventory/unlock) run in one atomic batch; hacks
-// apply an in-memory effect after the debit commits. Idempotent via
+// debit and the item side effects (inventory/unlock/hack debuff) run in one
+// atomic batch, each gated on changes(). Idempotent via
 // Idempotency-Key so a retry cannot double-charge or double-grant.
 users.post('/store/purchase', async (c) => {
   const orbitId = c.get('orbitId')
@@ -957,11 +965,10 @@ users.post('/store/purchase', async (c) => {
     return c.json({ ok: true, item_id: baseItem.id, cost, score: balance, balance, replayed: true })
   }
 
-  // Build the item effect. DB-backed effects (inventory/unlock) attach to the
-  // debit batch atomically; hacks register an in-memory debuff after commit.
+  // Build the item side effects. All attach to the debit batch atomically
+  // (inventory/unlock/hack debuff), each gated on changes().
   let extra: AtomicStatement[] = []
   let debitGate: { clause: string; args: any[] } | undefined
-  let effect: (() => void) | null = null
 
 if (baseItem.id === 'item-flash-drop') {
     // Flash Drop is a broadcast, not a targeted debuff: buying it grants an
@@ -1012,10 +1019,13 @@ if (baseItem.id === 'item-flash-drop') {
       created_at: now,
       expires_at: now + durationMs,
     }
-    effect = () => {
-      pruneExpiredHacks()
-      activeServerHacks.push(debuff)
-    }
+    // Durable: the INSERT rides the same atomic batch as the debit, gated on
+    // changes() like every other store side effect (a failed debit mints no
+    // debuff).
+    extra.push({
+      sql: 'INSERT INTO HackDebuffs (id, type, attacker_id, attacker_name, target_id, target_name, created_at, expires_at) SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE changes() = 1',
+      args: [debuff.id, debuff.type, debuff.attacker_id, debuff.attacker_name, debuff.target_id, debuff.target_name, debuff.created_at, debuff.expires_at],
+    })
   } else if (baseItem.consumable) {
     extra = [
       {
@@ -1069,7 +1079,6 @@ if (baseItem.id === 'item-flash-drop') {
   }
 
   const balance = (res[balanceIndex].rows[0]?.balance as number) ?? 0
-  if (effect) effect()
 
   return c.json({ ok: true, item_id: baseItem.id, cost, score: balance, balance })
 })
@@ -1077,9 +1086,8 @@ if (baseItem.id === 'item-flash-drop') {
 // Query active hack debuffs affecting the current user or launched by current user
 users.get('/hacks/active', async (c) => {
   const orbitId = c.get('orbitId')
-  pruneExpiredHacks()
-  const myDebuffs = activeServerHacks.filter((h) => h.target_id === orbitId || h.attacker_id === orbitId)
-  return c.json({ active_hacks: myDebuffs })
+  await pruneExpiredHacks(c.env.DB)
+  return c.json({ active_hacks: await listHacksFor(c.env.DB, orbitId) })
 })
 
 /**
@@ -1090,11 +1098,9 @@ users.get('/hacks/active', async (c) => {
 users.get('/hacks/spy-feed/:targetId', async (c) => {
   const orbitId = c.get('orbitId')
   const targetId = c.req.param('targetId') || ''
-  pruneExpiredHacks()
+  await pruneExpiredHacks(c.env.DB)
   const now = Date.now()
-  const session = activeServerHacks.find(
-    (h) => h.attacker_id === orbitId && h.target_id === targetId && h.expires_at > now,
-  )
+  const session = await findActiveHack(c.env.DB, orbitId, targetId)
   if (!session) return c.json({ error: 'No active hack session on that target' }, 403)
 
   const db = c.env.DB

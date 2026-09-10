@@ -495,6 +495,23 @@ CREATE TABLE IF NOT EXISTS DominationActions (
   executed_at DATETIME
 );
 CREATE INDEX IF NOT EXISTS idx_domination_actions_victim ON DominationActions(victim_id, created_at);
+
+-- Paid hack debuffs (users.ts store purchase → /hacks/active, spy-feed gate).
+-- Durable on purpose: the bundled sidecar restarts with every app relaunch,
+-- and an in-memory list silently ate paid effects + spy sessions (migration
+-- 048; fixes the docs-vs-logic "server-enforced" overclaim).
+CREATE TABLE IF NOT EXISTS HackDebuffs (
+  id TEXT PRIMARY KEY,
+  attacker_id TEXT NOT NULL,
+  target_id TEXT NOT NULL,
+  type TEXT NOT NULL,
+  attacker_name TEXT,
+  target_name TEXT,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_hack_debuffs_target ON HackDebuffs(target_id, expires_at);
+CREATE INDEX IF NOT EXISTS idx_hack_debuffs_attacker ON HackDebuffs(attacker_id, expires_at);
 CREATE INDEX IF NOT EXISTS idx_domination_actions_dominator ON DominationActions(dominator_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_domination_actions_status ON DominationActions(status);
 

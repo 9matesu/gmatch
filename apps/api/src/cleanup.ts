@@ -493,6 +493,7 @@ export async function deleteOfflineUsers(
       await db.prepare('DELETE FROM StoreUnlocks WHERE user_id = ?').bind(userId).run()
       await db.prepare('DELETE FROM UserInventory WHERE user_id = ?').bind(userId).run()
       await db.prepare('DELETE FROM DominationActions WHERE dominator_id = ? OR victim_id = ?').bind(userId, userId).run()
+      await db.prepare('DELETE FROM HackDebuffs WHERE attacker_id = ? OR target_id = ?').bind(userId, userId).run()
       await db.prepare('DELETE FROM LeagueRank WHERE user_id = ?').bind(userId).run()
       await db.prepare('DELETE FROM MatchArchive WHERE user_a = ? OR user_b = ?').bind(userId, userId).run()
       await db.prepare('DELETE FROM Wallets WHERE user_id = ?').bind(userId).run()

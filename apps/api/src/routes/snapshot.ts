@@ -45,7 +45,7 @@ const CONTENT_TABLES = [
   'StoreUnlocks', 'UserInventory', 'BabecockRounds', 'BabecockEntries', 'BabecockInvites', 'Lootboxes',
   'Slideshows', 'SlideshowItems',
   'Wallets', 'LedgerTransactions', 'EconomicOperations',
-  'Notifications', 'Playtime', 'Saves', 'DominationActions', 'DonationAcknowledgement',
+  'Notifications', 'Playtime', 'Saves', 'DominationActions', 'HackDebuffs', 'DonationAcknowledgement',
 ] as const
 
 /** Hard safety net — never snapshot node-local security/transport state. */
