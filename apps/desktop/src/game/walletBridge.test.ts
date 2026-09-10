@@ -54,6 +54,49 @@ describe('startWalletSync', () => {
     expect(fetchFn.mock.calls.some((c) => String(c[0]).includes('idle-credit'))).toBe(true)
   })
 
+  it('backs off after a 429 that carries retryInMs (no hammering the server throttle)', async () => {
+    let creditCalls = 0
+    const fetchFn = vi.fn(async (url: unknown) => {
+      const u = String(url)
+      if (u.includes('idle-credit')) {
+        creditCalls++
+        // Retry-After: 0 — orbitFetch retries its own 429 handling after that
+        // header's seconds; the mock resolves immediately so the bridge's
+        // backoff arms inside the test window (prod server sends real seconds).
+        return new Response(JSON.stringify({ error: 'limited', retryInMs: 400 }), { status: 429, headers: { 'Retry-After': '0' } })
+      }
+      return new Response(JSON.stringify({ balance: 0 }), { status: 200 })
+    })
+    const s = slice({ gc: 50, credited: 0 })
+    const stop = startWalletSync(() => s, generateIdentity(), fetchFn as unknown as typeof globalThis.fetch, 15)
+    await new Promise((r) => setTimeout(r, 200))
+    stop()
+    // 200ms at a 15ms tick = ~13 POSTs without backoff. With it, only the
+    // pre-backoff race (initial tick + orbitFetch's own retry) fires:
+    // the interval ticks after ~2ms are all skipped until 400ms.
+    expect(creditCalls).toBeLessThanOrEqual(4)
+  })
+
+  it('retries credits once the server-given backoff window passed', async () => {
+    let creditCalls = 0
+    const fetchFn = vi.fn(async (url: unknown) => {
+      const u = String(url)
+      if (u.includes('idle-credit')) {
+        creditCalls++
+        // first attempt throttled; later ones accepted
+        return creditCalls === 1
+          ? new Response(JSON.stringify({ error: 'limited', retryInMs: 20 }), { status: 429, headers: { 'Retry-After': '0' } })
+          : new Response(JSON.stringify({ balance: 50 }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ balance: 0 }), { status: 200 })
+    })
+    const s = slice({ gc: 50, credited: 0 })
+    const stop = startWalletSync(() => s, generateIdentity(), fetchFn as unknown as typeof globalThis.fetch, 15)
+    await new Promise((r) => setTimeout(r, 80))
+    stop()
+    expect(creditCalls).toBeGreaterThanOrEqual(2)
+  })
+
   it('does nothing when identity is null', () => {
     const fetchFn = vi.fn()
     const s = slice()

@@ -98,7 +98,7 @@ export default function Home() {
       window.removeEventListener('beforeunload', save);
     };
   }, []);
-  // Idle wallet <-> ledger mirror (plan D4): flush net deltas every 30s once
+  // Idle wallet <-> ledger mirror (plan D4): flush net deltas every 65s (above the server 60s credit throttle) once
   // an identity exists; reconcile server balance on identity change.
   useEffect(() => {
     if (!identity) return;

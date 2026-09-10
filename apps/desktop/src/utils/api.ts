@@ -237,7 +237,7 @@ export async function orbitFetch(
       // while and the X-Orbit-Timestamp expired before the request arrived).
       if (res.status === 401 && !isUpload) {
         const retryHeaders = await buildHeaders()
-        const retryRes = await fetch(url, { ...options, headers: retryHeaders, ...(retryHeaders.has('X-Orbit-Sealed') ? { body: 'sealed' } : {}), signal: controller.signal })
+        const retryRes = await fetchImpl(url, { ...options, headers: retryHeaders, ...(retryHeaders.has('X-Orbit-Sealed') ? { body: 'sealed' } : {}), signal: controller.signal })
         if (retryRes.ok) {
           if (method === 'GET') {
             responseCache.set(ck, { data: retryRes.clone(), expiry: Date.now() + CACHE_TTL })
@@ -252,7 +252,7 @@ export async function orbitFetch(
         await new Promise(r => setTimeout(r, Math.min(retryAfter * 1000, 10000)))
         // Re-sign with a fresh timestamp so the retry is not rejected as expired.
         const retryHeaders = await buildHeaders()
-        const retryRes = await fetch(url, { ...options, headers: retryHeaders, ...(retryHeaders.has('X-Orbit-Sealed') ? { body: 'sealed' } : {}), signal: controller.signal })
+        const retryRes = await fetchImpl(url, { ...options, headers: retryHeaders, ...(retryHeaders.has('X-Orbit-Sealed') ? { body: 'sealed' } : {}), signal: controller.signal })
         if (retryRes.ok) {
           if (method === 'GET') {
             responseCache.set(ck, { data: retryRes.clone(), expiry: Date.now() + CACHE_TTL })

@@ -161,6 +161,11 @@ describe('POST /api/economy/idle-credit', () => {
     expect(first.status).toBe(200)
     const second = await credit(50, 'session-d', 'idle-key-0004')
     expect(second.status).toBe(429)
+    // 429 must tell the client WHEN to retry (wallet sync backoff)
+    const j = await second.json()
+    expect(typeof j.retryInMs).toBe('number')
+    expect(j.retryInMs).toBeGreaterThan(0)
+    expect(j.retryInMs).toBeLessThanOrEqual(60_000)
   })
 })
 

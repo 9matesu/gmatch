@@ -25,6 +25,9 @@ export interface WalletSyncCtx extends WalletState {
     status: number
     json: () => Promise<Record<string, unknown>>
   }>
+  /** Called on 429 with the server-provided backoff (retryInMs) so the
+   * sync loop stops hammering the credit throttle. */
+  onThrottled?: (ms: number) => void
 }
 
 /** Push the net delta to the ledger. Returns the new wallet state, or null (no-op / failure). */
@@ -43,6 +46,14 @@ export async function syncWallet(c: WalletSyncCtx): Promise<WalletState | null> 
         body: JSON.stringify({ amount, session: c.orbitId, gps: Math.floor(c.gps || 0) }),
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
       })
+      if (res.status === 429) {
+        // Honor the server backoff window (economy-idle.ts retryInMs); fall
+        // back to the documented 60s cadence if the field is missing.
+        const j = await res.json().catch(() => ({} as Record<string, unknown>))
+        const ms = Number(j.retryInMs)
+        c.onThrottled?.(Number.isFinite(ms) && ms > 0 ? Math.min(ms, 60_000) : 60_000)
+        return null
+      }
       if (!res.ok) return null
       return markCredited(c, amount)
     } catch {

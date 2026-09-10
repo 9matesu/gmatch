@@ -32,6 +32,7 @@ export function makeSyncCtx(
   identity: IdentityLike,
   fetchFn: typeof globalThis.fetch = globalThis.fetch,
   gps = 0,
+  onThrottled?: (ms: number) => void,
 ): WalletSyncCtx {
   const call = async (
     endpoint: string,
@@ -50,6 +51,7 @@ export function makeSyncCtx(
   return {
     orbitId: identity.orbitId,
     gps,
+    onThrottled,
     gc: slice.gc,
     credited: slice.credited,
     debited: slice.debited,
@@ -66,13 +68,13 @@ export function startWalletSync(
   getSlice: () => IdleWalletSlice,
   identity: IdentityLike | null,
   fetchFn: typeof globalThis.fetch = globalThis.fetch,
-  intervalMs = 30_000,
+  intervalMs = 65_000, // > the server's 60s idle-credit throttle: a 429 becomes the exception (reconcile races), not every-other-tick
 ): () => void {
   if (!identity) return () => undefined
   let stopped = false
   const first = getSlice()
   const sample = { at: Date.now(), total: first.totalEarned, rate: 0 }
-  const tick = async () => {
+  let tick = async () => {
     if (stopped) return
     const slice = getSlice()
     // Velocity sampler: over windows >= 5s, earning per second from the
@@ -86,7 +88,7 @@ export function startWalletSync(
       sample.at = now
       sample.total = slice.totalEarned
     }
-    const ctx = makeSyncCtx(slice, identity, fetchFn, sample.rate)
+    const ctx = makeSyncCtx(slice, identity, fetchFn, sample.rate, throttled)
     const next = await syncWallet(ctx)
     // Markers only: gc may have grown during the round-trip (stale snapshot).
     if (next) slice.setWallet({ credited: next.credited, debited: next.debited })
@@ -98,6 +100,13 @@ export function startWalletSync(
     const r = await reconcileFromServer(ctx)
     if (r && !stopped) slice.setWallet(r)
   })()
+  // Backoff: a 429 (server one-per-60s credit throttle) used to be
+  // re-attempted blindly on EVERY 30s tick — console spam + useless traffic.
+  // The server answers 429 with retryInMs; skip ticks until that passes.
+  let retryAfter = 0
+  const throttled = (ms: number) => { retryAfter = Date.now() + ms }
+  const origTick = tick
+  tick = () => (Date.now() < retryAfter ? Promise.resolve() : origTick())
   const t = setInterval(() => void tick(), intervalMs)
   void tick()
   return () => {

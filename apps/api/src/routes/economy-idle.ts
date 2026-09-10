@@ -86,7 +86,12 @@ economyIdle.post('/idle-credit', async (c) => {
   // dropped response.
   const isReplay = prev !== undefined && prev.key === key
   if (prev && !isReplay && now - prev.at < CREDIT_COOLDOWN_MS) {
-    return c.json({ error: 'Idle credits are limited to one per 60 seconds' }, 429)
+    const retryInMs = CREDIT_COOLDOWN_MS - (now - prev.at)
+    // Retry-After (seconds, rounded up) so generic clients — orbitFetch's 429
+    // handler reads it — honor the real cadence instead of a fixed 5s guess.
+    return c.json({ error: 'Idle credits are limited to one per 60 seconds', retryInMs }, 429, {
+      'Retry-After': String(Math.ceil(retryInMs / 1000)),
+    })
   }
 
   // Earnings envelope (SPEC §2): the FIRST credit after a server start is a
