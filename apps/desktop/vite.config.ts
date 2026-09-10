@@ -192,6 +192,26 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/booru\/hgoon/, ''),
       },
+      '^/booru/qoh': {
+        target: 'https://qoh.booru.org',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/booru\/qoh/, ''),
+      },
+      '^/booru/celeb': {
+        target: 'https://celeb.booru.org',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/booru\/celeb/, ''),
+      },
+      '^/booru/foot': {
+        target: 'https://footfetishbooru.booru.org',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/booru\/foot/, ''),
+      },
+      '^/booru/blacked': {
+        target: 'https://blacked.booru.org',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/booru\/blacked/, ''),
+      },
     },
   },
   build: {

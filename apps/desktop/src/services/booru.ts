@@ -171,6 +171,12 @@ const DIRECT_SOURCES = [
   { id: 'xbooru-direct', origin: 'https://xbooru.com', proxy: '/booru/xbooru', type: 'dapi' },
   { id: 'konachan-direct', origin: 'https://konachan.com', proxy: '/booru/kona', type: 'moebooru' },
   { id: 'yandere-direct', origin: 'https://yande.re', proxy: '/booru/yand', type: 'moebooru' },
+  { id: 'realbooru-direct', origin: 'https://realbooru.com', proxy: '/booru/real', type: 'realhtml' },
+  { id: 'hgoon-direct', origin: 'https://hgoon.booru.org', proxy: '/booru/hgoon', type: 'booruorg', sub: 'hgoon' },
+  { id: 'qoh-direct', origin: 'https://qoh.booru.org', proxy: '/booru/qoh', type: 'booruorg', sub: 'qoh' },
+  { id: 'celeb-direct', origin: 'https://celeb.booru.org', proxy: '/booru/celeb', type: 'booruorg', sub: 'celeb' },
+  { id: 'footfetish-direct', origin: 'https://footfetishbooru.booru.org', proxy: '/booru/foot', type: 'booruorg', sub: 'footfetishbooru' },
+  { id: 'blacked-direct', origin: 'https://blacked.booru.org', proxy: '/booru/blacked', type: 'booruorg', sub: 'blacked' },
 ] as const
 
 /**
@@ -225,6 +231,48 @@ function toMoePosts(data: unknown, _origin: string): BooruPost[] {
     .filter((p) => p.id && p.url)
 }
 
+function parseRealbooruHtml(html: string): BooruPost[] {
+  const posts: BooruPost[] = []
+  const imgRegex =
+    /<img\s+[^>]*src="https:\/\/realbooru\.com\/thumbnails\/([^/]+)\/([^/]+)\/thumbnail_([^."]+)\.jpg"[^>]*title="([^"]*)"[^>]*alt="Image:\s*(\d+)"/gi
+  let m: RegExpExecArray | null
+  while ((m = imgRegex.exec(html)) !== null) {
+    const [, dir1, dir2, hash, rawTitle, postId] = m
+    const tags = rawTitle
+      .split(/,\s*/)
+      .map((t) => t.trim().replace(/\s+/g, '_'))
+      .filter(Boolean)
+    const isVideo = tags.includes('video') || tags.includes('mp4') || tags.includes('webm')
+    const ext = isVideo ? 'mp4' : 'jpg'
+    const url = `https://realbooru.com/images/${dir1}/${dir2}/${hash}.${ext}`
+    posts.push({ id: `rb-${postId}`, url, tags, rating: 'e' })
+  }
+  return posts
+}
+
+function parseBooruOrgHtml(html: string, sub: string): BooruPost[] {
+  const posts: BooruPost[] = []
+  const imgRegex =
+    /<img\s+[^>]*src="https:\/\/thumbs\.booru\.org\/([^/]+)\/thumbnails\/\/([^/]+)\/thumbnail_([^."]+)\.([^"]+)"[^>]*title="([^"]*)"/gi
+  let m: RegExpExecArray | null
+  while ((m = imgRegex.exec(html)) !== null) {
+    const [, bSub, dir, hash, ext, rawTitle] = m
+    const ratingMatch = /rating:([a-z]+)/i.exec(rawTitle)
+    const rating = ratingMatch ? ratingMatch[1].toLowerCase() : 'e'
+    const tagsPart = rawTitle
+      .replace(/score:\d+/i, '')
+      .replace(/rating:[a-z]+/i, '')
+      .trim()
+    const tags = tagsPart.split(/\s+/).filter(Boolean)
+    const url = `https://img.booru.org/${bSub}//images/${dir}/${hash}.${ext}`
+    const id = `${bSub}-${hash.slice(0, 10)}`
+    if (rating === 'explicit' || rating === 'e' || rating === 'questionable') {
+      posts.push({ id, url, tags, rating: 'e' })
+    }
+  }
+  return posts
+}
+
 /**
  * Browser-mode fetch. Hits the booru DAPIs through the Vite dev proxy
  * (same-origin, so no CORS block). Outside `vite dev` the proxy doesn't
@@ -245,12 +293,16 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
     for (const variant of queryVariants(req.tags)) {
       if (!reachable) break
       let url: string
-      let kind: 'dapi' | 'moe' = 'dapi'
-      if (src.type === 'moebooru' || (src as { id: string }).id === 'konachan-direct' || (src as { id: string }).id === 'yandere-direct') {
+      let kind: 'dapi' | 'moe' | 'html' = 'dapi'
+      if (src.type === 'moebooru') {
         kind = 'moe'
         const page = 1 + Math.floor(Math.random() * 5)
-        const tags = (src as { id: string }).id === 'konachan-direct' ? `${variant} rating:explicit` : variant
+        const tags = src.id === 'konachan-direct' ? `${variant} rating:explicit` : variant
         url = `${src.proxy}/post.json?tags=${encodeURIComponent(tags)}&limit=${req.limit}&page=${page}`
+      } else if (src.type === 'realhtml' || src.type === 'booruorg') {
+        kind = 'html'
+        const firstTag = variant.split(/\s+/).filter(Boolean)[0] || ''
+        url = `${src.proxy}/index.php?page=post&s=list&tags=${encodeURIComponent(firstTag)}`
       } else {
         url = `${src.proxy}/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
           `${variant} rating:explicit ${neg}`,
@@ -271,15 +323,28 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
         reachable = false
         continue
       }
-      // Combo queries can come back truncated — a parse failure just means
-      // "try the next variant", never offline by itself.
-      let data: unknown
-      try {
-        data = await res.json()
-      } catch {
-        continue
+      let parsed: BooruPost[]
+      if (kind === 'html') {
+        let html: string
+        try {
+          html = await res.text()
+        } catch {
+          continue
+        }
+        parsed =
+          src.type === 'realhtml'
+            ? parseRealbooruHtml(html).slice(0, req.limit)
+            : parseBooruOrgHtml(html, (src as { sub: string }).sub).slice(0, req.limit)
+      } else {
+        let data: unknown
+        try {
+          data = await res.json()
+        } catch {
+          continue
+        }
+        parsed = kind === 'moe' ? toMoePosts(data, src.origin) : toPosts(data, src.origin)
       }
-      const clean = sanitize(kind === 'moe' ? toMoePosts(data, src.origin) : toPosts(data, src.origin), variant)
+      const clean = sanitize(parsed, variant)
       if (clean.length === 0) continue
       const fresh = remember(clean)
       if (fresh.length === 0) continue // all repeats — narrower pages may be new
