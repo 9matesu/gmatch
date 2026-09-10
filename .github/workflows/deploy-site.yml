@@ -36,10 +36,18 @@ jobs:
       - name: Fetch latest release exe + build release.json
         run: |
           cd site
-          V=$(gh release list --limit 1 --json tagName --jq '.[0].tagName')
+          V=$(gh release list --limit 1 --json tagName --jq '.[0].tagName') || V=""
           F="gMatch-${V#v}-portable.exe"
-          gh release download "$V" -p "$F" -D releases/ || echo "WARN: no portable exe in release $V — publishing text-only"
-          if [ -f "releases/$F" ]; then node build-release.mjs "releases/$F"; fi
+          gh release download "$V" -p "$F" -D releases/ 2>/dev/null || true
+          # No GitHub Release (private repo era): the canonical artifact is the
+          # copy hosted on the fly homepage — hash what we actually fetch.
+          if ! ls releases/gMatch-*-portable.exe >/dev/null 2>&1; then
+            RJ=$(curl -fsS https://gmatch.fly.dev/release.json || echo "")
+            F=$(node -e "process.stdout.write(JSON.parse(process.argv[1]).file||'')" "$RJ" 2>/dev/null) || F=""
+            if [ -n "$F" ]; then curl -fsS -o "releases/$F" "https://gmatch.fly.dev/releases/$F" || echo "WARN: fly-hosted $F not fetched"; fi
+          fi
+          for E in releases/gMatch-*-portable.exe; do [ -f "$E" ] && node build-release.mjs "$E"; done
+          ls releases/gMatch-*-portable.exe >/dev/null 2>&1 || echo "WARN: no portable exe — publishing text-only"
       - name: Render legal pages + sync hash
         run: cd site && node build-legal.mjs && node sync-hash.mjs
       - name: HONESTY GATE (page may not claim what the files do not back)
