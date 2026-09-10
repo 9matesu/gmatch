@@ -27,26 +27,7 @@ stats.get('/daily', async (c) => {
   return c.json(results || [])
 })
 
-// Inbound traffic-source attribution. The web client reports where it came
-// from (document.referrer / ?ref= / utm_source) once per browser, keyed by a
-// visitor key so repeat loads never inflate acquisition counts.
-stats.post('/referral', async (c) => {
-  let body: any = {}
-  try { body = await c.req.json() } catch {}
-  const source = typeof body.source === 'string' ? body.source.trim().slice(0, 80) : ''
-  if (!source) return c.json({ ok: false }, 400)
-  const visitorKey = typeof body.visitor_key === 'string' && body.visitor_key.length > 0 ? body.visitor_key.slice(0, 128) : null
-  const referrerUrl = typeof body.referrer_url === 'string' ? body.referrer_url.slice(0, 500) : null
-  const landingPath = typeof body.landing_path === 'string' ? body.landing_path.slice(0, 200) : null
-
-  if (visitorKey) {
-    const exists = await c.env.DB.prepare('SELECT 1 FROM TrafficSources WHERE visitor_key = ? AND source = ?').bind(visitorKey, source).first()
-    if (exists) return c.json({ ok: true, recorded: false })
-    await c.env.DB.prepare('INSERT OR IGNORE INTO TrafficSources (id, visitor_key, source, referrer_url, landing_path) VALUES (?, ?, ?, ?, ?)')
-      .bind(crypto.randomUUID(), visitorKey, source, referrerUrl, landingPath).run()
-  }
-  return c.json({ ok: true, recorded: true })
-})
+// (POST /referral removed — privacy refactor: no referrer collection.)
 
 // Live counters composed from cheap aggregate queries — exposed read-only.
 stats.get('/live', async (c) => {

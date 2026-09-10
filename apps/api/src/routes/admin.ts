@@ -110,6 +110,8 @@ admin.post('/verify-pin', async (c) => {
 admin.use('/dashboard', adminAuth)
 admin.use('/content-reports', adminAuth)
 admin.use('/content-reports/*', adminAuth)
+admin.use('/cases', adminAuth)
+admin.use('/cases/*', adminAuth)
 admin.use('/users/*', adminAuth)
 admin.use('/users', adminAuth)
 admin.use('/announcements/*', adminAuth)
@@ -133,13 +135,9 @@ admin.use('/cleanup', adminAuth)
 // comments, private messages, admin audit log, daily stats.
 admin.use('/lobby-comments', adminAuth)
 admin.use('/lobby-comments/*', adminAuth)
-admin.use('/private-messages', adminAuth)
-admin.use('/private-messages/*', adminAuth)
 admin.use('/audit-log', adminAuth)
 admin.use('/audit-log/*', adminAuth)
 admin.use('/daily-stats', adminAuth)
-admin.use('/traffic-sources', adminAuth)
-admin.use('/traffic-sources/*', adminAuth)
 admin.use('/bot-config', adminAuth)
 admin.use('/bot-config/*', adminAuth)
 admin.use('/bots', adminAuth)
@@ -282,20 +280,8 @@ admin.get('/decks', async (c) => {
   return c.json(rows.results || [])
 })
 
-admin.get('/decks/:id', async (c) => {
-  const id = c.req.param('id')
-  const deck = await c.env.DB.prepare(`
-    SELECT d.*, u.display_name AS owner_name FROM Decks d
-    LEFT JOIN Users u ON u.id = d.owner_id WHERE d.id = ?
-  `).bind(id).first<any>()
-  if (!deck) return c.json({ error: 'Deck not found' }, 404)
-  const cards = await c.env.DB.prepare(`
-    SELECT dc.card_id, dc.position, c.name, c.rarity, c.value, c.moderation_state
-    FROM DeckCards dc LEFT JOIN Cards c ON c.id = dc.card_id
-    WHERE dc.deck_id = ? ORDER BY dc.position ASC
-  `).bind(id).all()
-  return c.json({ deck, cards: cards.results || [] })
-})
+// (GET /decks/:id removed: no caller, no UI — deck list carries card_count.)
+
 
 admin.get('/marketplace', async (c) => {
   const status = (c.req.query('status') || 'open').trim()
@@ -1339,7 +1325,13 @@ admin.get('/content-reports', async (c) => {
         LEFT JOIN Bans b ON b.user_id = t.${ownerCol}
         WHERE t.id IN (${list})
       `).bind(...ids).all<any>()
-      for (const row of rs || []) enrichment[`${type}:${row.id}`] = row
+      for (const row of rs || []) {
+        // A private_message report is disclosed BY THE RECEIVER (their own
+        // denunciation), so revealing this single row's plaintext to the mod
+        // is the consented door — unlike the bulk reader (removed).
+        if (type === 'private_message') enrichment[`${type}:${row.id}`] = { ...row, body: decryptText(row.body ?? '') }
+        else enrichment[`${type}:${row.id}`] = row
+      }
     }
   }
 
@@ -1394,6 +1386,48 @@ admin.post('/content-reports/:id/resolve', async (c) => {
     if (err instanceof ReportError) return c.json({ error: err.message }, err.status as any)
     throw err
   }
+})
+
+// ─── CASES — one report = one case (privacy-basis moderation view) ──────
+// A case is the ONLY way an admin sees disclosed private content: the
+// reporter's own denunciation attached evidence (object_id) or named a
+// target. Report-scoped by construction — never a bulk browse.
+admin.get('/cases/:id', async (c) => {
+  const id = c.req.param('id')
+  const r = await c.env.DB.prepare(`
+    SELECT cr.*, reporter.display_name AS reporter_name,
+           ru.display_name AS resolved_by_name
+    FROM ContentReports cr
+    LEFT JOIN Users reporter ON cr.reporter_id = reporter.id
+    LEFT JOIN Users ru ON cr.resolved_by = ru.id
+    WHERE cr.id = ?
+  `).bind(id).first<any>()
+  if (!r) return c.json({ error: 'Case not found' }, 404)
+
+  const caseOut: Record<string, unknown> = { ...r }
+  // Evidence object the reporter disclosed (their own attachment/copy).
+  if (r.object_id) {
+    const ev = await c.env.DB.prepare(
+      'SELECT id, owner_id, mime_type, size_bytes, created_at FROM Objects WHERE id = ?',
+    ).bind(r.object_id).first<any>()
+    caseOut.evidence = ev ? { ...ev, content_path: `/api/objects/${ev.id}/content` } : null
+  }
+  // Sender/recipient identities for private_message cases (the parties of
+  // the denunciation — content itself flows only via evidence/target).
+  if (r.target_type === 'private_message') {
+    const pm = await c.env.DB.prepare(
+      'SELECT sender_id, recipient_id, created_at FROM PrivateMessages WHERE id = ?',
+    ).bind(r.target_id).first<any>()
+    if (pm) {
+      const names = await c.env.DB.prepare(
+        'SELECT id, display_name FROM Users WHERE id IN (?, ?)',
+      ).bind(pm.sender_id, pm.recipient_id).all<any>()
+      const nm = (i: string) => (names.results || []).find((u: any) => u.id === i)?.display_name ?? null
+      caseOut.dm_parties = { sender_id: pm.sender_id, sender_name: nm(pm.sender_id), recipient_id: pm.recipient_id, recipient_name: nm(pm.recipient_id) }
+    }
+  }
+  await logAdminAction(c.env.DB, c.get('orbitId'), 'view_case', { id, type: 'content_report' })
+  return c.json(caseOut)
 })
 
 // List all users with ban status + identification + activity stamps
@@ -2335,55 +2369,11 @@ admin.delete('/lobby-comments/:id', async (c) => {
   return c.json({ ok: true })
 })
 
-// ─── D4: Private messages moderation (server-stored, plaintext per design) ──
-
-admin.get('/private-messages', async (c) => {
-  let userId = (c.req.query('user_id') || '').trim()
-  let limit = Math.min(Math.max(Number(c.req.query('limit') || 200), 1), 500)
-  try {
-    const body = await c.req.json().catch(() => null)
-    if (body?.user_id && typeof body.user_id === 'string') userId = body.user_id.trim()
-    if (body?.limit && Number.isFinite(body.limit)) limit = Math.min(Math.max(1, Number(body.limit)), 500)
-  } catch { }
-  const sql = userId
-    ? `SELECT pm.id, pm.sender_id, pm.recipient_id, pm.body, pm.created_at, pm.deleted_by, pm.hidden_at,
-              pm.attachment_id, o.content_url as attachment_url, o.mime_type as attachment_mime,
-              s.display_name as sender_name, r.display_name as recipient_name
-       FROM PrivateMessages pm
-       LEFT JOIN Users s ON s.id = pm.sender_id
-       LEFT JOIN Users r ON r.id = pm.recipient_id
-       LEFT JOIN Objects o ON o.id = pm.attachment_id
-       WHERE (pm.sender_id = ? OR pm.recipient_id = ?)
-       ORDER BY pm.created_at DESC LIMIT ?`
-    : `SELECT pm.id, pm.sender_id, pm.recipient_id, pm.body, pm.created_at, pm.deleted_by, pm.hidden_at,
-              pm.attachment_id, o.content_url as attachment_url, o.mime_type as attachment_mime,
-              s.display_name as sender_name, r.display_name as recipient_name
-       FROM PrivateMessages pm
-       LEFT JOIN Users s ON s.id = pm.sender_id
-       LEFT JOIN Users r ON r.id = pm.recipient_id
-       LEFT JOIN Objects o ON o.id = pm.attachment_id
-       ORDER BY pm.created_at DESC LIMIT ?`
-  const stmt = userId ? c.env.DB.prepare(sql).bind(userId, userId, limit) : c.env.DB.prepare(sql).bind(limit)
-  const { results } = await stmt.all()
-  const rows = (results || []).map((r: any) => ({ ...r, body: decryptText(r.body ?? '') }))
-  return c.json(rows)
-})
-
-admin.post('/private-messages/:id/hide', async (c) => {
-  const adminId = c.get('orbitId')
-  const id = c.req.param('id')
-  await c.env.DB.prepare('UPDATE PrivateMessages SET hidden_at = CURRENT_TIMESTAMP WHERE id = ? AND hidden_at IS NULL').bind(id).run()
-  await logAdminAction(c.env.DB, adminId, 'hide_pm', { id, type: 'private_message' })
-  return c.json({ ok: true })
-})
-
-admin.delete('/private-messages/:id', async (c) => {
-  const adminId = c.get('orbitId')
-  const id = c.req.param('id')
-  await c.env.DB.prepare('DELETE FROM PrivateMessages WHERE id = ?').bind(id).run()
-  await logAdminAction(c.env.DB, adminId, 'delete_pm', { id, type: 'private_message' }, 'Hard delete from admin panel')
-  return c.json({ ok: true })
-})
+// ─── D4: Private messages moderation — REMOVED (admin privacy refactor).
+// Bulk-decrypted DM browsing contradicted the published moderation model
+// (denunciation-based: a report discloses exactly the reported item — see
+// /content-reports + /cases). The software must not be ABLE to read DMs en
+// masse. History lives in git (file as of v1.1.2).
 
 // ─── D5: Admin audit log read-only viewer ────────────────────────────────
 
@@ -2421,31 +2411,12 @@ admin.get('/daily-stats', async (c) => {
   return c.json(results || [])
 })
 
-// ─── D7: Inbound traffic-source aggregation (referrer attribution) ───────
-
-admin.get('/traffic-sources', async (c) => {
-  const { results } = await c.env.DB.prepare(`
-    SELECT source, COUNT(*) as visits, DATE(MAX(created_at)) as last_seen, DATE(MIN(created_at)) as first_seen
-    FROM TrafficSources
-    GROUP BY source
-    ORDER BY visits DESC
-  `).all<any>()
-  const rows = results || []
-  const total = rows.reduce((acc: number, r: any) => acc + Number(r.visits || 0), 0)
-  return c.json({ sources: rows, total })
-})
+// ─── D7: Referrer/traffic analytics — REMOVED (privacy refactor). The
+// product claims zero tracking; the software no longer collects or reports
+// referrers. (Collection route: routes/stats.ts /referral — also removed.)
 
 // ─── D7: Lobby Chat moderation ──────────────────────────────────────────
-
-admin.get('/chat', async (c) => {
-  const { results } = await c.env.DB.prepare(`
-    SELECT id, sender_id, sender_name, body, created_at
-    FROM LobbyChat
-    ORDER BY created_at DESC
-    LIMIT 100
-  `).all()
-  return c.json(results || [])
-})
+// (legacy GET /chat 100-row dump removed: superseded by GET /chat/messages)
 
 admin.get('/chat/messages', async (c) => {
   const channel = c.req.query('channel') || 'all'
@@ -2493,41 +2464,8 @@ admin.get('/chat/messages', async (c) => {
     } catch { }
   }
 
-  // 2. PrivateMessages (DMs)
-  if (channel === 'all' || channel === 'dm') {
-    try {
-      const rows = await c.env.DB.prepare(`
-        SELECT pm.id, pm.sender_id, pm.recipient_id, pm.body, pm.created_at,
-               pm.attachment_id, o.content_url as attachment_url, o.mime_type as attachment_mime,
-               us.display_name as sender_name, ur.display_name as recipient_name
-        FROM PrivateMessages pm
-        LEFT JOIN Users us ON pm.sender_id = us.id
-        LEFT JOIN Users ur ON pm.recipient_id = ur.id
-        LEFT JOIN Objects o ON o.id = pm.attachment_id
-        WHERE pm.deleted_by IS NULL
-        ORDER BY pm.created_at DESC
-        LIMIT ?
-      `).bind(limit).all<any>()
-      for (const r of rows.results || []) {
-        const plainBody = decryptText(r.body ?? '')
-        if (!q || (plainBody && plainBody.toLowerCase().includes(q)) || (r.sender_name && r.sender_name.toLowerCase().includes(q))) {
-          results.push({
-            id: r.id,
-            channel: 'dm',
-            sender_id: r.sender_id,
-            sender_name: r.sender_name,
-            recipient_id: r.recipient_id,
-            recipient_name: r.recipient_name,
-            body: plainBody,
-            created_at: r.created_at,
-            attachment_id: r.attachment_id ?? null,
-            attachment_url: r.attachment_url ?? null,
-            attachment_mime: r.attachment_mime ?? null,
-          })
-        }
-      }
-    } catch { }
-  }
+  // 2. PrivateMessages — section REMOVED (privacy refactor): admins never
+  // bulk-read DMs. Report-scoped disclosure (Cases) is the only door.
 
   // 3. Match chat. This is intentionally read-only in the game workspace until
   // an admin explicitly deletes a message through the danger action below.

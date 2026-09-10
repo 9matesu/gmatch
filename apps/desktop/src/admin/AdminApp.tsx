@@ -70,7 +70,6 @@ export default function AdminPageClient() {
     announcementsList: [],
     recommendations: [],
     lobbyComments: [],
-    privateMessages: [],
     chatMessages: [],
     adminCards: [],
     cardsTotal: 0,
@@ -350,17 +349,6 @@ export default function AdminPageClient() {
         case "deleteComment":
           if (await confirm({ title: "Delete comment?", description: "Permanently delete this comment.", confirmLabel: "Delete", tone: "danger" })) {
             await orbitFetch(`/api/admin/lobby-comments/${args[0]}`, { method: "DELETE" }, identity);
-          }
-          break;
-        case "hidePm":
-          await orbitFetch(`/api/admin/private-messages/${args[0]}/hide`, { method: "POST" }, identity);
-          break;
-        case "unhidePm":
-          await orbitFetch(`/api/admin/private-messages/${args[0]}/unhide`, { method: "POST" }, identity);
-          break;
-        case "deletePm":
-          if (await confirm({ title: "Delete PM?", description: "Permanently delete this private message.", confirmLabel: "Delete", tone: "danger" })) {
-            await orbitFetch(`/api/admin/private-messages/${args[0]}`, { method: "DELETE" }, identity);
           }
           break;
         case "deleteChat":

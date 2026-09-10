@@ -540,6 +540,29 @@ describe('Admin API — content-report resolution (instant-hide triage)', () => 
     expect(r.reported_is_banned).toBe(false)
   })
 
+  it('GET /api/admin/cases/:id returns the case with disclosed evidence + parties', async () => {
+    const r = await findOpenReport(reportedUser.orbitId)
+    const res = await app.request(`/api/admin/cases/${r.id}`, {
+      headers: authHeaders(adminId, 'GET', `/api/admin/cases/${r.id}`),
+    }, env)
+    expect(res.status).toBe(200)
+    const data: any = await res.json()
+    expect(data.id).toBe(r.id)
+    expect(data.reporter_id).toBe(regularId.orbitId)
+    expect(data.evidence?.id).toBe('report-evidence-obj')
+    expect(data.evidence?.content_path).toBe('/api/objects/report-evidence-obj/content')
+    const log = await env.DB.prepare("SELECT 1 FROM AdminAuditLog WHERE action = 'view_case' AND target_id = ?").bind(r.id).first()
+    expect(log).toBeTruthy()
+  })
+
+  it('GET /api/admin/cases/:id 404s for unknown case and requires auth', async () => {
+    const missing = await app.request('/api/admin/cases/nope', {
+      headers: authHeaders(adminId, 'GET', '/api/admin/cases/nope'),
+    }, env)
+    expect(missing.status).toBe(404)
+    const anon = await app.request('/api/admin/cases/nope', {}, env)
+    expect([401, 403]).toContain(anon.status)
+  })
   it('POST resolve with ban marks resolved + bans user + wipes their content', async () => {
     const r = await findOpenReport(reportedUser.orbitId)
     expect(r).toBeDefined()

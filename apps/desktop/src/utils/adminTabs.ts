@@ -141,7 +141,6 @@ export const LEGACY_TAB_MAP: Record<TabId, TabId> = {
   announcements: "platform",
   recommendations: "platform",
   lobby_comments: "moderation",
-  private_messages: "moderation",
   chat: "moderation",
   cards_economy: "economy",
   audit_log: "analytics",
