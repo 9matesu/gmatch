@@ -259,4 +259,45 @@ describe('domination economy (cost + victim payout)', () => {
     expect(j.prices.message).toBe(500)
     expect(j.prices.camera).toBeGreaterThan(j.prices.message)
   })
+
+  it('GET /api/domination/targets exposes an online flag per target', async () => {
+    await env.DB.prepare("UPDATE Users SET pc_domination_enabled = 1, display_name = 'OnlineOne', last_seen = ? WHERE id = ?")
+      .bind(new Date().toISOString(), userB.orbitId).run()
+    const res = await app.request('/api/domination/targets', { headers: auth(userA, 'GET', '/api/domination/targets') })
+    const j = await res.json() as any
+    const t = j.targets.find((x: any) => x.id === userB.orbitId)
+    expect(t.online).toBe(true)
+    expect(t.last_seen).toBeTruthy()
+  })
+
+  it('POST /api/domination/ack/:id marks the action delivered for its victim only', async () => {
+    await env.DB.prepare('UPDATE Users SET pc_domination_enabled = 1, pc_domination_settings = ?, last_seen = ? WHERE id = ?')
+      .bind(JSON.stringify({ allowPopupMessage: true }), new Date().toISOString(), userB.orbitId).run()
+    await new EconomyService(env.DB).credit(userA.orbitId, 10000, { idempotencyKey: 'dom-fund', kind: 'reward', reference: 'test' })
+    const body = JSON.stringify({ targetId: userB.orbitId, action: 'message', payload: { text: 'yo' } })
+    const trig = await app.request('/api/domination/trigger', {
+      method: 'POST', headers: auth(userA, 'POST', '/api/domination/trigger', body), body,
+    })
+    expect(trig.status).toBe(200)
+    const { actionId } = await trig.json() as any
+    // stranger cannot ack
+    const userC = createTestIdentity()
+    await env.DB.prepare('INSERT INTO Users (id, public_key, display_name) VALUES (?, ?, ?)').bind(userC.orbitId, userC.publicKeyHex, 'UserC').run()
+    const bad = await app.request(`/api/domination/ack/${actionId}`, {
+      method: 'POST', headers: auth(userC, 'POST', `/api/domination/ack/${actionId}`),
+    })
+    expect([403, 404]).toContain(bad.status)
+    // the victim acks: status flips to executed
+    const ok = await app.request(`/api/domination/ack/${actionId}`, {
+      method: 'POST', headers: auth(userB, 'POST', `/api/domination/ack/${actionId}`),
+    })
+    expect(ok.status).toBe(200)
+    const row = await env.DB.prepare('SELECT status, executed_at FROM DominationActions WHERE id = ?').bind(actionId).first<any>()
+    expect(row.status).toBe('executed')
+    expect(row.executed_at).toBeTruthy()
+    // outgoing list now shows it as executed
+    const out = await app.request('/api/domination/outgoing', { headers: auth(userA, 'GET', '/api/domination/outgoing') })
+    const oj = await out.json() as any
+    expect(oj.actions.find((a: any) => a.id === actionId).status).toBe('executed')
+  })
 })

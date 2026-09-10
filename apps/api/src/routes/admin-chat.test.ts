@@ -71,12 +71,12 @@ describe('Admin chat moderation — /chat/messages', () => {
     ).bind('pm-1', alice.orbitId, bob.orbitId, encryptText('secret dm'), null, null, '2026-01-01T00:00:04Z').run()
   })
 
-  it('returns lobby, dm, match and group messages when channel=all', async () => {
+  it('returns lobby, match and group messages when channel=all — NEVER dms (privacy basis)', async () => {
     const { res, body } = await get('/api/admin/chat/messages?channel=all&limit=50')
     expect(res.status).toBe(200)
     const channels = body.map((m) => m.channel)
     expect(channels).toContain('lobby')
-    expect(channels).toContain('dm')
+    expect(channels).not.toContain('dm')
     expect(channels).toContain('match')
     expect(channels).toContain('group')
 
@@ -85,8 +85,8 @@ describe('Admin chat moderation — /chat/messages', () => {
     expect(lobby!.body).toBe('hello lobby')
     expect(lobby!.sender_name).toBe('Alice Alice')
 
-    const dm = body.find((m) => m.id === 'pm-1')
-    expect(dm!.body).toBe('secret dm')
+    // The seeded DM must never surface here.
+    expect(body.find((m) => m.id === 'pm-1')).toBeUndefined()
   })
 
   it('lobby filter returns only global_lobby messages and excludes card_queue', async () => {
@@ -95,10 +95,15 @@ describe('Admin chat moderation — /chat/messages', () => {
     expect(body[0].id).toBe('lobby-1')
   })
 
-  it('dm filter returns only private messages', async () => {
-    const { body } = await get('/api/admin/chat/messages?channel=dm&limit=50')
-    expect(body.length).toBe(1)
-    expect(body[0].channel).toBe('dm')
+  it('channel=dm yields nothing — bulk DM reads are removed by design', async () => {
+    const { res, body } = await get('/api/admin/chat/messages?channel=dm&limit=50')
+    expect(res.status).toBe(200)
+    expect(body.length).toBe(0)
+    // And the dedicated bulk endpoint is gone entirely.
+    const gone = await app.request('/api/admin/private-messages', {
+      headers: auth(admin, 'GET', '/api/admin/private-messages'),
+    }, env)
+    expect(gone.status).toBe(404)
   })
 
   it('match filter returns only match chat', async () => {
