@@ -55,3 +55,24 @@ describe('SidebarNav admin entry', () => {
     delete (window as unknown as { gmatch?: unknown }).gmatch
   })
 })
+
+describe('SidebarNav user-requested chrome', () => {
+  it('does not render the Deck shortcut in the sidebar', () => {
+    render(<SidebarNav />)
+    expect(screen.queryByText('Deck')).not.toBeInTheDocument()
+  })
+
+  it('expands Servers inline and shows the current server name', () => {
+    render(<SidebarNav serverName="Mateus World" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Servers' }))
+    expect(screen.getByText('Mateus World')).toBeInTheDocument()
+  })
+
+  it('collapses Porn Games when its header button is clicked again', () => {
+    render(<SidebarNav mainView="games" gamesSubTab="idle" />)
+    const header = screen.getByRole('button', { name: 'Porn Games' })
+    expect(screen.getByText('Idle Clicker')).toBeInTheDocument()
+    fireEvent.click(header)
+    expect(screen.queryByText('Idle Clicker')).not.toBeInTheDocument()
+  })
+})

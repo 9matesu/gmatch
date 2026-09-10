@@ -100,6 +100,29 @@ describe('Server directory API', () => {
     const list = (await after.json()) as { servers: Array<{ id: string }> }
     expect(list.servers.some((s) => s.id === id)).toBe(false)
   })
+
+  it('owner can rename a directory entry; others cannot', async () => {
+    const created = await register(env, owner, { name: 'Rename Me', description: 'old', endpoint_hint: 'rename.test:8790' })
+    const id = ((await created.json()) as any).server.id
+
+    const forbidden = await app.request(`/api/servers/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...headers(other, 'PATCH', `/api/servers/${id}`, JSON.stringify({ name: 'Hijacked' })) },
+      body: JSON.stringify({ name: 'Hijacked' }),
+    }, env)
+    expect(forbidden.status).toBe(403)
+
+    const ok = await app.request(`/api/servers/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...headers(owner, 'PATCH', `/api/servers/${id}`, JSON.stringify({ name: 'Renamed Node', description: 'new' })) },
+      body: JSON.stringify({ name: 'Renamed Node', description: 'new' }),
+    }, env)
+    expect(ok.status).toBe(200)
+    const body = (await ok.json()) as any
+    expect(body.server.name).toBe('Renamed Node')
+    expect(body.server.description).toBe('new')
+    expect(body.server.id).toBe(id)
+  })
 })
 
 // plan §5: central-node master admin over the directory (is_admin gate).
@@ -170,5 +193,51 @@ describe('Server directory admin API', () => {
     expect(del.status).toBe(200)
     const after = (await (await app.request('/api/servers/admin/directory', { headers: headers(master, 'GET', '/api/servers/admin/directory') }, env)).json()) as any
     expect(after.servers.some((s: any) => s.id === id)).toBe(false)
+  })
+})
+
+describe('Server node API', () => {
+  const host = createTestIdentity()
+  const member = createTestIdentity()
+  let env: Awaited<ReturnType<typeof createMockEnv>>
+
+  beforeAll(async () => {
+    env = await createMockEnv()
+    await app.request('/api/users', { headers: headers(host, 'GET', '/api/users') }, env)
+    await app.request('/api/users', { headers: headers(member, 'GET', '/api/users') }, env)
+    await env.DB.prepare('UPDATE Users SET is_admin = 1 WHERE id = ?').bind(host.orbitId).run()
+  })
+
+  it('defaults the node name to gmatch', async () => {
+    const res = await app.request('/api/servers/node', { headers: headers(host, 'GET', '/api/servers/node') }, env)
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as any
+    expect(body.name).toBe('gmatch')
+    expect(body.isAdmin).toBe(true)
+  })
+
+  it('host admin can rename the node and dashboard reflects it', async () => {
+    const raw = JSON.stringify({ name: 'Mateus World', description: 'fly node' })
+    const patch = await app.request('/api/servers/node', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...headers(host, 'PATCH', '/api/servers/node', raw) },
+      body: raw,
+    }, env)
+    expect(patch.status).toBe(200)
+    expect((await patch.json()).server.name).toBe('Mateus World')
+
+    const dash = await app.request('/api/servers/dashboard', {}, env)
+    const dashBody = (await dash.json()) as any
+    expect(dashBody.name).toBe('Mateus World')
+  })
+
+  it('rejects non-admin node rename', async () => {
+    const raw = JSON.stringify({ name: 'Hijack' })
+    const res = await app.request('/api/servers/node', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...headers(member, 'PATCH', '/api/servers/node', raw) },
+      body: raw,
+    }, env)
+    expect(res.status).toBe(403)
   })
 })

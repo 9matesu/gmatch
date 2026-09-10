@@ -11,6 +11,8 @@ for (const file of ['index.html', 'en.html']) {
   const before = html
   // sha block
   html = html.replace(/<pre id="sha256">[0-9a-f]{64}<\/pre>/, `<pre id="sha256">${rel.sha256}</pre>`)
+  html = html.replace(/<pre id="sha512">[0-9a-f]{128}<\/pre>/, `<pre id="sha512">${rel.sha512}</pre>`)
+  html = html.replace(/(<span id="build-date">)[^<]+(<\/span>)/, `$1${rel.buildDate}$2`)
   // version marker + filename mentions
   html = html.replace(/(<strong id="version">)[^<]+(<\/strong>)/, `$1${rel.version}$2`)
   html = html.replace(/gMatch-\d+\.\d+\.\d+-portable\.exe/g, rel.file)

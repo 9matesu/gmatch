@@ -268,6 +268,7 @@ export default function Home() {
   useEffect(() => { decisionMapRef.current = decisionMap }, [decisionMap])
 
   const handleSetMainView = useCallback((view: MainViewType) => {
+    setChatOpen(false)
     if (view === 'feed' && mainView === 'feed') {
       mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
     }
@@ -2375,6 +2376,21 @@ export default function Home() {
   // so the count never lists stale/idle users as "online".
   const onlineCount = useMemo(() => users.filter(u => u.online).length, [users])
 
+  // Current node name for the Servers sidebar group. The API always answers
+  // /api/servers/dashboard from whichever node this client is attached to.
+  const [serverName, setServerName] = useState('gmatch')
+  useEffect(() => {
+    if (!identity) return
+    let alive = true
+    orbitFetch('/api/servers/dashboard', { method: 'GET' }, identity)
+      .then(async (res) => (res.ok ? res.json() : null))
+      .then((d: any) => {
+        if (alive && typeof d?.name === 'string' && d.name.trim()) setServerName(d.name.trim())
+      })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [identity])
+
   // Sidebar "Porn Games" badge: deduped headcount of the lobby game room —
   // queued players + live online users + self. Mirrors the roster merge in
   // LobbyPanel without pulling the whole merge in.
@@ -2839,12 +2855,12 @@ export default function Home() {
           </ErrorBoundary>
         ) : (
           <ErrorBoundary>
-            <div className="relative z-10 w-full h-full min-h-0 bg-transparent text-retro-fg shadow-2xl flex overflow-hidden">
+            <div className="app-glass relative z-10 w-full h-full min-h-0 bg-transparent text-retro-fg shadow-2xl flex overflow-hidden">
               <SidebarNav
                 mainView={mainView}
                 setMainView={handleSetMainView}
                 onOpenHome={handleOpenHome}
-                onOpenCreatePost={() => setShowCreatePostModal(true)}
+                onOpenCreatePost={() => { setChatOpen(false); setShowCreatePostModal(true); }}
                 onOpenChat={() => {
                   if (chatOpen && panelTab === 'chat') {
                     setChatOpen(false);
@@ -2857,11 +2873,13 @@ export default function Home() {
                 }}
                 chatOpen={chatOpen && panelTab === 'chat'}
                 onOpenGallery={() => handleSetMainView('gallery')}
-                onOpenSettings={() => setShowSettingsModal(true)}
+                onOpenSettings={() => { setChatOpen(false); setShowSettingsModal(true); }}
                 onOpenStore={() => handleSetMainView('store')}
                 gamesSubTab={gamesSubTab}
                 onOpenGamesTab={(tab) => { handleSetMainView('games'); setGamesSubTab(tab); }}
                 onlineBadge={lobbyRoomCount}
+                serverName={serverName}
+                onGroupToggle={() => setChatOpen(false)}
                 unreadMessagesCount={pmUnreadCount}
                 notificationUnreadCount={lobby.unreadCount}
                 onOpenNotifications={toggleNotifications}
@@ -2881,7 +2899,7 @@ export default function Home() {
                 aria-hidden={!chatOpen}
               >
                 {chatOpen && (
-                  <div className="w-full h-full min-h-0 p-2 border-r border-border-glass bg-surface-canvas/40">
+                  <div className="w-full h-full min-h-0 p-2 glass-sidebar">
                     <SocialPanel
                       tab={panelTab}
                       onTabChange={setPanelTab}
@@ -3204,7 +3222,12 @@ export default function Home() {
                   {mainView === 'servers' && (
                     <div className="flex-1 min-h-0 w-full overflow-y-auto">
                       {identity ? (
-                        <ServersView identity={identity as never} toast={toast} />
+                        <ServersView
+                          identity={identity as never}
+                          toast={toast}
+                          showRooms={courierActive}
+                          onOpenRooms={() => handleSetMainView('rooms')}
+                        />
                       ) : (
                         <div className="p-6 text-xs text-retro-muted">Sign in to browse servers.</div>
                       )}

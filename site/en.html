@@ -4,20 +4,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>gMatch — rede P2P adulta com criptografia de ponta a ponta</title>
-<meta name="description" content="Aplicativo Windows (arquivo único) para rede social e jogos de cartas entre adultos. Todo conteúdo é criptografado entre você e o destinatário: o servidor não lê nada. Baixe, verifique o hash e rode.">
+<meta name="description" content="Aplicativo Windows (arquivo único) para rede social e jogos de cartas entre adultos. Todo conteúdo é criptografado entre você e o destinatário: o servidor não lê nada. Baixe, verifique o SHA-256 e rode.">
 </head>
 <body>
 <header>
 <h1>gMatch</h1>
 <p><strong>Conteúdo adulto: somente maiores de 18 anos.</strong> Ao baixar e usar, você declara ser maior de idade na sua jurisdição.</p>
+<p>Feito por duas pessoas que se cansaram de plataformas "adultas" que guardam cópia dos seus momentos mais privados no servidor de terceiros. Código aberto, sem anúncios, sem venda de dados, sem cadastro. O servidor com que você fala é, por design, quase cego.</p>
 <nav aria-label="Seções">
 <a href="#o-que-e">O que é</a> ·
+<a href="#cara">O que parece</a> ·
 <a href="#seguranca">Segurança</a> ·
 <a href="#criptografia">Criptografia</a> ·
 <a href="#download">Download</a> ·
 <a href="#verificar">Verificar o arquivo</a> ·
 <a href="#termos">Termos de Serviço</a> ·
 <a href="#privacidade">Privacidade</a> ·
+<a href="#faq">FAQ</a> ·
 <a href="index.html">English</a>
 </nav>
 </header>
@@ -25,63 +28,83 @@
 <main>
 <section id="o-que-e">
 <h2>O que é este aplicativo</h2>
-<p>gMatch é um programa para Windows (um único arquivo <code>.exe</code>, sem instalação) que funciona como uma rede social + arcade de jogos de cartas para adultos. Ele reúne:</p>
+<p>gMatch é um programa para Windows — um único <code>.exe</code>, sem instalação — que funciona como rede social adulta + arcade de jogos de cartas. Dentro dele:</p>
 <ul>
-<li>Feed com fotos/vídeos que VOCÊ publica e escolhe com quem compartilha;</li>
+<li>Feed com fotos/vídeos que VOCÊ publica, escolhendo quem vê cada post;</li>
 <li>Chat privado e salas de grupo com criptografia de ponta a ponta;</li>
-<li>Um idle-clicker adulto e um jogo de cartas 1v1 com baralhos, loja interna e mercado entre jogadores;</li>
-<li>Moderação por denúncia: quem recebe uma mensagem ofensiva pode denunciar e, só então, revelar a mensagem ao moderador.</li>
+<li>Um idle-clicker adulto e um jogo de cartas 1v1 com baralhos, loja e mercado entre jogadores;</li>
+<li>Moderação por denúncia: quem recebe algo ofensivo denuncia e SÓ ENTÃO revela aquela mensagem ao moderador.</li>
 </ul>
-<p>Não há cadastro, e-mail ou telefone. Sua "conta" é um par de chaves criptográficas gerado no seu computador. Você é o único responsável por guardar a chave secreta (o app oferece cópia de segurança em arquivo).</p>
+<p>Não há cadastro, e-mail ou telefone. Sua "conta" é um par de chaves gerado no seu computador. Ninguém redefine sua senha porque não existe senha — de propósito; o app obriga você a exportar backup da chave.</p>
+</section>
+
+<section id="cara">
+<h2>O que parece</h2>
+<p>Capturas reais do app na versão atual. Uma nota honesta: os mosaicos de imagem no feed e na arena são <strong>placeholders sintéticos 1×1 usados pelos nossos testes automatizados</strong>, não conteúdo adulto — esta é uma página pública e aqui também cumprimos as regras. Na sua máquina o feed mostra o que as SUAS tags puxam, e isso fica entre você e quem você escolher.</p>
+<p><img src="img/idle-grid.png" alt="Arena do idle-clicker gMatch: navegação lateral, palco, saldo e melhorias"></p>
+<p><em>A arena do Idle Clicker — barra lateral à esquerda, palco no centro, carteira e melhorias à direita. Tudo roda na sua máquina.</em></p>
+<p><img src="img/games-hub.png" alt="Hub de jogos do gMatch com sub-abas: Jogar Cartas, Galeria e Cartas, Idle Clicker, Loja, Babecock, Ranking"></p>
+<p><em>O hub de Jogos — todos os modos na barra lateral: Jogar Cartas, Galeria &amp; Cartas, Idle Clicker, Loja, Babecock, Ranking.</em></p>
+<p><img src="img/cards.png" alt="Lobby do jogo de cartas 1v1 com fila de partida e coleção"></p>
+<p><em>A arena de cartas 1v1 — entre na fila, assista partidas e negocie cartas no mercado entre jogadores.</em></p>
+<p><img src="img/feed.png" alt="Feed social do gMatch com posts, stories e dock lateral"></p>
+<p><em>O feed social — posts, stories, curtidas. Os envelopes que cruzam a internet são cifrados; o servidor retransmite sem abrir.</em></p>
+<p><img src="img/servers.png" alt="Navegador de servidores do gMatch: nós conectados, diretório público, painel de host"></p>
+<p><em>O navegador de servidores — entre no nó de um amigo, browse o diretório público ou hospede o seu. Você nunca é obrigado a usar nossa infraestrutura.</em></p>
 </section>
 
 <section id="seguranca">
 <h2>Segurança: o que o servidor pode e não pode ver</h2>
-<p>O servidor desta página hospeda apenas o download e um "correio" mínimo. Por design (auditado — veja os links abaixo):</p>
+<p>O servidor desta página hospeda apenas o download e um "correio" mínimo. Por design (auditado — relatório abaixo):</p>
 <ul>
-<li>Todo conteúdo (mensagens, fotos, legendas, salas) viaja <strong>cifrado</strong>. O servidor encaminha envelopes opacos endereçados a tokens: ele não sabe quem envia, para quem, nem o que contém.</li>
-<li>O servidor <strong>não mantém lista de quem está online</strong>: conexões são anônimas; presença existe apenas entre os seus contatos.</li>
-<li>Nada é armazenado em cache no seu disco pelo app: imagens do feed vivem só na memória da sessão; toda resposta do servidor vem marcada <code>no-store</code>.</li>
-<li>Suas chaves privadas ficam no seu Windows protegidas pelo cripto-sistema do próprio Windows (DPAPI) — nunca em texto puro, nunca no servidor.</li>
-<li>Endereços IP não são registrados em logs de aplicação; o relay TURN usa credenciais temporárias aleatórias, sem ligação com sua identidade.</li>
-<li>Você também pode não usar nosso servidor: o app hospeda o próprio servidor (a sua máquina guarda todos os dados) ou entra no de um amigo. O diretório público — mantido no central — lista só nomes e descrições; conteúdo e listas de usuários nunca passam por ele. Servidor com senha verifica a senha NA MÁQUINA DO HOST (scrypt, bloqueio por tentativas), nunca no central.</li>
+<li>Todo conteúdo (mensagens, fotos, legendas, salas) viaja <strong>cifrado</strong>. O servidor encaminha envelopes opacos endereçados a tokens: não sabe quem envia, para quem, nem o que contém.</li>
+<li>O servidor <strong>não mantém lista de quem está online</strong>: conexões são anônimas; presença existe só entre contatos.</li>
+<li>Nada é gravado em cache no seu disco: imagens vivem só na memória da sessão; toda resposta vem marcada <code>no-store</code>.</li>
+<li>Suas chaves privadas ficam no cofre criptográfico do próprio Windows (DPAPI) — nunca em texto puro, nunca no servidor.</li>
+<li>IPs não entram em logs de aplicação; o relay TURN opcional usa credenciais temporárias aleatórias, sem ligação com sua identidade.</li>
+<li>Você pode dispensar nosso servidor: o app hospeda o próprio nó (sua máquina guarda tudo) ou entra no de um amigo. O diretório público lista só nomes e descrições. Nó com senha verifica a senha NA MÁQUINA DO HOST (scrypt, bloqueio por tentativas), nunca no central.</li>
 </ul>
-<p>Leia o relatório completo de segurança: <a href="legal/security.html">Auditoria de segurança</a>. O código é aberto: <a href="https://github.com/9matesu/goongrid">github.com/9matesu/goongrid</a>.</p>
+<p>Relatório completo: <a href="legal/security.html">auditoria de segurança</a>. Código aberto: <a href="https://github.com/9matesu/goongrid">github.com/9matesu/goongrid</a>.</p>
 </section>
 
 <section id="criptografia">
 <h2>Criptografia e funcionamento (sem mistério)</h2>
 <ul>
-<li><strong>Identidade:</strong> ao iniciar, o app gera dois pares de chaves — Ed25519 (para assinar suas ações) e X25519 (para cifrar conteúdo). O seu "ID" é um resumo criptográfico (SHA-256) da chave pública. A chave privada nunca sai do seu dispositivo.</li>
-<li><strong>Mensagens 1:1:</strong> criptografia ECIES (X25519 + BLAKE3 + XChaCha20-Poly1305). Matematicamente, só quem tem a sua chave privada abre o que te enviaram — nem o servidor, nem o autor depois.</li>
-<li><strong>Salas de grupo:</strong> um segredo compartilhado (DEK) circula cifrado de convidado em convidado; quando alguém sai, o segredo é trocado (epoch) e o que foi dito antes continua legível, mas nada novo abre com a chave antiga.</li>
-<li><strong>Selamento de pedidos:</strong> toda chamada à API vem assinada e carimbadada no tempo (replay rejeitado); quando o nó anuncia uma chave de transporte, corpo e cabeçalhos viajam cifrados por ECIES até ele — quem vigia sua rede vê texto cifrado, não quem você seguiu nem o que curtiu.</li>
+<li><strong>Identidade:</strong> o app gera dois pares de chaves — Ed25519 (assina suas ações) e X25519 (cifra conteúdo). Seu "ID" é um resumo SHA-256 da chave pública. A chave privada nunca sai do dispositivo.</li>
+<li><strong>Mensagens 1:1:</strong> ECIES (X25519 + BLAKE3 + XChaCha20-Poly1305). Só quem tem sua chave privada abre o que te enviaram — nem o servidor, nem o autor depois.</li>
+<li><strong>Salas de grupo:</strong> um segredo compartilhado (DEK) circula cifrado entre membros; quando alguém sai, o segredo gira (epoch) — o passado continua legível, nada novo abre com a chave antiga.</li>
+<li><strong>Selamento de pedidos:</strong> toda chamada à API é assinada e carimbada no tempo (replay rejeitado); com chave de transporte anunciada, corpo e cabeçalhos viajam cifrados por ECIES até o nó — quem vigia sua rede vê texto cifrado.</li>
 <li><strong>Privacidade no P2P:</strong> candidatos ICE com IP literal são descartados antes de sair do app; o relay é opcional e rotulado aleatoriamente.</li>
-<li><strong>Limite honesto:</strong> criptografia protege conteúdo contra terceiros; NÃO protege contra alguém que roube seu computador desbloqueado ou sua chave exportada. Guarde a cópia da chave em lugar seguro.</li>
+<li><strong>Limite honesto:</strong> criptografia protege conteúdo contra terceiros; NÃO protege contra quem rouba seu computador desbloqueado ou sua chave exportada. Guarde o backup em lugar seguro e trave a tela.</li>
 </ul>
 </section>
 
 <section id="download">
 <h2>Download (Windows x64, arquivo único)</h2>
-<p>Versão <strong id="version">1.1.0</strong> · arquivo <code>gMatch-1.1.0-portable.exe</code> · 114 MB ·</p>
-<p><a href="https://github.com/9matesu/goongrid/releases/download/v1.1.0/gMatch-1.1.0-portable.exe" download>Baixar gMatch-1.1.0-portable.exe</a></p>
-<p>SHA-256 esperado (copie o valor abaixo e confira com o passo a passo da próxima seção):</p>
+<p>Versão <strong id="version">1.1.0</strong> · arquivo <code>gMatch-1.1.0-portable.exe</code> · 114.146.607 bytes (108,9 MiB) · compilado em <span id="build-date">2026-09-09T11:58:34.956Z</span> (UTC).</p>
+<p><a href="releases/gMatch-1.1.0-portable.exe" download>Baixar gMatch-1.1.0-portable.exe</a></p>
+<p><strong>SHA-256</strong> esperado — copie o valor abaixo e confira na próxima seção antes de rodar:</p>
 <pre id="sha256">f7608ffa2ece37f5d23fc772699a3a989e3c915d95600a4fcc904b6fba11a4e7</pre>
-<p><em>(O hash real é publicado automaticamente na página e em <code>release.json</code> a cada release.)</em></p>
+<p><strong>SHA-512</strong> esperado (paranoia extra é virtude com um arquivo de 109 MB):</p>
+<pre id="sha512">5bfebc0809d50f423c025c04dcf4c85901b881651a6cce8fe95047c34d8e603158a7e5991fef989a7ec44b54f959b022a9e2eaf5660982e2d964a2f63fbd71d2</pre>
+<p><em>(Os dois hashes, a data de compilação e o tamanho saem MECANICAMENTE do arquivo publicado, nunca digitados à mão. Os mesmos dados estão em <code>release.json</code> neste servidor.)</em></p>
+<h3>Assinatura de código: o que temos e o que não temos</h3>
+<p>Este binário NÃO tem assinatura Authenticode comercial — custa centenas de dólares por ano e pagamos o projeto com doação, não com venda de dados. Em vez disso publicamos a integridade criptográfica que você verifica sozinho: SHA-256 e SHA-512 derivados dos bytes exatos servidos nesta página. Ainda não há build para macOS/Linux.</p>
 <h3>"O Windows disse que pode ser perigo" — por que e o que fazer</h3>
-<p>O aviso <strong>SmartScreen</strong> aparece para QUALQUER programa legítimo não-assinado — não indica vírus. Este executável não tem assinatura comercial (custa centenas de dólares por ano e pagamos com doação, não com venda de dados). Para confiar de forma independente:</p>
+<p>O aviso <strong>SmartScreen</strong> aparece para QUALQUER programa legítimo não-assinado — é falta de recibo, não detector de vírus. Para confiar de forma independente:</p>
 <ol>
-<li>Verifique o SHA-256 (abaixo) — prova que o arquivo baixado é exatamente o que publicamos;</li>
-<li>Cole o hash ou envie o arquivo para análise no <a href="https://www.virustotal.com">VirusTotal</a> (verificação pública por ~70 antivírus);</li>
-<li>Ou não baixe o .exe: clone o código aberto e compile você mesmo: <a href="https://github.com/9matesu/goongrid">github.com/9matesu/goongrid</a> (comandos em <code>README.md</code> — <code>npm install</code>, <code>npm run dist</code>).</li>
+<li>Verifique o SHA-256 (seção a seguir) — prova de que o arquivo baixado é exatamente o que publicamos;</li>
+<li>Cole o hash (ou envie o arquivo) no <a href="https://www.virustotal.com">VirusTotal</a> — varredura pública por ~70 antivírus;</li>
+<li>Ou não baixe o .exe: clone o código aberto e compile você mesmo: <a href="https://github.com/9matesu/goongrid">github.com/9matesu/goongrid</a> (<code>npm install</code>, <code>npm run dist</code> — comandos no <code>README.md</code>).</li>
 </ol>
 </section>
 
 <section id="verificar">
 <h2>Verificar o hash no Windows (20 segundos, sem instalar nada)</h2>
-<p>Abra o menu Iniciar, digite <code>PowerShell</code>, abra e rode (ajuste o caminho se salvou em outro lugar):</p>
+<p>Abra o menu Iniciar, digite <code>PowerShell</code> e rode (ajuste o caminho se salvou em outro lugar):</p>
 <pre>Get-FileHash "$env:USERPROFILE\Downloads\gMatch-1.1.0-portable.exe" -Algorithm SHA256</pre>
 <p>Compare o valor <code>Hash</code> com o publicado acima. Se diferir em UM caractere, NÃO execute: apague e reporte em <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a>.</p>
+<p>Mesma ideia, qualquer algoritmo: <code>Get-FileHash ... -Algorithm SHA512</code> deve bater com o bloco SHA-512 acima.</p>
 </section>
 
 <section id="termos">
@@ -89,20 +112,20 @@
 <ul>
 <li><a href="legal/terms.html">Termos de Serviço</a> — elegibilidade (18+), chaves autocustodadas, conduta proibida, responsabilidade por conteúdo, encerramento.</li>
 <li><a href="legal/privacy.html">Política de Privacidade (LGPD)</a> — exatamente quais dados existem, base legal, seus direitos (art. 18) e como exercê-los.</li>
-<li><a href="legal/community.html">Regras da comunidade</a> — o que é bloqueado tecnicamente pelo app.</li>
-<li><a href="legal/abuse.html">Denúncias e abuso</a> — como reportar conteúdo e como funciona a revelação opcional para moderação.</li>
+<li><a href="legal/community.html">Regras da comunidade</a> — o que o app bloqueia tecnicamente, não só retoricamente.</li>
+<li><a href="legal/abuse.html">Denúncias e abuso</a> — como reportar e como funciona a revelação opcional para moderação.</li>
 <li><a href="legal/records.html">Registros de conteúdo adulto</a> — quem é o publisher das suas mídias (você) e o que isso significa.</li>
-<li><a href="legal/e2e.html">Aviso sobre criptografia e autocustódia</a> — limites do que podemos fazer por você.</li>
+<li><a href="legal/e2e.html">Aviso sobre criptografia e autocustódia</a> — os limites do que podemos fazer por você (resumo: quase nada, de propósito).</li>
 </ul>
-<p>Versão vigente destes documentos: <code>2026-09-09.1</code>. Alterações são registradas em <a href="legal/changelog.html">legal/changelog.html</a>. Dentro do app (Settings → Legal), o usuário logado lê e confirma aceite da versão vigente.</p>
+<p>Versão vigente destes documentos: <code>2026-09-09.1</code>. Alterações em <a href="legal/changelog.html">legal/changelog.html</a>. Dentro do app (Settings → Legal), o usuário confirma aceite da versão vigente.</p>
 </section>
 
 <section id="privacidade">
 <h2>Privacidade em uma olhada</h2>
 <ul>
-<li>Esta página: zero JavaScript, zero CSS, zero fontes externas, zero cookies, zero analytics. Nada aqui te rastreia.</li>
+<li>Esta página: zero JavaScript, zero CSS, zero fontes externas, zero cookies, zero analytics. Nada aqui te rastreia. (As capturas são PNGs servidos do mesmo diretório desta página — sem CDN.)</li>
 <li>O app: nenhum dado pessoal é coletado (não existe cadastro). O que circula pela internet são apenas envelopes cifrados com prazo de validade (máx. 7 dias no servidor oficial).</li>
-<li>No seu computador: chaves e histórico ficam cifrados pelo Windows (DPAPI); imagens nunca são gravadas em disco; ao fechar o app, nada de conteúdo permanece.</li>
+<li>No seu computador: chaves e histórico cifrados pelo Windows (DPAPI); imagens nunca gravadas em disco; ao fechar o app, nada de conteúdo permanece.</li>
 <li>Seus direitos LGPD (acesso, eliminação, portabilidade) são exercitados LOCALMENTE no app — exportando e apagando a sua identidade. Explicação completa em <a href="legal/privacy.html">legal/privacy.html</a>.</li>
 </ul>
 </section>
@@ -112,7 +135,8 @@
 <h3>Por que um .exe em vez de um site?</h3><p>Para que o conteúdo adulto nunca passe nem fique em um servidor web de terceiros: o app roda na sua máquina e só trafega envelope cifrado. Um site comum não tem como esconder do hospedeiro o que ele mostra.</p>
 <h3>Posso recuperar minha conta se perder a chave?</h3><p>Não — e isso é proposital (ninguém, nem nós, entra na sua conta). Por isso o app obriga backup/export da chave.</p>
 <h3>Tem telemetria, anúncios, cadastro?</h3><p>Não. Zero analytics, zero cookies na página, zero cadastro.</p>
-<h3>O que o servidor guarda mesmo?</h3><p>No modo oficial: envelopes cifrados com prazo de expiração (até 7 dias até o destinatário buscar) e um token de entrega que é um resumo matemático da chave pública do destinatário. Nada que aponte a uma pessoa.</p>
+<h3>O que o servidor guarda mesmo?</h3><p>No modo oficial: envelopes cifrados com expiração (até 7 dias até o destinatário buscar) e um token de entrega que é um resumo matemático da chave pública do destinatário. Nada que aponte a uma pessoa.</p>
+<h3>Por que as capturas mostram mosaicos no lugar das imagens?</h3><p>Porque esta é uma página pública de um app adulto, e nós moderamos as fronteiras do nosso próprio produto também. A interface nas imagens é 100% real — a imagem de teste é propositalmente em branco.</p>
 </section>
 </main>
 

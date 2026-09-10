@@ -110,7 +110,7 @@ describe('ServersView', () => {
   })
 
   it('without a configured central, explains instead of crashing', async () => {
-    stubLocalStorage()
+    stubLocalStorage({ 'gmatch.central.url': 'none' })
     mockFetch(async () => json({ servers: [] }))
     render(<ServersView identity={identity} toast={() => {}} />)
     await waitFor(() => expect(screen.getByText(/no central/i)).toBeInTheDocument())

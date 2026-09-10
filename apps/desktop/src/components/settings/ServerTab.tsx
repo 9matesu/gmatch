@@ -54,13 +54,13 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
           <SnapshotSection identity={identity as never} isHost toast={(m, t) => toast?.(m, t)} />
         </>
       )}
-      <div className="p-4 bg-surface-interactive border border-retro-border rounded-lg space-y-2">
+      <div className="glass-card p-4 space-y-2">
         <div className="flex items-center gap-2">
           <Server className="w-4 h-4 text-retro-accent" />
           <span className="text-xs font-medium text-retro-fg">
             {state.mode === 'host' ? 'This computer hosts the server' : 'Connected to a friend’s server'}
           </span>
-          <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full font-mono ${state.mode === 'host' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-sky-500/10 text-sky-300'}`}>
+          <span className={`glass-inset ml-auto text-[10px] px-2 py-0.5 rounded-full font-mono ${state.mode === 'host' ? 'text-emerald-200' : 'text-retro-fg'}`}>
             {state.mode.toUpperCase()}
           </span>
         </div>
@@ -99,13 +99,13 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
               onChange={(e) => setClientUrl(e.target.value)}
               placeholder="http://192.168.0.42:8790"
               aria-label="Friend server address"
-              className="flex-1 bg-surface-raised border border-border-glass focus:border-retro-accent/60 px-3 py-2 text-xs text-retro-fg rounded-lg outline-none font-mono"
+              className="glass-field flex-1 px-3 py-2 text-xs font-mono"
             />
             <button
               type="button"
               disabled={saving || !isServerUrl(clientUrl)}
               onClick={() => { playPress(880); void save('client', normalizeServerUrl(clientUrl)!) }}
-              className="px-3 py-2 rounded-lg bg-retro-accent text-black text-xs font-bold disabled:opacity-40 cursor-pointer"
+              className="glass-action glass-action-primary px-3 py-2 rounded-lg text-xs font-bold cursor-pointer"
             >
               Connect
             </button>

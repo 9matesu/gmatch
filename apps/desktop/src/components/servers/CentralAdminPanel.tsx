@@ -88,7 +88,7 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
         <button
           type="button"
           onClick={() => { playPress(700); void load() }}
-          className="ml-auto px-2 py-1 rounded-lg border border-retro-border text-retro-muted text-[11px] font-bold cursor-pointer hover:text-retro-fg flex items-center gap-1"
+          className="glass-action ml-auto px-3 py-1.5 rounded-lg text-retro-muted hover:text-retro-fg text-[11px] font-bold cursor-pointer flex items-center gap-1"
         >
           <RefreshCw className="w-3 h-3" /> Refresh
         </button>
@@ -96,11 +96,11 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
 
       {totals && (
         <div className="flex flex-wrap gap-1.5 text-[11px] font-mono text-retro-muted">
-          <span className="px-2 py-1 rounded bg-surface-raised border border-retro-border">total {totals.total}</span>
-          <span className="px-2 py-1 rounded bg-surface-raised border border-retro-border">online {totals.online}</span>
-          <span className="px-2 py-1 rounded bg-surface-raised border border-retro-border">stale {totals.stale}</span>
-          <span className="px-2 py-1 rounded bg-surface-raised border border-retro-border">hidden {totals.hidden}</span>
-          <span className="px-2 py-1 rounded bg-surface-raised border border-retro-border">blocked {totals.blocked}</span>
+          <span className="glass-inset px-2 py-1 rounded-full">total {totals.total}</span>
+          <span className="glass-inset px-2 py-1 rounded-full">online {totals.online}</span>
+          <span className="glass-inset px-2 py-1 rounded-full">stale {totals.stale}</span>
+          <span className="glass-inset px-2 py-1 rounded-full">hidden {totals.hidden}</span>
+          <span className="glass-inset px-2 py-1 rounded-full">blocked {totals.blocked}</span>
         </div>
       )}
 
@@ -108,12 +108,12 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
         {loading && rows.length === 0 && <li className="text-[11px] text-retro-muted">Loading directory…</li>}
         {!loading && rows.length === 0 && <li className="text-[11px] text-retro-muted">Directory is empty.</li>}
         {rows.map((row) => (
-          <li key={row.id} className={`p-3 bg-surface-interactive border border-retro-border rounded-lg flex items-start gap-3 ${row.hidden ? 'opacity-60' : ''}`}>
+          <li key={row.id} className={`glass-card p-3 flex items-start gap-3 ${row.hidden ? 'opacity-60' : ''}`}>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium text-retro-fg truncate">{row.name}</span>
-                {!!row.hidden && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-zinc-700/40 text-zinc-300 font-mono">HIDDEN</span>}
-                {!!row.blocked && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-rose-500/10 text-rose-300 font-mono">BLOCKED</span>}
+                {!!row.hidden && <span className="text-[9px] px-1.5 py-0.5 rounded-full glass-inset text-retro-muted font-mono">HIDDEN</span>}
+                {!!row.blocked && <span className="text-[9px] px-1.5 py-0.5 rounded-full glass-action-danger font-mono">BLOCKED</span>}
               </div>
               <p className="text-[10px] font-mono text-retro-muted mt-0.5 truncate">{row.endpoint_hint || 'no address'} · {row.id.slice(0, 8)}</p>
             </div>
@@ -123,7 +123,7 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
                 disabled={busyId === row.id}
                 onClick={() => void patch(row, { hidden: !row.hidden }, row.hidden ? 'Unhidden' : 'Hidden from public')}
                 title={row.hidden ? 'Show in public directory' : 'Hide from public directory'}
-                className="p-1.5 rounded text-retro-muted hover:text-retro-fg disabled:opacity-40 cursor-pointer"
+                className="glass-action p-1.5 rounded-lg text-retro-muted hover:text-retro-fg disabled:opacity-40 cursor-pointer"
               >
                 {row.hidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
               </button>
@@ -132,7 +132,7 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
                 disabled={busyId === row.id}
                 onClick={() => void remove(row)}
                 title="Force-unregister from directory"
-                className="p-1.5 rounded text-retro-muted hover:text-rose-400 disabled:opacity-40 cursor-pointer"
+                className="glass-action glass-action-danger p-1.5 rounded-lg disabled:opacity-40 cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>

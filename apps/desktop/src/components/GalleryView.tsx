@@ -99,9 +99,9 @@ export function GalleryView({
     <>
     <div id="gallery-section" className="space-y-4 font-sans select-none">
       {idleKeepsakes.length > 0 && (
-        <div className="bg-surface-raised border border-border-glass rounded-2xl overflow-hidden shadow-xl">
-          <div className="p-4 border-b border-border-glass bg-surface-raised flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-surface-interactive border border-border-glass flex items-center justify-center text-retro-muted">
+        <div className="glass-card overflow-hidden">
+          <div className="glass-header p-4 flex items-center gap-2">
+            <div className="glass-inset w-7 h-7 rounded-lg flex items-center justify-center text-retro-muted">
               <ImageIcon className="w-4 h-4" />
             </div>
             <div>
@@ -114,10 +114,10 @@ export function GalleryView({
           <IdleGalleryView onCreateCard={onCreateCardFromMedia} onSetWallpaper={onSetWallpaper} />
         </div>
       )}
-      <div className="bg-surface-raised border border-border-glass rounded-2xl overflow-hidden shadow-xl">
-        <div className="p-4 border-b border-border-glass bg-surface-raised flex flex-wrap items-center justify-between gap-3">
+      <div className="glass-card overflow-hidden">
+        <div className="glass-header p-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-surface-interactive border border-border-glass flex items-center justify-center text-retro-muted">
+            <div className="glass-inset w-7 h-7 rounded-lg flex items-center justify-center text-retro-muted">
               <Layers className="w-4 h-4" />
             </div>
             <div>
@@ -129,7 +129,7 @@ export function GalleryView({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap text-xs">
-            <div className="flex bg-surface-interactive p-0.5 rounded-lg border border-border-glass text-[11px] font-semibold">
+            <div className="glass-inset flex p-0.5 rounded-lg text-[11px] font-semibold">
               {(['all', 'received', 'sent', 'starred'] as const).map(t => (
                 <button
                   key={t}
@@ -139,7 +139,7 @@ export function GalleryView({
                     setGalleryPage(0)
                   }}
                   className={`px-2.5 py-1 rounded-md cursor-pointer uppercase transition-colors ${
-                    galleryFilter === t ? 'bg-surface-raised text-retro-fg font-bold shadow-sm' : 'text-retro-muted hover:text-retro-body'
+                    galleryFilter === t ? 'bg-white/14 text-retro-fg font-bold shadow-sm' : 'text-retro-muted hover:text-retro-body'
                   }`}
                 >
                   {t}
@@ -147,7 +147,7 @@ export function GalleryView({
               ))}
             </div>
 
-            <div className="flex items-center gap-1 bg-surface-interactive px-2 py-1 rounded-lg border border-border-glass text-[11px]">
+            <div className="glass-field flex items-center gap-1 px-2 py-1 text-[11px]">
               <span className="text-retro-muted font-semibold text-[10px] uppercase">Sort:</span>
               <select
                 value={gallerySort}
@@ -164,7 +164,7 @@ export function GalleryView({
               </select>
             </div>
 
-            <div className="flex items-center gap-1 bg-surface-interactive px-2 py-1 rounded-lg border border-border-glass text-[11px]">
+            <div className="glass-field flex items-center gap-1 px-2 py-1 text-[11px]">
               <Search className="w-3.5 h-3.5 text-retro-muted" />
               <input
                 type="text"
@@ -175,14 +175,14 @@ export function GalleryView({
               />
             </div>
 
-            <div className="flex bg-surface-interactive p-0.5 rounded-lg border border-border-glass text-[11px] font-semibold">
+            <div className="glass-inset flex p-0.5 rounded-lg text-[11px] font-semibold">
               {(['all', 'image', 'video'] as const).map(t => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => { setCardTypeFilter(t); setGalleryPage(0) }}
                   className={`px-2.5 py-1 rounded-md cursor-pointer uppercase transition-colors ${
-                    cardTypeFilter === t ? 'bg-surface-raised text-retro-fg font-bold shadow-sm' : 'text-retro-muted hover:text-retro-body'
+                    cardTypeFilter === t ? 'bg-white/14 text-retro-fg font-bold shadow-sm' : 'text-retro-muted hover:text-retro-body'
                   }`}
                 >
                   {t}
@@ -194,7 +194,7 @@ export function GalleryView({
               type="button"
               disabled={batchDownloading || filteredItems.length === 0}
               onClick={handleDownloadAll}
-              className="px-3 py-1 bg-surface-raised hover:bg-surface-interactive text-retro-body border border-border-glass rounded-lg font-semibold text-[11px] flex items-center gap-1.5 cursor-pointer disabled:opacity-40 transition-colors shadow-sm"
+              className="glass-action px-3 py-1 rounded-lg font-semibold text-[11px] flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
               title="Download all cards in current filter"
             >
               <Download className="w-3.5 h-3.5" />
@@ -204,9 +204,7 @@ export function GalleryView({
             <button
               type="button"
               onClick={() => setShowSlideshows((v) => !v)}
-              className={`px-3 py-1 border rounded-lg font-semibold text-[11px] flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm ${
-                showSlideshows ? 'bg-surface-interactive text-retro-fg border-zinc-600' : 'bg-surface-raised hover:bg-surface-interactive text-retro-body border-border-glass'
-              }`}
+              className={`glass-action ${showSlideshows ? 'glass-nav-active' : ''} px-3 py-1 rounded-lg font-semibold text-[11px] flex items-center gap-1.5 cursor-pointer`}
               title="Create and play slideshows"
             >
               <Film className="w-3.5 h-3.5" />
@@ -216,7 +214,7 @@ export function GalleryView({
         </div>
 
         {selectedGalleryIds.size > 0 && (
-          <div className="px-4 py-2.5 bg-surface-raised border-b border-border-glass flex items-center justify-between gap-3 text-xs animate-orbit-fade-in">
+          <div className="glass-header px-4 py-2.5 flex items-center justify-between gap-3 text-xs animate-orbit-fade-in">
             <div className="flex items-center gap-2 text-retro-fg font-bold">
               <CheckSquare className="w-4 h-4 text-emerald-600" />
               <span>{selectedGalleryIds.size} cards selected</span>
@@ -225,7 +223,7 @@ export function GalleryView({
               <button
                 type="button"
                 onClick={handleBatchDownload}
-                className="px-3 py-1 bg-black hover:bg-surface-elevated text-white font-bold text-[11px] rounded-md transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
+                className="glass-action glass-action-primary px-3 py-1.5 rounded-lg font-bold text-[11px] cursor-pointer flex items-center gap-1"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Download Selected</span>
@@ -233,7 +231,7 @@ export function GalleryView({
               <button
                 type="button"
                 onClick={handleBatchDelete}
-                className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-[11px] rounded-md transition-colors cursor-pointer flex items-center gap-1"
+                className="glass-action glass-action-danger px-3 py-1.5 rounded-lg font-bold text-[11px] cursor-pointer flex items-center gap-1"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Delete</span>
@@ -249,7 +247,7 @@ export function GalleryView({
           </div>
         )}
 
-        <div className="p-4 border-b border-border-glass bg-surface-canvas/60 space-y-2">
+        <div className="p-4 border-b border-white/10 bg-white/5 space-y-2">
           <div className="flex items-center justify-between text-xs font-bold text-retro-body">
             <span className="flex items-center gap-1.5 text-retro-fg">
               <Layers className="w-4 h-4 text-retro-muted" />
@@ -260,7 +258,7 @@ export function GalleryView({
           <button
             type="button"
             onClick={onOpenCreateCard}
-            className="w-full sm:w-auto px-4 py-2 bg-retro-accent text-black font-bold text-xs uppercase tracking-wider rounded-lg transition-colors cursor-pointer shadow-md hover:bg-retro-accent-hover flex items-center gap-2"
+            className="glass-action glass-action-primary w-full sm:w-auto px-4 py-2 font-bold text-xs uppercase tracking-wider rounded-lg cursor-pointer flex items-center gap-2"
           >
             <ImagePlus className="w-3.5 h-3.5" />
             <span>Create Card</span>
@@ -269,7 +267,7 @@ export function GalleryView({
 
       </div>
 
-      <div className="bg-surface-raised border border-border-glass rounded-lg p-4">
+      <div className="glass-card p-4">
           {itemsLoading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {Array.from({ length: 10 }).map((_, i) => <CardSkeleton key={i} />)}
@@ -353,7 +351,7 @@ export function GalleryView({
                         setGalleryPage(p => Math.max(0, p - 1))
                         document.getElementById('gallery-section')?.scrollIntoView({ behavior: 'smooth' })
                       }}
-                      className="px-2.5 py-1 text-xs font-semibold text-retro-muted border border-border-glass hover:bg-surface-interactive rounded-lg disabled:opacity-30 cursor-pointer transition-colors"
+                      className="glass-action px-3 py-1.5 text-xs font-semibold rounded-lg disabled:opacity-30 cursor-pointer"
                     >
                       ← Prev
                     </button>
@@ -367,7 +365,7 @@ export function GalleryView({
                         setGalleryPage(p => Math.min(totalPages - 1, p + 1))
                         document.getElementById('gallery-section')?.scrollIntoView({ behavior: 'smooth' })
                       }}
-                      className="px-2.5 py-1 text-xs font-semibold text-retro-muted border border-border-glass hover:bg-surface-interactive rounded-lg disabled:opacity-30 cursor-pointer transition-colors"
+                      className="glass-action px-3 py-1.5 text-xs font-semibold rounded-lg disabled:opacity-30 cursor-pointer"
                     >
                       Next →
                     </button>

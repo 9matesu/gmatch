@@ -33,6 +33,27 @@ const MAX_HINT = 120
 const MAX_PER_OWNER = 5
 const STALE_MS = 24 * 60 * 60 * 1000
 
+const NODE_NAME_KEY = 'server_name'
+const NODE_DESC_KEY = 'server_description'
+const NODE_DIRECTORY_KEY = 'server_directory_id'
+
+async function getMeta(db: D1Turso, key: string): Promise<string | null> {
+  const row = await db.prepare('SELECT value FROM SystemMeta WHERE key = ?').bind(key).first<{ value: string | null }>()
+  return row?.value ?? null
+}
+
+async function setMeta(db: D1Turso, key: string, value: string): Promise<void> {
+  await db.prepare('INSERT INTO SystemMeta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').bind(key, value).run()
+}
+
+async function clearMeta(db: D1Turso, key: string): Promise<void> {
+  await db.prepare('DELETE FROM SystemMeta WHERE key = ?').bind(key).run()
+}
+
+async function isNodeAdmin(db: D1Turso, orbitId: string): Promise<boolean> {
+  const row = await db.prepare('SELECT is_admin, (SELECT COUNT(*) FROM Users) as n FROM Users WHERE id = ?').bind(orbitId).first<{ is_admin: number; n: number }>()
+  return Boolean(row && (row.is_admin === 1 || (row.n ?? 0) <= 1))
+}
 
 function serverId(ownerPubHex: string, name: string): string {
   return bytesToHex(sha256(new TextEncoder().encode(`${ownerPubHex}|${name}`)))
@@ -101,6 +122,41 @@ servers.post('/', orbitAuth, async (c) => {
   return c.json({ server: row }, 201)
 })
 
+// ---- node-local identity (Servers suite) -------------------------------------
+// This is the name/details of the node answering the request, independent of
+// any central directory row. Host admins can change it from the Servers tab.
+servers.get('/node', orbitAuth, async (c) => {
+  const orbitId = c.get('orbitId')
+  const name = (await getMeta(c.env.DB, NODE_NAME_KEY)) || 'gmatch'
+  const description = (await getMeta(c.env.DB, NODE_DESC_KEY)) || ''
+  const directoryId = await getMeta(c.env.DB, NODE_DIRECTORY_KEY)
+  return c.json({
+    name,
+    description,
+    directoryId,
+    isAdmin: await isNodeAdmin(c.env.DB, orbitId),
+  })
+})
+
+servers.patch('/node', orbitAuth, async (c) => {
+  const orbitId = c.get('orbitId')
+  if (!(await isNodeAdmin(c.env.DB, orbitId))) return c.json({ error: 'only the node host can rename this server' }, 403)
+  let body: Record<string, unknown> = {}
+  try { body = (await c.req.json()) as Record<string, unknown> } catch { return c.json({ error: 'invalid json' }, 400) }
+  if (typeof body.name === 'string') {
+    const name = body.name.trim().slice(0, MAX_NAME)
+    if (!name) return c.json({ error: 'name is required' }, 400)
+    await setMeta(c.env.DB, NODE_NAME_KEY, name)
+  }
+  if (typeof body.description === 'string') {
+    await setMeta(c.env.DB, NODE_DESC_KEY, body.description.trim().slice(0, MAX_DESC))
+  }
+  const name = (await getMeta(c.env.DB, NODE_NAME_KEY)) || 'gmatch'
+  const description = (await getMeta(c.env.DB, NODE_DESC_KEY)) || ''
+  const directoryId = await getMeta(c.env.DB, NODE_DIRECTORY_KEY)
+  return c.json({ server: { name, description, directoryId, isAdmin: true } })
+})
+
 servers.post('/:id/ping', orbitAuth, async (c) => {
   const orbitId = c.get('orbitId')
   const id = c.req.param('id')
@@ -109,6 +165,40 @@ servers.post('/:id/ping', orbitAuth, async (c) => {
   const still = await c.env.DB.prepare('SELECT id FROM ServerDirectory WHERE id = ? AND owner_id = ?').bind(id, orbitId).first()
   if (!still) return c.json({ error: 'not found or not yours' }, 404)
   return c.json({ ok: true })
+})
+
+servers.patch('/:id', orbitAuth, async (c) => {
+  const orbitId = c.get('orbitId')
+  const id = c.req.param('id')
+  const row = await c.env.DB.prepare('SELECT owner_id FROM ServerDirectory WHERE id = ?').bind(id).first<{ owner_id: string }>()
+  if (!row) return c.json({ error: 'not found' }, 404)
+  if (row.owner_id !== orbitId) return c.json({ error: 'only the owner can update this server' }, 403)
+
+  let body: Record<string, unknown> = {}
+  try { body = (await c.req.json()) as Record<string, unknown> } catch { return c.json({ error: 'invalid json' }, 400) }
+
+  const current = await c.env.DB.prepare(
+    'SELECT name, description, endpoint_hint, password_required FROM ServerDirectory WHERE id = ?',
+  ).bind(id).first<{ name: string; description: string; endpoint_hint: string; password_required: number }>()
+  if (!current) return c.json({ error: 'not found' }, 404)
+
+  const name = typeof body.name === 'string' ? body.name.trim().slice(0, MAX_NAME) : current.name
+  const description = typeof body.description === 'string' ? body.description.trim().slice(0, MAX_DESC) : current.description
+  const endpointHint = typeof body.endpoint_hint === 'string' ? body.endpoint_hint.trim().slice(0, MAX_HINT) : current.endpoint_hint
+  const passwordRequired = typeof body.password_required === 'boolean' ? (body.password_required ? 1 : 0) : current.password_required
+  if (!name) return c.json({ error: 'name is required' }, 400)
+  if (!validHint(endpointHint)) return c.json({ error: 'endpoint_hint must be host:port or an http(s) origin' }, 400)
+
+  await c.env.DB.prepare(`
+    UPDATE ServerDirectory
+    SET name = ?, description = ?, endpoint_hint = ?, password_required = ?, updated_at = datetime('now'), last_seen = datetime('now')
+    WHERE id = ? AND owner_id = ?
+  `).bind(name, description, endpointHint, passwordRequired, id, orbitId).run()
+
+  const updated = await c.env.DB.prepare(
+    'SELECT id, name, description, owner_id, password_required, endpoint_hint, created_at, last_seen, updated_at FROM ServerDirectory WHERE id = ?',
+  ).bind(id).first()
+  return c.json({ server: updated })
 })
 
 // ---- per-node dashboard (plan T4) --------------------------------------------
@@ -129,8 +219,9 @@ servers.get('/dashboard', softAuth, async (c) => {
        (SELECT COUNT(*) FROM Users) as members_total`,
   ).first<{ posts_24h: number; members_total: number }>()
   const authed = !!c.get('orbitId')
+  const serverName = (await getMeta(c.env.DB, NODE_NAME_KEY)) || 'gmatch'
   return c.json({
-    name: 'gMatch server',
+    name: serverName,
     // userlist for signed-in members of any server; counts for anonymous
     users: authed
       ? (users.results || []).map((u) => ({

@@ -86,7 +86,7 @@ export function RoomsView({
   return (
     <div className="w-full max-w-6xl mx-auto px-3 py-4 flex gap-4 h-[calc(100vh-140px)] font-sans text-retro-fg">
       {/* Room list (Ares lobby column) */}
-      <aside className="w-60 shrink-0 flex flex-col glass-surface rounded-xl overflow-hidden">
+      <aside className="glass-card w-60 shrink-0 flex flex-col rounded-xl overflow-hidden">
         <div className="p-3 border-b border-border-glass flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-retro-muted">
           <Users className="w-4 h-4" /> Rooms
         </div>
@@ -101,7 +101,7 @@ export function RoomsView({
               key={r.id}
               type="button"
               onClick={() => { playPress(720); setActiveRoomId(r.id); }}
-              className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors cursor-pointer ${activeRoomId === r.id ? 'glass-tab-active' : 'hover:bg-white/5 text-retro-body'}`}
+              className={`glass-nav-item ${activeRoomId === r.id ? 'glass-nav-active' : ''} w-full text-left px-3 py-2 rounded-lg text-xs cursor-pointer`}
             >
               <span className="block truncate font-medium">{r.name}</span>
               <span className="block text-[10px] text-retro-muted">{r.members.length} member{r.members.length === 1 ? '' : 's'} · e{r.epoch}</span>
@@ -114,16 +114,16 @@ export function RoomsView({
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') create(); }}
             placeholder="new room name"
-            className="flex-1 min-w-0 bg-surface-raised border border-border-glass rounded-md px-2 py-1.5 text-xs outline-none focus:border-retro-accent/50"
+            className="glass-field flex-1 min-w-0 px-2 py-1.5 text-xs"
           />
-          <button type="button" onClick={create} aria-label="Create room" className="p-1.5 rounded-md bg-retro-accent text-black cursor-pointer hover:bg-retro-accent-hover">
+          <button type="button" onClick={create} aria-label="Create room" className="glass-action glass-action-primary p-1.5 rounded-lg cursor-pointer">
             <Plus className="w-4 h-4" />
           </button>
         </div>
       </aside>
 
       {/* Chat pane */}
-      <section className="flex-1 min-w-0 flex flex-col glass-surface rounded-xl overflow-hidden">
+      <section className="glass-card flex-1 min-w-0 flex flex-col rounded-xl overflow-hidden">
         {activeRoom ? (
           <>
             <header className="px-4 py-2.5 border-b border-border-glass flex items-center gap-3">
@@ -142,7 +142,7 @@ export function RoomsView({
                 <button
                   type="button"
                   onClick={() => { playPress(520); onLeave(activeRoom.id); if (rooms[0]?.id !== activeRoom.id) setActiveRoomId(rooms.find(r2 => r2.id !== activeRoom.id)?.id ?? null); toast(`Left "${activeRoom.name}" — the owner re-wraps its key`, 'info'); }}
-                  className="p-1.5 rounded-md text-retro-muted hover:text-rose-400 hover:bg-white/5 cursor-pointer"
+                  className="glass-action glass-action-danger p-1.5 rounded-lg cursor-pointer"
                   aria-label="Leave room"
                   title="Leave room"
                 >
@@ -162,7 +162,7 @@ export function RoomsView({
                   {m.senderOrbitId !== myOrbitId && (
                     <div className="text-[10px] text-retro-muted mb-0.5">{nameOf(m.senderOrbitId)}</div>
                   )}
-                  <div className={`px-3 py-2 rounded-lg text-xs leading-relaxed whitespace-pre-wrap break-words ${m.senderOrbitId === myOrbitId ? 'bg-retro-accent/15 text-retro-fg rounded-br-sm' : 'bg-surface-raised border border-border-glass rounded-bl-sm'}`}>
+                  <div className={`px-3 py-2 rounded-lg text-xs leading-relaxed whitespace-pre-wrap break-words ${m.senderOrbitId === myOrbitId ? 'glass-nav-active rounded-br-sm' : 'glass-inset rounded-bl-sm'}`}>
                     {m.text}
                   </div>
                 </div>
@@ -176,9 +176,9 @@ export function RoomsView({
                   onChange={(e) => setInvitePeer(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') void invite(); }}
                   placeholder="invite a contact by name or id…"
-                  className="flex-1 min-w-0 bg-surface-raised border border-border-glass rounded-md px-3 py-1.5 text-xs outline-none focus:border-retro-accent/50"
+                  className="glass-field flex-1 min-w-0 px-3 py-1.5 text-xs"
                 />
-                <button type="button" onClick={() => void invite()} className="px-3 py-1.5 rounded-md bg-surface-interactive border border-border-glass text-xs font-medium cursor-pointer hover:border-border-strong">
+                <button type="button" onClick={() => void invite()} className="glass-action px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer">
                   Invite
                 </button>
               </div>
@@ -189,13 +189,13 @@ export function RoomsView({
                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
                   rows={1}
                   placeholder={`Message ${activeRoom.name}… (sealed to every member)`}
-                  className="flex-1 resize-none bg-surface-raised border border-border-glass rounded-md px-3 py-2 text-xs outline-none focus:border-retro-accent/50"
+                  className="glass-field flex-1 resize-none px-3 py-2 text-xs"
                 />
                 <button
                   type="button"
                   onClick={send}
                   disabled={!draft.trim()}
-                  className="px-3 rounded-md bg-retro-accent text-black disabled:opacity-30 cursor-pointer hover:bg-retro-accent-hover"
+                  className="glass-action glass-action-primary px-3 rounded-lg disabled:opacity-30 cursor-pointer"
                   aria-label="Send"
                 >
                   <Send className="w-4 h-4" />

@@ -47,9 +47,9 @@ export default function GridWorkspace() {
 
   if (!setupComplete) {
     return (
-      <div className="relative flex h-full min-h-0 items-start justify-center overflow-y-auto styled-scrollbar bg-surface-canvas p-6">
-        <div className="w-full max-w-md rounded-lg border border-border-glass bg-retro-panel p-5 space-y-4 shadow-[0_12px_28px_rgba(0,0,0,0.5)]">
-          <div>
+      <div className="relative flex h-full min-h-0 items-stretch justify-center overflow-hidden bg-surface-canvas p-6">
+        <div className="glass-card flex h-full w-full max-w-md flex-col rounded-lg p-5 space-y-4">
+          <div className="shrink-0">
             <h2 className="text-sm font-bold uppercase tracking-wider text-retro-fg">Set up your feed</h2>
             <p className="text-xs text-retro-muted mt-1">
               The clicker stays asleep until you pick your starter tags. Nothing is fetched before that.

@@ -26,7 +26,7 @@ const SNAPSHOT_PATH = process.env.SNAPSHOT_PATH || join(process.cwd(), 'orbit.sn
 // can also be started bare (`bun run serve:api`, packaged api-stage). Resolve
 // env → persisted keyfile → fresh generated key so uploads/PMs never 500 on a
 // missing key.
-process.env.STORAGE_ENCRYPTION_KEY = resolveStorageKey(process.env.STORAGE_ENCRYPTION_KEY, SNAPSHOT_PATH)
+process.env.STORAGE_ENCRYPTION_KEY = resolveStorageKey(SNAPSHOT_PATH, process.env)
 const BLOB_STORE_DIR = process.env.BLOB_STORE_DIR || (process.env.SNAPSHOT_PATH ? join(dirname(process.env.SNAPSHOT_PATH), 'blobs') : './blobs')
 const SNAPSHOT_INTERVAL_MS = Math.max(
   30000,

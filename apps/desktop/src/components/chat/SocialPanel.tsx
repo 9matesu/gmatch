@@ -30,14 +30,14 @@ export function SocialPanel({
   };
 
   return (
-    <div className="w-full h-full min-h-0 flex flex-col overflow-hidden">
-      <div className="flex items-center border-b border-retro-border shrink-0 bg-surface-raised/60">
+    <div className="glass-card w-full h-full min-h-0 flex flex-col overflow-hidden rounded-2xl">
+      <div className="flex items-center border-b border-white/10 shrink-0 bg-white/5">
         <div className="flex flex-1 min-w-0">
           <button
             type="button"
             onClick={() => selectTab('chat')}
-            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors cursor-pointer relative ${
-              tab === 'chat' ? 'text-retro-accent' : 'text-retro-muted hover:text-retro-fg'
+            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium cursor-pointer relative ${
+              tab === 'chat' ? 'text-retro-fg bg-white/10 border-b border-white/40' : 'text-retro-muted hover:text-retro-fg hover:bg-white/5'
             }`}
           >
             <MessageSquare className="w-3.5 h-3.5" />
@@ -54,8 +54,8 @@ export function SocialPanel({
           <button
             type="button"
             onClick={() => selectTab('notifications')}
-            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors cursor-pointer relative ${
-              tab === 'notifications' ? 'text-retro-accent' : 'text-retro-muted hover:text-retro-fg'
+            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium cursor-pointer relative ${
+              tab === 'notifications' ? 'text-retro-fg bg-white/10 border-b border-white/40' : 'text-retro-muted hover:text-retro-fg hover:bg-white/5'
             }`}
           >
             <Bell className="w-3.5 h-3.5" />
@@ -76,7 +76,7 @@ export function SocialPanel({
             playPress(700);
             onClose();
           }}
-          className="p-2 rounded text-retro-muted hover:text-retro-fg cursor-pointer"
+          className="glass-action mr-2 p-1.5 rounded-lg text-retro-muted hover:text-retro-fg cursor-pointer"
           aria-label="Close panel"
           title="Close"
         >

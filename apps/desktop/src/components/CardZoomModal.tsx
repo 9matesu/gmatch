@@ -152,7 +152,7 @@ export function CardZoomModal({
     >
       {/* Top Header Bar */}
       <div
-        className="flex items-center justify-between z-10 bg-retro-panel/80 border border-retro-border p-2.5 sm:px-4 rounded-lg text-retro-fg"
+        className="glass-card flex items-center justify-between z-10 p-2.5 sm:px-4 rounded-xl text-retro-fg"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center gap-2.5 min-w-0">
@@ -164,12 +164,12 @@ export function CardZoomModal({
 
         {/* Zoom Controls & Close Button */}
         <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
-          <div className="flex items-center gap-1 rounded-xl border border-retro-border bg-retro-bg/60 px-1 py-1">
+          <div className="glass-inset flex items-center gap-1 rounded-lg p-1">
             <button
               type="button"
               onClick={handleZoomOut}
               disabled={scale <= 1}
-              className="w-8 h-8 btn-skeuo rounded-lg text-retro-body hover:text-white disabled:opacity-30 flex items-center justify-center cursor-pointer transition-all active:scale-95"
+              className="glass-action h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer disabled:opacity-30"
               title="Zoom Out (-)"
             >
               <ZoomOut className="w-3.5 h-3.5" />
@@ -181,7 +181,7 @@ export function CardZoomModal({
               type="button"
               onClick={handleZoomIn}
               disabled={scale >= 4}
-              className="w-8 h-8 btn-skeuo rounded-lg text-retro-body hover:text-white disabled:opacity-30 flex items-center justify-center cursor-pointer transition-all active:scale-95"
+              className="glass-action h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer disabled:opacity-30"
               title="Zoom In (+)"
             >
               <ZoomIn className="w-3.5 h-3.5" />
@@ -190,7 +190,7 @@ export function CardZoomModal({
               <button
                 type="button"
                 onClick={handleResetZoom}
-                className="w-8 h-8 btn-skeuo rounded-lg text-retro-accent flex items-center justify-center cursor-pointer transition-all active:scale-95"
+                className="glass-action h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer"
                 title="Reset Zoom (0)"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
@@ -213,7 +213,7 @@ export function CardZoomModal({
                   } catch { }
                 })()
               }}
-              className="h-10 w-8 btn-skeuo rounded-lg text-retro-body hover:text-white flex items-center justify-center cursor-pointer transition-all active:scale-95 hidden sm:flex"
+              className="glass-action h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer"
               title="Open original image in new tab"
             >
               <ExternalLink className="w-3.5 h-3.5" />
@@ -224,7 +224,7 @@ export function CardZoomModal({
               target="_blank"
               rel="noopener noreferrer"
               download="orbit-card.jpg"
-              className="h-10 w-8 btn-skeuo rounded-lg text-retro-body hover:text-white flex items-center justify-center cursor-pointer transition-all active:scale-95 hidden sm:flex"
+              className="glass-action h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer"
               title="Open original image in new tab"
             >
               <ExternalLink className="w-3.5 h-3.5" />
@@ -234,7 +234,7 @@ export function CardZoomModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 btn-skeuo rounded-lg text-retro-muted hover:text-red-400 flex items-center justify-center cursor-pointer transition-all active:scale-95"
+            className="glass-action glass-action-danger h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer"
             title="Close (Esc)"
           >
             <X className="w-4 h-4" />

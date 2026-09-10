@@ -165,7 +165,7 @@ export function ImageViewer({
         <button
           type="button"
           onClick={onClose}
-          className="px-4 py-2 bg-surface-canvas border border-zinc-700 hover:border-zinc-500 text-retro-body text-xs font-bold rounded-xl cursor-pointer"
+          className="glass-action glass-action-primary px-4 py-2 rounded-lg text-xs font-bold cursor-pointer"
         >
           Close (Esc)
         </button>
@@ -237,13 +237,13 @@ export function ImageViewer({
     >
       {/* Top Floating Control Bar */}
       <div
-        className="w-full max-w-4xl mx-auto bg-surface-canvas/90 border border-zinc-800/80 px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between shrink-0 z-40 shadow-2xl rounded-2xl backdrop-blur-md"
+        className="glass-card w-full max-w-4xl mx-auto px-3 py-2 flex items-center justify-between shrink-0 z-40 rounded-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 sm:gap-3 truncate min-w-0">
           <span className="text-xs sm:text-sm font-bold text-retro-fg truncate">{senderName}</span>
           {items.length > 1 && (
-            <span className="text-[10px] sm:text-xs font-mono font-bold text-cyan-300 bg-cyan-950/60 px-2 sm:px-2.5 py-0.5 border border-cyan-500/40 rounded-full shrink-0">
+            <span className="text-[10px] sm:text-xs font-mono glass-inset px-2 py-0.5 rounded-full shrink-0">
               {navIdx + 1} / {items.length}
             </span>
           )}
@@ -251,11 +251,11 @@ export function ImageViewer({
 
         {/* Zoom & View Controls */}
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-          <div className="flex items-center gap-1 sm:gap-1.5 rounded-xl border border-zinc-800/70 bg-surface-canvas/50 px-1 py-1">
+          <div className="glass-inset flex items-center gap-1 rounded-lg p-1">
             <button
               type="button"
               onClick={() => handleZoom(0.25)}
-              className="w-8 h-8 btn-skeuo rounded-lg text-retro-body hover:text-white flex items-center justify-center cursor-pointer transition-all active:scale-95"
+              className="glass-action h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer disabled:opacity-30"
               title="Zoom In (+)"
             >
               <ZoomIn className="w-3.5 h-3.5" />
@@ -263,7 +263,7 @@ export function ImageViewer({
             <button
               type="button"
               onClick={() => handleZoom(-0.25)}
-              className="w-8 h-8 btn-skeuo rounded-lg text-retro-body hover:text-white flex items-center justify-center cursor-pointer transition-all active:scale-95"
+              className="glass-action h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer disabled:opacity-30"
               title="Zoom Out (-)"
             >
               <ZoomOut className="w-3.5 h-3.5" />
@@ -271,7 +271,7 @@ export function ImageViewer({
             <button
               type="button"
               onClick={resetView}
-              className="w-8 h-8 btn-skeuo rounded-lg text-retro-body hover:text-white flex items-center justify-center cursor-pointer transition-all active:scale-95"
+              className="glass-action h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer disabled:opacity-30"
               title="Reset Zoom (0)"
             >
               <RotateCcw className="w-3.5 h-3.5" />
@@ -283,7 +283,7 @@ export function ImageViewer({
               playPress(680)
               onClose()
             }}
-            className="w-8 h-8 btn-skeuo rounded-lg text-retro-muted hover:text-red-400 flex items-center justify-center cursor-pointer transition-all active:scale-95"
+            className="glass-action glass-action-danger h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer"
             title="Close (Esc)"
           >
             <X className="w-4 h-4" />
@@ -309,7 +309,7 @@ export function ImageViewer({
               playPress(750)
               onNavigate(items[navIdx - 1].id)
             }}
-            className="absolute left-2 sm:left-4 z-40 p-2.5 sm:p-3.5 bg-surface-canvas/85 border border-zinc-800 text-retro-body hover:text-cyan-300 hover:border-cyan-500/50 rounded-2xl transition-all shadow-2xl cursor-pointer backdrop-blur-md active:scale-90"
+            className="glass-action absolute left-2 sm:left-4 z-40 h-10 w-10 sm:h-11 sm:w-11 rounded-full flex items-center justify-center cursor-pointer"
             title="Previous (←)"
           >
             <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -325,7 +325,7 @@ export function ImageViewer({
           }}
         >
           {loadError ? (
-            <div className="p-8 bg-surface-canvas border border-zinc-800 text-center space-y-2 rounded-2xl shadow-2xl">
+            <div className="glass-card p-8 text-center space-y-2">
               <span className="text-3xl text-zinc-600 block">◈</span>
               <p className="text-xs font-bold text-retro-body">Media unavailable or encrypted</p>
               <p className="text-[10px] text-retro-muted font-mono">ID: {activeItem?.id}</p>
@@ -339,12 +339,12 @@ export function ImageViewer({
 
               return (
                 <div
-                  className={`relative p-1 ${isCard ? 'metallic-card-border' : 'rounded-2xl border border-zinc-800 bg-surface-canvas/90 shadow-2xl'}`}
+                  className={`relative p-1 ${isCard ? 'metallic-card-border' : 'glass-card rounded-2xl'}`}
                   {...(isCard ? { 'data-rarity': rarity.rarity } : {})}
                 >
                   {isCard && (
                     <div className="absolute top-3 right-3 z-30 flex items-center gap-1.5 pointer-events-none">
-                      <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded-md bg-black/80 text-amber-300 border border-amber-400/40 shadow-lg backdrop-blur-xs">
+                      <span className="glass-inset text-[10px] font-mono font-bold px-2 py-0.5 rounded-md">
                         {formatGc(cardVal)}
                       </span>
                     </div>
@@ -377,7 +377,7 @@ export function ImageViewer({
               playPress(750)
               onNavigate(items[navIdx + 1].id)
             }}
-            className="absolute right-2 sm:right-4 z-40 p-2.5 sm:p-3.5 bg-surface-canvas/85 border border-zinc-800 text-retro-body hover:text-cyan-300 hover:border-cyan-500/50 rounded-2xl transition-all shadow-2xl cursor-pointer backdrop-blur-md active:scale-90"
+            className="glass-action absolute right-2 sm:right-4 z-40 h-10 w-10 sm:h-11 sm:w-11 rounded-full flex items-center justify-center cursor-pointer"
             title="Next (→)"
           >
             <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -387,22 +387,22 @@ export function ImageViewer({
 
       {/* Bottom Action Dock Bar */}
       <div
-        className="w-full max-w-4xl mx-auto bg-surface-canvas/90 border border-zinc-800/80 px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-center gap-2 sm:gap-2.5 flex-wrap shrink-0 z-40 shadow-2xl rounded-2xl backdrop-blur-md"
+        className="glass-card w-full max-w-4xl mx-auto px-3 py-2 flex items-center justify-center gap-2 flex-wrap shrink-0 z-40 rounded-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <button
           type="button"
           onClick={handleDownload}
-          className="btn-skeuo px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-retro-body hover:text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+          className="glass-action h-9 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
         >
-          <Download className="w-3.5 h-3.5 text-cyan-400" />
+          <Download className="w-3.5 h-3.5" />
           <span>Download</span>
         </button>
 
         <button
           type="button"
           onClick={handleCopyLink}
-          className="btn-skeuo px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-retro-body hover:text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+          className="glass-action h-9 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
         >
           <Copy className="w-3.5 h-3.5 text-retro-muted" />
           <span>{copied ? 'Copied Link!' : 'Copy Link'}</span>
@@ -415,13 +415,9 @@ export function ImageViewer({
               playPress(850)
               onToggleFavorite(activeItem)
             }}
-            className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 border ${
-              isFavorited
-                ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm'
-                : 'btn-skeuo text-retro-body hover:text-amber-300'
-            }`}
+            className={`glass-action ${isFavorited ? 'glass-nav-active' : ''} h-9 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer whitespace-nowrap`}
           >
-            <Star className={`w-3.5 h-3.5 ${isFavorited ? 'fill-amber-400 text-amber-400' : ''}`} />
+            <Star className={`w-3.5 h-3.5 ${isFavorited ? 'fill-white' : ''}`} />
             <span>{isFavorited ? 'Favorited' : 'Favorite'}</span>
           </button>
         )}
@@ -433,9 +429,9 @@ export function ImageViewer({
               playPress(800)
               onSetWallpaper(imageUrl)
             }}
-            className="btn-skeuo px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-yellow-300 hover:text-yellow-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+            className="glass-action h-9 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
           >
-            <ImageIcon className="w-3.5 h-3.5 text-yellow-400" />
+            <ImageIcon className="w-3.5 h-3.5" />
             <span>Set Background</span>
           </button>
         )}
@@ -447,7 +443,7 @@ export function ImageViewer({
               playPress(620)
               onDelete(activeItem)
             }}
-            className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-red-950/40 text-red-300 border border-red-500/40 hover:bg-red-900/60 hover:text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 shrink-0"
+            className="glass-action glass-action-danger h-9 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
           >
             <Trash2 className="w-3.5 h-3.5 text-red-400" />
             <span>Delete</span>

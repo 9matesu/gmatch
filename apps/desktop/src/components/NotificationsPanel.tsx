@@ -85,7 +85,7 @@ export function NotificationsPanel({
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden solid-panel">
-      <div className="px-4 py-3 border-b border-retro-border flex items-center justify-between shrink-0">
+      <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between shrink-0 bg-white/5">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-medium text-retro-fg">Notifications</h3>
           {unreadCount > 0 && (
@@ -101,7 +101,7 @@ export function NotificationsPanel({
               playPress(700);
               onMarkAllRead();
             }}
-            className="px-2 py-1 rounded text-xs text-retro-accent hover:bg-surface-interactive cursor-pointer"
+            className="glass-action px-3 py-1.5 rounded-lg text-xs cursor-pointer"
           >
             Mark all read
           </button>
@@ -119,9 +119,9 @@ export function NotificationsPanel({
               return (
                 <div
                   key={inv.id}
-                  className="p-3 rounded-lg border border-retro-accent/20 bg-retro-accent/5 flex items-center gap-3"
+                  className="glass-inset p-3 rounded-xl flex items-center gap-3"
                 >
-                  <div className="w-9 h-9 rounded-full bg-surface-interactive overflow-hidden flex items-center justify-center text-xs font-medium shrink-0">
+                  <div className="w-9 h-9 rounded-full overflow-hidden glass-field flex items-center justify-center text-xs font-medium shrink-0">
                     {inv.inviter_pfp_url ? (
                       <img
                         src={inv.inviter_pfp_url}
@@ -144,14 +144,14 @@ export function NotificationsPanel({
                     <button
                       type="button"
                       onClick={() => { onRespondInvite?.(inv.id, true); }}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-retro-accent text-black text-xs font-medium cursor-pointer"
+                      className="glass-action glass-action-primary flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer"
                     >
                       <Check className="w-3 h-3" /> Accept
                     </button>
                     <button
                       type="button"
                       onClick={() => { onRespondInvite?.(inv.id, false); }}
-                      className="px-2.5 py-1.5 rounded bg-surface-interactive border border-retro-border text-retro-body text-xs font-medium cursor-pointer"
+                      className="glass-action px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer"
                     >
                       Decline
                     </button>
@@ -179,11 +179,11 @@ export function NotificationsPanel({
                 key={n.id}
                 className={`p-3 rounded-lg flex items-start gap-3 border ${
                   n.read
-                    ? "border-retro-border bg-transparent"
-                    : "border-retro-accent/20 bg-retro-accent/5"
+                    ? "border-white/5 bg-white/5"
+                    : "glass-inset border-white/14"
                 }`}
               >
-                <div className="w-8 h-8 rounded-full bg-surface-interactive text-retro-muted shrink-0 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full glass-inset flex items-center justify-center shrink-0">
                   {TYPE_ICONS[n.type] || <Bell className="w-4 h-4" />}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -209,7 +209,7 @@ export function NotificationsPanel({
                           onRespondBabecock?.(inviteId, true);
                           onOpenBabecock?.();
                         }}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded bg-retro-warning text-black text-[11px] font-bold cursor-pointer"
+                        className="glass-action glass-action-primary inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer"
                       >
                         <LogIn className="w-3 h-3" /> Accept &amp; join
                       </button>

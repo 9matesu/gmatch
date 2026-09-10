@@ -37,8 +37,12 @@ function splitExcludes(raw: string): string[] {
     .filter(Boolean);
 }
 
-const inputCls =
-  'flex-1 min-w-0 bg-surface-raised border border-border-glass rounded-xl px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent placeholder:text-retro-muted/60';
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = window.setTimeout(() => reject(new Error('probe timeout')), ms);
+    promise.finally(() => window.clearTimeout(t)).then(resolve, reject);
+  });
+}
 
 export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
   const alreadyDone = useGame((s) => s.setupComplete);
@@ -93,7 +97,7 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
         const results = await Promise.all(
           probeJobs.map(async (job) => {
             try {
-              const res = await fetchPosts({ tags: job.name, limit: 3 });
+              const res = await withTimeout(fetchPosts({ tags: job.name, limit: 3 }), 2500);
               return { ...job, ok: res.ok, count: res.posts.length };
             } catch {
               return { ...job, ok: false, count: 0 };
@@ -171,7 +175,7 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
   if (alreadyDone && !editing) {
     return (
       <div className="space-y-3">
-        <div className="rounded-md border border-retro-accent/40 bg-retro-accent/10 p-5 text-sm text-retro-muted">
+        <div className="glass-inset p-5 text-sm text-retro-muted">
           Your feed is already tuned — {SETUP_TAG_COUNT} starter tags steer every fetch. Adjust
           excludes any time in <strong className="text-retro-fg">Settings → Feed</strong>.
         </div>
@@ -179,14 +183,14 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="flex-1 px-3 py-2 rounded-md border border-border-glass text-xs font-bold text-retro-fg hover:bg-surface-interactive cursor-pointer"
+            className="glass-action flex-1 px-3 py-2 rounded-lg text-xs font-bold cursor-pointer"
           >
             Change starter tags
           </button>
           <button
             type="button"
             onClick={onFinished}
-            className="flex-1 px-5 py-2.5 rounded-md chrome-accent text-sm font-black text-black cursor-pointer"
+            className="glass-action glass-action-primary flex-1 px-5 py-2.5 rounded-lg text-sm font-bold cursor-pointer"
           >
             Continue
           </button>
@@ -196,127 +200,138 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        {fields.map((f, i) => (
-          <label key={i} className="flex items-center gap-2.5">
-            <span className="w-5 shrink-0 text-center font-mono text-xs text-retro-muted">{i + 1}</span>
-            <input
-              className={inputCls}
-              value={f.value}
-              placeholder={`Starter tag ${i + 1} — e.g. creampie`}
-              aria-label={`Starter tag ${i + 1}`}
-              onChange={(e) => setFieldValue(i, e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  start();
-                }
-              }}
-            />
-            <span
-              className="flex w-20 shrink-0 items-center gap-1.5 text-[10px] text-retro-muted"
-              title={f.detail || f.status}
-            >
-              <span className={`w-2 h-2 rounded-full ${DOT_STYLE[f.status]}`} aria-hidden="true" />
-              <span className="font-mono">{f.detail}</span>
-            </span>
-          </label>
-        ))}
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      <div className="min-h-0 flex-1 overflow-y-auto styled-scrollbar pr-1 space-y-3">
+        <div className="space-y-2">
+          {fields.map((f, i) => (
+            <div key={i} className="grid grid-cols-[1.25rem_minmax(0,1fr)_5rem] items-center gap-2">
+              <span className="text-center font-mono text-xs text-retro-muted">{i + 1}</span>
+              <input
+                className="glass-field min-w-0 px-3 py-2 text-xs"
+                value={f.value}
+                placeholder={`Starter tag ${i + 1} — e.g. creampie`}
+                aria-label={`Starter tag ${i + 1}`}
+                onChange={(e) => setFieldValue(i, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    start();
+                  }
+                }}
+              />
+              <span
+                className="flex min-w-0 items-center gap-1.5 text-[10px] text-retro-muted"
+                title={f.detail || f.status}
+              >
+                <span className={`w-2 h-2 shrink-0 rounded-full ${DOT_STYLE[f.status]}`} aria-hidden="true" />
+                <span className="truncate font-mono">{f.detail}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex gap-2">
+          <input
+            className="glass-field flex-1 min-w-0 px-3 py-2 text-xs"
+            value={excludeInput}
+            placeholder="Extra excludes — comma/space separated"
+            aria-label="Extra excluded tags"
+            onChange={(e) => setExcludeInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addExcludes();
+              }
+            }}
+          />
+          <button
+            type="button"
+            disabled={!excludeInput.trim() || excludes.length >= 100}
+            onClick={addExcludes}
+            className="glass-action shrink-0 px-3 py-2 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-30"
+          >
+            Add
+          </button>
+        </div>
+        {excludes.length >= 100 && (
+          <p className="text-[10px] text-retro-muted">Maximum 100 personal excludes reached — remove one before adding another.</p>
+        )}
+
+        {excludes.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {excludes.map((x) => (
+              <span
+                key={x}
+                className="glass-inset inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-mono"
+              >
+                <span className="truncate">{x}</span>
+                <button
+                  type="button"
+                  aria-label={`Remove exclude ${x}`}
+                  onClick={() => setExcludes((prev) => prev.filter((t) => t !== x))}
+                  className="shrink-0 text-retro-muted hover:text-rose-300 cursor-pointer"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="space-y-1.5">
+          <p className="text-[10px] uppercase tracking-wider text-retro-muted">
+            One-tap excludes
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {SUGGESTED_EXCLUDES.filter((x) => !excludes.includes(x)).map((x) => (
+              <button
+                key={x}
+                type="button"
+                disabled={excludes.length >= 100}
+                onClick={() => setExcludes((prev) => [...prev, x].slice(0, 100))}
+                className="glass-action rounded-full px-2 py-1 text-[10px] font-mono text-retro-muted disabled:opacity-30 cursor-pointer"
+              >
+                + {x}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {note && (
+          <div role="alert" className="glass-action glass-action-danger rounded-lg p-3 text-sm">
+            {note}
+          </div>
+        )}
+
+        {ready && !allLive && (
+          <div className="glass-inset rounded-lg p-3 text-xs text-amber-100">
+            Some starter tags could not be verified live. You can still start — the grid falls back until they resolve.
+          </div>
+        )}
       </div>
 
-      <div className="flex gap-2">
-        <input
-          className={inputCls}
-          value={excludeInput}
-          placeholder="Extra excludes — feet, watersports… (comma/space separated)"
-          aria-label="Extra excluded tags"
-          onChange={(e) => setExcludeInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              addExcludes();
-            }
-          }}
-        />
+      <div className="glass-header shrink-0 -mx-5 -mb-5 px-5 py-4">
         <button
           type="button"
-          disabled={!excludeInput.trim()}
-          onClick={addExcludes}
-          className="px-3 py-2 rounded-xl border border-border-glass text-xs font-bold text-retro-fg disabled:opacity-30 hover:bg-surface-interactive cursor-pointer shrink-0"
+          disabled={!ready || starting}
+          onClick={start}
+          title={
+            !ready
+              ? `Enter ${SETUP_TAG_COUNT} distinct, valid starter tags`
+              : allLive
+                ? 'Start the grid'
+                : 'Tags not verified live — start anyway'
+          }
+          className="glass-action glass-action-primary w-full px-5 py-2.5 rounded-lg text-sm font-bold cursor-pointer"
         >
-          Add
+          {starting ? 'Starting…' : allLive ? 'Start' : 'Start anyway'}
         </button>
+        {!ready && (
+          <p className="mt-1 text-center text-[10px] text-retro-muted">
+            Enter {SETUP_TAG_COUNT} distinct starter tags to continue.
+          </p>
+        )}
       </div>
-
-      {excludes.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {excludes.map((x) => (
-            <span
-              key={x}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border-glass bg-white/5 px-2.5 py-1 text-[11px] font-mono text-retro-fg"
-            >
-              {x}
-              <button
-                type="button"
-                aria-label={`Remove exclude ${x}`}
-                onClick={() => setExcludes((prev) => prev.filter((t) => t !== x))}
-                className="text-retro-muted hover:text-red-400 cursor-pointer"
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="space-y-1.5">
-        <p className="text-[10px] uppercase tracking-wider text-retro-muted">
-          One-tap excludes &mdash; only the illegal core is blocked for everyone; these are yours to decide
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {SUGGESTED_EXCLUDES.filter((x) => !excludes.includes(x)).map((x) => (
-            <button
-              key={x}
-              type="button"
-              onClick={() => setExcludes((prev) => [...prev, x].slice(0, 100))}
-              className="rounded-full border border-border-glass px-2 py-0.5 text-[10px] font-mono text-retro-muted hover:text-retro-fg hover:border-retro-accent cursor-pointer"
-            >
-              + {x}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {note && (
-        <div role="alert" className="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
-          {note}
-        </div>
-      )}
-
-      {ready && !allLive && (
-        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
-          Some starter tags couldn&apos;t be verified live (mirror offline or no
-          results). You can start anyway &mdash; the grid falls back to offline
-          placeholders until they resolve.
-        </div>
-      )}
-
-      <button
-        type="button"
-        disabled={!ready || starting}
-        onClick={start}
-        title={
-          !ready
-            ? `Enter ${SETUP_TAG_COUNT} distinct, valid starter tags`
-            : allLive
-              ? 'Start the grid'
-              : 'Tags not verified live — start anyway'
-        }
-        className="w-full px-5 py-2.5 rounded-md chrome-accent text-sm font-black text-black disabled:opacity-40 cursor-pointer"
-      >
-        {starting ? 'Starting…' : allLive ? 'Start' : 'Start anyway'}
-      </button>
     </div>
   );
 }

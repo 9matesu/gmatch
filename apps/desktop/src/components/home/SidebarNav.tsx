@@ -27,11 +27,11 @@ import {
   Users,
   MousePointerClick,
   Swords,
-  Layers,
   Flame,
   ChevronDown,
   ChevronRight,
   Server,
+  Globe,
   ShieldCheck,
 } from 'lucide-react';
 import type { MainViewType } from './HomeFooter';
@@ -71,6 +71,8 @@ export function SidebarNav({
   gamesSubTab = 'duel',
   onOpenGamesTab,
   onlineBadge = 0,
+  serverName = 'gmatch',
+  onGroupToggle,
 }: {
   mainView?: MainViewType;
   setMainView?: (view: MainViewType) => void;
@@ -101,6 +103,10 @@ export function SidebarNav({
   onOpenGamesTab?: (tab: GamesNavTab) => void;
   /** Online-players badge shown on the Porn Games group. */
   onlineBadge?: number;
+  /** Current server name shown inline under the Servers button. */
+  serverName?: string;
+  /** Close transient panels before expanding/collapsing a sidebar group. */
+  onGroupToggle?: () => void;
 }) {
   const [now, setNow] = useState(() => Date.now());
   // HOST installs expose the admin suite in the sidebar (plan T4). Dev/browser
@@ -195,6 +201,7 @@ export function SidebarNav({
 
   const toggleGroup = (id: string) => {
     playPress(700);
+    onGroupToggle?.();
     setExpandedGroups((prev) => {
       const next = prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id];
       try { localStorage.setItem('goonmatch_sidebar_groups', JSON.stringify(next)); } catch { }
@@ -276,13 +283,6 @@ export function SidebarNav({
           action: () => openGamesTab('duel'),
         },
         {
-          id: 'games-deck',
-          label: 'Deck',
-          icon: Layers,
-          active: mainView === 'games' && gamesSubTab === 'cards',
-          action: () => openGamesTab('cards'),
-        },
-        {
           id: 'games-idle',
           label: 'Idle Clicker',
           icon: MousePointerClick,
@@ -305,17 +305,6 @@ export function SidebarNav({
         },
       ],
     },
-    ...(showRooms
-      ? [
-        {
-          id: 'rooms',
-          label: 'Rooms',
-          icon: Users,
-          active: mainView === 'rooms',
-          action: () => setMainView?.('rooms'),
-        },
-      ]
-      : []),
     {
       id: 'messages',
       label: 'Messages',
@@ -340,8 +329,35 @@ export function SidebarNav({
       id: 'servers',
       label: 'Servers',
       icon: Server,
-      active: mainView === 'servers',
+      active: mainView === 'servers' || (showRooms && mainView === 'rooms'),
       action: () => setMainView?.('servers'),
+      children: [
+        {
+          id: 'servers-current',
+          label: serverName || 'gmatch',
+          icon: Server,
+          active: mainView === 'servers',
+          action: () => setMainView?.('servers'),
+        },
+        ...(showRooms
+          ? [
+            {
+              id: 'servers-rooms',
+              label: 'Rooms',
+              icon: Users,
+              active: mainView === 'rooms',
+              action: () => setMainView?.('rooms'),
+            },
+          ]
+          : []),
+        {
+          id: 'servers-browser',
+          label: 'Browse servers',
+          icon: Globe,
+          active: false,
+          action: () => setMainView?.('servers'),
+        },
+      ],
     },
     {
       id: 'pc_domination',
@@ -378,9 +394,9 @@ export function SidebarNav({
       : '';
 
   return (
-    <aside className={`desktop-sidebar shrink-0 flex flex-col font-sans select-none h-full min-h-0 transition-[width] duration-200 bg-[color:var(--color-glass)] border-r border-zinc-800/80 ${collapsed ? 'w-[3.75rem]' : 'w-48'}`}>
+    <aside className={`desktop-sidebar glass-sidebar shrink-0 flex flex-col font-sans select-none h-full min-h-0 transition-[width] duration-200 ${collapsed ? 'w-[3.75rem]' : 'w-48'}`}>
       {/* Header: brand + collapse toggle */}
-      <div className="flex items-center justify-between gap-1 px-3 py-3 border-b border-zinc-800/80 shrink-0">
+      <div className="flex items-center justify-between gap-1 px-3 py-3 border-b border-white/10 shrink-0">
         {!collapsed && (
           <button
             type="button"
@@ -396,7 +412,7 @@ export function SidebarNav({
           onClick={() => { playPress(700); toggleCollapsed(); }}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60 transition-colors cursor-pointer ml-auto"
+          className="glass-action p-1.5 rounded-md text-retro-muted hover:text-retro-fg cursor-pointer ml-auto"
         >
           {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
         </button>
@@ -420,7 +436,7 @@ export function SidebarNav({
           )}
         </button>
 
-        <div className="border-t border-zinc-800/60 my-1" />
+        <div className="border-t border-white/10 my-1" />
 
         {orderedItems.map((item) => {
           if (isGroup(item)) {
@@ -431,19 +447,24 @@ export function SidebarNav({
                 <div
                   draggable={!collapsed}
                   {...dragHandlers(item.id)}
-                  className={`w-full flex items-center gap-1 pl-3 pr-1.5 py-0.5 rounded-md border transition-all duration-150 ${collapsed ? 'justify-center px-0' : ''} ${item.active
-                    ? 'bg-zinc-800/90 text-zinc-100 font-medium border-zinc-700/80 shadow-xs'
-                    : 'bg-transparent text-zinc-400 border-transparent'
-                    }${dropIndicator(item.id)}`}
+                  className={`glass-nav-item ${item.active ? 'glass-nav-active' : ''} w-full flex items-center gap-1 pl-3 pr-1.5 py-0.5 rounded-md border transition-all duration-150 ${collapsed ? 'justify-center px-0' : ''}${dropIndicator(item.id)}`}
                 >
                   <button
                     type="button"
-                    onClick={navClickGuard(() => { playPress(780); item.action(); if (!expanded) toggleGroup(item.id); })}
+                    onClick={navClickGuard(() => {
+                      playPress(780);
+                      if (expanded) {
+                        toggleGroup(item.id);
+                      } else {
+                        item.action();
+                        toggleGroup(item.id);
+                      }
+                    })}
                     aria-label={item.label}
                     title={collapsed ? item.label : undefined}
-                    className={`flex-1 min-w-0 flex items-center gap-2.5 py-1.5 rounded-md text-left cursor-pointer text-xs ${collapsed ? 'justify-center' : ''} ${item.active ? '' : 'hover:text-zinc-200'}`}
+                    className={`flex-1 min-w-0 flex items-center gap-2.5 py-1.5 rounded-md text-left cursor-pointer text-xs ${collapsed ? 'justify-center' : ''}`}
                   >
-                    <GroupIcon className={`w-4 h-4 shrink-0 transition-colors stroke-[1.75] ${item.active ? 'text-zinc-100' : 'text-zinc-400'}`} />
+                    <GroupIcon className="w-4 h-4 shrink-0 opacity-85 stroke-[1.75]" />
                     {!collapsed && <span className="truncate">{item.label}</span>}
                     {!collapsed && Boolean(item.badge && item.badge > 0) && (
                       <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-emerald-400 text-[9px] font-bold text-zinc-950 tabular-nums">
@@ -457,14 +478,14 @@ export function SidebarNav({
                       onClick={() => toggleGroup(item.id)}
                       aria-label={expanded ? `Collapse ${item.label}` : `Expand ${item.label}`}
                       aria-expanded={expanded}
-                      className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/60 transition-colors cursor-pointer shrink-0"
+                      className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-white/10 transition-colors cursor-pointer shrink-0"
                     >
                       {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                     </button>
                   )}
                 </div>
                 {expanded && !collapsed && (
-                  <div className="ml-4 pl-2 border-l border-zinc-800/80 space-y-0.5">
+                  <div className="ml-4 pl-2 border-l border-white/10 space-y-0.5">
                     {item.children.map((child) => {
                       const ChildIcon = child.icon;
                       return (
@@ -473,12 +494,9 @@ export function SidebarNav({
                           type="button"
                           onClick={() => { playPress(780); child.action(); }}
                           aria-label={child.label}
-                          className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-left cursor-pointer border transition-all duration-150 active:scale-[0.96] group text-xs ${child.active
-                            ? 'bg-zinc-800/90 text-zinc-100 font-medium border-zinc-700/80 shadow-xs'
-                            : 'bg-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 border-transparent'
-                            }`}
+                          className={`glass-nav-item ${child.active ? 'glass-nav-active' : ''} w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-left cursor-pointer border transition-all duration-150 active:scale-[0.96] group text-xs`}
                         >
-                          <ChildIcon className={`w-3.5 h-3.5 shrink-0 transition-colors stroke-[1.75] ${child.active ? 'text-zinc-100' : 'text-zinc-400 group-hover:text-zinc-200'}`} />
+                          <ChildIcon className="w-3.5 h-3.5 shrink-0 opacity-85 stroke-[1.75]" />
                           <span className="truncate">{child.label}</span>
                           {Boolean(child.badge && child.badge > 0) && (
                             <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-zinc-100 text-[9px] font-bold text-zinc-950 tabular-nums">
@@ -503,21 +521,9 @@ export function SidebarNav({
               onClick={navClickGuard(() => { playPress(item.isHack ? 800 : 780); item.action(); })}
               aria-label={item.label}
               title={collapsed ? item.label : undefined}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-left cursor-pointer border transition-all duration-150 active:scale-[0.96] group text-xs ${collapsed ? 'justify-center' : ''} ${item.isHack
-                ? item.active
-                  ? 'bg-rose-500/15 text-rose-300 border-rose-500/30 font-medium'
-                  : 'bg-transparent text-rose-400/90 hover:text-rose-200 hover:bg-rose-500/10 border-transparent'
-                : item.active
-                  ? 'bg-zinc-800/90 text-zinc-100 font-medium border-zinc-700/80 shadow-xs'
-                  : 'bg-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 border-transparent'
-                }${dropIndicator(item.id)}`}
+              className={`glass-nav-item ${item.active ? 'glass-nav-active' : ''} ${item.isHack ? 'border-rose-500/25 text-rose-200 hover:text-rose-100' : ''} w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-left cursor-pointer border transition-all duration-150 active:scale-[0.96] group text-xs ${collapsed ? 'justify-center' : ''}${dropIndicator(item.id)}`}
             >
-              <Icon className={`w-4 h-4 shrink-0 transition-colors stroke-[1.75] ${item.isHack
-                ? 'text-rose-400'
-                : item.active
-                  ? 'text-zinc-100'
-                  : 'text-zinc-400 group-hover:text-zinc-200'
-                }`} />
+              <Icon className={`w-4 h-4 shrink-0 stroke-[1.75] ${item.isHack ? 'text-rose-300' : 'opacity-85'}`} />
 
               {!collapsed && (
                 <span className="truncate">
@@ -542,7 +548,7 @@ export function SidebarNav({
           <button
             type="button"
             onClick={() => { playPress(600); setMainView?.('admin'); }}
-            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] cursor-pointer transition-all active:scale-[0.96] border ${collapsed ? 'justify-center' : ''} ${mainView === 'admin' ? 'bg-amber-500/10 border-amber-500/30 text-amber-300' : 'border-zinc-800 text-zinc-500 hover:text-amber-300 hover:border-amber-500/20'}`}
+            className={`glass-action ${mainView === 'admin' ? 'glass-nav-active text-amber-200 border-amber-300/30' : ''} w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] cursor-pointer transition-all active:scale-[0.96] border ${collapsed ? 'justify-center' : ''}`}
             title="You host this server — open the admin suite"
             aria-label="Open the admin suite"
           >
@@ -553,17 +559,14 @@ export function SidebarNav({
       )}
 
       {/* User panel: avatar + name, click to open profile */}
-      <div className="p-2 border-t border-zinc-800/80 shrink-0">
+      <div className="p-2 border-t border-white/10 shrink-0">
         <button
           type="button"
           onClick={() => { playPress(800); setMainView?.('profile'); }}
-          className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-left cursor-pointer transition-all duration-150 active:scale-[0.96] border ${collapsed ? 'justify-center' : ''} ${mainView === 'profile'
-            ? 'bg-zinc-800/90 border-zinc-700 text-zinc-100'
-            : 'border-transparent hover:bg-zinc-800/50 text-zinc-300'
-            }`}
+          className={`glass-nav-item ${mainView === 'profile' ? 'glass-nav-active' : ''} w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-left cursor-pointer transition-all duration-150 active:scale-[0.96] border ${collapsed ? 'justify-center' : ''}`}
           aria-label="Open your profile"
         >
-          <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-xs font-medium border shrink-0 bg-zinc-800 border-zinc-700 text-zinc-300">
+          <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-xs font-medium border shrink-0 bg-white/5 border-white/10 text-retro-fg">
             {profilePic ? (
               <img src={profilePic} alt="" className="w-full h-full object-cover" />
             ) : (
@@ -572,10 +575,10 @@ export function SidebarNav({
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1">
-              <div className={`text-xs font-medium truncate ${mainView === 'profile' ? 'text-zinc-100 font-semibold' : 'text-zinc-200'}`}>
+              <div className="text-xs font-medium truncate text-retro-fg">
                 {displayName || 'You'}
               </div>
-              <div className="text-[10px] text-zinc-400 flex items-center gap-1.5" role="status" aria-label={wsConnected ? 'Connected' : 'Reconnecting'} title={wsConnected ? 'Swarm connected' : 'Swarm reconnecting…'}>
+              <div className="text-[10px] text-retro-muted flex items-center gap-1.5" role="status" aria-label={wsConnected ? 'Connected' : 'Reconnecting'} title={wsConnected ? 'Swarm connected' : 'Swarm reconnecting…'}>
                 <span className={`w-1.5 h-1.5 rounded-full inline-block shrink-0 ${wsConnected ? 'bg-emerald-500' : 'bg-amber-400 animate-pulse'}`} />
                 <span>{wsConnected ? 'Online' : 'Connecting…'}</span>
               </div>
@@ -597,11 +600,11 @@ export function SidebarNav({
               <div
                 key={c.label}
                 title={c.title}
-                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-zinc-900/60 border border-zinc-800/80 min-w-0 ${collapsed ? 'justify-center' : 'flex-1 justify-center'}`}
+                className={`glass-inset flex items-center gap-1.5 px-2 py-1.5 rounded-md min-w-0 ${collapsed ? 'justify-center' : 'flex-1 justify-center'}`}
               >
                 <Icon className={`w-3.5 h-3.5 shrink-0 ${c.accent} stroke-[1.75]`} />
                 {!collapsed && (
-                  <span className="text-[11px] font-semibold text-zinc-200 font-mono tabular-nums tracking-tight truncate">
+                  <span className="text-[11px] font-semibold text-retro-fg font-mono tabular-nums tracking-tight truncate">
                     {c.value.toLocaleString()}
                   </span>
                 )}

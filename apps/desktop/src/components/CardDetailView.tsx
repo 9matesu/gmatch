@@ -182,7 +182,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
   if (loading) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
-        <div className="bg-surface-canvas border border-zinc-800 rounded-lg p-8 max-w-2xl w-full mx-4">
+        <div className="glass-card p-8 max-w-2xl w-full mx-4">
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-surface-elevated rounded w-3/4"></div>
             <div className="h-64 bg-surface-elevated rounded"></div>
@@ -195,10 +195,10 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
   if (error || !card) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
-        <div className="bg-surface-canvas border border-zinc-800 rounded-lg p-8 max-w-2xl w-full mx-4">
+        <div className="glass-card p-8 max-w-2xl w-full mx-4">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-retro-fg">Card Details</h2>
-            <button onClick={onClose} className="text-retro-muted hover:text-retro-body transition-colors cursor-pointer">
+            <button onClick={onClose} className="glass-action glass-action-danger h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer">
               <X className="w-6 h-6" />
             </button>
           </div>
@@ -214,16 +214,15 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 overflow-y-auto" onClick={onClose}>
-      <div className="bg-surface-canvas border border-zinc-800 rounded-lg max-w-2xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+      <div className="glass-card max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="glass-header flex items-center justify-between px-5 py-4 shrink-0">
           <div className="min-w-0">
             <h2 className="text-lg font-bold text-retro-fg truncate">{card.name || 'Unnamed Card'}</h2>
             <p className="text-[11px] text-retro-muted mt-0.5">
               {new Date(card.createdAt).toLocaleDateString()} · <span className="capitalize">{statusLabel}</span>
             </p>
           </div>
-          <button onClick={onClose} aria-label="Close card details" className="p-1.5 rounded-lg text-retro-muted hover:text-retro-body hover:bg-white/5 transition-colors cursor-pointer">
+          <button onClick={onClose} aria-label="Close card details" className="glass-action glass-action-danger h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -233,7 +232,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
           {/* Card media — ObjectImage does the signed object fetch (raw
               /api/objects URLs are auth-protected and fail as plain <img>). */}
           <div className="flex justify-center">
-            <div className="max-w-sm w-full rounded-lg overflow-hidden border border-zinc-700 bg-black">
+            <div className="glass-card max-w-sm w-full overflow-hidden rounded-lg">
               <ObjectImage
                 objectId={card.mediaObjectId}
                 contentUrl={card.contentUrl}
@@ -248,21 +247,21 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
 
           {/* Compact stat row */}
           <div className="flex items-center gap-2 flex-wrap text-xs">
-            <span className="px-2.5 py-1.5 rounded-lg bg-surface-elevated/50 border border-zinc-800 capitalize text-retro-fg font-semibold">
+            <span className="glass-inset px-2.5 py-1.5 rounded-full capitalize text-retro-fg font-semibold">
               <Tag className="w-3.5 h-3.5 inline mr-1 text-retro-muted" />{card.rarity}
             </span>
-            <span className="px-2.5 py-1.5 rounded-lg bg-surface-elevated/50 border border-zinc-800 text-retro-fg font-semibold">
+            <span className="glass-inset px-2.5 py-1.5 rounded-full text-retro-fg font-semibold">
               <TrendingUp className="w-3.5 h-3.5 inline mr-1 text-retro-muted" />{formatGc(card.value ?? 0)} g$
             </span>
-            <span className="px-2.5 py-1.5 rounded-lg bg-surface-elevated/50 border border-zinc-800 text-retro-fg font-semibold">
-              <Heart className="w-3.5 h-3.5 inline mr-1 text-pink-400" />{card.likeCount}
+            <span className="glass-inset px-2.5 py-1.5 rounded-full text-retro-fg font-semibold">
+              <Heart className="w-3.5 h-3.5 inline mr-1 text-retro-muted" />{card.likeCount}
             </span>
             {card.creatorId && (
               <button
                 type="button"
                 onClick={() => onOpenProfile?.(card.creatorId)}
                 disabled={!onOpenProfile}
-                className={`ml-auto px-2.5 py-1.5 rounded-lg bg-surface-elevated/50 border border-zinc-800 text-[11px] font-mono text-retro-muted ${onOpenProfile ? 'hover:text-retro-fg cursor-pointer' : 'cursor-default'}`}
+                className={`glass-inset ml-auto px-2.5 py-1.5 rounded-full text-[11px] font-mono text-retro-muted ${onOpenProfile ? 'cursor-pointer' : 'cursor-default'}`}
                 title="View creator"
               >
                 by {card.creatorId.slice(0, 8)}…
@@ -287,7 +286,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
 
           {/* Market actions */}
           {canBuy && (
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-cyan-500/25 bg-cyan-500/10 p-4">
+            <div className="glass-inset flex items-center justify-between gap-3 p-4">
               <div>
                 <div className="text-[10px] uppercase tracking-wider text-retro-muted font-bold">Community market price</div>
                 <div className="text-lg font-black font-mono text-cyan-300 tabular-nums">{formatGc(listingPrice ?? 0)} g$</div>
@@ -296,7 +295,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
                 type="button"
                 disabled={buying}
                 onClick={() => void handleBuy()}
-                className="px-5 py-2.5 rounded-lg bg-cyan-400 hover:bg-cyan-300 disabled:opacity-40 text-black text-xs font-black uppercase tracking-wider transition-colors cursor-pointer"
+                className="glass-action glass-action-primary px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
               >
                 {buying ? 'Buying…' : 'Buy Now'}
               </button>
@@ -304,20 +303,20 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
           )}
 
           {isOwner && card.marketStatus === 'cashed_out' && (
-            <div className="text-xs text-amber-400 font-semibold flex items-center gap-2">
+            <div className="text-xs text-retro-fg font-semibold flex items-center gap-2">
               <Coins className="w-4 h-4" /> This card was cashed out for g$.
             </div>
           )}
 
           {isOwner && card.marketStatus !== 'cashed_out' && (
-            <div className="space-y-3 pt-3 border-t border-zinc-800">
+            <div className="space-y-3 pt-3 border-t border-white/10">
               <div className="flex gap-3">
                 {card.marketStatus === 'none' && (
                   <button
                     type="button"
                     disabled={marketBusy || !/^\d+$/.test(listPrice) || Number(listPrice) <= 0}
                     onClick={() => { void mutateCard('list', { price: Number(listPrice) }, `Listed for ${formatGc(Number(listPrice))} g$`) }}
-                    className="flex-1 bg-cyan-500/20 hover:bg-cyan-500/30 disabled:opacity-40 text-cyan-300 font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer"
+                    className="glass-action glass-action-primary flex-1 py-2 px-4 rounded-lg font-semibold cursor-pointer disabled:opacity-40"
                   >
                     List for Sale
                   </button>
@@ -331,7 +330,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
                       type="button"
                       disabled={marketBusy}
                       onClick={() => { void mutateCard('cancel', undefined, 'Listing cancelled') }}
-                      className="flex-1 bg-red-500/20 hover:bg-red-500/30 disabled:opacity-40 text-red-300 font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer"
+                      className="glass-action glass-action-danger flex-1 py-2 px-4 rounded-lg font-semibold cursor-pointer disabled:opacity-40"
                     >
                       Cancel Listing
                     </button>
@@ -350,19 +349,19 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
                     aria-label="List price in g$"
                     value={listPrice}
                     onChange={(e) => setListPrice(e.target.value)}
-                    className="flex-1 bg-surface-raised border border-border-glass focus:border-retro-accent/60 px-3 py-2 text-xs text-retro-fg rounded-lg outline-none font-mono"
+                    className="glass-field flex-1 px-3 py-2 text-xs font-mono"
                   />
                 </div>
               )}
 
               {card.marketStatus === 'none' && (
-                <div className="rounded-lg p-4 border border-amber-500/20 bg-amber-500/5">
+                <div className="glass-inset p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-sm">
                       <div className="text-retro-muted text-xs mb-0.5">Cash out value</div>
                       <div className="font-bold text-retro-fg">
                         {formatGc(computeCashoutPayout(card.value ?? 0, cashoutRate))}
-                        <span className="ml-2 text-[10px] text-amber-400 font-mono">({(cashoutRate / 100).toFixed(1)}% rate)</span>
+                        <span className="ml-2 text-[10px] text-retro-muted font-mono">({(cashoutRate / 100).toFixed(1)}% rate)</span>
                       </div>
                     </div>
                     {confirmCashout ? (
@@ -371,11 +370,11 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
                           type="button"
                           disabled={cashingOut}
                           onClick={handleCashOut}
-                          className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black font-bold py-2 px-3 rounded-lg text-xs transition-colors cursor-pointer"
+                          className="glass-action glass-action-primary disabled:opacity-50 py-2 px-3 rounded-lg text-xs font-bold cursor-pointer"
                         >
                           {cashingOut ? 'Cashing out…' : 'Confirm'}
                         </button>
-                        <button type="button" onClick={() => setConfirmCashout(false)} className="text-retro-muted hover:text-retro-body text-xs px-2 py-1 cursor-pointer">
+                        <button type="button" onClick={() => setConfirmCashout(false)} className="glass-action text-xs px-3 py-1.5 rounded-lg cursor-pointer">
                           Cancel
                         </button>
                       </div>
@@ -383,7 +382,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
                       <button
                         type="button"
                         onClick={() => setConfirmCashout(true)}
-                        className="bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 font-bold py-2 px-4 rounded-lg text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                        className="glass-action glass-action-primary py-2 px-4 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer"
                       >
                         <Coins className="w-3.5 h-3.5" /> Cash Out Card
                       </button>
