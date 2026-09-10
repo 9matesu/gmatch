@@ -141,7 +141,8 @@ export function BabecockPanel({
     void refresh()
     const timer = setInterval(() => {
       setNow(Date.now())
-      void refresh()
+      // The 3-fetch refresh is network+DB; skip while hidden (clock stays).
+      if (!document.hidden) void refresh()
     }, 4000)
     return () => clearInterval(timer)
   }, [refresh, babecockVersion])
