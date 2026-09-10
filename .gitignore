@@ -27,3 +27,13 @@ node.key
 apps/desktop/dist-log.txt
 site/releases/*.exe
 !site/releases/.gitkeep
+
+# local perf sweep scratch (CDP probe outputs, seeded identity)
+.shots/
+.perf-*.json
+.perf-*.err
+.seed.json
+.legal-key.txt
+.dev-browser.log
+.vitebuild.log
+.preview.log
