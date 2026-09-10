@@ -100,7 +100,7 @@ export function ExploreSearchModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full text-retro-muted hover:text-retro-fg hover:bg-white/10 cursor-pointer transition-colors"
+            className="p-1.5 rounded-full text-retro-muted hover:text-retro-fg hover:bg-glass-w10 cursor-pointer transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -145,7 +145,7 @@ export function ExploreSearchModal({
                 return (
                   <div
                     key={id}
-                    className="flex items-center justify-between p-2 rounded-2xl hover:bg-white/5 transition-colors group"
+                    className="flex items-center justify-between p-2 rounded-2xl hover:bg-glass-w5 transition-colors group"
                   >
                     <div
                       className="flex items-center gap-3 cursor-pointer min-w-0 flex-1"
@@ -179,7 +179,7 @@ export function ExploreSearchModal({
                           onStartPm({ id, display_name: u.display_name });
                           onClose();
                         }}
-                        className="p-2 text-retro-muted hover:text-retro-fg rounded-xl hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+                        className="p-2 text-retro-muted hover:text-retro-fg rounded-xl hover:bg-glass-w10 transition-colors cursor-pointer shrink-0"
                         title="Message"
                       >
                         <MessageCircle className="w-4 h-4" />
@@ -200,7 +200,7 @@ export function ExploreSearchModal({
               {matchedPosts.slice(0, 8).map((p) => (
                 <div
                   key={p.id}
-                  className="flex items-center gap-3 p-2 rounded-2xl hover:bg-white/5 transition-colors cursor-pointer"
+                  className="flex items-center gap-3 p-2 rounded-2xl hover:bg-glass-w5 transition-colors cursor-pointer"
                   onClick={() => {
                     playPress(700);
                     onOpenPost?.(p);

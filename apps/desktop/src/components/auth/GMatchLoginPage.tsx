@@ -129,7 +129,7 @@ export function GMatchLoginPage({
                     suggestions={tagSuggestions}
                   />
 
-                  <label className="flex items-start gap-2.5 p-3 rounded-md bg-white/5 border border-border-glass cursor-pointer text-left select-none">
+                  <label className="flex items-start gap-2.5 p-3 rounded-md bg-glass-w5 border border-border-glass cursor-pointer text-left select-none">
                     <input
                       type="checkbox"
                       checked={agreedToTos}

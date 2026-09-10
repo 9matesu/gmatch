@@ -324,7 +324,7 @@ export function FollowersFollowingModal({
             return (
               <div
                 key={user.id}
-                className="flex items-center justify-between p-2 rounded-2xl hover:bg-white/5 transition-colors group"
+                className="flex items-center justify-between p-2 rounded-2xl hover:bg-glass-w5 transition-colors group"
               >
                 {/* User Avatar + Display Name */}
                 <div

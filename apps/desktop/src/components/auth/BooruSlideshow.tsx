@@ -165,7 +165,7 @@ export function BooruSlideshow({ className = '' }: { className?: string }) {
           </div>
 
           {/* Bottom Home Indicator Bar */}
-          <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 z-30 w-24 h-1 bg-white/20 rounded-full backdrop-blur-sm pointer-events-none" />
+          <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 z-30 w-24 h-1 bg-glass-w20 rounded-full backdrop-blur-sm pointer-events-none" />
 
           {/* Stack of Slides */}
           {images.map((img, idx) => (

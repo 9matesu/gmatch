@@ -115,7 +115,7 @@ export function AdminMediaCell({
           <button
             type="button"
             onClick={e => { e.stopPropagation(); handleClick(); }}
-            className="p-1.5 bg-surface-elevated border border-border-glass rounded text-retro-fg hover:bg-white/10 transition-colors"
+            className="p-1.5 bg-surface-elevated border border-border-glass rounded text-retro-fg hover:bg-glass-w10 transition-colors"
             aria-label="Zoom"
           >
             <ZoomIn className="w-4 h-4" />

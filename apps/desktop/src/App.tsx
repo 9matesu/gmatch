@@ -2163,6 +2163,33 @@ export default function Home() {
     }
   }
 
+  // Gallery quick actions from the context menu: pull the object's bytes
+  // once, then reuse the existing story/post upload paths.
+  const shareObjectAs = useCallback(async (item: { id: string }, mode: 'story' | 'repost') => {
+    if (!identity) return
+    try {
+      const res = await orbitFetch(`/api/objects/${item.id}`, {}, identity)
+      if (!res.ok) { toast('Could not load the image', 'error'); return }
+      const blob = await res.blob()
+      const mime = blob.type || 'image/jpeg'
+      const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg'
+      if (mode === 'story') {
+        await handleAddStory(new File([blob], `story_${Date.now()}.${ext}`, { type: mime }))
+        toast('Added to your story', 'success')
+        return
+      }
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result || ''))
+        reader.onerror = () => reject(reader.error)
+        reader.readAsDataURL(blob)
+      })
+      await publishPost([dataUrl], '', [])
+    } catch {
+      toast(mode === 'story' ? 'Story upload failed' : 'Repost failed', 'error')
+    }
+  }, [identity, toast])
+
   const fetchAnnouncements = useCallback(() => {
     if (!identity) return Promise.resolve()
     return orbitFetch('/api/announcements', {}, identity)
@@ -2401,6 +2428,15 @@ export default function Home() {
     if (identity?.orbitId) ids.add(identity.orbitId);
     return ids.size;
   }, [lobby.state?.players, lobby.onlineUsers, identity?.orbitId])
+
+  // Sidebar per-game counters: waiting/in-match players on the duel board.
+  const duelBadge = useMemo(() => {
+    const selfId = identity?.orbitId
+    return (lobby.state?.players || []).filter(
+      (p: { user_id?: string; status?: string }) =>
+        p.user_id && p.user_id !== selfId && (p.status === 'waiting' || p.status === 'in_match'),
+    ).length
+  }, [lobby.state?.players, identity?.orbitId])
 
   // Hold Space to fade the interface while keeping the wallpaper visible.
   // Editable controls keep their native spacebar behavior.
@@ -2878,7 +2914,8 @@ export default function Home() {
                 gamesSubTab={gamesSubTab}
                 onOpenGamesTab={(tab) => { handleSetMainView('games'); setGamesSubTab(tab); }}
                 onlineBadge={lobbyRoomCount}
-                serverName={serverName}
+                gameBadges={{ duel: duelBadge }}
+                isAdmin={myProfile.isAdmin}
                 onGroupToggle={() => setChatOpen(false)}
                 unreadMessagesCount={pmUnreadCount}
                 notificationUnreadCount={lobby.unreadCount}
@@ -3525,6 +3562,8 @@ export default function Home() {
                 }}
                 onReportUser={(id, name) => openReportModal(id, name)}
                 onReportItem={(ownerId, ownerName, objectId) => openReportModal(ownerId, ownerName, objectId)}
+                onRepostItem={(item) => void shareObjectAs(item, 'repost')}
+                onAddToStory={(item) => void shareObjectAs(item, 'story')}
               />
               <ReportModal
                 reportModal={reportModal}
@@ -3582,7 +3621,7 @@ export default function Home() {
                 }}
                 title="Change wallpaper background"
                 aria-label="Change wallpaper background"
-                className="hidden md:flex fixed right-3 top-1/2 -translate-y-1/2 z-40 w-10 h-10 items-center justify-center rounded-xl glass-toolbar border border-border-glass text-retro-muted hover:text-retro-fg hover:bg-white/10 transition-colors cursor-pointer shadow-2xl pointer-events-auto"
+                className="hidden md:flex fixed right-3 top-1/2 -translate-y-1/2 z-40 w-10 h-10 items-center justify-center rounded-xl glass-toolbar border border-border-glass text-retro-muted hover:text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer shadow-2xl pointer-events-auto"
               >
                 <ImageIcon className="w-4 h-4" />
               </button>
@@ -3697,7 +3736,7 @@ export default function Home() {
                           key={group.id}
                           type="button"
                           onClick={() => handleGroupPickerSelect(group.id)}
-                          className="w-full p-3 hover:bg-white/5 transition-colors text-left border-b border-border-glass last:border-0 flex items-center gap-3"
+                          className="w-full p-3 hover:bg-glass-w5 transition-colors text-left border-b border-border-glass last:border-0 flex items-center gap-3"
                         >
                           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center text-white font-bold text-sm">
                             {group.name.charAt(0).toUpperCase()}

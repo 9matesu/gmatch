@@ -101,6 +101,7 @@ export function StoreTab({
       }
       toast?.(`Bought for ${formatGc(listing.price)} g$ — it's in your collection`, 'success');
       refreshMarket();
+      window.dispatchEvent(new CustomEvent('orbit-cards-refresh'));
       window.dispatchEvent(new CustomEvent('orbit-score-refresh'));
     } catch {
       toast?.('Network error while buying', 'error');

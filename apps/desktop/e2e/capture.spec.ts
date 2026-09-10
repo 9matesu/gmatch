@@ -39,7 +39,7 @@ test('capture landing screenshots', async ({ browser }) => {
   await shot(page, 'games-hub')
 
   // 3. Card game (Play tab).
-  await page.getByRole('button', { name: 'Play', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Play Cards', exact: true }).first().click()
   await page.waitForTimeout(2500)
   await shot(page, 'cards')
 

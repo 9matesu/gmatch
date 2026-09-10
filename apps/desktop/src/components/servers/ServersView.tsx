@@ -21,6 +21,8 @@ interface DirectoryServer {
   owner_id: string
   password_required: number
   endpoint_hint?: string
+  user_count?: number | null
+  online_count?: number | null
   last_seen?: string
 }
 
@@ -68,7 +70,7 @@ export function ServersView({
   const [setupError, setSetupError] = useState('')
   const [showAdmin, setShowAdmin] = useState(false)
   const [query, setQuery] = useState('')
-  const [sort, setSort] = useState<'recent' | 'name'>('recent')
+  const [sort, setSort] = useState<'recent' | 'name' | 'online'>('recent')
   const [passwordOnly, setPasswordOnly] = useState(false)
   const [editingServer, setEditingServer] = useState(false)
   const [serverName, setServerName] = useState('gmatch')
@@ -147,6 +149,7 @@ export function ServersView({
       .filter((s) => !q || `${s.name} ${s.description ?? ''} ${s.endpoint_hint ?? ''}`.toLowerCase().includes(q))
       .sort((a, b) => {
         if (sort === 'name') return a.name.localeCompare(b.name)
+        if (sort === 'online') return (b.online_count ?? -1) - (a.online_count ?? -1)
         return String(b.last_seen ?? '').localeCompare(String(a.last_seen ?? ''))
       })
   }, [servers, query, sort, passwordOnly])
@@ -505,11 +508,12 @@ export function ServersView({
               <select
                 aria-label="Sort servers"
                 value={sort}
-                onChange={(e) => setSort(e.target.value as 'recent' | 'name')}
+                onChange={(e) => setSort(e.target.value as 'recent' | 'name' | 'online')}
                 className="glass-field px-2 py-1 text-[11px]"
               >
                 <option value="recent">Recent</option>
                 <option value="name">Name</option>
+                <option value="online">Most online</option>
               </select>
             </label>
             <button
@@ -563,6 +567,13 @@ export function ServersView({
                 </div>
                 {s.description && <p className="text-[11px] text-retro-muted truncate">{s.description}</p>}
                 <p className="text-[10px] font-mono text-retro-muted mt-0.5">{s.endpoint_hint || 'no address published'}</p>
+                {(typeof s.online_count === 'number' || typeof s.user_count === 'number') && (
+                  <p className="text-[10px] text-retro-fg mt-1 flex items-center gap-1.5 font-mono">
+                    <Users className="w-3 h-3 text-retro-muted" />
+                    <span className="text-emerald-400">{s.online_count ?? 0}</span>
+                    <span className="text-retro-muted">online · {s.user_count ?? '?'} members</span>
+                  </p>
+                )}
               </div>
               <div className="flex flex-col gap-1 shrink-0">
                 {mine(s) ? (

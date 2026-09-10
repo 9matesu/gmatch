@@ -78,7 +78,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
                 aria-checked={s.enabled}
                 aria-label={`${s.enabled ? 'Disable' : 'Enable'} ${s.label}`}
                 onClick={() => toggleCustomSource(s.id)}
-                className={`relative h-5 w-9 shrink-0 rounded-full transition-colors cursor-pointer ${s.enabled ? 'bg-retro-accent' : 'bg-white/10'}`}
+                className={`relative h-5 w-9 shrink-0 rounded-full transition-colors cursor-pointer ${s.enabled ? 'bg-retro-accent' : 'bg-glass-w10'}`}
               >
                 <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${s.enabled ? 'left-[18px]' : 'left-0.5'}`} />
               </button>

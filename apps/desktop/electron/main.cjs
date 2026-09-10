@@ -1,7 +1,7 @@
 // gMatch Electron main process.
 // All booru HTTP happens HERE (renderer never touches the network directly).
 // Endpoints per docs/SPEC.md §6. 10s timeout, browser UA, round-robin health.
-const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage, session } = require('electron')
+const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage, session, shell } = require('electron')
 const https = require('https')
 const path = require('path')
 const imageCache = require('./imageCache.cjs')
@@ -636,6 +636,12 @@ app.whenReady().then(async () => {
   ipcMain.handle('cache:image', (_event, url) => imageCache.cacheImage(url).then((local) => ({ local })))
   ipcMain.handle('cache:stats', () => imageCache.cacheStats())
   ipcMain.handle('cache:clear', () => imageCache.clearCache())
+  // Update check (Settings): installed version + open the download in the OS browser.
+  ipcMain.handle('app:version', () => app.getVersion())
+  ipcMain.handle('shell:open', (_event, url) => {
+    if (typeof url === 'string' && /^https?:\/\//i.test(url)) return shell.openExternal(url)
+    return Promise.reject(new Error('only http(s) URLs'))
+  })
   // OS wallpaper swap for consented domination effects (Windows; no-op else).
   ipcMain.handle('wallpaper:set-data', (_event, buf, mime) => wallpaperWin.setWallpaperFromBuffer(Buffer.from(buf), String(mime || '')))
   ipcMain.handle('wallpaper:restore', () => wallpaperWin.restoreWallpaper())

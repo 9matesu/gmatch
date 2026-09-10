@@ -125,7 +125,7 @@ const env = {
   ...(process.env.ADMIN_PIN_HASH ? { ADMIN_PIN_HASH: process.env.ADMIN_PIN_HASH } : {}),
   ...(process.env.API_SEALED_ONLY ? { API_SEALED_ONLY: process.env.API_SEALED_ONLY } : {}),
 }
-const WEB_DIST = join((import.meta as any).dir || process.cwd(), '..', '..', 'web', 'out')
+const WEB_DIST = process.env.WEB_DIST_DIR || join((import.meta as any).dir || process.cwd(), '..', '..', 'web', 'out')
 
 // Maintenance cadence: continuous automatic expiration sweep every 60s,
 // 3-hour picture wipe window, and daily score reset at 00:00 UTC.
@@ -165,6 +165,7 @@ const MIME: Record<string, string> = {
   '.xml': 'text/xml',
   '.woff2': 'font/woff2',
   '.woff': 'font/woff',
+  '.exe': 'application/octet-stream',
 }
 
 const wsToConn = new WeakMap<object, WsConn>()

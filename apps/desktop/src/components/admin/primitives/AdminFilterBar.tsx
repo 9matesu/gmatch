@@ -193,7 +193,7 @@ export function AdminFilterBar({
               "px-3 py-1.5 text-xs font-bold uppercase rounded border transition-colors flex items-center gap-1.5",
               expanded
                 ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/30"
-                : "bg-surface-interactive text-retro-fg border-border-glass hover:bg-white/10"
+                : "bg-surface-interactive text-retro-fg border-border-glass hover:bg-glass-w10"
             )}
           >
             {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -256,7 +256,7 @@ function MultiSelect({ value, options, onChange, placeholder }: {
           {options.map(opt => (
             <label
               key={opt.value}
-              className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/5 cursor-pointer"
+              className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-glass-w5 cursor-pointer"
             >
               <input
                 type="checkbox"

@@ -583,7 +583,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
             type="button"
             onClick={handleSyncImages}
             disabled={syncing}
-            className="px-3 py-2 bg-[#27272a] hover:bg-white/10 text-zinc-300 border border-[#27272a] rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95 shadow-sm"
+            className="px-3 py-2 bg-[#27272a] hover:bg-glass-w10 text-zinc-300 border border-[#27272a] rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95 shadow-sm"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin text-cyan-300' : ''}`} />
             <span>{syncing ? 'Syncing...' : 'Sync Card Cache'}</span>
@@ -1044,7 +1044,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                     key={cat}
                     type="button"
                     onClick={() => handleApplyNamePreset(cat)}
-                    className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-[#27272a] hover:bg-white/10 text-zinc-500 hover:text-zinc-100 border border-[#27272a] transition-colors cursor-pointer"
+                    className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-[#27272a] hover:bg-glass-w10 text-zinc-500 hover:text-zinc-100 border border-[#27272a] transition-colors cursor-pointer"
                   >
                     {cat}
                   </button>

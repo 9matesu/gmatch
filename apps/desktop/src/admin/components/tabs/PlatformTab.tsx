@@ -148,7 +148,7 @@ export function PlatformTab({ identity, pinVerified, onAction }: PlatformTabProp
             ) : (
               <div className="divide-y divide-border-subtle">
                 {announcements.map(ann => (
-                  <div key={ann.id} className="p-4 hover:bg-white/5 transition-colors flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div key={ann.id} className="p-4 hover:bg-glass-w5 transition-colors flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-semibold text-retro-fg truncate">{ann.message}</span>
@@ -202,7 +202,7 @@ export function PlatformTab({ identity, pinVerified, onAction }: PlatformTabProp
             ) : (
               <div className="divide-y divide-border-subtle">
                 {recommendations.map(rec => (
-                  <div key={rec.id} className="p-4 hover:bg-white/5 transition-colors flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div key={rec.id} className="p-4 hover:bg-glass-w5 transition-colors flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-semibold text-retro-fg truncate">{rec.content}</span>

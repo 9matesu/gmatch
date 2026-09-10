@@ -24,15 +24,15 @@ import {
   Zap,
   Trophy,
   Monitor,
-  Users,
   MousePointerClick,
   Swords,
   Flame,
   ChevronDown,
   ChevronRight,
   Server,
-  Globe,
   ShieldCheck,
+  ArrowLeft,
+  ArrowRight,
 } from 'lucide-react';
 import type { MainViewType } from './HomeFooter';
 
@@ -69,9 +69,10 @@ export function SidebarNav({
   wsConnected = false,
   showRooms = false,
   gamesSubTab = 'duel',
+  gameBadges,
   onOpenGamesTab,
   onlineBadge = 0,
-  serverName = 'gmatch',
+  isAdmin = false,
   onGroupToggle,
 }: {
   mainView?: MainViewType;
@@ -99,12 +100,14 @@ export function SidebarNav({
   showRooms?: boolean;
   /** Current Porn Games sub-tab (drives child highlight). */
   gamesSubTab?: string;
+  /** Per-game counters (waiting/in-match players, active rounds...). */
+  gameBadges?: Partial<Record<GamesNavTab, number>>;
   /** Navigate into Porn Games on a specific sub-tab. */
   onOpenGamesTab?: (tab: GamesNavTab) => void;
   /** Online-players badge shown on the Porn Games group. */
   onlineBadge?: number;
-  /** Current server name shown inline under the Servers button. */
-  serverName?: string;
+  /** Connected-server admin flag (Users.is_admin) — shows the Admin entry. */
+  isAdmin?: boolean;
   /** Close transient panels before expanding/collapsing a sidebar group. */
   onGroupToggle?: () => void;
 }) {
@@ -253,17 +256,14 @@ export function SidebarNav({
       action: () => openGamesTab('idle'),
       badge: onlineBadge,
       children: [
-        ...(onOpenStore
-          ? [
-            {
-              id: 'games-store',
-              label: 'Store',
-              icon: ShoppingBag,
-              active: mainView === 'store',
-              action: () => onOpenStore(),
-            },
-          ]
-          : []),
+        {
+          id: 'games-play',
+          label: 'Play Cards',
+          icon: Swords,
+          active: mainView === 'games' && gamesSubTab === 'duel',
+          action: () => openGamesTab('duel'),
+          badge: gameBadges?.duel,
+        },
         ...(onOpenGallery
           ? [
             {
@@ -276,25 +276,30 @@ export function SidebarNav({
           ]
           : []),
         {
-          id: 'games-play',
-          label: 'Play',
-          icon: Swords,
-          active: mainView === 'games' && gamesSubTab === 'duel',
-          action: () => openGamesTab('duel'),
-        },
-        {
           id: 'games-idle',
           label: 'Idle Clicker',
           icon: MousePointerClick,
           active: (mainView === 'games' && gamesSubTab === 'idle') || mainView === 'grid',
           action: () => openGamesTab('idle'),
         },
+        ...(onOpenStore
+          ? [
+            {
+              id: 'games-store',
+              label: 'Store',
+              icon: ShoppingBag,
+              active: mainView === 'store',
+              action: () => onOpenStore(),
+            },
+          ]
+          : []),
         {
           id: 'games-babecock',
           label: 'Babecock',
           icon: Flame,
           active: mainView === 'games' && gamesSubTab === 'babecock',
           action: () => openGamesTab('babecock'),
+          badge: gameBadges?.babecock,
         },
         {
           id: 'games-ranks',
@@ -331,33 +336,6 @@ export function SidebarNav({
       icon: Server,
       active: mainView === 'servers' || (showRooms && mainView === 'rooms'),
       action: () => setMainView?.('servers'),
-      children: [
-        {
-          id: 'servers-current',
-          label: serverName || 'gmatch',
-          icon: Server,
-          active: mainView === 'servers',
-          action: () => setMainView?.('servers'),
-        },
-        ...(showRooms
-          ? [
-            {
-              id: 'servers-rooms',
-              label: 'Rooms',
-              icon: Users,
-              active: mainView === 'rooms',
-              action: () => setMainView?.('rooms'),
-            },
-          ]
-          : []),
-        {
-          id: 'servers-browser',
-          label: 'Browse servers',
-          icon: Globe,
-          active: false,
-          action: () => setMainView?.('servers'),
-        },
-      ],
     },
     {
       id: 'pc_domination',
@@ -407,15 +385,36 @@ export function SidebarNav({
             gMatch
           </button>
         )}
-        <button
-          type="button"
-          onClick={() => { playPress(700); toggleCollapsed(); }}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="glass-action p-1.5 rounded-md text-retro-muted hover:text-retro-fg cursor-pointer ml-auto"
-        >
-          {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
-        </button>
+        {/* Browser-style history nav (ponytail: window.history IS the feature). */}
+        <div className="ml-auto flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => { playPress(700); window.history.back(); }}
+            aria-label="Back"
+            title="Back"
+            className="glass-action p-1.5 rounded-md text-retro-muted hover:text-retro-fg cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => { playPress(700); window.history.forward(); }}
+            aria-label="Forward"
+            title="Forward"
+            className="glass-action p-1.5 rounded-md text-retro-muted hover:text-retro-fg cursor-pointer"
+          >
+            <ArrowRight className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => { playPress(700); toggleCollapsed(); }}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="glass-action p-1.5 rounded-md text-retro-muted hover:text-retro-fg cursor-pointer"
+          >
+            {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+          </button>
+        </div>
       </div>
 
       <nav className="flex-1 min-h-0 overflow-y-auto styled-scrollbar p-2 space-y-1">
@@ -478,7 +477,7 @@ export function SidebarNav({
                       onClick={() => toggleGroup(item.id)}
                       aria-label={expanded ? `Collapse ${item.label}` : `Expand ${item.label}`}
                       aria-expanded={expanded}
-                      className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+                      className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer shrink-0"
                     >
                       {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                     </button>
@@ -541,19 +540,19 @@ export function SidebarNav({
         })}
       </nav>
 
-      {/* Admin entry (plan T4): this install HOSTS the server you're looking at,
-          so you are its admin — moderation suite lives under the PIN gate. */}
-      {isHost && (
+      {/* Admin entry (plan T4): shown when this install HOSTS the server or
+          when the connected server flags the account admin (Users.is_admin). */}
+      {(isHost || isAdmin) && (
         <div className="px-2 pb-1 shrink-0">
           <button
             type="button"
             onClick={() => { playPress(600); setMainView?.('admin'); }}
             className={`glass-action ${mainView === 'admin' ? 'glass-nav-active text-amber-200 border-amber-300/30' : ''} w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] cursor-pointer transition-all active:scale-[0.96] border ${collapsed ? 'justify-center' : ''}`}
-            title="You host this server — open the admin suite"
-            aria-label="Open the admin suite"
+            title="Open Admin Panel"
+            aria-label="Open Admin Panel"
           >
             <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-            {!collapsed && <span>Admin</span>}
+            {!collapsed && <span>Open Admin Panel</span>}
           </button>
         </div>
       )}
@@ -566,7 +565,7 @@ export function SidebarNav({
           className={`glass-nav-item ${mainView === 'profile' ? 'glass-nav-active' : ''} w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-left cursor-pointer transition-all duration-150 active:scale-[0.96] border ${collapsed ? 'justify-center' : ''}`}
           aria-label="Open your profile"
         >
-          <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-xs font-medium border shrink-0 bg-white/5 border-white/10 text-retro-fg">
+          <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-xs font-medium border shrink-0 bg-glass-w5 border-white/10 text-retro-fg">
             {profilePic ? (
               <img src={profilePic} alt="" className="w-full h-full object-cover" />
             ) : (

@@ -447,7 +447,7 @@ export function GMatchDMs({
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={submitNewGroup} className="px-3 py-1.5 bg-retro-accent text-black rounded-md text-xs font-bold cursor-pointer hover:bg-retro-accent-hover">Create</button>
-              <button type="button" onClick={() => { setShowNewGroup(false); setNewGroupMembers(new Set()); }} className="px-3 py-1.5 bg-white/8 border border-border-glass rounded-md text-xs cursor-pointer hover:bg-white/12">Cancel</button>
+              <button type="button" onClick={() => { setShowNewGroup(false); setNewGroupMembers(new Set()); }} className="px-3 py-1.5 bg-glass-w8 border border-border-glass rounded-md text-xs cursor-pointer hover:bg-glass-w12">Cancel</button>
             </div>
           </div>
         )}
@@ -469,7 +469,7 @@ export function GMatchDMs({
           <button
             type="button"
             onClick={() => { playPress(800); setListMode(false); onSelectGroup?.(null); onSelectPeer({ orbitId: 'global_lobby', name: 'Lobby Lounge (Everyone)' }); }}
-            className={`w-full p-3 flex items-center gap-3 hover:bg-white/5 transition-colors metro-rule text-left cursor-pointer ${openTarget === 'lobby' ? 'bg-white/8 border-border-glass' : ''}`}
+            className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors metro-rule text-left cursor-pointer ${openTarget === 'lobby' ? 'bg-glass-w8 border-border-glass' : ''}`}
           >
             <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center">
               <Globe className="w-4 h-4" />
@@ -486,7 +486,7 @@ export function GMatchDMs({
           <button
             type="button"
             onClick={() => { playPress(800); setListMode(false); onSelectGroup?.(null); onSelectPeer({ orbitId: 'card_queue', name: 'Card Game Queue' }); }}
-            className={`w-full p-3 flex items-center gap-3 hover:bg-white/5 transition-colors metro-rule text-left cursor-pointer ${openTarget === 'queue' ? 'bg-white/8 border-border-glass' : ''}`}
+            className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors metro-rule text-left cursor-pointer ${openTarget === 'queue' ? 'bg-glass-w8 border-border-glass' : ''}`}
           >
             <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center">
               <Gamepad2 className="w-4 h-4" />
@@ -508,7 +508,7 @@ export function GMatchDMs({
                   key={g.id}
                   type="button"
                   onClick={() => openGroup(g)}
-                  className={`w-full p-3 flex items-center gap-3 hover:bg-white/5 transition-colors metro-rule text-left cursor-pointer ${activeGroupId === g.id && openTarget === 'group' ? 'bg-white/8 border-border-glass' : ''}`}
+                  className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors metro-rule text-left cursor-pointer ${activeGroupId === g.id && openTarget === 'group' ? 'bg-glass-w8 border-border-glass' : ''}`}
                 >
                   <div className="w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center"><Users className="w-4 h-4" /></div>
                   <div className="flex-1 min-w-0">
@@ -535,7 +535,7 @@ export function GMatchDMs({
                       key={p.orbitId}
                       type="button"
                       onClick={() => { playPress(800); setListMode(false); onSelectGroup?.(null); onSelectPeer(p); setSearchQuery(''); }}
-                      className="w-full p-2.5 rounded-md flex items-center gap-3 hover:bg-white/5 transition-colors text-left cursor-pointer"
+                      className="w-full p-2.5 rounded-md flex items-center gap-3 hover:bg-glass-w5 transition-colors text-left cursor-pointer"
                     >
                       <div className="w-9 h-9 rounded-full bg-surface-raised border border-border-glass text-retro-muted font-medium text-xs flex items-center justify-center overflow-hidden shrink-0">
                         {pfp ? <img src={pfp} alt="" className="w-full h-full object-cover" /> : name.charAt(0).toUpperCase()}
@@ -576,7 +576,7 @@ export function GMatchDMs({
                   <button
                     type="button"
                     onClick={() => { playPress(800); setListMode(false); onSelectGroup?.(null); onSelectPeer({ orbitId: peerId, name, pfp }); setDeleteThreadPeerId(null); }}
-                    className={`w-full p-3 flex items-center gap-3 hover:bg-white/5 transition-colors metro-rule text-left cursor-pointer ${isSelected ? 'bg-white/8 border-border-glass' : ''}`}
+                    className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors metro-rule text-left cursor-pointer ${isSelected ? 'bg-glass-w8 border-border-glass' : ''}`}
                   >
                     <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center font-medium text-xs">
                       {pfp ? <img src={pfp} alt="" className="w-full h-full object-cover" /> : name.charAt(0).toUpperCase()}
@@ -601,7 +601,7 @@ export function GMatchDMs({
                       <button
                         type="button"
                         onClick={() => { handleDeleteThread(peerId); setDeleteThreadPeerId(null); }}
-                        className="w-full px-3 py-2 text-left text-xs text-rose-400 hover:bg-white/5 cursor-pointer"
+                        className="w-full px-3 py-2 text-left text-xs text-rose-400 hover:bg-glass-w5 cursor-pointer"
                       >
                         Delete Conversation
                       </button>
@@ -657,7 +657,7 @@ export function GMatchDMs({
                     title="Group members"
                     aria-label="Group members"
                     aria-expanded={showMembers}
-                    className={`p-1.5 rounded-md transition-colors cursor-pointer ${showMembers ? 'text-retro-accent bg-retro-accent/10' : 'text-retro-muted hover:text-retro-fg'}`}
+                    className={`p-1.5 rounded-md transition-colors cursor-pointer ${showMembers ? 'text-retro-accent bg-glass-w10' : 'text-retro-muted hover:text-retro-fg'}`}
                   >
                     <Users className="w-4 h-4" />
                   </button>
@@ -706,7 +706,7 @@ export function GMatchDMs({
                       type="button"
                       onClick={handleLoadHistory}
                       disabled={loadingHistory}
-                      className="px-3 py-1.5 rounded-md bg-white/8 border border-border-glass text-[10px] text-retro-muted hover:text-retro-fg hover:bg-white/12 transition-colors cursor-pointer disabled:opacity-40"
+                      className="px-3 py-1.5 rounded-md bg-glass-w8 border border-border-glass text-[10px] text-retro-muted hover:text-retro-fg hover:bg-glass-w12 transition-colors cursor-pointer disabled:opacity-40"
                     >
                       {loadingHistory ? 'Loading...' : 'Load earlier messages'}
                     </button>
@@ -745,7 +745,7 @@ export function GMatchDMs({
                           return (
                             <div key={msg.id} className="w-full">
                               {replyTarget && (
-                                <div className="text-[10px] text-retro-muted px-2.5 py-1 mb-0.5 bg-white/5 rounded-md border-l-2 border-retro-accent/50 truncate max-w-full">
+                                <div className="text-[10px] text-retro-muted px-2.5 py-1 mb-0.5 bg-glass-w5 rounded-md border-l-2 border-retro-accent/50 truncate max-w-full">
                                   <CornerUpLeft className="w-3 h-3 inline mr-1" />
                                   {replyTarget.senderId === identity?.orbitId ? 'You' : displayNameFor(replyTarget.senderId)}: {replyTarget.text}
                                 </div>
@@ -782,11 +782,11 @@ export function GMatchDMs({
                                       type="text"
                                       value={editingMessage.text}
                                       onChange={(e) => setEditingMessage({ ...editingMessage!, text: e.target.value })}
-                                      className="bg-white/10 border border-border-glass rounded px-2 py-1 text-xs text-retro-fg outline-none focus:border-retro-accent w-64"
+                                      className="bg-glass-w10 border border-border-glass rounded px-2 py-1 text-xs text-retro-fg outline-none focus:border-retro-accent w-64"
                                       autoFocus
                                     />
                                     <button type="button" onClick={() => handleEditMessage(msg)} className="px-2 py-1 bg-retro-accent text-black text-[10px] rounded cursor-pointer">Save</button>
-                                    <button type="button" onClick={() => setEditingMessage(null)} className="px-2 py-1 bg-white/8 border border-border-glass text-[10px] rounded cursor-pointer">Cancel</button>
+                                    <button type="button" onClick={() => setEditingMessage(null)} className="px-2 py-1 bg-glass-w8 border border-border-glass text-[10px] rounded cursor-pointer">Cancel</button>
                                   </div>
                                 ) : (
                                   msg.text
@@ -811,34 +811,34 @@ export function GMatchDMs({
                                 const canDeleteEveryone = isOwn && ageMs < 10 * 60 * 1000;
                                 return (
                                 <div className={`flex flex-wrap items-center gap-1 mt-1 ${isOwn ? 'justify-end' : ''}`}>
-                                  <button type="button" onClick={() => { setReplyingTo(msg); setActionFor(null); }} className="px-2 py-1 rounded-md bg-white/8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer hover:bg-white/12"><Reply className="w-3 h-3" /> Reply</button>
-                                  <button type="button" onClick={() => copyMessage(msg.text)} className="px-2 py-1 rounded-md bg-white/8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer hover:bg-white/12"><Copy className="w-3 h-3" /> Copy</button>
+                                  <button type="button" onClick={() => { setReplyingTo(msg); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Reply className="w-3 h-3" /> Reply</button>
+                                  <button type="button" onClick={() => copyMessage(msg.text)} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Copy className="w-3 h-3" /> Copy</button>
                                   {canEdit && (
                                     <button
                                       type="button"
                                       onClick={() => { setEditingMessage({ id: msg.id, text: msg.text }); setActionFor(null); }}
-                                      className="px-2 py-1 rounded-md bg-white/8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer hover:bg-white/12"
+                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer hover:bg-glass-w12"
                                     ><Edit2 className="w-3 h-3" /> Edit</button>
                                   )}
                                   {canDeleteEveryone && (
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteForEveryone(msg)}
-                                      className="px-2 py-1 rounded-md bg-white/8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer text-rose-400 hover:bg-white/12"
+                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer text-rose-400 hover:bg-glass-w12"
                                     ><Trash className="w-3 h-3" /> Delete for Everyone</button>
                                   )}
                                   {isOwn && (
                                     <button
                                       type="button"
                                       onClick={() => { onDeleteMessage?.(msg.id, activePmPeer?.orbitId || ''); setActionFor(null); }}
-                                      className="px-2 py-1 rounded-md bg-white/8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer text-rose-400 hover:bg-white/12"
+                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer text-rose-400 hover:bg-glass-w12"
                                     ><Trash2 className="w-3 h-3" /> Delete for Me</button>
                                   )}
                                   {!isOwn && onReportMessage && (
-                                    <button type="button" onClick={() => { onReportMessage(msg.id); setActionFor(null); }} className="px-2 py-1 rounded-md bg-white/8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer text-rose-400 hover:bg-white/12"><Flag className="w-3 h-3" /> Report</button>
+                                    <button type="button" onClick={() => { onReportMessage(msg.id); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer text-rose-400 hover:bg-glass-w12"><Flag className="w-3 h-3" /> Report</button>
                                   )}
                                   {!isOwn && onReportUser && (
-                                    <button type="button" onClick={() => { onReportUser(msg.senderId); setActionFor(null); }} className="px-2 py-1 rounded-md bg-white/8 border border-border-glass text-[10px] cursor-pointer text-rose-400 hover:bg-white/12">Report user</button>
+                                    <button type="button" onClick={() => { onReportUser(msg.senderId); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] cursor-pointer text-rose-400 hover:bg-glass-w12">Report user</button>
                                   )}
                                 </div>
                                 );

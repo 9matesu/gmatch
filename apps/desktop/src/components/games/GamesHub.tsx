@@ -138,7 +138,7 @@ export function GamesHub({
                 title={idleFullscreen ? 'Exit fullscreen' : 'Play fullscreen'}
                 aria-label={idleFullscreen ? 'Exit fullscreen' : 'Play fullscreen'}
                 aria-pressed={idleFullscreen}
-                className={`p-1.5 rounded-md transition-colors cursor-pointer ${idleFullscreen ? 'bg-retro-accent/20 text-retro-accent' : 'bg-black/50 text-retro-muted hover:text-retro-fg hover:bg-black/70'}`}
+                className={`p-1.5 rounded-md transition-colors cursor-pointer ${idleFullscreen ? 'bg-glass-w20 text-retro-accent' : 'bg-black/50 text-retro-muted hover:text-retro-fg hover:bg-black/70'}`}
               >
                 {idleFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
               </button>

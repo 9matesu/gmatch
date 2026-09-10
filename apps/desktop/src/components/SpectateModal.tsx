@@ -345,7 +345,7 @@ export function SpectateModal({
                 type="button"
                 onClick={() => { playPress(720); setIsExpanded((v) => !v) }}
                 title={isExpanded ? 'Restore View' : 'Maximize View'}
-                className="w-8 h-8 rounded-xl text-retro-muted hover:text-retro-fg hover:bg-white/10 flex items-center justify-center transition-all cursor-pointer"
+                className="w-8 h-8 rounded-xl text-retro-muted hover:text-retro-fg hover:bg-glass-w10 flex items-center justify-center transition-all cursor-pointer"
               >
                 {isExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
               </button>
@@ -353,7 +353,7 @@ export function SpectateModal({
                 type="button"
                 onClick={() => { playPress(720); setIsMinimized(true) }}
                 title="Picture-in-Picture Mini View"
-                className="w-8 h-8 rounded-xl text-retro-muted hover:text-retro-fg hover:bg-white/10 flex items-center justify-center transition-all cursor-pointer"
+                className="w-8 h-8 rounded-xl text-retro-muted hover:text-retro-fg hover:bg-glass-w10 flex items-center justify-center transition-all cursor-pointer"
               >
                 <Minimize2 className="w-3.5 h-3.5" />
               </button>
@@ -361,7 +361,7 @@ export function SpectateModal({
                 type="button"
                 onClick={() => { playPress(680); onClose() }}
                 title="Close Spectator"
-                className="w-8 h-8 rounded-xl text-retro-muted hover:text-red-500 hover:bg-white/10 flex items-center justify-center transition-all cursor-pointer"
+                className="w-8 h-8 rounded-xl text-retro-muted hover:text-red-500 hover:bg-glass-w10 flex items-center justify-center transition-all cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>

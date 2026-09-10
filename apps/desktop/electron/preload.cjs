@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('gmatch', {
   secureSet: (key, value) => ipcRenderer.invoke('secure:set', key, value),
   secureDelete: (key) => ipcRenderer.invoke('secure:delete', key),
   serverState: () => ipcRenderer.invoke('server:state'),
+  appVersion: () => ipcRenderer.invoke('app:version'),
+  openExternal: (url) => ipcRenderer.invoke('shell:open', url),
   serverSet: (payload) => ipcRenderer.invoke('server:set', payload),
   serverRelaunch: () => ipcRenderer.invoke('server:relaunch'),
   // OS integration for consented domination effects (Windows only, best-effort).

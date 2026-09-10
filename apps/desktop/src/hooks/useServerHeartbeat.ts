@@ -24,6 +24,16 @@ export function useServerHeartbeat(identity: Parameters<typeof orbitFetch>[2] | 
       if (!raw) return
       let body: Record<string, unknown>
       try { body = JSON.parse(raw) } catch { return }
+      // Game-browser metadata: report our own node's counts (dashboard route
+      // answers locally on the host node). Failure = register without counts.
+      try {
+        const d = await orbitFetch('/api/servers/dashboard', { method: 'GET' }, identity)
+        if (d.ok) {
+          const dj = await d.json()
+          if (typeof dj?.members_total === 'number') body.user_count = dj.members_total
+          if (Array.isArray(dj?.users)) body.online_count = dj.users.filter((u: { online?: boolean }) => u?.online).length
+        }
+      } catch { /* counts optional */ }
       try {
         await orbitFetch(central + '/api/servers', {
           method: 'POST',

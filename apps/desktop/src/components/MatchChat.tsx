@@ -63,7 +63,7 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-bold text-retro-body hover:text-retro-fg hover:bg-white/5 cursor-pointer transition-colors"
+        className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-bold text-retro-body hover:text-retro-fg hover:bg-glass-w5 cursor-pointer transition-colors"
       >
         <span className="flex items-center gap-1.5">
           <MessageSquare className="w-3.5 h-3.5 text-cyan-300" />

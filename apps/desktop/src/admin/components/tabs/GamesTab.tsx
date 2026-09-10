@@ -92,7 +92,7 @@ export function GamesTab({ identity, pinVerified, onZoom, onAction }: GamesTabPr
     const objectProtectedB = match.card_b ? true : false;
 
     return (
-      <div key={match.id} className="border-b border-border-subtle last:border-0 hover:bg-white/5 transition-colors">
+      <div key={match.id} className="border-b border-border-subtle last:border-0 hover:bg-glass-w5 transition-colors">
         <div className="p-3 flex items-center gap-3">
           <button
             type="button"
@@ -234,7 +234,7 @@ export function GamesTab({ identity, pinVerified, onZoom, onAction }: GamesTabPr
                 <button
                   type="button"
                   onClick={() => onAction("override", match.id, "draw")}
-                  className="px-2.5 py-1 rounded bg-surface-interactive text-retro-fg border border-border-glass hover:bg-white/10 font-bold text-[11px]"
+                  className="px-2.5 py-1 rounded bg-surface-interactive text-retro-fg border border-border-glass hover:bg-glass-w10 font-bold text-[11px]"
                 >
                   Draw
                 </button>
@@ -250,7 +250,7 @@ export function GamesTab({ identity, pinVerified, onZoom, onAction }: GamesTabPr
     const isExpanded = expandedId === match.id;
 
     return (
-      <div key={match.id} className="border-b border-border-subtle last:border-0 hover:bg-white/5 transition-colors">
+      <div key={match.id} className="border-b border-border-subtle last:border-0 hover:bg-glass-w5 transition-colors">
         <div className="p-3 flex items-center gap-3">
           <button
             type="button"
@@ -347,7 +347,7 @@ export function GamesTab({ identity, pinVerified, onZoom, onAction }: GamesTabPr
     const isExpanded = expandedId === match.id;
 
     return (
-      <div key={match.id} className="border-b border-border-subtle last:border-0 hover:bg-white/5 transition-colors">
+      <div key={match.id} className="border-b border-border-subtle last:border-0 hover:bg-glass-w5 transition-colors">
         <div className="p-3 flex items-center gap-3">
           <button
             type="button"
@@ -410,7 +410,7 @@ export function GamesTab({ identity, pinVerified, onZoom, onAction }: GamesTabPr
   };
 
   const renderRoom = (room: AdminRoom) => (
-    <div key={room.id} className="border-b border-border-subtle last:border-0 p-3 hover:bg-white/5 transition-colors">
+    <div key={room.id} className="border-b border-border-subtle last:border-0 p-3 hover:bg-glass-w5 transition-colors">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold text-retro-fg truncate">{room.name}</p>
@@ -429,7 +429,7 @@ export function GamesTab({ identity, pinVerified, onZoom, onAction }: GamesTabPr
   );
 
   const renderBabecock = (round: AdminBabecockRound) => (
-    <div key={round.id} className="border-b border-border-subtle last:border-0 p-3 hover:bg-white/5 transition-colors">
+    <div key={round.id} className="border-b border-border-subtle last:border-0 p-3 hover:bg-glass-w5 transition-colors">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold text-retro-fg truncate">{round.id.slice(0, 14)}</p>

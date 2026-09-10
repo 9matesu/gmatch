@@ -114,7 +114,7 @@ export function GroupMembersPopover({
                 })
               }}
               className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
-                selected.has(p.orbitId) ? 'bg-retro-accent/15 text-retro-fg border border-retro-accent/40' : 'hover:bg-white/5 text-retro-body border border-transparent'
+                selected.has(p.orbitId) ? 'bg-retro-accent/15 text-retro-fg border border-retro-accent/40' : 'hover:bg-glass-w5 text-retro-body border border-transparent'
               }`}
             >
               <UserPlus className={`w-3.5 h-3.5 shrink-0 ${selected.has(p.orbitId) ? 'text-retro-accent' : 'text-retro-muted'}`} />

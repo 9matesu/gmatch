@@ -166,12 +166,12 @@ interface FooterSecondaryItem {
                     : 'bg-transparent text-rose-400 hover:bg-rose-500/10 border-transparent'
                   : item.active
                    ? 'glass-tab-active text-retro-accent-text border-transparent shadow-[0_0_12px_rgba(159,227,255,0.1)]'
-                  : 'bg-transparent text-retro-muted hover:text-retro-fg hover:bg-white/5 border-transparent'
+                  : 'bg-transparent text-retro-muted hover:text-retro-fg hover:bg-glass-w5 border-transparent'
               }`}
             >
               {item.id === 'profile' ? (
                 <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden flex items-center justify-center text-[10px] font-medium border shrink-0 transition-colors ${
-                  item.active ? 'border-retro-accent bg-retro-accent/10 text-retro-accent' : 'border-border-glass bg-white/8 text-retro-muted group-hover:border-white/24'
+                  item.active ? 'border-retro-accent bg-glass-w10 text-retro-accent' : 'border-border-glass bg-glass-w8 text-retro-muted group-hover:border-white/24'
                 }`}>
                   {profilePic ? (
                     <img src={profilePic} alt="" className="w-full h-full object-cover" />

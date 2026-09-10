@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { User, OrbitObject } from '@orbit/shared';
 import { CardTile } from './home/CardTile';
@@ -11,7 +11,8 @@ import { SlideshowManager } from './slideshows/SlideshowManager';
 import IdleGalleryView from './grid/IdleGalleryView';
 import { useGame } from '@/game/store';
 import type { FeedPost } from './feed/GMatchFeed';
-import { Layers, Download, Trash2, CheckSquare, Search, Film, ImagePlus, ImageIcon } from 'lucide-react';
+import { Layers, Download, Trash2, CheckSquare, Search, Film, ImagePlus, ImageIcon, Tag } from 'lucide-react';
+import { DND_KEEPSAKE } from './DropZone';
 
 export interface GalleryViewProps {
   filteredItems: OrbitObject[];
@@ -93,7 +94,30 @@ export function GalleryView({
 }: GalleryViewProps) {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [showSlideshows, setShowSlideshows] = useState(false);
+  const [dndCardHover, setDndCardHover] = useState(false);
   const idleKeepsakes = useGame((s) => s.gallery);
+
+  // Tag pills: union of tags on the visible collection, most frequent first.
+  const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
+  const tagCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of filteredItems) {
+      const tags = (item as { tags?: string[] }).tags;
+      if (Array.isArray(tags)) for (const t of tags) counts.set(t, (counts.get(t) || 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20);
+  }, [filteredItems]);
+  const toggleTag = (t: string) => setActiveTags(prev => {
+    const next = new Set(prev);
+    if (next.has(t)) next.delete(t); else next.add(t);
+    return next;
+  });
+  const shownItems = activeTags.size === 0
+    ? paginatedItems
+    : filteredItems.filter((item) => {
+        const tags = (item as { tags?: string[] }).tags;
+        return Array.isArray(tags) && [...activeTags].every((t) => tags.includes(t));
+      });
 
   return (
     <>
@@ -247,7 +271,7 @@ export function GalleryView({
           </div>
         )}
 
-        <div className="p-4 border-b border-white/10 bg-white/5 space-y-2">
+        <div className="p-4 border-b border-white/10 bg-glass-w5 space-y-2">
           <div className="flex items-center justify-between text-xs font-bold text-retro-body">
             <span className="flex items-center gap-1.5 text-retro-fg">
               <Layers className="w-4 h-4 text-retro-muted" />
@@ -258,16 +282,52 @@ export function GalleryView({
           <button
             type="button"
             onClick={onOpenCreateCard}
-            className="glass-action glass-action-primary w-full sm:w-auto px-4 py-2 font-bold text-xs uppercase tracking-wider rounded-lg cursor-pointer flex items-center gap-2"
+            onDragOver={(e) => { if (onCreateCardFromMedia) { e.preventDefault(); setDndCardHover(true) } }}
+            onDragLeave={() => setDndCardHover(false)}
+            onDrop={(e) => {
+              if (!onCreateCardFromMedia) return
+              e.preventDefault()
+              setDndCardHover(false)
+              try {
+                const raw = e.dataTransfer.getData(DND_KEEPSAKE)
+                if (raw) onCreateCardFromMedia(JSON.parse(raw))
+              } catch { /* malformed payload — ignore */ }
+            }}
+            className={`glass-action glass-action-primary w-full sm:w-auto px-4 py-2 font-bold text-xs uppercase tracking-wider rounded-lg cursor-pointer flex items-center gap-2 ${dndCardHover ? 'ring-2 ring-retro-accent' : ''}`}
           >
             <ImagePlus className="w-3.5 h-3.5" />
-            <span>Create Card</span>
+            <span>{dndCardHover ? 'Drop to forge card' : 'Create Card'}</span>
           </button>
         </div>
 
       </div>
 
       <div className="glass-card p-4">
+          {tagCounts.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 pb-3 -mt-1">
+              <Tag className="w-3.5 h-3.5 text-retro-muted" />
+              {tagCounts.map(([t, n]) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => toggleTag(t)}
+                  aria-pressed={activeTags.has(t)}
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border cursor-pointer transition-colors ${activeTags.has(t) ? 'bg-glass-w20 border-retro-fg/70' : 'border-white/10 text-retro-muted hover:text-retro-body'}`}
+                >
+                  {t} <span className="opacity-60">{n}</span>
+                </button>
+              ))}
+              {activeTags.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTags(new Set())}
+                  className="text-[10px] text-retro-muted hover:text-retro-fg cursor-pointer underline"
+                >
+                  clear ({activeTags.size})
+                </button>
+              )}
+            </div>
+          )}
           {itemsLoading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {Array.from({ length: 10 }).map((_, i) => <CardSkeleton key={i} />)}
@@ -285,9 +345,14 @@ export function GalleryView({
                   if (!dragActive && e.buttons !== 0) setDragActive(true)
                 }}
               >
-                {paginatedItems.map(item => (
+                {shownItems.map(item => (
                   <div
                     key={item.id}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(DND_KEEPSAKE, JSON.stringify({ url: `/api/objects/${item.id}`, tags: (item as { tags?: string[] }).tags || [], name: (item as { caption?: string }).caption || 'Card' }))
+                      e.dataTransfer.effectAllowed = 'copy'
+                    }}
                     onContextMenu={(e) => { if (onItemContextMenu) { e.preventDefault(); onItemContextMenu(e, item) } }}
                   >
                     <CardTile

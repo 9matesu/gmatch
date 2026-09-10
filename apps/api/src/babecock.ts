@@ -137,6 +137,22 @@ export async function startRound(
   ])
 
   broadcastToRoom('lobby', { type: 'babecock', action: 'refresh' })
+
+  // Alert every online player that a round just started (bell + WS push).
+  // ponytail: capped fan-out (200/round); revisit if servers get big.
+  const online = await db
+    .prepare(
+      "SELECT id FROM Users WHERE id != ? AND COALESCE(is_admin, 0) = 0 AND id NOT LIKE 'bot_%' AND datetime(last_seen) >= datetime('now', '-60 seconds') LIMIT 200"
+    )
+    .bind(hostId)
+    .all<{ id: string }>()
+  const { createNotification } = await import('./notifications')
+  const { broadcastToUser } = await import('./ws-bus')
+  for (const u of online.results || []) {
+    const notif = await createNotification(db, u.id, 'babecock_start', 'Babecock round started', 'A new Babecock round is open — join before the timer ends', { round_id: roundId })
+    if (notif) broadcastToUser(u.id, { type: 'notification', action: 'new', notification: notif })
+  }
+
   return (await getCurrentRound(db, hostId)) as BabecockRound
 }
 

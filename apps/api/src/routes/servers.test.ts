@@ -50,6 +50,21 @@ describe('Server directory API', () => {
     expect(JSON.stringify(authList.servers)).toContain('example.org')
   })
 
+  it('directory carries host-reported counts; junk counts stay null', async () => {
+    const good = await register(env, owner, { name: 'Counted Node', user_count: 42, online_count: 7 })
+    expect(good.status).toBe(201)
+    const bad = await register(env, other, { name: 'Junk Counts', user_count: -5, online_count: 'x' })
+    expect(bad.status).toBe(201)
+
+    const list = (await (await app.request('/api/servers?_ts=1', {}, env)).json()) as { servers: Array<Record<string, unknown>> }
+    const counted = list.servers.find((s) => s.name === 'Counted Node')
+    expect(counted?.user_count).toBe(42)
+    expect(counted?.online_count).toBe(7)
+    const junked = list.servers.find((s) => s.name === 'Junk Counts')
+    expect(junked?.user_count).toBeNull()
+    expect(junked?.online_count).toBeNull()
+  })
+
   it('re-register with the same owner+name upserts (no duplicates)', async () => {
     const body = { name: 'Upsert Node', description: '', endpoint_hint: '', password_required: false }
     const first = await register(env, owner, body)

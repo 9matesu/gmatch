@@ -24,7 +24,7 @@ test('games: hub reachable with sub-tabs', async ({ page }) => {
   // 1.1 layout: games opens on the default tab and the sidebar exposes the
   // sub-tabs; the old page heading was removed with the games-group nav.
   await expect(page.getByRole('button', { name: 'Idle Clicker' }).first()).toBeVisible({ timeout: 20_000 })
-  await expect(page.getByRole('button', { name: 'Play', exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Play Cards', exact: true }).first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'Babecock', exact: true }).first()).toBeVisible()
 })
 
@@ -44,7 +44,7 @@ test('navigation round-trip preserves idle state', async ({ page }) => {
     }, { timeout: 15_000 })
     .not.toBe('0')
   const afterClick = await page.getByTestId('gc-balance').textContent()
-  await page.getByRole('button', { name: 'Play', exact: true }).click()
+  await page.getByRole('button', { name: 'Play Cards', exact: true }).click()
   await page.getByRole('button', { name: 'Idle Clicker' }).click()
   await expect(stage).toBeVisible()
   expect(await page.getByTestId('gc-balance').textContent()).toBe(afterClick)

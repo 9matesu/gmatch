@@ -41,7 +41,7 @@ export function AdminActionMenu<T>({
     <button
       type="button"
       onClick={() => setOpen(!open)}
-      className="p-1.5 rounded hover:bg-white/10 text-retro-muted hover:text-retro-fg transition-colors"
+      className="p-1.5 rounded hover:bg-glass-w10 text-retro-muted hover:text-retro-fg transition-colors"
       aria-label="Row actions"
       aria-expanded={open}
     >
@@ -71,8 +71,8 @@ export function AdminActionMenu<T>({
                     "w-full px-3 py-2 text-left text-xs flex items-center gap-2 transition-colors",
                     action.variant === "danger" && "text-red-300 hover:bg-red-500/10",
                     action.variant === "primary" && "text-cyan-300 hover:bg-cyan-500/10",
-                    action.variant === "ghost" && "text-retro-muted hover:text-retro-fg hover:bg-white/5",
-                    (!action.variant || action.variant === "default") && "text-retro-fg hover:bg-white/10",
+                    action.variant === "ghost" && "text-retro-muted hover:text-retro-fg hover:bg-glass-w5",
+                    (!action.variant || action.variant === "default") && "text-retro-fg hover:bg-glass-w10",
                     "disabled:opacity-40 disabled:cursor-not-allowed"
                   )}
                 >
@@ -114,7 +114,7 @@ export function BulkActionBar<T>({
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded hover:bg-white/10 text-retro-muted hover:text-retro-fg transition-colors md:hidden"
+            className="p-1 rounded hover:bg-glass-w10 text-retro-muted hover:text-retro-fg transition-colors md:hidden"
             aria-label="Clear selection"
           >
             <X className="w-4 h-4" />
@@ -135,7 +135,7 @@ export function BulkActionBar<T>({
                 "px-3 py-1.5 text-xs font-bold uppercase rounded transition-colors flex items-center gap-1.5",
                 action.variant === "danger" && "bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30",
                 action.variant === "primary" && "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/30",
-                action.variant !== "danger" && action.variant !== "primary" && "bg-surface-interactive text-retro-fg border border-border-glass hover:bg-white/10",
+                action.variant !== "danger" && action.variant !== "primary" && "bg-surface-interactive text-retro-fg border border-border-glass hover:bg-glass-w10",
                 "disabled:opacity-40 disabled:cursor-not-allowed"
               )}
             >
@@ -188,7 +188,7 @@ export function ConfirmDialog({
             <button
               type="button"
               onClick={onClose}
-              className="p-1 rounded hover:bg-white/10 text-retro-muted hover:text-retro-fg transition-colors"
+              className="p-1 rounded hover:bg-glass-w10 text-retro-muted hover:text-retro-fg transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
@@ -199,7 +199,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="px-3 py-1.5 text-xs font-bold rounded border border-border-glass text-retro-fg hover:bg-white/10 transition-colors disabled:opacity-40"
+            className="px-3 py-1.5 text-xs font-bold rounded border border-border-glass text-retro-fg hover:bg-glass-w10 transition-colors disabled:opacity-40"
           >
             {cancelLabel}
           </button>
@@ -214,7 +214,7 @@ export function ConfirmDialog({
               "px-3 py-1.5 text-xs font-bold rounded flex items-center gap-1.5 transition-colors disabled:opacity-40",
               variant === "danger" && "bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30",
               variant === "primary" && "bg-cyan-500 text-black border border-cyan-500 hover:bg-cyan-400",
-              variant === "default" && "bg-surface-interactive text-retro-fg border border-border-glass hover:bg-white/10"
+              variant === "default" && "bg-surface-interactive text-retro-fg border border-border-glass hover:bg-glass-w10"
             )}
           >
             {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
@@ -324,7 +324,7 @@ export function FormModal<T extends Record<string, unknown>>({
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded hover:bg-white/10 text-retro-muted hover:text-retro-fg transition-colors"
+            className="p-1 rounded hover:bg-glass-w10 text-retro-muted hover:text-retro-fg transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -403,7 +403,7 @@ export function FormModal<T extends Record<string, unknown>>({
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="px-3 py-1.5 text-xs font-bold rounded border border-border-glass text-retro-fg hover:bg-white/10 transition-colors disabled:opacity-40"
+            className="px-3 py-1.5 text-xs font-bold rounded border border-border-glass text-retro-fg hover:bg-glass-w10 transition-colors disabled:opacity-40"
           >
             Cancel
           </button>
@@ -524,7 +524,7 @@ export function DetailModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded hover:bg-white/10 text-retro-muted hover:text-retro-fg transition-colors"
+            className="p-1 rounded hover:bg-glass-w10 text-retro-muted hover:text-retro-fg transition-colors"
           >
             <X className="w-4 h-4" />
           </button>

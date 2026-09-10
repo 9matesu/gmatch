@@ -8,6 +8,7 @@ import { useGame, MAX_USER_EXCLUDES } from '../../game/store';
 import { FeedTuneStep } from '../../firstRun/FeedTuneStep';
 import { ServerTab } from './ServerTab';
 import { DeleteAccountSection } from './DeleteAccountSection';
+import { UpdateSection } from './UpdateSection';
 import {
   Settings,
   User,
@@ -91,7 +92,7 @@ function FeedSettingsTab({ toast }: { toast?: (msg: string, type?: string) => vo
             {owned.map((t) => (
               <span
                 key={t.name}
-                className="inline-flex items-center rounded-full border border-border-glass bg-white/5 px-2.5 py-1 text-[11px] font-mono text-retro-fg"
+                className="inline-flex items-center rounded-full border border-border-glass bg-glass-w5 px-2.5 py-1 text-[11px] font-mono text-retro-fg"
               >
                 {t.name}
               </span>
@@ -151,7 +152,7 @@ function FeedSettingsTab({ toast }: { toast?: (msg: string, type?: string) => vo
             {userExcludes.map((x) => (
               <span
                 key={x}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border-glass bg-white/5 px-2.5 py-1 text-[11px] font-mono text-retro-fg"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border-glass bg-glass-w5 px-2.5 py-1 text-[11px] font-mono text-retro-fg"
               >
                 {x}
                 <button
@@ -721,6 +722,9 @@ export function GMatchSettingsModal({
                 </div>
               </div>
             )}
+
+            {/* Updates (desktop builds only — hides without the bridge). */}
+            {activeTab === 'preferences' && <UpdateSection toast={toast} />}
 
             {/* ──────── 2. ACCOUNT & SECURITY ──────── */}
             {activeTab === 'account' && (

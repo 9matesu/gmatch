@@ -31,13 +31,13 @@ export function SocialPanel({
 
   return (
     <div className="glass-card w-full h-full min-h-0 flex flex-col overflow-hidden rounded-2xl">
-      <div className="flex items-center border-b border-white/10 shrink-0 bg-white/5">
+      <div className="flex items-center border-b border-white/10 shrink-0 bg-glass-w5">
         <div className="flex flex-1 min-w-0">
           <button
             type="button"
             onClick={() => selectTab('chat')}
             className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium cursor-pointer relative ${
-              tab === 'chat' ? 'text-retro-fg bg-white/10 border-b border-white/40' : 'text-retro-muted hover:text-retro-fg hover:bg-white/5'
+              tab === 'chat' ? 'text-retro-fg bg-glass-w10 border-b border-white/40' : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w5'
             }`}
           >
             <MessageSquare className="w-3.5 h-3.5" />
@@ -55,7 +55,7 @@ export function SocialPanel({
             type="button"
             onClick={() => selectTab('notifications')}
             className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium cursor-pointer relative ${
-              tab === 'notifications' ? 'text-retro-fg bg-white/10 border-b border-white/40' : 'text-retro-muted hover:text-retro-fg hover:bg-white/5'
+              tab === 'notifications' ? 'text-retro-fg bg-glass-w10 border-b border-white/40' : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w5'
             }`}
           >
             <Bell className="w-3.5 h-3.5" />

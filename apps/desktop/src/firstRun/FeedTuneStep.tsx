@@ -23,7 +23,7 @@ interface Field {
 const BLANK: Field = { value: '', status: 'empty', detail: '' };
 
 const DOT_STYLE: Record<FieldStatus, string> = {
-  empty: 'bg-white/20',
+  empty: 'bg-glass-w20',
   invalid: 'bg-red-500',
   checking: 'bg-amber-400 animate-pulse',
   live: 'bg-emerald-500',

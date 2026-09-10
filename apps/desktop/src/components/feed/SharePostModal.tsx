@@ -161,7 +161,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
               return (
                 <div
                   key={fId}
-                  className="p-2.5 rounded-2xl hover:bg-white/5 flex items-center justify-between border border-transparent hover:border-border-glass transition-colors"
+                  className="p-2.5 rounded-2xl hover:bg-glass-w5 flex items-center justify-between border border-transparent hover:border-border-glass transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-zinc-700 overflow-hidden border border-border-glass flex items-center justify-center text-xs font-bold">

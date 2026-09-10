@@ -851,6 +851,8 @@ CREATE TABLE IF NOT EXISTS ServerDirectory (
   owner_pubkey TEXT NOT NULL,
   endpoint_hint TEXT NOT NULL DEFAULT '',
   password_required INTEGER NOT NULL DEFAULT 0,
+  user_count INTEGER,
+  online_count INTEGER,
   hidden INTEGER NOT NULL DEFAULT 0,
   blocked INTEGER NOT NULL DEFAULT 0,
   master_note TEXT,

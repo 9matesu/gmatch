@@ -50,6 +50,7 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   match_result: <Trophy className="w-4 h-4 text-amber-400" />,
   pm: <MessageSquare className="w-4 h-4 text-cyan-400" />,
   babecock_invite: <Flame className="w-4 h-4 text-rose-400" />,
+  babecock_start: <Flame className="w-4 h-4 text-rose-400" />,
   like: <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />,
   comment: <MessageSquare className="w-4 h-4 text-sky-400" />,
   follow: <UserPlus className="w-4 h-4 text-purple-400" />,
@@ -85,11 +86,11 @@ export function NotificationsPanel({
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden solid-panel">
-      <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between shrink-0 bg-white/5">
+      <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between shrink-0 bg-glass-w5">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-medium text-retro-fg">Notifications</h3>
           {unreadCount > 0 && (
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-retro-accent/10 text-retro-accent tabular-nums">
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-glass-w10 text-retro-accent tabular-nums">
               {unreadCount}
             </span>
           )}
@@ -179,7 +180,7 @@ export function NotificationsPanel({
                 key={n.id}
                 className={`p-3 rounded-lg flex items-start gap-3 border ${
                   n.read
-                    ? "border-white/5 bg-white/5"
+                    ? "border-white/5 bg-glass-w5"
                     : "glass-inset border-white/14"
                 }`}
               >

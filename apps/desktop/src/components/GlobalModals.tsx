@@ -259,7 +259,7 @@ export function GlobalModals(props: GlobalModalsProps) {
             }}
             className="hidden"
           />
-          <div className="mt-3 p-3 border border-retro-accent bg-retro-accent/10 flex items-center justify-between">
+          <div className="mt-3 p-3 border border-retro-accent bg-glass-w10 flex items-center justify-between">
             <div>
               <div className="font-bold text-retro-fg">12h Story</div>
               <div className="text-[10px] text-retro-muted">Expires in 12 hours</div>

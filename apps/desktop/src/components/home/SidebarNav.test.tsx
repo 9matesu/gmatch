@@ -25,12 +25,12 @@ describe('SidebarNav presence indicator', () => {
     expect(status.textContent).not.toMatch(/Online/)
   })
 })
-// plan T4: HOST installs expose the admin suite button at the sidebar foot.
+// plan T4: HOST installs + server-flagged admins get the Admin Panel button.
 describe('SidebarNav admin entry', () => {
-  it('shows Admin button only when this install hosts the server', async () => {
-    // no bridge (browser/dev) -> no admin button
+  it('shows Open Admin Panel only when host or isAdmin', async () => {
+    // no bridge (browser/dev), no isAdmin -> no admin button
     const { unmount } = render(<SidebarNav />)
-    expect(screen.queryByRole('button', { name: /open the admin suite/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /open admin panel/i })).not.toBeInTheDocument()
     unmount()
     // host bridge -> button appears (async serverState)
     ;(window as unknown as { gmatch: unknown }).gmatch = {
@@ -38,20 +38,25 @@ describe('SidebarNav admin entry', () => {
     }
     const setMainView = vi.fn()
     render(<SidebarNav setMainView={setMainView} />)
-    const btn = await screen.findByRole('button', { name: /open the admin suite/i })
+    const btn = await screen.findByRole('button', { name: /open admin panel/i })
     fireEvent.click(btn)
     expect(setMainView).toHaveBeenCalledWith('admin')
     delete (window as unknown as { gmatch?: unknown }).gmatch
   })
 
-  it('CLIENT installs do not get the admin button', async () => {
+  it('server-admin CLIENT installs get the admin button via isAdmin prop', () => {
+    render(<SidebarNav isAdmin />)
+    expect(screen.getByRole('button', { name: /open admin panel/i })).toBeInTheDocument()
+  })
+
+  it('CLIENT installs without isAdmin do not get the admin button', async () => {
     ;(window as unknown as { gmatch: unknown }).gmatch = {
       serverState: async () => ({ packaged: true, mode: 'client', url: 'http://192.168.0.9:8790', lanUrls: [] }),
     }
     render(<SidebarNav />)
     // give the async probe time to resolve
     await new Promise((r) => setTimeout(r, 10))
-    expect(screen.queryByRole('button', { name: /open the admin suite/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /open admin panel/i })).not.toBeInTheDocument()
     delete (window as unknown as { gmatch?: unknown }).gmatch
   })
 })
@@ -62,10 +67,32 @@ describe('SidebarNav user-requested chrome', () => {
     expect(screen.queryByText('Deck')).not.toBeInTheDocument()
   })
 
-  it('expands Servers inline and shows the current server name', () => {
-    render(<SidebarNav serverName="Mateus World" />)
+  it('Servers is a flat button that navigates directly (no expand)', () => {
+    const setMainView = vi.fn()
+    render(<SidebarNav setMainView={setMainView} />)
     fireEvent.click(screen.getByRole('button', { name: 'Servers' }))
-    expect(screen.getByText('Mateus World')).toBeInTheDocument()
+    expect(setMainView).toHaveBeenCalledWith('servers')
+    expect(screen.queryByText('Mateus World')).not.toBeInTheDocument()
+    expect(screen.queryByText('Browse servers')).not.toBeInTheDocument()
+  })
+
+  it('games group children are ordered: Play Cards, Gallery & Cards, Idle Clicker, Store, Babecock, Rankings', () => {
+    render(
+      <SidebarNav
+        mainView="games"
+        gamesSubTab="idle"
+        onOpenGallery={() => {}}
+        onOpenStore={() => {}}
+      />,
+    )
+    const labels = ['Play Cards', 'Gallery & Cards', 'Idle Clicker', 'Store', 'Babecock', 'Rankings']
+    const nodes = labels.map((l) => screen.getByText(l))
+    // DOM order check: each label precedes the next in document position.
+    for (let i = 1; i < nodes.length; i++) {
+      expect(
+        nodes[i - 1].compareDocumentPosition(nodes[i]) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy()
+    }
   })
 
   it('collapses Porn Games when its header button is clicked again', () => {
@@ -74,5 +101,17 @@ describe('SidebarNav user-requested chrome', () => {
     expect(screen.getByText('Idle Clicker')).toBeInTheDocument()
     fireEvent.click(header)
     expect(screen.queryByText('Idle Clicker')).not.toBeInTheDocument()
+  })
+
+  it('back/forward chrome buttons drive window.history', () => {
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    const forward = vi.spyOn(window.history, 'forward').mockImplementation(() => {})
+    render(<SidebarNav />)
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Forward' }))
+    expect(back).toHaveBeenCalled()
+    expect(forward).toHaveBeenCalled()
+    back.mockRestore()
+    forward.mockRestore()
   })
 })

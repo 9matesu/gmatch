@@ -330,7 +330,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
               />
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t border-border-glass">
-              <button onClick={() => setShowTagsModal(null)} className="px-3 py-1.5 text-xs font-bold rounded border border-border-glass text-retro-fg hover:bg-white/10">Cancel</button>
+              <button onClick={() => setShowTagsModal(null)} className="px-3 py-1.5 text-xs font-bold rounded border border-border-glass text-retro-fg hover:bg-glass-w10">Cancel</button>
               <button onClick={handleSaveTags} className="px-3 py-1.5 text-xs font-bold rounded bg-cyan-500 text-black hover:bg-cyan-400">Save Tags</button>
             </div>
           </div>
@@ -384,7 +384,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-4 border-t border-border-glass">
-            <button onClick={() => setShowBalanceModal(null)} className="px-3 py-1.5 text-xs font-bold rounded border border-border-glass text-retro-fg hover:bg-white/10">Cancel</button>
+            <button onClick={() => setShowBalanceModal(null)} className="px-3 py-1.5 text-xs font-bold rounded border border-border-glass text-retro-fg hover:bg-glass-w10">Cancel</button>
             <button onClick={handleSaveBalance} className="px-3 py-1.5 text-xs font-bold rounded bg-cyan-500 text-black hover:bg-cyan-400">Save Changes</button>
           </div>
         </DetailModal>

@@ -333,7 +333,7 @@ export function CreatePostModal({
           {activeTab === 'upload' && (
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-border-glass hover:border-retro-accent rounded-2xl bg-surface-interactive hover:bg-retro-accent/10 p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all text-center group"
+              className="border-2 border-dashed border-border-glass hover:border-retro-accent rounded-2xl bg-surface-interactive hover:bg-glass-w10 p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all text-center group"
             >
               <UploadCloud className="w-8 h-8 text-retro-muted group-hover:text-retro-accent group-hover:scale-110 transition-transform" />
               <p className="text-xs font-bold text-retro-body">Drag &amp; drop photos or click to browse</p>

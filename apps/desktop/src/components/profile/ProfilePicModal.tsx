@@ -6,6 +6,7 @@ import { CameraCapture } from '../CameraCapture';
 import { DropZone } from '../DropZone';
 import { useCropper } from '../../hooks/useCropper';
 import { isCropableImage } from '../CropModal';
+import { fileToThumbDataUrl } from '../../utils/profile';
 import { playPress, playWin } from '../../utils/sounds';
 
 interface ProfilePicModalProps {
@@ -81,6 +82,23 @@ export function ProfilePicModal({
       const res = await crop(preview, { aspect: '1:1', title: 'Crop profile photo' });
       if (!res) return;
       finalUrl = res.dataUrl;
+    }
+    // Persist a compact 256px JPEG thumbnail (same helper onboarding uses):
+    // blob: dies on reload and MB-scale data URLs bloat every lobby/users
+    // payload — both were the "pfp not appearing in lobby" bug.
+    if (rawFile) {
+      try {
+        finalUrl = await fileToThumbDataUrl(rawFile);
+      } catch {
+        /* keep the cropped preview if thumbnailing fails */
+      }
+    } else if (/^(data:|blob:)/.test(finalUrl)) {
+      try {
+        const blob = await fetch(finalUrl).then((r) => r.blob());
+        finalUrl = await fileToThumbDataUrl(new File([blob], 'pfp.jpg', { type: blob.type }));
+      } catch {
+        /* keep the original when conversion fails */
+      }
     }
     playWin();
     onSave(finalUrl);
