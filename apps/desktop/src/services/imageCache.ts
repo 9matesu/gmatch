@@ -26,6 +26,7 @@ interface Bridge {
   cacheImage?: (url: string) => Promise<{ local: string | null }>
   cacheStats?: () => Promise<{ files: number; bytes: number }>
   clearCache?: () => Promise<{ files: number; bytes: number }>
+  evictImage?: (url: string) => Promise<{ ok: boolean }>
 }
 
 function bridge(): Bridge | null {
@@ -101,7 +102,12 @@ export function devFetchable(url: string): string | null {
     if (u.hostname === 'tbib.org') return `/booru/tbib${path}`
     if (u.hostname === 'xbooru.com') return `/booru/xbooru${path}`
     if (u.hostname === 'rule34.paheal.net') return `/booru/paheal${path}`
+    if (u.hostname === 'konachan.com') return `/booru/kona${path}`
+    if (u.hostname === 'yande.re' || u.hostname === 'files.yande.re') return `/booru/yand${path}`
     if (u.hostname === 'imhentai.xxx' || u.hostname.endsWith('.imhentai.xxx')) {
+      return `/px?u=${encodeURIComponent(url)}`
+    }
+    if (u.hostname === 'realbooru.com' || u.hostname.endsWith('.booru.org')) {
       return `/px?u=${encodeURIComponent(url)}`
     }
     return null
@@ -214,6 +220,21 @@ export async function clearImageCache(): Promise<ImageCacheStats> {
   session.clear()
   destroyLegacyIdb()
   return { files: 0, bytes: 0, backend: 'memory' }
+}
+
+/** Evict a single image from cache and free its memory. */
+export async function evictImage(url: string): Promise<void> {
+  if (!url) return
+  revokeUrl(url)
+  session.delete(url)
+  const b = bridge()
+  if (b?.evictImage) {
+    try {
+      await b.evictImage(url)
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 // --- test seams --------------------------------------------------------------

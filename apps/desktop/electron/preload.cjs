@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('gmatch', {
   cacheImage: (url) => ipcRenderer.invoke('cache:image', url),
   cacheStats: () => ipcRenderer.invoke('cache:stats'),
   clearCache: () => ipcRenderer.invoke('cache:clear'),
+  evictImage: (url) => ipcRenderer.invoke('cache:evict', url),
   // Player-owned idle folders (dialog-picked, served over idle-file://).
   customPickFolder: () => ipcRenderer.invoke('custom:pick-folder'),
   customListFolder: (id) => ipcRenderer.invoke('custom:list-folder', id),

@@ -205,12 +205,12 @@ function hasBadTag(tags, captions) {
 }
 
 function httpGet(url, headers) {
-  // imhentai's Cloudflare front challenges bare-Node fetches — a site
-  // Referer makes gallery/search pages answer 200 like a real browser tab.
-  const ref =
-    typeof url === 'string' && url.includes('imhentai.xxx')
-      ? { Referer: 'https://imhentai.xxx/' }
-      : {}
+  let ref = {}
+  if (typeof url === 'string') {
+    if (url.includes('imhentai.xxx')) ref = { Referer: 'https://imhentai.xxx/' }
+    else if (url.includes('realbooru.com')) ref = { Referer: 'https://realbooru.com/' }
+    else if (url.includes('booru.org')) ref = { Referer: 'https://booru.org/' }
+  }
   return new Promise((resolve, reject) => {
     const req = https.get(
       url,
@@ -292,6 +292,94 @@ function parsePahealXml(body, captions) {
       p.width * p.height >= MIN_PIXELS &&
       !hasBadTag(p.tags, captions),
   )
+}
+
+// --- konachan / yandere (Moebooru JSON: explicit hentai pools, no key) -------
+// Verified live: konachan.com answers rating:explicit server-side; yandere
+// ignores the rating filter, so rating is enforced client-side below.
+// Both paginate with ?page=N — random page per call keeps rounds fresh.
+function moebooruUrl(base, variant, n) {
+  const page = 1 + Math.floor(Math.random() * 5)
+  const tags = base.includes('konachan') ? `${variant} rating:explicit` : variant
+  return `${base}/post.json?tags=${encodeURIComponent(tags)}&limit=${n}&page=${page}`
+}
+
+function parseMoebooruJson(body, prefix, captions) {
+  let data
+  try {
+    data = JSON.parse(body)
+  } catch {
+    return []
+  }
+  const list = Array.isArray(data) ? data : []
+  return list
+    .filter((p) => p && typeof p === 'object')
+    .map((p) => ({
+      id: `${prefix}-${p.id ?? ''}`,
+      url: typeof p.file_url === 'string' ? p.file_url : '',
+      tags: typeof p.tags === 'string' ? p.tags.split(/[^a-z0-9_]+/i).filter(Boolean) : [],
+      rating: typeof p.rating === 'string' ? p.rating : 'e',
+      width: Number(p.width) || 0,
+      height: Number(p.height) || 0,
+    }))
+    .filter((p) => p.id !== `${prefix}-` && p.url)
+    .filter(
+      (p) =>
+        /\.(jpe?g|png)$/i.test(p.url) &&
+        (p.rating === 'explicit' || p.rating === 'e') &&
+        p.width >= MIN_WIDTH &&
+        p.height >= MIN_HEIGHT &&
+        p.width * p.height >= MIN_PIXELS &&
+        !hasBadTag(p.tags, captions),
+    )
+}
+
+// --- realbooru (HTML scraper: images/videos with Referer) --------------------
+function parseRealbooruHtml(html, captions) {
+  const posts = []
+  const imgRegex =
+    /<img\s+[^>]*src="https:\/\/realbooru\.com\/thumbnails\/([^/]+)\/([^/]+)\/thumbnail_([^."]+)\.jpg"[^>]*title="([^"]*)"[^>]*alt="Image:\s*(\d+)"/gi
+  let m
+  while ((m = imgRegex.exec(html)) !== null) {
+    const [, dir1, dir2, hash, rawTitle, postId] = m
+    const tags = rawTitle
+      .split(/,\s*/)
+      .map((t) => t.trim().replace(/\s+/g, '_'))
+      .filter(Boolean)
+    const isVideo = tags.includes('video') || tags.includes('mp4') || tags.includes('webm')
+    const ext = isVideo ? 'mp4' : 'jpg'
+    const url = `https://realbooru.com/images/${dir1}/${dir2}/${hash}.${ext}`
+    if (!hasBadTag(tags, captions)) {
+      posts.push({ id: `rb-${postId}`, url, tags, rating: 'e', width: 1200, height: 1200 })
+    }
+  }
+  return posts
+}
+
+// --- booru.org subdomains (hgoon, blacked, allgirl, rule34) ------------------
+function parseBooruOrgHtml(html, sub, captions) {
+  const posts = []
+  const imgRegex =
+    /<img\s+[^>]*src="https:\/\/thumbs\.booru\.org\/([^/]+)\/thumbnails\/\/([^/]+)\/thumbnail_([^."]+)\.([^"]+)"[^>]*title="([^"]*)"/gi
+  let m
+  while ((m = imgRegex.exec(html)) !== null) {
+    const [, bSub, dir, hash, ext, rawTitle] = m
+    const ratingMatch = /rating:([a-z]+)/i.exec(rawTitle)
+    const rating = ratingMatch ? ratingMatch[1].toLowerCase() : 'e'
+    const tagsPart = rawTitle
+      .replace(/score:\d+/i, '')
+      .replace(/rating:[a-z]+/i, '')
+      .trim()
+    const tags = tagsPart.split(/\s+/).filter(Boolean)
+    const url = `https://img.booru.org/${bSub}//images/${dir}/${hash}.${ext}`
+    const id = `${bSub}-${hash.slice(0, 10)}`
+    if (rating === 'explicit' || rating === 'e' || rating === 'questionable') {
+      if (!hasBadTag(tags, captions)) {
+        posts.push({ id, url, tags, rating: 'e', width: 1200, height: 1200 })
+      }
+    }
+  }
+  return posts
 }
 
 // --- redgifs (real/hardcore porn: pornstars, BBC, mp4s/gifs) ------------------
@@ -525,6 +613,73 @@ const SOURCES = [
     id: 'imhentai',
     fetch: (variant, n, captions) => fetchImhentai(variant, n, captions),
   },
+  {
+    // Explicit hentai pools (Moebooru JSON, no key): biggest anime/hentai
+    // archive of the bunch. Serves uncensored per yandere/konachan probes.
+    id: 'konachan',
+    fetch: async (variant, n, captions) =>
+      parseMoebooruJson(await httpGet(moebooruUrl('https://konachan.com', variant, n)), 'kona', captions),
+  },
+  {
+    id: 'yandere',
+    fetch: async (variant, n, captions) =>
+      parseMoebooruJson(await httpGet(moebooruUrl('https://yande.re', variant, n)), 'yand', captions),
+  },
+  {
+    // realbooru: real/hardcore porn (jav uncensored, pov, homemade).
+    // DAPI offline (API deliberately disabled) — HTML list scraper.
+    id: 'realbooru',
+    fetch: async (variant, n, captions) => {
+      const firstTag = variant.split(/\s+/).filter(Boolean)[0] || ''
+      const pid = Math.floor(Math.random() * 5)
+      const html = await httpGet(
+        `https://realbooru.com/index.php?page=post&s=list&tags=${encodeURIComponent(firstTag)}&pid=${pid}`
+      )
+      return parseRealbooruHtml(html, captions).slice(0, n)
+    },
+  },
+  {
+    // booru.org subdomains — same engine, shared parse:
+    // hgoon (goon hentai), blacked (interracial), allgirl, rule34.
+    id: 'hgoon',
+    fetch: async (variant, n, captions) => {
+      const firstTag = variant.split(/\s+/).filter(Boolean)[0] || ''
+      const html = await httpGet(
+        `https://hgoon.booru.org/index.php?page=post&s=list&tags=${encodeURIComponent(firstTag)}`
+      )
+      return parseBooruOrgHtml(html, 'hgoon', captions).slice(0, n)
+    },
+  },
+  {
+    id: 'blacked',
+    fetch: async (variant, n, captions) => {
+      const firstTag = variant.split(/\s+/).filter(Boolean)[0] || ''
+      const html = await httpGet(
+        `https://blacked.booru.org/index.php?page=post&s=list&tags=${encodeURIComponent(firstTag)}`
+      )
+      return parseBooruOrgHtml(html, 'blacked', captions).slice(0, n)
+    },
+  },
+  {
+    id: 'allgirl',
+    fetch: async (variant, n, captions) => {
+      const firstTag = variant.split(/\s+/).filter(Boolean)[0] || ''
+      const html = await httpGet(
+        `https://allgirl.booru.org/index.php?page=post&s=list&tags=${encodeURIComponent(firstTag)}`
+      )
+      return parseBooruOrgHtml(html, 'allgirl', captions).slice(0, n)
+    },
+  },
+  {
+    id: 'rule34-org',
+    fetch: async (variant, n, captions) => {
+      const firstTag = variant.split(/\s+/).filter(Boolean)[0] || ''
+      const html = await httpGet(
+        `https://rule34.booru.org/index.php?page=post&s=list&tags=${encodeURIComponent(firstTag)}`
+      )
+      return parseBooruOrgHtml(html, 'rule34', captions).slice(0, n)
+    },
+  },
 ]
 
 // AND-combos of narrow pervert tags often return 0 on DAPI mirrors, so each
@@ -636,6 +791,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('cache:image', (_event, url) => imageCache.cacheImage(url).then((local) => ({ local })))
   ipcMain.handle('cache:stats', () => imageCache.cacheStats())
   ipcMain.handle('cache:clear', () => imageCache.clearCache())
+  ipcMain.handle('cache:evict', (_event, url) => ({ ok: imageCache.evict(String(url ?? '')) }))
   // Update check (Settings): installed version + open the download in the OS browser.
   ipcMain.handle('app:version', () => app.getVersion())
   ipcMain.handle('shell:open', (_event, url) => {

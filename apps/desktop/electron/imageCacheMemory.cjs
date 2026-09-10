@@ -45,6 +45,14 @@ function get(key) {
   return hit.buf
 }
 
+function del(key) {
+  const hit = map.get(key)
+  if (!hit) return false
+  total -= hit.bytes
+  map.delete(key)
+  return true
+}
+
 function clear() {
   map.clear()
   total = 0
@@ -54,4 +62,4 @@ function totalBytes() { return total }
 function size() { return map.size }
 function getMaxBytes() { return maxBytes }
 
-module.exports = { put, get, clear, setMaxBytes, totalBytes, size, getMaxBytes }
+module.exports = { put, get, del, clear, setMaxBytes, totalBytes, size, getMaxBytes }

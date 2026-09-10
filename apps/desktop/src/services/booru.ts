@@ -63,10 +63,25 @@ const TIMEOUT_MS = 10_000
 // (localStorage), capped so it can't grow forever. Same file under a
 // different mirror id still counts as seen via its URL.
 const SEEN_KEY = 'gmatch.seen.v1'
-const SEEN_CAP = 500
+// ponytail: never repeat images across gameplay; large budget prevents recycling
+const SEEN_CAP = 50_000
 const seenIds = new Set<string>()
 const seenUrls = new Set<string>()
 let seenLoaded = false
+
+export function markSeen(id?: string, url?: string): void {
+  loadSeen()
+  if (id) seenIds.add(String(id))
+  if (url) seenUrls.add(String(url))
+  persistSeen()
+}
+
+export function isSeen(id?: string, url?: string): boolean {
+  loadSeen()
+  if (id && seenIds.has(String(id))) return true
+  if (url && seenUrls.has(String(url))) return true
+  return false
+}
 
 function loadSeen(): void {
   if (seenLoaded) return
@@ -152,8 +167,10 @@ function sanitize(posts: BooruPost[], query?: string): BooruPost[] {
 
 /** Mirrors reachable through the Vite dev proxy (same-origin → no CORS). */
 const DIRECT_SOURCES = [
-  { id: 'tbib-direct', origin: 'https://tbib.org', proxy: '/booru/tbib' },
-  { id: 'xbooru-direct', origin: 'https://xbooru.com', proxy: '/booru/xbooru' },
+  { id: 'tbib-direct', origin: 'https://tbib.org', proxy: '/booru/tbib', type: 'dapi' },
+  { id: 'xbooru-direct', origin: 'https://xbooru.com', proxy: '/booru/xbooru', type: 'dapi' },
+  { id: 'konachan-direct', origin: 'https://konachan.com', proxy: '/booru/kona', type: 'moebooru' },
+  { id: 'yandere-direct', origin: 'https://yande.re', proxy: '/booru/yand', type: 'moebooru' },
 ] as const
 
 /**
@@ -195,6 +212,19 @@ function toPosts(
     .filter((p) => p.id && p.url)
 }
 
+function toMoePosts(data: unknown, _origin: string): BooruPost[] {
+  const list = Array.isArray(data) ? data : []
+  return list
+    .filter((p): p is Record<string, unknown> => typeof p === 'object' && p !== null)
+    .map((p) => ({
+      id: String(p.id ?? ''),
+      url: typeof p.file_url === 'string' ? p.file_url : '',
+      tags: typeof p.tags === 'string' ? (p.tags as string).split(/\s+/).filter(Boolean) : [],
+      rating: typeof p.rating === 'string' ? p.rating : 'e',
+    }))
+    .filter((p) => p.id && p.url)
+}
+
 /**
  * Browser-mode fetch. Hits the booru DAPIs through the Vite dev proxy
  * (same-origin, so no CORS block). Outside `vite dev` the proxy doesn't
@@ -214,9 +244,18 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
     let reachable = true
     for (const variant of queryVariants(req.tags)) {
       if (!reachable) break
-      const url = `${src.proxy}/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
-        `${variant} rating:explicit ${neg}`,
-      )}&limit=${req.limit}&json=1&pid=${pid}`
+      let url: string
+      let kind: 'dapi' | 'moe' = 'dapi'
+      if (src.type === 'moebooru' || src.id === 'konachan-direct' || src.id === 'yandere-direct') {
+        kind = 'moe'
+        const page = 1 + Math.floor(Math.random() * 5)
+        const tags = src.id === 'konachan-direct' ? `${variant} rating:explicit` : variant
+        url = `${src.proxy}/post.json?tags=${encodeURIComponent(tags)}&limit=${req.limit}&page=${page}`
+      } else {
+        url = `${src.proxy}/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
+          `${variant} rating:explicit ${neg}`,
+        )}&limit=${req.limit}&json=1&pid=${pid}`
+      }
       let res: Response
       try {
         res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) })
@@ -240,7 +279,7 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
       } catch {
         continue
       }
-      const clean = sanitize(toPosts(data, src.origin), variant)
+      const clean = sanitize(kind === 'moe' ? toMoePosts(data, src.origin) : toPosts(data, src.origin), variant)
       if (clean.length === 0) continue
       const fresh = remember(clean)
       if (fresh.length === 0) continue // all repeats — narrower pages may be new

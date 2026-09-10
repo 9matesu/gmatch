@@ -9,7 +9,7 @@ import { randomBytes } from 'node:crypto'
 import path, { join } from 'node:path'
 
 // Hosts the dev /px byte-proxy may fetch (allowlist — no open proxy).
-const PX_ALLOW = /(^|\.)(imhentai\.xxx|paheal\.net|tbib\.org|xbooru\.com|redgifs\.com)$/
+const PX_ALLOW = /(^|\.)(imhentai\.xxx|paheal\.net|tbib\.org|xbooru\.com|redgifs\.com|konachan\.com|yande\.re|files\.yande\.re|realbooru\.com|booru\.org)$/
 
 const DEV_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36'
@@ -170,6 +170,27 @@ export default defineConfig({
         target: 'https://api.redgifs.com',
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/rg-auth/, ''),
+      },
+      '^/booru/kona': {
+        target: 'https://konachan.com',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/booru\/kona/, ''),
+      },
+      '^/booru/yand': {
+        target: 'https://yande.re',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/booru\/yand/, ''),
+      },
+      '^/booru/real': {
+        target: 'https://realbooru.com',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/booru\/real/, ''),
+        headers: { Referer: 'https://realbooru.com/' },
+      },
+      '^/booru/hgoon': {
+        target: 'https://hgoon.booru.org',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/booru\/hgoon/, ''),
       },
     },
   },
