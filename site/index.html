@@ -81,12 +81,12 @@
 
 <section id="download">
 <h2>Download (Windows x64, single file)</h2>
-<p>Version <strong id="version">1.1.0</strong> · file <code>gMatch-1.1.0-portable.exe</code> · 114,146,607 bytes (108.9 MiB) · built <span id="build-date">2026-09-09T11:58:34.956Z</span> (UTC).</p>
-<p><a href="releases/gMatch-1.1.0-portable.exe" download>Download gMatch-1.1.0-portable.exe</a></p>
+<p>Version <strong id="version">1.1.1</strong> · file <code>gMatch-1.1.1-portable.exe</code> · 114,146,607 bytes (108.9 MiB) · built <span id="build-date">2026-09-10T06:03:41.760Z</span> (UTC).</p>
+<p><a href="releases/gMatch-1.1.1-portable.exe" download>Download gMatch-1.1.1-portable.exe</a></p>
 <p>Expected <strong>SHA-256</strong> — copy the value below and check it against the next section before running anything:</p>
-<pre id="sha256">f7608ffa2ece37f5d23fc772699a3a989e3c915d95600a4fcc904b6fba11a4e7</pre>
+<pre id="sha256">209d5ff173309f607871c10c2d71df1364d3597d812674ca452a559a26862ab9</pre>
 <p>Expected <strong>SHA-512</strong> (extra paranoia is a virtue when the file is 109 MB):</p>
-<pre id="sha512">5bfebc0809d50f423c025c04dcf4c85901b881651a6cce8fe95047c34d8e603158a7e5991fef989a7ec44b54f959b022a9e2eaf5660982e2d964a2f63fbd71d2</pre>
+<pre id="sha512">dddeb7aca96548b09a6f5286c195acd226b4a0769150f31c13bedff7380d6cbd8c5ea797e3cbc865b1f296529bcdbd776d312f5202187c5d14e29d31d1bc0c1c</pre>
 <p><em>(Both hashes — plus the build date and byte count above — are derived mechanically from the shipped file at publish time, never hand-typed. The same data lives at <code>release.json</code> on this server.)</em></p>
 <h3>Code signing: what we do and don't have</h3>
 <p>This binary is <strong>not Authenticode-signed</strong>. A commercial code-signing certificate costs hundreds of dollars a year; we fund this project with donations, not data sales, so instead we publish the cryptographic integrity you can verify yourself: SHA-256 and SHA-512 digests derived from the exact bytes served on this page. There is no macOS or Linux build yet.</p>
@@ -102,7 +102,7 @@
 <section id="verify">
 <h2>Verify the hash on Windows (20 seconds, nothing to install)</h2>
 <p>Open the Start menu, type <code>PowerShell</code>, and run (adjust the path if you saved elsewhere):</p>
-<pre>Get-FileHash "$env:USERPROFILE\Downloads\gMatch-1.1.0-portable.exe" -Algorithm SHA256</pre>
+<pre>Get-FileHash "$env:USERPROFILE\Downloads\gMatch-1.1.1-portable.exe" -Algorithm SHA256</pre>
 <p>Compare the <code>Hash</code> value with the one published above. If it differs by even ONE character, do NOT run the file: delete it and report at <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a>.</p>
 <p>Same idea, any algorithm you prefer: <code>Get-FileHash ... -Algorithm SHA512</code> must match the SHA-512 block above.</p>
 </section>
