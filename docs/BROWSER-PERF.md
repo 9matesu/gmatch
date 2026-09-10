@@ -119,6 +119,17 @@ against a stale key). Now: 65s sync cadence, 429 carries `retryInMs` +
 `Retry-After`, the loop backs off, retries go through `fetchImpl`. Verified
 live: credit#2 → `429 Retry-After: 60 {"retryInMs":59991}`.
 
+## Post-script: the "low fps" report after the sweep was NOT code
+After the fixes shipped, the app still felt locked and the probe threw
+ERR_INSUFFICIENT_RESOURCES on every new page. Root cause: **C: drive at
+100% full (0 bytes)** — Chrome cannot write GPU/tab cache, Windows stalls,
+everything crawls. Disk fixed (2.1 GB+ free), re-measured with the same
+tools: prod walk RecalcStyle 0.885s / scroll **fps 60**; dev walk 0.954s /
+**fps 59** (dev Script 3.9s = hundreds of unbundled vite modules — a
+dev-mode artifact, not felt lag). Idle-stage probe (`tools/fps-idle.mjs`,
+the screen the report named): 60 fps, 0 long tasks, 0 running animations,
+both bases. Lesson for "before it was fluid, now it stutters": check `df`
+before profiling — a full system drive mimics a perf regression perfectly.
 
 ## Repro commands
 ```
