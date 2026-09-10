@@ -802,3 +802,20 @@ describe('Admin API — Lobby Images & Matches Moderation', () => {
     expect(match.result).toBe('admin_cancelled')
   })
 })
+
+describe('pagedQuery helper', () => {
+  it('clamps limit/offset and trims q', async () => {
+    const { pagedQuery } = await import('./admin')
+    const fake = (u: string) => ({ req: { url: `http://x${u}` } })
+    const a = pagedQuery(fake('/?q=%20hi%20&limit=9999&offset=-5'), 50, 200)
+    expect(a.q).toBe('hi')
+    expect(a.limit).toBe(200)
+    expect(a.offset).toBe(0)
+    const b = pagedQuery(fake('/'), 100, 500)
+    expect(b.limit).toBe(100)
+    expect(b.offset).toBe(0)
+    expect(b.param('missing')).toBe('')
+    const c = pagedQuery(fake('/?limit=abc'), 50, 200)
+    expect(c.limit).toBe(50)
+  })
+})

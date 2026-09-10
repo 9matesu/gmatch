@@ -18,7 +18,7 @@ interface EconomyTabProps {
 
 const subTabs = [
   { id: "cards", label: "Cards", icon: CreditCard },
-  { id: "wallets", label: "Wallets", icon: Wallet },
+  { id: "wallets", label: "Wallets (game g$)", icon: Wallet },
   { id: "ledger", label: "Ledger", icon: ListChecks },
   { id: "marketplace", label: "Marketplace", icon: ShoppingBag },
   { id: "decks", label: "Decks", icon: Layers },
@@ -425,7 +425,7 @@ export function EconomyTab({ identity, pinVerified, onZoom, onAction }: EconomyT
             <h2 className="text-xs font-bold uppercase tracking-wider">User Wallets</h2>
           </div>
           {wallets.length === 0 ? (
-            <AdminEmptyState title="No wallets" description="User wallets will appear here" illustration="folder" />
+            <AdminEmptyState title="No wallets" description="In-game g$ wallets will appear here (no financial data)" illustration="folder" />
           ) : (
             <div className="divide-y divide-border-subtle">
               {wallets.map(renderWalletRow)}

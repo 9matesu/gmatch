@@ -365,6 +365,10 @@ export const adminApi = {
       body: JSON.stringify({ action }),
     }),
 
+  /** Case = one report, seen legally: report + disclosed evidence + parties. */
+  caseDetail: (identity: OrbitIdentity, reportId: string) =>
+    fetchJson<Record<string, any>>(`${ADMIN_BASE}/cases/${reportId}`, identity),
+
   hideLobbyComment: (identity: OrbitIdentity, commentId: string) =>
     fetchJson<{ ok: boolean }>(`${ADMIN_BASE}/lobby-comments/${commentId}/hide`, identity, { method: "POST" }),
 

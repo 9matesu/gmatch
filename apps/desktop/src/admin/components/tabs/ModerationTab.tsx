@@ -17,7 +17,7 @@ interface ModerationTabProps {
 }
 
 const subTabs = [
-  { id: "reports", label: "Content Reports", icon: Flag },
+  { id: "reports", label: "Cases (Reports)", icon: Flag },
   { id: "comments", label: "Lobby Comments", icon: MessageSquare },
   { id: "chat", label: "Chat Messages", icon: Hash },
 ] as const;
@@ -40,9 +40,18 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
   const [selectedReport, setSelectedReport] = useState<AdminReport | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Case detail (report-scoped evidence + parties) fetched on expand —
+  // the only door to disclosed private content, per docs/ADMIN-SUITE.md.
+  const [caseDetail, setCaseDetail] = useState<Record<string, any>>({});
 
   const toggleExpand = (id: string) => {
-    setExpandedId(prev => (prev === id ? null : id));
+    setExpandedId(prev => {
+      const next = prev === id ? null : id;
+      if (next && identity && !caseDetail[next]) {
+        adminApi.caseDetail(identity, next).then(d => setCaseDetail(prev2 => ({ ...prev2, [next]: d }))).catch(() => { });
+      }
+      return next;
+    });
   };
 
   const fetchReports = useCallback(async () => {
@@ -239,6 +248,27 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                   <span className="text-retro-fg font-mono">{new Date(report.created_at).toLocaleString()}</span>
                 </div>
               </div>
+              {(() => {
+                const cd = caseDetail[report.id];
+                const parties = cd?.dm_parties;
+                const evidence = cd?.evidence;
+                if (!parties && !evidence) return null;
+                return (
+                  <div className="text-xs bg-surface-canvas/40 p-2.5 rounded border border-border-glass space-y-1.5">
+                    <span className="text-retro-muted text-[10px] block">Disclosed with the report:</span>
+                    {parties && (
+                      <div className="text-retro-fg">
+                        DM parties: {parties.sender_name || parties.sender_id.slice(0, 8)} → {parties.recipient_name || parties.recipient_id.slice(0, 8)}
+                      </div>
+                    )}
+                    {evidence && (
+                      <div className="text-retro-fg font-mono text-[10px] break-all">
+                        evidence object {String(evidence.id).slice(0, 12)} · {evidence.mime_type} · {(evidence.size_bytes / 1024).toFixed(0)} KiB
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               {report.preview && (
                 <div className="text-xs bg-surface-canvas/40 p-2.5 rounded border border-border-glass">
                   <span className="text-retro-muted text-[10px] block mb-0.5">Content Preview / Text:</span>

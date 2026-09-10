@@ -156,15 +156,23 @@ admin.use('/babecock', adminAuth)
 admin.use('/chat', adminAuth)
 admin.use('/chat/*', adminAuth)
 
+/** Shared paged-query parsing for the list endpoints: trimmed search,
+ * clamped limit/offset. Keeps every /api/admin list honest about ranges. */
+export function pagedQuery(c: { req: { url: string } }, defLimit = 50, maxLimit = 200) {
+  const url = new URL(c.req.url)
+  const q = (url.searchParams.get('q') || '').trim()
+  const limit = Math.min(Math.max(Number(url.searchParams.get('limit') || defLimit) || defLimit, 1), maxLimit)
+  const offset = Math.max(Number(url.searchParams.get('offset') || 0) || 0, 0)
+  const param = (name: string) => (url.searchParams.get(name) || '').trim()
+  return { url, q, limit, offset, param }
+}
+
 // Canonical card browser for the Cards & Economy admin workspace. Card value
 // and ownership remain service-owned; this endpoint is deliberately read-only.
 admin.get('/cards', async (c) => {
-  const url = new URL(c.req.url)
-  const q = (url.searchParams.get('q') || '').trim()
-  const owner = (url.searchParams.get('owner') || '').trim()
-  const state = (url.searchParams.get('moderation_state') || '').trim()
-  const limit = Math.min(Math.max(Number(url.searchParams.get('limit') || 50), 1), 200)
-  const offset = Math.max(Number(url.searchParams.get('offset') || 0), 0)
+  const { q, limit, offset, param } = pagedQuery(c)
+  const owner = param('owner')
+  const state = param('moderation_state')
   const where: string[] = []
   const args: unknown[] = []
   if (q) {
@@ -962,12 +970,9 @@ admin.delete('/lobby-images/:id', async (c) => {
 // keeping this resource explicit prevents the admin UI from conflating feed
 // moderation with the broader private media store.
 admin.get('/posts', async (c) => {
-  const url = new URL(c.req.url)
-  const q = (url.searchParams.get('q') || '').trim()
-  const author = (url.searchParams.get('author_id') || '').trim()
-  const visibility = url.searchParams.get('visibility') || 'all'
-  const limit = Math.min(Math.max(Number(url.searchParams.get('limit') || 50), 1), 200)
-  const offset = Math.max(Number(url.searchParams.get('offset') || 0), 0)
+  const { q, limit, offset, param } = pagedQuery(c)
+  const author = param('author_id')
+  const visibility = param('visibility') || 'all'
   const where = ['o.is_public = 1']
   const args: unknown[] = []
   if (visibility === 'hidden') where.push('o.hidden_at IS NOT NULL')
@@ -1028,14 +1033,11 @@ admin.delete('/posts/:id', async (c) => {
 
 // Sent pictures stream (objects)
 admin.get('/objects', async (c) => {
-  const url = new URL(c.req.url)
-  const q = (url.searchParams.get('q') || '').trim()
-  const owner = (url.searchParams.get('owner') || '').trim()
-  const type = url.searchParams.get('type') || ''
-  const sort = url.searchParams.get('sort') || 'created_at'
-  const order = url.searchParams.get('order')?.toLowerCase() === 'asc' ? 'ASC' : 'DESC'
-  const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '100', 10) || 100, 1), 500)
-  const offset = Math.max(parseInt(url.searchParams.get('offset') || '0', 10) || 0, 0)
+  const { q, limit, offset, param } = pagedQuery(c, 100, 500)
+  const owner = param('owner')
+  const type = param('type')
+  const sort = param('sort') || 'created_at'
+  const order = param('order').toLowerCase() === 'asc' ? 'ASC' : 'DESC'
 
   const where: string[] = []
   const params: unknown[] = []
@@ -1202,13 +1204,10 @@ const REPORT_ACCEPTED_TYPES = new Set([
 ])
 
 admin.get('/content-reports', async (c) => {
-  const url = new URL(c.req.url)
-  const q = (url.searchParams.get('q') || '').trim()
-  const status = url.searchParams.get('status') || ''
-  const category = url.searchParams.get('category') || ''
-  const targetType = url.searchParams.get('target_type') || ''
-  const limit = Math.min(Math.max(Number(url.searchParams.get('limit') || '200') || 200, 1), 500)
-  const offset = Math.max(Number(url.searchParams.get('offset') || '0') || 0, 0)
+  const { q, limit, offset, param } = pagedQuery(c, 200, 500)
+  const status = param('status')
+  const category = param('category')
+  const targetType = param('target_type')
 
   const where: string[] = []
   const params: unknown[] = []
@@ -1427,14 +1426,11 @@ admin.get('/cases/:id', async (c) => {
 
 // List all users with ban status + identification + activity stamps
 admin.get('/users', async (c) => {
-  const url = new URL(c.req.url)
-  const q = (url.searchParams.get('q') || '').trim()
-  const role = url.searchParams.get('role') || ''
-  const status = url.searchParams.get('status') || ''
-  const sort = url.searchParams.get('sort') || 'last_seen'
-  const order = url.searchParams.get('order')?.toLowerCase() === 'asc' ? 'ASC' : 'DESC'
-  const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '200', 10) || 200, 1), 500)
-  const offset = Math.max(parseInt(url.searchParams.get('offset') || '0', 10) || 0, 0)
+  const { q, limit, offset, param } = pagedQuery(c, 200, 500)
+  const role = param('role')
+  const status = param('status')
+  const sort = param('sort') || 'last_seen'
+  const order = param('order').toLowerCase() === 'asc' ? 'ASC' : 'DESC'
 
   const where: string[] = []
   const params: unknown[] = []
@@ -2199,6 +2195,7 @@ admin.post('/bot-config/sync-images', async (c) => {
   try { body = await c.req.json() } catch { }
   const playerTags = Array.isArray(body.tags) ? body.tags : undefined
   const cached = await refreshBotImageCache(c.env.DB, 20, playerTags)
+  await logAdminAction(c.env.DB, c.get('orbitId'), 'bot_sync_images', { type: 'bot_config' }, `cached=${cached.length}`)
   return c.json({ success: true, cachedCount: cached.length, samples: cached.slice(0, 5).map(c => c.url) })
 })
 
