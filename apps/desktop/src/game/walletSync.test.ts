@@ -37,6 +37,16 @@ describe('syncWallet (net flush, both directions)', () => {
     )
   })
 
+  it('chunks a >1M delta into server-legal credits (big offline resumes)', async () => {
+    const c = ctx({ gc: 2_500_000, credited: 0, debited: 0 })
+    const r = await syncWallet(c)
+    expect(c.post).toHaveBeenCalledWith(
+      '/api/economy/idle-credit',
+      expect.objectContaining({ body: expect.stringContaining('"amount":1000000') }),
+    )
+    expect(r!.credited).toBe(1_000_000)
+  })
+
   it('debits when mirrored spend exceeds flushed earnings', async () => {
     // earned 50 (credited 50), spent 20 locally -> gc 30, server expects 50
     const c = ctx({ gc: 30, credited: 50, debited: 0 })

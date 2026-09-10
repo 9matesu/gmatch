@@ -55,11 +55,11 @@ with duels, lootboxes, hacks and trades — one wallet, one economy.
   `POST /api/economy/idle-credit` / `idle-debit` (idempotent, 60s throttle).
   Credits are envelope-checked (economy-idle.ts `idleEnvelope`): after the
   first trusted flush per server start, each credit must fit 1.5× the client's
-  claimed g$/s elapsed rate (growth-capped 2x+100/credit, ceiling 50k/s).
-  Honest offline resumes (50% rule) always fit; a modified client cannot mint
-  g$ faster than its own registered rate — on shared/federated nodes this
-  protects OTHER players' leaderboards; on a node you host it only disciplines
-  honest crashes (best-effort by design).
+  claimed g$/s elapsed rate (claim ceiling 50k/s).
+  Honest offline resumes (50% rule) always fit; a modified client on someone
+  else's node is bounded to 1.5× the 50k/s claim ceiling (not unlimited, not
+  zero — best-effort by design, documented, protects casual leaderboard
+  integrity); on a node you host it only disciplines honest crashes.
   Legacy GP was a 1:1 rename (GP retired; old saves migrate `gp`→`gc`).
 - **XP** — drives Pornification tier (never resets within a run).
 - **Corruption shards** — prestige currency, persists through Brainmelt.

@@ -90,14 +90,15 @@ economyIdle.post('/idle-credit', async (c) => {
   }
 
   // Earnings envelope (SPEC §2): the FIRST credit after a server start is a
-  // trusted flush (honest resume with offline earnings — the sidecar restarts
-  // with the app, so this is "you" on your own machine). From the NEXT credit
-  // on, the client must claim its g$/s rate and the flush must fit
-  // floor(elapsed * claim * 1.5) + 5, with the claim growth-capped at 2x+100
-  // per credit so step-function buffs (caps, prestige) converge in a few
-  // ticks while a modified client cannot jump to the 50k/s ceiling. A
-  // missing/zero claim after registration fails loudly or keeps the previous
-  // rate respectively — the client can only ever under-claim.
+  // trusted flush (honest resume with offline earnings — the bundled sidecar
+  // restarts with the app, so the anchor is genuinely you). From the NEXT
+  // credit on, the flush must fit floor(elapsed * claimedGps * 1.5) + 5:
+  // the client MEASURES its velocity (totalEarned samples) and can only
+  // over-claim up to the MAX_CLAIMED_GPS ceiling — which is the documented
+  // best-effort bound: a modified client on a shared node mints at most 1.5x
+  // the highest sane rate, not unlimited. A missing claim after registration
+  // fails loudly; a zero claim (client's first sample window) keeps the
+  // registered rate — measured beats estimated, never jamming honest flows.
   let effectiveGps: number
   if (!prev) {
     effectiveGps = claimGps === null ? 0 : Math.min(Math.max(claimGps, 0), MAX_CLAIMED_GPS)
@@ -105,8 +106,7 @@ economyIdle.post('/idle-credit', async (c) => {
     if (claimGps === null && !isReplay) {
       return c.json({ error: 'gps (current passive g$/s) is required once a rate is registered' }, 400)
     }
-    const cap = prev.gps * 2 + 100
-    effectiveGps = !claimGps ? prev.gps : Math.min(claimGps, cap, MAX_CLAIMED_GPS)
+    effectiveGps = !claimGps ? prev.gps : Math.min(claimGps, MAX_CLAIMED_GPS)
     const maxAllowed = idleEnvelope(effectiveGps, now - prev.at, false)
     if (!isReplay && amount > maxAllowed) {
       return c.json({ error: `Credit exceeds your registered earning rate (max ${maxAllowed} now)`, maxAllowed }, 400)

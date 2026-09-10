@@ -32,16 +32,19 @@ export async function syncWallet(c: WalletSyncCtx): Promise<WalletState | null> 
   const delta = pendingDelta(c)
   if (delta === 0) return null
   if (delta > 0) {
+    // The ledger caps one credit at 1M — chunk honest big flushes (a long
+    // offline resume at high g$/s) instead of wedging on a permanent 400.
+    const amount = Math.min(delta, 1_000_000)
     // Stable key per (identity, credited-marker): a retry after a dropped
     // response replays server-side instead of double-paying.
     const key = `idle-${c.orbitId}-${c.credited}`.slice(0, 128)
     try {
       const res = await c.post('/api/economy/idle-credit', {
-        body: JSON.stringify({ amount: delta, session: c.orbitId, gps: Math.floor(c.gps || 0) }),
+        body: JSON.stringify({ amount, session: c.orbitId, gps: Math.floor(c.gps || 0) }),
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
       })
       if (!res.ok) return null
-      return markCredited(c, delta)
+      return markCredited(c, amount)
     } catch {
       return null
     }
