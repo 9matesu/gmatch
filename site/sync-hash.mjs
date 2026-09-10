@@ -1,12 +1,12 @@
 // Run from site/: node sync-hash.mjs
-// Rewrites the <pre id="sha256"> and version markers in index.html/en.html
+// Rewrites the <pre id="sha256"> and version markers in index.html
 // from release.json. Idempotent; the source of truth is release.json (which
 // build-release.mjs derives FROM THE FILE).
 import { readFileSync, writeFileSync } from 'node:fs'
 
 const rel = JSON.parse(readFileSync('release.json', 'utf8'))
 let touched = 0
-for (const file of ['index.html', 'en.html']) {
+for (const file of ['index.html']) {
   let html = readFileSync(file, 'utf8')
   const before = html
   // sha block

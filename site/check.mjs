@@ -9,9 +9,9 @@ const legalDir = join(ROOT, 'legal')
 const legalPages = existsSync(legalDir)
   ? readdirSync(legalDir).filter((f) => f.endsWith('.html')).map((f) => `legal/${f}`)
   : []
-const pages = ['index.html', 'en.html', ...legalPages].filter((p) => existsSync(join(ROOT, p)))
-if (pages.length < 2 + legalPages.length) {
-  console.error('CHECK FAILED: missing base pages (index.html/en.html)')
+const pages = ['index.html', ...legalPages].filter((p) => existsSync(join(ROOT, p)))
+if (!pages.includes('index.html')) {
+  console.error('CHECK FAILED: missing base page (index.html)')
   process.exit(1)
 }
 const fail = []
@@ -24,7 +24,8 @@ for (const p of pages) {
     if (!ALLOW.test(m[1])) fail.push(`${p}: external URL ${m[1]}`)
   for (const m of html.matchAll(/<(script|style|link|iframe|img)[^>]*>/gi)) {
     const tag = m[0]
-    if (/<link\b/i.test(tag) || /<style\b/i.test(tag) || /<script\b/i.test(tag)) fail.push(`${p}: styling/script tag banned: ${tag.slice(0, 60)}`)
+    // inline <style> is allowed; scripts and EXTERNAL resources (<link>) are not
+    if (/<link\b/i.test(tag) || /<script\b/i.test(tag)) fail.push(`${p}: script/external-resource tag banned: ${tag.slice(0, 60)}`)
     if (/<img\b/i.test(tag) && !/src="(?:data:image|img\/[a-z0-9-]+\.png)"/.test(tag)) fail.push(`${p}: banned <img> src`);
   }
 }
@@ -40,7 +41,7 @@ if (existsSync(exe)) {
 } else {
   console.log('note: local exe absent — trusting release.json sha256 (CI fetched it from GitHub Release)')
 }
-for (const p of ['index.html', 'en.html']) {
+for (const p of ['index.html']) {
   const html = readFileSync(join(ROOT, p), 'utf8')
   const shown = /id="sha256">([0-9a-f]{64})</.exec(html)?.[1]
   if (shown !== rel.sha256) fail.push(`${p}: published sha256 ${shown} != release.json ${rel.sha256}`)
@@ -58,10 +59,9 @@ for (const p of ['index.html', 'en.html']) {
   }
 }
 
-// 3) âncoras internas resolvem + 4) seções obrigatórias (EN default, PT mirror)
+// 3) âncoras internas resolvem + 4) seções obrigatórias
 const SECTIONS = {
   'index.html': ['what-it-is', 'security', 'crypto', 'download', 'verify', 'terms', 'privacy'],
-  'en.html': ['o-que-e', 'seguranca', 'criptografia', 'download', 'verificar', 'termos', 'privacidade'],
 }
 for (const [file, ids] of Object.entries(SECTIONS)) {
   const html = readFileSync(join(ROOT, file), 'utf8')

@@ -4,6 +4,49 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Security Audit — gMatch</title>
+<style>
+:root { color-scheme: dark; }
+html { background: #09090b; }
+body {
+  margin: 0;
+  padding: 56px 32px 96px;
+  max-width: 560px;
+  background: #09090b;
+  color: #d4d4d8;
+  font: 13px/1.7 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  letter-spacing: -0.08em;
+  text-align: left;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, strong { color: #fafafa; font-weight: 600; }
+h1 { font-size: 21px; line-height: 1.25; margin: 0 0 16px; }
+h2 { font-size: 14px; margin: 40px 0 12px; }
+h3 { font-size: 13px; margin: 28px 0 10px; }
+p { margin: 0 0 14px; }
+em { color: #71717a; }
+a { color: #fafafa; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: #3f3f46; }
+a:hover { color: #fff; text-decoration-color: #fff; }
+ul { margin: 0 0 16px; padding-left: 20px; }
+li { margin: 7px 0; }
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px; letter-spacing: normal;
+  background: #121215; border: 1px solid #1f1f23; border-radius: 4px;
+  padding: 1px 5px; color: #e4e4e7;
+}
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px; letter-spacing: normal; line-height: 1.65;
+  background: #121215; border: 1px solid #27272a; border-radius: 6px;
+  padding: 14px 16px; margin: 0 0 16px; color: #fafafa;
+  overflow-wrap: anywhere; white-space: pre-wrap;
+}
+hr { border: 0; border-top: 1px solid #1f1f23; margin: 56px 0 20px; }
+table { border-collapse: collapse; margin: 0 0 16px; }
+th, td { border: 1px solid #27272a; padding: 6px 12px; text-align: left; font-weight: 500; }
+::selection { background: rgba(255, 255, 255, 0.15); }
+@media (max-width: 480px) { body { padding: 40px 20px 72px; } }
+</style>
 </head>
 <body>
 <p><a href="../index.html#terms">← back to the main page</a></p>
@@ -111,7 +154,26 @@ curl -sI "$API_BASE/api/objects/&lt;own-id&gt;" | grep -i cache-control         
 <p>implementada (export/import manual cobre v1; ver ADR-002). Kill-switch</p>
 <p><code>API_SEALED_ONLY</code> ainda aceita legado assinado (mitigação de suporte,</p>
 <p>documentada). B.7 (signed URLs) permanece fechado na rodada 1.</p>
+<h2>Rodada 3 (2026-09-10, v1.1.3+ / branch fix/logic-consistency-sweep)</h2>
+<pre>
+| # | Sev | Achado | Repro | Status |
+<pre>
+|---|-----|--------|-------|--------|
+<pre>
+| F16 | ALTA | `idle-credit` aceitava QUALQUER inteiro 1..1M por throttle de 60s — a SPEC dizia ledger "autoritativo", mas a validação de taxa de ganho só existia no cliente (jogador mal-intencionado forjava g$ em nós compartilhados/federados; rankings viravam ficção). | histórico `economy-idle.ts` (sem gate) | ✅ envelope server-side: `idleEnvelope` = 1.5× taxa reivindicada × elapsed + 5 (teto de claim 50k/s); primeiro flush pós-boot do nó é confiável por design. Testes `economy-idle.test.ts` (16). Escopo honesto: no SEU nó disciplina crashes; em nós alheios limita o cheat ao teto documentado, não elimina. |
+<pre>
+| F17 | BAIXA | `buyCard` bloqueia auto-compra de listing próprio desde o scaffold (guard + teste existentes) — mas o StoreTab oferecia botão Buy ativo no próprio listing (403 confuso ao clicar). | `grep "own card" apps/api/src/cards.test.ts` | ✅ badge "Yours" no lugar do botão (UI honesta; server já estava certo). |
+<pre>
+| F18 | MÉDIA | Debuffs de hack pagos viviam em ARRAY EM MEMÓRIA — reiniciar o sidecar (todo relaunch do app!) comia o efeito ativo da vítima e a sessão de spy-feed do atacante já cobrada em g$. | `grep -n "activeServerHacks" apps/api/src/routes/users.ts` (histórico) | ✅ tabela `HackDebuffs` (migração 048): INSERT via lote atômico do débito (gate `changes()`), prune/leituras via DB; cleanup de conta + allowlist de snapshot ligados. Teste "survives module re-init" (`spy-feed.test.ts`). |
+<pre>
+| F19 | BAIXA | Ações de Domination nunca-acked (vítima fechou o app; câmera bloqueada pelo SO) ficavam `sent` para sempre — UI honesta ("awaiting") mas estado terminal inexistente. | `SELECT count(*) FROM DominationActions WHERE status='sent'` antigo | ✅ sweep 30min `sent→expired` no `deleteExpiredContent` (3d) + chips "fizzled/skipped" com explicação do reembolso-zero e nota no modal de câmera. |
+</pre>
+<p>Admin (refactor de privacidade, mesma semana): leitura em massa de DMs e</p>
+<p>analytics de referrer REMOVIDAS do software; disclosure agora é report-scoped</p>
+<p>(<code>GET /api/admin/cases/:id</code> — a linha "(e) key-disclosure fase futura" da</p>
+<p>rodada 1 torna-se realidade implementada). Ledger completo em</p>
+<p><code>docs/ADMIN-SUITE.md</code>.</p>
 <hr>
-<p>Contact: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · This page uses no JavaScript, CSS, cookies or analytics.</p>
+<p>Contact: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · This page uses no JavaScript, no external fonts, no cookies and no analytics.</p>
 </body>
 </html>

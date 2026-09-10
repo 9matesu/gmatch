@@ -5,6 +5,81 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>gMatch — adult P2P network with end-to-end encryption</title>
 <meta name="description" content="A single-file Windows app: an adult social network + card arcade between consenting adults. Everything is encrypted between you and the recipient — the server reads nothing. Download it, verify the SHA-256, run it.">
+<style>
+:root { color-scheme: dark; }
+html { background: #09090b; }
+body {
+  margin: 0;
+  padding: 56px 32px 96px;
+  max-width: 560px;
+  background: #09090b;
+  color: #d4d4d8;
+  font: 13px/1.7 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  letter-spacing: -0.08em;
+  text-align: left;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, strong { color: #fafafa; font-weight: 600; }
+h1 { font-size: 21px; line-height: 1.25; margin: 0 0 16px; }
+h2 { font-size: 14px; margin: 56px 0 14px; }
+h3 { font-size: 13px; margin: 30px 0 10px; }
+p { margin: 0 0 14px; }
+em { color: #71717a; }
+a {
+  color: #fafafa;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: #3f3f46;
+}
+a:hover { color: #fff; text-decoration-color: #fff; }
+nav { margin: 20px 0 0; line-height: 2; }
+nav a { color: #71717a; text-decoration: none; }
+nav a:hover { color: #fafafa; text-decoration: underline; text-underline-offset: 3px; }
+ul { margin: 0 0 16px; padding-left: 20px; }
+li { margin: 7px 0; }
+ol { margin: 0 0 16px; padding-left: 20px; }
+ol li { margin: 8px 0; }
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: normal;
+  background: #121215;
+  border: 1px solid #1f1f23;
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: #e4e4e7;
+}
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: normal;
+  line-height: 1.65;
+  background: #121215;
+  border: 1px solid #27272a;
+  border-radius: 6px;
+  padding: 14px 16px;
+  margin: 0 0 16px;
+  color: #fafafa;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #27272a;
+  border-radius: 6px;
+  margin: 26px 0 10px;
+}
+footer {
+  margin-top: 72px;
+  padding-top: 20px;
+  border-top: 1px solid #1f1f23;
+  color: #71717a;
+}
+::selection { background: rgba(255, 255, 255, 0.15); }
+@media (max-width: 480px) { body { padding: 40px 20px 72px; } }
+</style>
 </head>
 <body>
 <header>
@@ -12,20 +87,47 @@
 <p><strong>Adult content: 18+ only.</strong> By downloading and using gMatch you declare you are a consenting adult in your jurisdiction.</p>
 <p>Built by two people who got annoyed that every "adult" platform keeps a copy of your most private moments on someone's server. gMatch is open code, no ads, no data sales, no sign-up. The server you'll talk to is, by design, almost blind.</p>
 <nav aria-label="Sections">
+<a href="#download">Download</a> ·
+<a href="#verify">Verify the file</a> ·
 <a href="#what-it-is">What it is</a> ·
 <a href="#looks-like">What it looks like</a> ·
 <a href="#security">Security</a> ·
 <a href="#crypto">Cryptography</a> ·
-<a href="#download">Download</a> ·
-<a href="#verify">Verify the file</a> ·
 <a href="#terms">Terms of Service</a> ·
 <a href="#privacy">Privacy</a> ·
-<a href="#faq">FAQ</a> ·
-<a href="en.html">Português</a>
+<a href="#faq">FAQ</a>
 </nav>
 </header>
 
 <main>
+<section id="download">
+<h2>Download (Windows x64, single file)</h2>
+<p>Version <strong id="version">1.1.3</strong> · file <code>gMatch-1.1.3-portable.exe</code> · 114,067,504 bytes (108.8 MiB) · built <span id="build-date">2026-09-10T13:13:50.630Z</span> (UTC).</p>
+<p><a href="releases/gMatch-1.1.3-portable.exe" download>gMatch-1.1.3-portable.exe</a></p>
+<p>Expected <strong>SHA-256</strong> — copy the value below and check it against the next section before running anything:</p>
+<pre id="sha256">f5d5ffd80d863d94004c43b7e292eae67e401f2c4312ed61c912ac491938d7ca</pre>
+<p>Expected <strong>SHA-512</strong> (extra paranoia is a virtue when the file is 109 MB):</p>
+<pre id="sha512">cf0b512b5199a924d0e255763e374a95b3afcab3552a6602252dd6828d0a57395dd6003ba4a26a4a52be343bce1aea9c7d7282b29b1bc6d74c1cf1f3b7865339</pre>
+<p><em>(Both hashes — plus the build date and byte count above — are derived mechanically from the shipped file at publish time, never hand-typed. The same data lives at <code>release.json</code> on this server.)</em></p>
+<h3>Code signing: what we do and don't have</h3>
+<p>This binary is <strong>not Authenticode-signed</strong>. A commercial code-signing certificate costs hundreds of dollars a year; we fund this project with donations, not data sales, so instead we publish the cryptographic integrity you can verify yourself: SHA-256 and SHA-512 digests derived from the exact bytes served on this page. There is no macOS or Linux build yet.</p>
+<h3>"Windows said it might be dangerous" — why, and what to do</h3>
+<p>The <strong>SmartScreen</strong> warning appears for ANY legitimate unsigned program — it is a missing-receipt indicator, not a virus detector. To trust this file independently:</p>
+<ol>
+<li>Verify the SHA-256 (next section) — proof the downloaded file is byte-for-byte what we published;</li>
+<li>Paste the hash (or upload the file) at <a href="https://www.virustotal.com">VirusTotal</a> — a public scan by ~70 antivirus engines;</li>
+<li>Or skip the .exe entirely: clone the open-source code and build it yourself: <a href="https://github.com/9matesu/goongrid">github.com/9matesu/goongrid</a> (<code>npm install</code>, then <code>npm run dist</code> — the exact commands are in <code>README.md</code>).</li>
+</ol>
+</section>
+
+<section id="verify">
+<h2>Verify the hash on Windows (20 seconds, nothing to install)</h2>
+<p>Open the Start menu, type <code>PowerShell</code>, and run (adjust the path if you saved elsewhere):</p>
+<pre>Get-FileHash "$env:USERPROFILE\Downloads\gMatch-1.1.3-portable.exe" -Algorithm SHA256</pre>
+<p>Compare the <code>Hash</code> value with the one published above. If it differs by even ONE character, do NOT run the file: delete it and report at <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a>.</p>
+<p>Same idea, any algorithm you prefer: <code>Get-FileHash ... -Algorithm SHA512</code> must match the SHA-512 block above.</p>
+</section>
+
 <section id="what-it-is">
 <h2>What this application is</h2>
 <p>gMatch is a Windows program — one <code>.exe</code>, no installer — that works as an adult social network plus a card-game arcade. Inside it you get:</p>
@@ -79,34 +181,6 @@
 </ul>
 </section>
 
-<section id="download">
-<h2>Download (Windows x64, single file)</h2>
-<p>Version <strong id="version">1.1.3</strong> · file <code>gMatch-1.1.3-portable.exe</code> · 114,146,607 bytes (108.9 MiB) · built <span id="build-date">2026-09-10T13:13:50.630Z</span> (UTC).</p>
-<p><a href="releases/gMatch-1.1.3-portable.exe" download>Download gMatch-1.1.3-portable.exe</a></p>
-<p>Expected <strong>SHA-256</strong> — copy the value below and check it against the next section before running anything:</p>
-<pre id="sha256">f5d5ffd80d863d94004c43b7e292eae67e401f2c4312ed61c912ac491938d7ca</pre>
-<p>Expected <strong>SHA-512</strong> (extra paranoia is a virtue when the file is 109 MB):</p>
-<pre id="sha512">cf0b512b5199a924d0e255763e374a95b3afcab3552a6602252dd6828d0a57395dd6003ba4a26a4a52be343bce1aea9c7d7282b29b1bc6d74c1cf1f3b7865339</pre>
-<p><em>(Both hashes — plus the build date and byte count above — are derived mechanically from the shipped file at publish time, never hand-typed. The same data lives at <code>release.json</code> on this server.)</em></p>
-<h3>Code signing: what we do and don't have</h3>
-<p>This binary is <strong>not Authenticode-signed</strong>. A commercial code-signing certificate costs hundreds of dollars a year; we fund this project with donations, not data sales, so instead we publish the cryptographic integrity you can verify yourself: SHA-256 and SHA-512 digests derived from the exact bytes served on this page. There is no macOS or Linux build yet.</p>
-<h3>"Windows said it might be dangerous" — why, and what to do</h3>
-<p>The <strong>SmartScreen</strong> warning appears for ANY legitimate unsigned program — it is a missing-receipt indicator, not a virus detector. To trust this file independently:</p>
-<ol>
-<li>Verify the SHA-256 (next section) — proof the downloaded file is byte-for-byte what we published;</li>
-<li>Paste the hash (or upload the file) at <a href="https://www.virustotal.com">VirusTotal</a> — a public scan by ~70 antivirus engines;</li>
-<li>Or skip the .exe entirely: clone the open-source code and build it yourself: <a href="https://github.com/9matesu/goongrid">github.com/9matesu/goongrid</a> (<code>npm install</code>, then <code>npm run dist</code> — the exact commands are in <code>README.md</code>).</li>
-</ol>
-</section>
-
-<section id="verify">
-<h2>Verify the hash on Windows (20 seconds, nothing to install)</h2>
-<p>Open the Start menu, type <code>PowerShell</code>, and run (adjust the path if you saved elsewhere):</p>
-<pre>Get-FileHash "$env:USERPROFILE\Downloads\gMatch-1.1.3-portable.exe" -Algorithm SHA256</pre>
-<p>Compare the <code>Hash</code> value with the one published above. If it differs by even ONE character, do NOT run the file: delete it and report at <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a>.</p>
-<p>Same idea, any algorithm you prefer: <code>Get-FileHash ... -Algorithm SHA512</code> must match the SHA-512 block above.</p>
-</section>
-
 <section id="terms">
 <h2>Terms of Service &amp; Privacy (all documents)</h2>
 <ul>
@@ -123,7 +197,7 @@
 <section id="privacy">
 <h2>Privacy at a glance</h2>
 <ul>
-<li>This page: zero JavaScript, zero CSS, zero external fonts, zero cookies, zero analytics. Nothing here tracks you. (The screenshots are plain PNG files served from this same page's directory — no CDNs.)</li>
+<li>This page: zero JavaScript, zero external fonts, zero cookies, zero analytics — and no requests to anyone but this server. The styling is a single inline block in this file; nothing loads from outside. (The screenshots are plain PNG files served from this same page's directory — no CDNs.)</li>
 <li>The app: no personal data is collected because there is nothing to collect — no sign-up. What crosses the internet is only encrypted envelopes with an expiry (max 7 days on the official server).</li>
 <li>On your computer: keys and history are encrypted by Windows (DPAPI); images are never written to disk; when the app closes, no content lingers.</li>
 <li>Your LGPD/GDPR rights (access, deletion, portability) are exercised <em>locally</em> in the app — you export your identity, and you delete it. Full explanation at <a href="legal/privacy.html">legal/privacy.html</a>.</li>
@@ -141,7 +215,7 @@
 </main>
 
 <footer>
-<p>Contact: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · Code: <a href="https://github.com/9matesu/goongrid">MIT / see LICENSE in the repository</a> · This page uses no JavaScript, no CSS, no external fonts, no cookies, no analytics.</p>
+<p>Contact: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · Code: <a href="https://github.com/9matesu/goongrid">MIT / see LICENSE in the repository</a> · This page uses no JavaScript, no external fonts, no cookies, no analytics.</p>
 </footer>
 </body>
 </html>
