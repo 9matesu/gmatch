@@ -127,6 +127,12 @@ export default function Home() {
     document.documentElement.style.setProperty('--glass-blur', String(b));
   }, [settings.glassBlur]);
 
+  // Animated chrome toggle (paused by default — see globals.css perf gate).
+  useEffect(() => {
+    if (settings.animatedChrome) document.documentElement.setAttribute('data-motion', 'on');
+    else document.documentElement.removeAttribute('data-motion');
+  }, [settings.animatedChrome]);
+
   const game = useGame({ users, identity });
   const {
     relationships,

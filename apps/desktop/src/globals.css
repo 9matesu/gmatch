@@ -148,6 +148,10 @@
 
 :root {
 
+  /* Chrome sheen gate: 'none' removes the infinite animation entirely
+     (paused still costs a main-thread recalc tick per frame — measured).
+     html[data-motion="on"] restores it. */
+  --chrome-sheen: paused;
   /* Glass blur multiplier (Settings → Glass blur): 0 = off, 1 = full.
      Applied to every backdrop-filter blur site via calc. */
   --glass-blur: 0.7;
@@ -710,16 +714,13 @@
   padding: 1px;
 }
 
-/* Grain overlay: shell-level noise texture */
+/* Grain overlay: REMOVED (CDP perf sweep 2026-09-10). A fixed full-viewport
+   layer with mix-blend-mode: soft-light forced a blend-readback on every
+   composited frame — attribution showed it owned the entire RecalcStyle cost
+   (0.28s -> 0.00s removed, task 1.22s -> 0.07s) for a texture at opacity
+   0.025, i.e. invisible anyway. Keep the class inert for legacy mounts. */
 .grain-overlay::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0.025;
-  mix-blend-mode: soft-light;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.8'/%3E%3C/svg%3E");
+  content: none;
 }
 
 /* Metro rule: thin separator line */
@@ -782,7 +783,11 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.55);
   font-weight: 600;
   transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
-  animation: chrome-sheen 4s linear infinite;
+  animation-name: chrome-sheen;
+  animation-duration: 4s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-play-state: var(--chrome-sheen, paused);
 }
 
 .accent-control:hover {
@@ -1124,7 +1129,11 @@
   );
   background-size: 220% 100%;
   background-position: 0% 50%;
-  animation: chrome-sheen 4s linear infinite;
+  animation-name: chrome-sheen;
+  animation-duration: 4s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-play-state: var(--chrome-sheen, paused);
 }
 
 /* Animated gradient text (headings, prices, badges) */
@@ -1142,7 +1151,11 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: chrome-sheen 5s linear infinite;
+  animation-name: chrome-sheen;
+  animation-duration: 5s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-play-state: var(--chrome-sheen, paused);
 }
 
 /* Chrome border treatment for prominent cards */
@@ -1158,7 +1171,11 @@
   padding: 1.5px;
   background: linear-gradient(135deg, #ffffff, #9fe3ff 30%, #ffd6f0 60%, #d6c6ff 100%);
   background-size: 300% 300%;
-  animation: chrome-sheen 5s linear infinite;
+  animation-name: chrome-sheen;
+  animation-duration: 5s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-play-state: var(--chrome-sheen, paused);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -1176,6 +1193,16 @@
     background-size: 100% 100%;
     background-position: 0% 50%;
   }
+}
+
+/* Perf gate (CDP sweep 2026-09-10): the infinite sheen loops animate
+   background-position — non-composited — forcing a main-thread style recalc
+   every frame (RecalcStyle 3.09s on the standard walk). The media query
+   below (prefers-reduced-motion) already removed them fully; this var gate
+   makes the SAME removal user-reversible: Settings -> Animated chrome sets
+   html[data-motion="on"]. */
+html[data-motion="on"] {
+  --chrome-sheen: running;
 }
 
 .sidebar-create {
@@ -1227,7 +1254,11 @@
 .metallic-card-border[data-frame="holo"] {
   background: linear-gradient(135deg, #ff007f 0%, #7928ca 25%, #0070f3 50%, #00dfd8 75%, #ff0080 100%);
   background-size: 200% 200%;
-  animation: orbit-shimmer 4s ease infinite;
+  animation-name: orbit-shimmer;
+  animation-duration: 4s;
+  animation-timing-function: ease;
+  animation-iteration-count: infinite;
+  animation-play-state: var(--chrome-sheen, paused);
   box-shadow:
     0 12px 32px -8px rgba(0, 0, 0, 0.6),
     0 0 20px rgba(121, 40, 202, 0.4),
@@ -1360,10 +1391,6 @@
    scrolling on mobile GPUs. Keep the fixed chrome, but make content surfaces
    opaque and static on constrained devices. */
 @media (max-width: 700px), (prefers-reduced-transparency: reduce) {
-  .grain-overlay::after {
-    opacity: 0.012;
-  }
-
   .glass-panel,
   .glass-toolbar,
   .btn-skeuo {
@@ -1442,10 +1469,6 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
-  }
-
-  .grain-overlay::after {
-    opacity: 0.02;
   }
 }
 

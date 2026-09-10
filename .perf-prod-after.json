@@ -1,0 +1,156 @@
+{
+ "base": "http://localhost:4173/",
+ "lean": false,
+ "steps": [
+  {
+   "label": "load",
+   "ms": 965
+  },
+  {
+   "label": "home-idle-3s",
+   "ms": 3004
+  },
+  {
+   "label": "click-feed-tabs",
+   "ms": 4639
+  },
+  {
+   "label": "idle-clicks-20",
+   "ms": 2573
+  },
+  {
+   "label": "SIDEBAR",
+   "widths": [
+    180,
+    56.25,
+    180
+   ],
+   "expandClickableWhenCollapsed": true
+  },
+  {
+   "label": "sidebar-collapse-cycle",
+   "ms": 1394
+  },
+  {
+   "label": "scroll-feed",
+   "ms": 2413
+  }
+ ],
+ "metricsDeltaSec": {
+  "TaskDuration": 6.552,
+  "LayoutDuration": 0.304,
+  "RecalcStyleDuration": 2.917,
+  "ScriptDuration": 1.328,
+  "StyleAndLayoutDuration": 0
+ },
+ "heapUsedMB": 8.7,
+ "fpsScrollSample": 60,
+ "glassBackdropElements": 37,
+ "longOpsOver50ms": {
+  "FunctionCall": 3,
+  "Layout": 1
+ },
+ "topLongCalls": [
+  {
+   "ms": 81,
+   "fn": "W",
+   "url": "//localhost:4173/assets/boot-BcJOzpxk.js"
+  },
+  {
+   "ms": 80,
+   "fn": "mS",
+   "url": "//localhost:4173/assets/boot-BcJOzpxk.js"
+  }
+ ],
+ "topSelfTimeMs": [
+  {
+   "ms": 11426,
+   "where": "(idle) @:-1"
+  },
+  {
+   "ms": 4859,
+   "where": "(program) @:-1"
+  },
+  {
+   "ms": 690,
+   "where": "(anon) @//localhost:4173/assets/boot-BcJOzpxk.js:839"
+  },
+  {
+   "ms": 121,
+   "where": "check @:7220"
+  },
+  {
+   "ms": 86,
+   "where": "(garbage collector) @:-1"
+  },
+  {
+   "ms": 76,
+   "where": "_a @//localhost:4173/assets/boot-BcJOzpxk.js:798"
+  },
+  {
+   "ms": 34,
+   "where": "fetch @:-1"
+  },
+  {
+   "ms": 32,
+   "where": "elementsFromPoint @:-1"
+  },
+  {
+   "ms": 30,
+   "where": "Th @//localhost:4173/assets/boot-BcJOzpxk.js:47"
+  },
+  {
+   "ms": 28,
+   "where": "(anon) @//localhost:4173/assets/boot-BcJOzpxk.js:841"
+  },
+  {
+   "ms": 26,
+   "where": "Fz @//localhost:4173/assets/boot-BcJOzpxk.js:856"
+  },
+  {
+   "ms": 17,
+   "where": "getCSSContent @:3439"
+  },
+  {
+   "ms": 17,
+   "where": "Hs @//localhost:4173/assets/boot-BcJOzpxk.js:48"
+  },
+  {
+   "ms": 15,
+   "where": "isElementHiddenForAria @:3367"
+  }
+ ],
+ "consoleErrors": [
+  "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+  "Access to fetch at 'https://tbib.org/images/2344/775e25fdbc2daed06d40f422f236d9911354554d.jpg' from origin 'http://localhost:4173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+  "Failed to load resource: net::ERR_FAILED",
+  "Access to fetch at 'https://tbib.org/images/1320/a26263b65fadc75b38196b0de37b0222305c1a7f.jpg' from origin 'http://localhost:4173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+  "Failed to load resource: net::ERR_FAILED",
+  "Access to fetch at 'https://tbib.org/images/1320/6d31c146c83b9082a12593f17a9833a35026b2ae.jpg' from origin 'http://localhost:4173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+  "Failed to load resource: net::ERR_FAILED",
+  "Access to fetch at 'https://tbib.org/images/2344/775e25fdbc2daed06d40f422f236d9911354554d.jpg' from origin 'http://localhost:4173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+  "Failed to load resource: net::ERR_FAILED",
+  "Access to fetch at 'https://tbib.org/images/1320/a26263b65fadc75b38196b0de37b0222305c1a7f.jpg' from origin 'http://localhost:4173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+  "Failed to load resource: net::ERR_FAILED",
+  "Access to fetch at 'https://tbib.org/images/1320/6d31c146c83b9082a12593f17a9833a35026b2ae.jpg' from origin 'http://localhost:4173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+  "Failed to load resource: net::ERR_FAILED",
+  "Access to fetch at 'https://tbib.org/images/809/b7f8f8fe67806c0dd24928597fee501c5cfea160.jpg' from origin 'http://localhost:4173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+  "Failed to load resource: net::ERR_FAILED",
+  "Access to fetch at 'https://tbib.org/images/297/2593b04aaa4384a15306163508c44052f7ae168c.jpg' from origin 'http://localhost:4173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+  "Failed to load resource: net::ERR_FAILED",
+  "Access to fetch at 'https://tbib.org/images/1065/2bf7ae2dc2a3bee287a707eef11588125f251e77.jpg' from origin 'http://localhost:4173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+  "Failed to load resource: net::ERR_FAILED",
+  "Access to fetch at 'https://tbib.org/images/1577/20376ee5c39f8e708c7b0f076bb8326fc65d2dfb.jpg' from origin 'http://localhost:4173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+  "Failed to load resource: net::ERR_FAILED",
+  "Access to fetch at 'https://tbib.org/images/1321/f43035487e82d178c7f02ecb164363b1a4a1be0d.png' from origin 'http://localhost:4173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+  "Failed to load resource: net::ERR_FAILED",
+  "Access to fetch at 'https://tbib.org/images/553/34647154f5dc60424d7ff8da45e83d3238961f16.jpg' from origin 'http://localhost:4173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+  "Failed to load resource: net::ERR_FAILED"
+ ],
+ "consoleErrorsCount": 55,
+ "failedRequests": [
+  "401 http://127.0.0.1:8790/api/pm"
+ ],
+ "warningsCount": 0,
+ "domNodes": 485
+}

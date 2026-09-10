@@ -431,6 +431,15 @@ export function GMatchSettingsModal({
                     <p className="text-[10px] text-retro-muted">Backdrop frost strength. Lower is faster on weak GPUs; 0% disables it entirely.</p>
                   </div>
 
+                  {/* Animated chrome (perf gate) */}
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-xs font-medium text-retro-fg">Animated chrome</div>
+                      <div className="text-[11px] text-retro-muted">Moving shine on accent buttons/headings. Off is faster; enable for the sparkle.</div>
+                    </div>
+                    <Switch checked={settings.animatedChrome} onChange={() => updateSettings('animatedChrome', !settings.animatedChrome)} />
+                  </div>
+
                   {/* Feed Columns */}
                   <div className="flex items-center justify-between gap-4">
                     <div>
