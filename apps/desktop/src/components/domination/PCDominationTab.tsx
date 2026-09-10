@@ -513,11 +513,20 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                 </div>
               )}
               {targetsState === 'ready' && filteredTargets.length === 0 && (
-                <div className="p-6 text-center space-y-2">
+                <div className="p-6 text-center space-y-3">
                   <WifiOff className="w-5 h-5 mx-auto text-zinc-600" />
                   <p className="text-xs text-zinc-500">
-                    {search ? 'No player matches that name.' : 'Nobody has Domination switched on yet. Tell friends to enable it in their consent tab.'}
+                    {search ? 'No player matches that name.' : 'Nobody has Domination switched on yet.'}
                   </p>
+                  {!search && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('consent')}
+                      className="px-3 py-1.5 rounded-md bg-zinc-100 text-zinc-900 text-xs font-semibold hover:bg-white cursor-pointer transition-colors"
+                    >
+                      Set up my consent
+                    </button>
+                  )}
                 </div>
               )}
               {filteredTargets.map((t) => {
@@ -765,11 +774,18 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                         ? 'text-emerald-400 border-emerald-500/30'
                         : st === 'sent'
                           ? 'text-zinc-400 border-zinc-700'
-                          : 'text-rose-400 border-rose-500/30'
+                          : st === 'expired'
+                            ? 'text-amber-400 border-amber-500/30'
+                            : 'text-rose-400 border-rose-500/30'
                     }`}
-                    title={st === 'sent' ? 'Accepted by the server, waiting for their screen to confirm' : st === 'executed' ? 'Confirmed on their screen' : st}
+                    title={
+                      st === 'sent' ? 'Accepted by the server, waiting for their screen to confirm'
+                        : st === 'executed' ? 'Confirmed on their screen'
+                          : st === 'expired' ? 'Their client never confirmed it rendered (app closed or camera blocked). Their consent cut stayed paid.'
+                            : st
+                    }
                   >
-                    {st === 'executed' ? 'landed' : st === 'sent' ? (historyPane === 'outgoing' ? 'awaiting' : 'received') : st}
+                    {st === 'executed' ? 'landed' : st === 'sent' ? (historyPane === 'outgoing' ? 'awaiting' : 'received') : st === 'expired' ? (historyPane === 'outgoing' ? 'fizzled' : 'skipped') : st}
                   </span>
                 </div>
               );
@@ -778,7 +794,8 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
           {historyPane === 'outgoing' && historyState === 'ready' && outgoing.length > 0 && (
             <p className="text-[11px] text-zinc-600 px-1">
               <span className="font-mono">awaiting</span> = charged and relayed; it flips to{' '}
-              <span className="font-mono text-emerald-400/80">landed</span> once their client confirms.
+              <span className="font-mono text-emerald-400/80">landed</span> once their client confirms, or to{' '}
+              <span className="font-mono text-amber-400/80">fizzled</span> after 30 min if it never rendered.
               Camera requests stay <span className="font-mono">awaiting</span> until they approve the photo.
             </p>
           )}

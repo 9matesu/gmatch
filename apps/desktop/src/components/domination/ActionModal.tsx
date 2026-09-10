@@ -242,7 +242,8 @@ export function ActionModal({
                 <div className="font-medium text-zinc-200 text-xs">Ask for a public photo</div>
                 <div className="text-[11px] text-zinc-500 leading-snug mt-0.5">
                   Off: the snapshot goes only to you. Either way the target approves the capture, and
-                  their consent decides whether public is even possible.
+                  their consent decides whether public is even possible. If their OS blocks the camera,
+                  this quietly fizzles &mdash; check your Outbox.
                 </div>
               </div>
             </label>
