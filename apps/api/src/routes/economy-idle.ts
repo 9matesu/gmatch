@@ -21,11 +21,36 @@ economyIdle.onError((err, c) => {
   return c.json({ error: d.message }, d.status as any)
 })
 
-// last idle-credit per identity -> { at, key }. In-memory: the sidecar is
+// last idle-credit per identity -> { at, key, gps }. In-memory: the sidecar is
 // single-user-per-machine; the server deployment resets on boot, which is
-// acceptable for a 60s throttle.
-const lastCredit = new Map<string, { at: number; key: string }>()
-const CREDIT_COOLDOWN_MS = 60_000
+// acceptable for a 60s throttle. `gps` is the earning rate the client claimed
+// at its FIRST credit after a server reset (trusted boot-of-trust); every
+// later credit must fit floor(elapsed * claimedGps * 1.5) + 5 (see
+// idleEnvelope) — a modified client cannot mint g$ faster than its own
+// registered rate on someone else's leaderboard. On YOUR OWN node the
+// envelope only disciplines honest crashes; documented best-effort (SPEC §2).
+const lastCredit = new Map<string, { at: number; key: string; gps: number }>()
+let CREDIT_COOLDOWN_MS = 60_000
+
+/** Test hook: shorten the throttle so envelope tests can age the anchor. */
+export function __setIdleCooldown(ms: number) {
+  CREDIT_COOLDOWN_MS = ms
+}
+
+/** Max claimed g$/s the envelope math honors (caps bogus-gps tricks). */
+export const MAX_CLAIMED_GPS = 50_000
+
+/**
+ * Ceiling for a credit `elapsedMs` after the anchor, given claimed `gps`.
+ * The 1.5x headroom (vs the 50% offline rule) plus the +5 slop covers
+ * legitimate offline resumes and tick rounding. `firstCredit` (no anchor yet
+ * after a server restart) is a full trusted flush.
+ */
+export function idleEnvelope(gps: number, elapsedMs: number, firstCredit: boolean): number {
+  if (firstCredit) return 1_000_000
+  const capped = Math.min(Math.max(0, Math.floor(gps)), MAX_CLAIMED_GPS)
+  return Math.floor((Math.max(0, elapsedMs) / 1000) * capped * 1.5) + 5
+}
 
 /** Test-only: clear the in-memory throttle between cases. */
 export function __resetIdleThrottle() {
@@ -48,14 +73,44 @@ economyIdle.post('/idle-credit', async (c) => {
   if (!key || key.length < 8 || key.length > 128) {
     throw badRequest('idempotencyKey must be 8-128 characters (Idempotency-Key header or idempotency_key body)')
   }
+  const rawGps = body?.gps
+  if (rawGps !== undefined && (!Number.isFinite(Number(rawGps)) || Number(rawGps) < 0)) {
+    throw badRequest('gps must be a non-negative number (your current passive g$/s)')
+  }
+  const claimGps = rawGps === undefined ? null : Math.floor(Number(rawGps))
 
   const now = Date.now()
   const prev = lastCredit.get(orbitId)
   // A retry of the SAME key is a replay (no double-pay) — let it through the
-  // throttle so the client can safely re-send after a dropped response.
+  // throttle AND the envelope so the client can safely re-send after a
+  // dropped response.
   const isReplay = prev !== undefined && prev.key === key
   if (prev && !isReplay && now - prev.at < CREDIT_COOLDOWN_MS) {
     return c.json({ error: 'Idle credits are limited to one per 60 seconds' }, 429)
+  }
+
+  // Earnings envelope (SPEC §2): the FIRST credit after a server start is a
+  // trusted flush (honest resume with offline earnings — the sidecar restarts
+  // with the app, so this is "you" on your own machine). From the NEXT credit
+  // on, the client must claim its g$/s rate and the flush must fit
+  // floor(elapsed * claim * 1.5) + 5, with the claim growth-capped at 2x+100
+  // per credit so step-function buffs (caps, prestige) converge in a few
+  // ticks while a modified client cannot jump to the 50k/s ceiling. A
+  // missing/zero claim after registration fails loudly or keeps the previous
+  // rate respectively — the client can only ever under-claim.
+  let effectiveGps: number
+  if (!prev) {
+    effectiveGps = claimGps === null ? 0 : Math.min(Math.max(claimGps, 0), MAX_CLAIMED_GPS)
+  } else {
+    if (claimGps === null && !isReplay) {
+      return c.json({ error: 'gps (current passive g$/s) is required once a rate is registered' }, 400)
+    }
+    const cap = prev.gps * 2 + 100
+    effectiveGps = !claimGps ? prev.gps : Math.min(claimGps, cap, MAX_CLAIMED_GPS)
+    const maxAllowed = idleEnvelope(effectiveGps, now - prev.at, false)
+    if (!isReplay && amount > maxAllowed) {
+      return c.json({ error: `Credit exceeds your registered earning rate (max ${maxAllowed} now)`, maxAllowed }, 400)
+    }
   }
 
   const service = new EconomyService(c.env.DB)
@@ -64,7 +119,7 @@ economyIdle.post('/idle-credit', async (c) => {
     kind: 'reward',
     reference: `idle:${session}`,
   })
-  lastCredit.set(orbitId, { at: now, key })
+  lastCredit.set(orbitId, { at: now, key, gps: effectiveGps })
 
   return c.json({ balance: result.balance, delta: result.delta, replayed: result.replayed === true })
 })

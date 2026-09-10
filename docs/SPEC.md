@@ -53,6 +53,13 @@ with duels, lootboxes, hacks and trades — one wallet, one economy.
   stakes, lootboxes, hacks, trades, tags/caps/gallery buys. Server ledger
   (`EconomyService`) is authoritative; the idle game mirrors into it via
   `POST /api/economy/idle-credit` / `idle-debit` (idempotent, 60s throttle).
+  Credits are envelope-checked (economy-idle.ts `idleEnvelope`): after the
+  first trusted flush per server start, each credit must fit 1.5× the client's
+  claimed g$/s elapsed rate (growth-capped 2x+100/credit, ceiling 50k/s).
+  Honest offline resumes (50% rule) always fit; a modified client cannot mint
+  g$ faster than its own registered rate — on shared/federated nodes this
+  protects OTHER players' leaderboards; on a node you host it only disciplines
+  honest crashes (best-effort by design).
   Legacy GP was a 1:1 rename (GP retired; old saves migrate `gp`→`gc`).
 - **XP** — drives Pornification tier (never resets within a run).
 - **Corruption shards** — prestige currency, persists through Brainmelt.

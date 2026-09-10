@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import app from '../index'
 import { createTestIdentity, signRequestHeaders, createMockEnv } from '../test-utils'
 import { EconomyService } from '../economy'
-import { __resetIdleThrottle } from './economy-idle'
+import { __resetIdleThrottle, __setIdleCooldown } from './economy-idle'
 
 function authHeaders(identity: ReturnType<typeof createTestIdentity>, method: string, url: string, body?: string) {
   return signRequestHeaders(identity, method, url, body)
@@ -14,12 +14,15 @@ describe('POST /api/economy/idle-credit', () => {
 
   beforeEach(async () => {
     __resetIdleThrottle()
+    __setIdleCooldown(60_000)
     env = await createMockEnv()
     await app.request('/api/users', { headers: authHeaders(alice, 'GET', '/api/users') }, env)
   })
 
-  async function credit(amount: unknown, session: string, key: string) {
-    const body = JSON.stringify({ amount, session })
+  async function credit(amount: unknown, session: string, key: string, gps?: number) {
+    const bodyObj: Record<string, unknown> = { amount, session }
+    if (gps !== undefined) bodyObj.gps = gps
+    const body = JSON.stringify(bodyObj)
     return app.request(
       '/api/economy/idle-credit',
       {
@@ -83,6 +86,74 @@ describe('POST /api/economy/idle-credit', () => {
     const data = await second.json()
     expect(data.balance).toBe(100)
     expect(data.replayed).toBe(true)
+  })
+
+  it('accepts an in-envelope credit (first-ever is trusted, rate registered)', async () => {
+    const res = await credit(250, 'env-a', 'env-key-0001', 1000)
+    expect(res.status).toBe(200)
+  })
+
+  it('rejects a credit beyond the elapsed*rate envelope and reports the ceiling', async () => {
+    __setIdleCooldown(50)
+    const first = await credit(100, 'env-b', 'env-key-0002', 1)
+    expect(first.status).toBe(200)
+    await new Promise((r) => setTimeout(r, 1100))
+    const big = await credit(5000, 'env-b', 'env-key-0003', 1)
+    expect(big.status).toBe(400)
+    const j = await big.json()
+    expect(j.error).toMatch(/earning rate/i)
+    expect(typeof j.maxAllowed).toBe('number')
+    expect(j.maxAllowed).toBeLessThan(5000)
+    __setIdleCooldown(60_000)
+  })
+
+  it('elapsed covers an honest offline resume (50% rate fits the 1.5x envelope)', async () => {
+    __setIdleCooldown(50)
+    await credit(100, 'env-c', 'env-key-0004', 10)
+    await new Promise((r) => setTimeout(r, 1100))
+    // 1.1s at 10 g$/s: envelope floor(1.1*10*1.5)+5 = 21
+    const res = await credit(15, 'env-c', 'env-key-0005', 10)
+    expect(res.status).toBe(200)
+    __setIdleCooldown(60_000)
+  })
+
+  it('same-key replay after an accepted credit never re-runs the envelope', async () => {
+    const first = await credit(100, 'env-e', 'env-key-0006', 10)
+    expect(first.status).toBe(200)
+    const replay = await credit(100, 'env-e', 'env-key-0006', 10)
+    expect(replay.status).toBe(200)
+    const j = await replay.json()
+    expect(j.replayed).toBe(true)
+  })
+
+  it('requires gps once an identity has an anchor (old clients fail loudly, not silently)', async () => {
+    const first = await credit(10, 'env-f', 'env-key-0007', 5)
+    expect(first.status).toBe(200)
+    __setIdleCooldown(50)
+    await new Promise((r) => setTimeout(r, 60))
+    const body = JSON.stringify({ amount: 10, session: 'env-f' })
+    const noGps = await app.request('/api/economy/idle-credit', {
+      method: 'POST',
+      headers: {
+        ...authHeaders(alice, 'POST', '/api/economy/idle-credit', body),
+        'Content-Type': 'application/json',
+        'Idempotency-Key': 'env-key-0008',
+      },
+      body,
+    }, env)
+    expect(noGps.status).toBe(400)
+    const j = await noGps.json()
+    expect(j.error).toMatch(/gps/i)
+    __setIdleCooldown(60_000)
+  })
+
+  it('idleEnvelope caps claimed gps at 50k and floors elapsed earnings', async () => {
+    const { idleEnvelope } = await import('./economy-idle')
+    expect(idleEnvelope(10, 1_100, false)).toBe(21)
+    expect(idleEnvelope(9_999_999, 1_000, false)).toBe(75_005)
+    expect(idleEnvelope(10, 0, false)).toBe(5)
+    expect(idleEnvelope(0, 60_000, false)).toBe(5)
+    expect(idleEnvelope(10, 1_100, true)).toBe(1_000_000)
   })
 
   it('rate-limits a second distinct credit within 60s', async () => {

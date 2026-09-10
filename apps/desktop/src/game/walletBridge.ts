@@ -10,6 +10,12 @@ import type { WalletState } from './wallet'
 
 export interface IdleWalletSlice extends WalletState {
   setWallet: (w: { gc?: number; credited: number; debited: number }) => void
+  /** Monotonic lifetime g$ earned. The sync loop MEASURES earning velocity
+   * from it for the ledger envelope claim (economy-idle.ts idleEnvelope):
+   * measured beats estimated — after a restart it under-claims for one
+   * sample window (harmless: the delta just waits for the next tick), and it
+   * can never over-claim what was actually earned. */
+  totalEarned: number
 }
 
 interface IdentityLike {
@@ -25,6 +31,7 @@ export function makeSyncCtx(
   slice: IdleWalletSlice,
   identity: IdentityLike,
   fetchFn: typeof globalThis.fetch = globalThis.fetch,
+  gps = 0,
 ): WalletSyncCtx {
   const call = async (
     endpoint: string,
@@ -42,6 +49,7 @@ export function makeSyncCtx(
   }
   return {
     orbitId: identity.orbitId,
+    gps,
     gc: slice.gc,
     credited: slice.credited,
     debited: slice.debited,
@@ -62,10 +70,23 @@ export function startWalletSync(
 ): () => void {
   if (!identity) return () => undefined
   let stopped = false
+  const first = getSlice()
+  const sample = { at: Date.now(), total: first.totalEarned, rate: 0 }
   const tick = async () => {
     if (stopped) return
     const slice = getSlice()
-    const ctx = makeSyncCtx(slice, identity!, fetchFn)
+    // Velocity sampler: over windows >= 5s, earning per second from the
+    // monotonic total. A negative delta means a prestige/reset wrote a fresh
+    // save on top — re-anchor instead of claiming 0 forever.
+    const now = Date.now()
+    const d = slice.totalEarned - sample.total
+    const dt = now - sample.at
+    if (dt >= 5_000) {
+      if (d >= 0) sample.rate = (d / dt) * 1000
+      sample.at = now
+      sample.total = slice.totalEarned
+    }
+    const ctx = makeSyncCtx(slice, identity, fetchFn, sample.rate)
     const next = await syncWallet(ctx)
     // Markers only: gc may have grown during the round-trip (stale snapshot).
     if (next) slice.setWallet({ credited: next.credited, debited: next.debited })

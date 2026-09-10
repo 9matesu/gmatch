@@ -105,7 +105,7 @@ export default function Home() {
     const stop = startWalletSync(
       () => {
         const s = useIdleGame.getState();
-        return { gc: s.gc, credited: s.credited, debited: s.debited, setWallet: s.setWallet };
+        return { gc: s.gc, credited: s.credited, debited: s.debited, totalEarned: s.totalEarnedGc, setWallet: s.setWallet };
       },
       identity,
     );

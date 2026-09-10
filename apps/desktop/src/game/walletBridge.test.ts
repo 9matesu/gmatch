@@ -3,12 +3,18 @@ import { generateIdentity } from '@orbit/crypto'
 import { makeSyncCtx, startWalletSync, type IdleWalletSlice } from './walletBridge'
 
 function slice(over: Partial<IdleWalletSlice> = {}): IdleWalletSlice {
-  return { gc: 50, credited: 0, debited: 0, setWallet: vi.fn(), ...over }
+  return { gc: 50, credited: 0, debited: 0, totalEarned: 50, setWallet: vi.fn(), ...over }
 }
 
 const identity = generateIdentity()
 
 describe('makeSyncCtx', () => {
+  it('passes the measured gps claim through to the sync ctx', () => {
+    const fetchFn = vi.fn(async () => new Response('{}', { status: 200 }))
+    const ctx = makeSyncCtx(slice(), identity, fetchFn as unknown as typeof globalThis.fetch, 42.9)
+    expect(ctx.gps).toBe(42.9)
+  })
+
   it('wraps fetch into the injectable post/get contract', async () => {
     const fetchFn = vi.fn(async (..._args: unknown[]) => new Response(JSON.stringify({ balance: 1 }), { status: 200 }))
     const ctx = makeSyncCtx(slice(), identity, fetchFn as unknown as typeof globalThis.fetch)

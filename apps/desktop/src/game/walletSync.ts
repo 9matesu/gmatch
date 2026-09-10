@@ -12,6 +12,9 @@ import { pendingDelta, markCredited, markDebited, type WalletState } from './wal
 
 export interface WalletSyncCtx extends WalletState {
   orbitId: string
+  /** Passive+click earning rate the ledger envelope validates credits
+   * against (server: economy-idle.ts idleEnvelope). */
+  gps: number
   post: (endpoint: string, init: { body: string; headers: Record<string, string> }) => Promise<{
     ok: boolean
     status: number
@@ -34,7 +37,7 @@ export async function syncWallet(c: WalletSyncCtx): Promise<WalletState | null> 
     const key = `idle-${c.orbitId}-${c.credited}`.slice(0, 128)
     try {
       const res = await c.post('/api/economy/idle-credit', {
-        body: JSON.stringify({ amount: delta, session: c.orbitId }),
+        body: JSON.stringify({ amount: delta, session: c.orbitId, gps: Math.floor(c.gps || 0) }),
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
       })
       if (!res.ok) return null

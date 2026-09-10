@@ -5,6 +5,7 @@ import { pendingDelta } from './wallet'
 function ctx(overrides: Partial<WalletSyncCtx> = {}): WalletSyncCtx {
   return {
     orbitId: 'abc123',
+    gps: 4.7,
     gc: 50,
     credited: 0,
     debited: 0,
@@ -23,14 +24,14 @@ describe('syncWallet (net flush, both directions)', () => {
     expect(c.post).not.toHaveBeenCalled()
   })
 
-  it('credits unflushed earnings with a stable idempotency key', async () => {
+  it('credits unflushed earnings with a stable idempotency key + floored claimed gps', async () => {
     const c = ctx({ gc: 50, credited: 12, debited: 0 })
     const r = await syncWallet(c)
     expect(r).toEqual({ gc: 50, credited: 50, debited: 0 })
     expect(c.post).toHaveBeenCalledWith(
       '/api/economy/idle-credit',
       expect.objectContaining({
-        body: JSON.stringify({ amount: 38, session: 'abc123' }),
+        body: JSON.stringify({ amount: 38, session: 'abc123', gps: 4 }),
         headers: expect.objectContaining({ 'Idempotency-Key': 'idle-abc123-12' }),
       }),
     )
