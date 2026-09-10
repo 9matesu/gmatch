@@ -105,11 +105,20 @@ compact online-chips (cap 12 + `+N`), toolbar buttons unified to h-9.
 `ServersView.test.tsx` pins the merged counts line AND the absence of the
 duplicate header.
 
-## 401s in the walk (honest note)
+## 401s/429s in the walk (honest note)
 Every walk logs `401 /api/pm` — the PM sync fires once before the sealed
 session is established; the app retries successfully after. DevTools counts
 these as insight noise; the walk reproduces it, fix = defer the first poll
 until session-ready (follow-up, not in this sweep).
+
+User-reported follow-up (same class, fixed): `429 /api/economy/idle-credit`
+spammed the console because the wallet sync loop (30s) hammered the server's
+60s credit throttle blind, and `orbitFetch`'s own 429 retry used the GLOBAL
+fetch instead of the injected impl (double bug: untestable + double-traffic
+against a stale key). Now: 65s sync cadence, 429 carries `retryInMs` +
+`Retry-After`, the loop backs off, retries go through `fetchImpl`. Verified
+live: credit#2 → `429 Retry-After: 60 {"retryInMs":59991}`.
+
 
 ## Repro commands
 ```
@@ -122,9 +131,12 @@ node tools/ui-verify.mjs                                 # arrows/slider/switche
 ```
 
 ## Admin PIN (local machine)
-Dev sidecar: `ADMIN_PIN=<pin> npm run dev` (vite spawns bun with
+Verified live this sweep: `POST /api/admin/verify-pin` → 200 with the PIN,
+401 without. Dev sidecar: `ADMIN_PIN=<pin> npm run dev` (vite spawns bun with
 `{...process.env}`, `vite.config.ts:66`; `apps/api/src/serve.ts` wires it into
-`c.env`). Packaged server-mode: same inheritance via `apiSidecar.cjs`
-`env: {...process.env}` — set a system env var `ADMIN_PIN` or start via shell.
-PIN for this machine: see chat (never committed). Wrong PIN → 401; 5 tries/15 min
-→ 429 lockout. Central node (gmatch.fly.dev) keeps `ADMIN_PIN_HASH` — untouched.
+`c.env`). Packaged app: `apiSidecar.cjs` also spreads `...process.env`, so a
+system/user env var `ADMIN_PIN` reaches the bundled server on next launch.
+PIN for this machine: 318b98f8 (LOCAL DEV ONLY — plaintext PIN is a dev
+convenience; central keeps the hash). Wrong PIN → 401;
+5 tries/15 min → 429 lockout. Central node (gmatch.fly.dev) keeps
+`ADMIN_PIN_HASH` — untouched.
