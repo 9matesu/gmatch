@@ -224,11 +224,6 @@ export default function Home() {
   }, [mainView]);
 
   useEffect(() => {
-    const id = setInterval(() => setNowTick(Date.now()), 5000);
-    return () => clearInterval(id);
-  }, []);
-
-  useEffect(() => {
     try { localStorage.setItem('orbit_gallery_filter', galleryFilter) } catch { }
   }, [galleryFilter]);
   const [forwardedStashFile, setForwardedStashFile] = useState<File | null>(null)
@@ -653,6 +648,14 @@ export default function Home() {
       clearInterval(interval);
     };
   }, [identity]);
+
+  // Perf: nowTick only feeds the hack-expiry memos below; ticking the whole
+  // 4k-line App every 5s while no hack exists is pure waste. Gate it.
+  useEffect(() => {
+    if (!activeHacks.length) return;
+    const id = setInterval(() => setNowTick(Date.now()), 5000);
+    return () => clearInterval(id);
+  }, [activeHacks.length]);
 
   // Check if current player is vision jammed (Deny hack)
   const isVisionJammed = useMemo(() => {

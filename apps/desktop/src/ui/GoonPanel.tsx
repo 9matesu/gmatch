@@ -121,14 +121,19 @@ export default function GoonPanel() {
     }
   }, [viewMode, grid.length, fetching, feedOffline, setViewMode])
 
+  // Float budget: rapid clicking (or heat spam) used to append unbounded
+  // DOM spans + orphan timers on unmount. Cap live floats at 20 and clear
+  // every timer on unmount — the stage can't be the thing that leaks.
+  const floatTimers = useRef<number[]>([])
+  useEffect(() => () => { for (const t of floatTimers.current) window.clearTimeout(t); floatTimers.current = [] }, [])
   const spawnFloat = (x: number, y: number, gain: number, crit: boolean, cell: number | null, heatMult = 1) => {
     const id = ++floatId.current
     const heatTag = heatMult > 1 ? ` x${heatMult}` : ''
-    setFloats((f) => [...f, { id, x, y, text: `+${formatNum(gain)}${heatTag}`, crit, cell }])
-    window.setTimeout(() => setFloats((f) => f.filter((fl) => fl.id !== id)), 900)
+    setFloats((f) => [...f.slice(-19), { id, x, y, text: `+${formatNum(gain)}${heatTag}`, crit, cell }])
+    floatTimers.current.push(window.setTimeout(() => setFloats((f) => f.filter((fl) => fl.id !== id)), 900))
     if (crit) {
       setCritFlash(true)
-      window.setTimeout(() => setCritFlash(false), 350)
+      floatTimers.current.push(window.setTimeout(() => setCritFlash(false), 350))
     }
   }
 
@@ -293,7 +298,7 @@ export default function GoonPanel() {
             <>
               <button
                 type="button"
-                className="glass-button absolute left-2.5 top-1/2 z-[4] flex h-20 w-12 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-35"
+                className="icon-btn absolute left-1.5 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-[2px] hover:bg-black/65 disabled:opacity-25"
                 aria-label="Previous image"
                 title={canGridBack ? 'Back to the previous board' : 'Nothing behind you yet'}
                 disabled={!canGridBack}
@@ -303,7 +308,7 @@ export default function GoonPanel() {
               </button>
               <button
                 type="button"
-                className="glass-button absolute right-2.5 top-1/2 z-[4] flex h-20 w-12 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100"
+                className="icon-btn absolute right-1.5 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-[2px] hover:bg-black/65 disabled:opacity-25"
                 aria-label="Next image"
                 title="Skip this round — no reward"
                 onClick={() => skipGrid()}
@@ -379,7 +384,7 @@ export default function GoonPanel() {
           )}
           <button
             type="button"
-            className="glass-button absolute left-2.5 top-1/2 z-[5] flex h-20 w-12 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-35"
+            className="icon-btn absolute left-1.5 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-[2px] hover:bg-black/65 disabled:opacity-25"
             aria-label="Previous image"
             title={canGoBack ? 'Back to the skipped foe' : 'Nothing behind you yet'}
             disabled={!canGoBack}
@@ -392,7 +397,7 @@ export default function GoonPanel() {
           </button>
           <button
             type="button"
-            className="glass-button absolute right-2.5 top-1/2 z-[5] flex h-20 w-12 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100"
+            className="icon-btn absolute right-1.5 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-[2px] hover:bg-black/65 disabled:opacity-25"
               aria-label="Next image"
               title="Skip this foe — no reward"
               onClick={(e) => {
@@ -415,7 +420,7 @@ export default function GoonPanel() {
             ))}
         </div>
       )}
-      <div className="flex flex-none items-center gap-2 rounded-[10px] border border-border-glass bg-retro-bg px-2 py-1.5">
+      <div className="flex flex-none items-center gap-2 px-1 py-0.5">
         <div
           className="inline-flex flex-none overflow-hidden rounded-lg border border-border-glass"
           role="group"

@@ -1,0 +1,61 @@
+{
+ "base": "http://localhost:5173/",
+ "steps": [
+  {
+   "label": "load",
+   "ms": 1171
+  },
+  {
+   "label": "home-idle-3s",
+   "ms": 3005
+  },
+  {
+   "label": "click-feed-tabs",
+   "ms": 4876
+  },
+  {
+   "label": "idle-clicks-20",
+   "ms": 2733
+  },
+  {
+   "label": "SIDEBAR",
+   "widths": [
+    180,
+    56.25,
+    180
+   ],
+   "expandClickableWhenCollapsed": true
+  },
+  {
+   "label": "sidebar-collapse-cycle",
+   "ms": 1381
+  },
+  {
+   "label": "scroll-feed",
+   "ms": 2363
+  }
+ ],
+ "metricsDeltaSec": {
+  "TaskDuration": 7.567,
+  "LayoutDuration": 0.212,
+  "RecalcStyleDuration": 2.596,
+  "ScriptDuration": 3.06,
+  "StyleAndLayoutDuration": 0
+ },
+ "heapUsedMB": 26.1,
+ "fpsScrollSample": 59,
+ "glassBackdropElements": 35,
+ "longOpsOver50ms": {
+  "FunctionCall": 12
+ },
+ "consoleErrors": [
+  "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+  "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+ ],
+ "consoleErrorsCount": 2,
+ "failedRequests": [
+  "401 http://127.0.0.1:8790/api/pm"
+ ],
+ "warningsCount": 0,
+ "domNodes": 489
+}

@@ -126,10 +126,14 @@ export function SidebarNav({
     if (typeof window === 'undefined') return false;
     try { return localStorage.getItem('goonmatch_sidebar_collapsed') === '1'; } catch { return false; }
   });
+  // Perf: the 1s clock exists ONLY for the hack-glow expiry check (isHack).
+  // Ticking the whole sidebar nav once per second — forever — was a free
+  // re-render budget nobody spent. Run it only while a session is active.
   useEffect(() => {
+    if (!activeHack) return;
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [activeHack]);
 
   const toggleCollapsed = () => {
     setCollapsed((v) => {

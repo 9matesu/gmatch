@@ -1,4 +1,5 @@
 "use client";
+import { Switch } from '../../ui/Switch'
 
 import React, { useState, useEffect } from 'react';
 import type { AppSettings } from '../../hooks/useSettings';
@@ -509,22 +510,13 @@ export function GMatchSettingsModal({
                             <div className="text-[11px] text-retro-muted">{item.desc}</div>
                           </div>
 
-                          <button
-                            type="button"
-                            role="switch"
-                            aria-checked={isOn}
-                            onClick={() => {
+                          <Switch
+                            checked={isOn}
+                                                       onChange={() => {
                               playPress(isOn ? 600 : 900);
                               updateSettings(item.key, !isOn as any);
                             }}
-                            className={`w-11 h-6 rounded-full p-0.5 transition-colors cursor-pointer shrink-0 ${isOn ? 'bg-retro-accent' : 'bg-surface-raised'
-                              }`}
-                          >
-                            <div
-                              className={`w-5 h-5 rounded-full bg-surface-interactive shadow-md transition-transform ${isOn ? 'translate-x-5' : 'translate-x-0'
-                                }`}
-                            />
-                          </button>
+                          />
                         </div>
                       );
                     })}
@@ -566,23 +558,14 @@ export function GMatchSettingsModal({
                       <div className="text-[11px] text-retro-muted">Audio cue when a new direct message arrives</div>
                     </div>
 
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={settings.chatNotificationSfx}
-                      onClick={() => {
+                    <Switch
+                      checked={settings.chatNotificationSfx}
+                      onChange={() => {
                         playPress(settings.chatNotificationSfx ? 600 : 900);
                         updateSettings('chatNotificationSfx', !settings.chatNotificationSfx);
                         if (!settings.chatNotificationSfx) playMsgReceive();
                       }}
-                      className={`w-11 h-6 rounded-full p-0.5 transition-colors cursor-pointer shrink-0 ${settings.chatNotificationSfx ? 'bg-retro-accent' : 'bg-surface-raised'
-                        }`}
-                    >
-                      <div
-                        className={`w-5 h-5 rounded-full bg-surface-interactive shadow-md transition-transform ${settings.chatNotificationSfx ? 'translate-x-5' : 'translate-x-0'
-                          }`}
-                      />
-                    </button>
+                    />
                   </div>
                 </div>
 
@@ -704,18 +687,13 @@ export function GMatchSettingsModal({
                           <div className="text-xs font-medium text-retro-fg">Card Slideshow</div>
                           <div className="text-[11px] text-retro-muted">Cycle collected cards as background</div>
                         </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={settings.wallpaperSlideshow}
-                          onClick={() => {
+                        <Switch
+                          checked={settings.wallpaperSlideshow}
+                          onChange={() => {
                             playPress(750);
                             updateSettings('wallpaperSlideshow', !settings.wallpaperSlideshow);
                           }}
-                          className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer shrink-0 ${settings.wallpaperSlideshow ? 'bg-retro-accent' : 'bg-surface-raised border border-border-glass'}`}
-                        >
-                          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${settings.wallpaperSlideshow ? 'translate-x-5' : ''}`} />
-                        </button>
+                        />
                       </div>
 
                       {settings.wallpaperSlideshow && (
