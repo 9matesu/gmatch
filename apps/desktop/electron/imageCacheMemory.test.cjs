@@ -38,4 +38,14 @@ assert.strictEqual(mem.totalBytes(), 0)
 const src = fs.readFileSync(__filename.replace('.test.cjs', '.cjs'), 'utf8')
 assert.ok(!/writeFileSync|mkdirSync|createWriteStream/.test(src), 'imageCacheMemory must not touch disk')
 
+// Default byte budget is the economical 96MB (perf checkup, docs/PERF.md).
+delete require.cache[require.resolve('./imageCacheMemory.cjs')]
+const fresh = require('./imageCacheMemory.cjs')
+assert.strictEqual(fresh.getMaxBytes(), 96 * 1024 * 1024, `default budget 96MB (got ${fresh.getMaxBytes()})`)
+// 400 × 1MB puts must stay inside the default budget (eviction keeps up).
+for (let i = 0; i < 400; i++) fresh.put(`d${i}`, Buffer.alloc(1024 * 1024, i % 256))
+assert.ok(fresh.totalBytes() <= 96 * 1024 * 1024, `respects default budget: ${fresh.totalBytes()}`)
+assert.ok(fresh.get('d399'), 'newest survives the storm')
+assert.strictEqual(fresh.get('d0'), null, 'oldest evicted')
+
 console.log('imageCacheMemory: all assertions passed')

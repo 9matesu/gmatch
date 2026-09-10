@@ -2,7 +2,7 @@
 // Deliberately disk-free: content lives only for the session; a restart (or
 // OS sleep-to-disk excluded by design) leaves nothing. Map preserves
 // insertion order = LRU order; get() re-inserts to mark "recently used".
-const MAX_DEFAULT = 256 * 1024 * 1024 // 256MB ceiling (was ~150MB on disk)
+const MAX_DEFAULT = 96 * 1024 * 1024 // ~96MB: one feed page is ~20 imgs × ~300KB; keeps the working set, trims the museum (perf checkup: docs/PERF.md)
 
 let maxBytes = MAX_DEFAULT
 const map = new Map() // key -> { buf, bytes }
@@ -52,5 +52,6 @@ function clear() {
 
 function totalBytes() { return total }
 function size() { return map.size }
+function getMaxBytes() { return maxBytes }
 
-module.exports = { put, get, clear, setMaxBytes, totalBytes, size }
+module.exports = { put, get, clear, setMaxBytes, totalBytes, size, getMaxBytes }
