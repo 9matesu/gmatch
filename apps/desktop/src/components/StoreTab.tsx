@@ -564,14 +564,18 @@ export function StoreTab({
                 </button>
                 <div className="flex items-center justify-between gap-1.5 px-2 pb-2">
                   <span className="text-[11px] font-mono font-bold text-cyan-300 tabular-nums">{formatGc(l.price)} g$</span>
-                  <button
-                    type="button"
-                    disabled={buyingCardId !== null}
-                    onClick={() => void buyListing(l)}
-                    className="px-2 py-1 rounded bg-cyan-500/20 hover:bg-cyan-500/30 disabled:opacity-40 text-cyan-300 text-[10px] font-bold cursor-pointer transition-colors"
-                  >
-                    {buyingCardId === l.cardId ? '…' : 'Buy'}
-                  </button>
+                  {l.sellerId === identity?.orbitId ? (
+                    <span className="px-2 py-1 rounded bg-retro-interactive text-retro-muted text-[10px] font-bold" title="This is your own listing — cancel it from your card page instead">Yours</span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={buyingCardId !== null}
+                      onClick={() => void buyListing(l)}
+                      className="px-2 py-1 rounded bg-cyan-500/20 hover:bg-cyan-500/30 disabled:opacity-40 text-cyan-300 text-[10px] font-bold cursor-pointer transition-colors"
+                    >
+                      {buyingCardId === l.cardId ? '…' : 'Buy'}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
