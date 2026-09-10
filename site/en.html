@@ -81,12 +81,12 @@
 
 <section id="download">
 <h2>Download (Windows x64, arquivo único)</h2>
-<p>Versão <strong id="version">1.1.1</strong> · arquivo <code>gMatch-1.1.1-portable.exe</code> · 114.146.607 bytes (108,9 MiB) · compilado em <span id="build-date">2026-09-10T06:03:41.760Z</span> (UTC).</p>
-<p><a href="releases/gMatch-1.1.1-portable.exe" download>Baixar gMatch-1.1.1-portable.exe</a></p>
+<p>Versão <strong id="version">1.1.2</strong> · arquivo <code>gMatch-1.1.2-portable.exe</code> · 114.146.607 bytes (108,9 MiB) · compilado em <span id="build-date">2026-09-10T09:29:38.511Z</span> (UTC).</p>
+<p><a href="releases/gMatch-1.1.2-portable.exe" download>Baixar gMatch-1.1.2-portable.exe</a></p>
 <p><strong>SHA-256</strong> esperado — copie o valor abaixo e confira na próxima seção antes de rodar:</p>
-<pre id="sha256">209d5ff173309f607871c10c2d71df1364d3597d812674ca452a559a26862ab9</pre>
+<pre id="sha256">85144043c3daa9137521c33868f1740b88f88e5f58a08e690b337b95e0be10f2</pre>
 <p><strong>SHA-512</strong> esperado (paranoia extra é virtude com um arquivo de 109 MB):</p>
-<pre id="sha512">dddeb7aca96548b09a6f5286c195acd226b4a0769150f31c13bedff7380d6cbd8c5ea797e3cbc865b1f296529bcdbd776d312f5202187c5d14e29d31d1bc0c1c</pre>
+<pre id="sha512">f1e1bbfad573e6f41f5bb3f504f0652345c005ec81a3cddb16ac58df6b06f6a073a9948ba1b2e5a9005dd318b18f7cc5b8379667e9ce4fbeca0a0a831c5431b9</pre>
 <p><em>(Os dois hashes, a data de compilação e o tamanho saem MECANICAMENTE do arquivo publicado, nunca digitados à mão. Os mesmos dados estão em <code>release.json</code> neste servidor.)</em></p>
 <h3>Assinatura de código: o que temos e o que não temos</h3>
 <p>Este binário NÃO tem assinatura Authenticode comercial — custa centenas de dólares por ano e pagamos o projeto com doação, não com venda de dados. Em vez disso publicamos a integridade criptográfica que você verifica sozinho: SHA-256 e SHA-512 derivados dos bytes exatos servidos nesta página. Ainda não há build para macOS/Linux.</p>
@@ -102,7 +102,7 @@
 <section id="verificar">
 <h2>Verificar o hash no Windows (20 segundos, sem instalar nada)</h2>
 <p>Abra o menu Iniciar, digite <code>PowerShell</code> e rode (ajuste o caminho se salvou em outro lugar):</p>
-<pre>Get-FileHash "$env:USERPROFILE\Downloads\gMatch-1.1.1-portable.exe" -Algorithm SHA256</pre>
+<pre>Get-FileHash "$env:USERPROFILE\Downloads\gMatch-1.1.2-portable.exe" -Algorithm SHA256</pre>
 <p>Compare o valor <code>Hash</code> com o publicado acima. Se diferir em UM caractere, NÃO execute: apague e reporte em <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a>.</p>
 <p>Mesma ideia, qualquer algoritmo: <code>Get-FileHash ... -Algorithm SHA512</code> deve bater com o bloco SHA-512 acima.</p>
 </section>
