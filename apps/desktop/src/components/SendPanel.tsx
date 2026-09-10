@@ -210,7 +210,10 @@ export const SendPanel = forwardRef<SendPanelHandle, {
     })
     if (newFiles.length > 0) {
       const url = URL.createObjectURL(newFiles[0])
-      setPreviewUrl(url)
+      setPreviewUrl((prev) => {
+        if (prev.startsWith('blob:')) URL.revokeObjectURL(prev)
+        return url
+      })
     }
     onForwardClear?.()
   }, [onForwardClear])
@@ -223,6 +226,9 @@ export const SendPanel = forwardRef<SendPanelHandle, {
     const idx = allFiles.indexOf(file)
     if (idx === -1) return
     const blobUrl = URL.createObjectURL(file)
+    // The drop consumer reads the URL during the drag; release it after the
+    // gesture window (one timer per drag, no cross-component revocation dance).
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000)
     const meta = JSON.stringify({
       index: idx,
       name: file.name,
