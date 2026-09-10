@@ -171,7 +171,7 @@ function payloadSummary(action: string, payload: any): string {
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
-export function PCDominationTab({ identity, allUsers, points, toast: toastFn, activeHack, setActiveHack, onOpenFlash }: Props) {
+export function PCDominationTab({ identity, allUsers, profilePics, points, toast: toastFn, activeHack, setActiveHack, onOpenFlash }: Props) {
   const { settings, update } = useSettings();
   const [activeTab, setActiveTab] = useState<'send' | 'consent' | 'history' | 'hacks'>('send');
   const [targets, setTargets] = useState<DominationTarget[]>([]);
@@ -790,6 +790,7 @@ export function PCDominationTab({ identity, allUsers, points, toast: toastFn, ac
         <HacksPanel
           identity={identity}
           users={allUsers}
+          profilePics={profilePics}
           points={points}
           toast={toastFn}
           activeHack={activeHack}
