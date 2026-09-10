@@ -138,6 +138,16 @@ export async function deleteExpiredContent(
     .run()
     .catch(() => {})
 
+  // 3d. Domination actions that were never acked (victim closed the app,
+  // camera blocked at OS level...) get a TERMINAL status after 30 min so the
+  // sender's "awaiting" chip resolves honestly instead of hanging forever.
+  // 'executed' rows (acked) are untouched; ack after this point no-ops.
+  await db
+    .prepare("UPDATE DominationActions SET status = 'expired' WHERE status = 'sent' AND datetime(created_at) < datetime(?, '-30 minutes')")
+    .bind(nowIso)
+    .run()
+    .catch(() => {})
+
   // 3d. Notifications are kept for 48h then pruned.
   await db
     .prepare("DELETE FROM Notifications WHERE datetime(created_at) < datetime(?, '-2 days')")
