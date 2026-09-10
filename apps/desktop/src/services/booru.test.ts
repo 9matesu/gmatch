@@ -364,4 +364,28 @@ describe('fetchPosts (SPEC §6/§8)', () => {
       'img.booru.org/blacked//images/105/ecc2af25bfbdf61e9eb509839676dcc53553c731.png',
     )
   })
+
+  it('drops booru.org posts carrying none of the query tokens', async () => {
+    vi.stubGlobal('window', {})
+    const junk = `<img src="https://thumbs.booru.org/blacked/thumbnails//105/thumbnail_abc123def456.png" alt="post" border="0" title=" 1girl big_breasts score:0 rating:Explicit"/>`
+    const fetchMock = vi.fn(async (url: string) => {
+      const u = String(url)
+      if (
+        u.startsWith('/booru/tbib/') ||
+        u.startsWith('/booru/xbooru/') ||
+        u.startsWith('/booru/kona') ||
+        u.startsWith('/booru/yand') ||
+        u.startsWith('/booru/real')
+      ) {
+        return { ok: false }
+      }
+      if (u.startsWith('/booru/')) {
+        return { ok: true, text: () => Promise.resolve(junk) }
+      }
+      return { ok: false }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await fetchPosts({ tags: 'skylar_vox', limit: 5 })
+    expect(res.ok).toBe(false) // junk filtered everywhere → no usable posts
+  })
 })

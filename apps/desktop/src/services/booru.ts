@@ -133,6 +133,32 @@ function remember(posts: BooruPost[]): BooruPost[] {
   return fresh
 }
 
+function matchesQuery(post: BooruPost, query?: string): boolean {
+  // Untagged posts come from tag-targeted searches (redgifs/imhentai/paheal):
+  // nothing to check against, trust the search.
+  if (!query || post.tags.length === 0) return true
+  // Caption hunts: covers/doujins often don't have booru tags — pass through
+  if (/caption/i.test(query)) return true
+  const rawTokens = query
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+  if (rawTokens.length === 0) return true
+  const tokens = new Set<string>()
+  for (const t of rawTokens) {
+    tokens.add(t)
+    tokens.add(t.replace(/[\s-]+/g, '_'))
+    for (const sub of t.split('_')) {
+      if (sub.length > 2) tokens.add(sub)
+    }
+  }
+  const tags = post.tags.map((t) => t.toLowerCase().replace(/[\s-]+/g, '_'))
+  return Array.from(tokens).some((tok) =>
+    tags.some((t) => t === tok || t.includes(tok) || tok.includes(t)),
+  )
+}
+
 /**
  * Feed quality gate: explicit-only, humans only, no AI/B&W/comic/furry slop
  * (user spec). Applied to every response path. Caption hunts (query carries
@@ -142,7 +168,9 @@ function sanitize(posts: BooruPost[], query?: string): BooruPost[] {
   const captions = typeof query === 'string' && /caption/i.test(query)
   // Player excludes win everywhere: drop posts carrying an excluded tag on
   // both the IPC and direct paths (SPEC §8).
-  return allowOnly(posts, { captions }).filter((p) => !p.tags.some(isUserExcluded))
+  return allowOnly(posts, { captions })
+    .filter((p) => !p.tags.some(isUserExcluded))
+    .filter((p) => matchesQuery(p, query))
 }
 
 /** Mirrors reachable through the Vite dev proxy (same-origin → no CORS). */
@@ -223,7 +251,8 @@ function parseRealbooruHtml(html: string): BooruPost[] {
       .map((t) => t.trim().replace(/\s+/g, '_'))
       .filter(Boolean)
     const isVideo = tags.includes('video') || tags.includes('mp4') || tags.includes('webm')
-    const ext = isVideo ? 'mp4' : 'jpg'
+    const isGif = tags.includes('gif')
+    const ext = isVideo ? 'mp4' : isGif ? 'gif' : 'jpeg'
     const url = `https://realbooru.com/images/${dir1}/${dir2}/${hash}.${ext}`
     posts.push({ id: `rb-${postId}`, url, tags, rating: 'e' })
   }
@@ -281,14 +310,16 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
         url = `${src.proxy}/post.json?tags=${encodeURIComponent(tags)}&limit=${req.limit}&page=${page}`
       } else if (src.type === 'realhtml') {
         kind = 'html'
-        const firstTag = variant.split(/\s+/).filter(Boolean)[0] || ''
-        url = `${src.proxy}/index.php?page=post&s=list&tags=${encodeURIComponent(firstTag)}`
+        // Preserve multi-word tags with underscores (e.g. skylar_vox),
+        // don't drop the rest of the query with split(/\s+/)[0].
+        const tagParam = variant.trim().replace(/\s+/g, '_')
+        url = `${src.proxy}/index.php?page=post&s=list&tags=${encodeURIComponent(tagParam)}`
       } else if (src.type === 'booruorg') {
         // booru.org Cloudflare WAF challenges `tags=` queries with 403;
         // omitting `tags=` and paginating via random `pid` bypasses WAF (200 OK).
         // Each booru.org sub is already dedicated to its niche theme.
         kind = 'html'
-        const booruPid = Math.floor(Math.random() * 5) * 20
+        const booruPid = Math.floor(Math.random() * 10) * 20
         url = `${src.proxy}/index.php?page=post&s=list&pid=${booruPid}`
       } else {
         url = `${src.proxy}/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
@@ -444,6 +475,9 @@ async function imhentaiDirect(query: string, limit: number): Promise<BooruPost[]
     const posts: BooruPost[] = []
     for (const id of ids) {
       if (posts.length >= limit) break
+      // Cloudflare trips on back-to-back gallery bursts — small gap per fetch.
+      // ponytail: fixed 250ms sleep, backoff only if 403s persist.
+      await new Promise((r) => setTimeout(r, 250))
       try {
         const gRes = await fetch(toProxy(imhentaiGalleryUrl(id), IMHENTAI_ROOT, '/booru/imh'), {
           signal: AbortSignal.timeout(TIMEOUT_MS),

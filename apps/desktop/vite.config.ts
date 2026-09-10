@@ -94,8 +94,16 @@ function devPxPlugin(): Plugin {
             res.end('forbidden')
             return
           }
+          const headers: Record<string, string> = { 'User-Agent': DEV_UA }
+          if (target.hostname === 'realbooru.com') {
+            headers['Referer'] = 'https://realbooru.com/'
+          } else if (target.hostname.endsWith('.booru.org')) {
+            headers['Referer'] = `https://${target.hostname}/`
+          } else if (target.hostname.includes('imhentai.xxx')) {
+            headers['Referer'] = 'https://imhentai.xxx/'
+          }
           const r = await fetch(target.toString(), {
-            headers: { 'User-Agent': DEV_UA },
+            headers,
             signal: AbortSignal.timeout(15000),
           })
           if (!r.ok) {
@@ -150,12 +158,12 @@ export default defineConfig({
         target: 'https://imhentai.xxx',
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/booru\/imh/, ''),
-        // Cloudflare challenges the Node-proxied request when it carries a
-        // foreign Origin/Referer — strip them so gallery pages return 200.
+        headers: { Referer: 'https://imhentai.xxx/' },
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq) => {
             proxyReq.removeHeader('origin')
-            proxyReq.removeHeader('referer')
+            proxyReq.setHeader('referer', 'https://imhentai.xxx/')
+            proxyReq.setHeader('user-agent', DEV_UA)
           })
         },
       },

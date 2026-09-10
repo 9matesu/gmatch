@@ -67,6 +67,9 @@ let packagedServer = null // { mode, url } when app.isPackaged
 // (%APPDATA%/@gmatch/desktop). For existing installs, move the old profile
 // ONCE before anything reads it — keys (DPAPI), snapshot DB, blobs and local
 // storage all live under this folder and must survive the rename.
+// Boot must NEVER die silently: this block used to run (and throw) before any
+// error handler existed — a failed rename/mkdir here meant "double-click,
+// nothing happens, no log". One catch, loud dialog + log, then a safe boot.
 ;(function migrateUserData() {
   const fs = require('fs')
   try {
@@ -81,8 +84,10 @@ let packagedServer = null // { mode, url } when app.isPackaged
         fs.cpSync(oldPath, newPath, { recursive: true })
       }
     }
-  } catch {
-    /* first run or locked — the default path just works */
+  } catch (err) {
+    mainLog(`userData migration failed: ${err?.stack || err}`)
+    try { dialog.showErrorBox('gMatch could not start', `${String(err?.message || err)}\n\nDetails were written to:\n%APPDATA%\\gMatch\\main.log`) } catch { /* headless edge */ }
+    // Continue on the default path: worse than a rename, but never a zombie.
   }
 })()
 
@@ -371,7 +376,8 @@ function parseRealbooruHtml(html, captions) {
       .map((t) => t.trim().replace(/\s+/g, '_'))
       .filter(Boolean)
     const isVideo = tags.includes('video') || tags.includes('mp4') || tags.includes('webm')
-    const ext = isVideo ? 'mp4' : 'jpg'
+    const isGif = tags.includes('gif')
+    const ext = isVideo ? 'mp4' : isGif ? 'gif' : 'jpeg'
     const url = `https://realbooru.com/images/${dir1}/${dir2}/${hash}.${ext}`
     if (!hasBadTag(tags, captions)) {
       posts.push({ id: `rb-${postId}`, url, tags, rating: 'e', width: 1200, height: 1200 })
@@ -654,10 +660,12 @@ const SOURCES = [
     // DAPI offline (API deliberately disabled) — HTML list scraper.
     id: 'realbooru',
     fetch: async (variant, n, captions) => {
-      const firstTag = variant.split(/\s+/).filter(Boolean)[0] || ''
+      // Preserve multi-word tags with underscores (e.g. skylar_vox),
+      // don't drop the rest of the query with split(/\s+/)[0].
+      const tagParam = variant.trim().replace(/\s+/g, '_')
       const pid = Math.floor(Math.random() * 5)
       const html = await httpGet(
-        `https://realbooru.com/index.php?page=post&s=list&tags=${encodeURIComponent(firstTag)}&pid=${pid}`
+        `https://realbooru.com/index.php?page=post&s=list&tags=${encodeURIComponent(tagParam)}&pid=${pid}`
       )
       return parseRealbooruHtml(html, captions).slice(0, n)
     },
@@ -669,7 +677,7 @@ const SOURCES = [
     // via random `pid` returns 200 OK. Each sub is dedicated to its niche theme.
     id: 'hgoon',
     fetch: async (_variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 5) * 20
+      const pid = Math.floor(Math.random() * 10) * 20
       const html = await httpGet(`https://hgoon.booru.org/index.php?page=post&s=list&pid=${pid}`)
       return parseBooruOrgHtml(html, 'hgoon', captions).slice(0, n)
     },
@@ -677,7 +685,7 @@ const SOURCES = [
   {
     id: 'blacked',
     fetch: async (_variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 5) * 20
+      const pid = Math.floor(Math.random() * 10) * 20
       const html = await httpGet(`https://blacked.booru.org/index.php?page=post&s=list&pid=${pid}`)
       return parseBooruOrgHtml(html, 'blacked', captions).slice(0, n)
     },
@@ -685,7 +693,7 @@ const SOURCES = [
   {
     id: 'allgirl',
     fetch: async (_variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 5) * 20
+      const pid = Math.floor(Math.random() * 10) * 20
       const html = await httpGet(`https://allgirl.booru.org/index.php?page=post&s=list&pid=${pid}`)
       return parseBooruOrgHtml(html, 'allgirl', captions).slice(0, n)
     },
@@ -693,7 +701,7 @@ const SOURCES = [
   {
     id: 'rule34-org',
     fetch: async (_variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 5) * 20
+      const pid = Math.floor(Math.random() * 10) * 20
       const html = await httpGet(`https://rule34.booru.org/index.php?page=post&s=list&pid=${pid}`)
       return parseBooruOrgHtml(html, 'rule34', captions).slice(0, n)
     },
@@ -701,7 +709,7 @@ const SOURCES = [
   {
     id: 'qoh',
     fetch: async (_variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 5) * 20
+      const pid = Math.floor(Math.random() * 10) * 20
       const html = await httpGet(`https://qoh.booru.org/index.php?page=post&s=list&pid=${pid}`)
       return parseBooruOrgHtml(html, 'qoh', captions).slice(0, n)
     },
@@ -709,7 +717,7 @@ const SOURCES = [
   {
     id: 'celeb',
     fetch: async (_variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 5) * 20
+      const pid = Math.floor(Math.random() * 10) * 20
       const html = await httpGet(`https://celeb.booru.org/index.php?page=post&s=list&pid=${pid}`)
       return parseBooruOrgHtml(html, 'celeb', captions).slice(0, n)
     },
@@ -717,7 +725,7 @@ const SOURCES = [
   {
     id: 'footfetish',
     fetch: async (_variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 5) * 20
+      const pid = Math.floor(Math.random() * 10) * 20
       const html = await httpGet(`https://footfetishbooru.booru.org/index.php?page=post&s=list&pid=${pid}`)
       return parseBooruOrgHtml(html, 'footfetishbooru', captions).slice(0, n)
     },

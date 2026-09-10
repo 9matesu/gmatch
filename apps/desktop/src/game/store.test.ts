@@ -20,11 +20,12 @@ import { setupTag } from './tags'
 import { getUserExcludes } from './tagFilter'
 import { fetchPosts } from '../services/booru'
 import type { BooruResponse } from '../services/booru'
-import { useGame, HISTORY_CAP, GRID_SIZE, shufflePosts } from './store'
+import { useGame, HISTORY_CAP, GRID_SIZE, gridSizeForMode, shufflePosts, __resetFeedRetryForTests, lastFeedRetryMs } from './store'
 
 beforeEach(() => {
   mem.clear()
   useGame.getState().resetGame()
+  __resetFeedRetryForTests()
 })
 
 describe('clickImage', () => {
@@ -331,6 +332,23 @@ describe('background backdrop', () => {
     useGame.getState().setBackground(null)
     expect(useGame.getState().backgroundUrl).toBeNull()
   })
+
+  it('removeGalleryImage deletes permanently and clears a matching backdrop', () => {
+    useGame.setState({
+      gallery: [
+        { id: 'g1', url: 'https://x/g1.jpg', tags: ['a'], rarityBase: 10, clicks: 0, rarity: 'Gold' },
+        { id: 'g2', url: 'https://x/g2.jpg', tags: ['b'], rarityBase: 5, clicks: 0, rarity: 'Silver' },
+      ],
+      backgroundUrl: 'https://x/g1.jpg',
+    })
+    expect(useGame.getState().removeGalleryImage('nope')).toBe(false)
+    expect(useGame.getState().removeGalleryImage('g1')).toBe(true)
+    const s = useGame.getState()
+    expect(s.gallery.map((g) => g.id)).toEqual(['g2'])
+    expect(s.backgroundUrl).toBeNull()
+    expect(useGame.getState().removeGalleryImage('g2')).toBe(true)
+    expect(useGame.getState().gallery).toHaveLength(0)
+  })
 })
 
 describe('shufflePosts (never sequential)', () => {
@@ -351,15 +369,15 @@ describe('shufflePosts (never sequential)', () => {
 })
 
 describe('tick', () => {
-  it('pays passive g$/s from owned tags', () => {
+  it('pays passive g$/s from owned tags (halved)', () => {
     useGame.setState({
       gc: 0,
       tags: [{ name: 'wet', level: 2, base: 10, income: 5, weight: 2 }],
     })
     useGame.getState().tick(1000)
     const s = useGame.getState()
-    expect(s.gc).toBeGreaterThanOrEqual(10)
-    expect(s.totalEarnedGc).toBeGreaterThanOrEqual(10)
+    expect(s.gc).toBeGreaterThanOrEqual(5)
+    expect(s.totalEarnedGc).toBeGreaterThanOrEqual(5)
   })
 
   it('legacy timed caps still prune, permanent pops persist', () => {
@@ -427,9 +445,9 @@ describe('save / load / offline earnings', () => {
     useGame.getState().load()
     const s = useGame.getState()
     expect(s.gc).toBe(123)
-    expect(s.offlineGain).toBeCloseTo(150, 0) // 60s * 5 g$/s * 50%
+    expect(s.offlineGain).toBeCloseTo(75, 0) // 60s * 5 g$/s * 50% * 50% nerfed
     s.collectOffline()
-    expect(useGame.getState().gc).toBeCloseTo(273, 0)
+    expect(useGame.getState().gc).toBeCloseTo(198, 0)
     expect(useGame.getState().collectedOfflineEarnings).toBe(true)
     expect(useGame.getState().achievements).toContain('offline_slut')
   })
@@ -471,6 +489,19 @@ describe('addCustomTag', () => {
     expect(tag?.selected).toBe(true)
     const dupe = await useGame.getState().addCustomTag('bimbo')
     expect(dupe.added).toBe(false)
+  })
+
+  it('steers feed immediately with priorityTag when custom tag is added', async () => {
+    mocked.mockClear()
+    mocked.mockResolvedValue({ posts: [post], source: 'redgifs', ok: true })
+    await useGame.getState().addCustomTag('Gooner')
+    expect(useGame.getState().priorityTag).toBe('gooner')
+    // fetchFeed honors priorityTag first even with other owned tags in the pool
+    mocked.mockClear()
+    mocked.mockResolvedValue({ posts: [post], source: 'redgifs', ok: true })
+    await useGame.getState().fetchFeed()
+    expect(mocked).toHaveBeenCalledWith(expect.objectContaining({ tags: 'gooner' }))
+    expect(useGame.getState().priorityTag).toBeNull()
   })
 })
 
@@ -598,6 +629,57 @@ describe('3x3 grid mode', () => {
     useGame.getState().tick(1000)
     expect(useGame.getState().grid[0].hp).toBeLessThan(before)
   })
+
+  it('KO on single foe queues a non-blocking KoDrop from foe tags', () => {
+    const post = { id: 'p1', url: 'u1', tags: ['milf', 'solo', 'smile'], rating: 'e' }
+    useGame.setState({
+      current: post,
+      queue: [],
+      foeHp: 1,
+      foeMaxHp: 8,
+      foeClicks: 0,
+      tags: [],
+      imageReady: true,
+      pendingDrops: [],
+    })
+    const r = useGame.getState().clickImage()
+    expect(r.killed).toBe(true)
+    const s = useGame.getState()
+    expect(s.pendingDrops.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('claimDropTag adopts the suggested tag, claimDropAntiTag adds the exclude', () => {
+    useGame.setState({
+      tags: [],
+      userExcludes: [],
+      pendingDrops: [
+        { id: 'd1', foeTitle: 'milf', suggestedTag: 'milf', suggestedAntiTag: 'feet', timestamp: Date.now() },
+      ],
+    })
+    expect(useGame.getState().claimDropTag('d1')).toBe(true)
+    expect(useGame.getState().tags.map((t) => t.name)).toContain('milf')
+    useGame.setState({
+      pendingDrops: [
+        { id: 'd2', foeTitle: 'x', suggestedAntiTag: 'feet', timestamp: Date.now() },
+      ],
+    })
+    expect(useGame.getState().claimDropAntiTag('d2')).toBe(true)
+    expect(useGame.getState().userExcludes).toContain('feet')
+  })
+
+  it('gridSizeForMode sizes layouts and reorderGrid swaps tiles', () => {
+    expect(gridSizeForMode('1x1')).toBe(1)
+    expect(gridSizeForMode('1x2')).toBe(2)
+    expect(gridSizeForMode('2x2')).toBe(4)
+    expect(gridSizeForMode('3x3')).toBe(9)
+    useGame.setState({ queue: dozen(), grid: [] })
+    useGame.getState().setViewMode('1x2')
+    const s = useGame.getState()
+    expect(s.grid).toHaveLength(2)
+    const firstId = s.grid[0].post.id
+    useGame.getState().reorderGrid(0, 1)
+    expect(useGame.getState().grid[1].post.id).toBe(firstId)
+  })
 })
 
 describe('setup + user excludes (no hardcoded tags)', () => {
@@ -632,5 +714,30 @@ describe('setup + user excludes (no hardcoded tags)', () => {
     expect(useGame.getState().removeUserExclude('FEET')).toBe(true)
     expect(useGame.getState().removeUserExclude('feet')).toBe(false)
     expect(useGame.getState().userExcludes).toEqual([])
+  })
+})
+
+describe('silent feed retry (never offline)', () => {
+  it('schedules backoff on failure without stacking timers', async () => {
+    const { fetchPosts } = await import('../services/booru')
+    const mocked = vi.mocked(fetchPosts)
+    mocked.mockReset()
+    mocked.mockResolvedValue({ posts: [], source: null, ok: false, offline: true })
+    useGame.setState({
+      tags: [setupTag('aaa')],
+      current: { id: 'live', url: 'https://x/live.jpg', tags: ['aaa'] },
+      foeHp: 5,
+      foeMaxHp: 5,
+      past: [],
+    })
+    await useGame.getState().fetchFeed()
+    expect(lastFeedRetryMs).toBe(5000)
+    // Immediate refetch must not pile a second timer.
+    await useGame.getState().fetchFeed()
+    expect(lastFeedRetryMs).toBe(5000)
+    // Game stays playable: last foe alive, no offline flag.
+    const s = useGame.getState()
+    expect(s.current?.id).toBe('live')
+    expect(s.feedOffline).toBe(false)
   })
 })
