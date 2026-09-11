@@ -12,7 +12,7 @@ import { openApiRequest } from '@orbit/protocol'
 export async function unsealRequest(c: Context, next: Next) {
   const sealed = c.req.header('X-Orbit-Sealed')
   if (!sealed) {
-    if ((c.env as { API_SEALED_ONLY?: string })?.API_SEALED_ONLY && ['POST', 'PUT', 'PATCH'].includes(c.req.method)) {
+    if ((c.env as { API_SEALED_ONLY?: string })?.API_SEALED_ONLY && ['GET', 'POST', 'PUT', 'PATCH'].includes(c.req.method)) {
       return c.json({ error: 'sealed requests required (API_SEALED_ONLY)' }, 400)
     }
     return next()

@@ -52,7 +52,7 @@ describe('orbitFetch request sealing', () => {
     expect(seal.length).toBeGreaterThan(100)
   })
 
-  it('GET stays plaintext-signed (no seal attempted)', async () => {
+  it('GET seals identity headers (wave 2 B2): no X-Orbit-* in the clear', async () => {
     const node = generateIdentity()
     const fetchImpl = vi.fn(async (url: string) => {
       if (String(url).includes('/api/identity')) {
@@ -63,7 +63,10 @@ describe('orbitFetch request sealing', () => {
     const res = await orbitFetch('/api/users', { method: 'GET' }, identityLike(), fetchImpl)
     expect(res.status).toBe(200)
     const getCall = fetchCalls(fetchImpl).find(([u]) => String(u).includes('/api/users'))!
-    expect(new Headers(getCall[1]!.headers as HeadersInit).get('X-Orbit-Sealed')).toBeNull()
+    const headers = new Headers(getCall[1]!.headers as HeadersInit)
+    expect(headers.get('X-Orbit-Sealed')).toBeTruthy()
+    expect(headers.get('X-Orbit-Id')).toBeNull()
+    expect(headers.get('X-Orbit-Signature')).toBeNull()
   })
 
   it('node without a pubkey => legacy signed path, no seal header', async () => {

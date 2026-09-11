@@ -169,10 +169,12 @@ export async function orbitFetch(
 
   async function buildHeaders(): Promise<Headers> {
     const signed = signRequestHeaders(method, pathname, bodyForSig, identity, options.headers)
-    // Sealed mutation (security plan T2): signed headers + JSON body travel
-    // ECIES-encrypted to the node key; only X-Orbit-Sealed is visible on the
-    // wire. GET and multipart uploads stay as-is (idempotent reads / binary).
-    if (method !== 'GET' && !isFormUpload && identity.encryptionPrivHex && identity.encryptionPubHex) {
+    // Sealed request (security plan T2 + wave 2 B2): signed headers + JSON
+    // body travel ECIES-encrypted to the node key; only X-Orbit-Sealed is
+    // visible on the wire. GETs seal their identity headers too (empty body)
+    // so an observer never sees WHO asks. Multipart uploads stay as-is
+    // (binary streaming; identity headers ride plaintext there).
+    if (!isFormUpload && identity.encryptionPrivHex && identity.encryptionPubHex) {
       const nodePub = await getNodePubkey(fetchImpl, url)
       if (nodePub) {
         const headersRecord: Record<string, string> = {}
