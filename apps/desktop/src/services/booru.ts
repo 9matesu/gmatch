@@ -78,13 +78,38 @@ function loadSeen(): void {
   }
 }
 
+let seenTimer: ReturnType<typeof setTimeout> | null = null
+// ponytail: burst of drops writes once; a crash inside the window loses at
+// most one batch of seen marks (one duplicate image after a hard kill).
 function persistSeen(): void {
+  if (seenTimer) return
+  seenTimer = setTimeout(() => {
+    seenTimer = null
+    writeSeen()
+  }, 5_000)
+}
+
+function writeSeen(): void {
   try {
     if (typeof localStorage === 'undefined') return
     localStorage.setItem(SEEN_KEY, JSON.stringify({ ids: [...seenIds], urls: [...seenUrls] }))
   } catch {
     /* storage unavailable — memory still works for this session */
   }
+}
+
+/** Flush the pending seen-set immediately (page hide / app close). */
+export function flushSeen(): void {
+  if (!seenTimer) return
+  clearTimeout(seenTimer)
+  seenTimer = null
+  writeSeen()
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushSeen()
+  })
 }
 
 // Unhealthy-mirror cooldown: a mirror that errors or answers HTTP-error
@@ -106,6 +131,10 @@ export function __resetFeedState(): void {
   seenIds.clear()
   seenUrls.clear()
   seenLoaded = false
+  if (seenTimer) {
+    clearTimeout(seenTimer)
+    seenTimer = null
+  }
   redgifsToken = null
   redgifsTokenExp = 0
 }

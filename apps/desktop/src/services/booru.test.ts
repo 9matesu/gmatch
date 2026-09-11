@@ -1,13 +1,44 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { __resetFeedState, fetchPosts } from './booru'
+import { __resetFeedState, fetchPosts, markSeen } from './booru'
 
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.unstubAllEnvs()
+  vi.useRealTimers()
   __resetFeedState()
 })
 
+describe('seen-set persistence', () => {
+  it('persists at most once per burst (debounced)', async () => {
+    vi.useFakeTimers()
+    const setItem = vi.fn()
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem, removeItem: () => {} })
+    markSeen('a', 'u1')
+    markSeen('b', 'u2')
+    markSeen('c', 'u3')
+    expect(setItem).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(5_000)
+    expect(setItem).toHaveBeenCalledTimes(1)
+    const written = JSON.parse(String(setItem.mock.calls[0][1]))
+    expect(written.ids).toEqual(expect.arrayContaining(['a', 'b', 'c']))
+  })
+})
+
 describe('fetchPosts (SPEC §6/§8)', () => {
+  it('ipc path marks posts seen so the next round returns only fresh ones', async () => {
+    const p1 = { id: 'x1', url: 'https://e.test/1.jpg', tags: ['skylar_vox'], rating: 'e' }
+    const p2 = { id: 'x2', url: 'https://e.test/2.jpg', tags: ['skylar_vox'], rating: 'e' }
+    const p3 = { id: 'x3', url: 'https://e.test/3.jpg', tags: ['skylar_vox'], rating: 'e' }
+    const booruFetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, posts: [p1, p2], source: 'hgoon' })
+      .mockResolvedValueOnce({ ok: true, posts: [p1, p3], source: 'hgoon' })
+    vi.stubGlobal('window', { gmatch: { booruFetch } })
+    const first = await fetchPosts({ tags: 'skylar_vox', limit: 5 })
+    expect(first.posts.map((p) => p.id)).toEqual(['x1', 'x2'])
+    const second = await fetchPosts({ tags: 'skylar_vox', limit: 5 })
+    expect(second.posts.map((p) => p.id)).toEqual(['x3'])
+  })
   it('uses the Electron IPC bridge when present', async () => {
     const booruFetch = vi.fn().mockResolvedValue({
       posts: [{ id: '1', url: 'https://x/1.png', tags: ['gangbang'], rating: 'e' }],

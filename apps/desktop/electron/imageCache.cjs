@@ -13,7 +13,9 @@ const mem = require('./imageCacheMemory.cjs')
 
 const SCHEME = 'gmcache'
 const MAX_SINGLE_BYTES = 25 * 1024 * 1024
-const FEED_TTL_MS = 24 * 3600 * 1000
+// ponytail: 10min list TTL — a deduped query must refresh; the 24h "one call"
+// guarantee lives in the image-BYTES cache, not the feed list.
+const FEED_TTL_MS = 10 * 60 * 1000
 const FEED_MAX_QUERIES = 40
 const IMG_TIMEOUT_MS = 15_000
 

@@ -387,10 +387,13 @@ function parseRealbooruHtml(html, captions) {
 }
 
 // --- booru.org subdomains (hgoon, blacked, allgirl, rule34) ------------------
-function parseBooruOrgHtml(html, sub, captions) {
+function parseBooruOrgHtml(html, sub, captions, query) {
   const posts = []
   const imgRegex =
     /<img\s+[^>]*src="https:\/\/thumbs\.booru\.org\/([^/]+)\/thumbnails\/\/([^/]+)\/thumbnail_([^."]+)\.([^"]+)"[^>]*title="([^"]*)"/gi
+  // WAF forces tagless browsing; enforce the query locally so the feed still
+  // shows what the player asked for (mirror of matchesQuery in booru.ts).
+  const tokens = String(query || '').toLowerCase().split(/\s+/).filter(Boolean)
   let m
   while ((m = imgRegex.exec(html)) !== null) {
     const [, bSub, dir, hash, ext, rawTitle] = m
@@ -401,6 +404,11 @@ function parseBooruOrgHtml(html, sub, captions) {
       .replace(/rating:[a-z]+/i, '')
       .trim()
     const tags = tagsPart.split(/\s+/).filter(Boolean)
+    if (tokens.length) {
+      const tagSet = tags.map((t) => t.toLowerCase().replace(/[\s-]+/g, '_'))
+      const ok = tokens.some((tok) => tagSet.some((t) => t === tok || t.includes(tok) || tok.includes(t)))
+      if (!ok) continue
+    }
     const url = `https://img.booru.org/${bSub}//images/${dir}/${hash}.${ext}`
     const id = `${bSub}-${hash.slice(0, 10)}`
     if (rating === 'explicit' || rating === 'e' || rating === 'questionable') {
@@ -676,58 +684,58 @@ const SOURCES = [
     // Cloudflare WAF challenges `tags=` with 403; omitting `tags=` and paginating
     // via random `pid` returns 200 OK. Each sub is dedicated to its niche theme.
     id: 'hgoon',
-    fetch: async (_variant, n, captions) => {
+    fetch: async (variant, n, captions) => {
       const pid = Math.floor(Math.random() * 10) * 20
       const html = await httpGet(`https://hgoon.booru.org/index.php?page=post&s=list&pid=${pid}`)
-      return parseBooruOrgHtml(html, 'hgoon', captions).slice(0, n)
+      return parseBooruOrgHtml(html, 'hgoon', captions, variant).slice(0, n)
     },
   },
   {
     id: 'blacked',
-    fetch: async (_variant, n, captions) => {
+    fetch: async (variant, n, captions) => {
       const pid = Math.floor(Math.random() * 10) * 20
       const html = await httpGet(`https://blacked.booru.org/index.php?page=post&s=list&pid=${pid}`)
-      return parseBooruOrgHtml(html, 'blacked', captions).slice(0, n)
+      return parseBooruOrgHtml(html, 'blacked', captions, variant).slice(0, n)
     },
   },
   {
     id: 'allgirl',
-    fetch: async (_variant, n, captions) => {
+    fetch: async (variant, n, captions) => {
       const pid = Math.floor(Math.random() * 10) * 20
       const html = await httpGet(`https://allgirl.booru.org/index.php?page=post&s=list&pid=${pid}`)
-      return parseBooruOrgHtml(html, 'allgirl', captions).slice(0, n)
+      return parseBooruOrgHtml(html, 'allgirl', captions, variant).slice(0, n)
     },
   },
   {
     id: 'rule34-org',
-    fetch: async (_variant, n, captions) => {
+    fetch: async (variant, n, captions) => {
       const pid = Math.floor(Math.random() * 10) * 20
       const html = await httpGet(`https://rule34.booru.org/index.php?page=post&s=list&pid=${pid}`)
-      return parseBooruOrgHtml(html, 'rule34', captions).slice(0, n)
+      return parseBooruOrgHtml(html, 'rule34', captions, variant).slice(0, n)
     },
   },
   {
     id: 'qoh',
-    fetch: async (_variant, n, captions) => {
+    fetch: async (variant, n, captions) => {
       const pid = Math.floor(Math.random() * 10) * 20
       const html = await httpGet(`https://qoh.booru.org/index.php?page=post&s=list&pid=${pid}`)
-      return parseBooruOrgHtml(html, 'qoh', captions).slice(0, n)
+      return parseBooruOrgHtml(html, 'qoh', captions, variant).slice(0, n)
     },
   },
   {
     id: 'celeb',
-    fetch: async (_variant, n, captions) => {
+    fetch: async (variant, n, captions) => {
       const pid = Math.floor(Math.random() * 10) * 20
       const html = await httpGet(`https://celeb.booru.org/index.php?page=post&s=list&pid=${pid}`)
-      return parseBooruOrgHtml(html, 'celeb', captions).slice(0, n)
+      return parseBooruOrgHtml(html, 'celeb', captions, variant).slice(0, n)
     },
   },
   {
     id: 'footfetish',
-    fetch: async (_variant, n, captions) => {
+    fetch: async (variant, n, captions) => {
       const pid = Math.floor(Math.random() * 10) * 20
       const html = await httpGet(`https://footfetishbooru.booru.org/index.php?page=post&s=list&pid=${pid}`)
-      return parseBooruOrgHtml(html, 'footfetishbooru', captions).slice(0, n)
+      return parseBooruOrgHtml(html, 'footfetishbooru', captions, variant).slice(0, n)
     },
   },
 ]
