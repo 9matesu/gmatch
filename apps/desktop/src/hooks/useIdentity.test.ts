@@ -52,6 +52,7 @@ describe('Identity Export, Import and Logout Cleanup', () => {
     mockStorage['orbit_onboarding_v2:anonymous'] = '{"version":1,"current":"ready","completed":["server","profile","ready"]}'
     mockStorage['orbit_onboarding_v2:deadbeef'] = '{"version":1,"current":"ready","completed":["ready"]}'
     mockStorage['gmatch.onboarding.serverUrl'] = 'http://192.168.0.42:8790'
+    mockStorage['orbit_tour_v1:deadbeef'] = '{"version":1,"index":3,"status":"active"}'
     mockStorage['goonMatch_age_verified'] = 'true'
 
     // Run the REAL wipe (wipeUserStorage is what clearIdentity calls)
@@ -68,6 +69,7 @@ describe('Identity Export, Import and Logout Cleanup', () => {
     expect(mockStorage['orbit_onboarding_v2:anonymous']).toBeUndefined()
     expect(mockStorage['orbit_onboarding_v2:deadbeef']).toBeUndefined()
     expect(mockStorage['gmatch.onboarding.serverUrl']).toBeUndefined()
+    expect(mockStorage['orbit_tour_v1:deadbeef']).toBeUndefined()
     expect(mockStorage['goonMatch_age_verified']).toBe('true') // age survives logout
   })
 

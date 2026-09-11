@@ -52,7 +52,7 @@ export function wipeUserStorage() {
   // intentionally survives — the 18+ confirmation is device-level.)
   try {
     for (const k of Object.keys(localStorage)) {
-      if (k.startsWith('orbit_onboarding_v2:') || k === 'gmatch.onboarding.serverUrl') localStorage.removeItem(k);
+      if (k.startsWith('orbit_onboarding_v2:') || k.startsWith('orbit_tour_v1:') || k === 'gmatch.onboarding.serverUrl') localStorage.removeItem(k);
     }
   } catch { /* private mode */ }
 }
