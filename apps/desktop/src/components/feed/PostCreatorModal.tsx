@@ -114,7 +114,7 @@ export function PostCreatorModal({
         <div className="p-4 border-b border-border-glass flex items-center justify-between">
           <div className="flex items-center gap-2">
             <PlusSquare className="w-5 h-5 text-retro-fg" />
-            <h3 className="text-sm font-extrabold text-retro-fg">Create New Post</h3>
+            <h3 className="text-sm font-extrabold text-retro-fg">Create new post</h3>
           </div>
           <button
             type="button"

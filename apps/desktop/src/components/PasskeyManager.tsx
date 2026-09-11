@@ -45,7 +45,7 @@ export function PasskeyManager({ identity }: { identity: OrbitIdentity }) {
 
   return (
     <div className="bg-retro-border border border-retro-muted p-4 mt-4">
-      <h4 className="font-bold text-retro-fg text-sm mb-2">Vault Security</h4>
+      <h4 className="font-bold text-retro-fg text-sm mb-2">Vault security</h4>
       <p className="text-xs text-retro-muted mb-4">
         Your private key is currently only protected by local storage. Secure it by linking a WebAuthn Passkey (e.g. TouchID, YubiKey).
       </p>

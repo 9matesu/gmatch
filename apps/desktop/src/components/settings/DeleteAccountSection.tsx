@@ -84,7 +84,7 @@ export function DeleteAccountSection({
     <div className="rounded-xl border border-red-900/60 bg-red-950/20 p-4 space-y-3">
       <div className="flex items-center gap-2">
         <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-        <h4 className="text-xs font-semibold text-red-300">Delete Account &amp; Erase This Device</h4>
+        <h4 className="text-xs font-semibold text-red-300">Delete account &amp; erase this device</h4>
       </div>
       <p className="text-xs text-retro-muted leading-relaxed">
         Deletes your account and everything it touched on the server: profile, cards, posts,

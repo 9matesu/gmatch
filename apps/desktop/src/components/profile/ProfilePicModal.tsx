@@ -123,7 +123,7 @@ export function ProfilePicModal({
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass">
-          <h3 className="text-sm font-medium text-retro-fg">Profile Photo</h3>
+          <h3 className="text-sm font-medium text-retro-fg">Profile photo</h3>
           <button
             type="button"
             onClick={onClose}

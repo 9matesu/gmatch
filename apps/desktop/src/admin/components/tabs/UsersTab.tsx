@@ -142,7 +142,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-retro-fg">User Management</h1>
+          <h1 className="text-lg font-bold text-retro-fg">User management</h1>
           <p className="text-xs text-retro-muted mt-1">User moderation, bans, balances, and inspection</p>
         </div>
       </div>

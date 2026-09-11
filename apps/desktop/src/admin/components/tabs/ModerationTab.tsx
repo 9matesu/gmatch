@@ -609,7 +609,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-retro-fg">Moderation Center</h1>
+          <h1 className="text-lg font-bold text-retro-fg">Moderation center</h1>
           <p className="text-xs text-retro-muted mt-1">Unified report queue and in-loco content moderation</p>
         </div>
       </div>

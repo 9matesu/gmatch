@@ -87,7 +87,7 @@ function FeedSettingsTab({ toast }: { toast?: (msg: string, type?: string) => vo
   return (
     <div className="space-y-6 animate-orbit-fade-in">
       <div className="p-4 bg-surface-interactive border border-border-glass rounded-lg space-y-3">
-        <h4 className="text-xs font-medium text-retro-fg">Starter Picks</h4>
+        <h4 className="text-xs font-medium text-retro-fg">Starter picks</h4>
         {owned.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
             {owned.map((t) => (
@@ -121,7 +121,7 @@ function FeedSettingsTab({ toast }: { toast?: (msg: string, type?: string) => vo
       </div>
 
       <div className="p-4 bg-surface-raised border border-border-glass rounded-xl space-y-3">
-        <h4 className="text-xs font-medium text-retro-fg">Excluded Tags</h4>
+        <h4 className="text-xs font-medium text-retro-fg">Excluded tags</h4>
         <div className="flex gap-2">
           <input
             type="text"
@@ -391,7 +391,7 @@ export function GMatchSettingsModal({
               <div className="space-y-6 animate-orbit-fade-in">
                 {/* Display & Layout */}
                 <div className="p-4 bg-surface-interactive border border-border-glass rounded-lg space-y-4">
-                  <h4 className="text-xs font-medium text-retro-fg">Display &amp; Layout</h4>
+                  <h4 className="text-xs font-medium text-retro-fg">Display &amp; layout</h4>
 
                   {/* Panel opacity */}
                   <div className="space-y-1.5">
@@ -534,7 +534,7 @@ export function GMatchSettingsModal({
 
                 {/* Match Pacing & Audio */}
                 <div className="p-4 bg-surface-interactive border border-border-glass rounded-lg space-y-4">
-                  <h4 className="text-xs font-medium text-retro-fg">Match Pacing &amp; Audio</h4>
+                  <h4 className="text-xs font-medium text-retro-fg">Match pacing &amp; audio</h4>
 
                   <div className="flex items-center justify-between gap-4">
                     <div>
@@ -585,7 +585,7 @@ export function GMatchSettingsModal({
                     onClick={() => setWallpaperExpanded(!wallpaperExpanded)}
                   >
                     <div>
-                      <h4 className="text-xs font-medium text-retro-fg">Wallpaper Background</h4>
+                      <h4 className="text-xs font-medium text-retro-fg">Wallpaper background</h4>
                       <p className="text-xs text-retro-muted">Customize application background image or media</p>
                     </div>
                     <button
@@ -797,7 +797,7 @@ export function GMatchSettingsModal({
                 <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="text-xs font-medium text-rose-300">Log Out of this Device</h4>
+                      <h4 className="text-xs font-medium text-rose-300">Log out of this device</h4>
                       <p className="text-xs text-rose-300/70">Clears your private keys and session from local storage</p>
                     </div>
 

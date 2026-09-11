@@ -92,7 +92,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-retro-fg">Settings & Operations</h1>
+          <h1 className="text-lg font-bold text-retro-fg">Settings & operations</h1>
           <p className="text-xs text-retro-muted mt-1">Bot config, platform settings, and danger zone</p>
         </div>
       </div>

@@ -70,7 +70,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-bold text-retro-fg">Dashboard Overview</h1>
+        <h1 className="text-lg font-bold text-retro-fg">Dashboard overview</h1>
         <p className="text-xs text-retro-muted mt-1">Platform health and key metrics at a glance. Auto-refreshes every 15s.</p>
       </div>
 

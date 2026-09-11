@@ -65,19 +65,19 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
           {tab === 'getting-started' && (
             <div className="space-y-4">
               <section className="space-y-1.5">
-                <h3 className="text-xs font-medium text-retro-fg">What is GMatch?</h3>
+                <h3 className="text-xs font-medium text-retro-fg">What is gMatch?</h3>
                 <p className="text-xs text-retro-muted leading-relaxed">
                   A decentralized P2P card matching and image sharing network. Your identity is a cryptographic keypair generated locally in your browser. Files travel directly between peers via WebRTC and encrypted blobs.
                 </p>
               </section>
               <section className="space-y-1.5">
-                <h3 className="text-xs font-medium text-retro-fg">Your Identity</h3>
+                <h3 className="text-xs font-medium text-retro-fg">Your identity</h3>
                 <p className="text-xs text-retro-muted leading-relaxed">
                   When you launch GMatch, a signing keypair and an encryption keypair are created in your browser. Your GMatch ID is derived from your public key. Back up your export keys to restore your identity across devices.
                 </p>
               </section>
               <section className="space-y-1.5">
-                <h3 className="text-xs font-medium text-retro-fg">Setting Up</h3>
+                <h3 className="text-xs font-medium text-retro-fg">Setting up</h3>
                 <ol className="text-xs text-retro-muted space-y-1.5 list-decimal list-inside leading-relaxed">
                   <li><span className="text-retro-body font-medium">Create your identity</span> — keys are generated in-browser, never uploaded unencrypted</li>
                   <li><span className="text-retro-body font-medium">Set a display name &amp; tags</span> — helps others find you</li>
@@ -102,7 +102,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
           {tab === 'sending' && (
             <div className="space-y-4">
               <section className="space-y-1.5">
-                <h3 className="text-xs font-medium text-retro-fg">How to Send</h3>
+                <h3 className="text-xs font-medium text-retro-fg">How to send</h3>
                 <ol className="text-xs text-retro-muted space-y-1.5 list-decimal list-inside leading-relaxed">
                   <li><span className="text-retro-body font-medium">Select recipients</span> — check the box next to a user&apos;s name</li>
                   <li><span className="text-retro-body font-medium">Drop or click to browse</span> — media appear as preview thumbnails</li>
@@ -130,7 +130,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
           {tab === 'network' && (
             <div className="space-y-4">
               <section className="space-y-1.5">
-                <h3 className="text-xs font-medium text-retro-fg">Network Directory</h3>
+                <h3 className="text-xs font-medium text-retro-fg">Network directory</h3>
                 <p className="text-xs text-retro-muted leading-relaxed">
                   The directory shows all users connected to the relay. Users are sorted by online status first, then by activity.
                 </p>
@@ -153,13 +153,13 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                 </p>
               </section>
               <section className="space-y-1.5">
-                <h3 className="text-xs font-medium text-retro-fg">Keys &amp; Data Stay Local</h3>
+                <h3 className="text-xs font-medium text-retro-fg">Keys &amp; data stay local</h3>
                 <p className="text-xs text-retro-muted leading-relaxed">
                   Your private keys are generated in your browser and never uploaded. Private messages and protected content are encrypted end-to-end; the server cannot read them. Files are delivered via direct peer-to-peer connections wherever possible.
                 </p>
               </section>
               <section className="space-y-1.5">
-                <h3 className="text-xs font-medium text-retro-fg">What We Store &amp; Never Share</h3>
+                <h3 className="text-xs font-medium text-retro-fg">What we store &amp; never share</h3>
                 <p className="text-xs text-retro-muted leading-relaxed">
                   We store only the metadata needed to run the service and never sell your personal data. Moderation and admin actions are audited with actor, timestamp and reason; logs never contain private keys or plaintext protected content.
                 </p>
@@ -176,7 +176,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
           {tab === 'shortcuts' && (
             <div className="space-y-4">
               <section className="space-y-2">
-                <h3 className="text-xs font-medium text-retro-fg">Keyboard Shortcuts</h3>
+                <h3 className="text-xs font-medium text-retro-fg">Keyboard shortcuts</h3>
                 <div className="text-xs space-y-1.5">
                   {[
                     ['?', 'Open help modal'],

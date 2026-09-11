@@ -170,7 +170,7 @@ export function LiveCameraModal({
         <div className="p-4 bg-surface-raised border-b border-border-glass flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Camera className="w-5 h-5 text-retro-fg" />
-            <h3 className="text-sm font-black text-retro-fg tracking-tight">Camera Snapshot</h3>
+            <h3 className="text-sm font-black text-retro-fg tracking-tight">Camera snapshot</h3>
           </div>
           <button
             type="button"

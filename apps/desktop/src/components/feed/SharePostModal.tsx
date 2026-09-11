@@ -94,7 +94,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
         <div className="p-4 border-b border-border-glass flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Send className="w-5 h-5 text-retro-fg" />
-            <h3 className="text-sm font-extrabold text-retro-fg">Share Post</h3>
+            <h3 className="text-sm font-extrabold text-retro-fg">Share post</h3>
           </div>
           <button
             type="button"

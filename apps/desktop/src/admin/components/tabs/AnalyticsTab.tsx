@@ -141,7 +141,7 @@ export function AnalyticsTab({ identity, pinVerified }: AnalyticsTabProps) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-retro-fg">Analytics & Audit</h1>
+          <h1 className="text-lg font-bold text-retro-fg">Analytics & audit</h1>
           <p className="text-xs text-retro-muted mt-1">Admin audit log and aggregate daily activity</p>
         </div>
       </div>

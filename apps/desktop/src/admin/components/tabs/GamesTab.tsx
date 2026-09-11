@@ -455,7 +455,7 @@ export function GamesTab({ identity, pinVerified, onZoom, onAction }: GamesTabPr
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-retro-fg">Games Operations</h1>
+          <h1 className="text-lg font-bold text-retro-fg">Games operations</h1>
           <p className="text-xs text-retro-muted mt-1">Live matches, queue, rooms, and tournament operations</p>
         </div>
         <button

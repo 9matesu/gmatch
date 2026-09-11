@@ -937,9 +937,9 @@ export function GMatchFeed({
               <div className="w-12 h-12 rounded-full bg-glass-w12 border border-border-glass flex items-center justify-center mx-auto text-retro-muted">
                 <Camera className="w-5 h-5 stroke-[1.75]" />
               </div>
-              <h4 className="text-sm font-semibold text-retro-fg">No Posts Yet</h4>
+              <h4 className="text-sm font-semibold text-retro-fg">No posts yet</h4>
               <p className="text-xs text-retro-muted max-w-xs mx-auto leading-relaxed">
-                Capture or upload your first photo or video post to start sharing with your friends!
+                Upload your first post and it shows up here.
               </p>
               <button
                 type="button"

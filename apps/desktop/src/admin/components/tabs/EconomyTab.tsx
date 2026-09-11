@@ -357,7 +357,7 @@ export function EconomyTab({ identity, pinVerified, onZoom, onAction }: EconomyT
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-retro-fg">Cards & Economy</h1>
+          <h1 className="text-lg font-bold text-retro-fg">Cards & economy</h1>
           <p className="text-xs text-retro-muted mt-1">Inspect canonical ownership, valuation, listings, and in-loco card moderation</p>
         </div>
       </div>
