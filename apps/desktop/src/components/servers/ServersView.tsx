@@ -12,6 +12,7 @@ import { orbitFetch } from '../../utils/api'
 import { normalizeServerUrl } from '../../utils/serverUrl'
 import { joinServer } from '../../utils/join-server'
 import { rememberPendingHost } from '../../utils/server-host-pending'
+import { maskedServerUrl } from '../../utils/ipMask'
 import { claimPendingHost } from '../../hooks/usePendingServerHost'
 import { playPress } from '../../utils/sounds'
 import { CentralAdminPanel } from './CentralAdminPanel'
@@ -817,7 +818,7 @@ export function ServersView({
                             <p className="text-xs text-retro-muted truncate mt-0.5">{s.description}</p>
                           )}
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[10px] text-retro-muted font-mono">
-                            <span>{s.endpoint_hint || 'no address published'}</span>
+                            <span>{s.endpoint_hint ? maskedServerUrl(s.endpoint_hint) : 'no address published'}</span>
                             {(typeof s.online_count === 'number' || typeof s.user_count === 'number') && (
                               <span className="text-retro-fg">
                                 <strong>{s.online_count ?? 0}</strong> online · {s.user_count ?? '?'} members
