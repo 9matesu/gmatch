@@ -2,6 +2,7 @@
 
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { User, OrbitObject } from '@orbit/shared';
+import { Star } from 'lucide-react'
 
 interface ContextMenuState {
   x: number;
@@ -91,7 +92,7 @@ export function ContextOverlay({
               className="w-full text-left px-3 py-2 hover:bg-retro-bg text-retro-fg flex items-center justify-between transition-colors font-bold"
             >
               <span>{friendsIds.includes(contextMenu.data.id) ? 'Remove Contact' : 'Add Contact'}</span>
-              <span className="text-[10px] text-retro-accent">★</span>
+              <Star className="w-3 h-3 fill-current text-retro-accent" />
             </button>
             <button
               type="button"

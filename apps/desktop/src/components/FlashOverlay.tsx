@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { FLASH_POPUP_SECONDS, type FlashEvent } from '@orbit/shared'
 import { ObjectImage } from './ObjectImage'
+import { Zap, X, Heart } from 'lucide-react'
 
 export function FlashOverlay({
   flash,
@@ -34,19 +35,20 @@ export function FlashOverlay({
             {flash.pfp_url ? (
               <img src={flash.pfp_url} alt="" className="w-7 h-7 rounded-full border border-border-glass shrink-0" />
             ) : (
-              <div className="w-7 h-7 rounded-full bg-retro-panel border border-border-glass flex items-center justify-center text-xs shrink-0">⚡</div>
+              <div className="w-7 h-7 rounded-full bg-retro-panel border border-border-glass flex items-center justify-center text-xs shrink-0"><Zap className="w-3.5 h-3.5 fill-current" /></div>
             )}
             <div className="min-w-0">
-              <div className="text-xs font-black text-yellow-300 uppercase tracking-widest">⚡ Flash Drop</div>
+              <div className="text-xs font-black text-yellow-300 uppercase tracking-widest">Flash Drop</div>
               <div className="text-[10px] text-white/80 font-mono truncate">{flash.owner_name || 'Anonymous'}</div>
             </div>
           </div>
           <button
             type="button"
             onClick={onDismiss}
-            className="text-[10px] font-bold text-white/70 hover:text-white px-2 py-1 border border-white/30 rounded cursor-pointer"
+            aria-label="Dismiss flash"
+            className="text-white/70 hover:text-white p-1.5 rounded-md hover:bg-white/10 cursor-pointer"
           >
-            ✕
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
@@ -70,7 +72,7 @@ export function FlashOverlay({
             disabled={flash.liked_by_me}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-400/20 border border-yellow-400/40 text-yellow-300 text-xs font-bold cursor-pointer disabled:opacity-50"
           >
-            <span>{flash.liked_by_me ? '★' : '☆'}</span>
+            <Heart className={`w-3.5 h-3.5 ${flash.liked_by_me ? 'fill-current' : ''}`} />
             <span>{flash.likes_count}</span>
           </button>
           <div className="text-[10px] text-white/60 font-mono">

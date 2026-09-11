@@ -9,6 +9,7 @@ import { resolveMediaUrl } from "../../../utils/media";
 import { AdminMediaThumbnail } from "../AdminMediaThumbnail";
 import type { AdminObject, AdminPost, AdminLobbyImage, TableParams } from "../../../utils/adminTypes";
 import type { OrbitIdentity } from "@orbit/crypto";
+import { Star } from 'lucide-react'
 
 interface ContentTabProps {
   identity: OrbitIdentity | null;
@@ -127,7 +128,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-retro-muted shrink-0">
             <Badge variant="neutral" size="sm">♥ {obj.likes_count || 0}</Badge>
-            <Badge variant="neutral" size="sm">★ {obj.favorites_count || 0}</Badge>
+            <Badge variant="neutral" size="sm"><Star className="inline w-3 h-3 mr-0.5" />{obj.favorites_count || 0}</Badge>
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <button

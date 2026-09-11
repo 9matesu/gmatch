@@ -22,6 +22,7 @@ import {
   Gamepad2,
   ChevronLeft,
   ChevronRight,
+  Zap,
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject as StoryItem } from '@orbit/shared';
@@ -625,7 +626,7 @@ export function GMatchFeed({
                           <h3 className="text-xl font-black tracking-tight">{post.caption}</h3>
                           {post.players_playing && (
                             <p className="text-xs text-white/80 font-mono">
-                              ⚡ {post.players_playing.toLocaleString()} players online now
+                              <Zap className="inline w-3 h-3" /> {post.players_playing.toLocaleString()} online
                             </p>
                           )}
                           <button

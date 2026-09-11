@@ -7,6 +7,7 @@ import { orbitFetch } from '../utils/api'
 import type { OrbitIdentity } from '@orbit/crypto'
 import type { FlashEvent } from '@orbit/shared'
 import { userFacingResponse, userFacingError } from '../utils/userError'
+import { Zap, X } from 'lucide-react'
 
 export function FlashModal({
   identity,
@@ -35,7 +36,7 @@ export function FlashModal({
       const res = await orbitFetch('/api/flash', { method: 'POST', body: form }, identity)
       if (res.ok) {
         const data = await res.json().catch(() => null)
-        toast('⚡ Flash sent to everyone online!', 'success')
+        toast('Flash sent to everyone online!', 'success')
         onFired?.(data?.flash || null)
         onClose()
       } else {
@@ -80,7 +81,7 @@ export function FlashModal({
       >
         <div className="flex items-center justify-between p-4 border-b border-border-glass bg-retro-bg/90">
           <div className="flex items-center gap-2">
-            <span className="text-xl">⚡</span>
+            <Zap className="w-5 h-5 fill-current" />
             <div>
               <h2 className="text-sm font-black text-retro-fg uppercase tracking-widest">FIRE A FLASH DROP</h2>
               <p className="text-[10px] text-retro-muted font-sans">Your photo pops up on every online screen for 5 seconds</p>
@@ -91,7 +92,7 @@ export function FlashModal({
             onClick={onClose}
             className="text-xs font-bold text-retro-muted hover:text-retro-fg px-2.5 py-1 border border-border-glass rounded hover:border-retro-fg transition-colors cursor-pointer"
           >
-            ✕
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
@@ -140,7 +141,7 @@ export function FlashModal({
             onClick={submit}
             className="flex-1 px-3 py-2 text-[10px] font-black tracking-wider bg-yellow-500 text-black hover:bg-yellow-400 disabled:opacity-40 rounded cursor-pointer uppercase transition-colors"
           >
-            {sending ? 'Firing...' : '⚡ FIRE FLASH'}
+            {sending ? 'Firing...' : 'Fire flash'}
           </button>
         </div>
       </div>

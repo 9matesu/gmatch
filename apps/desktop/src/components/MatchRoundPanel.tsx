@@ -191,7 +191,7 @@ export function MatchRoundPanel({
       setLastResult({ matched: Boolean(res.matched), points: res.points_awarded })
       setNotices((n) => [
         ...n,
-        decision === 'boost' ? '★ Conviction Boost cast!' : res.matched ? 'Mutual like — it\'s a match!' : 'Decision recorded.',
+        decision === 'boost' ? 'Conviction Boost cast!' : res.matched ? 'Mutual like — it\'s a match!' : 'Decision recorded.',
       ])
     } else if (result && 'ok' in result) {
       setLocalDecidedRound(null)
@@ -291,7 +291,7 @@ export function MatchRoundPanel({
                     }`}
                 >
                   <span>R{rNum}</span>
-                  {past && <span>{past.matched ? '✓' : '✕'}</span>}
+                  {past && <span>{past.matched ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}</span>}
                 </div>
               )
             })}

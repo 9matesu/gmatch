@@ -28,6 +28,7 @@ import {
 import CachedImg from './CachedImg'
 import OfflineCard from './OfflineCard'
 import { Badge } from '../components/Badge'
+import { X } from 'lucide-react'
 import { Skeleton } from '../components/Skeleton'
 import { IconChevronL, IconChevronR } from './icons'
 
@@ -621,7 +622,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                           title={`Ban ${drop.suggestedAntiTag} from your feed`}
                           className={`${MONO} cursor-pointer rounded-md border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-[10px] font-bold text-red-300 hover:bg-red-500/25`}
                         >
-                          ✕ {drop.suggestedAntiTag}
+                          <X className="w-3 h-3 shrink-0" /> {drop.suggestedAntiTag}
                         </button>
                       )}
                     </div>

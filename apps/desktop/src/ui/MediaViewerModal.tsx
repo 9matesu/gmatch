@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { X } from 'lucide-react'
 
 interface Props {
   onClose: () => void
@@ -51,7 +52,7 @@ export default function MediaViewerModal({ onClose, children, label }: Props) {
           className="absolute right-1.5 top-1.5 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-0 bg-black/60 p-0 text-white/90 hover:bg-black/85"
           onClick={onClose}
         >
-          ✕
+          <X />
         </button>
       </div>
     </div>,

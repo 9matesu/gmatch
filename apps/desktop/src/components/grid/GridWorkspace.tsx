@@ -12,6 +12,7 @@ import { PanelResizer } from '../../ui/PanelResizer'
 import IdleGalleryView from './IdleGalleryView'
 import { playPress } from '../../utils/sounds'
 import '../../ui/grid-animations.css'
+import { X } from 'lucide-react'
 
 const RIGHT_KEY = 'idle.right.collapsed.v1'
 
@@ -207,7 +208,7 @@ export default function GridWorkspace({
                 className="p-1 rounded-md text-retro-muted hover:text-retro-fg hover:bg-surface-interactive cursor-pointer"
                 aria-label="Close gallery"
               >
-                ✕
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto pt-2">

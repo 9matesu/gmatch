@@ -10,6 +10,7 @@ import { isMediaVideo } from '../utils/media'
 import { ObjectImage } from './ObjectImage'
 import { playPress } from '../utils/sounds'
 import {
+  Star,
   X,
   Minimize2,
   Maximize2,
@@ -381,7 +382,7 @@ export function SpectateModal({
                   <span>R{rNum}</span>
                   {pastRound && (
                     <span className={pastRound.matched ? 'text-emerald-600 font-black' : 'text-retro-muted font-bold'}>
-                      {pastRound.matched ? '★' : '✕'}
+                      {pastRound.matched ? <Star className="w-3.5 h-3.5 fill-current" /> : <X className="w-3.5 h-3.5" />}
                     </span>
                   )}
                 </div>
@@ -624,7 +625,7 @@ export function SpectateModal({
                                 : 'bg-surface-interactive text-retro-muted border-border-glass'
                               }`}
                           >
-                            {h.matched ? '★ MUTUAL' : 'MISSED'}
+                            {h.matched ? 'MUTUAL' : 'MISSED'}
                           </span>
                         </div>
                       )
