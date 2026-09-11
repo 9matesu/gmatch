@@ -229,3 +229,18 @@ export function calculateDiscoveryReward(
   }
   return 0;
 }
+
+const RARITY_RANK: Record<CardRarity, number> = { common: 1, copper: 2, silver: 3, gold: 4, diamond: 5 }
+
+/** Card-driven tier-match economy: winning scales with BOTH cards' rarity
+ * (mutual quality pays), losing pays a small consolation scaled to your own
+ * card, and a boost costs against your own card's rarity. Single knob. */
+export function matchEconomy(
+  mineValue: number | null | undefined,
+  theirsValue: number | null | undefined,
+): { winGp: number; loseGp: number; boostCost: number } {
+  const rank = (v: number | null | undefined) => RARITY_RANK[computeCardRarity(v).rarity]
+  const rMine = rank(mineValue)
+  const rTheirs = rank(theirsValue)
+  return { winGp: 50 * rMine * rTheirs, loseGp: 10 * rMine, boostCost: 250 * rMine }
+}

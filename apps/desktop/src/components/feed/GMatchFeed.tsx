@@ -29,6 +29,7 @@ import { GMatchStories } from '../GMatchStories';
 import { InstagramPostModal } from './InstagramPostModal';
 import { LiveCameraModal } from '../camera/LiveCameraModal';
 import { ObjectImage } from '../ObjectImage';
+import CachedImg from '../../ui/CachedImg';
 import { LazyVideo } from '../LazyVideo';
 import { isMediaVideo } from '../../utils/media';
 import { orbitFetch, postShareUrl } from '../../utils/api';
@@ -701,7 +702,7 @@ export function GMatchFeed({
 
                 {/* Post Media with Click to Lightbox & Double Tap Like */}
                 <div
-                  className="relative w-full aspect-[4/5] max-h-[min(420px,60vh)] bg-surface-canvas flex items-center justify-center overflow-hidden cursor-pointer rounded-none"
+                  className="relative w-full bg-surface-canvas flex items-center justify-center overflow-hidden cursor-pointer rounded-none"
                   onClick={() => {
                     playPress(700);
                     setActiveLightboxPost(post);
@@ -724,23 +725,23 @@ export function GMatchFeed({
                             objectId={item.id}
                             contentUrl={url}
                             identity={identity}
-                            className="w-full h-full object-cover rounded-none"
-                            videoClassName="w-full h-full object-cover rounded-none"
+                            className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
+                            videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
                           />
                         ) : isVid ? (
                           <LazyVideo
                             src={url}
-                            videoClassName="w-full h-full object-cover rounded-none"
+                            videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
                             controls
                             muted={false}
                             playOnHover={false}
                             preload="metadata"
                           />
                         ) : (
-                          <img
+                          <CachedImg
                             src={url}
                             alt={post.caption || 'Post image'}
-                            className="w-full h-full object-cover rounded-none"
+                            className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
                             loading="lazy"
                           />
                         )}
@@ -751,23 +752,23 @@ export function GMatchFeed({
                       objectId={post.id}
                       contentUrl={post.url}
                       identity={identity}
-                      className="w-full h-full object-cover rounded-none"
-                      videoClassName="w-full h-full object-cover rounded-none"
+                      className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
+                      videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
                     />
 ) : isVideo ? (
                       <LazyVideo
                         src={post.url}
-                        videoClassName="w-full h-full object-cover rounded-none"
+                        videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
                         controls
                         muted={false}
                         playOnHover={false}
                         preload="metadata"
                       />
                   ) : (
-                    <img
+                    <CachedImg
                       src={post.url}
                       alt={post.caption || 'Post image'}
-                      className="w-full h-full object-cover rounded-none"
+                      className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
                       loading="lazy"
                     />
                   )}

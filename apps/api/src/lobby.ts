@@ -19,11 +19,13 @@ import {
   computeCardRarity,
   checkRarityPromotion,
   calculateDiscoveryReward,
+  matchEconomy,
   type CardEvaluationDelta,
   type MatchValuationSummary,
   type CardRarity,
 } from '@orbit/shared'
 import { applyLikeDecision, addPoints } from './game'
+import { EconomyService } from './economy'
 import { broadcastToUser, broadcastToRoom } from './ws-bus'
 import { advanceRooms } from './rooms'
 import { getBotConfig, getBotProfiles, pickBotDuelCard } from './bot-image-api'
@@ -1316,6 +1318,25 @@ export async function setMatchDecision(
       const pendingMine = myCol === 'decision_a' ? match.decision_a : match.decision_b
       if (boostsUsed + (pendingMine === 'boost' ? 1 : 0) >= DEFAULT_BOOST_CHARGES) {
         throw lobbyError('No boosts remaining this match', 400)
+      }
+      // A boost costs g$ scaled to YOUR card's rarity — stacking boosts on a
+      // diamond card is never cheap (card-driven economy, single knob).
+      const myCardId = match.user_a === userId ? match.card_a : match.card_b
+      const val = async (oid: string | null) =>
+        oid ? Number((await db.prepare('SELECT COALESCE(gacha_downloads_count, 0) AS v FROM Objects WHERE id = ?').bind(oid).first<{ v: number }>())?.v ?? 0) : 0
+      const cost = matchEconomy(await val(myCardId), 0).boostCost
+      try {
+        await new EconomyService(db).debit(userId, cost, {
+          idempotencyKey: `boost-${matchId}-${boostsUsed}`,
+          kind: 'purchase',
+          reference: 'match-boost',
+        })
+      } catch (err: any) {
+        const msg = String(err?.message || '').toLowerCase()
+        if (msg.includes('insufficient') || msg.includes('balance')) {
+          throw lobbyError(`Not enough g$ — a boost with this card costs ${cost} g$`, 402)
+        }
+        throw err
       }
     }
 

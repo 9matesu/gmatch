@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { ImagePlus, Loader2, Plus, Sparkles, Tag, X } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { DropZone, DND_KEEPSAKE } from './DropZone';
-import { orbitFetch, uploadWithProgress } from '../utils/api';
+import { uploadWithProgress } from '../utils/api';
+import { mediaUrlToCachedFile } from '../utils/cacheMedia';
 import { createCardFromMedia, type CanonicalCard, type CardCreationMetadata } from '../utils/cardCollection';
 import { useCropper } from '../hooks/useCropper';
 import { isCropableImage } from './CropModal';
@@ -19,6 +20,8 @@ interface CreateCardModalProps {
   cardsNeeded?: number;
   /** Prefill from an existing image (e.g. idle gallery keepsake). */
   initialMedia?: { url: string; tags?: string[]; name?: string } | null;
+  /** Prefill from a File dropped on the window (drag an image onto the app). */
+  initialFile?: File | null;
 }
 
 export interface CardPrefill {
@@ -27,10 +30,10 @@ export interface CardPrefill {
   name: string;
 }
 
-export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0, initialMedia = null }: CreateCardModalProps) {
-  const [file, setFile] = useState<File | null>(null);
+export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0, initialMedia = null, initialFile = null }: CreateCardModalProps) {
+  const [file, setFile] = useState<File | null>(initialFile);
   const [url, setUrl] = useState('');
-  const [name, setName] = useState('');
+  const [name, setName] = useState(initialFile ? initialFile.name.replace(/\.[^.]+$/, '').slice(0, 80) : '');
   const [description, setDescription] = useState('');
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -171,17 +174,18 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
     setError(null);
     setProgress(0);
     try {
+      let payloadFile = file
+      if (!payloadFile) {
+        // Cache-first: forge a card ONLY from bytes we fetched ourselves. A
+        // live-URL card dies when the host blocks hotlinks (user rule: gallery
+        // and cards are cache, never a live URL).
+        payloadFile = await mediaUrlToCachedFile(url.trim());
+      }
       const form = new FormData();
       form.append('is_story', 'false');
-      if (file) form.append('image', file);
-      else form.append('url', url.trim());
+      form.append('image', payloadFile);
 
-      const upload = file
-        ? await uploadWithProgress('/api/objects', form, identity, setProgress)
-        : await orbitFetch('/api/objects', { method: 'POST', body: form }, identity).then(async (response) => {
-          const body = await response.json().catch(() => null);
-          return { ok: response.ok, status: response.status, id: body?.id || null, error: body?.error };
-        });
+      const upload = await uploadWithProgress('/api/objects', form, identity, setProgress);
 
       if (!upload.ok || !upload.id) {
         throw new Error(upload.error || 'Media upload failed');
