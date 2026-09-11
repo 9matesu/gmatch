@@ -98,3 +98,41 @@ analytics de referrer REMOVIDAS do software; disclosure agora é report-scoped
 (`GET /api/admin/cases/:id` — a linha "(e) key-disclosure fase futura" da
 rodada 1 torna-se realidade implementada). Ledger completo em
 `docs/ADMIN-SUITE.md`.
+
+## Rodada 4 (2026-09-11, wave 2 / branch security/wave2-ip-masks)
+
+| # | Sev | Achado | Repro | Status |
+|---|-----|--------|-------|--------|
+| F20 | ALTA | Upload multipart guardava bytes **crus**: o stripper EXIF só rodava no caminho do proxy de URL externa (`proxy.ts`) — foto de celular com GPS entrava direto por `POST /api/objects`. | `git log -S stripImageMetadata -- apps/api/src/routes/objects.ts` (antes: ausente) | ✅ `metadata-strip.ts` compartilhado (JPEG APP1-15+COM, PNG tEXt/eXIf/iTXt/zTXt/tIME/iCCP, GIF app/comment ext, WebP EXIF/XMP/ICCP) aplicado na entrada (upload, pfp `data:`) e na saída (proxy já coberto); hash de dedup sobre bytes limpos. Testes `metadata-strip.test.ts`, `metadata-ingress.test.ts`. |
+| F21 | MÉDIA | Token de entrega = `blake3(pubkey)` **estático**: o courier podia correlacionar toda caixa já endereçada a você, pra sempre. | `packages/protocol/src/mail.ts` (histórico) | ✅ rotação por boot (`sessionDeliveryToken = blake3(pubkey‖epoch)`), epoch aprendida selada dentro do corpo dm/ack; caixa home fica fallback 1 boot. Courier continua sem tocar no schema. Testes `mail-store.test.ts` (ack com epoch), `handleRotation.test.ts`. |
+| F22 | ALTA | Admin = **quem soubesse o PIN por último** (`verify-pin` flipava `is_admin` universal); sem vínculo de identidade, PIN vazado = admin de qualquer nó. | `admin.ts` histórico: UPDATE Users SET is_admin=0 → grant ao chamador | ✅ `ADMIN_ORBIT_ID` (quando configurado, check de identidade ANTES da comparação do PIN, mesmo 401 + lockout); TTL de grant 12h (`admin_grant_at` em SystemMeta, `adminAuth` expira); sweep de guarda em TODA rota admin (`admin-guard.test.ts`); cap do mapa `pinFails` (10k). Nós self-host mantêm o modelo host-is-admin (documentado em F5). |
+| F23 | MÉDIA | Headers de identidade (`X-Orbit-Id`, assinatura) de **GETs** viajavam em claro — observador da rede sabia QUEM puxava o quê. | `api.ts` histórico: `if (method !== 'GET' && ...)` no seal | ✅ GETs selam headers (corpo vazio; `API_SEALED_ONLY` agora cobre GET — flip é passo de release, cliente primeiro). Query-string auditada: nenhum parâmetro carrega identidade. Testes `unseal.test.ts`, `api.seal.test.ts`. |
+| F24 | BAIXA | `GET /users/:id/pfp` fazia **302 para host externo** quando o avatar era URL — vazava IP do espectador pra terceiro. | `routes/users.ts:47` (histórico) | ✅ escrita nova não aceita mais URL crua: `http(s)` passa por `proxyAndStoreExternal` (falha → 400), `data:` é stripado; o 302 permanece só para linhas legadas. |
+| F25 | BAIXA | Rate limiter guardava **IP bruto como chave de mapa** em memória. | `rate-limit.ts` histórico `getClientIp` | ✅ chave = `sha256(salt-do-boot‖IP)[0:16]`; `security-greps.sh` prova que nenhum outro módulo lê XFF/X-Real-IP. |
+
+## O que NÃO resolvemos (honesto)
+
+- **IP na camada TCP**: a borda da rede (fly.io; Cloudflare quando o nó oficial
+  estiver proxied) continua vendo o IP do cliente — isso não se conserta em
+  código. O que o código garante: a camada da aplicação nunca armazena, ecoa,
+  loga nem renderiza IP (F25/B3/B4; `scripts/security-greps.sh` é o gate).
+  Passo de ops pendente: front do nó oficial por proxy reverso (CF Proxied).
+- **Correlação tráfego×tempo** no courier continua possível (padding/jitter
+  apenas; sem onion-routing não zera — rodada 1 já dizia).
+- **Metadados de vídeo** (mp4/webm) não são stripados (limite do parser
+  pure-JS; upgrade path: ffmpeg-sidecar se um dia for exigido).
+- Campo `location` em posts é texto digitado pelo autor (conteúdo, não
+  metadado de arquivo) — o app não o preenche sozinho.
+- Pentest continua **estático + testes locais**: não substitui auditoria
+  dinâmica de terceiros.
+- `API_SEALED_ONLY` cobrindo GET só é ligado APÓS o cliente com seal-GET estar
+  distribuído (kill-switch de suporte, mesma política da rodada 2).
+
+## Gate de runtime (wave 2)
+
+```bash
+bash scripts/security-greps.sh          # esperado: ALL GREPS CLEAN
+# admin sem identidade allowlistada: ADMIN_ORBIT_ID unset → modelo host-is-admin (self-host)
+# grant expirado: GET /api/admin/dashboard → 403 "Admin grant expired" após 12h
+# pfp legado: linha antiga com http:// ainda serve 302 (aceito, documentado F24)
+```

@@ -232,6 +232,14 @@ offline earnings). Each +5% click power. Persist across prestige.
 - TURN env (`NEXT_PUBLIC_TURN_URL/USERNAME/CREDENTIAL`) flips the config to
   `iceTransportPolicy: 'relay'` — fully relayed calls, zero IP exposure.
   Without TURN, STUN stays for connectivity but srflx never leaks onward.
+- Wave 2 (masks): peers address each other ONLY through delivery tokens
+  rendered as `handle.gmatch.com/<token>` (`utils/maskAdapter.ts`); tokens
+  rotate per boot (`utils/handleRotation.ts`, epoch travels sealed inside
+  dm/ack bodies). Node coordinates share as `gmatch://node/...` codes
+  (`utils/nodeMask.ts`) and the directory gossips through the node you are
+  on, so nodes stay reachable without the hub. Every image entering or
+  leaving the app is metadata-stripped (`apps/api/src/metadata-strip.ts`);
+  post tags live in the DB, never in the file.
 ## 11. Save
 
 - zustand state → localStorage `gmatch.save.v1`, autosave every 10s + on unload.
