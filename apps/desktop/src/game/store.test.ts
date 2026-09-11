@@ -741,3 +741,22 @@ describe('silent feed retry (never offline)', () => {
     expect(s.feedOffline).toBe(false)
   })
 })
+
+describe('purgePost (T3)', () => {
+  it('learns up to 3 non-noise, non-feed excludes and saves', () => {
+    useGame.setState({
+      tags: [{ name: 'skylar_vox', level: 3, base: 10, income: 1, weight: 1, selected: true }],
+      userExcludes: [],
+      current: { id: 'p1', url: 'https://x/p1.jpg', tags: ['skylar_vox', 'blonde_hair', 'big_breasts', '1girl', 'close-up'], preview: '', rating: 'explicit', source: 'x' } as never,
+      queue: [],
+      past: [],
+    })
+    useGame.getState().purgePost(useGame.getState().current as never)
+    const ex = useGame.getState().userExcludes
+    expect(ex.length).toBeGreaterThan(0)
+    expect(ex.length).toBeLessThanOrEqual(3)
+    expect(ex).not.toContain('skylar_vox') // active feed tag is intent-protected
+    expect(ex).not.toContain('close-up') // noise never becomes an exclude
+    expect(useGame.getState().current).toBeNull() // advanced off-screen
+  })
+})

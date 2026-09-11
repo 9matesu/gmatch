@@ -129,6 +129,10 @@ export interface GameState {
   goBack: () => boolean
   /** Grid mode: swap the whole board for a fresh one (session-only history). */
   skipGrid: () => void
+  /** "Never show this again": seen + bytes evicted + rarest content tags
+   * learned as anti-tags (player intent beats algorithm: feed tags never
+   * become excludes). */
+  purgePost: (post: BooruPost) => void
   undoGrid: () => boolean
   setBackground: (url: string | null) => void
   featureImage: (id: string) => void
@@ -1037,6 +1041,25 @@ export const useGame = create<GameState>((set, get) => ({
     set({ grid: filled.grid, queue: filled.queue, gridPast, feedOffline: false })
     // ponytail: refill when board has gaps OR queue falls below 2 boards ahead (18)
     if ((filled.grid.length < target || filled.queue.length < target * 2) && !s.fetching) void s.fetchFeed()
+  },
+
+  purgePost: (post) => {
+    const s = get()
+    void evictImage(post.url)
+    // Pull it off-screen instantly; the queue head refills if one exists.
+    if (s.current && s.current.id === post.id) set({ current: s.queue[0] ?? null, queue: s.queue.slice(1) })
+    if (isGridMode(s.viewMode)) set({ grid: s.grid.filter((c) => c.post.id !== post.id) })
+    // Learn: the 3 rarest content tags become anti-tags, but never a tag the
+    // player is actively feeding on (intent beats the algorithm).
+    const feed = new Set(feedQuery(s.tags))
+    const learn = rankTags(post.tags)
+      .map((t) => t.name)
+      .filter((t) => !isNoise(t) && !feed.has(t) && !s.userExcludes.includes(t))
+      .slice(0, 3)
+    for (const t of learn) get().addUserExclude(t)
+    const cur = get()
+    set({ toasts: pushToast(cur, learn.length ? `Purged — excluded: ${learn.join(', ')}` : 'Purged — will not return.') })
+    cur.save()
   },
 
   undoGrid: () => {

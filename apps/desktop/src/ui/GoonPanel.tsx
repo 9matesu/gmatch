@@ -28,7 +28,7 @@ import {
 import CachedImg from './CachedImg'
 import OfflineCard from './OfflineCard'
 import { Badge } from '../components/Badge'
-import { X } from 'lucide-react'
+import { Ban, X } from 'lucide-react'
 import { Skeleton } from '../components/Skeleton'
 import { IconChevronL, IconChevronR } from './icons'
 
@@ -84,6 +84,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   const goBack = useGame((s) => s.goBack)
   const canGoBack = useGame((s) => s.past.length > 0)
   const skipGrid = useGame((s) => s.skipGrid)
+  const purgePost = useGame((s) => s.purgePost)
   const undoGrid = useGame((s) => s.undoGrid)
   const canGridBack = useGame((s) => s.gridPast.length > 0)
   const queue = useGame((s) => s.queue)
@@ -365,7 +366,8 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                   } ${dragFrom === i ? 'opacity-50' : ''} ${shakeCell === i ? 'animate-[gg-shake_0.18s_ease-out]' : ''}`}
                 onClick={(e) => handleCellClick(i, e)}
                 onAuxClick={handleAuxClick}
-                aria-label={`Foe ${i + 1}: ${Math.ceil(cell.hp)} of ${cell.maxHp} HP — activate to attack, drag to reorder`}
+                onContextMenu={(e) => { e.preventDefault(); purgePost(cell.post) }}
+                aria-label={`Foe ${i + 1}: ${Math.ceil(cell.hp)} of ${cell.maxHp} HP — activate to attack, drag to reorder, right-click to purge`}
               >
                 {motion ? (
                   <video
@@ -556,6 +558,19 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               }}
             >
               <IconChevronR size={26} />
+          </button>
+          <button
+            type="button"
+            className="icon-btn absolute right-1.5 top-1.5 z-[6] flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-[2px] hover:bg-rose-600/70"
+            aria-label="Never show this again"
+            title="Purge — this image and its rarest tags never return"
+            hidden={!current}
+            onClick={(e) => {
+              e.stopPropagation()
+              if (current) purgePost(current)
+            }}
+          >
+            <Ban className="h-4 w-4" />
           </button>
           {floats
             .filter((f) => f.cell === null)
