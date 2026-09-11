@@ -149,7 +149,7 @@ export async function startRound(
   const { createNotification } = await import('./notifications')
   const { broadcastToUser } = await import('./ws-bus')
   for (const u of online.results || []) {
-    const notif = await createNotification(db, u.id, 'babecock_start', 'Babecock round started', 'A new Babecock round is open — join before the timer ends', { round_id: roundId })
+    const notif = await createNotification(db, u.id, 'babecock_start', 'Babecock round started', 'A Babecock round is open. Join before the timer ends.', { round_id: roundId })
     if (notif) broadcastToUser(u.id, { type: 'notification', action: 'new', notification: notif })
   }
 

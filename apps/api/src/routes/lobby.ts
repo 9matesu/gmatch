@@ -576,7 +576,7 @@ lobby.get('/images/:id/content', async (c) => {
   // from before the proxy — return 410 Gone so clients refresh and the
   // cleanup sweep eventually deletes it.
   if (row.content_url.startsWith('http://') || row.content_url.startsWith('https://')) {
-    return c.json({ error: 'External URL disabled — re-upload required' }, 410)
+    return c.json({ error: 'External URL disabled. Re-upload required' }, 410)
   }
 
   return c.json({ error: 'Invalid content URL' }, 404)

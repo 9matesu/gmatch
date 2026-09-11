@@ -130,7 +130,7 @@ domination.post('/trigger', async (c) => {
   // refuse before charging anything instead.
   const lastSeenMs = victim.last_seen ? Date.parse(victim.last_seen) : 0
   if (Date.now() - lastSeenMs > 10 * 60_000) {
-    return c.json({ error: 'They are offline right now — nothing was charged' }, 409)
+    return c.json({ error: 'They are offline right now. Nothing was charged' }, 409)
   }
 
   // Per-action cooldown so a funded account cannot spam one player's screen.
@@ -140,7 +140,7 @@ domination.post('/trigger', async (c) => {
   `).bind(dominatorId, targetId, action, new Date(Date.now() - 30_000).toISOString())
     .first<{ n: number }>()
   if (Number(recent?.n ?? 0) > 0) {
-    return c.json({ error: 'Slow down — you just sent that one. Try again in half a minute.' }, 429)
+    return c.json({ error: 'Slow down. You just sent that one. Try again in half a minute.' }, 429)
   }
 
   const victimSettings = JSON.parse(victim.pc_domination_settings || '{}')
@@ -202,7 +202,7 @@ domination.post('/trigger', async (c) => {
       reference: `domination-refund:${action}`,
     }).catch(() => { /* ledger alert below */ })
     console.error('[domination] insert failed, refunded', err)
-    return c.json({ error: 'Could not record the action — your g$ were refunded' }, 500)
+    return c.json({ error: 'Could not record the action. Your g$ were refunded' }, 500)
   }
 
   // Consent cut FIRST: the victim earns a share of the fee for hosting the

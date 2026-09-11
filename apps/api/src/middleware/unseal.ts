@@ -18,7 +18,7 @@ export async function unsealRequest(c: Context, next: Next) {
     return next()
   }
   const nodePrivHex = (c.env as { NODE_PRIV_HEX?: string })?.NODE_PRIV_HEX
-  if (!nodePrivHex) return c.json({ error: 'node key unavailable — server misconfigured' }, 500)
+  if (!nodePrivHex) return c.json({ error: 'node key unavailable. Server misconfigured' }, 500)
   let opened: { headers: Record<string, string>; body: string }
   try {
     opened = openApiRequest(sealed, nodePrivHex)

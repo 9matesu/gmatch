@@ -262,7 +262,7 @@ export async function acceptMatchInvite(
 
   const { createDirectMatch } = await import('./lobby')
   const match = await createDirectMatch(db, invite.inviter_id, inviteeId, now)
-  if (!match) return { error: 'Failed to start the match', status: 500 }
+  if (!match) return { error: "The match couldn't start", status: 500 }
 
   await db.prepare("UPDATE MatchInvites SET status = 'accepted', updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(inviteId).run()
 

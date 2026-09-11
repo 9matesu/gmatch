@@ -83,7 +83,7 @@ admin.post('/verify-pin', async (c) => {
   const fails = (pinFails.get(orbitId) || []).filter((t) => now - t < PIN_WINDOW_MS)
   if (fails.length >= PIN_MAX_FAILS) {
     pinFails.set(orbitId, fails)
-    return c.json({ error: 'Too many failed attempts — try again in 15 minutes' }, 429)
+    return c.json({ error: 'Too many failed attempts. Try again in 15 minutes' }, 429)
   }
 
   const presentedHash = sha256hexSync(pin)
