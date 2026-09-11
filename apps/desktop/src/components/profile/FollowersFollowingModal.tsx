@@ -218,11 +218,11 @@ export function FollowersFollowingModal({
       onClick={onClose}
     >
       <div
-        className="bg-surface-raised border border-retro-border w-full max-w-md rounded-lg overflow-hidden shadow-xl flex flex-col text-retro-fg max-h-[85vh] animate-orbit-pop"
+        className="bg-glass backdrop-blur-2xl border border-border-glass w-full max-w-md rounded-2xl overflow-hidden shadow-2xl flex flex-col text-retro-fg max-h-[88vh] animate-orbit-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header Bar */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-retro-border shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <Users className="w-4 h-4 text-retro-muted shrink-0" />
             <div className="min-w-0">
@@ -248,7 +248,7 @@ export function FollowersFollowingModal({
         </div>
 
         {/* Tab Selector */}
-        <div className="flex border-b border-retro-border shrink-0">
+        <div className="flex border-b border-border-glass shrink-0">
           <button
             type="button"
             onClick={() => {
@@ -279,8 +279,8 @@ export function FollowersFollowingModal({
         </div>
 
         {/* Search Bar Input */}
-        <div className="px-3 py-2 border-b border-retro-border shrink-0">
-          <div className="flex items-center gap-2 bg-surface-interactive rounded-lg px-3 py-1.5 text-xs text-retro-fg focus-within:border-zinc-500 border border-retro-border transition-colors">
+        <div className="px-3 py-2 border-b border-border-glass shrink-0">
+          <div className="flex items-center gap-2 bg-surface-interactive rounded-lg px-3 py-1.5 text-xs text-retro-fg focus-within:border-zinc-500 border border-border-glass transition-colors">
             <Search className="w-3.5 h-3.5 text-retro-muted shrink-0" />
             <input
               type="text"

@@ -5,6 +5,7 @@ import { DND_KEEPSAKE } from '../DropZone'
 import { offlineSvg } from '../../services/offlineSvg'
 import { redgifsPlayable } from '../../services/redgifs'
 import CachedImg from '../../ui/CachedImg'
+import MediaViewerModal from '../../ui/MediaViewerModal'
 import { EmptyState } from '../EmptyState'
 import { BTN, BTN_SMALL, MUTED } from '../../ui/styles'
 
@@ -198,32 +199,14 @@ export default function IdleGalleryView({
       </div>
 
       {viewer && (
-        <div
-          className="absolute inset-0 z-40 flex items-center justify-center overflow-hidden bg-black/85 p-3"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Keepsake viewer"
-          onClick={() => setViewerId(null)}
-        >
-          <figure
-            className="relative flex max-h-full min-h-0 w-auto max-w-full flex-col items-center"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <MediaViewerModal onClose={() => setViewerId(null)} label="Keepsake viewer">
+          <figure className="relative flex max-h-[80vh] min-h-0 w-auto max-w-full flex-col items-center">
             <div className="relative min-h-0 w-auto max-w-full">
               {viewer.kind === 'video' ? (
-                <video src={viewer.url} poster={viewer.preview || undefined} className="max-h-[62dvh] w-auto max-w-full rounded-lg object-contain" controls autoPlay muted loop playsInline />
+                <video src={viewer.url} poster={viewer.preview || undefined} className="max-h-[70vh] w-auto max-w-full rounded-lg object-contain" controls autoPlay muted loop playsInline />
               ) : (
-                <img src={viewer.url || offlineSvg(viewer.tags)} alt={viewer.tags.slice(0, 3).join(' ') || 'keepsake'} className="max-h-[62dvh] w-auto max-w-full rounded-lg object-contain" referrerPolicy="no-referrer" />
+                <img src={viewer.url || offlineSvg(viewer.tags)} alt={viewer.tags.slice(0, 3).join(' ') || 'keepsake'} className="max-h-[70vh] w-auto max-w-full rounded-lg object-contain" referrerPolicy="no-referrer" />
               )}
-              <button
-                type="button"
-                aria-label="Close viewer"
-                title="Close"
-                className="absolute right-1.5 top-1.5 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-0 bg-black/60 p-0 text-white/90 backdrop-blur-sm transition-colors hover:bg-black/85 hover:text-white"
-                onClick={() => setViewerId(null)}
-              >
-                <IconX size={14} />
-              </button>
               {shown.length > 1 && (
                 <>
                   <button
@@ -258,7 +241,7 @@ export default function IdleGalleryView({
               {shown.length > 1 ? ` · ${viewerIdx + 1}/${shown.length}` : ''}
             </figcaption>
           </figure>
-        </div>
+        </MediaViewerModal>
       )}
     </div>
   )

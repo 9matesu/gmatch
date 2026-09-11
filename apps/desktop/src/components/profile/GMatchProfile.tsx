@@ -144,7 +144,7 @@ export function GMatchProfile({
     });
   };
 
-  const effectiveFollowersCount = followersCount ?? myUser?.followers_count ?? myUser?.likes_received ?? 0;
+  const effectiveFollowersCount = followersCount ?? myUser?.followers_count ?? 0;
   const effectiveFollowingCount = followingCount ?? myUser?.following_count ?? 0;
 
   const stats = [

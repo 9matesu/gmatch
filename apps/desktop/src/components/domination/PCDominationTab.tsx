@@ -428,7 +428,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
             target's consent, and shows up in their history. Nothing lands without a switch you control.
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded-xl glass-inset px-3 py-2">
+        <div className="flex items-center gap-2 rounded-xl glass-inset bg-retro-bg/80 px-3 py-2">
           <Radio className={`w-3.5 h-3.5 ${receiving && !paused ? 'text-emerald-400' : 'text-retro-muted'}`} />
           <div className="text-xs leading-tight">
             <div className="font-medium">{receiving ? (paused ? 'Receiving — paused' : 'Receiving effects') : 'Not receiving'}</div>
@@ -443,7 +443,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
           >
             <span
               aria-hidden="true"
-              className={`absolute inset-x-0 h-1 rounded-full transition-colors ${receiving ? 'bg-emerald-500/50' : 'bg-surface-interactive'}`}
+              className={`absolute inset-x-0 h-1 rounded-full transition-colors ${receiving ? 'bg-emerald-500/50' : 'bg-surface-raised'}`}
             />
             <span
               aria-hidden="true"
@@ -545,7 +545,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     type="button"
                     onClick={() => setSelectedTarget(t)}
                     className={`w-full flex items-center gap-3 px-4 py-2.5 text-left border-b border-border-subtle transition-colors cursor-pointer ${
-                      isSel ? 'glass-nav-active' : 'hover:bg-surface-interactive/30'
+                      isSel ? 'glass-nav-active' : 'hover:bg-surface-interactive/60'
                     }`}
                   >
                     {t.pfpUrl ? (
@@ -574,7 +574,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
               </div>
             ) : (
               <>
-                <div className="flex items-center justify-between rounded-xl glass-inset px-4 py-2.5">
+                <div className="flex items-center justify-between rounded-xl glass-inset bg-retro-bg/80 px-4 py-2.5">
                   <div className="text-xs text-retro-fg">
                     Effects for <span className="font-semibold">{selectedTarget.displayName}</span>
                     {selectedTarget.enabled && !selectedTarget.online && (
@@ -603,9 +603,9 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                         }
                         className={`rounded-xl border p-4 text-left transition-colors relative ${
                           sending === action
-                            ? 'border-retro-accent glass-inset cursor-wait'
+                            ? 'border-retro-accent glass-inset bg-retro-bg/80 cursor-wait'
                             : sendable
-                              ? 'border-border-glass glass-inset hover:border-retro-accent/60 cursor-pointer'
+                              ? 'border-border-glass glass-inset bg-retro-bg/80 hover:border-retro-accent/60 cursor-pointer'
                               : 'border-border-subtle glass-inset opacity-45 cursor-not-allowed'
                         }`}
                       >
@@ -689,7 +689,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                       >
                         <span
                           aria-hidden="true"
-                          className={`absolute inset-x-0 h-1 rounded-full transition-colors ${value ? 'bg-emerald-500/50' : 'bg-surface-interactive'}`}
+                          className={`absolute inset-x-0 h-1 rounded-full transition-colors ${value ? 'bg-emerald-500/50' : 'bg-surface-raised'}`}
                         />
                         <span
                           aria-hidden="true"

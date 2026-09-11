@@ -56,7 +56,7 @@ with duels, lootboxes, hacks and trades — one wallet, one economy.
   Credits are envelope-checked (economy-idle.ts `idleEnvelope`): after the
   first trusted flush per server start, each credit must fit 1.5× the client's
   claimed g$/s elapsed rate (claim ceiling 50k/s).
-  Honest offline resumes (50% rule) always fit; a modified client on someone
+  Honest offline resumes (25% rule) always fit; a modified client on someone
   else's node is bounded to 1.5× the 50k/s claim ceiling (not unlimited, not
   zero — best-effort by design, documented, protects casual leaderboard
   integrity); on a node you host it only disciplines honest crashes.
@@ -235,7 +235,7 @@ offline earnings). Each +5% click power. Persist across prestige.
 ## 11. Save
 
 - zustand state → localStorage `gmatch.save.v1`, autosave every 10s + on unload.
-- Offline earnings = elapsed * GP/s * 50%, capped 8h, shown in modal on load.
+- Offline earnings = elapsed * GP/s * 25%, capped 8h, shown in modal on load.
 
 ## 12. Release 1.0 — server topology (no central server)
 
