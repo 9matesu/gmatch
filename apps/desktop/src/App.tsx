@@ -3870,7 +3870,7 @@ export default function Home() {
       {/* Versioned acceptance (C.2): once logged in, the CURRENT legal suite
           must be read + accepted before the app reveals itself. Re-triggers
           on every version bump (key = full doc@version map). */}
-      {isLoaded && identity && !legalAccepted && (
+      {isLoaded && identity && !legalAccepted && isOnboardingComplete(readOnboardingState(identity.orbitId)) && (
         <LegalCenter
           isOpen
           requireAccept

@@ -130,6 +130,7 @@ function ServerStep({ identity, ensureIdentity, onChosen }: {
   const central = useMemo(() => getCentralApiUrl(), []);
   const [servers, setServers] = useState<DirectoryServer[]>([]);
   const [sort, setSort] = useState<ServerSort>('players');
+  const [search, setSearch] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [nonce, setNonce] = useState(0);
@@ -186,7 +187,12 @@ function ServerStep({ identity, ensureIdentity, onChosen }: {
     setBusy(false);
   };
 
-  const sorted = useMemo(() => sortDirectoryServers(servers, central, sort), [servers, central, sort]);
+  const sorted = useMemo(() => {
+    const list = sortDirectoryServers(servers, central, sort);
+    const q = search.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((s) => (s.name + ' ' + (s.description || '')).toLowerCase().includes(q));
+  }, [servers, central, sort, search]);
 
   if (!central) {
     return <CentralSetup onSaved={() => setNonce((n) => n + 1)} />;
@@ -220,6 +226,17 @@ function ServerStep({ identity, ensureIdentity, onChosen }: {
         </div>
       </div>
 
+      <label className="block">
+        <span className="sr-only">Search servers</span>
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search servers by name or description"
+          className="glass-field w-full px-3 py-2 text-xs"
+        />
+      </label>
+
       {error && (
         <div role="alert" className="glass-inset p-3 text-xs text-retro-muted rounded-xl space-y-2">
           <p>{error} The directory at <span className="font-mono">{central.replace(/^https?:\/\//, '')}</span> may be offline.</p>
@@ -236,7 +253,9 @@ function ServerStep({ identity, ensureIdentity, onChosen }: {
       <ul className="space-y-1.5 max-h-[50vh] overflow-y-auto styled-scrollbar pr-0.5">
         {!error && sorted.length === 0 && (
           <li className="glass-inset p-4 text-xs text-retro-muted text-center rounded-xl">
-            {identity ? 'No servers online right now. Create one later from the Servers tab.' : 'Connecting…'}
+            {identity
+              ? (search.trim() ? `No servers match “${search.trim()}”.` : 'No servers online right now. Create one later from the Servers tab.')
+              : 'Connecting…'}
           </li>
         )}
         {sorted.map((s) => (
