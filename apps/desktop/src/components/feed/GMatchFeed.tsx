@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useCropper } from '../../hooks/useCropper';
 import { DEFAULT_FEED_SORT, FEED_SORT_LABELS, type FeedSort } from './feedSort'
+import { suggestFollows } from './suggestFollows'
 import { playPress, playWin, playMsgReceive } from '../../utils/sounds';
 import {
   Heart,
@@ -112,7 +113,8 @@ export function GMatchFeed({
   activeStoryUserId = null,
   onActiveStoryClose,
   onOpenDMs,
-  onOpenPostCreator,
+  onOpenPostCreator,  onFollowSuggestion,
+  myProfileTags = [],
   onSelectUser,
   onToggleTools,
   onOpenGameAd,
@@ -147,13 +149,15 @@ export function GMatchFeed({
   storiesLoading?: boolean;
   followingIds?: string[];
   profilePics?: Record<string, string>;
-  users?: Array<{ id: string; display_name?: string; orbitId?: string; pfp_url?: string | null }>;
+  users?: Array<{ id: string; display_name?: string; orbitId?: string; pfp_url?: string | null; tags?: string[]; online?: boolean; followers_count?: number }>;
   onAddStory?: () => void;
   onOpenStory?: (userId: string) => void;
   activeStoryUserId?: string | null;
   onActiveStoryClose?: () => void;
   onOpenDMs?: () => void;
   onOpenPostCreator?: () => void;
+  onFollowSuggestion?: (userId: string) => void | Promise<void>;
+  myProfileTags?: string[];
   onSelectUser?: (userId: string) => void;
   onToggleTools?: () => void;
   onOpenGameAd?: (mode: 'duel' | 'babecock' | 'ranks' | 'store' | 'discord' | 'coffee') => void;
@@ -383,6 +387,13 @@ export function GMatchFeed({
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
   }, [posts, likeCounts, commentsMap, tagAffinities, now, feedSort]);
+
+  const followSuggestions = useMemo(
+    () => displayPosts.length === 0
+      ? suggestFollows(users ?? [], identity?.orbitId, myProfileTags, new Set(followingIds))
+      : [],
+    [displayPosts.length, users, identity?.orbitId, myProfileTags, followingIds],
+  );
 
   const toggleLike = useCallback((post: FeedPost) => {
     playPress(820);
@@ -934,25 +945,50 @@ export function GMatchFeed({
           })}
 
           {displayPosts.length === 0 && (
-            <div className="bg-retro-panel border border-border-glass rounded-lg p-8 text-center space-y-3 shadow-xs my-4">
-              <div className="w-12 h-12 rounded-full bg-glass-w12 border border-border-glass flex items-center justify-center mx-auto text-retro-muted">
-                <Camera className="w-5 h-5 stroke-[1.75]" />
+            <div className="bg-retro-panel border border-border-glass rounded-lg p-8 text-center space-y-4 shadow-xs my-4 max-w-md mx-auto">
+              <div>
+                <h4 className="text-sm font-semibold text-retro-fg">Empty in here? Start posting and get things moving.</h4>
+                <p className="text-xs text-retro-muted mt-1 leading-relaxed">
+                  One upload, three tags. Posts are what grow followers.
+                </p>
               </div>
-              <h4 className="text-sm font-semibold text-retro-fg">No posts yet</h4>
-              <p className="text-xs text-retro-muted max-w-xs mx-auto leading-relaxed">
-                Upload your first post and it shows up here.
-              </p>
               <button
                 type="button"
                 onClick={() => {
                   if (onOpenPostCreator) onOpenPostCreator();
                   else setShowCustomPostCreator(true);
                 }}
-                 className="create-action px-4 py-2 text-xs font-semibold rounded-md transition-all duration-150 active:scale-[0.96] shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+                className="create-action px-4 py-2 text-xs font-semibold rounded-md transition-all duration-150 active:scale-[0.96] shadow-xs cursor-pointer inline-flex items-center gap-1.5"
               >
                 <PlusSquare className="w-4 h-4 stroke-[2]" />
-                 <span>Drop your first moment</span>
+                <span>Upload your first post</span>
               </button>
+              {followSuggestions.length > 0 && (
+                <div className="pt-2 border-t border-border-glass">
+                  <p className="text-[10px] uppercase tracking-wider text-retro-muted mb-2">Or follow someone</p>
+                  <div className="flex items-center justify-center gap-3">
+                    {followSuggestions.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => { void onFollowSuggestion?.(s.id); }}
+                        className="flex flex-col items-center gap-1 cursor-pointer group"
+                        aria-label={`Follow ${s.display_name || s.id}`}
+                      >
+                        <span className="w-10 h-10 rounded-full overflow-hidden border border-border-glass flex items-center justify-center text-xs text-retro-fg bg-glass-w5">
+                          {profilePics?.[s.id] ? (
+                            <img src={profilePics[s.id]} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            (s.display_name || s.id).slice(0, 2).toUpperCase()
+                          )}
+                        </span>
+                        <span className="text-[10px] text-retro-muted truncate max-w-[72px] group-hover:text-retro-fg">{s.display_name}</span>
+                        <span className="text-[10px] text-retro-fg border border-border-glass rounded-md px-1.5 py-0.5 group-hover:bg-glass-w10">Follow</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

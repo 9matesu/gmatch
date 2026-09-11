@@ -3098,6 +3098,8 @@ export default function Home() {
                                 onActiveStoryClose={() => setStoryViewerUserId(null)}
                                 onOpenDMs={() => handleSetMainView('messages')}
                                 onOpenPostCreator={() => setShowCreatePostModal(true)}
+                                onFollowSuggestion={(id) => { void toggleFollowUser(id); }}
+                                myProfileTags={myProfile.tags}
                                 onSelectUser={(uId) => {
                                   const target = users.find((u) => u.id === uId || (u as any).orbitId === uId);
                                   if (target) setSelectedProfileUser(target);
