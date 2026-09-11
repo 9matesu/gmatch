@@ -437,16 +437,13 @@ export function SidebarNav({
         <button
           type="button"
           onClick={() => { playPress(920); if (onOpenCreatePost) onOpenCreatePost(); else setMainView?.('create'); }}
-          aria-label="Create"
-          title="Create"
+          aria-label="Create post"
+          title="Create post"
           className={`create-action sidebar-create w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-left cursor-pointer transition-all duration-150 active:scale-[0.96] group mb-2 ${collapsed ? 'justify-center' : ''}`}
         >
           <PlusSquare className="w-4 h-4 shrink-0 text-current stroke-[2]" />
           {!collapsed && (
-            <span className="flex items-center justify-between gap-2 w-full text-xs font-semibold tracking-wide">
-              <span>Create</span>
-              <span className="text-[10px] font-normal normal-case opacity-75">post</span>
-            </span>
+            <span className="w-full text-xs font-semibold tracking-wide">Create post</span>
           )}
         </button>
 
@@ -481,7 +478,7 @@ export function SidebarNav({
                     <GroupIcon className="w-4 h-4 shrink-0 opacity-85 stroke-[1.75]" />
                     {!collapsed && <span className="truncate">{item.label}</span>}
                     {!collapsed && Boolean(item.badge && item.badge > 0) && (
-                      <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-emerald-400 text-[10px] font-bold text-retro-bg tabular-nums">
+                      <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-retro-fg text-[10px] font-bold text-retro-bg tabular-nums">
                         {item.badge! > 99 ? '99+' : item.badge}
                       </span>
                     )}

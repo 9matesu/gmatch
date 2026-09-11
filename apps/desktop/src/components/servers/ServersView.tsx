@@ -246,7 +246,7 @@ export function ServersView({
       try { claimedBefore = Boolean(localStorage.getItem(REG_KEY)) } catch { /* session-only */ }
       // One server per install: this machine already hosts its own node.
       if (claimedBefore && st?.mode === 'host') {
-        toast(`This computer already hosts “${serverName || 'a server'}” . Rename it on the left instead.`, 'warning')
+        toast(`This computer already hosts “${serverName || 'a server'}”. Rename it on the left instead.`, 'warning')
         return
       }
       const canHost = Boolean(window.gmatch?.serverSet && st?.packaged)
@@ -265,7 +265,7 @@ export function ServersView({
           const res = await window.gmatch!.serverSet!({ mode: 'host', url: '' })
           if (!res.ok) { toast(res.error || 'Could not switch to hosting your own server', 'error'); return }
           closeCreateForm()
-          toast(`Creating “${trimmed}” . The app restarts logged into your own server.`, 'success')
+          toast(`Creating “${trimmed}”. The app restarts logged into your own server.`, 'success')
           window.gmatch!.serverRelaunch?.()
           return
         }
@@ -378,7 +378,7 @@ export function ServersView({
   return (
     <div className="h-full min-h-0 flex-1 overflow-hidden p-2 sm:p-4 animate-orbit-fade-in flex flex-col">
       {/* Unified dashboard: one continuous glass-surface, internal dividers, no floating cards */}
-      <div className="glass-surface grid grid-cols-1 lg:grid-cols-[minmax(340px,400px)_1fr] gap-0 h-full min-h-0 flex-1 overflow-hidden rounded-xl">
+      <div className="glass-surface grid grid-cols-1 lg:grid-cols-[minmax(320px,34%)_1fr] gap-0 h-full min-h-0 flex-1 overflow-hidden rounded-xl">
         {/* LEFT COLUMN: Current Server & Member activity (24h) */}
         <aside className="flex flex-col min-h-0 h-full overflow-hidden lg:border-r lg:border-border-subtle" aria-label="Current server hub">
           {/* Current Node Hero */}
@@ -604,8 +604,8 @@ export function ServersView({
           <div className="flex flex-wrap items-center justify-between gap-2 shrink-0 pb-2 border-b border-border-subtle">
             <div className="flex items-center gap-2 min-w-0">
               <Globe className="w-4 h-4 text-retro-accent shrink-0" />
-              <h3 className="text-sm font-bold text-retro-fg uppercase tracking-wider truncate">
-                Central Directory
+              <h3 className="text-sm font-bold text-retro-fg truncate">
+                Central directory
               </h3>
               {central && (
                 <span className="text-[10px] font-mono text-retro-muted truncate max-w-[180px]">
