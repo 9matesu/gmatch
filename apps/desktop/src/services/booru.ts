@@ -475,7 +475,7 @@ function toProxy(url: string, origin: string, prefix: string): string {
  * Real/hardcore porn via the Vite dev proxy: temp token → gif search.
  * Null when unusable (caller moves to the next source). Never throws.
  */
-async function redgifsDirect(query: string, limit: number): Promise<BooruPost[] | null> {
+export async function redgifsDirect(query: string, limit: number, retried = false): Promise<BooruPost[] | null> {
   try {
     if (!redgifsToken || Date.now() >= redgifsTokenExp) {
       redgifsToken = null
@@ -493,6 +493,12 @@ async function redgifsDirect(query: string, limit: number): Promise<BooruPost[] 
       signal: AbortSignal.timeout(TIMEOUT_MS),
       headers: { Authorization: `Bearer ${redgifsToken}` },
     })
+    if (res.status === 401 && !retried) {
+      // ponytail: temp tokens die before our 20h guess; drop cached one, retry once fresh.
+      redgifsToken = null
+      redgifsTokenExp = 0
+      return redgifsDirect(query, limit, true)
+    }
     if (!res.ok) return null
     return parseRedgifs(await res.json())
   } catch {
