@@ -34,6 +34,9 @@ import { MIN_GAME_CARDS, type User, type OrbitObject } from "@orbit/shared";
 import { applyCanonicalCard } from "./game/galleryMapping";
 import { areItemsStructurallyEqual, areUsersStructurallyEqual, areAnnouncementsStructurallyEqual } from "./utils/compare";
 import { OnboardingFlow } from "./firstRun/OnboardingFlow";
+import { isOnboardingComplete, readOnboardingState } from "./firstRun/onboardingState";
+import { TourDock } from "./components/tour/TourDock";
+import { TOUR_STEPS, isTourOver, nextTourStep, readTourState, writeTourState, type TourState } from "./firstRun/tourState";
 import { GMatchFeed, type FeedPost } from "./components/feed/GMatchFeed";
 import { GMatchDMs } from "./components/chat/GMatchDMs";
 import type { GroupMember } from "./components/chat/GroupMembersPopover";
@@ -307,6 +310,37 @@ export default function Home() {
     const want = hashForView(view)
     if (window.location.hash !== want) window.history.pushState(null, '', want)
   }, [mainView]);
+
+  // Guided tour: resumable per identity, skippable, teleports only on user click.
+  const tourIdentityId = identity?.orbitId ?? null;
+  const [tourState, setTourState] = useState<TourState>(() => readTourState(tourIdentityId));
+
+  useEffect(() => {
+    setTourState(readTourState(tourIdentityId));
+  }, [tourIdentityId]);
+
+  useEffect(() => {
+    const onReset = () => setTourState(readTourState(tourIdentityId));
+    window.addEventListener('orbit_tour_reset', onReset);
+    return () => window.removeEventListener('orbit_tour_reset', onReset);
+  }, [tourIdentityId]);
+
+  const advanceTour = useCallback((dir: 1 | -1) => {
+    const step = TOUR_STEPS[tourState.index];
+    if (dir === 1 && step?.view) {
+      handleSetMainView(step.view);
+      if (step.gamesTab) setGamesSubTab(step.gamesTab);
+    }
+    const next = dir === 1 ? nextTourStep(tourState) : { ...tourState, index: Math.max(0, tourState.index - 1) };
+    writeTourState(tourIdentityId, next);
+    setTourState(next);
+  }, [handleSetMainView, tourIdentityId, tourState]);
+
+  const skipTour = useCallback(() => {
+    const next: TourState = { version: 1, index: tourState.index, status: 'skipped' };
+    writeTourState(tourIdentityId, next);
+    setTourState(next);
+  }, [tourIdentityId, tourState.index]);
 
   // Browser back/forward -> view. pushState entries surface via popstate;
   // manual hash edits via hashchange. Listen to both.
@@ -2784,6 +2818,16 @@ export default function Home() {
       />
 
       <OfflineWarningBanner identity={identity} />
+
+      {identity && !isTourOver(tourState) && isOnboardingComplete(readOnboardingState(identity.orbitId)) && (
+        <TourDock
+          steps={TOUR_STEPS}
+          state={tourState}
+          onNext={() => advanceTour(1)}
+          onBack={() => advanceTour(-1)}
+          onSkip={skipTour}
+        />
+      )}
 
       <div className={hideUiForWallpaper ? "opacity-0 pointer-events-none transition-opacity duration-150 w-full h-full min-h-0 flex flex-col items-center" : spaceUiDimmed ? "opacity-[0.15] pointer-events-none transition-opacity duration-150 w-full h-full min-h-0 flex flex-col items-center" : "transition-opacity duration-150 w-full h-full min-h-0 flex flex-col items-center"}>
         {!identity ? (
