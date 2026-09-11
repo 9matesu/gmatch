@@ -68,6 +68,21 @@ describe('ServersView', () => {
     expect(screen.queryByText('This server')).not.toBeInTheDocument()
   })
 
+  it('renders the directory as a gallery-style browser list with count', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'central', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 's1', name: 'Alpha Node', description: 'desc1', owner_id: 'o1', password_required: 0, endpoint_hint: '1.2.3.4:8790' },
+        { id: 's2', name: 'Beta Node', description: 'desc2', owner_id: 'o2', password_required: 1, endpoint_hint: '5.6.7.8:8790' },
+      ] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await waitFor(() => expect(screen.getByText('Alpha Node')).toBeInTheDocument())
+    expect(screen.getByText(/server browser \(2\)/i)).toBeInTheDocument()
+    expect(screen.getAllByRole('listitem').length).toBe(2)
+  })
+
   it('register form posts name and shows created server', async () => {
     let created = false
     mockFetch(async (url, init) => {
@@ -281,5 +296,31 @@ describe('ServersView', () => {
     fireEvent.click(screen.getByText('BobOnline'))
     expect(onSelectUser).toHaveBeenCalledWith(expect.objectContaining({ display_name: 'BobOnline' }))
     spy.mockRestore()
+  })
+
+  it('hides central admin button for non-admin callers', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'hub', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers/node')) return json({ name: 'hub', description: '', isAdmin: false })
+      if (url.includes('/api/servers')) return json({ servers: [] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await screen.findByText('Server browser (0)')
+    expect(screen.queryByRole('button', { name: /central admin/i })).toBeNull()
+  })
+
+  it('anonymous browser fetches directory only, never dashboard/node', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 's1', name: 'Alpha Node', description: '', owner_id: 'o1', password_required: 0, endpoint_hint: '' },
+      ] })
+      return json({})
+    })
+    render(<ServersView identity={null as never} toast={() => {}} />)
+    await screen.findByText('Alpha Node')
+    expect(screen.getByText(/server browser \(1\)/i)).toBeInTheDocument()
+    expect(calls.some((c) => c.url.includes('/api/servers/dashboard'))).toBe(false)
+    expect(calls.some((c) => c.url.includes('/api/servers/node'))).toBe(false)
   })
 })

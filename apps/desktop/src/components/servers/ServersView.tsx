@@ -90,7 +90,7 @@ export function ServersView({
   rooms = [],
   onOpenRoom,
 }: {
-  identity: Parameters<typeof orbitFetch>[2]
+  identity: Parameters<typeof orbitFetch>[2] | null
   toast: Toast
   showRooms?: boolean
   onOpenRooms?: () => void
@@ -125,6 +125,27 @@ export function ServersView({
   const [userTab, setUserTab] = useState<'online' | 'all24h'>('online')
 
   const refresh = useCallback(async () => {
+    // Anonymous browser: public directory only — never touch node routes
+    // (no ID yet, nothing to sign with).
+    if (!identity) {
+      if (!central) { setServers(readDirectoryCache()); setDirError(false); return }
+      try {
+        const res = await fetch(`${central}/api/servers?_ts=${Date.now()}`, { method: 'GET' })
+        if (res.ok) {
+          const data = (await res.json()) as { servers: DirectoryServer[] }
+          const merged = mergeDirectory(readDirectoryCache(), Array.isArray(data.servers) ? data.servers : [])
+          writeDirectoryCache(merged)
+          setServers(merged)
+          setDirError(false)
+        } else {
+          setDirError(true)
+        }
+      } catch {
+        setServers(readDirectoryCache())
+        setDirError(true)
+      }
+      return
+    }
     // Local node dashboard — always available, even with no central (plan §4).
     try {
       const d = await orbitFetch('/api/servers/dashboard', { method: 'GET' }, identity)
@@ -228,7 +249,7 @@ export function ServersView({
   const registerDirectory = async (
     n: string, d: string, h: string, pwRequired: boolean,
   ): Promise<DirectoryServer | null> => {
-    if (!central) return null
+    if (!central || !identity) return null
     try {
       const res = await orbitFetch(`${central}/api/servers`, {
         method: 'POST',
@@ -255,6 +276,7 @@ export function ServersView({
   // has to restart into host mode first, so the claim rides a one-shot
   // handoff; an unclaimed host claims immediately.
   const create = async () => {
+    if (!identity) return
     const trimmed = name.trim()
     if (!trimmed || busy) return
     const desc = description.trim()
@@ -313,9 +335,10 @@ export function ServersView({
     }
   }
 
-  const mine = (s: DirectoryServer) => s.owner_id === (identity as unknown as { orbitId: string }).orbitId
+  const mine = (s: DirectoryServer) => !!identity && s.owner_id === (identity as unknown as { orbitId: string }).orbitId
 
   const renameServer = async () => {
+    if (!identity) return
     const trimmed = serverName.trim()
     if (!trimmed || renaming) return
     setRenaming(true)
@@ -386,6 +409,7 @@ export function ServersView({
   }
 
   const unregister = async (s: DirectoryServer) => {
+    if (!identity) return
     if (!window.confirm(`Unregister "${s.name}" from the directory?`)) return
     const res = await orbitFetch(`${central}/api/servers/${s.id}`, { method: 'DELETE' }, identity)
     if (res.ok) {
@@ -412,9 +436,9 @@ export function ServersView({
   return (
     <div className="h-full min-h-0 flex-1 overflow-hidden p-2 sm:p-4 animate-orbit-fade-in flex flex-col">
       {/* Unified dashboard: one continuous glass-surface, internal dividers, no floating cards */}
-      <div className="glass-surface grid grid-cols-1 lg:grid-cols-[minmax(320px,34%)_1fr] gap-0 h-full min-h-0 flex-1 overflow-hidden rounded-xl">
-        {/* LEFT COLUMN: Current Server & Member activity (24h) */}
-        <aside className="flex flex-col min-h-0 h-full overflow-hidden lg:border-r lg:border-border-subtle" aria-label="Current server hub">
+      <div className={identity ? "glass-surface grid grid-cols-1 lg:grid-cols-[minmax(320px,34%)_1fr] gap-0 h-full min-h-0 flex-1 overflow-hidden rounded-xl" : "glass-surface grid grid-cols-1 gap-0 h-full min-h-0 flex-1 overflow-hidden rounded-xl"}>
+        {/* LEFT COLUMN: Current Server & Member activity (24h) — signed in only */}
+        {identity && (<aside className="flex flex-col min-h-0 h-full overflow-hidden lg:border-r lg:border-border-subtle" aria-label="Current server hub">
           {/* Current Node Hero */}
           <section className="p-3.5 space-y-3 shrink-0 border-b border-border-subtle" aria-label="Server dashboard">
             <div className="flex items-start justify-between gap-2.5">
@@ -586,7 +610,7 @@ export function ServersView({
                     <div
                       key={u.id}
                       onClick={() => handleUserClick(u)}
-                      className="group flex items-center justify-between gap-2 p-1.5 rounded-lg glass-inset hover:border-border-strong transition-all cursor-pointer"
+                      className="group flex items-center justify-between gap-2 p-2 rounded-lg glass-inset hover:border-border-strong transition-colors cursor-pointer"
                       title={`${u.display_name || u.id} — click to view profile`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
@@ -598,7 +622,7 @@ export function ServersView({
                           )}
                           <span
                             className={`absolute bottom-0 right-0 w-2 h-2 rounded-full border border-black ${
-                              u.online ? 'bg-emerald-400' : 'bg-glass-w20'
+                              u.online ? 'bg-emerald-400' : 'bg-retro-muted'
                             }`}
                             aria-hidden
                           />
@@ -621,26 +645,31 @@ export function ServersView({
               )}
             </div>
           </section>
-        </aside>
+        </aside>)}
 
         {/* RIGHT COLUMN: Public Directory Browser */}
-        <main className="flex flex-col min-h-0 h-full gap-2 overflow-hidden p-3.5 sm:pl-0" aria-label="Server directory">
+        <main className="flex flex-col min-h-0 h-full gap-2.5 overflow-hidden p-4 sm:p-5" aria-label="Server directory">
+          {!identity && (
+            <p className="text-xs text-retro-muted shrink-0">No account yet — one is created for you on the server you pick.</p>
+          )}
           {/* Header & Controls */}
-          <div className="flex flex-wrap items-center justify-between gap-2 shrink-0 pb-2 border-b border-border-subtle">
+          <div className="flex flex-wrap items-center justify-between gap-3 shrink-0 pb-2 border-b border-border-subtle">
             <div className="flex items-center gap-2 min-w-0">
-              <Globe className="w-4 h-4 text-retro-accent shrink-0" />
-              <h3 className="text-sm font-bold text-retro-fg truncate">
-                Central directory
-              </h3>
-              {central && (
-                <span className="text-[10px] font-mono text-retro-muted truncate max-w-[180px]">
-                  ({central.replace(/^https?:\/\//, '')})
-                </span>
-              )}
+              <div className="glass-inset w-7 h-7 rounded-lg flex items-center justify-center text-retro-muted shrink-0">
+                <Globe className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-xs font-bold text-retro-fg uppercase tracking-wider truncate">
+                  Server browser ({visibleServers.length})
+                </h2>
+                <p className="text-[10px] text-retro-muted truncate">
+                  {central ? `Every public node on ${central.replace(/^https?:\/\//, '')}` : 'Every public node on this central'}
+                </p>
+              </div>
             </div>
 
             <div className="flex items-center gap-1.5 ml-auto">
-              {central && (
+              {central && node?.isAdmin && (
                 <button
                   type="button"
                   onClick={() => { playPress(760); setShowAdmin((v) => !v) }}
@@ -650,14 +679,14 @@ export function ServersView({
                   Central admin
                 </button>
               )}
-              <button
+              {identity && (<button
                 type="button"
                 onClick={() => { playPress(880); setShowCreate((v) => !v) }}
                 aria-expanded={showCreate}
                 className="glass-action glass-action-primary h-8 px-3 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1"
               >
                 <Plus className="w-3 h-3" /> Create server
-              </button>
+              </button>)}
             </div>
           </div>
 
@@ -764,8 +793,8 @@ export function ServersView({
           ) : (
             <>
               {/* Search, Filter & Sort Toolbar */}
-              <div className="glass-toolbar flex flex-wrap items-center gap-2 p-1.5 shrink-0">
-                <div className="glass-field min-w-[160px] flex-1 flex items-center gap-1.5 px-2.5 py-1 text-xs">
+              <div className="glass-toolbar flex flex-wrap items-center gap-2.5 p-2 shrink-0">
+                <div className="glass-field min-w-[160px] flex-1 flex items-center gap-1.5 px-2.5 py-1.5 text-xs">
                   <Search className="w-3.5 h-3.5 text-retro-muted shrink-0" />
                   <input
                     aria-label="Search servers"
@@ -792,8 +821,9 @@ export function ServersView({
                   type="button"
                   onClick={() => setPasswordOnly((v) => !v)}
                   aria-pressed={passwordOnly}
-                  className={`glass-action h-8 px-2.5 rounded-lg text-xs font-bold cursor-pointer ${passwordOnly ? 'glass-nav-active text-amber-200' : 'text-retro-muted hover:text-retro-fg'}`}
+                  className={`glass-action h-8 px-2.5 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1.5 ${passwordOnly ? 'glass-nav-active text-amber-200' : 'text-retro-muted hover:text-retro-fg'}`}
                 >
+                  <span aria-hidden className={`w-1.5 h-1.5 rounded-full ${passwordOnly ? 'bg-amber-300' : 'bg-retro-muted'}`} />
                   Password only
                 </button>
                 <button
@@ -831,14 +861,17 @@ export function ServersView({
                 ) : (
                   <ul className="space-y-1.5">
                     {visibleServers.length === 0 && (
-                      <li className="glass-inset p-4 text-xs text-retro-muted text-center rounded-xl">
-                        {servers.length === 0
-                          ? 'No other servers online right now. A server appears here while its host is running gMatch.'
-                          : 'No servers match your search filters.'}
+                      <li className="glass-inset p-8 sm:p-12 text-xs text-retro-muted text-center rounded-xl flex flex-col items-center justify-center gap-2">
+                        <Globe className="w-8 h-8 text-retro-muted/40" />
+                        <p className="max-w-sm leading-relaxed">
+                          {servers.length === 0
+                            ? 'No other servers online right now. A server appears here while its host is running gMatch.'
+                            : 'No servers match your search filters.'}
+                        </p>
                       </li>
                     )}
                     {visibleServers.map((s) => (
-                      <li key={s.id} className="glass-inset p-2.5 flex items-start gap-2.5 rounded-xl hover:border-border-strong transition-colors">
+                      <li key={s.id} className="glass-inset p-3 sm:p-3.5 flex items-start gap-3 rounded-xl hover:border-border-strong transition-colors">
                         <div className="p-1.5 rounded-lg glass-panel shrink-0 text-retro-accent">
                           <Globe className="w-4 h-4" />
                         </div>
@@ -898,7 +931,7 @@ export function ServersView({
               </div>
 
               {/* Central master admin drawer */}
-              {showAdmin && <CentralAdminPanel central={central} identity={identity} toast={toast} />}
+              {showAdmin && identity && <CentralAdminPanel central={central} identity={identity} toast={toast} />}
             </>
           )}
         </main>
