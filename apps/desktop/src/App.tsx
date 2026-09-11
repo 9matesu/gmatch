@@ -2968,7 +2968,7 @@ export default function Home() {
                 wsConnected={isWsConnected}
                 showRooms={courierActive}
               />
-              <div className="flex-1 min-h-0 flex flex-col">
+              <div className="flex-1 min-w-0 min-h-0 flex flex-col">
                 <div ref={mainScrollRef} className="mobile-app-scroll flex-1 min-h-0 w-full flex flex-col relative z-10 overflow-y-auto styled-scrollbar">
 
                   {/* Modals & Config */}
