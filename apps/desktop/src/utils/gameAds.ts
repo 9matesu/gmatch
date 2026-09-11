@@ -23,7 +23,7 @@ export const GAME_AD_TEMPLATES: GameAdTemplate[] = [
   {
     mode: 'discord',
     gameName: 'Official Discord',
-    tagline: 'Join our community server, meet other creators, and get live updates.',
+    tagline: 'Community server. Updates land there first.',
     ctaLabel: 'Join Our Discord',
     gradient: 'from-[#5865F2] via-[#7289da] to-[#4752C4]',
     icon: 'discord',
@@ -32,7 +32,7 @@ export const GAME_AD_TEMPLATES: GameAdTemplate[] = [
   {
     mode: 'coffee',
     gameName: 'Buy Me A Coffee',
-    tagline: 'Support gMatch development and unlock exclusive supporter badges & perks.',
+    tagline: 'Support development. Supporters get badges and a few perks.',
     ctaLabel: 'Buy a Coffee',
     gradient: 'from-amber-400 via-yellow-500 to-amber-600',
     icon: 'coffee',
@@ -41,7 +41,7 @@ export const GAME_AD_TEMPLATES: GameAdTemplate[] = [
   {
     mode: 'duel',
     gameName: 'Card Duel Arena',
-    tagline: 'Deploy your deck. Climb the league. Crush your rivals.',
+    tagline: '1v1 card duels with real stakes.',
     ctaLabel: 'Enter the Arena',
     gradient: 'from-[#f09433] via-[#dc2743] to-[#bc1888]',
     icon: 'duel',
@@ -50,7 +50,7 @@ export const GAME_AD_TEMPLATES: GameAdTemplate[] = [
   {
     mode: 'babecock',
     gameName: 'Babecock',
-    tagline: 'The legendary arena showdown. Speed rounds, hot streaks.',
+    tagline: 'Fast rounds. Streaks count.',
     ctaLabel: 'Start a Session',
     gradient: 'from-amber-400 via-orange-500 to-rose-600',
     icon: 'babecock',
@@ -59,7 +59,7 @@ export const GAME_AD_TEMPLATES: GameAdTemplate[] = [
   {
     mode: 'ranks',
     gameName: 'Rankings',
-    tagline: 'Climb the global leaderboard. Only the obsessed stay on top.',
+    tagline: 'The global leaderboard. Only the obsessed stay on top.',
     ctaLabel: 'See the Standings',
     gradient: 'from-yellow-400 via-amber-500 to-orange-600',
     icon: 'ranks',
@@ -68,7 +68,7 @@ export const GAME_AD_TEMPLATES: GameAdTemplate[] = [
   {
     mode: 'store',
     gameName: 'Arcade Store',
-    tagline: 'Unlock exclusive cards, powerups and legendary loot. Limited drop.',
+    tagline: 'Cards, powerups and loot. New stock drops now and then.',
     ctaLabel: 'Open the Store',
     gradient: 'from-violet-500 via-purple-600 to-fuchsia-700',
     icon: 'store',
