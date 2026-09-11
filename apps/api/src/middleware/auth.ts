@@ -136,14 +136,14 @@ export async function orbitAuth(c: Context, next: Next) {
   let signatureBytes;
   try {
     signatureBytes = hexToBytes(signatureHex)
-  } catch (e) {
+  } catch  {
     return errorResponse(c, 'Invalid signature encoding', 400)
   }
 
   let isValid = false;
   try {
     isValid = verifySignature(signatureBytes, messageBytes, publicKeyHex)
-  } catch (e) {
+  } catch  {
     return errorResponse(c, 'Signature verification failed', 400)
   }
 
@@ -168,7 +168,7 @@ export async function orbitAuth(c: Context, next: Next) {
         // column optional
       }
     }
-  } catch (err) {
+  } catch  {
   }
 
   c.set('orbitId', orbitId)

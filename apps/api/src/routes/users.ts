@@ -145,7 +145,7 @@ users.get('/', async (c) => {
 
     const res = await c.env.DB.prepare(queryStr).bind(...params).all()
     results = res.results || []
-  } catch (err) {
+  } catch  {
     let queryStr = `
       SELECT u.id, u.public_key, u.encryption_pub_key, u.display_name, u.tags, u.last_seen, u.attention_at,
              COALESCE(u.objects_sent_count, 0) as objects_sent_count,

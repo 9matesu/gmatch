@@ -63,7 +63,7 @@ export async function createNotification(
       .bind(id, userId, type, title.slice(0, 200), body ? body.slice(0, 500) : null, data ? JSON.stringify(data) : null, now)
       .run()
     return { id, user_id: userId, type, title, body: body ?? null, data: data ? JSON.stringify(data) : null, read: 0, created_at: now }
-  } catch (err) {
+  } catch  {
     return null
   }
 }

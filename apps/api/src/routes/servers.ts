@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { bytesToHex, hexToBytes } from '../hexio'
+import { bytesToHex } from '../hexio'
 import { sha256 } from '@noble/hashes/sha256'
 import { orbitAuth } from '../middleware/auth'
 import { adminAuth } from '../middleware/admin'

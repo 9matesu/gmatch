@@ -1,7 +1,7 @@
 import crypto from 'crypto'
 import type { D1Turso } from './db'
 import type { LocalBlobStore } from './blob'
-import { PICTURE_WIPE_SECONDS, STORY_TTL_SECONDS, normalizeTags, OFFLINE_DELETION_SECONDS, OFFLINE_WARNING_SECONDS } from '@orbit/shared'
+import { PICTURE_WIPE_SECONDS, normalizeTags, OFFLINE_DELETION_SECONDS, OFFLINE_WARNING_SECONDS } from '@orbit/shared'
 import { purgeExpiredBabecock } from './babecock'
 
 const PICTURE_WIPE_MS = PICTURE_WIPE_SECONDS * 1000

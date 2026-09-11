@@ -1,20 +1,5 @@
 import type { D1Turso } from './db'
-import {
-  LOBBY_PICK_SECONDS,
-  LOBBY_REVEAL_SECONDS,
-  LOBBY_DECIDE_SECONDS,
-  ROOM_START_SECONDS,
-  ROOM_MAX_PLAYERS,
-  ROOM_MIN_PLAYERS,
-  ROOM_MAX_ROUNDS,
-  LEAGUE_CHAMPION_POINTS,
-  MatchRoom,
-  RoomPair,
-  RoomMember,
-  RoomSnapshot,
-  MatchCard,
-  LeagueEntry,
-} from '@orbit/shared'
+import { LOBBY_PICK_SECONDS, LOBBY_REVEAL_SECONDS, LOBBY_DECIDE_SECONDS, ROOM_START_SECONDS, ROOM_MIN_PLAYERS, ROOM_MAX_ROUNDS, LEAGUE_CHAMPION_POINTS, MatchRoom, RoomPair, RoomMember, RoomSnapshot, MatchCard, LeagueEntry } from '@orbit/shared'
 import { addPoints } from './game'
 import { broadcastToRoom } from './ws-bus'
 import crypto from 'node:crypto'
@@ -644,7 +629,7 @@ export async function listRooms(db: D1Turso): Promise<MatchRoom[]> {
 }
 
 /** Public, spectator-safe snapshot: cards are withheld until the reveal phase. */
-export async function getRoomSnapshot(db: D1Turso, roomId: string, viewerId?: string): Promise<RoomSnapshot> {
+export async function getRoomSnapshot(db: D1Turso, roomId: string, _viewerId?: string): Promise<RoomSnapshot> {
   const room = await fetchRoom(db, roomId)
   if (!room) throw roomError('Room not found', 404)
 

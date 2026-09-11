@@ -3,7 +3,7 @@ import { D1Turso } from '../db'
 import { orbitAuth } from '../middleware/auth'
 import { logAdminAction } from '../admin-audit'
 import { EconomyService } from '../economy'
-import type { DominationAction } from '@orbit/shared'
+
 import { isDefaultPeerName } from '@orbit/shared'
 
 type Bindings = {

@@ -2,8 +2,8 @@ import { Hono } from 'hono'
 import { bytesToHex, hexToBytes } from '../hexio'
 import { Context, Next } from 'hono'
 import { scrypt } from '@noble/hashes/scrypt'
-import { hmac } from '@noble/hashes/hmac'
-import { sha256 } from '@noble/hashes/sha256'
+
+
 import { randomBytes } from 'crypto'
 import { orbitAuth } from '../middleware/auth'
 import type { D1Turso } from '../db'

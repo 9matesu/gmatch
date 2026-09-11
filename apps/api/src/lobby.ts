@@ -26,9 +26,9 @@ import {
 import { applyLikeDecision, addPoints } from './game'
 import { broadcastToUser, broadcastToRoom } from './ws-bus'
 import { advanceRooms } from './rooms'
-import { getBotConfig, getBotProfiles, pickBotDuelCard, type BotConfig } from './bot-image-api'
+import { getBotConfig, getBotProfiles, pickBotDuelCard } from './bot-image-api'
 import { generateFallbackName } from '@orbit/shared'
-import { canUseBots, botFallbackWaitMs } from './bots/policy'
+import { canUseBots } from './bots/policy'
 import crypto from 'node:crypto'
 import { encryptBlob } from './crypto'
 import type { LocalBlobStore } from './blob'
@@ -636,7 +636,7 @@ async function pushMatchEvent(db: D1Turso, match: GameMatch, action: MatchAction
 // ---------------------------------------------------------------------------
 
 /** Create fresh matches for all pairs of eligible waiting players. */
-async function pairFromQueue(db: D1Turso, now: number, skipBots = false): Promise<boolean> {
+async function pairFromQueue(db: D1Turso, now: number, _skipBots = false): Promise<boolean> {
   // Find users currently in active matches
   const activeRows = await db
     .prepare("SELECT user_a, user_b FROM GameMatches WHERE status IN ('lobby', 'playing')")
@@ -867,7 +867,7 @@ export async function resolveMatch(db: D1Turso, match: GameMatch, now: number, r
         endedAt
       )
       .run()
-  } catch (err) {
+  } catch  {
   }
 
   // Persistent notification for both players when the duel resolves (the bell
@@ -893,7 +893,7 @@ export async function resolveMatch(db: D1Turso, match: GameMatch, now: number, r
       const notif = await createNotification(db, uid, 'match_result', title, body, { match_id: match.id, result })
       if (notif) broadcastToUser(uid, { type: 'notification', action: 'new', notification: notif })
     }
-  } catch (err) {
+  } catch  {
   }
 }
 

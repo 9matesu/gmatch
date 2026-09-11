@@ -3,7 +3,7 @@ import { orbitAuth } from '../middleware/auth'
 import type { D1Turso } from '../db'
 import type { LocalBlobStore } from '../blob'
 import { tierForMatches, tierColor, tierLabel } from '@orbit/shared'
-import { pairMatchCounts, recomputeUserMatches, computeMatchesTotal, applyLikeDecision } from '../game'
+import { computeMatchesTotal, applyLikeDecision } from '../game'
 import { broadcastToRoom } from '../ws-bus'
 
 type Bindings = {

@@ -455,7 +455,7 @@ objects.get('/stories', orbitAuth, async (c) => {
     `).all()
 
     return c.json(results || [])
-  } catch (err) {
+  } catch  {
     return c.json([])
   }
 })
