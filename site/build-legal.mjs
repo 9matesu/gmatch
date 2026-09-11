@@ -1,7 +1,7 @@
 // Run from site/: node build-legal.mjs
 // Renders the legal .md corpus (generated from the canonical TS source by
 // apps/desktop/scripts/gen-legal.cjs) into HTML in legal/.
-// Inline styling only, NO scripts — the honesty gate (check.mjs) enforces that.
+// Inline styling only, NO scripts; the honesty gate (check.mjs) enforces that.
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -92,7 +92,7 @@ function page(title, bodyHtml, note) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(title)} — gMatch</title>
+<title>${esc(title)}, gMatch</title>
 <style>
 :root { color-scheme: dark; }
 html { background: #09090b; }
@@ -142,7 +142,7 @@ th, td { border: 1px solid #27272a; padding: 6px 12px; text-align: left; font-we
 ${note ? `<p><em>${esc(note)}</em></p>` : ''}
 ${bodyHtml}
 <hr>
-<p>Contact: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · This page uses no JavaScript, no external fonts, no cookies and no analytics.</p>
+<p>Contact: <a href="abuse.html">abuse &amp; reports</a> · This page uses no JavaScript, no external fonts, no cookies and no analytics.</p>
 </body>
 </html>
 `
@@ -164,7 +164,7 @@ const mapped = {
 let n = 0
 for (const [html, [md, title, note]] of Object.entries(mapped)) {
   const src = readFileSync(join(MD, md), 'utf8')
-  writeFileSync(join(OUT, html), page(title, mdToHtml(src), note ?? 'Generated from the canonical in-app source — do not edit here.'))
+  writeFileSync(join(OUT, html), page(title, mdToHtml(src), note ?? 'Generated from the canonical in-app source. Do not edit here.'))
   n++
 }
 
@@ -176,10 +176,11 @@ const cl = [
   `<table><tr><th>document</th><th>version</th></tr>` +
     version.docs.map((d) => `<tr><td><a href="${d === 'e2e-disclaimer' ? 'e2e' : d}.html">${esc(d)}</a></td><td>${esc(version.version)}</td></tr>`).join('') +
     '</table>',
-  '<p>2026-09-09.2 — English-only binding corpus (terms, LGPD/GDPR privacy, community, abuse reports, adult records, E2E notice).</p>',
-  '<p>2026-09-11.1 — wave-2 privacy facts: rotating session delivery addresses, salted-hash rate-limit keys, masked server addresses, image metadata stripped on ingress.</p>',
+  '<p>2026-09-09.2: English-only binding corpus (terms, LGPD/GDPR privacy, community, abuse reports, adult records, E2E notice).</p>',
+  '<p>2026-09-11.1: wave-2 privacy facts: rotating session delivery addresses, salted-hash rate-limit keys, masked server addresses, image metadata stripped on ingress.</p>',
+  '<p>2026-09-11.2: contact channels moved in-app (Settings → Help); audit published on this site; no other substantive changes.</p>',
 ].join('\n')
-writeFileSync(join(OUT, 'changelog.html'), page('Legal changelog', cl, 'Generated from legal/version.json — canonical source: apps/desktop/src/legal/documents.ts.'))
+writeFileSync(join(OUT, 'changelog.html'), page('Legal changelog', cl, 'Generated from legal/version.json. Canonical source: apps/desktop/src/legal/documents.ts.'))
 n++
 
 // security page: the audit report itself

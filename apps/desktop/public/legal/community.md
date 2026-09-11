@@ -1,6 +1,6 @@
 # Community Rules
 
-_Binding text (EN)_: **2026-09-11.1** · updated: 2026-09-09
+_Binding text (EN)_: **2026-09-11.2** · updated: 2026-09-09
 Jurisdiction: Enforced technically client-side and by full-node hosts
 
 ## 1. Age and consent

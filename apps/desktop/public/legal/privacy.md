@@ -1,11 +1,11 @@
 # Privacy Policy (LGPD/GDPR)
 
-_Binding text (EN)_: **2026-09-11.1** · updated: 2026-09-09
+_Binding text (EN)_: **2026-09-11.2** · updated: 2026-09-09
 Jurisdiction: LGPD (Lei 13.709/2018); GDPR for EU users
 
 ## 1. Who is the controller
 
-For the OFFICIAL SITE (blind courier + TURN): the maintainers of the 9matesu/goongrid repository, contactable via the GitHub project. For FULL-NODES: the administrator of that server is the controller of the data it holds; the software only implements what the host runs.
+For the OFFICIAL SITE (blind courier + TURN): the maintainers of the official site, contactable through the in-app abuse channel (Settings → Help). For FULL-NODES: the administrator of that server is the controller of the data it holds; the software only implements what the host runs.
 
 ## 2. Legal bases
 
@@ -31,15 +31,15 @@ Contract performance (delivering the service you asked for) + legitimate interes
 
 - **Your machine:** the full identity, keys, threads, rooms, settings, game save. It never leaves to the site.
 
-- **Full-node (if you use one):** it stores posts, profiles, legacy DMs (encrypted with the SERVER key — the host can read them), economies and admin logs. Check your host's policy.
+- **Full-node (if you use one):** it stores posts, profiles, legacy DMs (encrypted with the SERVER key, so the host can read them), economies and admin logs. Check your host's policy.
 
 ## 5. Data subject rights (art. 18 LGPD / arts. 15-22 GDPR)
 
-Confirmation, access, rectification, portability, deletion and consent withdrawal are exercised LOCALLY: export your identity in the app (portability) and delete it (deletion on your device); in courier mode envelopes expire by themselves. For the official site, since data is only hashes and sealed bytes, it cannot be linked to you — deletion is baked into the architecture. For full-nodes, contact the host administrator.
+Confirmation, access, rectification, portability, deletion and consent withdrawal are exercised LOCALLY: export your identity in the app (portability) and delete it (deletion on your device); in courier mode envelopes expire by themselves. For the official site, since data is only hashes and sealed bytes, it cannot be linked to you, and deletion is baked into the architecture. For full-nodes, contact the host administrator.
 
 ## 6. Security
 
-Ed25519 signatures on every mutation with anti-replay nonces; ECIES (X25519 + XChaCha20-Poly1305 + BLAKE3 KDF); short-lived HMAC TURN credentials; shape-only validation without content reads; strict CSP; ICE candidate sanitisation against IP leaks (mDNS/relay). Full public audit at docs/SECURITY-AUDIT.md in the repository.
+Ed25519 signatures on every mutation with anti-replay nonces; ECIES (X25519 + XChaCha20-Poly1305 + BLAKE3 KDF); short-lived HMAC TURN credentials; shape-only validation without content reads; strict CSP; ICE candidate sanitisation against IP leaks (mDNS/relay). The full audit is published at legal/security.html on the official site.
 
 ## 7. International transfers and subprocessors
 

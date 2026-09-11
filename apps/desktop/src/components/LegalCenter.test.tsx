@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import { LegalCenter, isLegalAccepted } from '../components/LegalCenter'
-import { legalVersionKey } from '../legal/documents'
+import { legalVersionKey, LEGAL_VERSION } from '../legal/documents'
 
 // jsdom lacks scrollIntoView
 beforeAll(() => {
@@ -69,7 +69,7 @@ describe('LegalCenter', () => {
     render(<LegalCenter isOpen onAccept={onAccept} onClose={() => {}} initialDoc="terms" />)
     fireEvent.click(screen.getAllByRole('button', { name: /i accept/i })[0])
     expect(isLegalAccepted()).toBe(true)
-    expect(legalVersionKey()).toContain('@2026-09-09.2')
+    expect(legalVersionKey()).toContain('@' + LEGAL_VERSION)
   })
 
   it('closed renders nothing', () => {

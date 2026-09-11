@@ -79,10 +79,10 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
               <section className="space-y-1.5">
                 <h3 className="text-xs font-medium text-retro-fg">Setting up</h3>
                 <ol className="text-xs text-retro-muted space-y-1.5 list-decimal list-inside leading-relaxed">
-                  <li><span className="text-retro-body font-medium">Create your identity</span> — keys are generated in-browser, never uploaded unencrypted</li>
-                  <li><span className="text-retro-body font-medium">Set a display name &amp; tags</span> — helps others find you</li>
-                  <li><span className="text-retro-body font-medium">Browse the network</span> — online users appear at the top of the directory</li>
-                  <li><span className="text-retro-body font-medium">Duel and rank cards</span> — gain score and unlock rarity tiers</li>
+                  <li><span className="text-retro-body font-medium">Create your identity</span>: keys are generated in-browser, never uploaded unencrypted</li>
+                  <li><span className="text-retro-body font-medium">Set a display name &amp; tags</span>: helps others find you</li>
+                  <li><span className="text-retro-body font-medium">Browse the network</span>: online users appear at the top of the directory</li>
+                  <li><span className="text-retro-body font-medium">Duel and rank cards</span>: gain score and unlock rarity tiers</li>
                 </ol>
                 <button
                   type="button"
@@ -104,23 +104,23 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
               <section className="space-y-1.5">
                 <h3 className="text-xs font-medium text-retro-fg">How to send</h3>
                 <ol className="text-xs text-retro-muted space-y-1.5 list-decimal list-inside leading-relaxed">
-                  <li><span className="text-retro-body font-medium">Select recipients</span> — check the box next to a user&apos;s name</li>
-                  <li><span className="text-retro-body font-medium">Drop or click to browse</span> — media appear as preview thumbnails</li>
-                  <li><span className="text-retro-body font-medium">Configure options</span> — toggle encryption, timebomb, or auto-forward</li>
-                  <li><span className="text-retro-body font-medium">Send</span> — click the send button or drag a preview thumbnail onto a user card</li>
+                  <li><span className="text-retro-body font-medium">Select recipients</span>: check the box next to a user&apos;s name</li>
+                  <li><span className="text-retro-body font-medium">Drop or click to browse</span>: media appear as preview thumbnails</li>
+                  <li><span className="text-retro-body font-medium">Configure options</span>: toggle encryption, timebomb, or auto-forward</li>
+                  <li><span className="text-retro-body font-medium">Send</span>: click the send button or drag a preview thumbnail onto a user card</li>
                 </ol>
               </section>
               <section className="space-y-1.5">
                 <h3 className="text-xs font-medium text-retro-fg">Options Explained</h3>
                 <div className="text-xs text-retro-muted space-y-2">
                   <div className="bg-surface-interactive p-3 border border-border-glass rounded-lg">
-                    <span className="text-retro-body font-medium">Encrypt Image</span> — End-to-end encrypted with the recipient&apos;s encryption key.
+                    <span className="text-retro-body font-medium">Encrypt Image</span>: End-to-end encrypted with the recipient&apos;s encryption key.
                   </div>
                   <div className="bg-surface-interactive p-3 border border-border-glass rounded-lg">
-                    <span className="text-retro-body font-medium">Send as Remote Wallpaper</span> — Sets the image as desktop wallpaper on the recipient&apos;s end.
+                    <span className="text-retro-body font-medium">Send as Remote Wallpaper</span>: Sets the image as desktop wallpaper on the recipient&apos;s end.
                   </div>
                   <div className="bg-surface-interactive p-3 border border-border-glass rounded-lg">
-                    <span className="text-retro-body font-medium">Timebomb</span> — Image auto-deletes after the set duration.
+                    <span className="text-retro-body font-medium">Timebomb</span>: Image auto-deletes after the set duration.
                   </div>
                 </div>
               </section>
@@ -149,7 +149,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
               <section className="space-y-1.5">
                 <h3 className="text-xs font-medium text-retro-fg">Pseudonymous by Design</h3>
                 <p className="text-xs text-retro-muted leading-relaxed">
-                  Identities are derived from keys held on your device — there is no email, phone number or password tied to your account. Your profile (name, tags, bio, avatar, public posts and activity counters) is what other players see.
+                  Identities are derived from keys held on your device. There is no email, phone number or password tied to your account. Your profile (name, tags, bio, avatar, public posts and activity counters) is what other players see.
                 </p>
               </section>
               <section className="space-y-1.5">

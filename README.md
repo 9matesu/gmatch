@@ -1,14 +1,13 @@
 # gMatch
 
-Adults-only (18+) desktop app — one multiplayer idle game. The gMatch
+Adults-only (18+) desktop app. One multiplayer idle game. The gMatch
 social/gaming shell (feed, card duels, chat, P2P, hacks, moderation, admin
 dashboard) wrapping **Babecock · Idle** (ex-GoonGrid): click booru pictures to
 earn g$, buy tags that steer your feed, collect a gallery, pop GoonCaps,
 brainmelt for prestige. Idle earnings share the server g$ ledger with duels,
 lootboxes, hacks and trades.
 
-Built by merging 9matesu/orbit into 9matesu/goongrid (2026-09, tag
-`v0.2.0-orbit-merge`). See `docs/SPEC.md` for the full product spec and
+See `docs/SPEC.md` for the full product spec and
 `AGENTS.md` for dev rules.
 
 ## Run
@@ -31,7 +30,7 @@ npm run dist            # icon -> stage api (bun.exe + self-contained server) ->
 ```
 
 The packaged default is **client** mode pointing at the central node
-(`https://gmatch.fly.dev` — a blind courier: it relays encrypted envelopes it
+(`https://gmatch.fly.dev`, a blind courier: it relays encrypted envelopes it
 cannot open). **Host** mode is opt-in in Settings → Server: every copy still
 bundles its own full server (bun sidecar on `:8790`), shows the LAN addresses
 to give friends, and one world lives per host. No cloud account, no telemetry.

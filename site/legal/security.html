@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Security Audit — gMatch</title>
+<title>Security Audit, gMatch</title>
 <style>
 :root { color-scheme: dark; }
 html { background: #09090b; }
@@ -51,8 +51,8 @@ th, td { border: 1px solid #27272a; padding: 6px 12px; text-align: left; font-we
 <body>
 <p><a href="../index.html#terms">← back to the main page</a></p>
 <p><em>Generated from docs/SECURITY-AUDIT.md (white-box).</em></p>
-<h1>gMatch — Security Audit (static pentest)</h1>
-<p><strong>Scope:</strong> white-box of the source across four rounds (branches <code>security/audit-hardening</code>, <code>feat/encrypted-api-servers</code>, <code>fix/logic-consistency-sweep</code>, <code>security/wave2-ip-masks</code>): Electron desktop app + Hono/Bun API + <code>@orbit/crypto|protocol</code>. There was no deployed target for dynamic testing — every claim below cites verifiable code; the "Prove" commands reproduce each finding.</p>
+<h1>gMatch, Security Audit (static pentest)</h1>
+<p><strong>Scope:</strong> white-box of the source across four rounds (branches <code>security/audit-hardening</code>, <code>feat/encrypted-api-servers</code>, <code>fix/logic-consistency-sweep</code>, <code>security/wave2-ip-masks</code>): Electron desktop app + Hono/Bun API + <code>@orbit/crypto|protocol</code>. There was no deployed target for dynamic testing, every claim below cites verifiable code; the "Prove" commands reproduce each finding.</p>
 <p><strong>Methodology:</strong> persistence surfaces (disk, localStorage/LS leveldb, IndexedDB, Chromium cache, server SQLite snapshot), transport (signed REST, WS swarm, courier WS, WebRTC/ICE, TURN), authentication and access control, cryptographic primitives and the envelope protocol, threat model (a) user-disk forensics, (b) user-level malware, (c) server operator, (d) network MITM, (e) admin-panel abuse.</p>
 <h2>Round 1 (2026-09-09, v1.0)</h2>
 <pre>
@@ -60,38 +60,38 @@ th, td { border: 1px solid #27272a; padding: 6px 12px; text-align: left; font-we
 <pre>
 |---|-----|---------|-------|--------|
 <pre>
-| F1 | HIGH | Adult image cache persisted **plaintext on disk**: `&lt;userData&gt;/image-cache/&lt;fnv1a(url)&gt;.&lt;ext&gt;` + `meta.json` (~150MB/250 files LRU) + `feed-cache.json` (tag-query responses, 10min TTL). | `grep -n "writeFileSync(path.join(cacheDir" apps/desktop/electron/imageCache.cjs` | ✅ fix B.1 — in-memory LRU + destructive migration that wipes the old cache |
+| F1 | HIGH | Adult image cache persisted **plaintext on disk**: `&lt;userData&gt;/image-cache/&lt;fnv1a(url)&gt;.&lt;ext&gt;` + `meta.json` (~150MB/250 files LRU) + `feed-cache.json` (tag-query responses, 10min TTL). | `grep -n "writeFileSync(path.join(cacheDir" apps/desktop/electron/imageCache.cjs` | ✅ fix B.1, in-memory LRU + destructive migration that wipes the old cache |
 <pre>
-| F2 | HIGH | Objects/media served with `Cache-Control: public, max-age=31536000, immutable` → Chromium disk cache + intermediaries. | `grep -rn "max-age=31536000" apps/api/src/routes/objects.ts` | ✅ fix B.2 — `no-store` on every content response |
+| F2 | HIGH | Objects/media served with `Cache-Control: public, max-age=31536000, immutable` → Chromium disk cache + intermediaries. | `grep -rn "max-age=31536000" apps/api/src/routes/objects.ts` | ✅ fix B.2, `no-store` on every content response |
 <pre>
-| F3 | HIGH | Identity private keys (Ed25519 + X25519) in **plaintext localStorage** (`orbit_identity`). | `grep -n "orbit_identity" apps/desktop/src/hooks/useIdentity.ts`; no `safeStorage` in the repo. | ✅ fix B.3 — `safeStorage` (DPAPI) with destructive migration |
+| F3 | HIGH | Identity private keys (Ed25519 + X25519) in **plaintext localStorage** (`orbit_identity`). | `grep -n "orbit_identity" apps/desktop/src/hooks/useIdentity.ts`; no `safeStorage` in the repo. | ✅ fix B.3, `safeStorage` (DPAPI) with destructive migration |
 <pre>
-| F4 | MEDIUM | Admin PIN with **hardcoded fallback** (`ADMIN_PIN \|\| 'Ionwarehouse1'`), plaintext comparison, no lockout. | `grep -rn "Ionwarehouse1" apps/api/src/routes/admin.ts` | ✅ fix B.4 — no env → admin 503; hash + lockout |
+| F4 | MEDIUM | Admin PIN with **hardcoded fallback** (`ADMIN_PIN \|\| 'Ionwarehouse1'`), plaintext comparison, no lockout. | `grep -rn "Ionwarehouse1" apps/api/src/routes/admin.ts` | ✅ fix B.4, no env → admin 503; hash + lockout |
 <pre>
-| F5 | MEDIUM | LEGACY mode (full-node/self-host): DMs use AES under the **server's** storage key (it decrypts to deliver) — not E2EE. On the official SITE the legacy inbox does not exist (404 gate); the path there is the E2EE courier. | `apps/api/src/pm.ts:6,136` + `crypto.ts:7-16` | 📋 documented product decision (see "Per-mode model"); `e2e-disclaimer` explains it to the user |
+| F5 | MEDIUM | LEGACY mode (full-node/self-host): DMs use AES under the **server's** storage key (it decrypts to deliver), not E2EE. On the official SITE the legacy inbox does not exist (404 gate); the path there is the E2EE courier. | `apps/api/src/pm.ts:6,136` + `crypto.ts:7-16` | 📋 documented product decision (see "Per-mode model"); `e2e-disclaimer` explains it to the user |
 <pre>
-| F6 | MEDIUM | No automated proof that SITE mode never touches content tables (the SQLite snapshot only exists for full-nodes). | new `apps/api/src/site-blindness.test.ts` | ✅ fix B.6 — end-to-end verification test |
+| F6 | MEDIUM | No automated proof that SITE mode never touches content tables (the SQLite snapshot only exists for full-nodes). | new `apps/api/src/site-blindness.test.ts` | ✅ fix B.6, end-to-end verification test |
 <pre>
-| F7 | LOW | CSP `connect-src` with wildcards `*.workers.dev`/`*.fly.dev`; `style-src 'unsafe-inline'`. | `sed -n 24-27p apps/api/src/middleware/security-headers.ts` | ✅ fix B.5 — exact origins via `CSP_CONNECT_ORIGINS` (inline style kept only in dev, documented) |
+| F7 | LOW | CSP `connect-src` with wildcards `*.workers.dev`/`*.fly.dev`; `style-src 'unsafe-inline'`. | `sed -n 24-27p apps/api/src/middleware/security-headers.ts` | ✅ fix B.5, exact origins via `CSP_CONNECT_ORIGINS` (inline style kept only in dev, documented) |
 <pre>
-| F8 | LOW | Courier threads/rooms and PFPs (data-URL) in plaintext localStorage. | `grep -n "orbit_mail_threads\|goonmatch_pfps" apps/desktop/src -r` | ✅ B.3 — secure KV (DPAPI) for all content stores |
+| F8 | LOW | Courier threads/rooms and PFPs (data-URL) in plaintext localStorage. | `grep -n "orbit_mail_threads\|goonmatch_pfps" apps/desktop/src -r` | ✅ B.3, secure KV (DPAPI) for all content stores |
 <pre>
 | F9 | LOW | (same as F8, pfp) | idem | ✅ |
 <pre>
-| F10 | INFO | Streaming signed-URLs with 7h TTL in the query (`?sig&amp;exp`) — history-leak risk. | `grep -n "ttlSeconds" apps/api/src/crypto.ts` | ✅ fix B.7 — 15min TTL + single-use jti (replay/legacy-URL dead) |
+| F10 | INFO | Streaming signed-URLs with 7h TTL in the query (`?sig&amp;exp`), history-leak risk. | `grep -n "ttlSeconds" apps/api/src/crypto.ts` | ✅ fix B.7, 15min TTL + single-use jti (replay/legacy-URL dead) |
 </pre>
 <h2>Verified controls that ALREADY existed (positives)</h2>
 <ul>
 <li><strong>Auth:</strong> Ed25519 signature over <code>method|url|timestamp|nonce|body</code> on every mutation; timestamp window; server nonce + replay-block; <code>orbitId = sha256(pubkey)</code> re-hashed server-side. <code>apps/api/src/middleware/auth.ts</code>.</li>
 <li><strong>Envelope v2 E2EE</strong> (<code>packages/protocol/src/envelope.ts</code>): body + sender identity INSIDE the seal; Ed25519 binding over <code>v2|kind|id|to|body</code> (anti-rebinding of kind/recipient); X25519-ECIES + XChaCha20-Poly1305 + BLAKE3 KDF (13 tests).</li>
-<li><strong>Blind courier</strong> (<code>apps/api/src/mail-store.ts</code>, <code>routes/mail.ts</code>): SHAPE validation only; bytes stored verbatim; ack only with key-ownership proof (a token-guesser cannot drain someone else's box — forged-signature test); WS 100% anonymous (no frame declares identity); TTL + anti-flood caps.</li>
-<li><strong>TURN</strong> (<code>routes/turn.ts</code>, <code>turn-creds.ts</code>): username <code>&lt;rand16hex&gt;:&lt;exp&gt;</code> — relay logs do NOT link traffic to identity; standard coturn HMAC auth-secret; no creds → STUN-only, no hardcoded third-party relay.</li>
+<li><strong>Blind courier</strong> (<code>apps/api/src/mail-store.ts</code>, <code>routes/mail.ts</code>): SHAPE validation only; bytes stored verbatim; ack only with key-ownership proof (a token-guesser cannot drain someone else's box, forged-signature test); WS 100% anonymous (no frame declares identity); TTL + anti-flood caps.</li>
+<li><strong>TURN</strong> (<code>routes/turn.ts</code>, <code>turn-creds.ts</code>): username <code>&lt;rand16hex&gt;:&lt;exp&gt;</code>, relay logs do NOT link traffic to identity; standard coturn HMAC auth-secret; no creds → STUN-only, no hardcoded third-party relay.</li>
 <li><strong>ICE hygiene</strong> (<code>apps/desktop/src/utils/ice-hygiene.ts</code> + tests): host/srflx candidates with literal IPs dropped at the source on both stacks; only mDNS <code>.local</code> + relay.</li>
 <li><strong>SSRF guard</strong> (<code>apps/api/src/proxy.ts:34</code>, <code>routes/objects.ts:128</code>): loopback/link-local/private ranges blocked on the external-URL proxy.</li>
 <li><strong>PII in logs</strong> (<code>security-headers.ts: redactIp</code>): X-Forwarded-For/X-Real-IP redacted.</li>
 <li><strong>X-Frame-Options DENY; Referrer-Policy no-referrer; COEP strict</strong> (<code>security-headers.ts</code>).</li>
-<li><strong>At-rest AES-256-GCM</strong> for blobs and PMs on the full-node (a SQLite dump does not yield plaintext) — defense in depth for F5.</li>
-<li><strong>Inescapable 18+ age gate</strong> on first run + <strong>hard tag blocklist</strong> enforced in the main process (SPEC §8) — CSAM/incest/animals/non-consent etc. blocked at the origin of every booru request.</li>
+<li><strong>At-rest AES-256-GCM</strong> for blobs and PMs on the full-node (a SQLite dump does not yield plaintext), defense in depth for F5.</li>
+<li><strong>Inescapable 18+ age gate</strong> on first run + <strong>hard tag blocklist</strong> enforced in the main process (SPEC §8), CSAM/incest/animals/non-consent etc. blocked at the origin of every booru request.</li>
 <li><strong>SITE_SERVICES</strong> (<code>site-services.ts</code> + tests): in site mode, ALL content routes (pm, posts, objects, users, signal, lobby…) and the legacy swarm WS answer 404 at the edge.</li>
 <li><strong>Account deletion</strong> (<code>users.delete('/account')</code>) and story expiry (12h) + periodic cleanup (<code>cleanup.ts</code>).</li>
 <li><strong>No telemetry</strong>: zero analytics requests in the app; <code>grep -rn "analytics\|sentry\|beacon" apps/desktop/src</code> → 0.</li>
@@ -104,9 +104,9 @@ th, td { border: 1px solid #27272a; padding: 6px 12px; text-align: left; font-we
 <pre>
 | (a) User-disk forensics | F1/F2/F3/F8 → runtime-only: images in RAM only, `no-store`, keys and threads in DPAPI, local `storage.key` |
 <pre>
-| (b) User-level malware | DPAPI does not help (same session) — mitigated by: key export only via explicit modal + `will-prevent-unload` warning; honest limit stated in the ToS |
+| (b) User-level malware | DPAPI does not help (same session), mitigated by: key export only via explicit modal + `will-prevent-unload` warning; honest limit stated in the ToS |
 <pre>
-| (c) Server operator | Blind courier + envelope signature + public token + random TURN + ICE hygiene + SITE gate: the official host does NOT see content, conversation identity, presence, or the graph. Full-node: the HOST IS the server — `e2e-disclaimer` says so |
+| (c) Server operator | Blind courier + envelope signature + public token + random TURN + ICE hygiene + SITE gate: the official host does NOT see content, conversation identity, presence, or the graph. Full-node: the HOST IS the server, and `e2e-disclaimer` says so |
 <pre>
 | (d) Network MITM | TLS on the API + payloads already E2EE; replay protected by nonce/signature; CSP without arbitrary origins (F7 fixed) |
 <pre>
@@ -115,12 +115,12 @@ th, td { border: 1px solid #27272a; padding: 6px 12px; text-align: left; font-we
 <h2>Per-mode model (F5, recorded decision)</h2>
 <ul>
 <li><strong>Official SITE (<code>SITE_SERVICES=mail,turn</code>)</strong>: pure courier. The server is stateless for content (no table ever written; see <code>site-blindness.test.ts</code>), keeps opaque envelopes for ≤7d and does not know who connects.</li>
-<li><strong>Self-hosted full-node</strong>: LAN/community convenience — the HOST'S ADMINS see PMs/blobs with their own key, like any historical central server. It is not "their server", it is yours. ToS + disclaimer make this explicit.</li>
+<li><strong>Self-hosted full-node</strong>: LAN/community convenience: the HOST'S ADMINS see PMs/blobs with their own key, like any historical central server. It is not "their server"; it is yours. ToS + disclaimer make this explicit.</li>
 </ul>
 <h2>Limitations / out of reach</h2>
 <ul>
-<li>No forward secrecy (static X25519 per account) — ratchet/prekeys remain future 1.x hardening.</li>
-<li>No onion-routing — residual traffic×time correlation on any courier (mitigated client-side with padding/jitter; not eliminable).</li>
+<li>No forward secrecy (static X25519 per account), ratchet/prekeys remain future 1.x hardening.</li>
+<li>No onion-routing, residual traffic×time correlation on any courier (mitigated client-side with padding/jitter; not eliminable).</li>
 <li>The audit is static: it does not replace third-party dynamic pentesting or human counsel review for the legal side.</li>
 </ul>
 <h2>Runtime-only checklist (how to verify today)</h2>
@@ -140,15 +140,15 @@ curl -sI "$API_BASE/api/objects/&lt;own-id&gt;" | grep -i cache-control         
 <pre>
 |---|-----|---------|-------|--------|
 <pre>
-| F11 | HIGH | Signed mutations traveled with JSON body + headers in **plaintext** — any network MITM/observer saw the body, path and the user's target route. | `grep -n "X-Orbit-Signature" apps/desktop/src/utils/api.ts` | ✅ fix T2 — ECIES to the node's X25519 key (`GET /api/identity`), header `X-Orbit-Sealed`; body/headers readable only at the node (tests `packages/protocol/src/api-seal.test.ts`, `apps/api/src/middleware/unseal.test.ts`, `apps/desktop/src/utils/api.seal.test.ts`) |
+| F11 | HIGH | Signed mutations traveled with JSON body + headers in **plaintext**, any network MITM/observer saw the body, path and the user's target route. | `grep -n "X-Orbit-Signature" apps/desktop/src/utils/api.ts` | ✅ fix T2, ECIES to the node's X25519 key (`GET /api/identity`), header `X-Orbit-Sealed`; body/headers readable only at the node (tests `packages/protocol/src/api-seal.test.ts`, `apps/api/src/middleware/unseal.test.ts`, `apps/desktop/src/utils/api.seal.test.ts`) |
 <pre>
-| F12 | MEDIUM | No access control on **creating/joining** servers: any key could pollute the directory or impersonate a host. | new `apps/api/src/routes/servers.test.ts` | ✅ T3 — registration requires orbitAuth Ed25519; endpoint hint revealed only to signed callers; 5/max-owner; stale 24h |
+| F12 | MEDIUM | No access control on **creating/joining** servers: any key could pollute the directory or impersonate a host. | new `apps/api/src/routes/servers.test.ts` | ✅ T3, registration requires orbitAuth Ed25519; endpoint hint revealed only to signed callers; 5/max-owner; stale 24h |
 <pre>
-| F13 | LOW | Node userlist exposed precise last_seen. | `GET /api/servers/dashboard` anonymous | ✅ T4 — anonymous = counts only; members = truncated id (8) + 60s boolean |
+| F13 | LOW | Node userlist exposed precise last_seen. | `GET /api/servers/dashboard` anonymous | ✅ T4, anonymous = counts only; members = truncated id (8) + 60s boolean |
 <pre>
-| F14 | MEDIUM | Private servers without a password = any discovered key could write (orbitAuth auto-creates Users!). | new `apps/api/src/routes/password.test.ts` | ✅ T5 — scrypt in the host's SystemMeta + write gate for newcomers (signed allowlist, epoch grandfathered, lockout 5/15) |
+| F14 | MEDIUM | Private servers without a password = any discovered key could write (orbitAuth auto-creates Users!). | new `apps/api/src/routes/password.test.ts` | ✅ T5, scrypt in the host's SystemMeta + write gate for newcomers (signed allowlist, epoch grandfathered, lockout 5/15) |
 <pre>
-| F15 | LOW | Server handoff without a secure backup mechanism. | new `apps/api/src/routes/snapshot.test.ts` | ✅ T6 — `/api/snapshot` admin-only, content allowlist, never exports SystemMeta/Sessions/ServerDirectory |
+| F15 | LOW | Server handoff without a secure backup mechanism. | new `apps/api/src/routes/snapshot.test.ts` | ✅ T6, `/api/snapshot` admin-only, content allowlist, never exports SystemMeta/Sessions/ServerDirectory |
 </pre>
 <p>Honest open items from round 2: automatic multi-replica replication NOT</p>
 <p>implemented (manual export/import covers v1; see ADR-002). The</p>
@@ -160,17 +160,17 @@ curl -sI "$API_BASE/api/objects/&lt;own-id&gt;" | grep -i cache-control         
 <pre>
 |---|-----|---------|-------|--------|
 <pre>
-| F16 | HIGH | `idle-credit` accepted ANY integer 1..1M per 60s throttle — the SPEC called the ledger "authoritative", but the earning-rate validation existed only client-side (a malicious player forged g$ on shared/federated nodes; rankings became fiction). | historical `economy-idle.ts` (no gate) | ✅ server-side envelope: `idleEnvelope` = 1.5× claimed rate × elapsed + 5 (claim ceiling 50k/s); the node's first post-boot flush is trusted by design. Tests `economy-idle.test.ts` (16). Honest scope: on YOUR node it disciplines crashes; on other people's nodes it caps cheating at the documented ceiling, it does not eliminate it. |
+| F16 | HIGH | `idle-credit` accepted ANY integer 1..1M per 60s throttle, the SPEC called the ledger "authoritative", but the earning-rate validation existed only client-side (a malicious player forged g$ on shared/federated nodes; rankings became fiction). | historical `economy-idle.ts` (no gate) | ✅ server-side envelope: `idleEnvelope` = 1.5× claimed rate × elapsed + 5 (claim ceiling 50k/s); the node's first post-boot flush is trusted by design. Tests `economy-idle.test.ts` (16). Honest scope: on YOUR node it disciplines crashes; on other people's nodes it caps cheating at the documented ceiling, it does not eliminate it. |
 <pre>
-| F17 | LOW | `buyCard` has blocked self-purchase of one's own listing since the scaffold (guard + test existed) — but StoreTab offered an active Buy button on your own listing (confusing 403 on click). | `grep "own card" apps/api/src/cards.test.ts` | ✅ "Yours" badge replaces the button (honest UI; the server was already right). |
+| F17 | LOW | `buyCard` has blocked self-purchase of one's own listing since the scaffold (guard + test existed), but StoreTab offered an active Buy button on your own listing (confusing 403 on click). | `grep "own card" apps/api/src/cards.test.ts` | ✅ "Yours" badge replaces the button (honest UI; the server was already right). |
 <pre>
-| F18 | MEDIUM | Paid hack debuffs lived in an IN-MEMORY ARRAY — restarting the sidecar (every app relaunch!) ate the victim's active effect and the attacker's already-charged g$ spy-feed session. | `grep -n "activeServerHacks" apps/api/src/routes/users.ts` (historical) | ✅ `HackDebuffs` table (migration 048): INSERT via the debit's atomic batch (gate `changes()`), prune/reads via DB; account cleanup + snapshot allowlist wired. "Survives module re-init" test (`spy-feed.test.ts`). |
+| F18 | MEDIUM | Paid hack debuffs lived in an IN-MEMORY ARRAY, restarting the sidecar (every app relaunch!) ate the victim's active effect and the attacker's already-charged g$ spy-feed session. | `grep -n "activeServerHacks" apps/api/src/routes/users.ts` (historical) | ✅ `HackDebuffs` table (migration 048): INSERT via the debit's atomic batch (gate `changes()`), prune/reads via DB; account cleanup + snapshot allowlist wired. "Survives module re-init" test (`spy-feed.test.ts`). |
 <pre>
-| F19 | LOW | Never-acked Domination actions (victim closed the app; OS blocked the camera) stayed `sent` forever — honest UI ("awaiting") but no terminal state. | old `SELECT count(*) FROM DominationActions WHERE status='sent'` | ✅ 30min sweep `sent→expired` in `deleteExpiredContent` (3d) + "fizzled/skipped" chips explaining the zero-refund and a note in the camera modal. |
+| F19 | LOW | Never-acked Domination actions (victim closed the app; OS blocked the camera) stayed `sent` forever, honest UI ("awaiting") but no terminal state. | old `SELECT count(*) FROM DominationActions WHERE status='sent'` | ✅ 30min sweep `sent→expired` in `deleteExpiredContent` (3d) + "fizzled/skipped" chips explaining the zero-refund and a note in the camera modal. |
 </pre>
 <p>Admin (privacy refactor, same week): bulk DM reading and referrer analytics</p>
 <p>REMOVED from the software; disclosure is now report-scoped</p>
-<p>(<code>GET /api/admin/cases/:id</code> — the round-1 line "(e) key-disclosure future</p>
+<p>(<code>GET /api/admin/cases/:id</code>, the round-1 line "(e) key-disclosure future</p>
 <p>phase" becomes implemented reality). Full ledger in <code>docs/ADMIN-SUITE.md</code>.</p>
 <h2>Round 4 (2026-09-11, wave 2 / branch security/wave2-ip-masks)</h2>
 <pre>
@@ -178,15 +178,15 @@ curl -sI "$API_BASE/api/objects/&lt;own-id&gt;" | grep -i cache-control         
 <pre>
 |---|-----|---------|-------|--------|
 <pre>
-| F20 | HIGH | Multipart uploads stored **raw bytes**: the EXIF stripper only ran on the external-URL proxy path (`proxy.ts`) — a phone photo with GPS went straight in via `POST /api/objects`. | `git log -S stripImageMetadata -- apps/api/src/routes/objects.ts` (before: absent) | ✅ shared `metadata-strip.ts` (JPEG APP1-15+COM, PNG tEXt/eXIf/iTXt/zTXt/tIME/iCCP, GIF app/comment extensions, WebP EXIF/XMP/ICCP) applied on ingress (upload, `data:` pfp) and egress (proxy already covered); dedup hash computed over clean bytes. Tests `metadata-strip.test.ts`, `metadata-ingress.test.ts`. |
+| F20 | HIGH | Multipart uploads stored **raw bytes**: the EXIF stripper only ran on the external-URL proxy path (`proxy.ts`), a phone photo with GPS went straight in via `POST /api/objects`. | `git log -S stripImageMetadata -- apps/api/src/routes/objects.ts` (before: absent) | ✅ shared `metadata-strip.ts` (JPEG APP1-15+COM, PNG tEXt/eXIf/iTXt/zTXt/tIME/iCCP, GIF app/comment extensions, WebP EXIF/XMP/ICCP) applied on ingress (upload, `data:` pfp) and egress (proxy already covered); dedup hash computed over clean bytes. Tests `metadata-strip.test.ts`, `metadata-ingress.test.ts`. |
 <pre>
 | F21 | MEDIUM | Delivery token = `blake3(pubkey)` **static**: the courier could correlate every box ever addressed to you, forever. | `packages/protocol/src/mail.ts` (historical) | ✅ per-boot rotation (`sessionDeliveryToken = blake3(pubkey‖epoch)`); the epoch travels sealed inside dm/ack bodies; the home box stays a one-boot fallback. The courier schema is untouched. Tests `mail-store.test.ts` (ack with epoch), `handleRotation.test.ts`. |
 <pre>
 | F22 | HIGH | Admin = **whoever knew the PIN last** (`verify-pin` flipped `is_admin` universally); with no identity binding, a leaked PIN = admin of any node. | historical `admin.ts`: UPDATE Users SET is_admin=0 → grant to caller | ✅ `ADMIN_ORBIT_ID` (when configured, identity check BEFORE the PIN compare, same 401 + lockout); 12h grant TTL (`admin_grant_at` in SystemMeta, enforced by `adminAuth`); guard sweep over EVERY admin route (`admin-guard.test.ts`); `pinFails` map cap (10k). Self-host nodes keep the host-is-admin model (documented in F5). |
 <pre>
-| F23 | MEDIUM | Identity headers (`X-Orbit-Id`, signature) on **GETs** traveled in plaintext — a network observer knew WHO fetched what. | historical `api.ts`: `if (method !== 'GET' &amp;&amp; ...)` on the seal | ✅ GETs seal their headers (empty body; `API_SEALED_ONLY` now covers GET — the flip is a release-time step, client first). Query strings audited: no parameter carries identity. Tests `unseal.test.ts`, `api.seal.test.ts`. |
+| F23 | MEDIUM | Identity headers (`X-Orbit-Id`, signature) on **GETs** traveled in plaintext, a network observer knew WHO fetched what. | historical `api.ts`: `if (method !== 'GET' &amp;&amp; ...)` on the seal | ✅ GETs seal their headers (empty body; `API_SEALED_ONLY` now covers GET, the flip is a release-time step, client first). Query strings audited: no parameter carries identity. Tests `unseal.test.ts`, `api.seal.test.ts`. |
 <pre>
-| F24 | LOW | `GET /users/:id/pfp` issued a **302 to an external host** when the avatar was a URL — leaking the viewer's IP to a third party. | historical `routes/users.ts:47` | ✅ new writes no longer accept raw URLs: `http(s)` goes through `proxyAndStoreExternal` (failure → 400), `data:` is stripped; the 302 remains only for legacy rows. |
+| F24 | LOW | `GET /users/:id/pfp` issued a **302 to an external host** when the avatar was a URL, leaking the viewer's IP to a third party. | historical `routes/users.ts:47` | ✅ new writes no longer accept raw URLs: `http(s)` goes through `proxyAndStoreExternal` (failure → 400), `data:` is stripped; the 302 remains only for legacy rows. |
 <pre>
 | F25 | LOW | The rate limiter kept **raw IPs as in-memory map keys**. | historical `rate-limit.ts` `getClientIp` | ✅ key = `sha256(boot-salt‖IP)[0:16]`; `security-greps.sh` proves no other module reads XFF/X-Real-IP. |
 </pre>
@@ -194,14 +194,14 @@ curl -sI "$API_BASE/api/objects/&lt;own-id&gt;" | grep -i cache-control         
 <ul>
 <li><strong>TCP-layer IP</strong>: the network edge (fly.io; Cloudflare once the official</li>
 </ul>
-<p>  node is proxied) still sees client IPs — code cannot fix that. What the code</p>
+<p>  node is proxied) still sees client IPs, code cannot fix that. What the code</p>
 <p>  guarantees: the application layer never stores, echoes, logs or renders an</p>
 <p>  IP (F25/B3/B4; <code>scripts/security-greps.sh</code> is the gate). Pending ops step:</p>
 <p>  front the official node behind a reverse proxy (CF Proxied).</p>
 <ul>
 <li><strong>Traffic×time correlation</strong> on the courier remains possible (padding/jitter</li>
 </ul>
-<p>  only; without onion-routing it cannot reach zero — round 1 already said so).</p>
+<p>  only; without onion-routing it cannot reach zero, round 1 already said so).</p>
 <ul>
 <li><strong>Video metadata</strong> (mp4/webm) is not stripped (pure-JS parser limit; upgrade</li>
 </ul>
@@ -209,7 +209,7 @@ curl -sI "$API_BASE/api/objects/&lt;own-id&gt;" | grep -i cache-control         
 <ul>
 <li>The <code>location</code> field on posts is author-typed text (content, not file</li>
 </ul>
-<p>  metadata) — the app never fills it automatically.</p>
+<p>  metadata), the app never fills it automatically.</p>
 <ul>
 <li>The pentest remains <strong>static + local tests</strong>: it does not replace a</li>
 </ul>
@@ -226,6 +226,6 @@ bash scripts/security-greps.sh          # expected: ALL GREPS CLEAN
 # legacy pfp: an old row with http:// still 302s (accepted, documented in F24)
 </pre>
 <hr>
-<p>Contact: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · This page uses no JavaScript, no external fonts, no cookies and no analytics.</p>
+<p>Contact: <a href="abuse.html">abuse &amp; reports</a> · This page uses no JavaScript, no external fonts, no cookies and no analytics.</p>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Encryption &amp; Self-Custody Disclaimer — gMatch</title>
+<title>Encryption &amp; Self-Custody Disclaimer, gMatch</title>
 <style>
 :root { color-scheme: dark; }
 html { background: #09090b; }
@@ -50,18 +50,18 @@ th, td { border: 1px solid #27272a; padding: 6px 12px; text-align: left; font-we
 </head>
 <body>
 <p><a href="../index.html#terms">← back to the main page</a></p>
-<p><em>Generated from the canonical in-app source — do not edit here.</em></p>
+<p><em>Generated from the canonical in-app source. Do not edit here.</em></p>
 <h1>Encryption &amp; Self-Custody Disclaimer</h1>
-<p>_Binding text (EN)_: <strong>2026-09-11.1</strong> · updated: 2026-09-09</p>
+<p>_Binding text (EN)_: <strong>2026-09-11.2</strong> · updated: 2026-09-09</p>
 <p>Jurisdiction: Technical explanation tied to Terms §8</p>
 <h2>1. What the official server NEVER sees</h2>
-<p>DM/post/room content or names; who talks to whom (the courier routes hashes — you map IDs to your box locally); who is online; your images, text or history.</p>
+<p>DM/post/room content or names; who talks to whom (the courier routes hashes; you map IDs to your box locally); who is online; your images, text or history.</p>
 <h2>2. What it DOES see</h2>
-<p>The delivery address — a one-way hash of your public key that ROTATES every session (contacts learn the new address from inside the sealed messages themselves) — with minimal metadata (size, time, TTL) and anonymous TURN credential requests. Images you upload leave with pixels only: every metadata container (EXIF/GPS, XMP, text chunks) is stripped on the way in.</p>
+<p>The delivery address, a one-way hash of your public key that ROTATES every session (contacts learn the new address from inside the sealed messages themselves), with minimal metadata (size, time, TTL) and anonymous TURN credential requests. Images you upload leave with pixels only: every metadata container (EXIF/GPS, XMP, text chunks) is stripped on the way in.</p>
 <h2>3. Keys: what self-custody means</h2>
-<p>Private keys live only on your device (DPAPI-encrypted on Windows when available). No server can "reset my password". Lose the backup, lose the account — no exceptions.</p>
+<p>Private keys live only on your device (DPAPI-encrypted on Windows when available). No server can "reset my password". Lose the backup, lose the account. No exceptions.</p>
 <h2>4. TOFU (trust-on-first-use)</h2>
-<p>The app FIXES a contact's public key when you first encrypt a conversation. If the key changes you are warned explicitly before sending. There is no trusted identity directory to audit — out-of-band verification (e.g. comparing the hash in a channel both sides trust) is the only defence against a key-swap MITM.</p>
+<p>The app FIXES a contact's public key when you first encrypt a conversation. If the key changes you are warned explicitly before sending. There is no trusted identity directory to audit, so out-of-band verification (e.g. comparing the hash in a channel both sides trust) is the only defence against a key-swap MITM.</p>
 <h2>5. Honest limits</h2>
 <ul>
 <li>Courier timing metadata can correlate traffic under strong surveillance (no padding/onion by default).</li>
@@ -70,11 +70,11 @@ th, td { border: 1px solid #27272a; padding: 6px 12px; text-align: left; font-we
 <li>A third-party full-node can read everything passing through it ("the host IS the server").</li>
 </ul>
 <ul>
-<li>Malware running as your session user can read memory — that threat is your environment's.</li>
+<li>Malware running as your session user can read memory. That threat is your environment's.</li>
 </ul>
 <h2>6. No recovery support</h2>
 <p>"Reset my account" support requests are refused by principle: fulfilling them would break the promise of this document.</p>
 <hr>
-<p>Contact: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · This page uses no JavaScript, no external fonts, no cookies and no analytics.</p>
+<p>Contact: <a href="abuse.html">abuse &amp; reports</a> · This page uses no JavaScript, no external fonts, no cookies and no analytics.</p>
 </body>
 </html>
