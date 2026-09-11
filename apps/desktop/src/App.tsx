@@ -71,7 +71,7 @@ import GridWorkspace from "./components/grid/GridWorkspace";
 import AdminApp from "./admin/AdminApp";
 import { StoreView } from "./components/views/StoreView";
 import { NotificationsPanel } from "./components/NotificationsPanel";
-import { SocialPanel, type SocialPanelTab } from "./components/chat/SocialPanel";
+import { SocialPanel } from "./components/chat/SocialPanel";
 import { logger } from './utils/logger';
 import { useNotifications } from './hooks/useNotifications';
 import { useCourierDms } from './hooks/useCourierDms';
@@ -218,7 +218,7 @@ export default function Home() {
   const [dmMinimized, setDmMinimized] = useState(false);
   const [chatOpen, setChatOpen] = useState(() => desktopChatOnLoad());
   // UI-3: resizable messages sidebar (width persisted; smooth only when not dragging)
-  const [panelTab, setPanelTab] = useState<SocialPanelTab>('chat');
+  const [notifOpen, setNotifOpen] = useState(false);
   const [gamesSubTab, setGamesSubTab] = useState<'duel' | 'babecock' | 'ranks' | 'idle'>('idle');
   const [collapsedModules, setCollapsedModules] = useState<Record<string, boolean>>({});
   const toggleModule = (key: string) => setCollapsedModules((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -313,7 +313,6 @@ export default function Home() {
     const isDesktop = isDesktopViewport();
     if (view === 'messages' && isDesktop) {
       setDmMinimized(false);
-      setPanelTab('chat');
       setChatOpen(true);
       return;
     }
@@ -322,7 +321,6 @@ export default function Home() {
     }
     if (view === 'messages') {
       setDmMinimized(false);
-      setPanelTab('chat');
     }
     if (view === 'games') setGamesSubTab('duel');
     setMainView(view);
@@ -385,7 +383,6 @@ export default function Home() {
     setMainView('feed');
     setChatOpen(false);
     setDmMinimized(false);
-    setPanelTab('chat');
     setGamesSubTab('duel');
     mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
@@ -398,39 +395,12 @@ export default function Home() {
     }
   }, [identity, lobby]);
 
-  const openNotificationsOnDesktop = useCallback(() => {
-    setPanelTab('notifications');
-    setDmMinimized(false);
-    setChatOpen(true);
+  // Notifications are their own modal, opened from any bell (sidebar/feed
+  // header) — no longer a tab inside the messages dock.
+  const openNotifications = useCallback(() => {
+    setNotifOpen(true);
     lobby.markNotificationsRead();
   }, [lobby]);
-
-  const openNotificationsOnMobile = useCallback(() => {
-    setPanelTab('notifications');
-    setDmMinimized(false);
-    handleSetMainView('messages');
-    lobby.markNotificationsRead();
-  }, [handleSetMainView, lobby]);
-
-  const toggleNotifications = useCallback(() => {
-    setDmMinimized(false);
-    if (chatOpen && panelTab === 'notifications') {
-      setChatOpen(false);
-    } else {
-      setChatOpen(true);
-      setPanelTab('notifications');
-      lobby.markNotificationsRead();
-    }
-  }, [chatOpen, panelTab, lobby]);
-
-  const openNotifications = useCallback(() => {
-    const isDesktop =
-      typeof window !== 'undefined' &&
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(min-width: 768px)').matches;
-    if (isDesktop) openNotificationsOnDesktop();
-    else openNotificationsOnMobile();
-  }, [openNotificationsOnDesktop, openNotificationsOnMobile]);
 
   const [userDecks, setUserDecks] = useState<Deck[]>([]);
   const [activeDeckId, setActiveDeckId] = useState<string | null>(() => getStoredActiveDeckId());
@@ -2957,8 +2927,8 @@ export default function Home() {
                 isAdmin={myProfile.isAdmin}
                 onGroupToggle={() => setChatOpen(false)}
                 notificationUnreadCount={lobby.unreadCount}
-                onOpenNotifications={toggleNotifications}
-                notificationsOpen={chatOpen && panelTab === 'notifications'}
+                onOpenNotifications={openNotifications}
+                notificationsOpen={notifOpen}
                 profilePic={profilePics[identity?.orbitId || '']}
                 displayName={myProfile.displayName || myUser?.display_name || 'You'}
                 activeHack={activeHack}
@@ -3130,8 +3100,6 @@ export default function Home() {
                   {/* gMatch Direct Messages View */}
                   {mainView === 'messages' && !chatOpen && !dmMinimized && (
                     <MessagesView
-                      panelTab={panelTab}
-                      setPanelTab={setPanelTab}
                       identity={identity}
                       chatMessages={chatMessages}
                       pmPeer={pmPeer}
@@ -3165,10 +3133,6 @@ export default function Home() {
                       setViewerMessage={setViewerMessage}
                       setDmMinimized={setDmMinimized}
                       pmUnreadCount={pmUnreadCount}
-                      lobby={lobby}
-                      handleRespondBabecock={handleRespondBabecock}
-                      setGamesSubTab={setGamesSubTab}
-                      setMainView={setMainView}
                     />
                   )}
 
@@ -3445,6 +3409,32 @@ export default function Home() {
                   </div>
                 )}
 
+                {/* Notifications modal (sidebar/header bell) */}
+                {notifOpen && (
+                  <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4" role="dialog" aria-label="Notifications">
+                    <div className="absolute inset-0 bg-black/70" onClick={() => setNotifOpen(false)} />
+                    <div className="relative w-full max-w-md h-[70vh] glass-card rounded-xl overflow-hidden flex flex-col">
+                      <button
+                        type="button"
+                        onClick={() => setNotifOpen(false)}
+                        aria-label="Close notifications"
+                        className="absolute top-2 right-2 z-10 p-1.5 rounded-md hover:bg-glass-w8 text-retro-muted hover:text-retro-fg cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                      <NotificationsPanel
+                        notifications={lobby.notifications}
+                        unreadCount={lobby.unreadCount}
+                        invites={lobby.invites}
+                        onMarkAllRead={() => lobby.markNotificationsRead()}
+                        onRespondInvite={(id, accept) => lobby.respondToInvite(id, accept)}
+                        onRespondBabecock={handleRespondBabecock}
+                        onOpenBabecock={() => { setNotifOpen(false); setGamesSubTab('babecock'); setMainView('games'); }}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {/* Root-Level User Profile Modal */}
                 {selectedProfileUser && (
                   <UserProfileModal
@@ -3559,11 +3549,8 @@ export default function Home() {
                 unreadCount={pmUnreadCount}
               >
 <SocialPanel
-                      tab={panelTab}
-                      onTabChange={setPanelTab}
                       onClose={() => setChatOpen(false)}
                       chatUnread={pmUnreadCount}
-                      notificationUnread={lobby.unreadCount}
                       dm={
                         <GMatchDMs
                           identity={identity}
@@ -3615,17 +3602,6 @@ export default function Home() {
                           onDeleteThread={deleteThread}
                           onBackToThreads={() => { setPmPeer(null); loadPmThreads(); }}
                           onLoadHistory={loadPmHistory}
-                        />
-                      }
-                      notifications={
-                        <NotificationsPanel
-                          notifications={lobby.notifications}
-                          unreadCount={lobby.unreadCount}
-                          invites={lobby.invites}
-                          onMarkAllRead={() => lobby.markNotificationsRead()}
-                          onRespondInvite={(id, accept) => lobby.respondToInvite(id, accept)}
-                          onRespondBabecock={handleRespondBabecock}
-                          onOpenBabecock={() => { setGamesSubTab('babecock'); setMainView('games'); }}
                         />
                       }
                     />
@@ -3828,7 +3804,7 @@ export default function Home() {
                 onOpenSettings={() => setShowSettingsModal(true)}
                 onOpenStore={() => handleSetMainView('store')}
                 onOpenPlayers={() => { setGamesSubTab('duel'); handleSetMainView('games'); }}
-                onOpenNotifications={openNotificationsOnMobile}
+                onOpenNotifications={openNotifications}
                 unreadMessagesCount={pmUnreadCount}
                 unreadNotificationsCount={lobby.unreadCount}
                 profilePic={profilePics[identity?.orbitId || '']}
