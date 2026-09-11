@@ -222,7 +222,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
               </div>
             )}
             <div className="flex-1 min-w-0 space-y-2.5">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
                 <div>
                   <span className="text-retro-muted block text-[10px]">Report ID</span>
                   <span className="font-mono text-retro-fg break-all text-[10px]">{report.id}</span>
@@ -404,7 +404,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
               </div>
             )}
             <div className="flex-1 min-w-0 space-y-2.5">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
                 <div>
                   <span className="text-retro-muted block text-[10px]">Comment ID</span>
                   <span className="font-mono text-retro-fg break-all text-[10px]">{comment.id}</span>
@@ -547,7 +547,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
               </div>
             )}
             <div className="flex-1 min-w-0 space-y-2.5">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
                 <div>
                   <span className="text-retro-muted block text-[10px]">Message ID</span>
                   <span className="font-mono text-retro-fg break-all text-[10px]">{msg.id}</span>
@@ -559,7 +559,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                 <div>
                   <span className="text-retro-muted block text-[10px]">Sender</span>
                   <span className="font-semibold text-retro-fg">{msg.sender_name || msg.sender_id.slice(0, 10)}</span>
-                  <span className="font-mono text-cyan-300 block text-[9px] break-all">{msg.sender_id}</span>
+                  <span className="font-mono text-cyan-300 block text-[10px] break-all">{msg.sender_id}</span>
                 </div>
                 <div>
                   <span className="text-retro-muted block text-[10px]">Recipient</span>

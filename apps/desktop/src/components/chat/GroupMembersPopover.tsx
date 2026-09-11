@@ -126,7 +126,7 @@ export function GroupMembersPopover({
               type="button"
               onClick={() => void confirmAdd(Array.from(selected))}
               disabled={adding}
-              className="w-full mt-1 px-3 py-1.5 rounded-md bg-retro-accent text-black text-[11px] font-bold cursor-pointer disabled:opacity-50"
+              className="w-full mt-1 px-3 py-1.5 rounded-md bg-retro-accent text-black text-xs font-bold cursor-pointer disabled:opacity-50"
             >
               {adding ? 'Adding…' : `Add ${selected.size} to group`}
             </button>

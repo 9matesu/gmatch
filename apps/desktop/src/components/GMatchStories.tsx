@@ -307,7 +307,7 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
               <Plus className="w-3 h-3 stroke-[3]" />
             </div>
           </div>
-          <span className="text-[11px] font-medium text-retro-body truncate max-w-[64px]">Your story</span>
+          <span className="text-xs font-medium text-retro-body truncate max-w-[64px]">Your story</span>
         </div>
 
         {/* Grouped User Story Circles */}
@@ -340,7 +340,7 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
                 </div>
               </div>
             </div>
-            <span className="text-[11px] font-medium text-retro-body truncate max-w-[64px]">
+            <span className="text-xs font-medium text-retro-body truncate max-w-[64px]">
               {group.displayName}
             </span>
           </div>

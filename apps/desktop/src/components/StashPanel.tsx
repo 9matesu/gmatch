@@ -109,7 +109,7 @@ export function StashPanel({
                   entry.mimeType.startsWith('video/') ? (
                     <div className="relative w-full h-full">
                       <img src={entry.dataUrl} alt={entry.name} className="w-full h-full object-cover" />
-                      <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/80 text-white text-[8px] font-bold rounded font-mono">VIDEO</span>
+                      <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/80 text-white text-[10px] font-bold rounded font-mono">VIDEO</span>
                     </div>
                   ) : (
                     <img src={entry.dataUrl} alt={entry.name} className="w-full h-full object-cover" />
@@ -130,14 +130,14 @@ export function StashPanel({
                 <button
                   type="button"
                   onClick={() => handleSend(entry.id)}
-                  className="bg-retro-accent hover:bg-retro-fg hover:text-retro-bg text-white text-[9px] font-bold px-2 py-1 transition-colors"
+                  className="bg-retro-accent hover:bg-retro-fg hover:text-retro-bg text-white text-[10px] font-bold px-2 py-1 transition-colors"
                 >
                   Send
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDelete(entry.id)}
-                  className="bg-retro-error text-white text-[9px] font-bold px-2 py-1 transition-colors"
+                  className="bg-retro-error text-white text-[10px] font-bold px-2 py-1 transition-colors"
                 >
                   Del
                 </button>

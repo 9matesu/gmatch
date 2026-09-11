@@ -454,7 +454,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
             <button
               type="button"
               onClick={togglePause}
-              className={`ml-1 px-2 py-1 rounded-md text-[11px] font-medium border cursor-pointer transition-colors ${
+              className={`ml-1 px-2 py-1 rounded-md text-xs font-medium border cursor-pointer transition-colors ${
                 paused ? 'border-emerald-500/30 text-emerald-400' : 'border-border-glass text-retro-muted hover:text-retro-fg'
               }`}
             >
@@ -482,7 +482,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                 <Target className="w-3.5 h-3.5 text-retro-muted" /> Target
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-mono text-retro-muted">{onlineCount} online</span>
+                <span className="text-xs font-mono text-retro-muted">{onlineCount} online</span>
                 <button
                   type="button"
                   onClick={() => void loadTargets()}
@@ -551,7 +551,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     {t.pfpUrl ? (
                       <img src={t.pfpUrl} alt="" className="w-7 h-7 rounded-md object-cover border border-border-glass" />
                     ) : (
-                      <div className="w-7 h-7 rounded-md glass-inset flex items-center justify-center text-[11px] font-semibold text-retro-fg">
+                      <div className="w-7 h-7 rounded-md glass-inset flex items-center justify-center text-xs font-semibold text-retro-fg">
                         {t.displayName.charAt(0).toUpperCase()}
                       </div>
                     )}
@@ -612,13 +612,13 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <Icon className="w-4 h-4 text-retro-muted" />
                           {price != null ? (
-                            <span className="text-[11px] font-mono text-retro-muted">{price} g$</span>
+                            <span className="text-xs font-mono text-retro-muted">{price} g$</span>
                           ) : (
                             <Zap className="w-3.5 h-3.5 text-retro-muted opacity-40" />
                           )}
                         </div>
                         <div className="text-xs font-semibold text-retro-fg">{label}</div>
-                        <div className="text-[11px] text-retro-muted mt-1 leading-snug">{description}</div>
+                        <div className="text-xs text-retro-muted mt-1 leading-snug">{description}</div>
                         <div className={`mt-2 text-[10px] font-mono ${allowed ? 'text-emerald-400/80' : 'text-retro-muted'}`}>
                           {sending === action ? 'sending…' : allowed ? 'consented' : 'no consent'}
                         </div>
@@ -626,7 +626,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     );
                   })}
                 </div>
-                <p className="text-[11px] text-retro-muted leading-relaxed px-1">
+                <p className="text-xs text-retro-muted leading-relaxed px-1">
                   Charged only when the server accepts the send. If the connection drops mid-send, check
                   History → Outbox before retrying.
                 </p>
@@ -643,7 +643,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
             <div className="text-xs font-medium flex items-center gap-1.5 text-retro-fg">
               <Zap className="w-3.5 h-3.5 text-retro-muted" /> Preset
             </div>
-            <p className="text-[11px] text-retro-muted">
+            <p className="text-xs text-retro-muted">
               One-tap starting points for the switches below. Your public-photo setting is never touched.
             </p>
             <div className="flex flex-wrap gap-2">
@@ -698,7 +698,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                       </button>
                     <div className="min-w-0">
                       <div className="text-xs font-medium text-retro-fg">{label}</div>
-                      <div className="text-[11px] text-retro-muted leading-snug mt-0.5">{desc}</div>
+                      <div className="text-xs text-retro-muted leading-snug mt-0.5">{desc}</div>
                     </div>
                   </label>
                 );
@@ -777,7 +777,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                       {meta?.label || action.action}
                       {summary && <span className="text-retro-muted font-normal"> — {summary}</span>}
                     </div>
-                    <div className="text-[11px] text-retro-muted truncate">
+                    <div className="text-xs text-retro-muted truncate">
                       {historyPane === 'outgoing' ? `to ${other || 'unknown'}` : `from ${other || 'unknown'}`}
                       {' · '}{new Date(action.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </div>
@@ -806,7 +806,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
             })}
           </div>
           {historyPane === 'outgoing' && historyState === 'ready' && outgoing.length > 0 && (
-            <p className="text-[11px] text-retro-muted px-1">
+            <p className="text-xs text-retro-muted px-1">
               <span className="font-mono">awaiting</span> = charged and relayed; it flips to{' '}
               <span className="font-mono text-emerald-400/80">landed</span> once their client confirms, or to{' '}
               <span className="font-mono text-amber-400/80">fizzled</span> after 30 min if it never rendered.

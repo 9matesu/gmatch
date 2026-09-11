@@ -135,7 +135,7 @@ export function MatchCardUpload({
         onFiles={(list) => { if (list[0]) void pickFile(list[0]) }}
         onPasteUrl={(url) => void importLink(url)}
       >
-        <div className="text-[11px] text-retro-fg flex items-center justify-center gap-2">
+        <div className="text-xs text-retro-fg flex items-center justify-center gap-2">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-retro-accent">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="17 8 12 3 7 8" />
@@ -212,10 +212,10 @@ export function MatchCardUpload({
               )}
               {pending.status === 'ready' && (
                 <div className="absolute top-1.5 left-1.5 flex items-center gap-1">
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-retro-accent text-black">
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-retro-accent text-black">
                     Card preview
                   </span>
-                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/80 text-amber-300 border border-amber-500/40">
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/80 text-amber-300 border border-amber-500/40">
                     {formatGc(pending.value ?? 0)}
                   </span>
                 </div>
@@ -235,15 +235,15 @@ export function MatchCardUpload({
                       style={{ width: `${Math.min(100, Math.max(2, pending.progress))}%` }}
                     />
                   </div>
-                  <div className="text-[9px] font-mono text-retro-muted tabular-nums">Uploading… {pending.progress}%</div>
-                  <div className="text-[9px] text-retro-muted">Image is being uploaded to the orbit.</div>
+                  <div className="text-[10px] font-mono text-retro-muted tabular-nums">Uploading… {pending.progress}%</div>
+                  <div className="text-[10px] text-retro-muted">Image is being uploaded to the orbit.</div>
                 </div>
               )}
               {pending.status === 'error' && (
-                <div className="text-[9px] font-bold text-red-400">{pending.error}</div>
+                <div className="text-[10px] font-bold text-red-400">{pending.error}</div>
               )}
               {pending.status === 'sent' && (
-                <div className="text-[9px] font-black tracking-widest text-retro-accent uppercase">✓ Card sent</div>
+                <div className="text-[10px] font-black tracking-widest text-retro-accent uppercase">✓ Card sent</div>
               )}
 
               {(pending.status === 'ready' || pending.status === 'sent') && (
@@ -251,8 +251,8 @@ export function MatchCardUpload({
                   <div className="min-w-0">
                     <div className="text-[10px] font-bold text-retro-fg truncate">{pending.name || 'Unnamed Card'}</div>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded border ${rarity.badgeClass}`}>{rarity.label}</span>
-                      <span className="text-[9px] font-mono text-amber-300/90">{pending.value ?? 0} value</span>
+                      <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded border ${rarity.badgeClass}`}>{rarity.label}</span>
+                      <span className="text-[10px] font-mono text-amber-300/90">{pending.value ?? 0} value</span>
                     </div>
                   </div>
                 </div>

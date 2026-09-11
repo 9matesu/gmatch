@@ -49,7 +49,7 @@ export function CardBack({ label, className = '', ticking = false }: CardBackPro
         </div>
 
         {label && (
-          <span className={`text-[9px] font-bold tracking-wider uppercase text-center px-2 py-0.5 rounded-md ${
+          <span className={`text-[10px] font-bold tracking-wider uppercase text-center px-2 py-0.5 rounded-md ${
             isTicking ? 'text-cyan-300 bg-purple-950/60 border border-purple-500/30 animate-pulse' : 'text-retro-muted'
           }`}>
             {label}

@@ -51,7 +51,7 @@ export function CoffeeModal({ open, reason, onDismiss }: Props) {
             <p className="text-[10px] uppercase tracking-wider text-retro-muted font-bold">
               Infrastructure & Maintenance
             </p>
-            <ul className="text-[11px] text-retro-muted space-y-1.5">
+            <ul className="text-xs text-retro-muted space-y-1.5">
               <li className="flex items-center gap-2">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                 <span>AES-GCM at-rest encryption + SSRF-guarded media streaming</span>
@@ -85,14 +85,14 @@ export function CoffeeModal({ open, reason, onDismiss }: Props) {
             <button
               type="button"
               onClick={() => onDismiss('later')}
-              className="flex-1 py-1.5 text-[11px] font-semibold text-retro-muted hover:text-retro-body border border-zinc-800 hover:bg-surface-canvas rounded-lg transition-colors cursor-pointer"
+              className="flex-1 py-1.5 text-xs font-semibold text-retro-muted hover:text-retro-body border border-zinc-800 hover:bg-surface-canvas rounded-lg transition-colors cursor-pointer"
             >
               Maybe later
             </button>
             <button
               type="button"
               onClick={() => onDismiss('never')}
-              className="flex-1 py-1.5 text-[11px] font-semibold text-retro-muted hover:text-retro-body border border-transparent hover:border-zinc-800 rounded-lg transition-colors cursor-pointer"
+              className="flex-1 py-1.5 text-xs font-semibold text-retro-muted hover:text-retro-body border border-transparent hover:border-zinc-800 rounded-lg transition-colors cursor-pointer"
             >
               Don&apos;t show again
             </button>

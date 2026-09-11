@@ -62,7 +62,7 @@ export function HeaderAnnouncement({ identity }: { identity: OrbitIdentity | nul
     >
       <div className="pointer-events-auto max-w-xl w-full px-3.5 py-2 rounded-2xl bg-surface-canvas/95 border border-cyan-500/40 shadow-2xl shadow-cyan-950/40 backdrop-blur-2xl flex items-center justify-between gap-2.5 text-xs text-retro-fg animate-orbit-slide-up">
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <span className="shrink-0 text-[9px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 px-2 py-0.5 border border-cyan-500/40 rounded-md flex items-center gap-1 shadow-sm">
+          <span className="shrink-0 text-[10px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 px-2 py-0.5 border border-cyan-500/40 rounded-md flex items-center gap-1 shadow-sm">
             <Sparkles className="w-2.5 h-2.5" />
             <span>Broadcast</span>
           </span>

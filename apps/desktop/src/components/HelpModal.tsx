@@ -176,7 +176,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                     ['Ctrl+Shift+C', 'Copy your Orbit ID'],
                   ].map(([key, desc]) => (
                     <div key={key} className="flex items-center gap-3 py-1">
-                      <kbd className="bg-surface-interactive border border-border-glass px-2 py-0.5 text-[11px] font-mono text-retro-body rounded min-w-[90px] text-center">{key}</kbd>
+                      <kbd className="bg-surface-interactive border border-border-glass px-2 py-0.5 text-xs font-mono text-retro-body rounded min-w-[90px] text-center">{key}</kbd>
                       <span className="text-retro-muted">{desc}</span>
                     </div>
                   ))}

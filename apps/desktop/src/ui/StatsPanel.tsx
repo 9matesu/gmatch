@@ -53,7 +53,7 @@ export default function StatsPanel() {
         >
           {formatNum(s.gc)}
         </div>
-        <div className="text-[11px] font-bold uppercase tracking-[2px] text-retro-muted">g$</div>
+        <div className="text-xs font-bold uppercase tracking-[2px] text-retro-muted">g$</div>
       </div>
       <div className="mt-2">
         {statRow(<IconCoin size={12} />, 'g$/s', formatNum(gps))}

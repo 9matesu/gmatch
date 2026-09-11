@@ -37,13 +37,13 @@ export function SectionHelpButton({ title, description, onOpenFullHelp }: Sectio
 
       {open && (
         <div className="absolute left-0 top-7 z-50 w-64 bg-retro-panel border border-border-glass p-3 space-y-2 animate-orbit-fade-in">
-          <h4 className="text-[11px] font-bold text-retro-fg tracking-wider uppercase">{title}</h4>
+          <h4 className="text-xs font-bold text-retro-fg tracking-wider uppercase">{title}</h4>
           <p className="text-[10px] text-retro-muted leading-relaxed">{description}</p>
           {onOpenFullHelp && (
             <button
               type="button"
               onClick={() => { setOpen(false); onOpenFullHelp() }}
-              className="text-[9px] font-bold text-retro-accent hover:underline transition-colors"
+              className="text-[10px] font-bold text-retro-accent hover:underline transition-colors"
             >
               View full help guide →
             </button>

@@ -125,7 +125,7 @@ export function DropZone({
             <polyline points="17 8 12 3 7 8" />
             <line x1="12" y1="3" x2="12" y2="15" />
           </svg>
-          <p className={`${compact ? 'text-[11px]' : 'text-sm'} text-retro-muted`}>
+          <p className={`${compact ? 'text-xs' : 'text-sm'} text-retro-muted`}>
             Drop image/video, click to browse, or paste (Ctrl+V) link
           </p>
           {!compact && <p className="text-[10px] text-retro-muted/60">JPG, PNG, WebP, GIF, MP4, WebM, Twitter/X</p>}

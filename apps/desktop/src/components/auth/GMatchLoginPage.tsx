@@ -136,7 +136,7 @@ export function GMatchLoginPage({
                       onChange={(e) => setAgreedToTos(e.target.checked)}
                       className="mt-0.5 w-4 h-4 accent-retro-accent rounded cursor-pointer shrink-0"
                     />
-                    <span className="text-[11px] text-retro-muted leading-tight">
+                    <span className="text-xs text-retro-muted leading-tight">
                       I confirm I am 18+ and accept the{' '}
                       <button
                         type="button"

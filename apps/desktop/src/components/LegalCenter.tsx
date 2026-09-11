@@ -101,7 +101,7 @@ export function LegalCenter({
             </div>
             <div className="min-w-0">
               <h2 className="text-sm font-semibold text-white truncate">Legal Center — gMatch</h2>
-              <p className="text-[11px] text-zinc-400">
+              <p className="text-xs text-zinc-400">
                 {doc.title} · v{doc.version}
               </p>
             </div>
@@ -155,7 +155,7 @@ export function LegalCenter({
               ))}
             </div>
 
-            <p className="text-[11px] text-zinc-500 border border-zinc-800/70 rounded-lg px-3 py-2 flex items-start gap-2">
+            <p className="text-xs text-zinc-500 border border-zinc-800/70 rounded-lg px-3 py-2 flex items-start gap-2">
               <FileText className="w-3.5 h-3.5 mt-0.5 shrink-0" />
               <span>
                 Binding English text. Last updated: {doc.updated} · {doc.jurisdiction}.

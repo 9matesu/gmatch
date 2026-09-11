@@ -296,7 +296,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             <button
               key={mode}
               type="button"
-              className={`${MONO} cursor-pointer border-0 bg-transparent px-2 py-0.5 text-[11px] font-bold ${viewMode === mode ||
+              className={`${MONO} cursor-pointer border-0 bg-transparent px-2 py-0.5 text-xs font-bold ${viewMode === mode ||
                 (mode === '3x3' && viewMode === 'grid')
                 ? 'bg-retro-accent text-retro-accent-text'
                 : 'bg-transparent text-retro-muted hover:text-retro-fg'
@@ -579,7 +579,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               aria-expanded={dropsOpen}
               aria-label={`${pendingDrops.length} novelty drops waiting`}
               title="KO drops — adopt a tag, ban an anti-tag, one click each"
-              className={`${MONO} inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#ff2d78]/40 bg-[#ff2d78]/10 px-2 py-0.5 text-[11px] font-bold text-retro-fg`}
+              className={`${MONO} inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#ff2d78]/40 bg-[#ff2d78]/10 px-2 py-0.5 text-xs font-bold text-retro-fg`}
             >
               🎁 Drops
               <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ff2d78] px-1 text-[10px] font-black text-white">
@@ -654,7 +654,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
         )}
         {heatLive && (
           <span
-            className={`${MONO} inline-flex min-w-0 shrink items-center gap-1 whitespace-nowrap rounded-lg border border-[rgba(255,120,40,0.5)] bg-[rgba(255,80,0,0.15)] px-2 py-0.5 text-[11px] font-black text-[#ffb066]${reduceMotion ? '' : ' animate-pulse'}`}
+            className={`${MONO} inline-flex min-w-0 shrink items-center gap-1 whitespace-nowrap rounded-lg border border-[rgba(255,120,40,0.5)] bg-[rgba(255,80,0,0.15)] px-2 py-0.5 text-xs font-black text-[#ffb066]${reduceMotion ? '' : ' animate-pulse'}`}
             title={`Heat combo: ${heatStreak} rapid clicks — x${heat} click power`}
             aria-label={`Heat combo x${heat}`}
           >
@@ -674,7 +674,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           </button>
         )}
         <span
-          className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border-glass bg-retro-bg px-2 py-0.5 text-[11px] font-bold text-retro-fg [&_svg]:text-retro-accent`}
+          className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border-glass bg-retro-bg px-2 py-0.5 text-xs font-bold text-retro-fg [&_svg]:text-retro-accent`}
           title="Lifetime KOs — each foe hits harder"
         >
           KOs: {formatNum(defeated)}
@@ -708,7 +708,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               </kbd>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-1">
-                  <span className={`${DISPLAY} truncate text-[11px] font-bold leading-tight`}>
+                  <span className={`${DISPLAY} truncate text-xs font-bold leading-tight`}>
                     {def.name}
                   </span>
                   {st.count > 0 && (

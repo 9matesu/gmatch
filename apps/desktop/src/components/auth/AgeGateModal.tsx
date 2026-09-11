@@ -86,7 +86,7 @@ export function AgeGateModal({
           <button
             type="button"
             onClick={() => { playPress(700); onOpenTos(); }}
-            className="text-[11px] text-zinc-500 hover:text-zinc-300 underline font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
+            className="text-xs text-zinc-500 hover:text-zinc-300 underline font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
           >
             <FileText className="w-3 h-3" />
             <span>Terms of Service &amp; Privacy Policy</span>

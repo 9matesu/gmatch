@@ -109,7 +109,7 @@ export function UpdateSection({ toast }: {
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <h4 className="text-xs font-medium text-retro-fg">Updates</h4>
-          <p className="text-[11px] text-retro-muted">
+          <p className="text-xs text-retro-muted">
             Installed: <span className="font-mono">{installed ?? '…'}</span>
             {updater && phase === 'current' && status?.latest && <> · latest <span className="font-mono">{status.latest}</span></>}
             {updater && ['available', 'downloading', 'ready'].includes(phase) && status?.version && (
@@ -129,7 +129,7 @@ export function UpdateSection({ toast }: {
               type="button"
               disabled={installing}
               onClick={() => { playPress(900); void install(); }}
-              className="px-3 py-1.5 rounded-lg bg-retro-accent text-black text-[11px] font-bold cursor-pointer flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg bg-retro-accent text-black text-xs font-bold cursor-pointer flex items-center gap-1.5"
             >
               <Rocket className="w-3.5 h-3.5" /> {installing ? 'Restarting…' : `Install & Restart`}
             </button>
@@ -140,7 +140,7 @@ export function UpdateSection({ toast }: {
                 playPress(820);
                 void bridge.openExternal!(new URL(`/releases/${latest.file}`, getApiBaseUrl()).href);
               }}
-              className="px-3 py-1.5 rounded-lg bg-retro-accent text-black text-[11px] font-bold cursor-pointer flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg bg-retro-accent text-black text-xs font-bold cursor-pointer flex items-center gap-1.5"
             >
               <Download className="w-3.5 h-3.5" /> Download {latest.version}
             </button>
@@ -149,7 +149,7 @@ export function UpdateSection({ toast }: {
             type="button"
             disabled={busy}
             onClick={() => { playPress(700); void (updater ? check() : checkFallback()); }}
-            className="px-3 py-1.5 rounded-lg border border-border-glass text-[11px] text-retro-muted hover:text-retro-fg disabled:opacity-40 cursor-pointer flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-lg border border-border-glass text-xs text-retro-muted hover:text-retro-fg disabled:opacity-40 cursor-pointer flex items-center gap-1.5"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${busy ? 'animate-spin' : ''}`} /> {busy ? 'Checking…' : 'Check for updates'}
           </button>

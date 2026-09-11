@@ -48,7 +48,7 @@ export function PointsHelpModal({ onClose }: { onClose: () => void }) {
                 </div>
               ))}
             </div>
-            <p className="text-[11px] text-retro-muted leading-relaxed">
+            <p className="text-xs text-retro-muted leading-relaxed">
               Single likes earn no g$ — only mutual matches and duel results reward points.
             </p>
           </section>
@@ -71,7 +71,7 @@ export function PointsHelpModal({ onClose }: { onClose: () => void }) {
             </div>
           </section>
 
-          <p className="text-[11px] text-retro-muted leading-relaxed text-center pt-1">
+          <p className="text-xs text-retro-muted leading-relaxed text-center pt-1">
             g$ are in-game currency. They cannot be purchased with real money.
           </p>
         </div>

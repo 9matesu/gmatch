@@ -542,7 +542,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                       {deck.cards.length}/5 cards
                     </span>
                     {activeDeckId === deck.id && (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono text-[9px] font-bold flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono text-[10px] font-bold flex items-center gap-1">
                         <Star className="w-2.5 h-2.5 fill-emerald-400 text-emerald-400" /> Active
                       </span>
                     )}

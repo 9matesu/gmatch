@@ -3568,10 +3568,10 @@ export default function Home() {
                       </span>
                     </span>
                     <span className="flex flex-col items-start leading-tight">
-                      <span className="text-[11px] font-bold">
+                      <span className="text-xs font-bold">
                         {pmPeer ? pmPeer.display_name || 'Direct Message' : 'Direct Messages'}
                       </span>
-                      <span className="text-[9px] text-retro-muted">Tap to reopen</span>
+                      <span className="text-[10px] text-retro-muted">Tap to reopen</span>
                     </span>
                     {chatMessages.length > 0 && (
                       <span className="w-2 h-2 rounded-full bg-[#e1306c] ring-2 ring-white shrink-0" />

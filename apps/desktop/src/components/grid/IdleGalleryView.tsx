@@ -164,7 +164,7 @@ export default function IdleGalleryView({
                 {onCreateCard && (
                   <button
                     type="button"
-                    className={`${HOVER_BTN} relative right-auto top-auto h-[26px] px-1.5 text-[9px] font-bold uppercase tracking-wide`}
+                    className={`${HOVER_BTN} relative right-auto top-auto h-[26px] px-1.5 text-[10px] font-bold uppercase tracking-wide`}
                     title="Turn into a card"
                     aria-label={`Turn ${img.tags.slice(0, 2).join(' ') || 'keepsake'} into a card`}
                     onClick={() =>

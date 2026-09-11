@@ -413,20 +413,20 @@ export function ServersView({
                   <div className="flex items-center gap-1.5">
                     <h2 className="truncate text-base font-bold text-retro-fg leading-tight">{serverName || 'gmatch'}</h2>
                     {serverMode && (
-                      <span className="text-[9px] px-1.5 py-0.2 rounded font-mono uppercase glass-inset text-retro-muted border-border-subtle">
+                      <span className="text-[10px] px-1.5 py-0.2 rounded font-mono uppercase glass-inset text-retro-muted border-border-subtle">
                         {serverMode}
                       </span>
                     )}
                     {node?.isAdmin && (
                       <span
-                        className="text-[9px] px-1.5 py-0.2 rounded font-mono uppercase text-amber-200 border border-amber-400/30 bg-amber-400/10"
+                        className="text-[10px] px-1.5 py-0.2 rounded font-mono uppercase text-amber-200 border border-amber-400/30 bg-amber-400/10"
                         title="You administer this server"
                       >
                         Admin
                       </span>
                     )}
                   </div>
-                  <p className="truncate text-[11px] text-retro-muted mt-0.5">
+                  <p className="truncate text-xs text-retro-muted mt-0.5">
                     {dash ? `${dash.members_total} members · ${dash.posts_24h} posts/24h` : (serverDescription || 'Connected')}
                   </p>
                 </div>
@@ -436,7 +436,7 @@ export function ServersView({
                   <button
                     type="button"
                     onClick={() => { playPress(620); void leave() }}
-                    className="glass-action glass-action-danger h-8 px-2.5 rounded-lg text-[11px] font-bold cursor-pointer flex items-center gap-1"
+                    className="glass-action glass-action-danger h-8 px-2.5 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" /> Leave
                   </button>
@@ -446,7 +446,7 @@ export function ServersView({
                   onClick={() => { playPress(780); setServerName(serverName); setEditingServer((v) => !v) }}
                   aria-expanded={editingServer}
                   title="Rename server"
-                  className="glass-action h-8 px-2.5 rounded-lg text-[11px] font-bold text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1"
+                  className="glass-action h-8 px-2.5 rounded-lg text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1"
                 >
                   <Pencil className="w-3 h-3" /> Rename
                 </button>
@@ -456,7 +456,7 @@ export function ServersView({
             {/* Inline Editor */}
             {editingServer && (
               <div className="glass-inset space-y-2 p-2.5 rounded-lg">
-                <label className="block text-[11px] text-retro-muted">
+                <label className="block text-xs text-retro-muted">
                   Server name
                   <input
                     aria-label="Current server name"
@@ -466,7 +466,7 @@ export function ServersView({
                     className="glass-field mt-1 w-full px-2.5 py-1 text-xs"
                   />
                 </label>
-                <label className="block text-[11px] text-retro-muted">
+                <label className="block text-xs text-retro-muted">
                   Description
                   <input
                     aria-label="Current server description"
@@ -516,7 +516,7 @@ export function ServersView({
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {rooms.length === 0 ? (
-                  <span className="text-[11px] text-retro-muted py-1">No group rooms open yet.</span>
+                  <span className="text-xs text-retro-muted py-1">No group rooms open yet.</span>
                 ) : (
                   rooms.slice(0, 4).map((r) => (
                     <button
@@ -527,7 +527,7 @@ export function ServersView({
                         if (onOpenRoom) onOpenRoom(r.id)
                         else if (onOpenRooms) onOpenRooms()
                       }}
-                      className="glass-inset px-2 py-1 rounded-md text-[11px] font-medium text-retro-fg hover:border-retro-accent cursor-pointer transition-colors flex items-center gap-1"
+                      className="glass-inset px-2 py-1 rounded-md text-xs font-medium text-retro-fg hover:border-retro-accent cursor-pointer transition-colors flex items-center gap-1"
                     >
                       <span>#{r.name}</span>
                     </button>
@@ -544,7 +544,7 @@ export function ServersView({
                 <button
                   type="button"
                   onClick={() => setUserTab('online')}
-                  className={`px-2 py-1 rounded-md text-[11px] font-bold cursor-pointer transition-colors flex items-center gap-1.5 ${
+                  className={`px-2 py-1 rounded-md text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5 ${
                     userTab === 'online' ? 'glass-nav-active text-retro-fg shadow-sm' : 'text-retro-muted hover:text-retro-fg'
                   }`}
                 >
@@ -554,7 +554,7 @@ export function ServersView({
                 <button
                   type="button"
                   onClick={() => setUserTab('all24h')}
-                  className={`px-2 py-1 rounded-md text-[11px] font-bold cursor-pointer transition-colors flex items-center gap-1.5 ${
+                  className={`px-2 py-1 rounded-md text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5 ${
                     userTab === 'all24h' ? 'glass-nav-active text-retro-fg shadow-sm' : 'text-retro-muted hover:text-retro-fg'
                   }`}
                 >
@@ -567,7 +567,7 @@ export function ServersView({
 
             <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar pt-2 space-y-1.5 pr-0.5" aria-label="User list">
               {displayedUsers.length === 0 ? (
-                <div className="text-center py-8 text-[11px] text-retro-muted">
+                <div className="text-center py-8 text-xs text-retro-muted">
                   {userTab === 'online' ? 'Nobody is active right this second.' : 'No other users seen in the past 24 hours.'}
                 </div>
               ) : (
@@ -640,7 +640,7 @@ export function ServersView({
                   type="button"
                   onClick={() => { playPress(760); setShowAdmin((v) => !v) }}
                   aria-expanded={showAdmin}
-                  className="glass-action h-8 px-2.5 rounded-lg text-[11px] font-bold text-retro-muted hover:text-retro-fg cursor-pointer"
+                  className="glass-action h-8 px-2.5 rounded-lg text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer"
                 >
                   Central admin
                 </button>
@@ -649,7 +649,7 @@ export function ServersView({
                 type="button"
                 onClick={() => { playPress(880); setShowCreate((v) => !v) }}
                 aria-expanded={showCreate}
-                className="glass-action glass-action-primary h-8 px-3 rounded-lg text-[11px] font-bold cursor-pointer flex items-center gap-1"
+                className="glass-action glass-action-primary h-8 px-3 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1"
               >
                 <Plus className="w-3 h-3" /> Create server
               </button>
@@ -670,29 +670,29 @@ export function ServersView({
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <p className="text-[11px] text-retro-muted">
+              <p className="text-xs text-retro-muted">
                 This machine becomes the server: you are logged into it (and off
                 the node you were connected to) automatically, and you are its
                 admin. Friends join from the address below.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <label className="block text-[11px] text-retro-muted">
+                <label className="block text-xs text-retro-muted">
                   Server name
                   <input aria-label="Server name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60}
                     className="glass-field mt-0.5 w-full px-2.5 py-1 text-xs" />
                 </label>
-                <label className="block text-[11px] text-retro-muted">
+                <label className="block text-xs text-retro-muted">
                   Address friends use (optional — LAN or origin)
                   <input aria-label="Address hint" value={hint} onChange={(e) => setHint(e.target.value)} maxLength={120} placeholder="192.168.0.42:8790"
                     className="glass-field mt-0.5 w-full px-2.5 py-1 text-xs font-mono" />
                 </label>
               </div>
-              <label className="block text-[11px] text-retro-muted">
+              <label className="block text-xs text-retro-muted">
                 Description (public)
                 <input aria-label="Description" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={200}
                   className="glass-field mt-0.5 w-full px-2.5 py-1 text-xs" />
               </label>
-              <label className="flex items-center gap-2 text-[11px] text-retro-muted cursor-pointer pt-0.5">
+              <label className="flex items-center gap-2 text-xs text-retro-muted cursor-pointer pt-0.5">
                 <input type="checkbox" checked={needsPassword} onChange={(e) => setNeedsPassword(e.target.checked)} />
                 Ask visitors for a join password
               </label>
@@ -720,13 +720,13 @@ export function ServersView({
           {/* Directory Setup / Not configured notice */}
           {!central ? (
             <div className="glass-inset p-4 space-y-2 rounded-xl">
-              <p className="text-[11px] text-retro-muted">
+              <p className="text-xs text-retro-muted">
                 No central node is configured, so there is no public server
                 network to discover or list yours on. Creating a server still
                 works: it is hosted right here on this computer &mdash; add a
                 central address below to also list it for explorers.
               </p>
-              <label className="block text-[11px] text-retro-muted">
+              <label className="block text-xs text-retro-muted">
                 Central node URL
                 <input
                   aria-label="Central node URL"
@@ -737,7 +737,7 @@ export function ServersView({
                   className="glass-field mt-1 w-full px-2.5 py-1.5 text-xs font-mono"
                 />
               </label>
-              {setupError && <p role="alert" className="text-[11px] text-rose-400">{setupError}</p>}
+              {setupError && <p role="alert" className="text-xs text-rose-400">{setupError}</p>}
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -770,13 +770,13 @@ export function ServersView({
                     className="w-full bg-transparent text-retro-fg outline-none placeholder:text-retro-muted text-xs"
                   />
                 </div>
-                <label className="flex items-center gap-1.5 text-[11px] text-retro-muted">
+                <label className="flex items-center gap-1.5 text-xs text-retro-muted">
                   <ArrowDownUp className="w-3 h-3" />
                   <select
                     aria-label="Sort servers"
                     value={sort}
                     onChange={(e) => setSort(e.target.value as 'recent' | 'name' | 'online')}
-                    className="glass-field px-2 py-1 text-[11px] font-medium"
+                    className="glass-field px-2 py-1 text-xs font-medium"
                   >
                     <option value="recent">Recent</option>
                     <option value="name">Name</option>
@@ -787,14 +787,14 @@ export function ServersView({
                   type="button"
                   onClick={() => setPasswordOnly((v) => !v)}
                   aria-pressed={passwordOnly}
-                  className={`glass-action h-8 px-2.5 rounded-lg text-[11px] font-bold cursor-pointer ${passwordOnly ? 'glass-nav-active text-amber-200' : 'text-retro-muted hover:text-retro-fg'}`}
+                  className={`glass-action h-8 px-2.5 rounded-lg text-xs font-bold cursor-pointer ${passwordOnly ? 'glass-nav-active text-amber-200' : 'text-retro-muted hover:text-retro-fg'}`}
                 >
                   Password only
                 </button>
                 <button
                   type="button"
                   onClick={() => void refresh()}
-                  className="glass-action h-8 px-2.5 rounded-lg text-[11px] font-bold text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1"
+                  className="glass-action h-8 px-2.5 rounded-lg text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1"
                 >
                   <RefreshCw className="w-3 h-3" /> Refresh
                 </button>
@@ -803,7 +803,7 @@ export function ServersView({
               {/* Directory Content List */}
               <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar pr-0.5">
                 {dirError ? (
-                  <div className="glass-inset p-3 text-[11px] text-retro-muted space-y-2 rounded-xl">
+                  <div className="glass-inset p-3 text-xs text-retro-muted space-y-2 rounded-xl">
                     <p>
                       Could not reach the central directory at <span className="font-mono">{central}</span>.
                       It may be offline, or the address is wrong.
@@ -811,7 +811,7 @@ export function ServersView({
                     <button
                       type="button"
                       onClick={() => void refresh()}
-                      className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                      className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
                     >
                       <RefreshCw className="w-3 h-3" /> Retry
                     </button>
@@ -819,7 +819,7 @@ export function ServersView({
                 ) : (
                   <ul className="space-y-1.5">
                     {visibleServers.length === 0 && (
-                      <li className="glass-inset p-4 text-[11px] text-retro-muted text-center rounded-xl">
+                      <li className="glass-inset p-4 text-xs text-retro-muted text-center rounded-xl">
                         {servers.length === 0
                           ? 'No other servers online right now. A server appears here while its host is running gMatch.'
                           : 'No servers match your search filters.'}
@@ -837,13 +837,13 @@ export function ServersView({
                               <Lock className="w-3 h-3 text-amber-400 shrink-0" aria-label="password required" />
                             )}
                             {mine(s) && (
-                              <span className="text-[9px] px-1.5 py-0.2 rounded font-mono uppercase glass-inset text-retro-accent border border-retro-accent/30">
+                              <span className="text-[10px] px-1.5 py-0.2 rounded font-mono uppercase glass-inset text-retro-accent border border-retro-accent/30">
                                 YOURS · ADMIN
                               </span>
                             )}
                           </div>
                           {s.description && (
-                            <p className="text-[11px] text-retro-muted truncate mt-0.5">{s.description}</p>
+                            <p className="text-xs text-retro-muted truncate mt-0.5">{s.description}</p>
                           )}
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[10px] text-retro-muted font-mono">
                             <span>{s.endpoint_hint || 'no address published'}</span>
@@ -868,7 +868,7 @@ export function ServersView({
                             <button
                               type="button"
                               onClick={() => void join(s)}
-                              className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                              className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
                             >
                               <UserPlus className="w-3 h-3" /> Join
                             </button>

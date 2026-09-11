@@ -211,7 +211,7 @@ export function GMatchProfile({
                 <span className="text-sm sm:text-base font-semibold text-retro-fg tabular-nums">
                   {stat.value}
                 </span>
-                <span className="text-[11px] text-retro-muted">{stat.label}</span>
+                <span className="text-xs text-retro-muted">{stat.label}</span>
               </div>
             ))}
           </div>

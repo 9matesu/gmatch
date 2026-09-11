@@ -445,7 +445,7 @@ export function SidebarNav({
           {!collapsed && (
             <span className="flex items-center justify-between gap-2 w-full text-xs font-semibold tracking-wide">
               <span>Create</span>
-              <span className="text-[9px] font-normal normal-case opacity-75">post</span>
+              <span className="text-[10px] font-normal normal-case opacity-75">post</span>
             </span>
           )}
         </button>
@@ -481,7 +481,7 @@ export function SidebarNav({
                     <GroupIcon className="w-4 h-4 shrink-0 opacity-85 stroke-[1.75]" />
                     {!collapsed && <span className="truncate">{item.label}</span>}
                     {!collapsed && Boolean(item.badge && item.badge > 0) && (
-                      <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-emerald-400 text-[9px] font-bold text-zinc-950 tabular-nums">
+                      <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-emerald-400 text-[10px] font-bold text-zinc-950 tabular-nums">
                         {item.badge! > 99 ? '99+' : item.badge}
                       </span>
                     )}
@@ -513,7 +513,7 @@ export function SidebarNav({
                           <ChildIcon className="w-3.5 h-3.5 shrink-0 opacity-85 stroke-[1.75]" />
                           <span className="truncate">{child.label}</span>
                           {Boolean(child.badge && child.badge > 0) && (
-                            <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-zinc-100 text-[9px] font-bold text-zinc-950 tabular-nums">
+                            <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-zinc-100 text-[10px] font-bold text-zinc-950 tabular-nums">
                               {child.badge! > 9 ? '9+' : child.badge}
                             </span>
                           )}
@@ -546,7 +546,7 @@ export function SidebarNav({
               )}
 
               {!collapsed && Boolean(item.badge && item.badge > 0) && (
-                <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-zinc-100 text-[9px] font-bold text-zinc-950 tabular-nums">
+                <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-zinc-100 text-[10px] font-bold text-zinc-950 tabular-nums">
                   {item.badge! > 9 ? '9+' : item.badge}
                 </span>
               )}
@@ -562,7 +562,7 @@ export function SidebarNav({
           <button
             type="button"
             onClick={() => { playPress(600); setMainView?.('admin'); }}
-            className={`glass-action ${mainView === 'admin' ? 'glass-nav-active text-amber-200 border-amber-300/30' : ''} w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] cursor-pointer transition-all active:scale-[0.96] border ${collapsed ? 'justify-center' : ''}`}
+            className={`glass-action ${mainView === 'admin' ? 'glass-nav-active text-amber-200 border-amber-300/30' : ''} w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs cursor-pointer transition-all active:scale-[0.96] border ${collapsed ? 'justify-center' : ''}`}
             title="Open Admin Panel"
             aria-label="Open Admin Panel"
           >

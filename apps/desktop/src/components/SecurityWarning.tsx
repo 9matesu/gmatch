@@ -10,7 +10,7 @@ export function SecurityWarning({ className = '' }: { className?: string }) {
       <ShieldAlert className="w-4 h-4 text-retro-accent shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-retro-fg leading-tight">Security Notice</p>
-        <p className="text-[11px] text-retro-muted mt-0.5 leading-relaxed">
+        <p className="text-xs text-retro-muted mt-0.5 leading-relaxed">
           Never paste code, keys, or tokens into your browser console. gMatch will never ask you to do this. Pasting into DevTools can expose your account.
         </p>
       </div>

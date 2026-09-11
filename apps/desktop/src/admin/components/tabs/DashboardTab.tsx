@@ -121,7 +121,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
                       className="w-10 h-10"
                       onZoom={onZoom}
                       badge={obj.is_story === 1 && (
-                        <span className="absolute top-0.5 right-0.5 px-1 py-0.5 bg-cyan-500/10 border border-purple-300 text-cyan-300 font-mono font-bold text-[6px] rounded">STORY</span>
+                        <span className="absolute top-0.5 right-0.5 px-1 py-0.5 bg-cyan-500/10 border border-purple-300 text-cyan-300 font-mono font-bold text-[10px] rounded">STORY</span>
                       )}
                     />
                     <div className="min-w-0 flex-1">

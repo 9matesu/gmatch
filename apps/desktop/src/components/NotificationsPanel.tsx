@@ -137,7 +137,7 @@ export function NotificationsPanel({
                     <p className="text-xs font-medium text-retro-fg truncate">
                       {inv.inviter_name?.trim() || 'Unknown User'}
                     </p>
-                    <p className="text-[11px] text-retro-muted">
+                    <p className="text-xs text-retro-muted">
                       Challenged you to a duel · expires in {secondsLeft}s
                     </p>
                   </div>
@@ -167,7 +167,7 @@ export function NotificationsPanel({
           <div className="py-12 text-center space-y-2">
             <Bell className="w-6 h-6 mx-auto text-retro-muted" />
             <p className="text-xs font-medium text-retro-body">No notifications</p>
-            <p className="text-[11px] text-retro-muted">
+            <p className="text-xs text-retro-muted">
               Match invites and results will appear here.
             </p>
           </div>
@@ -197,7 +197,7 @@ export function NotificationsPanel({
                     )}
                   </div>
                   {n.body && (
-                    <p className="text-[11px] text-retro-muted mt-0.5">
+                    <p className="text-xs text-retro-muted mt-0.5">
                       {n.body}
                     </p>
                   )}
@@ -210,14 +210,14 @@ export function NotificationsPanel({
                           onRespondBabecock?.(inviteId, true);
                           onOpenBabecock?.();
                         }}
-                        className="glass-action glass-action-primary inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer"
+                        className="glass-action glass-action-primary inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer"
                       >
                         <LogIn className="w-3 h-3" /> Accept &amp; join
                       </button>
                       <button
                         type="button"
                         onClick={() => { onRespondBabecock?.(inviteId, false); }}
-                        className="px-2.5 py-1.5 rounded bg-surface-interactive border border-border-glass text-retro-body text-[11px] font-medium cursor-pointer"
+                        className="px-2.5 py-1.5 rounded bg-surface-interactive border border-border-glass text-retro-body text-xs font-medium cursor-pointer"
                       >
                         Decline
                       </button>

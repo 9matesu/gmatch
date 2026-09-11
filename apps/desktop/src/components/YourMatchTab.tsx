@@ -242,7 +242,7 @@ export function YourMatchTab({
         {!celebrate && st.phase === 'ended' && st.lastResult === 'ended' && (
           <div className="border border-rose-500/30 bg-rose-500/5 p-4 text-center space-y-2 animate-orbit-slide-up rounded-lg">
             <div className="text-sm font-medium text-rose-400">{matchEndSummary(st.lastResult, lastPayout, false)}</div>
-            <div className="text-[11px] text-retro-muted">Cards revealed below.</div>
+            <div className="text-xs text-retro-muted">Cards revealed below.</div>
             <div className="grid grid-cols-2 gap-2">
               {cardSlot('You', revealMineImg, 'Your card', 'border-rose-500/30', false)}
               {cardSlot(opponentName, revealTheirsImg, 'Their card', 'border-rose-500/30', false, false, opponentUser)}
@@ -273,7 +273,7 @@ export function YourMatchTab({
         )}
 
         {st.phase === 'pick' && needCard && !celebrate && (
-          <div className="text-center text-[11px] text-retro-muted">
+          <div className="text-center text-xs text-retro-muted">
             Cards reveal when both have played
           </div>
         )}

@@ -175,7 +175,7 @@ export function ProfileEditorModal({
                 maxLength={150}
                 className="w-full bg-surface-interactive border border-border-glass rounded-lg p-3 text-sm text-retro-fg focus:outline-none focus:border-retro-accent transition-colors resize-none placeholder:text-retro-muted"
               />
-              <div className="text-right text-[11px] text-retro-muted mt-0.5">
+              <div className="text-right text-xs text-retro-muted mt-0.5">
                 {bio.length}/150
               </div>
             </div>
@@ -200,7 +200,7 @@ export function ProfileEditorModal({
                   <Lock className="w-4 h-4 text-retro-muted" />
                   <div>
                     <span className="text-xs font-medium text-retro-body block">Private account [WIP]</span>
-                    <span className="text-[11px] text-retro-muted">Only approved followers can view your feed</span>
+                    <span className="text-xs text-retro-muted">Only approved followers can view your feed</span>
                   </div>
                 </div>
                 <input

@@ -177,7 +177,7 @@ export function ProfilePicModal({
             >
               <div className="space-y-1 text-center py-4">
                 <p className="text-xs text-retro-body font-medium">Drop image here</p>
-                <p className="text-[11px] text-retro-muted">JPG, PNG, WebP, GIF</p>
+                <p className="text-xs text-retro-muted">JPG, PNG, WebP, GIF</p>
               </div>
             </DropZone>
           )}

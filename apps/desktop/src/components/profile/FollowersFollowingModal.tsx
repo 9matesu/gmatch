@@ -360,7 +360,7 @@ export function FollowersFollowingModal({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2 text-[11px] text-retro-muted truncate font-mono">
+                    <div className="flex items-center gap-2 text-xs text-retro-muted truncate font-mono">
                       <span>{user.id.slice(0, 12)}...</span>
                       {(user as any).score ? (
                         <span className="text-amber-600 font-bold font-sans">
@@ -438,7 +438,7 @@ export function FollowersFollowingModal({
             <div className="py-12 text-center space-y-2">
               <Search className="w-8 h-8 text-retro-body mx-auto" />
               <p className="text-xs font-bold text-retro-body">No results found</p>
-              <p className="text-[11px] text-retro-muted">
+              <p className="text-xs text-retro-muted">
                 No users found matching &ldquo;{searchQuery}&rdquo;
               </p>
             </div>

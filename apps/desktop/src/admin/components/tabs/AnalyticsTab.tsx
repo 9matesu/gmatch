@@ -226,8 +226,8 @@ export function AnalyticsTab({ identity, pinVerified }: AnalyticsTabProps) {
                     const label = s.date.slice(5);
                     return (
                       <div key={s.date} className="flex flex-col items-center gap-1 min-w-0">
-                        <span className="text-[8px] text-retro-muted truncate font-mono">{label}</span>
-                        <span className="text-[9px] font-bold text-retro-fg">{s.active_users.toLocaleString()}</span>
+                        <span className="text-[10px] text-retro-muted truncate font-mono">{label}</span>
+                        <span className="text-[10px] font-bold text-retro-fg">{s.active_users.toLocaleString()}</span>
                         <div className="w-full max-w-[18px]">
                           <div className="w-full flex flex-col justify-end items-center gap-0.5 rounded overflow-hidden bg-surface-canvas" style={{ height: 84 }}>
                             <div className="w-full bg-amber-400/70" style={{ height: `${(s.new_users / (Math.max(...series("new_users"), 1))) * 84}px` }} />
@@ -235,7 +235,7 @@ export function AnalyticsTab({ identity, pinVerified }: AnalyticsTabProps) {
                             <div className="w-full bg-cyan-400/70" style={{ height: `${(s.active_users / (Math.max(...series("active_users"), 1))) * 84}px` }} />
                           </div>
                         </div>
-                        <span className="flex items-center gap-0.5 text-[8px] text-retro-muted">
+                        <span className="flex items-center gap-0.5 text-[10px] text-retro-muted">
                           <Activity className="w-2 h-2" /> {s.peak_concurrent.toLocaleString()}
                         </span>
                       </div>

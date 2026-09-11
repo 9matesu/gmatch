@@ -207,7 +207,7 @@ export function DmMinimizedView({
           </div>
         </div>
         <p className="text-xs font-bold text-retro-body">Direct Messages minimized</p>
-        <p className="text-[11px] text-retro-muted">Open the chat bubble at the bottom to keep talking.</p>
+        <p className="text-xs text-retro-muted">Open the chat bubble at the bottom to keep talking.</p>
       </div>
     </div>
   );

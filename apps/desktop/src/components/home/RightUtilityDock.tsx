@@ -96,7 +96,7 @@ export function RightUtilityDock({
               <div className="absolute right-full mr-2.5 px-2.5 py-1 rounded-xl bg-surface-canvas/95 border border-zinc-700/80 text-retro-fg text-xs font-bold shadow-2xl shadow-zinc-950/80 backdrop-blur-xl whitespace-nowrap pointer-events-none z-50 animate-orbit-slide-up flex items-center gap-1.5">
                 <span>{btn.label}</span>
                 {Boolean(btn.count && btn.count > 0) && (
-                  <span className={`px-1.5 py-0.2 rounded-md text-[9px] font-black ${btn.countColor}`}>
+                  <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${btn.countColor}`}>
                     {btn.count}
                   </span>
                 )}
@@ -123,7 +123,7 @@ export function RightUtilityDock({
             {/* Badge Indicator attached to outer wrapper so it never offsets inner icon */}
             {Boolean(btn.count && btn.count > 0) && (
               <span
-                className={`absolute -top-1 -right-1 z-20 pointer-events-none px-1.5 py-0.2 font-black text-[8px] rounded-full shadow-md ${btn.countColor
+                className={`absolute -top-1 -right-1 z-20 pointer-events-none px-1.5 py-0.2 font-black text-[10px] rounded-full shadow-md ${btn.countColor
                   }`}
               >
                 {btn.count}

@@ -93,18 +93,18 @@ function FeedSettingsTab({ toast }: { toast?: (msg: string, type?: string) => vo
             {owned.map((t) => (
               <span
                 key={t.name}
-                className="inline-flex items-center rounded-full border border-border-glass bg-glass-w5 px-2.5 py-1 text-[11px] font-mono text-retro-fg"
+                className="inline-flex items-center rounded-full border border-border-glass bg-glass-w5 px-2.5 py-1 text-xs font-mono text-retro-fg"
               >
                 {t.name}
               </span>
             ))}
           </div>
         ) : (
-          <p className="text-[11px] text-retro-muted">
+          <p className="text-xs text-retro-muted">
             No starter tags selected.
           </p>
         )}
-        <p className="text-[11px] text-retro-muted">
+        <p className="text-xs text-retro-muted">
           Active excluded tags ({userExcludes.length}/{MAX_USER_EXCLUDES}).
         </p>
         {showPicksEditor ? (
@@ -113,7 +113,7 @@ function FeedSettingsTab({ toast }: { toast?: (msg: string, type?: string) => vo
           <button
             type="button"
             onClick={() => setShowPicksEditor(true)}
-            className="px-3 py-1.5 rounded-xl border border-border-glass text-[11px] font-bold text-retro-fg hover:bg-surface-raised cursor-pointer"
+            className="px-3 py-1.5 rounded-xl border border-border-glass text-xs font-bold text-retro-fg hover:bg-surface-raised cursor-pointer"
           >
             Change starter tags
           </button>
@@ -147,13 +147,13 @@ function FeedSettingsTab({ toast }: { toast?: (msg: string, type?: string) => vo
           </button>
         </div>
         {userExcludes.length === 0 ? (
-          <p className="text-[11px] text-retro-muted">No custom excludes configured.</p>
+          <p className="text-xs text-retro-muted">No custom excludes configured.</p>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {userExcludes.map((x) => (
               <span
                 key={x}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border-glass bg-glass-w5 px-2.5 py-1 text-[11px] font-mono text-retro-fg"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border-glass bg-glass-w5 px-2.5 py-1 text-xs font-mono text-retro-fg"
               >
                 {x}
                 <button
@@ -396,8 +396,8 @@ export function GMatchSettingsModal({
                   {/* Panel opacity */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <label htmlFor="panel-opacity" className="text-[11px] text-retro-muted">Panel opacity</label>
-                      <span className="text-[11px] font-mono text-retro-fg tabular-nums">{Math.round((settings.panelOpacity ?? 1) * 100)}%</span>
+                      <label htmlFor="panel-opacity" className="text-xs text-retro-muted">Panel opacity</label>
+                      <span className="text-xs font-mono text-retro-fg tabular-nums">{Math.round((settings.panelOpacity ?? 1) * 100)}%</span>
                     </div>
                     <input
                       id="panel-opacity"
@@ -415,8 +415,8 @@ export function GMatchSettingsModal({
                   {/* Glass blur */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <label htmlFor="glass-blur" className="text-[11px] text-retro-muted">Glass blur</label>
-                      <span className="text-[11px] font-mono text-retro-fg tabular-nums">{Math.round((settings.glassBlur ?? 0.7) * 100)}%</span>
+                      <label htmlFor="glass-blur" className="text-xs text-retro-muted">Glass blur</label>
+                      <span className="text-xs font-mono text-retro-fg tabular-nums">{Math.round((settings.glassBlur ?? 0.7) * 100)}%</span>
                     </div>
                     <input
                       id="glass-blur"
@@ -435,7 +435,7 @@ export function GMatchSettingsModal({
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <div className="text-xs font-medium text-retro-fg">Animated chrome</div>
-                      <div className="text-[11px] text-retro-muted">Moving shine on accent buttons/headings. Off is faster; enable for the sparkle.</div>
+                      <div className="text-xs text-retro-muted">Moving shine on accent buttons/headings. Off is faster; enable for the sparkle.</div>
                     </div>
                     <Switch checked={settings.animatedChrome} onChange={() => updateSettings('animatedChrome', !settings.animatedChrome)} />
                   </div>
@@ -444,7 +444,7 @@ export function GMatchSettingsModal({
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <div className="text-xs font-medium text-retro-fg">Feed Columns</div>
-                      <div className="text-[11px] text-retro-muted">Columns for the main media feed</div>
+                      <div className="text-xs text-retro-muted">Columns for the main media feed</div>
                     </div>
                     <div className="flex bg-surface-raised border border-border-glass rounded-xl p-1 text-xs font-bold">
                       {(['1', '2', '3', '4', '5'] as const).map((col) => (
@@ -470,7 +470,7 @@ export function GMatchSettingsModal({
                   <div className="flex items-center justify-between gap-4 pt-2 border-t border-border-glass">
                     <div>
                       <div className="text-xs font-medium text-retro-fg">Gallery Columns</div>
-                      <div className="text-[11px] text-retro-muted">Columns displayed in card collection grid</div>
+                      <div className="text-xs text-retro-muted">Columns displayed in card collection grid</div>
                     </div>
                     <div className="flex bg-surface-raised border border-border-glass rounded-xl p-1 text-xs font-bold">
                       {(['2', '3'] as const).map((col) => (
@@ -516,7 +516,7 @@ export function GMatchSettingsModal({
                         <div key={item.key} className="pt-3 first:pt-0 flex items-center justify-between gap-4">
                           <div>
                             <div className="text-xs font-medium text-retro-fg">{item.label}</div>
-                            <div className="text-[11px] text-retro-muted">{item.desc}</div>
+                            <div className="text-xs text-retro-muted">{item.desc}</div>
                           </div>
 
                           <Switch
@@ -539,7 +539,7 @@ export function GMatchSettingsModal({
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <div className="text-xs font-medium text-retro-fg">Duel Reveal Pacing</div>
-                      <div className="text-[11px] text-retro-muted">Animation suspense speed when revealing cards</div>
+                      <div className="text-xs text-retro-muted">Animation suspense speed when revealing cards</div>
                     </div>
                     <div className="grid grid-cols-3 gap-1">
                       {(['instant', 'fast', 'dramatic'] as const).map((pacing) => (
@@ -564,7 +564,7 @@ export function GMatchSettingsModal({
                   <div className="flex items-center justify-between gap-4 pt-2 border-t border-border-glass">
                     <div>
                       <div className="text-xs font-medium text-retro-fg">Chat Notification Sound</div>
-                      <div className="text-[11px] text-retro-muted">Audio cue when a new direct message arrives</div>
+                      <div className="text-xs text-retro-muted">Audio cue when a new direct message arrives</div>
                     </div>
 
                     <Switch
@@ -586,7 +586,7 @@ export function GMatchSettingsModal({
                   >
                     <div>
                       <h4 className="text-xs font-medium text-retro-fg">Wallpaper Background</h4>
-                      <p className="text-[11px] text-retro-muted">Customize application background image or media</p>
+                      <p className="text-xs text-retro-muted">Customize application background image or media</p>
                     </div>
                     <button
                       type="button"
@@ -600,7 +600,7 @@ export function GMatchSettingsModal({
                     <div className="space-y-4 pt-3 border-t border-border-glass animate-orbit-fade-in">
                       {/* Presets */}
                       <div className="space-y-2">
-                        <div className="text-[11px] text-retro-muted">Presets</div>
+                        <div className="text-xs text-retro-muted">Presets</div>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           {WALLPAPER_PRESETS.map((preset) => (
                             <button
@@ -620,7 +620,7 @@ export function GMatchSettingsModal({
                                 }`}
                             >
                               <Image className="w-3.5 h-3.5" />
-                              <div className="truncate text-[11px]">{preset.name}</div>
+                              <div className="truncate text-xs">{preset.name}</div>
                             </button>
                           ))}
                         </div>
@@ -629,7 +629,7 @@ export function GMatchSettingsModal({
                       {/* Upload or URL */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-[11px] text-retro-muted">Custom Image or Media</span>
+                          <span className="text-xs text-retro-muted">Custom Image or Media</span>
                           {settings.wallpaperUrl && (
                             <button
                               type="button"
@@ -668,7 +668,7 @@ export function GMatchSettingsModal({
 
                       {/* Fit mode */}
                       <div className="flex items-center justify-between gap-4 pt-1">
-                        <div className="text-[11px] text-retro-muted">Image Fit</div>
+                        <div className="text-xs text-retro-muted">Image Fit</div>
                         <div className="flex gap-1">
                           {([
                             { id: 'cover', label: 'Fill' },
@@ -694,7 +694,7 @@ export function GMatchSettingsModal({
                       <div className="flex items-center justify-between pt-2 border-t border-border-glass">
                         <div>
                           <div className="text-xs font-medium text-retro-fg">Card Slideshow</div>
-                          <div className="text-[11px] text-retro-muted">Cycle collected cards as background</div>
+                          <div className="text-xs text-retro-muted">Cycle collected cards as background</div>
                         </div>
                         <Switch
                           checked={settings.wallpaperSlideshow}
@@ -707,7 +707,7 @@ export function GMatchSettingsModal({
 
                       {settings.wallpaperSlideshow && (
                         <div className="flex items-center gap-2 pt-1">
-                          <span className="text-[11px] text-retro-muted">Interval:</span>
+                          <span className="text-xs text-retro-muted">Interval:</span>
                           <input
                             type="number"
                             min={3}
@@ -720,7 +720,7 @@ export function GMatchSettingsModal({
                             }}
                             className="w-16 bg-surface-raised border border-border-glass rounded-lg px-2 py-1 text-xs text-retro-fg outline-none focus:border-black"
                           />
-                          <span className="text-[11px] text-retro-muted">seconds</span>
+                          <span className="text-xs text-retro-muted">seconds</span>
                         </div>
                       )}
                     </div>
@@ -761,7 +761,7 @@ export function GMatchSettingsModal({
                     </button>
                   </div>
 
-                  <p className="text-[11px] text-retro-muted leading-relaxed">
+                  <p className="text-xs text-retro-muted leading-relaxed">
                     Your Orbit ID is your private cryptographic key pair. Keys are stored locally on your device.
                   </p>
                 </div>
@@ -777,7 +777,7 @@ export function GMatchSettingsModal({
                       <Download className="w-4 h-4" />
                     </div>
                     <div className="text-xs font-medium text-retro-fg">Export Identity Backup</div>
-                    <p className="text-[11px] text-retro-muted">Save your private keys to log in on other devices</p>
+                    <p className="text-xs text-retro-muted">Save your private keys to log in on other devices</p>
                   </button>
 
                   <button
@@ -789,7 +789,7 @@ export function GMatchSettingsModal({
                       <LogIn className="w-4 h-4" />
                     </div>
                     <div className="text-xs font-medium text-retro-fg">Switch Account / Login</div>
-                    <p className="text-[11px] text-retro-muted">Import an existing secret key or switch profiles</p>
+                    <p className="text-xs text-retro-muted">Import an existing secret key or switch profiles</p>
                   </button>
                 </div>
 
@@ -798,7 +798,7 @@ export function GMatchSettingsModal({
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-xs font-medium text-rose-300">Log Out of this Device</h4>
-                      <p className="text-[11px] text-rose-300/70">Clears your private keys and session from local storage</p>
+                      <p className="text-xs text-rose-300/70">Clears your private keys and session from local storage</p>
                     </div>
 
                     <button

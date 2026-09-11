@@ -115,7 +115,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
             className="w-10 h-10"
             onZoom={onZoom}
             badge={obj.is_story === 1 && (
-              <span className="absolute top-0.5 right-0.5 px-1 py-0.5 bg-cyan-500/10 border border-purple-300 text-cyan-300 font-mono font-bold text-[6px] rounded">STORY</span>
+              <span className="absolute top-0.5 right-0.5 px-1 py-0.5 bg-cyan-500/10 border border-purple-300 text-cyan-300 font-mono font-bold text-[10px] rounded">STORY</span>
             )}
           />
           <div className="min-w-0 flex-1 cursor-pointer" onClick={() => toggleExpand(obj.id)}>
@@ -171,7 +171,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
               </button>
             </div>
             <div className="flex-1 min-w-0 space-y-2.5">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
                 <div>
                   <span className="text-retro-muted block text-[10px]">Object ID</span>
                   <span className="font-mono text-retro-fg break-all text-[10px]">{obj.id}</span>
@@ -315,7 +315,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
               </button>
             </div>
             <div className="flex-1 min-w-0 space-y-2.5">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
                 <div>
                   <span className="text-retro-muted block text-[10px]">Post ID</span>
                   <span className="font-mono text-retro-fg break-all text-[10px]">{post.id}</span>
@@ -348,7 +348,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                 </div>
               )}
               {post.post_tags && (
-                <div className="text-[11px] text-retro-muted">
+                <div className="text-xs text-retro-muted">
                   <span>Tags: </span>
                   <span className="text-cyan-300 font-mono">{post.post_tags}</span>
                 </div>
@@ -446,7 +446,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
               </button>
             </div>
             <div className="flex-1 min-w-0 space-y-2.5">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
                 <div>
                   <span className="text-retro-muted block text-[10px]">Image ID</span>
                   <span className="font-mono text-retro-fg break-all text-[10px]">{img.id}</span>

@@ -247,7 +247,7 @@ export function ValuationSummary({
             <div className="text-xs font-bold text-retro-fg truncate mt-0.5">
               {spotlightCard.isMine ? 'Your Card' : `${opponentName}'s Card`}
             </div>
-            <div className="text-[11px] text-emerald-400 font-mono font-bold">
+            <div className="text-xs text-emerald-400 font-mono font-bold">
               +{spotlightCard.delta} Points Gain
             </div>
           </div>
@@ -271,9 +271,9 @@ export function ValuationSummary({
               return (
                 <div key={c.round} className="flex items-center justify-between text-xs py-0.5">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-retro-muted text-[11px]">R{c.round}:</span>
-                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase ${rarity.badgeClass}`}>{rarity.label}</span>
-                    <span className="text-retro-muted text-[11px] flex items-center gap-1">
+                    <span className="font-mono text-retro-muted text-xs">R{c.round}:</span>
+                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold uppercase ${rarity.badgeClass}`}>{rarity.label}</span>
+                    <span className="text-retro-muted text-xs flex items-center gap-1">
                       {c.vote === 'boost' ? <><Zap className="w-3 h-3 text-amber-400" /> Boosted</> : c.vote === 'like' ? <><Heart className="w-3 h-3 text-amber-400 fill-rose-400" /> Liked</> : <><X className="w-3 h-3 text-retro-muted" /> Rejected</>}
                     </span>
                   </div>
@@ -293,8 +293,8 @@ export function ValuationSummary({
             {summary.oppCardDeltas.map((c) => (
               <div key={c.round} className="flex items-center justify-between text-xs py-0.5">
                 <div className="flex items-center gap-1.5">
-                  <span className="font-mono text-retro-muted text-[11px]">R{c.round}:</span>
-                  <span className="text-retro-muted text-[11px] flex items-center gap-1">
+                  <span className="font-mono text-retro-muted text-xs">R{c.round}:</span>
+                  <span className="text-retro-muted text-xs flex items-center gap-1">
                     {c.vote === 'boost' ? <><Zap className="w-3 h-3 text-amber-400" /> You Boosted</> : c.vote === 'like' ? <><Heart className="w-3 h-3 text-amber-400 fill-rose-400" /> You Liked</> : <><X className="w-3 h-3 text-retro-muted" /> You Rejected</>}
                   </span>
                 </div>

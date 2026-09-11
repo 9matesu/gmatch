@@ -301,7 +301,7 @@ export function CardZoomModal({
         <span>
           {caption ? <strong className="text-retro-fg">{caption}</strong> : 'Click image to toggle 2x zoom · Drag to pan when zoomed'}
         </span>
-        <span className="font-mono text-[9px] text-retro-muted hidden sm:inline">
+        <span className="font-mono text-[10px] text-retro-muted hidden sm:inline">
           [Esc] to close · [+] / [−] to zoom
         </span>
       </div>

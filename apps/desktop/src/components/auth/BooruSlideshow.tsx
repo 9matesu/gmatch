@@ -186,11 +186,11 @@ export function BooruSlideshow({ className = '' }: { className?: string }) {
 
           {/* Top Navigation & Status Bar */}
           <div className="absolute top-7 left-3 right-3 z-20 flex items-center justify-between pointer-events-none">
-            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-[9px] font-bold text-white">
+            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-[10px] font-bold text-white">
               <span className="w-1.5 h-1.5 rounded-full bg-retro-accent animate-pulse shadow-[0_0_6px_rgba(159,227,255,0.5)]" />
               <span>Live Feed</span>
             </div>
-            <div className="px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-[9px] font-mono font-bold text-white/90">
+            <div className="px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-[10px] font-mono font-bold text-white/90">
               <ImageIcon className="w-2.5 h-2.5 inline mr-1 -mt-0.5" />
               {activeIndex + 1}/{images.length}
             </div>
@@ -198,7 +198,7 @@ export function BooruSlideshow({ className = '' }: { className?: string }) {
 
           {/* Caption Overlay */}
           <div className="absolute bottom-6 left-3 right-3 z-20">
-            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/30 backdrop-blur-md text-[9px] font-black uppercase tracking-wider text-white mb-1.5">
+            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/30 backdrop-blur-md text-[10px] font-black uppercase tracking-wider text-white mb-1.5">
               <Sparkles className="w-2.5 h-2.5 text-retro-accent" />
               <span>Trending</span>
             </div>

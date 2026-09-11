@@ -236,14 +236,14 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
                 </div>
                 <div className="p-3 flex-1 flex flex-col justify-between">
                   <div>
-                    <div className="text-[9px] uppercase tracking-[0.18em] text-retro-muted">Chrome edition</div>
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-retro-muted">Chrome edition</div>
                     <div className="text-base font-black truncate mt-1">{name.trim() || 'Your Card Name'}</div>
                     <div className="flex flex-wrap gap-1 mt-2">
-                      {(tags.length ? tags : ['your-tags']).map((tag) => <span key={tag} className="text-[9px] rounded-full border px-1.5 py-0.5" style={{ borderColor: '#9FE3FF88', color: '#9FE3FF' }}>#{tag}</span>)}
+                      {(tags.length ? tags : ['your-tags']).map((tag) => <span key={tag} className="text-[10px] rounded-full border px-1.5 py-0.5" style={{ borderColor: '#9FE3FF88', color: '#9FE3FF' }}>#{tag}</span>)}
                     </div>
                   </div>
                   <div className="mt-4 flex items-end justify-between gap-2">
-                    <span className="text-[9px] text-retro-muted line-clamp-2">{description.trim() || 'Polished silver edge'}</span>
+                    <span className="text-[10px] text-retro-muted line-clamp-2">{description.trim() || 'Polished silver edge'}</span>
                     <span className="text-[10px] font-mono font-bold" style={{ color: '#9FE3FF' }}>VALUE TBD</span>
                   </div>
                 </div>

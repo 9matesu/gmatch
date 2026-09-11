@@ -69,7 +69,7 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
           <MessageSquare className="w-3.5 h-3.5 text-cyan-300" />
           <span>Match Chat {open ? '' : `(${list.length})`}</span>
         </span>
-        <span className="text-retro-muted flex items-center gap-1 text-[11px]">
+        <span className="text-retro-muted flex items-center gap-1 text-xs">
           <span>{open ? 'Collapse' : 'Expand'}</span>
           {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
         </span>
@@ -95,12 +95,12 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
                       }`}
                     >
                       {!mine && (
-                        <div className="text-[9px] font-bold text-cyan-300 uppercase mb-0.5 select-none">
+                        <div className="text-[10px] font-bold text-cyan-300 uppercase mb-0.5 select-none">
                           {m.sender_name?.trim() || 'Unknown User'}
                         </div>
                       )}
                       <div className="break-words whitespace-pre-wrap leading-relaxed select-text cursor-text">{m.body}</div>
-                      <time className={`mt-1 block text-[8px] select-none ${mine ? 'text-white/60 text-right' : 'text-retro-muted'}`} dateTime={m.created_at}>
+                      <time className={`mt-1 block text-[10px] select-none ${mine ? 'text-white/60 text-right' : 'text-retro-muted'}`} dateTime={m.created_at}>
                         {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </time>
                     </div>

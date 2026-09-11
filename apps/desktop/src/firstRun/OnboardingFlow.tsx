@@ -171,7 +171,7 @@ export function OnboardingFlow({
             <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
             <div>
               <span className="font-semibold text-white">18+ Mature Content Only</span>
-              <p className="text-zinc-400 text-[11px] leading-relaxed">
+              <p className="text-zinc-400 text-xs leading-relaxed">
                 gMatch contains adult media and community content intended exclusively for adults. You must be at least 18 years old to access this platform.
               </p>
             </div>
@@ -181,7 +181,7 @@ export function OnboardingFlow({
             <Lock className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
             <div>
               <span className="font-semibold text-white">Local-First &amp; P2P Privacy</span>
-              <p className="text-zinc-400 text-[11px] leading-relaxed">
+              <p className="text-zinc-400 text-xs leading-relaxed">
                 Your cryptographic keys and preferences remain securely on your device. We do not sell your personal data or track your behavior across platforms.
               </p>
             </div>
@@ -191,7 +191,7 @@ export function OnboardingFlow({
             <Scale className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
             <div>
               <span className="font-semibold text-white">Zero Tolerance Policy</span>
-              <p className="text-zinc-400 text-[11px] leading-relaxed">
+              <p className="text-zinc-400 text-xs leading-relaxed">
                 Strict zero tolerance for non-consensual imagery, underage material, or illegal content.
               </p>
             </div>
@@ -201,7 +201,7 @@ export function OnboardingFlow({
             <button
               type="button"
               onClick={() => { playPress(700); onOpenTos(); }}
-              className="text-[11px] text-zinc-400 hover:text-white underline underline-offset-2 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="text-xs text-zinc-400 hover:text-white underline underline-offset-2 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <FileText className="w-3.5 h-3.5" />
               <span>Read Full Terms of Service &amp; Privacy Policy</span>
@@ -273,7 +273,7 @@ export function OnboardingFlow({
           <button
             type="button"
             onClick={() => { playPress(400); setIsImporting(!isImporting); }}
-            className="text-[11px] text-zinc-500 hover:text-zinc-300 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+            className="text-xs text-zinc-500 hover:text-zinc-300 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <KeyRound className="w-3.5 h-3.5" />
             <span>{isImporting ? 'Create new anonymous identity instead' : 'Returning user? Import secret key'}</span>

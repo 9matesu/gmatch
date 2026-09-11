@@ -285,7 +285,7 @@ function DateRangePicker({ value, onChange }: {
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1">
-        <label className="text-[9px] text-retro-faint uppercase tracking-wider mb-0.5 block">From</label>
+        <label className="text-[10px] text-retro-faint uppercase tracking-wider mb-0.5 block">From</label>
         <input
           type="date"
           value={value.from || ""}
@@ -294,7 +294,7 @@ function DateRangePicker({ value, onChange }: {
         />
       </div>
       <div className="flex-1">
-        <label className="text-[9px] text-retro-faint uppercase tracking-wider mb-0.5 block">To</label>
+        <label className="text-[10px] text-retro-faint uppercase tracking-wider mb-0.5 block">To</label>
         <input
           type="date"
           value={value.to || ""}

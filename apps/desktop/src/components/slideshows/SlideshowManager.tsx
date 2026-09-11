@@ -236,7 +236,7 @@ export function SlideshowManager({
             </div>
           ) : (
             <div>
-              <p className="text-[11px] text-retro-muted mb-2">
+              <p className="text-xs text-retro-muted mb-2">
                 {selected.size} selected · {candidates.length} available
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-56 overflow-y-auto styled-scrollbar">
@@ -252,24 +252,24 @@ export function SlideshowManager({
                       }`}
                     >
                       {c.kind === 'post' ? <ImageIcon className="w-3.5 h-3.5 shrink-0" /> : <Film className="w-3.5 h-3.5 shrink-0" />}
-                      <span className="text-[11px] truncate">{c.label}</span>
+                      <span className="text-xs truncate">{c.label}</span>
                     </button>
                   );
                 })}
                 {candidates.length === 0 && (
-                  <p className="col-span-full text-[11px] text-retro-muted">No {sourceLabel[source]} available to select.</p>
+                  <p className="col-span-full text-xs text-retro-muted">No {sourceLabel[source]} available to select.</p>
                 )}
               </div>
             </div>
           )}
 
           <div className="flex items-center gap-3">
-            <label className="text-[11px] text-retro-muted flex items-center gap-2">
+            <label className="text-xs text-retro-muted flex items-center gap-2">
               Interval
               <select
                 value={intervalMs}
                 onChange={(e) => setIntervalMs(Number(e.target.value))}
-                className="bg-surface-interactive border border-border-glass text-retro-body text-[11px] rounded-lg px-2 py-1 outline-none cursor-pointer"
+                className="bg-surface-interactive border border-border-glass text-retro-body text-xs rounded-lg px-2 py-1 outline-none cursor-pointer"
               >
                 <option value={2000}>2s</option>
                 <option value={5000}>5s</option>
@@ -291,15 +291,15 @@ export function SlideshowManager({
 
       <div className="space-y-2 border-t border-border-glass pt-3">
         {loading ? (
-          <p className="text-[11px] text-retro-muted">Loading…</p>
+          <p className="text-xs text-retro-muted">Loading…</p>
         ) : list.length === 0 ? (
-          <p className="text-[11px] text-retro-muted">No slideshows yet. Create one from your gallery cards, posts, or API tags.</p>
+          <p className="text-xs text-retro-muted">No slideshows yet. Create one from your gallery cards, posts, or API tags.</p>
         ) : (
           list.map((s) => (
             <div key={s.id} className="flex items-center justify-between gap-2 bg-surface-interactive/40 border border-border-glass rounded-lg px-3 py-2">
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-retro-fg truncate">{s.title || 'Untitled slideshow'}</p>
-                <p className="text-[11px] text-retro-muted">
+                <p className="text-xs text-retro-muted">
                   {sourceLabel[s.source]} · {s.source === 'api' ? (s.tags.join(', ') || 'default tags') : `${s.item_count} item${s.item_count === 1 ? '' : 's'}`}
                 </p>
               </div>

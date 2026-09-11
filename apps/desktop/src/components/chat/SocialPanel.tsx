@@ -43,7 +43,7 @@ export function SocialPanel({
             <MessageSquare className="w-3.5 h-3.5" />
             Messages
             {chatUnread > 0 && (
-              <span className="px-1 py-0.5 rounded-full text-[9px] font-bold leading-none bg-retro-accent text-black tabular-nums">
+              <span className="px-1 py-0.5 rounded-full text-[10px] font-bold leading-none bg-retro-accent text-black tabular-nums">
                 {chatUnread}
               </span>
             )}
@@ -61,7 +61,7 @@ export function SocialPanel({
             <Bell className="w-3.5 h-3.5" />
             Notifications
             {notificationUnread > 0 && (
-              <span className="px-1 py-0.5 rounded-full text-[9px] font-bold leading-none bg-retro-accent text-black tabular-nums">
+              <span className="px-1 py-0.5 rounded-full text-[10px] font-bold leading-none bg-retro-accent text-black tabular-nums">
                 {notificationUnread}
               </span>
             )}

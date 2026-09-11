@@ -15,7 +15,7 @@ export function EmptyState({
       <div>
         <p className="text-sm font-bold text-retro-muted">{title}</p>
         {description && (
-          <p className="text-[11px] text-retro-muted/60 mt-1 max-w-xs mx-auto">{description}</p>
+          <p className="text-xs text-retro-muted/60 mt-1 max-w-xs mx-auto">{description}</p>
         )}
       </div>
       {action && <div className="pt-1">{action}</div>}

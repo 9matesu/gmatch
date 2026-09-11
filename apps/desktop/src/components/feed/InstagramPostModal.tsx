@@ -249,7 +249,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                     {post.tags && post.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mt-1.5">
                         {post.tags.map((t) => (
-                          <span key={t} className="text-[11px] font-semibold text-retro-accent hover:underline cursor-pointer">
+                          <span key={t} className="text-xs font-semibold text-retro-accent hover:underline cursor-pointer">
                             #{t.replace(/^#/, '')}
                           </span>
                         ))}
@@ -290,7 +290,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                   >
                     <Heart className={`w-3.5 h-3.5 ${c.is_liked ? 'text-red-500 fill-red-500' : ''}`} />
                     {c.like_count > 0 && (
-                      <span className="text-[8px] font-bold block text-center mt-0.5 text-retro-muted">{c.like_count}</span>
+                      <span className="text-[10px] font-bold block text-center mt-0.5 text-retro-muted">{c.like_count}</span>
                     )}
                   </button>
                 </div>

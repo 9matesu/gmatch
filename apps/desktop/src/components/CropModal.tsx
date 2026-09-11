@@ -170,13 +170,13 @@ export function CropModal({
               key={a.id}
               type="button"
               onClick={() => { playPress(720); setAspect(a.id); setPan({ x: 0, y: 0 }); }}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-colors border ${aspect === a.id ? 'bg-zinc-100 text-zinc-950 border-zinc-100' : 'text-zinc-400 border-zinc-800 hover:text-white hover:bg-zinc-900'}`}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-colors border ${aspect === a.id ? 'bg-zinc-100 text-zinc-950 border-zinc-100' : 'text-zinc-400 border-zinc-800 hover:text-white hover:bg-zinc-900'}`}
             >
               {a.label}
             </button>
           ))}
         </div>
-        <label className="flex items-center gap-2 text-[11px] text-zinc-400">
+        <label className="flex items-center gap-2 text-xs text-zinc-400">
           <span className="w-10 shrink-0">Zoom</span>
           <input type="range" min={100} max={400} value={zoom} onChange={(e) => setZoomClamped(Number(e.target.value))} className="flex-1 accent-white" aria-label="Zoom" />
         </label>

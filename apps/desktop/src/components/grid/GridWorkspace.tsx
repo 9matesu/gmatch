@@ -151,7 +151,7 @@ export default function GridWorkspace({
                     : 'border-border-glass bg-surface-raised text-retro-muted hover:text-retro-fg hover:bg-surface-interactive'
                     }`}
                 >
-                  <span className="text-[11px] font-mono font-bold leading-none">
+                  <span className="text-xs font-mono font-bold leading-none">
                     {collapsed ? '◧' : '⛶'}
                   </span>
                 </button>

@@ -86,7 +86,7 @@ export function MobileVirusOverlay({
             <h1 className="text-sm font-bold">
               Your screen is locked
             </h1>
-            <p className="text-[11px] text-red-200/80 truncate">
+            <p className="text-xs text-red-200/80 truncate">
               <strong>@{attackerName}</strong> used a hack from the store on you
             </p>
           </div>
@@ -107,7 +107,7 @@ export function MobileVirusOverlay({
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/40 pointer-events-none" />
       </div>
 
-      <p className="text-[11px] text-zinc-400 z-20 text-center">
+      <p className="text-xs text-zinc-400 z-20 text-center">
         Navigation unlocks when the timer runs out &mdash; or press Escape.
       </p>
     </div>

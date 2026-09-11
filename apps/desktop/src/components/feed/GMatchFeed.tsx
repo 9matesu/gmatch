@@ -680,12 +680,12 @@ export function GMatchFeed({
                     <div>
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs font-semibold text-zinc-200 group-hover:underline">{post.author_name}</span>
-                        <time className="text-[11px] text-zinc-500" dateTime={post.created_at}>
+                        <time className="text-xs text-zinc-500" dateTime={post.created_at}>
                           {new Date(post.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                         </time>
                       </div>
                       {post.location && (
-                        <span className="text-[11px] text-zinc-500 block">{post.location}</span>
+                        <span className="text-xs text-zinc-500 block">{post.location}</span>
                       )}
                     </div>
                   </div>
@@ -904,7 +904,7 @@ export function GMatchFeed({
                       <button
                         type="button"
                         onClick={() => { playPress(750); setActiveLightboxPost(post); }}
-                        className="text-left text-[11px] text-zinc-400 hover:text-zinc-200 cursor-pointer font-medium block"
+                        className="text-left text-xs text-zinc-400 hover:text-zinc-200 cursor-pointer font-medium block"
                       >
                         View all {postComments.length} comments
                       </button>
@@ -921,7 +921,7 @@ export function GMatchFeed({
                     <button
                       type="button"
                       onClick={() => { playPress(750); setActiveLightboxPost(post); }}
-                      className="text-left text-[11px] text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                      className="text-left text-xs text-zinc-400 hover:text-zinc-200 cursor-pointer"
                     >
                       Add a comment...
                     </button>

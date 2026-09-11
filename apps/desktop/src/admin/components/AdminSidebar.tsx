@@ -52,7 +52,7 @@ export function AdminSidebar({
           <span className="w-2.5 h-2.5 rounded-full bg-retro-accent shadow-[0_0_8px_rgba(159,227,255,0.4)]" />
           <div className="min-w-0">
             <div className="text-xs font-black tracking-tight text-retro-fg uppercase truncate">gMatch Admin</div>
-            <div className="text-[9px] font-mono text-retro-muted">Moderation Console</div>
+            <div className="text-[10px] font-mono text-retro-muted">Moderation Console</div>
           </div>
         </div>
         {onClose && (
@@ -70,7 +70,7 @@ export function AdminSidebar({
       <nav className="flex-1 overflow-y-auto p-3 space-y-3" role="list">
         {sections.map((section, _sectionIndex) => (
           <div key={section} className="space-y-1">
-            <div className="px-3 py-2 text-[9px] font-black uppercase tracking-[0.2em] text-retro-faint">
+            <div className="px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-retro-faint">
               {section}
             </div>
             {tabs
@@ -98,7 +98,7 @@ export function AdminSidebar({
                     </div>
                     {tab.badge && (
                       <span className={cn(
-                        "text-[9px] px-1.5 py-0.5 rounded-full font-mono font-bold",
+                        "text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold",
                         active ? "bg-black/25 text-retro-accent" : "bg-glass-w8 text-retro-muted",
                         tab.id === "reports" && tab.badge && Number(tab.badge) > 0 && "bg-red-500 text-white"
                       )}>

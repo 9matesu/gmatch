@@ -64,7 +64,7 @@ export function Leaderboard({
           <div className="flex items-center gap-3 min-w-0">
             <div className="relative flex-shrink-0">
               <Avatar id={topSender.id} imageUrl={topSender.pfp_url || undefined} size={40} />
-              <span className="absolute -top-1 -right-1 bg-retro-accent text-black text-[9px] w-4 h-4 rounded-full flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 bg-retro-accent text-black text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
                 <Crown className="w-2.5 h-2.5 fill-current" />
               </span>
             </div>
@@ -119,7 +119,7 @@ export function Leaderboard({
                 {isTop3 ? (
                   <Trophy className={`w-3.5 h-3.5 ${rank === 1 ? 'text-retro-accent' : rank === 2 ? 'text-retro-body' : 'text-amber-700'}`} />
                 ) : (
-                  <span className="text-[11px] font-mono text-retro-muted">#{rank}</span>
+                  <span className="text-xs font-mono text-retro-muted">#{rank}</span>
                 )}
               </span>
 

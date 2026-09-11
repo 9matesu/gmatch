@@ -173,7 +173,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
             </div>
             <div className="space-y-3">
               <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Cashout Rate (basis points)</label>
-              <p className="text-[11px] text-zinc-500">1 bp = 0.01%. Current: {(cashoutRateBps / 100).toFixed(2)}% (12500 = 125%)</p>
+              <p className="text-xs text-zinc-500">1 bp = 0.01%. Current: {(cashoutRateBps / 100).toFixed(2)}% (12500 = 125%)</p>
               <div className="flex items-center gap-2">
                 <input
                   type="number"

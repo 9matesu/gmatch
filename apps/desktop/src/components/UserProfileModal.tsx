@@ -163,7 +163,7 @@ export function UserProfileModal({
                 {hasStories && (
                   <div
                     onClick={handleAvatarClick}
-                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-white text-zinc-950 text-[9px] font-semibold flex items-center gap-0.5 cursor-pointer shadow-xs"
+                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-white text-zinc-950 text-[10px] font-semibold flex items-center gap-0.5 cursor-pointer shadow-xs"
                   >
                     <Play className="w-2 h-2 fill-current" />
                     <span>Story</span>

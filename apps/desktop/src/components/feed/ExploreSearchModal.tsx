@@ -216,7 +216,7 @@ export function ExploreSearchModal({
                   </div>
                   <div className="min-w-0 flex-1">
                     <span className="text-xs font-bold text-retro-fg block truncate">{p.author_name}</span>
-                    {p.caption && <p className="text-[11px] text-retro-muted truncate">{p.caption}</p>}
+                    {p.caption && <p className="text-xs text-retro-muted truncate">{p.caption}</p>}
                   </div>
                 </div>
               ))}

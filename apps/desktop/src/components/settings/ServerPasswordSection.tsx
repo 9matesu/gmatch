@@ -67,7 +67,7 @@ export function ServerPasswordSection({
           {enabled ? 'Password required to join' : 'Open server (no password)'}
         </span>
       </div>
-      <p className="text-[11px] text-retro-muted">
+      <p className="text-xs text-retro-muted">
         New players must enter this password once; existing members keep access. The password never leaves your machine — only its hash is stored.
       </p>
       <div className="flex gap-2">

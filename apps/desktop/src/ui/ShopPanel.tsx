@@ -112,7 +112,7 @@ function TagsTab() {
   return (
     <div className={TAB_BODY}>
       <div className="flex items-center justify-between gap-1.5">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-retro-muted">
+        <span className="text-xs font-bold uppercase tracking-wider text-retro-muted">
           Feed Tags ({owned})
         </span>
         <button
@@ -160,7 +160,7 @@ function TagsTab() {
               <IconRefresh size={11} />
             </button>
           </div>
-          {note && <div className={`${MUTED} text-[11px]`}>{note}</div>}
+          {note && <div className={`${MUTED} text-xs`}>{note}</div>}
         </div>
       )}
 
@@ -198,7 +198,7 @@ function TagsTab() {
                   soloTag(t.name)
                 }
               }}
-              className={`inline-flex max-w-full cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] leading-tight transition-colors ${on
+              className={`inline-flex max-w-full cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 text-xs leading-tight transition-colors ${on
                 ? 'border-retro-accent/50 bg-surface-interactive text-retro-fg'
                 : isOwned
                   ? 'border-border-subtle bg-surface-raised text-retro-muted hover:text-retro-fg hover:border-border-strong'
@@ -268,7 +268,7 @@ function CapsTab() {
               }}
             >
               <div>
-                <div className={`${DISPLAY} text-[11px] font-bold tracking-[0.5px]`}>
+                <div className={`${DISPLAY} text-xs font-bold tracking-[0.5px]`}>
                   {def.name}
                   {st.count > 0 && <span className={MONO}> x{st.count}</span>}
                 </div>
@@ -331,7 +331,7 @@ function PrestigeTab() {
           return (
             <div
               key={a.id}
-              className={`flex items-center gap-1.5 rounded-lg border bg-retro-bg p-2 text-[11px] ${
+              className={`flex items-center gap-1.5 rounded-lg border bg-retro-bg p-2 text-xs ${
                 got ? 'border-[rgba(255,215,94,0.5)] text-[#ffd75e]' : 'border-border-subtle text-retro-muted'
               }`}
               title={got ? 'Unlocked' : 'Locked'}

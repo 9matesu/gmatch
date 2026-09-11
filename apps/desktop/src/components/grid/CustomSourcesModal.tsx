@@ -143,7 +143,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
             </button>
           </div>
 
-          {notice && <p className="text-[11px] text-retro-body">{notice}</p>}
+          {notice && <p className="text-xs text-retro-body">{notice}</p>}
         </div>
       </div>
     </div>

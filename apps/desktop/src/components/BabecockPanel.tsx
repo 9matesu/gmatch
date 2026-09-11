@@ -570,7 +570,7 @@ export function BabecockPanel({
                       void dismissInvite(inv.id)
                       openModal('join')
                     }}
-                    className="px-3 py-1 bg-white text-zinc-950 hover:bg-zinc-200 font-semibold text-[11px] rounded-md transition-all duration-150 active:scale-[0.96] shadow-xs cursor-pointer"
+                    className="px-3 py-1 bg-white text-zinc-950 hover:bg-zinc-200 font-semibold text-xs rounded-md transition-all duration-150 active:scale-[0.96] shadow-xs cursor-pointer"
                   >
                     Join
                   </button>
@@ -679,7 +679,7 @@ export function BabecockPanel({
                     >
                       <div className="text-[10px] uppercase font-bold text-retro-muted tracking-wider p-3 flex items-center justify-between border-b border-white/5">
                         <span>Grid ({cols}×{rows}, {n} images)</span>
-                        {amHost && <span className="text-retro-muted text-[9px] flex items-center gap-1"><Move className="w-2.5 h-2.5" /> Drag to rearrange</span>}
+                        {amHost && <span className="text-retro-muted text-[10px] flex items-center gap-1"><Move className="w-2.5 h-2.5" /> Drag to rearrange</span>}
                       </div>
                       <div
                         className="grid gap-0 flex-1 min-h-0"
@@ -709,14 +709,14 @@ export function BabecockPanel({
                                 <ObjectImage contentUrl={entry.content_url} identity={identity ?? null} alt="" className="w-full h-full object-cover" />
                               )}
                               {isOp && (
-                                <span className="absolute top-1 left-1 bg-amber-400 text-black text-[8px] font-black px-1.5 py-0.5 rounded shadow-xs flex items-center gap-0.5">
+                                <span className="absolute top-1 left-1 bg-amber-400 text-black text-[10px] font-black px-1.5 py-0.5 rounded shadow-xs flex items-center gap-0.5">
                                   <Sparkles className="w-2 h-2" />
                                   <span>OP</span>
                                 </span>
                               )}
                               <span
                                 onClick={() => onOpenProfile?.(entry.user_id)}
-                                className="absolute bottom-1 left-1 right-1 text-[9px] font-bold text-white bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded truncate cursor-pointer hover:bg-black/80"
+                                className="absolute bottom-1 left-1 right-1 text-[10px] font-bold text-white bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded truncate cursor-pointer hover:bg-black/80"
                               >
                                 {entry.display_name || 'Anonymous'}
                                 {entry.user_id === selfId && ' (you)'}
@@ -869,7 +869,7 @@ export function BabecockPanel({
                           </span>
                         </div>
                       )}
-                      <div className="flex items-center justify-between text-[11px] text-retro-muted px-1">
+                      <div className="flex items-center justify-between text-xs text-retro-muted px-1">
                         <span className="font-bold text-retro-fg truncate">{g.host_name || 'Host'}</span>
                         <span className="text-[10px] text-retro-muted">{g.entries.length} cards</span>
                       </div>

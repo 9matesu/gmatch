@@ -115,7 +115,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
           />
           <div className="min-w-0">
             <span className="text-xs font-bold text-retro-fg block truncate">{post.author_name}</span>
-            <p className="text-[11px] text-retro-muted truncate">{post.caption || 'Post'}</p>
+            <p className="text-xs text-retro-muted truncate">{post.caption || 'Post'}</p>
           </div>
         </div>
 

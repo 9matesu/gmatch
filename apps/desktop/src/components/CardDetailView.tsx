@@ -218,7 +218,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
         <div className="glass-header flex items-center justify-between px-5 py-4 shrink-0">
           <div className="min-w-0">
             <h2 className="text-lg font-bold text-retro-fg truncate">{card.name || 'Unnamed Card'}</h2>
-            <p className="text-[11px] text-retro-muted mt-0.5">
+            <p className="text-xs text-retro-muted mt-0.5">
               {new Date(card.createdAt).toLocaleDateString()} · <span className="capitalize">{statusLabel}</span>
             </p>
           </div>
@@ -261,7 +261,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
                 type="button"
                 onClick={() => onOpenProfile?.(card.creatorId)}
                 disabled={!onOpenProfile}
-                className={`glass-inset ml-auto px-2.5 py-1.5 rounded-full text-[11px] font-mono text-retro-muted ${onOpenProfile ? 'cursor-pointer' : 'cursor-default'}`}
+                className={`glass-inset ml-auto px-2.5 py-1.5 rounded-full text-xs font-mono text-retro-muted ${onOpenProfile ? 'cursor-pointer' : 'cursor-default'}`}
                 title="View creator"
               >
                 by {card.creatorId.slice(0, 8)}…

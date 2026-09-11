@@ -386,13 +386,13 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
           <div className="text-[10px] text-retro-muted mt-0.5">{(cashoutRate / 100).toFixed(1)}% rate</div>
 
           {cashingOutAll && cashoutProgress ? (
-            <div className="mt-2.5 flex items-center gap-2 text-[11px] text-amber-300 font-medium">
+            <div className="mt-2.5 flex items-center gap-2 text-xs text-amber-300 font-medium">
               <span className="w-3 h-3 border border-amber-400 border-t-transparent rounded-full animate-spin" />
               Cashing out {cashoutProgress.done}/{cashoutProgress.total}…
             </div>
           ) : confirmCashoutAll ? (
             <div className="mt-2.5 space-y-2">
-              <p className="text-[11px] text-retro-body font-medium">
+              <p className="text-xs text-retro-body font-medium">
                 Cash out {cashableCount} card{cashableCount === 1 ? '' : 's'} for ~{formatGc(cashoutEstimate)}?
                 {skippedCount > 0 && (
                   <span className="text-retro-muted"> ({skippedCount} listed skipped)</span>
@@ -402,14 +402,14 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                 <button
                   type="button"
                   onClick={() => void handleCashOutAll()}
-                  className="px-2.5 py-1.5 rounded bg-amber-500 text-black text-[11px] font-bold cursor-pointer transition-colors hover:bg-amber-400"
+                  className="px-2.5 py-1.5 rounded bg-amber-500 text-black text-xs font-bold cursor-pointer transition-colors hover:bg-amber-400"
                 >
                   Confirm
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmCashoutAll(false)}
-                  className="px-2.5 py-1.5 rounded bg-surface-interactive border border-border-glass text-retro-body text-[11px] font-medium cursor-pointer transition-colors hover:text-retro-fg"
+                  className="px-2.5 py-1.5 rounded bg-surface-interactive border border-border-glass text-retro-body text-xs font-medium cursor-pointer transition-colors hover:text-retro-fg"
                 >
                   Cancel
                 </button>
@@ -423,7 +423,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                 setConfirmCashoutAll(true);
               }}
               disabled={cashableCount === 0}
-              className="mt-2.5 w-full px-2.5 py-1.5 rounded bg-amber-500/15 hover:bg-amber-500/25 disabled:opacity-40 text-amber-300 text-[11px] font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              className="mt-2.5 w-full px-2.5 py-1.5 rounded bg-amber-500/15 hover:bg-amber-500/25 disabled:opacity-40 text-amber-300 text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
             >
               <Coins className="w-3 h-3" />
               Cash Out All
@@ -441,7 +441,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
               return (
                 <span
                   key={r}
-                  className="text-[9px] font-bold px-1.5 py-0.5 rounded border tabular-nums"
+                  className="text-[10px] font-bold px-1.5 py-0.5 rounded border tabular-nums"
                   style={{ color: tier.accentColor, borderColor: `${tier.accentColor}66`, backgroundColor: `${tier.accentColor}14` }}
                 >
                   {tier.label} {count}
@@ -464,7 +464,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
             <button
               type="button"
               onClick={onOpenCardCollection}
-              className="px-2.5 py-1.5 text-[11px] font-medium border border-border-glass text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors whitespace-nowrap"
+              className="px-2.5 py-1.5 text-xs font-medium border border-border-glass text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors whitespace-nowrap"
             >
               View collection
             </button>
@@ -478,16 +478,16 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
               const tier = RARITY_TIERS[c.rarity as keyof typeof RARITY_TIERS];
               return (
                 <div key={c.id} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-surface-interactive border border-border-glass">
-                  <span className="text-[11px] font-mono text-retro-muted tabular-nums w-5 shrink-0">#{i + 1}</span>
+                  <span className="text-xs font-mono text-retro-muted tabular-nums w-5 shrink-0">#{i + 1}</span>
                   {tier && (
                     <span
-                      className="text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide shrink-0"
+                      className="text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide shrink-0"
                       style={{ color: tier.accentColor, borderColor: `${tier.accentColor}66`, backgroundColor: `${tier.accentColor}14` }}
                     >
                       {tier.label}
                     </span>
                   )}
-                  <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-retro-muted">{c.id.slice(0, 12)}…</span>
+                  <span className="min-w-0 flex-1 truncate font-mono text-xs text-retro-muted">{c.id.slice(0, 12)}…</span>
                   <span className="text-xs font-bold font-mono tabular-nums text-retro-fg shrink-0">{formatGc(c.value)}</span>
                   <span className="text-[10px] font-mono tabular-nums text-amber-300 shrink-0">→ {formatGc(computeCashoutPayout(c.value, cashoutRate))}</span>
                 </div>
@@ -508,7 +508,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
               {owned.map((item) => (
                 <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-surface-interactive border border-border-glass">
                   <span className="min-w-0 flex-1 truncate text-xs text-retro-body">{item.name}</span>
-                  <span className="text-[11px] font-mono tabular-nums text-retro-muted shrink-0">×{inventory[item.id]}</span>
+                  <span className="text-xs font-mono tabular-nums text-retro-muted shrink-0">×{inventory[item.id]}</span>
                 </div>
               ))}
             </div>
@@ -546,12 +546,12 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                     />
                   </div>
                   <div className="p-2">
-                    <div className="text-[11px] font-bold text-retro-fg truncate">{l.card?.name || 'Unnamed Card'}</div>
-                    <div className="text-[9px] capitalize text-retro-muted">{l.card?.rarity}</div>
+                    <div className="text-xs font-bold text-retro-fg truncate">{l.card?.name || 'Unnamed Card'}</div>
+                    <div className="text-[10px] capitalize text-retro-muted">{l.card?.rarity}</div>
                   </div>
                 </button>
                 <div className="flex items-center justify-between gap-1.5 px-2 pb-2">
-                  <span className="text-[11px] font-mono font-bold text-cyan-300 tabular-nums">{formatGc(l.price)} g$</span>
+                  <span className="text-xs font-mono font-bold text-cyan-300 tabular-nums">{formatGc(l.price)} g$</span>
                   {l.sellerId === identity?.orbitId ? (
                     <span className="px-2 py-1 rounded bg-retro-interactive text-retro-muted text-[10px] font-bold" title="This is your own listing — cancel it from your card page instead">Yours</span>
                   ) : (

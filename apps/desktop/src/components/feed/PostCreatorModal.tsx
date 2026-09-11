@@ -160,7 +160,7 @@ export function PostCreatorModal({
                     title="Upload from device"
                   >
                     <Upload className="w-4 h-4" />
-                    <span className="text-[9px] font-bold">Add</span>
+                    <span className="text-[10px] font-bold">Add</span>
                   </button>
 
                   {/* Snap with Camera */}
@@ -174,7 +174,7 @@ export function PostCreatorModal({
                     title="Take live photo"
                   >
                     <Camera className="w-4 h-4 text-retro-warning" />
-                    <span className="text-[9px] font-bold">Snap</span>
+                    <span className="text-[10px] font-bold">Snap</span>
                   </button>
                 </>
               )}

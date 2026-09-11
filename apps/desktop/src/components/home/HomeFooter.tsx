@@ -139,7 +139,7 @@ interface FooterSecondaryItem {
                      className="glass-button relative min-h-16 rounded-xl px-2 py-2 text-retro-body active:scale-95 flex flex-col items-center justify-center gap-1"
                   >
                     <Icon className="w-5 h-5 text-retro-accent" />
-                    <span className="text-[11px] font-medium">{item.label}</span>
+                    <span className="text-xs font-medium">{item.label}</span>
                     {'badge' in item && Boolean(item.badge && item.badge > 0) && <span className="absolute right-2 top-2 w-2 h-2 rounded-full bg-retro-accent" />}
                   </button>
                 );
@@ -183,7 +183,7 @@ interface FooterSecondaryItem {
                 <Icon className={`w-4 h-4 sm:w-5 sm:h-5 transition-colors ${item.highlight ? 'text-current' : item.active ? 'text-retro-accent' : ''}`} />
               )}
 
-              <span className={`text-[9px] sm:text-[10px] font-medium mt-0.5 whitespace-nowrap ${
+              <span className={`text-[10px] sm:text-[10px] font-medium mt-0.5 whitespace-nowrap ${
                   item.highlight ? 'text-current font-black uppercase tracking-wider' : item.active ? 'text-retro-accent' : 'text-retro-muted group-hover:text-retro-fg'
               }`}>
                 {item.label}

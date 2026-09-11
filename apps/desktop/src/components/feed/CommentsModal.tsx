@@ -142,7 +142,7 @@ export function CommentsModal({
                 className="p-1 text-retro-muted hover:text-red-500 cursor-pointer shrink-0"
               >
                 <Heart className={`w-4 h-4 ${c.is_liked ? 'text-red-500 fill-red-500' : ''}`} />
-                {c.like_count > 0 && <span className="text-[9px] font-bold block text-center mt-0.5">{c.like_count}</span>}
+                {c.like_count > 0 && <span className="text-[10px] font-bold block text-center mt-0.5">{c.like_count}</span>}
               </button>
 
               <button

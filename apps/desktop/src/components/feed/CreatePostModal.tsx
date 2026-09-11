@@ -464,7 +464,7 @@ export function CreatePostModal({
                         }`}
                     >
                       <img src={m.previewUrl} alt="" className="w-full h-full object-cover" />
-                      <span className="absolute bottom-0.5 right-0.5 px-1 bg-black/70 text-[8px] font-mono font-bold text-white rounded">
+                      <span className="absolute bottom-0.5 right-0.5 px-1 bg-black/70 text-[10px] font-mono font-bold text-white rounded">
                         #{idx + 1}
                       </span>
                     </div>

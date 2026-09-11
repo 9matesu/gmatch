@@ -196,7 +196,7 @@ export function EconomyTab({ identity, pinVerified, onZoom, onAction }: EconomyT
               </button>
             </div>
             <div className="flex-1 min-w-0 space-y-2.5">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
                 <div>
                   <span className="text-retro-muted block text-[10px]">Card ID</span>
                   <span className="font-mono text-retro-fg break-all text-[10px]">{card.id}</span>

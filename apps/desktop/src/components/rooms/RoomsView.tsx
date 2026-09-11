@@ -92,7 +92,7 @@ export function RoomsView({
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {rooms.length === 0 && (
-            <p className="text-[11px] text-retro-muted p-2 leading-relaxed">
+            <p className="text-xs text-retro-muted p-2 leading-relaxed">
               No rooms yet. A room is an end-to-end encrypted group chat — its key lives only on your devices and the members you invite.
             </p>
           )}

@@ -65,9 +65,9 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
             {state.mode.toUpperCase()}
           </span>
         </div>
-        <p className="text-[11px] text-retro-muted font-mono break-all">{maskedServerUrl(state.url)}</p>
+        <p className="text-xs text-retro-muted font-mono break-all">{maskedServerUrl(state.url)}</p>
         {state.packaged && (
-          <p className="text-[11px] text-retro-muted">
+          <p className="text-xs text-retro-muted">
             {state.mode === 'host'
               ? 'Friends running gMatch can enter one of the addresses below (click to copy the real one — shown masked for privacy) in their Settings → Server to join your world. Keep the app open and your firewall allows the port.'
               : 'All social data lives on the server you connected to. Switch back to Host anytime.'}
@@ -79,7 +79,7 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
               <button
                 key={u}
                 type="button"
-                className="block w-full text-left font-mono text-[11px] text-retro-fg hover:text-retro-accent cursor-pointer"
+                className="block w-full text-left font-mono text-xs text-retro-fg hover:text-retro-accent cursor-pointer"
                 onClick={() => { void navigator.clipboard.writeText(u); toast?.('Address copied', 'success') }}
                 title="Copy address"
               >
@@ -116,7 +116,7 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
               type="button"
               disabled={saving}
               onClick={() => { playPress(700); void save('host', '') }}
-              className="text-[11px] text-retro-muted hover:text-retro-fg underline cursor-pointer"
+              className="text-xs text-retro-muted hover:text-retro-fg underline cursor-pointer"
             >
               Stop connecting — host my own server again
             </button>

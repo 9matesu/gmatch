@@ -162,7 +162,7 @@ export function RankingsPanel({
                 onClick={() => onSelectUser(user.id)}
                 className="w-full text-left bg-surface-interactive border border-border-glass rounded-lg p-2.5 flex items-center gap-3 hover:border-zinc-500 transition-colors cursor-pointer"
               >
-                <span className="w-6 flex-shrink-0 text-center text-[11px] font-mono text-retro-muted">
+                <span className="w-6 flex-shrink-0 text-center text-xs font-mono text-retro-muted">
                   {rank <= 3 && rank === 1 ? (
                     <Trophy className="w-3.5 h-3.5 text-retro-accent mx-auto" />
                   ) : (

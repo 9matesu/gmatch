@@ -105,7 +105,7 @@ export function ActionModal({
             <div>
               <h3 className="text-sm font-semibold tracking-tight text-retro-fg">{actionTitle}</h3>
               {targetName && (
-                <p className="text-[11px] text-retro-muted">to {targetName}</p>
+                <p className="text-xs text-retro-muted">to {targetName}</p>
               )}
             </div>
           </div>
@@ -122,7 +122,7 @@ export function ActionModal({
         <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
           {needsUrl && (
             <div className="space-y-1.5">
-              <label className="block text-[11px] font-medium text-zinc-300">
+              <label className="block text-xs font-medium text-zinc-300">
                 {action === 'popup_video' ? 'Video URL (mp4/webm)' : 'Image URL'}
               </label>
               <input
@@ -138,7 +138,7 @@ export function ActionModal({
 
           {needsText && (
             <div className="space-y-1.5">
-              <label className="block text-[11px] font-medium text-zinc-300">Message</label>
+              <label className="block text-xs font-medium text-zinc-300">Message</label>
               <textarea
                 rows={3}
                 maxLength={action === 'text_overlay' ? 120 : 280}
@@ -240,7 +240,7 @@ export function ActionModal({
               />
               <div className="min-w-0">
                 <div className="font-medium text-retro-fg text-xs">Ask for a public photo</div>
-                <div className="text-[11px] text-retro-muted leading-snug mt-0.5">
+                <div className="text-xs text-retro-muted leading-snug mt-0.5">
                   Off: the snapshot goes only to you. Either way the target approves the capture, and
                   their consent decides whether public is even possible. If their OS blocks the camera,
                   this quietly fizzles &mdash; check your Outbox.
@@ -250,12 +250,12 @@ export function ActionModal({
           )}
 
           {formError && (
-            <p className="text-[11px] text-rose-400" role="alert">{formError}</p>
+            <p className="text-xs text-rose-400" role="alert">{formError}</p>
           )}
 
           {/* Footer: honest cost line */}
           <div className="pt-1 flex items-center justify-between gap-2">
-            <span className="text-[11px] text-retro-muted">
+            <span className="text-xs text-retro-muted">
               {price != null
                 ? <><span className="font-mono">{price} g$</span> charged only if the send is accepted.</>
                 : 'Charged only if the send is accepted.'}
