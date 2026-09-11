@@ -15,6 +15,27 @@ export function deliveryToken(pubKeyHex: string): string {
   return bytesToHexStatic(blake3(hexToBytes(pubKeyHex)))
 }
 
+/**
+ * Wave 2 (C2): rotating session handle — blake3(pubkey || epoch). The epoch
+ * is a 32-hex random the owner regenerates every boot; the courier sees a
+ * fresh unlinkable token per session and cannot correlate yesterday's box
+ * with today's. The static home token stays valid as fallback for senders
+ * that have not received the announce yet.
+ */
+export function sessionDeliveryToken(pubKeyHex: string, epochHex: string): string {
+  if (!/^[0-9a-f]{64}$/i.test(pubKeyHex) || !/^[0-9a-f]{32}$/i.test(epochHex)) {
+    throw new Error('sessionDeliveryToken: bad key or epoch')
+  }
+  return bytesToHexStatic(blake3(concat(hexToBytes(pubKeyHex), hexToBytes(epochHex))))
+}
+
+function concat(a: Uint8Array, b: Uint8Array): Uint8Array {
+  const out = new Uint8Array(a.length + b.length)
+  out.set(a, 0)
+  out.set(b, a.length)
+  return out
+}
+
 /** Does this token correspond to the given pubkey? (recipient-side lookup). */
 export function tokenMatches(pubKeyHex: string, token: string): boolean {
   try {

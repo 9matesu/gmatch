@@ -8,6 +8,7 @@ import {
   type EnvelopeKind,
   type OpenedEnvelope,
 } from '@orbit/protocol'
+import { watchedTokens, type EpochState } from './handleRotation'
 
 /**
  * Blind-courier mail client (plan Phase 3.1).
@@ -51,9 +52,13 @@ const BACKOFF_BASE_MS = 1000
 const BACKOFF_MAX_MS = 60_000
 
 /** Ed25519 ack body proving box ownership: sig over `<token>|<ids>`. */
-export function ackBody(identity: OrbitIdentity, token: string, ids: string[]) {
+export function ackBody(identity: OrbitIdentity, token: string, ids: string[], epoch?: string) {
   const msg = new TextEncoder().encode(`${token}|${ids.join(',')}`)
-  return { ids, pubkey: identity.publicKeyHex, sig: hexOf(signMessage(msg, identity.privateKeyHex)) }
+  const body: Record<string, unknown> = { ids, pubkey: identity.publicKeyHex, sig: hexOf(signMessage(msg, identity.privateKeyHex)) }
+  // Session-token drains carry the epoch the token was derived with (C2);
+  // the courier re-derives blake3(pubkey||epoch) to verify ownership.
+  if (epoch) body.epoch = epoch
+  return body
 }
 
 function hexOf(bytes: Uint8Array): string {
@@ -70,6 +75,9 @@ function randomId(): string {
 
 export class MailClient {
   readonly token: string
+  /** Rotating session epochs (wave 2 C2): cur is this boot's, prev drains
+   * one boot of overlap. Persisted by the caller via secure-storage. */
+  epoch: EpochState = { cur: '', prev: '' }
   private ws: MailSocket | null = null
   private reconnectAttempt = 0
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -130,7 +138,7 @@ export class MailClient {
     this.ws = sock
     sock.onopen = () => {
       this.reconnectAttempt = 0
-      sock.send(JSON.stringify({ type: 'watch', tokens: [this.token] }))
+      sock.send(JSON.stringify({ type: 'watch', tokens: watchedTokens(this.token, this.epoch) }))
       // Anything that arrived while disconnected is fetched once on connect.
       void this.pull()
     }
@@ -141,7 +149,7 @@ export class MailClient {
       } catch {
         return
       }
-      if (frame.type === 'mail' && frame.to === this.token) void this.pull()
+      if (frame.type === 'mail' && watchedTokens(this.token, this.epoch).includes(frame.to || '')) void this.pull()
     }
     sock.onclose = () => {
       this.ws = null
@@ -192,32 +200,36 @@ export class MailClient {
 
   private async doPull(): Promise<OpenedEnvelope[]> {
     const base = this.deps.apiBase.replace(/\/+$/, '')
-    const res = await this.fetcher()(`${base}/api/mail/${this.token}`).catch(() => null)
-    if (!res || !res.ok) {
-      this.log(`[mail] pull failed (${res ? res.status : 'network'})`)
-      return []
-    }
-    const { envelopes } = (await res.json()) as { envelopes?: Envelope[] }
-    if (!Array.isArray(envelopes) || envelopes.length === 0) return []
     const opened: OpenedEnvelope[] = []
-    const consumed: string[] = []
-    for (const env of envelopes) {
-      try {
-        const o = open1to1(env, this.deps.identity.encryptionPrivHex)
-        opened.push(o)
-        consumed.push(env.id)
-        this.deps.onMail(o, env)
-      } catch {
-        // Not openable by us (token collision/corruption) — leave it; the
-        // courier TTL collects it. Never ack what we cannot open.
+    // Wave 2 (C2): drain home + current + previous session boxes each pull.
+    for (const token of watchedTokens(this.token, this.epoch)) {
+      const res = await this.fetcher()(`${base}/api/mail/${token}`).catch(() => null)
+      if (!res || !res.ok) {
+        this.log(`[mail] pull failed (${res ? res.status : 'network'})`)
+        continue
       }
-    }
-    if (consumed.length > 0) {
-      await this.fetcher()(`${base}/api/mail/${this.token}/ack`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ackBody(this.deps.identity, this.token, consumed)),
-      }).catch(() => { /* mail stays until TTL; a later pull re-consumes */ })
+      const { envelopes } = (await res.json()) as { envelopes?: Envelope[] }
+      if (!Array.isArray(envelopes) || envelopes.length === 0) continue
+      const consumed: string[] = []
+      for (const env of envelopes) {
+        try {
+          const o = open1to1(env, this.deps.identity.encryptionPrivHex)
+          opened.push(o)
+          consumed.push(env.id)
+          this.deps.onMail(o, env)
+        } catch {
+          // Not openable by us (token collision/corruption) — leave it; the
+          // courier TTL collects it. Never ack what we cannot open.
+        }
+      }
+      if (consumed.length > 0) {
+        const epoch = token === this.token ? undefined : (token === this.epoch.cur ? this.epoch.cur : this.epoch.prev)
+        await this.fetcher()(`${base}/api/mail/${token}/ack`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(ackBody(this.deps.identity, token, consumed, epoch)),
+        }).catch(() => { /* mail stays until TTL; a later pull re-consumes */ })
+      }
     }
     return opened
   }

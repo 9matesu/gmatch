@@ -1,5 +1,5 @@
 import { verifySignature, hexToBytes } from '@orbit/crypto'
-import { deliveryToken } from '@orbit/protocol'
+import { deliveryToken, sessionDeliveryToken } from '@orbit/protocol'
 
 /**
  * Blind mail store — the courier's entire memory of a message.
@@ -40,6 +40,8 @@ export interface MailAck {
   ids: string[]
   pubkey: string
   sig: string
+  /** set when draining a rotating session token (wave 2 C2). */
+  epoch?: string
 }
 
 export interface MailStoreOptions {
@@ -148,8 +150,19 @@ export function createMailStore(opts: MailStoreOptions = {}): MailStore {
 
   function ack(a: MailAck): boolean {
     if (!TOKEN_RE.test(a.token) || !PUBKEY_RE.test(a.pubkey)) return false
-    // Prove key ownership of the token: token must derive from this pubkey...
-    if (deliveryToken(a.pubkey) !== a.token) return false
+    // Prove key ownership of the token: token must derive from this pubkey —
+    // static home token, or a rotating session token when the ack carries the
+    // epoch it was derived with (wave 2 C2). The sig below still covers the
+    // exact token, so a stolen epoch cannot drain a box it never received.
+    let derived = false
+    try {
+      derived = deliveryToken(a.pubkey) === a.token ||
+        (typeof a.epoch === 'string' && /^[0-9a-f]{32}$/i.test(a.epoch) &&
+          sessionDeliveryToken(a.pubkey, a.epoch) === a.token)
+    } catch {
+      derived = false
+    }
+    if (!derived) return false
     // ...and the ids list must be signed by that key (no token-guesser DoS).
     const msg = new TextEncoder().encode(`${a.token}|${a.ids.join(',')}`)
     let sig: Uint8Array
@@ -193,7 +206,7 @@ export function listEnvelopes(store: MailStore, token: string, now: number): Mai
 }
 export function ackEnvelopes(store: MailStore, a: Omit<MailAck, 'token'> & { token?: string }): boolean {
   // token defaults to the derivation of the claimed pubkey (single-source).
-  return store.ack({ token: a.token ?? deliveryToken(a.pubkey), ids: a.ids, pubkey: a.pubkey, sig: a.sig })
+  return store.ack({ token: a.token ?? deliveryToken(a.pubkey), ids: a.ids, pubkey: a.pubkey, sig: a.sig, epoch: a.epoch })
 }
 export function sweepMail(store: MailStore, now: number): number {
   return store.sweep(now)

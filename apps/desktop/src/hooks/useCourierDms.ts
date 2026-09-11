@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { OrbitIdentity } from '@orbit/crypto'
 import { MailClient, type MailSocket } from '../utils/mail-client'
-import { DmManager, DmStore, type DmMessage } from '../utils/mail-dm'
+import { DmManager, DmStore, scopedKey, type DmMessage } from '../utils/mail-dm'
+import { rotateEpoch, type EpochState } from '../utils/handleRotation'
+import { getSecureItem, setSecureItem } from '../utils/secure-storage'
 import { RoomManager, type Room, type RoomMessage } from '../utils/rooms'
 import { detectMailMode, type MailMode } from '../utils/mail-mode'
 import { getApiBaseUrl } from '../utils/api'
@@ -60,10 +62,13 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
       setThreads((prev) => ({ ...prev, [peerId]: store.thread(peerId) }))
     }
     const refreshRooms = () => setRoomsState(roomMgr.rooms())
-    const facade: Pick<MailClient, 'send'> = {
+    const facade: Pick<MailClient, 'send' | 'epoch'> = {
       send: (body, kind, recipient, opts) => {
         if (!clientRef.current) return Promise.reject(new Error('mail client not ready'))
         return clientRef.current.send(body, kind, recipient, opts)
+      },
+      get epoch() {
+        return clientRef.current?.epoch ?? { cur: '', prev: '' }
       },
     }
     const mailAsClient = facade as unknown as MailClient
@@ -92,6 +97,16 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
       },
       log: (m) => logger.log(m),
     })
+    // Wave 2 (C2): rotate the session handle once per boot; prev is kept one
+    // cycle so mail addressed to yesterday's token still drains. (Dev
+    // StrictMode double-mount rotates twice — worst case one overlap cycle
+    // is skipped in dev only.)
+    const epochKey = scopedKey('orbit_mail_epoch_v1', identity.orbitId)
+    let stored: EpochState | null = null
+    try { stored = getSecureItem(epochKey) ? JSON.parse(getSecureItem(epochKey) as string) : null } catch { /* fresh */ }
+    const rotated = rotateEpoch(stored)
+    setSecureItem(epochKey, JSON.stringify(rotated))
+    client.epoch = rotated
     storeRef.current = store
     managerRef.current = manager
     roomsRef.current = roomMgr

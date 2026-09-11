@@ -1,8 +1,10 @@
 import type { OpenedEnvelope, Envelope } from '@orbit/protocol'
+import { deliveryToken } from '@orbit/protocol'
 import { getSecureItem, setSecureItem } from './secure-storage'
 import type { MailClient } from './mail-client'
 import type { OrbitIdentity } from '@orbit/crypto'
 import { logger } from './logger'
+import { isEpoch, peerAddressToken } from './handleRotation'
 
 /**
  * Courier-backed DM layer (plan P3.2). Source of truth is LOCAL
@@ -38,6 +40,8 @@ export interface PeerKeys {
   publicKeyHex: string
   encryptionPubHex: string
   displayName?: string
+  /** Peer's current session epoch, learned from sealed bodies (C2). */
+  epoch?: string
 }
 
 /** Scope a base key to one identity: two accounts on one device must not
@@ -117,15 +121,17 @@ export class DmStore {
   }
 }
 
-/** Body format for DM envelopes + receipts (all sealed end-to-end). */
-export function encodeDmBody(msg: DmMessage): string {
-  return JSON.stringify({ t: 'dm', id: msg.id, text: msg.text, ts: msg.ts })
+/** Body format for DM envelopes + receipts (all sealed end-to-end).
+ * `e` piggybacks the sender's current session epoch (wave 2 C2) so replies
+ * address the rotating token instead of the static home token. */
+export function encodeDmBody(msg: DmMessage, epoch?: string): string {
+  return JSON.stringify({ t: 'dm', id: msg.id, text: msg.text, ts: msg.ts, ...(epoch ? { e: epoch } : {}) })
 }
-export function encodeAckBody(refId: string): string {
-  return JSON.stringify({ t: 'dm_ack', id: refId })
+export function encodeAckBody(refId: string, epoch?: string): string {
+  return JSON.stringify({ t: 'dm_ack', id: refId, ...(epoch ? { e: epoch } : {}) })
 }
 
-export function decodeBody(json: string): { t: 'dm' | 'dm_ack'; id: string; text?: string; ts?: number } | null {
+export function decodeBody(json: string): { t: 'dm' | 'dm_ack'; id: string; text?: string; ts?: number; e?: string } | null {
   try {
     const parsed = JSON.parse(json)
     if ((parsed.t === 'dm' || parsed.t === 'dm_ack') && typeof parsed.id === 'string') return parsed
@@ -166,10 +172,10 @@ export class DmManager {
       return msg
     }
     try {
-      const env = await this.deps.mail.send(encodeDmBody(msg), 'mail', {
+      const env = await this.deps.mail.send(encodeDmBody(msg, this.deps.mail.epoch?.cur), 'mail', {
         publicKeyHex: keys.publicKeyHex,
         encryptionPubHex: keys.encryptionPubHex,
-      })
+      }, { to: peerAddressToken(keys, deliveryToken) })
       msg.status = 'sent'
       msg.envelopeId = env.id
     } catch {
@@ -190,9 +196,13 @@ export class DmManager {
     // Trust-on-first-use: cache the sealing peer's pubkey material. The
     // sender's X25519 enc pub rides the wire as env.fromEph (ECIES input),
     // so replies/acks can be sealed back without a prior contact entry.
+    const prior = this.deps.store.peerKeys(peerId)
     this.deps.store.rememberPeer(peerId, {
       publicKeyHex: opened.senderPubHex,
       encryptionPubHex: env.fromEph || '',
+      // Learn the sender's rotating handle from the sealed body (C2); keep
+      // the last known epoch when this body predates rotation.
+      epoch: isEpoch(body.e) ? body.e : prior?.epoch,
     })
     if (body.t === 'dm_ack') {
       const own = this.deps.store.thread(peerId).find((m) => m.id === body.id)
@@ -222,10 +232,10 @@ export class DmManager {
     const peerKeys = this.deps.store.peerKeys(peerId)
     if (peerKeys?.encryptionPubHex) {
       void this.deps.mail
-        .send(encodeAckBody(body.id), 'mail', {
+        .send(encodeAckBody(body.id, this.deps.mail.epoch?.cur), 'mail', {
           publicKeyHex: peerKeys.publicKeyHex,
           encryptionPubHex: peerKeys.encryptionPubHex,
-        })
+        }, { to: peerAddressToken(peerKeys, deliveryToken) })
         .catch(() => { /* best-effort receipt */ })
     }
     return true

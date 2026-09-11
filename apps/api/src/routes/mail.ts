@@ -170,7 +170,7 @@ mail.get('/:token', (c) => {
 mail.post('/:token/ack', async (c) => {
   const token = c.req.param('token')
   if (!TOKEN_RE.test(token)) return c.json({ error: 'invalid token' }, 400)
-  let body: { ids?: string[]; pubkey?: string; sig?: string }
+  let body: { ids?: string[]; pubkey?: string; sig?: string; epoch?: string }
   try {
     body = await c.req.json()
   } catch {
@@ -179,7 +179,7 @@ mail.post('/:token/ack', async (c) => {
   if (!Array.isArray(body.ids) || typeof body.pubkey !== 'string' || typeof body.sig !== 'string') {
     return c.json({ error: 'ids, pubkey and sig are required' }, 400)
   }
-  const ok = mailStore.ack({ token, ids: body.ids, pubkey: body.pubkey, sig: body.sig })
+  const ok = mailStore.ack({ token, ids: body.ids, pubkey: body.pubkey, sig: body.sig, epoch: body.epoch })
   if (!ok) return c.json({ error: 'ack rejected' }, 403)
   return c.json({ ok: true })
 })
