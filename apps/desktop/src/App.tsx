@@ -2917,6 +2917,7 @@ export default function Home() {
                 chatOpen={chatOpen && panelTab === 'chat'}
                 onOpenGallery={() => handleSetMainView('gallery')}
                 onOpenSettings={() => { setChatOpen(false); setShowSettingsModal(true); }}
+                onLogout={() => { setChatOpen(false); setIdentityModalMode('logout'); }}
                 onOpenStore={() => handleSetMainView('store')}
                 gamesSubTab={gamesSubTab}
                 onOpenGamesTab={(tab) => { handleSetMainView('games'); setGamesSubTab(tab); }}

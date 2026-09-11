@@ -29,6 +29,7 @@ import {
   ChevronRight,
   Server,
   ShieldCheck,
+  LogOut,
   ArrowLeft,
   ArrowRight,
 } from 'lucide-react';
@@ -53,6 +54,7 @@ export function SidebarNav({
   onOpenChat,
   chatOpen = false,
   onOpenSettings,
+  onLogout,
   onOpenStore,
   unreadMessagesCount = 0,
   notificationUnreadCount = 0,
@@ -79,6 +81,7 @@ export function SidebarNav({
   onOpenChat?: () => void;
   chatOpen?: boolean;
   onOpenSettings?: () => void;
+  onLogout?: () => void;
   onOpenStore?: () => void;
   unreadMessagesCount?: number;
   notificationUnreadCount?: number;
@@ -571,10 +574,11 @@ export function SidebarNav({
 
       {/* User panel: avatar + name, click to open profile */}
       <div className="p-2 border-t border-white/10 shrink-0">
+        <div className="flex items-center gap-1">
         <button
           type="button"
           onClick={() => { playPress(800); setMainView?.('profile'); }}
-          className={`glass-nav-item ${mainView === 'profile' ? 'glass-nav-active' : ''} w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-left cursor-pointer transition-all duration-150 active:scale-[0.96] border ${collapsed ? 'justify-center' : ''}`}
+          className={`glass-nav-item ${mainView === 'profile' ? 'glass-nav-active' : ''} flex-1 min-w-0 flex items-center gap-2.5 px-2 py-1.5 rounded-md text-left cursor-pointer transition-all duration-150 active:scale-[0.96] border ${collapsed ? 'justify-center' : ''}`}
           aria-label="Open your profile"
         >
           <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-xs font-medium border shrink-0 bg-glass-w5 border-white/10 text-retro-fg">
@@ -596,6 +600,18 @@ export function SidebarNav({
             </div>
           )}
         </button>
+        {onLogout && !collapsed && (
+          <button
+            type="button"
+            onClick={onLogout}
+            aria-label="Log out"
+            title="Log out"
+            className="p-1.5 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer shrink-0"
+          >
+            <LogOut className="w-3.5 h-3.5" strokeWidth={1.75} />
+          </button>
+        )}
+        </div>
       </div>
 
     </aside>
