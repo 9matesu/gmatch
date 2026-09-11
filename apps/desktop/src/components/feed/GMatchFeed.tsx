@@ -652,7 +652,7 @@ export function GMatchFeed({
 
         {/* Feed Posts List with Sharp Square Images */}
         <div className={`mt-3 ${feedCols === '1' ? 'space-y-3' : 'grid grid-cols-1 sm:grid-cols-2 gap-3' + (feedCols === '3' ? ' lg:grid-cols-3' : feedCols === '4' ? ' lg:grid-cols-3 xl:grid-cols-4' : feedCols === '5' ? ' lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5' : '')}`}>
-          {displayPosts.map((post, idx) => {
+          {displayPosts.map((post, _idx) => {
             const isLiked = !!likedPosts[post.id];
             const isSaved = !!savedPosts[post.id];
             const currentLikes = likeCounts[post.id] ?? post.like_count ?? 0;

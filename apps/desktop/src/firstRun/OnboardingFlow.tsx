@@ -15,13 +15,7 @@ import {
 } from 'lucide-react';
 import { saveUserProfile } from '../utils/profile';
 import { playPress, playWin } from '../utils/sounds';
-import {
-  type OnboardingState,
-  isOnboardingComplete,
-  onboardingStorageKey,
-  readOnboardingState,
-  writeOnboardingState,
-} from './onboardingState';
+import { type OnboardingState, isOnboardingComplete, readOnboardingState, writeOnboardingState } from './onboardingState';
 import { isDefaultPeerName } from '@orbit/shared';
 
 type Profile = { displayName: string; tags: string[]; pfpUrl?: string };

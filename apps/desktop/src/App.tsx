@@ -1742,7 +1742,7 @@ export default function Home() {
   const sendPanelRef = useRef<SendPanelHandle>(null)
   const storyFileInputRef = useRef<HTMLInputElement>(null)
 
-  const onDropOnUser = useCallback((userId: string, fileMeta: unknown) => {
+  const onDropOnUser = useCallback((userId: string, _fileMeta: unknown) => {
     setSelectedIds(new Set([userId]))
     setTimeout(() => sendPanelRef.current?.triggerUpload(), 100)
   }, [])

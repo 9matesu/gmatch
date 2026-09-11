@@ -141,7 +141,7 @@ function serveIdleFile(request) {
 }
 
 function init(dataPath, { ipcMain, BrowserWindow }) {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+   
   const { dialog, protocol } = require('electron')
   userDataPath = dataPath
   loadGrants()

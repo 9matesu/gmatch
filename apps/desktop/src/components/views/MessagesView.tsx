@@ -8,7 +8,7 @@ import type { User } from '@orbit/shared';
 import type { ChatMessage } from '../../hooks/useP2P';
 import type { useLobby } from '../../hooks/useLobby';
 import { SocialPanel, type SocialPanelTab } from '../chat/SocialPanel';
-import { GMatchDMs, type PeerInfo, type ThreadItem, type GroupInfo } from '../chat/GMatchDMs';
+import { GMatchDMs, type ThreadItem, type GroupInfo } from '../chat/GMatchDMs';
 import type { GroupMember } from '../chat/GroupMembersPopover';
 import { NotificationsPanel } from '../NotificationsPanel';
 import type { MainViewType } from '../home/HomeFooter';

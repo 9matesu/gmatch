@@ -6,26 +6,7 @@
 // Right = public directory browser (search, join, create).
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  Server,
-  Lock,
-  Globe,
-  Radio,
-  UserPlus,
-  ShieldCheck,
-  RefreshCw,
-  Pencil,
-  Check,
-  X,
-  Users,
-  Search,
-  ArrowDownUp,
-  ArrowLeft,
-  Clock,
-  MessageSquare,
-  Activity,
-  Plus,
-} from 'lucide-react'
+import { Lock, Globe, UserPlus, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, ArrowLeft, Clock, MessageSquare, Plus } from 'lucide-react'
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
 import { orbitFetch } from '../../utils/api'
 import { normalizeServerUrl } from '../../utils/serverUrl'

@@ -2,7 +2,7 @@
 
 // Extracted verbatim from App.tsx `mainView === 'profile'` branch.
 import type { OrbitIdentity } from '@orbit/crypto';
-import { getSecureItem, setSecureItem } from '../../utils/secure-storage'
+import { setSecureItem } from '../../utils/secure-storage'
 import type { OrbitObject, User } from '@orbit/shared';
 import { GMatchProfile } from '../profile/GMatchProfile';
 import type { FeedPost } from '../feed/GMatchFeed';

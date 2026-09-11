@@ -136,7 +136,7 @@ export function BooruSlideshow({ className = '' }: { className?: string }) {
 
   const goTo = useCallback((idx: number) => {
     playPress(700);
-    setActiveIndex((prev) => (images.length === 0 ? 0 : (idx + images.length) % images.length));
+    setActiveIndex((_prev) => (images.length === 0 ? 0 : (idx + images.length) % images.length));
   }, [images.length]);
 
   useEffect(() => {

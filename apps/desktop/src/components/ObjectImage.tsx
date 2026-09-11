@@ -159,7 +159,7 @@ export function ObjectImage({
         controls={controls}
         playsInline={playsInline}
         preload={preload}
-        onError={(e) => {
+        onError={(_e) => {
           onError?.()
           setHasError(true)
         }}
@@ -174,7 +174,7 @@ export function ObjectImage({
       className={className}
       loading={loading}
       fetchPriority={fetchPriority}
-      onError={(e) => {
+      onError={(_e) => {
         onError?.()
         setHasError(true)
       }}

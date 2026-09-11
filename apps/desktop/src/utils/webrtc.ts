@@ -131,7 +131,7 @@ export class OrbitPeer {
     return offerId
   }
 
-  async sendFile(file: File, identity: OrbitIdentity, recipientId: string): Promise<void> {
+  async sendFile(file: File, identity: OrbitIdentity, _recipientId: string): Promise<void> {
     logger.log('[ORBIT WebRTC] Preparing to stream file over WebRTC DataChannel:', file.name, 'Size:', file.size)
     if (!this.channel || this.channel.readyState !== 'open') {
       await new Promise<void>((resolve, reject) => {
@@ -219,7 +219,7 @@ export class OrbitPeer {
     this.startIcePoll(offerId, identity)
   }
 
-  private setupDataChannel(identity: OrbitIdentity) {
+  private setupDataChannel(_identity: OrbitIdentity) {
     if (!this.channel) return
     this.channel.binaryType = 'arraybuffer'
 

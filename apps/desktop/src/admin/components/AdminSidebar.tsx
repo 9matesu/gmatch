@@ -68,7 +68,7 @@ export function AdminSidebar({
       </div>
 
       <nav className="flex-1 overflow-y-auto p-3 space-y-3" role="list">
-        {sections.map((section, sectionIndex) => (
+        {sections.map((section, _sectionIndex) => (
           <div key={section} className="space-y-1">
             <div className="px-3 py-2 text-[9px] font-black uppercase tracking-[0.2em] text-retro-faint">
               {section}

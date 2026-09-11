@@ -54,7 +54,7 @@ export function AdminActionMenu<T>({
       {trigger || defaultTrigger}
       {open && (
         <div className="absolute right-0 top-full mt-1 z-50 min-w-[160px] bg-surface-elevated border border-border-glass rounded-lg shadow-lg overflow-hidden animate-orbit-pop">
-          {visibleActions.map((action, index) => {
+          {visibleActions.map((action, _index) => {
               const actionIcon = action.icon;
               const isIconFunction = typeof actionIcon === 'function';
               const ActionIcon = isIconFunction ? (actionIcon as (row: T) => React.ComponentType<{ className?: string }>)(row) : actionIcon;
