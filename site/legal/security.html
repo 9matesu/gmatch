@@ -51,128 +51,180 @@ th, td { border: 1px solid #27272a; padding: 6px 12px; text-align: left; font-we
 <body>
 <p><a href="../index.html#terms">← back to the main page</a></p>
 <p><em>Generated from docs/SECURITY-AUDIT.md (white-box).</em></p>
-<h1>gMatch — Auditoria de Segurança (static pentest)</h1>
-<p><strong>Escopo:</strong> white-box do fonte na branch <code>security/audit-hardening</code> (base <code>feat/secure-p2p-phase1</code> @ <code>e9414ed</code>+), app desktop Electron + API Hono/Bun + <code>@orbit/crypto|protocol</code>. Não houve alvo deployed para teste dinâmico — toda afirmação abaixo cita código verificável; os comandos "Provar" reproduzem cada achado.</p>
-<p><strong>Metodologia:</strong> superfícies de persistência (disco, localStorage/LS leveldb, IndexedDB, cache Chromium, snapshot SQLite do servidor), transporte (REST assinado, WS swarm, WS correio, WebRTC/ICE, TURN), autenticação e controle de acesso, primitivas criptográficas e protocolo de envelope, modelo de ameaças (a) forense do disco do usuário, (b) malware user-level, (c) operador do servidor, (d) MITM de rede, (e) abuso do painel admin.</p>
-<h2>Achados</h2>
+<h1>gMatch — Security Audit (static pentest)</h1>
+<p><strong>Scope:</strong> white-box of the source across four rounds (branches <code>security/audit-hardening</code>, <code>feat/encrypted-api-servers</code>, <code>fix/logic-consistency-sweep</code>, <code>security/wave2-ip-masks</code>): Electron desktop app + Hono/Bun API + <code>@orbit/crypto|protocol</code>. There was no deployed target for dynamic testing — every claim below cites verifiable code; the "Prove" commands reproduce each finding.</p>
+<p><strong>Methodology:</strong> persistence surfaces (disk, localStorage/LS leveldb, IndexedDB, Chromium cache, server SQLite snapshot), transport (signed REST, WS swarm, courier WS, WebRTC/ICE, TURN), authentication and access control, cryptographic primitives and the envelope protocol, threat model (a) user-disk forensics, (b) user-level malware, (c) server operator, (d) network MITM, (e) admin-panel abuse.</p>
+<h2>Round 1 (2026-09-09, v1.0)</h2>
 <pre>
-| # | Sev | Finding | Provar | Status |
+| # | Sev | Finding | Prove | Status |
 <pre>
-|---|---|---|---|---|
+|---|-----|---------|-------|--------|
 <pre>
-| F1 | ALTA | Cache de imagens adultas persistido **em disco plaintext**: `&lt;userData&gt;/image-cache/&lt;fnv1a(url)&gt;.&lt;ext&gt;` + `meta.json` (~150MB/250 arquivos LRU) + `feed-cache.json` (respostas de tag query, TTL 10min). | `grep -n "writeFileSync(path.join(cacheDir" apps/desktop/electron/imageCache.cjs` | ✅ fix B.1 — LRU **em memória** + migração destrutiva que apaga o cache antigo |
+| F1 | HIGH | Adult image cache persisted **plaintext on disk**: `&lt;userData&gt;/image-cache/&lt;fnv1a(url)&gt;.&lt;ext&gt;` + `meta.json` (~150MB/250 files LRU) + `feed-cache.json` (tag-query responses, 10min TTL). | `grep -n "writeFileSync(path.join(cacheDir" apps/desktop/electron/imageCache.cjs` | ✅ fix B.1 — in-memory LRU + destructive migration that wipes the old cache |
 <pre>
-| F2 | ALTA | Objetos/mídias servidos com `Cache-Control: public, max-age=31536000, immutable` → Chromium cache em disco + intermediários. | `grep -rn "max-age=31536000" apps/api/src/routes/objects.ts` | ✅ fix B.2 — `no-store` em todas as respostas de conteúdo |
+| F2 | HIGH | Objects/media served with `Cache-Control: public, max-age=31536000, immutable` → Chromium disk cache + intermediaries. | `grep -rn "max-age=31536000" apps/api/src/routes/objects.ts` | ✅ fix B.2 — `no-store` on every content response |
 <pre>
-| F3 | ALTA | Chaves privadas da identidade (Ed25519 + X25519) em **localStorage plaintext** (`orbit_identity`). | `grep -n "orbit_identity" apps/desktop/src/hooks/useIdentity.ts`; sem `safeStorage` no repo. | ✅ fix B.3 — `safeStorage` (DPAPI) com migração destrutiva |
+| F3 | HIGH | Identity private keys (Ed25519 + X25519) in **plaintext localStorage** (`orbit_identity`). | `grep -n "orbit_identity" apps/desktop/src/hooks/useIdentity.ts`; no `safeStorage` in the repo. | ✅ fix B.3 — `safeStorage` (DPAPI) with destructive migration |
 <pre>
-| F4 | MÉDIA | Admin PIN com **fallback hardcodado** (`ADMIN_PIN \|\| 'Ionwarehouse1'`), comparação em texto puro, sem lockout. | `grep -rn "Ionwarehouse1" apps/api/src/routes/admin.ts` | ✅ fix B.4 — sem env → admin 503; hash + lockout |
+| F4 | MEDIUM | Admin PIN with **hardcoded fallback** (`ADMIN_PIN \|\| 'Ionwarehouse1'`), plaintext comparison, no lockout. | `grep -rn "Ionwarehouse1" apps/api/src/routes/admin.ts` | ✅ fix B.4 — no env → admin 503; hash + lockout |
 <pre>
-| F5 | MÉDIA | Modo LEGACY (full-node/self-host): DMs com AES-storage **do servidor** (ele decripta para entregar) — não é E2EE. No SITE oficial o inbox não existe (gate 404) e o caminho é o correio E2EE. | `apps/api/src/pm.ts:6,136` + `crypto.ts:7-16` | 📋 decisão de produto documentada (ver "Modelo por modo"); `e2e-disclaimer` explica ao usuário |
+| F5 | MEDIUM | LEGACY mode (full-node/self-host): DMs use AES under the **server's** storage key (it decrypts to deliver) — not E2EE. On the official SITE the legacy inbox does not exist (404 gate); the path there is the E2EE courier. | `apps/api/src/pm.ts:6,136` + `crypto.ts:7-16` | 📋 documented product decision (see "Per-mode model"); `e2e-disclaimer` explains it to the user |
 <pre>
-| F6 | MÉDIA | Faltava prova automatizada de que o modo SITE nunca toca as tabelas de conteúdo (o snapshot SQLite só existe p/ full-node). | novo `apps/api/src/site-blindness.test.ts` | ✅ fix B.6 — teste-verificação end-to-end |
+| F6 | MEDIUM | No automated proof that SITE mode never touches content tables (the SQLite snapshot only exists for full-nodes). | new `apps/api/src/site-blindness.test.ts` | ✅ fix B.6 — end-to-end verification test |
 <pre>
-| F7 | BAIXA | CSP `connect-src` com wildcards `*.workers.dev`/`*.fly.dev`; `style-src 'unsafe-inline'`. | `sed -n 24-27p apps/api/src/middleware/security-headers.ts` | ✅ fix B.5 — origins exatos via `CSP_CONNECT_ORIGINS` (inline style mantido só em dev, documentado) |
+| F7 | LOW | CSP `connect-src` with wildcards `*.workers.dev`/`*.fly.dev`; `style-src 'unsafe-inline'`. | `sed -n 24-27p apps/api/src/middleware/security-headers.ts` | ✅ fix B.5 — exact origins via `CSP_CONNECT_ORIGINS` (inline style kept only in dev, documented) |
 <pre>
-| F8 | BAIXA | Threads/rooms courier e PFPs (data-URL) em localStorage plaintext. | `grep -n "orbit_mail_threads\|goonmatch_pfps" apps/desktop/src -r` | ✅ B.3 — secure KV (DPAPI) para todos os stores de conteúdo |
+| F8 | LOW | Courier threads/rooms and PFPs (data-URL) in plaintext localStorage. | `grep -n "orbit_mail_threads\|goonmatch_pfps" apps/desktop/src -r` | ✅ B.3 — secure KV (DPAPI) for all content stores |
 <pre>
-| F9 | BAIXA | (mesmo F8, pfp) | idem | ✅ |
+| F9 | LOW | (same as F8, pfp) | idem | ✅ |
 <pre>
-| F10 | INFO | Signed-URLs de streaming com TTL 7h na query (`?sig&amp;exp`) — risco de vazamento por histórico. | `grep -n "ttlSeconds" apps/api/src/crypto.ts` | ✅ fix B.7 — TTL 15min + single-use jti (replay/legacy-URL dead) |
+| F10 | INFO | Streaming signed-URLs with 7h TTL in the query (`?sig&amp;exp`) — history-leak risk. | `grep -n "ttlSeconds" apps/api/src/crypto.ts` | ✅ fix B.7 — 15min TTL + single-use jti (replay/legacy-URL dead) |
 </pre>
-<h2>Controles verificados que JÁ existiam (positivos)</h2>
+<h2>Verified controls that ALREADY existed (positives)</h2>
 <ul>
-<li><strong>Auth:</strong> assinatura Ed25519 <code>method|url|timestamp|nonce|body</code> em toda mutação; janela de timestamp; nonce-server + replay-block; <code>orbitId = sha256(pubkey)</code> re-hash server-side. <code>apps/api/src/middleware/auth.ts</code>.</li>
-<li><strong>Envelope v2 E2EE</strong> (<code>packages/protocol/src/envelope.ts</code>): corpo + identidade do remetente DENTRO do seal; binding Ed25519 sobre <code>v2|kind|id|to|body</code> (anti-rebinding de kind/destinatário); X25519-ECIES + XChaCha20-Poly1305 + BLAKE3 KDF (13 testes).</li>
-<li><strong>Correio cego</strong> (<code>apps/api/src/mail-store.ts</code>, <code>routes/mail.ts</code>): validação de FORMA apenas; bytes verbatim; ack só com prova de posse da chave (quem chuta token não apaga caixa alheia — teste com assinatura forjada); WS 100% anônimo (nenhum frame declara identidade); TTL + caps anti-flood.</li>
-<li><strong>TURN</strong> (<code>routes/turn.ts</code>, <code>turn-creds.ts</code>): username <code>&lt;rand16hex&gt;:&lt;exp&gt;</code> — logs do relay NÃO ligam tráfego a identidade; HMAC auth-secret padrão coturn; sem creds → STUN-only sem hardcode de relay terceiro.</li>
-<li><strong>ICE hygiene</strong> (<code>apps/desktop/src/utils/ice-hygiene.ts</code> + testes): candidatos host/srflx com IP literal descartados na origem dos dois stacks; só mDNS <code>.local</code> + relay.</li>
-<li><strong>SSRF guard</strong> (<code>apps/api/src/proxy.ts:34</code>, <code>routes/objects.ts:128</code>): loopback/link-local/private ranges bloqueados no proxy de URL externa.</li>
-<li><strong>PII em logs</strong> (<code>security-headers.ts: redactIp</code>): X-Forwarded-For/X-Real-IP redigidos.</li>
+<li><strong>Auth:</strong> Ed25519 signature over <code>method|url|timestamp|nonce|body</code> on every mutation; timestamp window; server nonce + replay-block; <code>orbitId = sha256(pubkey)</code> re-hashed server-side. <code>apps/api/src/middleware/auth.ts</code>.</li>
+<li><strong>Envelope v2 E2EE</strong> (<code>packages/protocol/src/envelope.ts</code>): body + sender identity INSIDE the seal; Ed25519 binding over <code>v2|kind|id|to|body</code> (anti-rebinding of kind/recipient); X25519-ECIES + XChaCha20-Poly1305 + BLAKE3 KDF (13 tests).</li>
+<li><strong>Blind courier</strong> (<code>apps/api/src/mail-store.ts</code>, <code>routes/mail.ts</code>): SHAPE validation only; bytes stored verbatim; ack only with key-ownership proof (a token-guesser cannot drain someone else's box — forged-signature test); WS 100% anonymous (no frame declares identity); TTL + anti-flood caps.</li>
+<li><strong>TURN</strong> (<code>routes/turn.ts</code>, <code>turn-creds.ts</code>): username <code>&lt;rand16hex&gt;:&lt;exp&gt;</code> — relay logs do NOT link traffic to identity; standard coturn HMAC auth-secret; no creds → STUN-only, no hardcoded third-party relay.</li>
+<li><strong>ICE hygiene</strong> (<code>apps/desktop/src/utils/ice-hygiene.ts</code> + tests): host/srflx candidates with literal IPs dropped at the source on both stacks; only mDNS <code>.local</code> + relay.</li>
+<li><strong>SSRF guard</strong> (<code>apps/api/src/proxy.ts:34</code>, <code>routes/objects.ts:128</code>): loopback/link-local/private ranges blocked on the external-URL proxy.</li>
+<li><strong>PII in logs</strong> (<code>security-headers.ts: redactIp</code>): X-Forwarded-For/X-Real-IP redacted.</li>
 <li><strong>X-Frame-Options DENY; Referrer-Policy no-referrer; COEP strict</strong> (<code>security-headers.ts</code>).</li>
-<li><strong>At-rest AES-256-GCM</strong> para blobs e PMs no full-node (dump do SQLite não entrega plaintext) — defesa em profundidade do F5.</li>
-<li><strong>Age gate 18+ inescapável</strong> no primeiro run + <strong>hard blocklist de tags</strong> aplicada no main process (SPEC §8) — CSAM/incest/animals/non-consent etc. bloqueados na origem de toda requisição booru.</li>
-<li><strong>SITE_SERVICES</strong> (<code>site-services.ts</code> + testes): no modo site, TODAS as rotas de conteúdo (pm, posts, objects, users, signal, lobby...) e o WS de swarm legado respondem 404 na borda.</li>
-<li><strong>Deleção de conta</strong> (<code>users.delete('/account')</code>) e expiração de stories (12h) + limpeza periódica (<code>cleanup.ts</code>).</li>
-<li><strong>Sem telemetria</strong>: nenhuma requisição de analytics no app; <code>grep -rn "analytics\|sentry\|beacon" apps/desktop/src</code> → 0.</li>
+<li><strong>At-rest AES-256-GCM</strong> for blobs and PMs on the full-node (a SQLite dump does not yield plaintext) — defense in depth for F5.</li>
+<li><strong>Inescapable 18+ age gate</strong> on first run + <strong>hard tag blocklist</strong> enforced in the main process (SPEC §8) — CSAM/incest/animals/non-consent etc. blocked at the origin of every booru request.</li>
+<li><strong>SITE_SERVICES</strong> (<code>site-services.ts</code> + tests): in site mode, ALL content routes (pm, posts, objects, users, signal, lobby…) and the legacy swarm WS answer 404 at the edge.</li>
+<li><strong>Account deletion</strong> (<code>users.delete('/account')</code>) and story expiry (12h) + periodic cleanup (<code>cleanup.ts</code>).</li>
+<li><strong>No telemetry</strong>: zero analytics requests in the app; <code>grep -rn "analytics\|sentry\|beacon" apps/desktop/src</code> → 0.</li>
 </ul>
-<h2>Ameaças modeladas → cobertura</h2>
+<h2>Threats modeled → coverage</h2>
 <pre>
-| Ameaça | Mitigação no código |
+| Threat | Mitigation in code |
 <pre>
 |---|---|
 <pre>
-| (a) Forense do disco do usuário | F1/F2/F3/F8 → runtime-only: imagens só em RAM, `no-store`, chaves e threads em DPAPI, `storage.key` local |
+| (a) User-disk forensics | F1/F2/F3/F8 → runtime-only: images in RAM only, `no-store`, keys and threads in DPAPI, local `storage.key` |
 <pre>
-| (b) Malware user-level | DPAPI não ajuda (mesma sessão) — mitigado por: export de chave só via modal explícito + `will-prevent-unload` com aviso; limite honesto no ToS |
+| (b) User-level malware | DPAPI does not help (same session) — mitigated by: key export only via explicit modal + `will-prevent-unload` warning; honest limit stated in the ToS |
 <pre>
-| (c) Operador do servidor | Correio cego + envelope sig + token público + TURN random + ICE hygiene + SITE gate: o host oficial NÃO vê conteúdo, identidade de conversa, presença, nem grafo. Full-node: o HOST É o servidor — `e2e-disclaimer` declara |
+| (c) Server operator | Blind courier + envelope signature + public token + random TURN + ICE hygiene + SITE gate: the official host does NOT see content, conversation identity, presence, or the graph. Full-node: the HOST IS the server — `e2e-disclaimer` says so |
 <pre>
-| (d) MITM de rede | TLS na API + payloads já E2EE; replay protegido por nonce/signature; CSP sem origens arbitrárias (F7 corrigido) |
+| (d) Network MITM | TLS on the API + payloads already E2EE; replay protected by nonce/signature; CSP without arbitrary origins (F7 fixed) |
 <pre>
-| (e) Abuso de admin | PIN com hash + lockout + sem default (F4); unseal de conteúdo só via key-disclosure da vítima (plan courier P5, fase futura) |
+| (e) Admin abuse | PIN hashed + lockout + no default (F4); wave 2 adds identity binding + 12h grant TTL (F22); content unseal only via victim key-disclosure (implemented: report-scoped cases) |
 </pre>
-<h2>Modelo por modo (F5, decisão registrada)</h2>
+<h2>Per-mode model (F5, recorded decision)</h2>
 <ul>
-<li><strong>SITE oficial (<code>SITE_SERVICES=mail,turn</code>)</strong>: correio puro. O servidor é stateless para conteúdo (nenhuma tabela escrita; ver <code>site-blindness.test.ts</code>), guarda envelopes opacos por ≤7d e não sabe quem conecta.</li>
-<li><strong>Full-node self-host</strong>: conveniência LAN/comunidade — o ADMINS-DO-HOST vê PMs/blobs com a chave dele, igual a qualquer servidor central histórico. Não é "o servidor deles", é o seu. ToS + disclaimer deixam isso explícito.</li>
+<li><strong>Official SITE (<code>SITE_SERVICES=mail,turn</code>)</strong>: pure courier. The server is stateless for content (no table ever written; see <code>site-blindness.test.ts</code>), keeps opaque envelopes for ≤7d and does not know who connects.</li>
+<li><strong>Self-hosted full-node</strong>: LAN/community convenience — the HOST'S ADMINS see PMs/blobs with their own key, like any historical central server. It is not "their server", it is yours. ToS + disclaimer make this explicit.</li>
 </ul>
-<h2>Limitações / não-alcance</h2>
+<h2>Limitations / out of reach</h2>
 <ul>
-<li>Sem forward secrecy (X25519 estático por conta) — ratchet/prekeys ficam como hardening 1.x futuro.</li>
-<li>Sem onion-routing — correlação tráfego×tempo residual em qualquer correio (mitigada com padding/jitter no cliente; não eliminável).</li>
-<li>Auditoria é estática: não substitui pentest dinâmico por terceiros nem revisão de counsel humana para o jurídico.</li>
+<li>No forward secrecy (static X25519 per account) — ratchet/prekeys remain future 1.x hardening.</li>
+<li>No onion-routing — residual traffic×time correlation on any courier (mitigated client-side with padding/jitter; not eliminable).</li>
+<li>The audit is static: it does not replace third-party dynamic pentesting or human counsel review for the legal side.</li>
 </ul>
-<h2>Checklist de runtime-only (como verificar hoje)</h2>
+<h2>Runtime-only checklist (how to verify today)</h2>
 <pre>
-# 1) nada de imagem em disco após rodar o app:
-ls "$APPDATA/@gmatch/desktop/image-cache" 2&gt;/dev/null; echo "exit=$?"   # esperado: não existe / exit≠0
-# 2) respostas sem cache:
+# 1) no image on disk after running the app:
+ls "$APPDATA/@gmatch/desktop/image-cache" 2&gt;/dev/null; echo "exit=$?"   # expected: missing / exit≠0
+# 2) responses without cache:
 curl -sI "$API_BASE/api/objects/&lt;own-id&gt;" | grep -i cache-control          # no-store
-# 3) sem chave no localStorage:
-#    (abrir DevTools do app) localStorage.getItem('orbit_identity')          # null
-#    arquivo cifrado: &lt;userData&gt;/identity.bin (DPAPI)
-# 4) admin sem env desabilitado: POST /api/admin/verify-pin → 503 sem ADMIN_PIN_HASH
+# 3) no key in localStorage:
+#    (open the app's DevTools) localStorage.getItem('orbit_identity')       # null
+#    encrypted file: &lt;userData&gt;/identity.bin (DPAPI)
+# 4) admin disabled without env: POST /api/admin/verify-pin → 503 without ADMIN_PIN_HASH
 </pre>
-<h2>Rodada 2 (2026-09-09, v1.1+ / branch feat/encrypted-api-servers)</h2>
+<h2>Round 2 (2026-09-09, v1.1+ / branch feat/encrypted-api-servers)</h2>
 <pre>
-| # | Sev | Achado | Repro | Status |
+| # | Sev | Finding | Repro | Status |
 <pre>
-|---|-----|--------|-------|--------|
+|---|-----|---------|-------|--------|
 <pre>
-| F11 | ALTA | Mutação assinada viajava com body JSON + headers em **texto puro** — qualquer MITM/observador da rede via corpo, path e a rota-alvo do usuário. | `grep -n "X-Orbit-Signature" apps/desktop/src/utils/api.ts` | ✅ fix T2 — ECIES para a X25519 key do nó (`GET /api/identity`), header `X-Orbit-Sealed`; body/headers legíveis só no nó (testes `packages/protocol/src/api-seal.test.ts`, `apps/api/src/middleware/unseal.test.ts`, `apps/desktop/src/utils/api.seal.test.ts`) |
+| F11 | HIGH | Signed mutations traveled with JSON body + headers in **plaintext** — any network MITM/observer saw the body, path and the user's target route. | `grep -n "X-Orbit-Signature" apps/desktop/src/utils/api.ts` | ✅ fix T2 — ECIES to the node's X25519 key (`GET /api/identity`), header `X-Orbit-Sealed`; body/headers readable only at the node (tests `packages/protocol/src/api-seal.test.ts`, `apps/api/src/middleware/unseal.test.ts`, `apps/desktop/src/utils/api.seal.test.ts`) |
 <pre>
-| F12 | MÉDIA | Nenhum controle de acesso ao **criar/entrar** em servidores: qualquer key poderia poluir o diretório ou se fingir host. | novo `apps/api/src/routes/servers.test.ts` | ✅ T3 — registro exige orbitAuth Ed25519; hint de endpoint revelado só a chamados assinados; 5/max-dono; stale 24h |
+| F12 | MEDIUM | No access control on **creating/joining** servers: any key could pollute the directory or impersonate a host. | new `apps/api/src/routes/servers.test.ts` | ✅ T3 — registration requires orbitAuth Ed25519; endpoint hint revealed only to signed callers; 5/max-owner; stale 24h |
 <pre>
-| F13 | BAIXA | Userlist do nó exporia last_seen preciso. | `GET /api/servers/dashboard` anônimo | ✅ T4 — anônimo = só contagens; membros = id truncado (8) + boolean 60s |
+| F13 | LOW | Node userlist exposed precise last_seen. | `GET /api/servers/dashboard` anonymous | ✅ T4 — anonymous = counts only; members = truncated id (8) + 60s boolean |
 <pre>
-| F14 | MÉDIA | Servidores privados sem senha = qualquer key descoberta podia escrever (orbitAuth auto-cria Users!). | novo `apps/api/src/routes/password.test.ts` | ✅ T5 — scrypt no SystemMeta do host + gate de escrita p/ newcomers (allowlist assinada, epoch grandfathered, lockout 5/15) |
+| F14 | MEDIUM | Private servers without a password = any discovered key could write (orbitAuth auto-creates Users!). | new `apps/api/src/routes/password.test.ts` | ✅ T5 — scrypt in the host's SystemMeta + write gate for newcomers (signed allowlist, epoch grandfathered, lockout 5/15) |
 <pre>
-| F15 | BAIXA | Handoff de servidor sem mecanismo seguro de backup. | novo `apps/api/src/routes/snapshot.test.ts` | ✅ T6 — `/api/snapshot` admin-only, allowlist de conteúdo, nunca exporta SystemMeta/Sessions/ServerDirectory |
+| F15 | LOW | Server handoff without a secure backup mechanism. | new `apps/api/src/routes/snapshot.test.ts` | ✅ T6 — `/api/snapshot` admin-only, content allowlist, never exports SystemMeta/Sessions/ServerDirectory |
 </pre>
-<p>Pendências honestas da rodada 2: replicação automática multi-réplica NÃO</p>
-<p>implementada (export/import manual cobre v1; ver ADR-002). Kill-switch</p>
-<p><code>API_SEALED_ONLY</code> ainda aceita legado assinado (mitigação de suporte,</p>
-<p>documentada). B.7 (signed URLs) permanece fechado na rodada 1.</p>
-<h2>Rodada 3 (2026-09-10, v1.1.3+ / branch fix/logic-consistency-sweep)</h2>
+<p>Honest open items from round 2: automatic multi-replica replication NOT</p>
+<p>implemented (manual export/import covers v1; see ADR-002). The</p>
+<p><code>API_SEALED_ONLY</code> kill-switch still accepts legacy signed requests (support</p>
+<p>mitigation, documented). B.7 (signed URLs) remains closed from round 1.</p>
+<h2>Round 3 (2026-09-10, v1.1.3+ / branch fix/logic-consistency-sweep)</h2>
 <pre>
-| # | Sev | Achado | Repro | Status |
+| # | Sev | Finding | Repro | Status |
 <pre>
-|---|-----|--------|-------|--------|
+|---|-----|---------|-------|--------|
 <pre>
-| F16 | ALTA | `idle-credit` aceitava QUALQUER inteiro 1..1M por throttle de 60s — a SPEC dizia ledger "autoritativo", mas a validação de taxa de ganho só existia no cliente (jogador mal-intencionado forjava g$ em nós compartilhados/federados; rankings viravam ficção). | histórico `economy-idle.ts` (sem gate) | ✅ envelope server-side: `idleEnvelope` = 1.5× taxa reivindicada × elapsed + 5 (teto de claim 50k/s); primeiro flush pós-boot do nó é confiável por design. Testes `economy-idle.test.ts` (16). Escopo honesto: no SEU nó disciplina crashes; em nós alheios limita o cheat ao teto documentado, não elimina. |
+| F16 | HIGH | `idle-credit` accepted ANY integer 1..1M per 60s throttle — the SPEC called the ledger "authoritative", but the earning-rate validation existed only client-side (a malicious player forged g$ on shared/federated nodes; rankings became fiction). | historical `economy-idle.ts` (no gate) | ✅ server-side envelope: `idleEnvelope` = 1.5× claimed rate × elapsed + 5 (claim ceiling 50k/s); the node's first post-boot flush is trusted by design. Tests `economy-idle.test.ts` (16). Honest scope: on YOUR node it disciplines crashes; on other people's nodes it caps cheating at the documented ceiling, it does not eliminate it. |
 <pre>
-| F17 | BAIXA | `buyCard` bloqueia auto-compra de listing próprio desde o scaffold (guard + teste existentes) — mas o StoreTab oferecia botão Buy ativo no próprio listing (403 confuso ao clicar). | `grep "own card" apps/api/src/cards.test.ts` | ✅ badge "Yours" no lugar do botão (UI honesta; server já estava certo). |
+| F17 | LOW | `buyCard` has blocked self-purchase of one's own listing since the scaffold (guard + test existed) — but StoreTab offered an active Buy button on your own listing (confusing 403 on click). | `grep "own card" apps/api/src/cards.test.ts` | ✅ "Yours" badge replaces the button (honest UI; the server was already right). |
 <pre>
-| F18 | MÉDIA | Debuffs de hack pagos viviam em ARRAY EM MEMÓRIA — reiniciar o sidecar (todo relaunch do app!) comia o efeito ativo da vítima e a sessão de spy-feed do atacante já cobrada em g$. | `grep -n "activeServerHacks" apps/api/src/routes/users.ts` (histórico) | ✅ tabela `HackDebuffs` (migração 048): INSERT via lote atômico do débito (gate `changes()`), prune/leituras via DB; cleanup de conta + allowlist de snapshot ligados. Teste "survives module re-init" (`spy-feed.test.ts`). |
+| F18 | MEDIUM | Paid hack debuffs lived in an IN-MEMORY ARRAY — restarting the sidecar (every app relaunch!) ate the victim's active effect and the attacker's already-charged g$ spy-feed session. | `grep -n "activeServerHacks" apps/api/src/routes/users.ts` (historical) | ✅ `HackDebuffs` table (migration 048): INSERT via the debit's atomic batch (gate `changes()`), prune/reads via DB; account cleanup + snapshot allowlist wired. "Survives module re-init" test (`spy-feed.test.ts`). |
 <pre>
-| F19 | BAIXA | Ações de Domination nunca-acked (vítima fechou o app; câmera bloqueada pelo SO) ficavam `sent` para sempre — UI honesta ("awaiting") mas estado terminal inexistente. | `SELECT count(*) FROM DominationActions WHERE status='sent'` antigo | ✅ sweep 30min `sent→expired` no `deleteExpiredContent` (3d) + chips "fizzled/skipped" com explicação do reembolso-zero e nota no modal de câmera. |
+| F19 | LOW | Never-acked Domination actions (victim closed the app; OS blocked the camera) stayed `sent` forever — honest UI ("awaiting") but no terminal state. | old `SELECT count(*) FROM DominationActions WHERE status='sent'` | ✅ 30min sweep `sent→expired` in `deleteExpiredContent` (3d) + "fizzled/skipped" chips explaining the zero-refund and a note in the camera modal. |
 </pre>
-<p>Admin (refactor de privacidade, mesma semana): leitura em massa de DMs e</p>
-<p>analytics de referrer REMOVIDAS do software; disclosure agora é report-scoped</p>
-<p>(<code>GET /api/admin/cases/:id</code> — a linha "(e) key-disclosure fase futura" da</p>
-<p>rodada 1 torna-se realidade implementada). Ledger completo em</p>
-<p><code>docs/ADMIN-SUITE.md</code>.</p>
+<p>Admin (privacy refactor, same week): bulk DM reading and referrer analytics</p>
+<p>REMOVED from the software; disclosure is now report-scoped</p>
+<p>(<code>GET /api/admin/cases/:id</code> — the round-1 line "(e) key-disclosure future</p>
+<p>phase" becomes implemented reality). Full ledger in <code>docs/ADMIN-SUITE.md</code>.</p>
+<h2>Round 4 (2026-09-11, wave 2 / branch security/wave2-ip-masks)</h2>
+<pre>
+| # | Sev | Finding | Repro | Status |
+<pre>
+|---|-----|---------|-------|--------|
+<pre>
+| F20 | HIGH | Multipart uploads stored **raw bytes**: the EXIF stripper only ran on the external-URL proxy path (`proxy.ts`) — a phone photo with GPS went straight in via `POST /api/objects`. | `git log -S stripImageMetadata -- apps/api/src/routes/objects.ts` (before: absent) | ✅ shared `metadata-strip.ts` (JPEG APP1-15+COM, PNG tEXt/eXIf/iTXt/zTXt/tIME/iCCP, GIF app/comment extensions, WebP EXIF/XMP/ICCP) applied on ingress (upload, `data:` pfp) and egress (proxy already covered); dedup hash computed over clean bytes. Tests `metadata-strip.test.ts`, `metadata-ingress.test.ts`. |
+<pre>
+| F21 | MEDIUM | Delivery token = `blake3(pubkey)` **static**: the courier could correlate every box ever addressed to you, forever. | `packages/protocol/src/mail.ts` (historical) | ✅ per-boot rotation (`sessionDeliveryToken = blake3(pubkey‖epoch)`); the epoch travels sealed inside dm/ack bodies; the home box stays a one-boot fallback. The courier schema is untouched. Tests `mail-store.test.ts` (ack with epoch), `handleRotation.test.ts`. |
+<pre>
+| F22 | HIGH | Admin = **whoever knew the PIN last** (`verify-pin` flipped `is_admin` universally); with no identity binding, a leaked PIN = admin of any node. | historical `admin.ts`: UPDATE Users SET is_admin=0 → grant to caller | ✅ `ADMIN_ORBIT_ID` (when configured, identity check BEFORE the PIN compare, same 401 + lockout); 12h grant TTL (`admin_grant_at` in SystemMeta, enforced by `adminAuth`); guard sweep over EVERY admin route (`admin-guard.test.ts`); `pinFails` map cap (10k). Self-host nodes keep the host-is-admin model (documented in F5). |
+<pre>
+| F23 | MEDIUM | Identity headers (`X-Orbit-Id`, signature) on **GETs** traveled in plaintext — a network observer knew WHO fetched what. | historical `api.ts`: `if (method !== 'GET' &amp;&amp; ...)` on the seal | ✅ GETs seal their headers (empty body; `API_SEALED_ONLY` now covers GET — the flip is a release-time step, client first). Query strings audited: no parameter carries identity. Tests `unseal.test.ts`, `api.seal.test.ts`. |
+<pre>
+| F24 | LOW | `GET /users/:id/pfp` issued a **302 to an external host** when the avatar was a URL — leaking the viewer's IP to a third party. | historical `routes/users.ts:47` | ✅ new writes no longer accept raw URLs: `http(s)` goes through `proxyAndStoreExternal` (failure → 400), `data:` is stripped; the 302 remains only for legacy rows. |
+<pre>
+| F25 | LOW | The rate limiter kept **raw IPs as in-memory map keys**. | historical `rate-limit.ts` `getClientIp` | ✅ key = `sha256(boot-salt‖IP)[0:16]`; `security-greps.sh` proves no other module reads XFF/X-Real-IP. |
+</pre>
+<h2>What we did NOT solve (honest)</h2>
+<ul>
+<li><strong>TCP-layer IP</strong>: the network edge (fly.io; Cloudflare once the official</li>
+</ul>
+<p>  node is proxied) still sees client IPs — code cannot fix that. What the code</p>
+<p>  guarantees: the application layer never stores, echoes, logs or renders an</p>
+<p>  IP (F25/B3/B4; <code>scripts/security-greps.sh</code> is the gate). Pending ops step:</p>
+<p>  front the official node behind a reverse proxy (CF Proxied).</p>
+<ul>
+<li><strong>Traffic×time correlation</strong> on the courier remains possible (padding/jitter</li>
+</ul>
+<p>  only; without onion-routing it cannot reach zero — round 1 already said so).</p>
+<ul>
+<li><strong>Video metadata</strong> (mp4/webm) is not stripped (pure-JS parser limit; upgrade</li>
+</ul>
+<p>  path: ffmpeg-sidecar if ever demanded).</p>
+<ul>
+<li>The <code>location</code> field on posts is author-typed text (content, not file</li>
+</ul>
+<p>  metadata) — the app never fills it automatically.</p>
+<ul>
+<li>The pentest remains <strong>static + local tests</strong>: it does not replace a</li>
+</ul>
+<p>  third-party dynamic audit.</p>
+<ul>
+<li><code>API_SEALED_ONLY</code> covering GET is only flipped AFTER the seal-GET client</li>
+</ul>
+<p>  release is distributed (support kill-switch, same policy as round 2).</p>
+<h2>Runtime gate (wave 2)</h2>
+<pre>
+bash scripts/security-greps.sh          # expected: ALL GREPS CLEAN
+# admin without allowlisted identity: ADMIN_ORBIT_ID unset → host-is-admin model (self-host)
+# expired grant: GET /api/admin/dashboard → 403 "Admin grant expired" after 12h
+# legacy pfp: an old row with http:// still 302s (accepted, documented in F24)
+</pre>
 <hr>
 <p>Contact: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · This page uses no JavaScript, no external fonts, no cookies and no analytics.</p>
 </body>

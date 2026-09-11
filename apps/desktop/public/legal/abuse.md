@@ -1,6 +1,6 @@
 # Abuse Reports & Notice-and-Takedown
 
-_Binding text (EN)_: **2026-09-09.2** · updated: 2026-09-09
+_Binding text (EN)_: **2026-09-11.1** · updated: 2026-09-09
 Jurisdiction: MGA 512 (US) as reference; LGPD/CC Brazil for removal
 
 ## 1. The honest E2EE problem

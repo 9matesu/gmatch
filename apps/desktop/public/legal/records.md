@@ -1,6 +1,6 @@
 # Adult Content & Records (18 U.S.C. §2257-adjacent)
 
-_Binding text (EN)_: **2026-09-09.2** · updated: 2026-09-09
+_Binding text (EN)_: **2026-09-11.1** · updated: 2026-09-09
 Jurisdiction: US (for publishers of explicit content under US jurisdiction); analogous local laws
 
 ## 1. Who is the "publisher"

@@ -1,6 +1,6 @@
 # Terms of Use
 
-_Binding text (EN)_: **2026-09-09.2** · updated: 2026-09-09
+_Binding text (EN)_: **2026-09-11.1** · updated: 2026-09-09
 Jurisdiction: Brazil (LGPD); GDPR applies additionally where applicable
 
 ## 1. Eligibility and age

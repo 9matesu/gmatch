@@ -177,6 +177,7 @@ const cl = [
     version.docs.map((d) => `<tr><td><a href="${d === 'e2e-disclaimer' ? 'e2e' : d}.html">${esc(d)}</a></td><td>${esc(version.version)}</td></tr>`).join('') +
     '</table>',
   '<p>2026-09-09.2 — English-only binding corpus (terms, LGPD/GDPR privacy, community, abuse reports, adult records, E2E notice).</p>',
+  '<p>2026-09-11.1 — wave-2 privacy facts: rotating session delivery addresses, salted-hash rate-limit keys, masked server addresses, image metadata stripped on ingress.</p>',
 ].join('\n')
 writeFileSync(join(OUT, 'changelog.html'), page('Legal changelog', cl, 'Generated from legal/version.json — canonical source: apps/desktop/src/legal/documents.ts.'))
 n++

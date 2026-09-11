@@ -245,19 +245,25 @@ offline earnings). Each +5% click power. Persist across prestige.
 - zustand state → localStorage `gmatch.save.v1`, autosave every 10s + on unload.
 - Offline earnings = elapsed * GP/s * 25%, capped 8h, shown in modal on load.
 
-## 12. Release 1.0 — server topology (no central server)
+## 12. Server topology (central courier + opt-in host mode)
 
 - Every packaged copy bundles its OWN server: `apps/desktop/scripts/stage-api.cjs`
   stages a self-contained API (`packages/{crypto,shared}` + `apps/api` + prod
   deps + `bun.exe`) at `api-stage/`; electron-builder ships it as
   `resources/api` (`extraResources`). Nothing must be installed on the machine.
 - Packaged startup (`electron/main.cjs` + `electron/server-mode.cjs`):
-  - **host** (default): spawn the bundled server on `:8790` (world data lives in
-    `userData/orbit.sqlite` + `userData/blobs`); Settings → Server lists this
-    machine's LAN URLs (`http://<ip>:8790`) to share with friends.
-  - **client**: skip the local server; the renderer points at a friend's URL
-    (validated `http(s)://host[:port]`, persisted in `userData/server-mode.json`,
-    applied on relaunch). `GMATCH_SERVER_URL` env overrides both.
+  - **client** (default): the central node `https://gmatch.fly.dev` — a blind
+    courier (mail + TURN only; content routes 404 at the edge). A persisted
+    `userData/server-mode.json` may point at any friend's node instead
+    (validated `http(s)://host[:port]`, applied on relaunch).
+    `GMATCH_SERVER_URL` env overrides both.
+  - **host** (opt-in in Settings → Server): spawn the bundled server on
+    `:8790` (world data lives in `userData/orbit.sqlite` + `userData/blobs`);
+    the Server tab lists this machine's LAN URLs (`http://<ip>:8790`) to share
+    with friends.
+  - Nodes are reachable WITHOUT the hub (wave 2): the directory gossips
+    through whichever node you are on into `orbit_node_directory_v1`, and
+    `gmatch://node/...` codes (`utils/nodeMask.ts`) join a node out-of-band.
 - Discovery across machines = everyone on the SAME host's server: WS swarm
   relays presence, `GET /api/users/online` (last_seen ≤ 60s, minus caller)
   seeds a joining client's peer map immediately; WebRTC direct fanout uses

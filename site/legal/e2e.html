@@ -52,12 +52,12 @@ th, td { border: 1px solid #27272a; padding: 6px 12px; text-align: left; font-we
 <p><a href="../index.html#terms">← back to the main page</a></p>
 <p><em>Generated from the canonical in-app source — do not edit here.</em></p>
 <h1>Encryption &amp; Self-Custody Disclaimer</h1>
-<p>_Binding text (EN)_: <strong>2026-09-09.2</strong> · updated: 2026-09-09</p>
+<p>_Binding text (EN)_: <strong>2026-09-11.1</strong> · updated: 2026-09-09</p>
 <p>Jurisdiction: Technical explanation tied to Terms §8</p>
 <h2>1. What the official server NEVER sees</h2>
 <p>DM/post/room content or names; who talks to whom (the courier routes hashes — you map IDs to your box locally); who is online; your images, text or history.</p>
 <h2>2. What it DOES see</h2>
-<p>The delivery address (hash of your public key) with minimal metadata (size, time, TTL) and anonymous TURN credential requests.</p>
+<p>The delivery address — a one-way hash of your public key that ROTATES every session (contacts learn the new address from inside the sealed messages themselves) — with minimal metadata (size, time, TTL) and anonymous TURN credential requests. Images you upload leave with pixels only: every metadata container (EXIF/GPS, XMP, text chunks) is stripped on the way in.</p>
 <h2>3. Keys: what self-custody means</h2>
 <p>Private keys live only on your device (DPAPI-encrypted on Windows when available). No server can "reset my password". Lose the backup, lose the account — no exceptions.</p>
 <h2>4. TOFU (trust-on-first-use)</h2>

@@ -21,7 +21,7 @@ npm run serve:api       # terminal 1 (needs bun: npm i -g --allow-scripts=bun bu
 npm run dev             # terminal 2
 ```
 
-## Release .exe (no central server)
+## Release .exe
 
 ```
 cd apps/desktop
@@ -30,10 +30,12 @@ npm run dist            # icon -> stage api (bun.exe + self-contained server) ->
 # artifact: release/gMatch-<version>-portable.exe  (single file, runs straight)
 ```
 
-Every copy bundles its own server: **host** mode (default) runs it locally and
-Settings → Server shows the LAN addresses (`http://192.168.x.x:8790`) to give
-friends; a friend switches their copy to **client** mode with that address.
-One world per host — no cloud account, no telemetry. Pushing a `v*` tag runs
+The packaged default is **client** mode pointing at the central node
+(`https://gmatch.fly.dev` — a blind courier: it relays encrypted envelopes it
+cannot open). **Host** mode is opt-in in Settings → Server: every copy still
+bundles its own full server (bun sidecar on `:8790`), shows the LAN addresses
+to give friends, and one world lives per host. No cloud account, no telemetry.
+Pushing a `v*` tag runs
 `.github/workflows/release.yml`, which gates on lint/typecheck/tests and
 publishes the exe to the GitHub release.
 

@@ -1,6 +1,6 @@
 # Privacy Policy (LGPD/GDPR)
 
-_Binding text (EN)_: **2026-09-09.2** · updated: 2026-09-09
+_Binding text (EN)_: **2026-09-11.1** · updated: 2026-09-09
 Jurisdiction: LGPD (Lei 13.709/2018); GDPR for EU users
 
 ## 1. Who is the controller
@@ -17,7 +17,7 @@ Contract performance (delivering the service you asked for) + legitimate interes
 
 - No presence: site mode exposes nothing about who is online, the social graph, profiles or posts.
 
-- No IP: TURN credential requests use an ephemeral random identity per session; server logs record redacted IPs (last octet removed).
+- No IP: TURN credential requests use an ephemeral random identity per session; server logs record redacted IPs (last octet removed); the rate limiter keys buckets on a salted one-way hash, never the address itself; the app never displays a raw server address (masked as 203.0.•••.•••).
 
 - No telemetry: the application makes zero analytics, crash-report or beacon requests to third parties.
 

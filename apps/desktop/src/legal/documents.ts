@@ -22,7 +22,7 @@ export interface LegalDoc {
   body: string[]
 }
 
-export const LEGAL_VERSION = '2026-09-09.2'
+export const LEGAL_VERSION = '2026-09-11.1'
 
 export const LEGAL_DOCS: Record<LegalId, LegalDoc> = {
   terms: {
@@ -76,7 +76,7 @@ export const LEGAL_DOCS: Record<LegalId, LegalDoc> = {
       '## 3. What we do NOT collect (minimisation statement)',
       '- No content: the official courier receives only sealed envelopes (XChaCha20-Poly1305) and the delivery address = BLAKE3 hash of your public key. It cannot know who sent, what, or when you read.',
       '- No presence: site mode exposes nothing about who is online, the social graph, profiles or posts.',
-      '- No IP: TURN credential requests use an ephemeral random identity per session; server logs record redacted IPs (last octet removed).',
+      '- No IP: TURN credential requests use an ephemeral random identity per session; server logs record redacted IPs (last octet removed); the rate limiter keys buckets on a salted one-way hash, never the address itself; the app never displays a raw server address (masked as 203.0.•••.•••).',
       '- No telemetry: the application makes zero analytics, crash-report or beacon requests to third parties.',
       '- No cookies: the desktop software uses no cookies and no trackers.',
       '- Nothing on your disk beyond the session: images live ONLY in memory (RAM cache, gone at exit); keys and history are encrypted by the Windows DPAPI; content HTTP responses use Cache-Control: no-store.',
@@ -169,7 +169,7 @@ export const LEGAL_DOCS: Record<LegalId, LegalDoc> = {
       '## 1. What the official server NEVER sees',
       'DM/post/room content or names; who talks to whom (the courier routes hashes — you map IDs to your box locally); who is online; your images, text or history.',
       '## 2. What it DOES see',
-      'The delivery address (hash of your public key) with minimal metadata (size, time, TTL) and anonymous TURN credential requests.',
+      'The delivery address — a one-way hash of your public key that ROTATES every session (contacts learn the new address from inside the sealed messages themselves) — with minimal metadata (size, time, TTL) and anonymous TURN credential requests. Images you upload leave with pixels only: every metadata container (EXIF/GPS, XMP, text chunks) is stripped on the way in.',
       '## 3. Keys: what self-custody means',
       'Private keys live only on your device (DPAPI-encrypted on Windows when available). No server can "reset my password". Lose the backup, lose the account — no exceptions.',
       '## 4. TOFU (trust-on-first-use)',

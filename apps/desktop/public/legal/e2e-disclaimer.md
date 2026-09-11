@@ -1,6 +1,6 @@
 # Encryption & Self-Custody Disclaimer
 
-_Binding text (EN)_: **2026-09-09.2** · updated: 2026-09-09
+_Binding text (EN)_: **2026-09-11.1** · updated: 2026-09-09
 Jurisdiction: Technical explanation tied to Terms §8
 
 ## 1. What the official server NEVER sees
@@ -9,7 +9,7 @@ DM/post/room content or names; who talks to whom (the courier routes hashes — 
 
 ## 2. What it DOES see
 
-The delivery address (hash of your public key) with minimal metadata (size, time, TTL) and anonymous TURN credential requests.
+The delivery address — a one-way hash of your public key that ROTATES every session (contacts learn the new address from inside the sealed messages themselves) — with minimal metadata (size, time, TTL) and anonymous TURN credential requests. Images you upload leave with pixels only: every metadata container (EXIF/GPS, XMP, text chunks) is stripped on the way in.
 
 ## 3. Keys: what self-custody means
 

@@ -52,7 +52,7 @@ th, td { border: 1px solid #27272a; padding: 6px 12px; text-align: left; font-we
 <p><a href="../index.html#terms">← back to the main page</a></p>
 <p><em>Generated from the canonical in-app source — do not edit here.</em></p>
 <h1>Privacy Policy (LGPD/GDPR)</h1>
-<p>_Binding text (EN)_: <strong>2026-09-09.2</strong> · updated: 2026-09-09</p>
+<p>_Binding text (EN)_: <strong>2026-09-11.1</strong> · updated: 2026-09-09</p>
 <p>Jurisdiction: LGPD (Lei 13.709/2018); GDPR for EU users</p>
 <h2>1. Who is the controller</h2>
 <p>For the OFFICIAL SITE (blind courier + TURN): the maintainers of the 9matesu/goongrid repository, contactable via the GitHub project. For FULL-NODES: the administrator of that server is the controller of the data it holds; the software only implements what the host runs.</p>
@@ -66,7 +66,7 @@ th, td { border: 1px solid #27272a; padding: 6px 12px; text-align: left; font-we
 <li>No presence: site mode exposes nothing about who is online, the social graph, profiles or posts.</li>
 </ul>
 <ul>
-<li>No IP: TURN credential requests use an ephemeral random identity per session; server logs record redacted IPs (last octet removed).</li>
+<li>No IP: TURN credential requests use an ephemeral random identity per session; server logs record redacted IPs (last octet removed); the rate limiter keys buckets on a salted one-way hash, never the address itself; the app never displays a raw server address (masked as 203.0.•••.•••).</li>
 </ul>
 <ul>
 <li>No telemetry: the application makes zero analytics, crash-report or beacon requests to third parties.</li>
