@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { Hono } from 'hono'
 import { orbitAuth } from '../middleware/auth'
-import { adminAuth } from '../middleware/admin'
+import { adminAuth, ADMIN_GRANT_KEY } from '../middleware/admin'
 import type { D1Turso } from '../db'
 import type { LocalBlobStore } from '../blob'
 import { purgeObjectLikes } from '../game'
@@ -116,6 +116,9 @@ admin.post('/verify-pin', async (c) => {
   await c.env.DB.prepare('UPDATE Users SET is_admin = 0').run()
   await c.env.DB.prepare('INSERT INTO Users (id, public_key, is_admin) VALUES (?, ?, 1) ON CONFLICT(id) DO UPDATE SET is_admin = 1')
     .bind(orbitId, c.get('publicKeyHex')).run()
+  // Wave 2 (E3): stamp the grant; adminAuth expires it after 12h.
+  await c.env.DB.prepare('INSERT INTO SystemMeta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+    .bind(ADMIN_GRANT_KEY, String(Date.now())).run()
 
   return c.json({ success: true })
 })
