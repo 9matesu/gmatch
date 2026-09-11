@@ -17,7 +17,7 @@ export function TourDock({ steps, state, onNext, onBack, onSkip }: Props) {
   const label = last ? 'Done' : step.view ? 'Show me' : 'Next';
 
   return (
-    <div className="fixed bottom-4 right-4 z-[var(--z-toast)] w-[320px] max-w-[calc(100vw-2rem)] rounded-lg border border-border-glass bg-retro-panel p-4 shadow-xl select-none">
+    <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-[var(--z-toast)] w-[320px] max-w-[calc(100vw-2rem)] rounded-lg border border-border-glass bg-retro-panel p-4 shadow-xl select-none">
       <div className="flex items-center justify-between gap-2">
         <span className="text-[10px] font-medium uppercase tracking-wide text-retro-muted">
           {state.index + 1} of {steps.length}
@@ -59,7 +59,7 @@ export function TourDock({ steps, state, onNext, onBack, onSkip }: Props) {
           <button
             type="button"
             onClick={() => { playPress(); onNext(); }}
-            className={`${BTN} ${BTN_SMALL} ${BTN_PRIMARY}`}
+            className={`${BTN} ${BTN_SMALL} ${BTN_PRIMARY} whitespace-nowrap`}
           >
             {label}
             {!last && <ChevronRight className="w-3.5 h-3.5" />}
