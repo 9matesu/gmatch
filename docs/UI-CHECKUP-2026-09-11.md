@@ -22,6 +22,8 @@ assertion pinned a migrated class.
 - Rarity badge colors / HP fill / +g$ float / GAME_AD gradients / phone-bezel
   and skeuo gradients: game semantics + game art (DESIGN.md exemptions).
 - `bg-black` solid on media/player letterboxing: not a scrim.
+- `text-white` over media/overlay surfaces (162 runs): intentional media-overlay
+glyph color, not chrome drift — chrome text uses text-retro-*.
 - ❤️/⚡ inside CommentsModal BUTTON ACTIONS: they append text to the user's own
   comment (content, not chrome) — icon+label already lucide.
 - Admin kit (Badge/FilterBar primitives): token-scoped greps read 0; internal
