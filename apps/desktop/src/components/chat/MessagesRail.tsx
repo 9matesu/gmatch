@@ -38,25 +38,40 @@ export function MessagesRail({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        aria-label={open ? 'Collapse messages' : 'Expand messages'}
-        title="Messages"
-        className="hidden md:flex fixed right-0 bottom-24 z-[var(--z-dropdown)] flex-col items-center gap-1.5 py-3 px-1 rounded-l-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer select-none"
-      >
-        <span className="text-lg leading-none" aria-hidden>{open ? '⌄' : '⌃'}</span>
-        <span className="text-[10px] tracking-wider" style={{ writingMode: 'vertical-rl' }}>Messages</span>
-        {unreadCount > 0 && !open && <span className="w-2 h-2 rounded-full bg-retro-fg" />}
-      </button>
+      {!open && (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={false}
+          aria-label="Expand messages"
+          title="Messages"
+          className="hidden md:flex fixed right-0 bottom-2 z-[var(--z-dropdown)] flex-col items-center gap-1.5 py-3 px-1 rounded-l-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer select-none"
+        >
+          <span className="text-lg leading-none" aria-hidden>⌃</span>
+          <span className="text-[10px] tracking-wider" style={{ writingMode: 'vertical-rl' }}>Messages</span>
+          {unreadCount > 0 && <span className="w-2 h-2 rounded-full bg-retro-fg" />}
+        </button>
+      )}
 
       {open && (
-        <div className="hidden md:flex fixed right-2 bottom-2 z-[var(--z-dropdown)] h-[60vh] w-[min(920px,calc(100vw-2rem))] rounded-xl border border-border-glass bg-retro-panel shadow-2xl overflow-hidden">
+        <div data-rail-panel className="hidden md:flex flex-col fixed right-2 bottom-2 z-[var(--z-dropdown)] h-[60vh] max-h-[calc(100vh-6.5rem)] w-[min(920px,calc(100vw-1rem))] rounded-xl border border-border-glass bg-retro-panel shadow-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-2 py-1.5 border-b border-border-glass shrink-0">
+            <span className="text-[10px] uppercase tracking-wider text-retro-muted">Messages</span>
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-expanded
+              aria-label="Collapse messages"
+              className="p-1.5 rounded-md hover:bg-glass-w8 text-retro-muted hover:text-retro-fg cursor-pointer"
+            >
+              <span className="text-base leading-none" aria-hidden>⌄</span>
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 flex">
           <div className="flex-1 min-w-0 p-2 border-r border-border-glass">
             {children}
           </div>
-          <aside className="w-56 shrink-0 flex flex-col">
+          <aside className="w-56 shrink-0 flex flex-col min-h-0">
             <div className="flex items-center gap-1 p-2 border-b border-border-glass text-xs">
               {(['players', 'groups'] as const).map((t) => (
                 <button
@@ -113,6 +128,7 @@ export function MessagesRail({
               )}
             </div>
           </aside>
+          </div>
         </div>
       )}
     </>
