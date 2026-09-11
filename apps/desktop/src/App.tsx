@@ -80,6 +80,7 @@ import { usePendingJoinVerify } from './hooks/usePendingJoinVerify';
 import { usePendingServerHost } from './hooks/usePendingServerHost';
 import { OfflineWarningBanner } from "./components/OfflineWarningBanner";
 import { dataUrlToBlob, localObjectBlobUrl } from "./utils/mediaData";
+import { mediaUrlToCachedFile } from "./utils/cacheMedia";
 
 const MAX_GALLERY_ITEMS_IN_MEMORY = 80;
 const MAX_PROFILE_PICS_IN_MEMORY = 120;
@@ -524,6 +525,14 @@ export default function Home() {
   const resolveWallpaperUrl = useCallback((url: string): Promise<string> => {
     if (!url) return Promise.resolve('')
     if (url.startsWith('data:') || url.startsWith('blob:')) return Promise.resolve(url)
+    if (/^https?:/i.test(url)) {
+      // Remote booru bytes: no ACAO there, so orbitFetch's signed headers
+      // would preflight-block it. cacheMedia's ladder (gmcache bridge →
+      // dev proxy → direct fetch) is the byte path for exactly this.
+      return mediaUrlToCachedFile(url)
+        .then(f => URL.createObjectURL(f))
+        .catch(() => url)
+    }
     if (!identity) return Promise.resolve(url)
     return orbitFetch(url, {}, identity)
       .then(r => r.ok ? r.blob() : null)
