@@ -167,7 +167,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
         toast?.(data.error || 'Cashout failed', 'error');
         return;
       }
-      toast?.(`Cashed out for ${formatGc(data.payout)}!`, 'success');
+      toast?.(`Cashed out for ${formatGc(data.payout)}.`, 'success');
       setConfirmCashout(false);
       window.dispatchEvent(new CustomEvent('orbit-cards-refresh'));
       window.dispatchEvent(new CustomEvent('orbit-score-refresh'));

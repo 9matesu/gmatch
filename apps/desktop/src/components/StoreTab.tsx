@@ -212,7 +212,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
 
     const cashedCount = cashable.length - failed;
     if (cashedCount > 0) {
-      toast?.(`Cashed out ${cashedCount} card${cashedCount === 1 ? '' : 's'} for ${formatGc(payout)}!`, 'success');
+      toast?.(`Cashed out ${cashedCount} card${cashedCount === 1 ? '' : 's'} for ${formatGc(payout)}.`, 'success');
     } else {
       toast?.('No cards were cashed out', 'error');
     }
