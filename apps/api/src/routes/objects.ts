@@ -9,6 +9,7 @@ import { PICTURE_TTL_SECONDS, STORY_TTL_SECONDS, checkBlacklistedTags } from '@o
 import { sha256 } from '@noble/hashes/sha256'
 import { bytesToHex } from '@noble/hashes/utils'
 import { proxyAndStoreExternal } from '../proxy'
+import { stripImageMetadata } from '../metadata-strip'
 
 type Bindings = {
   DB: D1Turso
@@ -230,14 +231,19 @@ objects.post('/', orbitAuth, async (c) => {
         return c.json({ error: 'Invalid media format (magic bytes check failed)' }, 400)
       }
 
-      imageSize = bytes.length
       const detectedMime = detectMediaMime(bytes, imageFile?.type || imageFile?.name)
+      // Wave 2 / F20: strip every metadata container (EXIF/GPS, XMP, ICC,
+      // comments) BEFORE hashing/storing — tags live in the DB, never in the
+      // file. Stripping before the hash keeps dedup on canonical bytes.
+      const strippedBytes = stripImageMetadata(bytes, detectedMime)
+      imageSize = strippedBytes.length
 
       // Content fingerprint for dedup: trust a client-computed SHA-256 when
-      // provided, otherwise compute it server-side so the guard always holds.
+      // provided, otherwise compute it server-side (over the stripped bytes)
+      // so the guard always holds.
       const contentHash = clientContentHash && /^[0-9a-f]{64}$/.test(clientContentHash)
         ? clientContentHash
-        : await sha256Hex(bytes)
+        : await sha256Hex(strippedBytes)
 
       // Handle byte-identical re-uploads: reuse existing object and attach any recipients
       if (contentHash && isStory === 0) {
@@ -268,7 +274,7 @@ objects.post('/', orbitAuth, async (c) => {
       }
 
       // Encrypt blob at rest before storing
-      const encryptedBytes = encryptBlob(bytes)
+      const encryptedBytes = encryptBlob(strippedBytes)
       const mimeType = isWallpaper ? 'image/wallpaper' : (encrypted ? 'application/octet-stream' : detectedMime)
 
       if (c.env.BUCKET) {
@@ -277,12 +283,12 @@ objects.post('/', orbitAuth, async (c) => {
         })
       }
 
-      const contentUrl = (bytes.length <= 128 * 1024 && !encrypted)
-        ? `data:${mimeType === 'image/wallpaper' ? 'image/jpeg' : mimeType};base64,${Buffer.from(bytes).toString('base64')}`
+      const contentUrl = (strippedBytes.length <= 128 * 1024 && !encrypted)
+        ? `data:${mimeType === 'image/wallpaper' ? 'image/jpeg' : mimeType};base64,${Buffer.from(strippedBytes).toString('base64')}`
         : `/api/objects/${objectId}`
 
       await c.env.DB.prepare('INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, caption, is_public, post_caption, location, post_tags, is_story, expires_at, content_hash, post_group, is_chat) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(
-        objectId, orbitId, bytes.length, mimeType, contentUrl, caption, isPublic, postCaption, location, postTags, isStory, expiresAt, contentHash, postGroup, isChat
+        objectId, orbitId, strippedBytes.length, mimeType, contentUrl, caption, isPublic, postCaption, location, postTags, isStory, expiresAt, contentHash, postGroup, isChat
       ).run()
     }
 

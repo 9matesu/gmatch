@@ -9,6 +9,7 @@ import { maybeResetDailyScores } from '../cleanup'
 import { broadcastToRoom } from '../ws-bus'
 import { reportContent, ReportError } from '../reports'
 import { EconomyService, buildDebitStatements, type BalanceOpResult } from '../economy'
+import { stripImageMetadata } from '../metadata-strip'
 import { mintCardStatements } from '../cards'
 import crypto from 'crypto'
 
@@ -460,9 +461,30 @@ users.on(['PATCH', 'PUT'], '/profile', async (c) => {
     updates.push('tags = ?')
     values.push(JSON.stringify(cleanTags ?? []))
   }
+  let cleanPfp: string | null | undefined
   if (pfp_url !== undefined) {
+    // Wave 2 / F20+F24: avatars never carry file metadata and never point at
+    // a third-party host (the old 302 leaked the viewer's IP upstream).
+    // data: URIs get stripped in place; http(s) gets proxied through our own
+    // storage; anything else is rejected.
+    if (typeof pfp_url === 'string' && pfp_url.startsWith('data:image/')) {
+      const comma = pfp_url.indexOf(',')
+      const meta = pfp_url.slice(5, comma)
+      if (!meta.includes('base64')) return c.json({ error: 'Avatar must be a base64 data URL' }, 400)
+      const raw = new Uint8Array(Buffer.from(pfp_url.slice(comma + 1), 'base64'))
+      const mime = meta.split(';')[0]
+      const clean = stripImageMetadata(raw, mime)
+      cleanPfp = `data:${mime};base64,${Buffer.from(clean).toString('base64')}`
+    } else if (typeof pfp_url === 'string' && /^https?:\/\//i.test(pfp_url)) {
+      const { proxyAndStoreExternal } = await import('../proxy')
+      const proxied = await proxyAndStoreExternal(pfp_url, c.env.BUCKET, 'objects', crypto.randomUUID())
+      if (!proxied) return c.json({ error: 'Could not fetch or validate the URL' }, 400)
+      cleanPfp = proxied.storedUrl
+    } else {
+      cleanPfp = pfp_url === null || pfp_url === '' ? null : pfp_url
+    }
     updates.push('pfp_url = ?')
-    values.push(pfp_url)
+    values.push(cleanPfp)
   }
   if (cleanBio !== undefined) {
     updates.push('bio = ?')
@@ -487,7 +509,7 @@ users.on(['PATCH', 'PUT'], '/profile', async (c) => {
     const push: any = { type: 'PROFILE', user: { id: orbitId } }
     if (cleanName !== undefined) push.user.display_name = cleanName
     if (tags !== undefined) push.user.tags = cleanTags ?? []
-    if (pfp_url !== undefined) push.user.pfp_url = pfp_url
+    if (pfp_url !== undefined) push.user.pfp_url = cleanPfp
     broadcastToRoom('global', push)
     broadcastToRoom('lobby', { type: 'lobby', action: 'profile_updated', user: push.user })
   }
