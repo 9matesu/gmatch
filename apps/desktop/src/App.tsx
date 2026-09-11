@@ -44,8 +44,7 @@ import type { GroupMember } from "./components/chat/GroupMembersPopover";
 import { AttachmentUploadModal } from "./components/AttachmentUploadModal";
 import { ProfileView } from "./components/views/ProfileView";
 import { MessagesView, DmMinimizedView } from "./components/views/MessagesView";
-import { useResizablePanel } from "./hooks/useResizablePanel";
-import { PanelResizer } from "./ui/PanelResizer";
+import { MessagesRail } from "./components/chat/MessagesRail";
 import { GameView } from "./components/views/GameView";
 import { AgeGateModal } from "./components/auth/AgeGateModal";
 import { LegalCenter, isLegalAccepted } from "./components/LegalCenter";
@@ -203,8 +202,6 @@ export default function Home() {
   const [dmMinimized, setDmMinimized] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   // UI-3: resizable messages sidebar (width persisted; smooth only when not dragging)
-  const chatPanel = useResizablePanel('chat')
-  const [chatResizing, setChatResizing] = useState(false)
   const [panelTab, setPanelTab] = useState<SocialPanelTab>('chat');
   const [gamesSubTab, setGamesSubTab] = useState<'duel' | 'cards' | 'babecock' | 'ranks' | 'store' | 'idle'>('idle');
   const [collapsedModules, setCollapsedModules] = useState<Record<string, boolean>>({});
@@ -297,7 +294,16 @@ export default function Home() {
   useEffect(() => { decisionMapRef.current = decisionMap }, [decisionMap])
 
   const handleSetMainView = useCallback((view: MainViewType) => {
-    setChatOpen(false)
+    const isDesktop =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(min-width: 768px)').matches;
+    if (view === 'messages' && isDesktop) {
+      setDmMinimized(false);
+      setPanelTab('chat');
+      setChatOpen(true);
+      return;
+    }
     if (view === 'feed' && mainView === 'feed') {
       mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
     }
@@ -671,12 +677,6 @@ export default function Home() {
     targetUserId?: string | null;
     targetName?: string | null;
   }>({ isOpen: false, initialTab: 'followers', targetUserId: null, targetName: null });
-
-  useEffect(() => {
-    const handleOpenTools = () => setShowSettingsModal(true);
-    window.addEventListener('orbit_open_tools', handleOpenTools);
-    return () => window.removeEventListener('orbit_open_tools', handleOpenTools);
-  }, []);
 
   // Active Server Hacking Debuffs
   const [activeHacks, setActiveHacks] = useState<ActiveHackDebuff[]>([]);
@@ -2944,95 +2944,6 @@ export default function Home() {
                 wsConnected={isWsConnected}
                 showRooms={courierActive}
               />
-              <div
-                className={`hidden md:flex shrink-0 min-h-0 overflow-hidden ${chatResizing ? '' : 'transition-[width] duration-300 ease-out'}`}
-                style={{ width: chatOpen ? `min(${chatPanel.width}px, 92vw)` : 0 }}
-                aria-hidden={!chatOpen}
-              >
-                {chatOpen && (
-                  <div className="w-full h-full min-h-0 p-2 glass-sidebar">
-                    <SocialPanel
-                      tab={panelTab}
-                      onTabChange={setPanelTab}
-                      onClose={() => setChatOpen(false)}
-                      chatUnread={pmUnreadCount}
-                      notificationUnread={lobby.unreadCount}
-                      dm={
-                        <GMatchDMs
-                          identity={identity}
-                          chatMessages={chatMessages}
-                          pmMessages={pmPeer ? pmMessagesByPeer[pmPeer.id || (pmPeer as any).orbitId || ''] || [] : []}
-                          activePmPeer={pmPeer ? { orbitId: pmPeer.id || (pmPeer as any).orbitId, name: pmPeer.display_name || (pmPeer as any).name || 'User' } : null}
-                          peers={users.map((u) => ({ orbitId: u.id || (u as any).orbitId, name: u.display_name || (u as any).name || 'User' }))}
-                          threads={pmThreads}
-                          profilePics={profilePics}
-                          myDisplayName={myProfile.displayName || 'You'}
-                          groups={chatGroups}
-                          groupMessages={groupMessagesByGroup}
-                          activeGroupId={activeGroupId}
-                          onSelectGroup={setActiveGroupId}
-                          onSendMessage={sendChatMessage}
-                          onSendPm={(peerId, text, replyToId, attachment) => {
-                            void sendPm(peerId, text, replyToId, attachment);
-                          }}
-                          onSelectPeer={(p) => {
-                            if (p) {
-                              const found = users.find((u) => u.id === p.orbitId || (u as any).orbitId === p.orbitId);
-                              setPmPeer(found || ({ id: p.orbitId, display_name: p.name } as any));
-                              if (p.orbitId !== 'global_lobby' && p.orbitId !== 'card_queue') {
-                                loadPmMessages(p.orbitId);
-                              }
-                            } else {
-                              setPmPeer(null);
-                            }
-                          }}
-                          onReportMessage={reportPmMessage}
-                          onReportUser={reportPmUser}
-                          onDeleteMessage={(messageId, peerId) => {
-                            if (peerId) void deletePmMessage(messageId, peerId);
-                          }}
-                          onCreateGroup={createGroup}
-                          onOpenAttachment={openAttachmentModal}
-                          onSendGroupMessage={(groupId, text, replyToId, attachment) => {
-                            void sendGroupMessage(groupId, text, replyToId, attachment);
-                          }}
-                          onLeaveGroup={leaveGroup}
-                          onLoadGroupMessages={loadGroupMessages}
-                          onLoadGroupMembers={loadGroupMembers}
-                          onAddGroupMembers={addGroupMembers}
-                          onOpenProfile={(userId) => {
-                            const t = users.find((u) => u.id === userId || (u as any).orbitId === userId);
-                            if (t) setSelectedProfileUser(t);
-                          }}
-                          onOpenImage={(msg) => setViewerMessage(msg)}
-                          onDeleteThread={deleteThread}
-                          onBackToThreads={() => { setPmPeer(null); loadPmThreads(); }}
-                          onLoadHistory={loadPmHistory}
-                        />
-                      }
-                      notifications={
-                        <NotificationsPanel
-                          notifications={lobby.notifications}
-                          unreadCount={lobby.unreadCount}
-                          invites={lobby.invites}
-                          onMarkAllRead={() => lobby.markNotificationsRead()}
-                          onRespondInvite={(id, accept) => lobby.respondToInvite(id, accept)}
-                          onRespondBabecock={handleRespondBabecock}
-                          onOpenBabecock={() => { setGamesSubTab('babecock'); setMainView('games'); }}
-                        />
-                      }
-                    />
-                  </div>
-                )}
-              </div>
-              {/* UI-3: drag handle between the messages panel and content */}
-              <PanelResizer
-                disabled={!chatOpen}
-                side="right"
-                onResizeStart={() => setChatResizing(true)}
-                onResizeEnd={() => setChatResizing(false)}
-                onDelta={chatPanel.dragBy}
-              />
               <div className="flex-1 min-h-0 flex flex-col">
                 <div ref={mainScrollRef} className="mobile-app-scroll flex-1 min-h-0 w-full flex flex-col relative z-10 overflow-y-auto styled-scrollbar">
 
@@ -3096,7 +3007,6 @@ export default function Home() {
                                 }}
                                 activeStoryUserId={storyViewerUserId}
                                 onActiveStoryClose={() => setStoryViewerUserId(null)}
-                                onOpenDMs={() => handleSetMainView('messages')}
                                 onOpenPostCreator={() => setShowCreatePostModal(true)}
                                 onFollowSuggestion={(id) => { void toggleFollowUser(id); }}
                                 myProfileTags={myProfile.tags}
@@ -3104,7 +3014,6 @@ export default function Home() {
                                   const target = users.find((u) => u.id === uId || (u as any).orbitId === uId);
                                   if (target) setSelectedProfileUser(target);
                                 }}
-                                onToggleTools={() => window.dispatchEvent(new CustomEvent('orbit_open_tools'))}
                                 users={users}
                                 onStartPm={(user) => {
                                   const target = users.find((u) => u.id === user.id || (u as any).orbitId === user.id);
@@ -3597,6 +3506,93 @@ export default function Home() {
                 reportCategory={reportCategory}
                 setReportCategory={setReportCategory}
               />
+
+              {/* Desktop messages rail: collapsed edge tab, bottom drawer */}
+              <MessagesRail
+                open={chatOpen}
+                onToggle={() => { playPress(860); setChatOpen((v) => !v); }}
+                unreadCount={pmUnreadCount}
+                users={users}
+                profilePics={profilePics}
+                onOpenProfile={(userId) => {
+                  const t = users.find((u) => u.id === userId);
+                  if (t) setSelectedProfileUser(t);
+                }}
+                groups={chatGroups.map((g) => ({ id: g.id, name: g.name, member_count: g.member_count }))}
+                onOpenGroup={(gid) => { setActiveGroupId(gid); setPanelTab('chat'); }}
+              >
+<SocialPanel
+                      tab={panelTab}
+                      onTabChange={setPanelTab}
+                      onClose={() => setChatOpen(false)}
+                      chatUnread={pmUnreadCount}
+                      notificationUnread={lobby.unreadCount}
+                      dm={
+                        <GMatchDMs
+                          identity={identity}
+                          chatMessages={chatMessages}
+                          pmMessages={pmPeer ? pmMessagesByPeer[pmPeer.id || (pmPeer as any).orbitId || ''] || [] : []}
+                          activePmPeer={pmPeer ? { orbitId: pmPeer.id || (pmPeer as any).orbitId, name: pmPeer.display_name || (pmPeer as any).name || 'User' } : null}
+                          peers={users.map((u) => ({ orbitId: u.id || (u as any).orbitId, name: u.display_name || (u as any).name || 'User' }))}
+                          threads={pmThreads}
+                          profilePics={profilePics}
+                          myDisplayName={myProfile.displayName || 'You'}
+                          groups={chatGroups}
+                          groupMessages={groupMessagesByGroup}
+                          activeGroupId={activeGroupId}
+                          onSelectGroup={setActiveGroupId}
+                          onSendMessage={sendChatMessage}
+                          onSendPm={(peerId, text, replyToId, attachment) => {
+                            void sendPm(peerId, text, replyToId, attachment);
+                          }}
+                          onSelectPeer={(p) => {
+                            if (p) {
+                              const found = users.find((u) => u.id === p.orbitId || (u as any).orbitId === p.orbitId);
+                              setPmPeer(found || ({ id: p.orbitId, display_name: p.name } as any));
+                              if (p.orbitId !== 'global_lobby' && p.orbitId !== 'card_queue') {
+                                loadPmMessages(p.orbitId);
+                              }
+                            } else {
+                              setPmPeer(null);
+                            }
+                          }}
+                          onReportMessage={reportPmMessage}
+                          onReportUser={reportPmUser}
+                          onDeleteMessage={(messageId, peerId) => {
+                            if (peerId) void deletePmMessage(messageId, peerId);
+                          }}
+                          onCreateGroup={createGroup}
+                          onOpenAttachment={openAttachmentModal}
+                          onSendGroupMessage={(groupId, text, replyToId, attachment) => {
+                            void sendGroupMessage(groupId, text, replyToId, attachment);
+                          }}
+                          onLeaveGroup={leaveGroup}
+                          onLoadGroupMessages={loadGroupMessages}
+                          onLoadGroupMembers={loadGroupMembers}
+                          onAddGroupMembers={addGroupMembers}
+                          onOpenProfile={(userId) => {
+                            const t = users.find((u) => u.id === userId || (u as any).orbitId === userId);
+                            if (t) setSelectedProfileUser(t);
+                          }}
+                          onOpenImage={(msg) => setViewerMessage(msg)}
+                          onDeleteThread={deleteThread}
+                          onBackToThreads={() => { setPmPeer(null); loadPmThreads(); }}
+                          onLoadHistory={loadPmHistory}
+                        />
+                      }
+                      notifications={
+                        <NotificationsPanel
+                          notifications={lobby.notifications}
+                          unreadCount={lobby.unreadCount}
+                          invites={lobby.invites}
+                          onMarkAllRead={() => lobby.markNotificationsRead()}
+                          onRespondInvite={(id, accept) => lobby.respondToInvite(id, accept)}
+                          onRespondBabecock={handleRespondBabecock}
+                          onOpenBabecock={() => { setGamesSubTab('babecock'); setMainView('games'); }}
+                        />
+                      }
+                    />
+              </MessagesRail>
 
               {/* Floating Minimized DM Dock Bubble */}
               {dmMinimized && (

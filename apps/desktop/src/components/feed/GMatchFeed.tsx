@@ -111,11 +111,9 @@ export function GMatchFeed({
   onOpenStory,
   activeStoryUserId = null,
   onActiveStoryClose,
-  onOpenDMs,
   onOpenPostCreator,  onFollowSuggestion,
   myProfileTags = [],
   onSelectUser,
-  onToggleTools,
   onOpenGameAd,
   onStartPm,
   onPersistLike,
@@ -153,12 +151,10 @@ export function GMatchFeed({
   onOpenStory?: (userId: string) => void;
   activeStoryUserId?: string | null;
   onActiveStoryClose?: () => void;
-  onOpenDMs?: () => void;
   onOpenPostCreator?: () => void;
   onFollowSuggestion?: (userId: string) => void | Promise<void>;
   myProfileTags?: string[];
   onSelectUser?: (userId: string) => void;
-  onToggleTools?: () => void;
   onOpenGameAd?: (mode: 'duel' | 'babecock' | 'ranks' | 'store' | 'discord' | 'coffee') => void;
   onStartPm?: (user: { id: string; display_name?: string }) => void;
   onPersistLike?: (postId: string, liked: boolean) => Promise<number | undefined>;
@@ -563,27 +559,15 @@ export function GMatchFeed({
         />
       </div>
 
-      {/* Feed Top Header - Seamless, 0 upper gap, sticky with navigation */}
+      {/* Feed Top Header — the only bar: brand, sort tabs, search, alerts */}
       <FeedHeader
         unreadCount={unreadCount}
-        onOpenCamera={() => setShowCameraModal(true)}
-        onCreatePost={() => {
-          if (onOpenPostCreator) onOpenPostCreator();
-          else setShowCustomPostCreator(true);
-        }}
-        onToggleTools={onToggleTools}
         onOpenSearch={() => setShowExploreSearch(true)}
         onOpenNotifications={() => {
           if (onOpenNotifications) onOpenNotifications();
           onRefreshNotifications?.();
         }}
-        onOpenDMs={onOpenDMs}
-      />
-
-      {/* Feed Content Column (Posts) */}
-      <div className="w-full max-w-[1400px] mx-auto flex flex-col px-2 sm:px-4 py-2 space-y-3">
-        {/* Feed Sort / Filter Bar */}
-        <div className="flex items-center justify-between px-3 sm:px-6 py-2 gap-2 border-b border-border-glass bg-retro-panel backdrop-blur-sm sticky top-[57px] z-20">
+        sortTabs={
           <div className="flex items-center gap-1 text-xs">
             {(['latest', 'trending'] as const).map((mode) => (
               <button
@@ -599,11 +583,18 @@ export function GMatchFeed({
               </button>
             ))}
           </div>
+        }
+      />
+
+      {/* Feed Content Column (Posts) */}
+      <div className="w-full max-w-[1400px] mx-auto flex flex-col px-2 sm:px-4 py-2 space-y-3">
+        {/* Density bar: post count + column picker */}
+        <div className="flex items-center justify-end px-3 sm:px-6 py-1 gap-2 border-b border-border-glass">
           <div className="flex items-center gap-3">
             <span className="text-xs text-retro-muted">
               {displayPosts.length} posts
             </span>
-            <div className="flex items-center bg-retro-panel border border-border-glass rounded-md p-0.5 text-xs">
+            <div className="flex items-center bg-retro-panel border border-border-glass rounded-md p-0.5 text-xs">
               {(['1', '2', '3', '4', '5'] as const).map((cols) => (
                 <button
                   key={cols}

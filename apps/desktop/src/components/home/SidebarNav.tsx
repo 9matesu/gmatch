@@ -461,7 +461,7 @@ export function SidebarNav({
                 <div
                   draggable={!collapsed}
                   {...dragHandlers(item.id)}
-                  className={`glass-nav-item ${item.active ? 'glass-nav-active' : ''} w-full flex items-center gap-1 pl-3 pr-1.5 py-0.5 rounded-md border transition-all duration-150 ${collapsed ? 'justify-center px-0' : ''}${dropIndicator(item.id)}`}
+                  className={`glass-nav-item ${item.active ? 'glass-nav-active' : ''} w-full flex items-center gap-1 py-0.5 rounded-md border transition-all duration-150 ${collapsed ? 'justify-center px-0' : 'pl-3 pr-1.5'}${dropIndicator(item.id)}`}
                 >
                   <button
                     type="button"
