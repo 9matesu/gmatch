@@ -206,7 +206,7 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
 
   return (
     <div className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-6" onMouseDown={onClose}>
-      <div className="glass-surface w-full max-w-5xl max-h-[92dvh] overflow-y-auto rounded-3xl p-4 sm:p-6 text-retro-fg" onMouseDown={(event) => event.stopPropagation()}>
+      <div className="glass-surface w-full max-w-5xl max-h-[92dvh] overflow-y-auto rounded-xl p-4 sm:p-6 text-retro-fg" onMouseDown={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-4 mb-5">
           <div>
             <div className="flex items-center gap-2 text-retro-accent text-[10px] font-black uppercase tracking-[0.18em]">
@@ -228,7 +228,7 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
 
         <div className="grid lg:grid-cols-[minmax(220px,0.7fr)_minmax(0,1.3fr)] gap-5">
           <div className="flex flex-col items-center gap-3">
-            <div className="w-full max-w-[270px] aspect-[3/4.2] rounded-2xl p-1.5 transition-all" style={{ background: `linear-gradient(135deg, #9FE3FF, rgba(255,255,255,.55), #9FE3FF)`, boxShadow: '0 18px 50px #9FE3FF44' }}>
+            <div className="w-full max-w-[270px] aspect-[3/4.2] rounded-xl p-1.5 transition-all" style={{ background: `linear-gradient(135deg, #9FE3FF, rgba(255,255,255,.55), #9FE3FF)`, boxShadow: '0 18px 50px #9FE3FF44' }}>
               <div className="relative w-full h-full overflow-hidden rounded-xl bg-surface-canvas flex flex-col">
                 <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-white/20 via-transparent to-transparent z-10" />
                 <div className="aspect-[3/3.1] bg-black/30 overflow-hidden flex items-center justify-center">

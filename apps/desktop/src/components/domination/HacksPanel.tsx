@@ -50,7 +50,7 @@ export function HacksPanel({
           onExpire={expireHack}
         />
       ) : (
-        <div className="glass-panel p-4 rounded-2xl border border-border-glass bg-surface-raised/40">
+        <div className="glass-panel p-4 rounded-xl border border-border-glass bg-surface-raised/40">
           <p className="text-xs text-retro-muted">
             No hack running. Buy one below to open a spy session on a player.
           </p>

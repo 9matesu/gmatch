@@ -310,7 +310,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
           </button>
         </div>
 
-        <div className="bg-surface-raised border border-border-glass rounded-2xl p-4">
+        <div className="bg-surface-raised border border-border-glass rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
             <div>
                <div className="flex items-center gap-2">
@@ -495,7 +495,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
 
   return (
     <div className="space-y-4">
-      <div className="bg-surface-raised border border-border-glass rounded-2xl p-4">
+      <div className="bg-surface-raised border border-border-glass rounded-xl p-4">
         <h2 className="text-lg font-bold text-retro-fg mb-4">Create New Deck</h2>
         <div className="flex gap-2">
           <input
@@ -517,7 +517,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
         </div>
       </div>
 
-      <div className="bg-surface-raised border border-border-glass rounded-2xl p-4">
+      <div className="bg-surface-raised border border-border-glass rounded-xl p-4">
         <h2 className="text-lg font-bold text-retro-fg mb-4">Your Decks</h2>
         {loading ? (
           <div className="text-center py-8 text-retro-muted text-xs">Loading decks...</div>

@@ -30,7 +30,7 @@ export function SocialPanel({
   };
 
   return (
-    <div className="glass-card w-full h-full min-h-0 flex flex-col overflow-hidden rounded-2xl">
+    <div className="glass-card w-full h-full min-h-0 flex flex-col overflow-hidden rounded-xl">
       <div className="flex items-center border-b border-white/10 shrink-0 bg-glass-w5">
         <div className="flex flex-1 min-w-0">
           <button

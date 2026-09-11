@@ -51,7 +51,7 @@ export function TargetSelectorModal({
       onClick={onClose}
     >
       <div
-        className="bg-surface-raised text-retro-fg w-full max-w-md rounded-3xl border border-border-glass shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-orbit-slide-up"
+        className="bg-surface-raised text-retro-fg w-full max-w-md rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-orbit-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -100,7 +100,7 @@ export function TargetSelectorModal({
               <div
                 key={peerId}
                 onClick={() => { playPress(750); setSelectedTarget(peer); }}
-                className={`p-3 rounded-2xl flex items-center justify-between border transition-all cursor-pointer ${
+                className={`p-3 rounded-xl flex items-center justify-between border transition-all cursor-pointer ${
                   isSelected
                     ? 'bg-rose-50 border-rose-400 text-rose-950 shadow-xs'
                     : 'bg-surface-raised border-border-glass hover:border-border-glass'

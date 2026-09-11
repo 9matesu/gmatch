@@ -3692,7 +3692,7 @@ export default function Home() {
               />
               {groupPickerOpen && chatGroups.length > 0 && (
                 <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-                  <div className="bg-surface-raised border border-border-glass rounded-3xl max-w-md w-full shadow-2xl overflow-hidden">
+                  <div className="bg-surface-raised border border-border-glass rounded-xl max-w-md w-full shadow-2xl overflow-hidden">
                     <div className="p-4 border-b border-border-glass flex items-center justify-between">
                       <h3 className="text-sm font-bold text-retro-fg">Select Group Chat</h3>
                       <button onClick={() => setGroupPickerOpen(false)} className="text-retro-muted hover:text-retro-body p-1">

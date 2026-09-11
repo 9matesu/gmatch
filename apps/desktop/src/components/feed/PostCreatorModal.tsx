@@ -107,7 +107,7 @@ export function PostCreatorModal({
       onClick={onClose}
     >
       <div
-        className="bg-glass backdrop-blur-2xl text-retro-fg w-full max-w-lg rounded-2xl border border-border-glass shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-orbit-slide-up"
+        className="bg-glass backdrop-blur-2xl text-retro-fg w-full max-w-lg rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-orbit-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -191,7 +191,7 @@ export function PostCreatorModal({
           </div>
 
           {/* Mandatory Tags Section */}
-          <div className="space-y-1.5 p-3.5 bg-retro-warning/10 border border-retro-warning/30 rounded-2xl">
+          <div className="space-y-1.5 p-3.5 bg-retro-warning/10 border border-retro-warning/30 rounded-xl">
             <div className="flex items-center justify-between">
               <label className="text-xs font-black text-retro-warning flex items-center gap-1.5">
                 <span>Required Tags *</span>

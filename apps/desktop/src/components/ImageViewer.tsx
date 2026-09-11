@@ -339,7 +339,7 @@ export function ImageViewer({
 
               return (
                 <div
-                  className={`relative p-1 ${isCard ? 'metallic-card-border' : 'glass-card rounded-2xl'}`}
+                  className={`relative p-1 ${isCard ? 'metallic-card-border' : 'glass-card rounded-xl'}`}
                   {...(isCard ? { 'data-rarity': rarity.rarity } : {})}
                 >
                   {isCard && (

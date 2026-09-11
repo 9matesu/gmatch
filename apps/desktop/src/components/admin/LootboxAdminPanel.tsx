@@ -155,7 +155,7 @@ export function LootboxAdminPanel({ identity }: { identity: OrbitIdentity | null
   };
 
   return (
-    <div className="bg-[#18181b] border border-[#27272a] p-5 rounded-2xl shadow-xs space-y-4">
+    <div className="bg-[#18181b] border border-[#27272a] p-5 rounded-xl shadow-xs space-y-4">
       <div className="text-xs font-bold text-zinc-100 uppercase tracking-wider flex items-center gap-2">
         <span>Lootboxes</span>
       </div>

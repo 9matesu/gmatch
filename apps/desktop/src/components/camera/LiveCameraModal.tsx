@@ -163,7 +163,7 @@ export function LiveCameraModal({
       onClick={onClose}
     >
       <div
-        className="bg-surface-raised text-retro-fg w-full max-w-lg rounded-none sm:rounded-3xl border border-border-glass shadow-2xl overflow-hidden flex flex-col h-full sm:h-auto max-h-screen sm:max-h-[90vh]"
+        className="bg-surface-raised text-retro-fg w-full max-w-lg rounded-none sm:rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col h-full sm:h-auto max-h-screen sm:max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -244,7 +244,7 @@ export function LiveCameraModal({
               <button
                 type="button"
                 onClick={handleRetake}
-                className="flex-1 py-3 bg-surface-interactive hover:bg-[#e4e4e7] text-retro-fg rounded-2xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors border border-border-glass"
+                className="flex-1 py-3 bg-surface-interactive hover:bg-[#e4e4e7] text-retro-fg rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors border border-border-glass"
               >
                 <RefreshCw className="w-4 h-4" />
                 <span>Retake</span>
@@ -252,7 +252,7 @@ export function LiveCameraModal({
               <button
                 type="button"
                 onClick={handleConfirmPhoto}
-                className="flex-1 py-3 bg-gradient-to-r from-cyan-500 via-teal-500 to-amber-500 hover:opacity-95 text-white rounded-2xl text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md"
+                className="flex-1 py-3 bg-gradient-to-r from-cyan-500 via-teal-500 to-amber-500 hover:opacity-95 text-white rounded-xl text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md"
               >
                 <Check className="w-4 h-4" />
                 <span>Attach to Post</span>

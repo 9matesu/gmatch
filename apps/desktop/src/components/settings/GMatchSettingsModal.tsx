@@ -120,7 +120,7 @@ function FeedSettingsTab({ toast }: { toast?: (msg: string, type?: string) => vo
         )}
       </div>
 
-      <div className="p-4 bg-surface-raised border border-border-glass rounded-2xl space-y-3">
+      <div className="p-4 bg-surface-raised border border-border-glass rounded-xl space-y-3">
         <h4 className="text-xs font-medium text-retro-fg">Excluded Tags</h4>
         <div className="flex gap-2">
           <input
@@ -302,7 +302,7 @@ export function GMatchSettingsModal({
       onClick={onClose}
     >
       <div
-        className="bg-glass backdrop-blur-2xl text-retro-fg border border-border-glass rounded-2xl shadow-2xl w-full max-w-4xl h-[90vh] max-h-[750px] overflow-hidden flex flex-col md:flex-row animate-orbit-pop"
+        className="bg-glass backdrop-blur-2xl text-retro-fg border border-border-glass rounded-xl shadow-2xl w-full max-w-4xl h-[90vh] max-h-[750px] overflow-hidden flex flex-col md:flex-row animate-orbit-pop"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Left Navigation Sidebar */}
@@ -771,7 +771,7 @@ export function GMatchSettingsModal({
                   <button
                     type="button"
                     onClick={() => onOpenIdentityModal?.('export')}
-                    className="p-4 bg-surface-raised border border-border-glass hover:border-retro-accent rounded-2xl text-left space-y-1 transition-all cursor-pointer group shadow-xs"
+                    className="p-4 bg-surface-raised border border-border-glass hover:border-retro-accent rounded-xl text-left space-y-1 transition-all cursor-pointer group shadow-xs"
                   >
                     <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center">
                       <Download className="w-4 h-4" />
@@ -783,7 +783,7 @@ export function GMatchSettingsModal({
                   <button
                     type="button"
                     onClick={() => onOpenIdentityModal?.('login')}
-                    className="p-4 bg-surface-raised border border-border-glass hover:border-retro-accent rounded-2xl text-left space-y-1 transition-all cursor-pointer group shadow-xs"
+                    className="p-4 bg-surface-raised border border-border-glass hover:border-retro-accent rounded-xl text-left space-y-1 transition-all cursor-pointer group shadow-xs"
                   >
                     <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-200 text-cyan-400 flex items-center justify-center">
                       <LogIn className="w-4 h-4" />
@@ -794,7 +794,7 @@ export function GMatchSettingsModal({
                 </div>
 
                 {/* Danger Zone: Log Out */}
-                <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl space-y-3">
+                <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-xs font-medium text-rose-300">Log Out of this Device</h4>

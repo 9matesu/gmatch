@@ -127,7 +127,7 @@ interface FooterSecondaryItem {
       {moreOpen && (
         <>
           <button type="button" aria-label="Close more menu" onClick={() => setMoreOpen(false)} className="fixed inset-0 z-40 bg-black/45" />
-           <div className="absolute bottom-full left-2 right-2 z-50 mb-2 rounded-2xl glass-surface p-2">
+           <div className="absolute bottom-full left-2 right-2 z-50 mb-2 rounded-xl glass-surface p-2">
             <div className="grid grid-cols-3 gap-2">
               {secondaryItems.map((item) => {
                 const Icon = item.icon;
@@ -159,7 +159,7 @@ interface FooterSecondaryItem {
               aria-label={item.label}
                className={`glass-button relative flex flex-col items-center justify-center w-full max-w-[100px] h-11 sm:h-12 rounded-md transition-all cursor-pointer group border touch-manipulation ${
                 item.highlight
-                  ? 'create-action -mt-3 h-14 sm:h-16 rounded-2xl border-transparent shadow-lg'
+                  ? 'create-action -mt-3 h-14 sm:h-16 rounded-xl border-transparent shadow-lg'
                   : ('isHack' in item && item.isHack)
                   ? item.active
                     ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'

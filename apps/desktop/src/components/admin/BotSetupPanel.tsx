@@ -559,7 +559,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
   return (
     <div className="space-y-6 font-sans select-none">
       {/* Header Banner */}
-      <section className="bg-[#18181b] border border-[#27272a] rounded-2xl p-5 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <section className="bg-[#18181b] border border-[#27272a] rounded-xl p-5 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-purple-500/30 flex items-center justify-center text-cyan-300 shadow-md">
             <Bot className="w-5 h-5" />
@@ -602,7 +602,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
       </section>
 
       {/* Info Notice: Tag Matching & Ephemeral Storage */}
-      <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-2xl p-4 flex items-start gap-3 text-xs text-zinc-300">
+      <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-4 flex items-start gap-3 text-xs text-zinc-300">
         <Sparkles className="w-5 h-5 text-cyan-300 shrink-0 mt-0.5" />
         <div className="space-y-1">
           <span className="font-bold text-zinc-100">Dynamic Player Tag Matching Active</span>
@@ -613,7 +613,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
       </div>
 
       {/* Activation Rules */}
-      <section className="bg-[#18181b] border border-[#27272a] rounded-2xl p-5 space-y-4 shadow-xs">
+      <section className="bg-[#18181b] border border-[#27272a] rounded-xl p-5 space-y-4 shadow-xs">
         <div className="flex items-center gap-2 border-b border-[#27272a] pb-3">
           <Sliders className="w-4 h-4 text-cyan-300" />
           <span className="text-xs font-bold uppercase tracking-wider text-zinc-100">Bot Activation Rules</span>
@@ -673,7 +673,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
         <div className="lg:col-span-7 space-y-6">
 
           {/* 0. Global Search Tags Manager */}
-          <div className="bg-[#18181b] border border-[#27272a] rounded-2xl p-5 space-y-4 shadow-xs">
+          <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-5 space-y-4 shadow-xs">
 <div className="flex items-center justify-between border-b border-[#27272a] pb-3">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-100">
                 <Tag className="w-4 h-4 text-cyan-300" />
@@ -736,7 +736,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
           </div>
 
           {/* 1. Multi-API Provider Manager */}
-          <div className="bg-[#18181b] border border-[#27272a] rounded-2xl p-5 space-y-4 shadow-xs">
+          <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-5 space-y-4 shadow-xs">
             <div className="flex items-center justify-between border-b border-[#27272a] pb-3">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-100">
                 <Globe className="w-4 h-4 text-cyan-300" />
@@ -1032,7 +1032,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
           </div>
 
           {/* 2. Bot Names List Configuration */}
-          <div className="bg-[#18181b] border border-[#27272a] rounded-2xl p-5 space-y-4 shadow-lg">
+          <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-5 space-y-4 shadow-lg">
             <div className="flex items-center justify-between border-b border-[#27272a] pb-3">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-100">
                 <Users className="w-4 h-4 text-amber-400" />
@@ -1070,7 +1070,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
           </div>
 
           {/* Bot Duelist Profiles: persistent per-bot identity */}
-          <div className="bg-[#18181b] border border-[#27272a] rounded-2xl p-5 space-y-4 shadow-lg">
+          <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-5 space-y-4 shadow-lg">
             <div className="flex items-center justify-between border-b border-[#27272a] pb-3">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-100">
                 <Bot className="w-4 h-4 text-emerald-400" />
@@ -1239,7 +1239,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
 
         {/* Right Column: Live Test Diagnostics & Sample Image Previews */}
         <div className="lg:col-span-5 space-y-6">
-          <div className="bg-[#18181b] border border-[#27272a] rounded-2xl p-5 space-y-4 shadow-lg">
+          <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-5 space-y-4 shadow-lg">
             <div className="flex items-center justify-between border-b border-[#27272a] pb-3">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-100">
                 <Terminal className="w-4 h-4 text-emerald-400" />
@@ -1359,7 +1359,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
           </div>
 
           {/* 3. Pre-Defined Cards for Newcomers Settings */}
-          <div className="bg-[#18181b] border border-[#27272a] rounded-2xl p-5 space-y-4 shadow-lg">
+          <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-5 space-y-4 shadow-lg">
             <div className="flex items-center justify-between border-b border-[#27272a] pb-3">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-100">
                 <Sparkles className="w-4 h-4 text-cyan-300" />

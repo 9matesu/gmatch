@@ -333,7 +333,7 @@ export function CreatePostModal({
           {activeTab === 'upload' && (
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-border-glass hover:border-retro-accent rounded-2xl bg-surface-interactive hover:bg-glass-w10 p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all text-center group"
+              className="border-2 border-dashed border-border-glass hover:border-retro-accent rounded-xl bg-surface-interactive hover:bg-glass-w10 p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all text-center group"
             >
               <UploadCloud className="w-8 h-8 text-retro-muted group-hover:text-retro-accent group-hover:scale-110 transition-transform" />
               <p className="text-xs font-bold text-retro-body">Drag &amp; drop photos or click to browse</p>
@@ -350,7 +350,7 @@ export function CreatePostModal({
           )}
 
           {activeTab === 'camera' && (
-            <div className="border border-border-glass rounded-2xl overflow-hidden bg-black p-2 flex flex-col items-center gap-3">
+            <div className="border border-border-glass rounded-xl overflow-hidden bg-black p-2 flex flex-col items-center gap-3">
               {cameraError ? (
                 <div className="p-6 text-center text-xs text-retro-error font-bold">
                   {cameraError}
@@ -372,7 +372,7 @@ export function CreatePostModal({
           )}
 
           {activeTab === 'url' && (
-            <div className="bg-surface-interactive border border-border-glass p-3 rounded-2xl flex gap-2">
+            <div className="bg-surface-interactive border border-border-glass p-3 rounded-xl flex gap-2">
               <input
                 type="url"
                 value={urlInput}
@@ -393,7 +393,7 @@ export function CreatePostModal({
           {/* Carousel & Multi-Media Viewer */}
           {mediaList.length > 0 && currentMedia && (
             <div className="space-y-3">
-              <div className="relative w-full rounded-2xl overflow-hidden bg-black flex items-center justify-center border border-border-glass group">
+              <div className="relative w-full rounded-xl overflow-hidden bg-black flex items-center justify-center border border-border-glass group">
                 <img
                   src={currentMedia.previewUrl}
                   alt=""

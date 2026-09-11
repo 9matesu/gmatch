@@ -526,7 +526,7 @@ export function BabecockPanel({
       {/* Tutorial overlay */}
       {showTutorial && (
         <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-surface-raised border border-border-glass rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+          <div className="bg-surface-raised border border-border-glass rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center text-orange-600">
                 <Flame className="w-4 h-4" />
@@ -651,7 +651,7 @@ export function BabecockPanel({
               <div className="text-xs text-retro-muted py-6 text-center">Loading Babecock arena…</div>
             ) : !round ? (
               <div className="text-center py-10 space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-orange-50 border border-orange-200 flex items-center justify-center text-orange-500 mx-auto">
+                <div className="w-12 h-12 rounded-xl bg-orange-50 border border-orange-200 flex items-center justify-center text-orange-500 mx-auto">
                   <Flame className="w-6 h-6 text-orange-500" />
                 </div>
                 <p className="text-xs text-retro-muted max-w-sm mx-auto leading-relaxed">
@@ -674,7 +674,7 @@ export function BabecockPanel({
                   const { cols, rows, spanFor } = computeCollageGrid(n)
                   return (
                     <div
-                      className="bg-black rounded-2xl overflow-hidden w-full flex flex-col"
+                      className="bg-black rounded-xl overflow-hidden w-full flex flex-col"
                       style={{ aspectRatio: `${cols} / ${rows}`, minHeight: 280, maxHeight: 'min(62vh, 560px)' }}
                     >
                       <div className="text-[10px] uppercase font-bold text-retro-muted tracking-wider p-3 flex items-center justify-between border-b border-white/5">
@@ -792,7 +792,7 @@ export function BabecockPanel({
                       </button>
 
                       {invitePickerOpen && (
-                        <div className="absolute z-30 top-full left-0 mt-1.5 w-64 max-h-72 overflow-y-auto styled-scrollbar bg-surface-raised border border-border-glass rounded-2xl shadow-xl p-2 space-y-1">
+                        <div className="absolute z-30 top-full left-0 mt-1.5 w-64 max-h-72 overflow-y-auto styled-scrollbar bg-surface-raised border border-border-glass rounded-xl shadow-xl p-2 space-y-1">
                           {candidateUsers.length === 0 ? (
                             <div className="text-xs text-retro-muted p-2 text-center">No online peers to invite.</div>
                           ) : (
@@ -828,7 +828,7 @@ export function BabecockPanel({
       </div>
 
       {/* Gallery Section */}
-      <div className="bg-surface-raised border border-border-glass rounded-2xl overflow-hidden shadow-xs">
+      <div className="bg-surface-raised border border-border-glass rounded-xl overflow-hidden shadow-xs">
         <button
           type="button"
           onClick={() => setGalleryOpen((v) => !v)}
@@ -885,7 +885,7 @@ export function BabecockPanel({
       {/* Modal: Start or Join Round */}
       {modal && (
         <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-surface-raised border border-border-glass rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl space-y-4 p-5">
+          <div className="bg-surface-raised border border-border-glass rounded-xl max-w-lg w-full overflow-hidden shadow-2xl space-y-4 p-5">
             <div className="flex items-center justify-between border-b border-border-glass pb-3">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center text-orange-600">
@@ -1023,7 +1023,7 @@ export function BabecockPanel({
           onClick={() => setExpandedRound(null)}
         >
           <div
-            className="bg-surface-raised border border-border-glass rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto styled-scrollbar p-5 space-y-4 shadow-2xl"
+            className="bg-surface-raised border border-border-glass rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto styled-scrollbar p-5 space-y-4 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-border-glass pb-3">

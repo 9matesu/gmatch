@@ -218,7 +218,7 @@ export function FollowersFollowingModal({
       onClick={onClose}
     >
       <div
-        className="bg-glass backdrop-blur-2xl border border-border-glass w-full max-w-md rounded-2xl overflow-hidden shadow-2xl flex flex-col text-retro-fg max-h-[88vh] animate-orbit-slide-up"
+        className="bg-glass backdrop-blur-2xl border border-border-glass w-full max-w-md rounded-xl overflow-hidden shadow-2xl flex flex-col text-retro-fg max-h-[88vh] animate-orbit-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header Bar */}
@@ -324,7 +324,7 @@ export function FollowersFollowingModal({
             return (
               <div
                 key={user.id}
-                className="flex items-center justify-between p-2 rounded-2xl hover:bg-glass-w5 transition-colors group"
+                className="flex items-center justify-between p-2 rounded-xl hover:bg-glass-w5 transition-colors group"
               >
                 {/* User Avatar + Display Name */}
                 <div

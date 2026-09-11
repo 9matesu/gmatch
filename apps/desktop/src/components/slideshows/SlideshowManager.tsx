@@ -175,7 +175,7 @@ export function SlideshowManager({
   };
 
   return (
-    <div className="bg-surface-raised border border-border-glass rounded-2xl p-4 space-y-4">
+    <div className="bg-surface-raised border border-border-glass rounded-xl p-4 space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Film className="w-4 h-4 text-retro-muted" />

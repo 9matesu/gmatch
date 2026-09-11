@@ -163,7 +163,7 @@ export function AttachmentUploadModal({
 
   return (
     <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-surface-raised border border-border-glass rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl space-y-4 p-5">
+      <div className="bg-surface-raised border border-border-glass rounded-xl max-w-lg w-full overflow-hidden shadow-2xl space-y-4 p-5">
         <div className="flex items-center justify-between border-b border-border-glass pb-3">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center text-orange-600">

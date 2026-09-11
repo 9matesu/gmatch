@@ -30,7 +30,7 @@ export function CoffeeModal({ open, reason, onDismiss }: Props) {
 
   return (
     <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/80 backdrop-blur-md animate-orbit-fade-in p-4">
-      <div className="bg-surface-canvas/95 border border-zinc-800 rounded-2xl w-[440px] max-w-[92vw] shadow-2xl animate-orbit-pop overflow-hidden backdrop-blur-md">
+      <div className="bg-surface-canvas/95 border border-zinc-800 rounded-xl w-[440px] max-w-[92vw] shadow-2xl animate-orbit-pop overflow-hidden backdrop-blur-md">
         {/* Header */}
         <div className="bg-surface-canvas/60 px-5 py-3.5 border-b border-zinc-800 flex items-center justify-between">
           <div className="flex items-center gap-2">

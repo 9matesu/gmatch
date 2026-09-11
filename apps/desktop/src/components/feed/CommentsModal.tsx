@@ -62,7 +62,7 @@ export function CommentsModal({
       onClick={onClose}
     >
       <div
-        className="bg-surface-raised w-full max-w-md rounded-t-3xl sm:rounded-3xl border border-border-glass shadow-2xl overflow-hidden flex flex-col h-[75vh] max-h-[600px] animate-orbit-slide-up"
+        className="bg-surface-raised w-full max-w-md rounded-t-3xl sm:rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col h-[75vh] max-h-[600px] animate-orbit-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Comments Header */}

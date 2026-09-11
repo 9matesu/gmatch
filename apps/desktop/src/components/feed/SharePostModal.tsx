@@ -87,7 +87,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
       onClick={onClose}
     >
       <div
-        className="bg-glass backdrop-blur-2xl w-full max-w-lg rounded-2xl border border-border-glass shadow-2xl overflow-hidden flex flex-col max-h-[88vh] animate-orbit-slide-up"
+        className="bg-glass backdrop-blur-2xl w-full max-w-lg rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col max-h-[88vh] animate-orbit-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -161,7 +161,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
               return (
                 <div
                   key={fId}
-                  className="p-2.5 rounded-2xl hover:bg-glass-w5 flex items-center justify-between border border-transparent hover:border-border-glass transition-colors"
+                  className="p-2.5 rounded-xl hover:bg-glass-w5 flex items-center justify-between border border-transparent hover:border-border-glass transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-zinc-700 overflow-hidden border border-border-glass flex items-center justify-center text-xs font-bold">

@@ -88,7 +88,7 @@ export function ExploreSearchModal({
       onClick={onClose}
     >
       <div
-        className="bg-surface-raised w-full sm:max-w-lg h-full sm:h-[80vh] max-h-[80vh] rounded-none sm:rounded-3xl border border-border-glass shadow-2xl overflow-hidden flex flex-col text-retro-fg animate-orbit-pop"
+        className="bg-surface-raised w-full sm:max-w-lg h-full sm:h-[80vh] max-h-[80vh] rounded-none sm:rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col text-retro-fg animate-orbit-pop"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -145,7 +145,7 @@ export function ExploreSearchModal({
                 return (
                   <div
                     key={id}
-                    className="flex items-center justify-between p-2 rounded-2xl hover:bg-glass-w5 transition-colors group"
+                    className="flex items-center justify-between p-2 rounded-xl hover:bg-glass-w5 transition-colors group"
                   >
                     <div
                       className="flex items-center gap-3 cursor-pointer min-w-0 flex-1"
@@ -200,7 +200,7 @@ export function ExploreSearchModal({
               {matchedPosts.slice(0, 8).map((p) => (
                 <div
                   key={p.id}
-                  className="flex items-center gap-3 p-2 rounded-2xl hover:bg-glass-w5 transition-colors cursor-pointer"
+                  className="flex items-center gap-3 p-2 rounded-xl hover:bg-glass-w5 transition-colors cursor-pointer"
                   onClick={() => {
                     playPress(700);
                     onOpenPost?.(p);

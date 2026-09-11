@@ -335,7 +335,7 @@ export function GMatchProfile({
                   playsInline
                 />
                 {isMediaVideo(post.url) && (
-                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-sm p-1 pointer-events-none text-white z-10">
+                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
                 )}
@@ -381,7 +381,7 @@ export function GMatchProfile({
                   playsInline
                 />
                 {isMediaVideo(post.url) && (
-                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-sm p-1 pointer-events-none text-white z-10">
+                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
                 )}
@@ -420,7 +420,7 @@ export function GMatchProfile({
                   playsInline
                 />
                 {isMediaVideo(post.url) && (
-                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-sm p-1 pointer-events-none text-white z-10">
+                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
                 )}
@@ -457,7 +457,7 @@ export function GMatchProfile({
                   playsInline
                 />
                 {isMediaVideo(card.content_url || (card as any).url) && (
-                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-sm p-1 pointer-events-none text-white z-10">
+                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
                 )}

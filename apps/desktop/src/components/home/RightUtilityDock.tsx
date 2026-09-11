@@ -81,7 +81,7 @@ export function RightUtilityDock({
   return (
     <aside
       aria-label="Quick Actions Dock"
-      className="hidden lg:flex fixed right-3 top-1/2 -translate-y-1/2 z-50 flex-col items-center gap-2 p-1.5 bg-surface-canvas/90 backdrop-blur-2xl border border-zinc-800/80 rounded-2xl shadow-2xl pointer-events-auto font-sans select-none animate-orbit-slide-left"
+      className="hidden lg:flex fixed right-3 top-1/2 -translate-y-1/2 z-50 flex-col items-center gap-2 p-1.5 bg-surface-canvas/90 backdrop-blur-2xl border border-zinc-800/80 rounded-xl shadow-2xl pointer-events-auto font-sans select-none animate-orbit-slide-left"
     >
       {/* 1-3. Main Dock Buttons with Exact Geometric Center Alignment */}
       {dockButtons.map((btn) => {

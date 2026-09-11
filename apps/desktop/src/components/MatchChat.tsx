@@ -59,7 +59,7 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
   const list = messages || []
 
   return (
-    <div className="border border-border-glass rounded-2xl overflow-hidden bg-surface-raised shadow-xs font-sans">
+    <div className="border border-border-glass rounded-xl overflow-hidden bg-surface-raised shadow-xs font-sans">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -88,7 +88,7 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
                 return (
                   <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
                     <div
-                      className={`max-w-[85%] px-3 py-1.5 rounded-2xl text-xs shadow-xs select-text ${
+                      className={`max-w-[85%] px-3 py-1.5 rounded-xl text-xs shadow-xs select-text ${
                         mine
                           ? 'bg-gradient-to-r from-cyan-600 to-amber-600 text-white rounded-br-xs'
                           : 'bg-cyan-500/10 text-retro-fg border border-purple-100 rounded-bl-xs'

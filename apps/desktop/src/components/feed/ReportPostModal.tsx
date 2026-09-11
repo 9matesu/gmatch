@@ -33,7 +33,7 @@ export function ReportPostModal({ post, onClose, onReport, toast }: ReportPostMo
       onClick={onClose}
     >
       <div
-        className="bg-surface-raised w-full max-w-sm rounded-t-3xl sm:rounded-3xl border border-border-glass shadow-2xl overflow-hidden animate-orbit-slide-up p-5 space-y-4"
+        className="bg-surface-raised w-full max-w-sm rounded-t-3xl sm:rounded-xl border border-border-glass shadow-2xl overflow-hidden animate-orbit-slide-up p-5 space-y-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-zinc-100 pb-3">

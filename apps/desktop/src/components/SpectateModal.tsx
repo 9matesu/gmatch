@@ -193,7 +193,7 @@ export function SpectateModal({
     return (
       <div
         style={pipPos ? { left: `${pipPos.x}px`, top: `${pipPos.y}px`, bottom: 'auto', right: 'auto' } : undefined}
-        className="fixed bottom-6 right-6 z-[var(--z-system)] w-80 bg-surface-canvas/95 border-2 border-cyan-500/60 rounded-2xl shadow-2xl overflow-hidden flex flex-col select-none backdrop-blur-2xl animate-orbit-fade-in font-sans"
+        className="fixed bottom-6 right-6 z-[var(--z-system)] w-80 bg-surface-canvas/95 border-2 border-cyan-500/60 rounded-xl shadow-2xl overflow-hidden flex flex-col select-none backdrop-blur-2xl animate-orbit-fade-in font-sans"
       >
         <div
           onMouseDown={handleMouseDown}
@@ -311,7 +311,7 @@ export function SpectateModal({
       >
         <div
           className={`relative w-full ${isExpanded ? 'max-w-6xl h-[92vh]' : 'max-w-3xl max-h-[88vh]'
-            } bg-surface-raised border border-border-glass rounded-3xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300`}
+            } bg-surface-raised border border-border-glass rounded-xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header Bar */}
@@ -395,7 +395,7 @@ export function SpectateModal({
               {/* Left Column: Live Arena & Cards */}
               <div className="space-y-4 flex flex-col">
                 {/* Scoreboard Players Card Header */}
-                <div className="grid grid-cols-2 gap-3 items-center bg-surface-raised p-3.5 border border-border-glass rounded-2xl shadow-xs">
+                <div className="grid grid-cols-2 gap-3 items-center bg-surface-raised p-3.5 border border-border-glass rounded-xl shadow-xs">
                   {/* Player A */}
                   <div className="flex items-center gap-3">
                     <div className="relative">
@@ -448,7 +448,7 @@ export function SpectateModal({
                 {/* Duel Cards Display */}
                 <div className="grid grid-cols-2 gap-3 sm:gap-4">
                   {/* Card A */}
-                  <div className="flex flex-col items-center gap-2.5 bg-surface-raised p-3 sm:p-4 border border-border-glass rounded-2xl shadow-xs">
+                  <div className="flex flex-col items-center gap-2.5 bg-surface-raised p-3 sm:p-4 border border-border-glass rounded-xl shadow-xs">
                     <div className="text-[10px] font-bold tracking-wider text-cyan-300 uppercase flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
                       <span>{pA.display_name || 'Player 1'}&apos;s Card</span>
@@ -508,7 +508,7 @@ export function SpectateModal({
                   </div>
 
                   {/* Card B */}
-                  <div className="flex flex-col items-center gap-2.5 bg-surface-raised p-3 sm:p-4 border border-border-glass rounded-2xl shadow-xs">
+                  <div className="flex flex-col items-center gap-2.5 bg-surface-raised p-3 sm:p-4 border border-border-glass rounded-xl shadow-xs">
                     <div className="text-[10px] font-bold tracking-wider text-amber-700 uppercase flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                       <span>{pB.display_name || 'Player 2'}&apos;s Card</span>
@@ -571,7 +571,7 @@ export function SpectateModal({
 
               {/* Right Column: Rounds History */}
               {history.length > 0 && (
-                <div className="border border-border-glass bg-surface-raised p-3.5 rounded-2xl flex flex-col min-h-0 lg:h-full shadow-xs">
+                <div className="border border-border-glass bg-surface-raised p-3.5 rounded-xl flex flex-col min-h-0 lg:h-full shadow-xs">
                   <div className="text-xs font-black text-retro-body uppercase tracking-widest shrink-0 mb-3 flex items-center gap-2">
                     <Award className="w-3.5 h-3.5 text-amber-500" />
                     <span>Duel Round History</span>
