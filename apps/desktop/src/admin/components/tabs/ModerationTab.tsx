@@ -241,7 +241,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                 </div>
                 <div>
                   <span className="text-retro-muted block text-[10px]">Category</span>
-                  <span className="text-retro-fg font-semibold uppercase">{report.category || "Uncategorized"}</span>
+                  <span className="text-retro-fg font-semibold uppercase tracking-wider">{report.category || "Uncategorized"}</span>
                 </div>
                 <div>
                   <span className="text-retro-muted block text-[10px]">Timestamp</span>

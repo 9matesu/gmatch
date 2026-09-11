@@ -567,7 +567,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
           <div>
             <h2 className="text-base font-extrabold text-retro-fg uppercase tracking-wider flex items-center gap-2">
               <span>Bot Duelist &amp; Multi-API Management</span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${enabled ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-red-500/20 text-red-300 border border-red-500/40'}`}>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${enabled ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-red-500/20 text-red-300 border border-red-500/40'}`}>
                 {enabled ? 'Bots Active' : 'Bots Disabled'}
               </span>
             </h2>
@@ -769,28 +769,28 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                   <button
                     type="button"
                     onClick={() => handleBatchEnable(true)}
-                    className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/50 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer"
+                    className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/50 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer"
                   >
                     Enable
                   </button>
                   <button
                     type="button"
                     onClick={() => handleBatchEnable(false)}
-                    className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer"
+                    className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer"
                   >
                     Disable
                   </button>
                   <button
                     type="button"
                     onClick={handleBatchApplyGlobalQuery}
-                    className="px-2.5 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/50 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer"
+                    className="px-2.5 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/50 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer"
                   >
                     Apply Global Query
                   </button>
                   <button
                     type="button"
                     onClick={handleBatchDelete}
-                    className="px-2.5 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/50 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer"
+                    className="px-2.5 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/50 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer"
                   >
                     Delete Selected
                   </button>
@@ -856,7 +856,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-bold text-retro-fg truncate">{prov.name}</span>
-                            <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded bg-[#27272a] text-retro-muted border border-[#27272a]">
+                            <span className="text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.2 rounded bg-[#27272a] text-retro-muted border border-[#27272a]">
                               {prov.providerType}
                             </span>
                           </div>
@@ -911,7 +911,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {/* Name */}
                           <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-retro-muted uppercase">Provider Label:</label>
+                            <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider">Provider Label:</label>
                             <input
                               type="text"
                               value={prov.name}
@@ -922,7 +922,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
 
                           {/* Provider Type */}
                           <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-retro-muted uppercase">Provider Engine:</label>
+                            <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider">Provider Engine:</label>
                             <select
                               value={prov.providerType}
                               onChange={(e) => handleUpdateProvider(prov.id, { providerType: e.target.value as ProviderType })}
@@ -940,7 +940,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
 
                           {/* Weight / Priority */}
                           <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-retro-muted uppercase">Weight (Priority):</label>
+                            <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider">Weight (Priority):</label>
                             <input
                               type="number"
                               min={1}
@@ -955,7 +955,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
 
                         {/* URL */}
                         <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-retro-muted uppercase">API URL Endpoint:</label>
+                          <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider">API URL Endpoint:</label>
                           <input
                             type="text"
                             value={prov.url}
@@ -969,7 +969,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                           {/* API Key */}
                           <div className="space-y-1">
                             <div className="flex items-center justify-between">
-                              <label className="text-[10px] font-bold text-retro-muted uppercase">API Key / Token:</label>
+                              <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider">API Key / Token:</label>
                               <button
                                 type="button"
                                 onClick={() => setShowKeyFor({ ...showKeyFor, [prov.id]: !isShowKey })}
@@ -990,7 +990,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
 
                           {/* User ID / Login (Crucial for Gelbooru & Danbooru) */}
                           <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-retro-muted uppercase">User ID / Login (Gelbooru &amp; Danbooru):</label>
+                            <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider">User ID / Login (Gelbooru &amp; Danbooru):</label>
                             <input
                               type="text"
                               value={prov.userId || ''}
@@ -1044,7 +1044,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                     key={cat}
                     type="button"
                     onClick={() => handleApplyNamePreset(cat)}
-                    className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-[#27272a] hover:bg-glass-w10 text-retro-muted hover:text-retro-fg border border-[#27272a] transition-colors cursor-pointer"
+                    className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-[#27272a] hover:bg-glass-w10 text-retro-muted hover:text-retro-fg border border-[#27272a] transition-colors cursor-pointer"
                   >
                     {cat}
                   </button>
@@ -1393,7 +1393,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-[10px] font-bold text-retro-muted uppercase block mb-1">Primary Source Provider:</label>
+                <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider block mb-1">Primary Source Provider:</label>
                 <select
                   value={providers[0]?.id || 'prov_gelbooru'}
                   onChange={(e) => {
@@ -1411,7 +1411,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-retro-muted uppercase block mb-1">Starter Card Tags Filter:</label>
+                <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider block mb-1">Starter Card Tags Filter:</label>
                 <div className="flex gap-2">
                   <input
                     type="text"

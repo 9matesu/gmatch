@@ -297,7 +297,7 @@ export function ReportModal({
               key={cat}
               type="button"
               onClick={() => setReportCategory(cat)}
-              className={`px-3 py-1 border font-bold uppercase transition-colors ${
+              className={`px-3 py-1 border font-bold uppercase tracking-wider transition-colors ${
                 reportCategory === cat
                   ? 'bg-retro-accent text-black border-retro-accent'
                   : 'bg-retro-bg text-retro-muted border-border-glass hover:text-retro-fg'

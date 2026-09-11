@@ -95,7 +95,7 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
                       }`}
                     >
                       {!mine && (
-                        <div className="text-[10px] font-bold text-cyan-300 uppercase mb-0.5 select-none">
+                        <div className="text-[10px] font-bold text-cyan-300 uppercase tracking-wider mb-0.5 select-none">
                           {m.sender_name?.trim() || 'Unknown User'}
                         </div>
                       )}

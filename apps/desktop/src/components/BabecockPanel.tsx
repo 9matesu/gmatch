@@ -922,7 +922,7 @@ export function BabecockPanel({
                     fileRef.current = null
                     setHasFile(false)
                   }}
-                  className={`flex-1 py-1.5 rounded-lg transition-all uppercase cursor-pointer flex items-center justify-center gap-1.5 ${mode === m ? 'bg-surface-raised text-retro-fg shadow-xs font-black' : 'text-retro-muted hover:text-retro-body'
+                  className={`flex-1 py-1.5 rounded-lg transition-all uppercase tracking-wider cursor-pointer flex items-center justify-center gap-1.5 ${mode === m ? 'bg-surface-raised text-retro-fg shadow-xs font-black' : 'text-retro-muted hover:text-retro-body'
                     }`}
                 >
                   {m === 'upload' && <UploadCloud className="w-3.5 h-3.5" />}

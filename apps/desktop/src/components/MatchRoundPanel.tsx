@@ -374,7 +374,7 @@ export function MatchRoundPanel({
                         >
                           <div className="metallic-card flex flex-col h-full">
                             <div className="absolute top-2 left-2 z-20 flex items-center gap-1">
-                              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border shadow-md ${rarity.badgeClass}`}>
+                              <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-md ${rarity.badgeClass}`}>
                                 {rarity.label}
                               </span>
                               <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-amber-300 border border-amber-400/40 shadow-md backdrop-blur-xs">
@@ -589,7 +589,7 @@ export function MatchRoundPanel({
                     <div className="metallic-card flex flex-col h-full">
                       {/* Top Badges */}
                       <div className="absolute top-2 left-2 z-20 flex items-center gap-1">
-                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border shadow-md ${myRarity.badgeClass}`}>
+                        <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-md ${myRarity.badgeClass}`}>
                           {myRarity.label}
                         </span>
                         <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-amber-300 border border-amber-400/40 shadow-md backdrop-blur-xs">
@@ -686,7 +686,7 @@ export function MatchRoundPanel({
                       {/* Top Badges */}
                       {opponentImg.url && (
                         <div className="absolute top-2 left-2 z-20 flex items-center gap-1">
-                          <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border shadow-md ${oppRarity.badgeClass}`}>
+                          <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-md ${oppRarity.badgeClass}`}>
                             {oppRarity.label}
                           </span>
                           <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-amber-300 border border-amber-400/40 shadow-md backdrop-blur-xs">

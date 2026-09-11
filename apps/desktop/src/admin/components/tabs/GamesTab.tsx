@@ -169,7 +169,7 @@ export function GamesTab({ identity, pinVerified, onZoom, onAction }: GamesTabPr
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-surface-canvas/60 p-3 rounded-lg border border-border-glass space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-cyan-300 uppercase">Player A: {match.user_a_name || match.user_a.slice(0, 8)}</span>
+                  <span className="text-xs font-bold text-cyan-300 uppercase tracking-wider">Player A: {match.user_a_name || match.user_a.slice(0, 8)}</span>
                   <span className="text-xs font-mono font-bold text-retro-fg">Score: {match.score_a || 0}</span>
                 </div>
                 <div className="flex items-start gap-3">
@@ -192,7 +192,7 @@ export function GamesTab({ identity, pinVerified, onZoom, onAction }: GamesTabPr
 
               <div className="bg-surface-canvas/60 p-3 rounded-lg border border-border-glass space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-purple-300 uppercase">Player B: {match.user_b_name || match.user_b.slice(0, 8)}</span>
+                  <span className="text-xs font-bold text-purple-300 uppercase tracking-wider">Player B: {match.user_b_name || match.user_b.slice(0, 8)}</span>
                   <span className="text-xs font-mono font-bold text-retro-fg">Score: {match.score_b || 0}</span>
                 </div>
                 <div className="flex items-start gap-3">

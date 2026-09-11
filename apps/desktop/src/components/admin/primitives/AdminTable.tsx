@@ -419,7 +419,7 @@ export function AdminTable<T extends Record<string, unknown>>({
                   )}
                   disabled={action.disabled?.(data.filter(row => rowSelection[getRowId(row)]))}
                   className={cn(
-                    "px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors",
+                    "px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors",
                     action.variant === "danger" && "bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30",
                     action.variant === "primary" && "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/30",
                     action.variant !== "danger" && action.variant !== "primary" && "bg-surface-interactive text-retro-fg border border-border-glass hover:bg-glass-w10"

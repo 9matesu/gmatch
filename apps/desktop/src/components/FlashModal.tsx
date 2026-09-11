@@ -107,7 +107,7 @@ export function FlashModal({
                 fileRef.current = null
                 setHasFile(false)
               }}
-              className={`px-3 py-1 rounded transition-colors uppercase cursor-pointer ${
+              className={`px-3 py-1 rounded transition-colors uppercase tracking-wider cursor-pointer ${
                 mode === m ? 'bg-retro-accent text-black font-black' : 'text-retro-muted hover:text-retro-fg'
               }`}
             >

@@ -252,7 +252,7 @@ export function MatchCardUpload({
                   <div className="min-w-0">
                     <div className="text-[10px] font-bold text-retro-fg truncate">{pending.name || 'Unnamed Card'}</div>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded border ${rarity.badgeClass}`}>{rarity.label}</span>
+                      <span className={`text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${rarity.badgeClass}`}>{rarity.label}</span>
                       <span className="text-[10px] font-mono text-amber-300/90">{pending.value ?? 0} value</span>
                     </div>
                   </div>

@@ -129,11 +129,11 @@ export function CardTile({
       <div className="flex flex-col h-full rounded-[6px] overflow-hidden" style={{ boxShadow: `inset 0 0 0 1.5px ${accent}66` }}>
         {/* Top Badges */}
         <div className="absolute top-2 left-2 z-20 flex flex-wrap items-center gap-1">
-          <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border shadow-md ${rarity.badgeClass}`}>
+          <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-md ${rarity.badgeClass}`}>
             {rarity.label}
           </span>
           {frameType !== 'chrome' && (
-            <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded-md border shadow-md font-mono ${
+            <span className={`text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-md font-mono ${
               frameType === 'holo'
                 ? 'bg-gradient-to-r from-pink-500/80 via-purple-500/80 to-cyan-500/80 text-white border-pink-400/60'
                 : frameType === 'carbon'

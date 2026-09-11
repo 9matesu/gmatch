@@ -115,7 +115,7 @@ export function AdminSidebar({
       <div className="p-4 border-t border-border-glass space-y-2">
         <div className="flex items-center justify-between text-[10px] font-mono text-retro-muted">
           <span>Admin Status:</span>
-          <span className="text-emerald-400 font-bold uppercase">Active</span>
+          <span className="text-emerald-400 font-bold uppercase tracking-wider">Active</span>
         </div>
         <a
           href="/"

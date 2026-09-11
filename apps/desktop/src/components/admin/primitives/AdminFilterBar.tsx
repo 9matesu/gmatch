@@ -180,7 +180,7 @@ export function AdminFilterBar({
             <button
               type="button"
               onClick={handleClearAll}
-              className="px-2.5 py-1 text-[10px] font-bold uppercase rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 transition-colors"
+              className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 transition-colors"
             >
               <X className="w-3 h-3 mr-1" />
               Clear All
@@ -190,7 +190,7 @@ export function AdminFilterBar({
             type="button"
             onClick={() => setExpanded(!expanded)}
             className={cn(
-              "px-3 py-1.5 text-xs font-bold uppercase rounded border transition-colors flex items-center gap-1.5",
+              "px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded border transition-colors flex items-center gap-1.5",
               expanded
                 ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/30"
                 : "bg-surface-interactive text-retro-fg border-border-glass hover:bg-glass-w10"

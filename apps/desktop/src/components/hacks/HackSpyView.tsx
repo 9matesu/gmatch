@@ -175,7 +175,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div className="bg-black/40 p-3.5 rounded-xl border border-border-glass space-y-1">
-              <span className="text-retro-muted block text-[10px] uppercase font-bold">Player</span>
+              <span className="text-retro-muted block text-[10px] uppercase tracking-wider font-bold">Player</span>
               <p className="text-retro-fg font-bold truncate">{feed?.target?.display_name || session.targetUserName}</p>
               {feed?.target?.bio ? (
                 <p className="text-[10px] text-retro-body italic mt-1 line-clamp-2">&quot;{feed.target.bio}&quot;</p>
@@ -183,7 +183,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
             </div>
 
             <div className="bg-black/40 p-3.5 rounded-xl border border-border-glass space-y-1">
-              <span className="text-retro-muted block text-[10px] uppercase font-bold">Session</span>
+              <span className="text-retro-muted block text-[10px] uppercase tracking-wider font-bold">Session</span>
               <p className={feedError ? 'text-amber-300 font-bold' : 'text-emerald-300 font-bold'}>
                 {feedError || 'Live'}
               </p>

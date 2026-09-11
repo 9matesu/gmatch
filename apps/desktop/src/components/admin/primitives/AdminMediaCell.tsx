@@ -79,7 +79,7 @@ export function AdminMediaCell({
           className
         )}
       >
-        <span className="text-[10px] text-retro-muted uppercase font-mono">
+        <span className="text-[10px] text-retro-muted uppercase tracking-wider font-mono">
           {obj.failed || loadError ? "N/A" : "…"}
         </span>
       </div>

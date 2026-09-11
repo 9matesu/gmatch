@@ -162,7 +162,7 @@ export function GalleryView({
                     setGalleryFilter(t)
                     setGalleryPage(0)
                   }}
-                  className={`px-2.5 py-1 rounded-md cursor-pointer uppercase transition-colors ${
+                  className={`px-2.5 py-1 rounded-md cursor-pointer uppercase tracking-wider transition-colors ${
                     galleryFilter === t ? 'bg-white/14 text-retro-fg font-bold shadow-sm' : 'text-retro-muted hover:text-retro-body'
                   }`}
                 >
@@ -172,7 +172,7 @@ export function GalleryView({
             </div>
 
             <div className="glass-field flex items-center gap-1 px-2 py-1 text-xs">
-              <span className="text-retro-muted font-semibold text-[10px] uppercase">Sort:</span>
+              <span className="text-retro-muted font-semibold text-[10px] uppercase tracking-wider">Sort:</span>
               <select
                 value={gallerySort}
                 onChange={(e) => {
@@ -205,7 +205,7 @@ export function GalleryView({
                   key={t}
                   type="button"
                   onClick={() => { setCardTypeFilter(t); setGalleryPage(0) }}
-                  className={`px-2.5 py-1 rounded-md cursor-pointer uppercase transition-colors ${
+                  className={`px-2.5 py-1 rounded-md cursor-pointer uppercase tracking-wider transition-colors ${
                     cardTypeFilter === t ? 'bg-white/14 text-retro-fg font-bold shadow-sm' : 'text-retro-muted hover:text-retro-body'
                   }`}
                 >

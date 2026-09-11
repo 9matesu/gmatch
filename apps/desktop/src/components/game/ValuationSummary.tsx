@@ -222,7 +222,7 @@ export function ValuationSummary({
           </div>
           {summary.promotions.map((p) => (
             <div key={p.id} className="text-xs font-medium text-retro-body">
-              Card upgraded from <span className="uppercase text-amber-300 font-bold">{p.oldRarity}</span> to <span className="uppercase text-amber-400 font-extrabold">{p.newRarity}</span>
+              Card upgraded from <span className="uppercase tracking-wider text-amber-300 font-bold">{p.oldRarity}</span> to <span className="uppercase text-amber-400 font-extrabold">{p.newRarity}</span>
             </div>
           ))}
         </div>
@@ -272,7 +272,7 @@ export function ValuationSummary({
                 <div key={c.round} className="flex items-center justify-between text-xs py-0.5">
                   <div className="flex items-center gap-1.5">
                     <span className="font-mono text-retro-muted text-xs">R{c.round}:</span>
-                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold uppercase ${rarity.badgeClass}`}>{rarity.label}</span>
+                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold uppercase tracking-wider ${rarity.badgeClass}`}>{rarity.label}</span>
                     <span className="text-retro-muted text-xs flex items-center gap-1">
                       {c.vote === 'boost' ? <><Zap className="w-3 h-3 text-amber-400" /> Boosted</> : c.vote === 'like' ? <><Heart className="w-3 h-3 text-amber-400 fill-rose-400" /> Liked</> : <><X className="w-3 h-3 text-retro-muted" /> Rejected</>}
                     </span>

@@ -393,13 +393,13 @@ export function ServersView({
                   <div className="flex items-center gap-1.5">
                     <h2 className="truncate text-base font-bold text-retro-fg leading-tight">{serverName || 'gmatch'}</h2>
                     {serverMode && (
-                      <span className="text-[10px] px-1.5 py-0.2 rounded font-mono uppercase glass-inset text-retro-muted border-border-subtle">
+                      <span className="text-[10px] px-1.5 py-0.2 rounded font-mono uppercase tracking-wider glass-inset text-retro-muted border-border-subtle">
                         {serverMode}
                       </span>
                     )}
                     {node?.isAdmin && (
                       <span
-                        className="text-[10px] px-1.5 py-0.2 rounded font-mono uppercase text-amber-200 border border-amber-400/30 bg-amber-400/10"
+                        className="text-[10px] px-1.5 py-0.2 rounded font-mono uppercase tracking-wider text-amber-200 border border-amber-400/30 bg-amber-400/10"
                         title="You administer this server"
                       >
                         Admin
@@ -817,7 +817,7 @@ export function ServersView({
                               <Lock className="w-3 h-3 text-amber-400 shrink-0" aria-label="password required" />
                             )}
                             {mine(s) && (
-                              <span className="text-[10px] px-1.5 py-0.2 rounded font-mono uppercase glass-inset text-retro-accent border border-retro-accent/30">
+                              <span className="text-[10px] px-1.5 py-0.2 rounded font-mono uppercase tracking-wider glass-inset text-retro-accent border border-retro-accent/30">
                                 YOURS · ADMIN
                               </span>
                             )}
