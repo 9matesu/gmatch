@@ -12,7 +12,6 @@ import {
   Home,
   Gamepad2,
   PlusSquare,
-  Send,
   User,
   LayoutGrid,
   Settings,
@@ -51,12 +50,9 @@ export function SidebarNav({
   onOpenHome,
   onOpenCreatePost,
   onOpenGallery,
-  onOpenChat,
-  chatOpen = false,
   onOpenSettings,
   onLogout,
   onOpenStore,
-  unreadMessagesCount = 0,
   notificationUnreadCount = 0,
   onOpenNotifications,
   notificationsOpen = false,
@@ -78,12 +74,9 @@ export function SidebarNav({
   onOpenHome?: () => void;
   onOpenCreatePost?: () => void;
   onOpenGallery?: () => void;
-  onOpenChat?: () => void;
-  chatOpen?: boolean;
   onOpenSettings?: () => void;
   onLogout?: () => void;
   onOpenStore?: () => void;
-  unreadMessagesCount?: number;
   notificationUnreadCount?: number;
   onOpenNotifications?: () => void;
   notificationsOpen?: boolean;
@@ -312,14 +305,6 @@ export function SidebarNav({
           action: () => openGamesTab('ranks'),
         },
       ],
-    },
-    {
-      id: 'messages',
-      label: 'Messages',
-      icon: Send,
-      active: chatOpen || mainView === 'messages',
-      action: () => (onOpenChat ? onOpenChat() : setMainView?.('messages')),
-      badge: unreadMessagesCount,
     },
     ...(onOpenNotifications
       ? [

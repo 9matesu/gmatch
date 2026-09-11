@@ -2922,17 +2922,6 @@ export default function Home() {
                 setMainView={handleSetMainView}
                 onOpenHome={handleOpenHome}
                 onOpenCreatePost={() => { setChatOpen(false); setShowCreatePostModal(true); }}
-                onOpenChat={() => {
-                  if (chatOpen && panelTab === 'chat') {
-                    setChatOpen(false);
-                  } else {
-                    setChatOpen(true);
-                    setPanelTab('chat');
-                  }
-                  setDmMinimized(false);
-                  if (mainView === 'messages') setMainView('feed');
-                }}
-                chatOpen={chatOpen && panelTab === 'chat'}
                 onOpenGallery={() => handleSetMainView('gallery')}
                 onOpenSettings={() => { setChatOpen(false); setShowSettingsModal(true); }}
                 onLogout={() => { setChatOpen(false); setIdentityModalMode('logout'); }}
@@ -2946,7 +2935,6 @@ export default function Home() {
                 gameBadges={{ duel: duelBadge }}
                 isAdmin={myProfile.isAdmin}
                 onGroupToggle={() => setChatOpen(false)}
-                unreadMessagesCount={pmUnreadCount}
                 notificationUnreadCount={lobby.unreadCount}
                 onOpenNotifications={toggleNotifications}
                 notificationsOpen={chatOpen && panelTab === 'notifications'}
