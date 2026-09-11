@@ -227,7 +227,7 @@ describe('mergeTags (T2: two pills -> combined search)', () => {
     const next = mergeTags(tags, 'a', 'b')
     expect(next?.find((t) => t.name === 'a')).toBeUndefined()
     expect(next?.find((t) => t.name === 'b')).toBeUndefined()
-    const m = next?.find((t) => t.name === 'a_b')
+    const m = next?.find((t) => t.name === 'a b')
     expect(m?.level).toBe(3)
     expect(m?.selected).toBe(true)
   })
