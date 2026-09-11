@@ -66,7 +66,9 @@ grep -rc "border-retro-border" src --include=*.tsx | grep -v ':0'
 grep -rhoE "z-\[[0-9]{3,}\]" src --include=*.tsx
 grep -rhoE "text-\[(6|7|8|9|11)px\]" src --include=*.tsx
 grep -rho "rounded-3xl" src --include=*.tsx
-grep -rn "❤️\|⚡\|★\|✕" src --include=*.tsx | grep -v test
+# Exemption (2026-09-11 audit): CommentsModal quick-reaction buttons insert emoji
+# into the user's comment BODY (content, not chrome); their chrome is lucide.
+grep -rn "❤️\|⚡\|★\|✕" src --include=*.tsx | grep -v test | grep -v CommentsModal
 grep -rhoE "duration-(75|100|200|1000)\b" src --include=*.tsx
 grep -rn "animate-fade-in\|animate-slide-up\|animate-slide-down" src --include=*.tsx | grep -v orbit
 ```
