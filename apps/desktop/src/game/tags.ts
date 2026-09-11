@@ -134,3 +134,33 @@ export function feedQuery(tags: OwnedTag[], limit = 5): string[] {
     .slice(0, limit)
     .map((t) => t.name)
 }
+
+/**
+ * Permanently drop an owned tag (player cleanup). Refuses the unowned and the
+ * last selected pill — an empty feed starves the round-robin.
+ */
+export function removeTag(tags: OwnedTag[], name: string): OwnedTag[] | null {
+  const target = tags.find((t) => t.name === name)
+  if (!target || target.level <= 0) return null
+  const rest = tags.filter((t) => t.name !== name)
+  if (isTagSelected(target) && !rest.some(isTagSelected)) return null
+  return rest
+}
+
+/**
+ * Merge two owned pills into one combined-search tag (booru AND: the feed
+ * sends "a b"; the query-ladder in services/booru degrades long combos).
+ * Level = best of the two (capped); the loser is consumed. Income follows the
+ * merged name's own stats, boosted by the surviving level.
+ */
+export function mergeTags(tags: OwnedTag[], a: string, b: string): OwnedTag[] | null {
+  if (a === b) return null
+  const ta = tags.find((t) => t.name === a)
+  const tb = tags.find((t) => t.name === b)
+  if (!ta || !tb || ta.level <= 0 || tb.level <= 0) return null
+  const name = `${normalizeCustomTag(a)}_${normalizeCustomTag(b)}`
+  const level = Math.min(MAX_TAG_LEVEL, Math.max(ta.level, tb.level))
+  const stats = deriveTagStats(name, 1)
+  const merged: OwnedTag = { name, level, selected: true, base: stats.base, income: stats.income + ta.income + tb.income, weight: stats.weight }
+  return [...tags.filter((t) => t.name !== a && t.name !== b), merged]
+}

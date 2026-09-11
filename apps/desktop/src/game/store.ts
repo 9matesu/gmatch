@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { getSecureItem } from '../utils/secure-storage'
 import { clickGain, clickPower, heatMultiplier, heatStreakAfter, isCrit, passiveGps } from './economy'
 import type { EconomyInput } from './economy'
-import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, normalizeCustomTag, setupTag, soloTag as soloTagList, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
+import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, mergeTags as mergeTagList, normalizeCustomTag, removeTag as removeTagList, setupTag, soloTag as soloTagList, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
 import { getUserExcludes, isNoise, isQueryBlocked, rankTags, setUserExcludes } from './tagFilter'
 import { KILL_XP, foeMaxHp, killBonusGp } from './battle'
 import { CAPS, activeCaps, capAutoClicksPerSec, popCap as popCapList } from './caps'
@@ -120,6 +120,8 @@ export interface GameState {
   buyTag: (name: string) => boolean
   toggleTag: (name: string) => boolean
   soloTag: (name: string) => boolean
+  deleteTag: (name: string) => boolean
+  mergeTags: (a: string, b: string) => boolean
   refreshTagMarket: () => Promise<void>
   addCustomTag: (raw: string) => Promise<{ added: boolean; message: string }>
   fetchFeed: () => Promise<void>
@@ -769,6 +771,23 @@ export const useGame = create<GameState>((set, get) => ({
     const next = soloTagList(get().tags, name)
     if (!next) return false
     set({ tags: next, priorityTag: name })
+    return true
+  },
+
+  deleteTag: (name) => {
+    const s = get()
+    const next = removeTagList(s.tags, name)
+    if (!next) return false
+    set({ tags: next, toasts: pushToast(s, `Tag ${name} removed.`) })
+    return true
+  },
+
+  mergeTags: (a, b) => {
+    const s = get()
+    const next = mergeTagList(s.tags, a, b)
+    if (!next) return false
+    const name = `${a}_${b}`
+    set({ tags: next, priorityTag: name, toasts: pushToast(s, `Merged into ${name} — combined search, best level kept.`) })
     return true
   },
 

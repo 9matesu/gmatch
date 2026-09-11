@@ -8,7 +8,9 @@ import {
   discoverTags,
   feedQuery,
   isTagSelected,
+  mergeTags,
   normalizeCustomTag,
+  removeTag,
   setupTag,
   soloTag,
   tagCost,
@@ -199,5 +201,44 @@ describe('validateCustomTag (custom search tags)', () => {
     expect(validateCustomTag('loli')).toEqual({ ok: false, reason: 'blocked' })
     expect(validateCustomTag('schoolgirl uniform')).toEqual({ ok: false, reason: 'blocked' })
     expect(validateCustomTag('highres')).toEqual({ ok: false, reason: 'noise' })
+  })
+})
+
+describe('removeTag (T1: player cleanup)', () => {
+  it('drops the owned tag, keeps the rest', () => {
+    const tags = [tag('a', 3), tag('b', 1), tag('c', 0)]
+    const next = removeTag(tags, 'a')
+    expect(next?.map((t) => t.name)).toEqual(['b', 'c'])
+  })
+  it('refuses to remove unowned/missing', () => {
+    const tags = [tag('a', 3), tag('c', 0)]
+    expect(removeTag(tags, 'c')).toBeNull()
+    expect(removeTag(tags, 'zz')).toBeNull()
+  })
+  it('refuses when it is the last selected pill', () => {
+    const tags = [{ ...tag('a', 3), selected: true }, { ...tag('b', 1), selected: false }]
+    expect(removeTag(tags, 'a')).toBeNull()
+  })
+})
+
+describe('mergeTags (T2: two pills -> combined search)', () => {
+  it('merges both levels into one selected tag', () => {
+    const tags = [tag('a', 3), tag('b', 2), tag('c', 1)]
+    const next = mergeTags(tags, 'a', 'b')
+    expect(next?.find((t) => t.name === 'a')).toBeUndefined()
+    expect(next?.find((t) => t.name === 'b')).toBeUndefined()
+    const m = next?.find((t) => t.name === 'a_b')
+    expect(m?.level).toBe(3)
+    expect(m?.selected).toBe(true)
+  })
+  it('caps at MAX_TAG_LEVEL and keeps untouched tags', () => {
+    const tags = [tag('x'.repeat(20), MAX_TAG_LEVEL), tag('y'.repeat(20), MAX_TAG_LEVEL)]
+    const m = mergeTags(tags, tags[0].name, tags[1].name)?.find((t) => t.level === MAX_TAG_LEVEL)
+    expect(m).toBeDefined()
+  })
+  it('refuses unowned or unknown', () => {
+    const tags = [tag('a', 1), tag('c', 0)]
+    expect(mergeTags(tags, 'a', 'c')).toBeNull()
+    expect(mergeTags(tags, 'a', 'zz')).toBeNull()
   })
 })

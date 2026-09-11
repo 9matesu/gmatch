@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { X } from 'lucide-react'
 import { useGame } from '../game/store'
 import { MAX_TAG_LEVEL, tagCost } from '../game/tags'
 import { CAPS, capEffectLabel, capStacks } from '../game/caps'
@@ -92,12 +93,15 @@ function TagsTab() {
   const buyTag = useGame((s) => s.buyTag)
   const toggleTag = useGame((s) => s.toggleTag)
   const soloTag = useGame((s) => s.soloTag)
+  const deleteTag = useGame((s) => s.deleteTag)
+  const mergeTags = useGame((s) => s.mergeTags)
   const refreshTagMarket = useGame((s) => s.refreshTagMarket)
   const addCustomTag = useGame((s) => s.addCustomTag)
   const owned = tags.filter((t) => t.level > 0).length
   const [custom, setCustom] = useState('')
   const [note, setNote] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [mergeSel, setMergeSel] = useState<string | null>(null)
 
   const submitCustom = () => {
     const q = custom
@@ -183,13 +187,27 @@ function TagsTab() {
           const cost = tagCost(t.base, t.level)
           const afford = !maxed && gc >= cost
           return (
+            <span key={t.name} className="relative inline-flex group">
             <button
-              key={t.name}
               type="button"
-              onClick={() => (isOwned ? toggleTag(t.name) : buyTag(t.name))}
+              onClick={() => {
+                if (mergeSel && isOwned) {
+                  if (mergeSel === t.name) setMergeSel(null)
+                  else { mergeTags(mergeSel, t.name); setMergeSel(null) }
+                } else if (!mergeSel) {
+                  if (isOwned) toggleTag(t.name)
+                  else buyTag(t.name)
+                }
+              }}
+              onDoubleClick={() => {
+                if (isOwned) { setMergeSel(mergeSel === t.name ? null : t.name) }
+              }}
+              onContextMenu={(e) => {
+                if (isOwned) { e.preventDefault(); soloTag(t.name) }
+              }}
               title={
                 isOwned
-                  ? `${t.name} · Lv${t.level} · +${formatNum(t.income)}/s · click ${on ? 'OFF' : 'ON'} · shift-click = solo`
+                  ? `${t.name} · Lv${t.level} · +${formatNum(t.income)}/s · click ${on ? 'OFF' : 'ON'} · right-click = solo · double-click = pick for merge`
                   : `${t.name} · buy for ${formatNum(cost)} g$`
               }
               onAuxClick={(e) => {
@@ -203,7 +221,7 @@ function TagsTab() {
                 : isOwned
                   ? 'border-border-subtle bg-surface-raised text-retro-muted hover:text-retro-fg hover:border-border-strong'
                   : 'border-border-dashed bg-transparent text-retro-muted hover:text-retro-fg hover:border-retro-accent/50'
-                } ${!isOwned && !afford ? 'opacity-50' : ''}`}
+                } ${!isOwned && !afford ? 'opacity-50' : ''} ${mergeSel === t.name ? 'ring-1 ring-retro-accent' : ''}`}
             >
               <span
                 className={`h-1.5 w-1.5 shrink-0 rounded-full ${on
@@ -217,7 +235,19 @@ function TagsTab() {
                 aria-hidden="true"
               />
               <span className="truncate font-medium">{t.name}</span>
+              {isOwned && (
+                <span
+                  role="button"
+                  tabIndex={-1}
+                  aria-label={`Delete ${t.name}`}
+                  onClick={(e) => { e.stopPropagation(); deleteTag(t.name) }}
+                  className="-mr-1 hidden shrink-0 rounded p-0.5 text-retro-muted hover:text-rose-400 group-hover:inline-flex"
+                >
+                  <X className="h-3 w-3" />
+                </span>
+              )}
             </button>
+            </span>
           )
         }
 
