@@ -86,7 +86,7 @@ function FeedSettingsTab({ toast }: { toast?: (msg: string, type?: string) => vo
 
   return (
     <div className="space-y-6 animate-orbit-fade-in">
-      <div className="p-4 bg-surface-interactive border border-retro-border rounded-lg space-y-3">
+      <div className="p-4 bg-surface-interactive border border-border-glass rounded-lg space-y-3">
         <h4 className="text-xs font-medium text-retro-fg">Starter Picks</h4>
         {owned.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
@@ -306,9 +306,9 @@ export function GMatchSettingsModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Left Navigation Sidebar */}
-        <div className="w-full md:w-56 border-b md:border-b-0 md:border-r border-retro-border bg-surface-raised flex flex-col shrink-0">
+        <div className="w-full md:w-56 border-b md:border-b-0 md:border-r border-border-glass bg-surface-raised flex flex-col shrink-0">
           {/* Header */}
-          <div className="p-4 border-b border-retro-border flex items-center justify-between">
+          <div className="p-4 border-b border-border-glass flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-surface-interactive flex items-center justify-center text-retro-muted">
                 <Settings className="w-4 h-4" />
@@ -354,7 +354,7 @@ export function GMatchSettingsModal({
           </div>
 
           {/* User Profile Mini Footer */}
-          <div className="hidden md:flex mt-auto p-3 border-t border-retro-border items-center justify-between">
+          <div className="hidden md:flex mt-auto p-3 border-t border-border-glass items-center justify-between">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-7 h-7 rounded-full bg-surface-interactive flex items-center justify-center font-medium text-xs text-retro-muted">
                 {identity?.orbitId?.substring(0, 1).toUpperCase() || 'U'}
@@ -371,7 +371,7 @@ export function GMatchSettingsModal({
         {/* Right Main Content Pane */}
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-surface-raised">
           {/* Top Bar */}
-          <div className="hidden md:flex items-center justify-between px-5 py-3.5 border-b border-retro-border">
+          <div className="hidden md:flex items-center justify-between px-5 py-3.5 border-b border-border-glass">
             <h3 className="text-sm font-medium text-retro-fg">
               {navItems.find((n) => n.id === activeTab)?.label}
             </h3>
@@ -390,7 +390,7 @@ export function GMatchSettingsModal({
             {activeTab === 'preferences' && (
               <div className="space-y-6 animate-orbit-fade-in">
                 {/* Display & Layout */}
-                <div className="p-4 bg-surface-interactive border border-retro-border rounded-lg space-y-4">
+                <div className="p-4 bg-surface-interactive border border-border-glass rounded-lg space-y-4">
                   <h4 className="text-xs font-medium text-retro-fg">Display &amp; Layout</h4>
 
                   {/* Panel opacity */}
@@ -467,7 +467,7 @@ export function GMatchSettingsModal({
                   </div>
 
                   {/* Gallery Columns */}
-                  <div className="flex items-center justify-between gap-4 pt-2 border-t border-retro-border">
+                  <div className="flex items-center justify-between gap-4 pt-2 border-t border-border-glass">
                     <div>
                       <div className="text-xs font-medium text-retro-fg">Gallery Columns</div>
                       <div className="text-[11px] text-retro-muted">Columns displayed in card collection grid</div>
@@ -493,7 +493,7 @@ export function GMatchSettingsModal({
                   </div>
 
                   {/* Display Toggles */}
-                  <div className="space-y-3 pt-2 border-t border-retro-border divide-y divide-[#27272a]">
+                  <div className="space-y-3 pt-2 border-t border-border-glass divide-y divide-[#27272a]">
                     {([
                       {
                         label: 'Auto-Refresh Heartbeat Sync',
@@ -533,7 +533,7 @@ export function GMatchSettingsModal({
                 </div>
 
                 {/* Match Pacing & Audio */}
-                <div className="p-4 bg-surface-interactive border border-retro-border rounded-lg space-y-4">
+                <div className="p-4 bg-surface-interactive border border-border-glass rounded-lg space-y-4">
                   <h4 className="text-xs font-medium text-retro-fg">Match Pacing &amp; Audio</h4>
 
                   <div className="flex items-center justify-between gap-4">
@@ -561,7 +561,7 @@ export function GMatchSettingsModal({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between gap-4 pt-2 border-t border-retro-border">
+                  <div className="flex items-center justify-between gap-4 pt-2 border-t border-border-glass">
                     <div>
                       <div className="text-xs font-medium text-retro-fg">Chat Notification Sound</div>
                       <div className="text-[11px] text-retro-muted">Audio cue when a new direct message arrives</div>
@@ -579,7 +579,7 @@ export function GMatchSettingsModal({
                 </div>
 
                 {/* Wallpaper & Background Section */}
-                <div className="p-4 bg-surface-interactive border border-retro-border rounded-lg space-y-3">
+                <div className="p-4 bg-surface-interactive border border-border-glass rounded-lg space-y-3">
                   <div
                     className="flex items-center justify-between cursor-pointer"
                     onClick={() => setWallpaperExpanded(!wallpaperExpanded)}
@@ -597,7 +597,7 @@ export function GMatchSettingsModal({
                   </div>
 
                   {wallpaperExpanded && (
-                    <div className="space-y-4 pt-3 border-t border-retro-border animate-orbit-fade-in">
+                    <div className="space-y-4 pt-3 border-t border-border-glass animate-orbit-fade-in">
                       {/* Presets */}
                       <div className="space-y-2">
                         <div className="text-[11px] text-retro-muted">Presets</div>
@@ -691,7 +691,7 @@ export function GMatchSettingsModal({
                       </div>
 
                       {/* Slideshow */}
-                      <div className="flex items-center justify-between pt-2 border-t border-retro-border">
+                      <div className="flex items-center justify-between pt-2 border-t border-border-glass">
                         <div>
                           <div className="text-xs font-medium text-retro-fg">Card Slideshow</div>
                           <div className="text-[11px] text-retro-muted">Cycle collected cards as background</div>
@@ -736,7 +736,7 @@ export function GMatchSettingsModal({
             {activeTab === 'account' && (
               <div className="space-y-6 animate-orbit-fade-in">
                 {/* Orbit ID Display */}
-                <div className="p-4 bg-surface-interactive border border-retro-border rounded-lg space-y-3">
+                <div className="p-4 bg-surface-interactive border border-border-glass rounded-lg space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-medium text-retro-muted">
                       Cryptographic Identity Key

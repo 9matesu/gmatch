@@ -90,11 +90,11 @@ export function StashPanel({
       {loading ? (
         <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="aspect-square bg-retro-bg border border-retro-border animate-pulse" />
+            <div key={i} className="aspect-square bg-retro-bg border border-border-glass animate-pulse" />
           ))}
         </div>
       ) : entries.length === 0 ? (
-        <div className="text-center py-12 text-retro-muted text-xs border border-dashed border-retro-border bg-retro-bg">
+        <div className="text-center py-12 text-retro-muted text-xs border border-dashed border-border-glass bg-retro-bg">
           No images stashed yet. Click &quot;Load Folder&quot; to add images for quick sending.
         </div>
       ) : (
@@ -102,7 +102,7 @@ export function StashPanel({
           {entries.map(entry => (
             <div
               key={entry.id}
-              className="bg-retro-bg border border-retro-border overflow-hidden group relative"
+              className="bg-retro-bg border border-border-glass overflow-hidden group relative"
             >
               <div className="aspect-square overflow-hidden bg-black">
                 {entry.dataUrl ? (

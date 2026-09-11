@@ -200,12 +200,12 @@ export function GlobalModals(props: GlobalModalsProps) {
 
       {showMaxGoonerModal && (
         <Modal title="Maximum Gooner Hardcore" onClose={() => setShowMaxGoonerModal(false)}>
-          <div className="p-3 bg-retro-bg border border-retro-border text-[11px] text-retro-fg space-y-1 mb-3">
+          <div className="p-3 bg-retro-bg border border-border-glass text-[11px] text-retro-fg space-y-1 mb-3">
             <p className="font-bold uppercase tracking-wider">⚠ YOU&apos;VE BEEN WARNED</p>
             <p>Maximum Gooner Mode turns on automatic image reception, chime audio alerts, blinking sender highlights, and auto-forwarding.</p>
           </div>
           <div className="space-y-3">
-            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-retro-border cursor-pointer hover:border-retro-accent transition-colors">
+            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-border-glass cursor-pointer hover:border-retro-accent transition-colors">
               <span className="font-bold text-retro-fg">♦ Master Hardcore Switch</span>
               <input
                 type="checkbox"
@@ -223,19 +223,19 @@ export function GlobalModals(props: GlobalModalsProps) {
                 className="w-4 h-4 accent-retro-accent cursor-pointer"
               />
             </label>
-            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-retro-border cursor-pointer hover:border-retro-accent transition-colors">
+            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-border-glass cursor-pointer hover:border-retro-accent transition-colors">
               <span className="text-retro-fg">♪ Sound Effect on Image Arrival</span>
               <input type="checkbox" checked={settings.soundEffects} onChange={(e) => updateSettings('soundEffects', e.target.checked)} className="w-4 h-4 accent-retro-accent cursor-pointer" />
             </label>
-            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-retro-border cursor-pointer hover:border-retro-accent transition-colors">
+            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-border-glass cursor-pointer hover:border-retro-accent transition-colors">
               <span className="text-retro-fg">▣ Auto-Open Image Lightbox</span>
               <input type="checkbox" checked={settings.autoOpenImages} onChange={(e) => updateSettings('autoOpenImages', e.target.checked)} className="w-4 h-4 accent-retro-accent cursor-pointer" />
             </label>
-            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-retro-border cursor-pointer hover:border-retro-accent transition-colors">
+            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-border-glass cursor-pointer hover:border-retro-accent transition-colors">
               <span className="text-retro-fg">⇄ Auto-Forward to All Friends</span>
               <input type="checkbox" checked={settings.autoForwardAll} onChange={(e) => updateSettings('autoForwardAll', e.target.checked)} className="w-4 h-4 accent-retro-accent cursor-pointer" />
             </label>
-            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-retro-border cursor-pointer hover:border-retro-accent transition-colors">
+            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-border-glass cursor-pointer hover:border-retro-accent transition-colors">
               <span className="text-retro-fg">▣ Allow Remote Wallpaper</span>
               <input type="checkbox" checked={settings.allowRemoteWallpaper} onChange={(e) => updateSettings('allowRemoteWallpaper', e.target.checked)} className="w-4 h-4 accent-retro-accent cursor-pointer" />
             </label>

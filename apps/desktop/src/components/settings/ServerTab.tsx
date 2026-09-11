@@ -91,7 +91,7 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
       </div>
 
       {state.packaged && (
-        <div className="p-4 bg-surface-interactive border border-retro-border rounded-lg space-y-3">
+        <div className="p-4 bg-surface-interactive border border-border-glass rounded-lg space-y-3">
           <div className="text-xs font-medium text-retro-fg">Connect to a friend instead</div>
           <div className="flex gap-2">
             <input

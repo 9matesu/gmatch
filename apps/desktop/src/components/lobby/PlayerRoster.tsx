@@ -66,7 +66,7 @@ function PlayerTile({
           ? 'border-retro-warning/50'
           : player.id === selfId
           ? 'border-retro-accent/30'
-          : 'border-retro-border'
+          : 'border-border-glass'
       } hover:border-retro-accent/60`}
     >
       <Avatar id={player.id} imageUrl={player.pfp_url || undefined} fill />
@@ -147,7 +147,7 @@ function DuelPair({
 }) {
   return (
     <div className="col-span-2 sm:col-span-3 md:col-span-4 lg:col-span-5">
-      <div className="flex items-center justify-between gap-3 bg-surface-raised border border-retro-border rounded-lg px-3 py-2 mb-1.5">
+      <div className="flex items-center justify-between gap-3 bg-surface-raised border border-border-glass rounded-lg px-3 py-2 mb-1.5">
         <div className="flex items-center gap-2 min-w-0 text-[11px] font-medium text-retro-muted truncate">
           <span className="w-1.5 h-1.5 rounded-full bg-retro-accent flex-shrink-0" />
           {players.map((m, index) => (
@@ -229,7 +229,7 @@ export function PlayerRoster({
       <div className="space-y-3">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="border border-retro-border p-3 flex flex-col items-center gap-2 rounded">
+            <div key={i} className="border border-border-glass p-3 flex flex-col items-center gap-2 rounded">
               <div className="skeleton w-8 h-8 rounded-full" />
               <div className="skeleton w-full h-3" />
               <div className="skeleton w-16 h-2.5" />
@@ -242,7 +242,7 @@ export function PlayerRoster({
 
   if (players.length === 0) {
     return (
-      <div className="border border-dashed border-retro-border rounded-lg p-8 text-center">
+      <div className="border border-dashed border-border-glass rounded-lg p-8 text-center">
         <p className="text-xs text-retro-muted">Nobody online yet.</p>
       </div>
     )

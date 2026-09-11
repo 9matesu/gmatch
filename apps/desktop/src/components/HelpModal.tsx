@@ -22,11 +22,11 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
       onClick={onClose}
     >
       <div
-        className="bg-surface-raised border border-retro-border rounded-lg max-w-xl w-full max-h-[85vh] flex flex-col shadow-xl overflow-hidden"
+        className="bg-surface-raised border border-border-glass rounded-lg max-w-xl w-full max-h-[85vh] flex flex-col shadow-xl overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-retro-border">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass">
           <h2 className="text-sm font-medium text-retro-fg">Help</h2>
           <button
             type="button"
@@ -38,7 +38,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-0.5 p-1.5 border-b border-retro-border overflow-x-auto styled-scrollbar">
+        <div className="flex gap-0.5 p-1.5 border-b border-border-glass overflow-x-auto styled-scrollbar">
           {TABS.map(t => {
             const IconComp = t.icon;
             return (
@@ -101,13 +101,13 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
               <section className="space-y-1.5">
                 <h3 className="text-xs font-medium text-retro-fg">Options Explained</h3>
                 <div className="text-xs text-retro-muted space-y-2">
-                  <div className="bg-surface-interactive p-3 border border-retro-border rounded-lg">
+                  <div className="bg-surface-interactive p-3 border border-border-glass rounded-lg">
                     <span className="text-retro-body font-medium">Encrypt Image</span> — End-to-end encrypted with the recipient&apos;s encryption key.
                   </div>
-                  <div className="bg-surface-interactive p-3 border border-retro-border rounded-lg">
+                  <div className="bg-surface-interactive p-3 border border-border-glass rounded-lg">
                     <span className="text-retro-body font-medium">Send as Remote Wallpaper</span> — Sets the image as desktop wallpaper on the recipient&apos;s end.
                   </div>
-                  <div className="bg-surface-interactive p-3 border border-retro-border rounded-lg">
+                  <div className="bg-surface-interactive p-3 border border-border-glass rounded-lg">
                     <span className="text-retro-body font-medium">Timebomb</span> — Image auto-deletes after the set duration.
                   </div>
                 </div>
@@ -176,7 +176,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                     ['Ctrl+Shift+C', 'Copy your Orbit ID'],
                   ].map(([key, desc]) => (
                     <div key={key} className="flex items-center gap-3 py-1">
-                      <kbd className="bg-surface-interactive border border-retro-border px-2 py-0.5 text-[11px] font-mono text-retro-body rounded min-w-[90px] text-center">{key}</kbd>
+                      <kbd className="bg-surface-interactive border border-border-glass px-2 py-0.5 text-[11px] font-mono text-retro-body rounded min-w-[90px] text-center">{key}</kbd>
                       <span className="text-retro-muted">{desc}</span>
                     </div>
                   ))}

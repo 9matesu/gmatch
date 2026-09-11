@@ -78,7 +78,7 @@ export function FlashModal({
         className="bg-retro-panel border-2 border-yellow-500 rounded-xl max-w-md w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 border-b border-retro-border bg-retro-bg/90">
+        <div className="flex items-center justify-between p-4 border-b border-border-glass bg-retro-bg/90">
           <div className="flex items-center gap-2">
             <span className="text-xl">⚡</span>
             <div>
@@ -89,13 +89,13 @@ export function FlashModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-xs font-bold text-retro-muted hover:text-retro-fg px-2.5 py-1 border border-retro-border rounded hover:border-retro-fg transition-colors cursor-pointer"
+            className="text-xs font-bold text-retro-muted hover:text-retro-fg px-2.5 py-1 border border-border-glass rounded hover:border-retro-fg transition-colors cursor-pointer"
           >
             ✕
           </button>
         </div>
 
-        <div className="flex items-center gap-1.5 p-2.5 border-b border-retro-border bg-retro-bg text-[10px] font-bold">
+        <div className="flex items-center gap-1.5 p-2.5 border-b border-border-glass bg-retro-bg text-[10px] font-bold">
           {(['camera', 'upload'] as const).map((m) => (
             <button
               key={m}
@@ -127,13 +127,13 @@ export function FlashModal({
                 </div>
               </DropZone>
               {preview && (
-                <img src={preview} alt="Preview" className="w-full max-h-56 object-contain rounded-lg border border-retro-border bg-black" />
+                <img src={preview} alt="Preview" className="w-full max-h-56 object-contain rounded-lg border border-border-glass bg-black" />
               )}
             </>
           )}
         </div>
 
-        <div className="p-3.5 border-t border-retro-border bg-retro-bg/90 flex items-center gap-2">
+        <div className="p-3.5 border-t border-border-glass bg-retro-bg/90 flex items-center gap-2">
           <button
             type="button"
             disabled={sending || (!hasFile && !preview)}

@@ -72,7 +72,7 @@ function PreviewThumbnail({ file, onRemove, onDragStart }: {
 
   return (
     <div
-      className="relative group border border-retro-border bg-retro-bg flex-shrink-0 w-20 h-20 overflow-hidden"
+      className="relative group border border-border-glass bg-retro-bg flex-shrink-0 w-20 h-20 overflow-hidden"
       draggable
       onDragStart={(e) => onDragStart(e, file)}
     >
@@ -418,8 +418,8 @@ export const SendPanel = forwardRef<SendPanelHandle, {
   }), [handleUpload])
 
   return (
-    <div className="bg-retro-panel border border-retro-border text-xs">
-      <div className="p-4 border-b border-retro-border flex items-center justify-between bg-retro-bg">
+    <div className="bg-retro-panel border border-border-glass text-xs">
+      <div className="p-4 border-b border-border-glass flex items-center justify-between bg-retro-bg">
         <h3 className="font-bold text-retro-fg text-sm flex items-center gap-2">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-retro-accent">
             <path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7z" />
@@ -450,7 +450,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
         </div>
 
         {backgroundUploads.length > 0 && (
-          <div className="border border-retro-border bg-retro-bg px-3 py-2 flex items-center justify-between gap-3 text-[10px] text-retro-muted">
+          <div className="border border-border-glass bg-retro-bg px-3 py-2 flex items-center justify-between gap-3 text-[10px] text-retro-muted">
             <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-retro-accent animate-pulse" />Uploading in background</span>
             <span>{backgroundUploads.length} image{backgroundUploads.length === 1 ? '' : 's'} queued</span>
           </div>
@@ -458,7 +458,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
 
         {/* Large media preview */}
         {allFiles.length > 0 && previewUrl && (
-          <div className="relative border border-retro-border bg-retro-bg rounded-lg overflow-hidden">
+          <div className="relative border border-border-glass bg-retro-bg rounded-lg overflow-hidden">
             {allFiles[0].type.startsWith('video/') || /\.(mp4|webm|mov|ogg)$/i.test(allFiles[0].name) ? (
               <video
                 src={previewUrl}
@@ -499,7 +499,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
           </div>
         )}
 
-        <div className="flex border border-retro-border bg-retro-bg p-1 text-xs font-bold rounded-lg">
+        <div className="flex border border-border-glass bg-retro-bg p-1 text-xs font-bold rounded-lg">
           <button
             type="button"
             onClick={() => setMode('file')}
@@ -550,7 +550,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
             type="url"
             value={linkUrl}
             onChange={e => setLinkUrl(e.target.value)}
-            className="w-full p-3 bg-retro-bg border border-retro-border text-xs text-retro-fg focus:outline-none placeholder:text-retro-muted rounded-lg"
+            className="w-full p-3 bg-retro-bg border border-border-glass text-xs text-retro-fg focus:outline-none placeholder:text-retro-muted rounded-lg"
             placeholder="https://example.com/media.mp4 or .jpg"
             maxLength={2048}
           />
@@ -560,12 +560,12 @@ export const SendPanel = forwardRef<SendPanelHandle, {
           type="text"
           value={caption}
           onChange={e => setCaption(e.target.value)}
-          className="w-full p-3 bg-retro-bg border border-retro-border text-xs text-retro-fg focus:outline-none placeholder:text-retro-muted"
+          className="w-full p-3 bg-retro-bg border border-border-glass text-xs text-retro-fg focus:outline-none placeholder:text-retro-muted"
           placeholder="Caption (optional)"
           maxLength={200}
         />
 
-        <div className="border border-retro-border bg-retro-bg">
+        <div className="border border-border-glass bg-retro-bg">
           <button
             type="button"
             onClick={() => setShowAdvanced(!showAdvanced)}
@@ -579,8 +579,8 @@ export const SendPanel = forwardRef<SendPanelHandle, {
           </button>
 
           {showAdvanced && (
-            <div className="p-3 border-t border-retro-border space-y-3">
-              <label className="flex items-center justify-between p-2.5 bg-retro-panel border border-retro-border cursor-pointer hover:border-retro-accent transition-colors select-none">
+            <div className="p-3 border-t border-border-glass space-y-3">
+              <label className="flex items-center justify-between p-2.5 bg-retro-panel border border-border-glass cursor-pointer hover:border-retro-accent transition-colors select-none">
                 <div>
                   <div className="text-xs font-semibold text-retro-fg">Encrypt</div>
                   <div className="text-[9px] text-retro-muted">End-to-end encrypted</div>
@@ -594,7 +594,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
                 />
               </label>
 
-              <label className="flex items-center justify-between p-2.5 bg-retro-panel border border-retro-border cursor-pointer hover:border-retro-accent transition-colors select-none">
+              <label className="flex items-center justify-between p-2.5 bg-retro-panel border border-border-glass cursor-pointer hover:border-retro-accent transition-colors select-none">
                 <div>
                   <div className="text-xs font-semibold text-retro-warning">Set as Background</div>
                   <div className="text-[9px] text-retro-muted">Remote wallpaper</div>
@@ -608,7 +608,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
               </label>
 
               <div className="space-y-1.5">
-                <label className="flex items-center justify-between p-2.5 bg-retro-panel border border-retro-border cursor-pointer hover:border-retro-accent transition-colors select-none">
+                <label className="flex items-center justify-between p-2.5 bg-retro-panel border border-border-glass cursor-pointer hover:border-retro-accent transition-colors select-none">
                   <div>
                     <div className="text-xs font-semibold text-retro-warning">Auto-Delete</div>
                     <div className="text-[9px] text-retro-muted">Auto-removes after timer</div>
@@ -626,7 +626,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
                     <select
                       value={timebombHours}
                       onChange={(e) => setTimebombHours(parseInt(e.target.value, 10))}
-                      className="bg-retro-bg border border-retro-border text-xs text-retro-fg px-2 py-1 focus:outline-none"
+                      className="bg-retro-bg border border-border-glass text-xs text-retro-fg px-2 py-1 focus:outline-none"
                     >
                       <option value={1}>1 hour</option>
                       <option value={6}>6 hours</option>
@@ -637,7 +637,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
                 )}
               </div>
 
-              <label className="flex items-center justify-between p-2.5 bg-retro-panel border border-retro-border cursor-pointer hover:border-retro-accent transition-colors select-none">
+              <label className="flex items-center justify-between p-2.5 bg-retro-panel border border-border-glass cursor-pointer hover:border-retro-accent transition-colors select-none">
                 <div>
                   <div className="text-xs font-semibold text-retro-accent">Auto-Forward</div>
                   <div className="text-[9px] text-retro-muted">Forward to all contacts</div>
@@ -673,7 +673,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
               {mode === 'file' && <span>{progress}%</span>}
             </div>
             {mode === 'file' && (
-              <div className="w-full bg-retro-bg h-1.5 border border-retro-border">
+              <div className="w-full bg-retro-bg h-1.5 border border-border-glass">
                 <div
                   className="bg-retro-accent h-1.5 transition-all duration-300"
                   style={{ width: `${progress}%` }}

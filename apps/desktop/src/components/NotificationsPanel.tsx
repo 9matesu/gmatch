@@ -217,7 +217,7 @@ export function NotificationsPanel({
                       <button
                         type="button"
                         onClick={() => { onRespondBabecock?.(inviteId, false); }}
-                        className="px-2.5 py-1.5 rounded bg-surface-interactive border border-retro-border text-retro-body text-[11px] font-medium cursor-pointer"
+                        className="px-2.5 py-1.5 rounded bg-surface-interactive border border-border-glass text-retro-body text-[11px] font-medium cursor-pointer"
                       >
                         Decline
                       </button>

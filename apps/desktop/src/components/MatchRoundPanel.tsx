@@ -238,7 +238,7 @@ export function MatchRoundPanel({
             <img
               src={match.opponent.pfp_url}
               alt=""
-              className="w-5 h-5 rounded-full border border-retro-border object-cover flex-shrink-0"
+              className="w-5 h-5 rounded-full border border-border-glass object-cover flex-shrink-0"
             />
           ) : null}
           <span className="truncate text-sm">
@@ -255,7 +255,7 @@ export function MatchRoundPanel({
         </span>
 
         {/* Score */}
-        <div className="flex items-center gap-1 px-2 py-0.5 bg-surface-interactive border border-retro-border rounded-md text-xs tabular-nums">
+        <div className="flex items-center gap-1 px-2 py-0.5 bg-surface-interactive border border-border-glass rounded-md text-xs tabular-nums">
           <span className="text-retro-accent font-medium">{match.score_mine || 0}</span>
           <span className="text-retro-muted">:</span>
           <span className="text-retro-fg font-medium">{match.score_opponent || 0}</span>
@@ -269,7 +269,7 @@ export function MatchRoundPanel({
 
       <div className="module-body space-y-2">
         {/* Round Progress */}
-        <div className="flex items-center justify-between gap-1 p-2 bg-surface-canvas border border-retro-border rounded-lg">
+        <div className="flex items-center justify-between gap-1 p-2 bg-surface-canvas border border-border-glass rounded-lg">
           <div className="text-xs font-medium text-retro-muted">
             Progress
           </div>
@@ -286,8 +286,8 @@ export function MatchRoundPanel({
                       : past
                         ? past.matched
                           ? 'border-retro-online/40 bg-retro-online/10 text-retro-online'
-                          : 'border-retro-border bg-surface-interactive text-retro-muted'
-                        : 'border-retro-border/40 bg-transparent text-retro-muted/40'
+                          : 'border-border-glass bg-surface-interactive text-retro-muted'
+                        : 'border-border-glass/40 bg-transparent text-retro-muted/40'
                     }`}
                 >
                   <span>R{rNum}</span>
@@ -299,7 +299,7 @@ export function MatchRoundPanel({
         </div>
 
         <div className="flex flex-col gap-1">
-          <div className="h-1 w-full bg-surface-interactive border border-retro-border rounded-full overflow-hidden">
+          <div className="h-1 w-full bg-surface-interactive border border-border-glass rounded-full overflow-hidden">
             <div
               className={`h-full transition-all duration-1000 ease-linear ${isResult ? 'bg-retro-muted' : msLeft <= 10000 ? 'bg-rose-500' : 'bg-retro-accent'}`}
               style={{ width: `${isResult ? 100 : pct}%` }}
@@ -336,7 +336,7 @@ export function MatchRoundPanel({
         )}
 
         {phase === 'lobby' && (
-          <div className="border border-dashed border-retro-border p-4 text-center space-y-2 rounded-lg">
+          <div className="border border-dashed border-border-glass p-4 text-center space-y-2 rounded-lg">
             <p className="text-xs text-retro-muted">
               Matched with <span className="text-retro-fg font-medium">{opponentName}</span>
             </p>
@@ -348,7 +348,7 @@ export function MatchRoundPanel({
 
         {phase === 'pick' && (
           <>
-            <div className="border border-retro-border p-2.5 text-xs text-retro-muted flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg">
+            <div className="border border-border-glass p-2.5 text-xs text-retro-muted flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg">
               <span className="font-medium text-retro-fg">Round {currentRound}/{maxRounds}:</span>
               <span>
                 {deckExhausted
@@ -431,7 +431,7 @@ export function MatchRoundPanel({
                   </div>
                 </div>
 
-                <div className="p-2.5 bg-surface-interactive border border-retro-border rounded-lg text-center text-xs text-retro-fg">
+                <div className="p-2.5 bg-surface-interactive border border-border-glass rounded-lg text-center text-xs text-retro-fg">
                   {match.opponent_played ? 'Both cards submitted — revealing soon' : `Waiting for ${opponentName}...`}
                 </div>
               </div>
@@ -444,7 +444,7 @@ export function MatchRoundPanel({
                 )}
 
                 {myCards.length === 0 ? (
-                  <div className="border border-retro-border p-6 text-center text-xs text-retro-muted space-y-3 rounded-xl bg-surface-canvas/40">
+                  <div className="border border-border-glass p-6 text-center text-xs text-retro-muted space-y-3 rounded-xl bg-surface-canvas/40">
                     <p className="text-retro-fg font-semibold">No playable cards in your active deck.</p>
                     <p className="text-retro-muted text-[11px]">Select or build a 5-card deck in the Deck Builder to play duels.</p>
                     {onOpenDeckBuilder && (
@@ -472,7 +472,7 @@ export function MatchRoundPanel({
                             disabled={isAlreadyPlayed}
                             onClick={() => !isAlreadyPlayed && setSelectedCard(card.id)}
                             className={`relative aspect-square overflow-hidden border-2 transition-all rounded ${rarity.borderClass} ${isAlreadyPlayed
-                                ? 'opacity-30 grayscale cursor-not-allowed border-retro-border'
+                                ? 'opacity-30 grayscale cursor-not-allowed border-border-glass'
                                 : selectedCard === card.id
                                   ? 'border-retro-fg ring-2 ring-retro-fg/30'
                                   : 'hover:border-retro-muted'
@@ -529,7 +529,7 @@ export function MatchRoundPanel({
         )}
 
         {(phase === 'reveal' || waitingDecide) && (
-          <div className="border border-retro-border p-3 text-center text-xs text-retro-muted animate-orbit-fade-in rounded-lg">
+          <div className="border border-border-glass p-3 text-center text-xs text-retro-muted animate-orbit-fade-in rounded-lg">
             {phase === 'reveal' ? (
               <>
                 <span className="font-medium text-retro-fg">Cards revealed</span> — deciding in {countdown}
@@ -625,7 +625,7 @@ export function MatchRoundPanel({
                           >
                             <LinkIcon className="w-5 h-5 text-purple-400" />
                             <span className="text-[11px] font-medium">Link card</span>
-                            <span className="text-[10px] font-mono border border-retro-border px-2 py-0.5 rounded">Open ↗</span>
+                            <span className="text-[10px] font-mono border border-border-glass px-2 py-0.5 rounded">Open ↗</span>
                           </a>
                         ) : (
                           <CardBack label="Your card" />
@@ -723,7 +723,7 @@ export function MatchRoundPanel({
                           >
                             <LinkIcon className="w-5 h-5 text-purple-400" />
                             <span className="text-[11px] font-medium">Link card</span>
-                            <span className="text-[10px] font-mono border border-retro-border px-2 py-0.5 rounded">Open ↗</span>
+                            <span className="text-[10px] font-mono border border-border-glass px-2 py-0.5 rounded">Open ↗</span>
                           </a>
                         ) : opponentImg.failed ? (
                           <div className="w-full h-full flex items-center justify-center text-retro-muted text-xs">
@@ -765,7 +765,7 @@ export function MatchRoundPanel({
               Both cards revealed — decide if you like <span className="text-retro-fg font-medium">{opponentName}</span>&apos;s card
             </p>
             {lastResult && (
-              <div className={`border p-3 text-center text-sm font-medium animate-orbit-slide-up rounded-lg ${lastResult.matched ? 'text-retro-fg border-retro-accent bg-glass-w10 animate-orbit-match-flux' : 'text-retro-muted border-retro-border'}`}>
+              <div className={`border p-3 text-center text-sm font-medium animate-orbit-slide-up rounded-lg ${lastResult.matched ? 'text-retro-fg border-retro-accent bg-glass-w10 animate-orbit-match-flux' : 'text-retro-muted border-border-glass'}`}>
                 {lastResult.matched ? 'It\'s a match!' : 'Decision recorded'}
                 {typeof lastResult.points === 'number' && lastResult.points > 0 && (
                   <span className="ml-2 text-retro-accent font-medium">+{lastResult.points} pts</span>
@@ -773,7 +773,7 @@ export function MatchRoundPanel({
               </div>
             )}
             {decideError && (
-              <div className="border border-retro-border p-3 text-center text-xs text-retro-muted rounded-lg">
+              <div className="border border-border-glass p-3 text-center text-xs text-retro-muted rounded-lg">
                 {decideError}
               </div>
             )}
@@ -781,7 +781,7 @@ export function MatchRoundPanel({
               <button
                 disabled={submitting}
                 onClick={() => handleDecide('reject')}
-                className="py-2.5 px-2 text-xs font-medium border border-retro-border text-retro-muted hover:text-rose-400 hover:border-rose-500/30 cursor-pointer rounded-lg bg-surface-interactive hover:bg-rose-500/5 transition-colors flex items-center justify-center gap-1.5"
+                className="py-2.5 px-2 text-xs font-medium border border-border-glass text-retro-muted hover:text-rose-400 hover:border-rose-500/30 cursor-pointer rounded-lg bg-surface-interactive hover:bg-rose-500/5 transition-colors flex items-center justify-center gap-1.5"
                 title="Reject (-5 pts)"
               >
                 <X className="w-3.5 h-3.5" />
@@ -801,7 +801,7 @@ export function MatchRoundPanel({
                 onClick={() => handleDecide('boost')}
                 className={`py-2.5 px-2 text-xs font-medium rounded-lg border transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${boostsRemaining > 0
                     ? 'bg-glass-w10 text-retro-accent border-retro-accent/30 hover:bg-glass-w20'
-                    : 'opacity-40 border-retro-border text-retro-muted cursor-not-allowed bg-surface-interactive'
+                    : 'opacity-40 border-border-glass text-retro-muted cursor-not-allowed bg-surface-interactive'
                   }`}
                 title={boostsRemaining > 0 ? `Conviction Boost (+25 pts) — costs ${formatGc(matchEconomy(myCardVal, 0).boostCost)} g$` : 'No boosts remaining'}
               >
@@ -827,7 +827,7 @@ export function MatchRoundPanel({
           <button
             disabled={submitting}
             onClick={handleQuit}
-            className="w-full py-2 text-xs font-medium text-retro-muted hover:text-retro-fg border border-retro-border hover:border-retro-fg cursor-pointer rounded-lg transition-colors"
+            className="w-full py-2 text-xs font-medium text-retro-muted hover:text-retro-fg border border-border-glass hover:border-retro-fg cursor-pointer rounded-lg transition-colors"
           >
             {submitting ? 'Leaving...' : 'Leave match'}
           </button>

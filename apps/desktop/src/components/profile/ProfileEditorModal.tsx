@@ -89,11 +89,11 @@ export function ProfileEditorModal({
       onClick={(e) => e.stopPropagation()}
     >
       <div
-        className="w-full max-w-md bg-surface-raised border border-retro-border rounded-lg shadow-xl overflow-hidden flex flex-col max-h-[85vh] animate-orbit-pop"
+        className="w-full max-w-md bg-surface-raised border border-border-glass rounded-lg shadow-xl overflow-hidden flex flex-col max-h-[85vh] animate-orbit-pop"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-retro-border">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass">
           <button
             type="button"
             onClick={onClose}
@@ -117,7 +117,7 @@ export function ProfileEditorModal({
           {/* Avatar */}
           <div className="flex flex-col items-center gap-2 pb-2">
             <div
-              className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-retro-border cursor-pointer group"
+              className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-border-glass cursor-pointer group"
               onClick={() => setShowPicModal(true)}
             >
               {pfpUrl ? (
@@ -161,7 +161,7 @@ export function ProfileEditorModal({
                 placeholder="Name"
                 maxLength={40}
                 required
-                className="w-full bg-surface-interactive border border-retro-border rounded-lg px-3 py-2 text-sm text-retro-fg focus:outline-none focus:border-retro-accent transition-colors placeholder:text-retro-muted"
+                className="w-full bg-surface-interactive border border-border-glass rounded-lg px-3 py-2 text-sm text-retro-fg focus:outline-none focus:border-retro-accent transition-colors placeholder:text-retro-muted"
               />
             </div>
 
@@ -173,7 +173,7 @@ export function ProfileEditorModal({
                 placeholder="Write a pornified bio... What do you like?"
                 rows={3}
                 maxLength={150}
-                className="w-full bg-surface-interactive border border-retro-border rounded-lg p-3 text-sm text-retro-fg focus:outline-none focus:border-retro-accent transition-colors resize-none placeholder:text-retro-muted"
+                className="w-full bg-surface-interactive border border-border-glass rounded-lg p-3 text-sm text-retro-fg focus:outline-none focus:border-retro-accent transition-colors resize-none placeholder:text-retro-muted"
               />
               <div className="text-right text-[11px] text-retro-muted mt-0.5">
                 {bio.length}/150
@@ -182,7 +182,7 @@ export function ProfileEditorModal({
 
             <div>
               <label className="text-xs font-medium text-retro-body block mb-1.5">Favorite Website</label>
-              <div className="flex items-center gap-2 bg-surface-interactive border border-retro-border rounded-lg px-3 py-2">
+              <div className="flex items-center gap-2 bg-surface-interactive border border-border-glass rounded-lg px-3 py-2">
                 <Globe className="w-4 h-4 text-retro-muted shrink-0" />
                 <input
                   type="url"
@@ -194,8 +194,8 @@ export function ProfileEditorModal({
               </div>
             </div>
 
-            <div className="pt-2 border-t border-retro-border">
-              <label className="flex items-center justify-between p-3 rounded-lg bg-surface-interactive border border-retro-border cursor-pointer select-none">
+            <div className="pt-2 border-t border-border-glass">
+              <label className="flex items-center justify-between p-3 rounded-lg bg-surface-interactive border border-border-glass cursor-pointer select-none">
                 <div className="flex items-center gap-2.5">
                   <Lock className="w-4 h-4 text-retro-muted" />
                   <div>

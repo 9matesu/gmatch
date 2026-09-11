@@ -216,7 +216,7 @@ export function YourMatchTab({
         <button
           onClick={() => void onEnd(match.id)}
           disabled={submitting}
-          className="text-xs font-medium px-2.5 py-1 border border-retro-border text-retro-muted hover:text-retro-fg hover:border-retro-fg disabled:opacity-30 rounded transition-colors"
+          className="text-xs font-medium px-2.5 py-1 border border-border-glass text-retro-muted hover:text-retro-fg hover:border-retro-fg disabled:opacity-30 rounded transition-colors"
         >
           End
         </button>
@@ -252,19 +252,19 @@ export function YourMatchTab({
 
         {/* Quit */}
         {!celebrate && st.phase === 'ended' && st.lastResult === 'quit' && (
-          <div className="border border-retro-border p-3 text-center text-xs text-retro-muted animate-orbit-fade-in rounded-lg">
+          <div className="border border-border-glass p-3 text-center text-xs text-retro-muted animate-orbit-fade-in rounded-lg">
             {matchEndSummary(st.lastResult, lastPayout, false)}
           </div>
         )}
 
         {st.phase !== 'ended' && (
           <div className="grid grid-cols-2 gap-2">
-            {cardSlot('You', myCardImg, needCard ? 'Send a card' : 'Your card', st.myCardId ? 'border-retro-accent bg-glass-w5' : 'border-retro-border border-dashed', needCard)}
+            {cardSlot('You', myCardImg, needCard ? 'Send a card' : 'Your card', st.myCardId ? 'border-retro-accent bg-glass-w5' : 'border-border-glass border-dashed', needCard)}
             {cardSlot(
               opponentName,
               oppCardImg,
               'Waiting...',
-              opponentHidden ? 'border-retro-border border-dashed' : st.opponentCardId ? 'border-retro-accent bg-glass-w5' : 'border-retro-border border-dashed',
+              opponentHidden ? 'border-border-glass border-dashed' : st.opponentCardId ? 'border-retro-accent bg-glass-w5' : 'border-border-glass border-dashed',
               !st.opponentCardId,
               opponentHidden,
               opponentUser
@@ -278,10 +278,10 @@ export function YourMatchTab({
           </div>
         )}
 
-        {error && <div className="border border-retro-border p-2 text-center text-xs text-retro-muted rounded-lg">{error}</div>}
+        {error && <div className="border border-border-glass p-2 text-center text-xs text-retro-muted rounded-lg">{error}</div>}
 
         {(waitingForCard || waitingForDecision) && !celebrate && (
-          <div className="border border-retro-border p-2 text-center text-xs text-retro-muted animate-orbit-pulse-soft rounded-lg">
+          <div className="border border-border-glass p-2 text-center text-xs text-retro-muted animate-orbit-pulse-soft rounded-lg">
             Waiting for {opponentName}...
           </div>
         )}
@@ -303,7 +303,7 @@ export function YourMatchTab({
                     <button
                       key={card.id}
                       onClick={() => setSelectedCard(card.id)}
-                      className={`relative aspect-square overflow-hidden border-2 rounded ${selectedCard === card.id ? 'border-retro-fg ring-2 ring-retro-fg/30' : 'border-retro-border hover:border-retro-muted'}`}
+                      className={`relative aspect-square overflow-hidden border-2 rounded ${selectedCard === card.id ? 'border-retro-fg ring-2 ring-retro-fg/30' : 'border-border-glass hover:border-retro-muted'}`}
                     >
                       {card.content_url ? (
                         <ObjectImage
@@ -336,7 +336,7 @@ export function YourMatchTab({
             <button
               disabled={submitting}
               onClick={() => void decideAndCapture('reject')}
-              className="py-2.5 text-xs font-medium border border-retro-border text-retro-muted hover:text-rose-400 hover:border-rose-500/30 bg-surface-interactive hover:bg-rose-500/5 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              className="py-2.5 text-xs font-medium border border-border-glass text-retro-muted hover:text-rose-400 hover:border-rose-500/30 bg-surface-interactive hover:bg-rose-500/5 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
               <span>Reject</span>
@@ -353,7 +353,7 @@ export function YourMatchTab({
         )}
 
         {st.phase === 'decide' && st.myDecision && (
-          <div className="border border-retro-border p-3 text-center text-xs text-retro-muted rounded-lg">
+          <div className="border border-border-glass p-3 text-center text-xs text-retro-muted rounded-lg">
             Decision recorded — waiting for {opponentName}...
           </div>
         )}

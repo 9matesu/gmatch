@@ -37,14 +37,14 @@ export function Leaderboard({
   const topSender = rankedUsers[0]
 
   return (
-    <div className="bg-surface-raised border border-retro-border rounded-lg p-4 space-y-3">
+    <div className="bg-surface-raised border border-border-glass rounded-lg p-4 space-y-3">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-retro-border pb-3">
+      <div className="flex items-center justify-between border-b border-border-glass pb-3">
         <div className="flex items-center gap-2">
           <Trophy className="w-4 h-4 text-retro-accent" />
           <h2 className="text-sm font-medium text-retro-fg">Leaderboard</h2>
         </div>
-        <div className="flex bg-surface-interactive border border-retro-border p-0.5 rounded-md text-xs">
+        <div className="flex bg-surface-interactive border border-border-glass p-0.5 rounded-md text-xs">
           {(['all', 'today'] as const).map(t => (
             <button
               key={t}
@@ -60,7 +60,7 @@ export function Leaderboard({
 
       {/* Top Player */}
       {topSender && (
-        <div className="bg-surface-interactive border border-retro-border rounded-lg p-3 flex items-center justify-between gap-3">
+        <div className="bg-surface-interactive border border-border-glass rounded-lg p-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="relative flex-shrink-0">
               <Avatar id={topSender.id} imageUrl={topSender.pfp_url || undefined} size={40} />
@@ -97,7 +97,7 @@ export function Leaderboard({
           <button
             type="button"
             onClick={() => onSelectUser(topSender.id)}
-            className="px-3 py-1.5 text-xs font-medium bg-surface-interactive border border-retro-border text-retro-body hover:border-zinc-500 transition-colors flex-shrink-0 cursor-pointer rounded-lg"
+            className="px-3 py-1.5 text-xs font-medium bg-surface-interactive border border-border-glass text-retro-body hover:border-zinc-500 transition-colors flex-shrink-0 cursor-pointer rounded-lg"
           >
             View
           </button>
@@ -113,7 +113,7 @@ export function Leaderboard({
           return (
             <div
               key={user.id}
-              className="bg-surface-interactive border border-retro-border rounded-lg p-2.5 flex items-center gap-3 hover:border-zinc-500 transition-colors"
+              className="bg-surface-interactive border border-border-glass rounded-lg p-2.5 flex items-center gap-3 hover:border-zinc-500 transition-colors"
             >
               <span className="w-5 flex items-center justify-center text-xs flex-shrink-0">
                 {isTop3 ? (
@@ -149,7 +149,7 @@ export function Leaderboard({
               <button
                 type="button"
                 onClick={() => onSelectUser(user.id)}
-                className="px-2.5 py-1 text-xs font-medium bg-surface-raised border border-retro-border text-retro-body hover:border-zinc-500 rounded-lg transition-colors flex-shrink-0 cursor-pointer"
+                className="px-2.5 py-1 text-xs font-medium bg-surface-raised border border-border-glass text-retro-body hover:border-zinc-500 rounded-lg transition-colors flex-shrink-0 cursor-pointer"
               >
                 View
               </button>
@@ -159,7 +159,7 @@ export function Leaderboard({
       </div>
 
       {rankedUsers.length === 0 && (
-        <div className="text-center py-8 text-retro-muted text-xs border border-dashed border-retro-border rounded-lg p-4">
+        <div className="text-center py-8 text-retro-muted text-xs border border-dashed border-border-glass rounded-lg p-4">
           No network users registered yet.
         </div>
       )}

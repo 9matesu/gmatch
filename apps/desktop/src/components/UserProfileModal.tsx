@@ -330,7 +330,7 @@ export function UserProfileModal({
 
             {/* Posts Gallery: public posts are the primary profile content. */}
             {userPosts.length > 0 && (
-              <div className="space-y-2 border-t border-retro-border pt-3">
+              <div className="space-y-2 border-t border-border-glass pt-3">
                 <span className="text-xs font-medium text-retro-body flex items-center gap-1.5">
                   <Grid className="w-3.5 h-3.5" />
                   <span>Posts ({userPosts.length})</span>
@@ -341,7 +341,7 @@ export function UserProfileModal({
                       key={post.id}
                       type="button"
                       onClick={() => setSelectedPost(post)}
-                      className="aspect-square bg-surface-interactive rounded-lg overflow-hidden border border-retro-border cursor-pointer group hover:opacity-90 transition-opacity"
+                      className="aspect-square bg-surface-interactive rounded-lg overflow-hidden border border-border-glass cursor-pointer group hover:opacity-90 transition-opacity"
                     >
                       <ObjectImage
                         contentUrl={post.url}
@@ -358,7 +358,7 @@ export function UserProfileModal({
 
             {/* Cards Gallery */}
             {userCards.length > 0 && (
-              <div className="space-y-2 border-t border-retro-border pt-3">
+              <div className="space-y-2 border-t border-border-glass pt-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-retro-body flex items-center gap-1.5">
                     <Grid className="w-3.5 h-3.5" />
@@ -371,7 +371,7 @@ export function UserProfileModal({
                     <div
                       key={card.id}
                       onClick={() => setSelectedCardImage(card.content_url || (card as any).data || (card as any).url || `/api/objects/${card.id}`)}
-                      className="aspect-square bg-surface-interactive rounded-lg overflow-hidden border border-retro-border cursor-pointer group hover:opacity-90 transition-opacity"
+                      className="aspect-square bg-surface-interactive rounded-lg overflow-hidden border border-border-glass cursor-pointer group hover:opacity-90 transition-opacity"
                     >
                       <ObjectImage
                         contentUrl={card.content_url || (card as any).data || (card as any).url || `/api/objects/${card.id}`}
@@ -396,7 +396,7 @@ export function UserProfileModal({
           onClick={() => setShowPic(false)}
         >
           <div className="relative max-w-sm max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
-            <img src={resolveMediaUrl(profilePic)} alt={displayName} className="max-w-full max-h-[80vh] rounded-lg border border-retro-border shadow-xl object-contain" />
+            <img src={resolveMediaUrl(profilePic)} alt={displayName} className="max-w-full max-h-[80vh] rounded-lg border border-border-glass shadow-xl object-contain" />
             <button
               type="button"
               onClick={() => setShowPic(false)}
@@ -419,7 +419,7 @@ export function UserProfileModal({
               contentUrl={selectedCardImage}
               identity={null}
               alt="Card preview"
-              className="max-w-full max-h-[85vh] rounded-lg border border-retro-border shadow-xl object-contain"
+              className="max-w-full max-h-[85vh] rounded-lg border border-border-glass shadow-xl object-contain"
               controls
               autoPlay
             />

@@ -3423,12 +3423,12 @@ export default function Home() {
                       <img
                         src={lobbyLightboxUrl}
                         alt="Lobby image"
-                        className="max-w-full max-h-[85vh] object-contain rounded-lg border-2 border-retro-border shadow-2xl"
+                        className="max-w-full max-h-[85vh] object-contain rounded-lg border-2 border-border-glass shadow-2xl"
                       />
                       <button
                         type="button"
                         onClick={() => setLobbyLightboxUrl(null)}
-                        className="absolute top-2 right-2 bg-retro-panel border border-retro-border text-retro-muted hover:text-retro-fg p-1.5 transition-colors cursor-pointer"
+                        className="absolute top-2 right-2 bg-retro-panel border border-border-glass text-retro-muted hover:text-retro-fg p-1.5 transition-colors cursor-pointer"
                         aria-label="Close image"
                       >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>

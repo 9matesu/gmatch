@@ -66,7 +66,7 @@ export function ContextOverlay({
       onContextMenu={(e) => { e.preventDefault(); onDismiss() }}
     >
       <div
-        className="fixed bg-retro-panel border border-retro-border p-1.5 w-48 text-xs z-[210] space-y-0.5"
+        className="fixed bg-retro-panel border border-border-glass p-1.5 w-48 text-xs z-[210] space-y-0.5"
         style={{ top: Math.min(contextMenu.y, window.innerHeight - 180), left: Math.min(contextMenu.x, window.innerWidth - 200) }}
         onClick={e => e.stopPropagation()}
       >
@@ -299,7 +299,7 @@ export function ReportModal({
               className={`px-3 py-1 border font-bold uppercase transition-colors ${
                 reportCategory === cat
                   ? 'bg-retro-accent text-black border-retro-accent'
-                  : 'bg-retro-bg text-retro-muted border-retro-border hover:text-retro-fg'
+                  : 'bg-retro-bg text-retro-muted border-border-glass hover:text-retro-fg'
               }`}
             >
               {cat}
@@ -311,7 +311,7 @@ export function ReportModal({
           value={reportReason}
           onChange={e => setReportReason(e.target.value)}
           placeholder="Describe the issue (optional)..."
-          className="w-full p-2.5 bg-retro-bg border border-retro-border text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none"
+          className="w-full p-2.5 bg-retro-bg border border-border-glass text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none"
           maxLength={200}
         />
         <div className="flex gap-2 pt-1">

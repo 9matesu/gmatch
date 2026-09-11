@@ -336,7 +336,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
       {!arsenalOnly && (
       <>
       {/* Header */}
-      <section className="w-full bg-surface-raised border border-retro-border rounded-lg p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <section className="w-full bg-surface-raised border border-border-glass rounded-lg p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-surface-interactive flex items-center justify-center text-retro-muted">
             <ShoppingBag className="w-4 h-4" />
@@ -351,7 +351,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
           </div>
         </div>
 
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-interactive border border-retro-border rounded-lg">
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-interactive border border-border-glass rounded-lg">
           <Coins className="w-3.5 h-3.5 text-retro-accent" />
           <span className="text-xs text-retro-muted">Balance:</span>
           <span className="text-sm font-medium font-mono text-retro-fg tabular-nums">g$ {points.toLocaleString()}</span>
@@ -360,7 +360,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
 
       {/* Economy Dashboard */}
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-surface-raised border border-retro-border rounded-lg p-3.5 col-span-2 lg:col-span-1">
+        <div className="bg-surface-raised border border-border-glass rounded-lg p-3.5 col-span-2 lg:col-span-1">
           <div className="flex items-center gap-1.5 text-retro-muted text-[10px] font-semibold uppercase tracking-wider">
             <Coins className="w-3.5 h-3.5 text-retro-accent" />
             Balance
@@ -368,7 +368,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
           <div className="mt-1 text-lg font-bold font-mono tabular-nums text-retro-fg">{formatGc(points)}</div>
         </div>
 
-        <div className="bg-surface-raised border border-retro-border rounded-lg p-3.5">
+        <div className="bg-surface-raised border border-border-glass rounded-lg p-3.5">
           <div className="flex items-center gap-1.5 text-retro-muted text-[10px] font-semibold uppercase tracking-wider">
             <Layers className="w-3.5 h-3.5" />
             Portfolio Value
@@ -409,7 +409,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                 <button
                   type="button"
                   onClick={() => setConfirmCashoutAll(false)}
-                  className="px-2.5 py-1.5 rounded bg-surface-interactive border border-retro-border text-retro-body text-[11px] font-medium cursor-pointer transition-colors hover:text-retro-fg"
+                  className="px-2.5 py-1.5 rounded bg-surface-interactive border border-border-glass text-retro-body text-[11px] font-medium cursor-pointer transition-colors hover:text-retro-fg"
                 >
                   Cancel
                 </button>
@@ -431,7 +431,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
           )}
         </div>
 
-        <div className="bg-surface-raised border border-retro-border rounded-lg p-3.5 col-span-2 lg:col-span-1">
+        <div className="bg-surface-raised border border-border-glass rounded-lg p-3.5 col-span-2 lg:col-span-1">
           <div className="text-retro-muted text-[10px] font-semibold uppercase tracking-wider mb-1.5">Rarity Mix</div>
           <div className="flex flex-wrap gap-1.5">
             {RARITY_ORDER.map((r) => {
@@ -457,14 +457,14 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
       {!arsenalOnly && (
       <>
       {/* Most valuable cards */}
-      <section className="bg-surface-raised border border-retro-border rounded-lg p-4">
+      <section className="bg-surface-raised border border-border-glass rounded-lg p-4">
         <div className="flex items-center justify-between gap-2 mb-3">
           <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Most valuable cards</h3>
           {onOpenCardCollection && (
             <button
               type="button"
               onClick={onOpenCardCollection}
-              className="px-2.5 py-1.5 text-[11px] font-medium border border-retro-border text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors whitespace-nowrap"
+              className="px-2.5 py-1.5 text-[11px] font-medium border border-border-glass text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors whitespace-nowrap"
             >
               View collection
             </button>
@@ -477,7 +477,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
             {[...portfolio].sort((a, b) => b.value - a.value).slice(0, 8).map((c, i) => {
               const tier = RARITY_TIERS[c.rarity as keyof typeof RARITY_TIERS];
               return (
-                <div key={c.id} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-surface-interactive border border-retro-border">
+                <div key={c.id} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-surface-interactive border border-border-glass">
                   <span className="text-[11px] font-mono text-retro-muted tabular-nums w-5 shrink-0">#{i + 1}</span>
                   {tier && (
                     <span
@@ -498,7 +498,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
       </section>
 
       {/* Inventory (read-only) */}
-      <section className="bg-surface-raised border border-retro-border rounded-lg p-4">
+      <section className="bg-surface-raised border border-border-glass rounded-lg p-4">
         <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider mb-3">Inventory</h3>
         {(() => {
           const owned = storeItems.filter((item) => (inventory[item.id] || 0) > 0);
@@ -506,7 +506,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
           return (
             <div className="space-y-1.5">
               {owned.map((item) => (
-                <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-surface-interactive border border-retro-border">
+                <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-surface-interactive border border-border-glass">
                   <span className="min-w-0 flex-1 truncate text-xs text-retro-body">{item.name}</span>
                   <span className="text-[11px] font-mono tabular-nums text-retro-muted shrink-0">×{inventory[item.id]}</span>
                 </div>
@@ -517,7 +517,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
       </section>
 
       {/* Community Market — Steam-style buy/sell between players */}
-      <section className="bg-surface-raised border border-retro-border rounded-lg p-4">
+      <section className="bg-surface-raised border border-border-glass rounded-lg p-4">
         <div className="flex items-center justify-between gap-2 mb-3">
           <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Community Market</h3>
           <span className="text-[10px] text-retro-muted">{marketListings.length} open listing{marketListings.length === 1 ? '' : 's'}</span>
@@ -527,7 +527,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {marketListings.map((l) => (
-              <div key={l.listingId} className="rounded-lg border border-retro-border bg-surface-interactive overflow-hidden flex flex-col">
+              <div key={l.listingId} className="rounded-lg border border-border-glass bg-surface-interactive overflow-hidden flex flex-col">
                 <button
                   type="button"
                   onClick={() => setMarketCardId(l.cardId)}
@@ -606,7 +606,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-retro-border mt-3 flex items-center justify-between gap-2">
+              <div className="pt-3 border-t border-border-glass mt-3 flex items-center justify-between gap-2">
                 <span className="text-sm font-medium font-mono tabular-nums text-rose-400">
                   g$ {item.cost.toLocaleString()}
                 </span>

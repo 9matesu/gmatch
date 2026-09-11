@@ -295,7 +295,7 @@ export function CardZoomModal({
 
       {/* Bottom Caption Bar / Instructions */}
       <div
-        className="flex flex-wrap items-center justify-between gap-2 z-10 bg-retro-panel/80 border border-retro-border px-4 py-2 rounded-lg text-retro-muted text-[10px]"
+        className="flex flex-wrap items-center justify-between gap-2 z-10 bg-retro-panel/80 border border-border-glass px-4 py-2 rounded-lg text-retro-muted text-[10px]"
         onClick={e => e.stopPropagation()}
       >
         <span>

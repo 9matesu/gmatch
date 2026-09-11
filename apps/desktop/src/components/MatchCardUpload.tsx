@@ -121,7 +121,7 @@ export function MatchCardUpload({
       onChange={(e) => setCardName(e.target.value)}
       maxLength={80}
       placeholder="Card name"
-      className="flex-1 bg-retro-bg border border-retro-border px-3 py-1.5 text-[10px] text-retro-fg outline-none placeholder:text-retro-muted rounded"
+      className="flex-1 bg-retro-bg border border-border-glass px-3 py-1.5 text-[10px] text-retro-fg outline-none placeholder:text-retro-muted rounded"
     />
   )
 
@@ -151,7 +151,7 @@ export function MatchCardUpload({
             onChange={(e) => setLinkInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') void importLink() }}
             placeholder={pending ? 'or paste a new link to replace it' : linkPlaceholder}
-            className="flex-1 bg-retro-bg border border-retro-border px-3 py-1.5 text-[10px] text-retro-fg outline-none placeholder:text-retro-muted rounded"
+            className="flex-1 bg-retro-bg border border-border-glass px-3 py-1.5 text-[10px] text-retro-fg outline-none placeholder:text-retro-muted rounded"
           />
           <button
             type="button"
@@ -229,7 +229,7 @@ export function MatchCardUpload({
             <div className="p-3 space-y-2">
               {pending.status === 'uploading' && (
                 <div className="space-y-1">
-                  <div className="h-1.5 w-full bg-retro-surface border border-retro-border rounded-full overflow-hidden">
+                  <div className="h-1.5 w-full bg-retro-surface border border-border-glass rounded-full overflow-hidden">
                     <div
                       className="h-full bg-retro-accent transition-all duration-150"
                       style={{ width: `${Math.min(100, Math.max(2, pending.progress))}%` }}

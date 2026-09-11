@@ -27,7 +27,7 @@ export function LeagueBoard({ league, users, onOpenProfile }: LeagueBoardProps) 
             const userObj = users?.find(u => u.id === entry.user_id) || { id: entry.user_id, display_name: entry.display_name } as User
             onOpenProfile?.(userObj)
           }}
-          className="border border-retro-border rounded p-2.5 bg-retro-panel flex items-center justify-between gap-3 hover:border-retro-accent transition-colors cursor-pointer"
+          className="border border-border-glass rounded p-2.5 bg-retro-panel flex items-center justify-between gap-3 hover:border-retro-accent transition-colors cursor-pointer"
         >
           <div className="flex items-center gap-3 min-w-0">
             <span className={`text-xs font-black font-mono w-6 text-center ${

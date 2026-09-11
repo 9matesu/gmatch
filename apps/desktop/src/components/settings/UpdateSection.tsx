@@ -105,7 +105,7 @@ export function UpdateSection({ toast }: {
   const hasUpdateFallback = Boolean(installed && latest && isNewer(latest.version, installed));
 
   return (
-    <div className="p-4 bg-surface-interactive border border-retro-border rounded-lg space-y-3">
+    <div className="p-4 bg-surface-interactive border border-border-glass rounded-lg space-y-3">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <h4 className="text-xs font-medium text-retro-fg">Updates</h4>
