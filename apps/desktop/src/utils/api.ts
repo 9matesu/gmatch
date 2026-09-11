@@ -222,7 +222,11 @@ export async function orbitFetch(
     const isUpload = options.body instanceof FormData
     const timeout = setTimeout(() => controller.abort(), isUpload ? 120000 : 30000)
     try {
-      const res = await fetchImpl(url, { ...options, headers, ...(headers.has('X-Orbit-Sealed') ? { body: sealedBody } : {}), signal: controller.signal })
+      // GET must never carry a body (real fetch throws) — the seal lives in
+      // the header alone; only non-GET sealed requests send the placeholder.
+      const bodyInitFor = (h: Headers) =>
+        h.has('X-Orbit-Sealed') && method !== 'GET' && method !== 'HEAD' ? { body: sealedBody } : {}
+      const res = await fetchImpl(url, { ...options, headers, ...bodyInitFor(headers), signal: controller.signal })
       clearTimeout(timeout)
       if (res.ok) {
         if (method === 'GET') {
@@ -241,7 +245,7 @@ export async function orbitFetch(
       // while and the X-Orbit-Timestamp expired before the request arrived).
       if (res.status === 401 && !isUpload) {
         const retryHeaders = await buildHeaders()
-        const retryRes = await fetchImpl(url, { ...options, headers: retryHeaders, ...(retryHeaders.has('X-Orbit-Sealed') ? { body: 'sealed' } : {}), signal: controller.signal })
+        const retryRes = await fetchImpl(url, { ...options, headers: retryHeaders, ...bodyInitFor(retryHeaders), signal: controller.signal })
         if (retryRes.ok) {
           if (method === 'GET') {
             responseCache.set(ck, { data: retryRes.clone(), expiry: Date.now() + CACHE_TTL })
@@ -256,7 +260,7 @@ export async function orbitFetch(
         await new Promise(r => setTimeout(r, Math.min(retryAfter * 1000, 10000)))
         // Re-sign with a fresh timestamp so the retry is not rejected as expired.
         const retryHeaders = await buildHeaders()
-        const retryRes = await fetchImpl(url, { ...options, headers: retryHeaders, ...(retryHeaders.has('X-Orbit-Sealed') ? { body: 'sealed' } : {}), signal: controller.signal })
+        const retryRes = await fetchImpl(url, { ...options, headers: retryHeaders, ...bodyInitFor(retryHeaders), signal: controller.signal })
         if (retryRes.ok) {
           if (method === 'GET') {
             responseCache.set(ck, { data: retryRes.clone(), expiry: Date.now() + CACHE_TTL })
