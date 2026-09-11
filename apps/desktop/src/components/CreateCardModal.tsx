@@ -213,7 +213,6 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
               <Sparkles className="w-4 h-4" /> Card Forge
             </div>
             <h2 className="text-xl sm:text-2xl font-black mt-1">Create a unique card</h2>
-            <p className="text-xs text-retro-muted mt-1">Build the look now. Rarity and value are assigned by the server after creation.</p>
           </div>
           <button type="button" onClick={onClose} className="glass-button p-2 rounded-xl text-retro-muted hover:text-retro-fg" aria-label="Close card creator">
             <X className="w-5 h-5" />

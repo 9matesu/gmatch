@@ -69,7 +69,7 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
         {state.packaged && (
           <p className="text-xs text-retro-muted">
             {state.mode === 'host'
-              ? 'Friends running gMatch can enter one of the addresses below (click to copy the real one — shown masked for privacy) in their Settings → Server to join your world. Keep the app open and your firewall allows the port.'
+              ? 'Enter one of these addresses into your friend’s Settings → Server to join your world. Click a row to copy the real address.'
               : 'All social data lives on the server you connected to. Switch back to Host anytime.'}
           </p>
         )}
