@@ -3,9 +3,9 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useCropper } from '../../hooks/useCropper';
-import { DEFAULT_FEED_SORT, FEED_SORT_LABELS, type FeedSort } from './feedSort'
+import { DEFAULT_FEED_SORT, FEED_SORT_LABELS, firstLikeCrossed, type FeedSort } from './feedSort'
 import { suggestFollows } from './suggestFollows'
-import { playPress, playWin, playMsgReceive } from '../../utils/sounds';
+import { playPress, playWin, playMsgReceive, playLikeOnce } from '../../utils/sounds';
 import {
   Heart,
   MessageCircle,
@@ -394,6 +394,33 @@ export function GMatchFeed({
       : [],
     [displayPosts.length, users, identity?.orbitId, myProfileTags, followingIds],
   );
+
+  // First-like flash: session-local celebration when MY post crosses 0 -> 1
+  // likes after mount. Pre-liked posts at mount are seeded into the baseline
+  // ref so reloads don't re-celebrate old news.
+  const firstLikedBaseline = useRef<Set<string> | null>(null)
+  const [firstLikeId, setFirstLikeId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!identity?.orbitId) return
+    if (firstLikedBaseline.current === null) {
+      firstLikedBaseline.current = new Set(
+        posts.filter((p) => p.author_id === identity.orbitId && (p.like_count ?? 0) > 0).map((p) => p.id),
+      )
+      return
+    }
+    for (const p of posts) {
+      if (p.author_id !== identity.orbitId) continue
+      const prev = p.like_count ?? 0
+      const next = likeCounts[p.id] ?? prev
+      if (firstLikeCrossed(prev, next) && !firstLikedBaseline.current.has(p.id)) {
+        firstLikedBaseline.current.add(p.id)
+        playLikeOnce()
+        setFirstLikeId(p.id)
+        const timer = setTimeout(() => setFirstLikeId(null), 1500)
+        return () => clearTimeout(timer)
+      }
+    }
+  }, [posts, likeCounts, identity?.orbitId])
 
   const toggleLike = useCallback((post: FeedPost) => {
     playPress(820);
@@ -822,6 +849,11 @@ export function GMatchFeed({
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 animate-orbit-pop">
                       <Heart className="w-20 h-20 text-white fill-white opacity-90" />
                     </div>
+                  )}
+                  {firstLikeId === post.id && (
+                    <span className="absolute left-2 top-2 z-20 text-[10px] font-bold text-retro-fg bg-retro-panel border border-border-glass rounded-md px-1.5 py-0.5 animate-orbit-pop">
+                      First like
+                    </span>
                   )}
                 </div>
 
