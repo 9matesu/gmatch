@@ -99,13 +99,16 @@ export function CropModal({
       return;
     }
     try {
-      const visW = fw / scale;
-      const visH = fh / scale;
       const sx = (dispW - fw) / 2 - pan.x;
       const sy = (dispH - fh) / 2 - pan.y;
-      const outScale = Math.min(1, MAX_EDGE / Math.max(fw, fh));
-      const ow = Math.round(fw * outScale);
-      const oh = Math.round(fh * outScale);
+      // Export at the SOURCE resolution (natural pixels of the crop window),
+      // not the on-screen frame size — the old math re-rasterized a 4000px
+      // photo to ~400px, which is the "blurry upload" bug.
+      const visW = Math.max(1, fw / scale);
+      const visH = Math.max(1, fh / scale);
+      const outScale = Math.min(1, MAX_EDGE / Math.max(visW, visH));
+      const ow = Math.round(visW * outScale);
+      const oh = Math.round(visH * outScale);
       const canvas = document.createElement('canvas');
       canvas.width = ow;
       canvas.height = oh;

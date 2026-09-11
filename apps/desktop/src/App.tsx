@@ -2070,7 +2070,9 @@ export default function Home() {
           mime_type: dbObj.mime_type,
           created_at: dbObj.created_at,
           content_url: contentUrl,
-          display_name: 'Unknown User',
+          display_name: dbObj.owner_id === identity.orbitId
+            ? (myProfile.displayName || 'You')
+            : 'Unknown User',
           sender_pubkey: dbObj.sender_pubkey,
           sender_enc_pubkey: dbObj.sender_enc_pubkey,
         })
@@ -2146,7 +2148,7 @@ export default function Home() {
         setItems(prev => areItemsStructurallyEqual(prev, payloadList) ? prev : payloadList);
         setItemsLoading(false);
       });
-  }, [identity, updateSettings, toast, enqueueDecision]);
+  }, [identity, updateSettings, toast, enqueueDecision, myProfile.displayName]);
 
   const loadStories = useCallback(() => {
     if (!identity) return Promise.resolve()
@@ -2669,12 +2671,14 @@ export default function Home() {
         created_at: img.created_at,
         caption: img.caption,
         content_url: img.content_url,
-        display_name: 'Unknown User',
+        display_name: img.owner_id === identity?.orbitId
+          ? (myProfile.displayName || 'You')
+          : (users.find((u) => u.id === img.owner_id)?.display_name?.trim() || 'Unknown User'),
         expires_at: img.expires_at,
       } as OrbitObject)
     }
     return Array.from(map.values())
-  }, [items, stories, lobby.images])
+  }, [items, stories, lobby.images, users, identity?.orbitId, myProfile.displayName])
 
   const myUser = useMemo(() => {
     return users.find(u => u.id === identity?.orbitId)
@@ -3043,9 +3047,21 @@ export default function Home() {
                                   const u = users.find((x) => x.id === userId)
                                   openContextMenu('user', u || { id: userId, display_name: displayName })(e)
                                 }}
-                                onArchivePost={(id) => {
-                                  setArchivedPostIds((prev) => new Set(prev).add(id));
-                                  toast('Post archived', 'info');
+                                onArchivePost={async (id) => {
+                                  if (!identity) return
+                                  try {
+                                    const res = await orbitFetch(`/api/objects/${id}/archive`, { method: 'POST' }, identity)
+                                    if (!res.ok) throw new Error(String(res.status))
+                                    const { is_archived } = await res.json()
+                                    setArchivedPostIds((prev) => {
+                                      const next = new Set(prev)
+                                      if (is_archived) next.add(id); else next.delete(id)
+                                      return next
+                                    })
+                                    toast(is_archived ? 'Post archived' : 'Post unarchived', 'info')
+                                  } catch {
+                                    toast('Archive failed. Try again.', 'error')
+                                  }
                                 }}
                                 onDeletePost={(id) => {
                                   setDeletedPostIds((prev) => new Set(prev).add(id));
