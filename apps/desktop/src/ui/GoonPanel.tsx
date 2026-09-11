@@ -294,16 +294,19 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           role="group"
           aria-label="Feed layout"
         >
-          {(['1x1', '1x2', '2x2', '3x3'] as ViewMode[]).map((mode) => (
+          {(['1x1', '1x2', '2x2', '3x3'] as ViewMode[]).map((mode) => {
+            const active = viewMode === mode
+              || (mode === '1x1' && viewMode === 'single')
+              || (mode === '3x3' && viewMode === 'grid')
+            return (
             <button
               key={mode}
               type="button"
-              className={`${MONO} cursor-pointer border-0 bg-transparent px-2 py-0.5 text-xs font-bold ${viewMode === mode ||
-                (mode === '3x3' && viewMode === 'grid')
+              className={`${MONO} cursor-pointer border-0 bg-transparent px-2 py-0.5 text-xs font-bold ${active
                 ? 'bg-retro-accent text-retro-accent-text'
                 : 'bg-transparent text-retro-muted hover:text-retro-fg'
                 }`}
-              aria-pressed={viewMode === mode || (mode === '3x3' && viewMode === 'grid')}
+              aria-pressed={active}
               onClick={() => setViewMode(mode)}
               title={
                 mode === '1x1'
@@ -317,7 +320,8 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             >
               {mode === '1x1' ? '1×1' : mode === '1x2' ? '1×2' : mode === '2x2' ? '2×2' : '3×3'}
             </button>
-          ))}
+            )
+          })}
         </div>
         {headerRight}
       </div>
@@ -426,7 +430,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               )}
             </div>
           ))}
-          {feedOffline && (
+          {feedOffline && grid.length > 0 && (
             <Badge variant="warning" className={`${MONO} absolute right-2.5 top-2.5`}>
               OFFLINE
             </Badge>
@@ -525,11 +529,6 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             >
               Loading…
             </span>
-          )}
-          {showOffline && (
-            <Badge variant="warning" className={`${MONO} absolute right-2.5 top-2.5`}>
-              OFFLINE
-            </Badge>
           )}
           {showOffline && (
             <OfflineCard fetching={fetching} feedOffline={feedOffline} onRetry={() => void fetchFeed()} />
