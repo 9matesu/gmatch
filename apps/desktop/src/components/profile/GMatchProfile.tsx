@@ -290,7 +290,7 @@ export function GMatchProfile({
       </div>
 
       {/* Tabs */}
-      <div className="bg-surface-raised border-b border-border-glass flex items-center">
+      <div className="bg-surface-raised border-b border-border-glass flex items-center gap-1 px-2 py-2">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = profileTab === tab.id;
@@ -299,9 +299,9 @@ export function GMatchProfile({
               key={tab.id}
               type="button"
               onClick={() => { playPress(750); setProfileTab(tab.id as any); }}
-              className={`py-3 flex-1 flex items-center justify-center gap-1.5 text-xs font-medium border-b-2 transition-colors cursor-pointer ${isActive
-                  ? 'border-retro-accent text-retro-accent'
-                  : 'border-transparent text-retro-muted hover:text-retro-body'
+              className={`py-1.5 px-3 flex items-center justify-center gap-1.5 text-xs font-medium rounded-md transition-colors cursor-pointer ${isActive
+                  ? 'bg-glass-w12 text-retro-fg'
+                  : 'text-retro-muted hover:text-retro-body'
                 }`}
             >
               <Icon className="w-4 h-4" />

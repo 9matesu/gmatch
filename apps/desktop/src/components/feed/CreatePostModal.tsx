@@ -289,13 +289,13 @@ export function CreatePostModal({
         </div>
 
         {/* Mode Selector Tabs */}
-        <div className="flex border-b border-border-glass px-3 pt-2 gap-2 text-xs">
+        <div className="flex items-center border-b border-border-glass px-3 pt-2 pb-2 gap-1.5 text-xs">
           <button
             type="button"
             onClick={() => { playPress(750); setActiveTab('upload'); }}
-            className={`flex items-center gap-1.5 px-3.5 py-2 border-b-2 transition-all cursor-pointer font-medium ${activeTab === 'upload'
-              ? 'border-white text-white bg-glass-w12 rounded-t-md'
-              : 'border-transparent text-retro-muted hover:text-retro-fg'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all duration-150 cursor-pointer font-medium ${activeTab === 'upload'
+              ? 'bg-glass-w12 text-retro-fg'
+              : 'text-retro-muted hover:text-retro-fg'
               }`}
           >
             <UploadCloud className="w-4 h-4" />
@@ -305,9 +305,9 @@ export function CreatePostModal({
           <button
             type="button"
             onClick={() => { playPress(750); setActiveTab('camera'); }}
-            className={`flex items-center gap-1.5 px-3.5 py-2 border-b-2 transition-all cursor-pointer font-medium ${activeTab === 'camera'
-              ? 'border-white text-white bg-glass-w12 rounded-t-md'
-              : 'border-transparent text-retro-muted hover:text-retro-fg'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all duration-150 cursor-pointer font-medium ${activeTab === 'camera'
+              ? 'bg-glass-w12 text-retro-fg'
+              : 'text-retro-muted hover:text-retro-fg'
               }`}
           >
             <Camera className="w-4 h-4" />
@@ -317,9 +317,9 @@ export function CreatePostModal({
           <button
             type="button"
             onClick={() => { playPress(750); setActiveTab('url'); }}
-            className={`flex items-center gap-1.5 px-3.5 py-2 border-b-2 transition-all cursor-pointer font-medium ${activeTab === 'url'
-              ? 'border-white text-white bg-glass-w12 rounded-t-md'
-              : 'border-transparent text-retro-muted hover:text-retro-fg'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all duration-150 cursor-pointer font-medium ${activeTab === 'url'
+              ? 'bg-glass-w12 text-retro-fg'
+              : 'text-retro-muted hover:text-retro-fg'
               }`}
           >
             <LinkIcon className="w-4 h-4" />

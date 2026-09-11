@@ -900,7 +900,7 @@ export function GMatchFeed({
 
                   {/* Likes Count */}
                   {currentLikes > 0 && (
-                    <div className="text-xs font-semibold text-retro-fg font-mono tracking-tight">
+                    <div className="text-xs font-semibold text-retro-fg tracking-tight">
                       {currentLikes.toLocaleString()} {currentLikes === 1 ? 'like' : 'likes'}
                     </div>
                   )}

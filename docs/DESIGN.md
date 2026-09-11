@@ -50,6 +50,9 @@ with `aria-pressed`, never two buttons for one boolean.
 ## Icons
 lucide only, `currentColor`, `w-3.5`/`w-4` `stroke-[1.75]`. ZERO emoji/glyph in
 chrome (❤️⚡★✕→Heart/Zap/Star/X). User-typed content may still contain emoji.
+Sanctioned disclosure glyphs (user directive 2026-09-11): ⌃ ⌄ on the messages
+rail handle and the chat panel close control — functional toggles, not
+decoration. The Unicode sweep skips exactly these two.
 
 ## Compaction
 "nem tudo é botão": drop a description when it restates its sibling label (keep

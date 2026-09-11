@@ -55,7 +55,7 @@ export function ProfileView({
   deletePostOnServer: (postId: string) => void;
 }) {
   return (
-    <div className="p-2 sm:p-6 max-w-4xl mx-auto w-full">
+    <div className="p-4 sm:p-8 w-full max-w-[1600px] mx-auto">
       <GMatchProfile
         identity={identity}
         myUser={myUser}

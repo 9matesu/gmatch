@@ -255,9 +255,9 @@ export function FollowersFollowingModal({
               playPress(650);
               setActiveTab('followers');
             }}
-            className={`flex-1 py-2.5 text-xs font-medium transition-colors cursor-pointer text-center relative border-b-2 ${activeTab === 'followers'
-                ? 'text-retro-fg border-retro-accent'
-                : 'text-retro-muted hover:text-retro-fg border-transparent'
+            className={`flex-1 py-1.5 text-xs font-medium transition-colors cursor-pointer text-center rounded-md ${activeTab === 'followers'
+                ? 'bg-glass-w12 text-retro-fg'
+                : 'text-retro-muted hover:text-retro-fg'
               }`}
           >
             <span>{isTargetMode ? networkFollowers.length : followersUsers.length} Followers</span>
@@ -269,9 +269,9 @@ export function FollowersFollowingModal({
               playPress(650);
               setActiveTab('following');
             }}
-            className={`flex-1 py-2.5 text-xs font-medium transition-colors cursor-pointer text-center relative border-b-2 ${activeTab === 'following'
-                ? 'text-retro-fg border-retro-accent'
-                : 'text-retro-muted hover:text-retro-fg border-transparent'
+            className={`flex-1 py-1.5 text-xs font-medium transition-colors cursor-pointer text-center rounded-md ${activeTab === 'following'
+                ? 'bg-glass-w12 text-retro-fg'
+                : 'text-retro-muted hover:text-retro-fg'
               }`}
           >
             <span>{isTargetMode ? networkFollowing.length : followingUsers.length} Following</span>
