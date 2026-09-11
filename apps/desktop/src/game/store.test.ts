@@ -740,6 +740,25 @@ describe('silent feed retry (never offline)', () => {
     expect(s.current?.id).toBe('live')
     expect(s.feedOffline).toBe(false)
   })
+
+  it('never recycles past images into queue or grid on offline failure', async () => {
+    const { fetchPosts } = await import('../services/booru')
+    const mocked = vi.mocked(fetchPosts)
+    mocked.mockReset()
+    mocked.mockResolvedValue({ posts: [], source: null, ok: false, offline: true })
+    const pastPost = { id: 'old-1', url: 'https://x/old-1.jpg', tags: ['aaa'] }
+    useGame.setState({
+      tags: [setupTag('aaa')],
+      current: { id: 'live', url: 'https://x/live.jpg', tags: ['aaa'] },
+      queue: [],
+      past: [pastPost],
+      gallery: [{ id: 'old-1', url: 'https://x/old-1.jpg', tags: ['aaa'], rarity: 'Common', rarityBase: 1, clicks: 2 }],
+    })
+    await useGame.getState().fetchFeed()
+    const s = useGame.getState()
+    expect(s.queue).toEqual([])
+    expect(s.queue.some((p) => p.url === pastPost.url)).toBe(false)
+  })
 })
 
 describe('purgePost (T3)', () => {

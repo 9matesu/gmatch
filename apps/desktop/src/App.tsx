@@ -199,13 +199,13 @@ export default function Home() {
   const [canonicalCards, setCanonicalCards] = useState<CanonicalCard[]>([]);
   const [itemsLoading, setItemsLoading] = useState(true);
   const [mainView, setMainView] = useState<MainViewType>(() => {
-    if (typeof window === 'undefined') return 'feed'
+    if (typeof window === 'undefined') return 'servers'
     // Direct URL wins over the last-visited persisted view (plan §5).
     const fromHash = viewFromHash(window.location.hash)
     const saved = localStorage.getItem('orbit_main_view') as MainViewType | null
-    const resolved = fromHash || (saved && ROUTE_VIEWS.includes(saved as RoutedView) ? saved : 'feed')
+    const resolved = fromHash || (saved && ROUTE_VIEWS.includes(saved as RoutedView) ? saved : 'servers')
     // Desktop never renders the inline messages view (rail only).
-    return resolved === 'messages' && isDesktopViewport() ? 'feed' : resolved
+    return resolved === 'messages' && isDesktopViewport() ? 'servers' : resolved
   });
   const [showCreatePostModal, setShowCreatePostModal] = useState(false);
 

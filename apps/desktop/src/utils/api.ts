@@ -10,11 +10,8 @@ function computeApiBase(): string {
     (import.meta.env.VITE_API_URL as string | undefined) ||
     (typeof window !== 'undefined' && (window as unknown as { __API_BASE__?: string }).__API_BASE__)
   if (envUrl) return envUrl.replace(/\/+$/, '')
-  if (typeof window !== 'undefined' &&
-      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(window.location.origin)) {
-    // Browser dev (vite): keep the local sidecar — dev must stay offline-safe.
-    return 'http://127.0.0.1:8790'
-  }
+  // Dev (vite) and packaged builds both default to the gmatch central node;
+  // the local sidecar is opt-in via VITE_API_URL / __API_BASE__ / server-mode.
   return 'https://gmatch.fly.dev'
 }
 
