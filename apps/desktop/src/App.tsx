@@ -3552,19 +3552,11 @@ export default function Home() {
                 setReportCategory={setReportCategory}
               />
 
-              {/* Desktop messages rail: collapsed edge tab, bottom drawer */}
+              {/* Desktop messages dock: bottom tab, full-height side panel */}
               <MessagesRail
                 open={chatOpen}
                 onToggle={() => { playPress(860); setChatOpen((v) => !v); }}
                 unreadCount={pmUnreadCount}
-                users={users}
-                profilePics={profilePics}
-                onOpenProfile={(userId) => {
-                  const t = users.find((u) => u.id === userId);
-                  if (t) setSelectedProfileUser(t);
-                }}
-                groups={chatGroups.map((g) => ({ id: g.id, name: g.name, member_count: g.member_count }))}
-                onOpenGroup={(gid) => { setActiveGroupId(gid); setPanelTab('chat'); }}
               >
 <SocialPanel
                       tab={panelTab}

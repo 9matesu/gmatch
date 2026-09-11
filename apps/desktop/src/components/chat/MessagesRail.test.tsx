@@ -6,10 +6,6 @@ import { MessagesRail } from './MessagesRail'
 const base = {
   onToggle: vi.fn(),
   unreadCount: 2,
-  users: [],
-  profilePics: {},
-  onOpenProfile: vi.fn(),
-  groups: [],
 }
 
 describe('MessagesRail', () => {
@@ -32,6 +28,12 @@ describe('MessagesRail', () => {
     expect(collapse.closest('[data-rail-panel]')).toBeTruthy()
     fireEvent.click(collapse)
     expect(base.onToggle).toHaveBeenCalled()
+  })
+
+  it('dock is compact: capped at 40vw/720px so the main column keeps room', () => {
+    render(<MessagesRail open {...base}>child</MessagesRail>)
+    const panel = screen.getByRole('button', { name: 'Collapse messages' }).closest('[data-rail-panel]')
+    expect(panel!.className).toMatch(/w-\[min\(720px,40vw\)\]/)
   })
 
   it('dock occupies the same flex layer: relative, full height, shrink-0, no fixed/z-index', () => {

@@ -398,10 +398,10 @@ export function GMatchDMs({
   const canShowMembers = openTarget === 'group' && !!activeGroupId && !!onLoadGroupMembers;
 
   return (
-    <div className="flex-1 min-h-[480px] h-full w-full solid-panel overflow-hidden flex flex-col md:flex-row-reverse font-sans text-retro-fg animate-orbit-fade-in">
+    <div className="flex-1 min-h-0 h-full w-full solid-panel overflow-hidden flex flex-col md:flex-row-reverse font-sans text-retro-fg animate-orbit-fade-in">
       {/* Thread list column — right side on desktop, coupled with the rail's
           players/groups aside; chat panel owns the left. */}
-      <div className={`w-full md:w-80 lg:w-88 border-r md:border-r-0 md:border-l border-border-glass flex flex-col bg-surface-canvas/80 shrink-0 min-h-0 select-none ${openTarget ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`w-full md:w-60 lg:w-64 border-r md:border-r-0 md:border-l border-border-glass flex flex-col bg-surface-canvas/80 shrink-0 min-h-0 select-none ${openTarget ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-3 sm:p-4 metro-rule flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <h2 className="font-semibold text-sm text-retro-fg truncate">
