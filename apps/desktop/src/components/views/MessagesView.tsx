@@ -12,7 +12,7 @@ import { GMatchDMs, type ThreadItem, type GroupInfo } from '../chat/GMatchDMs';
 import type { GroupMember } from '../chat/GroupMembersPopover';
 import { NotificationsPanel } from '../NotificationsPanel';
 import type { MainViewType } from '../home/HomeFooter';
-type GamesSubTab = 'duel' | 'cards' | 'babecock' | 'ranks' | 'store';
+type GamesSubTab = 'duel' | 'cards' | 'babecock' | 'ranks';
 
 export function MessagesView({
   panelTab,

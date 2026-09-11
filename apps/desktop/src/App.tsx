@@ -204,7 +204,7 @@ export default function Home() {
   const [chatOpen, setChatOpen] = useState(false);
   // UI-3: resizable messages sidebar (width persisted; smooth only when not dragging)
   const [panelTab, setPanelTab] = useState<SocialPanelTab>('chat');
-  const [gamesSubTab, setGamesSubTab] = useState<'duel' | 'cards' | 'babecock' | 'ranks' | 'store' | 'idle'>('idle');
+  const [gamesSubTab, setGamesSubTab] = useState<'duel' | 'cards' | 'babecock' | 'ranks' | 'idle'>('idle');
   const [collapsedModules, setCollapsedModules] = useState<Record<string, boolean>>({});
   const toggleModule = (key: string) => setCollapsedModules((prev) => ({ ...prev, [key]: !prev[key] }));
   const [nowTick, setNowTick] = useState<number>(() => Date.now());
@@ -3042,6 +3042,8 @@ export default function Home() {
                                 onOpenGameAd={(mode) => {
                                   if (mode === 'coffee') {
                                     setManualCoffeeOpen(true);
+                                  } else if (mode === 'store') {
+                                    handleSetMainView('store');
                                   } else if (mode !== 'discord') {
                                     setGamesSubTab(mode);
                                     setMainView('games');

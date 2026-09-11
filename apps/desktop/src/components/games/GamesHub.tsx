@@ -25,14 +25,14 @@ export function GamesHub({
   cards: StoredCard[];
   users?: User[];
   onSelectUser?: (userId: string) => void;
-  initialSubTab?: GamesTab | 'store';
+  initialSubTab?: GamesTab;
   renderDuelContent: () => React.ReactNode;
   onOpenStore?: () => void;
   toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
   /** Open the custom image-sources manager (idle clicker). */
   onOpenSources?: () => void;
 }) {
-  const initial = (initialSubTab === 'store' ? 'idle' : initialSubTab) as GamesTab;
+  const initial = initialSubTab as GamesTab;
   const [subTab, setSubTab] = useState<GamesTab>(initial);
 
   // Idle Clicker fullscreen: Fullscreen API on the workspace box, with an

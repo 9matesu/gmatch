@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo , useRef} from 'react';
 import {
   Monitor,
   Shield,
@@ -12,11 +12,8 @@ import {
   Paintbrush,
   Gamepad2,
   AlertTriangle,
-  Send,
   Loader2,
   Target,
-  History,
-  ShieldAlert,
   RefreshCw,
   WifiOff,
   Inbox,
@@ -173,7 +170,6 @@ type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
 export function PCDominationTab({ identity, allUsers, profilePics, points, toast: toastFn, activeHack, setActiveHack, onOpenFlash }: Props) {
   const { settings, update } = useSettings();
-  const [activeTab, setActiveTab] = useState<'send' | 'consent' | 'history' | 'hacks'>('send');
   const [targets, setTargets] = useState<DominationTarget[]>([]);
   const [targetsState, setTargetsState] = useState<LoadState>('idle');
   const [selectedTarget, setSelectedTarget] = useState<DominationTarget | null>(null);
@@ -234,12 +230,12 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
 
   // Light auto-refresh so the online dots don't go stale while you browse.
   useEffect(() => {
-    if (!identity || activeTab !== 'send') return;
+    if (!identity) return;
     const t = window.setInterval(() => {
       if (!document.hidden) void loadTargets();
     }, 60_000);
     return () => window.clearInterval(t);
-  }, [identity, activeTab, loadTargets]);
+  }, [identity, loadTargets]);
 
   const loadHistory = useCallback(async () => {
     if (!identity) return;
@@ -259,8 +255,8 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
   }, [identity]);
 
   useEffect(() => {
-    if (activeTab === 'history' && historyState === 'idle') void loadHistory();
-  }, [activeTab, historyState, loadHistory]);
+    if (historyState === 'idle') void loadHistory();
+  }, [historyState, loadHistory]);
 
   // ── consent sync (full map, never partial — server replaces the JSON) ──
   const syncSettingsToServer = useCallback(async (enabled: boolean, consentMap: Record<string, boolean>) => {
@@ -395,27 +391,16 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
     );
   }
 
-  const tabBtn = (id: typeof activeTab, label: string, Icon: React.ComponentType<{ className?: string }>) => (
-    <button
-      type="button"
-      onClick={() => setActiveTab(id)}
-      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-        activeTab === id ? 'glass-nav-active text-retro-fg' : 'text-retro-muted hover:text-retro-fg'
-      }`}
-    >
-      <Icon className="w-3.5 h-3.5" />
-      {label}
-    </button>
-  );
-
   const statusChip = (t: DominationTarget) => {
     if (!t.enabled) return { text: 'blocked', cls: 'text-retro-muted border-border-glass' };
     if (t.online) return { text: 'online', cls: 'text-emerald-400 border-emerald-500/30' };
     return { text: `seen ${timeAgo(t.last_seen)}`, cls: 'text-amber-400/80 border-amber-500/20' };
   };
 
+  const dominationTopRef = useRef<HTMLDivElement>(null);
+
   return (
-    <div className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-6 flex flex-col gap-5 font-sans select-none pb-24 lg:pb-16">
+    <div ref={dominationTopRef} className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-6 flex flex-col gap-5 font-sans select-none pb-24 lg:pb-16">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -464,16 +449,8 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-border-subtle pb-2 overflow-x-auto">
-        {tabBtn('send', 'Send', Send)}
-        {tabBtn('consent', 'My consent', Shield)}
-        {tabBtn('history', 'History', History)}
-        {tabBtn('hacks', 'Hacks', ShieldAlert)}
-      </div>
-
-      {/* ── SEND ── */}
-      {activeTab === 'send' && (
+      <section aria-label="Send">
+        <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider mt-1">Send</h3>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
           {/* Target column */}
           <div className="lg:col-span-2 rounded-xl glass-surface flex flex-col overflow-hidden">
@@ -528,7 +505,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                   {!search && (
                     <button
                       type="button"
-                      onClick={() => setActiveTab('consent')}
+                      onClick={() => document.getElementById('pc-dom-consent')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                       className="glass-action glass-action-primary px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors"
                     >
                       Set up my consent
@@ -634,10 +611,10 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
             )}
           </div>
         </div>
-      )}
+      </section>
 
-      {/* ── CONSENT ── */}
-      {activeTab === 'consent' && (
+      <section id="pc-dom-consent" aria-label="My consent">
+        <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider mt-1">My consent</h3>
         <div className="space-y-5">
           <div className="rounded-xl glass-surface p-4 space-y-3">
             <div className="text-xs font-medium flex items-center gap-1.5 text-retro-fg">
@@ -706,10 +683,10 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
             </div>
           </div>
         </div>
-      )}
+      </section>
 
-      {/* ── HISTORY ── */}
-      {activeTab === 'history' && (
+      <section aria-label="History">
+        <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider mt-1">History</h3>
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1 glass-inset p-0.5 rounded-lg">
@@ -814,10 +791,10 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
             </p>
           )}
         </div>
-      )}
+      </section>
 
-      {/* ── HACKS ── */}
-      {activeTab === 'hacks' && (
+      <section aria-label="Hacks">
+        <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider mt-1">Hacks</h3>
         <HacksPanel
           identity={identity}
           users={allUsers}
@@ -827,9 +804,9 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
           activeHack={activeHack}
           setActiveHack={setActiveHack}
           onOpenFlash={onOpenFlash}
-          onExitSpy={() => setActiveTab('send')}
+          onExitSpy={() => dominationTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
         />
-      )}
+      </section>
 
       {actionModal && (
         <ActionModal

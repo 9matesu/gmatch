@@ -13,7 +13,7 @@ import CustomSourcesModal from '../grid/CustomSourcesModal';
 import type { MainViewType } from '../home/HomeFooter';
 
 type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
-type GamesSubTab = 'duel' | 'cards' | 'babecock' | 'ranks' | 'store' | 'idle';
+type GamesSubTab = 'duel' | 'cards' | 'babecock' | 'ranks' | 'idle';
 
 export function GamesView({
   gamesSubTab,
