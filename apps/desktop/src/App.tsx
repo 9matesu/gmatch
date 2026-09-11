@@ -30,7 +30,7 @@ import { ROUTE_VIEWS, hashForView, viewFromHash, type RoutedView } from "./utils
 import { playChime, playPress, playMsgReceive } from "./utils/sounds";
 import { useLobby } from "./hooks/useLobby";
 import { UserProfileModal } from "./components/UserProfileModal";
-import { MIN_GAME_CARDS, type User, type OrbitObject } from "@orbit/shared";
+import { MIN_GAME_CARDS, generateFallbackName, type User, type OrbitObject } from "@orbit/shared";
 import { applyCanonicalCard } from "./game/galleryMapping";
 import { areItemsStructurallyEqual, areUsersStructurallyEqual, areAnnouncementsStructurallyEqual } from "./utils/compare";
 import { OnboardingFlow } from "./firstRun/OnboardingFlow";
@@ -2080,7 +2080,7 @@ export default function Home() {
           content_url: contentUrl,
           display_name: dbObj.owner_id === identity.orbitId
             ? (myProfile.displayName || 'You')
-            : 'Unknown User',
+            : (usersRef.current.find((u) => u.id === dbObj.owner_id)?.display_name?.trim() || generateFallbackName(dbObj.owner_id)),
           sender_pubkey: dbObj.sender_pubkey,
           sender_enc_pubkey: dbObj.sender_enc_pubkey,
         })
@@ -2404,7 +2404,7 @@ export default function Home() {
                 mime_type: meta.mime_type || 'image/jpeg',
                 created_at: new Date().toISOString(),
                 content_url: dataUrl,
-                display_name: 'Unknown User',
+                display_name: usersRef.current.find((u) => u.id === offer.sender_id)?.display_name?.trim() || generateFallbackName(offer.sender_id),
                 sender_pubkey: meta.sender_pubkey,
                 sender_enc_pubkey: meta.sender_enc_pubkey,
               }
