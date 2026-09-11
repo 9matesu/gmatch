@@ -94,7 +94,7 @@ export function PostCreatorModal({
     }
 
     playWin();
-    toast?.('Post published successfully!', 'success');
+    toast?.('Posted.', 'success');
     onClose();
     setMedia([]);
     setCaption('');

@@ -64,7 +64,7 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
       }, identity)
       if (res.ok) { toast(label, 'success'); await load() }
       else toast('Update failed', 'error')
-    } catch { toast('Network error', 'error') } finally { setBusyId(null) }
+    } catch { toast('Couldn\'t reach the server.', 'error') } finally { setBusyId(null) }
   }
 
   const remove = async (row: DirRow) => {
@@ -73,9 +73,9 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
     setBusyId(row.id)
     try {
       const res = await orbitFetch(`${central}/api/servers/admin/directory/${row.id}`, { method: 'DELETE' }, identity)
-      if (res.ok) { toast('Unregistered', 'success'); await load() }
+      if (res.ok) { toast('Server unregistered.', 'success'); await load() }
       else toast('Only the central master can unregister', 'error')
-    } catch { toast('Network error', 'error') } finally { setBusyId(null) }
+    } catch { toast('Couldn\'t reach the server.', 'error') } finally { setBusyId(null) }
   }
 
   if (!authorized) return null

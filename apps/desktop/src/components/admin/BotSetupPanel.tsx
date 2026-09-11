@@ -294,7 +294,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
 
   const handleApplyGlobalTagsToAllProviders = () => {
     setProviders(providers.map((p) => ({ ...p, tags: [...globalTags] })));
-    toast('Applied default query to all active API providers!', 'success');
+    toast('Applied default query to all active providers.', 'success');
   };
 
   const handleApplyTagPreset = (presetTags: string[]) => {
@@ -327,7 +327,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
         const result: ApiTestResult = await res.json();
         setTestResult(result);
         if (result.ok) {
-          toast(`Connected to ${provider.name}! Found ${result.foundCount} images (${result.latencyMs}ms)`, 'success');
+          toast(`Connected to ${provider.name}. Found ${result.foundCount} images (${result.latencyMs}ms)`, 'success');
         } else {
           toast(`Test Failed: ${result.error || 'Check diagnostics logs'}`, 'error');
         }
@@ -347,7 +347,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
       const res = await orbitFetch('/api/admin/bot-config/sync-images', { method: 'POST' }, identity);
       if (res.ok) {
         const data = await res.json();
-        toast(`Synced ${data.cachedCount} fresh cards across active providers!`, 'success');
+        toast(`Synced ${data.cachedCount} fresh cards across active providers.`, 'success');
       } else {
         toast('Failed to sync bot images', 'error');
       }
@@ -379,7 +379,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
 
   const handleDeleteProvider = (id: string) => {
     if (providers.length <= 1) {
-      toast('You must have at least one provider in the pool', 'error');
+      toast('Keep at least one provider in the pool.', 'error');
       return;
     }
 
@@ -431,7 +431,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
 
   const handleBatchDelete = () => {
     if (selectedProviderIds.size >= providers.length) {
-      toast('You must have at least one provider in the pool', 'error');
+      toast('Keep at least one provider in the pool.', 'error');
       return;
     }
     setProviders((current) => {
@@ -1321,7 +1321,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                       const text = (testResult.logs || []).join('\n') + (testResult.error ? `\n[ERROR] ${testResult.error}` : '');
                       if (navigator.clipboard) {
                         navigator.clipboard.writeText(text);
-                        toast('Diagnostic logs copied to clipboard!', 'success');
+                        toast('Logs copied.', 'success');
                       }
                     }}
                     className="text-[10px] font-bold text-cyan-300 hover:text-cyan-300 flex items-center gap-1 cursor-pointer"
@@ -1368,13 +1368,13 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
               <button
                 type="button"
                 onClick={async () => {
-                  toast('Generating 5 unique starter cards...', 'info');
+                  toast('Generating 5 starter cards…', 'info');
                   try {
                     const res = await orbitFetch('/api/starter-deck/test', { method: 'POST' }, identity);
                     if (res.ok) {
                       const data = await res.json();
                       if (Array.isArray(data?.cards)) {
-                        toast(`Generated ${data.cards.length} starter cards!`, 'success');
+                        toast(`Generated ${data.cards.length} starter cards.`, 'success');
                       }
                     }
                   } catch {

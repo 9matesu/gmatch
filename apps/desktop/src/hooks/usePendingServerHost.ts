@@ -37,7 +37,7 @@ export async function claimPendingHost(
   if (!node?.isAdmin) {
     // Someone else already owns this node — never overwrite their server.
     clearPendingHost()
-    toast('This computer already administers a different server — create canceled', 'error')
+    toast('This computer already runs a server. Create canceled.', 'error')
     return 'taken'
   }
   try {
@@ -69,7 +69,7 @@ export async function claimPendingHost(
     } catch { /* offline — password can be set manually */ }
   }
   clearPendingHost()
-  toast(`You are now hosting "${pending.name}" — you are its admin`, 'success')
+  toast(`You are now hosting "${pending.name}" . You are its admin.`, 'success')
   return 'ok'
 }
 

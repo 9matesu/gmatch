@@ -76,7 +76,7 @@ export function IdentityModal({
       // was gated forever and the app felt uncloseable).
       try { localStorage.setItem('orbit_key_saved', 'true'); } catch {}
       setCopied(true);
-      toast(`${label} copied to clipboard!`, "success");
+      toast(`${label} copied.`, "success");
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast("Failed to copy to clipboard", "error");
@@ -117,7 +117,7 @@ export function IdentityModal({
       return;
     }
 
-    toast("Identity restored successfully! Welcome back.", "success");
+    toast("Identity restored.", "success");
     onClose();
     onIdentityChanged?.('login');
   };

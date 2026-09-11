@@ -74,7 +74,7 @@ export function DeleteAccountSection({
   const copyKey = async () => {
     try {
       await navigator.clipboard.writeText(identityKeyPayload(identity, displayName));
-      toast('Secret key copied — store it somewhere outside gMatch.', 'success');
+      toast('Secret key copied. Store it somewhere outside gMatch.', 'success');
     } catch {
       toast('Clipboard blocked; reveal the key and copy it manually.', 'warning');
     }

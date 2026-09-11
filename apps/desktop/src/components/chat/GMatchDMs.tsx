@@ -708,7 +708,7 @@ export function GMatchDMs({
                       disabled={loadingHistory}
                       className="px-3 py-1.5 rounded-md bg-glass-w8 border border-border-glass text-[10px] text-retro-muted hover:text-retro-fg hover:bg-glass-w12 transition-colors cursor-pointer disabled:opacity-40"
                     >
-                      {loadingHistory ? 'Loading...' : 'Load earlier messages'}
+                      {loadingHistory ? 'Loading…' : 'Load earlier messages'}
                     </button>
                   </div>
                 )}

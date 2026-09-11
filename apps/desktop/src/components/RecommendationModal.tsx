@@ -31,7 +31,7 @@ export function RecommendationModal({
       }, identity)
 
       if (res.ok) {
-        toast('Recommendation submitted! Thank you.', 'success')
+        toast('Recommendation submitted.', 'success')
         onClose()
       } else {
         const errText = await res.text()

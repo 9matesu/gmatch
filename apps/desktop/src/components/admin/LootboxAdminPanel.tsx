@@ -130,7 +130,7 @@ export function LootboxAdminPanel({ identity }: { identity: OrbitIdentity | null
         toast(err.error || 'Failed to save lootbox', 'error');
       }
     } catch {
-      toast('Network error', 'error');
+      toast('Couldn\'t reach the server.', 'error');
     } finally {
       setSaving(false);
     }

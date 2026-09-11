@@ -57,7 +57,7 @@ export function RoomsView({
     if (room) {
       setActiveRoomId(room.id);
       setNewName('');
-      toast(`Room "${room.name}" created — invite people to fill it`, 'success');
+      toast(`Room "${room.name}" created. Invite people to fill it.`, 'success');
     }
   };
 
@@ -75,7 +75,7 @@ export function RoomsView({
       (u) => (u.display_name || '').toLowerCase() === invitePeer.trim().toLowerCase() || u.id === invitePeer.trim(),
     );
     if (!target) {
-      toast('No contact with that name/id — share a GMatch ID or DM them once first', 'error');
+      toast('No contact with that name or ID. Share a GMatch ID, or DM them once first.', 'error');
       return;
     }
     const ok = await onInvite(activeRoom.id, target.id);
@@ -141,7 +141,7 @@ export function RoomsView({
               {activeRoom.ownerId !== myOrbitId && (
                 <button
                   type="button"
-                  onClick={() => { playPress(520); onLeave(activeRoom.id); if (rooms[0]?.id !== activeRoom.id) setActiveRoomId(rooms.find(r2 => r2.id !== activeRoom.id)?.id ?? null); toast(`Left "${activeRoom.name}" — the owner re-wraps its key`, 'info'); }}
+                  onClick={() => { playPress(520); onLeave(activeRoom.id); if (rooms[0]?.id !== activeRoom.id) setActiveRoomId(rooms.find(r2 => r2.id !== activeRoom.id)?.id ?? null); toast(`Left "${activeRoom.name}" . The owner re-wraps its key.`, 'info'); }}
                   className="glass-action glass-action-danger p-1.5 rounded-lg cursor-pointer"
                   aria-label="Leave room"
                   title="Leave room"

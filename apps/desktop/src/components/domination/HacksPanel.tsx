@@ -70,7 +70,7 @@ export function HacksPanel({
           onDeployHack={(session) => {
             setActiveHack(session);
             try { localStorage.setItem('orbit_active_hack', JSON.stringify(session)); } catch { }
-            toast(`Cyber hack deployed on ${session.targetUserName}!`, 'success');
+            toast(`Cyber hack deployed on ${session.targetUserName}.`, 'success');
           }}
         />
       </div>

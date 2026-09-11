@@ -36,7 +36,7 @@ export function FlashModal({
       const res = await orbitFetch('/api/flash', { method: 'POST', body: form }, identity)
       if (res.ok) {
         const data = await res.json().catch(() => null)
-        toast('Flash sent to everyone online!', 'success')
+        toast('Flash sent to everyone online.', 'success')
         onFired?.(data?.flash || null)
         onClose()
       } else {

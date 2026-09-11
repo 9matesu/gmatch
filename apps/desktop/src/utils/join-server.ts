@@ -26,7 +26,7 @@ export async function joinServer(
   try { localStorage.setItem(SERVER_MARKER_KEY, target) } catch { /* private mode */ }
   const res = await window.gmatch.serverSet({ mode: 'client', url: target })
   if (!res.ok) { toast(res.error || 'Could not switch servers', 'error'); return 'failed' }
-  toast(`Switching to ${s.name} — the app restarts`, 'success')
+  toast(`Switching to ${s.name}. The app restarts.`, 'success')
   window.gmatch.serverRelaunch?.()
   return 'relaunching'
 }

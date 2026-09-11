@@ -35,7 +35,7 @@ export function usePendingJoinVerify(
           toast('Joined the server', 'success')
           setState({ done: true, ok: true })
         } else if (res.status === 403) {
-          toast('Server password is wrong — open Servers to re-enter it', 'warning')
+          toast('Wrong server password. Re-enter it in Servers.', 'warning')
           setState({ done: true, ok: false })
         } else {
           setState({ done: true, ok: false })

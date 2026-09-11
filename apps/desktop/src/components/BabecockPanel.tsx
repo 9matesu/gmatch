@@ -287,13 +287,13 @@ export function BabecockPanel({
         body: JSON.stringify({ invitee_id: inviteeId }),
       }, identity)
       if (res.ok) {
-        toast('Invite sent!', 'success')
+        toast('Invite sent.', 'success')
       } else {
         const data = await res.json().catch(() => null)
         toast(data?.error || 'Invite failed', 'error')
       }
     } catch {
-      toast('Invite failed — try again', 'error')
+      toast('Invite failed. Try again.', 'error')
     } finally {
       setSendingInvite(null)
       setInvitePickerOpen(false)
@@ -405,7 +405,7 @@ export function BabecockPanel({
       form.append('tags', 'babecock')
       const res = await orbitFetch('/api/objects', { method: 'POST', body: form }, identity)
       if (res.ok) {
-        toast('Posted to your feed!', 'success')
+        toast('Posted to your feed.', 'success')
       } else {
         const data = await res.json().catch(() => null)
         toast(data?.error || 'Failed to post to feed', 'error')
@@ -456,7 +456,7 @@ export function BabecockPanel({
           window.dispatchEvent(new CustomEvent('babecock-share-to-group', {
             detail: { attachment: { id: data.id, url: `/api/objects/${data.id}`, isVideo: entry.mime_type.startsWith('video') } }
           }))
-          toast('Ready to share — pick a group chat', 'success')
+          toast('Ready to share. Pick a group chat.', 'success')
         }
       } else {
         const data = await res.json().catch(() => null)

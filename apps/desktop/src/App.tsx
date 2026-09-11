@@ -1060,7 +1060,7 @@ export default function Home() {
   // Unified report for any content type. Reporting hides the item instantly.
   const reportTarget = useCallback((targetType: string, targetId: string, reason?: string) => {
     if (!identity) return
-    toast('Reported — content hidden pending admin review', 'info')
+    toast('Reported. Content hidden until an admin reviews it.', 'info')
     orbitFetch('/api/report', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1166,8 +1166,8 @@ export default function Home() {
   // Settings modal is open — nudge the user toward Install & Restart.
   useEffect(() => {
     const off = window.gmatch?.onUpdateStatus?.((s) => {
-      if (s.phase === 'available' && s.version) toast(`gMatch ${s.version} is downloading — finish it in Settings → Updates`, 'info');
-      else if (s.phase === 'ready' && s.version) toast(`gMatch ${s.version} is ready — Install & Restart in Settings → Updates`, 'success');
+      if (s.phase === 'available' && s.version) toast(`gMatch ${s.version} is downloading. Finish it in Settings → Updates.`, 'info');
+      else if (s.phase === 'ready' && s.version) toast(`gMatch ${s.version} is ready. Install & Restart in Settings → Updates.`, 'success');
     });
     return () => { off?.() };
   }, [toast]);
@@ -1284,11 +1284,11 @@ export default function Home() {
     // never a server inbox. Attachments ride the sealed body as object refs.
     if (courier.courierActive) {
       if (replyToId || attachment) {
-        toast('Replies/attachments over the courier need a direct connection — send text for now', 'warning')
+        toast('Replies and attachments need a direct connection. Send text for now.', 'warning')
       }
       const msg = await courier.send(peerId, text.trim())
       if (!msg || msg.status === 'failed') {
-        toast('Peer key unknown — message held locally. It will NOT deliver until you meet their key.', 'error')
+        toast('Peer key unknown. The message stays local and won\'t deliver until you have their key.', 'error')
       }
       void loadPmMessages(peerId)
       loadPmThreads()
@@ -1333,7 +1333,7 @@ export default function Home() {
       loadPmThreads()
     } catch {
       setPmMessagesByPeer(prev => ({ ...prev, [peerId]: (prev[peerId] || []).filter(m => m.id !== optimisticId) }))
-      toast('Could not send message — the server is unreachable', 'error')
+      toast('Couldn\'t send the message. The server is unreachable.', 'error')
     }
   }, [identity, myProfile.displayName, loadPmMessages, loadPmThreads, toast, courierActive, courierSend])
 
@@ -1745,7 +1745,7 @@ export default function Home() {
 
   const handleSetProfilePic = async (file: File) => {
     if (!identity) return
-    toast('Updating profile picture...', 'info')
+    toast('Updating profile picture…', 'info')
 
     try {
       // 1. Generate a lightweight 256x256 thumbnail data URL via canvas
@@ -1794,7 +1794,7 @@ export default function Home() {
         return
       }
 
-      toast('Profile picture updated!', 'success')
+      toast('Profile picture updated.', 'success')
       loadUsers()
       void lobby.refresh()
 
@@ -2244,7 +2244,7 @@ export default function Home() {
       loadGallery()
     } catch (err) {
       logger.error(err)
-      toast('Story upload failed - try again.', 'error')
+      toast('Story upload failed. Try again.', 'error')
     }
   }
 
@@ -2703,7 +2703,7 @@ export default function Home() {
   const handleBatchDownload = async () => {
     if (selectedGalleryIds.size === 0) return
     const targets = items.filter(i => selectedGalleryIds.has(i.id))
-    toast(`Downloading ${targets.length} items...`, 'info')
+    toast(`Downloading ${targets.length} items…`, 'info')
     for (const item of targets) {
       try {
         const res = await orbitFetch(`/api/objects/${item.id}`, {}, identity!)
@@ -2723,7 +2723,7 @@ export default function Home() {
   const handleDownloadAll = async () => {
     if (filteredItems.length === 0 || !identity) return
     setBatchDownloading(true)
-    toast(`Starting download of ${filteredItems.length} cards...`, 'info')
+    toast(`Starting download of ${filteredItems.length} cards…`, 'info')
     let count = 0
     for (const item of filteredItems) {
       try {
@@ -2741,7 +2741,7 @@ export default function Home() {
       } catch { }
     }
     setBatchDownloading(false)
-    toast(`Downloaded ${count} cards!`, 'success')
+    toast(`Downloaded ${count} cards.`, 'success')
   }
 
   const toggleFavorite = useCallback(async (item: OrbitObject) => {
@@ -2856,7 +2856,7 @@ export default function Home() {
                   }
                   setMyProfile({ displayName: effectiveName, tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [], isAdmin: false, pfpUrl: pfpUrl || '' });
                 }
-                toast('Logged in to gMatch!', 'success');
+                toast('Logged in.', 'success');
                 loadUsers();
                 loadGallery();
               }}
@@ -2884,7 +2884,7 @@ export default function Home() {
                     },
                   );
                 }
-                toast(`Welcome to gMatch, ${name}!`, 'success');
+                toast(`Welcome to gMatch, ${name}.`, 'success');
                 loadUsers();
                 loadGallery();
               }}
@@ -2892,7 +2892,7 @@ export default function Home() {
                 setMyProfile((prev) => ({ ...prev, displayName: profile.displayName, tags: profile.tags, pfpUrl: profile.pfpUrl || prev.pfpUrl }));
               }}
               onComplete={() => {
-                toast('Your account is ready to play!', 'success');
+                toast('Account ready.', 'success');
               }}
             />
           </ErrorBoundary>
@@ -3724,7 +3724,7 @@ export default function Home() {
                   setMyProfile((prev) => ({ ...prev, displayName: profile.displayName, tags: profile.tags, pfpUrl: profile.pfpUrl || prev.pfpUrl }));
                 }}
                 onComplete={() => {
-                  toast('Your account is ready to play!', 'success');
+                  toast('Account ready.', 'success');
                 }}
                 onOpenTos={() => { setLegalDoc('terms'); setShowTosModal(true) }}
               />
@@ -3806,7 +3806,7 @@ export default function Home() {
           onCreated={() => {
             setCreateCardNeeded(Math.max(0, MIN_GAME_CARDS - (myCards.length + 1)))
             setForgeFile(null)
-            toast('Unique card created!', 'success')
+            toast('Card created.', 'success')
           }}
         />
       )}

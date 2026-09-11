@@ -53,7 +53,7 @@ export function ServerPasswordSection({
         toast(e.error || 'Could not change the password', 'error')
       }
     } catch {
-      toast('Network error', 'error')
+      toast('Couldn\'t reach the server.', 'error')
     } finally {
       setBusy(false)
     }

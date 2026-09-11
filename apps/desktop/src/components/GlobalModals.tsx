@@ -249,7 +249,7 @@ export function GlobalModals(props: GlobalModalsProps) {
           attackerName={activeVirusHack.attacker_name}
           onComplete={() => {
             setActiveHacks((prev) => prev.filter((h) => h.id !== activeVirusHack.id));
-            toast('Virus lock expired! System restored.', 'info');
+            toast('Virus lock expired. System restored.', 'info');
           }}
         />
       )}

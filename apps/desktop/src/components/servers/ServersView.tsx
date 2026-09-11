@@ -223,7 +223,7 @@ export function ServersView({
       const e = (await res.json().catch(() => ({}))) as { error?: string }
       toast(e.error || 'Could not register with the directory', 'warning')
     } catch {
-      toast('Directory offline — your server will be listed once it answers', 'warning')
+      toast('Directory offline. Your server gets listed once it answers.', 'warning')
     }
     return null
   }
@@ -246,7 +246,7 @@ export function ServersView({
       try { claimedBefore = Boolean(localStorage.getItem(REG_KEY)) } catch { /* session-only */ }
       // One server per install: this machine already hosts its own node.
       if (claimedBefore && st?.mode === 'host') {
-        toast(`This computer already hosts “${serverName || 'a server'}” — rename it on the left instead`, 'warning')
+        toast(`This computer already hosts “${serverName || 'a server'}” . Rename it on the left instead.`, 'warning')
         return
       }
       const canHost = Boolean(window.gmatch?.serverSet && st?.packaged)
@@ -265,28 +265,28 @@ export function ServersView({
           const res = await window.gmatch!.serverSet!({ mode: 'host', url: '' })
           if (!res.ok) { toast(res.error || 'Could not switch to hosting your own server', 'error'); return }
           closeCreateForm()
-          toast(`Creating “${trimmed}” — the app restarts logged into your own server`, 'success')
+          toast(`Creating “${trimmed}” . The app restarts logged into your own server.`, 'success')
           window.gmatch!.serverRelaunch?.()
           return
         }
         // Already hosting an unclaimed node (1.0 default): claim it now.
         closeCreateForm()
         const out = await claimPendingHost(identity, toast)
-        if (out === 'retry') toast('Your local server is still starting — the claim retries automatically', 'warning')
+        if (out === 'retry') toast('Local server is still starting. The claim retries on its own.', 'warning')
         await refresh()
         return
       }
       // Browser/dev build without the desktop bridge: directory-only listing;
       // hosting your own node needs the packaged app.
-      if (!central) { toast('Configure a central node to list a server here — hosting it yourself runs in the desktop app', 'warning'); return }
+      if (!central) { toast('Configure a central node to list a server here. Hosting runs in the desktop app.', 'warning'); return }
       const listed = await registerDirectory(trimmed, desc, hintFinal, needsPassword)
       if (listed) {
-        toast('Server registered — it is listed for signed-in explorers', 'success')
+        toast('Server registered. Signed-in users can see it in the directory.', 'success')
         closeCreateForm()
         await refresh()
       }
     } catch {
-      toast('Network error', 'error')
+      toast('Couldn\'t reach the server.', 'error')
     } finally {
       setBusy(false)
     }
@@ -328,16 +328,16 @@ export function ServersView({
               body: JSON.stringify({ name: trimmed, description: serverDescription.trim() }),
             }, identity)
             if (dirRes.ok) localStorage.setItem(DIRECTORY_ID_KEY, directoryId)
-            else toast('Server renamed locally; directory update failed', 'warning')
+            else toast('Server renamed here, but the directory didn\'t update.', 'warning')
           } catch {
-            toast('Server renamed locally; directory is offline', 'warning')
+            toast('Server renamed here. The directory is offline.', 'warning')
           }
         }
       }
       toast('Server renamed', 'success')
       void refresh()
     } catch {
-      toast('Network error', 'error')
+      toast('Couldn\'t reach the server.', 'error')
     } finally {
       setRenaming(false)
     }
@@ -348,7 +348,7 @@ export function ServersView({
   const leave = async () => {
     if (!window.gmatch?.serverSet) return
     const res = await window.gmatch.serverSet({ mode: 'host', url: '' })
-    if (res.ok) { toast('Returning to your own server — the app restarts', 'success'); window.gmatch.serverRelaunch?.() }
+    if (res.ok) { toast('Returning to your own server. The app restarts.', 'success'); window.gmatch.serverRelaunch?.() }
   }
 
   const unregister = async (s: DirectoryServer) => {
@@ -356,7 +356,7 @@ export function ServersView({
     const res = await orbitFetch(`${central}/api/servers/${s.id}`, { method: 'DELETE' }, identity)
     if (res.ok) {
       try { if (localStorage.getItem(DIRECTORY_ID_KEY) === s.id) localStorage.removeItem(DIRECTORY_ID_KEY) } catch { /* session-only */ }
-      toast('Unregistered', 'success'); void refresh()
+      toast('Server unregistered.', 'success'); void refresh()
     }
     else toast('Only the owner can unregister a server', 'error')
   }

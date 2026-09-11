@@ -288,7 +288,7 @@ export function AttachmentUploadModal({
             className="px-5 py-2 bg-black hover:bg-surface-elevated text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-            <span>{uploading ? 'Uploading...' : 'Attach'}</span>
+            <span>{uploading ? 'Uploading…' : 'Attach'}</span>
           </button>
         </div>
       </div>

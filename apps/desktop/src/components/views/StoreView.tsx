@@ -42,7 +42,7 @@ export function StoreView({
           setActiveHack(session);
           try { localStorage.setItem('orbit_active_hack', JSON.stringify(session)); } catch { }
           onSetMainView('pc_domination');
-          toast(`Cyber hack deployed on ${session.targetUserName}!`, 'success');
+          toast(`Cyber hack deployed on ${session.targetUserName}.`, 'success');
         }}
       />
     </div>

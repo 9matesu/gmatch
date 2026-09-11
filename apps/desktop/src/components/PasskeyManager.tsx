@@ -36,7 +36,7 @@ export function PasskeyManager({ identity }: { identity: OrbitIdentity }) {
         throw new Error(await verifyRes.text());
       }
 
-      setStatus('Passkey secured successfully.');
+      setStatus('Passkey secured.');
     } catch (e: unknown) {
       logger.error(e);
       setStatus(`Error: ${e instanceof Error ? e.message : String(e)}`);

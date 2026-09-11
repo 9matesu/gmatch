@@ -38,9 +38,9 @@ export function SnapshotSection({
       a.download = `gmatch-snapshot-${new Date().toISOString().slice(0, 10)}.json`
       a.click()
       URL.revokeObjectURL(url)
-      toast('Snapshot exported — keep the file safe', 'success')
+      toast('Snapshot exported. Keep the file somewhere safe.', 'success')
     } catch {
-      toast('Network error', 'error')
+      toast('Couldn\'t reach the server.', 'error')
     } finally {
       setBusy(false)
     }
@@ -67,13 +67,13 @@ export function SnapshotSection({
       if (res.ok) {
         const data = (await res.json()) as { restored?: Record<string, number> }
         const total = Object.values(data.restored || {}).reduce((a, b) => a + b, 0)
-        toast(`Snapshot imported — ${total} rows restored`, 'success')
+        toast(`Snapshot imported. ${total} rows restored.`, 'success')
       } else {
         const e = (await res.json().catch(() => ({}))) as { error?: string }
         toast(e.error || 'Import failed', 'error')
       }
     } catch {
-      toast('Network error', 'error')
+      toast('Couldn\'t reach the server.', 'error')
     } finally {
       setBusy(false)
     }
