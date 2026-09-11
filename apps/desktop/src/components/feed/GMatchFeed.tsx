@@ -14,7 +14,6 @@ import {
   MoreHorizontal,
   Sparkles,
   Repeat,
-  Camera,
   PlusSquare,
   Coffee,
   Swords,
