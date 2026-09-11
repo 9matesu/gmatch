@@ -413,7 +413,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
       )}
 
       {cameraAsk && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4">
+        <div className="fixed inset-0 z-[var(--z-lightbox)] flex items-center justify-center bg-black/80 p-4">
           <div className="max-w-sm w-full glass-surface rounded-2xl border border-border-glass bg-zinc-950 p-6 space-y-4 text-center">
             <div className="w-12 h-12 mx-auto rounded-2xl bg-surface-interactive flex items-center justify-center">
               <Camera className="w-6 h-6 text-retro-fg" />

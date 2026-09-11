@@ -214,7 +214,7 @@ export function FollowersFollowingModal({
 
   return (
     <div
-      className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/75 backdrop-blur-md p-3 sm:p-4 select-none font-sans animate-orbit-fade-in"
+      className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/75 backdrop-blur-md p-3 sm:p-4 select-none font-sans animate-orbit-fade-in"
       onClick={onClose}
     >
       <div

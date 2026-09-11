@@ -32,7 +32,7 @@ export default function MediaViewerModal({ onClose, children, label }: Props) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1200] bg-black/75"
+      className="fixed inset-0 z-[var(--z-modal)] bg-black/75"
       role="dialog"
       aria-modal="true"
       aria-label={label}

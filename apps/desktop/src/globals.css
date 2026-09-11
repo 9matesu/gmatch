@@ -36,6 +36,13 @@
   /* Borders and highlights */
   --color-border-glass: #27272a;
   --color-border-subtle: #1f1f23;
+
+  /* Z scale (V1): arbitrary 3+ digit z-index banned — see docs/DESIGN.md */
+  --z-dropdown: 40;
+  --z-modal: 50;
+  --z-lightbox: 60;
+  --z-toast: 70;
+  --z-system: 80;
   --color-border-strong: #3f3f46;
 
   /* Accent: Clean high-contrast monochrome (Vercel style) */

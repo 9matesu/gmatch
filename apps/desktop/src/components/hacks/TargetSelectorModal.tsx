@@ -47,7 +47,7 @@ export function TargetSelectorModal({
 
   return (
     <div
-      className="fixed inset-0 z-[99999] bg-black/75 backdrop-blur-md flex items-center justify-center p-4 select-none animate-orbit-fade-in font-sans"
+      className="fixed inset-0 z-[var(--z-system)] bg-black/75 backdrop-blur-md flex items-center justify-center p-4 select-none animate-orbit-fade-in font-sans"
       onClick={onClose}
     >
       <div

@@ -61,12 +61,12 @@ export function ContextOverlay({
 
   return (
     <div
-      className="fixed inset-0 z-[200]"
+      className="fixed inset-0 z-[var(--z-modal)]"
       onClick={onDismiss}
       onContextMenu={(e) => { e.preventDefault(); onDismiss() }}
     >
       <div
-        className="fixed bg-retro-panel border border-border-glass p-1.5 w-48 text-xs z-[210] space-y-0.5"
+        className="fixed bg-retro-panel border border-border-glass p-1.5 w-48 text-xs z-[var(--z-modal)] space-y-0.5"
         style={{ top: Math.min(contextMenu.y, window.innerHeight - 180), left: Math.min(contextMenu.x, window.innerWidth - 200) }}
         onClick={e => e.stopPropagation()}
       >
@@ -277,7 +277,7 @@ export function ReportModal({
   if (!reportModal) return null;
 
   return (
-    <div className="fixed inset-0 z-[300] bg-black/80 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[var(--z-modal)] bg-black/80 flex items-center justify-center p-4" onClick={onClose}>
       <div
         className="bg-retro-panel border border-retro-error max-w-sm w-full p-5 space-y-3"
         onClick={e => e.stopPropagation()}

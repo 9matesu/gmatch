@@ -88,7 +88,7 @@ export function ActionModal({
   const field = "w-full glass-field rounded-md p-2.5 text-xs outline-none placeholder:text-retro-muted";
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 select-none font-sans" onClick={onClose}>
+    <div className="fixed inset-0 z-[var(--z-toast)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 select-none font-sans" onClick={onClose}>
       <div
         className="glass-surface rounded-xl max-w-lg w-full shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}

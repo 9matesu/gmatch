@@ -257,7 +257,7 @@ export function CreatePostModal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 font-sans select-none animate-orbit-fade-in"
+      className="fixed inset-0 z-[var(--z-modal)] bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 font-sans select-none animate-orbit-fade-in"
       onClick={onClose}
     >
       <div

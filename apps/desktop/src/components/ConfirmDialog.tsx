@@ -65,7 +65,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     <Ctx.Provider value={confirm}>
       {children}
       {pending && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 animate-orbit-fade-in">
+        <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 animate-orbit-fade-in">
           <div
             className="bg-zinc-900 border border-zinc-800 rounded-lg p-5 w-[380px] max-w-[90vw] shadow-2xl animate-orbit-pop"
             role="dialog"

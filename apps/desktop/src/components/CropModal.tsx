@@ -122,7 +122,7 @@ export function CropModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[10001] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg" onClick={onCancel}>
+    <div className="fixed inset-0 z-[var(--z-system)] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg" onClick={onCancel}>
       <div className="w-full max-w-sm bg-zinc-950 border border-zinc-800 rounded-xl p-4 space-y-3 animate-orbit-pop" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold">{title}</h3>

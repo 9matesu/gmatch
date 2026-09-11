@@ -193,7 +193,7 @@ export function SpectateModal({
     return (
       <div
         style={pipPos ? { left: `${pipPos.x}px`, top: `${pipPos.y}px`, bottom: 'auto', right: 'auto' } : undefined}
-        className="fixed bottom-6 right-6 z-[99999] w-80 bg-surface-canvas/95 border-2 border-cyan-500/60 rounded-2xl shadow-2xl overflow-hidden flex flex-col select-none backdrop-blur-2xl animate-orbit-fade-in font-sans"
+        className="fixed bottom-6 right-6 z-[var(--z-system)] w-80 bg-surface-canvas/95 border-2 border-cyan-500/60 rounded-2xl shadow-2xl overflow-hidden flex flex-col select-none backdrop-blur-2xl animate-orbit-fade-in font-sans"
       >
         <div
           onMouseDown={handleMouseDown}
@@ -306,7 +306,7 @@ export function SpectateModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-[99999] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/90 backdrop-blur-xl animate-orbit-fade-in font-sans select-none"
+        className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/90 backdrop-blur-xl animate-orbit-fade-in font-sans select-none"
         onClick={onClose}
       >
         <div

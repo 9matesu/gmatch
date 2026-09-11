@@ -525,7 +525,7 @@ export function BabecockPanel({
     <div className="space-y-4 font-sans select-none">
       {/* Tutorial overlay */}
       {showTutorial && (
-        <div className="fixed inset-0 z-[9997] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-surface-raised border border-border-glass rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center text-orange-600">
@@ -884,7 +884,7 @@ export function BabecockPanel({
 
       {/* Modal: Start or Join Round */}
       {modal && (
-        <div className="fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-surface-raised border border-border-glass rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl space-y-4 p-5">
             <div className="flex items-center justify-between border-b border-border-glass pb-3">
               <div className="flex items-center gap-2">
@@ -1019,7 +1019,7 @@ export function BabecockPanel({
       {/* Expanded Gallery Round Lightbox */}
       {expandedRound && (
         <div
-          className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-orbit-fade-in"
+          className="fixed inset-0 z-[var(--z-toast)] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-orbit-fade-in"
           onClick={() => setExpandedRound(null)}
         >
           <div

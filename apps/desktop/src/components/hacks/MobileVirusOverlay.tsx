@@ -78,7 +78,7 @@ export function MobileVirusOverlay({
   }, [onComplete]);
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black flex flex-col items-center justify-between p-4 select-none overflow-hidden font-sans cursor-default">
+    <div className="fixed inset-0 z-[var(--z-toast)] bg-black flex flex-col items-center justify-between p-4 select-none overflow-hidden font-sans cursor-default">
       <div className="w-full z-20 bg-red-950/90 text-white p-3 rounded-2xl border border-red-500/50 shadow-2xl flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
           <ShieldAlert className="w-6 h-6 text-red-400 shrink-0" />

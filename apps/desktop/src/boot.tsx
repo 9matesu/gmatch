@@ -12,7 +12,7 @@ export function mount(): void {
       <div className="dark antialiased grain-overlay font-sans" style={{ colorScheme: 'dark' }}>
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[999] focus:bg-retro-panel focus:text-retro-accent focus:px-4 focus:py-2 focus:text-xs focus:font-bold focus:border focus:border-border-glass focus:rounded-lg"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[var(--z-modal)] focus:bg-retro-panel focus:text-retro-accent focus:px-4 focus:py-2 focus:text-xs focus:font-bold focus:border focus:border-border-glass focus:rounded-lg"
         >
           Skip to main content
         </a>

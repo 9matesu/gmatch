@@ -156,7 +156,7 @@ export function ImageViewer({
   if (!activeItem) {
     return (
       <div
-        className="fixed inset-0 z-[99999] bg-surface-canvas/95 backdrop-blur-2xl flex flex-col items-center justify-center gap-4 p-6 font-sans animate-orbit-fade-in select-none"
+        className="fixed inset-0 z-[var(--z-system)] bg-surface-canvas/95 backdrop-blur-2xl flex flex-col items-center justify-center gap-4 p-6 font-sans animate-orbit-fade-in select-none"
         onClick={onClose}
       >
         <span className="text-3xl text-zinc-600 block">◈</span>
@@ -228,7 +228,7 @@ export function ImageViewer({
 
   return (
     <div
-      className="fixed inset-0 z-[99999] bg-black/95 backdrop-blur-2xl flex flex-col justify-between p-2 sm:p-4 md:p-6 overflow-hidden select-none font-sans animate-orbit-fade-in"
+      className="fixed inset-0 z-[var(--z-system)] bg-black/95 backdrop-blur-2xl flex flex-col justify-between p-2 sm:p-4 md:p-6 overflow-hidden select-none font-sans animate-orbit-fade-in"
       onClick={() => {
         if (!didDragRef.current) onClose()
       }}

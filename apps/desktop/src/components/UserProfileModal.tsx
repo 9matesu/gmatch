@@ -111,7 +111,7 @@ export function UserProfileModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-xs p-0 sm:p-4 animate-orbit-fade-in select-none font-sans"
+        className="fixed inset-0 z-[var(--z-system)] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-xs p-0 sm:p-4 animate-orbit-fade-in select-none font-sans"
         onClick={onClose}
       >
         <div
@@ -392,7 +392,7 @@ export function UserProfileModal({
       {/* Full Picture Modal */}
       {showPic && profilePic && (
         <div
-          className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/90 p-4 cursor-pointer"
+          className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/90 p-4 cursor-pointer"
           onClick={() => setShowPic(false)}
         >
           <div className="relative max-w-sm max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
@@ -411,7 +411,7 @@ export function UserProfileModal({
       {/* Card Image Lightbox */}
       {selectedCardImage && (
         <div
-          className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/90 p-4 cursor-pointer"
+          className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/90 p-4 cursor-pointer"
           onClick={() => setSelectedCardImage(null)}
         >
           <div className="relative max-w-md max-h-[85vh]" onClick={(e) => e.stopPropagation()}>

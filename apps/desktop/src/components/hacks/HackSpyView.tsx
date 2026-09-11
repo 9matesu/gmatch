@@ -124,7 +124,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
   return (
     <div className="relative w-full h-full flex flex-col font-sans select-none overflow-hidden bg-surface-canvas text-retro-fg">
       {flashWhite && (
-        <div className="fixed inset-0 z-[99999] bg-glass-w20 pointer-events-none" />
+        <div className="fixed inset-0 z-[var(--z-system)] bg-glass-w20 pointer-events-none" />
       )}
 
       {/* Session header */}

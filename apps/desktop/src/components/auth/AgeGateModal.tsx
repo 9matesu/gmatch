@@ -40,7 +40,7 @@ export function AgeGateModal({
   if (isVerified) return null;
 
   return (
-    <div className="fixed inset-0 z-[99995] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in">
+    <div className="fixed inset-0 z-[var(--z-toast)] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in">
       <div
         className="bg-zinc-950 border border-zinc-800 rounded-xl max-w-md w-full p-6 sm:p-7 shadow-2xl space-y-5 text-center flex flex-col items-center animate-orbit-slide-up text-zinc-100"
         onClick={(e) => e.stopPropagation()}

@@ -83,7 +83,7 @@ export function LegalCenter({
 
   return (
     <div
-      className="fixed inset-0 z-[99994] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-orbit-fade-in font-sans"
+      className="fixed inset-0 z-[var(--z-toast)] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-orbit-fade-in font-sans"
       onClick={requireAccept ? undefined : onClose}
       role="dialog"
       aria-modal="true"

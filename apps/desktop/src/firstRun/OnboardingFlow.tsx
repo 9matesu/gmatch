@@ -144,7 +144,7 @@ export function OnboardingFlow({
   };
 
   return (
-    <div className="fixed inset-0 z-[99990] overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-zinc-100">
+    <div className="fixed inset-0 z-[var(--z-lightbox)] overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-zinc-100">
       <div className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-xl p-6 sm:p-8 shadow-2xl space-y-6 animate-orbit-slide-up">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
