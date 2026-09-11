@@ -36,6 +36,7 @@ import { areItemsStructurallyEqual, areUsersStructurallyEqual, areAnnouncementsS
 import { OnboardingFlow } from "./firstRun/OnboardingFlow";
 import { isOnboardingComplete, readOnboardingState } from "./firstRun/onboardingState";
 import { TourDock } from "./components/tour/TourDock";
+import { TourDeck } from "./components/tour/TourDeck";
 import { DEFAULT_FEED_SORT, isFeedSort, type FeedSort } from "./components/feed/feedSort";
 import { TOUR_STEPS, isTourOver, nextTourStep, readTourState, writeTourState, type TourState } from "./firstRun/tourState";
 import { GMatchFeed, type FeedPost } from "./components/feed/GMatchFeed";
@@ -2833,7 +2834,7 @@ export default function Home() {
 
       <OfflineWarningBanner identity={identity} />
 
-      {identity && !isTourOver(tourState) && isOnboardingComplete(readOnboardingState(identity.orbitId)) && (
+      {identity && tourState.status === 'active' && tourState.index > 0 && isOnboardingComplete(readOnboardingState(identity.orbitId)) && (
         <TourDock
           steps={TOUR_STEPS}
           state={tourState}
@@ -2974,6 +2975,12 @@ export default function Home() {
                   )}
 
                   {/* gMatch Main Feed View */}
+                  {mainView === 'feed' && identity && tourState.status === 'active' && tourState.index === 0 && isOnboardingComplete(readOnboardingState(identity.orbitId)) && (
+                    <TourDeck
+                      onOpen={(step) => advanceTour(1)}
+                      onDismiss={skipTour}
+                    />
+                  )}
                   {mainView === 'feed' && (
                     <div className={isVisionJammed ? "relative" : ""}>
                       {isVisionJammed && (
@@ -2982,7 +2989,7 @@ export default function Home() {
                         </div>
                       )}
                       <div className={isVisionJammed ? "blur-md select-none pointer-events-none transition-all duration-300" : ""}>
-                        <div className="w-full max-w-5xl mx-auto px-3 sm:px-4 flex flex-col gap-4 pb-24 lg:pb-16">
+                        <div className="w-full max-w-5xl mx-auto px-3 sm:px-4 pt-3 sm:pt-4 flex flex-col gap-4 pb-24 lg:pb-16">
                           {/* ── Feed ── */}
                           <section className="module module-primary module-glass glass-surface overflow-visible order-1">
                             <div className="module-header flex items-center justify-between sticky top-0 z-20">
