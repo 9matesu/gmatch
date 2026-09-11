@@ -1322,7 +1322,7 @@ export async function setMatchDecision(
       // A boost costs g$ scaled to YOUR card's rarity — stacking boosts on a
       // diamond card is never cheap (card-driven economy, single knob).
       const myCardId = match.user_a === userId ? match.card_a : match.card_b
-      const val = async (oid: string | null) =>
+      const val = async (oid: string | null | undefined) =>
         oid ? Number((await db.prepare('SELECT COALESCE(gacha_downloads_count, 0) AS v FROM Objects WHERE id = ?').bind(oid).first<{ v: number }>())?.v ?? 0) : 0
       const cost = matchEconomy(await val(myCardId), 0).boostCost
       try {

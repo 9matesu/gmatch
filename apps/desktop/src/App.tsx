@@ -772,6 +772,7 @@ export default function Home() {
   const [showCreateCardModal, setShowCreateCardModal] = useState(false)
   const [createCardNeeded, setCreateCardNeeded] = useState(0)
   const [cardPrefill, setCardPrefill] = useState<{ url: string; tags: string[]; name: string } | null>(null)
+  const [forgeFile, setForgeFile] = useState<File | null>(null)
   const [dragAnchorId, setDragAnchorId] = useState<string | null>(null)
   const [dragActive, setDragActive] = useState(false)
   // Root card-detail host (plan §12): any view dispatches 'gmatch:open-card'
@@ -784,6 +785,30 @@ export default function Home() {
     }
     window.addEventListener('gmatch:open-card', onOpenCard)
     return () => window.removeEventListener('gmatch:open-card', onOpenCard)
+  }, [])
+  // Drag an image/video anywhere onto the app -> open the Card Forge with it.
+  // Drops that already landed on a DropZone are defaultPrevented there; skip
+  // those so the two handlers never both eat one drop.
+  useEffect(() => {
+    const allow = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes('Files')) e.preventDefault()
+    }
+    const onDrop = (e: DragEvent) => {
+      if (e.defaultPrevented) return
+      const f = e.dataTransfer?.files?.[0]
+      if (!f || !(/^image\//.test(f.type) || /^video\//.test(f.type))) return
+      e.preventDefault()
+      setForgeFile(f)
+      setCardPrefill(null)
+      setShowCreateCardModal(true)
+      playPress(820)
+    }
+    window.addEventListener('dragover', allow)
+    window.addEventListener('drop', onDrop)
+    return () => {
+      window.removeEventListener('dragover', allow)
+      window.removeEventListener('drop', onDrop)
+    }
   }, [])
   const [profilePics, setProfilePics] = useState<Record<string, string>>(() => {
     if (typeof window === 'undefined') return {}
@@ -3730,9 +3755,11 @@ export default function Home() {
           identity={identity}
           cardsNeeded={createCardNeeded}
           initialMedia={cardPrefill}
-          onClose={() => { setShowCreateCardModal(false); setCardPrefill(null); }}
+          initialFile={forgeFile}
+          onClose={() => { setShowCreateCardModal(false); setCardPrefill(null); setForgeFile(null); }}
           onCreated={() => {
             setCreateCardNeeded(Math.max(0, MIN_GAME_CARDS - (myCards.length + 1)))
+            setForgeFile(null)
             toast('Unique card created!', 'success')
           }}
         />
