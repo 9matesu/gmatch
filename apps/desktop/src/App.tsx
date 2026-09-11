@@ -84,6 +84,20 @@ import { dataUrlToBlob, localObjectBlobUrl } from "./utils/mediaData";
 const MAX_GALLERY_ITEMS_IN_MEMORY = 80;
 const MAX_PROFILE_PICS_IN_MEMORY = 120;
 
+const isDesktopViewport = () =>
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(min-width: 768px)').matches
+
+// Desktop has no inline messages view: #/messages (or a persisted 'messages'
+// main view) opens the bottom-right rail instead.
+const desktopChatOnLoad = () => {
+  if (!isDesktopViewport()) return false
+  const fromHash = viewFromHash(window.location.hash)
+  const saved = localStorage.getItem('orbit_main_view')
+  return fromHash === 'messages' || (!fromHash && saved === 'messages')
+}
+
 export default function Home() {
   useEffect(() => {
     runMigrations();
@@ -187,10 +201,10 @@ export default function Home() {
     if (typeof window === 'undefined') return 'feed'
     // Direct URL wins over the last-visited persisted view (plan §5).
     const fromHash = viewFromHash(window.location.hash)
-    if (fromHash) return fromHash
     const saved = localStorage.getItem('orbit_main_view') as MainViewType | null
-    if (saved && ROUTE_VIEWS.includes(saved as RoutedView)) return saved
-    return 'feed'
+    const resolved = fromHash || (saved && ROUTE_VIEWS.includes(saved as RoutedView) ? saved : 'feed')
+    // Desktop never renders the inline messages view (rail only).
+    return resolved === 'messages' && isDesktopViewport() ? 'feed' : resolved
   });
   const [showCreatePostModal, setShowCreatePostModal] = useState(false);
 
@@ -201,7 +215,7 @@ export default function Home() {
     }
   }, [mainView]);
   const [dmMinimized, setDmMinimized] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(() => desktopChatOnLoad());
   // UI-3: resizable messages sidebar (width persisted; smooth only when not dragging)
   const [panelTab, setPanelTab] = useState<SocialPanelTab>('chat');
   const [gamesSubTab, setGamesSubTab] = useState<'duel' | 'babecock' | 'ranks' | 'idle'>('idle');
@@ -295,10 +309,7 @@ export default function Home() {
   useEffect(() => { decisionMapRef.current = decisionMap }, [decisionMap])
 
   const handleSetMainView = useCallback((view: MainViewType) => {
-    const isDesktop =
-      typeof window !== 'undefined' &&
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(min-width: 768px)').matches;
+    const isDesktop = isDesktopViewport();
     if (view === 'messages' && isDesktop) {
       setDmMinimized(false);
       setPanelTab('chat');
@@ -358,6 +369,7 @@ export default function Home() {
   useEffect(() => {
     const onNav = () => {
       const v = viewFromHash(window.location.hash)
+      if (v === 'messages' && isDesktopViewport()) { setChatOpen(true); return }
       if (v && v !== mainView) setMainView(v)
     }
     window.addEventListener('hashchange', onNav)
