@@ -7,6 +7,8 @@ import { specialTabState, revealedCards } from '../utils/special'
 import { resolveDisplayName } from '../utils/lobby'
 import { useObjectImage } from '../hooks/useObjectImage'
 import { playTierUpOnce, playMatchOnce, playRejectOnce, playTimeoutOnce } from '../utils/sounds'
+import { matchEndSummary } from '../utils/matchEndSummary'
+import { notifyWhenHidden } from '../utils/notifyHidden'
 import { CardZoomModal } from './CardZoomModal'
 import { CardBack } from './CardBack'
 import { CreateCardModal } from './CreateCardModal'
@@ -49,6 +51,14 @@ export function YourMatchTab({
 
   // Confirmation banner shown on level-up / final payouts, then auto-dismissed.
   const [celebrate, setCelebrate] = useState<{ final: boolean; tier: number; points: number } | null>(null)
+  // g$ from the server's card-driven economy, when I was the one who closed
+  // the round (the deciding response carries it; the other side falls back to
+  // a payout-less summary line).
+  const [lastPayout, setLastPayout] = useState<{ gp: number; reason: string } | null>(null)
+  const decideAndCapture = async (decision: 'like' | 'reject') => {
+    const res = (await onDecide(match.id, decision)) as { payout?: { gp: number; reason: string } } | null | undefined
+    if (res && typeof res.payout?.gp === 'number') setLastPayout(res.payout)
+  }
   const [zoomModal, setZoomModal] = useState<{ isOpen: boolean; imageUrl: string | null; title?: string; subtitle?: string }>({
     isOpen: false,
     imageUrl: null,
@@ -63,19 +73,22 @@ export function YourMatchTab({
       const final = match.status === 'ended'
       const points = final ? SPECIAL_FINAL_POINTS : SPECIAL_TIER_POINTS
       setCelebrate({ final, tier: match.tier, points })
-      if (soundEnabled) {
+      if (soundEnabled && !document.hidden) {
         if (final) playMatchOnce()
         else playTierUpOnce()
       }
+      notifyWhenHidden(matchEndSummary(match.last_result, lastPayout, final))
       const t = setTimeout(() => setCelebrate(null), 2800)
       return () => clearTimeout(t)
     }
-    if (match.last_result === 'expired' && soundEnabled) {
-      playTimeoutOnce()
-    } else if (match.last_result === 'ended' && match.status === 'ended' && soundEnabled) {
-      playRejectOnce()
+    if (soundEnabled && !document.hidden) {
+      if (match.last_result === 'expired') playTimeoutOnce()
+      else if (match.last_result === 'ended' && match.status === 'ended') playRejectOnce()
     }
-  }, [prevKey, lastKey, match.last_result, match.status, match.tier, soundEnabled])
+    if (match.status === 'ended' && (match.last_result === 'ended' || match.last_result === 'expired' || match.last_result === 'quit')) {
+      notifyWhenHidden(matchEndSummary(match.last_result, lastPayout, false))
+    }
+  }, [prevKey, lastKey, match.last_result, match.status, match.tier, soundEnabled, lastPayout])
 
   const myCardImg = useObjectImage(st?.myCardId ?? null, identity)
   const oppCardImg = useObjectImage(st?.opponentCardId ?? null, identity)
@@ -220,6 +233,7 @@ export function YourMatchTab({
             </div>
             <div className="text-xs text-retro-fg">
               +{celebrate.points} pts {celebrate.final ? '— Match complete' : `— Tier ${celebrate.tier}`}
+              {lastPayout?.reason === 'mutual_like' ? ` · +${lastPayout.gp} g$` : ''}
             </div>
           </div>
         )}
@@ -227,8 +241,8 @@ export function YourMatchTab({
         {/* No match */}
         {!celebrate && st.phase === 'ended' && st.lastResult === 'ended' && (
           <div className="border border-rose-500/30 bg-rose-500/5 p-4 text-center space-y-2 animate-orbit-slide-up rounded-lg">
-            <div className="text-sm font-medium text-rose-400">No match</div>
-            <div className="text-[11px] text-retro-muted">You didn&apos;t match this round — both re-queued.</div>
+            <div className="text-sm font-medium text-rose-400">{matchEndSummary(st.lastResult, lastPayout, false)}</div>
+            <div className="text-[11px] text-retro-muted">Cards revealed below.</div>
             <div className="grid grid-cols-2 gap-2">
               {cardSlot('You', revealMineImg, 'Your card', 'border-rose-500/30', false)}
               {cardSlot(opponentName, revealTheirsImg, 'Their card', 'border-rose-500/30', false, false, opponentUser)}
@@ -239,7 +253,7 @@ export function YourMatchTab({
         {/* Quit */}
         {!celebrate && st.phase === 'ended' && st.lastResult === 'quit' && (
           <div className="border border-retro-border p-3 text-center text-xs text-retro-muted animate-orbit-fade-in rounded-lg">
-            Match ended — you&apos;ve been re-queued.
+            {matchEndSummary(st.lastResult, lastPayout, false)}
           </div>
         )}
 
@@ -321,7 +335,7 @@ export function YourMatchTab({
           <div className="grid grid-cols-2 gap-2">
             <button
               disabled={submitting}
-              onClick={() => void onDecide(match.id, 'reject')}
+              onClick={() => void decideAndCapture('reject')}
               className="py-2.5 text-xs font-medium border border-retro-border text-retro-muted hover:text-rose-400 hover:border-rose-500/30 bg-surface-interactive hover:bg-rose-500/5 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
@@ -329,7 +343,7 @@ export function YourMatchTab({
             </button>
             <button
               disabled={submitting}
-              onClick={() => void onDecide(match.id, 'like')}
+              onClick={() => void decideAndCapture('like')}
               className="py-2.5 text-xs font-medium bg-retro-fg text-retro-bg hover:bg-retro-fg/90 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <Heart className="w-3.5 h-3.5 fill-current text-rose-400" />

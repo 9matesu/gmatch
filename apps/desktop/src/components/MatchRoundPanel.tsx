@@ -14,7 +14,7 @@ import {
 } from '../utils/sounds'
 import type { LobbyDecisionResult, LobbyDecisionFailure } from '../hooks/useLobby'
 import { CardZoomModal } from './CardZoomModal'
-import { computeCardRarity, formatGc } from '@orbit/shared'
+import { computeCardRarity, formatGc, matchEconomy } from '@orbit/shared'
 import { isMediaVideo } from '../utils/media'
 import { MediaBadge } from './MediaBadge'
 import { CardBack } from './CardBack'
@@ -78,6 +78,11 @@ export function MatchRoundPanel({
   const currentRound = match?.round_seq || 1
   const maxRounds = match?.max_rounds || 5
   const playedCards = match?.played_cards || []
+  // The card I have on the table this round — its value prices my boost.
+  const myCardVal = Math.max(0, ...myCards
+    .filter((c) => c.id === (match?.my_card || ''))
+    .map((c) => Number((c as { value?: number }).value ?? c.gacha_downloads_count ?? 0))
+    .concat(0))
   // Deck exhaustion: every card I own is already used this match. The server
   // then allows replaying a used card so a player with fewer cards than
   // rounds can keep the duel going — mirror that here by re-enabling the grid.
@@ -798,10 +803,10 @@ export function MatchRoundPanel({
                     ? 'bg-glass-w10 text-retro-accent border-retro-accent/30 hover:bg-glass-w20'
                     : 'opacity-40 border-retro-border text-retro-muted cursor-not-allowed bg-surface-interactive'
                   }`}
-                title={boostsRemaining > 0 ? 'Conviction Boost (+25 pts)' : 'No boosts remaining'}
+                title={boostsRemaining > 0 ? `Conviction Boost (+25 pts) — costs ${formatGc(matchEconomy(myCardVal, 0).boostCost)} g$` : 'No boosts remaining'}
               >
                 <Zap className="w-3.5 h-3.5 fill-current" />
-                <span>Boost {boostsRemaining > 0 ? `(${boostsRemaining})` : ''}</span>
+                <span>Boost {boostsRemaining > 0 ? `(${boostsRemaining} · ${formatGc(matchEconomy(myCardVal, 0).boostCost)} g$)` : ''}</span>
               </button>
             </div>
           </>
