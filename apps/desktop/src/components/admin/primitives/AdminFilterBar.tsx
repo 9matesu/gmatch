@@ -202,7 +202,7 @@ export function AdminFilterBar({
         </div>
       </div>
 
-      <div className={cn("space-y-3 transition-all duration-200", expanded ? "opacity-100 max-h-96" : "opacity-0 max-h-0 overflow-hidden")}>
+      <div className={cn("space-y-3 transition-all duration-150", expanded ? "opacity-100 max-h-96" : "opacity-0 max-h-0 overflow-hidden")}>
         <div className="flex flex-wrap gap-3">
           {filterConfigs.map(config => <Fragment key={config.key}>{renderFilter(config)}</Fragment>)}
         </div>

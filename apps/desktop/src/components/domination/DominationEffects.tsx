@@ -374,7 +374,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
       )}
 
       {messageEffect && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 max-w-md animate-slide-up" onClick={() => removeEffect(messageEffect.id)}>
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 max-w-md animate-orbit-slide-up" onClick={() => removeEffect(messageEffect.id)}>
           <div className="glass-panel p-6 rounded-xl border border-zinc-700 text-center shadow-2xl">
             <p className="text-zinc-100 text-lg">{messageEffect.data.text}</p>
             <p className="text-xs text-zinc-500 mt-2">Click to dismiss</p>
@@ -394,7 +394,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
           }}
         >
           <div
-            className="pointer-events-auto bg-black/70 px-6 py-4 rounded-xl border border-zinc-700 shadow-2xl animate-fade-in cursor-pointer"
+            className="pointer-events-auto bg-black/70 px-6 py-4 rounded-xl border border-zinc-700 shadow-2xl animate-orbit-fade-in cursor-pointer"
             style={{
               fontSize: textOverlayEffect.data.size === 'small' ? '1.5rem'
                 : textOverlayEffect.data.size === 'medium' ? '3rem' : '5rem',
@@ -457,8 +457,8 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
           from { opacity: 0; transform: translateX(-50%) translateY(20px); }
           to { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
-        .animate-slide-up { animation: slideUp 0.3s ease-out; }
-        .animate-fade-in { animation: fadeIn 0.2s ease-out; }
+        .animate-orbit-slide-up { animation: slideUp 0.3s ease-out; }
+        .animate-orbit-fade-in { animation: fadeIn 0.2s ease-out; }
       `}</style>
     </>
   );

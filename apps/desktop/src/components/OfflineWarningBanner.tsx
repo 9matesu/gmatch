@@ -64,7 +64,7 @@ export function OfflineWarningBanner({ identity }: { identity: OrbitIdentity | n
         isCritical
           ? "bg-zinc-950/95 border-red-500/30 text-zinc-100"
           : "bg-zinc-950/95 border-amber-500/30 text-zinc-100"
-      } backdrop-blur-md shadow-md animate-slide-down`}
+      } backdrop-blur-md shadow-md animate-orbit-slide-up`}
       role="alert"
       aria-live={isCritical ? "assertive" : "polite"}
     >

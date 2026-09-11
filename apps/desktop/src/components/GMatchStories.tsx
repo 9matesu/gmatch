@@ -377,7 +377,7 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
                 return (
                   <div key={s.id || sIdx} className="flex-1 h-1 rounded-full bg-surface-raised/20 overflow-hidden backdrop-blur-xs">
                     <div
-                      className="h-full bg-surface-raised transition-all duration-75"
+                      className="h-full bg-surface-raised transition-all duration-150"
                       style={{ width: `${fillPercent}%` }}
                     />
                   </div>

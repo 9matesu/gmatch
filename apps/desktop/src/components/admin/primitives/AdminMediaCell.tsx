@@ -107,7 +107,7 @@ export function AdminMediaCell({
           src={url}
           alt=""
           onError={() => setLoadError(true)}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
         />
       )}
       {showZoom && (

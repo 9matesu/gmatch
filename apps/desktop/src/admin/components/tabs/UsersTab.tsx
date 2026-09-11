@@ -417,7 +417,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                         title={selectedUser.display_name || selectedUser.id}
                         subtitle={obj.mime_type || "Media"}
                         className="aspect-square cursor-pointer"
-                        imageClassName="group-hover:scale-105 transition-transform duration-200"
+                        imageClassName="group-hover:scale-105 transition-transform duration-150"
                         onZoom={onZoom}
                         badge={obj.is_story === 1 && (
                           <span className="absolute top-1 right-1 px-1 py-0.5 bg-cyan-500/10 border border-purple-300 text-cyan-300 font-mono font-bold text-[10px] rounded">STORY</span>

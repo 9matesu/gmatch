@@ -102,7 +102,7 @@ export function MobileVirusOverlay({
         <img
           src={images[activeImageIndex] || SAMPLE_IMAGES[0]}
           alt=""
-          className={`w-full h-full object-cover ${reduceMotion ? '' : 'transition-transform duration-1000'}`}
+          className={`w-full h-full object-cover ${reduceMotion ? '' : 'transition-transform duration-700'}`}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/40 pointer-events-none" />
       </div>

@@ -328,8 +328,8 @@ export function GMatchProfile({
                   contentUrl={post.url}
                   identity={identity}
                   alt=""
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                  videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
+                  videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
                   muted
                   autoPlay={false}
                   playsInline
@@ -374,8 +374,8 @@ export function GMatchProfile({
                   contentUrl={post.url}
                   identity={identity}
                   alt=""
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                  videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
+                  videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
                   muted
                   autoPlay={false}
                   playsInline
@@ -413,8 +413,8 @@ export function GMatchProfile({
                   objectId={post.id}
                   identity={identity}
                   alt=""
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                  videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
+                  videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
                   muted
                   autoPlay={false}
                   playsInline
@@ -450,8 +450,8 @@ export function GMatchProfile({
                   objectId={card.id}
                   identity={identity}
                   alt=""
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                  videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
+                  videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
                   muted
                   autoPlay={false}
                   playsInline

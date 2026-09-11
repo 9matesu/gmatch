@@ -140,7 +140,7 @@ export function LazyVideo({
       {/* Play on hover badge — hidden when native controls are active */}
       {showBadge && playOnHover && !controls && (
         <div
-          className={`absolute bottom-2 left-2 z-10 pointer-events-none flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-xs border border-white/10 text-[10px] font-bold text-retro-accent shadow transition-opacity duration-200 ${
+          className={`absolute bottom-2 left-2 z-10 pointer-events-none flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-xs border border-white/10 text-[10px] font-bold text-retro-accent shadow transition-opacity duration-150 ${
             isPlaying ? "opacity-0" : "opacity-100"
           }`}
         >

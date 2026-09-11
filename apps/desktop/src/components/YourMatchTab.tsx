@@ -156,9 +156,9 @@ export function YourMatchTab({
         ) : img?.url ? (
           <>
             {img.url.split('?')[0].toLowerCase().match(/\.(mp4|webm|mov|ogg)$/) || img.url.includes('video/') ? (
-              <LazyVideo src={img.url} videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+              <LazyVideo src={img.url} videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150" />
             ) : (
-              <img src={img.url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+              <img src={img.url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150" />
             )}
             <button
               type="button"

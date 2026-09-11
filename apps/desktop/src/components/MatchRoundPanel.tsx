@@ -301,7 +301,7 @@ export function MatchRoundPanel({
         <div className="flex flex-col gap-1">
           <div className="h-1 w-full bg-surface-interactive border border-border-glass rounded-full overflow-hidden">
             <div
-              className={`h-full transition-all duration-1000 ease-linear ${isResult ? 'bg-retro-muted' : msLeft <= 10000 ? 'bg-rose-500' : 'bg-retro-accent'}`}
+              className={`h-full transition-all duration-700 ease-linear ${isResult ? 'bg-retro-muted' : msLeft <= 10000 ? 'bg-rose-500' : 'bg-retro-accent'}`}
               style={{ width: `${isResult ? 100 : pct}%` }}
             />
           </div>

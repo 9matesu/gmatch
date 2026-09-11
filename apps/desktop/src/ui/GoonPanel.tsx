@@ -695,7 +695,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             <button
               key={id}
               type="button"
-              className={`flex flex-1 min-w-[120px] cursor-pointer items-center gap-1.5 rounded-lg border px-2 py-1 text-left text-retro-fg transition-all duration-75 enabled:hover:border-retro-accent enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${isLive
+              className={`flex flex-1 min-w-[120px] cursor-pointer items-center gap-1.5 rounded-lg border px-2 py-1 text-left text-retro-fg transition-all duration-150 enabled:hover:border-retro-accent enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${isLive
                 ? 'border-[#ff2d78] bg-[#ff2d78]/15 shadow-[0_0_8px_rgba(255,45,120,0.25)]'
                 : 'border-border-glass bg-surface-raised hover:bg-surface-interactive'
                 }`}

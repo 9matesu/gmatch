@@ -372,7 +372,7 @@ export function SidebarNav({
       : '';
 
   return (
-    <aside className={`desktop-sidebar glass-sidebar shrink-0 flex flex-col font-sans select-none h-full min-h-0 transition-[width] duration-200 ${collapsed ? 'w-[3.75rem]' : 'w-48'}`}>
+    <aside className={`desktop-sidebar glass-sidebar shrink-0 flex flex-col font-sans select-none h-full min-h-0 transition-[width] duration-150 ${collapsed ? 'w-[3.75rem]' : 'w-48'}`}>
       {/* Header: brand + collapse toggle */}
       <div className="flex items-center justify-between gap-1 px-3 py-3 border-b border-white/10 shrink-0">
         {collapsed ? (

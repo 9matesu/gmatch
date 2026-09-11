@@ -248,7 +248,7 @@ export function CardZoomModal({
         onClick={handleImageClick}
       >
         <div
-          className="relative max-w-full max-h-full flex items-center justify-center transition-transform duration-100 ease-out"
+          className="relative max-w-full max-h-full flex items-center justify-center transition-transform duration-150 ease-out"
           style={{
             transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
             cursor: scale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'zoom-in',

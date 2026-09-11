@@ -318,7 +318,7 @@ export function ImageViewer({
 
         {/* Image Display */}
         <div
-          className="transition-transform duration-75 flex items-center justify-center max-w-full max-h-full"
+          className="transition-transform duration-150 flex items-center justify-center max-w-full max-h-full"
           onClick={(e) => e.stopPropagation()}
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
