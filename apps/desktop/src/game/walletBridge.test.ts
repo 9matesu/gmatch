@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { generateIdentity } from '@orbit/crypto'
-import { makeSyncCtx, startWalletSync, type IdleWalletSlice } from './walletBridge'
+import { adoptServerBalance, makeSyncCtx, startWalletSync, type IdleWalletSlice } from './walletBridge'
 
 function slice(over: Partial<IdleWalletSlice> = {}): IdleWalletSlice {
   return { gc: 50, credited: 0, debited: 0, totalEarned: 50, setWallet: vi.fn(), ...over }
@@ -103,5 +103,19 @@ describe('startWalletSync', () => {
     const stop = startWalletSync(() => s, null, fetchFn as unknown as typeof globalThis.fetch, 10)
     expect(stop()).toBeUndefined()
     expect(fetchFn).not.toHaveBeenCalled()
+  })
+})
+
+describe('adoptServerBalance (purchase echo)', () => {
+  it('mirrors the server balance and keeps unflushed earnings pending', () => {
+    const s = slice({ gc: 140, credited: 100, debited: 0 })
+    expect(adoptServerBalance(s, 80)).toBe(true)
+    expect(s.setWallet).toHaveBeenCalledWith({ gc: 120, credited: 80, debited: 0 })
+  })
+
+  it('ignores a non-numeric balance', () => {
+    const s = slice()
+    expect(adoptServerBalance(s, NaN)).toBe(false)
+    expect(s.setWallet).not.toHaveBeenCalled()
   })
 })

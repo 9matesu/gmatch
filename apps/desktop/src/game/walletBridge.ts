@@ -61,6 +61,22 @@ export function makeSyncCtx(
 }
 
 /**
+ * Adopt a freshly server-confirmed balance into the idle wallet mirror
+ * (plan D4 hardening): a store purchase debits the ledger directly, and
+ * until now the idle `gc` only learned about it at the next 65s sync tick —
+ * the header/profile number and the clicker disagreed for a minute. Same
+ * math as reconcileFromServer, with the balance the purchase already
+ * returned: the ledger becomes the mirror base, unflushed local earnings
+ * stay pending. Never negative.
+ */
+export function adoptServerBalance(slice: IdleWalletSlice, balance: number): boolean {
+  if (!Number.isFinite(balance)) return false
+  const pending = Math.max(0, Math.floor(slice.gc) - (slice.credited - slice.debited))
+  slice.setWallet({ gc: balance + pending, credited: balance, debited: 0 })
+  return true
+}
+
+/**
  * Periodic sync loop: every `intervalMs`, push the net wallet delta to the
  * ledger. Returns a stop function. No-op until an identity exists.
  */
