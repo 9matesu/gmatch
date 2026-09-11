@@ -46,7 +46,7 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     id: 'messages', title: 'Messages', view: 'messages',
-    text: 'Server chat and direct messages. Notifications sit in the tab next to it, grouped.',
+    text: 'Server chat and direct messages live in the rail on the right edge. Notifications group beside it.',
   },
   {
     id: 'gallery', title: 'Gallery', view: 'gallery',
