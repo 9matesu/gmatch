@@ -1,9 +1,9 @@
 "use client";
 
-// Desktop messages rail: replaces the old inline left chat panel. Collapsed
-// handle on the right edge (single unicode chevron, no button casing);
-// expands into a bottom-right drawer — chat on the left (children),
-// players/groups info on the right. Instagram-style.
+// Desktop messages dock: collapsed tab pinned bottom-right; expands into a
+// full-height flex sibling of the main column (pushes the timeline left,
+// never overlays it) — chat on the left (children), players/groups on the
+// right. Instagram-style.
 
 import { useState } from 'react';
 import type { User } from '@orbit/shared';
@@ -45,16 +45,16 @@ export function MessagesRail({
           aria-expanded={false}
           aria-label="Expand messages"
           title="Messages"
-          className="hidden md:flex fixed right-0 bottom-2 z-[var(--z-dropdown)] flex-col items-center gap-1.5 py-3 px-1 rounded-l-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer select-none"
+          className="hidden md:flex fixed bottom-2 right-2 z-[var(--z-dropdown)] items-center gap-2 py-2 px-3 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer select-none"
         >
           <span className="text-lg leading-none" aria-hidden>⌃</span>
-          <span className="text-[10px] tracking-wider" style={{ writingMode: 'vertical-rl' }}>Messages</span>
+          <span className="text-[10px] uppercase tracking-wider">Messages</span>
           {unreadCount > 0 && <span className="w-2 h-2 rounded-full bg-retro-fg" />}
         </button>
       )}
 
       {open && (
-        <div data-rail-panel className="hidden md:flex flex-col fixed right-2 bottom-2 z-[var(--z-dropdown)] h-[60vh] max-h-[calc(100vh-6.5rem)] w-[min(920px,calc(100vw-1rem))] rounded-xl border border-border-glass bg-retro-panel shadow-2xl overflow-hidden">
+        <div data-rail-panel className="hidden md:flex flex-col relative h-full w-[min(920px,50vw)] shrink-0 border-l border-border-glass bg-retro-panel overflow-hidden">
           <div className="flex items-center justify-between px-2 py-1.5 border-b border-border-glass shrink-0">
             <span className="text-[10px] uppercase tracking-wider text-retro-muted">Messages</span>
             <button

@@ -13,18 +13,18 @@ const base = {
 }
 
 describe('MessagesRail', () => {
-  it('collapsed: handle is fixed to the bottom-right corner and nothing else renders', () => {
+  it('collapsed: tab is pinned bottom-right and nothing else renders', () => {
     render(<MessagesRail open={false} {...base}>child</MessagesRail>)
     const handle = screen.getByRole('button', { name: 'Expand messages' })
     expect(handle.className).toMatch(/fixed/)
     expect(handle.className).toMatch(/bottom-2/)
-    expect(handle.className).toMatch(/right-0/)
+    expect(handle.className).toMatch(/right-2/)
     expect(screen.queryByText('child')).not.toBeInTheDocument()
     fireEvent.click(handle)
     expect(base.onToggle).toHaveBeenCalled()
   })
 
-  it('open: drawer renders above the corner, handle is gone, collapse control lives in the panel header', () => {
+  it('open: dock is a full-height flex sibling (pushes content, never overlays), handle is gone, collapse control lives in the panel header', () => {
     render(<MessagesRail open {...base}>child</MessagesRail>)
     expect(screen.getByText('child')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Expand messages' })).not.toBeInTheDocument()
@@ -34,10 +34,13 @@ describe('MessagesRail', () => {
     expect(base.onToggle).toHaveBeenCalled()
   })
 
-  it('drawer is height-capped so it never overflows the viewport', () => {
+  it('dock occupies the same flex layer: relative, full height, shrink-0, no fixed/z-index', () => {
     render(<MessagesRail open {...base}>child</MessagesRail>)
     const panel = screen.getByRole('button', { name: 'Collapse messages' }).closest('[data-rail-panel]')
-    expect(panel!.className).toMatch(/max-h-\[calc\(100vh-6\.5rem\)\]/)
-    expect(panel!.className).toMatch(/z-\[var\(--z-dropdown\)\]/)
+    expect(panel!.className).toMatch(/\brelative\b/)
+    expect(panel!.className).toMatch(/h-full/)
+    expect(panel!.className).toMatch(/shrink-0/)
+    expect(panel!.className).not.toMatch(/fixed/)
+    expect(panel!.className).not.toMatch(/z-\[/)
   })
 })
