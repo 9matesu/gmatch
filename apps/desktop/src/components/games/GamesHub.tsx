@@ -4,36 +4,30 @@ import { useEffect, useRef, useState } from 'react';
 import { playPress } from '../../utils/sounds';
 import { BabecockPanel } from '../BabecockPanel';
 import { RankingsPanel } from './RankingsPanel';
-import { openCardDetail } from '../../utils/openCard';
 import GridWorkspace from '../grid/GridWorkspace';
 import type { OrbitIdentity } from '@orbit/crypto';
-import type { OrbitObject as StoredCard, User } from '@orbit/shared';
+import type { User } from '@orbit/shared';
 
-type GamesTab = 'duel' | 'cards' | 'babecock' | 'ranks' | 'idle';
+type GamesTab = 'duel' | 'babecock' | 'ranks' | 'idle';
 
 export function GamesHub({
   identity,
-  cards,
   users = [],
   onSelectUser,
   initialSubTab = 'idle',
   renderDuelContent,
-  toast,
   onOpenSources,
 }: {
   identity: OrbitIdentity | null;
-  cards: StoredCard[];
   users?: User[];
   onSelectUser?: (userId: string) => void;
   initialSubTab?: GamesTab;
   renderDuelContent: () => React.ReactNode;
-  onOpenStore?: () => void;
-  toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
   /** Open the custom image-sources manager (idle clicker). */
   onOpenSources?: () => void;
 }) {
-  const initial = initialSubTab as GamesTab;
-  const [subTab, setSubTab] = useState<GamesTab>(initial);
+  // GamesView keys a remount per sub-tab; no local tab state needed.
+  const subTab: GamesTab = initialSubTab;
 
   // Idle Clicker fullscreen: Fullscreen API on the workspace box, with an
   // in-app expanded fallback (some hosts deny the request).

@@ -204,7 +204,7 @@ export default function Home() {
   const [chatOpen, setChatOpen] = useState(false);
   // UI-3: resizable messages sidebar (width persisted; smooth only when not dragging)
   const [panelTab, setPanelTab] = useState<SocialPanelTab>('chat');
-  const [gamesSubTab, setGamesSubTab] = useState<'duel' | 'cards' | 'babecock' | 'ranks' | 'idle'>('idle');
+  const [gamesSubTab, setGamesSubTab] = useState<'duel' | 'babecock' | 'ranks' | 'idle'>('idle');
   const [collapsedModules, setCollapsedModules] = useState<Record<string, boolean>>({});
   const toggleModule = (key: string) => setCollapsedModules((prev) => ({ ...prev, [key]: !prev[key] }));
   const [nowTick, setNowTick] = useState<number>(() => Date.now());
@@ -336,8 +336,11 @@ export default function Home() {
   const advanceTour = useCallback((dir: 1 | -1) => {
     const step = TOUR_STEPS[tourState.index];
     if (dir === 1 && step?.view) {
-      handleSetMainView(step.view);
-      if (step.gamesTab) setGamesSubTab(step.gamesTab);
+      if (step.gamesTab === 'cards') { handleSetMainView('gallery'); }
+      else {
+        handleSetMainView(step.view);
+        if (step.gamesTab) setGamesSubTab(step.gamesTab);
+      }
     }
     const next = dir === 1 ? nextTourStep(tourState) : { ...tourState, index: Math.max(0, tourState.index - 1) };
     writeTourState(tourIdentityId, next);
