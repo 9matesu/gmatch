@@ -52,9 +52,9 @@ const BACKOFF_BASE_MS = 1000
 const BACKOFF_MAX_MS = 60_000
 
 /** Ed25519 ack body proving box ownership: sig over `<token>|<ids>`. */
-export function ackBody(identity: OrbitIdentity, token: string, ids: string[], epoch?: string) {
+export function ackBody(identity: OrbitIdentity, token: string, ids: string[], epoch?: string): { ids: string[]; pubkey: string; sig: string; epoch?: string } {
   const msg = new TextEncoder().encode(`${token}|${ids.join(',')}`)
-  const body: Record<string, unknown> = { ids, pubkey: identity.publicKeyHex, sig: hexOf(signMessage(msg, identity.privateKeyHex)) }
+  const body: { ids: string[]; pubkey: string; sig: string; epoch?: string } = { ids, pubkey: identity.publicKeyHex, sig: hexOf(signMessage(msg, identity.privateKeyHex)) }
   // Session-token drains carry the epoch the token was derived with (C2);
   // the courier re-derives blake3(pubkey||epoch) to verify ownership.
   if (epoch) body.epoch = epoch
@@ -170,7 +170,7 @@ export class MailClient {
     body: string,
     kind: EnvelopeKind,
     recipient: { publicKeyHex: string; encryptionPubHex: string },
-    opts?: { id?: string; exp?: number },
+    opts?: { id?: string; exp?: number; to?: string },
   ): Promise<Envelope> {
     const id = this.deps.identity
     const env = seal1to1(body, kind, {

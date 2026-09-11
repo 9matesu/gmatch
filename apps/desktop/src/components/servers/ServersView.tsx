@@ -8,11 +8,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Lock, Globe, UserPlus, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, ArrowLeft, Clock, MessageSquare, Plus } from 'lucide-react'
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
-import { orbitFetch } from '../../utils/api'
+import { orbitFetch, getApiBaseUrl } from '../../utils/api'
 import { normalizeServerUrl } from '../../utils/serverUrl'
 import { joinServer } from '../../utils/join-server'
 import { rememberPendingHost } from '../../utils/server-host-pending'
 import { maskedServerUrl } from '../../utils/ipMask'
+import { mergeDirectory, readDirectoryCache, writeDirectoryCache } from './directoryMerge'
+import { decodeNodeMask } from '../../utils/nodeMask'
 import { claimPendingHost } from '../../hooks/usePendingServerHost'
 import { playPress } from '../../utils/sounds'
 import { CentralAdminPanel } from './CentralAdminPanel'
@@ -147,19 +149,37 @@ export function ServersView({
       }
     } catch { /* old nodes have no /node yet */ }
 
-    if (!central) { setServers([]); setDirError(false); return }
+    if (!central) { setServers(readDirectoryCache()); setDirError(false); return }
     try {
       // cache-bust: orbitFetch dedups/caches GETs; the list must be fresh
       const res = await orbitFetch(`${central}/api/servers?_ts=${Date.now()}`, { method: 'GET' }, identity)
       if (res.ok) {
         const data = (await res.json()) as { servers: DirectoryServer[] }
-        setServers(Array.isArray(data.servers) ? data.servers : [])
+        // Wave 2 (D2): the hub's list merges into the local gossip cache so
+        // the directory survives the central node going down later.
+        let merged = mergeDirectory(readDirectoryCache(), Array.isArray(data.servers) ? data.servers : [])
+        // Wave 2 (D2): gossip — when we're ON another node, ask it too. Its
+        // directory (plus what it learned) seeds ours, so nodes are reachable
+        // without the hub. Best-effort: an old node 404s and we move on.
+        if (central && central.replace(/\/+$/, '').toLowerCase() !== getApiBaseUrl().replace(/\/+$/, '').toLowerCase()) {
+          try {
+            const r2 = await orbitFetch(`${getApiBaseUrl()}/api/servers?_ts=${Date.now()}`, { method: 'GET' }, identity)
+            if (r2.ok) {
+              const d2 = (await r2.json()) as { servers?: DirectoryServer[] }
+              if (Array.isArray(d2.servers)) merged = mergeDirectory(merged, d2.servers)
+            }
+          } catch { /* node offline or legacy — cache stays as-is */ }
+        }
+        writeDirectoryCache(merged)
+        setServers(merged)
         setDirError(false)
       } else {
         setDirError(true)
       }
     } catch {
-      // Configured central is unreachable: surface it rather than fake "none online".
+      // Configured central is unreachable: fall back to gossiped nodes, and
+      // surface it rather than fake "none online".
+      setServers(readDirectoryCache())
       setDirError(true)
     }
   }, [identity, central])
@@ -345,6 +365,19 @@ export function ServersView({
   }
 
   const join = async (s: DirectoryServer) => { void joinServer(s, toast) }
+
+  // Wave 2 (D2): out-of-band join — paste a gmatch://node/ code shared by the
+  // host directly (no hub coordination needed to reach a node).
+  const joinByCode = async () => {
+    const entered = window.prompt('Paste a node code (gmatch://node/...):')
+    if (!entered) return
+    const coord = decodeNodeMask(entered)
+    if (!coord) { toast('That is not a valid node code.', 'error'); return }
+    const host = coord.port ? `${coord.host}:${coord.port}` : coord.host
+    // Persist before the relaunch kills the process.
+    writeDirectoryCache(mergeDirectory(readDirectoryCache(), [{ id: `mask:${host}`, name: coord.name, owner_id: '', password_required: 0, endpoint_hint: host }]))
+    await joinServer({ id: `mask:${host}`, name: coord.name, owner_id: '', password_required: 0, endpoint_hint: host }, toast)
+  }
 
   const leave = async () => {
     if (!window.gmatch?.serverSet) return
@@ -769,6 +802,13 @@ export function ServersView({
                   className="glass-action h-8 px-2.5 rounded-lg text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1"
                 >
                   <RefreshCw className="w-3 h-3" /> Refresh
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void joinByCode()}
+                  className="glass-action h-8 px-2.5 rounded-lg text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> Node code
                 </button>
               </div>
 
