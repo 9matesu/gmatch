@@ -32,7 +32,7 @@ interface Pick {
 const DOT: Record<PickStatus, string> = {
   checking: 'bg-amber-400 animate-pulse',
   live: 'bg-emerald-500',
-  unverified: 'bg-zinc-500',
+  unverified: 'bg-retro-muted',
 };
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {

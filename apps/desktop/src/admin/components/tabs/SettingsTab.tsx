@@ -137,20 +137,20 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
         <div className="space-y-6">
           <div className="rounded-xl border border-border-glass bg-surface-raised p-5 space-y-6">
             <div className="flex items-center justify-between border-b border-border-glass pb-3">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-100">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-retro-fg">
                 <Globe className="w-4 h-4 text-cyan-300" />
                 <span>Discord Invite</span>
               </div>
             </div>
             <div className="space-y-3">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Discord Invite URL</label>
+              <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider block">Discord Invite URL</label>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
                   value={discordLink}
                   onChange={e => setDiscordLink(e.target.value)}
                   placeholder="https://discord.gg/..."
-                  className="flex-1 bg-[#18181b] border border-[#27272a] rounded-xl px-3 py-2 text-xs text-zinc-100 outline-none focus:border-cyan-500"
+                  className="flex-1 bg-[#18181b] border border-[#27272a] rounded-xl px-3 py-2 text-xs text-retro-fg outline-none focus:border-cyan-500"
                 />
                 <button
                   type="button"
@@ -166,14 +166,14 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
 
           <div className="rounded-xl border border-border-glass bg-surface-raised p-5 space-y-6">
             <div className="flex items-center justify-between border-b border-border-glass pb-3">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-100">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-retro-fg">
                 <ZapIcon className="w-4 h-4 text-amber-400" />
                 <span>Economy Cashout Rate</span>
               </div>
             </div>
             <div className="space-y-3">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Cashout Rate (basis points)</label>
-              <p className="text-xs text-zinc-500">1 bp = 0.01%. Current: {(cashoutRateBps / 100).toFixed(2)}% (12500 = 125%)</p>
+              <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider block">Cashout Rate (basis points)</label>
+              <p className="text-xs text-retro-muted">1 bp = 0.01%. Current: {(cashoutRateBps / 100).toFixed(2)}% (12500 = 125%)</p>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
@@ -181,7 +181,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
                   onChange={e => setCashoutRateBps(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
                   min={0}
                   max={100000}
-                  className="flex-1 bg-[#18181b] border border-[#27272a] rounded-xl px-3 py-2 text-xs text-zinc-100 outline-none focus:border-cyan-500 font-mono"
+                  className="flex-1 bg-[#18181b] border border-[#27272a] rounded-xl px-3 py-2 text-xs text-retro-fg outline-none focus:border-cyan-500 font-mono"
                 />
                 <button
                   type="button"
@@ -204,7 +204,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
               <AlertTriangle className="w-4 h-4" />
               <span>Danger Zone</span>
             </div>
-            <p className="text-xs text-zinc-400 leading-relaxed">
+            <p className="text-xs text-retro-muted leading-relaxed">
               These actions are irreversible and can cause permanent data loss. Use with extreme caution.
             </p>
           </div>
@@ -214,7 +214,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-xs font-bold text-red-300 uppercase tracking-wider">Run Database Cleanup</h3>
-                  <p className="text-[10px] text-zinc-500 mt-1">Expires stale content, sweeps orphan blobs, resets daily scores. Cheaper than waiting for the next tick.</p>
+                  <p className="text-[10px] text-retro-muted mt-1">Expires stale content, sweeps orphan blobs, resets daily scores. Cheaper than waiting for the next tick.</p>
                 </div>
                 <button
                   type="button"
@@ -230,7 +230,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-xs font-bold text-red-300 uppercase tracking-wider">Clean ALL Posts & Reset</h3>
-                  <p className="text-[10px] text-zinc-500 mt-1">Purges all user posts, media objects, likes and comments platform-wide. Cannot be undone.</p>
+                  <p className="text-[10px] text-retro-muted mt-1">Purges all user posts, media objects, likes and comments platform-wide. Cannot be undone.</p>
                 </div>
                 <button
                   type="button"
@@ -246,7 +246,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-xs font-bold text-amber-300 uppercase tracking-wider">Migrate Lobby → Posts</h3>
-                  <p className="text-[10px] text-zinc-500 mt-1">Transfers all lobby board images into user gMatch profiles under Posts, preserving likes and metadata.</p>
+                  <p className="text-[10px] text-retro-muted mt-1">Transfers all lobby board images into user gMatch profiles under Posts, preserving likes and metadata.</p>
                 </div>
                 <button
                   type="button"

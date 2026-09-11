@@ -214,7 +214,7 @@ export function FollowersFollowingModal({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/75 backdrop-blur-md p-3 sm:p-4 select-none font-sans animate-orbit-fade-in"
+      className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/70 backdrop-blur-md p-3 sm:p-4 select-none font-sans animate-orbit-fade-in"
       onClick={onClose}
     >
       <div
@@ -280,7 +280,7 @@ export function FollowersFollowingModal({
 
         {/* Search Bar Input */}
         <div className="px-3 py-2 border-b border-border-glass shrink-0">
-          <div className="flex items-center gap-2 bg-surface-interactive rounded-lg px-3 py-1.5 text-xs text-retro-fg focus-within:border-zinc-500 border border-border-glass transition-colors">
+          <div className="flex items-center gap-2 bg-surface-interactive rounded-lg px-3 py-1.5 text-xs text-retro-fg focus-within:border-border-glass border border-border-glass transition-colors">
             <Search className="w-3.5 h-3.5 text-retro-muted shrink-0" />
             <input
               type="text"
@@ -335,7 +335,7 @@ export function FollowersFollowingModal({
                   <div
                     className={`w-11 h-11 rounded-full p-[2px] shrink-0 transition-transform group-hover:scale-105 ${hasStory
                         ? 'bg-gradient-to-tr from-cyan-500 via-teal-500 to-amber-500 shadow-xs'
-                        : 'bg-zinc-700'
+                        : 'bg-glass-w20'
                       }`}
                   >
                     <div className="w-full h-full rounded-full bg-surface-raised overflow-hidden border border-white flex items-center justify-center text-xs font-black text-retro-fg">

@@ -159,7 +159,7 @@ export function ImageViewer({
         className="fixed inset-0 z-[var(--z-system)] bg-surface-canvas/95 backdrop-blur-2xl flex flex-col items-center justify-center gap-4 p-6 font-sans animate-orbit-fade-in select-none"
         onClick={onClose}
       >
-        <span className="text-3xl text-zinc-600 block">◈</span>
+        <span className="text-3xl text-retro-muted block">◈</span>
         <p className="text-sm font-bold text-retro-fg">Media not found</p>
         <p className="text-xs text-retro-muted font-mono">ID: {itemId}</p>
         <button
@@ -228,7 +228,7 @@ export function ImageViewer({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-system)] bg-black/95 backdrop-blur-2xl flex flex-col justify-between p-2 sm:p-4 md:p-6 overflow-hidden select-none font-sans animate-orbit-fade-in"
+      className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-2xl flex flex-col justify-between p-2 sm:p-4 md:p-6 overflow-hidden select-none font-sans animate-orbit-fade-in"
       onClick={() => {
         if (!didDragRef.current) onClose()
       }}
@@ -326,7 +326,7 @@ export function ImageViewer({
         >
           {loadError ? (
             <div className="glass-card p-8 text-center space-y-2">
-              <span className="text-3xl text-zinc-600 block">◈</span>
+              <span className="text-3xl text-retro-muted block">◈</span>
               <p className="text-xs font-bold text-retro-body">Media unavailable or encrypted</p>
               <p className="text-[10px] text-retro-muted font-mono">ID: {activeItem?.id}</p>
             </div>

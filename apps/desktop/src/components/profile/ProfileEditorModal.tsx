@@ -85,7 +85,7 @@ export function ProfileEditorModal({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-modal)] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg"
+      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg"
       onClick={(e) => e.stopPropagation()}
     >
       <div

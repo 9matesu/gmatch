@@ -162,7 +162,7 @@ export function AttachmentUploadModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-surface-raised border border-border-glass rounded-xl max-w-lg w-full overflow-hidden shadow-2xl space-y-4 p-5">
         <div className="flex items-center justify-between border-b border-border-glass pb-3">
           <div className="flex items-center gap-2">

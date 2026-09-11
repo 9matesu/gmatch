@@ -325,7 +325,7 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
               className={`p-[2.5px] rounded-full transition-transform group-hover:scale-105 ${
                 group.hasUnseen
                   ? 'bg-gradient-to-tr from-cyan-500 via-teal-500 to-amber-500'
-                  : 'bg-zinc-700'
+                  : 'bg-glass-w20'
               }`}
             >
               <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-surface-raised p-[2px] overflow-hidden">
@@ -355,7 +355,7 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
       {/* ── 2. Fullscreen Instagram Story Viewer Lightbox ── */}
       {openUserId && activeGroup && currentStory && createPortal(
         <div
-          className="fixed inset-0 z-[var(--z-system)] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-0 animate-orbit-fade-in"
+          className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-2xl flex items-center justify-center p-0 animate-orbit-fade-in"
           onClick={closeStoryViewer}
           onMouseDown={() => setIsPaused(true)}
           onMouseUp={() => setIsPaused(false)}

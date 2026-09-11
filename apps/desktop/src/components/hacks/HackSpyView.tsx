@@ -140,7 +140,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
           </button>
 
           <div className="flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full ${feedError ? 'bg-zinc-500' : 'bg-retro-online'}`} />
+            <span className={`w-2.5 h-2.5 rounded-full ${feedError ? 'bg-retro-muted' : 'bg-retro-online'}`} />
             <span className="text-xs font-bold tracking-wide text-retro-fg flex items-center gap-1.5">
               <IconComponent className="w-3.5 h-3.5 inline text-retro-accent" />
               <span>{feed?.target?.display_name || session.targetUserName}</span>
@@ -166,7 +166,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
             </div>
             <span className={`px-3 py-1 rounded-full font-mono text-[10px] font-bold tracking-wider border ${
               feedError
-                ? 'bg-zinc-500/10 border-zinc-600 text-zinc-400'
+                ? 'bg-glass-w5 border-border-glass text-retro-muted'
                 : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
             }`}>
               {feedError ? 'OFFLINE' : 'LIVE'}

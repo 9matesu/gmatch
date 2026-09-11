@@ -112,7 +112,7 @@ export function CardTile({
     <div
       data-rarity={rarity.rarity}
       data-frame={frameType}
-      className={`group relative select-none cursor-pointer transition-all duration-150 active:scale-[0.96] rounded-lg border border-zinc-800/90 bg-zinc-950 overflow-hidden shadow-xs hover:border-zinc-700 ${
+      className={`group relative select-none cursor-pointer transition-all duration-150 active:scale-[0.96] rounded-lg border border-border-glass bg-retro-bg overflow-hidden shadow-xs hover:border-border-glass ${
         selected ? 'ring-2 ring-white shadow-xl scale-[1.02] z-10' : ''
       }`}
       onClick={() => {
@@ -137,7 +137,7 @@ export function CardTile({
               frameType === 'holo'
                 ? 'bg-gradient-to-r from-pink-500/80 via-purple-500/80 to-cyan-500/80 text-white border-pink-400/60'
                 : frameType === 'carbon'
-                ? 'bg-zinc-950/90 text-zinc-300 border-zinc-700/80'
+                ? 'bg-retro-bg/90 text-retro-fg border-border-glass'
                 : frameType === 'neon'
                 ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400/80'
                 : 'bg-black/80 text-retro-fg border-border-glass'
@@ -176,8 +176,8 @@ export function CardTile({
             }}
             className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
               selected
-                ? 'bg-surface-interactive border-zinc-100 text-retro-fg shadow-md'
-                : 'bg-black/60 border-zinc-700 opacity-0 group-hover:opacity-100 text-transparent hover:border-zinc-400'
+                ? 'bg-surface-interactive border-border-glass text-retro-fg shadow-md'
+                : 'bg-black/60 border-border-glass opacity-0 group-hover:opacity-100 text-transparent hover:border-border-glass'
             }`}
           >
             <Check className="w-3 h-3 stroke-[3]" />
@@ -202,9 +202,9 @@ export function CardTile({
         </div>
 
         {/* Card Info Footer */}
-        <div className="p-2.5 bg-zinc-950 border-t border-zinc-800/80 flex flex-col gap-1">
+        <div className="p-2.5 bg-retro-bg border-t border-border-glass flex flex-col gap-1">
           <div className="flex items-center justify-between gap-1.5">
-            <div className="min-w-0 flex-1 text-xs font-semibold text-zinc-200 truncate" title={cardTitle}>
+            <div className="min-w-0 flex-1 text-xs font-semibold text-retro-fg truncate" title={cardTitle}>
               {cardTitle}
             </div>
             <div className="shrink-0 text-[10px] font-mono font-bold tabular-nums tracking-tight" style={{ color: accent }}>
@@ -212,7 +212,7 @@ export function CardTile({
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-zinc-400">
+          <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-retro-muted">
             <span className="truncate">
               by{' '}
               {onOpenOwnerProfile ? (
@@ -222,16 +222,16 @@ export function CardTile({
                     e.stopPropagation()
                     onOpenOwnerProfile(item.owner_id)
                   }}
-                  className="inline font-medium cursor-pointer hover:underline hover:text-zinc-200 transition-colors"
+                  className="inline font-medium cursor-pointer hover:underline hover:text-retro-fg transition-colors"
                   title={`View ${ownerLabel}`}
                 >
                   {ownerLabel}
                 </button>
               ) : (
-                <span className="font-medium text-zinc-300">{ownerLabel}</span>
+                <span className="font-medium text-retro-fg">{ownerLabel}</span>
               )}
             </span>
-            <span className="shrink-0 flex items-center gap-1 font-bold text-zinc-300">
+            <span className="shrink-0 flex items-center gap-1 font-bold text-retro-fg">
               <Heart className="w-2.5 h-2.5 fill-rose-500 text-rose-400" />
               <span>{likes}</span>
             </span>
@@ -242,7 +242,7 @@ export function CardTile({
               {itemTags.map((tag) => (
                 <span
                   key={tag}
-                  className="text-[10px] font-mono font-medium px-1.5 py-0.2 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 truncate max-w-[90px]"
+                  className="text-[10px] font-mono font-medium px-1.5 py-0.2 rounded bg-retro-panel border border-border-glass text-retro-muted truncate max-w-[90px]"
                   style={{ color: accent }}
                 >
                   #{tag}

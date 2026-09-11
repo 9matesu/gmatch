@@ -122,7 +122,7 @@ export function ActionModal({
         <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
           {needsUrl && (
             <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-zinc-300">
+              <label className="block text-xs font-medium text-retro-fg">
                 {action === 'popup_video' ? 'Video URL (mp4/webm)' : 'Image URL'}
               </label>
               <input
@@ -132,13 +132,13 @@ export function ActionModal({
                 onChange={(e) => { setUrl(e.target.value); setFormError(null); }}
                 className={field}
               />
-              <p className="text-[10px] text-zinc-600">Paste a direct media link — their client loads it straight.</p>
+              <p className="text-[10px] text-retro-muted">Paste a direct media link — their client loads it straight.</p>
             </div>
           )}
 
           {needsText && (
             <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-zinc-300">Message</label>
+              <label className="block text-xs font-medium text-retro-fg">Message</label>
               <textarea
                 rows={3}
                 maxLength={action === 'text_overlay' ? 120 : 280}

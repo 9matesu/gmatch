@@ -173,7 +173,7 @@ export function YourMatchTab({
                   })
                 }
               }}
-              className="absolute top-1.5 right-1.5 bg-black/80 border border-zinc-700 text-retro-fg text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity font-bold flex items-center gap-1 cursor-pointer"
+              className="absolute top-1.5 right-1.5 bg-black/80 border border-border-glass text-retro-fg text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity font-bold flex items-center gap-1 cursor-pointer"
               title="Zoom into card"
             >
               <ZoomIn className="w-3 h-3" />

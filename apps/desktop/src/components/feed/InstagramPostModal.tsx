@@ -86,21 +86,21 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
   return createPortal(
     (
       <div
-        className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 md:p-6 animate-orbit-fade-in select-none"
+        className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 md:p-6 animate-orbit-fade-in select-none"
         onClick={onClose}
       >
         {/* Close button in top-right */}
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 z-50 text-zinc-400 hover:text-white p-2 rounded-full cursor-pointer bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-700/60 transition-colors"
+          className="absolute top-4 right-4 z-50 text-retro-muted hover:text-white p-2 rounded-full cursor-pointer bg-retro-panel/80 hover:bg-glass-w12 border border-border-glass transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Main 2-Column Dialog */}
         <div
-          className="bg-zinc-900 text-zinc-100 w-full max-w-5xl h-full sm:h-auto sm:max-h-[90vh] rounded-none sm:rounded-xl border border-zinc-800 shadow-2xl overflow-hidden flex flex-col md:flex-row animate-orbit-slide-up"
+          className="bg-retro-panel text-retro-fg w-full max-w-5xl h-full sm:h-auto sm:max-h-[90vh] rounded-none sm:rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col md:flex-row animate-orbit-slide-up"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Left Column: Media Viewer with Multi-Media Carousel & Zoom */}
@@ -182,7 +182,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); handleZoomToggle(); }}
-                className="flex items-center gap-1 hover:text-zinc-200 cursor-pointer"
+                className="flex items-center gap-1 hover:text-retro-fg cursor-pointer"
               >
                 {zoomLevel > 1 ? <ZoomOut className="w-3.5 h-3.5" /> : <ZoomIn className="w-3.5 h-3.5" />}
                 <span className="font-mono">{Math.round(zoomLevel * 100)}%</span>
@@ -191,15 +191,15 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
           </div>
 
           {/* Right Column: Author, Caption, Comments Stream & Input */}
-          <div className="w-full md:w-[380px] lg:w-[420px] bg-zinc-950 flex flex-col justify-between border-t md:border-t-0 md:border-l border-zinc-800 h-full">
+          <div className="w-full md:w-[380px] lg:w-[420px] bg-retro-bg flex flex-col justify-between border-t md:border-t-0 md:border-l border-border-glass h-full">
             {/* Header */}
-            <div className="p-3.5 border-b border-zinc-800 flex items-center justify-between">
+            <div className="p-3.5 border-b border-border-glass flex items-center justify-between">
               <div
                 className="flex items-center gap-3 cursor-pointer"
                 onClick={handleAuthorClick}
               >
-                <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 p-[1px] flex-shrink-0">
-                  <div className="w-full h-full rounded-full bg-zinc-900 overflow-hidden flex items-center justify-center text-xs font-semibold text-zinc-200">
+                <div className="w-8 h-8 rounded-full bg-glass-w12 border border-border-glass p-[1px] flex-shrink-0">
+                  <div className="w-full h-full rounded-full bg-retro-panel overflow-hidden flex items-center justify-center text-xs font-semibold text-retro-fg">
                     {authorAvatar ? (
                       <img src={authorAvatar} alt="" className="w-full h-full object-cover" />
                     ) : (
@@ -209,10 +209,10 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                 </div>
                 <div>
                   <div className="flex items-center gap-1">
-                    <span className="text-xs font-semibold text-zinc-100 hover:underline">{post.author_name}</span>
+                    <span className="text-xs font-semibold text-retro-fg hover:underline">{post.author_name}</span>
                   </div>
                   {post.location && (
-                    <span className="text-[10px] text-zinc-500 font-medium block">{post.location}</span>
+                    <span className="text-[10px] text-retro-muted font-medium block">{post.location}</span>
                   )}
                 </div>
               </div>
@@ -220,7 +220,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
               <button
                 type="button"
                 onClick={() => onOptionsClick?.(post)}
-                className="p-1.5 text-zinc-400 hover:text-zinc-200 rounded-md cursor-pointer hover:bg-zinc-800 transition-colors"
+                className="p-1.5 text-retro-muted hover:text-retro-fg rounded-md cursor-pointer hover:bg-glass-w12 transition-colors"
               >
                 <MoreHorizontal className="w-4 h-4" />
               </button>
@@ -304,7 +304,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
             </div>
 
             {/* Action Bar & Input */}
-            <div className="border-t border-zinc-800 bg-zinc-950 flex flex-col">
+            <div className="border-t border-border-glass bg-retro-bg flex flex-col">
               {/* Actions */}
               <div className="p-3 pb-2 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -314,14 +314,14 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                     className="cursor-pointer transition-transform duration-150 active:scale-[0.92]"
                   >
                     <Heart
-                      className={`w-5 h-5 transition-colors stroke-[1.75] ${isLiked ? 'text-rose-500 fill-rose-500' : 'text-zinc-400 hover:text-zinc-200'
+                      className={`w-5 h-5 transition-colors stroke-[1.75] ${isLiked ? 'text-rose-500 fill-rose-500' : 'text-retro-muted hover:text-retro-fg'
                         }`}
                     />
                   </button>
                   <button
                     type="button"
                     onClick={() => onOpenShare?.(post)}
-                    className="text-zinc-400 hover:text-zinc-200 cursor-pointer transition-transform duration-150 active:scale-[0.92]"
+                    className="text-retro-muted hover:text-retro-fg cursor-pointer transition-transform duration-150 active:scale-[0.92]"
                   >
                     <Send className="w-5 h-5 stroke-[1.75]" />
                   </button>
@@ -333,19 +333,19 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                   className="cursor-pointer transition-transform duration-150 active:scale-[0.92]"
                 >
                   <Bookmark
-                    className={`w-5 h-5 transition-colors stroke-[1.75] ${isSaved ? 'text-white fill-white' : 'text-zinc-400 hover:text-zinc-200'
+                    className={`w-5 h-5 transition-colors stroke-[1.75] ${isSaved ? 'text-white fill-white' : 'text-retro-muted hover:text-retro-fg'
                       }`}
                   />
                 </button>
               </div>
 
               {/* Likes Summary */}
-              <div className="px-3 pb-2 text-xs font-semibold text-zinc-300 font-mono tracking-tight">
+              <div className="px-3 pb-2 text-xs font-semibold text-retro-fg font-mono tracking-tight">
                 {likeCount.toLocaleString()} {likeCount === 1 ? 'like' : 'likes'}
               </div>
 
               {/* Comment Input */}
-              <div className="p-3 border-t border-zinc-800 flex items-center gap-2">
+              <div className="p-3 border-t border-border-glass flex items-center gap-2">
                 <input
                   type="text"
                   value={commentInput}
@@ -357,13 +357,13 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                     }
                   }}
                   placeholder="Add a comment..."
-                  className="flex-1 bg-zinc-900 border border-zinc-800 rounded-md px-3.5 py-2 text-xs text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-zinc-600 transition-colors"
+                  className="flex-1 bg-retro-panel border border-border-glass rounded-md px-3.5 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-border-glass transition-colors"
                 />
                 <button
                   type="button"
                   onClick={handleSendComment}
                   disabled={!commentInput.trim()}
-                  className="px-4 py-2 bg-white text-zinc-950 hover:bg-zinc-200 disabled:opacity-40 rounded-md text-xs font-semibold cursor-pointer transition-all duration-150 active:scale-[0.96] shadow-xs"
+                  className="px-4 py-2 bg-white text-retro-bg hover:bg-retro-fg disabled:opacity-40 rounded-md text-xs font-semibold cursor-pointer transition-all duration-150 active:scale-[0.96] shadow-xs"
                 >
                   Post
                 </button>

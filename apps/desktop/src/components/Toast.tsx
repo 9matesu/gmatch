@@ -82,12 +82,12 @@ function ToastItem({ message, onDone }: { message: ToastMessage; onDone: () => v
 
   return (
     <div
-      className={`pointer-events-auto bg-zinc-950/95 border border-zinc-800 rounded-lg px-3.5 py-2.5 shadow-2xl backdrop-blur-md transition-all duration-150 flex items-start gap-2.5 max-w-sm ${
+      className={`pointer-events-auto bg-retro-bg/95 border border-border-glass rounded-lg px-3.5 py-2.5 shadow-2xl backdrop-blur-md transition-all duration-150 flex items-start gap-2.5 max-w-sm ${
         visible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-2 scale-95'
       }`}
     >
       <IconComp className={`w-4 h-4 shrink-0 mt-0.5 ${iconColor}`} />
-      <span className="text-xs text-zinc-200 leading-relaxed break-words font-medium">{message.text}</span>
+      <span className="text-xs text-retro-fg leading-relaxed break-words font-medium">{message.text}</span>
     </div>
   );
 }

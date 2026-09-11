@@ -111,18 +111,18 @@ export function UserProfileModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-[var(--z-system)] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-xs p-0 sm:p-4 animate-orbit-fade-in select-none font-sans"
+        className="fixed inset-0 z-[var(--z-system)] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-xs p-0 sm:p-4 animate-orbit-fade-in select-none font-sans"
         onClick={onClose}
       >
         <div
-          className="bg-zinc-900 border border-zinc-800 w-full max-w-lg overflow-hidden shadow-2xl rounded-t-2xl sm:rounded-xl animate-orbit-pop text-zinc-100 max-h-[92dvh] sm:max-h-[90vh] flex flex-col"
+          className="bg-retro-panel border border-border-glass w-full max-w-lg overflow-hidden shadow-2xl rounded-t-2xl sm:rounded-xl animate-orbit-pop text-retro-fg max-h-[92dvh] sm:max-h-[90vh] flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 shrink-0">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass shrink-0">
             <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${user.online ? 'bg-emerald-500' : 'bg-zinc-600'}`} />
-              <span className="text-xs font-medium text-zinc-400">
+              <span className={`w-2 h-2 rounded-full ${user.online ? 'bg-emerald-500' : 'bg-glass-w20'}`} />
+              <span className="text-xs font-medium text-retro-muted">
                 {user.online ? 'Online' : 'Offline'}
               </span>
             </div>
@@ -130,7 +130,7 @@ export function UserProfileModal({
             <button
               type="button"
               onClick={onClose}
-              className="text-zinc-400 hover:text-zinc-100 p-1 rounded-md cursor-pointer hover:bg-zinc-800 transition-colors"
+              className="text-retro-muted hover:text-retro-fg p-1 rounded-md cursor-pointer hover:bg-glass-w12 transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
@@ -147,14 +147,14 @@ export function UserProfileModal({
                   title={hasStories ? 'Watch story' : 'View picture'}
                   className={`w-18 h-18 sm:w-20 sm:h-20 rounded-full overflow-hidden cursor-pointer group transition-transform hover:scale-105 border-2 ${
                     hasStories
-                      ? 'border-zinc-200'
-                      : 'border-zinc-700'
+                      ? 'border-border-glass'
+                      : 'border-border-glass'
                   }`}
                 >
                   {profilePic ? (
                     <img src={resolveMediaUrl(profilePic)} alt={displayName} className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full bg-zinc-800 flex items-center justify-center text-lg font-semibold text-zinc-400">
+                    <div className="w-full h-full bg-glass-w12 flex items-center justify-center text-lg font-semibold text-retro-muted">
                       {displayName.substring(0, 2).toUpperCase()}
                     </div>
                   )}
@@ -163,7 +163,7 @@ export function UserProfileModal({
                 {hasStories && (
                   <div
                     onClick={handleAvatarClick}
-                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-white text-zinc-950 text-[10px] font-semibold flex items-center gap-0.5 cursor-pointer shadow-xs"
+                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-white text-retro-bg text-[10px] font-semibold flex items-center gap-0.5 cursor-pointer shadow-xs"
                   >
                     <Play className="w-2 h-2 fill-current" />
                     <span>Story</span>
@@ -173,8 +173,8 @@ export function UserProfileModal({
 
               <div className="flex-1 flex items-center justify-around text-center">
                 <div className="flex flex-col">
-                  <span className="text-sm font-semibold text-zinc-100 font-mono tabular-nums">{userPosts.length}</span>
-                  <span className="text-[10px] text-zinc-400">posts</span>
+                  <span className="text-sm font-semibold text-retro-fg font-mono tabular-nums">{userPosts.length}</span>
+                  <span className="text-[10px] text-retro-muted">posts</span>
                 </div>
 
                 <div
@@ -185,10 +185,10 @@ export function UserProfileModal({
                     onOpenFollowers?.('followers');
                   }}
                 >
-                  <span className="text-sm font-semibold text-zinc-100 group-hover:underline font-mono tabular-nums">
+                  <span className="text-sm font-semibold text-retro-fg group-hover:underline font-mono tabular-nums">
                     {followersCount !== null ? followersCount : (user.likes_received ?? 0)}
                   </span>
-                  <span className="text-[10px] text-zinc-400">followers</span>
+                  <span className="text-[10px] text-retro-muted">followers</span>
                 </div>
 
                 <div
@@ -199,23 +199,23 @@ export function UserProfileModal({
                     onOpenFollowers?.('following');
                   }}
                 >
-                  <span className="text-sm font-semibold text-zinc-100 font-mono tabular-nums">
+                  <span className="text-sm font-semibold text-retro-fg font-mono tabular-nums">
                     {followingCount !== null ? followingCount : (user.following_count ?? 0)}
                   </span>
-                  <span className="text-[10px] text-zinc-400">following</span>
+                  <span className="text-[10px] text-retro-muted">following</span>
                 </div>
               </div>
             </div>
 
             {/* Name & ID */}
             <div className="space-y-1">
-              <h3 className="text-sm font-semibold text-zinc-100">@{displayName}</h3>
-              <div className="flex items-center gap-2 text-xs text-zinc-400 font-mono">
+              <h3 className="text-sm font-semibold text-retro-fg">@{displayName}</h3>
+              <div className="flex items-center gap-2 text-xs text-retro-muted font-mono">
                 <span className="truncate max-w-[220px]">{user.id}</span>
                 <button
                   type="button"
                   onClick={handleCopy}
-                  className="text-[10px] text-zinc-400 hover:text-zinc-200 px-2 py-0.5 border border-zinc-800 bg-zinc-950 rounded-md cursor-pointer flex items-center gap-1 shrink-0 transition-colors"
+                  className="text-[10px] text-retro-muted hover:text-retro-fg px-2 py-0.5 border border-border-glass bg-retro-bg rounded-md cursor-pointer flex items-center gap-1 shrink-0 transition-colors"
                   title="Copy ID"
                 >
                   {copied ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
@@ -230,14 +230,14 @@ export function UserProfileModal({
                 {tags.map((tag) => (
                   <span
                     key={tag}
-                    className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-zinc-400"
+                    className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-md bg-retro-bg border border-border-glass text-retro-muted"
                   >
                     #{tag}
                   </span>
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-zinc-500 italic">No tags set</p>
+              <p className="text-xs text-retro-muted italic">No tags set</p>
             )}
 
             {/* Action Buttons */}
@@ -249,7 +249,7 @@ export function UserProfileModal({
                     onSendCard(user.id);
                     onClose();
                   }}
-                  className="py-2 px-3 bg-white hover:bg-zinc-200 text-zinc-950 font-semibold text-xs rounded-md transition-all duration-150 active:scale-[0.96] shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+                  className="py-2 px-3 bg-white hover:bg-retro-fg text-retro-bg font-semibold text-xs rounded-md transition-all duration-150 active:scale-[0.96] shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <Send className="w-3.5 h-3.5 stroke-[2]" />
                   <span>Send Card</span>
@@ -263,7 +263,7 @@ export function UserProfileModal({
                     onStartPm({ id: user.id, display_name: displayName });
                     onClose();
                   }}
-                  className="py-2 px-3 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-100 font-semibold text-xs rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
+                  className="py-2 px-3 bg-glass-w12 hover:bg-glass-w20 border border-border-glass text-retro-fg font-semibold text-xs rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <MessageCircle className="w-3.5 h-3.5 stroke-[1.75]" />
                   <span>Message</span>
@@ -274,7 +274,7 @@ export function UserProfileModal({
                 <button
                   type="button"
                   onClick={() => onInviteToGame(user.id)}
-                  className="py-2 px-3 bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-200 font-semibold text-xs rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
+                  className="py-2 px-3 bg-glass-w12 hover:bg-glass-w12 border border-border-glass text-retro-fg font-semibold text-xs rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <Swords className="w-3.5 h-3.5 stroke-[1.75]" />
                   <span>Invite to Game</span>
@@ -283,7 +283,7 @@ export function UserProfileModal({
             </div>
 
             {/* Secondary Actions */}
-            <div className="flex items-center gap-2 border-t border-zinc-800 pt-3">
+            <div className="flex items-center gap-2 border-t border-border-glass pt-3">
               {followHandler && (
                 <button
                   type="button"
@@ -291,7 +291,7 @@ export function UserProfileModal({
                   className={`flex-1 py-2 px-3 border text-xs font-semibold rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5 ${
                      following
                        ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
-                      : 'border-zinc-800 bg-zinc-950 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900'
+                      : 'border-border-glass bg-retro-bg text-retro-fg hover:border-border-glass hover:bg-retro-panel'
                   }`}
                 >
                    <Star className={`w-3.5 h-3.5 ${following ? 'fill-amber-400 text-amber-400' : ''}`} />
@@ -392,7 +392,7 @@ export function UserProfileModal({
       {/* Full Picture Modal */}
       {showPic && profilePic && (
         <div
-          className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/90 p-4 cursor-pointer"
+          className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/70 p-4 cursor-pointer"
           onClick={() => setShowPic(false)}
         >
           <div className="relative max-w-sm max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
@@ -411,7 +411,7 @@ export function UserProfileModal({
       {/* Card Image Lightbox */}
       {selectedCardImage && (
         <div
-          className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/90 p-4 cursor-pointer"
+          className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/70 p-4 cursor-pointer"
           onClick={() => setSelectedCardImage(null)}
         >
           <div className="relative max-w-md max-h-[85vh]" onClick={(e) => e.stopPropagation()}>

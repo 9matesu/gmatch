@@ -153,7 +153,7 @@ export function BooruSlideshow({ className = '' }: { className?: string }) {
   return (
     <div className={`relative mx-auto flex flex-col items-center shrink-0 ${className}`}>
       {/* Outer Smartphone Bezel */}
-      <div className="relative w-[clamp(220px,40vw,340px)] aspect-[9/16] rounded-[2.5rem] p-2.5 bg-gradient-to-b from-zinc-800 via-zinc-900 to-zinc-950 shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-zinc-700/50 shrink-0">
+      <div className="relative w-[clamp(220px,40vw,340px)] aspect-[9/16] rounded-[2.5rem] p-2.5 bg-gradient-to-b from-zinc-800 via-zinc-900 to-zinc-950 shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-border-glass shrink-0">
         <div className="absolute inset-[1px] rounded-[2.4rem] bg-gradient-to-b from-zinc-700/20 via-transparent to-transparent pointer-events-none" />
 
         {/* Inner Phone Screen */}
@@ -162,7 +162,7 @@ export function BooruSlideshow({ className = '' }: { className?: string }) {
           {/* Top Notch / Dynamic Island */}
           <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 w-20 h-3.5 bg-black rounded-full flex items-center justify-end px-2 gap-1.5 shadow-md">
             <span className="w-1.5 h-1.5 rounded-full bg-surface-elevated" />
-            <span className="w-1.5 h-1.5 rounded-full bg-surface-canvas border border-zinc-700" />
+            <span className="w-1.5 h-1.5 rounded-full bg-surface-canvas border border-border-glass" />
           </div>
 
           {/* Bottom Home Indicator Bar */}

@@ -3415,7 +3415,7 @@ export default function Home() {
                 {/* Lobby Image Fallback Lightbox */}
                 {lobbyLightboxUrl && !expandedItemId && (
                   <div
-                    className="fixed inset-0 z-[var(--z-system)] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 cursor-pointer animate-orbit-fade-in"
+                    className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-md flex items-center justify-center p-4 cursor-pointer animate-orbit-fade-in"
                     onClick={() => setLobbyLightboxUrl(null)}
                   >
                     <div className="relative max-w-4xl max-h-[90vh] flex items-center justify-center" onClick={e => e.stopPropagation()}>
@@ -3691,7 +3691,7 @@ export default function Home() {
                 recipientId={attachmentModal?.peerId}
               />
               {groupPickerOpen && chatGroups.length > 0 && (
-                <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
                   <div className="bg-surface-raised border border-border-glass rounded-xl max-w-md w-full shadow-2xl overflow-hidden">
                     <div className="p-4 border-b border-border-glass flex items-center justify-between">
                       <h3 className="text-sm font-bold text-retro-fg">Select Group Chat</h3>

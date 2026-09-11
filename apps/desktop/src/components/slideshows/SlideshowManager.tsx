@@ -185,7 +185,7 @@ export function SlideshowManager({
           <button
             type="button"
             onClick={() => { setCreating((v) => !v); setSelected(new Set()); }}
-            className="px-3 py-1.5 text-xs font-semibold text-retro-body bg-surface-interactive border border-border-glass rounded-lg hover:border-zinc-500 cursor-pointer flex items-center gap-1.5 transition-colors"
+            className="px-3 py-1.5 text-xs font-semibold text-retro-body bg-surface-interactive border border-border-glass rounded-lg hover:border-border-glass cursor-pointer flex items-center gap-1.5 transition-colors"
           >
             {creating ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
             {creating ? 'Cancel' : 'New'}

@@ -97,7 +97,7 @@ export function Leaderboard({
           <button
             type="button"
             onClick={() => onSelectUser(topSender.id)}
-            className="px-3 py-1.5 text-xs font-medium bg-surface-interactive border border-border-glass text-retro-body hover:border-zinc-500 transition-colors flex-shrink-0 cursor-pointer rounded-lg"
+            className="px-3 py-1.5 text-xs font-medium bg-surface-interactive border border-border-glass text-retro-body hover:border-border-glass transition-colors flex-shrink-0 cursor-pointer rounded-lg"
           >
             View
           </button>
@@ -113,7 +113,7 @@ export function Leaderboard({
           return (
             <div
               key={user.id}
-              className="bg-surface-interactive border border-border-glass rounded-lg p-2.5 flex items-center gap-3 hover:border-zinc-500 transition-colors"
+              className="bg-surface-interactive border border-border-glass rounded-lg p-2.5 flex items-center gap-3 hover:border-border-glass transition-colors"
             >
               <span className="w-5 flex items-center justify-center text-xs flex-shrink-0">
                 {isTop3 ? (
@@ -126,7 +126,7 @@ export function Leaderboard({
               <div className="relative flex-shrink-0">
                 <Avatar id={user.id} imageUrl={user.pfp_url || undefined} size={32} />
                 <span
-                  className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-surface-interactive ${user.online ? 'bg-retro-online' : 'bg-zinc-500'
+                  className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-surface-interactive ${user.online ? 'bg-retro-online' : 'bg-retro-muted'
                     }`}
                 />
               </div>
@@ -149,7 +149,7 @@ export function Leaderboard({
               <button
                 type="button"
                 onClick={() => onSelectUser(user.id)}
-                className="px-2.5 py-1 text-xs font-medium bg-surface-raised border border-border-glass text-retro-body hover:border-zinc-500 rounded-lg transition-colors flex-shrink-0 cursor-pointer"
+                className="px-2.5 py-1 text-xs font-medium bg-surface-raised border border-border-glass text-retro-body hover:border-border-glass rounded-lg transition-colors flex-shrink-0 cursor-pointer"
               >
                 View
               </button>

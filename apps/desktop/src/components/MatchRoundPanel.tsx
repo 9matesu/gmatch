@@ -399,7 +399,7 @@ export function MatchRoundPanel({
                                 </div>
                               )}
                             </div>
-                            <div className="p-2 bg-surface-canvas/90 border-t border-zinc-800/80 backdrop-blur-md text-left">
+                            <div className="p-2 bg-surface-canvas/90 border-t border-border-glass backdrop-blur-md text-left">
                               <div className="text-xs font-semibold text-retro-fg truncate">{name}</div>
                               <div className="text-[10px] font-mono text-retro-muted truncate">by You</div>
                             </div>
@@ -421,7 +421,7 @@ export function MatchRoundPanel({
                           </div>
                         ) : (
                           <div className="space-y-2 text-retro-muted">
-                            <div className="w-12 h-16 border border-dashed border-zinc-700 rounded-lg mx-auto flex items-center justify-center text-sm opacity-50">?</div>
+                            <div className="w-12 h-16 border border-dashed border-border-glass rounded-lg mx-auto flex items-center justify-center text-sm opacity-50">?</div>
                             <div className="text-[10px]">Picking card...</div>
                           </div>
                         )}
@@ -598,7 +598,7 @@ export function MatchRoundPanel({
                       </div>
 
                       <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="bg-black/80 border border-zinc-700 text-retro-fg text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1">
+                        <div className="bg-black/80 border border-border-glass text-retro-fg text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1">
                           <ZoomIn className="w-3 h-3" />
                           <span>Zoom</span>
                         </div>
@@ -644,7 +644,7 @@ export function MatchRoundPanel({
                       </div>
 
                       {/* Card Info Footer */}
-                      <div className="p-2 bg-surface-canvas/90 border-t border-zinc-800/80 backdrop-blur-md text-left">
+                      <div className="p-2 bg-surface-canvas/90 border-t border-border-glass backdrop-blur-md text-left">
                         <div className="text-xs font-semibold text-retro-fg truncate">{myTitle}</div>
                         <div className="text-[10px] font-mono text-retro-muted truncate">by You</div>
                       </div>
@@ -696,7 +696,7 @@ export function MatchRoundPanel({
                       )}
 
                       <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="bg-black/80 border border-zinc-700 text-retro-fg text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1">
+                        <div className="bg-black/80 border border-border-glass text-retro-fg text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1">
                           <ZoomIn className="w-3 h-3" />
                           <span>Zoom</span>
                         </div>
@@ -746,7 +746,7 @@ export function MatchRoundPanel({
                       </div>
 
                       {/* Card Info Footer */}
-                      <div className="p-2 bg-surface-canvas/90 border-t border-zinc-800/80 backdrop-blur-md text-left">
+                      <div className="p-2 bg-surface-canvas/90 border-t border-border-glass backdrop-blur-md text-left">
                         <div className="text-xs font-semibold text-retro-fg truncate">{oppTitle}</div>
                         <div className="text-[10px] font-mono text-retro-muted truncate">by {opponentName}</div>
                       </div>

@@ -81,7 +81,7 @@ export function RightUtilityDock({
   return (
     <aside
       aria-label="Quick Actions Dock"
-      className="hidden lg:flex fixed right-3 top-1/2 -translate-y-1/2 z-50 flex-col items-center gap-2 p-1.5 bg-surface-canvas/90 backdrop-blur-2xl border border-zinc-800/80 rounded-xl shadow-2xl pointer-events-auto font-sans select-none animate-orbit-slide-left"
+      className="hidden lg:flex fixed right-3 top-1/2 -translate-y-1/2 z-50 flex-col items-center gap-2 p-1.5 bg-surface-canvas/90 backdrop-blur-2xl border border-border-glass rounded-xl shadow-2xl pointer-events-auto font-sans select-none animate-orbit-slide-left"
     >
       {/* 1-3. Main Dock Buttons with Exact Geometric Center Alignment */}
       {dockButtons.map((btn) => {
@@ -93,7 +93,7 @@ export function RightUtilityDock({
           <div key={btn.id} className="relative flex items-center justify-center">
             {/* Floating Tooltip Label on Hover (left side) */}
             {isHovered && (
-              <div className="absolute right-full mr-2.5 px-2.5 py-1 rounded-xl bg-surface-canvas/95 border border-zinc-700/80 text-retro-fg text-xs font-bold shadow-2xl shadow-zinc-950/80 backdrop-blur-xl whitespace-nowrap pointer-events-none z-50 animate-orbit-slide-up flex items-center gap-1.5">
+              <div className="absolute right-full mr-2.5 px-2.5 py-1 rounded-xl bg-surface-canvas/95 border border-border-glass text-retro-fg text-xs font-bold shadow-2xl shadow-zinc-950/80 backdrop-blur-xl whitespace-nowrap pointer-events-none z-50 animate-orbit-slide-up flex items-center gap-1.5">
                 <span>{btn.label}</span>
                 {Boolean(btn.count && btn.count > 0) && (
                   <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${btn.countColor}`}>
@@ -101,7 +101,7 @@ export function RightUtilityDock({
                   </span>
                 )}
                 {/* Pointer arrow */}
-                <div className="absolute -right-1 top-1/2 -translate-y-1/2 w-2 h-2 rotate-45 bg-surface-canvas border-r border-t border-zinc-700/80" />
+                <div className="absolute -right-1 top-1/2 -translate-y-1/2 w-2 h-2 rotate-45 bg-surface-canvas border-r border-t border-border-glass" />
               </div>
             )}
 
@@ -113,7 +113,7 @@ export function RightUtilityDock({
               aria-label={btn.label}
               className={`p-0 m-0 w-11 h-11 aspect-square rounded-xl inline-flex items-center justify-center transition-all duration-150 cursor-pointer overflow-hidden active:scale-90 shadow-md ${btn.active
                 ? 'bg-gradient-to-r from-zinc-200 to-white text-retro-fg font-bold border border-border-glass shadow-zinc-950/50 scale-105'
-                : 'btn-skeuo text-retro-muted hover:text-retro-fg hover:border-zinc-700'
+                : 'btn-skeuo text-retro-muted hover:text-retro-fg hover:border-border-glass'
                 }`}
             >
               {/* Perfectly Centered Icon */}
@@ -141,9 +141,9 @@ export function RightUtilityDock({
       {onShare && (
         <div className="relative flex items-center justify-center">
           {hoveredBtn === 'share' && (
-            <div className="absolute right-full mr-2.5 px-2.5 py-1 rounded-xl bg-surface-canvas/95 border border-zinc-700/80 text-retro-fg text-xs font-bold shadow-2xl shadow-zinc-950/80 backdrop-blur-xl whitespace-nowrap pointer-events-none z-50 animate-orbit-slide-up flex items-center gap-1">
+            <div className="absolute right-full mr-2.5 px-2.5 py-1 rounded-xl bg-surface-canvas/95 border border-border-glass text-retro-fg text-xs font-bold shadow-2xl shadow-zinc-950/80 backdrop-blur-xl whitespace-nowrap pointer-events-none z-50 animate-orbit-slide-up flex items-center gap-1">
               <span>Share Link</span>
-              <div className="absolute -right-1 top-1/2 -translate-y-1/2 w-2 h-2 rotate-45 bg-surface-canvas border-r border-t border-zinc-700/80" />
+              <div className="absolute -right-1 top-1/2 -translate-y-1/2 w-2 h-2 rotate-45 bg-surface-canvas border-r border-t border-border-glass" />
             </div>
           )}
 
@@ -153,7 +153,7 @@ export function RightUtilityDock({
             onMouseEnter={() => setHoveredBtn('share')}
             onMouseLeave={() => setHoveredBtn(null)}
             aria-label="Share Link"
-            className="p-0 m-0 w-11 h-11 aspect-square rounded-xl inline-flex items-center justify-center transition-all duration-150 cursor-pointer overflow-hidden active:scale-90 btn-skeuo text-retro-muted hover:text-retro-fg hover:border-zinc-700 shadow-md"
+            className="p-0 m-0 w-11 h-11 aspect-square rounded-xl inline-flex items-center justify-center transition-all duration-150 cursor-pointer overflow-hidden active:scale-90 btn-skeuo text-retro-muted hover:text-retro-fg hover:border-border-glass shadow-md"
           >
             <Share2 className="w-4.5 h-4.5 shrink-0 block m-auto transition-transform duration-150 hover:scale-110" />
           </button>

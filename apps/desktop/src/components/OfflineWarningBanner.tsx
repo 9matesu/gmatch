@@ -62,8 +62,8 @@ export function OfflineWarningBanner({ identity }: { identity: OrbitIdentity | n
     <div
       className={`fixed top-0 left-0 right-0 z-50 px-4 py-3 border-b ${
         isCritical
-          ? "bg-zinc-950/95 border-red-500/30 text-zinc-100"
-          : "bg-zinc-950/95 border-amber-500/30 text-zinc-100"
+          ? "bg-retro-bg/95 border-red-500/30 text-retro-fg"
+          : "bg-retro-bg/95 border-amber-500/30 text-retro-fg"
       } backdrop-blur-md shadow-md animate-orbit-slide-up`}
       role="alert"
       aria-live={isCritical ? "assertive" : "polite"}
@@ -77,11 +77,11 @@ export function OfflineWarningBanner({ identity }: { identity: OrbitIdentity | n
               <AlertTriangle className="w-5 h-5 text-amber-400" />
             )}
           </span>
-          <div className="text-xs leading-relaxed font-sans text-zinc-300">
+          <div className="text-xs leading-relaxed font-sans text-retro-fg">
             <strong className={`font-semibold block ${isCritical ? "text-red-400" : "text-amber-400"}`}>
               {isCritical ? "Account expires soon" : "Account at risk"}
             </strong>
-            You&apos;ve been offline for <strong className="text-zinc-100 font-mono">{warning.daysOffline} day(s)</strong>. 
+            You&apos;ve been offline for <strong className="text-retro-fg font-mono">{warning.daysOffline} day(s)</strong>. 
             Your account and all content will be permanently deleted{" "}
             {isCritical ? (
               <>in <strong className="text-red-300 font-mono">{warning.hoursLeft} hour(s)</strong>.</>
@@ -97,7 +97,7 @@ export function OfflineWarningBanner({ identity }: { identity: OrbitIdentity | n
               setDismissed(true);
               setTimeout(() => setDismissed(false), 30 * 60 * 1000);
             }}
-            className="px-3 py-1.5 text-xs font-medium rounded-md border border-zinc-800 bg-zinc-900 text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all duration-150 active:scale-[0.96] cursor-pointer"
+            className="px-3 py-1.5 text-xs font-medium rounded-md border border-border-glass bg-retro-panel text-retro-fg hover:text-white hover:bg-glass-w12 transition-all duration-150 active:scale-[0.96] cursor-pointer"
             aria-label="Dismiss warning for 30 minutes"
           >
             Dismiss
@@ -107,7 +107,7 @@ export function OfflineWarningBanner({ identity }: { identity: OrbitIdentity | n
             className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-150 active:scale-[0.96] shadow-xs ${
               isCritical
                 ? "bg-red-500 text-white hover:bg-red-600"
-                : "bg-white text-zinc-950 hover:bg-zinc-200"
+                : "bg-white text-retro-bg hover:bg-retro-fg"
             }`}
           >
             Log in now

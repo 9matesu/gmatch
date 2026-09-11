@@ -180,7 +180,7 @@ export function IdentityModal({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-system)] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 select-none font-sans"
+      className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 select-none font-sans"
       onClick={onClose}
     >
       <div

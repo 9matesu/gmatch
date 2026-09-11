@@ -122,19 +122,19 @@ export function CropModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[var(--z-system)] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg" onClick={onCancel}>
-      <div className="w-full max-w-sm bg-zinc-950 border border-zinc-800 rounded-xl p-4 space-y-3 animate-orbit-pop" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg" onClick={onCancel}>
+      <div className="w-full max-w-sm bg-retro-bg border border-border-glass rounded-xl p-4 space-y-3 animate-orbit-pop" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold">{title}</h3>
-          <button type="button" onClick={onCancel} aria-label="Cancel crop" className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900 cursor-pointer transition-colors">
+          <button type="button" onClick={onCancel} aria-label="Cancel crop" className="p-1.5 rounded-lg text-retro-muted hover:text-white hover:bg-retro-panel cursor-pointer transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
         <div ref={boxRef} className="h-[46vh] w-full flex items-center justify-center">
           {loadError ? (
-            <div className="text-xs text-zinc-400 text-center">Could not load this image — it will be used uncropped.</div>
+            <div className="text-xs text-retro-muted text-center">Could not load this image — it will be used uncropped.</div>
           ) : (
-            <div className="relative overflow-hidden rounded-lg border border-zinc-700 bg-black touch-none select-none" style={{ width: fw || 'auto', height: fh || 'auto' }}>
+            <div className="relative overflow-hidden rounded-lg border border-border-glass bg-black touch-none select-none" style={{ width: fw || 'auto', height: fh || 'auto' }}>
               {img && (
                 <img
                   src={src}
@@ -170,21 +170,21 @@ export function CropModal({
               key={a.id}
               type="button"
               onClick={() => { playPress(720); setAspect(a.id); setPan({ x: 0, y: 0 }); }}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-colors border ${aspect === a.id ? 'bg-zinc-100 text-zinc-950 border-zinc-100' : 'text-zinc-400 border-zinc-800 hover:text-white hover:bg-zinc-900'}`}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-colors border ${aspect === a.id ? 'bg-retro-fg text-retro-bg border-border-glass' : 'text-retro-muted border-border-glass hover:text-white hover:bg-retro-panel'}`}
             >
               {a.label}
             </button>
           ))}
         </div>
-        <label className="flex items-center gap-2 text-xs text-zinc-400">
+        <label className="flex items-center gap-2 text-xs text-retro-muted">
           <span className="w-10 shrink-0">Zoom</span>
           <input type="range" min={100} max={400} value={zoom} onChange={(e) => setZoomClamped(Number(e.target.value))} className="flex-1 accent-white" aria-label="Zoom" />
         </label>
         <div className="flex items-center justify-end gap-2 pt-1">
-          <button type="button" onClick={onCancel} className="px-3 py-2 rounded-lg text-xs font-semibold text-zinc-300 hover:bg-zinc-900 cursor-pointer transition-colors">
+          <button type="button" onClick={onCancel} className="px-3 py-2 rounded-lg text-xs font-semibold text-retro-fg hover:bg-retro-panel cursor-pointer transition-colors">
             Cancel
           </button>
-          <button type="button" onClick={exportCrop} disabled={loadError} className="px-4 py-2 rounded-lg bg-zinc-100 hover:bg-white disabled:opacity-40 text-black text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5">
+          <button type="button" onClick={exportCrop} disabled={loadError} className="px-4 py-2 rounded-lg bg-retro-fg hover:bg-white disabled:opacity-40 text-black text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5">
             <Check className="w-3.5 h-3.5" /> Apply
           </button>
         </div>

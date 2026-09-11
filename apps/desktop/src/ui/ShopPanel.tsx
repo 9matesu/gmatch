@@ -209,10 +209,10 @@ function TagsTab() {
                 className={`h-1.5 w-1.5 shrink-0 rounded-full ${on
                   ? 'bg-retro-online'
                   : isOwned
-                    ? 'bg-zinc-600'
+                    ? 'bg-glass-w20'
                     : afford
                       ? 'bg-retro-accent'
-                      : 'bg-zinc-700'
+                      : 'bg-glass-w20'
                   }`}
                 aria-hidden="true"
               />

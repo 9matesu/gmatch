@@ -198,7 +198,7 @@ export function SpectateModal({
       >
         <div
           onMouseDown={handleMouseDown}
-          className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-zinc-900 to-zinc-950 border-b border-zinc-800 cursor-grab active:cursor-grabbing"
+          className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-zinc-900 to-zinc-950 border-b border-border-glass cursor-grab active:cursor-grabbing"
         >
           <div className="flex items-center gap-2 min-w-0">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
@@ -307,7 +307,7 @@ export function SpectateModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/90 backdrop-blur-xl animate-orbit-fade-in font-sans select-none"
+        className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/70 backdrop-blur-xl animate-orbit-fade-in font-sans select-none"
         onClick={onClose}
       >
         <div
@@ -479,12 +479,12 @@ export function SpectateModal({
                                 muted
                                 playsInline
                               />
-                              <span className="absolute bottom-2 right-2 bg-black/70 border border-zinc-700 text-[10px] font-bold text-white px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                              <span className="absolute bottom-2 right-2 bg-black/70 border border-border-glass text-[10px] font-bold text-white px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                                 <ZoomIn className="w-3 h-3" />
                                 <span>ZOOM</span>
                               </span>
                             </div>
-                            <div className="p-2 bg-surface-canvas/90 border-t border-zinc-800/80 backdrop-blur-md text-left">
+                            <div className="p-2 bg-surface-canvas/90 border-t border-border-glass backdrop-blur-md text-left">
                               <div className="text-xs font-semibold text-retro-fg truncate">{pA.display_name || 'Player 1'}</div>
                             </div>
                           </button>
@@ -539,12 +539,12 @@ export function SpectateModal({
                                 muted
                                 playsInline
                               />
-                              <span className="absolute bottom-2 right-2 bg-black/70 border border-zinc-700 text-[10px] font-bold text-white px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                              <span className="absolute bottom-2 right-2 bg-black/70 border border-border-glass text-[10px] font-bold text-white px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                                 <ZoomIn className="w-3 h-3" />
                                 <span>ZOOM</span>
                               </span>
                             </div>
-                            <div className="p-2 bg-surface-canvas/90 border-t border-zinc-800/80 backdrop-blur-md text-left">
+                            <div className="p-2 bg-surface-canvas/90 border-t border-border-glass backdrop-blur-md text-left">
                               <div className="text-xs font-semibold text-retro-fg truncate">{pB.display_name || 'Player 2'}</div>
                             </div>
                           </button>

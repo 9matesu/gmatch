@@ -368,7 +368,7 @@ export function SidebarNav({
 
   const dropIndicator = (id: string) =>
     overId === id && dragId && dragId !== id
-      ? ' outline outline-1 -outline-offset-1 outline-zinc-500/70'
+      ? ' outline outline-1 -outline-offset-1 outline-border-strong'
       : '';
 
   return (
@@ -394,7 +394,7 @@ export function SidebarNav({
             type="button"
             onClick={() => { playPress(700); onOpenHome?.(); }}
             aria-label="Go to gMatch home"
-            className="text-sm font-bold text-zinc-100 tracking-tight leading-none hover:text-white transition-colors cursor-pointer"
+            className="text-sm font-bold text-retro-fg tracking-tight leading-none hover:text-white transition-colors cursor-pointer"
           >
             gMatch
           </button>
@@ -481,7 +481,7 @@ export function SidebarNav({
                     <GroupIcon className="w-4 h-4 shrink-0 opacity-85 stroke-[1.75]" />
                     {!collapsed && <span className="truncate">{item.label}</span>}
                     {!collapsed && Boolean(item.badge && item.badge > 0) && (
-                      <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-emerald-400 text-[10px] font-bold text-zinc-950 tabular-nums">
+                      <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-emerald-400 text-[10px] font-bold text-retro-bg tabular-nums">
                         {item.badge! > 99 ? '99+' : item.badge}
                       </span>
                     )}
@@ -513,7 +513,7 @@ export function SidebarNav({
                           <ChildIcon className="w-3.5 h-3.5 shrink-0 opacity-85 stroke-[1.75]" />
                           <span className="truncate">{child.label}</span>
                           {Boolean(child.badge && child.badge > 0) && (
-                            <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-zinc-100 text-[10px] font-bold text-zinc-950 tabular-nums">
+                            <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-retro-fg text-[10px] font-bold text-retro-bg tabular-nums">
                               {child.badge! > 9 ? '9+' : child.badge}
                             </span>
                           )}
@@ -546,7 +546,7 @@ export function SidebarNav({
               )}
 
               {!collapsed && Boolean(item.badge && item.badge > 0) && (
-                <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-zinc-100 text-[10px] font-bold text-zinc-950 tabular-nums">
+                <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-retro-fg text-[10px] font-bold text-retro-bg tabular-nums">
                   {item.badge! > 9 ? '9+' : item.badge}
                 </span>
               )}

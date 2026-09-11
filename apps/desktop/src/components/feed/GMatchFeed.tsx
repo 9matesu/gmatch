@@ -545,7 +545,7 @@ export function GMatchFeed({
       {/* Feed Content Column (Posts) */}
       <div className="w-full max-w-[1400px] mx-auto flex flex-col px-2 sm:px-4 py-2 space-y-3">
         {/* Feed Sort / Filter Bar */}
-        <div className="flex items-center justify-between px-3 sm:px-6 py-2 gap-2 border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm sticky top-[57px] z-20">
+        <div className="flex items-center justify-between px-3 sm:px-6 py-2 gap-2 border-b border-border-glass bg-retro-panel backdrop-blur-sm sticky top-[57px] z-20">
           <div className="flex items-center gap-1 text-xs">
             {(['latest', 'trending'] as const).map((mode) => (
               <button
@@ -553,8 +553,8 @@ export function GMatchFeed({
                 type="button"
                 onClick={() => { playPress(720); onFeedSortChange?.(mode); }}
                 className={`px-3 py-1.5 rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer font-medium ${feedSort === mode
-                    ? 'bg-zinc-800 text-zinc-100 shadow-xs border border-zinc-700'
-                    : 'text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-glass-w12 text-retro-fg shadow-xs border border-border-glass'
+                    : 'text-retro-muted hover:text-retro-fg'
                   }`}
               >
                 {mode === 'latest' ? 'Latest' : 'Trending'}
@@ -562,18 +562,18 @@ export function GMatchFeed({
             ))}
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-zinc-400">
+            <span className="text-xs text-retro-muted">
               {displayPosts.length} posts
             </span>
-            <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-md p-0.5 text-xs">
+            <div className="flex items-center bg-retro-panel border border-border-glass rounded-md p-0.5 text-xs">
               {(['1', '2', '3', '4', '5'] as const).map((cols) => (
                 <button
                   key={cols}
                   type="button"
                   onClick={() => { playPress(720); onFeedColsChange?.(cols); }}
                   className={`px-2 py-1 rounded transition-all duration-150 active:scale-[0.96] cursor-pointer font-medium ${feedCols === cols
-                      ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
-                      : 'text-zinc-400 hover:text-zinc-200'
+                      ? 'bg-retro-fg text-retro-bg font-semibold shadow-xs'
+                      : 'text-retro-muted hover:text-retro-fg'
                     }`}
                   title={`${cols}-column feed`}
                   aria-label={`${cols}-column feed`}
@@ -602,13 +602,13 @@ export function GMatchFeed({
             return post.is_sponsored ? (
               <article
                 key={post.id}
-                className={`bg-zinc-900/60 border border-zinc-800 rounded-lg overflow-hidden flex flex-col [content-visibility:auto] [contain-intrinsic-size:0_560px] shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
+                className={`bg-retro-panel border border-border-glass rounded-lg overflow-hidden flex flex-col [content-visibility:auto] [contain-intrinsic-size:0_560px] shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
                 {/* Sponsored Banner */}
-                <div className="bg-zinc-950 px-4 py-2 flex items-center gap-2 text-xs text-zinc-400 border-b border-zinc-800">
-                  <Sparkles className="w-3.5 h-3.5 text-zinc-300" />
+                <div className="bg-retro-bg px-4 py-2 flex items-center gap-2 text-xs text-retro-muted border-b border-border-glass">
+                  <Sparkles className="w-3.5 h-3.5 text-retro-fg" />
                   <span>Sponsored</span>
-                  <span className="ml-auto text-zinc-500">
+                  <span className="ml-auto text-retro-muted">
                     {GAME_AD_TEMPLATES.find((t) => t.mode === post.game_mode)?.gameName || 'gMatch Arcade'}
                   </span>
                 </div>
@@ -637,7 +637,7 @@ export function GMatchFeed({
                               // the vercel-style refactor dropped these handlers).
                               onOpenGameAd?.(post.game_mode || 'duel');
                             }}
-                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-zinc-950 font-bold text-xs uppercase tracking-wider hover:bg-zinc-100 transition-transform active:scale-95 shadow-lg"
+                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-retro-bg font-bold text-xs uppercase tracking-wider hover:bg-retro-fg transition-transform active:scale-95 shadow-lg"
                           >
                             <span>{post.cta_label || 'Play Now'}</span>
                             <ChevronRight className="w-3.5 h-3.5" />
@@ -651,13 +651,13 @@ export function GMatchFeed({
             ) : (
               <article
                 key={post.id}
-                className={`bg-zinc-900/60 border border-zinc-800 rounded-lg overflow-hidden flex flex-col [content-visibility:auto] [contain-intrinsic-size:0_560px] shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
+                className={`bg-retro-panel border border-border-glass rounded-lg overflow-hidden flex flex-col [content-visibility:auto] [contain-intrinsic-size:0_560px] shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
                 {/* Repost Header Banner */}
                 {post.is_reposted && (
-                  <div className="bg-zinc-950 border-b border-zinc-800 px-4 py-2 flex items-center gap-1.5 text-xs text-zinc-400">
-                    <Repeat className="w-3.5 h-3.5 text-zinc-300" />
-                    <span>Reposted by <strong className="text-zinc-200 font-medium">@{post.reposted_by || 'Peer'}</strong></span>
+                  <div className="bg-retro-bg border-b border-border-glass px-4 py-2 flex items-center gap-1.5 text-xs text-retro-muted">
+                    <Repeat className="w-3.5 h-3.5 text-retro-fg" />
+                    <span>Reposted by <strong className="text-retro-fg font-medium">@{post.reposted_by || 'Peer'}</strong></span>
                   </div>
                 )}
 
@@ -669,8 +669,8 @@ export function GMatchFeed({
                     onContextMenu={(e) => onUserContext?.(e, post.author_id, post.author_name)}
                     title={authorHasStory ? 'Watch story' : 'View profile'}
                   >
-                    <div className={`w-8 h-8 rounded-full p-[1.5px] flex-shrink-0 ${authorHasStory ? 'bg-gradient-to-tr from-zinc-300 to-zinc-600' : 'bg-zinc-800 border border-zinc-700'}`}>
-                      <div className="w-full h-full rounded-full bg-zinc-900 overflow-hidden flex items-center justify-center text-xs font-semibold text-zinc-200">
+                    <div className={`w-8 h-8 rounded-full p-[1.5px] flex-shrink-0 ${authorHasStory ? 'bg-gradient-to-tr from-zinc-300 to-zinc-600' : 'bg-glass-w12 border border-border-glass'}`}>
+                      <div className="w-full h-full rounded-full bg-retro-panel overflow-hidden flex items-center justify-center text-xs font-semibold text-retro-fg">
                         {profilePics[post.author_id] || post.author_avatar ? (
                           <img src={profilePics[post.author_id] || post.author_avatar!} alt="" className="w-full h-full object-cover" />
                         ) : (
@@ -680,13 +680,13 @@ export function GMatchFeed({
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-semibold text-zinc-200 group-hover:underline">{post.author_name}</span>
-                        <time className="text-xs text-zinc-500" dateTime={post.created_at}>
+                        <span className="text-xs font-semibold text-retro-fg group-hover:underline">{post.author_name}</span>
+                        <time className="text-xs text-retro-muted" dateTime={post.created_at}>
                           {new Date(post.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                         </time>
                       </div>
                       {post.location && (
-                        <span className="text-xs text-zinc-500 block">{post.location}</span>
+                        <span className="text-xs text-retro-muted block">{post.location}</span>
                       )}
                     </div>
                   </div>
@@ -694,7 +694,7 @@ export function GMatchFeed({
                   <button
                     type="button"
                     onClick={() => setOptionsPost(post)}
-                    className="text-zinc-400 hover:text-zinc-200 p-1.5 rounded-md cursor-pointer hover:bg-zinc-800 transition-colors"
+                    className="text-retro-muted hover:text-retro-fg p-1.5 rounded-md cursor-pointer hover:bg-glass-w12 transition-colors"
                     aria-label="Post options"
                   >
                     <MoreHorizontal className="w-4 h-4" />
@@ -824,7 +824,7 @@ export function GMatchFeed({
                         className="cursor-pointer transition-transform duration-150 active:scale-[0.92]"
                       >
                         <Heart
-                          className={`w-4 h-4 transition-colors stroke-[1.75] ${isLiked ? 'text-rose-500 fill-rose-500' : 'text-zinc-400 hover:text-zinc-200'
+                          className={`w-4 h-4 transition-colors stroke-[1.75] ${isLiked ? 'text-rose-500 fill-rose-500' : 'text-retro-muted hover:text-retro-fg'
                             }`}
                         />
                       </button>
@@ -836,7 +836,7 @@ export function GMatchFeed({
                           setActiveLightboxPost(post);
                         }}
                         aria-label="Comment"
-                        className="text-zinc-400 hover:text-zinc-200 cursor-pointer transition-transform duration-150 active:scale-[0.92]"
+                        className="text-retro-muted hover:text-retro-fg cursor-pointer transition-transform duration-150 active:scale-[0.92]"
                       >
                         <MessageCircle className="w-4 h-4 stroke-[1.75]" />
                       </button>
@@ -845,7 +845,7 @@ export function GMatchFeed({
                         type="button"
                         onClick={() => setSharingPost(post)}
                         aria-label="Share post"
-                        className="text-zinc-400 hover:text-zinc-200 cursor-pointer transition-transform duration-150 active:scale-[0.92]"
+                        className="text-retro-muted hover:text-retro-fg cursor-pointer transition-transform duration-150 active:scale-[0.92]"
                       >
                         <Send className="w-4 h-4 stroke-[1.75]" />
                       </button>
@@ -858,7 +858,7 @@ export function GMatchFeed({
                       className="cursor-pointer transition-transform duration-150 active:scale-[0.92]"
                     >
                       <Bookmark
-                        className={`w-4 h-4 transition-colors stroke-[1.75] ${isSaved ? 'text-zinc-100 fill-zinc-100' : 'text-zinc-400 hover:text-zinc-200'
+                        className={`w-4 h-4 transition-colors stroke-[1.75] ${isSaved ? 'text-retro-fg fill-retro-fg' : 'text-retro-muted hover:text-retro-fg'
                           }`}
                       />
                     </button>
@@ -866,16 +866,16 @@ export function GMatchFeed({
 
                   {/* Likes Count */}
                   {currentLikes > 0 && (
-                    <div className="text-xs font-semibold text-zinc-300 font-mono tracking-tight">
+                    <div className="text-xs font-semibold text-retro-fg font-mono tracking-tight">
                       {currentLikes.toLocaleString()} {currentLikes === 1 ? 'like' : 'likes'}
                     </div>
                   )}
 
                   {/* Caption & Tags */}
                   {post.caption && (
-                    <div className="text-xs text-zinc-300 leading-relaxed">
+                    <div className="text-xs text-retro-fg leading-relaxed">
                       <span
-                        className="font-semibold text-zinc-100 mr-1.5 cursor-pointer hover:underline"
+                        className="font-semibold text-retro-fg mr-1.5 cursor-pointer hover:underline"
                         onClick={() => onSelectUser?.(post.author_id)}
                       >
                         {post.author_name}
@@ -891,7 +891,7 @@ export function GMatchFeed({
                         <span
                           key={t}
                           onClick={() => boostTagAffinity([t])}
-                          className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800/70 text-zinc-400 hover:text-zinc-200 cursor-pointer transition-colors"
+                          className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-glass-w12 text-retro-muted hover:text-retro-fg cursor-pointer transition-colors"
                         >
                           #{t.replace(/^#/, '')}
                         </span>
@@ -905,16 +905,16 @@ export function GMatchFeed({
                       <button
                         type="button"
                         onClick={() => { playPress(750); setActiveLightboxPost(post); }}
-                        className="text-left text-xs text-zinc-400 hover:text-zinc-200 cursor-pointer font-medium block"
+                        className="text-left text-xs text-retro-muted hover:text-retro-fg cursor-pointer font-medium block"
                       >
                         View all {postComments.length} comments
                       </button>
 
                       {/* Show top recent comment snippet */}
-                      <div className="text-xs text-zinc-300 flex items-center justify-between">
+                      <div className="text-xs text-retro-fg flex items-center justify-between">
                         <div className="truncate">
-                          <strong className="font-semibold text-zinc-100 mr-1.5">{postComments[postComments.length - 1].author_name}</strong>
-                          <span className="text-zinc-400">{postComments[postComments.length - 1].text}</span>
+                          <strong className="font-semibold text-retro-fg mr-1.5">{postComments[postComments.length - 1].author_name}</strong>
+                          <span className="text-retro-muted">{postComments[postComments.length - 1].text}</span>
                         </div>
                       </div>
                     </div>
@@ -922,7 +922,7 @@ export function GMatchFeed({
                     <button
                       type="button"
                       onClick={() => { playPress(750); setActiveLightboxPost(post); }}
-                      className="text-left text-xs text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                      className="text-left text-xs text-retro-muted hover:text-retro-fg cursor-pointer"
                     >
                       Add a comment...
                     </button>
@@ -933,12 +933,12 @@ export function GMatchFeed({
           })}
 
           {displayPosts.length === 0 && (
-            <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-8 text-center space-y-3 shadow-xs my-4">
-              <div className="w-12 h-12 rounded-full bg-zinc-800/60 border border-zinc-700/60 flex items-center justify-center mx-auto text-zinc-400">
+            <div className="bg-retro-panel border border-border-glass rounded-lg p-8 text-center space-y-3 shadow-xs my-4">
+              <div className="w-12 h-12 rounded-full bg-glass-w12 border border-border-glass flex items-center justify-center mx-auto text-retro-muted">
                 <Camera className="w-5 h-5 stroke-[1.75]" />
               </div>
-              <h4 className="text-sm font-semibold text-zinc-100">No Posts Yet</h4>
-              <p className="text-xs text-zinc-400 max-w-xs mx-auto leading-relaxed">
+              <h4 className="text-sm font-semibold text-retro-fg">No Posts Yet</h4>
+              <p className="text-xs text-retro-muted max-w-xs mx-auto leading-relaxed">
                 Capture or upload your first photo or video post to start sharing with your friends!
               </p>
               <button
@@ -959,8 +959,8 @@ export function GMatchFeed({
           {displayPosts.length > 0 && hasMore !== false && (
             <div ref={sentinelRef} className="py-6 flex flex-col items-center justify-center gap-2">
               {(internalLoadingMore || isLoadingMore) ? (
-                <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-800 shadow-xs text-xs font-medium text-zinc-300">
-                  <span className="w-3.5 h-3.5 border-2 border-zinc-700 border-t-zinc-200 rounded-full animate-spin" />
+                <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-retro-panel border border-border-glass shadow-xs text-xs font-medium text-retro-fg">
+                  <span className="w-3.5 h-3.5 border-2 border-border-glass border-t-retro-fg rounded-full animate-spin" />
                   <span>Loading more moments…</span>
                 </div>
               ) : (

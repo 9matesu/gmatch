@@ -159,7 +159,7 @@ export function LiveCameraModal({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-system)] bg-black/80 backdrop-blur-md flex items-center justify-center p-0 sm:p-4 animate-orbit-fade-in select-none"
+      className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-md flex items-center justify-center p-0 sm:p-4 animate-orbit-fade-in select-none"
       onClick={onClose}
     >
       <div
@@ -200,7 +200,7 @@ export function LiveCameraModal({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-4 py-2 bg-surface-elevated text-white text-xs font-bold rounded-xl cursor-pointer hover:bg-zinc-700 flex items-center gap-1.5"
+                  className="px-4 py-2 bg-surface-elevated text-white text-xs font-bold rounded-xl cursor-pointer hover:bg-glass-w20 flex items-center gap-1.5"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   <span>Upload File</span>

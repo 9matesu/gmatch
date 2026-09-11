@@ -403,7 +403,7 @@ export function GMatchDMs({
       <div className={`w-full md:w-80 lg:w-88 border-r border-border-glass flex flex-col bg-surface-canvas/80 shrink-0 min-h-0 select-none ${openTarget ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-3 sm:p-4 metro-rule flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            <h2 className="font-semibold text-sm text-zinc-50 truncate">
+            <h2 className="font-semibold text-sm text-retro-fg truncate">
               {myDisplayName || 'Messages'}
             </h2>
           </div>

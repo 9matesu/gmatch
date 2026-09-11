@@ -144,34 +144,34 @@ export function OnboardingFlow({
   };
 
   return (
-    <div className="fixed inset-0 z-[var(--z-lightbox)] overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-zinc-100">
-      <div className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-xl p-6 sm:p-8 shadow-2xl space-y-6 animate-orbit-slide-up">
+    <div className="fixed inset-0 z-[var(--z-lightbox)] overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg">
+      <div className="w-full max-w-lg bg-retro-bg border border-border-glass rounded-xl p-6 sm:p-8 shadow-2xl space-y-6 animate-orbit-slide-up">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-[10px] font-mono uppercase tracking-wider text-zinc-400">
-              <Sparkles className="w-3 h-3 text-zinc-300" />
+            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-retro-panel border border-border-glass text-[10px] font-mono uppercase tracking-wider text-retro-muted">
+              <Sparkles className="w-3 h-3 text-retro-fg" />
               <span>Decentralized Adult Network</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-white">
               Welcome to gMatch
             </h1>
-            <p className="text-xs text-zinc-400 leading-relaxed">
+            <p className="text-xs text-retro-muted leading-relaxed">
               Fast, privacy-preserving adult media and peer-to-peer card gaming.
             </p>
           </div>
-          <div className="w-10 h-10 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-200 shrink-0">
+          <div className="w-10 h-10 rounded-lg bg-retro-panel border border-border-glass flex items-center justify-center text-retro-fg shrink-0">
             <ShieldAlert className="w-5 h-5" />
           </div>
         </div>
 
         {/* Legal & Privacy Advisory Box */}
-        <div className="rounded-lg border border-zinc-800/90 bg-zinc-900/40 p-4 space-y-3">
+        <div className="rounded-lg border border-border-glass bg-retro-panel/40 p-4 space-y-3">
           <div className="flex items-start gap-2.5 text-xs">
             <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
             <div>
               <span className="font-semibold text-white">18+ Mature Content Only</span>
-              <p className="text-zinc-400 text-xs leading-relaxed">
+              <p className="text-retro-muted text-xs leading-relaxed">
                 gMatch contains adult media and community content intended exclusively for adults. You must be at least 18 years old to access this platform.
               </p>
             </div>
@@ -181,27 +181,27 @@ export function OnboardingFlow({
             <Lock className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
             <div>
               <span className="font-semibold text-white">Local-First &amp; P2P Privacy</span>
-              <p className="text-zinc-400 text-xs leading-relaxed">
+              <p className="text-retro-muted text-xs leading-relaxed">
                 Your cryptographic keys and preferences remain securely on your device. We do not sell your personal data or track your behavior across platforms.
               </p>
             </div>
           </div>
 
           <div className="flex items-start gap-2.5 text-xs">
-            <Scale className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
+            <Scale className="w-4 h-4 text-retro-muted shrink-0 mt-0.5" />
             <div>
               <span className="font-semibold text-white">Zero Tolerance Policy</span>
-              <p className="text-zinc-400 text-xs leading-relaxed">
+              <p className="text-retro-muted text-xs leading-relaxed">
                 Strict zero tolerance for non-consensual imagery, underage material, or illegal content.
               </p>
             </div>
           </div>
 
-          <div className="pt-1 border-t border-zinc-800/60">
+          <div className="pt-1 border-t border-border-glass">
             <button
               type="button"
               onClick={() => { playPress(700); onOpenTos(); }}
-              className="text-xs text-zinc-400 hover:text-white underline underline-offset-2 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="text-xs text-retro-muted hover:text-white underline underline-offset-2 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <FileText className="w-3.5 h-3.5" />
               <span>Read Full Terms of Service &amp; Privacy Policy</span>
@@ -213,9 +213,9 @@ export function OnboardingFlow({
         <div className="space-y-4">
           {!isImporting ? (
             <div className="space-y-1.5">
-              <label htmlFor="onboarding-display-name" className="text-xs font-medium text-zinc-300 flex items-center justify-between">
+              <label htmlFor="onboarding-display-name" className="text-xs font-medium text-retro-fg flex items-center justify-between">
                 <span>Display Name</span>
-                <span className="text-[10px] text-zinc-500 font-normal">Public handle</span>
+                <span className="text-[10px] text-retro-muted font-normal">Public handle</span>
               </label>
               <div className="flex items-center gap-2">
                 <input
@@ -225,13 +225,13 @@ export function OnboardingFlow({
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. AnonGooner"
                   maxLength={30}
-                  className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-zinc-500 transition-colors"
+                  className="flex-1 bg-retro-panel border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-border-glass transition-colors"
                 />
                 <button
                   type="button"
                   onClick={handleRandomize}
                   title="Generate random anonymous handle"
-                  className="p-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer shrink-0"
+                  className="p-2 bg-retro-panel hover:bg-glass-w12 border border-border-glass rounded-lg text-retro-muted hover:text-retro-fg transition-colors cursor-pointer shrink-0"
                 >
                   <Dices className="w-4 h-4" />
                 </button>
@@ -240,7 +240,7 @@ export function OnboardingFlow({
           ) : (
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <label htmlFor="onboarding-secret-key" className="text-xs font-medium text-zinc-300">
+                <label htmlFor="onboarding-secret-key" className="text-xs font-medium text-retro-fg">
                   Secret Key
                 </label>
                 <input
@@ -249,11 +249,11 @@ export function OnboardingFlow({
                   value={secretKey}
                   onChange={(e) => setSecretKey(e.target.value)}
                   placeholder="Paste your exported secret key"
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs font-mono text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-zinc-500 transition-colors"
+                  className="w-full bg-retro-panel border border-border-glass rounded-lg px-3 py-2 text-xs font-mono text-retro-fg placeholder:text-retro-muted outline-none focus:border-border-glass transition-colors"
                 />
               </div>
               <div className="space-y-1.5">
-                <label htmlFor="onboarding-import-name" className="text-xs font-medium text-zinc-300">
+                <label htmlFor="onboarding-import-name" className="text-xs font-medium text-retro-fg">
                   Display Name (Optional)
                 </label>
                 <input
@@ -263,7 +263,7 @@ export function OnboardingFlow({
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Leave blank to use existing name"
                   maxLength={30}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-zinc-500 transition-colors"
+                  className="w-full bg-retro-panel border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-border-glass transition-colors"
                 />
               </div>
             </div>
@@ -273,7 +273,7 @@ export function OnboardingFlow({
           <button
             type="button"
             onClick={() => { playPress(400); setIsImporting(!isImporting); }}
-            className="text-xs text-zinc-500 hover:text-zinc-300 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+            className="text-xs text-retro-muted hover:text-retro-fg inline-flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <KeyRound className="w-3.5 h-3.5" />
             <span>{isImporting ? 'Create new anonymous identity instead' : 'Returning user? Import secret key'}</span>
@@ -281,14 +281,14 @@ export function OnboardingFlow({
         </div>
 
         {/* Checkbox Gate */}
-        <label className="flex items-start gap-3 p-3 rounded-lg border border-zinc-800 bg-zinc-900/30 hover:bg-zinc-900/60 transition-colors cursor-pointer select-none">
+        <label className="flex items-start gap-3 p-3 rounded-lg border border-border-glass bg-retro-panel/30 hover:bg-retro-panel/60 transition-colors cursor-pointer select-none">
           <input
             type="checkbox"
             checked={ageConfirmed}
             onChange={(e) => { playPress(600); setAgeConfirmed(e.target.checked); }}
-            className="w-4 h-4 mt-0.5 rounded border-zinc-700 bg-zinc-900 text-white accent-white cursor-pointer"
+            className="w-4 h-4 mt-0.5 rounded border-border-glass bg-retro-panel text-white accent-white cursor-pointer"
           />
-          <span className="text-xs text-zinc-300 leading-snug">
+          <span className="text-xs text-retro-fg leading-snug">
             I confirm that I am at least <strong>18 years of age</strong>, and I agree to the{' '}
             <button
               type="button"
@@ -297,7 +297,7 @@ export function OnboardingFlow({
                 playPress(700);
                 onOpenTos();
               }}
-              className="text-white underline underline-offset-2 hover:text-zinc-200"
+              className="text-white underline underline-offset-2 hover:text-retro-fg"
             >
               Terms of Service &amp; Privacy Policy
             </button>
@@ -317,7 +317,7 @@ export function OnboardingFlow({
             type="button"
             onClick={handleEnter}
             disabled={busy || !ageConfirmed || (!name.trim() && !isImporting) || (isImporting && !secretKey.trim())}
-            className="w-full py-2.5 px-4 rounded-lg bg-white hover:bg-zinc-200 active:scale-[0.99] text-black font-semibold text-xs shadow-sm transition-all disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-2.5 px-4 rounded-lg bg-white hover:bg-retro-fg active:scale-[0.99] text-black font-semibold text-xs shadow-sm transition-all disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
           >
             {busy ? (
               <span>Configuring Account...</span>

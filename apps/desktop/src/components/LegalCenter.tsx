@@ -83,25 +83,25 @@ export function LegalCenter({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-toast)] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-orbit-fade-in font-sans"
+      className="fixed inset-0 z-[var(--z-toast)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-orbit-fade-in font-sans"
       onClick={requireAccept ? undefined : onClose}
       role="dialog"
       aria-modal="true"
       aria-label="Legal Center"
     >
       <div
-        className="bg-zinc-950 border border-zinc-800 rounded-xl max-w-3xl w-full max-h-[88vh] shadow-2xl flex flex-col animate-orbit-slide-up text-zinc-100"
+        className="bg-retro-bg border border-border-glass rounded-xl max-w-3xl w-full max-h-[88vh] shadow-2xl flex flex-col animate-orbit-slide-up text-retro-fg"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-zinc-800 flex items-center justify-between gap-2">
+        <div className="p-4 sm:p-5 border-b border-border-glass flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 shrink-0 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 flex items-center justify-center">
+            <div className="w-8 h-8 shrink-0 rounded-lg bg-retro-panel border border-border-glass text-retro-fg flex items-center justify-center">
               <Scale className="w-4 h-4" />
             </div>
             <div className="min-w-0">
               <h2 className="text-sm font-semibold text-white truncate">Legal Center — gMatch</h2>
-              <p className="text-xs text-zinc-400">
+              <p className="text-xs text-retro-muted">
                 {doc.title} · v{doc.version}
               </p>
             </div>
@@ -111,7 +111,7 @@ export function LegalCenter({
               <button
                 type="button"
                 onClick={() => { playPress(700); onClose() }}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-retro-muted hover:text-white hover:bg-retro-panel transition-colors cursor-pointer"
                 aria-label="Close"
               >
                 <X className="w-4 h-4" />
@@ -122,14 +122,14 @@ export function LegalCenter({
 
         <div className="flex flex-1 min-h-0">
           {/* Doc nav */}
-          <nav className="w-44 sm:w-52 shrink-0 border-r border-zinc-800/70 overflow-y-auto p-2 space-y-1 hidden sm:block">
+          <nav className="w-44 sm:w-52 shrink-0 border-r border-border-glass overflow-y-auto p-2 space-y-1 hidden sm:block">
             {LEGAL_IDS.map((id) => (
               <button
                 key={id}
                 type="button"
                 onClick={() => { playPress(650); setActive(id) }}
                 className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                  active === id ? 'bg-zinc-900 text-white border border-zinc-700' : 'text-zinc-400 hover:text-white hover:bg-zinc-900/50 border border-transparent'
+                  active === id ? 'bg-retro-panel text-white border border-border-glass' : 'text-retro-muted hover:text-white hover:bg-retro-panel/50 border border-transparent'
                 }`}
               >
                 {NAV_LABELS[id]}
@@ -138,7 +138,7 @@ export function LegalCenter({
           </nav>
 
           {/* Body */}
-          <div className="flex-1 min-w-0 overflow-y-auto p-5 sm:p-6 space-y-4 text-xs text-zinc-300 leading-relaxed">
+          <div className="flex-1 min-w-0 overflow-y-auto p-5 sm:p-6 space-y-4 text-xs text-retro-fg leading-relaxed">
             {/* mobile doc switcher */}
             <div className="sm:hidden flex gap-1.5 overflow-x-auto pb-2">
               {LEGAL_IDS.map((id) => (
@@ -147,7 +147,7 @@ export function LegalCenter({
                   type="button"
                   onClick={() => setActive(id)}
                   className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] border cursor-pointer ${
-                    active === id ? 'bg-zinc-900 text-white border-zinc-700' : 'text-zinc-400 border-zinc-800'
+                    active === id ? 'bg-retro-panel text-white border-border-glass' : 'text-retro-muted border-border-glass'
                   }`}
                 >
                   {NAV_LABELS[id]}
@@ -155,7 +155,7 @@ export function LegalCenter({
               ))}
             </div>
 
-            <p className="text-xs text-zinc-500 border border-zinc-800/70 rounded-lg px-3 py-2 flex items-start gap-2">
+            <p className="text-xs text-retro-muted border border-border-glass rounded-lg px-3 py-2 flex items-start gap-2">
               <FileText className="w-3.5 h-3.5 mt-0.5 shrink-0" />
               <span>
                 Binding English text. Last updated: {doc.updated} · {doc.jurisdiction}.
@@ -171,11 +171,11 @@ export function LegalCenter({
                   <h4 className="font-semibold text-white mb-1">{heading.replace(/^## /, '')}</h4>
                   {block.map((line, j) =>
                     line.startsWith('- ') ? (
-                      <ul key={j} className="list-disc pl-5 text-zinc-400 space-y-1 my-1">
+                      <ul key={j} className="list-disc pl-5 text-retro-muted space-y-1 my-1">
                         <li>{renderBold(line.slice(2))}</li>
                       </ul>
                     ) : (
-                      <p key={j} className="text-zinc-400 my-2">
+                      <p key={j} className="text-retro-muted my-2">
                         {renderBold(line)}
                       </p>
                     ),
@@ -187,18 +187,18 @@ export function LegalCenter({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-zinc-800 bg-zinc-900/30 flex items-center justify-between gap-2">
+        <div className="p-4 border-t border-border-glass bg-retro-panel/30 flex items-center justify-between gap-2">
           <button
             type="button"
             onClick={() => { playPress(720); download() }}
-            className="px-3 py-2 rounded-lg border border-zinc-700 text-zinc-300 hover:text-white hover:bg-zinc-900 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+            className="px-3 py-2 rounded-lg border border-border-glass text-retro-fg hover:text-white hover:bg-retro-panel text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
           >
             <Download className="w-3.5 h-3.5" /> Download Markdown
           </button>
           <button
             type="button"
             onClick={() => { playPress(750); markLegalAccepted(); onAccept?.(); if (!onAccept) onClose() }}
-            className="px-4 py-2 bg-white hover:bg-zinc-200 text-black font-semibold text-xs rounded-lg transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+            className="px-4 py-2 bg-white hover:bg-retro-fg text-black font-semibold text-xs rounded-lg transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
           >
             <Check className="w-3.5 h-3.5" /> I Accept the Terms
           </button>
@@ -212,5 +212,5 @@ export function LegalCenter({
 function renderBold(text: string): React.ReactNode {
   const parts = text.split(/\*\*(.+?)\*\*/g)
   if (parts.length === 1) return text
-  return parts.map((p, i) => (i % 2 === 1 ? <strong key={i} className="text-zinc-200">{p}</strong> : p))
+  return parts.map((p, i) => (i % 2 === 1 ? <strong key={i} className="text-retro-fg">{p}</strong> : p))
 }

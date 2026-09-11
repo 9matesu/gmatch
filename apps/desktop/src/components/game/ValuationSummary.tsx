@@ -192,9 +192,9 @@ export function ValuationSummary({
   const spotlightCard = summary.cardOfTheMatch;
 
   return (
-    <div className="space-y-4 animate-orbit-slide-up bg-surface-canvas/70 border border-zinc-800 rounded-xl p-4 font-sans text-retro-fg backdrop-blur-md">
+    <div className="space-y-4 animate-orbit-slide-up bg-surface-canvas/70 border border-border-glass rounded-xl p-4 font-sans text-retro-fg backdrop-blur-md">
       {/* Header: Social Valuation Summary banner */}
-      <div className="p-4 bg-surface-canvas/60 border border-zinc-800/80 rounded-xl text-center space-y-2">
+      <div className="p-4 bg-surface-canvas/60 border border-border-glass rounded-xl text-center space-y-2">
         <div className="flex items-center justify-center gap-1.5 text-xs font-bold uppercase tracking-wider text-retro-body">
           <Trophy className="w-4 h-4 text-amber-400" />
           <span>Match Valuation Complete</span>
@@ -230,8 +230,8 @@ export function ValuationSummary({
 
       {/* Card of the Match Spotlight */}
       {spotlightCard && spotlightCard.delta > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-surface-canvas/50 border border-zinc-800 rounded-xl">
-          <div className="w-14 h-14 rounded-lg border border-zinc-700 overflow-hidden shrink-0 bg-black">
+        <div className="flex items-center gap-3 p-3 bg-surface-canvas/50 border border-border-glass rounded-xl">
+          <div className="w-14 h-14 rounded-lg border border-border-glass overflow-hidden shrink-0 bg-black">
             <ObjectImage
               contentUrl={spotlightCard.url}
               objectId={spotlightCard.id}
@@ -262,8 +262,8 @@ export function ValuationSummary({
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {/* My Played Cards */}
-          <div className="p-3 bg-surface-canvas/50 border border-zinc-800/80 rounded-xl space-y-2">
-            <div className="text-xs font-bold text-retro-body border-b border-zinc-800 pb-1.5">
+          <div className="p-3 bg-surface-canvas/50 border border-border-glass rounded-xl space-y-2">
+            <div className="text-xs font-bold text-retro-body border-b border-border-glass pb-1.5">
               Your Cards Valuation:
             </div>
             {summary.myCardDeltas.map((c) => {
@@ -286,8 +286,8 @@ export function ValuationSummary({
           </div>
 
           {/* Opponent Cards */}
-          <div className="p-3 bg-surface-canvas/50 border border-zinc-800/80 rounded-xl space-y-2">
-            <div className="text-xs font-bold text-retro-muted border-b border-zinc-800 pb-1.5">
+          <div className="p-3 bg-surface-canvas/50 border border-border-glass rounded-xl space-y-2">
+            <div className="text-xs font-bold text-retro-muted border-b border-border-glass pb-1.5">
               {opponentName}&apos;s Cards:
             </div>
             {summary.oppCardDeltas.map((c) => (
@@ -313,7 +313,7 @@ export function ValuationSummary({
           type="button"
           onClick={onReturnToLobby}
           disabled={submitting}
-          className="flex-1 py-2.5 text-xs font-semibold uppercase tracking-wider bg-surface-canvas hover:bg-surface-elevated text-retro-body border border-zinc-700 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+          className="flex-1 py-2.5 text-xs font-semibold uppercase tracking-wider bg-surface-canvas hover:bg-surface-elevated text-retro-body border border-border-glass rounded-lg transition-colors cursor-pointer disabled:opacity-50"
         >
           Return to Lobby
         </button>

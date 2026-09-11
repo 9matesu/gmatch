@@ -62,7 +62,7 @@ export function SlideshowPlayer({
 
   if (count === 0) {
     return (
-      <div className="fixed inset-0 z-[var(--z-modal)] bg-black/95 flex items-center justify-center flex-col gap-4" onClick={onClose}>
+      <div className="fixed inset-0 z-[var(--z-modal)] bg-black/70 flex items-center justify-center flex-col gap-4" onClick={onClose}>
         <p className="text-sm text-retro-muted">No items in this slideshow.</p>
         <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg bg-glass-w10 text-retro-fg text-xs font-semibold cursor-pointer">Close</button>
       </div>
@@ -72,7 +72,7 @@ export function SlideshowPlayer({
   const isVideo = image.isVideo || isMediaVideo(current?.url);
 
   return (
-    <div className="fixed inset-0 z-[var(--z-modal)] bg-black/95 flex items-center justify-center select-none" onClick={onClose}>
+    <div className="fixed inset-0 z-[var(--z-modal)] bg-black/70 flex items-center justify-center select-none" onClick={onClose}>
       <button
         type="button"
         onClick={onClose}
@@ -124,7 +124,7 @@ export function SlideshowPlayer({
             </button>
           ) : (
             <button type="button" onClick={() => setPaused(true)} aria-label="Pause" className="p-1.5 rounded-full bg-glass-w10 hover:bg-glass-w20 cursor-pointer">
-              <span className="block w-3 h-3 bg-zinc-200 rounded-[2px]" />
+              <span className="block w-3 h-3 bg-retro-fg rounded-[2px]" />
             </button>
           )}
           <span className="text-xs text-retro-muted font-mono tabular-nums">{index + 1} / {count}</span>

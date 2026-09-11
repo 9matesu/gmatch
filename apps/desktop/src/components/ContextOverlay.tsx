@@ -278,7 +278,7 @@ export function ReportModal({
   if (!reportModal) return null;
 
   return (
-    <div className="fixed inset-0 z-[var(--z-modal)] bg-black/80 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[var(--z-modal)] bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
       <div
         className="bg-retro-panel border border-retro-error max-w-sm w-full p-5 space-y-3"
         onClick={e => e.stopPropagation()}

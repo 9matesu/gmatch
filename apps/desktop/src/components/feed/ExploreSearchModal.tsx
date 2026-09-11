@@ -155,7 +155,7 @@ export function ExploreSearchModal({
                         onClose();
                       }}
                     >
-                      <div className="w-10 h-10 rounded-full bg-zinc-700 overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold">
+                      <div className="w-10 h-10 rounded-full bg-glass-w20 overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold">
                         {pfp ? (
                           <img src={pfp} alt="" className="w-full h-full object-cover" />
                         ) : (
@@ -207,7 +207,7 @@ export function ExploreSearchModal({
                     onClose();
                   }}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-zinc-700 overflow-hidden shrink-0 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-glass-w20 overflow-hidden shrink-0 flex items-center justify-center">
                     {p.url ? (
                       <ObjectImage contentUrl={p.url} identity={identity} alt="" className="w-full h-full object-cover" />
                     ) : (

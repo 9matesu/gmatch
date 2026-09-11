@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { DropZone } from './DropZone'
 import { isMediaVideo, resolveMediaUrl } from '../utils/media'
+import { Check } from 'lucide-react'
 import { ObjectImage } from './ObjectImage'
 import { computeCardRarity, formatGc } from '@orbit/shared'
 
@@ -243,7 +244,7 @@ export function MatchCardUpload({
                 <div className="text-[10px] font-bold text-red-400">{pending.error}</div>
               )}
               {pending.status === 'sent' && (
-                <div className="text-[10px] font-black tracking-widest text-retro-accent uppercase">✓ Card sent</div>
+                <div className="text-[10px] font-black tracking-widest text-retro-accent uppercase flex items-center gap-1">Card sent<Check className="w-3.5 h-3.5" /></div>
               )}
 
               {(pending.status === 'ready' || pending.status === 'sent') && (

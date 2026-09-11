@@ -589,7 +589,7 @@ export function ServersView({
                           )}
                           <span
                             className={`absolute bottom-0 right-0 w-2 h-2 rounded-full border border-black ${
-                              u.online ? 'bg-emerald-400' : 'bg-zinc-600'
+                              u.online ? 'bg-emerald-400' : 'bg-glass-w20'
                             }`}
                             aria-hidden
                           />

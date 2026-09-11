@@ -263,7 +263,7 @@ export function GMatchProfile({
           <button
             type="button"
             onClick={() => { playPress(800); setShowEditor(true); }}
-            className="flex-1 py-2 px-3 rounded-lg bg-surface-interactive border border-border-glass hover:border-zinc-500 text-retro-body font-medium text-xs transition-colors cursor-pointer"
+            className="flex-1 py-2 px-3 rounded-lg bg-surface-interactive border border-border-glass hover:border-border-glass text-retro-body font-medium text-xs transition-colors cursor-pointer"
           >
             Edit profile
           </button>
@@ -271,7 +271,7 @@ export function GMatchProfile({
           <button
             type="button"
             onClick={handleShareProfile}
-            className="flex-1 py-2 px-3 rounded-lg bg-surface-interactive border border-border-glass hover:border-zinc-500 text-retro-body font-medium text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+            className="flex-1 py-2 px-3 rounded-lg bg-surface-interactive border border-border-glass hover:border-border-glass text-retro-body font-medium text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
           >
             <Share2 className="w-3.5 h-3.5" />
             <span>Share</span>
@@ -282,7 +282,7 @@ export function GMatchProfile({
             onClick={() => { playPress(750); onOpenSettings?.(); }}
             title="Settings"
             aria-label="Settings"
-            className="p-2 rounded-lg bg-surface-interactive border border-border-glass hover:border-zinc-500 text-retro-body cursor-pointer transition-colors"
+            className="p-2 rounded-lg bg-surface-interactive border border-border-glass hover:border-border-glass text-retro-body cursor-pointer transition-colors"
           >
             <Settings className="w-4 h-4" />
           </button>
