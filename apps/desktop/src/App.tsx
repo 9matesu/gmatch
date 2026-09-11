@@ -2729,7 +2729,6 @@ export default function Home() {
 
   if (!isLoaded) return <PageSkeleton />;
 
-  const myDisplayName = myProfile.displayName || ''
   const myPostTags = identity ? deriveProfileTags(serverPosts.filter(p => p.author_id === identity.orbitId), []) : []
 
   return (

@@ -91,7 +91,6 @@ export function GMatchProfile({
 
   const isFlashing = activePowerups.includes('powerup_flash') || activePowerups.includes('flash');
   const isVerified = activePowerups.includes('powerup_verified') || activePowerups.includes('verified') || myUser?.is_admin;
-  const isGlitched = activePowerups.includes('powerup_hack') || activePowerups.includes('hack');
 
   const myPosts = posts.filter(
     (p) => identity && p.author_id === identity.orbitId && !p.is_archived && !p.id.startsWith('stream_') && !p.id.startsWith('booru_') && !p.is_sponsored

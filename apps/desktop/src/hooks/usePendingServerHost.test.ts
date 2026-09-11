@@ -7,8 +7,6 @@ import { generateIdentity } from '@orbit/crypto'
 
 const identity = generateIdentity() as never
 
-const HOST_KEY = ['gmatch', 'server', 'host'].join('.')
-
 function stubLocalStorage() {
   const store = new Map<string, string>()
   vi.stubGlobal('localStorage', {

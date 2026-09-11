@@ -213,7 +213,7 @@ export function GMatchDMs({
         body: JSON.stringify({ body: newText }),
       }, identity);
       if (res.ok) {
-        const data = await res.json();
+        await res.json();
         // Message updated via WS push
       }
     } catch {}

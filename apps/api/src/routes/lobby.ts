@@ -458,7 +458,6 @@ lobby.get('/images', orbitAuth, async (c) => {
   const images = await getLobbyImages(c.env.DB)
   // Replace base64 data URLs with a lightweight content endpoint reference
   // to avoid serving megabytes of base64 in the list JSON response.
-  const base = c.req.url.replace(/\/api\/lobby\/images.*$/, '')
   const mapped = images.map((img) => {
     if (img.content_url && img.content_url.startsWith('data:')) {
       return { ...img, content_url: `/api/lobby/images/${img.id}/content` }

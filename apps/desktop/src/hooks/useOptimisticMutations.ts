@@ -149,8 +149,7 @@ export function useOfflineQueue(options: UseOfflineQueueOptions) {
       try {
         await mutation.mutationFn();
         setQueue(prev => prev.slice(1));
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err));
+      } catch  {
         if (mutation.retries >= maxRetries) {
           setQueue(prev => prev.slice(1));
         } else {

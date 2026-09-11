@@ -8,7 +8,7 @@ import { CardZoomModal } from './CardZoomModal'
 import {  formatGc } from '@orbit/shared'
 import { isMediaVideo } from '../utils/media'
 import { ObjectImage } from './ObjectImage'
-import { playPress, playMatch } from '../utils/sounds'
+import { playPress } from '../utils/sounds'
 import {
   X,
   Minimize2,
@@ -39,15 +39,12 @@ export function SpectateModal({
   onOpenItem,
   players,
   identity = null,
-  soundEnabled = false,
 }: Props) {
   const [now, setNow] = useState<number>(() => Date.now())
   const [isMinimized, setIsMinimized] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null)
   const [pipPos, setPipPos] = useState<{ x: number; y: number } | null>(null)
-  const [,setSpectatorVote] = useState<'a' | 'b' | null>(null)
-  const [,setVotedRounds] = useState<Record<number, 'a' | 'b'>>({})
   const [zoomModal, setZoomModal] = useState<{
     isOpen: boolean
     imageUrl: string | null

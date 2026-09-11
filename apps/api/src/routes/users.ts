@@ -1099,7 +1099,6 @@ users.get('/hacks/spy-feed/:targetId', async (c) => {
   const orbitId = c.get('orbitId')
   const targetId = c.req.param('targetId') || ''
   await pruneExpiredHacks(c.env.DB)
-  const now = Date.now()
   const session = await findActiveHack(c.env.DB, orbitId, targetId)
   if (!session) return c.json({ error: 'No active hack session on that target' }, 403)
 

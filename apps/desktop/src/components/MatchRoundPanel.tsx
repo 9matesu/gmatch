@@ -74,7 +74,6 @@ export function MatchRoundPanel({
   const prevRound = useRef<number | null>(null)
   const timedOutRef = useRef<boolean>(false)
 
-  const selfId = identity?.orbitId || ''
   const phase = match?.phase ?? null
   const currentRound = match?.round_seq || 1
   const maxRounds = match?.max_rounds || 5
@@ -157,18 +156,6 @@ export function MatchRoundPanel({
   const isRoundResult = phase === 'round_result'
   const isResult = phase === 'result'
 
-  const bannerAction =
-    match.phase === 'result'
-      ? 'DONE'
-      : phase === 'round_result'
-        ? 'ROUND RECAP'
-        : phase === 'pick'
-          ? 'PICK'
-          : phase === 'decide'
-            ? 'DECIDE'
-            : phase === 'reveal'
-              ? 'REVEAL'
-              : 'WAIT'
 
   const handlePick = async (cardId: string): Promise<boolean> => {
     if (submitting) return false

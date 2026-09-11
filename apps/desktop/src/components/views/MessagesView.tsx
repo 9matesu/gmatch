@@ -12,8 +12,6 @@ import { GMatchDMs, type ThreadItem, type GroupInfo } from '../chat/GMatchDMs';
 import type { GroupMember } from '../chat/GroupMembersPopover';
 import { NotificationsPanel } from '../NotificationsPanel';
 import type { MainViewType } from '../home/HomeFooter';
-
-type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 type GamesSubTab = 'duel' | 'cards' | 'babecock' | 'ranks' | 'store';
 
 export function MessagesView({

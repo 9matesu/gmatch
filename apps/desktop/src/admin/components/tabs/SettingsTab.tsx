@@ -15,19 +15,6 @@ interface SettingsTabProps {
   onAction: (action: string, ...args: unknown[]) => void;
 }
 
-
-
-
-
-function parseTagsInput(input: string): string[] {
-  return Array.from(new Set(
-    input
-      .split(/[\n,]+/)
-      .map((t) => t.trim().toLowerCase().replace(/^#/, ''))
-      .filter(Boolean)
-  ));
-}
-
 export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProps) {
   const [activeSection, setActiveSection] = useState<"bot" | "lootboxes" | "platform" | "danger">("bot");
   const [discordLink, setDiscordLink] = useState("");

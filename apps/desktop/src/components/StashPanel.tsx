@@ -34,12 +34,9 @@ export function StashPanel({
 
     setImporting(true)
     const mediaFiles = Array.from(files).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'))
-    let count = 0
-
     for (const file of mediaFiles) {
       try {
         await addToStash(file)
-        count++
       } catch (err) {
         logger.error('Failed to stash', file.name, err)
       }

@@ -20,10 +20,6 @@ const subTabs = [
 
 type SubTab = typeof subTabs[number]["id"];
 
-function asArray<T>(value: T[] | undefined): T[] {
-  return Array.isArray(value) ? value : [];
-}
-
 function Sparkline({ data, height = 40, color = "#67e8f9" }: { data: number[]; height?: number; color?: string }) {
   if (!data.length) return null;
   const max = Math.max(...data, 1);

@@ -6,7 +6,6 @@ import type { LocalBlobStore } from '../blob'
 import { purgeObjectLikes, addPoints } from '../game'
 import { deleteExpiredContent } from '../cleanup'
 import { PICTURE_TTL_SECONDS, STORY_TTL_SECONDS, checkBlacklistedTags } from '@orbit/shared'
-import { lookup } from 'node:dns/promises'
 import { sha256 } from '@noble/hashes/sha256'
 import { bytesToHex } from '@noble/hashes/utils'
 import { proxyAndStoreExternal } from '../proxy'
@@ -125,69 +124,6 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
 /** Any object still alive (profile pics never expire, everything else has a future expires_at). */
 const LIVE_OBJECT_FILTER = "(expires_at IS NULL OR datetime(expires_at) > datetime('now'))"
 
-// Block requests to loopback, link-local and private ranges so users can't turn
-// the server into an SSRF proxy when importing links as cards.
-async function isPrivateTarget(url: URL): Promise<boolean> {
-  if (!['http:', 'https:'].includes(url.protocol)) return true
-  const hostname = url.hostname.toLowerCase()
-  if (hostname === 'localhost' || hostname.endsWith('.localhost') || hostname === '::1' || hostname === '0.0.0.0') return true
-  if (/^127\./.test(hostname) || /^10\./.test(hostname) || /^192\.168\./.test(hostname) || /^169\.254\./.test(hostname)) return true
-  if (/^\[?f[cd][0-9a-f]{2}:/.test(hostname)) return true // fc00::/7 ULA
-  try {
-    const { address } = await lookup(hostname)
-    const addr = address.replace(/^::ffff:/, '')
-    if (/^127\./.test(addr) || /^10\./.test(addr) || /^192\.168\./.test(addr) || /^169\.254\./.test(addr)) return true
-    if (addr.startsWith('::1')) return true
-  } catch {
-    return true
-  }
-  return false
-}
-
-/** Fetch a remote image and return validated image bytes, or null on failure. */
-async function fetchRemoteImage(url: string, maxBytes = 50 * 1024 * 1024): Promise<Uint8Array | null> {
-  let parsed: URL
-  try {
-    parsed = new URL(url)
-  } catch {
-    return null
-  }
-  if (await isPrivateTarget(parsed)) return null
-  try {
-    const res = await fetch(parsed.toString(), { signal: AbortSignal.timeout(8000), redirect: 'follow' })
-    if (!res.ok) return null
-    const len = Number(res.headers.get('content-length') || 0)
-    if (len > maxBytes) return null
-    const buf = new Uint8Array(await res.arrayBuffer())
-    if (buf.length > maxBytes) return null
-    if (!isValidMediaMagicBytes(buf)) return null
-    return buf
-  } catch {
-    return null
-  }
-}
-
-async function resolveTwitterMedia(url: string): Promise<{ mediaUrl: string; isVideo: boolean } | null> {
-  try {
-    const parsed = new URL(url)
-    const host = parsed.hostname.toLowerCase()
-    if (host === 'twitter.com' || host === 'www.twitter.com' || host === 'x.com' || host === 'www.x.com' || host === 'vxtwitter.com' || host === 'fxtwitter.com') {
-      const vxUrl = `https://api.vxtwitter.com${parsed.pathname}`
-      const res = await fetch(vxUrl, { signal: AbortSignal.timeout(6000), headers: { 'User-Agent': 'Mozilla/5.0' } })
-      if (res.ok) {
-        const data = await res.json() as any
-        const vid = data.media_extended?.find((m: any) => m.type === 'video' || m.type === 'gif')
-        if (vid?.url) return { mediaUrl: vid.url, isVideo: true }
-        if (Array.isArray(data.mediaURLs) && data.mediaURLs.length > 0) {
-          const first = data.mediaURLs[0]
-          return { mediaUrl: first, isVideo: first.endsWith('.mp4') || first.endsWith('.webm') }
-        }
-      }
-    }
-  } catch { }
-  return null
-}
-
 objects.post('/', orbitAuth, async (c) => {
   try {
     const orbitId = c.get('orbitId')
@@ -201,7 +137,6 @@ objects.post('/', orbitAuth, async (c) => {
 
     const isStory = formData.get('is_story') === 'true' ? 1 : 0
     const isWallpaper = formData.get('is_wallpaper') === 'true' ? 1 : 0
-    const isPfp = formData.get('is_pfp') === 'true' ? 1 : 0
     const isChat = (formData.get('is_chat') === 'true' || formData.get('is_chat') === '1') ? 1 : 0
     const isPublic = (formData.get('is_public') === 'true' || formData.get('is_public') === '1') ? 1 : 0
     const postCaption = (formData.get('post_caption') as string | null)?.trim() || null

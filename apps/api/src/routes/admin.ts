@@ -1564,11 +1564,9 @@ admin.post('/users/:id/ban', async (c) => {
   ).bind(banId, userId, orbitId, reason, scope, banScopeChat ? 1 : 0, banScopePm ? 1 : 0).run()
 
   // Wipe all content (cards, stories, likes, PMs, chats) but keep the account.
-  let wipedObjects = 0
   if (wipe) {
     try {
-      const affected = await wipeUserContent(c.env.DB, userId, { BUCKET: c.env.BUCKET })
-      wipedObjects = affected.length
+      await wipeUserContent(c.env.DB, userId, { BUCKET: c.env.BUCKET })
     } catch (error) {
       console.warn('[admin] wipe failed on ban:', error)
     }

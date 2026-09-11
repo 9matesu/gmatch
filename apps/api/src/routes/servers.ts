@@ -46,10 +46,6 @@ async function setMeta(db: D1Turso, key: string, value: string): Promise<void> {
   await db.prepare('INSERT INTO SystemMeta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').bind(key, value).run()
 }
 
-async function clearMeta(db: D1Turso, key: string): Promise<void> {
-  await db.prepare('DELETE FROM SystemMeta WHERE key = ?').bind(key).run()
-}
-
 async function isNodeAdmin(db: D1Turso, orbitId: string): Promise<boolean> {
   const row = await db.prepare('SELECT is_admin, (SELECT COUNT(*) FROM Users) as n FROM Users WHERE id = ?').bind(orbitId).first<{ is_admin: number; n: number }>()
   return Boolean(row && (row.is_admin === 1 || (row.n ?? 0) <= 1))

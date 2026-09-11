@@ -325,7 +325,6 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
 
   const renderCommentRow = (comment: AdminLobbyComment) => {
     const isExpanded = expandedId === comment.id;
-    const hasImage = Boolean(comment.image_content_url || comment.image_id);
     const mediaUrl = comment.image_content_url ? resolveMediaUrl(comment.image_content_url) : comment.image_id ? resolveMediaUrl(`/api/lobby/images/${comment.image_id}/content`) : null;
 
     return (
@@ -482,7 +481,6 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
 
   const renderChatRow = (msg: AdminChatMessage) => {
     const isExpanded = expandedId === `${msg.channel}:${msg.id}`;
-    const hasAttachment = Boolean(msg.attachment_url || msg.attachment_id);
     const attachmentUrl = msg.attachment_url ? resolveMediaUrl(msg.attachment_url) : msg.attachment_id ? resolveMediaUrl(`/api/objects/${msg.attachment_id}/content`) : null;
 
     return (

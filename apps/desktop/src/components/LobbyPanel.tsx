@@ -1,401 +1,26 @@
 "use client";
 
 import { useMemo, useState, useRef, useEffect } from 'react'
-import { type OrbitObject, type LobbyImage, type LobbyComment, type User, type LeagueEntry } from '@orbit/shared'
+import { type OrbitObject, type User, type LeagueEntry } from '@orbit/shared'
 import type { OrbitIdentity } from '@orbit/crypto'
-import { currentMatch, activeTask } from '../utils/lobby'
+import { currentMatch } from '../utils/lobby'
 import type { useLobby } from '../hooks/useLobby'
 import { MatchRoundPanel } from './MatchRoundPanel'
 import { YourMatchTab } from './YourMatchTab'
-import { orbitFetch, uploadWithProgress } from '../utils/api'
-import { createCardFromMedia } from '../utils/cardCollection'
-import { playQueueJoin, playLike, playMatch } from '../utils/sounds'
+import { orbitFetch } from '../utils/api'
+import { playQueueJoin, playMatch } from '../utils/sounds'
 import { SpectateModal } from './SpectateModal'
 import { useToast } from './Toast'
 import { useConfirm } from './ConfirmDialog'
 import { MatchChat } from './MatchChat'
-import { isMediaVideo, resolveMediaUrl } from '../utils/media'
-import { MessageCircle } from 'lucide-react'
-import { LazyVideo } from './LazyVideo'
+
+
+
 import { LeagueBoard } from './lobby/LeagueBoard'
 import { PlayerRoster } from './lobby/PlayerRoster'
 import { QueueControls } from './lobby/QueueControls'
 import { CardTile } from './home/CardTile'
 import { openCardDetail } from '../utils/openCard'
-
-interface LobbyTileProps {
-  img: LobbyImage
-  now: number
-  soundEnabled: boolean
-  onLike: (id: string) => void
-  onExpandItem?: (id: string) => void
-  onOpenImage?: (url: string) => void
-  onGetLikers?: (id: string) => Promise<string[]>
-  onGetComments?: (id: string) => Promise<LobbyComment[]>
-  onAddComment?: (id: string, body: string) => Promise<LobbyComment | null>
-  onDeleteComment?: (commentId: string) => Promise<boolean>
-  onReportComment?: (commentId: string) => void
-  onReport?: (id: string, category: string, reason: string) => Promise<{ hidden?: boolean } | null>
-  selfId?: string
-  onOpenProfile?: (user: User) => void
-  users?: User[]
-}
-
-// Each lobby board tile owns its own broken-image state so a 404 on an
-// expired /api/lobby/images/:id/content ref is hidden by returning null
-// instead of rendering a placeholder. The CSS grid reflows to close the gap.
-function LobbyTile({ img, now, soundEnabled, onLike, onExpandItem, onOpenImage, onGetLikers, onGetComments, onAddComment, onDeleteComment, onReportComment, onReport, selfId, users }: LobbyTileProps) {
-  const [errored, setErrored] = useState(false)
-  const [showLikers, setShowLikers] = useState(false)
-  const [likers, setLikers] = useState<string[]>([])
-  const [likersLoading, setLikersLoading] = useState(false)
-  const [showComments, setShowComments] = useState(false)
-  const [comments, setComments] = useState<LobbyComment[]>([])
-  const [commentsLoading, setCommentsLoading] = useState(false)
-  const [newComment, setNewComment] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [showReport, setShowReport] = useState(false)
-  const [reportCategory, setReportCategory] = useState('inappropriate')
-  const [reportReason, setReportReason] = useState('')
-  const [reporting, setReporting] = useState(false)
-  const isVid = isMediaVideo(img.content_url) || Boolean(img.mime_type?.startsWith('video/'))
-  const createdAtMs = img.created_at ? new Date(img.created_at).getTime() : 0
-  const expireAtMs = createdAtMs > 0 ? createdAtMs + (3 * 3600 * 1000) : 0
-  const wipeMsLeft = Math.max(0, expireAtMs - now)
-  const wipeHoursLeft = Math.floor(wipeMsLeft / 3_600_000)
-  const wipeMinsLeft = Math.floor((wipeMsLeft % 3_600_000) / 60_000)
-  const wipeText = createdAtMs > 0 && wipeMsLeft > 0 ? `${wipeHoursLeft}h ${wipeMinsLeft}m` : '3h wipe'
-  const mediaSrc = resolveMediaUrl(img.content_url || `/api/lobby/images/${img.id}/content`)
-
-  // uploader name (B3): prefer the row column, fall back to a Users lookup.
-  const uploaderName = useMemo(() => {
-    if (img.uploader_name) return img.uploader_name
-    if (users && img.owner_id) {
-      const u = users.find((x) => x.id === img.owner_id)
-      if (u?.display_name) return u.display_name
-    }
-    return null
-  }, [img.uploader_name, img.owner_id, users])
-
-  const handleMediaError = () => {
-    setErrored(true)
-    // Only evict the row from client state on a genuine server-fetch failure.
-    // A video decode miss in the <img> branch (e.g. when a previously-detected
-    // video tile briefly falls back to <img>) or a data:/blob: decode failure
-    // must NOT prune the tile permanently — the server still has it.
-    if (
-      typeof window !== 'undefined' &&
-      img.id &&
-      !isVid &&
-      mediaSrc.startsWith('/api/')
-    ) {
-      window.dispatchEvent(new CustomEvent('orbit-lobby-image-404', { detail: { imageId: img.id } }))
-    }
-  }
-
-  const loadLikers = async () => {
-    if (!onGetLikers) return
-    setLikersLoading(true)
-    try {
-      const list = await onGetLikers(img.id)
-      setLikers(list)
-    } finally {
-      setLikersLoading(false)
-    }
-  }
-
-  const loadComments = async () => {
-    if (!onGetComments) return
-    setCommentsLoading(true)
-    try {
-      const list = await onGetComments(img.id)
-      setComments(list)
-    } finally {
-      setCommentsLoading(false)
-    }
-  }
-
-  const submitComment = async () => {
-    const body = newComment.trim()
-    if (!body || !onAddComment) return
-    setSubmitting(true)
-    try {
-      const created = await onAddComment(img.id, body)
-      if (created) {
-        setComments((prev) => [...prev, created])
-        setNewComment('')
-      }
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const removeComment = async (commentId: string) => {
-    if (!onDeleteComment) return
-    const ok = await onDeleteComment(commentId)
-    if (ok) setComments((prev) => prev.filter((c) => c.id !== commentId))
-  }
-
-  const submitReport = async () => {
-    if (!onReport) return
-    setReporting(true)
-    try {
-      await onReport(img.id, reportCategory, reportReason.trim())
-      setShowReport(false)
-      setReportReason('')
-    } finally {
-      setReporting(false)
-    }
-  }
-
-  if (errored || !mediaSrc) return null
-
-  return (
-    <div
-      key={img.id}
-      className="relative group border border-retro-border rounded-lg overflow-hidden animate-orbit-fade-in cursor-pointer aspect-square bg-black shadow-sm"
-      onClick={() => {
-        if (showComments || showLikers || showReport) return
-        if (onExpandItem) {
-          onExpandItem(img.id)
-        } else if (onOpenImage && mediaSrc) {
-          onOpenImage(mediaSrc)
-        }
-      }}
-    >
-      {isVid ? (
-        <LazyVideo
-          src={mediaSrc}
-          videoClassName="hover:opacity-90 transition-opacity"
-          onError={handleMediaError}
-        />
-      ) : (
-        <img
-          src={mediaSrc}
-          alt={img.caption || ''}
-          onError={handleMediaError}
-          className="w-full aspect-square object-cover hover:opacity-90 transition-opacity"
-        />
-      )}
-
-      {/* Auto-wipe countdown timestamp timer badge */}
-      <div className="absolute top-1.5 right-1.5 bg-black/85 border border-retro-border text-retro-muted group-hover:text-retro-accent text-[8px] font-mono font-bold px-1.5 py-0.5 rounded tracking-wider flex items-center gap-1 z-10 pointer-events-none shadow">
-        <span>⏱</span> {wipeText}
-      </div>
-
-      {/* Uploader name badge (B3) */}
-      {uploaderName && (
-        <div className="absolute top-1.5 left-1.5 bg-black/85 border border-retro-border text-retro-fg group-hover:text-retro-accent text-[8px] font-mono font-bold px-1.5 py-0.5 rounded tracking-wider z-10 pointer-events-none shadow max-w-[60%] truncate">
-          @{uploaderName}
-        </div>
-      )}
-
-      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2 gap-1.5 z-20">
-        {img.caption && <span className="text-[9px] text-retro-fg truncate font-medium">{img.caption}</span>}
-        <div className="flex gap-1.5 pointer-events-auto flex-wrap">
-          {/* B2: star -> like label change ("★ LIKE") */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onLike(img.id)
-              if (soundEnabled) playLike()
-            }}
-            className="text-[9px] font-black tracking-widest text-retro-accent border border-retro-accent/60 px-2.5 py-1 hover:bg-retro-accent hover:text-retro-fg cursor-pointer bg-black/80 rounded transition-colors uppercase"
-          >
-            ★ LIKE ({img.likes_count || 0})
-          </button>
-          {/* B4: who-liked popover toggle */}
-          {onGetLikers && (img.likes_count || 0) > 0 && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                if (!showLikers) loadLikers()
-                setShowLikers((v) => !v)
-                setShowComments(false)
-                setShowReport(false)
-              }}
-              className="text-[9px] font-bold tracking-wider text-retro-muted border border-retro-border px-2 py-1 hover:bg-retro-fg hover:text-retro-fg cursor-pointer bg-black/80 rounded transition-colors uppercase"
-              title="See who liked"
-            >
-              ⓘ
-            </button>
-          )}
-          {/* B1: comments toggle */}
-          {onGetComments && onAddComment && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                if (!showComments) loadComments()
-                setShowComments((v) => !v)
-                setShowLikers(false)
-                setShowReport(false)
-              }}
-              className="text-[9px] font-bold tracking-wider text-retro-muted border border-retro-border px-2 py-1 hover:bg-retro-fg hover:text-retro-fg cursor-pointer bg-black/80 rounded transition-colors uppercase"
-              title="Comments"
-            >
-              <MessageCircle className="w-3 h-3" />
-            </button>
-          )}
-          {/* B5: report button */}
-          {onReport && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                setShowReport((v) => !v)
-                setShowLikers(false)
-                setShowComments(false)
-              }}
-              className="text-[9px] font-bold tracking-wider text-retro-muted border border-retro-border px-2 py-1 hover:bg-red-800 hover:text-white cursor-pointer bg-black/80 rounded transition-colors uppercase"
-              title="Report"
-            >
-              ⚑
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* B4: who-liked popover */}
-      {showLikers && (
-        <div
-          className="absolute inset-0 z-30 bg-black/95 p-2 flex flex-col gap-1 text-retro-fg animate-orbit-fade-in"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-widest text-retro-accent">
-            <span>Liked by</span>
-            <button type="button" onClick={() => setShowLikers(false)} className="text-retro-muted hover:text-retro-fg">✕</button>
-          </div>
-          <div className="flex-1 overflow-auto text-[9px] font-mono">
-            {likersLoading ? (
-              <div className="text-retro-muted">Loading…</div>
-            ) : likers.length === 0 ? (
-              <div className="text-retro-muted">No likes recorded.</div>
-            ) : (
-              <ul className="flex flex-col gap-0.5">
-                {likers.map((name, i) => (
-                  <li key={i} className="truncate">@{name}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* B1: comments popover */}
-      {showComments && (
-        <div
-          className="absolute inset-0 z-30 bg-black/95 p-2 flex flex-col gap-1 text-retro-fg animate-orbit-fade-in"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-widest text-retro-accent">
-            <span>Comments</span>
-            <button type="button" onClick={() => setShowComments(false)} className="text-retro-muted hover:text-retro-fg">✕</button>
-          </div>
-          <div className="flex-1 overflow-auto text-[9px] font-mono flex flex-col gap-1">
-            {commentsLoading ? (
-              <div className="text-retro-muted">Loading…</div>
-            ) : comments.length === 0 ? (
-              <div className="text-retro-muted">No comments yet.</div>
-            ) : (
-              comments.map((c) => (
-                <div key={c.id} className="border border-retro-border rounded px-1.5 py-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-retro-accent font-bold">@{c.display_name || 'anon'}</span>
-                    {(selfId && (c.user_id === selfId)) && (
-                      <button
-                        type="button"
-                        onClick={() => removeComment(c.id)}
-                        className="text-retro-muted hover:text-red-500 text-[8px]"
-                      >del</button>
-                    )}
-                    {(!selfId || (selfId && c.user_id !== selfId)) && onReportComment && (
-                      <button
-                        type="button"
-                        title="Report comment"
-                        onClick={() => onReportComment(c.id)}
-                        className="text-retro-muted hover:text-red-400 text-[8px]"
-                      >flag</button>
-                    )}
-                  </div>
-                  <div className="text-retro-fg break-words">{c.body}</div>
-                </div>
-              ))
-            )}
-          </div>
-          <div className="flex gap-1">
-            <input
-              type="text"
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              maxLength={500}
-              placeholder="Add a comment…"
-              className="flex-1 bg-black/80 border border-retro-border rounded px-1.5 py-1 text-[9px] text-retro-fg focus:outline-none focus:border-retro-accent"
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !submitting) {
-                  e.preventDefault()
-                  submitComment()
-                }
-              }}
-            />
-            <button
-              type="button"
-              disabled={submitting || !newComment.trim()}
-              onClick={(e) => { e.stopPropagation(); submitComment() }}
-              className="text-[9px] font-bold tracking-wider text-retro-accent border border-retro-accent/60 px-2 py-1 hover:bg-retro-accent hover:text-retro-fg bg-black/80 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Send
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* B5: report popover */}
-      {showReport && (
-        <div
-          className="absolute inset-0 z-30 bg-black/95 p-2 flex flex-col gap-1.5 text-retro-fg animate-orbit-fade-in"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-widest text-red-500">
-            <span>Report image</span>
-            <button type="button" onClick={() => setShowReport(false)} className="text-retro-muted hover:text-retro-fg">✕</button>
-          </div>
-          <select
-            value={reportCategory}
-            onChange={(e) => setReportCategory(e.target.value)}
-            className="bg-black/80 border border-retro-border rounded px-1.5 py-1 text-[9px] text-retro-fg"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <option value="inappropriate">Inappropriate</option>
-            <option value="spam">Spam</option>
-            <option value="copyright">Copyright</option>
-            <option value="other">Other</option>
-          </select>
-          <textarea
-            value={reportReason}
-            onChange={(e) => setReportReason(e.target.value)}
-            maxLength={500}
-            placeholder="Reason (optional)"
-            rows={3}
-            className="bg-black/80 border border-retro-border rounded px-1.5 py-1 text-[9px] text-retro-fg resize-none"
-            onClick={(e) => e.stopPropagation()}
-          />
-          <button
-            type="button"
-            disabled={reporting}
-            onClick={(e) => { e.stopPropagation(); submitReport() }}
-            className="text-[9px] font-bold tracking-wider text-white border border-red-600 px-2 py-1 hover:bg-red-700 bg-red-900/70 rounded disabled:opacity-50"
-          >
-            {reporting ? 'Sending…' : 'Submit report'}
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
 
 type IdentityLike = OrbitIdentity | null;
 
@@ -418,12 +43,11 @@ interface Props {
   sendInvite?: (userId: string) => Promise<{ ok: boolean; error?: string }>
 }
 
-export function LobbyPanel({ lobby, identity, myCards, soundEnabled, onExpandItem, onOpenProfile, users, onOpenSpectateItem, onOpenCardChat, onOpenCreateCard, onOpenDeckBuilder, toggleAutoQueue, sendInvite }: Props) {
-const { state, images, joined, autoQueueEnabled, loading, toggleAutoQueue: lobbyToggleAutoQueue, sendInvite: lobbySendInvite, spectateMatch, closeSpectate, spectatingMatchId, spectatingSnapshot, liveMatches, pickCard, decide, quitMatch, activeSpecials, submitSpecialCard, endSpecialMatch, decideSpecialMatch, onlineUsers } = lobby
+export function LobbyPanel({ lobby, identity, myCards, soundEnabled, onExpandItem, onOpenProfile, users, onOpenSpectateItem, onOpenCardChat, onOpenCreateCard, onOpenDeckBuilder, toggleAutoQueue }: Props) {
+const { state, joined, autoQueueEnabled, loading, toggleAutoQueue: lobbyToggleAutoQueue, spectateMatch, closeSpectate, spectatingMatchId, spectatingSnapshot, liveMatches, pickCard, decide, quitMatch, activeSpecials, submitSpecialCard, endSpecialMatch, decideSpecialMatch, onlineUsers } = lobby
 
   // Use passed-in override functions if provided, otherwise fall back to lobby functions
   const effectiveToggleAutoQueue = toggleAutoQueue ?? lobbyToggleAutoQueue
-  const effectiveSendInvite = sendInvite ?? lobbySendInvite
 
 const selfId = identity?.orbitId || ''
   const { toast } = useToast()
@@ -474,7 +98,6 @@ const selfId = identity?.orbitId || ''
   }, [joined, autoQueueEnabled, state?.match, activeSpecials.length])
 
   const match = useMemo(() => currentMatch(state), [state])
-  const hasMatch = Boolean(match)
   const matchRoundInfo = useMemo(
     () => (match ? { seq: match.round_seq || 1, max: match.max_rounds || 5, deadline: match.phase_deadline ?? 0 } : null),
     [match]
@@ -503,8 +126,6 @@ const selfId = identity?.orbitId || ''
   useEffect(() => {
     const result = state?.match?.result ?? null
     if (result && result !== prevResultRef.current) {
-      const sm = state?.match?.score_mine ?? 0
-      const so = state?.match?.score_opponent ?? 0
       if (result === 'winner_a' || result === 'winner_b') {
         const won = (result === 'winner_a' && state?.match?.user_a_info?.id === selfId) || (result === 'winner_b' && state?.match?.user_b_info?.id === selfId)
         toast(won ? 'Match victory. +50 points.' : 'Match complete.', won ? 'success' : 'info')
@@ -671,24 +292,7 @@ const selfId = identity?.orbitId || ''
   // two player tiles. Everyone else renders as an individual tile.
   
 
-  const boardImages = useMemo(() => {
-    const seen = new Set<string>()
-    const clean: typeof images = []
-    for (const img of images) {
-      if (!img.content_url) continue
-      // Dedup purely on img.id — setLobbyImage always assigns a
-      // crypto.randomUUID(), so id is never falsy. The previous
-      // `|| img.content_url` fallback was dead-weight that could dedupe
-      // unrelated tiles sharing a stale content_url prefix.
-      const key = img.id
-      if (seen.has(key)) continue
-      seen.add(key)
-      clean.push(img)
-    }
-    return clean
-  }, [images])
 
-  const hiddenBoardCount = images.length - boardImages.length
 
   const [queuedSinceFallback, setQueuedSinceFallback] = useState<number | null>(null)
   useEffect(() => {

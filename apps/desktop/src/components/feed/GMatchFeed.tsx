@@ -30,7 +30,7 @@ import { InstagramPostModal } from './InstagramPostModal';
 import { LiveCameraModal } from '../camera/LiveCameraModal';
 import { ObjectImage } from '../ObjectImage';
 import { LazyVideo } from '../LazyVideo';
-import { isMediaVideo, resolveMediaUrl } from '../../utils/media';
+import { isMediaVideo } from '../../utils/media';
 import { orbitFetch, postShareUrl } from '../../utils/api';
 import { GAME_AD_TEMPLATES } from '../../utils/gameAds';
 import { ExploreSearchModal } from './ExploreSearchModal';
@@ -94,73 +94,6 @@ const AD_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> =
   babecock: Flame,
   ranks: Trophy,
   store: ShoppingBag,
-}
-
-/**
- * LCP-critical first feed image. Object-backed posts normally render via a
- * signed JS fetch → blob URL, which the browser cannot prioritise. Instead we
- * mint a one-time signed URL (GET /api/objects/:id/signed-url) and let the
- * <img> load it directly with fetchpriority=high + eager so the largest paint
- * happens as early as possible. Falls back to ObjectImage if the mint fails.
- */
-function SignedPostImage({
-  id,
-  url,
-  identity,
-  alt,
-  className,
-}: {
-  id: string
-  url?: string | null
-  identity: OrbitIdentity | null
-  alt?: string
-  className?: string
-}) {
-  const [signedUrl, setSignedUrl] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    setSignedUrl(null)
-    if (!id) return
-    // Only attempt signed URL fetch when identity is available (for auth-protected objects)
-    // For public objects, the regular /api/objects/:id endpoint with CORS works fine
-    if (!identity) return
-    orbitFetch(`/api/objects/${id}/signed-url`, { method: 'GET' }, identity)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { url?: string } | null) => {
-        if (!cancelled && d?.url) setSignedUrl(d.url)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [id, identity])
-
-  if (signedUrl) {
-    return (
-      <img
-        src={resolveMediaUrl(signedUrl)}
-        alt={alt || 'Post image'}
-        className={className}
-        loading="eager"
-        fetchPriority="high"
-        draggable={false}
-        crossOrigin="use-credentials"
-      />
-    )
-  }
-  return (
-    <ObjectImage
-      contentUrl={url}
-      objectId={id}
-      identity={identity}
-      alt={alt}
-      className={className}
-      videoClassName={className}
-      loading="eager"
-      fetchPriority="high"
-    />
-  )
 }
 
 export function GMatchFeed({
