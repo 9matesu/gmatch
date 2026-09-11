@@ -111,7 +111,7 @@ export function FlashModal({
                 mode === m ? 'bg-retro-accent text-black font-black' : 'text-retro-muted hover:text-retro-fg'
               }`}
             >
-              {m === 'camera' ? '📷 Camera' : '📁 Upload'}
+              {m === 'camera' ? 'Camera' : 'Upload'}
             </button>
           ))}
         </div>

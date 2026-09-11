@@ -127,7 +127,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
             </p>
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-retro-muted shrink-0">
-            <Badge variant="neutral" size="sm">♥ {obj.likes_count || 0}</Badge>
+            <Badge variant="neutral" size="sm">{obj.likes_count || 0} likes</Badge>
             <Badge variant="neutral" size="sm"><Star className="inline w-3 h-3 mr-0.5" />{obj.favorites_count || 0}</Badge>
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -270,7 +270,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
             </p>
           </div>
           <div className="flex items-center gap-2 text-[10px] text-retro-muted shrink-0">
-            <Badge variant="neutral" size="sm">♥ {post.like_count || 0}</Badge>
+            <Badge variant="neutral" size="sm">{post.like_count || 0} likes</Badge>
             <Badge variant="neutral" size="sm">{post.comment_count || 0} comments</Badge>
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -418,7 +418,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
             <p className="text-[10px] text-retro-muted truncate">{img.user_name || img.user_id.slice(0, 10)} · {new Date(img.created_at).toLocaleString()}</p>
           </div>
           <div className="flex items-center gap-2 text-[10px] text-retro-muted shrink-0">
-            <Badge variant="neutral" size="sm">♥ {img.likes_count || 0}</Badge>
+            <Badge variant="neutral" size="sm">{img.likes_count || 0} likes</Badge>
           </div>
           <button
             type="button"
@@ -462,7 +462,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                 </div>
                 <div>
                   <span className="text-retro-muted block text-[10px]">Likes</span>
-                  <span className="text-retro-fg">♥ {img.likes_count || 0}</span>
+                  <span className="text-retro-fg">{img.likes_count || 0} likes</span>
                 </div>
                 <div>
                   <span className="text-retro-muted block text-[10px]">Created At</span>

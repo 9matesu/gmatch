@@ -1468,7 +1468,7 @@ export default function Home() {
 
       if (typeof document !== 'undefined' && document.hidden) {
         const oldTitle = document.title
-        document.title = '🔔 (1) New Interaction · gMatch'
+        document.title = '(1) New interaction · gMatch'
         const restore = () => {
           document.title = oldTitle
           window.removeEventListener('focus', restore)
@@ -2114,7 +2114,7 @@ export default function Home() {
             const currentUsers = usersRef.current;
             const sender = currentUsers.find(u => u.id === newest.owner_id);
             const senderName = sender?.display_name?.trim() || 'Unknown User';
-            toast(`◈ ${senderName} sent you an image`, 'info');
+            toast(`${senderName} sent you an image`, 'info');
           }
         }
       }
@@ -2411,7 +2411,7 @@ export default function Home() {
               const currentUsers = usersRef.current;
               const wrtcSender = currentUsers.find(u => u.id === offer.sender_id);
               const wrtcName = wrtcSender?.display_name?.trim() || 'Unknown User';
-              toast(`◈ ${wrtcName} sent you an image (P2P)`, 'info')
+              toast(`${wrtcName} sent you an image (P2P)`, 'info')
               peer.close()
             }
           }

@@ -330,7 +330,7 @@ export function GamesTab({ identity, pinVerified, onZoom, onAction }: GamesTabPr
                       <div className="min-w-0 flex-1 text-[10px]">
                         <p className="font-bold text-retro-fg">Round {r.round}</p>
                         <p className="text-retro-muted">{r.decision_a || "—"} vs {r.decision_b || "—"}</p>
-                        <p className={cn("font-semibold", r.matched ? "text-emerald-400" : "text-retro-muted")}>{r.matched ? "Matched ♥" : "No Match"}</p>
+                        <p className={cn("font-semibold", r.matched ? "text-emerald-400" : "text-retro-muted")}>{r.matched ? "Matched" : "No Match"}</p>
                       </div>
                     </div>
                   ))}

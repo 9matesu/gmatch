@@ -130,7 +130,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
                     </div>
                     <div className="flex items-center gap-1.5 text-[10px] text-retro-muted">
                       <Badge variant="neutral" size="sm">{obj.recipients_count || 0}</Badge>
-                      <Badge variant="neutral" size="sm">♥ {obj.likes_count || 0}</Badge>
+                      <Badge variant="neutral" size="sm">{obj.likes_count || 0} likes</Badge>
                     </div>
                   </div>
                 );

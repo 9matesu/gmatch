@@ -1283,7 +1283,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
 
                 {testResult.error && (
                   <div className="p-2.5 bg-rose-100/80 border border-rose-300 rounded-lg text-xs text-rose-900 font-mono leading-relaxed">
-                    ⚠️ {testResult.error}
+                    {testResult.error}
                   </div>
                 )}
               </div>

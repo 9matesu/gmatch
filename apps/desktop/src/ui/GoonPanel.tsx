@@ -597,7 +597,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               title="KO drops — adopt a tag, ban an anti-tag, one click each"
               className={`${MONO} inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#ff2d78]/40 bg-[#ff2d78]/10 px-2 py-0.5 text-xs font-bold text-retro-fg`}
             >
-              🎁 Drops
+              Drops
               <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ff2d78] px-1 text-[10px] font-black text-white">
                 {pendingDrops.length}
               </span>
@@ -674,7 +674,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             title={`Heat combo: ${heatStreak} rapid clicks — x${heat} click power`}
             aria-label={`Heat combo x${heat}`}
           >
-            🔥 x{heat}
+            x{heat}
           </span>
         )}
         {feedOffline && (

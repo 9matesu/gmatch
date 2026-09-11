@@ -201,12 +201,12 @@ export function GlobalModals(props: GlobalModalsProps) {
       {showMaxGoonerModal && (
         <Modal title="Maximum Gooner Hardcore" onClose={() => setShowMaxGoonerModal(false)}>
           <div className="p-3 bg-retro-bg border border-border-glass text-xs text-retro-fg space-y-1 mb-3">
-            <p className="font-bold uppercase tracking-wider">⚠ YOU&apos;VE BEEN WARNED</p>
+            <p className="font-bold uppercase tracking-wider">You&apos;ve been warned</p>
             <p>Maximum Gooner Mode turns on automatic image reception, chime audio alerts, blinking sender highlights, and auto-forwarding.</p>
           </div>
           <div className="space-y-3">
             <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-border-glass cursor-pointer hover:border-retro-accent transition-colors">
-              <span className="font-bold text-retro-fg">♦ Master Hardcore Switch</span>
+              <span className="font-bold text-retro-fg">Master Hardcore Switch</span>
               <input
                 type="checkbox"
                 checked={settings.maximumGooner}
@@ -224,7 +224,7 @@ export function GlobalModals(props: GlobalModalsProps) {
               />
             </label>
             <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-border-glass cursor-pointer hover:border-retro-accent transition-colors">
-              <span className="text-retro-fg">♪ Sound Effect on Image Arrival</span>
+              <span className="text-retro-fg">Sound effect on image arrival</span>
               <input type="checkbox" checked={settings.soundEffects} onChange={(e) => updateSettings('soundEffects', e.target.checked)} className="w-4 h-4 accent-retro-accent cursor-pointer" />
             </label>
             <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-border-glass cursor-pointer hover:border-retro-accent transition-colors">
