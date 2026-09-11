@@ -55,6 +55,34 @@ describe('metadata ingress strip (upload + pfp)', () => {
     expect(out[out.length - 1]).toBe(0xd9)
   })
 
+  it('POST /api/objects png egress via signed-url is metadata-free', async () => {
+    const png = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+      0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 10, 0x74, 0x45, 0x58, 0x74, ...ascii('A\x00gps:leak'), 0, 0, 0, 0,
+      0, 0, 0, 3, 0x49, 0x44, 0x41, 0x54, 1, 2, 3, 0, 0, 0, 0,
+      0, 0, 0, 0, 0x49, 0x45, 0x4e, 0x44, 0, 0, 0, 0,
+    ])
+    const formData = new FormData()
+    formData.append('image', new Blob([png], { type: 'image/png' }), 'shot.png')
+    formData.append('is_public', '1')
+    const res = await app.request('/api/objects', {
+      method: 'POST',
+      headers: signRequestHeaders(user, 'POST', '/api/objects'),
+      body: formData,
+    }, env)
+    expect(res.status).toBe(201)
+    const json = await res.json() as { id: string }
+    const signed = await app.request(`/api/objects/${json.id}/signed-url`, {
+      headers: signRequestHeaders(user, 'GET', `/api/objects/${json.id}/signed-url`),
+    }, env)
+    expect(signed.status).toBe(200)
+    const { url } = await signed.json() as { url: string }
+    const served = await app.request(url.replace(/^https?:\/\/[^/]+/, ''), {}, env)
+    expect(served.status).toBe(200)
+    expect(Buffer.from(await served.arrayBuffer()).toString('latin1')).not.toContain('gps:leak')
+  })
+
   it('PATCH /api/users/profile strips EXIF from data: pfp', async () => {
     const b64 = Buffer.from(jpegWithExif()).toString('base64')
     const body = JSON.stringify({ display_name: 'Stripper', pfp_url: `data:image/jpeg;base64,${b64}` })
