@@ -385,10 +385,6 @@ export function ServersView({
           <section className="p-3.5 space-y-3 shrink-0 border-b border-border-subtle" aria-label="Server dashboard">
             <div className="flex items-start justify-between gap-2.5">
               <div className="flex min-w-0 items-center gap-2.5">
-                <span className="relative flex h-3 w-3 shrink-0 items-center justify-center">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                </span>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
                     <h2 className="truncate text-base font-bold text-retro-fg leading-tight">{serverName || 'gmatch'}</h2>
@@ -528,7 +524,6 @@ export function ServersView({
                     userTab === 'online' ? 'glass-nav-active text-retro-fg shadow-sm' : 'text-retro-muted hover:text-retro-fg'
                   }`}
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                   Online ({onlineUsers.length})
                 </button>
                 <button
@@ -579,11 +574,7 @@ export function ServersView({
                             {u.display_name || u.id}
                           </div>
                           <div className="text-[10px] text-retro-muted truncate font-mono">
-                            {u.online ? (
-                              <span className="text-emerald-400">online now</span>
-                            ) : (
-                              formatRelativeTime(u.last_seen)
-                            )}
+                            {u.online ? 'active now' : formatRelativeTime(u.last_seen)}
                           </div>
                         </div>
                       </div>
@@ -828,9 +819,8 @@ export function ServersView({
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[10px] text-retro-muted font-mono">
                             <span>{s.endpoint_hint || 'no address published'}</span>
                             {(typeof s.online_count === 'number' || typeof s.user_count === 'number') && (
-                              <span className="flex items-center gap-1 text-retro-fg">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-                                <strong className="text-emerald-400">{s.online_count ?? 0}</strong> online · {s.user_count ?? '?'} members
+                              <span className="text-retro-fg">
+                                <strong>{s.online_count ?? 0}</strong> online · {s.user_count ?? '?'} members
                               </span>
                             )}
                           </div>
