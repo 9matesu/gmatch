@@ -115,6 +115,7 @@ export function GMatchFeed({
   myProfileTags = [],
   onSelectUser,
   onOpenGameAd,
+  shareGroups = [],
   onStartPm,
   onPersistLike,
   onPersistSave,
@@ -156,6 +157,8 @@ export function GMatchFeed({
   myProfileTags?: string[];
   onSelectUser?: (userId: string) => void;
   onOpenGameAd?: (mode: 'duel' | 'babecock' | 'ranks' | 'store' | 'discord' | 'coffee') => void;
+  /** Real groups for the share sheet. */
+  shareGroups?: { id: string; name: string; member_count: number }[];
   onStartPm?: (user: { id: string; display_name?: string }) => void;
   onPersistLike?: (postId: string, liked: boolean) => Promise<number | undefined>;
   onPersistSave?: (postId: string, saved: boolean) => void;
@@ -1040,6 +1043,7 @@ export function GMatchFeed({
           userNames={Object.fromEntries(users.map((u) => [u.id, u.display_name || '']))}
           identity={identity}
           toast={toast}
+          groups={shareGroups}
         />,
         document.body,
       )}

@@ -61,12 +61,13 @@ pm.post('/', async (c) => {
     try {
       const { createNotification } = await import('../notifications')
       const { broadcastToUser: pushUser } = await import('../ws-bus')
+      const senderRow = await c.env.DB.prepare('SELECT display_name FROM Users WHERE id = ?').bind(result.sender_id).first<{ display_name: string | null }>()
       const notif = await createNotification(
         c.env.DB,
         result.recipient_id,
         'pm',
         'New private message',
-         'Unknown User sent you a message',
+        `${senderRow?.display_name?.trim() || 'Someone'} sent you a message`,
         { pm_id: result.id, sender_id: result.sender_id }
       )
       if (notif) pushUser(result.recipient_id, { type: 'notification', action: 'new', notification: notif })
@@ -110,12 +111,13 @@ pm.post('/send', async (c) => {
     try {
       const { createNotification } = await import('../notifications')
       const { broadcastToUser: pushUser } = await import('../ws-bus')
+      const senderRow = await c.env.DB.prepare('SELECT display_name FROM Users WHERE id = ?').bind(result.sender_id).first<{ display_name: string | null }>()
       const notif = await createNotification(
         c.env.DB,
         result.recipient_id,
         'pm',
         'New private message',
-         'Unknown User sent you a message',
+        `${senderRow?.display_name?.trim() || 'Someone'} sent you a message`,
         { pm_id: result.id, sender_id: result.sender_id }
       )
       if (notif) pushUser(result.recipient_id, { type: 'notification', action: 'new', notification: notif })

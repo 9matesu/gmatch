@@ -1469,6 +1469,10 @@ export default function Home() {
     const handleIncomingNotif = (e: Event) => {
       const detail = (e as CustomEvent<unknown>).detail as Record<string, unknown> | null
       if (!detail) return
+      // PMs arrive on their own socket channel too (message + sound there);
+      // the server's 'pm' notification row exists for the panel/reload, so
+      // re-announcing it here is the duplicate the user reported.
+      if (detail.type === 'pm') return
       playChime()
       openNotifications()
 
@@ -3012,6 +3016,7 @@ export default function Home() {
                                 activeStoryUserId={storyViewerUserId}
                                 onActiveStoryClose={() => setStoryViewerUserId(null)}
                                 onOpenPostCreator={() => setShowCreatePostModal(true)}
+                                shareGroups={chatGroups.map((g) => ({ id: g.id, name: g.name, member_count: g.member_count }))}
                                 onFollowSuggestion={(id) => { void toggleFollowUser(id); }}
                                 myProfileTags={myProfile.tags}
                                 onSelectUser={(uId) => {

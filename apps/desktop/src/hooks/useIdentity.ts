@@ -19,6 +19,7 @@ export interface ExportedIdentityPayload extends OrbitIdentity {
 
 const USER_STORAGE_KEYS = [
   'orbit_identity',
+  'orbit_share_recent',
   'orbit_display_name',
   'orbit_tags',
   'orbit_pending_tags',
