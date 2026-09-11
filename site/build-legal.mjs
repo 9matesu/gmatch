@@ -19,6 +19,13 @@ function mdToHtml(md) {
   const out = []
   let inList = false
   let inPre = false
+  let inTable = false
+  const closeTable = () => {
+    if (inTable) {
+      out.push('</table>')
+      inTable = false
+    }
+  }
   const closeList = () => {
     if (inList) {
       out.push('</ul>')
@@ -29,6 +36,7 @@ function mdToHtml(md) {
     const line = raw.trimEnd()
     if (line.startsWith('```')) {
       closeList()
+      closeTable()
       if (inPre) {
         out.push('</pre>')
         inPre = false
@@ -43,15 +51,19 @@ function mdToHtml(md) {
       continue
     }
     if (/^\|.*\|$/.test(line.trim())) {
-      // tables (audit findings): render verbatim inside a pre for alignment
-      if (!out.at(-1) || !out.at(-1).endsWith('<pre>')) {
+      // markdown table -> real <table>; first row is the header, |---| separator skipped
+      const cells = line.trim().slice(1, -1).split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, '|'))
+      if (cells.every((c) => /^:?-{1,}:?$/.test(c))) continue
+      if (!inTable) {
         closeList()
-        out.push('<pre>')
+        out.push('<table>')
+        inTable = true
       }
-      out.push(esc(line.trim()))
-      if (!/^\|/.test(lines[lines.indexOf(raw) + 1]?.trim() ?? '')) out.push('</pre>')
+      const tag = out.at(-1)?.includes('<table>') ? 'th' : 'td'
+      out.push(`<tr>${cells.map((c) => `<${tag}>${inline(c)}</${tag}>`).join('')}</tr>`)
       continue
     }
+    closeTable()
     let m
     if ((m = /^### (.*)$/.exec(line))) {
       closeList()
@@ -76,6 +88,7 @@ function mdToHtml(md) {
     }
   }
   closeList()
+  closeTable()
   if (inPre) out.push('</pre>')
   return out.join('\n')
 }
