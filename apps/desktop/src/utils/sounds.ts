@@ -16,6 +16,28 @@ function ensureGestureHook() {
   window.addEventListener('touchstart', resume, { passive: true });
 }
 
+const lastPlayed = new Map<string, number>();
+
+/**
+ * Collapse rapid re-fires of the same game-event sound. The same match event
+ * can reach several mounted panels at once (round panel + your-match tab +
+ * notification hook), which used to stack identical one-shots.
+ */
+export function throttled<T extends (...a: never[]) => unknown>(
+  fn: T,
+  ms = 400,
+  key?: string,
+): T {
+  const id = key ?? fn.name ?? "anon";
+  return ((...a: Parameters<T>) => {
+    const now = Date.now();
+    const prev = lastPlayed.get(id);
+    if (prev !== undefined && now - prev < ms) return undefined;
+    lastPlayed.set(id, now);
+    return (fn as unknown as (...x: Parameters<T>) => unknown)(...a);
+  }) as unknown as T;
+}
+
 function ensureCtx(): AudioContext | null {
   if (typeof window === 'undefined') return null;
   const AC = window.AudioContext || (window as any).webkitAudioContext;
@@ -305,3 +327,12 @@ export function playQueueJoin() {
 }
 
 export function resetChatSfx() {}
+
+/* Game-event wrappers: one fire per window even when several panels mount the
+ * same state transition (round panel + your-match tab + notifications hook). */
+export const playMatchOnce = /* @__PURE__ */ throttled(playMatch, 1500, 'match');
+export const playTierUpOnce = /* @__PURE__ */ throttled(playTierUp, 1500, 'tier');
+export const playCountdownOnce = /* @__PURE__ */ throttled(playCountdown, 900, 'countdown');
+export const playTimeoutOnce = /* @__PURE__ */ throttled(playTimeout, 1500, 'timeout');
+export const playLikeOnce = /* @__PURE__ */ throttled(playLike, 300, 'like');
+export const playRejectOnce = /* @__PURE__ */ throttled(playReject, 300, 'reject');

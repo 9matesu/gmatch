@@ -5,11 +5,11 @@ import type { MatchSnapshot, LobbyState, OrbitObject, User } from '@orbit/shared
 import { countdownMs, formatCountdown, matchWindowMs, opponentCardId, resolveDisplayName, myCardId } from '../utils/lobby'
 import { useObjectImage } from '../hooks/useObjectImage'
 import {
-  playCountdown,
-  playTimeout,
-  playLike,
-  playReject,
-  playMatch,
+  playCountdownOnce,
+  playTimeoutOnce,
+  playLikeOnce,
+  playRejectOnce,
+  playMatchOnce,
   playUpload,
 } from '../utils/sounds'
 import type { LobbyDecisionResult, LobbyDecisionFailure } from '../hooks/useLobby'
@@ -101,7 +101,7 @@ export function MatchRoundPanel({
       setSelectedCard(null)
       setLocalDecidedRound(null)
       if (phase === 'round_result') {
-        if (soundEnabled && match?.matched) playMatch()
+        if (soundEnabled && match?.matched) playMatchOnce()
       }
       setDecideError(null)
     }
@@ -119,10 +119,10 @@ export function MatchRoundPanel({
     if (!match) return
     const ms = countdownMs(match.phase_deadline, now)
     if (ms > 0 && ms <= 5000) {
-      playCountdown()
+      playCountdownOnce()
     } else if (ms <= 0 && !timedOutRef.current) {
       timedOutRef.current = true
-      playTimeout()
+      playTimeoutOnce()
     }
   }, [now, phase, match, soundEnabled])
 
@@ -177,8 +177,8 @@ export function MatchRoundPanel({
       setBoostsRemaining((prev) => Math.max(0, prev - 1))
     }
     if (soundEnabled) {
-      if (decision === 'like' || decision === 'boost') playLike()
-      else playReject()
+      if (decision === 'like' || decision === 'boost') playLikeOnce()
+      else playRejectOnce()
     }
     const result = await onDecide(match.id, decision)
     if (result && !('ok' in result)) {

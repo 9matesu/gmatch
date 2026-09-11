@@ -6,7 +6,7 @@ import { specialTierLine, tierColor, tierLabel, SPECIAL_TIER_POINTS, SPECIAL_FIN
 import { specialTabState, revealedCards } from '../utils/special'
 import { resolveDisplayName } from '../utils/lobby'
 import { useObjectImage } from '../hooks/useObjectImage'
-import { playTierUp, playMatch, playReject, playTimeout } from '../utils/sounds'
+import { playTierUpOnce, playMatchOnce, playRejectOnce, playTimeoutOnce } from '../utils/sounds'
 import { CardZoomModal } from './CardZoomModal'
 import { CardBack } from './CardBack'
 import { CreateCardModal } from './CreateCardModal'
@@ -64,16 +64,16 @@ export function YourMatchTab({
       const points = final ? SPECIAL_FINAL_POINTS : SPECIAL_TIER_POINTS
       setCelebrate({ final, tier: match.tier, points })
       if (soundEnabled) {
-        if (final) playMatch()
-        else playTierUp()
+        if (final) playMatchOnce()
+        else playTierUpOnce()
       }
       const t = setTimeout(() => setCelebrate(null), 2800)
       return () => clearTimeout(t)
     }
     if (match.last_result === 'expired' && soundEnabled) {
-      playTimeout()
+      playTimeoutOnce()
     } else if (match.last_result === 'ended' && match.status === 'ended' && soundEnabled) {
-      playReject()
+      playRejectOnce()
     }
   }, [prevKey, lastKey, match.last_result, match.status, match.tier, soundEnabled])
 
