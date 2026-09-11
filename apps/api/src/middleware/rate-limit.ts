@@ -58,7 +58,7 @@ function cleanupStores() {
   }
 }
 
-function getClientIp(c: Context): string {
+function hashedIpKey(c: Context): string {
   const raw = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || c.req.header('x-real-ip') || 'unknown'
   return createHash('sha256').update(`${IP_BUCKET_SALT}|${raw}`).digest('hex').slice(0, 16)
 }
@@ -73,7 +73,7 @@ function getRateLimitSubject(c: Context): { key: string; max: number } {
   if (orbitId && /^[a-zA-Z0-9_-]{8,128}$/.test(orbitId)) {
     return { key: `id:${orbitId}`, max: AUTH_MAX_REQUESTS }
   }
-  return { key: `ip:${getClientIp(c)}`, max: ANON_MAX_REQUESTS }
+  return { key: `ip:${hashedIpKey(c)}`, max: ANON_MAX_REQUESTS }
 }
 
 export async function rateLimit(c: Context, next: Next) {
