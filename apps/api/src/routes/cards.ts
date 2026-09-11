@@ -89,6 +89,17 @@ cards.post('/:id/buy', async (c) => {
   const key = idempotencyKey(c, body)
   const service = new CardService(c.env.DB)
   const result = await service.buyCard(c.get('orbitId'), c.req.param('id'), key)
+  if (!result.replayed) {
+    // Seller ping — best-effort; the purchase already stands (follow-notify pattern).
+    try {
+      const buyer = await c.env.DB.prepare('SELECT display_name FROM Users WHERE id = ?').bind(result.buyerId).first<{ display_name: string | null }>()
+      const name = buyer?.display_name?.trim() || 'Someone'
+      const { createNotification } = await import('../notifications')
+      const { broadcastToUser } = await import('../ws-bus')
+      const notif = await createNotification(c.env.DB, result.sellerId, 'card_purchase', `${name} bought your card`, null, { card_id: result.cardId, buyer_id: result.buyerId })
+      if (notif) broadcastToUser(result.sellerId, { type: 'notification', action: 'new', notification: notif })
+    } catch { /* notification is best-effort */ }
+  }
   return c.json(result)
 })
 

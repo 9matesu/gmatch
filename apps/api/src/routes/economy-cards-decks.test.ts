@@ -82,6 +82,11 @@ describe('economy/cards/decks route wiring', () => {
     const buy: any = await buyRes.json()
     expect(buy.buyerId).toBe(bob.orbitId)
 
+    // seller gets a 'card_purchase' notification (Instagram-style activity feed)
+    const notifs = await env.DB.prepare("SELECT type, user_id FROM Notifications WHERE type = 'card_purchase'").all<any>()
+    expect(notifs.results.length).toBe(1)
+    expect(notifs.results[0].user_id).toBe(alice.orbitId)
+
     await expect(economy.getBalance(bob.orbitId)).resolves.toBe(900)
   })
 })

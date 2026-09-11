@@ -17,7 +17,7 @@ import { MIN_GAME_CARDS } from '@orbit/shared'
  * fresh GameMatches duel via lobby.createDirectMatch.
  */
 
-export type NotificationType = 'match_invite' | 'match_result' | 'pm' | 'babecock_invite' | 'babecock_start' | 'like' | 'comment' | 'follow' | 'card_received' | 'system'
+export type NotificationType = 'match_invite' | 'match_result' | 'pm' | 'babecock_invite' | 'babecock_start' | 'like' | 'comment' | 'follow' | 'card_received' | 'card_purchase' | 'system'
 
 export interface NotificationRow {
   id: string
