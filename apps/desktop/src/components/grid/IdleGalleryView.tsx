@@ -7,6 +7,7 @@ import { redgifsPlayable } from '../../services/redgifs'
 import CachedImg from '../../ui/CachedImg'
 import MediaViewerModal from '../../ui/MediaViewerModal'
 import { EmptyState } from '../EmptyState'
+import { Image as ImageIcon, Search } from 'lucide-react'
 import { BTN, BTN_SMALL, MUTED } from '../../ui/styles'
 
 /** Tag filter input — shell glass tokens (was .custom-tag-input). */
@@ -40,7 +41,7 @@ export default function IdleGalleryView({
     return (
       <div className="min-h-0 flex-1 overflow-y-auto p-3.5">
         <EmptyState
-          icon="🖼️"
+          icon={ImageIcon}
           title="No keepsakes yet"
           description="Drain feed images to keep them here."
         />
@@ -81,7 +82,7 @@ export default function IdleGalleryView({
       )}
       {shown.length === 0 ? (
         <EmptyState
-          icon="🔍"
+          icon={Search}
           title="No keepsakes match that tag"
           description={`Nothing in the gallery carries “${filter.trim()}”. Try a shorter tag.`}
           action={

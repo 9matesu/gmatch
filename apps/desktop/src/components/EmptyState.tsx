@@ -1,17 +1,19 @@
+import type { LucideIcon } from 'lucide-react'
+
 export function EmptyState({
-  icon,
+  icon: Icon,
   title,
   description,
   action,
 }: {
-  icon?: string
+  icon?: LucideIcon
   title: string
   description?: string
   action?: React.ReactNode
 }) {
   return (
     <div className="empty-state space-y-3">
-      {icon && <span className="text-3xl opacity-40">{icon}</span>}
+      {Icon && <Icon className="w-7 h-7 text-retro-muted opacity-60" strokeWidth={1.5} aria-hidden />}
       <div>
         <p className="text-sm font-bold text-retro-muted">{title}</p>
         {description && (
