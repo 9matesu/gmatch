@@ -1,22 +1,37 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+// Social onboarding: the 18+ gate lives in AgeGateModal (rendered above this
+// wall); this is server picker → profile only. Joining a server stamps
+// SERVER_MARKER_KEY and relaunches; the post-restart mount resumes at profile.
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import {
-  ShieldAlert,
-  Lock,
-  Scale,
-  FileText,
-  Dices,
-  KeyRound,
   ArrowRight,
-  Sparkles,
+  ArrowLeft,
   CheckCircle2,
+  Dices,
+  Globe,
+  KeyRound,
+  Lock,
+  RefreshCw,
+  UserPlus,
 } from 'lucide-react';
+import { API_BASE, orbitFetch } from '../utils/api';
+import { getCentralApiUrl, setCentralApiUrl } from '../utils/central';
+import { normalizeServerUrl } from '../utils/serverUrl';
+import { joinServer } from '../utils/join-server';
+import {
+  SERVER_MARKER_KEY,
+  type OnboardingState,
+  isOnboardingComplete,
+  readOnboardingState,
+  writeOnboardingState,
+} from './onboardingState';
+import { sortDirectoryServers, type ServerSort } from './serverSort';
 import { saveUserProfile } from '../utils/profile';
 import { playPress, playWin } from '../utils/sounds';
-import { type OnboardingState, isOnboardingComplete, readOnboardingState, writeOnboardingState } from './onboardingState';
 import { isDefaultPeerName } from '@orbit/shared';
+import type { DirectoryServer } from '../components/servers/ServersView';
 
 type Profile = { displayName: string; tags: string[]; pfpUrl?: string };
 
@@ -28,7 +43,273 @@ interface Props {
   onProfileUpdated: (profile: Profile) => void;
   onComplete: () => void;
   onOpenTos: () => void;
+  /** createIdentity() from useIdentity — local keypair only, no server call. */
+  ensureIdentity: () => OrbitIdentity | null;
   tagSuggestions?: string[];
+}
+
+function sameOrigin(a: string, b: string): boolean {
+  return a.replace(/\/+$/, '').toLowerCase() === b.replace(/\/+$/, '').toLowerCase();
+}
+
+export function OnboardingFlow(props: Props) {
+  const { identity, initialProfile } = props;
+  const identityId = identity?.orbitId || null;
+  const [state, setState] = useState<OnboardingState>(() => readOnboardingState(identityId));
+  const [step, setStep] = useState<'server' | 'profile'>(() => {
+    try {
+      const marker = localStorage.getItem(SERVER_MARKER_KEY);
+      return marker && sameOrigin(marker, API_BASE) ? 'profile' : 'server';
+    } catch {
+      return 'server';
+    }
+  });
+
+  // Returning-user migration (kept from the old wall): a real display name or
+  // a completed anonymous run means login-onboarding is done.
+  useEffect(() => {
+    const nextState = readOnboardingState(identityId);
+    const anonymous = readOnboardingState(null);
+    let migrated = nextState;
+    if (
+      nextState.completed.length === 0 &&
+      (anonymous.completed.includes('ready') || !isDefaultPeerName(initialProfile.displayName))
+    ) {
+      migrated = { version: 1, completed: ['server', 'profile', 'ready'], current: 'ready' };
+    }
+    if (migrated !== nextState) {
+      writeOnboardingState(identityId, migrated);
+      setState(migrated);
+    }
+  }, [identityId, initialProfile.displayName]);
+
+  useEffect(() => {
+    writeOnboardingState(identityId, state);
+  }, [identityId, state]);
+
+  if (isOnboardingComplete(state)) return null;
+
+  const finish = () => {
+    const next: OnboardingState = { version: 1, completed: ['server', 'profile', 'ready'], current: 'ready' };
+    writeOnboardingState(identityId, next);
+    setState(next);
+    props.onComplete();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[var(--z-lightbox)] overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg">
+      <div className="w-full max-w-2xl bg-retro-bg border border-border-glass rounded-xl p-6 sm:p-8 shadow-2xl space-y-5 animate-orbit-slide-up">
+        {step === 'server' ? (
+          <ServerStep
+            identity={identity}
+            ensureIdentity={props.ensureIdentity}
+            onChosen={() => setStep('profile')}
+          />
+        ) : (
+          <ProfileStep
+            {...props}
+            onBack={() => {
+              try {
+                localStorage.removeItem(SERVER_MARKER_KEY);
+              } catch { /* private mode */ }
+              setStep('server');
+            }}
+            onDone={finish}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ServerStep({ identity, ensureIdentity, onChosen }: {
+  identity: OrbitIdentity | null;
+  ensureIdentity: Props['ensureIdentity'];
+  onChosen: () => void;
+}) {
+  const central = useMemo(() => getCentralApiUrl(), []);
+  const [servers, setServers] = useState<DirectoryServer[]>([]);
+  const [sort, setSort] = useState<ServerSort>('players');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [nonce, setNonce] = useState(0);
+
+  // The directory hides join addresses from anonymous callers, so the picker
+  // needs a local keypair FIRST (no server-side profile exists yet — that is
+  // saved in ProfileStep on the chosen node). createIdentity() also wipes
+  // stale per-user storage, which is exactly the "fresh account" posture.
+  useEffect(() => {
+    if (!identity) void ensureIdentity();
+    // mount-once: identity arrives via props afterward; the fetch effect below
+    // reacts to it.
+  }, []);
+
+  useEffect(() => {
+    if (!central || !identity) return;
+    let cancelled = false;
+    setError('');
+    (async () => {
+      try {
+        // cache-bust: orbitFetch dedups/caches GETs; the list must be fresh
+        const res = await orbitFetch(`${central}/api/servers?_ts=${Date.now()}`, { method: 'GET' }, identity);
+        if (cancelled) return;
+        if (!res.ok) {
+          setError('Could not reach the server network.');
+          return;
+        }
+        const data = (await res.json()) as { servers: DirectoryServer[] };
+        if (!cancelled) setServers(Array.isArray(data.servers) ? data.servers : []);
+      } catch {
+        if (!cancelled) setError('Could not reach the server network.');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [central, identity, nonce]);
+
+  const join = async (s: DirectoryServer) => {
+    if (busy || !identity) return;
+    setBusy(true);
+    const raw = s.endpoint_hint || '';
+    const target = raw ? normalizeServerUrl(raw) || normalizeServerUrl('http://' + raw) || raw : '';
+    if (!window.gmatch?.serverSet || (target && sameOrigin(target, API_BASE))) {
+      // dev/browser build, or already on this node: no restart possible —
+      // continue on the current node instead of dead-ending the flow.
+      try {
+        localStorage.setItem(SERVER_MARKER_KEY, API_BASE);
+      } catch { /* private mode */ }
+      onChosen();
+    } else {
+      await joinServer(s, () => { /* toasts irrelevant — app relaunches */ });
+    }
+    setBusy(false);
+  };
+
+  const sorted = useMemo(() => sortDirectoryServers(servers, central, sort), [servers, central, sort]);
+
+  if (!central) {
+    return <CentralSetup onSaved={() => setNonce((n) => n + 1)} />;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight text-white">Choose your server</h1>
+          <p className="text-xs text-retro-muted">Pick a community to join. Your profile comes next.</p>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <select
+            aria-label="Sort servers"
+            value={sort}
+            onChange={(e) => setSort(e.target.value as ServerSort)}
+            className="glass-field px-2 py-1 text-xs font-medium"
+          >
+            <option value="players">Most players</option>
+            <option value="name">Name</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => { playPress(780); setNonce((n) => n + 1); }}
+            aria-label="Refresh servers"
+            className="glass-action h-8 px-2.5 rounded-lg text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div role="alert" className="glass-inset p-3 text-xs text-retro-muted rounded-xl space-y-2">
+          <p>{error} The directory at <span className="font-mono">{central.replace(/^https?:\/\//, '')}</span> may be offline.</p>
+          <button
+            type="button"
+            onClick={() => setNonce((n) => n + 1)}
+            className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+          >
+            <RefreshCw className="w-3 h-3" /> Retry
+          </button>
+        </div>
+      )}
+
+      <ul className="space-y-1.5 max-h-[50vh] overflow-y-auto styled-scrollbar pr-0.5">
+        {!error && sorted.length === 0 && (
+          <li className="glass-inset p-4 text-xs text-retro-muted text-center rounded-xl">
+            {identity ? 'No servers online right now. Create one later from the Servers tab.' : 'Connecting…'}
+          </li>
+        )}
+        {sorted.map((s) => (
+          <li key={s.id} className="glass-inset p-2.5 flex items-center gap-2.5 rounded-xl hover:border-border-strong transition-colors">
+            <div className="p-1.5 rounded-lg glass-panel shrink-0 text-retro-accent"><Globe className="w-4 h-4" /></div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-retro-fg truncate">{s.name}</span>
+                {!!s.password_required && <Lock className="w-3 h-3 text-amber-400 shrink-0" aria-label="password required" />}
+              </div>
+              {s.description && <p className="text-xs text-retro-muted truncate mt-0.5">{s.description}</p>}
+              <p className="mt-0.5 text-[10px] text-retro-muted font-mono">
+                <strong className="text-emerald-400">{s.online_count ?? '—'}</strong> online · {s.user_count ?? '?'} members
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={busy || !identity}
+              onClick={() => void join(s)}
+              className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0 disabled:opacity-30"
+            >
+              <UserPlus className="w-3 h-3" /> Join
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="text-[10px] text-retro-muted flex items-center gap-1.5">
+        <KeyRound className="w-3 h-3" /> No account yet — one is created for you on the server you pick.
+      </p>
+    </div>
+  );
+}
+
+function CentralSetup({ onSaved }: { onSaved: () => void }) {
+  const [url, setUrl] = useState('');
+  const [err, setErr] = useState('');
+  const save = () => {
+    const raw = url.trim();
+    const normalized = raw && (normalizeServerUrl(raw) || normalizeServerUrl(`http://${raw}`));
+    if (!normalized) {
+      setErr('That does not look like an http(s) address (e.g. https://gmatch.fly.dev).');
+      return;
+    }
+    setCentralApiUrl(normalized);
+    setErr('');
+    onSaved();
+  };
+  return (
+    <div className="space-y-3">
+      <h1 className="text-xl font-semibold tracking-tight text-white">Connect to the network</h1>
+      <p className="text-xs text-retro-muted">No central directory is configured, so there is no server list to browse. Add one to continue.</p>
+      <label className="block text-xs text-retro-muted">
+        Central node URL
+        <input
+          aria-label="Central node URL"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://gmatch.fly.dev"
+          maxLength={120}
+          className="glass-field mt-1 w-full px-2.5 py-1.5 text-xs font-mono"
+        />
+      </label>
+      {err && <p role="alert" className="text-xs text-rose-400">{err}</p>}
+      <button
+        type="button"
+        onClick={save}
+        disabled={!url.trim()}
+        className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-30"
+      >
+        Continue
+      </button>
+    </div>
+  );
 }
 
 function generateRandomHandle(): string {
@@ -40,19 +321,8 @@ function generateRandomHandle(): string {
   return `${prefix}${suffix}_${num}`;
 }
 
-export function OnboardingFlow({
-  identity,
-  initialProfile,
-  onLogin,
-  onCreateAccount,
-  onProfileUpdated,
-  onComplete,
-  onOpenTos,
-}: Props) {
-  const identityId = identity?.orbitId || null;
-  const [state, setState] = useState<OnboardingState>(() => readOnboardingState(identityId));
-
-  // Form states
+function ProfileStep(props: Props & { onBack: () => void; onDone: () => void }) {
+  const { identity, initialProfile, onLogin, onCreateAccount, onProfileUpdated, onBack, onDone } = props;
   const [name, setName] = useState(() => {
     if (initialProfile.displayName && !isDefaultPeerName(initialProfile.displayName)) {
       return initialProfile.displayName;
@@ -61,63 +331,17 @@ export function OnboardingFlow({
   });
   const [isImporting, setIsImporting] = useState(false);
   const [secretKey, setSecretKey] = useState('');
-  const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  // Handle returning users / migration
-  useEffect(() => {
-    if (!identity) return;
-    const nextState = readOnboardingState(identityId);
-    const anonymous = readOnboardingState(null);
-    let migrated = nextState;
-
-    // Returning account holder (finished onboarding under the anonymous key, or
-    // already has a real display name): login-onboarding is complete. Idle
-    // starter tags are handled by the clicker itself, so don't re-show the wall.
-    if (
-      nextState.completed.length === 0 &&
-      (anonymous.completed.includes('ready') || !isDefaultPeerName(initialProfile.displayName))
-    ) {
-      migrated = { version: 1, completed: ['welcome', 'ready'], current: 'ready' };
-    }
-
-    if (migrated !== nextState) {
-      writeOnboardingState(identityId, migrated);
-      setState(migrated);
-    }
-  }, [identity, identityId, initialProfile.displayName]);
-
-  // Sync state changes to storage
-  useEffect(() => {
-    writeOnboardingState(identityId, state);
-  }, [identityId, state]);
-
-  if (isOnboardingComplete(state)) return null;
-
-  const handleRandomize = () => {
-    playPress(500);
-    setName(generateRandomHandle());
-  };
-
-  const handleEnter = async () => {
-    if (!ageConfirmed || busy) return;
+  const enter = useCallback(async () => {
+    if (busy) return;
     const effectiveName = name.trim() || generateRandomHandle();
-
     setBusy(true);
     setError('');
-
     try {
-      // 1. Confirm age verification in localStorage
-      try {
-        localStorage.setItem('goonMatch_age_verified', 'true');
-      } catch {}
-
-      // 2. Authenticate or create account
       if (isImporting) {
-        if (!secretKey.trim()) {
-          throw new Error('Please enter your exported secret key');
-        }
+        if (!secretKey.trim()) throw new Error('Please enter your exported secret key');
         await onLogin(effectiveName, initialProfile.tags.join(','), secretKey.trim(), initialProfile.pfpUrl);
       } else if (!identity) {
         await onCreateAccount(effectiveName, initialProfile.tags.join(','), initialProfile.pfpUrl);
@@ -125,212 +349,114 @@ export function OnboardingFlow({
         await saveUserProfile(identity, { display_name: effectiveName });
         onProfileUpdated({ displayName: effectiveName, tags: initialProfile.tags, pfpUrl: initialProfile.pfpUrl });
       }
-
       playWin();
-
-      // 3. Account ready — onboarding ends here. Idle starter tags are asked
-      //    for the first time the player opens the idle clicker (GridWorkspace
-      //    gates itself on setupComplete), so the rest of gMatch is usable
-      //    immediately instead of blocking login on a tag wall.
-      const nextState: OnboardingState = { version: 1, completed: ['welcome', 'ready'], current: 'ready' };
-      writeOnboardingState(identityId, nextState);
-      setState(nextState);
-      onComplete();
+      onDone();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not complete setup');
     } finally {
       setBusy(false);
     }
-  };
+  }, [busy, name, isImporting, secretKey, identity, initialProfile, onLogin, onCreateAccount, onProfileUpdated, onDone]);
 
   return (
-    <div className="fixed inset-0 z-[var(--z-lightbox)] overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg">
-      <div className="w-full max-w-lg bg-retro-bg border border-border-glass rounded-xl p-6 sm:p-8 shadow-2xl space-y-6 animate-orbit-slide-up">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-retro-panel border border-border-glass text-[10px] font-mono uppercase tracking-wider text-retro-muted">
-              <Sparkles className="w-3 h-3 text-retro-fg" />
-              <span>Decentralized Adult Network</span>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-white">
-              Welcome to gMatch
-            </h1>
-            <p className="text-xs text-retro-muted leading-relaxed">
-              Fast, privacy-preserving adult media and peer-to-peer card gaming.
-            </p>
-          </div>
-          <div className="w-10 h-10 rounded-lg bg-retro-panel border border-border-glass flex items-center justify-center text-retro-fg shrink-0">
-            <ShieldAlert className="w-5 h-5" />
-          </div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight text-white">Set up your profile</h1>
+          <p className="text-xs text-retro-muted">Only your name is required — everything else you can add later.</p>
         </div>
-
-        {/* Legal & Privacy Advisory Box */}
-        <div className="rounded-lg border border-border-glass bg-retro-panel/40 p-4 space-y-3">
-          <div className="flex items-start gap-2.5 text-xs">
-            <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-semibold text-white">18+ Mature Content Only</span>
-              <p className="text-retro-muted text-xs leading-relaxed">
-                gMatch contains adult media and community content intended exclusively for adults. You must be at least 18 years old to access this platform.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-2.5 text-xs">
-            <Lock className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-semibold text-white">Local-First &amp; P2P Privacy</span>
-              <p className="text-retro-muted text-xs leading-relaxed">
-                Your cryptographic keys and preferences remain securely on your device. We do not sell your personal data or track your behavior across platforms.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-2.5 text-xs">
-            <Scale className="w-4 h-4 text-retro-muted shrink-0 mt-0.5" />
-            <div>
-              <span className="font-semibold text-white">Zero Tolerance Policy</span>
-              <p className="text-retro-muted text-xs leading-relaxed">
-                Strict zero tolerance for non-consensual imagery, underage material, or illegal content.
-              </p>
-            </div>
-          </div>
-
-          <div className="pt-1 border-t border-border-glass">
-            <button
-              type="button"
-              onClick={() => { playPress(700); onOpenTos(); }}
-              className="text-xs text-retro-muted hover:text-white underline underline-offset-2 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>Read Full Terms of Service &amp; Privacy Policy</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Form: Account & Identity */}
-        <div className="space-y-4">
-          {!isImporting ? (
-            <div className="space-y-1.5">
-              <label htmlFor="onboarding-display-name" className="text-xs font-medium text-retro-fg flex items-center justify-between">
-                <span>Display Name</span>
-                <span className="text-[10px] text-retro-muted font-normal">Public handle</span>
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  id="onboarding-display-name"
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. AnonGooner"
-                  maxLength={30}
-                  className="flex-1 bg-retro-panel border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-border-glass transition-colors"
-                />
-                <button
-                  type="button"
-                  onClick={handleRandomize}
-                  title="Generate random anonymous handle"
-                  className="p-2 bg-retro-panel hover:bg-glass-w12 border border-border-glass rounded-lg text-retro-muted hover:text-retro-fg transition-colors cursor-pointer shrink-0"
-                >
-                  <Dices className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <label htmlFor="onboarding-secret-key" className="text-xs font-medium text-retro-fg">
-                  Secret Key
-                </label>
-                <input
-                  id="onboarding-secret-key"
-                  type="password"
-                  value={secretKey}
-                  onChange={(e) => setSecretKey(e.target.value)}
-                  placeholder="Paste your exported secret key"
-                  className="w-full bg-retro-panel border border-border-glass rounded-lg px-3 py-2 text-xs font-mono text-retro-fg placeholder:text-retro-muted outline-none focus:border-border-glass transition-colors"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label htmlFor="onboarding-import-name" className="text-xs font-medium text-retro-fg">
-                  Display Name (Optional)
-                </label>
-                <input
-                  id="onboarding-import-name"
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Leave blank to use existing name"
-                  maxLength={30}
-                  className="w-full bg-retro-panel border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-border-glass transition-colors"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Toggle Import / Create */}
-          <button
-            type="button"
-            onClick={() => { playPress(400); setIsImporting(!isImporting); }}
-            className="text-xs text-retro-muted hover:text-retro-fg inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <KeyRound className="w-3.5 h-3.5" />
-            <span>{isImporting ? 'Create new anonymous identity instead' : 'Returning user? Import secret key'}</span>
-          </button>
-        </div>
-
-        {/* Checkbox Gate */}
-        <label className="flex items-start gap-3 p-3 rounded-lg border border-border-glass bg-retro-panel/30 hover:bg-retro-panel/60 transition-colors cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={ageConfirmed}
-            onChange={(e) => { playPress(600); setAgeConfirmed(e.target.checked); }}
-            className="w-4 h-4 mt-0.5 rounded border-border-glass bg-retro-panel text-white accent-white cursor-pointer"
-          />
-          <span className="text-xs text-retro-fg leading-snug">
-            I confirm that I am at least <strong>18 years of age</strong>, and I agree to the{' '}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                playPress(700);
-                onOpenTos();
-              }}
-              className="text-white underline underline-offset-2 hover:text-retro-fg"
-            >
-              Terms of Service &amp; Privacy Policy
-            </button>
-            .
-          </span>
-        </label>
-
-        {error && (
-          <div role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">
-            {error}
-          </div>
-        )}
-
-        {/* Submit / Enter Action */}
-        <div className="pt-2">
-          <button
-            type="button"
-            onClick={handleEnter}
-            disabled={busy || !ageConfirmed || (!name.trim() && !isImporting) || (isImporting && !secretKey.trim())}
-            className="w-full py-2.5 px-4 rounded-lg bg-white hover:bg-retro-fg active:scale-[0.99] text-black font-semibold text-xs shadow-sm transition-all disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
-          >
-            {busy ? (
-              <span>Configuring Account...</span>
-            ) : (
-              <>
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>Continue</span>
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => { playPress(620); onBack(); }}
+          className="glass-action h-8 px-2.5 rounded-lg text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1 shrink-0"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" /> Change server
+        </button>
       </div>
+
+      {isImporting ? (
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <label htmlFor="onboarding-secret-key" className="text-xs font-medium text-retro-fg">Secret Key</label>
+            <input
+              id="onboarding-secret-key"
+              type="password"
+              value={secretKey}
+              onChange={(e) => setSecretKey(e.target.value)}
+              placeholder="Paste your exported secret key"
+              className="w-full bg-retro-panel border border-border-glass rounded-lg px-3 py-2 text-xs font-mono text-retro-fg placeholder:text-retro-muted outline-none focus:border-border-glass transition-colors"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="onboarding-import-name" className="text-xs font-medium text-retro-fg">Display Name (Optional)</label>
+            <input
+              id="onboarding-import-name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Leave blank to use existing name"
+              maxLength={30}
+              className="w-full bg-retro-panel border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-border-glass transition-colors"
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          <label htmlFor="onboarding-display-name" className="text-xs font-medium text-retro-fg flex items-center justify-between">
+            <span>Display Name</span>
+            <span className="text-[10px] text-retro-muted font-normal">Required · public handle</span>
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              id="onboarding-display-name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. AnonGooner"
+              maxLength={30}
+              className="flex-1 bg-retro-panel border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-border-glass transition-colors"
+            />
+            <button
+              type="button"
+              onClick={() => { playPress(500); setName(generateRandomHandle()); }}
+              title="Generate random anonymous handle"
+              className="p-2 bg-retro-panel hover:bg-glass-w12 border border-border-glass rounded-lg text-retro-muted hover:text-retro-fg transition-colors cursor-pointer shrink-0"
+            >
+              <Dices className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => { playPress(400); setIsImporting((v) => !v); }}
+        className="text-xs text-retro-muted hover:text-retro-fg inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+      >
+        <KeyRound className="w-3.5 h-3.5" />
+        <span>{isImporting ? 'Create new anonymous identity instead' : 'Returning user? Import secret key'}</span>
+      </button>
+
+      {error && (
+        <div role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">{error}</div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => void enter()}
+        disabled={busy || (!isImporting && !name.trim()) || (isImporting && !secretKey.trim())}
+        className="w-full py-2.5 px-4 rounded-lg bg-white hover:bg-retro-fg active:scale-[0.99] text-black font-semibold text-xs shadow-sm transition-all disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
+      >
+        {busy ? (
+          <span>Joining…</span>
+        ) : (
+          <>
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>Enter</span>
+            <ArrowRight className="w-4 h-4" />
+          </>
+        )}
+      </button>
     </div>
   );
 }

@@ -2791,6 +2791,7 @@ export default function Home() {
             <OnboardingFlow
               identity={null}
               initialProfile={myProfile}
+              ensureIdentity={() => createIdentity()}
               onOpenTos={() => { setLegalDoc('terms'); setShowTosModal(true) }}
               tagSuggestions={myPostTags}
               onLogin={async (name, tags, customKey, pfpUrl) => {
@@ -3663,6 +3664,7 @@ export default function Home() {
               <OnboardingFlow
                 identity={identity}
                 initialProfile={{ displayName: myProfile.displayName, tags: myProfile.tags, pfpUrl: myProfile.pfpUrl }}
+                ensureIdentity={() => createIdentity()}
                 tagSuggestions={myPostTags}
                 onLogin={async (name, tags, customKey, pfpUrl) => {
                   if (!customKey) throw new Error('Missing secret key');

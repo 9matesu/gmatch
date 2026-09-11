@@ -10,7 +10,7 @@ import { Lock, Globe, UserPlus, ShieldCheck, RefreshCw, Pencil, Check, X, Search
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
 import { orbitFetch } from '../../utils/api'
 import { normalizeServerUrl } from '../../utils/serverUrl'
-import { rememberJoin } from '../../utils/server-join'
+import { joinServer } from '../../utils/join-server'
 import { rememberPendingHost } from '../../utils/server-host-pending'
 import { claimPendingHost } from '../../hooks/usePendingServerHost'
 import { playPress } from '../../utils/sounds'
@@ -343,27 +343,7 @@ export function ServersView({
     }
   }
 
-  const join = async (s: DirectoryServer) => {
-    const url = s.endpoint_hint
-    if (!url) { toast('This server has no address to join (owner is offline?)', 'warning'); return }
-    if (!window.gmatch?.serverSet) { toast('Joining servers works in the desktop app', 'warning'); return }
-    let password: string | undefined
-    if (s.password_required) {
-      const entered = window.prompt(`"${s.name}" is password-protected. Enter the password:`)
-      if (entered === null) return
-      password = entered
-    }
-    // hand the password to the post-restart boot (one-shot, local only)
-    const target = normalizeServerUrl(url) || normalizeServerUrl('http://' + url) || url
-    if (password !== undefined) rememberJoin({ url: target, password })
-    const res = await window.gmatch.serverSet({ mode: 'client', url: target })
-    if (res.ok) {
-      toast(`Switching to ${s.name} — the app restarts`, 'success')
-      window.gmatch.serverRelaunch?.()
-    } else {
-      toast(res.error || 'Could not switch servers', 'error')
-    }
-  }
+  const join = async (s: DirectoryServer) => { void joinServer(s, toast) }
 
   const leave = async () => {
     if (!window.gmatch?.serverSet) return

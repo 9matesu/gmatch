@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { ShieldAlert, CheckCircle2, XCircle, FileText } from 'lucide-react';
 import { playPress, playWin } from '../../utils/sounds';
-import { isOnboardingComplete, readOnboardingState } from '../../firstRun/onboardingState';
 
 export function AgeGateModal({
   onOpenTos,
@@ -11,13 +10,11 @@ export function AgeGateModal({
   onOpenTos?: () => void;
 }) {
   // Read synchronously so the gate never flashes the login screen behind it.
+  // The age check runs BEFORE onboarding (it is step 1 of the social flow);
+  // the goonMatch_age_verified key intentionally survives logout.
   const [isVerified, setIsVerified] = useState(() => {
     if (typeof window === 'undefined') return true;
     try {
-      // If onboarding is active (not complete), OnboardingFlow is the single unified gate
-      if (!isOnboardingComplete(readOnboardingState(null))) {
-        return true;
-      }
       return localStorage.getItem('goonMatch_age_verified') === 'true';
     } catch {
       return true;
