@@ -64,15 +64,15 @@ describe('serialize / deserialize round-trip', () => {
   })
 })
 
-describe('offline earnings (SPEC §11)', () => {
-  it('elapsed * g$/s * 50%', () => {
-    expect(offlineEarnings(10, 60_000)).toBe(300)
+describe('offline earnings (SPEC §11) nerfed 25%/25%', () => {
+  it('elapsed * g$/s * 25%', () => {
+    expect(offlineEarnings(10, 60_000)).toBe(150)
     expect(offlineEarnings(0, 60_000)).toBe(0)
   })
 
   it('caps at 8 hours', () => {
     expect(OFFLINE_CAP_MS).toBe(8 * 60 * 60 * 1000)
-    expect(offlineEarnings(10, OFFLINE_CAP_MS)).toBe(10 * 8 * 3600 * 0.5)
+    expect(offlineEarnings(10, OFFLINE_CAP_MS)).toBe(10 * 8 * 3600 * 0.25)
     expect(offlineEarnings(10, OFFLINE_CAP_MS * 10)).toBe(offlineEarnings(10, OFFLINE_CAP_MS))
   })
 

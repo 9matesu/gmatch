@@ -2,7 +2,7 @@ import type { ActiveCap, CapId, CustomSource, GalleryImage, OwnedTag, ViewMode }
 
 export const SAVE_KEY = 'gmatch.save.v1'
 export const SAVE_VERSION = 3
-export const OFFLINE_RATE = 0.5
+export const OFFLINE_RATE = 0.25
 export const OFFLINE_CAP_MS = 8 * 60 * 60 * 1000
 
 export interface SaveData {
@@ -144,7 +144,7 @@ function sanitizeCustomSources(v: unknown): CustomSource[] {
 }
 
 /**
- * Offline earnings = elapsed * g$/s * 50%, capped at 8h (SPEC §11).
+ * Offline earnings = elapsed * g$/s * 25%, capped at 8h (SPEC §11).
  * elapsedMs is clamped to [0, capMs].
  */
 export function offlineEarnings(

@@ -4,16 +4,18 @@ import { logger } from './logger';
 
 function computeApiBase(): string {
   // Desktop merge (D3): VITE_API_URL, or the Electron preload's __API_BASE__
-  // (local sidecar). Default: sidecar on 8790.
+  // (local sidecar). Default: central node; local sidecar is opt-in via the
+  // server-mode switch in Settings.
   const envUrl =
     (import.meta.env.VITE_API_URL as string | undefined) ||
     (typeof window !== 'undefined' && (window as unknown as { __API_BASE__?: string }).__API_BASE__)
   if (envUrl) return envUrl.replace(/\/+$/, '')
-  if (typeof window !== 'undefined' && window.location.origin.startsWith('http')) {
-    // Browser dev (vite): same-origin, API proxied or sidecar on 8790.
+  if (typeof window !== 'undefined' &&
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(window.location.origin)) {
+    // Browser dev (vite): keep the local sidecar — dev must stay offline-safe.
     return 'http://127.0.0.1:8790'
   }
-  return 'http://127.0.0.1:8790'
+  return 'https://gmatch.fly.dev'
 }
 
 export const API_BASE = computeApiBase();

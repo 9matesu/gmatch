@@ -189,6 +189,7 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
     const step = (INTERVAL_MS / DURATION_MS) * 100;
 
     const timer = setInterval(() => {
+      if (document.hidden) return
       setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(timer);

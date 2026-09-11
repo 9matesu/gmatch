@@ -87,15 +87,32 @@ export default function Home() {
 
   const { identity, isLoaded, createIdentity, exportIdentity, loginWithExportedId, clearIdentity } = useIdentity();
   // Idle game loop (merged from gmatch App): load save, tick economy, autosave.
+  // Wall-clock dt so a throttled/hidden window accrues honestly in one catch-up
+  // tick instead of silently losing seconds to Chromium timer clamping.
   useEffect(() => {
     useIdleGame.getState().load();
-    const t = setInterval(() => useIdleGame.getState().tick(1000), 1000);
+    let lastBeat = Date.now()
+    const beat = () => {
+      const now = Date.now()
+      const dt = now - lastBeat
+      lastBeat = now
+      if (document.hidden && dt < 60_000) return
+      useIdleGame.getState().tick(Math.min(dt, 8 * 3600_000))
+    }
+    const t = setInterval(beat, 1000);
+    const onVis = () => {
+      if (!document.hidden) {
+        beat()
+      }
+    }
+    document.addEventListener('visibilitychange', onVis)
     const save = () => useIdleGame.getState().save();
     const ts = setInterval(save, 10_000);
     window.addEventListener('beforeunload', save);
     return () => {
       clearInterval(t);
       clearInterval(ts);
+      document.removeEventListener('visibilitychange', onVis)
       window.removeEventListener('beforeunload', save);
     };
   }, []);

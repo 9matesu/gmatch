@@ -142,6 +142,7 @@ export function BooruSlideshow({ className = '' }: { className?: string }) {
   useEffect(() => {
     if (images.length < 2) return;
     const id = setInterval(() => {
+      if (document.hidden) return
       setActiveIndex((prev) => (prev + 1) % images.length);
     }, SLIDE_INTERVAL_MS);
     return () => clearInterval(id);

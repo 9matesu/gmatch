@@ -369,15 +369,15 @@ describe('shufflePosts (never sequential)', () => {
 })
 
 describe('tick', () => {
-  it('pays passive g$/s from owned tags (halved)', () => {
+  it('pays passive g$/s from owned tags (quartered)', () => {
     useGame.setState({
       gc: 0,
       tags: [{ name: 'wet', level: 2, base: 10, income: 5, weight: 2 }],
     })
     useGame.getState().tick(1000)
     const s = useGame.getState()
-    expect(s.gc).toBeGreaterThanOrEqual(5)
-    expect(s.totalEarnedGc).toBeGreaterThanOrEqual(5)
+    expect(s.gc).toBeGreaterThanOrEqual(2.5)
+    expect(s.totalEarnedGc).toBeGreaterThanOrEqual(2.5)
   })
 
   it('legacy timed caps still prune, permanent pops persist', () => {
@@ -445,9 +445,9 @@ describe('save / load / offline earnings', () => {
     useGame.getState().load()
     const s = useGame.getState()
     expect(s.gc).toBe(123)
-    expect(s.offlineGain).toBeCloseTo(75, 0) // 60s * 5 g$/s * 50% * 50% nerfed
+    expect(s.offlineGain).toBeCloseTo(18.75, 0) // 60s * 1.25 gps * 25% (passive+offline quartered)
     s.collectOffline()
-    expect(useGame.getState().gc).toBeCloseTo(198, 0)
+    expect(useGame.getState().gc).toBeCloseTo(141.75, 0)
     expect(useGame.getState().collectedOfflineEarnings).toBe(true)
     expect(useGame.getState().achievements).toContain('offline_slut')
   })

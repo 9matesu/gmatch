@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { Server, Wifi } from 'lucide-react'
 import { playPress } from '../../utils/sounds'
 import { isServerUrl, normalizeServerUrl } from '../../utils/serverUrl'
+import { maskedServerUrl } from '../../utils/ipMask'
 import { ServerPasswordSection } from './ServerPasswordSection'
 import { SnapshotSection } from './SnapshotSection'
 import { useIdentity } from '../../hooks/useIdentity'
@@ -64,11 +65,11 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
             {state.mode.toUpperCase()}
           </span>
         </div>
-        <p className="text-[11px] text-retro-muted font-mono break-all">{state.url}</p>
+        <p className="text-[11px] text-retro-muted font-mono break-all">{maskedServerUrl(state.url)}</p>
         {state.packaged && (
           <p className="text-[11px] text-retro-muted">
             {state.mode === 'host'
-              ? 'Friends running gMatch can enter one of the addresses below in their Settings → Server to join your world. Keep the app open and your firewall allows the port.'
+              ? 'Friends running gMatch can enter one of the addresses below (click to copy the real one — shown masked for privacy) in their Settings → Server to join your world. Keep the app open and your firewall allows the port.'
               : 'All social data lives on the server you connected to. Switch back to Host anytime.'}
           </p>
         )}
@@ -82,7 +83,7 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
                 onClick={() => { void navigator.clipboard.writeText(u); toast?.('Address copied', 'success') }}
                 title="Copy address"
               >
-                <Wifi className="inline w-3 h-3 mr-1.5" />{u}
+                <Wifi className="inline w-3 h-3 mr-1.5" />{maskedServerUrl(u)}
               </button>
             ))}
           </div>

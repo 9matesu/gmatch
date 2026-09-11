@@ -48,13 +48,13 @@ export function galleryIncome(gallery: GalleryImage[]): number {
   return gallery.reduce((sum, img) => sum + rarityIncome(img.rarity), 0)
 }
 
-/** Passive g$/s from tags + gallery, scaled by shards and passive caps. Nerfed by 50% so clicking stays king. */
+/** Passive g$/s from tags + gallery, scaled by shards and passive caps. Nerfed to 25% so clicking stays king. */
 export function passiveGps(input: EconomyInput, now: number): number {
   return (
     (tagIncome(input.tags) + galleryIncome(input.gallery)) *
     shardMultiplier(input.shards) *
     capPassiveMult(input.caps, now) *
-    0.5
+    0.25
   )
 }
 
