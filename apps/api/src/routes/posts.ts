@@ -5,6 +5,7 @@ import type { LocalBlobStore } from '../blob'
 import { purgeObjectLikes } from '../game'
 import { reportContent, ReportError } from '../reports'
 import { promoteLobbyImageToPost } from '../lobby'
+import { generateFallbackName } from '@orbit/shared'
 
 type Bindings = {
   DB: D1Turso
@@ -63,7 +64,7 @@ function serializePost(row: any): any {
   return {
     id: row.id,
     author_id: row.owner_id,
-    author_name: row.author_name?.trim() || 'Unknown User',
+    author_name: row.author_name?.trim() || generateFallbackName(row.owner_id),
     author_avatar: row.author_pfp || null,
     url: row.content_url || `/api/objects/${row.id}`,
     mime_type: row.mime_type || 'image/jpeg',
@@ -231,7 +232,7 @@ posts.get('/:id', async (c) => {
     comments: (comments.results || []).map((c: any) => ({
       id: c.id,
       author_id: c.author_id,
-      author_name: c.author_name?.trim() || 'Unknown User',
+      author_name: c.author_name?.trim() || generateFallbackName(c.author_id),
       author_avatar: c.author_pfp || null,
       text: c.body,
       like_count: Number(c.like_count || 0),
@@ -329,7 +330,7 @@ posts.get('/:id/comments', async (c) => {
   return c.json((rows.results || []).map((c: any) => ({
     id: c.id,
     author_id: c.author_id,
-      author_name: c.author_name?.trim() || 'Unknown User',
+      author_name: c.author_name?.trim() || generateFallbackName(c.author_id),
     author_avatar: c.author_pfp || null,
     text: c.body,
     like_count: Number(c.like_count || 0),
