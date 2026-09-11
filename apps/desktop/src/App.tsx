@@ -73,6 +73,7 @@ import { useNotifications } from './hooks/useNotifications';
 import { useCourierDms } from './hooks/useCourierDms';
 import { useServerHeartbeat } from './hooks/useServerHeartbeat';
 import { usePendingJoinVerify } from './hooks/usePendingJoinVerify';
+import { usePendingServerHost } from './hooks/usePendingServerHost';
 import { OfflineWarningBanner } from "./components/OfflineWarningBanner";
 import { dataUrlToBlob, localObjectBlobUrl } from "./utils/mediaData";
 
@@ -1084,6 +1085,16 @@ export default function Home() {
   // active only when the API 404s /api/pm (official SITE).
   useServerHeartbeat(identity ?? null);
   usePendingJoinVerify(identity, toast);
+  usePendingServerHost(identity ?? null, toast);
+  // Global update toasts: the portable self-update runs whether or not the
+  // Settings modal is open — nudge the user toward Install & Restart.
+  useEffect(() => {
+    const off = window.gmatch?.onUpdateStatus?.((s) => {
+      if (s.phase === 'available' && s.version) toast(`gMatch ${s.version} is downloading — finish it in Settings → Updates`, 'info');
+      else if (s.phase === 'ready' && s.version) toast(`gMatch ${s.version} is ready — Install & Restart in Settings → Updates`, 'success');
+    });
+    return () => { off?.() };
+  }, [toast]);
 
   const courier = useCourierDms(identity, {
     onNotify: (msg) => {
@@ -3274,13 +3285,20 @@ export default function Home() {
                   )}
 
                   {mainView === 'servers' && (
-                    <div className="flex-1 min-h-0 w-full overflow-y-auto">
+                    <div className="flex-1 min-h-0 w-full overflow-hidden">
                       {identity ? (
                         <ServersView
                           identity={identity as never}
                           toast={toast}
                           showRooms={courierActive}
                           onOpenRooms={() => handleSetMainView('rooms')}
+                          onSelectUser={(u) => {
+                            const full = users.find((existing) => existing.id === u.id || (existing as any).orbitId === u.id)
+                            setSelectedProfileUser(full || u)
+                          }}
+                          profilePics={profilePics}
+                          rooms={courier.rooms.map((r) => ({ id: r.id, name: r.name, membersCount: r.members.length }))}
+                          onOpenRoom={(_roomId) => handleSetMainView('rooms')}
                         />
                       ) : (
                         <div className="p-6 text-xs text-retro-muted">Sign in to browse servers.</div>

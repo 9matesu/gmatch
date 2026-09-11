@@ -91,6 +91,106 @@ describe('ServersView', () => {
     expect(JSON.parse(String(post?.init?.body))).toMatchObject({ name: 'My Realm' })
   })
 
+  it('create while connected to central hosts locally: switches + relaunches, claim survives restart', async () => {
+    const HOST_KEY = ['gmatch', 'server', 'host'].join('.')
+    const serverSet = vi.fn().mockResolvedValue({ ok: true })
+    const serverRelaunch = vi.fn().mockResolvedValue(undefined)
+    ;(window as unknown as { gmatch?: unknown }).gmatch = {
+      serverSet,
+      serverRelaunch,
+      serverState: vi.fn().mockResolvedValue({ packaged: true, mode: 'client', url: 'https://central.test', lanUrls: ['http://192.168.0.42:8790'] }),
+    }
+    const ownId = (identity as unknown as { orbitId: string }).orbitId
+    mockFetch(async (url, init) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'central', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers') && init?.method === 'POST') {
+        return json({ server: { id: 'b'.repeat(64), name: 'My Realm', owner_id: ownId, password_required: 0, endpoint_hint: '' } }, 201)
+      }
+      return json({ servers: [] })
+    })
+    const toasts: string[] = []
+    render(<ServersView identity={identity} toast={(m) => toasts.push(m)} />)
+    fireEvent.click(await screen.findByRole('button', { name: /create server/i }))
+    fireEvent.change(screen.getByLabelText(/server name/i), { target: { value: 'My Realm' } })
+    fireEvent.click(screen.getByRole('button', { name: /^create$/i }))
+    await waitFor(() => expect(serverSet).toHaveBeenCalledWith({ mode: 'host', url: '' }))
+    expect(serverRelaunch).toHaveBeenCalled()
+    // one-shot claim carried across the restart (name + directory linkage)
+    const raw = localStorage.getItem(HOST_KEY)
+    expect(raw).toBeTruthy()
+    expect(JSON.parse(raw!)).toMatchObject({ name: 'My Realm', directoryId: 'b'.repeat(64) })
+    // heartbeat replay payload saved; LAN hint auto-filled
+    expect(JSON.parse(localStorage.getItem('gmatch.server.register') || '{}')).toMatchObject({
+      name: 'My Realm', endpoint_hint: 'http://192.168.0.42:8790',
+    })
+    delete (window as unknown as { gmatch?: unknown }).gmatch
+  })
+
+  it('create on a fresh host claims the local node immediately, including the join password', async () => {
+    const serverRelaunch = vi.fn()
+    const serverSet = vi.fn()
+    ;(window as unknown as { gmatch?: unknown }).gmatch = {
+      serverSet,
+      serverRelaunch,
+      serverState: vi.fn().mockResolvedValue({ packaged: true, mode: 'host', url: 'http://127.0.0.1:8790', lanUrls: [] }),
+    }
+    const ownId = (identity as unknown as { orbitId: string }).orbitId
+    mockFetch(async (url, init) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'gmatch', users: [], posts_24h: 0, members_total: 1 })
+      if (url.includes('/api/servers/node')) {
+        if (init?.method === 'PATCH') return json({ server: { name: 'My Realm', description: '', directoryId: 'c'.repeat(64), isAdmin: true } })
+        return json({ name: 'gmatch', description: '', directoryId: null, isAdmin: true })
+      }
+      if (url.includes('/api/server/password') && init?.method === 'POST') return json({ enabled: true })
+      if (url.includes('/api/servers') && init?.method === 'POST') {
+        return json({ server: { id: 'c'.repeat(64), name: 'My Realm', owner_id: ownId, password_required: 1, endpoint_hint: '' } }, 201)
+      }
+      return json({ servers: [] })
+    })
+    const toasts: string[] = []
+    render(<ServersView identity={identity} toast={(m) => toasts.push(m)} />)
+    fireEvent.click(await screen.findByRole('button', { name: /create server/i }))
+    fireEvent.change(screen.getByLabelText(/server name/i), { target: { value: 'My Realm' } })
+    fireEvent.click(screen.getByRole('checkbox', { name: /join password/i }))
+    fireEvent.change(screen.getByLabelText(/server join password/i), { target: { value: 'secret' } })
+    fireEvent.click(screen.getByRole('button', { name: /^create$/i }))
+    await waitFor(() => expect(toasts.join('|')).toMatch(/admin/i))
+    const patch = calls.find((c) => c.url.includes('/api/servers/node') && c.init?.method === 'PATCH')
+    expect(patch).toBeTruthy()
+    expect(JSON.parse(String(patch?.init?.body))).toMatchObject({ name: 'My Realm', directory_id: 'c'.repeat(64) })
+    const pw = calls.find((c) => c.url.includes('/api/server/password'))
+    expect(JSON.parse(String(pw?.init?.body))).toMatchObject({ password: 'secret' })
+    // no restart needed when already hosting
+    expect(serverRelaunch).not.toHaveBeenCalled()
+    expect(serverSet).not.toHaveBeenCalled()
+    delete (window as unknown as { gmatch?: unknown }).gmatch
+  })
+
+  it('second create on a hosting install is blocked in favor of rename', async () => {
+    stubLocalStorage({
+      'gmatch.central.url': 'https://central.test',
+      'gmatch.server.register': JSON.stringify({ name: 'My Realm' }),
+    })
+    ;(window as unknown as { gmatch?: unknown }).gmatch = {
+      serverSet: vi.fn(),
+      serverRelaunch: vi.fn(),
+      serverState: vi.fn().mockResolvedValue({ packaged: true, mode: 'host', url: 'http://127.0.0.1:8790', lanUrls: [] }),
+    }
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'My Realm', users: [], posts_24h: 0, members_total: 1 })
+      return json({ servers: [] })
+    })
+    const toasts: string[] = []
+    render(<ServersView identity={identity} toast={(m) => toasts.push(m)} />)
+    fireEvent.click(await screen.findByRole('button', { name: /create server/i }))
+    fireEvent.change(screen.getByLabelText(/server name/i), { target: { value: 'Second Server' } })
+    fireEvent.click(screen.getByRole('button', { name: /^create$/i }))
+    await waitFor(() => expect(toasts.join('|')).toMatch(/already hosts/i))
+    expect(calls.some((c) => c.init?.method === 'POST')).toBe(false)
+    expect((window as unknown as { gmatch: { serverSet: ReturnType<typeof vi.fn> } }).gmatch.serverSet).not.toHaveBeenCalled()
+    delete (window as unknown as { gmatch?: unknown }).gmatch
+  })
+
   it('join sets the node URL for the session and asks for restart when packaged', async () => {
     ;(window as unknown as { gmatch?: unknown }).gmatch = {
       serverSet: vi.fn().mockResolvedValue({ ok: true }),
@@ -147,5 +247,39 @@ describe('ServersView', () => {
     expect(JSON.parse(raw!).password).toBe('s3cret')
     delete (window as unknown as { gmatch?: unknown }).gmatch
     vi.restoreAllMocks()
+  })
+
+  it('allows switching between online and 24h tabs and clicking user card opens profile', async () => {
+    const orbitApi = await import('../../utils/api')
+    const spy = vi.spyOn(orbitApi, 'orbitFetch').mockImplementation(async (endpoint: string) => {
+      if (String(endpoint).includes('/api/servers/dashboard')) {
+        return json({
+          name: 'hub',
+          users: [
+            { id: 'usr_on', display_name: 'BobOnline', online: true, last_seen: new Date().toISOString() },
+            { id: 'usr_off', display_name: 'CarolRecent', online: false, last_seen: new Date(Date.now() - 3600000).toISOString() },
+          ],
+          posts_24h: 5,
+          members_total: 12,
+        })
+      }
+      if (String(endpoint).includes('/api/servers')) return json({ servers: [] })
+      return json({})
+    })
+    const onSelectUser = vi.fn()
+    render(<ServersView identity={identity} toast={() => {}} onSelectUser={onSelectUser} />)
+
+    // Online tab is default: BobOnline is visible, CarolRecent is hidden
+    expect(await screen.findByText('BobOnline', {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(screen.queryByText('CarolRecent')).toBeNull()
+
+    // Switch to Last 24h tab: CarolRecent is visible too
+    fireEvent.click(screen.getByRole('button', { name: /last 24h/i }))
+    expect(await screen.findByText('CarolRecent')).toBeInTheDocument()
+
+    // Click Bob's card: triggers onSelectUser
+    fireEvent.click(screen.getByText('BobOnline'))
+    expect(onSelectUser).toHaveBeenCalledWith(expect.objectContaining({ display_name: 'BobOnline' }))
+    spy.mockRestore()
   })
 })

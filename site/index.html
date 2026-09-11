@@ -102,13 +102,15 @@ footer {
 <main>
 <section id="download">
 <h2>Download (Windows x64, single file)</h2>
-<p>Version <strong id="version">1.1.3</strong> · file <code>gMatch-1.1.3-portable.exe</code> · 114,067,504 bytes (108.8 MiB) · built <span id="build-date">2026-09-10T13:13:50.630Z</span> (UTC).</p>
-<p><a href="releases/gMatch-1.1.3-portable.exe" download>gMatch-1.1.3-portable.exe</a></p>
+<p>Version <strong id="version">1.1.4</strong> · file <code>gMatch-1.1.4-portable.exe</code> · 114,165,417 bytes (108.9 MiB) · built <span id="build-date">2026-09-10T23:13:29.193Z</span> (UTC).</p>
+<p><a href="releases/gMatch-1.1.4-portable.exe" download>gMatch-1.1.4-portable.exe</a></p>
 <p>Expected <strong>SHA-256</strong> — copy the value below and check it against the next section before running anything:</p>
-<pre id="sha256">f5d5ffd80d863d94004c43b7e292eae67e401f2c4312ed61c912ac491938d7ca</pre>
+<pre id="sha256">8a5dee388df7f8ac2407e97711e8f000853cee44c722f828451f5c568fa19161</pre>
 <p>Expected <strong>SHA-512</strong> (extra paranoia is a virtue when the file is 109 MB):</p>
-<pre id="sha512">cf0b512b5199a924d0e255763e374a95b3afcab3552a6602252dd6828d0a57395dd6003ba4a26a4a52be343bce1aea9c7d7282b29b1bc6d74c1cf1f3b7865339</pre>
+<pre id="sha512">83f5f284c49a8f32edcc6111a60b9bac0ec6a1a5a3090df4b4c923dd877007d15b38e8ed08da28ac98c071e1ecd8e8cebf31153e69a67e533c3a2d01ff180120</pre>
 <p><em>(Both hashes — plus the build date and byte count above — are derived mechanically from the shipped file at publish time, never hand-typed. The same data lives at <code>release.json</code> on this server.)</em></p>
+<h3>Staying current (updates)</h3>
+<p>From version 1.1.4, gMatch checks this server's <code>release.json</code> shortly after each start and once a day after that. When a newer build exists it downloads it automatically, verifies it against the SHA-256 published for that file, and a single <strong>Install &amp; Restart</strong> button in Settings swaps the .exe you already run and relaunches it — same file, same folder, no installer, nothing else changes. If antivirus or SmartScreen refuses the swap, the app keeps running the old build and the exact downloaded file is left next to it; every step is written to <code>%APPDATA%\gMatch\main.log</code>. Builds 1.1.3 and older cannot self-update: download the new file once and it inherits everything.</p>
 <h3>Code signing: what we do and don't have</h3>
 <p>This binary is <strong>not Authenticode-signed</strong>. A commercial code-signing certificate costs hundreds of dollars a year; we fund this project with donations, not data sales, so instead we publish the cryptographic integrity you can verify yourself: SHA-256 and SHA-512 digests derived from the exact bytes served on this page. There is no macOS or Linux build yet.</p>
 <h3>"Windows said it might be dangerous" — why, and what to do</h3>
@@ -123,7 +125,7 @@ footer {
 <section id="verify">
 <h2>Verify the hash on Windows (20 seconds, nothing to install)</h2>
 <p>Open the Start menu, type <code>PowerShell</code>, and run (adjust the path if you saved elsewhere):</p>
-<pre>Get-FileHash "$env:USERPROFILE\Downloads\gMatch-1.1.3-portable.exe" -Algorithm SHA256</pre>
+<pre>Get-FileHash "$env:USERPROFILE\Downloads\gMatch-1.1.4-portable.exe" -Algorithm SHA256</pre>
 <p>Compare the <code>Hash</code> value with the one published above. If it differs by even ONE character, do NOT run the file: delete it and report at <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a>.</p>
 <p>Same idea, any algorithm you prefer: <code>Get-FileHash ... -Algorithm SHA512</code> must match the SHA-512 block above.</p>
 </section>

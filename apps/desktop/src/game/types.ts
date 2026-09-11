@@ -46,8 +46,17 @@ export interface BooruPost {
   kind?: 'image' | 'video'
 }
 
-/** Single/grid view for the feed stage. */
-export type ViewMode = 'single' | 'grid'
+/** Single/grid view for the feed stage (supports 1x1, 1x2, 2x2, 3x3). */
+export type ViewMode = 'single' | 'grid' | '1x1' | '1x2' | '2x2' | '3x3'
+
+/** Dynamic novelty drop earned upon defeating a foe (non-blocking). */
+export interface KoDrop {
+  id: string
+  foeTitle: string
+  suggestedTag?: string
+  suggestedAntiTag?: string
+  timestamp: number
+}
 
 /**
  * Player-owned idle-clicker image source. `urls` = pasted direct media

@@ -36,38 +36,42 @@ export default function StatsPanel() {
   }, [refreshCache])
 
   const statRow = (icon: ReactNode, label: string, value: ReactNode) => (
-    <div className="flex items-center justify-between border-b border-border-subtle py-[7px] text-[13px] text-retro-muted">
-      <span className="inline-flex items-center gap-[7px]">
+    <div className="flex items-center justify-between border-b border-border-subtle py-1 text-xs text-retro-muted last:border-0">
+      <span className="inline-flex items-center gap-1.5">
         {icon} {label}
       </span>
-      <b className={`${MONO} text-sm text-retro-fg`}>{value}</b>
+      <b className={`${MONO} text-xs text-retro-fg`}>{value}</b>
     </div>
   )
 
   return (
-    <aside className={`${PLATE} ${PANEL}`}>
-      <div
-        className={`${DISPLAY} text-[40px] font-bold leading-[1.1] break-all text-retro-fg [font-variant-numeric:tabular-nums]`}
-        data-testid="gc-balance"
-      >
-        {formatNum(s.gc)}
+    <aside className={`${PLATE} ${PANEL} !p-3`}>
+      <div className="flex items-baseline justify-between gap-2">
+        <div
+          className={`${DISPLAY} text-[30px] font-bold leading-none break-all text-retro-fg [font-variant-numeric:tabular-nums]`}
+          data-testid="gc-balance"
+        >
+          {formatNum(s.gc)}
+        </div>
+        <div className="text-[11px] font-bold uppercase tracking-[2px] text-retro-muted">g$</div>
       </div>
-      <div className="mb-3.5 text-[11px] uppercase tracking-[2px] text-retro-muted">g$</div>
-      {statRow(<IconCoin size={13} />, 'g$/s', formatNum(gps))}
-      {statRow(<IconBolt size={13} />, 'Click power', formatNum(cp))}
-      {statRow(
-        <IconCursor size={13} />,
-        'Clicks / crits',
-        <>
-          {s.clicks} / {s.crits}
-        </>,
-      )}
-      {statRow(<IconShard size={13} />, 'Corruption shards', s.shards)}
-      {statRow(
-        <IconImage size={13} />,
-        'Picture cache',
-        cache ? `${cache.files} · ${formatCacheMb(cache.bytes)}` : <Skeleton className="h-3 w-16" />,
-      )}
+      <div className="mt-2">
+        {statRow(<IconCoin size={12} />, 'g$/s', formatNum(gps))}
+        {statRow(<IconBolt size={12} />, 'Click power', formatNum(cp))}
+        {statRow(
+          <IconCursor size={12} />,
+          'Clicks / crits',
+          <>
+            {s.clicks} / {s.crits}
+          </>,
+        )}
+        {statRow(<IconShard size={12} />, 'Corruption shards', s.shards)}
+        {statRow(
+          <IconImage size={12} />,
+          'Picture cache',
+          cache ? `${cache.files} · ${formatCacheMb(cache.bytes)}` : <Skeleton className="h-3 w-16" />,
+        )}
+      </div>
       {cache && cache.files > 0 && (
         <button
           type="button"

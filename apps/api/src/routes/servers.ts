@@ -162,6 +162,13 @@ servers.patch('/node', orbitAuth, async (c) => {
   if (typeof body.description === 'string') {
     await setMeta(c.env.DB, NODE_DESC_KEY, body.description.trim().slice(0, MAX_DESC))
   }
+  // Directory row this node is listed as (set by the create-server flow so
+  // /node can report the linkage without leaning on the owner's localStorage).
+  if (typeof body.directory_id === 'string') {
+    const did = body.directory_id.trim().toLowerCase()
+    if (!/^[0-9a-f]{64}$/.test(did)) return c.json({ error: 'directory_id must be a directory server id' }, 400)
+    await setMeta(c.env.DB, NODE_DIRECTORY_KEY, did)
+  }
   const name = (await getMeta(c.env.DB, NODE_NAME_KEY)) || 'gmatch'
   const description = (await getMeta(c.env.DB, NODE_DESC_KEY)) || ''
   const directoryId = await getMeta(c.env.DB, NODE_DIRECTORY_KEY)
@@ -220,10 +227,13 @@ servers.patch('/:id', orbitAuth, async (c) => {
 // (they don't exist), no last_seen timestamps leaking activity patterns.
 servers.get('/dashboard', softAuth, async (c) => {
   const users = await c.env.DB.prepare(
-    `SELECT id, display_name, CASE WHEN last_seen IS NOT NULL AND datetime(last_seen) >= datetime('now', '-60 seconds') THEN 1 ELSE 0 END as online
-     FROM Users WHERE is_admin = 0 OR is_admin IS NULL
-     ORDER BY online DESC, display_name ASC LIMIT 100`,
-  ).all<{ id: string; display_name: string | null; online: number }>()
+    `SELECT id, display_name, pfp_url, last_seen,
+       CASE WHEN last_seen IS NOT NULL AND datetime(last_seen) >= datetime('now', '-60 seconds') THEN 1 ELSE 0 END as online,
+       CASE WHEN last_seen IS NOT NULL AND datetime(last_seen) >= datetime('now', '-24 hours') THEN 1 ELSE 0 END as active_24h
+     FROM Users WHERE (is_admin = 0 OR is_admin IS NULL)
+       AND (last_seen IS NOT NULL AND datetime(last_seen) >= datetime('now', '-24 hours'))
+     ORDER BY online DESC, last_seen DESC, display_name ASC LIMIT 100`,
+  ).all<{ id: string; display_name: string | null; pfp_url: string | null; last_seen: string | null; online: number }>()
   const counts = await c.env.DB.prepare(
     `SELECT
        (SELECT COUNT(*) FROM Objects WHERE is_public = 1 AND created_at >= datetime('now', '-1 day')) as posts_24h,
@@ -238,6 +248,8 @@ servers.get('/dashboard', softAuth, async (c) => {
       ? (users.results || []).map((u) => ({
           id: u.id.slice(0, 8),
           display_name: u.display_name?.trim() || undefined,
+          pfp_url: u.pfp_url || undefined,
+          last_seen: u.last_seen,
           online: u.online === 1,
         }))
       : [],

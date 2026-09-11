@@ -2,8 +2,8 @@ import { create } from 'zustand'
 import { getSecureItem } from '../utils/secure-storage'
 import { clickGain, clickPower, heatMultiplier, heatStreakAfter, isCrit, passiveGps } from './economy'
 import type { EconomyInput } from './economy'
-import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, setupTag, soloTag as soloTagList, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
-import { getUserExcludes, rankTags, setUserExcludes } from './tagFilter'
+import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, normalizeCustomTag, setupTag, soloTag as soloTagList, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
+import { getUserExcludes, isNoise, isQueryBlocked, rankTags, setUserExcludes } from './tagFilter'
 import { KILL_XP, foeMaxHp, killBonusGp } from './battle'
 import { CAPS, activeCaps, capAutoClicksPerSec, popCap as popCapList } from './caps'
 import { imageRarity } from './rarity'
@@ -20,8 +20,9 @@ import {
 } from './save'
 import type { SaveData } from './save'
 import { fetchPosts } from '../services/booru'
+import { evictImage } from '../services/imageCache'
 import { isCustomMediaUrl, sampleCustomSources } from '../services/customSources'
-import type { ActiveCap, BooruPost, CapId, CustomSource, GalleryImage, GridCell, OwnedTag, ViewMode } from './types'
+import type { ActiveCap, BooruPost, CapId, CustomSource, GalleryImage, GridCell, KoDrop, OwnedTag, ViewMode } from './types'
 
 export interface Toast {
   id: number
@@ -81,6 +82,7 @@ export interface GameState {
   defeated: number
   /** Round-robin cursor over the tag pool — one tag per fetch, never stacked. */
   feedCursor: number
+  priorityTag: string | null
   feedOffline: boolean
   fetching: boolean
   /** True only while the CURRENT stage image is resolved + decoded. Clicks
@@ -95,6 +97,12 @@ export interface GameState {
   clickCell: (index: number) => ClickResult
   dropCell: (index: number) => void
   setViewMode: (mode: ViewMode) => void
+  reorderGrid: (from: number, to: number) => void
+  /** KO novelty pipeline (session-only): generated per drain from foe tags. */
+  pendingDrops: KoDrop[]
+  claimDropTag: (id: string) => boolean
+  claimDropAntiTag: (id: string) => boolean
+  dismissDrop: (id: string) => void
   /** Player-picked starter tags + extra excludes (setup screen, one shot). */
   setupComplete: boolean
   userExcludes: string[]
@@ -122,6 +130,8 @@ export interface GameState {
   undoGrid: () => boolean
   setBackground: (url: string | null) => void
   featureImage: (id: string) => void
+  /** Permanently delete a keepsake from the gallery (never blocks play). */
+  removeGalleryImage: (id: string) => boolean
   popCap: (capId: CapId) => boolean
   brainmelt: () => boolean
   tick: (dtMs?: number) => void
@@ -265,6 +275,7 @@ function freshData() {
     backgroundUrl: null as string | null,
     viewMode: 'single' as ViewMode,
     grid: [] as GridCell[],
+    pendingDrops: [] as KoDrop[],
     foeHp: 0,
     foeMaxHp: 0,
     foeClicks: 0,
@@ -273,6 +284,7 @@ function freshData() {
     maxHeatStreak: 0,
     defeated: 0,
     feedCursor: 0,
+    priorityTag: null,
     feedOffline: false,
     fetching: false,
     imageReady: false,
@@ -313,21 +325,67 @@ function pushPast(past: BooruPost[], post: BooruPost | null): BooruPost[] {
   if (!post) return past
   return [...past, post].slice(-HISTORY_CAP)
 }
+
+/** Silent feed retry: sources are never allowed to kill the game.
+ * Backoff 5s → 10s → 20s → 40s → 60s cap (session-only, module timer).
+ * Success clears via clearFeedRetry. Test hook: lastFeedRetryMs + reset. */
+let feedRetryTimer: ReturnType<typeof setTimeout> | null = null
+let feedRetryStep = 0
+export let lastFeedRetryMs = 0
+export function __resetFeedRetryForTests() {
+  if (feedRetryTimer) clearTimeout(feedRetryTimer)
+  feedRetryTimer = null
+  feedRetryStep = 0
+  lastFeedRetryMs = 0
+}
+function clearFeedRetry() {
+  if (feedRetryTimer) clearTimeout(feedRetryTimer)
+  feedRetryTimer = null
+  feedRetryStep = 0
+  lastFeedRetryMs = 0
+}
+function scheduleFeedRetry() {
+  if (feedRetryTimer) return
+  const delay = Math.min(60_000, 5_000 * 2 ** feedRetryStep)
+  feedRetryStep += 1
+  lastFeedRetryMs = delay
+  // ponytail: module timer, unref'd so tests/exit never hang; store.fetchFeed on fire
+  feedRetryTimer = setTimeout(() => {
+    feedRetryTimer = null
+    void useGame.getState().fetchFeed()
+  }, delay)
+  if (typeof feedRetryTimer === 'object' && feedRetryTimer !== null && 'unref' in feedRetryTimer) {
+    ; (feedRetryTimer as { unref: () => void }).unref()
+  }
+}
 /** Session-only snapshots of skipped grids (undo stack for the grid arrows). */
 export const GRID_HISTORY_CAP = 10
 
-/** 3x3 grid size — nine live squares. */
+/** 3x3 grid size — nine live squares (ceiling; per-layout targets below). */
 export const GRID_SIZE = 9
+
+/** Live grid squares per layout: 1x1=1, 1x2=2, 2x2=4, 3x3=9. */
+export function gridSizeForMode(mode: ViewMode): number {
+  switch (mode) {
+    case '1x1': return 1
+    case '1x2': return 2
+    case '2x2': return 4
+    case '3x3': return 9
+    case 'grid': return 9
+    default: return 0
+  }
+}
 
 /** Fill empty grid squares from the queue head (fresh HP per cell). Pure. */
 function fillGrid(
   grid: GridCell[],
   queue: BooruPost[],
   defeated: number,
+  target = GRID_SIZE,
 ): { grid: GridCell[]; queue: BooruPost[] } {
   const g = [...grid]
   const q = [...queue]
-  while (g.length < GRID_SIZE && q.length > 0) {
+  while (g.length < target && q.length > 0) {
     const post = q.shift() as BooruPost
     const maxHp = foeMaxHp(defeated)
     g.push({ post, hp: maxHp, maxHp, clicks: 0 })
@@ -335,7 +393,12 @@ function fillGrid(
   return { grid: g, queue: q }
 }
 
-/** Shared drain reward: gallery keep + market discovery + past + KO count. */
+/** True when the mode shows grid squares (3x3 layouts + legacy 'grid'). */
+export function isGridMode(mode: ViewMode): boolean {
+  return mode !== 'single' && mode !== '1x1'
+}
+
+/** Shared drain reward: gallery keep + market discovery + past + KO count + novelty drop. */
 function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: number) {
   const defeated = s.defeated + 1
   const rarityBase = rarityBaseForPost(post.id)
@@ -351,6 +414,28 @@ function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: 
     kind: post.kind,
     preview: post.preview,
   }
+  // Novelty drop (non-blocking): one suggested tag + one anti-tag from the foe.
+  const ownedNames = new Set(s.tags.map((t) => t.name.toLowerCase()))
+  const cleanFoeTags = post.tags
+    .map((t) => normalizeCustomTag(String(t)))
+    .filter((t) => t.length >= 2 && !isQueryBlocked(t) && !isNoise(t))
+  const candidateTag = cleanFoeTags.find((t) => !ownedNames.has(t))
+  const candidateAntiTag = cleanFoeTags.find(
+    (t) => t !== candidateTag && !s.userExcludes.includes(t),
+  )
+  const newDrop: KoDrop | null =
+    candidateTag || candidateAntiTag
+      ? {
+          id: `drop:${post.id}:${now}`,
+          foeTitle: cleanFoeTags[0] ?? 'foe',
+          suggestedTag: candidateTag,
+          suggestedAntiTag: candidateAntiTag,
+          timestamp: now,
+        }
+      : null
+  const pendingDrops = newDrop
+    ? [newDrop, ...s.pendingDrops.filter((d) => d.id !== newDrop.id)].slice(0, 8)
+    : s.pendingDrops
   return {
     defeated,
     bonus,
@@ -360,6 +445,7 @@ function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: 
     tags: discoverTags(s.tags, post.tags),
     // The drained foe stays reachable via the back arrow (shown beaten, no HP).
     past: pushPast(s.past, post),
+    pendingDrops,
   }
 }
 
@@ -464,6 +550,7 @@ export const useGame = create<GameState>((set, get) => ({
       past: ko.past,
       gallery: ko.gallery,
       defeated: ko.defeated,
+      pendingDrops: ko.pendingDrops,
       current: ko.current,
       queue: ko.queue,
       foeHp: ko.foeHp,
@@ -481,6 +568,7 @@ export const useGame = create<GameState>((set, get) => ({
       past: next.past,
       gallery: next.gallery,
       defeated: next.defeated,
+      pendingDrops: next.pendingDrops,
       current: next.current,
       queue: next.queue,
       foeHp: next.foeHp,
@@ -540,6 +628,7 @@ export const useGame = create<GameState>((set, get) => ({
       s.grid.filter((_, i) => i !== index),
       s.queue,
       spoil.defeated,
+      gridSizeForMode(s.viewMode),
     )
     const next: GameState = {
       ...s,
@@ -552,6 +641,7 @@ export const useGame = create<GameState>((set, get) => ({
       past: spoil.past,
       gallery: spoil.gallery,
       defeated: spoil.defeated,
+      pendingDrops: spoil.pendingDrops,
       queue: filled.queue,
       grid: filled.grid,
     }
@@ -573,7 +663,7 @@ export const useGame = create<GameState>((set, get) => ({
       maxHeatStreak: Math.max(s.maxHeatStreak, streak),
       ...progress(next, s.xp),
     })
-    if (filled.grid.length < GRID_SIZE) void get().fetchFeed()
+    if (filled.grid.length < gridSizeForMode(get().viewMode)) void get().fetchFeed()
     return { gain, crit, killed: true, heat }
   },
 
@@ -581,29 +671,73 @@ export const useGame = create<GameState>((set, get) => ({
     const s = get()
     const cell = s.grid[index]
     if (!cell) return
-    // Broken image: no reward, no KO — the square just slides a fresh foe in.
+    // Broken image: no reward, no KO — drop its bytes, slide a fresh foe in.
+    void evictImage(cell.post.url)
+    const target = gridSizeForMode(s.viewMode)
     const filled = fillGrid(
       s.grid.filter((_, i) => i !== index),
       s.queue,
       s.defeated,
+      target,
     )
     set({
       past: pushPast(s.past, cell.post),
       queue: filled.queue,
       grid: filled.grid,
     })
-    if (filled.grid.length < GRID_SIZE && !get().fetching) void get().fetchFeed()
+    if (filled.grid.length < target && !get().fetching) void get().fetchFeed()
   },
 
   setViewMode: (mode) => {
     const s = get()
-    if (mode !== 'grid') {
+    if (!isGridMode(mode)) {
       if (s.viewMode !== mode) set({ viewMode: mode })
       return
     }
-    const filled = fillGrid(s.grid, s.queue, s.defeated)
+    const target = gridSizeForMode(mode)
+    // Trim oversized boards when shrinking layouts; preserve order.
+    const grid = s.grid.slice(0, target)
+    const filled = fillGrid(grid, s.queue, s.defeated, target)
     set({ viewMode: mode, queue: filled.queue, grid: filled.grid })
-    if (filled.grid.length < GRID_SIZE && !get().fetching) void get().fetchFeed()
+    if (filled.grid.length < target && !get().fetching) void get().fetchFeed()
+  },
+
+  reorderGrid: (from, to) => {
+    const s = get()
+    if (from === to || from < 0 || to < 0 || from >= s.grid.length || to >= s.grid.length) return
+    const grid = [...s.grid]
+    const [cell] = grid.splice(from, 1)
+    grid.splice(to, 0, cell)
+    set({ grid })
+  },
+
+  claimDropTag: (id) => {
+    const s = get()
+    const drop = s.pendingDrops.find((d) => d.id === id)
+    if (!drop?.suggestedTag) return false
+    const name = drop.suggestedTag
+    if (s.tags.some((t) => t.name.toLowerCase() === name)) {
+      set({ pendingDrops: s.pendingDrops.filter((d) => d.id !== id) })
+      return true
+    }
+    const stats = deriveTagStats(name, 1)
+    const tags = [...s.tags, { name, level: 1, selected: true, ...stats }]
+    set({ tags, pendingDrops: s.pendingDrops.filter((d) => d.id !== id) })
+    get().save()
+    return true
+  },
+
+  claimDropAntiTag: (id) => {
+    const s = get()
+    const drop = s.pendingDrops.find((d) => d.id === id)
+    if (!drop?.suggestedAntiTag) return false
+    const ok = get().addUserExclude(drop.suggestedAntiTag)
+    set({ pendingDrops: get().pendingDrops.filter((d) => d.id !== id) })
+    return ok
+  },
+
+  dismissDrop: (id) => {
+    set((s) => ({ pendingDrops: s.pendingDrops.filter((d) => d.id !== id) }))
   },
 
   buyTag: (name) => {
@@ -634,7 +768,7 @@ export const useGame = create<GameState>((set, get) => ({
   soloTag: (name) => {
     const next = soloTagList(get().tags, name)
     if (!next) return false
-    set({ tags: next })
+    set({ tags: next, priorityTag: name })
     return true
   },
 
@@ -675,6 +809,7 @@ export const useGame = create<GameState>((set, get) => ({
     const prog = progress(next, s.xp)
     set({
       tags: next.tags,
+      priorityTag: verdict.name,
       achievements: prog.achievements,
       toasts: [...prog.toasts, { id: toastSeq++, msg: `Custom tag added: ${verdict.name}` }],
     })
@@ -751,26 +886,35 @@ export const useGame = create<GameState>((set, get) => ({
       // Stacked AND-queries truncate on the mirrors and repeat the same top
       // posts — rotation keeps the feed fresh and online.
       const pool = owned.slice(0, 4)
-      const first = pool[s.feedCursor % pool.length]
-      let res = await fetchPosts({ tags: first, limit: 10 })
+      const priority = s.priorityTag && owned.includes(s.priorityTag) ? s.priorityTag : null
+      // A freshly added/picked tag steers the very next fetch (priority first),
+      // then hands back to rotation once its batch lands.
+      const first = priority ?? pool[s.feedCursor % pool.length]
+      // ponytail: in grid mode pull a larger batch (30) so queue stays ahead of the 3x3 grid
+      const batchLimit = isGridMode(get().viewMode) ? 30 : 15
+      let res = await fetchPosts({ tags: first, limit: batchLimit })
       cursor = s.feedCursor + 1
       if (!res.ok || res.posts.length === 0) {
         // Flaky round — retry once with the NEXT tag, never the same one.
         const second = pool[cursor % pool.length]
-        res = await fetchPosts({ tags: second, limit: 10 })
+        res = await fetchPosts({ tags: second, limit: batchLimit })
         cursor += 1
       }
       if (res.ok && res.posts.length > 0) {
         // Random order every round — never push API sequence straight to the feed.
         posts = shufflePosts(res.posts)
+        if (priority) set({ priorityTag: null })
       }
     }
     if (posts && posts.length > 0) {
+      // Success: clear the offline flag + reset the retry backoff.
+      clearFeedRetry()
       const foe = foeMaxHp(s.defeated)
-      if (get().viewMode === 'grid') {
+      if (isGridMode(get().viewMode)) {
         // Grid consumes the whole batch: append to the queue, top up squares.
+        const target = gridSizeForMode(get().viewMode)
         const q = [...get().queue, ...posts]
-        const filled = fillGrid(get().grid, q, get().defeated)
+        const filled = fillGrid(get().grid, q, get().defeated, target)
         set({
           queue: filled.queue,
           grid: filled.grid,
@@ -791,17 +935,38 @@ export const useGame = create<GameState>((set, get) => ({
         fetching: false,
       })
     } else {
-      if (get().viewMode === 'grid') {
-        // Offline in grid mode: keep live squares + remaining queue, just flag it.
-        set({ feedCursor: cursor, feedOffline: true, fetching: false })
+      // Sources unreachable: keep the game ALWAYS playable — recycle the
+      // queue/past so the player never stares at an empty offline board,
+      // and schedule a silent background retry (no modal, no block).
+      scheduleFeedRetry()
+      if (isGridMode(get().viewMode)) {
+        // Recycle unseen posts so grid keeps foes in play while offline.
+        const livePosts = [...get().grid.map((c) => c.post), ...get().queue]
+        const recycle = shufflePosts([...get().past.slice(-12), ...livePosts])
+        const target = gridSizeForMode(get().viewMode)
+        const filled = fillGrid(get().grid, recycle.slice(0, Math.max(0, target - get().grid.length)), get().defeated, target)
+        set({ feedCursor: cursor, fetching: false, feedOffline: livePosts.length === 0 && filled.grid.length === 0, grid: filled.grid })
       } else {
-        set({ current: null, queue: [], foeHp: 0, foeMaxHp: 0, foeClicks: 0, feedCursor: cursor, feedOffline: true, fetching: false })
+        const keep = get().current ?? get().past[get().past.length - 1] ?? null
+        const foe = keep ? foeMaxHp(get().defeated) : 0
+        set({
+          current: keep,
+          queue: get().queue.length > 0 ? get().queue : get().past.slice(-6),
+          foeHp: keep ? Math.max(foe, 1) : 0,
+          foeMaxHp: keep ? foe : 0,
+          foeClicks: 0,
+          feedCursor: cursor,
+          // Only flag offline when literally nothing is left to play with.
+          feedOffline: !keep,
+          fetching: false,
+        })
       }
     }
   },
 
   advanceFeed: () => {
     const s = get()
+    if (s.current) void evictImage(s.current.url)
     if (s.queue.length > 0) {
       // Skipping is free but pays nothing — the beaten-or-not choice is the player's.
       // The skipped foe stays reachable via the back arrow at full HP.
@@ -844,12 +1009,15 @@ export const useGame = create<GameState>((set, get) => ({
 
   skipGrid: () => {
     const s = get()
-    if (s.viewMode !== 'grid' || s.grid.length === 0) return
+    if (!isGridMode(s.viewMode) || s.grid.length === 0) return
+    for (const c of s.grid) void evictImage(c.post.url)
     const gridPast = [...s.gridPast, s.grid].slice(-GRID_HISTORY_CAP)
     // Fresh board: every square refills from the queue head (fetch tops up).
-    const filled = fillGrid([], s.queue, s.defeated)
+    const target = gridSizeForMode(s.viewMode)
+    const filled = fillGrid([], s.queue, s.defeated, target)
     set({ grid: filled.grid, queue: filled.queue, gridPast, feedOffline: false })
-    if (filled.grid.length < GRID_SIZE && !s.fetching) void s.fetchFeed()
+    // ponytail: refill when board has gaps OR queue falls below 2 boards ahead (18)
+    if ((filled.grid.length < target || filled.queue.length < target * 2) && !s.fetching) void s.fetchFeed()
   },
 
   undoGrid: () => {
@@ -876,6 +1044,20 @@ export const useGame = create<GameState>((set, get) => ({
 
   setBackground: (url) => {
     set({ backgroundUrl: url })
+  },
+
+  /** Permanently delete a keepsake from the gallery (never blocks play). */
+  removeGalleryImage: (id) => {
+    const s = get()
+    const img = s.gallery.find((g) => g.id === id)
+    if (!img) return false
+    const gallery = s.gallery.filter((g) => g.id !== id)
+    set({
+      gallery,
+      backgroundUrl: s.backgroundUrl === img.url ? null : s.backgroundUrl,
+    })
+    get().save()
+    return true
   },
 
   popCap: (capId) => {
@@ -954,12 +1136,13 @@ export const useGame = create<GameState>((set, get) => ({
     const autoDmg = clickPower(input, now) * auto * (dtMs / 1000)
     const gain = (gps + clickPower(input, now) * auto) * (dtMs / 1000)
     // Grid mode: auto-clicks batter the first square (one KO per tick at most).
-    if (s.viewMode === 'grid') {
+    if (isGridMode(s.viewMode)) {
       const cell = s.grid[0]
       if (cell && autoDmg > 0) {
         if (cell.hp - autoDmg <= 0) {
           const spoil = gallerySpoils(s, cell.post, cell.clicks, now)
-          const filled = fillGrid(s.grid.slice(1), s.queue, spoil.defeated)
+          const target = gridSizeForMode(s.viewMode)
+          const filled = fillGrid(s.grid.slice(1), s.queue, spoil.defeated, target)
           const next: GameState = {
             ...s,
             caps,
@@ -970,6 +1153,7 @@ export const useGame = create<GameState>((set, get) => ({
             past: spoil.past,
             gallery: spoil.gallery,
             defeated: spoil.defeated,
+            pendingDrops: spoil.pendingDrops,
             queue: filled.queue,
             grid: filled.grid,
             lastSeenAt: now,
@@ -984,12 +1168,13 @@ export const useGame = create<GameState>((set, get) => ({
             past: next.past,
             gallery: next.gallery,
             defeated: next.defeated,
+            pendingDrops: next.pendingDrops,
             queue: next.queue,
             grid: next.grid,
             lastSeenAt: next.lastSeenAt,
             ...progress(next, s.xp),
           })
-          if (filled.grid.length < GRID_SIZE && !get().fetching) void get().fetchFeed()
+          if (filled.grid.length < target && !get().fetching) void get().fetchFeed()
           return
         }
         const grid = s.grid.map((c, i) => (i === 0 ? { ...c, hp: c.hp - autoDmg } : c))
@@ -1234,6 +1419,7 @@ export const useGame = create<GameState>((set, get) => ({
     set({
       tags: picked,
       setupComplete: true,
+      priorityTag: clean[clean.length - 1] ?? null,
       userExcludes: next.userExcludes,
       achievements: prog.achievements,
       toasts: [...prog.toasts, { id: toastSeq++, msg: `Feed tuned: ${clean.join(', ')}` }],

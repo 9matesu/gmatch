@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { playPress } from '../../utils/sounds';
-import { Maximize, Minimize2, Images } from 'lucide-react';
 import { BabecockPanel } from '../BabecockPanel';
 import { RankingsPanel } from './RankingsPanel';
 import { DeckBuilder } from './DeckBuilder';
@@ -61,10 +60,10 @@ export function GamesHub({
   };
 
   return (
-    <div className={`w-full max-w-6xl mx-auto flex flex-col font-sans select-none ${subTab === 'idle' ? 'pb-2' : 'pb-24'} text-retro-fg animate-orbit-fade-in`}>
+    <div className={`w-full flex flex-col font-sans select-none ${subTab === 'idle' ? 'pb-0 flex-1 min-h-0 h-full max-w-none mx-0' : 'pb-24 max-w-6xl mx-auto'} text-retro-fg animate-orbit-fade-in`}>
       {/* Tab bar removed — every game is reachable from the sidebar. */}
       {/* Content */}
-      <div className={subTab === 'idle' ? 'p-2' : 'p-3 sm:p-4'}>
+      <div className={subTab === 'idle' ? 'p-1 sm:p-2 flex-1 min-h-0 h-full w-full flex flex-col overflow-hidden' : 'p-3 sm:p-4'}>
         {subTab === 'duel' && (
           <div className="space-y-4">
             {renderDuelContent()}
@@ -118,32 +117,13 @@ export function GamesHub({
         {subTab === 'idle' && (
           <div
             ref={idleBoxRef}
-            className={`relative rounded-lg overflow-hidden bg-surface-canvas ${idleFullscreen ? 'h-dvh p-4' : 'h-[calc(100dvh-160px)] min-h-[520px]'}`}
+            className={`relative min-h-0 flex-1 w-full rounded-lg overflow-hidden bg-surface-canvas p-1 sm:p-2 flex flex-col ${idleFullscreen ? 'h-dvh' : 'h-[calc(100dvh-72px)] min-h-[580px]'}`}
           >
-            <div className="absolute right-2 top-2 z-20 flex items-center gap-1.5">
-              {onOpenSources && (
-                <button
-                  type="button"
-                  onClick={() => { playPress(700); onOpenSources(); }}
-                  title="Custom image sources — add your own URLs or folders"
-                  aria-label="Custom image sources"
-                  className="p-1.5 rounded-md bg-black/50 text-retro-muted hover:text-retro-fg hover:bg-black/70 transition-colors cursor-pointer"
-                >
-                  <Images className="w-4 h-4" />
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={toggleIdleFullscreen}
-                title={idleFullscreen ? 'Exit fullscreen' : 'Play fullscreen'}
-                aria-label={idleFullscreen ? 'Exit fullscreen' : 'Play fullscreen'}
-                aria-pressed={idleFullscreen}
-                className={`p-1.5 rounded-md transition-colors cursor-pointer ${idleFullscreen ? 'bg-glass-w20 text-retro-accent' : 'bg-black/50 text-retro-muted hover:text-retro-fg hover:bg-black/70'}`}
-              >
-                {idleFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-              </button>
-            </div>
-            <GridWorkspace />
+            <GridWorkspace
+              idleFullscreen={idleFullscreen}
+              onToggleFullscreen={toggleIdleFullscreen}
+              onOpenSources={onOpenSources}
+            />
           </div>
         )}
 

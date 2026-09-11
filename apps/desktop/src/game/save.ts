@@ -109,7 +109,9 @@ export function deserialize(raw: string | null | undefined): SaveData | null {
     defeated: num(d.defeated, 0),
     maxHeatStreak: num(d.maxHeatStreak, 0),
     backgroundUrl: typeof d.backgroundUrl === 'string' ? d.backgroundUrl : null,
-    viewMode: d.viewMode === 'grid' ? 'grid' : 'single',
+    viewMode: (['single', 'grid', '1x1', '1x2', '2x2', '3x3'].includes(d.viewMode as string)
+      ? d.viewMode
+      : 'single') as ViewMode,
     setupComplete: d.setupComplete === true,
     userExcludes: arr<string>(d.userExcludes),
     customSources: sanitizeCustomSources((d as Partial<SaveData>).customSources),

@@ -75,17 +75,17 @@ describe('passive g$/s (SPEC §3/§4)', () => {
     expect(galleryIncome([img('Common'), img('Copper'), img('Silver'), img('Gold'), img('Diamond')])).toBe(144)
   })
 
-  it('passive scales with shards and Pornmeat, not with click caps', () => {
+  it('passive scales with shards and Pornmeat, not with click caps (halved)', () => {
     const input: EconomyInput = {
       ...base,
       tags: [tag('wet', 2, 5)],
       gallery: [img('Gold')],
     }
-    expect(passiveGps(input, NOW)).toBe(40)
-    expect(passiveGps({ ...input, shards: 2 }, NOW)).toBeCloseTo(48)
-    expect(passiveGps({ ...input, caps: caps(['hypno', NOW + 1]) }, NOW)).toBe(80)
-    expect(passiveGps({ ...input, caps: caps(['blue', NOW + 1]) }, NOW)).toBe(40)
-    expect(passiveGps({ ...input, caps: caps(['melt', NOW + 1]) }, NOW)).toBe(400)
+    expect(passiveGps(input, NOW)).toBe(20)
+    expect(passiveGps({ ...input, shards: 2 }, NOW)).toBeCloseTo(24)
+    expect(passiveGps({ ...input, caps: caps(['hypno', NOW + 1]) }, NOW)).toBe(40)
+    expect(passiveGps({ ...input, caps: caps(['blue', NOW + 1]) }, NOW)).toBe(20)
+    expect(passiveGps({ ...input, caps: caps(['melt', NOW + 1]) }, NOW)).toBe(200)
   })
 })
 

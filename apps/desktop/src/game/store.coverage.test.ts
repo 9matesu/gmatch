@@ -9,7 +9,7 @@ import { setupTag } from './tags'
 import { getUserExcludes } from './tagFilter'
 import { fetchPosts } from '../services/booru'
 import type { BooruResponse } from '../services/booru'
-import { MAX_USER_EXCLUDES, useGame, GRID_SIZE } from './store'
+import { MAX_USER_EXCLUDES, useGame, GRID_SIZE, __resetFeedRetryForTests } from './store'
 import type { BooruPost } from './types'
 
 const mocked = vi.mocked(fetchPosts)
@@ -43,6 +43,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  __resetFeedRetryForTests()
   vi.unstubAllGlobals()
 })
 
@@ -228,19 +229,21 @@ describe('fetchFeed guards + offline shapes', () => {
     expect(mocked).not.toHaveBeenCalled()
   })
 
-  it('grid mode keeps live squares when the feed goes offline', async () => {
+  it('grid mode recycles squares when the feed goes offline (never dead)', async () => {
     useGame.setState({ tags: [setupTag('aaa')], queue: dozen(), grid: [] })
     useGame.getState().setViewMode('grid')
     const before = useGame.getState().grid
     mocked.mockResolvedValue(offline)
     await useGame.getState().fetchFeed()
     const s = useGame.getState()
-    expect(s.feedOffline).toBe(true)
-    expect(s.grid).toBe(before) // squares untouched
+    expect(s.feedOffline).toBe(false)
+    expect(s.grid.length).toBeGreaterThan(0)
+    expect(s.grid).not.toBe(before)
     expect(s.current).toBeNull()
+    __resetFeedRetryForTests()
   })
 
-  it('single mode clears the board when the feed goes offline', async () => {
+  it('single mode keeps the last foe playable when the feed goes offline', async () => {
     useGame.setState({
       tags: [setupTag('aaa')],
       current: foe('old'),
@@ -251,9 +254,9 @@ describe('fetchFeed guards + offline shapes', () => {
     mocked.mockResolvedValue(offline)
     await useGame.getState().fetchFeed()
     const s = useGame.getState()
-    expect(s.current).toBeNull()
-    expect(s.queue).toEqual([])
-    expect(s.feedOffline).toBe(true)
+    expect(s.current?.id).toBe('old')
+    expect(s.feedOffline).toBe(false)
+    __resetFeedRetryForTests()
   })
 
   it('retries once with the NEXT tag on a flaky round', async () => {
@@ -368,20 +371,21 @@ describe('clickCell / dropCell edges', () => {
     expect(mocked).not.toHaveBeenCalled()
   })
 
-  it('dropCell with no refill asks the feed', async () => {
+  it('dropCell with no refill asks the feed and recycles history', async () => {
     mocked.mockClear()
     useGame.setState({
       tags: [setupTag('aaa')],
       grid: [{ post: foe('broken'), hp: 5, maxHp: 8, clicks: 0 }],
       queue: [],
+      past: [],
       viewMode: 'grid',
     })
     useGame.getState().dropCell(0)
     await settle()
     const s = useGame.getState()
-    expect(s.grid).toHaveLength(0)
     expect(s.past.map((p) => p.id)).toEqual(['broken'])
     expect(mocked).toHaveBeenCalled()
+    __resetFeedRetryForTests()
   })
 })
 

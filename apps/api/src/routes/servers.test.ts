@@ -255,4 +255,25 @@ describe('Server node API', () => {
     }, env)
     expect(res.status).toBe(403)
   })
+
+  it('node can remember its directory row id (create-server claim)', async () => {
+    const did = 'a'.repeat(64)
+    const raw = JSON.stringify({ directory_id: did.toUpperCase() })
+    const patch = await app.request('/api/servers/node', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...headers(host, 'PATCH', '/api/servers/node', raw) },
+      body: raw,
+    }, env)
+    expect(patch.status).toBe(200)
+    const get = await app.request('/api/servers/node', { headers: headers(host, 'GET', '/api/servers/node') }, env)
+    expect((await get.json() as any).directoryId).toBe(did)
+
+    const bad = JSON.stringify({ directory_id: 'not-a-dir-id' })
+    const res = await app.request('/api/servers/node', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...headers(host, 'PATCH', '/api/servers/node', bad) },
+      body: bad,
+    }, env)
+    expect(res.status).toBe(400)
+  })
 })

@@ -1,9 +1,8 @@
 import { memo } from 'react'
 
 /**
- * Compact pill switch (user: "não gordos"). h-4 w-8 track, h-3 w-3 knob.
- * Kept 100% a11y-identical to the inline buttons it replaced: role="switch",
- * aria-checked, onClick — no visual-only wrappers.
+ * Thin horizontal track switch: w-9 line (h-1) + floating h-3 w-3 knob.
+ * role="switch", aria-checked, onClick.
  */
 export const Switch = memo(function Switch({
   checked,
@@ -21,11 +20,16 @@ export const Switch = memo(function Switch({
       aria-checked={checked}
       aria-label={label}
       onClick={onChange}
-      className={`h-4 w-8 shrink-0 cursor-pointer rounded-full border-0 p-0.5 transition-colors ${checked ? 'bg-retro-accent' : 'bg-surface-raised'
-        }`}
+      className="relative flex h-4 w-9 shrink-0 cursor-pointer items-center border-0 p-0"
     >
       <span
-        className={`block h-3 w-3 rounded-full bg-surface-interactive shadow transition-transform ${checked ? 'translate-x-4' : 'translate-x-0'
+        aria-hidden="true"
+        className={`absolute inset-x-0 h-1 rounded-full transition-colors ${checked ? 'bg-retro-accent/50' : 'bg-surface-interactive'
+          }`}
+      />
+      <span
+        aria-hidden="true"
+        className={`absolute left-0 h-3 w-3 rounded-full shadow transition-transform ${checked ? 'translate-x-6 bg-retro-accent' : 'translate-x-0 bg-retro-muted'
           }`}
       />
     </button>

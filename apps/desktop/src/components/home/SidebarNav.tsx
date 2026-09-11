@@ -20,7 +20,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Bell,
-  Coins,
   Zap,
   Trophy,
   Monitor,
@@ -63,7 +62,7 @@ export function SidebarNav({
   profilePic,
   displayName = 'You',
   activeHack = null,
-  balance = 0,
+  balance: _balance = 0,
   score = 0,
   reputation = 0,
   wsConnected = false,
@@ -605,13 +604,12 @@ export function SidebarNav({
         </button>
       </div>
 
-      {/* Currency HUD — g$ + a single lifetime XP tile (today's gain in the
-          tooltip). Reputation and XP are one progression now (plan §3). */}
+      {/* Currency HUD — a single lifetime XP tile (today's gain in the
+          tooltip). Reputation and XP are one progression now (plan §3).
+          The clicker StatsPanel is the single source for the g$ balance. */}
       <div className="px-2 pb-2 shrink-0">
         <div className={`flex gap-1.5 ${collapsed ? 'flex-col items-center' : 'flex-row'}`}>
-          {[
-            { icon: Coins, label: 'g$', value: balance, accent: 'text-amber-400', title: 'Balance (g$)' },
-            { icon: Zap, label: 'XP', value: reputation, accent: 'text-sky-400', title: `${reputation.toLocaleString()} lifetime XP · +${score.toLocaleString()} today` },
+          {[{ icon: Zap, label: 'XP', value: reputation, accent: 'text-sky-400', title: `${reputation.toLocaleString()} lifetime XP · +${score.toLocaleString()} today` },
           ].map((c) => {
             const Icon = c.icon;
             return (
