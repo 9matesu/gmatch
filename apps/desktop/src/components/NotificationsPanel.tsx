@@ -13,6 +13,7 @@ import {
   UserPlus,
   Sparkles,
 } from "lucide-react";
+import { groupNotifications, groupTitle, type NotifItem } from "../utils/groupNotifications";
 import { playPress } from "../utils/sounds";
 
 export interface NotificationItem {
@@ -81,6 +82,9 @@ export function NotificationsPanel({
         .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || "")),
     [notifications]
   );
+  // Instagram-style fold: "Rafael and 3 others liked your card" — pure view
+  // logic; read-state plumbing stays as-is (mark-all), no per-group action.
+  const groups = useMemo(() => groupNotifications(items as unknown as NotifItem[]), [items]);
 
   const openInvites = invites.filter((invite) => new Date(invite.expires_at).getTime() > now);
 
@@ -172,14 +176,16 @@ export function NotificationsPanel({
             </p>
           </div>
         ) : (
-          items.map((n) => {
+          groups.map((g) => {
+            const n = g.items[0];
             const isBabecockInvite = n.type === "babecock_invite";
-            const inviteId = typeof n.data === 'string' ? (() => { try { return JSON.parse(n.data)?.invite_id; } catch { return undefined; } })() : n.data?.invite_id;
+            const inviteId = typeof n.data === 'string' ? (() => { try { return JSON.parse(n.data)?.invite_id; } catch { return undefined; } })() : (n.data as { invite_id?: string })?.invite_id;
+            const title = g.items.length > 1 ? groupTitle(g.type, g.actors) : n.title;
             return (
               <div
-                key={n.id}
+                key={g.key}
                 className={`p-3 rounded-lg flex items-start gap-3 border ${
-                  n.read
+                  g.unread === 0
                     ? "border-white/5 bg-glass-w5"
                     : "glass-inset border-white/14"
                 }`}
@@ -190,9 +196,12 @@ export function NotificationsPanel({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-xs font-medium text-retro-fg truncate">
-                      {n.title}
+                      {title}
+                      {g.items.length > 1 && (
+                        <span className="text-retro-muted"> · {g.items.length}</span>
+                      )}
                     </p>
-                    {!n.read && (
+                    {g.unread > 0 && (
                       <span className="w-1.5 h-1.5 rounded-full bg-retro-accent shrink-0" />
                     )}
                   </div>
