@@ -4,8 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import { playPress } from '../../utils/sounds';
 import { BabecockPanel } from '../BabecockPanel';
 import { RankingsPanel } from './RankingsPanel';
-import { DeckBuilder } from './DeckBuilder';
-import { CardTile } from '../home/CardTile';
 import { openCardDetail } from '../../utils/openCard';
 import GridWorkspace from '../grid/GridWorkspace';
 import type { OrbitIdentity } from '@orbit/crypto';
@@ -67,43 +65,6 @@ export function GamesHub({
         {subTab === 'duel' && (
           <div className="space-y-4">
             {renderDuelContent()}
-          </div>
-        )}
-
-        {subTab === 'cards' && (
-          <div className="space-y-4">
-            <div className="glass-surface rounded-lg p-4">
-              {cards.length === 0 ? (
-                <p className="text-xs text-retro-muted text-center py-8">No cards yet — battle in the arena or upload to your collection.</p>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {cards.slice(0, 24).map((card) => (
-                    <div
-                      key={card.id}
-                      className="cursor-grab active:cursor-grabbing"
-                      draggable
-                      title="Drag into the deck editor to add"
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData('application/x-gmatch-card', JSON.stringify({ cardId: (card as any).card_id || card.id }));
-                        e.dataTransfer.effectAllowed = 'copy';
-                      }}
-                    >
-                      <CardTile item={card as any} users={users} identity={identity} onClick={() => openCardDetail(card)} />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            {/* Deck (Games -> Cards -> Deck): collection manager lives inside Cards */}
-            <div className="glass-surface rounded-lg p-4">
-              <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider mb-3">Deck</h3>
-              <DeckBuilder
-                identity={identity}
-                cards={cards}
-                onEnterArena={() => setSubTab('duel')}
-                toast={toast}
-              />
-            </div>
           </div>
         )}
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { User, OrbitObject } from '@orbit/shared';
 import { CardTile } from './home/CardTile';
@@ -93,6 +93,11 @@ export function GalleryView({
   onSetWallpaper,
 }: GalleryViewProps) {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedGalleryIds(new Set()) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [setSelectedGalleryIds])
   const [showSlideshows, setShowSlideshows] = useState(false);
   const [dndCardHover, setDndCardHover] = useState(false);
   const idleKeepsakes = useGame((s) => s.gallery);

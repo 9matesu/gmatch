@@ -285,7 +285,10 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   return (
     <section
       ref={stageRef as React.RefObject<HTMLElement>}
-      className={`${PLATE} ${PANEL} flex flex-col gap-2 overflow-hidden`}
+      // flex-1 min-h-0: the stage keeps ONE fixed box between images; the
+      // old auto height resized to each picture's intrinsic ratio and made
+      // the click target jump under the cursor every advance.
+      className={`${PLATE} ${PANEL} flex min-h-0 flex-1 flex-col gap-2 overflow-hidden`}
     >
       {/* Integrated panel toolbar: gallery + sources + fullscreen live here, never floating */}
       <div className="flex flex-none items-center justify-between gap-2 px-1 pt-0.5">

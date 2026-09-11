@@ -465,9 +465,9 @@ export default function Home() {
   }, [items, canonicalCards, identity, activeDeckId, userDecks])
 
   const navigateToDeckBuilder = useCallback(() => {
-    setGamesSubTab('cards');
-    setMainView('games');
-  }, []);
+    handleSetMainView('gallery');
+    // mount-once handler: handleSetMainView identity is stable enough here
+  }, [handleSetMainView]);
 
   const openCreateCardModal = () => {
     setCreateCardNeeded(Math.max(0, MIN_GAME_CARDS - myCards.length))
@@ -2600,7 +2600,7 @@ export default function Home() {
     },
   });
 
-  const ITEMS_PER_PAGE = 24
+  const ITEMS_PER_PAGE = 18
 
   const filteredItems = useMemo(() => {
     const rawList = items.filter(item => {
@@ -2935,7 +2935,10 @@ export default function Home() {
                 onLogout={() => { setChatOpen(false); setIdentityModalMode('logout'); }}
                 onOpenStore={() => handleSetMainView('store')}
                 gamesSubTab={gamesSubTab}
-                onOpenGamesTab={(tab) => { handleSetMainView('games'); setGamesSubTab(tab); }}
+                onOpenGamesTab={(tab) => {
+                  if (tab === 'cards') { handleSetMainView('gallery'); return; }
+                  handleSetMainView('games'); setGamesSubTab(tab);
+                }}
                 onlineBadge={lobbyRoomCount}
                 gameBadges={{ duel: duelBadge }}
                 isAdmin={myProfile.isAdmin}

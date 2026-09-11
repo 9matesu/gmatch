@@ -93,8 +93,7 @@ export default function IdleGalleryView({
         />
       ) : null}
       {backgroundUrl && (
-        <div className="mb-2.5 flex items-center justify-between gap-2.5 rounded-[10px] border border-retro-accent/40 bg-retro-bg px-3 py-2">
-          <span className={MUTED}>Backdrop live</span>
+        <div className="mb-2.5 flex items-center gap-2.5 rounded-[10px] border border-border-glass bg-retro-bg px-3 py-2">
           <button
             type="button"
             className={`${BTN} ${BTN_SMALL} flex-none`}
