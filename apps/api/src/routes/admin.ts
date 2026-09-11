@@ -25,6 +25,7 @@ type Bindings = {
   BUCKET?: LocalBlobStore
   ADMIN_PIN?: string
   ADMIN_PIN_HASH?: string
+  ADMIN_ORBIT_ID?: string
 }
 
 const admin = new Hono<{ Bindings: Bindings, Variables: { orbitId: string, publicKeyHex: string } }>()
@@ -84,6 +85,19 @@ admin.post('/verify-pin', async (c) => {
   if (fails.length >= PIN_MAX_FAILS) {
     pinFails.set(orbitId, fails)
     return c.json({ error: 'Too many failed attempts. Try again in 15 minutes' }, 429)
+  }
+
+  // Wave 2 (E1): when ADMIN_ORBIT_ID is configured, the PIN unlocks ONLY for
+  // that identity — knowing the PIN is no longer becoming the admin. The
+  // identity check runs BEFORE the pin compare so a non-admin cannot even
+  // probe the PIN; the response is the same 401 as a wrong PIN and counts
+  // toward this caller's lockout window. Without ADMIN_ORBIT_ID the node
+  // keeps the host-is-admin model (self-host/LAN), documented in SECURITY-AUDIT.
+  const adminOrbit = (c.env.ADMIN_ORBIT_ID || '').trim()
+  if (adminOrbit && adminOrbit !== orbitId) {
+    fails.push(now)
+    pinFails.set(orbitId, fails)
+    return c.json({ error: 'Invalid secret admin passcode' }, 401)
   }
 
   const presentedHash = sha256hexSync(pin)

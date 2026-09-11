@@ -123,6 +123,7 @@ const env = {
   NODE_PUB_HEX: nodeKey.pubHex,
   ...(process.env.ADMIN_PIN ? { ADMIN_PIN: process.env.ADMIN_PIN } : {}),
   ...(process.env.ADMIN_PIN_HASH ? { ADMIN_PIN_HASH: process.env.ADMIN_PIN_HASH } : {}),
+  ...(process.env.ADMIN_ORBIT_ID ? { ADMIN_ORBIT_ID: process.env.ADMIN_ORBIT_ID } : {}),
   ...(process.env.API_SEALED_ONLY ? { API_SEALED_ONLY: process.env.API_SEALED_ONLY } : {}),
 }
 const WEB_DIST = process.env.WEB_DIST_DIR || join((import.meta as any).dir || process.cwd(), '..', '..', 'web', 'out')

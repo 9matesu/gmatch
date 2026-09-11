@@ -80,4 +80,21 @@ describe('B.4 — admin PIN hardening', () => {
     const src = readFileSync(join(__dirname, 'admin.ts'), 'utf8')
     expect(src).not.toMatch(/Ionw\w+/)
   })
+
+  // Wave 2 (E1): PIN + allowlisted identity, or nothing.
+  it('ADMIN_ORBIT_ID set: correct PIN from a NON-admin identity → 401 + lockout counts', async () => {
+    const hash = await sha256hex('s3cret')
+    const intruder = createTestIdentity()
+    const req = (id: typeof adminId) => app.request(
+      '/api/admin/verify-pin',
+      { method: 'POST', headers: signRequestHeaders(id, 'POST', '/api/admin/verify-pin', JSON.stringify({ pin: 's3cret' })), body: JSON.stringify({ pin: 's3cret' }) },
+      { ...env, ADMIN_PIN_HASH: hash, ADMIN_ORBIT_ID: adminId.orbitId },
+    )
+    expect((await req(intruder)).status).toBe(401)
+    // 5 attempts → the intruder is locked out like any pin-guesser
+    for (let i = 0; i < 4; i++) expect((await req(intruder)).status).toBe(401)
+    expect((await req(intruder)).status).toBe(429)
+    // the real admin still passes
+    expect((await req(adminId)).status).toBe(200)
+  })
 })
