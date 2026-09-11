@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useCropper } from '../../hooks/useCropper';
+import { DEFAULT_FEED_SORT, FEED_SORT_LABELS, type FeedSort } from './feedSort'
 import { playPress, playWin, playMsgReceive } from '../../utils/sounds';
 import {
   Heart,
@@ -129,7 +130,7 @@ export function GMatchFeed({
   onLoadMore,
   hasMore = true,
   isLoadingMore = false,
-  feedSort = 'latest',
+  feedSort = DEFAULT_FEED_SORT,
   onFeedSortChange,
   feedCols = '1',
   onFeedColsChange,
@@ -170,8 +171,8 @@ export function GMatchFeed({
   onLoadMore?: () => Promise<void | boolean>;
   hasMore?: boolean;
   isLoadingMore?: boolean;
-  feedSort?: 'latest' | 'trending';
-  onFeedSortChange?: (sort: 'latest' | 'trending') => void;
+  feedSort?: FeedSort;
+  onFeedSortChange?: (sort: FeedSort) => void;
   feedCols?: '1' | '2' | '3' | '4' | '5';
   onFeedColsChange?: (cols: '1' | '2' | '3' | '4' | '5') => void;
   toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
@@ -557,7 +558,7 @@ export function GMatchFeed({
                     : 'text-retro-muted hover:text-retro-fg'
                   }`}
               >
-                {mode === 'latest' ? 'Latest' : 'Trending'}
+                {FEED_SORT_LABELS[mode]}
               </button>
             ))}
           </div>

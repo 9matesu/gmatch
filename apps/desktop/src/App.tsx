@@ -36,6 +36,7 @@ import { areItemsStructurallyEqual, areUsersStructurallyEqual, areAnnouncementsS
 import { OnboardingFlow } from "./firstRun/OnboardingFlow";
 import { isOnboardingComplete, readOnboardingState } from "./firstRun/onboardingState";
 import { TourDock } from "./components/tour/TourDock";
+import { DEFAULT_FEED_SORT, isFeedSort, type FeedSort } from "./components/feed/feedSort";
 import { TOUR_STEPS, isTourOver, nextTourStep, readTourState, writeTourState, type TourState } from "./firstRun/tourState";
 import { GMatchFeed, type FeedPost } from "./components/feed/GMatchFeed";
 import { GMatchDMs } from "./components/chat/GMatchDMs";
@@ -903,7 +904,12 @@ export default function Home() {
 
   // ─── Public posts feed (server) ───
   const [isLoadingMoreFeed, setIsLoadingMoreFeed] = useState(false)
-  const [feedSort, setFeedSort] = useState<'latest' | 'trending'>('latest')
+  const [feedSort, setFeedSort] = useState<FeedSort>(() => {
+    try { const s = localStorage.getItem('orbit_feed_sort'); return isFeedSort(s) ? s : DEFAULT_FEED_SORT } catch { return DEFAULT_FEED_SORT }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('orbit_feed_sort', feedSort) } catch { }
+  }, [feedSort])
 
   useEffect(() => {
     if (!selectedProfileUser) {
