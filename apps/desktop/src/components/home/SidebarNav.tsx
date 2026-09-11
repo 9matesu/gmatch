@@ -255,8 +255,8 @@ export function SidebarNav({
       id: 'games',
       label: 'Porn Games',
       icon: Gamepad2,
-      active: mainView === 'games' || mainView === 'grid',
-      action: () => openGamesTab('idle'),
+      active: mainView === 'games' || mainView === 'grid' || mainView === 'gallery',
+      action: () => (onOpenGallery ? onOpenGallery() : openGamesTab('idle')),
       badge: onlineBadge,
       children: [
         {
