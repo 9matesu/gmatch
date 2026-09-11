@@ -18,6 +18,18 @@ Copy was audited separately today (see the humanize sweep commits); not re-litig
   (commit "ui: glyph/emoji chrome out"; docs: exemption note).
 - TourDock CTA wrapped its chevron to a second line at narrow widths —
   `whitespace-nowrap` (verified: desk-servers.png, mob-feed.png).
+- Double OFFLINE on the idle canvas: corner badge suppressed whenever the
+  centered OfflineCard renders (both sites; grid keeps the badge only while
+  images are still up). Verified by DOM assertion (never co-render).
+- Default viewMode 'single' rendered NO active segment in the 1x1/1x2/2x2/3x3
+  control (the 'single' alias matched no button) — 1x1 is 'single'; it now
+  presses at default. This was the real cause behind finding 2, not the
+  highlight color. Verified: exactly one aria-pressed.
+- Sidebar Create button: stray "post" micro-label merged into the label
+  ("Create post", one aria-label, per reduction filter).
+- Unread sidebar badge moved off green (bg-retro-fg); green now means presence
+  only. Tag dots/online dots untouched.
+- Servers "Central DIRECTORY" all-caps H3 demoted to sentence case.
 - TourDock flush to the mobile bottom edge — safe-area inset on `bottom-4`
   (verified: mob-feed.png).
 
@@ -33,37 +45,25 @@ Copy was audited separately today (see the humanize sweep commits); not re-litig
 - desk-feed.png captured fully black: capture-timing artifact, NOT a defect —
   mob-feed.png at the same route renders full chrome; journey tests pass.
 
-## Phase 1 — critical (real UX cost, fix next wave)
+## Phase 1 — critical (fixed same-day; see "Fixed this wave")
 
-1. Idle canvas shows TWO offline indicators at once: corner `OFFLINE` badge
-   (`src/ui/GoonPanel.tsx:430` and `:531`) plus the `OfflineCard` centered in the
-   same canvas (`GoonPanel.tsx:~535`). Same state, two chrome layers. Fix: kill
-   the corner badge where OfflineCard renders (single source per surface).
-2. Grid mode segmented control (1×1/1×2/2×2/3×3, `src/components/grid/`) shows no
-   visible active state at desktop width — current mode uncommunicated. Needs one
-   active-class check (may be the `bg-glass-w10` being too subtle on that surface;
-   raise to the sidebar's active language).
+1. Idle canvas double OFFLINE indicator (GoonPanel badge + OfflineCard). FIXED.
+2. Grid segmented control without active state. FIXED — root cause was the
+   'single' viewMode alias matching no button, not a contrast problem.
 
 ## Phase 2 — refinement
 
-3. Servers header: three clusters (server title | orphaned Rename | CENTRAL
-   DIRECTORY + buttons) fight for H1 on one row (desk-servers.png header).
-   Demote `CENTRAL DIRECTORY` to a section caption under the panel, left-align
-   Rename with the title group. Files: `src/components/servers/ServersView.tsx`
-   header block (~line 380-420 region).
-4. Servers directory column split is fixed ~1:2 regardless of content
-   (ServersView two-column body); 1 online server + empty directory wastes the
-   frame. Try `grid-cols-[minmax(280px,1fr)_minmax(0,1.4fr)]` or stack when
-   both lists are short. Judgment call — screenshot both.
-5. Active tab language in the Online/Last-24h pills is faint border-only
-   (ServersView ~line 200); unify with the feed pager's filled-white language.
-6. Green means three things at once: presence dot, unread badge, selected feed
-   tag. Pick one green usage (presence is the load-bearing one) and move the
-   unread badge to `retro-accent`. Evidence: desk-servers.png sidebar +
-   mob-feed.png tag pills. Semantic-color work, app-wide grep, phased.
-7. "post" micro-label inside the sidebar Create button
-   (`src/components/home/SidebarNav.tsx:448`) restates nothing and looks orphaned
-   at desktop (vision flagged it twice). Reduction filter: remove, keep the `title=`.
+3. Servers "CENTRAL DIRECTORY" H1 competition. FIXED (sentence case, h3 role
+   already correct; Rename already lives in the title group's action cluster —
+   the screenshot's "orphan" read was the flex gap, left as-is).
+4. Servers column split softened to `minmax(320px,34%)_1fr`. Full
+   content-driven stacking: skip until the directory routinely holds >5 rows.
+5. REVERSED under source audit: Online/Last-24h pills already use the house
+   `glass-nav-active` language (globals.css:529); the screenshot's faint read
+   was the seeded one-member server, not the styling.
+6. Green triple-meaning: FIXED for the unread badge. Tag-selection dots stay
+   green (they read as "live tag", a presence metaphor — one family, accepted).
+7. Create "post" micro-label. FIXED (merged).
 
 ## Phase 3 — polish / backlog
 
