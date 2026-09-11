@@ -43,7 +43,8 @@ function isExempt(c: Context): boolean {
   const method = c.req.method
   const url = c.req.path
   if (EXEMPT_PATHS.has(`${method}:${url}`)) return true
-  if (method === 'GET' && url.startsWith('/api/admin/')) return true
+  // Wave 2 (F1.6): GET /api/admin/* is no longer exempt — signed callers
+  // already get the per-orbitId bucket (1200/min), plenty for panel polling.
   if (method === 'GET' && url.startsWith('/api/objects/')) return true
   if (method === 'GET' && url.endsWith('/pfp')) return true
   if (url.startsWith('/api/lobby/match/') || url.startsWith('/api/lobby/special/')) return true

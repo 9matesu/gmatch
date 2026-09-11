@@ -44,6 +44,18 @@ const PIN_WINDOW_MS = 15 * 60 * 1000
 const PIN_MAX_FAILS = 5
 const pinFails = new Map<string, number[]>() // orbitId -> failure timestamps
 
+// Wave 2 (F1.4): the map keys are attacker-chosen (orbitAuth auto-creates
+// identities), so it needs a ceiling. Past 10k identities, drop the oldest
+// half — a locked-out attacker just cost themselves their own history.
+function prunePinFails(): void {
+  if (pinFails.size <= 10_000) return
+  let i = 0
+  for (const k of pinFails.keys()) {
+    pinFails.delete(k)
+    if (++i >= 5_000) break
+  }
+}
+
 export function _resetPinLockout(): void {
   pinFails.clear()
 }
@@ -81,6 +93,7 @@ admin.post('/verify-pin', async (c) => {
 
   // lockout check (sliding window)
   const now = Date.now()
+  prunePinFails()
   const fails = (pinFails.get(orbitId) || []).filter((t) => now - t < PIN_WINDOW_MS)
   if (fails.length >= PIN_MAX_FAILS) {
     pinFails.set(orbitId, fails)
