@@ -758,5 +758,8 @@ describe('purgePost (T3)', () => {
     expect(ex).not.toContain('skylar_vox') // active feed tag is intent-protected
     expect(ex).not.toContain('close-up') // noise never becomes an exclude
     expect(useGame.getState().current).toBeNull() // advanced off-screen
+    // 2+ learned tags leave a count-1 co-occurrence pair behind (T4)
+    expect(useGame.getState().coRules.length).toBeGreaterThan(0)
+    expect(useGame.getState().coRules[0].count).toBe(1)
   })
 })

@@ -4,6 +4,7 @@ import { clickGain, clickPower, heatMultiplier, heatStreakAfter, isCrit, passive
 import type { EconomyInput } from './economy'
 import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, mergeTags as mergeTagList, normalizeCustomTag, removeTag as removeTagList, setupTag, soloTag as soloTagList, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
 import { getUserExcludes, isNoise, isQueryBlocked, rankTags, setUserExcludes } from './tagFilter'
+import { learnPurge, setCoRules, setFeedIntent } from './tagCooccur'
 import { KILL_XP, foeMaxHp, killBonusGp } from './battle'
 import { CAPS, activeCaps, capAutoClicksPerSec, popCap as popCapList } from './caps'
 import { imageRarity } from './rarity'
@@ -106,6 +107,7 @@ export interface GameState {
   /** Player-picked starter tags + extra excludes (setup screen, one shot). */
   setupComplete: boolean
   userExcludes: string[]
+  coRules: { a: string; b: string; count: number }[]
   /** Player-owned feed sources (custom URLs / local folders, tried first). */
   customSources: CustomSource[]
   addUrlSource: (label: string, rawUrls: string[]) => { added: boolean; message: string }
@@ -263,6 +265,7 @@ function freshData() {
     tags: [] as OwnedTag[],
     setupComplete: false,
     userExcludes: [] as string[],
+    coRules: [] as { a: string; b: string; count: number }[],
     customSources: [] as CustomSource[],
     gallery: [] as GalleryImage[],
     caps: [] as ActiveCap[],
@@ -790,7 +793,7 @@ export const useGame = create<GameState>((set, get) => ({
     const s = get()
     const next = mergeTagList(s.tags, a, b)
     if (!next) return false
-    const name = `${a}_${b}`
+    const name = `${a} ${b}`
     set({ tags: next, priorityTag: name, toasts: pushToast(s, `Merged into ${name} — combined search, best level kept.`) })
     return true
   },
@@ -909,6 +912,7 @@ export const useGame = create<GameState>((set, get) => ({
       // Stacked AND-queries truncate on the mirrors and repeat the same top
       // posts — rotation keeps the feed fresh and online.
       const pool = owned.slice(0, 4)
+      setFeedIntent(pool)
       const priority = s.priorityTag && owned.includes(s.priorityTag) ? s.priorityTag : null
       // A freshly added/picked tag steers the very next fetch (priority first),
       // then hands back to rotation once its batch lands.
@@ -1057,8 +1061,11 @@ export const useGame = create<GameState>((set, get) => ({
       .filter((t) => !isNoise(t) && !feed.has(t) && !s.userExcludes.includes(t))
       .slice(0, 3)
     for (const t of learn) get().addUserExclude(t)
+    // Learn co-occurrence pairs from the purged content tags (T4).
+    const coRules = learnPurge(learn, get().coRules)
+    setCoRules(coRules)
     const cur = get()
-    set({ toasts: pushToast(cur, learn.length ? `Purged — excluded: ${learn.join(', ')}` : 'Purged — will not return.') })
+    set({ coRules, toasts: pushToast(cur, learn.length ? `Purged — excluded: ${learn.join(', ')}` : 'Purged — will not return.') })
     cur.save()
   },
 
@@ -1331,6 +1338,7 @@ export const useGame = create<GameState>((set, get) => ({
       viewMode: s.viewMode,
       setupComplete: s.setupComplete,
       userExcludes: s.userExcludes,
+      coRules: s.coRules,
       customSources: s.customSources,
       lastSeenAt: now,
     }
@@ -1347,6 +1355,7 @@ export const useGame = create<GameState>((set, get) => ({
     const tags = d.tags
     const userExcludes = d.userExcludes
     setUserExcludes(userExcludes)
+    setCoRules(d.coRules)
     // JSON turns Infinity into null — restore permanent pops; legacy timed
     // entries keep their expiry and prune via activeCaps as before.
     const caps = activeCaps(
@@ -1381,6 +1390,7 @@ export const useGame = create<GameState>((set, get) => ({
       tags,
       setupComplete: d.setupComplete,
       userExcludes,
+      coRules: d.coRules,
       customSources: d.customSources,
       gallery: d.gallery,
       caps,

@@ -1,11 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { __resetFeedState, fetchPosts, markSeen } from './booru'
+import { setCoRules, setFeedIntent, __resetCoRules } from '../game/tagCooccur'
+import { setUserExcludes } from '../game/tagFilter'
 
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.unstubAllEnvs()
   vi.useRealTimers()
   __resetFeedState()
+  __resetCoRules()
+  setCoRules([])
+  setFeedIntent([])
+  setUserExcludes([])
 })
 
 describe('seen-set persistence', () => {
@@ -418,5 +424,23 @@ describe('fetchPosts (SPEC §6/§8)', () => {
     vi.stubGlobal('fetch', fetchMock)
     const res = await fetchPosts({ tags: 'skylar_vox', limit: 5 })
     expect(res.ok).toBe(false) // junk filtered everywhere → no usable posts
+  })
+})
+
+describe('co-occurrence gate (T4)', () => {
+  it('drops posts carrying a learned pair, keeps feed-intent posts', async () => {
+    setCoRules([{ a: 'heterochromia', b: 'odd_eyes', count: 2 }])
+    setFeedIntent([])
+    const bad = { id: 'c1', url: 'https://e.test/c1.jpg', tags: ['skylar_vox', 'heterochromia', 'odd_eyes'], rating: 'e' }
+    const good = { id: 'c2', url: 'https://e.test/c2.jpg', tags: ['skylar_vox', 'heterochromia'], rating: 'e' }
+    vi.stubGlobal('window', { gmatch: { booruFetch: vi.fn().mockResolvedValue({ ok: true, posts: [bad, good], source: 'hgoon' }) } })
+    const res = await fetchPosts({ tags: 'heterochromia', limit: 5 })
+    expect(res.posts.map((p) => p.id)).toEqual(['c2'])
+    // same rule, but the tag is active feed intent -> stand down
+    setFeedIntent(['heterochromia'])
+    __resetFeedState()
+    vi.stubGlobal('window', { gmatch: { booruFetch: vi.fn().mockResolvedValue({ ok: true, posts: [bad], source: 'hgoon' }) } })
+    const res2 = await fetchPosts({ tags: 'odd_eyes', limit: 5 })
+    expect(res2.posts.map((p) => p.id)).toEqual(['c1'])
   })
 })

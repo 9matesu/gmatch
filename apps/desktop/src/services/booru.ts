@@ -3,6 +3,7 @@
 // proxy) — different trust domains, intentionally not merged.
 import type { BooruPost } from '../game/types'
 import { isQueryBlocked, isUserExcluded } from '../game/tagFilter'
+import { blockedPair, getCoRules, isFeedIntent } from '../game/tagCooccur'
 import { allowOnly } from './postFilter'
 import {
   REDGIFS_API,
@@ -162,6 +163,12 @@ function remember(posts: BooruPost[]): BooruPost[] {
   return fresh
 }
 
+// Co-occurrence rules blocked by the player's current feed intent (T4).
+function feedTagsSafe(tags: string[]): Set<string> {
+  // A tag ON the post that is also feed intent means "I want this": stand down.
+  return new Set(tags.filter(isFeedIntent))
+}
+
 function matchesQuery(post: BooruPost, query?: string): boolean {
   // Untagged posts come from tag-targeted searches (redgifs/imhentai/paheal):
   // nothing to check against, trust the search.
@@ -199,6 +206,7 @@ function sanitize(posts: BooruPost[], query?: string): BooruPost[] {
   // both the IPC and direct paths (SPEC §8).
   return allowOnly(posts, { captions })
     .filter((p) => !p.tags.some(isUserExcluded))
+    .filter((p) => !blockedPair(p.tags, getCoRules(), feedTagsSafe(p.tags)))
     .filter((p) => matchesQuery(p, query))
 }
 

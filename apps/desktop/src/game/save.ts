@@ -33,6 +33,8 @@ export interface SaveData {
   /** Player's feed starter picks + extra excludes (setup screen / config tab). */
   setupComplete: boolean
   userExcludes: string[]
+  /** Co-occurrence pairs learned from purges (T4). */
+  coRules: { a: string; b: string; count: number }[]
   /** Player-owned idle feed sources (custom URLs / local folders). */
   customSources: CustomSource[]
   lastSeenAt: number
@@ -63,6 +65,7 @@ export function defaultSave(now = Date.now()): SaveData {
     viewMode: 'single',
     setupComplete: false,
     userExcludes: [],
+    coRules: [],
     customSources: [],
     lastSeenAt: now,
   }
@@ -114,6 +117,7 @@ export function deserialize(raw: string | null | undefined): SaveData | null {
       : 'single') as ViewMode,
     setupComplete: d.setupComplete === true,
     userExcludes: arr<string>(d.userExcludes),
+    coRules: (Array.isArray(d.coRules) ? d.coRules : []).filter((r: any) => typeof r?.a === 'string' && typeof r?.b === 'string').slice(0, 200),
     customSources: sanitizeCustomSources((d as Partial<SaveData>).customSources),
     lastSeenAt: num(d.lastSeenAt, 0),
   }

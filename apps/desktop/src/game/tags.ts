@@ -158,7 +158,7 @@ export function mergeTags(tags: OwnedTag[], a: string, b: string): OwnedTag[] | 
   const ta = tags.find((t) => t.name === a)
   const tb = tags.find((t) => t.name === b)
   if (!ta || !tb || ta.level <= 0 || tb.level <= 0) return null
-  const name = `${normalizeCustomTag(a)}_${normalizeCustomTag(b)}`
+  const name = `${a} ${b}`
   const level = Math.min(MAX_TAG_LEVEL, Math.max(ta.level, tb.level))
   const stats = deriveTagStats(name, 1)
   const merged: OwnedTag = { name, level, selected: true, base: stats.base, income: stats.income + ta.income + tb.income, weight: stats.weight }
