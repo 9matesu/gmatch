@@ -1056,13 +1056,15 @@ export const useGame = create<GameState>((set, get) => ({
     // Learn: the 3 rarest content tags become anti-tags, but never a tag the
     // player is actively feeding on (intent beats the algorithm).
     const feed = new Set(feedQuery(s.tags))
-    const learn = rankTags(post.tags)
+    const content = rankTags(post.tags)
       .map((t) => t.name)
-      .filter((t) => !isNoise(t) && !feed.has(t) && !s.userExcludes.includes(t))
-      .slice(0, 3)
+      .filter((t) => !isNoise(t) && !feed.has(t))
+    const learn = content.filter((t) => !s.userExcludes.includes(t)).slice(0, 3)
     for (const t of learn) get().addUserExclude(t)
-    // Learn co-occurrence pairs from the purged content tags (T4).
-    const coRules = learnPurge(learn, get().coRules)
+    // Pairs are learned from ALL content tags (not just the newly excluded
+    // ones): the co-occurrence gate fires at count>=2 even if intent later
+    // frees a tag from exclusion.
+    const coRules = learnPurge(content.slice(0, 6), get().coRules)
     setCoRules(coRules)
     const cur = get()
     set({ coRules, toasts: pushToast(cur, learn.length ? `Purged — excluded: ${learn.join(', ')}` : 'Purged — will not return.') })
