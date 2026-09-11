@@ -46,8 +46,8 @@ export function SpectateModal({
   const [isExpanded, setIsExpanded] = useState(false)
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null)
   const [pipPos, setPipPos] = useState<{ x: number; y: number } | null>(null)
-  const [spectatorVote, setSpectatorVote] = useState<'a' | 'b' | null>(null)
-  const [votedRounds, setVotedRounds] = useState<Record<number, 'a' | 'b'>>({})
+  const [,setSpectatorVote] = useState<'a' | 'b' | null>(null)
+  const [,setVotedRounds] = useState<Record<number, 'a' | 'b'>>({})
   const [zoomModal, setZoomModal] = useState<{
     isOpen: boolean
     imageUrl: string | null
@@ -189,12 +189,7 @@ export function SpectateModal({
   const cardAUrl = formatCardUrl(pA.card)
   const cardBUrl = formatCardUrl(pB.card)
 
-  const handleVote = (side: 'a' | 'b') => {
-    playPress(side === 'a' ? 840 : 920)
-    setSpectatorVote(side)
-    setVotedRounds((prev) => ({ ...prev, [currentRound]: side }))
-    if (soundEnabled) playMatch()
-  }
+  
 
   // Minimized Picture-in-Picture (PiP) floating window with Shadcn Yellow/Cyan Theme
   if (isMinimized) {

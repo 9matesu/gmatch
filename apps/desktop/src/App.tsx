@@ -609,8 +609,8 @@ export default function Home() {
       return { displayName: '', tags: [] as string[], isAdmin: false, pfpUrl: '' }
     }
   });
-  const [announcements, setAnnouncements] = useState<{ id: string; message: string; created_at: string; created_by_name: string | null }[]>([])
-  const [showPasskeys, setShowPasskeys] = useState(false);
+  const [,setAnnouncements] = useState<{ id: string; message: string; created_at: string; created_by_name: string | null }[]>([])
+  const [showPasskeys,] = useState(false);
   const [identityModalMode, setIdentityModalMode] = useState<'export' | 'login' | 'logout' | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [followersModalState, setFollowersModalState] = useState<{
@@ -1604,12 +1604,7 @@ export default function Home() {
     }
   }, [])
 
-  const selectGroupForAttachment = useCallback((groupId: string) => {
-    const replyToId = (window as any).__pendingGroupReplyToId
-      ; (window as any).__pendingGroupReplyToId = null
-    setGroupPickerOpen(false)
-    setAttachmentModal({ isOpen: true, target: 'group', groupId, replyToId })
-  }, [])
+  
 
   const closeAttachmentModal = useCallback(() => {
     setAttachmentModal(null)
@@ -1742,23 +1737,9 @@ export default function Home() {
   const sendPanelRef = useRef<SendPanelHandle>(null)
   const storyFileInputRef = useRef<HTMLInputElement>(null)
 
-  const onDropOnUser = useCallback((userId: string, _fileMeta: unknown) => {
-    setSelectedIds(new Set([userId]))
-    setTimeout(() => sendPanelRef.current?.triggerUpload(), 100)
-  }, [])
+  
 
-  const syncFriendsIds = useCallback(async () => {
-    if (!identity) return
-    try {
-      const res = await orbitFetch('/api/friends', {}, identity)
-      if (res.ok) {
-        const data = await res.json()
-        const ids = Array.isArray(data) ? data.map((f: { id: string }) => f.id) : []
-        setFriendsIds(ids)
-        try { localStorage.setItem('goonmatch-friends', JSON.stringify(ids)) } catch { }
-      }
-    } catch { }
-  }, [identity])
+  
 
   const p2pItemsRef = useRef(p2pItems);
   const settingsRef = useRef(settings);
@@ -2429,11 +2410,11 @@ export default function Home() {
   // `u.online` only — the API sets this to true when last_seen is within
   // 60s (apps/api/src/routes/users.ts:120). Drop the prior 15-min fallback
   // so the count never lists stale/idle users as "online".
-  const onlineCount = useMemo(() => users.filter(u => u.online).length, [users])
+  
 
   // Current node name for the Servers sidebar group. The API always answers
   // /api/servers/dashboard from whichever node this client is attached to.
-  const [serverName, setServerName] = useState('gmatch')
+  const [,setServerName] = useState('gmatch')
   useEffect(() => {
     if (!identity) return
     let alive = true
@@ -2637,59 +2618,11 @@ export default function Home() {
     setGalleryPage(0)
   }, [galleryFilter])
 
-  const handleForwardItem = useCallback(async (item: OrbitObject) => {
-    try {
-      if (item.content_url && item.content_url.startsWith('data:')) {
-        const res = await fetch(item.content_url)
-        const blob = await res.blob()
-        const file = new File([blob], `forward_${item.id.slice(0, 6)}.jpg`, { type: item.mime_type || 'image/jpeg' })
-        setForwardedStashFile(file)
-      } else if (identity) {
-        const res = await orbitFetch(`/api/objects/${item.id}`, {}, identity)
-        if (res.ok) {
-          const blob = await res.blob()
-          const file = new File([blob], `forward_${item.id.slice(0, 6)}.jpg`, { type: item.mime_type || 'image/jpeg' })
-          setForwardedStashFile(file)
-        }
-      }
-      toast('Image loaded into Send Panel for fast-forwarding!', 'info')
-    } catch {
-      toast('Failed to prepare image for forwarding', 'error')
-    }
-  }, [identity, toast])
+  
 
-  const handleSaveToCards = useCallback(async (contentUrl: string): Promise<boolean> => {
-    if (!identity) return false
-    try {
-      const res = await fetch(contentUrl)
-      if (!res.ok) throw new Error('fetch failed')
-      const blob = await res.blob()
-      const ext = blob.type.includes('png') ? 'png' : 'jpg'
-      const file = new File([blob], `saved_${Date.now()}.${ext}`, { type: blob.type || 'image/jpeg' })
-      const form = new FormData()
-      form.append('image', file)
-      const up = await orbitFetch('/api/objects', { method: 'POST', body: form }, identity)
-      if (!up.ok) return false
-      loadGallery()
-      return true
-    } catch {
-      return false
-    }
-  }, [identity, loadGallery])
+  
 
-  const handleSelectAllGallery = () => {
-    const currentPageIds = new Set(paginatedItems.map(i => i.id))
-    const allSelectedOnPage = paginatedItems.every(i => selectedGalleryIds.has(i.id))
-    if (allSelectedOnPage) {
-      const next = new Set(selectedGalleryIds)
-      for (const id of currentPageIds) next.delete(id)
-      setSelectedGalleryIds(next)
-    } else {
-      const next = new Set(selectedGalleryIds)
-      for (const id of currentPageIds) next.add(id)
-      setSelectedGalleryIds(next)
-    }
-  }
+  
 
   const handleBatchDownload = async () => {
     if (selectedGalleryIds.size === 0) return
@@ -2743,12 +2676,7 @@ export default function Home() {
     return true
   }, [identity])
 
-  const handleBatchFavorite = async () => {
-    if (selectedGalleryIds.size === 0) return
-    const targets = items.filter(i => selectedGalleryIds.has(i.id))
-    await Promise.all(targets.map(item => toggleFavorite(item).catch(() => false)))
-    toast(`Updated starred status for ${targets.length} items`, 'success')
-  }
+  
 
   const handleBatchDelete = async () => {
     if (selectedGalleryIds.size === 0) return
@@ -2778,42 +2706,7 @@ export default function Home() {
     loadGallery()
   }
 
-  const handleDeleteFailed = async () => {
-    if (!identity) return
-    const owned: string[] = []
-    const received: string[] = []
-    for (const item of items) {
-      try {
-        const res = await orbitFetch(`/api/objects/${item.id}`, { method: 'GET' }, identity)
-        if (!res.ok) {
-          if (item.owner_id === identity.orbitId) {
-            owned.push(item.id)
-          } else {
-            received.push(item.id)
-          }
-        }
-      } catch {
-        if (item.owner_id === identity.orbitId) {
-          owned.push(item.id)
-        } else {
-          received.push(item.id)
-        }
-      }
-    }
-    let deleted = 0
-    for (const id of owned) {
-      try { await orbitFetch(`/api/objects/${id}`, { method: 'DELETE' }, identity); deleted++ } catch { }
-    }
-    for (const id of received) {
-      try { await orbitFetch(`/api/inbox/${id}/remove`, { method: 'POST' }, identity); deleted++ } catch { }
-    }
-    if (deleted > 0) {
-      toast(`Cleaned up ${deleted} inaccessible item(s)`, 'success')
-      loadGallery()
-    } else {
-      toast('All items accessible', 'info')
-    }
-  }
+  
 
   const handleDelete = useCallback(async (item: OrbitObject) => {
     if (!await confirm({

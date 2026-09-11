@@ -178,7 +178,7 @@ export class OrbitPeer {
       if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
     }
     if (!offerRes || !offerRes.ok) throw new Error('[phase:fetch-offer] Failed to fetch WebRTC offer')
-    const { offer, sender_id } = await offerRes.json()
+    const { offer } = await offerRes.json()
 
     this.pc = new RTCPeerConnection(defaultIceConfig(readTurnEnv()))
     this.pc.ondatachannel = (e) => {

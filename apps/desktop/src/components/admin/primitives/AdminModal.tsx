@@ -491,15 +491,7 @@ interface DetailModalProps {
   size?: "sm" | "md" | "lg" | "xl" | "full";
 }
 
-export function DetailModal({
-  isOpen,
-  onClose,
-  title,
-  subtitle,
-  children,
-  className,
-  size = "md",
-}: DetailModalProps) {
+export function DetailModal({ isOpen, onClose, title, subtitle, children, size = "md" }: DetailModalProps) {
   if (!isOpen) return null;
 
   const sizeClasses = {

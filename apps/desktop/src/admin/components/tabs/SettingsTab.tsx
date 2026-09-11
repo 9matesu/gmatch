@@ -15,13 +15,9 @@ interface SettingsTabProps {
   onAction: (action: string, ...args: unknown[]) => void;
 }
 
-const ICONS = ['Sparkles', 'Box', 'Gift', 'Gem', 'Star', 'Trophy', 'Zap', 'Crown'];
 
-const STATE_LABEL: Record<string, { text: string; cls: string }> = {
-  draft: { text: 'Draft', cls: 'bg-[#27272a] text-zinc-400' },
-  released: { text: 'Released', cls: 'bg-emerald-500/15 text-emerald-400' },
-  archived: { text: 'Archived', cls: 'bg-amber-500/15 text-amber-400' },
-};
+
+
 
 function parseTagsInput(input: string): string[] {
   return Array.from(new Set(

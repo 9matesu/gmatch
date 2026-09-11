@@ -29,19 +29,7 @@ interface PortfolioCard {
 
 const RARITY_ORDER = ['common', 'copper', 'silver', 'gold', 'diamond'] as const;
 
-export function StoreTab({
-  points,
-  onPurchase,
-  onUseConsumable,
-  onDeployHack,
-  identity,
-  onOpenCardCollection,
-  onOpenFlash,
-  users = [],
-  profilePics = {},
-  toast,
-  arsenalOnly = false,
-}: {
+export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCardCollection, onOpenFlash, users = [], profilePics = {}, toast, arsenalOnly = false }: {
   points: number;
   onPurchase?: (item: StoreItem) => void;
   onUseConsumable?: (item: StoreItem) => void;

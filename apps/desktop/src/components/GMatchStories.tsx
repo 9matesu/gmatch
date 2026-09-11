@@ -42,18 +42,7 @@ interface GroupedUserStories {
   lastCreatedAt: string;
 }
 
-export function GMatchStories({
-  stories,
-  loading = false,
-  relationships = [],
-  currentUserId,
-  identity,
-  profilePics = {},
-  activeUserId,
-  onCloseActiveUser,
-  onAddStory,
-  onStartPm,
-}: GMatchStoriesProps) {
+export function GMatchStories({ stories, loading = false, currentUserId, identity, profilePics = {}, activeUserId, onCloseActiveUser, onAddStory, onStartPm }: GMatchStoriesProps) {
   const { toast } = useToast();
   const [seenStoryIds, setSeenStoryIds] = useState<Set<string>>(() => {
     if (typeof window === 'undefined') return new Set();

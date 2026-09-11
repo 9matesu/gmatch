@@ -48,7 +48,7 @@ export function CreatePostModal({
   const [uploading, setUploading] = useState(false);
 
   // Camera state
-  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [,setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);

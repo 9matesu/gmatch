@@ -31,7 +31,7 @@ export function PlatformTab({ identity, pinVerified, onAction }: PlatformTabProp
   const [isLoading, setIsLoading] = useState(false);
   const [newAnnouncement, setNewAnnouncement] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [editingRec, setEditingRec] = useState<AdminRecommendation | null>(null);
+  const [,setEditingRec] = useState<AdminRecommendation | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!identity || !pinVerified) return;
@@ -64,14 +64,7 @@ export function PlatformTab({ identity, pinVerified, onAction }: PlatformTabProp
     }
   };
 
-  const handleDeleteAnnouncement = async (id: string) => {
-    if (!identity) return;
-    try {
-      await adminApi.deleteAnnouncement(identity, id);
-      fetchData();
-    } catch {
-    }
-  };
+  
 
   const handleUpdateRecommendation = async (id: string, status: string) => {
     if (!identity) return;

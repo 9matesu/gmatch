@@ -143,7 +143,7 @@ export function AdminTable<T extends Record<string, unknown>>({
   const [data, setData] = useState<T[]>(() => normalizeTableRows<T>(initialData));
   const [total, setTotal] = useState(initialTotal);
   const [isFetching, setIsFetching] = useState(false);
-  const parentRef = useRef<HTMLDivElement>(null);
+  
   const lastNotifiedParamsRef = useRef<string>("");
 
   const fetchData = useCallback(async () => {

@@ -34,10 +34,10 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
   const [reportsTotal, setReportsTotal] = useState(0);
   const [comments, setComments] = useState<AdminLobbyComment[]>([]);
   const [chatMessages, setChatMessages] = useState<AdminChatMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading,] = useState(false);
   const [reportsParams, setReportsParams] = useState<TableParams>({ page: 1, pageSize: 50, filters: { status: "open" } });
   const [chatParams, setChatParams] = useState<TableParams>({ page: 1, pageSize: 50, filters: { channel: "all" } });
-  const [selectedReport, setSelectedReport] = useState<AdminReport | null>(null);
+  
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   // Case detail (report-scoped evidence + parties) fetched on expand —

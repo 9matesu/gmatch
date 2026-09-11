@@ -36,7 +36,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
   const [posts, setPosts] = useState<AdminPost[]>([]);
   const [postsTotal, setPostsTotal] = useState(0);
   const [lobbyImages, setLobbyImages] = useState<AdminLobbyImage[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading,] = useState(false);
   const [objectsParams, setObjectsParams] = useState<TableParams>({ page: 1, pageSize: 50 });
   const [postsParams, setPostsParams] = useState<TableParams>({ page: 1, pageSize: 50, filters: { visibility: "all" } });
   const [expandedId, setExpandedId] = useState<string | null>(null);

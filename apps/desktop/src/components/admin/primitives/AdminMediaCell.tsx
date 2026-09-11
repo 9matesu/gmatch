@@ -137,16 +137,7 @@ interface AdminRowMediaProps {
   className?: string;
 }
 
-export function AdminRowMedia({
-  id,
-  contentUrl,
-  mimeType,
-  identity,
-  onZoom,
-  title,
-  subtitle,
-  className,
-}: AdminRowMediaProps) {
+export function AdminRowMedia({ id, contentUrl, mimeType, identity, onZoom, title, className }: AdminRowMediaProps) {
   return (
     <AdminMediaCell
       id={id}

@@ -12,7 +12,7 @@ import {
 } from './ice-hygiene'
 
 const hostV4 = 'candidate:1 1 udp 2122260223 192.168.1.5 54321 typ host'
-const hostMdns = 'candidate:1 1 udp 2122260223 fe80::1 54321 typ host'
+
 const mdnsHost = 'candidate:1 1 udp 2122260223 my-laptop.local 54321 typ host'
 const hostV6 = 'candidate:1 1 udp 2122260223 2001:db8::42 54321 typ host'
 const srflx = 'candidate:2 1 udp 1685790719 203.0.113.7 41234 typ srflx raddr 192.168.1.5 rport 54321'

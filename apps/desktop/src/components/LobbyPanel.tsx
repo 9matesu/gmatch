@@ -44,23 +44,7 @@ interface LobbyTileProps {
 // Each lobby board tile owns its own broken-image state so a 404 on an
 // expired /api/lobby/images/:id/content ref is hidden by returning null
 // instead of rendering a placeholder. The CSS grid reflows to close the gap.
-function LobbyTile({
-  img,
-  now,
-  soundEnabled,
-  onLike,
-  onExpandItem,
-  onOpenImage,
-  onGetLikers,
-  onGetComments,
-  onAddComment,
-  onDeleteComment,
-  onReportComment,
-  onReport,
-  selfId,
-  onOpenProfile,
-  users,
-}: LobbyTileProps) {
+function LobbyTile({ img, now, soundEnabled, onLike, onExpandItem, onOpenImage, onGetLikers, onGetComments, onAddComment, onDeleteComment, onReportComment, onReport, selfId, users }: LobbyTileProps) {
   const [errored, setErrored] = useState(false)
   const [showLikers, setShowLikers] = useState(false)
   const [likers, setLikers] = useState<string[]>([])
@@ -434,52 +418,8 @@ interface Props {
   sendInvite?: (userId: string) => Promise<{ ok: boolean; error?: string }>
 }
 
-export function LobbyPanel({
-  lobby,
-  identity,
-  myCards,
-  soundEnabled,
-  onOpenImage,
-  onExpandItem,
-  onOpenHelp,
-  onOpenProfile,
-  users,
-  onOpenSpectateItem,
-  onOpenCardChat,
-  onOpenCreateCard,
-  onOpenDeckBuilder,
-  toggleAutoQueue,
-  sendInvite,
-}: Props) {
-const {
-    state,
-    images,
-    joined,
-    autoQueueEnabled,
-    loading,
-    toggleAutoQueue: lobbyToggleAutoQueue,
-    sendInvite: lobbySendInvite,
-    spectateMatch,
-    closeSpectate,
-    spectatingMatchId,
-    spectatingSnapshot,
-    liveMatches,
-    pickCard,
-    decide,
-    quitMatch,
-    likeImage,
-    getLikers,
-    getComments,
-    addComment,
-    deleteComment,
-    reportImage,
-    activeSpecials,
-    uploadMatchCard,
-    submitSpecialCard,
-    endSpecialMatch,
-    decideSpecialMatch,
-    onlineUsers,
-  } = lobby
+export function LobbyPanel({ lobby, identity, myCards, soundEnabled, onExpandItem, onOpenProfile, users, onOpenSpectateItem, onOpenCardChat, onOpenCreateCard, onOpenDeckBuilder, toggleAutoQueue, sendInvite }: Props) {
+const { state, images, joined, autoQueueEnabled, loading, toggleAutoQueue: lobbyToggleAutoQueue, sendInvite: lobbySendInvite, spectateMatch, closeSpectate, spectatingMatchId, spectatingSnapshot, liveMatches, pickCard, decide, quitMatch, activeSpecials, submitSpecialCard, endSpecialMatch, decideSpecialMatch, onlineUsers } = lobby
 
   // Use passed-in override functions if provided, otherwise fall back to lobby functions
   const effectiveToggleAutoQueue = toggleAutoQueue ?? lobbyToggleAutoQueue
@@ -539,7 +479,7 @@ const selfId = identity?.orbitId || ''
     () => (match ? { seq: match.round_seq || 1, max: match.max_rounds || 5, deadline: match.phase_deadline ?? 0 } : null),
     [match]
   )
-  const task = useMemo(() => activeTask(match), [match])
+  
   const matchPanelKey = match ? match.id : null
 
   const prevCount = useRef<number | null>(null)
@@ -729,22 +669,7 @@ const selfId = identity?.orbitId || ''
   // Render segments: dueling pairs are grouped as one unit so a single
   // combined SPECTATE row renders above each matched pair, followed by the
   // two player tiles. Everyone else renders as an individual tile.
-  const rosterSegments = useMemo(() => {
-    const segments: Array<{ kind: 'pair'; matchId: string; players: typeof mergedPlayers } | { kind: 'solo'; player: typeof mergedPlayers[number] }> = []
-    const placed = new Set<string>()
-    for (const p of lobbyPlayers) {
-      if (placed.has(p.id)) continue
-      if (p.queueStatus === 'in_match' && p.activeMatchId) {
-        const members = lobbyPlayers.filter((m) => m.activeMatchId === p.activeMatchId)
-        for (const m of members) placed.add(m.id)
-        segments.push({ kind: 'pair', matchId: p.activeMatchId, players: members })
-      } else {
-        placed.add(p.id)
-        segments.push({ kind: 'solo', player: p })
-      }
-    }
-    return segments
-  }, [lobbyPlayers])
+  
 
   const boardImages = useMemo(() => {
     const seen = new Set<string>()
@@ -845,74 +770,11 @@ const selfId = identity?.orbitId || ''
     return ok
   }
 
-  const handleMatchUpload = async (file: File, name: string | null, onProgress?: (pct: number) => void): Promise<{ ok: boolean; cardId: string | null; name?: string | null; value?: number; error?: string }> => {
-    if (!identity || !match) return { ok: false, cardId: null, error: 'No active match' }
-    const form = new FormData()
-    form.append('image', file)
-    form.append('is_story', 'false')
-    form.append('recipients', match.opponent.id)
-    try {
-      const res = await uploadWithProgress('/api/objects', form, identity, onProgress)
-      if (!res.ok) {
-        if (res.id) {
-          const card = await createCardFromMedia(identity, res.id, name)
-          return { ok: true, cardId: res.id, name: card?.name ?? name, value: card?.value ?? 0 }
-        }
-        const error = res.error || (res.status === 409 ? 'You already uploaded this image. Choose a different one.' : 'Upload failed')
-        return { ok: false, cardId: null, error }
-      }
-      if (!res.id) return { ok: false, cardId: null, error: 'Upload failed' }
-      const card = await createCardFromMedia(identity, res.id, name)
-      return { ok: true, cardId: res.id, name: card?.name ?? name, value: card?.value ?? 0 }
-    } catch (err: any) {
-      return { ok: false, cardId: null, error: err?.message || 'Upload failed' }
-    }
-  }
+  
 
-  const handleMatchUrlUpload = async (url: string, name: string | null): Promise<{ ok: boolean; cardId: string | null; name?: string | null; value?: number; error?: string }> => {
-    if (!identity || !match || !url.trim()) return { ok: false, cardId: null, error: 'No active match' }
-    const form = new FormData()
-    form.append('url', url.trim())
-    form.append('is_story', 'false')
-    form.append('recipients', match.opponent.id)
-    try {
-      const res = await orbitFetch('/api/objects', { method: 'POST', body: form }, identity)
-      if (!res.ok) {
-        const data = await res.json().catch(() => null)
-        return { ok: false, cardId: null, error: data?.error || `Upload failed (${res.status})` }
-      }
-      const body = await res.json()
-      const id = typeof body?.id === 'string' ? body.id : null
-      if (!id) return { ok: false, cardId: null, error: 'Upload failed' }
-      const card = await createCardFromMedia(identity, id, name)
-      return { ok: true, cardId: id, name: card?.name ?? name, value: card?.value ?? 0 }
-    } catch {
-      return { ok: false, cardId: null, error: 'Upload failed — check the URL and try again' }
-    }
-  }
+  
 
-  const handleSpecialUrlUpload = async (url: string, name: string | null): Promise<{ ok: boolean; cardId: string | null; name?: string | null; value?: number; error?: string }> => {
-    if (!identity || !url.trim()) return { ok: false, cardId: null, error: 'No active match' }
-    const form = new FormData()
-    form.append('url', url.trim())
-    form.append('is_story', 'false')
-    const specialOpponent = activeSpecials[0] ? (activeSpecials[0].user_a === selfId ? activeSpecials[0].user_b : activeSpecials[0].user_a) : null
-    if (specialOpponent) form.append('recipients', specialOpponent)
-    try {
-      const res = await orbitFetch('/api/objects', { method: 'POST', body: form }, identity)
-      if (!res.ok) {
-        const data = await res.json().catch(() => null)
-        return { ok: false, cardId: null, error: data?.error || `Upload failed (${res.status})` }
-      }
-      const body = await res.json()
-      const id = typeof body?.id === 'string' ? body.id : null
-      if (!id) return { ok: false, cardId: null, error: 'Upload failed' }
-      const card = await createCardFromMedia(identity, id, name)
-      return { ok: true, cardId: id, name: card?.name ?? name, value: card?.value ?? 0 }
-    } catch {
-      return { ok: false, cardId: null, error: 'Upload failed — check the URL and try again' }
-    }
-  }
+  
 
   const handleSpectate = async (matchId: string) => {
     if (spectateRequesting) return

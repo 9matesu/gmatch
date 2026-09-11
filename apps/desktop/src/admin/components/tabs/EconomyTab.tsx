@@ -38,12 +38,12 @@ export function EconomyTab({ identity, pinVerified, onZoom, onAction }: EconomyT
   const [ledger, setLedger] = useState<Array<{ id: string; user_id: string; display_name?: string | null; kind: string; delta: number; balance_after: number; created_at: string }>>([]);
   const [marketplace, setMarketplace] = useState<Array<{ id: string; card_id: string; seller_name?: string | null; price: number; status: string; name?: string | null }>>([]);
   const [decks, setDecks] = useState<Array<{ id: string; owner_name?: string | null; name: string; game_id: string; card_count: number }>>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading,] = useState(false);
   const [cardsParams, setCardsParams] = useState<TableParams>({ page: 1, pageSize: 50, filters: {} });
-  const [walletsParams, setWalletsParams] = useState<TableParams>({ page: 1, pageSize: 50 });
-  const [ledgerParams, setLedgerParams] = useState<TableParams>({ page: 1, pageSize: 100 });
+  const [walletsParams,] = useState<TableParams>({ page: 1, pageSize: 50 });
+  const [ledgerParams,] = useState<TableParams>({ page: 1, pageSize: 100 });
   const [marketParams, setMarketParams] = useState<TableParams>({ page: 1, pageSize: 50, filters: { status: "open" } });
-  const [decksParams, setDecksParams] = useState<TableParams>({ page: 1, pageSize: 100 });
+  const [decksParams,] = useState<TableParams>({ page: 1, pageSize: 100 });
   const [selectedCard, setSelectedCard] = useState<AdminCard | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 

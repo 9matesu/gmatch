@@ -18,27 +18,7 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import type { FeedPost, PostComment } from './GMatchFeed';
 import { ObjectImage } from '../ObjectImage';
 
-export function InstagramPostModal({
-  post,
-  isOpen,
-  onClose,
-  identity,
-  profilePics = {},
-  isLiked = false,
-  isSaved = false,
-  likeCount = 0,
-  comments = [],
-  onToggleLike,
-  onToggleSave,
-  onAddComment,
-  onToggleCommentLike,
-  onOpenShare,
-  onOptionsClick,
-  onSelectUser,
-  onAvatarClick,
-  onOpenNetwork,
-  toast,
-}: {
+export function InstagramPostModal({ post, isOpen, onClose, identity, profilePics = {}, isLiked = false, isSaved = false, likeCount = 0, comments = [], onToggleLike, onToggleSave, onAddComment, onToggleCommentLike, onOpenShare, onOptionsClick, onSelectUser, onAvatarClick, onOpenNetwork }: {
   post: FeedPost | null;
   isOpen: boolean;
   onClose: () => void;

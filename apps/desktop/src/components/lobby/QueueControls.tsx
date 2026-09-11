@@ -25,23 +25,7 @@ export interface QueueControlsProps {
   now: number
 }
 
-export function QueueControls({
-  state,
-  match,
-  matchRoundInfo,
-  autoQueueEnabled,
-  soundEnabled,
-  myCardsCount,
-  queuedSinceMs,
-  showLeagueTab,
-  onToggleAutoQueue,
-  onOpenCreateCard,
-  onOpenDeckBuilder,
-  onShowLeagueTab,
-  onOpenCardChat,
-  toast,
-  now,
-}: QueueControlsProps) {
+export function QueueControls({ state, match, matchRoundInfo, autoQueueEnabled, myCardsCount, queuedSinceMs, showLeagueTab, onToggleAutoQueue, onOpenCreateCard, onOpenDeckBuilder, onShowLeagueTab, onOpenCardChat, toast, now }: QueueControlsProps) {
   const hasMatch = Boolean(match)
 
   return (
