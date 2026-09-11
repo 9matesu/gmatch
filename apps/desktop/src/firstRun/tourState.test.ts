@@ -7,7 +7,6 @@ import {
   isTourOver,
   nextTourStep,
   readTourState,
-  resetTour,
   wipeAllTourStates,
   writeTourState,
 } from './tourState';
@@ -71,13 +70,6 @@ describe('tourState', () => {
     expect(isTourOver({ version: 1, index: 2, status: 'skipped' })).toBe(true);
   });
 
-  it('resetTour brings it back at step 0 (Help re-arm)', () => {
-    stubLocalStorage();
-    writeTourState('abc', { version: 1, index: 5, status: 'skipped' });
-    resetTour('abc');
-    expect(readTourState('abc')).toEqual({ version: 1, index: 0, status: 'active' });
-  });
-
   it('wipeAllTourStates removes only tour keys', () => {
     const data = stubLocalStorage();
     data.set(`${TOUR_KEY_PREFIX}one`, '{}');
@@ -87,6 +79,8 @@ describe('tourState', () => {
     expect(data.has(`${TOUR_KEY_PREFIX}one`)).toBe(false);
     expect(data.has(`${TOUR_KEY_PREFIX}two`)).toBe(false);
     expect(data.get('something_else')).toBe('keep');
+    // after a wipe, reads return fresh step 0 (that IS the re-arm path)
+    expect(readTourState('one')).toEqual({ version: 1, index: 0, status: 'active' });
   });
 
   it('every step id is unique, copy is English, view is valid', () => {

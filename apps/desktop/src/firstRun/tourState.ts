@@ -105,10 +105,6 @@ export function isTourOver(state: TourState): boolean {
   return state.status !== 'active';
 }
 
-export function resetTour(identityId: string | null | undefined) {
-  writeTourState(identityId, initialTourState());
-}
-
 export function wipeAllTourStates() {
   if (typeof window === 'undefined') return;
   try {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react'
+import { wipeAllTourStates } from '../firstRun/tourState'
 import { HelpCircle, X, UploadCloud, Globe, Shield, Keyboard } from 'lucide-react'
 
 const TABS = [
@@ -83,6 +84,17 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                   <li><span className="text-retro-body font-medium">Browse the network</span> — online users appear at the top of the directory</li>
                   <li><span className="text-retro-body font-medium">Duel and rank cards</span> — gain score and unlock rarity tiers</li>
                 </ol>
+                <button
+                  type="button"
+                  onClick={() => {
+                    wipeAllTourStates()
+                    window.dispatchEvent(new CustomEvent('orbit_tour_reset'))
+                    onClose()
+                  }}
+                  className="text-xs text-retro-muted hover:text-retro-fg underline underline-offset-2 cursor-pointer"
+                >
+                  Redo the guided tour
+                </button>
               </section>
             </div>
           )}
