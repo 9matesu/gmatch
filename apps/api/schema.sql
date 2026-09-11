@@ -115,7 +115,8 @@ CREATE TABLE IF NOT EXISTS Objects (
   is_sensitive INTEGER NOT NULL DEFAULT 0,
   sensitive_reason TEXT,
   post_group TEXT,
-  is_chat INTEGER NOT NULL DEFAULT 0
+  is_chat INTEGER NOT NULL DEFAULT 0,
+  is_archived INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_objects_owner_content_hash ON Objects (owner_id, content_hash);

@@ -679,4 +679,17 @@ objects.delete('/:id', orbitAuth, async (c) => {
   return c.json({ success: true })
 })
 
+// Toggle the author's own post archive state. Archived posts stay in the
+// author's feed (client filters them) and drop out of everyone else's.
+objects.post('/:id/archive', orbitAuth, async (c) => {
+  const id = c.req.param('id')
+  const orbitId = c.get('orbitId')
+  const obj = await c.env.DB.prepare('SELECT owner_id FROM Objects WHERE id = ?').bind(id).first<{ owner_id: string }>()
+  if (!obj) return c.json({ error: 'Not found' }, 404)
+  if (obj.owner_id !== orbitId) return c.json({ error: 'Forbidden' }, 403)
+  await c.env.DB.prepare('UPDATE Objects SET is_archived = 1 - COALESCE(is_archived, 0) WHERE id = ?').bind(id).run()
+  const row = await c.env.DB.prepare('SELECT is_archived FROM Objects WHERE id = ?').bind(id).first<{ is_archived: number }>()
+  return c.json({ id, is_archived: Number(row?.is_archived || 0) })
+})
+
 export { objects }
