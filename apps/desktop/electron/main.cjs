@@ -492,13 +492,23 @@ function parseRedgifsJson(body, captions) {
 }
 
 async function fetchRedgifs(variant, n, captions) {
-  const token = await redgifsAuth()
   const page = 1 + Math.floor(Math.random() * 5)
   const url =
     `${REDGIFS_API}/v2/gifs/search?search_text=${encodeURIComponent(redgifsWords(variant))}` +
     `&order=trending&count=${n}&page=${page}`
-  const body = await httpGet(url, { Authorization: `Bearer ${token}` })
-  return parseRedgifsJson(body, captions)
+  try {
+    const token = await redgifsAuth()
+    const body = await httpGet(url, { Authorization: `Bearer ${token}` })
+    return parseRedgifsJson(body, captions)
+  } catch (e) {
+    if (!/401/.test(String((e && e.message) || e))) throw e
+    // ponytail: stale cached temp token; drop it and retry once.
+    redgifsToken = null
+    redgifsTokenExp = 0
+    const token = await redgifsAuth()
+    const body = await httpGet(url, { Authorization: `Bearer ${token}` })
+    return parseRedgifsJson(body, captions)
+  }
 }
 
 // --- imhentai (hentai galleries: captions, hardcore doujins) ------------------
