@@ -21,6 +21,7 @@ import {
   Repeat,
   Sparkles,
   ImagePlus,
+  MoreVertical,
 } from 'lucide-react'
 import { MUTED } from '../../ui/styles'
 
@@ -108,10 +109,21 @@ export default function IdleGalleryView({
   const [viewerId, setViewerId] = useState<string | null>(null)
   const [showSlideshow, setShowSlideshow] = useState(false)
   const [slideshowItems, setSlideshowItems] = useState<ResolvedItem[]>([])
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!openMenuId) return
+    const handleOutside = () => setOpenMenuId(null)
+    window.addEventListener('click', handleOutside)
+    return () => window.removeEventListener('click', handleOutside)
+  }, [openMenuId])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setSelectedIds(new Set())
+      if (e.key === 'Escape') {
+        setSelectedIds(new Set())
+        setOpenMenuId(null)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -463,7 +475,9 @@ export default function IdleGalleryView({
                     )
                     e.dataTransfer.effectAllowed = 'copy'
                   }}
-                  className={`group relative aspect-square overflow-hidden rounded-[10px] border bg-black shadow-[0_4px_10px_rgba(0,0,0,0.5)] cursor-grab active:cursor-grabbing ${
+                  className={`group relative aspect-square rounded-[10px] border bg-black shadow-[0_4px_10px_rgba(0,0,0,0.5)] cursor-grab active:cursor-grabbing ${
+                    openMenuId === img.id ? 'z-30' : 'overflow-hidden'
+                  } ${
                     isSelected
                       ? 'border-emerald-500 ring-2 ring-emerald-500/40'
                       : isBackdrop
@@ -523,117 +537,147 @@ export default function IdleGalleryView({
                     )}
                   </button>
 
-                  {/* Top-right Action Buttons */}
-                  <div className="absolute right-1 top-1 z-10 flex flex-col gap-1">
-                    {onRepostImage && (
-                      <button
-                        type="button"
-                        className={`${HOVER_BTN} relative right-auto top-auto h-[26px] w-[26px] hover:!text-sky-300`}
-                        title="Repost to feed"
-                        aria-label={`Repost ${img.tags.slice(0, 2).join(' ') || 'image'} to feed`}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onRepostImage({
-                            url: img.url,
-                            tags: img.tags,
-                            name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
-                          })
-                        }}
-                      >
-                        <Repeat size={13} />
-                      </button>
-                    )}
-
-                    {onAddToStory && (
-                      <button
-                        type="button"
-                        className={`${HOVER_BTN} relative right-auto top-auto h-[26px] w-[26px] hover:!text-amber-300`}
-                        title="Add to story"
-                        aria-label={`Add ${img.tags.slice(0, 2).join(' ') || 'image'} to story`}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onAddToStory({
-                            url: img.url,
-                            tags: img.tags,
-                            name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
-                          })
-                        }}
-                      >
-                        <Sparkles size={13} />
-                      </button>
-                    )}
-
-                    {onCreateCard && (
-                      <button
-                        type="button"
-                        className={`${HOVER_BTN} relative right-auto top-auto h-[26px] px-1.5 text-[10px] font-bold uppercase tracking-wide`}
-                        title="Turn into a card"
-                        aria-label={`Turn ${img.tags.slice(0, 2).join(' ') || 'keepsake'} into a card`}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onCreateCard({
-                            url: isMotion && img.url.includes('redgifs') ? redgifsPlayable(img.url) : img.url,
-                            tags: img.tags.slice(0, 8),
-                            name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
-                          })
-                        }}
-                      >
-                        Card
-                      </button>
-                    )}
-
+                  {/* Top-right More Options Menu Button & Dropdown */}
+                  <div className="absolute right-1.5 top-1.5 z-20">
                     <button
                       type="button"
-                      className={`${HOVER_BTN} relative right-auto top-auto h-[26px] w-[26px]`}
-                      title="Re-feature in the Goon Panel"
-                      aria-label={`Re-feature ${img.tags.slice(0, 2).join(' ') || 'keepsake'}`}
+                      className={`${HOVER_BTN} ${
+                        openMenuId === img.id ? '!opacity-100 ring-1 ring-white/30' : ''
+                      } relative right-auto top-auto h-6 w-6 rounded-md bg-black/75 hover:bg-black/90 text-white/80 hover:text-white border border-white/10 shadow-md backdrop-blur-md cursor-pointer transition-all`}
+                      title="More options"
+                      aria-label={`Options for ${img.tags.slice(0, 2).join(' ') || 'keepsake'}`}
                       onClick={(e) => {
                         e.stopPropagation()
-                        featureImage(img.id)
+                        setOpenMenuId((prev) => (prev === img.id ? null : img.id))
                       }}
                     >
-                      <IconRefresh size={13} />
+                      <MoreVertical size={13} />
                     </button>
 
-                    <button
-                      type="button"
-                      className={`${HOVER_BTN} relative right-auto top-auto h-[26px] w-[26px] disabled:cursor-default disabled:opacity-100 disabled:text-retro-accent`}
-                      title={isBackdrop ? 'This is the app backdrop' : 'Set as app backdrop'}
-                      aria-label={
-                        isBackdrop
-                          ? 'Current app backdrop'
-                          : `Set ${img.tags.slice(0, 2).join(' ') || 'image'} as app backdrop`
-                      }
-                      disabled={isBackdrop}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setBackground(img.url)
-                        onSetWallpaper?.(img.url)
-                      }}
-                    >
-                      <IconWallpaper size={13} />
-                    </button>
+                    {openMenuId === img.id && (
+                      <div
+                        className="absolute right-0 top-7 z-30 w-44 py-1 bg-surface-raised/95 backdrop-blur-xl border border-border-glass rounded-xl shadow-2xl text-xs flex flex-col animate-orbit-fade-in"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {onRepostImage && (
+                          <button
+                            type="button"
+                            className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-white/10 transition-colors cursor-pointer"
+                            title="Repost to feed"
+                            aria-label={`Repost ${img.tags.slice(0, 2).join(' ') || 'image'} to feed`}
+                            onClick={() => {
+                              setOpenMenuId(null)
+                              onRepostImage({
+                                url: img.url,
+                                tags: img.tags,
+                                name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
+                              })
+                            }}
+                          >
+                            <Repeat size={13} className="text-sky-400" />
+                            <span>Repost to feed</span>
+                          </button>
+                        )}
 
-                    <button
-                      type="button"
-                      className={`${HOVER_BTN} relative right-auto top-auto h-[26px] w-[26px] hover:!text-rose-300`}
-                      title="Delete permanently from the gallery"
-                      aria-label={`Delete ${img.tags.slice(0, 2).join(' ') || 'keepsake'} permanently`}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        if (window.confirm('Delete this keepsake permanently?')) {
-                          removeGalleryImage(img.id)
-                          if (viewerId === img.id) setViewerId(null)
-                          setSelectedIds((prev) => {
-                            const next = new Set(prev)
-                            next.delete(img.id)
-                            return next
-                          })
-                        }
-                      }}
-                    >
-                      <IconTrash size={13} />
-                    </button>
+                        {onAddToStory && (
+                          <button
+                            type="button"
+                            className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-white/10 transition-colors cursor-pointer"
+                            title="Add to story"
+                            aria-label={`Add ${img.tags.slice(0, 2).join(' ') || 'image'} to story`}
+                            onClick={() => {
+                              setOpenMenuId(null)
+                              onAddToStory({
+                                url: img.url,
+                                tags: img.tags,
+                                name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
+                              })
+                            }}
+                          >
+                            <Sparkles size={13} className="text-amber-400" />
+                            <span>Add to story</span>
+                          </button>
+                        )}
+
+                        {onCreateCard && (
+                          <button
+                            type="button"
+                            className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-white/10 transition-colors cursor-pointer"
+                            title="Turn into a card"
+                            aria-label={`Turn ${img.tags.slice(0, 2).join(' ') || 'keepsake'} into a card`}
+                            onClick={() => {
+                              setOpenMenuId(null)
+                              onCreateCard({
+                                url: isMotion && img.url.includes('redgifs') ? redgifsPlayable(img.url) : img.url,
+                                tags: img.tags.slice(0, 8),
+                                name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
+                              })
+                            }}
+                          >
+                            <ImagePlus size={13} className="text-purple-400" />
+                            <span>Create card</span>
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-white/10 transition-colors cursor-pointer"
+                          title="Re-feature in the Goon Panel"
+                          aria-label={`Re-feature ${img.tags.slice(0, 2).join(' ') || 'keepsake'}`}
+                          onClick={() => {
+                            setOpenMenuId(null)
+                            featureImage(img.id)
+                          }}
+                        >
+                          <IconRefresh size={13} className="text-emerald-400" />
+                          <span>Re-feature</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={isBackdrop}
+                          className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-default"
+                          title={isBackdrop ? 'This is the app backdrop' : 'Set as app backdrop'}
+                          aria-label={
+                            isBackdrop
+                              ? 'Current app backdrop'
+                              : `Set ${img.tags.slice(0, 2).join(' ') || 'image'} as app backdrop`
+                          }
+                          onClick={() => {
+                            setOpenMenuId(null)
+                            setBackground(img.url)
+                            onSetWallpaper?.(img.url)
+                          }}
+                        >
+                          <IconWallpaper size={13} className="text-cyan-400" />
+                          <span>{isBackdrop ? 'Active backdrop' : 'Set backdrop'}</span>
+                        </button>
+
+                        <div className="h-[1px] bg-border-glass my-1" />
+
+                        <button
+                          type="button"
+                          className="flex items-center gap-2 px-3 py-1.5 text-left text-rose-400 hover:bg-rose-500/15 transition-colors cursor-pointer"
+                          title="Delete permanently from the gallery"
+                          aria-label={`Delete ${img.tags.slice(0, 2).join(' ') || 'keepsake'} permanently`}
+                          onClick={() => {
+                            setOpenMenuId(null)
+                            if (window.confirm('Delete this keepsake permanently?')) {
+                              removeGalleryImage(img.id)
+                              if (viewerId === img.id) setViewerId(null)
+                              setSelectedIds((prev) => {
+                                const next = new Set(prev)
+                                next.delete(img.id)
+                                return next
+                              })
+                            }
+                          }}
+                        >
+                          <IconTrash size={13} />
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               )

@@ -12,15 +12,7 @@ import {
 import type { AppSettings } from '../../hooks/useSettings';
 import { playPress } from '../../utils/sounds';
 
-export const WALLPAPER_PRESETS = [
-  { id: 'default', name: 'Default', url: '' },
-  { id: 'cyber', name: 'Cyber Grid', url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1920&q=80' },
-  { id: 'lofi', name: 'Lofi Room', url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1920&q=80' },
-  { id: 'synth', name: 'Synthwave', url: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?auto=format&fit=crop&w=1920&q=80' },
-  { id: 'neon', name: 'Neon Rain', url: 'https://images.unsplash.com/photo-1514565131-fce0801e5785?auto=format&fit=crop&w=1920&q=80' },
-  { id: 'anime', name: 'Tokyo Night', url: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=1920&q=80' },
-  { id: 'minimal', name: 'Deep Space', url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1920&q=80' },
-];
+export const WALLPAPER_PRESETS: { id: string; name: string; url: string }[] = [];
 
 interface ThemeDrawerProps {
   isOpen: boolean;
@@ -214,10 +206,10 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
         </div>
       </div>
 
-      {/* Wallpaper Presets */}
-      <div className="space-y-2">
+      {/* Wallpaper */}
+      <div className="space-y-2 pt-1 border-t border-border-glass">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-semibold text-retro-muted uppercase tracking-wider">Wallpaper Presets</span>
+          <span className="text-[11px] font-semibold text-retro-muted uppercase tracking-wider">Wallpaper</span>
           {settings.wallpaperUrl && (
             <button
               type="button"
@@ -227,32 +219,6 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
               <ArrowCounterClockwise className="w-3 h-3" /> Reset default
             </button>
           )}
-        </div>
-        <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
-          {WALLPAPER_PRESETS.map((preset) => {
-            const isSelected = settings.wallpaperPreset === preset.id || (!settings.wallpaperUrl && preset.id === 'default');
-            return (
-              <button
-                key={preset.id}
-                type="button"
-                onClick={() => {
-                  playPress(800);
-                  updateSettings('wallpaperUrl', preset.url);
-                  updateSettings('wallpaperPreset', preset.id);
-                  updateSettings('wallpaperMime', '');
-                  updateSettings('wallpaperSlideshow', false);
-                  setCustomUrlInput(preset.url);
-                }}
-                className={`py-1.5 px-1 rounded-lg border text-[10px] font-medium truncate transition-all cursor-pointer text-center ${
-                  isSelected
-                    ? 'bg-retro-accent text-retro-accent-text border-transparent font-bold shadow-xs'
-                    : 'bg-surface-interactive/40 text-retro-muted border-border-subtle hover:text-retro-fg hover:bg-surface-interactive'
-                }`}
-              >
-                {preset.name}
-              </button>
-            );
-          })}
         </div>
       </div>
 

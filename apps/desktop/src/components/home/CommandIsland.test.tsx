@@ -55,4 +55,17 @@ describe('CommandIsland navigation coverage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'More options' }))
     expect(screen.getByText('Domination')).toBeInTheDocument()
   })
+
+  it('Clicker button appears on the pill and does not duplicate the notification button', async () => {
+    const setMainView = vi.fn();
+    render(<CommandIsland mainView="grid" setMainView={setMainView} unreadNotificationsCount={2} />);
+    const clickerButton = screen.getByRole('button', { name: 'Clicker' });
+    expect(clickerButton).toBeInTheDocument();
+    fireEvent.click(clickerButton);
+    expect(setMainView).toHaveBeenCalledWith('grid');
+
+    // Ensure only one Alerts/Notifications button exists
+    const notifButtons = screen.getAllByRole('button', { name: /notifications/i });
+    expect(notifButtons.length).toBe(1);
+  });
 })

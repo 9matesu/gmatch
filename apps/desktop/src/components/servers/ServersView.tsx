@@ -270,7 +270,25 @@ export function ServersView({
     }
   }, [identity, central])
 
-  useEffect(() => { void refresh() }, [refresh])
+  useEffect(() => {
+    try {
+      const cached = readDirectoryCache().filter(
+        (s) => s.name.trim().toLowerCase() !== 'gmatch' && !s.endpoint_hint?.includes('8790') && s.id !== 'central-node'
+      )
+      writeDirectoryCache(cached)
+      if (localStorage.getItem(DIRECTORY_ID_KEY) === 'central-node') localStorage.removeItem(DIRECTORY_ID_KEY)
+      const regRaw = localStorage.getItem(REG_KEY)
+      if (regRaw) {
+        try {
+          const parsed = JSON.parse(regRaw)
+          if (parsed.name?.trim().toLowerCase() === 'gmatch' || parsed.endpoint_hint?.includes('8790')) {
+            localStorage.removeItem(REG_KEY)
+          }
+        } catch { /* ignore */ }
+      }
+    } catch { /* ignore */ }
+    void refresh()
+  }, [refresh])
   useEffect(() => {
     window.gmatch?.serverState?.()
       .then((s) => {
@@ -300,7 +318,15 @@ export function ServersView({
 
   const visibleServers = useMemo(() => {
     const q = query.trim().toLowerCase()
+    const centralNorm = (central || '').trim().replace(/\/+$/, '').toLowerCase()
     return servers
+      .filter((s) => {
+        if (s.id === 'central-node') return false
+        if (s.name.trim().toLowerCase() === 'gmatch') return false
+        if (s.endpoint_hint?.includes('127.0.0.1:8790') || s.endpoint_hint?.includes('localhost:8790')) return false
+        if (s.endpoint_hint && normalizeServerUrl(s.endpoint_hint)?.toLowerCase() === centralNorm) return false
+        return true
+      })
       .filter((s) => !passwordOnly || s.password_required)
       .filter((s) => !q || `${s.name} ${s.description ?? ''} ${s.endpoint_hint ?? ''}`.toLowerCase().includes(q))
       .sort((a, b) => {
@@ -308,7 +334,7 @@ export function ServersView({
         if (sort === 'online') return (b.online_count ?? -1) - (a.online_count ?? -1)
         return String(b.last_seen ?? '').localeCompare(String(a.last_seen ?? ''))
       })
-  }, [servers, query, sort, passwordOnly])
+  }, [servers, query, sort, passwordOnly, central])
 
   const closeCreateForm = () => {
     setShowCreate(false); setName(''); setDescription(''); setHint(''); setNeedsPassword(false); setIsPrivate(false); setServerPassword('')

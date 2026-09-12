@@ -15,11 +15,11 @@
   --color-surface-elevated: #18181b;
   --color-surface-interactive: #27272a;
 
-  /* Glass surfaces (used with backdrop-filter). --panel-alpha scales uniformly */
+  /* Glass surfaces (used with backdrop-filter). --panel-alpha scales uniformly: 1 = solid, opaque */
   --panel-alpha: 1;
-  --color-glass: rgba(18, 18, 21, calc(0.85 * var(--panel-alpha)));
-  --color-glass-strong: rgba(24, 24, 27, calc(0.95 * var(--panel-alpha)));
-  --color-glass-solid: #18181b;
+  --color-glass: rgba(18, 18, 21, var(--panel-alpha));
+  --color-glass-strong: rgba(24, 24, 27, var(--panel-alpha));
+  --color-glass-solid: rgba(24, 24, 27, var(--panel-alpha));
 
   /* White-alpha glass fills */
   --color-glass-w5: rgba(255, 255, 255, calc(0.05 * var(--panel-alpha)));
@@ -692,7 +692,7 @@
 .app-glass .bg-surface-elevated {
   background:
     linear-gradient(145deg, rgba(255, 255, 255, calc(0.09 * var(--panel-alpha))), transparent 36%),
-    linear-gradient(180deg, rgba(24, 24, 27, calc(0.82 * var(--panel-alpha))), rgba(9, 9, 11, calc(0.90 * var(--panel-alpha)))) !important;
+    linear-gradient(180deg, rgba(24, 24, 27, var(--panel-alpha)), rgba(9, 9, 11, var(--panel-alpha))) !important;
   border-color: rgba(255, 255, 255, 0.13) !important;
   box-shadow:
     0 12px 30px rgba(0, 0, 0, 0.26),
@@ -701,11 +701,24 @@
 }
 
 .app-glass .bg-surface-elevated\/50 {
-  background: rgba(24, 24, 27, calc(0.72 * var(--panel-alpha))) !important;
+  background: rgba(24, 24, 27, calc(0.80 * var(--panel-alpha))) !important;
   border-color: rgba(255, 255, 255, 0.12) !important;
   box-shadow:
     0 10px 24px rgba(0, 0, 0, 0.24),
     inset 0 1px 0 rgba(255, 255, 255, 0.10) !important;
+}
+
+.app-glass .bg-surface-canvas {
+  background-color: rgba(9, 9, 11, var(--panel-alpha)) !important;
+}
+.app-glass .bg-surface-canvas\/80 {
+  background-color: rgba(9, 9, 11, calc(0.80 * var(--panel-alpha))) !important;
+}
+.app-glass .bg-surface-canvas\/60 {
+  background-color: rgba(9, 9, 11, calc(0.60 * var(--panel-alpha))) !important;
+}
+.app-glass .bg-surface-canvas\/50 {
+  background-color: rgba(9, 9, 11, calc(0.50 * var(--panel-alpha))) !important;
 }
 
 @supports (backdrop-filter: blur(1px)) {

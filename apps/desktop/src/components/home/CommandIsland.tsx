@@ -121,7 +121,7 @@ export function CommandIsland({
     },
     {
       id: 'grid' as MainViewType,
-      label: 'Grid',
+      label: 'Clicker',
       icon: SquaresFour,
       active: mainView === 'grid',
       badge: 0,
@@ -198,24 +198,7 @@ export function CommandIsland({
       );
     }
 
-    // Default action: quick notification / alerts trigger
-    return (
-      <button
-        type="button"
-        onClick={() => {
-          playPress(800);
-          onOpenNotifications?.();
-        }}
-        className="relative p-2 rounded-full hover:bg-glass-w10 text-retro-muted hover:text-retro-fg transition-colors"
-        title="Notifications"
-        aria-label="Notifications"
-      >
-        <Bell className="w-4 h-4" />
-        {unreadNotificationsCount > 0 && (
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-retro-error ring-2 ring-retro-panel" />
-        )}
-      </button>
-    );
+    return null;
   };
 
   return (
@@ -317,12 +300,17 @@ export function CommandIsland({
           </button>
         </div>
 
-        <div className="h-4 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
-
         {/* Contextual Capsule */}
-        <div className="flex items-center gap-1 shrink-0">
-          {renderContextualAction()}
-        </div>
+        {renderContextualAction() && (
+          <>
+            <div className="h-4 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
+            <div className="flex items-center gap-1 shrink-0">
+              {renderContextualAction()}
+            </div>
+          </>
+        )}
+
+        <div className="h-4 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
 
         {/* More Options / Expand-Collapse Toggle */}
         <button

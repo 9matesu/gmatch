@@ -165,15 +165,19 @@ describe('IdleGalleryView', () => {
       />
     )
 
-    // Hover / action buttons on tile
-    const repostTileBtn = screen.getAllByRole('button', { name: /Repost .* to feed/i })[0]
+    // Hover / options dropdown on tile
+    const moreTileBtn = screen.getAllByRole('button', { name: /^Options for /i })[0]
+    await userEvent.click(moreTileBtn)
+
+    const repostTileBtn = screen.getByRole('button', { name: /Repost .* to feed/i })
     await userEvent.click(repostTileBtn)
     expect(onRepost).toHaveBeenCalledTimes(1)
     expect(onRepost).toHaveBeenCalledWith(
       expect.objectContaining({ url: images[images.length - 1].url })
     )
 
-    const storyTileBtn = screen.getAllByRole('button', { name: /Add .* to story/i })[0]
+    await userEvent.click(moreTileBtn)
+    const storyTileBtn = screen.getByRole('button', { name: /Add .* to story/i })
     await userEvent.click(storyTileBtn)
     expect(onAddToStory).toHaveBeenCalledTimes(1)
 

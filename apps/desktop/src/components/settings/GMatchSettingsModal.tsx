@@ -58,12 +58,6 @@ interface GMatchSettingsModalProps {
   initialTab?: SettingsOpenTarget;
 }
 
-const WALLPAPER_PRESETS = [
-  { id: 'default', name: 'Default Minimal', url: '' },
-  { id: 'grid', name: 'Cyber Grid Neon', url: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1920&q=80' },
-  { id: 'space', name: 'Deep Space Orbit', url: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=1920&q=80' },
-  { id: 'minimal', name: 'Studio Gradient', url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1920&q=80' },
-];
 
 function FeedSettingsTab({
   toast,
@@ -323,11 +317,11 @@ export function GMatchSettingsModal({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 pb-[var(--island-clearance)] select-none font-sans animate-orbit-fade-in"
+      className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 pb-[calc(var(--island-clearance)+1.5rem)] select-none font-sans animate-orbit-fade-in"
       onClick={onClose}
     >
       <div
-        className="bg-glass backdrop-blur-2xl text-retro-fg border border-border-glass rounded-xl shadow-2xl w-full max-w-4xl h-[90vh] max-h-[750px] overflow-hidden flex flex-col md:flex-row animate-orbit-pop"
+        className="bg-glass backdrop-blur-2xl text-retro-fg border border-border-glass rounded-xl shadow-2xl w-full max-w-4xl h-[80vh] max-h-[580px] overflow-hidden flex flex-col md:flex-row animate-orbit-pop my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Left Navigation Sidebar */}
@@ -623,34 +617,6 @@ export function GMatchSettingsModal({
 
                   {wallpaperExpanded && (
                     <div className="space-y-4 pt-3 border-t border-border-glass animate-orbit-fade-in">
-                      {/* Presets */}
-                      <div className="space-y-2">
-                        <div className="text-xs text-retro-muted">Presets</div>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                          {WALLPAPER_PRESETS.map((preset) => (
-                            <button
-                              key={preset.id}
-                              type="button"
-                              onClick={() => {
-                                playPress(800);
-                                updateSettings('wallpaperUrl', preset.url);
-                                updateSettings('wallpaperPreset', preset.id);
-                                updateSettings('wallpaperMime', '');
-                                updateSettings('wallpaperSlideshow', false);
-                                setCustomWallpaperInput(preset.url);
-                              }}
-                              className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer text-left space-y-1 ${settings.wallpaperPreset === preset.id || (!settings.wallpaperUrl && preset.id === 'default')
-                                  ? 'bg-black text-white border-black shadow-xs'
-                                  : 'bg-surface-raised text-retro-fg border-border-glass hover:bg-surface-interactive'
-                                }`}
-                            >
-                              <Image className="w-3.5 h-3.5" />
-                              <div className="truncate text-xs">{preset.name}</div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
                       {/* Upload or URL */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">

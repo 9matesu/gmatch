@@ -18,16 +18,6 @@ function computeApiBase(): string {
     (typeof window !== 'undefined' && (window as unknown as { __API_BASE__?: string }).__API_BASE__)
   if (envUrl) return envUrl.replace(/\/+$/, '')
 
-  // Dev mode in browser (npm run dev): default to local dev sidecar on 8790
-  if (
-    typeof window !== 'undefined' &&
-    (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1') &&
-    import.meta.env.DEV &&
-    import.meta.env.MODE !== 'test'
-  ) {
-    return 'http://127.0.0.1:8790'
-  }
-
   // Dev (vite) and packaged builds both default to the gmatch central node;
   // the local sidecar is opt-in via VITE_API_URL / __API_BASE__ / server-mode.
   return 'https://gmatch.fly.dev'
