@@ -2886,10 +2886,7 @@ export default function Home() {
         ) : (
           <ErrorBoundary>
             <div className="app-glass relative z-10 w-full h-full min-h-0 bg-transparent text-retro-fg shadow-2xl flex flex-col overflow-hidden">
-              <NativeHeaderBar
-                wsConnected={isWsConnected}
-                activeRoomName={mainView.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-              />
+              <NativeHeaderBar />
               <div className="flex-1 min-w-0 min-h-0 flex flex-row overflow-hidden relative">
                 <div ref={mainScrollRef} className="mobile-app-scroll flex-1 min-w-0 min-h-0 w-full flex flex-col relative z-10 overflow-y-auto styled-scrollbar pb-24">
 

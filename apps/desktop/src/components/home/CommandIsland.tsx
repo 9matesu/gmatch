@@ -62,7 +62,7 @@ export function CommandIsland({
   mainView,
   setMainView,
   balance = 0,
-  wsConnected = false,
+  wsConnected: _wsConnected = false,
   unreadMessagesCount = 0,
   unreadNotificationsCount = 0,
   displayName = 'You',
@@ -214,14 +214,8 @@ export function CommandIsland({
         aria-label="Command Island"
         className="command-island fixed bottom-5 left-1/2 -translate-x-1/2 z-[var(--z-dropdown)] flex max-w-[calc(100vw-1.5rem)] items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full select-none transition-all duration-300 overflow-x-auto styled-scrollbar"
       >
-        {/* Left Telemetry: $G Balance & Socket Status */}
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-glass-w5 border border-border-glass text-[11px] font-mono tabular-nums text-retro-body shrink-0">
-          <span
-            className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-              wsConnected ? 'bg-retro-online' : 'bg-retro-warning'
-            }`}
-            title={wsConnected ? 'Swarm: Online' : 'Swarm: Reconnecting'}
-          />
+        {/* Left Telemetry: $G Balance */}
+        <div className="flex items-center px-2.5 py-1 rounded-full bg-glass-w5 border border-border-glass text-[11px] font-mono tabular-nums text-retro-body shrink-0">
           <span className="font-semibold text-retro-fg tracking-tight">
             ${Math.floor(balance).toLocaleString()}
           </span>
