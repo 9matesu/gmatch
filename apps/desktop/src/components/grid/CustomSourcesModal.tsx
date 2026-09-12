@@ -62,17 +62,17 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-label="Custom image sources">
-      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-[#0b0e14] shadow-[0_0_50px_rgba(0,0,0,0.8)]">
-        <div className="flex items-center justify-between gap-3 border-b border-white/10 p-4 bg-[#131722]/50">
+      <div className="w-full max-w-lg overflow-hidden rounded-xl border border-border-glass bg-retro-panel shadow-xl">
+        <div className="flex items-center justify-between gap-3 border-b border-border-glass p-4 bg-glass-w5">
           <div>
             <h2 className="text-sm font-bold text-white tracking-wide">Custom image sources</h2>
-            <p className="text-[11px] text-white/50 mt-0.5">Tried before built-in feeds. Used as-is — only add trusted sources.</p>
+            <p className="text-[11px] text-retro-muted mt-0.5">Tried before built-in feeds. Used as-is — only add trusted sources.</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/50 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer"
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-border-glass bg-glass-w5 text-retro-muted hover:text-white hover:bg-glass-w10 hover:border-border-strong transition-all cursor-pointer"
           >
             <X size={14} weight="bold" />
           </button>
@@ -83,7 +83,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
             <p className="text-xs text-white/40 italic py-2">No custom sources yet — paste links or add a folder below.</p>
           )}
           {sources.map((s) => (
-            <div key={s.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-[#131722]/80 px-3.5 py-2.5">
+            <div key={s.id} className="flex items-center gap-3 rounded-xl border border-border-glass bg-glass-w8 px-3.5 py-2.5">
               <button
                 type="button"
                 role="switch"
@@ -94,11 +94,11 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
               >
                 <span
                   aria-hidden="true"
-                  className={`absolute inset-0 rounded-full transition-colors ${s.enabled ? 'bg-emerald-500/40' : 'bg-white/10'}`}
+                  className={`absolute inset-0 rounded-full transition-colors ${s.enabled ? 'bg-emerald-500/40' : 'bg-glass-w10'}`}
                 />
                 <span
                   aria-hidden="true"
-                  className={`absolute left-0.5 h-4 w-4 rounded-full shadow-md transition-transform duration-200 ${s.enabled ? 'translate-x-4 bg-emerald-400' : 'translate-x-0 bg-white/40'}`}
+                  className={`absolute left-0.5 h-4 w-4 rounded-full shadow-md transition-transform duration-200 ${s.enabled ? 'translate-x-4 bg-emerald-400' : 'translate-x-0 bg-glass-w20'}`}
                 />
               </button>
               <div className="min-w-0 flex-1">
@@ -128,7 +128,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
             </div>
           ))}
 
-          <div className="space-y-2.5 rounded-xl border border-white/10 bg-[#131722]/80 p-3.5">
+          <div className="space-y-2.5 rounded-xl border border-border-glass bg-glass-w8 p-3.5">
             <div className="text-xs font-bold text-white flex items-center gap-1.5">
               <Globe size={13} weight="bold" className="text-retro-accent" />
               Add direct media links
@@ -138,7 +138,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
               onChange={(e) => setLabel(e.target.value)}
               placeholder="Label (e.g. My collection)"
               aria-label="Source label"
-              className="w-full rounded-lg border border-white/10 bg-[#0b0e14] px-3 py-2 text-xs text-white outline-none placeholder:text-white/30 focus:border-retro-accent/60 transition-colors"
+              className="w-full rounded-lg border border-border-glass bg-retro-bg px-3 py-2 text-xs text-white outline-none placeholder:text-retro-faint focus:border-retro-accent/60 transition-colors"
             />
             <textarea
               value={urlsText}
@@ -146,7 +146,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
               placeholder={'Paste direct image/video links, one per line\nhttps://…/a.jpg\nhttps://…/b.mp4'}
               aria-label="Media links"
               rows={3}
-              className="w-full rounded-lg border border-white/10 bg-[#0b0e14] px-3 py-2 text-xs text-white outline-none placeholder:text-white/30 focus:border-retro-accent/60 transition-colors"
+              className="w-full rounded-lg border border-border-glass bg-retro-bg px-3 py-2 text-xs text-white outline-none placeholder:text-retro-faint focus:border-retro-accent/60 transition-colors"
             />
             <div className="flex items-center justify-between gap-2 pt-1">
               <span className={`${MONO} text-[11px] text-white/40`}>{usable.length} of {pasted.length} usable</span>
@@ -162,7 +162,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
             </div>
           </div>
 
-          <div className="space-y-2.5 rounded-xl border border-white/10 bg-[#131722]/80 p-3.5">
+          <div className="space-y-2.5 rounded-xl border border-border-glass bg-glass-w8 p-3.5">
             <div className="text-xs font-bold text-white flex items-center gap-1.5">
               <FolderSimple size={13} weight="bold" className="text-retro-accent" />
               Add a local folder

@@ -416,7 +416,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
               onClick={() => setCardSection("cards")}
               className={cn(
                 "px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer",
-                cardSection === "cards" ? "bg-white/10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
+                cardSection === "cards" ? "bg-glass-w10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
               )}
             >
               Minted Cards ({cardsTotal})
@@ -426,7 +426,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
               onClick={() => setCardSection("market")}
               className={cn(
                 "px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer",
-                cardSection === "market" ? "bg-white/10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
+                cardSection === "market" ? "bg-glass-w10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
               )}
             >
               Marketplace Listings ({marketplace.length})
@@ -436,7 +436,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
               onClick={() => setCardSection("decks")}
               className={cn(
                 "px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer",
-                cardSection === "decks" ? "bg-white/10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
+                cardSection === "decks" ? "bg-glass-w10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
               )}
             >
               Player Decks ({decks.length})
@@ -621,7 +621,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
               onClick={() => setWalletSection("wallets")}
               className={cn(
                 "px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer",
-                walletSection === "wallets" ? "bg-white/10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
+                walletSection === "wallets" ? "bg-glass-w10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
               )}
             >
               Top Wallet Balances ({wallets.length})
@@ -631,7 +631,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
               onClick={() => setWalletSection("ledger")}
               className={cn(
                 "px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer",
-                walletSection === "ledger" ? "bg-white/10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
+                walletSection === "ledger" ? "bg-glass-w10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
               )}
             >
               Transaction Ledger ({ledger.length})

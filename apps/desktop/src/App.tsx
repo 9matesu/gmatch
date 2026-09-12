@@ -2795,7 +2795,7 @@ export default function Home() {
   const myPostTags = identity ? deriveProfileTags(serverPosts.filter(p => p.author_id === identity.orbitId), []) : []
 
   return (
-    <main id="main-content" className="h-[100dvh] max-h-[100dvh] min-h-0 w-full flex flex-col items-center justify-start relative overflow-hidden" style={{ background: '#080A0D' }}>
+    <main id="main-content" className="h-[100dvh] max-h-[100dvh] min-h-0 w-full flex flex-col items-center justify-start relative overflow-hidden" style={{ background: 'var(--color-retro-bg)' }}>
       <WallpaperBackground
         wallpaperBg={wallpaperBg}
         wallpaperFit={settings.wallpaperFit}
@@ -3567,7 +3567,7 @@ export default function Home() {
                     onClick={() => { playPress(900); setDmMinimized(false); }}
                     title="Expand Direct Messages"
                     aria-label="Expand Direct Messages"
-                    className="pointer-events-auto flex items-center gap-2.5 bg-black text-white pl-2 pr-4 py-2 rounded-full shadow-2xl border border-white/20 hover:bg-surface-canvas transition-colors cursor-pointer active:scale-95"
+                    className="pointer-events-auto flex items-center gap-2.5 bg-black text-white pl-2 pr-4 py-2 rounded-full shadow-2xl border border-border-strong hover:bg-surface-canvas transition-colors cursor-pointer active:scale-95"
                   >
                     <span className="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-500 via-teal-500 to-amber-500 p-[2px] shrink-0">
                       <span className="w-full h-full rounded-full bg-black overflow-hidden flex items-center justify-center text-xs font-bold text-white">
@@ -3589,7 +3589,7 @@ export default function Home() {
                       <span className="text-[10px] text-retro-muted">Tap to reopen</span>
                     </span>
                     {chatMessages.length > 0 && (
-                      <span className="w-2 h-2 rounded-full bg-[#e1306c] ring-2 ring-white shrink-0" />
+                      <span className="w-2 h-2 rounded-full bg-retro-accent ring-2 ring-retro-fg shrink-0" />
                     )}
                   </button>
                 </div>

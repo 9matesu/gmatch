@@ -322,7 +322,7 @@ export function ValuationSummary({
             type="button"
             onClick={onPlayAgain}
             disabled={submitting}
-            className="flex-1 py-2.5 text-xs font-bold uppercase tracking-wider bg-surface-interactive text-retro-fg hover:bg-white/15 rounded-lg transition-colors cursor-pointer disabled:opacity-50 shadow-md"
+            className="flex-1 py-2.5 text-xs font-bold uppercase tracking-wider bg-surface-interactive text-retro-fg hover:bg-glass-w12 rounded-lg transition-colors cursor-pointer disabled:opacity-50 shadow-md"
           >
             Play Next Duel
           </button>

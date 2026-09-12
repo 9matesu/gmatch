@@ -78,7 +78,7 @@ export function GMatchLoginPage({
   };
 
   return (
-    <div className="min-h-[100dvh] w-full text-retro-fg flex flex-col justify-between overflow-x-hidden font-sans select-none" style={{ background: '#080A0D' }}>
+    <div className="min-h-[100dvh] w-full text-retro-fg flex flex-col justify-between overflow-x-hidden font-sans select-none" style={{ background: 'var(--color-retro-bg)' }}>
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60" />
         <div className="absolute top-1/4 left-1/4 w-64 h-64 rounded-full bg-retro-accent/3 blur-3xl" />

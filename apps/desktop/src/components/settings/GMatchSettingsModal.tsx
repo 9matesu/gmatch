@@ -518,7 +518,7 @@ export function GMatchSettingsModal({
                   </div>
 
                   {/* Display Toggles */}
-                  <div className="space-y-3 pt-2 border-t border-border-glass divide-y divide-[#27272a]">
+                  <div className="space-y-3 pt-2 border-t border-border-glass divide-y divide-border-glass">
                     {([
                       {
                         label: 'Auto-Refresh Heartbeat Sync',

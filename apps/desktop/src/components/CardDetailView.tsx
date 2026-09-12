@@ -309,7 +309,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
           )}
 
           {isOwner && card.marketStatus !== 'cashed_out' && (
-            <div className="space-y-3 pt-3 border-t border-white/10">
+            <div className="space-y-3 pt-3 border-t border-border-glass">
               <div className="flex gap-3">
                 {card.marketStatus === 'none' && (
                   <button

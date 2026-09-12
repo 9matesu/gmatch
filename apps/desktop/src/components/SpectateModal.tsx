@@ -492,7 +492,7 @@ export function SpectateModal({
                           <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-surface-canvas relative overflow-hidden text-retro-muted">
                             <div className={`absolute inset-0 bg-gradient-to-br from-cyan-900/60 via-teal-900/40 to-cyan-900/50 blur-xl opacity-70 animate-pulse transition-all duration-300`} />
                             <div className="relative z-10 flex flex-col items-center gap-2 text-center">
-                              <div className="w-10 h-14 rounded-xl border border-white/20 bg-surface-raised/10 backdrop-blur-md flex items-center justify-center shadow-lg animate-bounce">
+                              <div className="w-10 h-14 rounded-xl border border-border-strong bg-surface-raised/10 backdrop-blur-md flex items-center justify-center shadow-lg animate-bounce">
                                 <Sparkles className="w-4 h-4 text-cyan-300 animate-spin" />
                               </div>
                               <span className="text-[10px] font-mono font-black text-purple-200 uppercase tracking-wider">
@@ -552,7 +552,7 @@ export function SpectateModal({
                           <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-surface-canvas relative overflow-hidden text-retro-muted">
                             <div className={`absolute inset-0 bg-gradient-to-br from-amber-900/60 via-orange-900/40 to-rose-900/50 blur-xl opacity-70 animate-pulse transition-all duration-300`} />
                             <div className="relative z-10 flex flex-col items-center gap-2 text-center">
-                              <div className="w-10 h-14 rounded-xl border border-white/20 bg-surface-raised/10 backdrop-blur-md flex items-center justify-center shadow-lg animate-bounce">
+                              <div className="w-10 h-14 rounded-xl border border-border-strong bg-surface-raised/10 backdrop-blur-md flex items-center justify-center shadow-lg animate-bounce">
                                 <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />
                               </div>
                               <span className="text-[10px] font-mono font-black text-amber-200 uppercase tracking-wider">

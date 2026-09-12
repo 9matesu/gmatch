@@ -244,7 +244,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
               onClick={() => setContentSection("posts")}
               className={cn(
                 "px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer",
-                contentSection === "posts" ? "bg-white/10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
+                contentSection === "posts" ? "bg-glass-w10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
               )}
             >
               Feed Posts ({postsTotal})
@@ -254,7 +254,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
               onClick={() => setContentSection("lobby")}
               className={cn(
                 "px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer",
-                contentSection === "lobby" ? "bg-white/10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
+                contentSection === "lobby" ? "bg-glass-w10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
               )}
             >
               Lobby Board Images ({lobbyImages.length})
@@ -320,7 +320,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                             <button
                               type="button"
                               onClick={() => { onAction("togglePostVisibility", post); setTimeout(fetchPosts, 300); }}
-                              className="px-2.5 py-1 text-xs font-semibold rounded border border-white/10 text-retro-muted hover:text-retro-fg cursor-pointer"
+                              className="px-2.5 py-1 text-xs font-semibold rounded border border-border-glass text-retro-muted hover:text-retro-fg cursor-pointer"
                             >
                               {isHidden ? "Unhide" : "Hide"}
                             </button>
@@ -390,7 +390,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
               onClick={() => setMatchSection("live")}
               className={cn(
                 "px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer",
-                matchSection === "live" ? "bg-white/10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
+                matchSection === "live" ? "bg-glass-w10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
               )}
             >
               Live Matches ({matches.length})
@@ -400,7 +400,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
               onClick={() => setMatchSection("archive")}
               className={cn(
                 "px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer",
-                matchSection === "archive" ? "bg-white/10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
+                matchSection === "archive" ? "bg-glass-w10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
               )}
             >
               Match Archive ({archiveTotal})
@@ -410,7 +410,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
               onClick={() => setMatchSection("tiers")}
               className={cn(
                 "px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer",
-                matchSection === "tiers" ? "bg-white/10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
+                matchSection === "tiers" ? "bg-glass-w10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
               )}
             >
               Tier Matches ({specialMatches.length})
@@ -617,7 +617,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                       <button
                         type="button"
                         onClick={() => { onAction("toggleAnnouncement", ann.id, !ann.is_active); setTimeout(fetchAnnouncements, 300); }}
-                        className="px-2 py-1 text-[10px] font-semibold rounded border border-white/10 text-retro-muted hover:text-retro-fg cursor-pointer"
+                        className="px-2 py-1 text-[10px] font-semibold rounded border border-border-glass text-retro-muted hover:text-retro-fg cursor-pointer"
                       >
                         {ann.is_active ? "Deactivate" : "Activate"}
                       </button>

@@ -169,7 +169,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                   {mediaList.map((_, idx) => (
                     <span
                       key={idx}
-                      className={`w-1.5 h-1.5 rounded-full transition-all ${idx === activeMediaIndex ? 'bg-white w-3' : 'bg-white/40'
+                      className={`w-1.5 h-1.5 rounded-full transition-all ${idx === activeMediaIndex ? 'bg-white w-3' : 'bg-glass-w20'
                         }`}
                     />
                   ))}

@@ -383,7 +383,7 @@ export function FollowersFollowingModal({
                         onStartPm({ id: user.id, display_name: user.display_name || undefined });
                       }}
                       title="Send Private Message"
-                      className="p-2 text-retro-muted hover:text-retro-fg rounded-xl hover:bg-white/15/80 transition-colors cursor-pointer"
+                      className="p-2 text-retro-muted hover:text-retro-fg rounded-xl hover:bg-glass-w12/80 transition-colors cursor-pointer"
                     >
                       <MessageCircle className="w-4 h-4" />
                     </button>

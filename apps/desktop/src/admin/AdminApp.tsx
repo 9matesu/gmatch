@@ -382,7 +382,7 @@ export default function AdminPageClient() {
   // Passcode gate view
   if (!pinVerified) {
     return (
-      <div className="min-h-screen bg-[#080A0D] text-retro-fg flex items-center justify-center p-4 font-sans">
+      <div className="min-h-screen bg-retro-bg text-retro-fg flex items-center justify-center p-4 font-sans">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60" />
           <div className="absolute top-1/4 left-1/4 w-48 h-48 rounded-full bg-retro-accent/3 blur-3xl" />

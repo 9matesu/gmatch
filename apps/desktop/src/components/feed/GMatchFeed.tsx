@@ -657,7 +657,7 @@ export function GMatchFeed({
                         <div className="text-center p-6 space-y-3 z-10">
                           <h3 className="text-xl font-black tracking-tight">{post.caption}</h3>
                           {post.players_playing && (
-                            <p className="text-xs text-white/80 font-mono">
+                            <p className="text-xs text-retro-body font-mono">
                               <Zap className="inline w-3 h-3" /> {post.players_playing.toLocaleString()} online
                             </p>
                           )}

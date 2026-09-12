@@ -44,7 +44,7 @@ export function PostOptionsModal({
       onClick={onClose}
     >
       <div
-        className="bg-surface-raised w-full max-w-sm rounded-xl border border-border-glass shadow-2xl overflow-hidden animate-orbit-slide-up divide-y divide-[#27272a] text-center text-xs font-semibold relative"
+        className="bg-surface-raised w-full max-w-sm rounded-xl border border-border-glass shadow-2xl overflow-hidden animate-orbit-slide-up divide-y divide-border-glass text-center text-xs font-semibold relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close button in top-right */}

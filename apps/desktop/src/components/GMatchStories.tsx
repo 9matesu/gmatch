@@ -501,7 +501,7 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
                   className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all cursor-pointer active:scale-80 shadow-md ${
                     likedStories.has(currentStory.id)
                       ? 'bg-cyan-500 border-cyan-500 text-white'
-                      : 'bg-surface-raised/10 hover:bg-surface-raised/20 border-white/20 text-white'
+                      : 'bg-surface-raised/10 hover:bg-surface-raised/20 border-border-strong text-white'
                   }`}
                   aria-label="Like story"
                 >
@@ -515,7 +515,7 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
                     playPress(880);
                     if (onStartPm) onStartPm({ id: activeGroup.userId, display_name: activeGroup.displayName });
                   }}
-                  className="h-10 px-5 rounded-full bg-surface-raised/10 hover:bg-surface-raised/20 border border-white/20 flex items-center justify-center gap-2 text-white transition-all cursor-pointer active:scale-95 shadow-md"
+                  className="h-10 px-5 rounded-full bg-surface-raised/10 hover:bg-surface-raised/20 border border-border-strong flex items-center justify-center gap-2 text-white transition-all cursor-pointer active:scale-95 shadow-md"
                   aria-label={`Message ${activeGroup.displayName}`}
                 >
                   <MessageCircle className="w-4 h-4" />

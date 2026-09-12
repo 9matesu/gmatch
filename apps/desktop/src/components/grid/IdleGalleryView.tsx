@@ -294,7 +294,7 @@ export default function IdleGalleryView({
                   setPage(0)
                 }}
                 className={`px-2.5 py-1 rounded-md cursor-pointer uppercase tracking-wider transition-colors ${
-                  typeFilter === t ? 'bg-white/14 text-retro-fg font-bold shadow-sm' : 'text-retro-muted hover:text-retro-body'
+                  typeFilter === t ? 'bg-glass-w12 text-retro-fg font-bold shadow-sm' : 'text-retro-muted hover:text-retro-body'
                 }`}
               >
                 {t}
@@ -322,7 +322,7 @@ export default function IdleGalleryView({
 
       {/* Batch Action Bar */}
       {selectedIds.size > 0 && (
-        <div className="glass-header px-4 py-2.5 flex items-center justify-between gap-3 text-xs animate-orbit-fade-in border-t border-white/10">
+        <div className="glass-header px-4 py-2.5 flex items-center justify-between gap-3 text-xs animate-orbit-fade-in border-t border-border-glass">
           <div className="flex items-center gap-2 text-retro-fg font-bold">
             <CheckSquare className="w-4 h-4 text-emerald-600" />
             <span>{selectedIds.size} images selected</span>
@@ -382,7 +382,7 @@ export default function IdleGalleryView({
               className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border cursor-pointer transition-colors ${
                 activeTags.has(t)
                   ? 'bg-glass-w20 border-retro-fg/70 text-retro-fg'
-                  : 'border-white/10 text-retro-muted hover:text-retro-body'
+                  : 'border-border-glass text-retro-muted hover:text-retro-body'
               }`}
             >
               {t} <span className="opacity-60">{n}</span>

@@ -177,7 +177,7 @@ export function GalleryView({
                     setGalleryPage(0)
                   }}
                   className={`px-2.5 py-1 rounded-md cursor-pointer uppercase tracking-wider transition-colors ${
-                    galleryFilter === t ? 'bg-white/14 text-retro-fg font-bold shadow-sm' : 'text-retro-muted hover:text-retro-body'
+                    galleryFilter === t ? 'bg-glass-w12 text-retro-fg font-bold shadow-sm' : 'text-retro-muted hover:text-retro-body'
                   }`}
                 >
                   {t}
@@ -220,7 +220,7 @@ export function GalleryView({
                   type="button"
                   onClick={() => { setCardTypeFilter(t); setGalleryPage(0) }}
                   className={`px-2.5 py-1 rounded-md cursor-pointer uppercase tracking-wider transition-colors ${
-                    cardTypeFilter === t ? 'bg-white/14 text-retro-fg font-bold shadow-sm' : 'text-retro-muted hover:text-retro-body'
+                    cardTypeFilter === t ? 'bg-glass-w12 text-retro-fg font-bold shadow-sm' : 'text-retro-muted hover:text-retro-body'
                   }`}
                 >
                   {t}
@@ -285,7 +285,7 @@ export function GalleryView({
           </div>
         )}
 
-        <div className="p-4 border-b border-white/10 bg-glass-w5 space-y-2">
+        <div className="p-4 border-b border-border-glass bg-glass-w5 space-y-2">
           <div className="flex items-center justify-between text-xs font-bold text-retro-body">
             <span className="flex items-center gap-1.5 text-retro-fg">
               <Layers className="w-4 h-4 text-retro-muted" />
@@ -326,7 +326,7 @@ export function GalleryView({
                   type="button"
                   onClick={() => toggleTag(t)}
                   aria-pressed={activeTags.has(t)}
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border cursor-pointer transition-colors ${activeTags.has(t) ? 'bg-glass-w20 border-retro-fg/70' : 'border-white/10 text-retro-muted hover:text-retro-body'}`}
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border cursor-pointer transition-colors ${activeTags.has(t) ? 'bg-glass-w20 border-retro-fg/70' : 'border-border-glass text-retro-muted hover:text-retro-body'}`}
                 >
                   {t} <span className="opacity-60">{n}</span>
                 </button>

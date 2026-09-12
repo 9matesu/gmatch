@@ -300,7 +300,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
 
   const critFlashEl = critFlash && (
     <div className="pointer-events-none absolute inset-0 z-[10] flex items-center justify-center bg-rose-500/15 backdrop-blur-[1px] animate-[gg-crit_0.35s_ease-out_forwards]">
-      <div className="flex items-center gap-2 rounded-xl border border-rose-500/60 bg-[#0b0e14]/90 px-6 py-2.5 font-mono text-xl font-black tracking-widest text-rose-400 shadow-[0_0_40px_rgba(244,63,94,0.4)]">
+      <div className="flex items-center gap-2 rounded-xl border border-rose-500/60 bg-retro-bg/90 px-6 py-2.5 font-mono text-xl font-black tracking-widest text-rose-400 shadow-[0_0_40px_rgba(244,63,94,0.4)]">
         <Lightning className="h-5 w-5 text-rose-400" weight="fill" />
         CRITICAL HIT!
       </div>
@@ -318,7 +318,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
       {/* Integrated panel toolbar: gallery + sources + fullscreen live here, never floating */}
       <div className="flex flex-none items-center justify-between gap-2 px-1 pt-0.5">
         <div
-          className="inline-flex flex-none items-center bg-[#131722]/90 border border-white/10 rounded-lg p-0.5 gap-0.5 shadow-inner"
+          className="inline-flex flex-none items-center bg-glass-w8 border border-border-glass rounded-lg p-0.5 gap-0.5 shadow-inner"
           role="group"
           aria-label="Feed layout"
         >
@@ -331,8 +331,8 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               key={mode}
               type="button"
               className={`${MONO} cursor-pointer rounded-md border-0 px-2.5 py-0.5 text-xs transition-all duration-150 ${active
-                ? 'bg-white/10 text-white shadow-sm font-bold'
-                : 'text-white/45 hover:text-white/80 hover:bg-white/5 font-medium'
+                ? 'bg-glass-w10 text-white shadow-sm font-bold'
+                : 'text-white/45 hover:text-retro-body hover:bg-glass-w5 font-medium'
                 }`}
               aria-pressed={active}
               onClick={() => setViewMode(mode)}
@@ -631,11 +631,11 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               </span>
             </button>
             {dropsOpen && (
-              <div className="absolute bottom-full left-0 z-30 mb-1.5 w-64 space-y-1.5 rounded-xl border border-white/10 bg-[#131722] p-2.5 shadow-2xl backdrop-blur-md">
+              <div className="absolute bottom-full left-0 z-30 mb-1.5 w-64 space-y-1.5 rounded-xl border border-border-glass bg-retro-panel p-2.5 shadow-2xl backdrop-blur-md">
                 {pendingDrops.slice(0, 4).map((drop) => (
-                  <div key={drop.id} className="rounded-lg border border-white/5 bg-[#0b0e14]/80 p-2">
+                  <div key={drop.id} className="rounded-lg border border-border-glass bg-retro-bg/80 p-2">
                     <div className="flex items-center justify-between gap-1">
-                      <span className={`${MONO} truncate text-[10px] font-bold text-white/50`}>
+                      <span className={`${MONO} truncate text-[10px] font-bold text-retro-muted`}>
                         from {drop.foeTitle}
                       </span>
                       <button
@@ -681,7 +681,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           </div>
         )}
         {isGrid ? (
-          <span className={`${MONO} text-xs font-medium text-white/60`}>
+          <span className={`${MONO} text-xs font-medium text-retro-muted`}>
             {grid.length}/{gridTarget} live{feedOffline ? ' · offline' : ''}
           </span>
         ) : inBattle ? (
@@ -692,7 +692,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                 style={{ width: `${hpPct}%` }}
               />
             </div>
-            <span className={`${MONO} whitespace-nowrap text-xs font-semibold text-white/60`}>
+            <span className={`${MONO} whitespace-nowrap text-xs font-semibold text-retro-muted`}>
               {formatNum(Math.ceil(foeHp))}/{formatNum(foeMaxHp)} <span className="text-[10px] text-white/40">HP</span>
             </span>
           </div>
@@ -723,7 +723,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           </button>
         )}
         <span
-          className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-white/10 bg-[#131722]/80 px-2.5 py-1 text-xs font-bold text-white/70 shadow-sm`}
+          className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border-glass bg-glass-w8 px-2.5 py-1 text-xs font-bold text-retro-body shadow-sm`}
           title="Lifetime KOs — each foe hits harder"
         >
           <Skull size={13} weight="bold" className="text-rose-400" />
@@ -733,7 +733,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
 
       {/* Thumb-sized compact bottom dock with [1] [2] [3] [4] keyboard triggers */}
       <div
-        className="flex flex-none items-center gap-2 overflow-x-auto rounded-xl border border-white/10 bg-[#131722]/90 p-1.5 backdrop-blur-md styled-scrollbar"
+        className="flex flex-none items-center gap-2 overflow-x-auto rounded-xl border border-border-glass bg-glass-w8 p-1.5 backdrop-blur-md styled-scrollbar"
         role="group"
         aria-label="Powerups dock"
       >
@@ -747,7 +747,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               type="button"
               className={`group relative flex flex-1 min-w-[125px] cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-all duration-150 enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${isLive
                 ? 'border-rose-500/50 bg-rose-500/10 shadow-[0_0_12px_rgba(244,63,94,0.15)] hover:border-rose-500/70 hover:bg-rose-500/15'
-                : 'border-white/5 bg-[#0b0e14]/60 hover:border-white/15 hover:bg-white/5'
+                : 'border-border-glass bg-retro-bg/60 hover:border-border-strong hover:bg-glass-w5'
                 }`}
               disabled={points < def.cost}
               onClick={() => popCap(id)}
@@ -767,9 +767,9 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                     </span>
                   )}
                 </div>
-                <div className="flex items-center justify-between gap-1 text-[10px] text-white/50 leading-tight">
+                <div className="flex items-center justify-between gap-1 text-[10px] text-retro-muted leading-tight">
                   <span className="truncate">{capEffectLabel(id)}</span>
-                  <span className={`${MONO} shrink-0 font-semibold text-white/70`}>{formatNum(def.cost)}</span>
+                  <span className={`${MONO} shrink-0 font-semibold text-retro-body`}>{formatNum(def.cost)}</span>
                 </div>
               </div>
             </button>

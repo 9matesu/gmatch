@@ -116,7 +116,7 @@ export function ExploreSearchModal({
               onChange={(e) => setQuery(e.target.value)}
               autoFocus
               placeholder="Search people, captions, tags..."
-              className="w-full bg-transparent focus:outline-none text-xs placeholder:text-[#8e8e8e]"
+              className="w-full bg-transparent focus:outline-none text-xs placeholder:text-retro-muted"
             />
             {query && (
               <button
@@ -239,7 +239,7 @@ export function ExploreSearchModal({
                       setQuery('#' + t);
                       toast?.(`Showing posts tagged #${t}`, 'info');
                     }}
-                    className="px-2.5 py-1 rounded-full bg-surface-interactive hover:bg-white/15 text-xs font-bold text-retro-body flex items-center gap-1 cursor-pointer transition-colors border border-border-glass"
+                    className="px-2.5 py-1 rounded-full bg-surface-interactive hover:bg-glass-w12 text-xs font-bold text-retro-body flex items-center gap-1 cursor-pointer transition-colors border border-border-glass"
                   >
                     <Hash className="w-3 h-3 text-retro-muted" />
                     {t}

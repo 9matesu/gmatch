@@ -678,7 +678,7 @@ export function BabecockPanel({
                       className="bg-black rounded-xl overflow-hidden w-full flex flex-col"
                       style={{ aspectRatio: `${cols} / ${rows}`, minHeight: 280, maxHeight: 'min(62vh, 560px)' }}
                     >
-                      <div className="text-[10px] uppercase font-bold text-retro-muted tracking-wider p-3 flex items-center justify-between border-b border-white/5">
+                      <div className="text-[10px] uppercase font-bold text-retro-muted tracking-wider p-3 flex items-center justify-between border-b border-border-glass">
                         <span>Grid ({cols}×{rows}, {n} images)</span>
                         {amHost && <span className="text-retro-muted text-[10px] flex items-center gap-1"><Move className="w-2.5 h-2.5" /> Drag to rearrange</span>}
                       </div>

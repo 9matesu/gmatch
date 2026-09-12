@@ -171,7 +171,7 @@ interface FooterSecondaryItem {
             >
               {item.id === 'profile' ? (
                 <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden flex items-center justify-center text-[10px] font-medium border shrink-0 transition-colors ${
-                  item.active ? 'border-retro-accent bg-glass-w10 text-retro-accent' : 'border-border-glass bg-glass-w8 text-retro-muted group-hover:border-white/24'
+                  item.active ? 'border-retro-accent bg-glass-w10 text-retro-accent' : 'border-border-glass bg-glass-w8 text-retro-muted group-hover:border-border-strong'
                 }`}>
                   {profilePic ? (
                     <img src={profilePic} alt="" className="w-full h-full object-cover" />

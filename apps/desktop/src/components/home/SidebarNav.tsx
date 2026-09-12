@@ -399,7 +399,7 @@ export function SidebarNav({
   return (
     <aside className={`desktop-sidebar glass-sidebar shrink-0 flex flex-col font-sans select-none h-full min-h-0 transition-[width] duration-150 ${collapsed ? 'w-[3.75rem]' : 'w-48'}`}>
       {/* Header: brand + collapse toggle */}
-      <div className="flex items-center justify-between gap-1 px-3 py-3 border-b border-white/10 shrink-0">
+      <div className="flex items-center justify-between gap-1 px-3 py-3 border-b border-border-glass shrink-0">
         {collapsed ? (
           // Collapsed rail is 60px: three history buttons + padding overflow it
           // and the expand toggle lands outside the visible box (dead click).
@@ -472,7 +472,7 @@ export function SidebarNav({
           )}
         </button>
 
-        <div className="border-t border-white/10 my-1" />
+        <div className="border-t border-border-glass my-1" />
 
         {orderedItems.map((item) => {
           if (isGroup(item)) {
@@ -521,7 +521,7 @@ export function SidebarNav({
                   )}
                 </div>
                 {expanded && !collapsed && (
-                  <div className="ml-4 pl-2 border-l border-white/10 space-y-0.5">
+                  <div className="ml-4 pl-2 border-l border-border-glass space-y-0.5">
                     {item.children.map((child) => {
                       const ChildIcon = child.icon;
                       return (
@@ -595,7 +595,7 @@ export function SidebarNav({
       )}
 
       {/* User panel: avatar + name, click to open profile */}
-      <div className="p-2 border-t border-white/10 shrink-0">
+      <div className="p-2 border-t border-border-glass shrink-0">
         <div className="flex items-center gap-1">
         <button
           type="button"
@@ -603,7 +603,7 @@ export function SidebarNav({
           className={`glass-nav-item ${mainView === 'profile' ? 'glass-nav-active' : ''} flex-1 min-w-0 flex items-center gap-2.5 px-2 py-1.5 rounded-md text-left cursor-pointer transition-all duration-150 active:scale-[0.96] border ${collapsed ? 'justify-center' : ''}`}
           aria-label="Open your profile"
         >
-          <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-xs font-medium border shrink-0 bg-glass-w5 border-white/10 text-retro-fg">
+          <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-xs font-medium border shrink-0 bg-glass-w5 border-border-glass text-retro-fg">
             {profilePic ? (
               <img src={profilePic} alt="" className="w-full h-full object-cover" />
             ) : (

@@ -395,7 +395,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
               onClick={() => setCommType("comments")}
               className={cn(
                 "px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer",
-                commType === "comments" ? "bg-white/10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
+                commType === "comments" ? "bg-glass-w10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
               )}
             >
               Lobby Comments ({comments.length})
@@ -405,7 +405,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
               onClick={() => setCommType("chat")}
               className={cn(
                 "px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer",
-                commType === "chat" ? "bg-white/10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
+                commType === "chat" ? "bg-glass-w10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
               )}
             >
               Chat Messages ({chatMessages.length})
@@ -433,7 +433,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                           <button
                             type="button"
                             onClick={() => { onAction("unhideComment", c.id); setTimeout(fetchComments, 300); }}
-                            className="px-2 py-1 text-[10px] font-semibold rounded border border-white/10 text-retro-muted hover:text-retro-fg cursor-pointer"
+                            className="px-2 py-1 text-[10px] font-semibold rounded border border-border-glass text-retro-muted hover:text-retro-fg cursor-pointer"
                           >
                             Unhide
                           </button>

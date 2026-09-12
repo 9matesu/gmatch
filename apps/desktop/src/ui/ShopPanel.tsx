@@ -51,7 +51,7 @@ function loadSavedTab(): ShopTab {
 
 /** Tag search / filter input — Cyber-Slate styling. */
 const TAG_INPUT =
-  'min-w-0 flex-1 rounded-xl border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-retro-fg outline-none placeholder:text-retro-muted focus:border-retro-accent/60 transition-colors font-mono'
+  'min-w-0 flex-1 rounded-xl border border-border-glass bg-black/40 px-3 py-1.5 text-xs text-retro-fg outline-none placeholder:text-retro-muted focus:border-retro-accent/60 transition-colors font-mono'
 
 function TagsTab() {
   const tags = useGame((s) => s.tags)
@@ -120,8 +120,8 @@ function TagsTab() {
             on
               ? 'border-retro-accent/50 bg-retro-accent/15 text-retro-fg shadow-[0_0_8px_rgba(56,139,253,0.15)]'
               : isOwned
-                ? 'border-white/10 bg-white/[0.03] text-retro-muted hover:text-white hover:border-white/20'
-                : 'border-dashed border-white/15 bg-transparent text-retro-muted hover:border-retro-accent/40 hover:text-retro-fg'
+                ? 'border-border-glass bg-glass-w5 text-retro-muted hover:text-retro-fg hover:border-border-strong'
+                : 'border-dashed border-border-strong bg-transparent text-retro-muted hover:border-retro-accent/40 hover:text-retro-fg'
           } ${!isOwned && !afford ? 'opacity-40' : ''} ${mergeSel === t.name ? 'ring-1 ring-retro-accent' : ''}`}
         >
           <span
@@ -129,10 +129,10 @@ function TagsTab() {
               on
                 ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]'
                 : isOwned
-                  ? 'bg-white/20'
+                  ? 'bg-glass-w20'
                   : afford
                     ? 'bg-retro-accent'
-                    : 'bg-white/20'
+                    : 'bg-glass-w20'
             }`}
             aria-hidden="true"
           />
@@ -163,7 +163,7 @@ function TagsTab() {
         <button
           type="button"
           onClick={() => { playPress(720); setSearchOpen((v) => !v); }}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] text-[11px] font-medium text-retro-muted hover:text-white transition-colors cursor-pointer"
+          className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-border-glass bg-glass-w5 hover:bg-glass-w10 text-[11px] font-medium text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
         >
           {searchOpen ? <X className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
           <span>{searchOpen ? 'Close' : 'Add Tag'}</span>
@@ -172,7 +172,7 @@ function TagsTab() {
 
       {/* Custom Tag Search Input Box */}
       {searchOpen && (
-        <div className="space-y-2 rounded-xl border border-white/[0.08] bg-black/40 p-2.5 shadow-inner">
+        <div className="space-y-2 rounded-xl border border-border-glass bg-black/40 p-2.5 shadow-inner">
           <div className="flex items-center gap-1.5">
             <input
               className={TAG_INPUT}
@@ -200,7 +200,7 @@ function TagsTab() {
               type="button"
               disabled={fetching}
               onClick={() => { playPress(700); void refreshTagMarket(); }}
-              className="p-1.5 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-retro-muted hover:text-white transition-colors cursor-pointer disabled:opacity-40"
+              className="p-1.5 rounded-xl border border-border-glass bg-glass-w5 hover:bg-glass-w10 text-retro-muted hover:text-retro-fg transition-colors cursor-pointer disabled:opacity-40"
               title="Refresh market offers"
             >
               <ArrowClockwise className="w-3.5 h-3.5" />
@@ -231,7 +231,7 @@ function TagsTab() {
 
       {/* Market Offers Section */}
       {marketTags.length > 0 && (
-        <div className="pt-2 border-t border-white/[0.06] space-y-1.5">
+        <div className="pt-2 border-t border-border-glass space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted flex items-center justify-between">
             <span>Market Discoveries ({marketTags.length})</span>
           </span>
@@ -273,16 +273,16 @@ function CapsTab() {
               className={`flex items-center justify-between gap-3 rounded-xl border p-2.5 transition-all duration-150 ${
                 st.count > 0
                   ? 'border-pink-500/30 bg-pink-500/[0.04] shadow-[0_0_12px_rgba(236,72,153,0.1)]'
-                  : 'border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12]'
+                  : 'border-border-glass bg-glass-w5 hover:border-border-strong'
               }`}
             >
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <div className="w-6 h-6 rounded-lg bg-black/50 border border-white/10 flex items-center justify-center font-mono text-[11px] font-bold text-retro-muted shrink-0">
+                <div className="w-6 h-6 rounded-lg bg-black/50 border border-border-glass flex items-center justify-center font-mono text-[11px] font-bold text-retro-muted shrink-0">
                   {idx + 1}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-white truncate">
+                    <span className="text-xs font-bold text-retro-fg truncate">
                       {def.name}
                     </span>
                     {st.count > 0 && (
@@ -302,7 +302,7 @@ function CapsTab() {
                 className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-bold transition-all cursor-pointer shrink-0 ${
                   afford
                     ? 'border-retro-accent/50 bg-retro-accent/20 text-retro-fg hover:bg-retro-accent/30 shadow-[0_0_8px_rgba(56,139,253,0.2)]'
-                    : 'border-white/[0.06] bg-white/[0.02] text-retro-muted opacity-40 cursor-not-allowed'
+                    : 'border-border-glass bg-glass-w5 text-retro-muted opacity-40 cursor-not-allowed'
                 }`}
                 disabled={!afford}
                 onClick={() => { playPress(800); popCap(id); }}
@@ -330,7 +330,7 @@ function PrestigeTab() {
   return (
     <div className="space-y-3">
       {/* Brainmelt Terminal Card */}
-      <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-b from-purple-950/20 to-black/40 p-3.5 space-y-3">
+      <div className="rounded-lg border border-border-glass bg-glass-w5 p-3.5 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-purple-300 font-bold text-xs">
             <Sparkle className="w-4 h-4 text-purple-400" weight="fill" />
@@ -346,7 +346,7 @@ function PrestigeTab() {
         </p>
 
         {/* Reset vs Keep Rules */}
-        <div className="grid grid-cols-2 gap-2 text-[10px] bg-black/40 rounded-xl p-2 border border-white/[0.04]">
+        <div className="grid grid-cols-2 gap-2 text-[10px] bg-black/40 rounded-xl p-2 border border-border-glass">
           <div className="space-y-1">
             <div className="font-bold text-rose-400 flex items-center gap-1">
               <WarningCircle className="w-3 h-3" /> Resets
@@ -369,8 +369,8 @@ function PrestigeTab() {
           type="button"
           className={`w-full py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold tracking-wider uppercase transition-all cursor-pointer ${
             ready
-              ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-[0_0_16px_rgba(244,63,94,0.4)]'
-              : 'border border-white/10 bg-white/[0.04] text-retro-muted opacity-40 cursor-not-allowed'
+              ? 'bg-rose-600 hover:bg-rose-500 text-retro-fg shadow-[0_0_16px_rgba(244,63,94,0.4)]'
+              : 'border border-border-glass bg-glass-w5 text-retro-muted opacity-40 cursor-not-allowed'
           }`}
           disabled={!ready}
           onClick={() => { playPress(900); brainmelt(); }}
@@ -394,7 +394,7 @@ function PrestigeTab() {
                 className={`flex items-center gap-2 rounded-xl border p-2 text-xs transition-colors ${
                   got
                     ? 'border-amber-500/30 bg-amber-500/[0.05] text-amber-200'
-                    : 'border-white/[0.04] bg-white/[0.02] text-retro-muted opacity-50'
+                    : 'border-border-glass bg-glass-w5 text-retro-muted opacity-50'
                 }`}
                 title={got ? 'Unlocked Trophy' : 'Locked Trophy'}
               >
@@ -431,7 +431,7 @@ export default function ShopPanel() {
   return (
     <aside className={`${PLATE} flex min-h-0 flex-1 flex-col p-3.5 space-y-3`}>
       {/* 3-Tab Segmented Switcher */}
-      <div className="flex items-center p-1 rounded-xl bg-black/50 border border-white/[0.06]" role="tablist">
+      <div className="flex items-center p-1 rounded-xl bg-black/50 border border-border-glass" role="tablist">
         <button
           type="button"
           role="tab"
@@ -439,14 +439,14 @@ export default function ShopPanel() {
           onClick={() => handleTab('tags')}
           className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
             tab === 'tags'
-              ? 'bg-white/[0.1] text-white shadow-sm'
+              ? 'bg-glass-w10 text-retro-fg shadow-sm'
               : 'text-retro-muted hover:text-retro-fg'
           }`}
         >
           <TagIcon className="w-3.5 h-3.5" />
           <span>Tags</span>
           {ownedTagsCount > 0 && (
-            <span className="font-mono text-[10px] px-1 rounded-full bg-white/[0.08] text-retro-fg">
+            <span className="font-mono text-[10px] px-1 rounded-full bg-glass-w10 text-retro-fg">
               {ownedTagsCount}
             </span>
           )}
@@ -459,7 +459,7 @@ export default function ShopPanel() {
           onClick={() => handleTab('caps')}
           className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
             tab === 'caps'
-              ? 'bg-white/[0.1] text-white shadow-sm'
+              ? 'bg-glass-w10 text-retro-fg shadow-sm'
               : 'text-retro-muted hover:text-retro-fg'
           }`}
         >
@@ -479,7 +479,7 @@ export default function ShopPanel() {
           onClick={() => handleTab('prestige')}
           className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
             tab === 'prestige'
-              ? 'bg-white/[0.1] text-white shadow-sm'
+              ? 'bg-glass-w10 text-retro-fg shadow-sm'
               : 'text-retro-muted hover:text-retro-fg'
           }`}
         >

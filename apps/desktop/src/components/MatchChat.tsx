@@ -100,7 +100,7 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
                         </div>
                       )}
                       <div className="break-words whitespace-pre-wrap leading-relaxed select-text cursor-text">{m.body}</div>
-                      <time className={`mt-1 block text-[10px] select-none ${mine ? 'text-white/60 text-right' : 'text-retro-muted'}`} dateTime={m.created_at}>
+                      <time className={`mt-1 block text-[10px] select-none ${mine ? 'text-retro-muted text-right' : 'text-retro-muted'}`} dateTime={m.created_at}>
                         {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </time>
                     </div>
