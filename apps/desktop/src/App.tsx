@@ -14,6 +14,7 @@ import { useToast } from "./components/Toast";
 import { useConfirm } from "./components/ConfirmDialog";
 import { usePlaytime, useCoffeeGate } from "./hooks/usePlaytime";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { userFacingError } from './utils/userError';
 import { ImageViewer } from "./components/ImageViewer";
 import { PasskeyManager } from "./components/PasskeyManager";
 import { IdleOverlay } from "./components/IdleOverlay";
@@ -1616,7 +1617,7 @@ export default function Home() {
       loadChatGroups()
       return true
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Could not add members', 'error')
+      toast(userFacingError(err, { fallback: 'Could not add members.' }), 'error')
       return false
     }
   }, [identity, loadChatGroups, toast])
@@ -1656,7 +1657,7 @@ export default function Home() {
       }
       loadGroupMessages(groupId)
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Could not send group message', 'error')
+      toast(userFacingError(err, { fallback: 'Could not send group message. The server is unreachable.' }), 'error')
     }
   }, [identity, loadGroupMessages, toast])
 
