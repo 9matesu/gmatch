@@ -215,7 +215,7 @@ export function CommandIsland({
         className="command-island fixed bottom-5 left-1/2 -translate-x-1/2 z-[var(--z-dropdown)] flex max-w-[calc(100vw-1.5rem)] items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full select-none transition-all duration-300 overflow-x-auto styled-scrollbar"
       >
         {/* Left Telemetry: $G Balance */}
-        <div className="flex items-center px-2.5 py-1 rounded-full bg-glass-w5 border border-border-glass text-[11px] font-mono tabular-nums text-retro-body shrink-0">
+        <div className="flex items-center px-2.5 py-1 rounded-full bg-glass-w5 border border-border-glass text-xs font-mono tabular-nums text-retro-body shrink-0">
           <span className="font-semibold text-retro-fg tracking-tight">
             ${Math.floor(balance).toLocaleString()}
           </span>
@@ -243,7 +243,7 @@ export function CommandIsland({
                 }`}
               >
                 <Icon className="w-4 h-4" weight={isActive ? 'fill' : 'regular'} />
-                <span className="text-[11px] font-medium hidden md:inline">
+                <span className="text-xs font-medium hidden md:inline">
                   {item.label}
                 </span>
               </button>
@@ -272,7 +272,7 @@ export function CommandIsland({
               className="w-4 h-4"
               weight={messagesOpen || mainView === 'messages' ? 'fill' : 'regular'}
             />
-            <span className="text-[11px] font-medium hidden md:inline">Chat</span>
+            <span className="text-xs font-medium hidden md:inline">Chat</span>
             {unreadMessagesCount > 0 && (
               <span className="w-2 h-2 rounded-full bg-retro-error ring-2 ring-retro-panel" />
             )}
@@ -302,7 +302,7 @@ export function CommandIsland({
                 <User className="w-3.5 h-3.5" weight={mainView === 'profile' ? 'fill' : 'regular'} />
               )}
             </div>
-            <span className="text-[11px] font-medium hidden md:inline">Profile</span>
+            <span className="text-xs font-medium hidden md:inline">Profile</span>
           </button>
         </div>
 
@@ -352,7 +352,7 @@ export function CommandIsland({
               }`}
             >
               <ShoppingBag className="w-3.5 h-3.5 text-retro-warning shrink-0" weight={mainView === 'store' ? 'fill' : 'regular'} />
-              <span className="text-[11px] hidden sm:inline">Store</span>
+              <span className="text-xs hidden sm:inline">Store</span>
             </button>
 
             {/* Servers */}
@@ -369,7 +369,7 @@ export function CommandIsland({
               }`}
             >
               <HardDrives className="w-3.5 h-3.5 text-retro-online shrink-0" weight={mainView === 'servers' ? 'fill' : 'regular'} />
-              <span className="text-[11px] hidden sm:inline">Servers</span>
+              <span className="text-xs hidden sm:inline">Servers</span>
             </button>
 
             {/* Domination */}
@@ -386,7 +386,7 @@ export function CommandIsland({
               }`}
             >
               <Monitor className="w-3.5 h-3.5 text-retro-info shrink-0" weight={mainView === 'pc_domination' ? 'fill' : 'regular'} />
-              <span className="text-[11px] hidden sm:inline">Domination</span>
+              <span className="text-xs hidden sm:inline">Domination</span>
             </button>
 
             {/* Rooms (conditional on courier active) */}
@@ -404,7 +404,7 @@ export function CommandIsland({
                 }`}
               >
                 <Users className="w-3.5 h-3.5 text-retro-muted shrink-0" weight={mainView === 'rooms' ? 'fill' : 'regular'} />
-                <span className="text-[11px] hidden sm:inline">Rooms</span>
+                <span className="text-xs hidden sm:inline">Rooms</span>
               </button>
             )}
 
@@ -420,7 +420,7 @@ export function CommandIsland({
               className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
             >
               <Bell className="w-3.5 h-3.5 text-retro-accent shrink-0" />
-              <span className="text-[11px] hidden sm:inline">Alerts</span>
+              <span className="text-xs hidden sm:inline">Alerts</span>
               {unreadNotificationsCount > 0 && (
                 <span className="w-1.5 h-1.5 rounded-full bg-retro-error ring-1 ring-retro-panel" />
               )}
@@ -438,7 +438,7 @@ export function CommandIsland({
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
             >
               <PaintBrush className="w-3.5 h-3.5 text-chrome-pink shrink-0" />
-              <span className="text-[11px] hidden sm:inline">Theme</span>
+              <span className="text-xs hidden sm:inline">Theme</span>
             </button>
 
             {/* Settings */}
@@ -453,7 +453,7 @@ export function CommandIsland({
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
             >
               <Gear className="w-3.5 h-3.5 text-retro-muted shrink-0" />
-              <span className="text-[11px] hidden sm:inline">Settings</span>
+              <span className="text-xs hidden sm:inline">Settings</span>
             </button>
 
             {/* Admin (conditional on admin flag) */}
@@ -474,7 +474,7 @@ export function CommandIsland({
                 }`}
               >
                 <ShieldCheck className="w-3.5 h-3.5 text-retro-error shrink-0" weight={mainView === 'admin' ? 'fill' : 'regular'} />
-                <span className="text-[11px] hidden sm:inline">Admin</span>
+                <span className="text-xs hidden sm:inline">Admin</span>
               </button>
             )}
 
@@ -493,7 +493,7 @@ export function CommandIsland({
                   className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-error/80 hover:text-retro-error hover:bg-retro-error/10 active:scale-95 transition-all"
                 >
                   <SignOut className="w-3.5 h-3.5 shrink-0" />
-                  <span className="text-[11px] hidden sm:inline">Logout</span>
+                  <span className="text-xs hidden sm:inline">Logout</span>
                 </button>
               </>
             )}

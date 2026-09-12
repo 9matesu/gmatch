@@ -192,7 +192,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                 {profilePics[r.id] ? (
                   <img src={profilePics[r.id]} alt="" className="w-4 h-4 rounded-full object-cover" />
                 ) : (
-                  <span className="w-4 h-4 rounded-full bg-glass-w10 flex items-center justify-center text-[8px]">{r.name.slice(0, 1).toUpperCase()}</span>
+                  <span className="w-4 h-4 rounded-full bg-glass-w10 flex items-center justify-center text-[10px]">{r.name.slice(0, 1).toUpperCase()}</span>
                 )}
                 <span className="max-w-[110px] truncate">{r.name}</span>
               </button>

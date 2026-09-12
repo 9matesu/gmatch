@@ -11,7 +11,7 @@ export default function OfflineModal() {
   return (
     <Modal title="Welcome back" onClose={collectOffline} maxWidth="max-w-md" dismissable={false}>
       <div className="flex flex-col gap-3.5">
-        <h2 className={`${DISPLAY} m-0 text-[22px] font-bold uppercase tracking-[1px] text-balance text-retro-fg`}>
+        <h2 className={`${DISPLAY} m-0 text-2xl font-bold uppercase tracking-[1px] text-balance text-retro-fg`}>
           Welcome back, degenerate
         </h2>
         <p className="m-0 text-xs leading-relaxed text-retro-muted">

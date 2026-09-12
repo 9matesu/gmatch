@@ -165,7 +165,7 @@ interface FooterSecondaryItem {
                     ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
                     : 'bg-transparent text-rose-400 hover:bg-rose-500/10 border-transparent'
                   : item.active
-                   ? 'glass-tab-active text-retro-accent-text border-transparent shadow-[0_0_12px_rgba(159,227,255,0.1)]'
+                   ? 'glass-tab-active text-retro-accent-text border-transparent'
                   : 'bg-transparent text-retro-muted hover:text-retro-fg hover:bg-glass-w5 border-transparent'
               }`}
             >
@@ -190,7 +190,7 @@ interface FooterSecondaryItem {
               </span>
 
               {Boolean(item.badge && item.badge > 0) && (
-                <span className="absolute top-1 right-2 sm:right-3 w-2 h-2 rounded-full bg-retro-accent shadow-[0_0_8px_rgba(159,227,255,0.4)]" />
+                <span className="absolute top-1 right-2 sm:right-3 w-2 h-2 rounded-full bg-retro-accent" />
               )}
             </button>
           );

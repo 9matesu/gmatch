@@ -72,7 +72,7 @@ export default function StatsPanel() {
             {formatNum(s.points)}
           </div>
         </div>
-        <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-glass-w8 text-retro-accent border border-border-glass">
+        <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-glass-w8 text-retro-accent border border-border-glass">
           PTS
         </span>
       </div>
@@ -125,7 +125,7 @@ export default function StatsPanel() {
       </div>
 
       {/* Cache Telemetry Bar */}
-      <div className="flex items-center justify-between gap-2 pt-1 border-t border-border-glass text-[11px] text-retro-muted">
+      <div className="flex items-center justify-between gap-2 pt-1 border-t border-border-glass text-xs text-retro-muted">
         <div className="flex items-center gap-1.5 truncate">
           <Images className="w-3.5 h-3.5 text-retro-muted shrink-0" />
           <span className="font-mono text-[10px]">

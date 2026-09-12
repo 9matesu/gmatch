@@ -586,7 +586,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xs font-bold uppercase tracking-wider text-retro-fg">Broadcast Banner Notices</h2>
-                <p className="text-[11px] text-retro-muted mt-0.5">Platform-wide alert banners shown at the top of player screens</p>
+                <p className="text-xs text-retro-muted mt-0.5">Platform-wide alert banners shown at the top of player screens</p>
               </div>
               <button
                 type="button"
@@ -639,7 +639,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
           <div className="rounded-xl border border-border-glass bg-surface-raised p-4 space-y-4">
             <div>
               <h2 className="text-xs font-bold uppercase tracking-wider text-retro-fg">Community Feedback & Suggestions</h2>
-              <p className="text-[11px] text-retro-muted mt-0.5">Submissions from player in-app recommendation forms</p>
+              <p className="text-xs text-retro-muted mt-0.5">Submissions from player in-app recommendation forms</p>
             </div>
 
             {recommendations.length === 0 ? (

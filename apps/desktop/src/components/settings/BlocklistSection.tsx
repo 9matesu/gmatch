@@ -431,13 +431,13 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-border-glass">
               <div>
                 <h4 className="text-xs font-semibold text-retro-fg">{CATEGORY_META[activeCategory].label}</h4>
-                <p className="text-[11px] text-retro-muted">{CATEGORY_META[activeCategory].desc}</p>
+                <p className="text-xs text-retro-muted">{CATEGORY_META[activeCategory].desc}</p>
               </div>
               {currentCategoryTags.length > 0 && (
                 <button
                   type="button"
                   onClick={clearCategory}
-                  className="text-[11px] text-red-400 hover:text-red-300 font-medium cursor-pointer self-start sm:self-auto"
+                  className="text-xs text-red-400 hover:text-red-300 font-medium cursor-pointer self-start sm:self-auto"
                 >
                   Clear All ({currentCategoryTags.length})
                 </button>

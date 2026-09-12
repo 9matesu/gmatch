@@ -593,13 +593,13 @@ export function GMatchDMs({
                   >
                     <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center font-medium text-xs">
                       {pfp ? <img src={pfp} alt="" className="w-full h-full object-cover" /> : name.charAt(0).toUpperCase()}
-                      {isUnread && <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-retro-accent shadow-[0_0_8px_rgba(159,227,255,0.4)]" />}
+                      {isUnread && <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-retro-accent" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1">
                         <span className={`text-xs truncate ${isUnread ? 'font-semibold text-retro-fg' : 'font-medium text-retro-body'}`}>{name}</span>
                         {isUnread ? (
-                          <span className="w-2 h-2 rounded-full bg-retro-accent shrink-0 shadow-[0_0_8px_rgba(159,227,255,0.4)]" />
+                          <span className="w-2 h-2 rounded-full bg-retro-accent shrink-0" />
                         ) : (
                           <span className="text-[10px] text-retro-muted shrink-0 tabular-nums">
                             {thread.last_created_at ? new Date(thread.last_created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}

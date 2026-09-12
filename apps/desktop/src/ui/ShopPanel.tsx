@@ -118,7 +118,7 @@ function TagsTab() {
           }
           className={`inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-all duration-150 ${
             on
-              ? 'border-retro-accent/50 bg-retro-accent/15 text-retro-fg shadow-[0_0_8px_rgba(56,139,253,0.15)]'
+              ? 'border-retro-accent/50 bg-retro-accent/15 text-retro-fg'
               : isOwned
                 ? 'border-border-glass bg-glass-w5 text-retro-muted hover:text-retro-fg hover:border-border-strong'
                 : 'border-dashed border-border-strong bg-transparent text-retro-muted hover:border-retro-accent/40 hover:text-retro-fg'
@@ -127,7 +127,7 @@ function TagsTab() {
           <span
             className={`h-1.5 w-1.5 shrink-0 rounded-full transition-colors ${
               on
-                ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]'
+                ? 'bg-emerald-400'
                 : isOwned
                   ? 'bg-glass-w20'
                   : afford
@@ -157,13 +157,13 @@ function TagsTab() {
     <div className="space-y-3">
       {/* Top action bar: count & toggle search drawer */}
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-retro-muted">
+        <span className="text-xs font-bold uppercase tracking-wider text-retro-muted">
           Active Tags ({owned})
         </span>
         <button
           type="button"
           onClick={() => { playPress(720); setSearchOpen((v) => !v); }}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-border-glass bg-glass-w5 hover:bg-glass-w10 text-[11px] font-medium text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
+          className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-border-glass bg-glass-w5 hover:bg-glass-w10 text-xs font-medium text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
         >
           {searchOpen ? <X className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
           <span>{searchOpen ? 'Close' : 'Add Tag'}</span>
@@ -206,7 +206,7 @@ function TagsTab() {
               <ArrowClockwise className="w-3.5 h-3.5" />
             </button>
           </div>
-          {note && <div className="text-[11px] text-retro-muted px-1">{note}</div>}
+          {note && <div className="text-xs text-retro-muted px-1">{note}</div>}
         </div>
       )}
 
@@ -253,7 +253,7 @@ function CapsTab() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-retro-muted">
+        <span className="text-xs font-bold uppercase tracking-wider text-retro-muted">
           Permanent Overclocks
         </span>
         <span className="text-[10px] font-mono text-retro-muted">
@@ -272,12 +272,12 @@ function CapsTab() {
               key={id}
               className={`flex items-center justify-between gap-3 rounded-xl border p-2.5 transition-all duration-150 ${
                 st.count > 0
-                  ? 'border-pink-500/30 bg-pink-500/[0.04] shadow-[0_0_12px_rgba(236,72,153,0.1)]'
+                  ? 'border-pink-500/30 bg-pink-500/[0.04]'
                   : 'border-border-glass bg-glass-w5 hover:border-border-strong'
               }`}
             >
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <div className="w-6 h-6 rounded-lg bg-black/50 border border-border-glass flex items-center justify-center font-mono text-[11px] font-bold text-retro-muted shrink-0">
+                <div className="w-6 h-6 rounded-lg bg-black/50 border border-border-glass flex items-center justify-center font-mono text-xs font-bold text-retro-muted shrink-0">
                   {idx + 1}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -301,7 +301,7 @@ function CapsTab() {
                 type="button"
                 className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-bold transition-all cursor-pointer shrink-0 ${
                   afford
-                    ? 'border-retro-accent/50 bg-retro-accent/20 text-retro-fg hover:bg-retro-accent/30 shadow-[0_0_8px_rgba(56,139,253,0.2)]'
+                    ? 'border-retro-accent/50 bg-retro-accent/20 text-retro-fg hover:bg-retro-accent/30'
                     : 'border-border-glass bg-glass-w5 text-retro-muted opacity-40 cursor-not-allowed'
                 }`}
                 disabled={!afford}
@@ -341,7 +341,7 @@ function PrestigeTab() {
           </span>
         </div>
 
-        <p className="text-[11px] text-retro-muted leading-relaxed">
+        <p className="text-xs text-retro-muted leading-relaxed">
           Brainmelt burns your current run to forge permanent Corruption Shards — each granting <b className="text-white">+10% passive multiplier</b> across all future runs.
         </p>
 
@@ -369,7 +369,7 @@ function PrestigeTab() {
           type="button"
           className={`w-full py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold tracking-wider uppercase transition-all cursor-pointer ${
             ready
-              ? 'bg-rose-600 hover:bg-rose-500 text-retro-fg shadow-[0_0_16px_rgba(244,63,94,0.4)]'
+              ? 'bg-rose-600 hover:bg-rose-500 text-retro-fg'
               : 'border border-border-glass bg-glass-w5 text-retro-muted opacity-40 cursor-not-allowed'
           }`}
           disabled={!ready}
@@ -399,7 +399,7 @@ function PrestigeTab() {
                 title={got ? 'Unlocked Trophy' : 'Locked Trophy'}
               >
                 <Trophy className={`w-3.5 h-3.5 shrink-0 ${got ? 'text-amber-400' : 'text-retro-muted'}`} weight={got ? 'fill' : 'regular'} />
-                <span className="truncate text-[11px] font-medium">{a.name}</span>
+                <span className="truncate text-xs font-medium">{a.name}</span>
               </div>
             )
           })}

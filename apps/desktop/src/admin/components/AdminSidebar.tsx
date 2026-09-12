@@ -49,7 +49,7 @@ export function AdminSidebar({
     >
       <div className="p-4 border-b border-border-glass flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-retro-accent shadow-[0_0_8px_rgba(159,227,255,0.4)]" />
+          <span className="w-2.5 h-2.5 rounded-full bg-retro-accent" />
           <div className="min-w-0">
             <div className="text-xs font-black tracking-tight text-retro-fg uppercase truncate">gMatch Admin</div>
             <div className="text-[10px] font-mono text-retro-muted">Moderation Console</div>

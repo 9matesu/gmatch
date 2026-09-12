@@ -278,20 +278,20 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                 <span className="font-mono text-retro-fg">{report.target_type}:{report.target_id}</span>
               </div>
               {caseDetail[report.id]?.reported_user && (
-                <div className="p-2 rounded bg-surface-canvas border border-border-glass text-[11px]">
+                <div className="p-2 rounded bg-surface-canvas border border-border-glass text-xs">
                   <span className="text-retro-muted uppercase tracking-wider font-bold">Reported Account:</span>{" "}
                   <span className="text-retro-fg font-semibold">{caseDetail[report.id].reported_user.display_name}</span>{" "}
                   <span className="text-retro-muted font-mono">({caseDetail[report.id].reported_user.id.slice(0, 10)})</span>
                 </div>
               )}
               {report.reason && (
-                <div className="p-2 rounded bg-surface-canvas border border-border-glass text-[11px]">
+                <div className="p-2 rounded bg-surface-canvas border border-border-glass text-xs">
                   <span className="text-retro-muted uppercase tracking-wider font-bold">Reason:</span>{" "}
                   <span className="text-retro-fg">{report.reason}</span>
                 </div>
               )}
               {caseDetail[report.id]?.target?.caption && (
-                <div className="p-2 rounded bg-surface-canvas border border-border-glass text-[11px]">
+                <div className="p-2 rounded bg-surface-canvas border border-border-glass text-xs">
                   <span className="text-retro-muted uppercase tracking-wider font-bold">Content Text:</span>{" "}
                   <span className="text-retro-fg">{caseDetail[report.id].target.caption}</span>
                 </div>

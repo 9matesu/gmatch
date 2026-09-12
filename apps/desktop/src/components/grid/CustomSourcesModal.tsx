@@ -66,7 +66,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
         <div className="flex items-center justify-between gap-3 border-b border-border-glass p-4 bg-glass-w5">
           <div>
             <h2 className="text-sm font-bold text-white tracking-wide">Custom image sources</h2>
-            <p className="text-[11px] text-retro-muted mt-0.5">Tried before built-in feeds. Used as-is — only add trusted sources.</p>
+            <p className="text-xs text-retro-muted mt-0.5">Tried before built-in feeds. Used as-is — only add trusted sources.</p>
           </div>
           <button
             type="button"
@@ -103,7 +103,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
               </button>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-xs font-bold text-white">{s.label}</div>
-                <div className="truncate text-[11px] text-white/40 flex items-center gap-1 mt-0.5">
+                <div className="truncate text-xs text-white/40 flex items-center gap-1 mt-0.5">
                   {s.kind === 'folder' ? (
                     <>
                       <FolderSimple size={12} weight="bold" className="text-retro-accent" />
@@ -149,7 +149,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
               className="w-full rounded-lg border border-border-glass bg-retro-bg px-3 py-2 text-xs text-white outline-none placeholder:text-retro-faint focus:border-retro-accent/60 transition-colors"
             />
             <div className="flex items-center justify-between gap-2 pt-1">
-              <span className={`${MONO} text-[11px] text-white/40`}>{usable.length} of {pasted.length} usable</span>
+              <span className={`${MONO} text-xs text-white/40`}>{usable.length} of {pasted.length} usable</span>
               <button
                 type="button"
                 onClick={submitUrls}
@@ -168,7 +168,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
               Add a local folder
             </div>
             {!canPickFolder && (
-              <p className="text-[11px] text-white/40">Folder sources need the desktop app — links work everywhere.</p>
+              <p className="text-xs text-white/40">Folder sources need the desktop app — links work everywhere.</p>
             )}
             <button
               type="button"

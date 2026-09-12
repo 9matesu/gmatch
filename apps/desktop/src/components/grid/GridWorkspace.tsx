@@ -210,7 +210,7 @@ export default function GridWorkspace({
                   <h3 className="text-sm font-bold text-white tracking-wide uppercase">
                     Drained Foes Gallery
                   </h3>
-                  <p className="text-[11px] text-white/40">Collected keepsake archive & cards</p>
+                  <p className="text-xs text-white/40">Collected keepsake archive & cards</p>
                 </div>
               </div>
               <button
