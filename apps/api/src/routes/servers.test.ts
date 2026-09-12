@@ -60,8 +60,9 @@ describe('Server directory API', () => {
     const counted = list.servers.find((s) => s.name === 'Counted Node')
     expect(counted?.user_count).toBe(42)
     expect(counted?.online_count).toBe(7)
-    // owner_name is host-reported display metadata, clamped to 40
-    expect(counted?.owner_name).toBe('x'.repeat(40))
+    // owner_name is stored (clamped to 40 in POST) but NEVER listed — the
+    // public browser shows servers, not admins.
+    expect(counted?.owner_name).toBeUndefined()
     const junked = list.servers.find((s) => s.name === 'Junk Counts')
     expect(junked?.user_count).toBeNull()
     expect(junked?.online_count).toBeNull()
@@ -140,6 +141,41 @@ describe('Server directory API', () => {
     expect(body.server.name).toBe('Renamed Node')
     expect(body.server.description).toBe('new')
     expect(body.server.id).toBe(id)
+  })
+
+  it('private servers are listed only to their owner; owner_name never listed; flag survives heartbeat', async () => {
+    const created = await register(env, owner, { name: 'Hidden Realm', endpoint_hint: 'secret.host:8790', private: true })
+    expect(created.status).toBe(201)
+    const row = (await created.json()) as { server: { id: string; is_private: number } }
+    expect(row.server.is_private).toBe(1)
+
+    // anonymous and other authed callers never see the row at all
+    const anon = (await (await app.request('/api/servers', {}, env)).json()) as { servers: Array<{ id: string }> }
+    expect(anon.servers.some((s) => s.id === row.server.id)).toBe(false)
+    const otherList = (await (await app.request('/api/servers', { headers: headers(other, 'GET', '/api/servers') }, env)).json()) as { servers: Array<{ id: string }> }
+    expect(otherList.servers.some((s) => s.id === row.server.id)).toBe(false)
+
+    // the owner sees their own private row
+    const ownList = (await (await app.request('/api/servers', { headers: headers(owner, 'GET', '/api/servers') }, env)).json()) as { servers: Array<{ id: string; name?: string }> }
+    expect(ownList.servers.find((s) => s.id === row.server.id)?.name).toBe('Hidden Realm')
+
+    // owner_name is NEVER a listed column (the browser shows handles, not admins)
+    expect(JSON.stringify(anon.servers)).not.toContain('owner_name')
+    expect('owner_name' in ownList.servers[0]).toBe(false)
+
+    // heartbeat replay WITHOUT the flag must not flip it back to public
+    await register(env, owner, { name: 'Hidden Realm' })
+    const after = (await (await app.request('/api/servers', { headers: headers(owner, 'GET', '/api/servers') }, env)).json()) as { servers: Array<{ id: string; is_private: number }> }
+    expect(after.servers.find((s) => s.id === row.server.id)?.is_private).toBe(1)
+
+    // owner flips it back to public via PATCH
+    await app.request(`/api/servers/${row.server.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...headers(owner, 'PATCH', `/api/servers/${row.server.id}`, JSON.stringify({ private: false })) },
+      body: JSON.stringify({ private: false }),
+    }, env)
+    const pub = (await (await app.request('/api/servers', { headers: headers(other, 'GET', '/api/servers') }, env)).json()) as { servers: Array<{ id: string }> }
+    expect(pub.servers.some((s) => s.id === row.server.id)).toBe(true)
   })
 })
 

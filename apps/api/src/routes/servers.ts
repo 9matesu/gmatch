@@ -70,15 +70,18 @@ function validHint(hint: string): boolean {
 }
 
 servers.get('/', softAuth, async (c) => {
+  const viewer = c.get('orbitId') || ''
   const { results } = await c.env.DB.prepare(
-    `SELECT id, name, description, owner_id, owner_name, password_required, endpoint_hint, user_count, online_count, created_at, last_seen
+    `SELECT id, name, description, owner_id, password_required, endpoint_hint, user_count, online_count, is_private, created_at, last_seen
      FROM ServerDirectory
      WHERE last_seen >= datetime('now', ?)
        AND COALESCE(hidden, 0) = 0 AND COALESCE(blocked, 0) = 0
+       AND (COALESCE(is_private, 0) = 0 OR owner_id = ?)
      ORDER BY last_seen DESC LIMIT 100`,
-  ).bind(`-${STALE_MS / 1000} seconds`).all<Record<string, unknown>>()
+  ).bind(`-${STALE_MS / 1000} seconds`, viewer).all<Record<string, unknown>>()
   // Host addresses go to signed-in callers only (anti-scraper, anti-mapping):
   // anonymous directory browsers see name/description, never coordinates.
+  // owner_name is NEVER listed — the browser shows the server, not the admin.
   const authed = !!c.get('orbitId')
   return c.json({ servers: (results || []).map((r) => (authed ? r : { ...r, endpoint_hint: undefined })) })
 })
@@ -93,6 +96,9 @@ servers.post('/', orbitAuth, async (c) => {
   let userCount: number | null = null
   let onlineCount: number | null = null
   let ownerName = ''
+  // Owner privacy: true/false sets it; absent (heartbeat replay) preserves the
+  // stored value — an unflagged replay must never make a private server public.
+  let priv: 0 | 1 | null = null
   try {
     const body = await c.req.json()
     if (typeof body?.name === 'string') name = body.name.trim().slice(0, MAX_NAME)
@@ -108,6 +114,8 @@ servers.post('/', orbitAuth, async (c) => {
     // Host-reported display handle for the row (share flows); clamped, same
     // best-effort class as the counts. Absent never erases a known name.
     if (typeof body?.owner_name === 'string') ownerName = body.owner_name.trim().slice(0, 40)
+    if (body?.private === true) priv = 1
+    if (body?.private === false) priv = 0
   } catch {
     return c.json({ error: 'invalid json' }, 400)
   }
@@ -120,17 +128,18 @@ servers.post('/', orbitAuth, async (c) => {
   if (!mine && (existing?.n ?? 0) >= MAX_PER_OWNER) return c.json({ error: `max ${MAX_PER_OWNER} servers per owner` }, 429)
 
   await c.env.DB.prepare(`
-    INSERT INTO ServerDirectory (id, name, description, owner_id, owner_pubkey, owner_name, endpoint_hint, password_required, user_count, online_count, created_at, last_seen)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    INSERT INTO ServerDirectory (id, name, description, owner_id, owner_pubkey, owner_name, endpoint_hint, password_required, user_count, online_count, is_private, created_at, last_seen)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, 0), datetime('now'), datetime('now'))
     ON CONFLICT(id) DO UPDATE SET description = excluded.description, endpoint_hint = excluded.endpoint_hint,
       password_required = excluded.password_required,
       owner_name = COALESCE(excluded.owner_name, ServerDirectory.owner_name),
       user_count = COALESCE(excluded.user_count, ServerDirectory.user_count),
       online_count = COALESCE(excluded.online_count, ServerDirectory.online_count),
+      is_private = COALESCE(?, ServerDirectory.is_private),
       last_seen = datetime('now')
-  `).bind(id, name, description, orbitId, ownerPub, ownerName || null, endpointHint, passwordRequired, userCount, onlineCount).run()
+  `).bind(id, name, description, orbitId, ownerPub, ownerName || null, endpointHint, passwordRequired, userCount, onlineCount, priv, priv).run()
 
-  const row = await c.env.DB.prepare('SELECT id, name, description, owner_id, owner_name, password_required, created_at FROM ServerDirectory WHERE id = ?').bind(id).first()
+  const row = await c.env.DB.prepare('SELECT id, name, description, owner_id, owner_name, password_required, is_private, created_at FROM ServerDirectory WHERE id = ?').bind(id).first()
   return c.json({ server: row }, 201)
 })
 
@@ -197,25 +206,26 @@ servers.patch('/:id', orbitAuth, async (c) => {
   try { body = (await c.req.json()) as Record<string, unknown> } catch { return c.json({ error: 'invalid json' }, 400) }
 
   const current = await c.env.DB.prepare(
-    'SELECT name, description, endpoint_hint, password_required FROM ServerDirectory WHERE id = ?',
-  ).bind(id).first<{ name: string; description: string; endpoint_hint: string; password_required: number }>()
+    'SELECT name, description, endpoint_hint, password_required, is_private FROM ServerDirectory WHERE id = ?',
+  ).bind(id).first<{ name: string; description: string; endpoint_hint: string; password_required: number; is_private: number }>()
   if (!current) return c.json({ error: 'not found' }, 404)
 
   const name = typeof body.name === 'string' ? body.name.trim().slice(0, MAX_NAME) : current.name
   const description = typeof body.description === 'string' ? body.description.trim().slice(0, MAX_DESC) : current.description
   const endpointHint = typeof body.endpoint_hint === 'string' ? body.endpoint_hint.trim().slice(0, MAX_HINT) : current.endpoint_hint
   const passwordRequired = typeof body.password_required === 'boolean' ? (body.password_required ? 1 : 0) : current.password_required
+  const isPrivate = typeof body.private === 'boolean' ? (body.private ? 1 : 0) : current.is_private
   if (!name) return c.json({ error: 'name is required' }, 400)
   if (!validHint(endpointHint)) return c.json({ error: 'endpoint_hint must be host:port or an http(s) origin' }, 400)
 
   await c.env.DB.prepare(`
     UPDATE ServerDirectory
-    SET name = ?, description = ?, endpoint_hint = ?, password_required = ?, updated_at = datetime('now'), last_seen = datetime('now')
+    SET name = ?, description = ?, endpoint_hint = ?, password_required = ?, is_private = ?, updated_at = datetime('now'), last_seen = datetime('now')
     WHERE id = ? AND owner_id = ?
-  `).bind(name, description, endpointHint, passwordRequired, id, orbitId).run()
+  `).bind(name, description, endpointHint, passwordRequired, isPrivate, id, orbitId).run()
 
   const updated = await c.env.DB.prepare(
-    'SELECT id, name, description, owner_id, password_required, endpoint_hint, created_at, last_seen, updated_at FROM ServerDirectory WHERE id = ?',
+    'SELECT id, name, description, owner_id, password_required, is_private, endpoint_hint, created_at, last_seen, updated_at FROM ServerDirectory WHERE id = ?',
   ).bind(id).first()
   return c.json({ server: updated })
 })
