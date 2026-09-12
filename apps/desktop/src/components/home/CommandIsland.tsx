@@ -2,26 +2,26 @@
 
 import React, { useState } from 'react';
 import {
-  House,
-  SquaresFour,
-  Sword,
-  Cards,
-  ChatCircleText,
+  Home,
+  LayoutGrid,
+  Swords,
+  Layers,
+  MessageSquare,
   Plus,
-  GameController,
-  DotsThree,
-  Gear,
+  Gamepad2,
+  MoreHorizontal,
+  Settings,
   ShoppingBag,
-  HardDrives,
+  HardDrive,
   ShieldCheck,
-  SignOut,
-  PaintBrush,
+  LogOut,
+  Palette,
   Monitor,
   Users,
   User,
   Bell,
   X,
-} from '@phosphor-icons/react';
+} from 'lucide-react';
 import { playPress } from '../../utils/sounds';
 import type { MainViewType } from './HomeFooter';
 
@@ -82,28 +82,28 @@ export function CommandIsland({
     {
       id: 'feed' as MainViewType,
       label: 'Feed',
-      icon: House,
+      icon: Home,
       active: mainView === 'feed',
       badge: 0,
     },
     {
       id: 'grid' as MainViewType,
       label: 'Grid',
-      icon: SquaresFour,
+      icon: LayoutGrid,
       active: mainView === 'grid',
       badge: 0,
     },
     {
       id: 'games' as MainViewType,
       label: 'Arena',
-      icon: Sword,
+      icon: Swords,
       active: mainView === 'games' || mainView === 'game',
       badge: 0,
     },
     {
       id: 'gallery' as MainViewType,
       label: 'Vault',
-      icon: Cards,
+      icon: Layers,
       active: mainView === 'gallery',
       badge: 0,
     },
@@ -123,7 +123,7 @@ export function CommandIsland({
           title="Create Post"
           aria-label="Create Post"
         >
-          <Plus className="w-3.5 h-3.5" weight="bold" />
+          <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
           <span className="hidden sm:inline">Post</span>
         </button>
       );
@@ -141,7 +141,7 @@ export function CommandIsland({
           title="Forge Card"
           aria-label="Forge Card"
         >
-          <Plus className="w-3.5 h-3.5" weight="bold" />
+          <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
           <span className="hidden sm:inline">Forge</span>
         </button>
       );
@@ -159,7 +159,7 @@ export function CommandIsland({
           title="Quick Match"
           aria-label="Quick Match"
         >
-          <GameController className="w-3.5 h-3.5" weight="fill" />
+          <Gamepad2 className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">Play</span>
         </button>
       );
@@ -260,7 +260,7 @@ export function CommandIsland({
                   }}
                   className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] active:scale-95 transition-all text-xs text-retro-body hover:text-white"
                 >
-                  <HardDrives className="w-4 h-4 text-[#3fb950]" />
+                  <HardDrive className="w-4 h-4 text-[#3fb950]" />
                   <span>Servers</span>
                 </button>
 
@@ -301,7 +301,7 @@ export function CommandIsland({
                   }}
                   className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] active:scale-95 transition-all text-xs text-retro-body hover:text-white"
                 >
-                  <PaintBrush className="w-4 h-4 text-[#f472b6]" />
+                  <Palette className="w-4 h-4 text-[#f472b6]" />
                   <span>Wallpaper</span>
                 </button>
 
@@ -314,7 +314,7 @@ export function CommandIsland({
                   }}
                   className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] active:scale-95 transition-all text-xs text-retro-body hover:text-white"
                 >
-                  <Gear className="w-4 h-4 text-retro-muted" />
+                  <Settings className="w-4 h-4 text-retro-muted" />
                   <span>Settings</span>
                 </button>
 
@@ -344,7 +344,7 @@ export function CommandIsland({
                   }}
                   className="w-full mt-3 pt-3 border-t border-white/8 flex items-center justify-center gap-2 text-xs font-medium text-[#f85149] hover:text-[#ff7b72] transition-colors"
                 >
-                  <SignOut className="w-3.5 h-3.5" />
+                  <LogOut className="w-3.5 h-3.5" />
                   <span>Log out</span>
                 </button>
               )}
@@ -392,7 +392,7 @@ export function CommandIsland({
                     : 'text-retro-muted hover:text-white hover:bg-white/[0.06] active:scale-95'
                 }`}
               >
-                <Icon className="w-4 h-4" weight={isActive ? 'fill' : 'regular'} />
+                <Icon className="w-4 h-4" strokeWidth={isActive ? 2.75 : 1.75} />
                 <span className="text-[11px] font-medium hidden md:inline">
                   {item.label}
                 </span>
@@ -418,9 +418,9 @@ export function CommandIsland({
                 : 'text-retro-muted hover:text-white hover:bg-white/[0.06] active:scale-95'
             }`}
           >
-            <ChatCircleText
+            <MessageSquare
               className="w-4 h-4"
-              weight={messagesOpen || mainView === 'messages' ? 'fill' : 'regular'}
+              strokeWidth={messagesOpen || mainView === 'messages' ? 2.75 : 1.75}
             />
             <span className="text-[11px] font-medium hidden md:inline">Chat</span>
             {unreadMessagesCount > 0 && (
@@ -445,7 +445,7 @@ export function CommandIsland({
             aria-label="More options"
             className="p-1.5 rounded-full text-retro-muted hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all"
           >
-            <DotsThree className="w-4 h-4" weight="bold" />
+            <MoreHorizontal className="w-4 h-4" />
           </button>
         </div>
       </nav>
