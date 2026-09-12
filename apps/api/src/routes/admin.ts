@@ -11,7 +11,7 @@ import { runPeriodicMaintenance } from '../cleanup'
 import { broadcastToRoom } from '../ws-bus'
 import { parseTags, clampCashoutRateBps, type GameMatch } from '@orbit/shared'
 import { logAdminAction } from '../admin-audit'
-import { decryptText } from '../crypto'
+import { decryptText, createSignedObjectToken } from '../crypto'
 import { getBotConfig, saveBotConfig, testBotApi, refreshBotImageCache, getBotProfiles, saveBotProfile, deleteBotProfile, generateBotPicture } from '../bot-image-api'
 import { validateProviderUrl } from '../bots/provider-pool'
 import { listLootboxes, getLootbox, normalizeTags, normalizeDrawConfig, stateTransition, isValidState, type LootboxState } from '../lootboxes/service'
@@ -1069,7 +1069,9 @@ admin.get('/objects', async (c) => {
   const sort = param('sort') || 'created_at'
   const order = param('order').toLowerCase() === 'asc' ? 'ASC' : 'DESC'
 
-  const where: string[] = []
+  // Denunciation protocol: the object browser is for PUBLIC surfaces only.
+  // Private objects (DM attachments, drafts) are never enumerable by admins.
+  const where: string[] = ['o.is_public = 1']
   const params: unknown[] = []
   if (q) {
     where.push(`(o.caption LIKE ? OR o.id LIKE ? OR u.display_name LIKE ?)`)
@@ -1124,59 +1126,13 @@ admin.get('/objects', async (c) => {
   return c.json(out)
 })
 
-// Intercept everything one user ever sent: every object they own, with counts
-// and a signed-GET content_url. Lets a moderator sweep a reported account
-// without hunting through the global stream.
-admin.get('/users/:id/objects', async (c) => {
-  const userId = c.req.param('id')
-  if (!userId) return c.json({ error: 'Missing user id' }, 400)
+// (GET /users/:id/objects removed — denunciation protocol: no bulk
+// sweep of a user's assets. Case evidence is the only door.)
 
-  const { results } = await c.env.DB.prepare(`
-    SELECT o.id, o.owner_id, o.mime_type, o.size_bytes, o.is_story, o.created_at, o.caption,
-           o.is_wallpaper,
-           COALESCE(rc.n, 0) as recipients_count,
-           COALESCE(lc.n, 0) as likes_count,
-           COALESCE(fc.n, 0) as favorites_count,
-           CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END AS sender_is_banned,
-           CASE WHEN t.card_a = o.id OR t.card_b = o.id THEN 1 ELSE 0 END AS used_in_tier_match
-    FROM Objects o
-    LEFT JOIN Users u ON o.owner_id = u.id
-    LEFT JOIN Bans b ON b.user_id = o.owner_id
-    LEFT JOIN TierMatches t ON (t.card_a = o.id OR t.card_b = o.id) AND t.status = 'active'
-    LEFT JOIN (SELECT object_id, COUNT(*) as n FROM Recipients GROUP BY object_id) rc ON rc.object_id = o.id
-    LEFT JOIN (SELECT object_id, COUNT(*) as n FROM Likes GROUP BY object_id) lc ON lc.object_id = o.id
-    LEFT JOIN (SELECT object_id, COUNT(*) as n FROM Favorites GROUP BY object_id) fc ON fc.object_id = o.id
-    WHERE o.owner_id = ?
-    ORDER BY o.created_at DESC
-    LIMIT 200
-  `).bind(userId).all()
-
-  const out = (results || []).map((o: any) => ({
-    id: o.id,
-    owner_id: o.owner_id,
-    mime_type: o.mime_type,
-    size_bytes: o.size_bytes,
-    is_story: o.is_story,
-    is_wallpaper: o.is_wallpaper,
-    created_at: o.created_at,
-    caption: o.caption,
-    recipients_count: Number(o.recipients_count || 0),
-    likes_count: Number(o.likes_count || 0),
-    favorites_count: Number(o.favorites_count || 0),
-    sender_is_banned: o.sender_is_banned ? true : false,
-    used_in_tier_match: o.used_in_tier_match ? true : false,
-    content_url: `/api/objects/${o.id}`,
-  }))
-
-  return c.json(out)
-})
-
-// Admin-only hard delete of any object (moderation). Purges likes/favorites,
-// recipients, blob, and TierMatches card references in one go.
 admin.post('/objects/:id/delete', async (c) => {
   const adminId = c.get('orbitId')
   const id = c.req.param('id')
-  const obj = await c.env.DB.prepare('SELECT owner_id, mime_type FROM Objects WHERE id = ?').bind(id).first<{ owner_id: string; mime_type: string }>()
+  const obj = await c.env.DB.prepare('SELECT owner_id, mime_type FROM Objects WHERE id = ? AND is_public = 1').bind(id).first<{ owner_id: string; mime_type: string }>()
   if (!obj) return c.json({ error: 'Object not found' }, 404)
 
   if (obj.mime_type !== 'text/url' && c.env.BUCKET) {
@@ -1203,7 +1159,7 @@ admin.post('/objects/:id/delete', async (c) => {
 admin.post('/objects/:id/redact', async (c) => {
   const adminId = c.get('orbitId')
   const id = c.req.param('id')
-  const obj = await c.env.DB.prepare('SELECT mime_type FROM Objects WHERE id = ?').bind(id).first<{ mime_type: string }>()
+  const obj = await c.env.DB.prepare('SELECT mime_type FROM Objects WHERE id = ? AND is_public = 1').bind(id).first<{ mime_type: string }>()
   if (!obj) return c.json({ error: 'Object not found' }, 404)
 
   if (obj.mime_type !== 'text/url' && c.env.BUCKET) {
@@ -1434,7 +1390,7 @@ admin.get('/cases/:id', async (c) => {
     const ev = await c.env.DB.prepare(
       'SELECT id, owner_id, mime_type, size_bytes, created_at FROM Objects WHERE id = ?',
     ).bind(r.object_id).first<any>()
-    caseOut.evidence = ev ? { ...ev, content_path: `/api/objects/${ev.id}/content` } : null
+    caseOut.evidence = ev ? { ...ev, evidence_path: `/api/admin/cases/${id}/evidence` } : null
   }
   // Sender/recipient identities for private_message cases (the parties of
   // the denunciation — content itself flows only via evidence/target).
@@ -1451,6 +1407,18 @@ admin.get('/cases/:id', async (c) => {
     }
   }
   await logAdminAction(c.env.DB, c.get('orbitId'), 'view_case', { id, type: 'content_report' })
+
+// The consented door: a short-lived signed token for the ONE object the
+// reporter disclosed on THIS case. Audited; nothing else is reachable.
+admin.get('/cases/:id/evidence', async (c) => {
+  const id = c.req.param('id')
+  const r = await c.env.DB.prepare('SELECT object_id FROM ContentReports WHERE id = ?')
+    .bind(id).first<{ object_id: string | null }>()
+  if (!r?.object_id) return c.json({ error: 'No evidence on this case' }, 404)
+  const { sig, exp, jti } = createSignedObjectToken(r.object_id, 300)
+  await logAdminAction(c.env.DB, c.get('orbitId'), 'view_case_evidence', { id, object_id: r.object_id })
+  return c.json({ url: `/api/objects/${r.object_id}?sig=${sig}&exp=${exp}&jti=${jti}` })
+})
   return c.json(caseOut)
 })
 
@@ -2537,8 +2505,6 @@ admin.delete('/chat/messages/:channel/:id', async (c) => {
 
   if (channel === 'lobby') {
     await c.env.DB.prepare('DELETE FROM LobbyChat WHERE id = ?').bind(id).run().catch(() => { })
-  } else if (channel === 'dm') {
-    await c.env.DB.prepare("UPDATE PrivateMessages SET deleted_by = ?, hidden_at = datetime('now') WHERE id = ?").bind(adminId, id).run().catch(() => { })
   } else if (channel === 'match') {
     await c.env.DB.prepare('DELETE FROM MatchChat WHERE id = ?').bind(id).run().catch(() => { })
   } else if (channel === 'group') {

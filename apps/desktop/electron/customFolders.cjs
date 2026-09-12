@@ -111,6 +111,15 @@ function insideGrant(abs, root) {
 
 function serveIdleFile(request) {
   try {
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+          'Access-Control-Allow-Headers': '*',
+        },
+      })
+    }
     const u = new URL(request.url)
     const grant = findGrant(u.host)
     if (!grant) return new Response('unknown folder', { status: 404 })
@@ -133,7 +142,11 @@ function serveIdleFile(request) {
     }
     const data = fs.readFileSync(abs)
     return new Response(data, {
-      headers: { 'Content-Type': EXT_MIME[ext] || 'application/octet-stream' },
+      headers: {
+        'Content-Type': EXT_MIME[ext] || 'application/octet-stream',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+      },
     })
   } catch {
     return new Response('error', { status: 500 })

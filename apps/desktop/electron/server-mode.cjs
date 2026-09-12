@@ -23,6 +23,9 @@ function readServerMode() {
   }
   try {
     const raw = JSON.parse(fs.readFileSync(configPath(), 'utf8'))
+    if (raw && raw.mode === 'host') {
+      return { mode: 'host', url: `http://127.0.0.1:${PORT}` }
+    }
     if (raw && raw.mode === 'client' && /^https?:\/\/[\w.-]+(:\d+)?$/.test(raw.url || '')) {
       return { mode: 'client', url: raw.url.replace(/\/+$/, '') }
     }

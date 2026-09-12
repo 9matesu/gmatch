@@ -269,9 +269,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
     try {
       for (const next of queue.slice(0, 3)) {
         if (next?.url) {
-          const img = new Image()
-          img.referrerPolicy = 'no-referrer'
-          img.src = next.url
+          void resolveImage(next.url)
         }
       }
     } catch {
@@ -509,9 +507,9 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           )}
           {/* Blurred cover fill so the stage reads as an image, not a
               letterbox — the foreground stays 100% visible (object-contain). */}
-          {!showOffline && (
+          {!showOffline && shownUrl && (
             <img
-              src={shownUrl ?? src}
+              src={shownUrl}
               alt=""
               aria-hidden="true"
               className="pointer-events-none absolute inset-0 z-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl select-none"
@@ -530,16 +528,16 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               controls={reduceMotion}
               onError={onImageError}
             />
-          ) : (
+          ) : !showOffline && shownUrl ? (
             <img
               className={`${GOON_IMAGE} relative z-[1]`}
-              src={shownUrl ?? src}
+              src={shownUrl}
               alt="goon feed"
               referrerPolicy="no-referrer"
               onError={onImageError}
               draggable={false}
             />
-          )}
+          ) : null}
           {!imageReady && !showOffline && !isMotion && (
             <span
               className={`${MONO} absolute left-1/2 top-1/2 z-[2] -translate-x-1/2 -translate-y-1/2 rounded-lg bg-black/60 px-3 py-1.5 text-xs text-retro-muted`}

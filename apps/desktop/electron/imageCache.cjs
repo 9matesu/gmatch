@@ -10,6 +10,12 @@ const path = require('path')
 const http = require('http')
 const https = require('https')
 const mem = require('./imageCacheMemory.cjs')
+let electronNet = null
+try {
+  electronNet = require('electron').net
+} catch {
+  /* running outside electron (e.g. node test) */
+}
 
 const SCHEME = 'gmcache'
 const MAX_SINGLE_BYTES = 25 * 1024 * 1024
@@ -69,36 +75,71 @@ function stats() {
   return { files: mem.size(), bytes: mem.totalBytes() }
 }
 
-function fetchBinary(url, redirects = 3) {
-  return new Promise((resolve, reject) => {
-    let u
+function getReferer(url) {
+  if (typeof url !== 'string') return undefined
+  try {
+    const u = new URL(url)
+    if (url.includes('imhentai.xxx')) return 'https://imhentai.xxx/'
+    if (url.includes('paheal')) return 'https://rule34.paheal.net/'
+    if (url.includes('realbooru.com')) return 'https://realbooru.com/'
+    if (url.includes('booru.org')) return 'https://booru.org/'
+    return u.origin + '/'
+  } catch {
+    return undefined
+  }
+}
+
+async function fetchBinary(url, redirects = 3) {
+  let u
+  try {
+    u = new URL(url)
+  } catch {
+    throw new Error('bad url')
+  }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') {
+    throw new Error('bad protocol')
+  }
+
+  const ref = getReferer(url)
+  const reqHeaders = {
+    'User-Agent': UA,
+    Accept: 'image/*,video/*,*/*',
+    ...(ref ? { Referer: ref } : {}),
+  }
+
+  if (electronNet && typeof electronNet.fetch === 'function') {
     try {
-      u = new URL(url)
-    } catch {
-      reject(new Error('bad url'))
-      return
+      const res = await electronNet.fetch(url, {
+        headers: reqHeaders,
+        redirect: 'follow',
+      })
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`)
+      }
+      const type = String(res.headers.get('content-type') || '')
+      const isOctet = type.includes('octet-stream')
+      const hasMediaExt = /\.(jpe?g|png|gif|webp|avif|bmp|mp4|webm|mov)(\?|#|$)/i.test(url)
+      if (!/^(image|video)\//i.test(type) && !(isOctet && hasMediaExt)) {
+        throw new Error(`not an image: ${type}`)
+      }
+      const ab = await res.arrayBuffer()
+      const buf = Buffer.from(ab)
+      if (buf.length > MAX_SINGLE_BYTES) {
+        throw new Error('file too large')
+      }
+      return { buf, mime: type || 'application/octet-stream' }
+    } catch (err) {
+      if (err && /HTTP \d+/.test(err.message)) throw err
+      if (err && /file too large/.test(err.message)) throw err
+      /* fallback to node http/https */
     }
-    if (u.protocol !== 'https:' && u.protocol !== 'http:') {
-      reject(new Error('bad protocol'))
-      return
-    }
-    const isImh = typeof url === 'string' && url.includes('imhentai.xxx')
-    const isPaheal = typeof url === 'string' && url.includes('paheal')
-    const isRealbooru = typeof url === 'string' && url.includes('realbooru.com')
-    const isBooruOrg = typeof url === 'string' && url.includes('booru.org')
+  }
+
+  return new Promise((resolve, reject) => {
     const mod = u.protocol === 'https:' ? https : http
     const req = mod.get(
       url,
-      {
-        headers: {
-          'User-Agent': UA,
-          Accept: 'image/*,video/*,*/*',
-          ...(isImh ? { Referer: 'https://imhentai.xxx/' } : {}),
-          ...(isPaheal ? { Referer: 'https://rule34.paheal.net/' } : {}),
-          ...(isRealbooru ? { Referer: 'https://realbooru.com/' } : {}),
-          ...(isBooruOrg ? { Referer: 'https://booru.org/' } : {}),
-        },
-      },
+      { headers: reqHeaders },
       (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirects > 0) {
           res.resume()
@@ -112,7 +153,9 @@ function fetchBinary(url, redirects = 3) {
           return
         }
         const type = String(res.headers['content-type'] || '')
-        if (!/^(image|video)\//i.test(type)) {
+        const isOctet = type.includes('octet-stream')
+        const hasMediaExt = /\.(jpe?g|png|gif|webp|avif|bmp|mp4|webm|mov)(\?|#|$)/i.test(url)
+        if (!/^(image|video)\//i.test(type) && !(isOctet && hasMediaExt)) {
           res.resume()
           reject(new Error(`not an image: ${type}`))
           return
@@ -220,13 +263,29 @@ function setFeedCache(query, posts) {
  */
 async function serveImage(request) {
   try {
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+          'Access-Control-Allow-Headers': '*',
+        },
+      })
+    }
     const u = new URL(request.url)
     const key = path.basename(u.pathname || u.host || '')
     if (!key || key.includes('..')) return new Response('bad file', { status: 400 })
     const buf = mem.get(key)
     if (!buf) return new Response('miss', { status: 404 })
     const mime = Object.values(meta).find((m) => m.key === key)?.mime || EXT_MIME[key.split('.').pop()] || 'application/octet-stream'
-    return new Response(buf, { headers: { 'Content-Type': mime, 'Cache-Control': 'no-store' } })
+    return new Response(buf, {
+      headers: {
+        'Content-Type': mime,
+        'Cache-Control': 'no-store',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+      },
+    })
   } catch {
     return new Response('cache error', { status: 500 })
   }

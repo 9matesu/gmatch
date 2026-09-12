@@ -113,9 +113,22 @@ async function startApi() {
 
 function stopApi() {
   if (proc) {
-    proc.kill()
+    const pid = proc.pid
+    try {
+      if (process.platform === 'win32' && pid) {
+        const { execSync } = require('node:child_process')
+        try { execSync(`taskkill /pid ${pid} /T /F`, { stdio: 'ignore' }) } catch {}
+      }
+    } catch {}
+    try {
+      proc.kill('SIGKILL')
+    } catch {}
     proc = null
   }
 }
+
+process.on('exit', () => stopApi())
+process.on('SIGINT', () => { stopApi(); process.exit(0) })
+process.on('SIGTERM', () => { stopApi(); process.exit(0) })
 
 module.exports = { startApi, stopApi, API_BASE, PORT }

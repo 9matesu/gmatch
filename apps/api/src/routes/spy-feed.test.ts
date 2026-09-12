@@ -68,7 +68,8 @@ describe('GET /api/users/hacks/spy-feed/:targetId', () => {
     expect(j.hack.type).toBe('deny')
     expect(j.target.id).toBe(victim.orbitId)
     expect(j.posts.some((p: any) => p.caption === 'my secret deck')).toBe(true)
-    expect(j.intercepted.some((m: any) => m.body.includes('secret deck'))).toBe(true)
+    // Denunciation protocol: even a paid 'spy' hack never surfaces DM bodies.
+    expect(j.intercepted).toEqual([])
   })
 
   it('debuff survives a module re-init (app relaunch restarts the sidecar)', async () => {

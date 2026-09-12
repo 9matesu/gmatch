@@ -1133,11 +1133,8 @@ users.get('/hacks/spy-feed/:targetId', async (c) => {
     WHERE owner_id = ? AND is_public = 1 AND hidden_at IS NULL AND post_group IS NULL
     ORDER BY created_at DESC LIMIT 8
   `).bind(targetId).all<{ id: string; caption: string | null; like_count: number; created_at: string }>().catch(() => ({ results: [] as any[] }))
-  const pmPeeks = await db.prepare(`
-    SELECT body, created_at FROM PrivateMessages
-    WHERE (sender_id = ? OR recipient_id = ?) AND hidden_at IS NULL
-    ORDER BY created_at DESC LIMIT 5
-  `).bind(targetId, targetId).all<{ body: string; created_at: string }>().catch(() => ({ results: [] as any[] }))
+  // Denunciation protocol: even a paid spy hack never surfaces DM bodies.
+  // Private messages are nobody's game currency, not even the admin's.
 
   return c.json({
     hack: { type: session.type, expires_at: session.expires_at },
@@ -1149,9 +1146,7 @@ users.get('/hacks/spy-feed/:targetId', async (c) => {
     posts: (posts.results || []).map((r) => ({
       id: r.id, caption: r.caption || '', likes: Number(r.like_count || 0), created_at: r.created_at,
     })),
-    intercepted: (pmPeeks.results || []).map((r) => ({
-      body: String(r.body || '').slice(0, 140), created_at: r.created_at,
-    })),
+    intercepted: [],
   })
 })
 // The set of store items this user has already unlocked (used to restore the

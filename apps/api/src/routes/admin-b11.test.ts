@@ -30,8 +30,8 @@ async function grantAdmin(identity: TestIdentity) {
 let seedCounter = 100
 async function seedObjectFor(owner: TestIdentity): Promise<void> {
   await env.DB.prepare(
-    `INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, caption, created_at)
-     VALUES (?, ?, 4, 'image/jpeg', 'data:image/jpeg;base64,/9j/4AAQ', ?, datetime('now'))`
+    `INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, caption, created_at, is_public)
+     VALUES (?, ?, 4, 'image/jpeg', 'data:image/jpeg;base64,/9j/4AAQ', ?, datetime('now'), 1)`
   ).bind(`b11-object-${seedCounter++}`, owner.orbitId, `card-${seedCounter}.jpg`).run()
 }
 

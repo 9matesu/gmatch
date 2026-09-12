@@ -16,39 +16,6 @@ type Bindings = {
   BUCKET?: LocalBlobStore
 }
 
-// Cache admin status briefly so image streams don't fan out a DB query per tile.
-const adminStatusCache = new Map<string, { isAdmin: boolean; expiresAt: number }>()
-const ADMIN_STATUS_TTL_MS = 60_000
-const ADMIN_STATUS_MAX_ENTRIES = 5_000
-
-function cachedAdminStatus(orbitId: string, isAdmin: boolean) {
-  if (adminStatusCache.size >= ADMIN_STATUS_MAX_ENTRIES) {
-    const now = Date.now()
-    for (const [id, entry] of adminStatusCache) {
-      if (entry.expiresAt <= now) adminStatusCache.delete(id)
-    }
-  }
-  adminStatusCache.set(orbitId, { isAdmin, expiresAt: Date.now() + ADMIN_STATUS_TTL_MS })
-}
-
-/**
- * True if the authenticated user holds the is_admin flag. Used by the object
- * read path so admins can inspect any object while everyone else is confined
- * to objects they own or were explicitly made a recipient of.
- */
-async function isAdminUser(db: D1Turso, orbitId: string): Promise<boolean> {
-  const cached = adminStatusCache.get(orbitId)
-  if (cached && cached.expiresAt > Date.now()) return cached.isAdmin
-  try {
-    const row = await db.prepare('SELECT is_admin FROM Users WHERE id = ?').bind(orbitId).first<{ is_admin?: number }>()
-    const isAdmin = Boolean(row?.is_admin)
-    cachedAdminStatus(orbitId, isAdmin)
-    return isAdmin
-  } catch {
-    return false
-  }
-}
-
 const objects = new Hono<{ Bindings: Bindings, Variables: { orbitId: string, publicKeyHex: string, isSignedToken?: boolean } }>()
 
 export function isValidMediaMagicBytes(bytes: Uint8Array): boolean {
@@ -443,7 +410,7 @@ objects.get('/:id/signed-url', orbitAuth, async (c) => {
     const recipient = await c.env.DB.prepare(
       'SELECT 1 FROM Recipients WHERE object_id = ? AND recipient_id = ? LIMIT 1'
     ).bind(id, orbitId).first()
-    if (!recipient && !(await isAdminUser(c.env.DB, orbitId))) {
+    if (!recipient) {
       const isCard = await c.env.DB.prepare(
         "SELECT 1 FROM Cards WHERE media_object_id = ? AND moderation_state = 'active' LIMIT 1"
       ).bind(id).first().catch(() => null)
@@ -529,7 +496,7 @@ objects.get('/:id', async (c, next) => {
       const recipient = await c.env.DB.prepare(
         'SELECT 1 FROM Recipients WHERE object_id = ? AND recipient_id = ? LIMIT 1'
       ).bind(id, orbitId).first()
-      if (!recipient && !(await isAdminUser(c.env.DB, orbitId))) {
+      if (!recipient) {
         return c.json({ error: 'Object not found' }, 404)
       }
     }

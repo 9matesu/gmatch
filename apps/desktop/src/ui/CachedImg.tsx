@@ -13,17 +13,30 @@ interface CachedImgProps extends ImgHTMLAttributes<HTMLImageElement> {
  * in browser dev mode) and falls back to the remote URL otherwise.
  */
 export default function CachedImg({ src, fallbackSrc, onError, ...rest }: CachedImgProps) {
-  const [display, setDisplay] = useState(src)
+  const isLocal = /^(gmcache|idle-file|blob|data):/i.test(src)
+  const [display, setDisplay] = useState<string>(isLocal ? src : '')
+  const [resolved, setResolved] = useState<boolean>(isLocal)
 
   useEffect(() => {
     let live = true
-    setDisplay(src)
+    if (/^(gmcache|idle-file|blob|data):/i.test(src)) {
+      setDisplay(src)
+      setResolved(true)
+      return
+    }
+    setResolved(false)
     resolveImage(src)
       .then((local) => {
-        if (live && local !== src) setDisplay(local)
+        if (live) {
+          setDisplay(local || src)
+          setResolved(true)
+        }
       })
       .catch(() => {
-        /* remote src already set */
+        if (live) {
+          setDisplay(src)
+          setResolved(true)
+        }
       })
     return () => {
       live = false
@@ -32,9 +45,10 @@ export default function CachedImg({ src, fallbackSrc, onError, ...rest }: Cached
 
   return (
     <img
-      src={display}
+      src={display || undefined}
       {...rest}
       onError={(e) => {
+        if (!resolved) return
         if (fallbackSrc && e.currentTarget.src !== fallbackSrc) {
           e.currentTarget.src = fallbackSrc
           return

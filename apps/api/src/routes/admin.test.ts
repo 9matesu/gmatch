@@ -91,7 +91,7 @@ describe('Admin API — adminAuth middleware', () => {
     expect(Array.isArray(body)).toBe(true)
   })
 
-  it('GET /api/objects/:id lets an admin inspect an object they do not own', async () => {
+  it('admin CANNOT read a private object without a case (denunciation protocol)', async () => {
     await env.DB.prepare(
       "INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url) VALUES (?, ?, 4, 'image/jpeg', 'data:image/jpeg;base64,/9j/4AAQ')"
     ).bind('admin-moderation-object', regularId.orbitId).run()
@@ -100,8 +100,7 @@ describe('Admin API — adminAuth middleware', () => {
       headers: authHeaders(adminId, 'GET', '/api/objects/admin-moderation-object'),
     }, env)
 
-    expect(res.status).toBe(200)
-    expect(res.headers.get('content-type')).toBe('image/jpeg')
+    expect(res.status).toBe(404)
   })
 })
 
@@ -509,7 +508,7 @@ describe('Admin API — content-report resolution (instant-hide triage)', () => 
     await seed()
     await env.DB.prepare(
       "INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url) VALUES (?, ?, 4, 'image/jpeg', 'data:image/jpeg;base64,/9j/4AAQ')"
-    ).bind('report-evidence-obj', reportedUser.orbitId).run()
+    ).bind('report-evidence-obj', regularId.orbitId).run()
     await env.DB.prepare(
       "INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url) VALUES (?, ?, 4, 'image/jpeg', 'data:image/jpeg;base64,/9j/4AAQ')"
     ).bind('user-sent-obj-1', reportedUser.orbitId).run()
@@ -550,7 +549,7 @@ describe('Admin API — content-report resolution (instant-hide triage)', () => 
     expect(data.id).toBe(r.id)
     expect(data.reporter_id).toBe(regularId.orbitId)
     expect(data.evidence?.id).toBe('report-evidence-obj')
-    expect(data.evidence?.content_path).toBe('/api/objects/report-evidence-obj/content')
+    expect(data.evidence?.evidence_path).toBe(`/api/admin/cases/${r.id}/evidence`)
     const log = await env.DB.prepare("SELECT 1 FROM AdminAuditLog WHERE action = 'view_case' AND target_id = ?").bind(r.id).first()
     expect(log).toBeTruthy()
   })
@@ -649,18 +648,27 @@ describe('Admin API — content-report resolution (instant-hide triage)', () => 
     expect(fresh?.action).toBe('deny')
   })
 
-  it('GET /api/admin/users/:id/objects lists a user\'s objects', async () => {
-    await env.DB.prepare(
-      "INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url) VALUES (?, ?, 4, 'image/jpeg', 'data:image/jpeg;base64,/9j/4AAQ')"
-    ).bind('intercept-obj-1', reportedUser.orbitId).run()
-
+  it('GET /api/admin/users/:id/objects is GONE (bulk private sweep removed)', async () => {
     const res = await app.request(`/api/admin/users/${reportedUser.orbitId}/objects`, {
       headers: authHeaders(adminId, 'GET', `/api/admin/users/${reportedUser.orbitId}/objects`),
     }, env)
+    expect(res.status).toBe(404)
+  })
+
+  it('GET /api/admin/cases/:id/evidence mints a short-lived token for the DISCLOSED object only', async () => {
+    const r = await findOpenReport(reportedUser.orbitId)
+    const res = await app.request(`/api/admin/cases/${r.id}/evidence`, {
+      headers: authHeaders(adminId, 'GET', `/api/admin/cases/${r.id}/evidence`),
+    }, env)
     expect(res.status).toBe(200)
-    const objs: any = await res.json()
-    const ids = objs.map((o: any) => o.id)
-    expect(ids).toContain('intercept-obj-1')
+    const data: any = await res.json()
+    expect(data.url).toContain('/api/objects/report-evidence-obj?sig=')
+    const obj = await app.request(data.url, {}, env)
+    expect(obj.status).toBe(200)
+    const noEv = await app.request('/api/admin/cases/nope/evidence', {
+      headers: authHeaders(adminId, 'GET', '/api/admin/cases/nope/evidence'),
+    }, env)
+    expect(noEv.status).toBe(404)
   })
 })
 

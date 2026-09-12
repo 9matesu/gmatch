@@ -96,12 +96,12 @@ let packagedServer = null // { mode, url } when app.isPackaged
 protocol.registerSchemesAsPrivileged([
   {
     scheme: imageCache.SCHEME,
-    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
+    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true, bypassCSP: true },
   },
   {
     // Player-owned idle folders: <img>/<video> + fetch (mint re-upload).
     scheme: customFolders.SCHEME,
-    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
+    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true, bypassCSP: true },
   },
 ])
 
@@ -233,18 +233,55 @@ function hasBadTag(tags, captions) {
   })
 }
 
-function httpGet(url, headers) {
+async function httpGet(url, headers) {
   let ref = {}
   if (typeof url === 'string') {
-    if (url.includes('imhentai.xxx')) ref = { Referer: 'https://imhentai.xxx/' }
-    else if (url.includes('realbooru.com')) ref = { Referer: 'https://realbooru.com/' }
-    else if (url.includes('booru.org')) ref = { Referer: 'https://booru.org/' }
+    try {
+      const u = new URL(url)
+      if (url.includes('imhentai.xxx')) ref = { Referer: 'https://imhentai.xxx/' }
+      else if (url.includes('paheal')) ref = { Referer: 'https://rule34.paheal.net/' }
+      else if (url.includes('realbooru.com')) ref = { Referer: 'https://realbooru.com/' }
+      else if (url.includes('booru.org')) ref = { Referer: 'https://booru.org/' }
+      else ref = { Referer: u.origin + '/' }
+    } catch {
+      /* ignore invalid url */
+    }
   }
+  const allHeaders = {
+    'User-Agent': UA,
+    Accept: 'application/json, text/xml, text/html, */*',
+    ...ref,
+    ...(headers || {}),
+  }
+
+  if (net && typeof net.fetch === 'function') {
+    try {
+      const res = await net.fetch(url, {
+        headers: allHeaders,
+        redirect: 'follow',
+      })
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`)
+      }
+      return await res.text()
+    } catch (err) {
+      if (err && /HTTP \d+/.test(err.message)) throw err
+      /* fallback to https.get if net.fetch fails */
+    }
+  }
+
   return new Promise((resolve, reject) => {
-    const req = https.get(
+    const mod = typeof url === 'string' && url.startsWith('http:') ? require('http') : https
+    const req = mod.get(
       url,
-      { headers: { 'User-Agent': UA, Accept: 'application/json, text/xml, */*', ...ref, ...(headers || {}) } },
+      { headers: allHeaders },
       (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          res.resume()
+          const next = new URL(res.headers.location, url).toString()
+          httpGet(next, headers).then(resolve, reject)
+          return
+        }
         if (res.statusCode >= 400) {
           res.resume()
           reject(new Error(`HTTP ${res.statusCode}`))
@@ -256,8 +293,7 @@ function httpGet(url, headers) {
         res.on('end', () => resolve(body))
       },
     )
-    req.setTimeout(TIMEOUT_MS, () => req.destroy(new Error('quality-gate timeout'))
-    )
+    req.setTimeout(TIMEOUT_MS, () => req.destroy(new Error('quality-gate timeout')))
     req.on('error', reject)
   })
 }
@@ -903,7 +939,10 @@ app.whenReady().then(async () => {
   })
   // Apply the new mode NOW: relaunch the app (used by the Settings button).
   ipcMain.handle('server:relaunch', () => {
-    app.relaunch()
+    apiSidecar.stopApi()
+    try { if (secureKV) secureKV.flush() } catch { /* best effort */ }
+    const execPath = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath
+    app.relaunch({ execPath })
     app.exit(0)
   })
   // Portable self-update (GitHub Releases): check + auto-download in main,
@@ -969,6 +1008,7 @@ app.on('second-instance', () => {
 })
 
 app.on('before-quit', () => { apiSidecar.stopApi(); try { if (secureKV) secureKV.flush() } catch { /* best effort */ } })
+app.on('will-quit', () => { apiSidecar.stopApi() })
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

@@ -90,11 +90,11 @@ describe('Objects API — Security & Access Control (GAPs A/B)', () => {
     expect(res.status).toBe(200);
   });
 
-  it('GAP-A: allows admin to read any object', async () => {
+  it('GAP-A: an admin CANNOT read a private object without a case (denunciation protocol)', async () => {
     const path = `/api/objects/${testObjectId}`;
     const headers = signRequestHeaders(admin, 'GET', path);
     const res = await app.request(path, { method: 'GET', headers });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(404);
   });
 
   it('GAP-A: allows direct media streaming via valid signed HMAC token URL without headers', async () => {
