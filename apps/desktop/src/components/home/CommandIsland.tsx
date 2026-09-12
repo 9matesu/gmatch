@@ -20,10 +20,20 @@ import {
   Users,
   User,
   Bell,
-  X,
 } from '@phosphor-icons/react';
 import { playPress } from '../../utils/sounds';
 import type { MainViewType } from './HomeFooter';
+
+const SATELLITE_KEY = 'gmatch.satellite_bar.visible';
+
+function readSatelliteOpen(): boolean {
+  try {
+    const v = localStorage.getItem(SATELLITE_KEY);
+    return v === null ? true : v === '1';
+  } catch {
+    return true;
+  }
+}
 
 export interface CommandIslandProps {
   mainView: MainViewType;
@@ -70,12 +80,24 @@ export function CommandIsland({
   onOpenCreateCard,
   showRooms = false,
 }: CommandIslandProps) {
-  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [satelliteOpen, setSatelliteOpen] = useState<boolean>(readSatelliteOpen);
+
+  const toggleSatellite = () => {
+    playPress(760);
+    setSatelliteOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SATELLITE_KEY, next ? '1' : '0');
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   const handleNavClick = (view: MainViewType, soundFreq = 780) => {
     playPress(soundFreq);
     setMainView(view);
-    setMoreMenuOpen(false);
   };
 
   const navItems = [
@@ -187,169 +209,176 @@ export function CommandIsland({
 
   return (
     <>
-      {/* Secondary More Menu Drawer / Sheet */}
-      {moreMenuOpen && (
-        <div className="fixed inset-0 z-[var(--z-modal)] flex flex-col justify-end pointer-events-auto">
-          <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
-            onClick={() => setMoreMenuOpen(false)}
-            aria-hidden="true"
-          />
-          <div className="relative w-full max-w-md mx-auto mb-20 px-4 animate-orbit-slide-up">
-            <div className="bg-retro-panel border border-border-glass rounded-xl shadow-2xl p-4 text-retro-fg">
-              <div className="flex items-center justify-between pb-3 mb-3 border-b border-border-glass">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full overflow-hidden border border-border-glass bg-glass-w5 flex items-center justify-center text-xs">
-                    {profilePic ? (
-                      <img src={profilePic} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <User className="w-4 h-4 text-retro-muted" />
-                    )}
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold text-retro-fg">{displayName}</div>
-                    <div className="text-[10px] text-retro-muted font-mono flex items-center gap-1.5">
-                      <span className={`w-1.5 h-1.5 rounded-full ${wsConnected ? 'bg-retro-online' : 'bg-retro-warning'}`} />
-                      {wsConnected ? 'Online' : 'Reconnecting'}
-                    </div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setMoreMenuOpen(false)}
-                  className="p-1 rounded-lg text-retro-muted hover:text-retro-fg hover:bg-glass-w10 transition-colors"
-                  aria-label="Close menu"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+      {/* Floating Satellite Deck (Secondary Tools & Views, pinned directly above the pill) */}
+      {satelliteOpen && (
+        <div
+          role="toolbar"
+          aria-label="Secondary navigation"
+          className="satellite-dock fixed bottom-[4.25rem] sm:bottom-[4.5rem] left-1/2 -translate-x-1/2 z-[var(--z-dropdown)] flex max-w-[95vw] items-center gap-1 sm:gap-1.5 overflow-x-auto px-2.5 py-1.5 rounded-full bg-[#131722]/90 border border-white/10 backdrop-blur-md shadow-2xl select-none animate-in fade-in zoom-in-95 duration-150 styled-scrollbar"
+        >
+          {/* Store */}
+          <button
+            type="button"
+            onClick={() => {
+              playPress(800);
+              if (onOpenStore) onOpenStore();
+              else handleNavClick('store');
+            }}
+            aria-label="Store"
+            aria-current={mainView === 'store' ? 'page' : undefined}
+            title="Store & Boosters"
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+              mainView === 'store'
+                ? 'bg-hud-accent text-retro-fg scale-[1.02]'
+                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+            }`}
+          >
+            <ShoppingBag className="w-3.5 h-3.5 text-retro-warning shrink-0" weight={mainView === 'store' ? 'fill' : 'regular'} />
+            <span className="text-[11px] hidden sm:inline">Store</span>
+          </button>
 
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    playPress(800);
-                    setMoreMenuOpen(false);
-                    if (onOpenProfile) onOpenProfile(); else handleNavClick('profile');
-                  }}
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-glass-w5 hover:bg-glass-w10 active:scale-95 transition-all text-xs text-retro-body hover:text-retro-fg"
-                >
-                  <User className="w-4 h-4 text-retro-info" />
-                  <span>Profile</span>
-                </button>
+          {/* Servers */}
+          <button
+            type="button"
+            onClick={() => handleNavClick('servers')}
+            aria-label="Servers"
+            aria-current={mainView === 'servers' ? 'page' : undefined}
+            title="Public & Private Servers"
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+              mainView === 'servers'
+                ? 'bg-hud-accent text-retro-fg scale-[1.02]'
+                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+            }`}
+          >
+            <HardDrives className="w-3.5 h-3.5 text-retro-online shrink-0" weight={mainView === 'servers' ? 'fill' : 'regular'} />
+            <span className="text-[11px] hidden sm:inline">Servers</span>
+          </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    playPress(800);
-                    setMoreMenuOpen(false);
-                    if (onOpenStore) onOpenStore(); else handleNavClick('store');
-                  }}
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-glass-w5 hover:bg-glass-w10 active:scale-95 transition-all text-xs text-retro-body hover:text-retro-fg"
-                >
-                  <ShoppingBag className="w-4 h-4 text-retro-warning" />
-                  <span>Store</span>
-                </button>
+          {/* Domination */}
+          <button
+            type="button"
+            onClick={() => handleNavClick('pc_domination')}
+            aria-label="Domination"
+            aria-current={mainView === 'pc_domination' ? 'page' : undefined}
+            title="PC Domination Battles"
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+              mainView === 'pc_domination'
+                ? 'bg-hud-accent text-retro-fg scale-[1.02]'
+                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+            }`}
+          >
+            <Monitor className="w-3.5 h-3.5 text-retro-info shrink-0" weight={mainView === 'pc_domination' ? 'fill' : 'regular'} />
+            <span className="text-[11px] hidden sm:inline">Domination</span>
+          </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    playPress(800);
-                    setMoreMenuOpen(false);
-                    handleNavClick('servers');
-                  }}
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-glass-w5 hover:bg-glass-w10 active:scale-95 transition-all text-xs text-retro-body hover:text-retro-fg"
-                >
-                  <HardDrives className="w-4 h-4 text-retro-online" />
-                  <span>Servers</span>
-                </button>
+          {/* Rooms (conditional on courier active) */}
+          {showRooms && (
+            <button
+              type="button"
+              onClick={() => handleNavClick('rooms')}
+              aria-label="Rooms"
+              aria-current={mainView === 'rooms' ? 'page' : undefined}
+              title="Blind Courier Rooms"
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                mainView === 'rooms'
+                  ? 'bg-hud-accent text-retro-fg scale-[1.02]'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5 text-retro-muted shrink-0" weight={mainView === 'rooms' ? 'fill' : 'regular'} />
+              <span className="text-[11px] hidden sm:inline">Rooms</span>
+            </button>
+          )}
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    playPress(800);
-                    setMoreMenuOpen(false);
-                    handleNavClick('pc_domination');
-                  }}
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-glass-w5 hover:bg-glass-w10 active:scale-95 transition-all text-xs text-retro-body hover:text-retro-fg"
-                >
-                  <Monitor className="w-4 h-4 text-retro-muted" />
-                  <span>Domination</span>
-                </button>
+          {/* Notifications */}
+          <button
+            type="button"
+            onClick={() => {
+              playPress(800);
+              onOpenNotifications?.();
+            }}
+            aria-label="Notifications"
+            title="Activity Notifications"
+            className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
+          >
+            <Bell className="w-3.5 h-3.5 text-retro-accent shrink-0" />
+            <span className="text-[11px] hidden sm:inline">Alerts</span>
+            {unreadNotificationsCount > 0 && (
+              <span className="w-1.5 h-1.5 rounded-full bg-retro-error ring-1 ring-retro-panel" />
+            )}
+          </button>
 
-                {showRooms && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playPress(800);
-                      setMoreMenuOpen(false);
-                      handleNavClick('rooms');
-                    }}
-                    className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-glass-w5 hover:bg-glass-w10 active:scale-95 transition-all text-xs text-retro-body hover:text-retro-fg"
-                  >
-                    <Users className="w-4 h-4 text-retro-muted" />
-                    <span>Rooms</span>
-                  </button>
-                )}
+          {/* Wallpaper */}
+          <button
+            type="button"
+            onClick={() => {
+              playPress(800);
+              onOpenWallpaper?.();
+            }}
+            aria-label="Wallpaper"
+            title="Custom Wallpaper Settings"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
+          >
+            <PaintBrush className="w-3.5 h-3.5 text-chrome-pink shrink-0" />
+            <span className="text-[11px] hidden sm:inline">Theme</span>
+          </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    playPress(800);
-                    setMoreMenuOpen(false);
-                    onOpenWallpaper?.();
-                  }}
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-glass-w5 hover:bg-glass-w10 active:scale-95 transition-all text-xs text-retro-body hover:text-retro-fg"
-                >
-                  <PaintBrush className="w-4 h-4 text-chrome-pink" />
-                  <span>Wallpaper</span>
-                </button>
+          {/* Settings */}
+          <button
+            type="button"
+            onClick={() => {
+              playPress(800);
+              onOpenSettings?.();
+            }}
+            aria-label="Settings"
+            title="Application Settings"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
+          >
+            <Gear className="w-3.5 h-3.5 text-retro-muted shrink-0" />
+            <span className="text-[11px] hidden sm:inline">Settings</span>
+          </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    playPress(800);
-                    setMoreMenuOpen(false);
-                    onOpenSettings?.();
-                  }}
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-glass-w5 hover:bg-glass-w10 active:scale-95 transition-all text-xs text-retro-body hover:text-retro-fg"
-                >
-                  <Gear className="w-4 h-4 text-retro-muted" />
-                  <span>Settings</span>
-                </button>
+          {/* Admin (conditional on admin flag) */}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => {
+                playPress(840);
+                handleNavClick('admin');
+              }}
+              aria-label="Admin"
+              aria-current={mainView === 'admin' ? 'page' : undefined}
+              title="Admin Control Panel"
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                mainView === 'admin'
+                  ? 'bg-hud-accent text-retro-fg scale-[1.02]'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-retro-error shrink-0" weight={mainView === 'admin' ? 'fill' : 'regular'} />
+              <span className="text-[11px] hidden sm:inline">Admin</span>
+            </button>
+          )}
 
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playPress(840);
-                      setMoreMenuOpen(false);
-                      handleNavClick('admin');
-                    }}
-                    className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-glass-w5 hover:bg-glass-w10 active:scale-95 transition-all text-xs text-retro-body hover:text-retro-fg"
-                  >
-                    <ShieldCheck className="w-4 h-4 text-retro-error" />
-                    <span>Admin</span>
-                  </button>
-                )}
-              </div>
-
-              {onLogout && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    playPress(700);
-                    setMoreMenuOpen(false);
-                    onLogout();
-                  }}
-                  className="w-full mt-3 pt-3 border-t border-border-glass flex items-center justify-center gap-2 text-xs font-medium text-retro-error hover:text-retro-error transition-colors"
-                >
-                  <SignOut className="w-3.5 h-3.5" />
-                  <span>Log out</span>
-                </button>
-              )}
-            </div>
-          </div>
+          {/* Logout (conditional on onLogout) */}
+          {onLogout && (
+            <>
+              <div className="h-3.5 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
+              <button
+                type="button"
+                onClick={() => {
+                  playPress(700);
+                  onLogout();
+                }}
+                aria-label="Log out"
+                title="Log out"
+                className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-error/80 hover:text-retro-error hover:bg-retro-error/10 active:scale-95 transition-all"
+              >
+                <SignOut className="w-3.5 h-3.5 shrink-0" />
+                <span className="text-[11px] hidden sm:inline">Logout</span>
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -414,7 +443,7 @@ export function CommandIsland({
             aria-label="Messages"
             className={`relative flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
               messagesOpen || mainView === 'messages'
-                ? 'bg-hud-accent text-retro-fg'
+                ? 'bg-hud-accent text-retro-fg scale-[1.02]'
                 : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
             }`}
           >
@@ -427,6 +456,33 @@ export function CommandIsland({
               <span className="w-2 h-2 rounded-full bg-retro-error ring-2 ring-retro-panel" />
             )}
           </button>
+
+          {/* User Profile Button directly on the Pill */}
+          <button
+            type="button"
+            onClick={() => {
+              playPress(800);
+              if (onOpenProfile) onOpenProfile();
+              else handleNavClick('profile');
+            }}
+            aria-label="Profile"
+            aria-current={mainView === 'profile' ? 'page' : undefined}
+            title={`Profile (${displayName})`}
+            className={`relative flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+              mainView === 'profile'
+                ? 'bg-hud-accent text-retro-fg scale-[1.02]'
+                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+            }`}
+          >
+            <div className="w-5 h-5 rounded-full overflow-hidden border border-white/20 bg-black/40 flex items-center justify-center shrink-0">
+              {profilePic ? (
+                <img src={profilePic} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <User className="w-3.5 h-3.5" weight={mainView === 'profile' ? 'fill' : 'regular'} />
+              )}
+            </div>
+            <span className="text-[11px] font-medium hidden md:inline">Profile</span>
+          </button>
         </div>
 
         <div className="h-4 w-[1px] bg-glass-w10 mx-0.5" />
@@ -435,15 +491,18 @@ export function CommandIsland({
         <div className="flex items-center gap-1">
           {renderContextualAction()}
 
-          {/* More Menu Trigger */}
+          {/* More Options / Satellite Deck Toggle */}
           <button
             type="button"
-            onClick={() => {
-              playPress(760);
-              setMoreMenuOpen((v) => !v);
-            }}
+            onClick={toggleSatellite}
             aria-label="More options"
-            className="p-1.5 rounded-full text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
+            aria-pressed={satelliteOpen}
+            title={satelliteOpen ? 'Hide secondary bar' : 'Show secondary bar'}
+            className={`p-1.5 rounded-full transition-all active:scale-95 ${
+              satelliteOpen
+                ? 'bg-glass-w15 text-retro-fg shadow-inner'
+                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8'
+            }`}
           >
             <DotsThree className="w-4 h-4" weight="bold" />
           </button>

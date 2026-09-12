@@ -11,11 +11,21 @@ beforeEach(() => {
 })
 
 const openMore = () => {
-  fireEvent.click(screen.getByRole('button', { name: 'More options' }))
+  if (!screen.queryByText('Domination')) {
+    fireEvent.click(screen.getByRole('button', { name: 'More options' }))
+  }
 }
 
 describe('CommandIsland navigation coverage', () => {
-  it('More menu reaches Domination (was orphaned with the sidebar)', async () => {
+  it('Profile button appears directly on the pill and navigates to profile', async () => {
+    const setMainView = vi.fn()
+    const onOpenProfile = vi.fn()
+    render(<CommandIsland mainView="feed" setMainView={setMainView} onOpenProfile={onOpenProfile} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Profile' }))
+    expect(onOpenProfile).toHaveBeenCalled()
+  })
+
+  it('Satellite bar reaches Domination (was orphaned with the sidebar)', async () => {
     const setMainView = vi.fn()
     render(<CommandIsland mainView="feed" setMainView={setMainView} />)
     openMore()
@@ -34,5 +44,15 @@ describe('CommandIsland navigation coverage', () => {
     openMore()
     fireEvent.click(await screen.findByText('Rooms'))
     expect(setMainView).toHaveBeenCalledWith('rooms')
+  })
+
+  it('toggles satellite bar visibility when clicking More options', async () => {
+    const setMainView = vi.fn()
+    render(<CommandIsland mainView="feed" setMainView={setMainView} />)
+    expect(screen.getByText('Domination')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'More options' }))
+    expect(screen.queryByText('Domination')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'More options' }))
+    expect(screen.getByText('Domination')).toBeInTheDocument()
   })
 })
