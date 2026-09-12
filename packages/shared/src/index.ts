@@ -1,3 +1,5 @@
+import blocklistData from '../../../shared/blocklist.json'
+
 export type OrbitId = string;
 
 export type LikeDecision = 'like' | 'reject' | 'pass';
@@ -5,17 +7,31 @@ export type LikeDecision = 'like' | 'reject' | 'pass';
 export const MAX_TAGS = 5;
 export const MAX_TAG_LENGTH = 20;
 
-export const TAG_BLACKLIST = [
-  'zoo', 'zoophilia', 'bestiality', 'beastiality',
-  'nl', 'noncon', 'non-con', 'rape',
-  'lolicon', 'shotacon', 'loli', 'shota',
-  'cp', 'cub', 'underage', 'minor', 'pedo', 'pedophile'
-] as const;
+function resolveInitialBlocklist(): string[] {
+  if (typeof process !== 'undefined' && process.env?.BLOCKLIST_PATH) {
+    try {
+      const fs = require('node:fs')
+      if (fs.existsSync(process.env.BLOCKLIST_PATH)) {
+        const raw = JSON.parse(fs.readFileSync(process.env.BLOCKLIST_PATH, 'utf8'))
+        if (Array.isArray(raw?.blocklist)) return raw.blocklist
+      }
+    } catch {
+      /* fallback */
+    }
+  }
+  return Array.isArray(blocklistData.blocklist) ? [...blocklistData.blocklist] : []
+}
+
+export let TAG_BLACKLIST: string[] = resolveInitialBlocklist()
+
+export function setTagBlacklist(list: string[]): void {
+  TAG_BLACKLIST = [...list]
+}
 
 export function isBlacklistedTag(tag: string): boolean {
   if (!tag) return false;
   const clean = tag.trim().toLowerCase().replace(/^#/, '').replace(/[^a-z0-9_-]/g, '');
-  return TAG_BLACKLIST.some(b => clean === b || clean.startsWith(`${b}_`) || clean.endsWith(`_${b}`) || clean === b);
+  return TAG_BLACKLIST.some(b => clean.includes(b));
 }
 
 /**

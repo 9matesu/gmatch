@@ -162,116 +162,34 @@ const UA =
   '(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
 const TIMEOUT_MS = 10_000
 
-// Feed quality: explicit-only + anti-slop negatives appended to every query.
-const NEGATIVES = [
-  '-ai_generated',
-  '-ai-generated',
-  '-furry',
-  '-anthro',
-  '-feral',
-  '-scalie',
-  '-monochrome',
-  '-greyscale',
-  '-sketch',
-  '-comic',
-  '-manga',
-  '-lineart',
-  '-lowres',
-  '-worst_quality',
-  '-jpeg_artifacts',
-  '-watermark',
-  '-censored',
-].join(' ')
+// Build negative query terms directly from the active blocklist (single source of truth).
+function getQueryNegatives() {
+  if (!currentBlocklist || currentBlocklist.length === 0) return ''
+  return currentBlocklist
+    .filter((b) => /^[a-z0-9_-]+$/i.test(b))
+    .map((b) => `-${b}`)
+    .join(' ')
+}
 
-// Hard post-level floor (user spec: high quality always). The renderer also
-// enforces this in src/services/postFilter.ts — duplicated on purpose so the
-// main process stays authoritative even if the renderer is tampered with.
+// Hard post-level floor (user spec: high quality always).
 const MIN_WIDTH = 700
 const MIN_HEIGHT = 700
 const MIN_PIXELS = 700 * 700
-
-// Tag fragments that void a post regardless of negatives (server-side
-// negative support is unreliable on some mirrors — xbooru ignores them).
-const BAD_TAG_FRAGMENTS = [
-  'ai_generated',
-  'ai-generated',
-  'ai_assisted',
-  'monochrome',
-  'greyscale',
-  'grayscale',
-  'sketch',
-  'lineart',
-  'line_art',
-  'comic',
-  'manga',
-  '4koma',
-  'silent_comic',
-  'furry',
-  'anthro',
-  'feral',
-  'scalie',
-  'animal_',
-  'monster_',
-  'horse',
-  'tentacle',
-  'futanari',
-  '1futa',
-  'trap',
-  'otokonoko',
-  'tomgirl',
-  'crossdressing',
-  'yaoi',
-  'netorare',
-  'vocaloid',
-  '3d',
-  'daz_studio',
-  'honey_select',
-  'koikatsu',
-  'render',
-  'ugly_bastard',
-  'amputee',
-  'guro',
-  'ryona',
-  'scat',
-  'urine',
-  'aged_down',
-  'aged_up',
-  'greyscale_background',
-  'speech_bubble',
-  'english_text',
-  'translated',
-  'commentary',
-  'watermark',
-  'signature',
-  'bad_id',
-  'bad_pixiv_id',
-  'pixiv_id',
-  'hetero',
-  'limited_palette',
-  'paper',
-  'scan',
-]
 
 function isQueryBlocked(query) {
   const q = String(query).toLowerCase()
   return currentBlocklist.some((bad) => q.includes(bad))
 }
 
-// Caption hunts (query carries caption/goon_caption) keep text-overlay tags
-// that the gate otherwise drops — mirrors src/services/postFilter.ts.
-const TEXT_OVERLAY = ['speech_bubble', 'english_text', 'translated', 'commentary']
-
 function isCaptionQuery(query) {
   return /caption/i.test(String(query))
 }
 
-function hasBadTag(tags, captions) {
+// Post tag filter: strictly checks the active blocklist JSON — no hard blocks.
+function hasBadTag(tags) {
   return tags.some((t) => {
     const s = String(t).toLowerCase()
-    if (captions && (s.includes('caption') || s.includes('dialogue') || TEXT_OVERLAY.some((b) => s.includes(b)))) {
-      return false
-    }
-    return BAD_TAG_FRAGMENTS.some((b) => s.includes(b))
+    return currentBlocklist.some((bad) => s.includes(bad))
   })
 }
 
@@ -715,17 +633,15 @@ const SOURCES = [
     id: 'tbib',
     fetch: async (variant, n, captions) => {
       const pid = Math.floor(Math.random() * 8)
+      const negs = getQueryNegatives()
+      const query = (variant + ' rating:explicit ' + negs).trim()
       let body = await httpGet(
-        `https://tbib.org/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
-          variant + ' rating:explicit ' + NEGATIVES,
-        )}&limit=${n}&json=1&pid=${pid}`
+        `https://tbib.org/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(query)}&limit=${n}&json=1&pid=${pid}`
       )
       let posts = parseDanbooruJson(body, 'https://tbib.org', captions)
       if (posts.length === 0 && pid > 0) {
         body = await httpGet(
-          `https://tbib.org/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
-            variant + ' rating:explicit ' + NEGATIVES,
-          )}&limit=${n}&json=1&pid=0`
+          `https://tbib.org/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(query)}&limit=${n}&json=1&pid=0`
         )
         posts = parseDanbooruJson(body, 'https://tbib.org', captions)
       }
@@ -736,17 +652,15 @@ const SOURCES = [
     id: 'xbooru',
     fetch: async (variant, n, captions) => {
       const pid = Math.floor(Math.random() * 8)
+      const negs = getQueryNegatives()
+      const query = (variant + ' rating:explicit ' + negs).trim()
       let body = await httpGet(
-        `https://xbooru.com/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
-          variant + ' rating:explicit ' + NEGATIVES,
-        )}&limit=${n}&json=1&pid=${pid}`
+        `https://xbooru.com/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(query)}&limit=${n}&json=1&pid=${pid}`
       )
       let posts = parseDanbooruJson(body, 'https://xbooru.com', captions)
       if (posts.length === 0 && pid > 0) {
         body = await httpGet(
-          `https://xbooru.com/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
-            variant + ' rating:explicit ' + NEGATIVES,
-          )}&limit=${n}&json=1&pid=0`
+          `https://xbooru.com/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(query)}&limit=${n}&json=1&pid=0`
         )
         posts = parseDanbooruJson(body, 'https://xbooru.com', captions)
       }

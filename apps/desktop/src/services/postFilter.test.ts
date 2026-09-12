@@ -1,6 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { allowOnly, isPostAllowed } from './postFilter'
 import type { BooruPost } from '../game/types'
+import {
+  __resetBlocklist,
+  updateActiveBlocklist,
+  setUserExcludes,
+  __resetUserExcludes,
+} from '../game/tagFilter'
 
 function post(overrides: Partial<BooruPost> = {}): BooruPost {
   return {
@@ -12,8 +18,13 @@ function post(overrides: Partial<BooruPost> = {}): BooruPost {
   }
 }
 
-describe('isPostAllowed (feed quality gate)', () => {
-  it('keeps explicit human posts', () => {
+describe('isPostAllowed (single source of truth blocklist gate)', () => {
+  beforeEach(() => {
+    __resetBlocklist()
+    __resetUserExcludes()
+  })
+
+  it('keeps explicit posts', () => {
     expect(isPostAllowed(post())).toBe(true)
   })
 
@@ -23,43 +34,53 @@ describe('isPostAllowed (feed quality gate)', () => {
     expect(isPostAllowed(post({ rating: 'safe' }))).toBe(false)
   })
 
-  it('rejects AI-generated slop', () => {
-    expect(isPostAllowed(post({ tags: ['ai_generated', 'gangbang'] }))).toBe(false)
-    expect(isPostAllowed(post({ tags: ['ai-generated'] }))).toBe(false)
+  it('rejects posts containing blocklisted tags', () => {
+    expect(isPostAllowed(post({ tags: ['loli', 'gangbang'] }))).toBe(false)
+    expect(isPostAllowed(post({ tags: ['rape'] }))).toBe(false)
+    expect(isPostAllowed(post({ tags: ['bestiality'] }))).toBe(false)
   })
 
-  it('rejects furry / anthro / scalie / feral', () => {
-    for (const t of ['furry', 'anthro', 'scalie', 'feral', 'animal_ears', 'horse_cock']) {
-      expect(isPostAllowed(post({ tags: [t] })), t).toBe(false)
-    }
+  it('dynamically allows or blocks based strictly on blocklist.json (no hard blocks in code)', () => {
+    // By default, 'furry' or 'ai_generated' are not in default hard blocklist
+    expect(isPostAllowed(post({ tags: ['furry'] }))).toBe(true)
+    expect(isPostAllowed(post({ tags: ['ai_generated'] }))).toBe(true)
+
+    // When the user/config adds them to the blocklist JSON, they are immediately blocked
+    updateActiveBlocklist({ blocklist: ['furry', 'ai_generated'] })
+    expect(isPostAllowed(post({ tags: ['furry'] }))).toBe(false)
+    expect(isPostAllowed(post({ tags: ['ai_generated'] }))).toBe(false)
+
+    // When removed from blocklist, they are allowed again
+    updateActiveBlocklist({ blocklist: [] })
+    expect(isPostAllowed(post({ tags: ['furry'] }))).toBe(true)
+    expect(isPostAllowed(post({ tags: ['ai_generated'] }))).toBe(true)
   })
 
-  it('rejects monochrome / sketch / comic / 3d media', () => {
-    for (const t of ['monochrome', 'greyscale', 'sketch', 'comic', '3d']) {
-      expect(isPostAllowed(post({ tags: [t] })), t).toBe(false)
-    }
+  it('honors user excludes if configured', () => {
+    setUserExcludes(['tentacles'])
+    expect(isPostAllowed(post({ tags: ['tentacles'] }))).toBe(false)
   })
 
-  it('allows motion urls (gif/mp4/webm) — kind is inferred at render', () => {
+  it('allows motion urls (gif/mp4/webm)', () => {
     expect(isPostAllowed(post({ url: 'https://x/1.webm' }))).toBe(true)
     expect(isPostAllowed(post({ url: 'https://x/1.gif' }))).toBe(true)
     expect(isPostAllowed(post({ url: 'https://x/1.mp4' }))).toBe(true)
     expect(isPostAllowed(post({ url: 'https://x/1.png' }))).toBe(true)
     expect(isPostAllowed(post({ url: 'https://x/1.swf' }))).toBe(false)
   })
-
-  it('drops text-overlay tags unless it is a caption hunt', () => {
-    const captioned = post({ tags: ['goon_caption', 'english_text', 'speech_bubble'] })
-    expect(isPostAllowed(captioned)).toBe(false)
-    expect(isPostAllowed(captioned, { captions: true })).toBe(true)
-  })
 })
 
 describe('allowOnly', () => {
+  beforeEach(() => {
+    __resetBlocklist()
+    __resetUserExcludes()
+  })
+
   it('filters in place, preserving order', () => {
+    updateActiveBlocklist({ blocklist: ['blocked_tag'] })
     const posts = [
       post({ id: 'a' }),
-      post({ id: 'b', tags: ['furry'] }),
+      post({ id: 'b', tags: ['blocked_tag'] }),
       post({ id: 'c', rating: 's' }),
       post({ id: 'd' }),
     ]
@@ -67,6 +88,7 @@ describe('allowOnly', () => {
   })
 
   it('returns empty for all-blocked input', () => {
-    expect(allowOnly([post({ tags: ['ai_generated'] })])).toEqual([])
+    updateActiveBlocklist({ blocklist: ['blocked_term'] })
+    expect(allowOnly([post({ tags: ['blocked_term'] })])).toEqual([])
   })
 })

@@ -82,6 +82,13 @@ async function startApi() {
       STORAGE_ENCRYPTION_KEY: storageKey,
       SNAPSHOT_PATH: path.join(app.getPath('userData'), 'orbit.sqlite'),
       BLOB_STORE_DIR: path.join(app.getPath('userData'), 'blobs'),
+      BLOCKLIST_PATH: (() => {
+        const userPath = path.join(app.getPath('userData'), 'blocklist.json')
+        if (require('node:fs').existsSync(userPath)) return userPath
+        return app.isPackaged
+          ? path.join(process.resourcesPath, 'shared', 'blocklist.json')
+          : path.join(__dirname, '..', '..', '..', 'shared', 'blocklist.json')
+      })(),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
