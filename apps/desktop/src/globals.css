@@ -40,14 +40,12 @@
   --z-toast: 70;
   --z-system: 80;
 
-  /* Accent: Steam Deck Cyber Blue — THE accent (DESIGN v1.1) */
-  --color-retro-accent: #388bfd;
-  --color-retro-accent-hover: #58a6ff;
+  /* Accent: classic monochrome (user revert 2026-09-12: blue felt off) */
+  --color-retro-accent: #ffffff;
+  --color-retro-accent-hover: #e4e4e7;
   --color-retro-accent-text: #0b0e14;
-  --color-hud-accent: #388bfd;
-  --color-hud-accent-hover: #58a6ff;
-  --color-hud-accent-glow: rgba(56, 139, 253, 0.25);
-  --color-chrome-cyan: #38bdf8;
+  --color-hud-accent: #ffffff;
+  --color-hud-accent-hover: #e4e4e7;
   --color-chrome-lav: #a78bfa;
   --color-chrome-pink: #f472b6;
   --color-chrome-mint: #3fb950;
@@ -62,8 +60,8 @@
   --color-retro-online: #3fb950;
   --color-retro-warning: #d29922;
   --color-retro-error: #f85149;
-  --color-retro-info: #58a6ff;
-  --color-retro-selection: rgba(56, 139, 253, 0.20);
+  --color-retro-info: #c9d1d9;
+  --color-retro-selection: rgba(255, 255, 255, 0.12);
 
   /* Legacy aliases for backward compatibility */
   --color-retro-bg: #0b0e14;
@@ -343,7 +341,7 @@
 .glass-tab:hover,
 .glass-button:hover {
   color: var(--color-retro-fg);
-  border-color: rgba(88, 166, 255, 0.35);
+  border-color: rgba(255, 255, 255, 0.30);
   background: var(--color-surface-elevated);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
@@ -356,14 +354,14 @@
 
 .glass-tab-active {
   color: #ffffff;
-  border-color: rgba(88, 166, 255, 0.5);
+  border-color: rgba(255, 255, 255, 0.45);
   background: var(--color-surface-interactive);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 .glass-tab-active:hover {
   color: #ffffff;
-  border-color: rgba(88, 166, 255, 0.7);
+  border-color: rgba(255, 255, 255, 0.65);
   background: var(--color-surface-interactive);
 }
 
@@ -764,7 +762,7 @@
   border-radius: inherit;
   background:
     linear-gradient(115deg, rgba(255, 255, 255, 0.14), transparent 22%),
-    linear-gradient(295deg, rgba(159, 227, 255, 0.10), transparent 28%);
+    linear-gradient(295deg, rgba(255, 255, 255, 0.08), transparent 28%);
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
   padding: 1px;

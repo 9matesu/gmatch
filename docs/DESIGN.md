@@ -1,4 +1,4 @@
-# gMatch Design System v1.1 (Cyber-Slate HUD)
+# gMatch Design System v1.2 (Monochrome Slate HUD)
 
 One design system for every tab, page, modal, button, settings and admin panel.
 Convergence contract — tokens already exist in `src/globals.css` (@theme) and
@@ -18,9 +18,10 @@ rejected (dead code). Everything decorative that does not carry information
   outside scrims
 
 ## Accent — one color, one role
-`--color-retro-accent` IS the blue (#388bfd family). There is exactly one interactive
-accent; `hud-accent`/`chrome-cyan` are aliases, not a second palette. White is text,
-never an accent fill. Focus ring = `--ring` (hud-accent-hover).
+`--color-retro-accent` IS classic monochrome: white #ffffff on ink #0b0e14
+(user revert 2026-09-12 — the cyber-blue steam tone felt off). There is
+exactly one interactive accent; `hud-accent` is an alias, not a second
+palette. Focus ring = `--ring`.
 
 ## Borders
 `border-border-glass`, 1px. `border-retro-border` is deprecated (exception line
