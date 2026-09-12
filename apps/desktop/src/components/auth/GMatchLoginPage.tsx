@@ -196,7 +196,7 @@ export function GMatchLoginPage({
               </button>
             </form>
 
-            <div className="pt-2 text-center metro-rule-top">
+            <div className="pt-2 text-center border-t border-border-glass">
               {mode === 'signup' ? (
                 <button
                   type="button"

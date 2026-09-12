@@ -191,7 +191,7 @@ export default function GridWorkspace({
       {/* Keepsakes Gallery Modal */}
       {galleryOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-6 backdrop-blur-md"
+          className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 p-3 sm:p-6 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-label="Keepsakes Gallery"

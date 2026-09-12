@@ -405,7 +405,7 @@ export function GMatchDMs({
       {/* Thread list column — right side on desktop, coupled with the rail's
           players/groups aside; chat panel owns the left. */}
       <div className={`w-full md:w-60 lg:w-64 border-r md:border-r-0 md:border-l border-border-glass flex-col bg-surface-canvas/80 shrink-0 min-h-0 select-none ${openTarget ? (sidebarOpen ? 'flex' : 'hidden') : 'flex'}`}>
-        <div className="p-3 sm:p-4 metro-rule flex items-center justify-between shrink-0">
+        <div className="p-3 sm:p-4 border-b border-border-glass flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <h2 className="font-semibold text-sm text-retro-fg truncate">
               {myDisplayName || 'Messages'}
@@ -434,7 +434,7 @@ export function GMatchDMs({
         </div>
 
         {showNewGroup && (
-          <div className="p-3 metro-rule space-y-2 shrink-0">
+          <div className="p-3 border-b border-border-glass space-y-2 shrink-0">
             <input
               type="text"
               value={newGroupName}
@@ -465,7 +465,7 @@ export function GMatchDMs({
           </div>
         )}
 
-        <div className="p-2.5 metro-rule shrink-0">
+        <div className="p-2.5 border-b border-border-glass shrink-0">
           <div className="flex items-center gap-2 bg-surface-raised border border-border-glass rounded-md px-3 py-1.5 text-xs text-retro-body">
             <Search className="w-3.5 h-3.5 text-retro-muted shrink-0" />
             <input
@@ -482,7 +482,7 @@ export function GMatchDMs({
           <button
             type="button"
             onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectPeer({ orbitId: 'global_lobby', name: 'Lobby Lounge (Everyone)' }); }}
-            className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors metro-rule text-left cursor-pointer ${openTarget === 'lobby' ? 'bg-glass-w8 border-border-glass' : ''}`}
+            className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-border-glass text-left cursor-pointer ${openTarget === 'lobby' ? 'bg-glass-w8 border-border-glass' : ''}`}
           >
             <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center">
               <Globe className="w-4 h-4" />
@@ -499,7 +499,7 @@ export function GMatchDMs({
           <button
             type="button"
             onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectPeer({ orbitId: 'card_queue', name: 'Card Game Queue' }); }}
-            className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors metro-rule text-left cursor-pointer ${openTarget === 'queue' ? 'bg-glass-w8 border-border-glass' : ''}`}
+            className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-border-glass text-left cursor-pointer ${openTarget === 'queue' ? 'bg-glass-w8 border-border-glass' : ''}`}
           >
             <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center">
               <Gamepad2 className="w-4 h-4" />
@@ -515,13 +515,13 @@ export function GMatchDMs({
 
           {groups.length > 0 && (
             <>
-              <div className="px-3 py-1.5 metro-rule text-xs text-retro-muted flex items-center gap-1.5"><Users className="w-3 h-3" /> Groups</div>
+              <div className="px-3 py-1.5 border-b border-border-glass text-xs text-retro-muted flex items-center gap-1.5"><Users className="w-3 h-3" /> Groups</div>
               {groups.map((g) => (
                 <button
                   key={g.id}
                   type="button"
                   onClick={() => openGroup(g)}
-                  className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors metro-rule text-left cursor-pointer ${activeGroupId === g.id && openTarget === 'group' ? 'bg-glass-w8 border-border-glass' : ''}`}
+                  className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-border-glass text-left cursor-pointer ${activeGroupId === g.id && openTarget === 'group' ? 'bg-glass-w8 border-border-glass' : ''}`}
                 >
                   <div className="w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center"><Users className="w-4 h-4" /></div>
                   <div className="flex-1 min-w-0">
@@ -533,7 +533,7 @@ export function GMatchDMs({
             </>
           )}
 
-          <div className="px-3 py-1.5 metro-rule text-xs text-retro-muted"><span>Direct Messages</span></div>
+          <div className="px-3 py-1.5 border-b border-border-glass text-xs text-retro-muted"><span>Direct Messages</span></div>
 
           {isSearching ? (
             <div className="p-2 space-y-1">
@@ -589,7 +589,7 @@ export function GMatchDMs({
                   <button
                     type="button"
                     onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectPeer({ orbitId: peerId, name, pfp }); setDeleteThreadPeerId(null); }}
-                    className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors metro-rule text-left cursor-pointer ${isSelected ? 'bg-glass-w8 border-border-glass' : ''}`}
+                    className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-border-glass text-left cursor-pointer ${isSelected ? 'bg-glass-w8 border-border-glass' : ''}`}
                   >
                     <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center font-medium text-xs">
                       {pfp ? <img src={pfp} alt="" className="w-full h-full object-cover" /> : name.charAt(0).toUpperCase()}
@@ -632,7 +632,7 @@ export function GMatchDMs({
       <div className={`flex-1 min-h-0 flex flex-col bg-surface-canvas/50 min-w-0 overflow-hidden ${openTarget ? 'flex' : 'hidden md:flex'}`}>
         {openTarget ? (
           <>
-            <div className="p-3 sm:p-3.5 px-4 metro-rule flex items-center justify-between shrink-0 select-none">
+            <div className="p-3 sm:p-3.5 px-4 border-b border-border-glass flex items-center justify-between shrink-0 select-none">
               <div className="flex items-center gap-3 min-w-0">
                 <button
                   type="button"
@@ -708,7 +708,7 @@ export function GMatchDMs({
              </div>
 
              {canShowMembers && showMembers && (
-               <div className="metro-rule max-h-72 overflow-y-auto styled-scrollbar bg-surface-canvas/60 shrink-0">
+               <div className="border-b border-border-glass max-h-72 overflow-y-auto styled-scrollbar bg-surface-canvas/60 shrink-0">
                  <GroupMembersPopover
                    groupId={activeGroupId as string}
                    loadMembers={onLoadGroupMembers}
@@ -887,7 +887,7 @@ export function GMatchDMs({
             </div>
 
             {replyingTo && (
-              <div className="px-3 pt-2 flex items-center gap-2 text-xs text-retro-muted shrink-0 metro-rule-top">
+              <div className="px-3 pt-2 flex items-center gap-2 text-xs text-retro-muted shrink-0 border-t border-border-glass">
                 <CornerUpLeft className="w-3.5 h-3.5" />
                 <span className="truncate">Replying to {replyingTo.senderId === identity?.orbitId ? 'you' : displayNameFor(replyingTo.senderId)}: {replyingTo.text}</span>
                 <button type="button" onClick={() => setReplyingTo(null)} className="ml-auto text-retro-muted hover:text-retro-fg cursor-pointer"><X className="w-3.5 h-3.5" /></button>
@@ -895,14 +895,14 @@ export function GMatchDMs({
             )}
 
             {pendingAttachment && (
-              <div className="px-3 pt-2 flex items-center gap-2 text-xs text-retro-muted shrink-0 metro-rule-top">
+              <div className="px-3 pt-2 flex items-center gap-2 text-xs text-retro-muted shrink-0 border-t border-border-glass">
                 <ImagePlus className="w-3.5 h-3.5" />
                 <span className="truncate">Attachment ready to send</span>
                 <button type="button" onClick={() => setPendingAttachment(null)} className="ml-auto text-retro-muted hover:text-retro-fg cursor-pointer"><X className="w-3.5 h-3.5" /></button>
               </div>
             )}
 
-            <form onSubmit={handleSend} className="p-3 metro-rule-top flex items-center gap-2 shrink-0">
+            <form onSubmit={handleSend} className="p-3 border-t border-border-glass flex items-center gap-2 shrink-0">
               {(activePmPeer && openTarget === 'peer') || openTarget === 'group' ? (
                 <button
                   type="button"

@@ -3404,7 +3404,7 @@ export default function Home() {
                 {/* Lobby Image Fallback Lightbox */}
                 {lobbyLightboxUrl && !expandedItemId && (
                   <div
-                    className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-md flex items-center justify-center p-4 cursor-pointer animate-orbit-fade-in"
+                    className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer animate-orbit-fade-in"
                     onClick={() => setLobbyLightboxUrl(null)}
                   >
                     <div className="relative max-w-4xl max-h-[90vh] flex items-center justify-center" onClick={e => e.stopPropagation()}>

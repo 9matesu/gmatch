@@ -111,7 +111,7 @@ export function UserProfileModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-[var(--z-system)] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-xs p-0 sm:p-4 animate-orbit-fade-in select-none font-sans"
+        className="fixed inset-0 z-[var(--z-system)] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4 animate-orbit-fade-in select-none font-sans"
         onClick={onClose}
       >
         <div

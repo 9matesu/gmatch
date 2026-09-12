@@ -29,7 +29,7 @@ export function CoffeeModal({ open, reason, onDismiss }: Props) {
       : "You've spent over an hour in duels. Server snapshots, encrypted blob storage, and bandwidth aren't free. If GMatch has been worth your time, consider supporting development."
 
   return (
-    <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 backdrop-blur-md animate-orbit-fade-in p-4">
+    <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-orbit-fade-in p-4">
       <div className="bg-surface-canvas/95 border border-border-glass rounded-xl w-[440px] max-w-[92vw] shadow-2xl animate-orbit-pop overflow-hidden backdrop-blur-md">
         {/* Header */}
         <div className="bg-surface-canvas/60 px-5 py-3.5 border-b border-border-glass flex items-center justify-between">

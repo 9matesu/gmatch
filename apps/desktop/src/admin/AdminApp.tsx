@@ -388,7 +388,7 @@ export default function AdminPageClient() {
           <div className="absolute top-1/4 left-1/4 w-48 h-48 rounded-full bg-retro-accent/3 blur-3xl" />
         </div>
         <div className="relative z-10 w-full max-w-sm glass-panel p-6 space-y-4">
-          <div className="flex items-center justify-between metro-rule pb-3">
+          <div className="flex items-center justify-between border-b border-border-glass pb-3">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-retro-accent" />
               <h1 className="text-sm font-bold text-retro-fg uppercase tracking-wider">Admin Operations</h1>

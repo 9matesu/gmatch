@@ -307,7 +307,7 @@ export function SpectateModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/70 backdrop-blur-xl animate-orbit-fade-in font-sans select-none"
+        className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/70 backdrop-blur-sm animate-orbit-fade-in font-sans select-none"
         onClick={onClose}
       >
         <div

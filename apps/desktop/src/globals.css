@@ -788,14 +788,6 @@
 }
 
 /* Metro rule: thin separator line */
-.metro-rule {
-  border-bottom: 1px solid var(--color-border-glass);
-}
-
-.metro-rule-top {
-  border-top: 1px solid var(--color-border-glass);
-}
-
 /* Skeuomorphic control: tactile buttons */
 .skeuo-control {
   background: linear-gradient(180deg, rgba(255, 255, 255, calc(0.08 * var(--panel-alpha))) 0%, rgba(255, 255, 255, calc(0.02 * var(--panel-alpha))) 100%), var(--color-surface-raised);

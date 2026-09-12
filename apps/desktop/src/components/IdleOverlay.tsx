@@ -88,7 +88,7 @@ export function IdleOverlay({ items, identity, onExit }: {
   const currentUrl = currentItem ? imageUrls.get(currentItem.id) : null
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center overflow-hidden cursor-pointer" onClick={handleInteract}>
+    <div className="fixed inset-0 z-[var(--z-modal)] bg-black flex flex-col items-center justify-center overflow-hidden cursor-pointer" onClick={handleInteract}>
       {loaded && currentUrl ? (
         <>
           <img

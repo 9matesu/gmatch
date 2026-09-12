@@ -526,7 +526,7 @@ export function BabecockPanel({
     <div className="space-y-4 font-sans select-none">
       {/* Tutorial overlay */}
       {showTutorial && (
-        <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-surface-raised border border-border-glass rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center text-orange-600">

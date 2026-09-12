@@ -73,7 +73,7 @@ export function AdminLayout({
           <>
             {sidebarOpen && (
               <div
-                className="fixed inset-0 z-40 bg-black/70 animate-orbit-fade-in lg:hidden"
+                className="fixed inset-0 z-[var(--z-dropdown)] bg-black/70 animate-orbit-fade-in lg:hidden"
                 onClick={() => setSidebarOpen(false)}
                 aria-hidden="true"
               />

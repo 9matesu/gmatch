@@ -126,7 +126,7 @@ interface FooterSecondaryItem {
      <footer className="relative shrink-0 w-full glass-surface border-0 border-t border-border-glass rounded-none px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] flex items-center justify-center font-sans select-none z-30">
       {moreOpen && (
         <>
-          <button type="button" aria-label="Close more menu" onClick={() => setMoreOpen(false)} className="fixed inset-0 z-40 bg-black/70" />
+          <button type="button" aria-label="Close more menu" onClick={() => setMoreOpen(false)} className="fixed inset-0 z-[var(--z-dropdown)] bg-black/70" />
            <div className="absolute bottom-full left-2 right-2 z-50 mb-2 rounded-xl glass-surface p-2">
             <div className="grid grid-cols-3 gap-2">
               {secondaryItems.map((item) => {

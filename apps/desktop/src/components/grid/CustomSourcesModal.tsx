@@ -61,7 +61,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-label="Custom image sources">
+    <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Custom image sources">
       <div className="w-full max-w-lg overflow-hidden rounded-xl border border-border-glass bg-retro-panel shadow-xl">
         <div className="flex items-center justify-between gap-3 border-b border-border-glass p-4 bg-glass-w5">
           <div>

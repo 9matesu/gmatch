@@ -86,7 +86,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
   return createPortal(
     (
       <div
-        className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 md:p-6 animate-orbit-fade-in select-none"
+        className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 md:p-6 animate-orbit-fade-in select-none"
         onClick={onClose}
       >
         {/* Close button in top-right */}

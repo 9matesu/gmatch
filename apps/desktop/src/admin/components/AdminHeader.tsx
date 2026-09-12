@@ -67,7 +67,7 @@ export function AdminHeader({
 
   return (
     <header className={cn(
-      "h-14 metro-rule px-4 md:px-6 flex items-center justify-between shrink-0 glass-toolbar border-0 border-b border-border-glass rounded-none sticky top-0 z-30",
+      "h-14 border-b border-border-glass px-4 md:px-6 flex items-center justify-between shrink-0 glass-toolbar border-0 border-b border-border-glass rounded-none sticky top-0 z-30",
       isMobile && "px-3"
     )}>
       <div className="flex items-center gap-3 min-w-0">

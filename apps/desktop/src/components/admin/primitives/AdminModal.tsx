@@ -177,7 +177,7 @@ export function ConfirmDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 animate-orbit-fade-in">
+    <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 bg-black/70 animate-orbit-fade-in">
       <div className="w-full max-w-md bg-surface-elevated border border-border-glass rounded-xl shadow-2xl overflow-hidden animate-orbit-pop">
         <div className="p-5 space-y-4">
           <div className="flex items-start justify-between">
@@ -314,7 +314,7 @@ export function FormModal<T extends Record<string, unknown>>({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 animate-orbit-fade-in">
+    <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 bg-black/70 animate-orbit-fade-in">
       <div className={cn(
         "w-full max-w-lg bg-surface-elevated border border-border-glass rounded-xl shadow-2xl overflow-hidden animate-orbit-pop max-h-[90vh] flex flex-col",
         className
@@ -507,7 +507,7 @@ export function DetailModal({ isOpen, onClose, title, subtitle, children, data, 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 animate-orbit-fade-in">
+    <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 bg-black/70 animate-orbit-fade-in">
       <div className={cn(
         "w-full bg-surface-elevated border border-border-glass rounded-xl shadow-2xl overflow-hidden animate-orbit-pop max-h-[90vh] flex flex-col",
         sizeClasses[size]
