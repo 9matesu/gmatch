@@ -27,7 +27,7 @@ function booruOrgSource(sub, { httpGet, parse }, id = sub.split('.')[0]) {
     fetch: async (variant, n, captions) => {
       const pid = Math.floor(Math.random() * 10) * 20
       const html = await httpGet(`https://${sub}/index.php?page=post&s=list&pid=${pid}`)
-      return parse(html, sub.split('.')[0], captions, variant).slice(0, n)
+      return parse(html, captions, variant).slice(0, n)
     },
   }
 }

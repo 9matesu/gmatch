@@ -36,8 +36,14 @@ export type SettingsTabId =
   | 'account'
   | 'feed'
   | 'blocklist'
-  | 'wallpaper'
   | 'server';
+
+/** What opens Settings: a real tab, or Preferences with the wallpaper section expanded. */
+export type SettingsOpenTarget = SettingsTabId | 'wallpaper';
+
+const TAB_IDS: readonly SettingsTabId[] = ['preferences', 'account', 'feed', 'blocklist', 'server']
+const resolveTab = (t: SettingsOpenTarget): SettingsTabId =>
+  t !== 'wallpaper' && TAB_IDS.includes(t) ? t : 'preferences';
 
 interface GMatchSettingsModalProps {
   isOpen: boolean;
@@ -49,7 +55,7 @@ interface GMatchSettingsModalProps {
   /** Called after the account + every local trace is deleted — shell logs out. */
   onAccountDeleted?: () => void;
   toast?: (msg: string, type?: 'error' | 'success' | 'info' | 'warning' | any) => void;
-  initialTab?: SettingsTabId;
+  initialTab?: SettingsOpenTarget;
 }
 
 const WALLPAPER_PRESETS = [
@@ -212,34 +218,14 @@ export function GMatchSettingsModal({
   toast,
   initialTab = 'preferences',
 }: GMatchSettingsModalProps) {
-  const [activeTab, setActiveTab] = useState<SettingsTabId>(() => {
-    if (
-      initialTab === 'account' ||
-      initialTab === 'feed' ||
-      initialTab === 'blocklist' ||
-      initialTab === 'server'
-    )
-      return initialTab;
-    return 'preferences';
-  });
+  const [activeTab, setActiveTab] = useState<SettingsTabId>(() => resolveTab(initialTab));
   const [wallpaperExpanded, setWallpaperExpanded] = useState(() => initialTab === 'wallpaper');
   const [copiedId, setCopiedId] = useState(false);
   const [customWallpaperInput, setCustomWallpaperInput] = useState(settings.wallpaperUrl || '');
 
   useEffect(() => {
-    if (initialTab === 'wallpaper') {
-      setActiveTab('preferences');
-      setWallpaperExpanded(true);
-    } else if (
-      initialTab === 'account' ||
-      initialTab === 'feed' ||
-      initialTab === 'blocklist' ||
-      initialTab === 'server'
-    ) {
-      setActiveTab(initialTab);
-    } else {
-      setActiveTab('preferences');
-    }
+    setActiveTab(resolveTab(initialTab));
+    setWallpaperExpanded(initialTab === 'wallpaper');
   }, [initialTab]);
 
   if (!isOpen) return null;

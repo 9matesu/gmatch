@@ -14,6 +14,7 @@ import { useToast } from "./components/Toast";
 import { useConfirm } from "./components/ConfirmDialog";
 import { usePlaytime, useCoffeeGate } from "./hooks/usePlaytime";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import type { SettingsOpenTarget } from './components/settings/GMatchSettingsModal';
 import { userFacingError } from './utils/userError';
 import { ImageViewer } from "./components/ImageViewer";
 import { PasskeyManager } from "./components/PasskeyManager";
@@ -466,7 +467,7 @@ export default function Home() {
   const [hideUiForWallpaper, setHideUiForWallpaper] = useState(false)
   const [spaceUiDimmed, setSpaceUiDimmed] = useState(false)
   const wallpaperBgRef = useRef('')
-  const [settingsInitialTab, setSettingsInitialTab] = useState<'preferences' | 'wallpaper'>('preferences')
+  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsOpenTarget>('preferences')
 
   const handleSetWallpaper = (url: string) => {
     if (!url) return;
