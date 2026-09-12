@@ -3,6 +3,7 @@
 const { spawn } = require('node:child_process')
 const { app } = require('electron')
 const path = require('node:path')
+const { adminPin } = require('./admin-pin.cjs')
 
 const PORT = Number(process.env.GMATCH_API_PORT || 8790)
 const API_BASE = `http://127.0.0.1:${PORT}`
@@ -77,6 +78,7 @@ async function startApi() {
     env: {
       ...process.env,
       PORT: String(PORT),
+      ADMIN_PIN: adminPin(app.getPath('userData')),
       STORAGE_ENCRYPTION_KEY: storageKey,
       SNAPSHOT_PATH: path.join(app.getPath('userData'), 'orbit.sqlite'),
       BLOB_STORE_DIR: path.join(app.getPath('userData'), 'blobs'),

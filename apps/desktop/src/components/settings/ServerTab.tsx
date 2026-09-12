@@ -12,7 +12,7 @@ import { ServerPasswordSection } from './ServerPasswordSection'
 import { SnapshotSection } from './SnapshotSection'
 import { useIdentity } from '../../hooks/useIdentity'
 
-type State = { packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[] }
+type State = { packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[]; adminPin?: string }
 
 export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => void }) {
   const { identity } = useIdentity()
@@ -66,6 +66,19 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
           </span>
         </div>
         <p className="text-xs text-retro-muted font-mono break-all">{maskedServerUrl(state.url)}</p>
+        {state.mode === 'host' && state.adminPin && (
+          <p className="text-xs text-retro-muted">
+            Admin passcode (this node only):{' '}
+            <button
+              type="button"
+              title="Copy passcode"
+              onClick={() => { navigator.clipboard?.writeText(state.adminPin!); toast?.('Passcode copied', 'success') }}
+              className="font-mono text-amber-200 hover:text-amber-100 cursor-pointer"
+            >
+              {state.adminPin}
+            </button>
+          </p>
+        )}
         {state.packaged && (
           <p className="text-xs text-retro-muted">
             {state.mode === 'host'

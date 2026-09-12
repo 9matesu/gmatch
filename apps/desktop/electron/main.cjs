@@ -1049,6 +1049,10 @@ app.whenReady().then(async () => {
   // Server-mode bridge for the Settings UI (packaged topology control).
   ipcMain.handle('server:state', () => ({
     packaged: app.isPackaged,
+    // Hosts own their node: the PIN is shown in Settings so the developer
+    // (and any self-hoster) can unlock the bundled admin console. See
+    // electron/admin-pin.cjs header for the trust argument.
+    adminPin: require('./admin-pin.cjs').adminPin(app.getPath('userData')),
     ...(app.isPackaged
       ? { ...serverMode.readServerMode(), lanUrls: serverMode.lanUrls() }
       : { mode: 'host', url: apiSidecar.API_BASE, lanUrls: serverMode.lanUrls() }),
