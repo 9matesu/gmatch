@@ -56,6 +56,7 @@ import { GamesView } from "./components/views/GamesView";
 import { getStoredActiveDeckId, type Deck } from "./components/games/DeckBuilder";
 import { type MainViewType, type ActiveHackSession } from "./components/home/CommandIsland";
 import { CommandIsland } from "./components/home/CommandIsland";
+import { ThemeDrawer } from "./components/theme/ThemeDrawer";
 import { NativeHeaderBar } from "./components/home/NativeHeaderBar";
 import { RoomsView } from "./components/rooms/RoomsView";
 import { ServersView } from "./components/servers/ServersView";
@@ -648,6 +649,7 @@ export default function Home() {
   const [showPasskeys,] = useState(false);
   const [identityModalMode, setIdentityModalMode] = useState<'export' | 'login' | 'logout' | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showThemeDrawer, setShowThemeDrawer] = useState(false);
   const [followersModalState, setFollowersModalState] = useState<{
     isOpen: boolean;
     initialTab: 'followers' | 'following';
@@ -3782,8 +3784,7 @@ export default function Home() {
               messagesOpen={chatOpen}
               onOpenWallpaper={() => {
                 playPress(760);
-                setSettingsInitialTab('wallpaper');
-                setShowSettingsModal(true);
+                setShowThemeDrawer((v) => !v);
               }}
               onLogout={() => { setChatOpen(false); setIdentityModalMode('logout'); }}
               onOpenProfile={() => handleSetMainView('profile')}
@@ -3793,6 +3794,14 @@ export default function Home() {
           </ErrorBoundary>
         )}
       </div>
+
+      <ThemeDrawer
+        isOpen={showThemeDrawer}
+        onClose={() => setShowThemeDrawer(false)}
+        settings={settings}
+        updateSettings={updateSettings}
+        toast={toast}
+      />
 
       {showCreateCardModal && identity && (
         <CreateCardModal

@@ -303,7 +303,7 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
                 <span className="text-xs font-black text-retro-muted">YOU</span>
               )}
             </div>
-            <div className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-retro-accent border-2 border-white flex items-center justify-center text-white shadow-xs">
+            <div className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-[#0095f6] border-2 border-white flex items-center justify-center text-white shadow-xs">
               <Plus className="w-3 h-3 stroke-[3]" />
             </div>
           </div>

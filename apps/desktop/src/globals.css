@@ -9,29 +9,29 @@
    ────────────────────────────────────────────────────────────── */
 
 @theme inline {
-  /* Core canvas and surfaces — Steam Deck Cyber-Slate */
-  --color-surface-canvas: #0b0e14;
-  --color-surface-raised: #131722;
-  --color-surface-elevated: #181f2e;
-  --color-surface-interactive: #212a3e;
+  /* Core canvas and surfaces */
+  --color-surface-canvas: #09090b;
+  --color-surface-raised: #121215;
+  --color-surface-elevated: #18181b;
+  --color-surface-interactive: #27272a;
 
   /* Glass surfaces (used with backdrop-filter). --panel-alpha scales uniformly */
   --panel-alpha: 1;
-  --color-glass: rgba(19, 23, 34, calc(0.85 * var(--panel-alpha)));
-  --color-glass-strong: rgba(24, 31, 46, calc(0.95 * var(--panel-alpha)));
-  --color-glass-solid: #131722;
+  --color-glass: rgba(18, 18, 21, calc(0.85 * var(--panel-alpha)));
+  --color-glass-strong: rgba(24, 24, 27, calc(0.95 * var(--panel-alpha)));
+  --color-glass-solid: #18181b;
 
   /* White-alpha glass fills */
-  --color-glass-w5: rgba(255, 255, 255, calc(0.04 * var(--panel-alpha)));
-  --color-glass-w8: rgba(255, 255, 255, calc(0.07 * var(--panel-alpha)));
-  --color-glass-w10: rgba(255, 255, 255, calc(0.09 * var(--panel-alpha)));
+  --color-glass-w5: rgba(255, 255, 255, calc(0.05 * var(--panel-alpha)));
+  --color-glass-w8: rgba(255, 255, 255, calc(0.08 * var(--panel-alpha)));
+  --color-glass-w10: rgba(255, 255, 255, calc(0.10 * var(--panel-alpha)));
   --color-glass-w12: rgba(255, 255, 255, calc(0.12 * var(--panel-alpha)));
-  --color-glass-w20: rgba(255, 255, 255, calc(0.18 * var(--panel-alpha)));
+  --color-glass-w20: rgba(255, 255, 255, calc(0.20 * var(--panel-alpha)));
 
   /* Hairline borders and highlights */
-  --color-border-glass: #1e2638;
-  --color-border-subtle: #161c28;
-  --color-border-strong: #2d3852;
+  --color-border-glass: #27272a;
+  --color-border-subtle: #1f1f23;
+  --color-border-strong: #3f3f46;
 
   /* Z scale (V1): arbitrary 3+ digit z-index banned — see docs/DESIGN.md */
   --z-dropdown: 40;
@@ -44,10 +44,10 @@
      Side rails and tall modals stop above it so the pill bar is never covered. */
   --island-clearance: 76px;
 
-  /* Accent: classic monochrome (user revert 2026-09-12: blue felt off) */
+  /* Accent: classic monochrome */
   --color-retro-accent: #ffffff;
   --color-retro-accent-hover: #e4e4e7;
-  --color-retro-accent-text: #0b0e14;
+  --color-retro-accent-text: #09090b;
   --color-hud-accent: #ffffff;
   --color-hud-accent-hover: #e4e4e7;
   --color-chrome-lav: #a78bfa;
@@ -55,22 +55,22 @@
   --color-chrome-mint: #3fb950;
 
   /* Text hierarchy */
-  --color-retro-fg: #f0f6fc;
-  --color-retro-body: #c9d1d9;
-  --color-retro-muted: #8b949e;
-  --color-retro-faint: #484f58;
+  --color-retro-fg: #fafafa;
+  --color-retro-body: #d4d4d8;
+  --color-retro-muted: #71717a;
+  --color-retro-faint: #52525b;
 
   /* Status colors */
   --color-retro-online: #3fb950;
   --color-retro-warning: #d29922;
   --color-retro-error: #f85149;
-  --color-retro-info: #c9d1d9;
+  --color-retro-info: #d4d4d8;
   --color-retro-selection: rgba(255, 255, 255, 0.12);
 
   /* Legacy aliases for backward compatibility */
-  --color-retro-bg: #0b0e14;
-  --color-retro-panel: #131722;
-  --color-retro-border: #1e2638;
+  --color-retro-bg: #09090b;
+  --color-retro-panel: #121215;
+  --color-retro-border: #27272a;
 
   /* Shadcn compatibility */
   --background: #09090b;
@@ -435,7 +435,7 @@
    Command Island Floating Dock
    ────────────────────────────────────────────────────────────── */
 .command-island {
-  background: rgba(19, 23, 34, 0.94);
+  background: rgba(18, 18, 21, 0.94);
   border: 1px solid var(--color-border-glass);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
@@ -445,7 +445,7 @@
 }
 
 .command-island:hover {
-  border-color: var(--color-hud-accent-hover);
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 

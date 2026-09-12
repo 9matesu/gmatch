@@ -6,7 +6,8 @@
 // Right = public directory browser (search, join, create).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Lock, Globe, UserPlus, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, Share2, ArrowLeft, Clock, MessageSquare, Plus } from 'lucide-react'
+import { Lock, Globe, UserPlus, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, Share2, ArrowLeft, Clock, MessageSquare, Plus, Trash2 } from 'lucide-react'
+import { generateIdentity } from '@orbit/crypto'
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
 import { orbitFetch, getApiBaseUrl } from '../../utils/api'
 import { normalizeServerUrl, isCurrentServerUrl } from '../../utils/serverUrl'
@@ -140,6 +141,11 @@ export function ServersView({
   const [hostState, setHostState] = useState<ServerBridgeState | null>(null)
   const [pinToDismiss, setPinToDismiss] = useState('')
   const [userTab, setUserTab] = useState<'online' | 'all24h'>('online')
+  const [activeTab, setActiveTab] = useState<'browse' | 'hub'>('browse')
+  const [deleteTarget, setDeleteTarget] = useState<DirectoryServer | null>(null)
+  const [deletePasscode, setDeletePasscode] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   // Join prompts (Electron has no window.prompt): one pending resolver ref,
   // one dialog kind at a time (password during join, or the paste-code modal).
   const pendingAsk = useRef<((v: string | null) => void) | null>(null)
@@ -540,6 +546,105 @@ export function ServersView({
     else toast('Only the owner can unregister a server', 'error')
   }
 
+  const forgetLocalServer = (s: DirectoryServer) => {
+    try {
+      const cached = readDirectoryCache().filter((item) => item.id !== s.id)
+      writeDirectoryCache(cached)
+      setServers((prev) => prev.filter((item) => item.id !== s.id))
+      if (localStorage.getItem(DIRECTORY_ID_KEY) === s.id) localStorage.removeItem(DIRECTORY_ID_KEY)
+      const raw = localStorage.getItem(REG_KEY)
+      if (raw) {
+        const myDirectoryId = localStorage.getItem(DIRECTORY_ID_KEY) || ''
+        if (!myDirectoryId || s.id === myDirectoryId) localStorage.removeItem(REG_KEY)
+      }
+      toast(`Removed "${s.name}" from local list.`, 'info')
+    } catch { /* session-only */ }
+    setDeleteTarget(null)
+    setDeletePasscode('')
+    setDeleteError('')
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    setDeleteError('')
+
+    try {
+      // 1. Owner unregister directly
+      if (mine(deleteTarget)) {
+        const res = await orbitFetch(`${central}/api/servers/${deleteTarget.id}`, { method: 'DELETE' }, identity)
+        if (res.ok) {
+          forgetLocalServer(deleteTarget)
+          toast('Server unregistered.', 'success')
+          void refresh()
+          return
+        }
+      }
+
+      // 2. Passcode provided: verify with /api/admin/verify-pin
+      if (deletePasscode.trim()) {
+        let activeIdentity = identity
+        if (!activeIdentity) {
+          activeIdentity = generateIdentity()
+        }
+        const verifyRes = await orbitFetch(
+          `${central}/api/admin/verify-pin`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pin: deletePasscode.trim() }),
+          },
+          activeIdentity,
+        )
+        if (!verifyRes.ok) {
+          const errData = (await verifyRes.json().catch(() => ({}))) as { error?: string }
+          setDeleteError(errData.error || 'Incorrect admin passcode.')
+          setDeleting(false)
+          return
+        }
+
+        // Delete from central directory using admin endpoint
+        const delRes = await orbitFetch(
+          `${central}/api/servers/admin/directory/${deleteTarget.id}`,
+          { method: 'DELETE' },
+          activeIdentity,
+        )
+        if (delRes.ok) {
+          forgetLocalServer(deleteTarget)
+          toast('Server permanently deleted from directory', 'success')
+          void refresh()
+          return
+        } else {
+          const errData = (await delRes.json().catch(() => ({}))) as { error?: string }
+          setDeleteError(errData.error || 'Failed to delete server from directory.')
+          setDeleting(false)
+          return
+        }
+      }
+
+      // 3. Already node admin
+      if (node?.isAdmin) {
+        const delRes = await orbitFetch(
+          `${central}/api/servers/admin/directory/${deleteTarget.id}`,
+          { method: 'DELETE' },
+          identity,
+        )
+        if (delRes.ok) {
+          forgetLocalServer(deleteTarget)
+          toast('Server permanently deleted from directory', 'success')
+          void refresh()
+          return
+        }
+      }
+
+      setDeleteError('Enter the Central Admin Passcode to permanently delete this server.')
+    } catch (e) {
+      setDeleteError((e as Error)?.message || 'Failed to delete server')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const setPrivate = async (s: DirectoryServer, v: boolean) => {
     if (!identity || !central) return
     const res = await orbitFetch(`${central}/api/servers/${s.id}`, {
@@ -570,267 +675,388 @@ export function ServersView({
 
   return (
     <div className="h-full min-h-0 flex-1 overflow-hidden p-2 sm:p-4 animate-orbit-fade-in flex flex-col">
-      {/* Unified dashboard: one continuous glass-surface, internal dividers, no floating cards */}
-      <div className={identity ? "glass-surface grid grid-cols-1 lg:grid-cols-[minmax(320px,34%)_1fr] gap-0 h-full min-h-0 flex-1 overflow-hidden rounded-xl" : "glass-surface grid grid-cols-1 gap-0 h-full min-h-0 flex-1 overflow-hidden rounded-xl"}>
-        {/* LEFT COLUMN: Current Server & Member activity (24h) — signed in only */}
-        {identity && (<aside className="flex flex-col min-h-0 h-full overflow-hidden lg:border-r lg:border-border-subtle" aria-label="Current server hub">
-          {/* Current Node Hero */}
-          <section className="p-3.5 space-y-3 shrink-0 border-b border-border-subtle" aria-label="Server dashboard">
-            <div className="flex items-start justify-between gap-2.5">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <h2 className="truncate text-base font-bold text-retro-fg leading-tight">{serverName || 'gmatch'}</h2>
-                    {serverMode && (
-                      <span className="text-[10px] px-1.5 py-0.2 rounded font-mono uppercase tracking-wider glass-inset text-retro-muted border-border-subtle">
-                        {serverMode}
-                      </span>
-                    )}
-                    {node?.isAdmin && (
-                      <span
-                        className="text-[10px] px-1.5 py-0.2 rounded font-mono uppercase tracking-wider text-amber-200 border border-amber-400/30 bg-amber-400/10"
-                        title="You administer this server"
-                      >
-                        Admin
-                      </span>
-                    )}
-                  </div>
-                  <p className="truncate text-xs text-retro-muted mt-0.5">
-                    {dash ? `${dash.members_total} members · ${dash.posts_24h} posts/24h` : (serverDescription || 'Connected')}
-                  </p>
-                </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                {serverMode === 'client' && (
-                  <button
-                    type="button"
-                    onClick={() => { playPress(620); void leave() }}
-                    className="glass-action glass-action-danger h-8 px-2.5 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1"
-                  >
-                    <ArrowLeft className="w-3.5 h-3.5" /> Leave
-                  </button>
-                )}
-                {serverMode === 'host' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playPress(820)
-                      void window.gmatch?.serverState?.()
-                        .then((st) => void shareServer(st?.lanUrls?.[0] || '', serverName))
-                        .catch(() => void shareServer('', serverName))
-                    }}
-                    className="glass-action h-8 px-2.5 rounded-lg text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1"
-                  >
-                    <Share2 className="w-3 h-3" /> Share
-                  </button>
-                )}
+      {/* Top Tab Bar */}
+      {identity && (
+        <div className="flex items-center justify-between pb-2.5 shrink-0 border-b border-border-glass mb-3">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => { playPress(750); setActiveTab('browse'); }}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'browse'
+                  ? 'bg-retro-accent text-retro-accent-text shadow-xs'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8'
+              }`}
+            >
+              Browse Servers ({visibleServers.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => { playPress(750); setActiveTab('hub'); }}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'hub'
+                  ? 'bg-retro-accent text-retro-accent-text shadow-xs'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8'
+              }`}
+            >
+              <span>My Server / Hub</span>
+              {dash ? <span className="text-[10px] opacity-75 font-mono font-normal">({dash.members_total})</span> : null}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* First-login admin passcode */}
+      {serverMode === 'host' && node?.isAdmin && pinToDismiss && (
+        <div role="alert" data-testid="admin-pin-banner" className="mb-3 bg-surface-interactive/90 border border-amber-400/40 p-3 rounded-xl space-y-1.5 shrink-0 shadow-lg">
+          <p className="text-xs text-retro-fg font-bold">You are the admin of this server</p>
+          <p className="text-xs text-retro-muted">
+            Your admin passcode (unlocks the console. Store it somewhere safe):{' '}
+            <button
+              type="button"
+              className="font-mono text-amber-200 hover:text-amber-100 cursor-pointer"
+              onClick={() => { void navigator.clipboard.writeText(pinToDismiss); toast('Passcode copied', 'success'); }}
+            >
+              {pinToDismiss}
+            </button>
+          </p>
+          <button
+            type="button"
+            onClick={() => { try { localStorage.setItem(PIN_SEEN_KEY, '1'); } catch { /* session-only */ } setPinToDismiss(''); }}
+            className="glass-action glass-action-primary px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer"
+          >
+            Got it
+          </button>
+        </div>
+      )}
+
+      {/* Unified dashboard */}
+      <div className="glass-surface flex flex-col h-full min-h-0 flex-1 overflow-hidden rounded-xl">
+        {activeTab === 'hub' && identity ? (
+          <aside className="flex flex-col min-h-0 h-full overflow-y-auto styled-scrollbar p-4 sm:p-6 space-y-4 max-w-4xl w-full mx-auto" aria-label="Current server hub">
+            {/* Top Navigation */}
+            <div className="flex items-center justify-between pb-2 border-b border-border-glass">
+              <button
+                type="button"
+                onClick={() => { playPress(700); setActiveTab('browse'); }}
+                className="flex items-center gap-1.5 text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer transition-colors"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Back to Server Browser
+              </button>
+              {central && (
                 <button
                   type="button"
-                  onClick={() => { playPress(780); setServerName(serverName); setEditingServer((v) => !v) }}
-                  aria-expanded={editingServer}
-                  title="Rename server"
-                  className="glass-action h-8 px-2.5 rounded-lg text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1"
+                  onClick={() => { playPress(760); setShowAdmin((v) => !v); }}
+                  className="glass-action px-2.5 py-1 rounded-lg text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer"
                 >
-                  <Pencil className="w-3 h-3" /> Rename
+                  Central Admin
                 </button>
-              </div>
+              )}
             </div>
 
-            {/* First-login admin passcode: shown once while hosting as admin,
-                until dismissed (this node's console PIN, never the PIN of a
-                node you merely joined). */}
-            {serverMode === 'host' && node?.isAdmin && pinToDismiss && (
-              <div role="alert" data-testid="admin-pin-banner" className="glass-inset p-2.5 rounded-lg space-y-1.5">
-                <p className="text-xs text-retro-fg font-bold">You are the admin of this server</p>
-                <p className="text-xs text-retro-muted">
-                  Your admin passcode (unlocks the console. Store it somewhere safe):{' '}
-                  <button
-                    type="button"
-                    className="font-mono text-amber-200 hover:text-amber-100 cursor-pointer"
-                    onClick={() => { void navigator.clipboard.writeText(pinToDismiss); toast('Passcode copied', 'success') }}
-                  >
-                    {pinToDismiss}
-                  </button>
-                </p>
-                <button
-                  type="button"
-                  onClick={() => { try { localStorage.setItem(PIN_SEEN_KEY, '1') } catch { /* session-only */ } setPinToDismiss('') }}
-                  className="glass-action glass-action-primary px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer"
-                >
-                  Got it
-                </button>
-              </div>
-            )}
+            {/* Current Node Hero */}
+            <section className="p-4 sm:p-5 bg-surface-raised/80 border border-border-glass rounded-2xl shadow-sm space-y-3" aria-label="Server dashboard">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h2 className="truncate text-lg font-bold text-retro-fg">{serverName || 'gmatch'}</h2>
+                      {serverMode && (
+                        <span className="text-[10px] px-2 py-0.5 rounded font-mono uppercase tracking-wider bg-surface-interactive border border-border-subtle text-retro-muted">
+                          {serverMode}
+                        </span>
+                      )}
+                      {node?.isAdmin && (
+                        <span
+                          className="text-[10px] px-2 py-0.5 rounded font-mono uppercase tracking-wider text-amber-200 border border-amber-400/30 bg-amber-400/10"
+                          title="You administer this server"
+                        >
+                          Admin
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-retro-muted mt-1">
+                      {dash ? `${dash.members_total} members · ${dash.posts_24h} posts/24h` : (serverDescription || 'Connected')}
+                    </p>
+                  </div>
+                </div>
 
-            {/* Inline Editor */}
-            {editingServer && (
-              <div className="glass-inset space-y-2 p-2.5 rounded-lg">
-                <label className="block text-xs text-retro-muted">
-                  Server name
-                  <input
-                    aria-label="Current server name"
-                    value={serverName}
-                    onChange={(e) => setServerName(e.target.value)}
-                    maxLength={60}
-                    className="glass-field mt-1 w-full px-2.5 py-1 text-xs"
-                  />
-                </label>
-                <label className="block text-xs text-retro-muted">
-                  Description
-                  <input
-                    aria-label="Current server description"
-                    value={serverDescription}
-                    onChange={(e) => setServerDescription(e.target.value)}
-                    maxLength={200}
-                    className="glass-field mt-1 w-full px-2.5 py-1 text-xs"
-                  />
-                </label>
-                <div className="flex gap-2 pt-1">
+                <div className="flex shrink-0 items-center gap-2">
+                  {serverMode === 'client' && (
+                    <button
+                      type="button"
+                      onClick={() => { playPress(620); void leave(); }}
+                      className="glass-action glass-action-danger h-8 px-3 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" /> Leave
+                    </button>
+                  )}
+                  {serverMode === 'host' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playPress(820);
+                        void window.gmatch?.serverState?.()
+                          .then((st) => void shareServer(st?.lanUrls?.[0] || '', serverName))
+                          .catch(() => void shareServer('', serverName));
+                      }}
+                      className="glass-action h-8 px-3 rounded-lg text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1"
+                    >
+                      <Share2 className="w-3.5 h-3.5" /> Share
+                    </button>
+                  )}
                   <button
                     type="button"
-                    disabled={!serverName.trim() || renaming}
-                    onClick={() => void renameServer()}
-                    className="glass-action glass-action-primary h-8 px-3 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1"
+                    onClick={() => { playPress(780); setServerName(serverName); setEditingServer((v) => !v); }}
+                    aria-expanded={editingServer}
+                    title="Rename server"
+                    className="glass-action h-8 px-3 rounded-lg text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1"
                   >
-                    <Check className="w-3.5 h-3.5" /> Save
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setEditingServer(false); setServerName(node?.name || dash?.name || 'gmatch'); setServerDescription(node?.description || '') }}
-                    className="glass-action h-8 px-2.5 rounded-lg text-xs text-retro-muted cursor-pointer flex items-center gap-1"
-                  >
-                    <X className="w-3.5 h-3.5" /> Cancel
+                    <Pencil className="w-3.5 h-3.5" /> Rename
                   </button>
                 </div>
               </div>
-            )}
-          </section>
 
-          {/* Connected Chat Rooms Preview (if courier mode is active) */}
-          {showRooms && (
-            <section className="p-3 space-y-2 shrink-0 border-b border-border-subtle">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-retro-fg flex items-center gap-1.5">
-                  <MessageSquare className="w-3.5 h-3.5 text-retro-accent" /> Active Rooms
-                </span>
-                {onOpenRooms && (
+              {/* Inline Editor */}
+              {editingServer && (
+                <div className="bg-surface-interactive/60 border border-border-glass space-y-2 p-3 rounded-xl">
+                  <label className="block text-xs text-retro-muted">
+                    Server name
+                    <input
+                      aria-label="Current server name"
+                      value={serverName}
+                      onChange={(e) => setServerName(e.target.value)}
+                      maxLength={60}
+                      className="glass-field mt-1 w-full px-2.5 py-1.5 text-xs"
+                    />
+                  </label>
+                  <label className="block text-xs text-retro-muted">
+                    Description
+                    <input
+                      aria-label="Current server description"
+                      value={serverDescription}
+                      onChange={(e) => setServerDescription(e.target.value)}
+                      maxLength={200}
+                      className="glass-field mt-1 w-full px-2.5 py-1.5 text-xs"
+                    />
+                  </label>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      disabled={!serverName.trim() || renaming}
+                      onClick={() => void renameServer()}
+                      className="glass-action glass-action-primary h-8 px-3 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1"
+                    >
+                      <Check className="w-3.5 h-3.5" /> Save
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setEditingServer(false); setServerName(node?.name || dash?.name || 'gmatch'); setServerDescription(node?.description || ''); }}
+                      className="glass-action h-8 px-2.5 rounded-lg text-xs text-retro-muted cursor-pointer flex items-center gap-1"
+                    >
+                      <X className="w-3.5 h-3.5" /> Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {/* Connected Chat Rooms Preview */}
+            {showRooms && (
+              <section className="p-4 bg-surface-raised/80 border border-border-glass rounded-2xl shadow-sm space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-retro-fg flex items-center gap-1.5">
+                    <MessageSquare className="w-3.5 h-3.5 text-retro-accent" /> Active Rooms
+                  </span>
+                  {onOpenRooms && (
+                    <button
+                      type="button"
+                      onClick={() => { playPress(720); onOpenRooms(); }}
+                      className="text-[10px] text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
+                    >
+                      View all ({rooms.length}) →
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {rooms.length === 0 ? (
+                    <span className="text-xs text-retro-muted py-1">No group rooms open yet.</span>
+                  ) : (
+                    rooms.slice(0, 8).map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => {
+                          playPress(720);
+                          if (onOpenRoom) onOpenRoom(r.id);
+                          else if (onOpenRooms) onOpenRooms();
+                        }}
+                        className="bg-surface-interactive/60 border border-border-subtle hover:border-border-strong px-2.5 py-1 rounded-lg text-xs font-medium text-retro-fg cursor-pointer transition-colors flex items-center gap-1"
+                      >
+                        <span>#{r.name}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* Active Members & 24h Activity List */}
+            <section className="p-4 bg-surface-raised/80 border border-border-glass rounded-2xl shadow-sm space-y-3" aria-label="Server members">
+              <div className="flex items-center justify-between pb-2 border-b border-border-glass">
+                <div className="flex items-center gap-1 bg-surface-interactive/60 border border-border-subtle p-0.5 rounded-lg">
                   <button
                     type="button"
-                    onClick={() => { playPress(720); onOpenRooms() }}
-                    className="text-[10px] text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
+                    onClick={() => setUserTab('online')}
+                    className={`px-2.5 py-1 rounded-md text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5 ${
+                      userTab === 'online' ? 'bg-retro-accent text-retro-accent-text shadow-xs' : 'text-retro-muted hover:text-retro-fg'
+                    }`}
                   >
-                    View all ({rooms.length}) →
+                    Online ({onlineUsers.length})
                   </button>
-                )}
+                  <button
+                    type="button"
+                    onClick={() => setUserTab('all24h')}
+                    className={`px-2.5 py-1 rounded-md text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5 ${
+                      userTab === 'all24h' ? 'bg-retro-accent text-retro-accent-text shadow-xs' : 'text-retro-muted hover:text-retro-fg'
+                    }`}
+                  >
+                    Last 24h ({allUsers.length})
+                  </button>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {rooms.length === 0 ? (
-                  <span className="text-xs text-retro-muted py-1">No group rooms open yet.</span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                {displayedUsers.length === 0 ? (
+                  <div className="col-span-full text-xs text-retro-muted py-6 text-center italic">
+                    {userTab === 'online' ? 'No other members online right now' : 'No active members in the last 24 hours'}
+                  </div>
                 ) : (
-                  rooms.slice(0, 4).map((r) => (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => {
-                        playPress(720)
-                        if (onOpenRoom) onOpenRoom(r.id)
-                        else if (onOpenRooms) onOpenRooms()
-                      }}
-                      className="glass-inset px-2 py-1 rounded-md text-xs font-medium text-retro-fg hover:border-retro-accent cursor-pointer transition-colors flex items-center gap-1"
-                    >
-                      <span>#{r.name}</span>
-                    </button>
-                  ))
+                  displayedUsers.map((u) => {
+                    const initial = (u.display_name || u.id || '?').charAt(0).toUpperCase();
+                    return (
+                      <div
+                        key={u.id}
+                        onClick={() => handleUserClick(u)}
+                        className="group flex items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-interactive/40 border border-border-subtle hover:border-border-strong hover:bg-surface-interactive transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="relative w-8 h-8 rounded-full overflow-hidden bg-surface-raised border border-border-subtle shrink-0 flex items-center justify-center text-xs font-bold text-retro-muted">
+                            {u.pfp_url ? (
+                              <img src={u.pfp_url} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <span>{initial}</span>
+                            )}
+                            {u.online && (
+                              <span
+                                className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-retro-online ring-1 ring-black"
+                                aria-label="online"
+                              />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-retro-fg truncate group-hover:text-retro-accent transition-colors">
+                              {u.display_name || u.id}
+                            </div>
+                            <div className="text-[10px] text-retro-muted truncate font-mono">
+                              {u.online ? 'active now' : formatRelativeTime(u.last_seen)}
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-[10px] text-retro-muted opacity-0 group-hover:opacity-100 transition-opacity pr-1">
+                          profile →
+                        </span>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </section>
-          )}
-
-          {/* Active Members & 24h Activity List */}
-          <section className="flex-1 min-h-0 flex flex-col p-3 overflow-hidden" aria-label="Server members">
-            <div className="flex items-center justify-between pb-2 border-b border-border-subtle shrink-0">
-              <div className="flex items-center gap-1 glass-inset p-0.5 rounded-lg">
-                <button
-                  type="button"
-                  onClick={() => setUserTab('online')}
-                  className={`px-2 py-1 rounded-md text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5 ${
-                    userTab === 'online' ? 'glass-nav-active text-retro-fg shadow-sm' : 'text-retro-muted hover:text-retro-fg'
-                  }`}
-                >
-                  Online ({onlineUsers.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUserTab('all24h')}
-                  className={`px-2 py-1 rounded-md text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5 ${
-                    userTab === 'all24h' ? 'glass-nav-active text-retro-fg shadow-sm' : 'text-retro-muted hover:text-retro-fg'
-                  }`}
-                >
-                  <Clock className="w-3 h-3" />
-                  Last 24h ({allUsers.length})
-                </button>
-              </div>
-              <span className="text-[10px] text-retro-muted font-mono">{allUsers.length} total</span>
-            </div>
-
-            <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar pt-2 space-y-1.5 pr-0.5" aria-label="User list">
-              {displayedUsers.length === 0 ? (
-                <div className="text-center py-8 text-xs text-retro-muted">
-                  {userTab === 'online' ? 'Nobody is active right this second.' : 'No other users seen in the past 24 hours.'}
-                </div>
-              ) : (
-                displayedUsers.map((u) => {
-                  const avatar = u.pfp_url || profilePics[u.id]
-                  return (
-                    <div
-                      key={u.id}
-                      onClick={() => handleUserClick(u)}
-                      className="group flex items-center justify-between gap-2 p-2 rounded-lg glass-inset hover:border-border-strong transition-colors cursor-pointer"
-                      title={`${u.display_name || u.id}. Click to view profile`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="relative w-7 h-7 rounded-full overflow-hidden glass-inset border-border-subtle shrink-0 flex items-center justify-center text-[10px] font-bold text-retro-muted">
-                          {avatar ? (
-                            <img src={avatar} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <span>{(u.display_name || u.id).slice(0, 2).toUpperCase()}</span>
-                          )}
-                          <span
-                            className={`absolute bottom-0 right-0 w-2 h-2 rounded-full border border-black ${
-                              u.online ? 'bg-emerald-400' : 'bg-retro-muted'
-                            }`}
-                            aria-hidden
-                          />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold text-retro-fg truncate group-hover:text-retro-accent transition-colors">
-                            {u.display_name || u.id}
-                          </div>
-                          <div className="text-[10px] text-retro-muted truncate font-mono">
-                            {u.online ? 'active now' : formatRelativeTime(u.last_seen)}
-                          </div>
-                        </div>
-                      </div>
-                      <span className="text-[10px] text-retro-muted opacity-0 group-hover:opacity-100 transition-opacity pr-1">
-                        profile →
-                      </span>
+          </aside>
+        ) : (
+          /* BROWSE SERVERS VIEW */
+          <main className="flex flex-col min-h-0 h-full gap-3 overflow-hidden p-3 sm:p-5" aria-label="Server directory">
+            {/* Top Current Node Summary Bar */}
+            {identity && (
+              <section className="p-3 bg-surface-interactive/30 border border-border-glass rounded-xl flex flex-wrap items-center justify-between gap-2.5 shrink-0" aria-label="Server dashboard">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-2.5 h-2.5 rounded-full bg-retro-online shrink-0" />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <h2 className="truncate text-xs sm:text-sm font-bold text-retro-fg">{serverName || 'gmatch'}</h2>
+                      {serverMode && (
+                        <span className="text-[10px] px-1.5 py-0.2 rounded font-mono uppercase tracking-wider bg-surface-raised border border-border-subtle text-retro-muted">
+                          {serverMode}
+                        </span>
+                      )}
+                      {node?.isAdmin && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.2 rounded font-mono uppercase tracking-wider text-amber-200 border border-amber-400/30 bg-amber-400/10"
+                          title="You administer this server"
+                        >
+                          Admin
+                        </span>
+                      )}
                     </div>
-                  )
-                })
-              )}
-            </div>
-          </section>
-        </aside>)}
+                    <p className="truncate text-[11px] text-retro-muted mt-0.5">
+                      {dash ? `${dash.members_total} members · ${dash.posts_24h} posts/24h` : (serverDescription || 'Connected')}
+                    </p>
+                  </div>
+                </div>
 
-        {/* RIGHT COLUMN: Public Directory Browser */}
-        <main className="flex flex-col min-h-0 h-full gap-2.5 overflow-hidden p-4 sm:p-5" aria-label="Server directory">
-          {!identity && (
-            <p className="text-xs text-retro-muted shrink-0">No account yet. One is created for you on the server you pick.</p>
-          )}
+                <div className="flex items-center gap-2 ml-auto">
+                  <div className="flex items-center gap-1 bg-surface-raised p-0.5 rounded-lg border border-border-subtle">
+                    <button
+                      type="button"
+                      onClick={() => setUserTab('online')}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${
+                        userTab === 'online' ? 'bg-retro-accent text-retro-accent-text shadow-xs' : 'text-retro-muted hover:text-retro-fg'
+                      }`}
+                    >
+                      Online ({onlineUsers.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUserTab('all24h')}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${
+                        userTab === 'all24h' ? 'bg-retro-accent text-retro-accent-text shadow-xs' : 'text-retro-muted hover:text-retro-fg'
+                      }`}
+                    >
+                      Last 24h ({allUsers.length})
+                    </button>
+                  </div>
+
+                  <div className="hidden md:flex items-center gap-1">
+                    {displayedUsers.slice(0, 4).map((u) => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => handleUserClick(u)}
+                        className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-raised hover:bg-surface-elevated border border-border-subtle text-[10px] text-retro-fg cursor-pointer transition-colors"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-retro-online" />
+                        <span className="truncate max-w-[80px]">{u.display_name || u.id}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => { playPress(750); setActiveTab('hub'); }}
+                    className="px-2.5 py-1 rounded-lg text-xs font-bold text-retro-muted hover:text-retro-fg hover:bg-glass-w8 transition-colors cursor-pointer"
+                  >
+                    Manage Hub &rarr;
+                  </button>
+                </div>
+              </section>
+            )}
+            {!identity && (
+              <p className="text-xs text-retro-muted shrink-0">No account yet. One is created for you on the server you pick.</p>
+            )}
           {/* Header & Controls */}
           <div className="flex flex-wrap items-center justify-between gap-3 shrink-0 pb-2 border-b border-border-subtle">
             <div className="flex items-center gap-2 min-w-0">
-              <div className="glass-inset w-7 h-7 rounded-lg flex items-center justify-center text-retro-muted shrink-0">
+              <div className="w-7 h-7 rounded-lg bg-surface-raised border border-border-subtle flex items-center justify-center text-retro-muted shrink-0">
                 <Globe className="w-4 h-4" />
               </div>
               <div className="min-w-0">
@@ -1033,7 +1259,7 @@ export function ServersView({
 
           {/* Directory Setup / Not configured notice */}
           {!central || setupUrl ? (
-            <div className="glass-inset p-4 space-y-2 rounded-xl">
+            <div className="bg-surface-raised/80 border border-border-glass p-4 space-y-2 rounded-xl">
               <p className="text-xs text-retro-muted">
                 No central node is configured, so there is no public server
                 network to discover or list yours on. Creating a server still
@@ -1125,7 +1351,7 @@ export function ServersView({
               {/* Directory Content List */}
               <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar pr-0.5">
                 {dirError ? (
-                  <div className="glass-inset p-3 text-xs text-retro-muted space-y-2 rounded-xl">
+                  <div className="bg-surface-raised/80 border border-border-glass p-3 text-xs text-retro-muted space-y-2 rounded-xl">
                     <p>
                       Could not reach the central directory at <span className="font-mono">{central}</span>.
                       It may be offline, or the address is wrong.
@@ -1141,7 +1367,7 @@ export function ServersView({
                 ) : (
                   <ul className="space-y-1.5">
                     {visibleServers.length === 0 && (
-                      <li className="glass-inset p-8 sm:p-12 text-xs text-retro-muted text-center rounded-xl flex flex-col items-center justify-center gap-2">
+                      <li className="bg-surface-raised/60 border border-border-glass p-8 sm:p-12 text-xs text-retro-muted text-center rounded-xl flex flex-col items-center justify-center gap-2">
                         <Globe className="w-8 h-8 text-retro-muted/40" />
                         <p className="max-w-sm leading-relaxed">
                           {servers.length === 0
@@ -1151,8 +1377,8 @@ export function ServersView({
                       </li>
                     )}
                     {visibleServers.map((s) => (
-                      <li key={s.id} className="glass-inset p-3 sm:p-3.5 flex items-start gap-3 rounded-xl hover:border-border-strong transition-colors">
-                        <div className="p-1.5 rounded-lg glass-panel shrink-0 text-retro-accent">
+                      <li key={s.id} className="bg-surface-raised/80 border border-border-glass p-3 sm:p-3.5 flex items-start gap-3 rounded-xl hover:border-retro-muted/40 shadow-xs transition-colors">
+                        <div className="p-1.5 rounded-lg bg-surface-elevated border border-border-subtle shrink-0 text-retro-accent">
                           <Globe className="w-4 h-4" />
                         </div>
                         <div className="min-w-0 flex-1">
@@ -1162,7 +1388,7 @@ export function ServersView({
                               <Lock className="w-3 h-3 text-amber-400 shrink-0" aria-label="password required" />
                             )}
                             {mine(s) && (
-                              <span className="text-[10px] px-1.5 py-0.2 rounded font-mono uppercase tracking-wider glass-inset text-retro-accent border border-retro-accent/30">
+                              <span className="text-[10px] px-1.5 py-0.2 rounded font-mono uppercase tracking-wider bg-retro-accent/10 text-retro-accent border border-retro-accent/30">
                                 YOURS · ADMIN
                               </span>
                             )}
@@ -1241,23 +1467,45 @@ export function ServersView({
                             >
                               <Share2 className="w-3 h-3" /> Share
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => { setDeleteTarget(s); setDeleteError(''); setDeletePasscode('') }}
+                              className="glass-action glass-action-danger px-2.5 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer flex items-center gap-1"
+                              title="Delete or forget server"
+                            >
+                              <Trash2 className="w-3 h-3" /> Delete
+                            </button>
                             </>
-                          ) : isCurrent(s) && identity ? (
-                            <button
-                              type="button"
-                              disabled
-                              className="glass-action px-3 py-1.5 rounded-lg text-xs font-bold text-retro-muted cursor-default"
-                            >
-                              Connected
-                            </button>
                           ) : (
-                            <button
-                              type="button"
-                              onClick={() => void join(s)}
-                              className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
-                            >
-                              <UserPlus className="w-3 h-3" /> {!identity ? 'Enter' : 'Join'}
-                            </button>
+                            <>
+                              {isCurrent(s) && identity ? (
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="glass-action px-3 py-1.5 rounded-lg text-xs font-bold text-retro-muted cursor-default"
+                                >
+                                  Connected
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => void join(s)}
+                                  className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                                >
+                                  <UserPlus className="w-3 h-3" /> {!identity ? 'Enter' : 'Join'}
+                                </button>
+                              )}
+                              {s.id !== 'central-node' && (
+                                <button
+                                  type="button"
+                                  onClick={() => { setDeleteTarget(s); setDeleteError(''); setDeletePasscode('') }}
+                                  className="glass-action hover:bg-rose-500/10 hover:text-rose-400 px-2.5 py-1 rounded-lg text-[10px] font-bold text-retro-muted cursor-pointer flex items-center gap-1"
+                                  title="Delete or forget server"
+                                >
+                                  <Trash2 className="w-3 h-3" /> Delete
+                                </button>
+                              )}
+                            </>
                           )}
                         </div>
                       </li>
@@ -1293,9 +1541,94 @@ export function ServersView({
           onCancel={() => setCodeAskOpen(false)}
         />
       )}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-surface-raised border border-border-glass rounded-2xl p-5 shadow-2xl space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-retro-fg">Delete Server</h3>
+                  <p className="text-xs text-retro-muted font-mono truncate max-w-[240px]">{deleteTarget.name}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setDeleteTarget(null); setDeletePasscode(''); setDeleteError('') }}
+                className="text-retro-muted hover:text-retro-fg p-1 rounded-lg hover:bg-glass-w8 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="text-xs text-retro-muted space-y-2">
+              <p>
+                {mine(deleteTarget)
+                  ? 'You are the owner of this server. You can unregister it from the central directory or remove it from your local list.'
+                  : 'You do not own this server. You can enter the Central Admin Passcode to permanently delete it from the directory, or forget it from your local view.'}
+              </p>
+
+              {!mine(deleteTarget) && (
+                <div className="space-y-1.5 pt-1">
+                  <label className="block text-[11px] font-semibold text-retro-fg">
+                    Central Admin Passcode
+                  </label>
+                  <input
+                    type="password"
+                    value={deletePasscode}
+                    onChange={(e) => setDeletePasscode(e.target.value)}
+                    placeholder="Enter central passcode (e.g. 1984)"
+                    className="w-full px-3 py-2 rounded-xl bg-surface-canvas border border-border-glass text-xs font-mono text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-retro-accent"
+                  />
+                  <p className="text-[10px] text-retro-muted">
+                    Required if deleting a server created by another identity or when unauthenticated.
+                  </p>
+                </div>
+              )}
+
+              {deleteError && (
+                <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 p-2 rounded-lg font-mono">
+                  {deleteError}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border-subtle">
+              <button
+                type="button"
+                onClick={() => forgetLocalServer(deleteTarget)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-retro-muted hover:text-retro-fg hover:bg-glass-w8 border border-border-subtle transition-colors cursor-pointer"
+              >
+                Forget from local list
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setDeleteTarget(null); setDeletePasscode(''); setDeleteError('') }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={() => void handleDeleteConfirm()}
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-rose-500 hover:bg-rose-600 text-white shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  {deleting ? 'Deleting...' : (mine(deleteTarget) ? 'Unregister & Delete' : 'Permanently Delete')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
             </>
           )}
         </main>
+      )}
       </div>
     </div>
   )
