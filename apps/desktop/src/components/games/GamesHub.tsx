@@ -60,7 +60,7 @@ export function GamesHub({
       {/* Sleek Arena Mode Pills */}
       {subTab !== 'idle' && (
         <div className="flex items-center justify-between gap-2 px-3 sm:px-4 pt-3 pb-1">
-          <div className="flex items-center gap-1 p-1 rounded-full bg-[#131722] border border-white/10" role="tablist" aria-label="Arena Modes">
+          <div className="flex items-center gap-1 p-1 rounded-full bg-retro-panel border border-border-glass" role="tablist" aria-label="Arena Modes">
             {[
               { id: 'duel' as const, label: '1v1 Arena' },
               { id: 'ranks' as const, label: 'Rankings' },
@@ -76,8 +76,8 @@ export function GamesHub({
                 aria-pressed={subTab === mode.id}
                 className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                   subTab === mode.id
-                    ? 'bg-[#388bfd] text-white shadow-[0_2px_8px_rgba(56,139,253,0.35)]'
-                    : 'text-retro-muted hover:text-white'
+                    ? 'bg-hud-accent text-white '
+                    : 'text-retro-muted hover:text-retro-fg'
                 }`}
               >
                 {mode.label}

@@ -119,7 +119,7 @@ export function CommandIsland({
             playPress(920);
             onOpenCreatePost?.();
           }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#388bfd] text-white hover:bg-[#58a6ff] active:scale-95 transition-all text-xs font-semibold shadow-[0_2px_12px_rgba(56,139,253,0.4)]"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-hud-accent text-retro-fg hover:bg-hud-accent-hover active:scale-95 transition-all text-xs font-semibold"
           title="Create Post"
           aria-label="Create Post"
         >
@@ -137,7 +137,7 @@ export function CommandIsland({
             playPress(900);
             onOpenCreateCard?.();
           }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#a371f7] text-white hover:bg-[#b88bf9] active:scale-95 transition-all text-xs font-semibold shadow-[0_2px_12px_rgba(163,113,247,0.4)]"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-chrome-lav text-retro-fg hover:bg-chrome-lav/90 active:scale-95 transition-all text-xs font-semibold"
           title="Forge Card"
           aria-label="Forge Card"
         >
@@ -155,7 +155,7 @@ export function CommandIsland({
             playPress(940);
             handleNavClick('games');
           }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#238636] text-white hover:bg-[#2ea043] active:scale-95 transition-all text-xs font-semibold shadow-[0_2px_12px_rgba(35,134,54,0.4)]"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-retro-online text-retro-fg hover:bg-retro-online/90 active:scale-95 transition-all text-xs font-semibold"
           title="Quick Match"
           aria-label="Quick Match"
         >
@@ -173,13 +173,13 @@ export function CommandIsland({
           playPress(800);
           onOpenNotifications?.();
         }}
-        className="relative p-2 rounded-full hover:bg-white/10 text-retro-muted hover:text-retro-fg transition-colors"
+        className="relative p-2 rounded-full hover:bg-glass-w10 text-retro-muted hover:text-retro-fg transition-colors"
         title="Notifications"
         aria-label="Notifications"
       >
         <Bell className="w-4 h-4" />
         {unreadNotificationsCount > 0 && (
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#f85149] ring-2 ring-[#131722]" />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-retro-error ring-2 ring-retro-panel" />
         )}
       </button>
     );
@@ -191,15 +191,15 @@ export function CommandIsland({
       {moreMenuOpen && (
         <div className="fixed inset-0 z-[var(--z-modal)] flex flex-col justify-end pointer-events-auto">
           <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
             onClick={() => setMoreMenuOpen(false)}
             aria-hidden="true"
           />
-          <div className="relative w-full max-w-md mx-auto mb-20 px-4 animate-sheet-up">
-            <div className="bg-[#131722] border border-white/10 rounded-2xl shadow-2xl p-4 text-retro-fg">
-              <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/8">
+          <div className="relative w-full max-w-md mx-auto mb-20 px-4 animate-orbit-slide-up">
+            <div className="bg-retro-panel border border-border-glass rounded-xl shadow-2xl p-4 text-retro-fg">
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-border-glass">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full overflow-hidden border border-white/15 bg-white/5 flex items-center justify-center text-xs">
+                  <div className="w-8 h-8 rounded-full overflow-hidden border border-border-glass bg-glass-w5 flex items-center justify-center text-xs">
                     {profilePic ? (
                       <img src={profilePic} alt="" className="w-full h-full object-cover" />
                     ) : (
@@ -207,9 +207,9 @@ export function CommandIsland({
                     )}
                   </div>
                   <div>
-                    <div className="text-xs font-semibold text-white">{displayName}</div>
+                    <div className="text-xs font-semibold text-retro-fg">{displayName}</div>
                     <div className="text-[10px] text-retro-muted font-mono flex items-center gap-1.5">
-                      <span className={`w-1.5 h-1.5 rounded-full ${wsConnected ? 'bg-[#3fb950]' : 'bg-[#d29922]'}`} />
+                      <span className={`w-1.5 h-1.5 rounded-full ${wsConnected ? 'bg-retro-online' : 'bg-retro-warning'}`} />
                       {wsConnected ? 'Online' : 'Reconnecting'}
                     </div>
                   </div>
@@ -217,7 +217,7 @@ export function CommandIsland({
                 <button
                   type="button"
                   onClick={() => setMoreMenuOpen(false)}
-                  className="p-1 rounded-lg text-retro-muted hover:text-white hover:bg-white/10 transition-colors"
+                  className="p-1 rounded-lg text-retro-muted hover:text-retro-fg hover:bg-glass-w10 transition-colors"
                   aria-label="Close menu"
                 >
                   <X className="w-4 h-4" />
@@ -232,9 +232,9 @@ export function CommandIsland({
                     setMoreMenuOpen(false);
                     if (onOpenProfile) onOpenProfile(); else handleNavClick('profile');
                   }}
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] active:scale-95 transition-all text-xs text-retro-body hover:text-white"
+                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-glass-w5 hover:bg-glass-w10 active:scale-95 transition-all text-xs text-retro-body hover:text-retro-fg"
                 >
-                  <User className="w-4 h-4 text-[#58a6ff]" />
+                  <User className="w-4 h-4 text-retro-info" />
                   <span>Profile</span>
                 </button>
 
@@ -245,9 +245,9 @@ export function CommandIsland({
                     setMoreMenuOpen(false);
                     if (onOpenStore) onOpenStore(); else handleNavClick('store');
                   }}
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] active:scale-95 transition-all text-xs text-retro-body hover:text-white"
+                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-glass-w5 hover:bg-glass-w10 active:scale-95 transition-all text-xs text-retro-body hover:text-retro-fg"
                 >
-                  <ShoppingBag className="w-4 h-4 text-[#d29922]" />
+                  <ShoppingBag className="w-4 h-4 text-retro-warning" />
                   <span>Store</span>
                 </button>
 
@@ -258,9 +258,9 @@ export function CommandIsland({
                     setMoreMenuOpen(false);
                     handleNavClick('servers');
                   }}
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] active:scale-95 transition-all text-xs text-retro-body hover:text-white"
+                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-glass-w5 hover:bg-glass-w10 active:scale-95 transition-all text-xs text-retro-body hover:text-retro-fg"
                 >
-                  <HardDrives className="w-4 h-4 text-[#3fb950]" />
+                  <HardDrives className="w-4 h-4 text-retro-online" />
                   <span>Servers</span>
                 </button>
 
@@ -271,7 +271,7 @@ export function CommandIsland({
                     setMoreMenuOpen(false);
                     handleNavClick('pc_domination');
                   }}
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] active:scale-95 transition-all text-xs text-retro-body hover:text-white"
+                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-glass-w5 hover:bg-glass-w10 active:scale-95 transition-all text-xs text-retro-body hover:text-retro-fg"
                 >
                   <Monitor className="w-4 h-4 text-retro-muted" />
                   <span>Domination</span>
@@ -285,7 +285,7 @@ export function CommandIsland({
                       setMoreMenuOpen(false);
                       handleNavClick('rooms');
                     }}
-                    className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] active:scale-95 transition-all text-xs text-retro-body hover:text-white"
+                    className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-glass-w5 hover:bg-glass-w10 active:scale-95 transition-all text-xs text-retro-body hover:text-retro-fg"
                   >
                     <Users className="w-4 h-4 text-retro-muted" />
                     <span>Rooms</span>
@@ -299,9 +299,9 @@ export function CommandIsland({
                     setMoreMenuOpen(false);
                     onOpenWallpaper?.();
                   }}
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] active:scale-95 transition-all text-xs text-retro-body hover:text-white"
+                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-glass-w5 hover:bg-glass-w10 active:scale-95 transition-all text-xs text-retro-body hover:text-retro-fg"
                 >
-                  <PaintBrush className="w-4 h-4 text-[#f472b6]" />
+                  <PaintBrush className="w-4 h-4 text-chrome-pink" />
                   <span>Wallpaper</span>
                 </button>
 
@@ -312,7 +312,7 @@ export function CommandIsland({
                     setMoreMenuOpen(false);
                     onOpenSettings?.();
                   }}
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] active:scale-95 transition-all text-xs text-retro-body hover:text-white"
+                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-glass-w5 hover:bg-glass-w10 active:scale-95 transition-all text-xs text-retro-body hover:text-retro-fg"
                 >
                   <Gear className="w-4 h-4 text-retro-muted" />
                   <span>Settings</span>
@@ -326,9 +326,9 @@ export function CommandIsland({
                       setMoreMenuOpen(false);
                       handleNavClick('admin');
                     }}
-                    className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] active:scale-95 transition-all text-xs text-retro-body hover:text-white"
+                    className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-glass-w5 hover:bg-glass-w10 active:scale-95 transition-all text-xs text-retro-body hover:text-retro-fg"
                   >
-                    <ShieldCheck className="w-4 h-4 text-[#f85149]" />
+                    <ShieldCheck className="w-4 h-4 text-retro-error" />
                     <span>Admin</span>
                   </button>
                 )}
@@ -342,7 +342,7 @@ export function CommandIsland({
                     setMoreMenuOpen(false);
                     onLogout();
                   }}
-                  className="w-full mt-3 pt-3 border-t border-white/8 flex items-center justify-center gap-2 text-xs font-medium text-[#f85149] hover:text-[#ff7b72] transition-colors"
+                  className="w-full mt-3 pt-3 border-t border-border-glass flex items-center justify-center gap-2 text-xs font-medium text-retro-error hover:text-retro-error transition-colors"
                 >
                   <SignOut className="w-3.5 h-3.5" />
                   <span>Log out</span>
@@ -359,19 +359,19 @@ export function CommandIsland({
         className="command-island fixed bottom-5 left-1/2 -translate-x-1/2 z-[var(--z-dropdown)] flex items-center gap-1 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-full select-none transition-all duration-300"
       >
         {/* Left Telemetry: $G Balance & Socket Status */}
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/[0.04] border border-white/5 text-[11px] font-mono tabular-nums text-retro-body">
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-glass-w5 border border-border-glass text-[11px] font-mono tabular-nums text-retro-body">
           <span
             className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-              wsConnected ? 'bg-[#3fb950] shadow-[0_0_6px_#3fb950]' : 'bg-[#d29922]'
+              wsConnected ? 'bg-retro-online' : 'bg-retro-warning'
             }`}
             title={wsConnected ? 'Swarm: Online' : 'Swarm: Reconnecting'}
           />
-          <span className="font-semibold text-white tracking-tight">
+          <span className="font-semibold text-retro-fg tracking-tight">
             ${Math.floor(balance).toLocaleString()}
           </span>
         </div>
 
-        <div className="h-4 w-[1px] bg-white/10 mx-0.5" />
+        <div className="h-4 w-[1px] bg-glass-w10 mx-0.5" />
 
         {/* Center Primary Nav Tabs */}
         <div className="flex items-center gap-0.5 sm:gap-1">
@@ -388,8 +388,8 @@ export function CommandIsland({
                 aria-current={isActive ? 'page' : undefined}
                 className={`relative flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                   isActive
-                    ? 'bg-[#388bfd] text-white shadow-[0_2px_12px_rgba(56,139,253,0.35)] scale-[1.02]'
-                    : 'text-retro-muted hover:text-white hover:bg-white/[0.06] active:scale-95'
+                    ? 'bg-hud-accent text-retro-fg scale-[1.02]'
+                    : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
                 }`}
               >
                 <Icon className="w-4 h-4" weight={isActive ? 'fill' : 'regular'} />
@@ -414,8 +414,8 @@ export function CommandIsland({
             aria-label="Messages"
             className={`relative flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
               messagesOpen || mainView === 'messages'
-                ? 'bg-[#388bfd] text-white shadow-[0_2px_12px_rgba(56,139,253,0.35)]'
-                : 'text-retro-muted hover:text-white hover:bg-white/[0.06] active:scale-95'
+                ? 'bg-hud-accent text-retro-fg'
+                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
             }`}
           >
             <ChatCircleText
@@ -424,12 +424,12 @@ export function CommandIsland({
             />
             <span className="text-[11px] font-medium hidden md:inline">Chat</span>
             {unreadMessagesCount > 0 && (
-              <span className="w-2 h-2 rounded-full bg-[#f85149] ring-2 ring-[#131722]" />
+              <span className="w-2 h-2 rounded-full bg-retro-error ring-2 ring-retro-panel" />
             )}
           </button>
         </div>
 
-        <div className="h-4 w-[1px] bg-white/10 mx-0.5" />
+        <div className="h-4 w-[1px] bg-glass-w10 mx-0.5" />
 
         {/* Right Contextual Capsule */}
         <div className="flex items-center gap-1">
@@ -443,7 +443,7 @@ export function CommandIsland({
               setMoreMenuOpen((v) => !v);
             }}
             aria-label="More options"
-            className="p-1.5 rounded-full text-retro-muted hover:text-white hover:bg-white/[0.06] active:scale-95 transition-all"
+            className="p-1.5 rounded-full text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
           >
             <DotsThree className="w-4 h-4" weight="bold" />
           </button>
