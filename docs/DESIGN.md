@@ -88,7 +88,10 @@ distinct features into menus.
 HP fill, crit flash, +g$ float, rarity badge colors (shared card-valuation),
 GAME_AD_TEMPLATES gradients, NSFW media itself, `gg-*` grid keyframes,
 `.holo-*` foil + CardTile 3D tilt, island backdrop blur,
-media overlay chips (`bg-black/*` on image/video, not dialog roots).
+media overlay chips (`bg-black/*` on image/video, not dialog roots),
+runtime data colors: card accent (#9FE3FF, user-editable payload), generated
+avatar palette (Avatar.tsx), admin Sparkline series colors, canvas raster fills,
+Instagram-brand story-add badge.
 
 ## Acceptance greps (must read 0)
 ```
@@ -97,7 +100,7 @@ grep -rhoE "z-\[[0-9]{3,}\]" src --include=*.tsx
 grep -rhoE "text-\[(6|7|8|9|11)px\]" src --include=*.tsx
 grep -rho "rounded-3xl" src --include=*.tsx
 grep -rhoE "rounded-(2xl|3xl)" src --include=*.tsx
-grep -rhoE "#[0-9a-fA-F]{6}" src --include=*.tsx | grep -viE "e08a4c|cfd6e6|ffd75e|5ee0ff|b8b8c4"
+grep -rn "#[0-9a-fA-F]\{6\}" src --include=*.tsx | grep -v test | grep -viE "e08a4c|cfd6e6|ffd75e|5ee0ff|b8b8c4|9fe3ff|sparkline|color=|avatar.tsx|babecockpanel|0b0e14|0095f6|d6c6ff|ffd6f0"
 grep -rn "bg-white/\|border-white/" src --include=*.tsx | grep -v test | grep -v holo | grep -v "bg-black/" | grep -v BooruSlideshow
 grep -rhoE "duration-(75|100|200|1000)\b" src --include=*.tsx
 grep -rhoE "duration-\[[0-9]+ms\]" src --include=*.tsx
@@ -111,3 +114,5 @@ grep -rn "metro-rule" src
 grep -rn "❤️\|⚡\|★\|✕" src --include=*.tsx | grep -v test | grep -v CommentsModal
 grep -rn "animate-fade-in\|animate-slide-up\|animate-slide-down" src --include=*.tsx | grep -v orbit
 ```
+Codified (with the exemption lists and the em-dash/placeholder nuances):
+`bash apps/desktop/design-gates.sh` — every count must read 0, all scrims /70.

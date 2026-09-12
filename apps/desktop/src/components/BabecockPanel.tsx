@@ -333,7 +333,7 @@ export function BabecockPanel({
         setPostingToFeed(false)
         return
       }
-      ctx.fillStyle = '#080A0D'
+      ctx.fillStyle = '#0b0e14'  // canvas raster (exempt: computed, not a class)
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
       const loadImage = async (entry: BabecockEntry): Promise<HTMLImageElement | null> => {

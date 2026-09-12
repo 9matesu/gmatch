@@ -96,7 +96,7 @@ export function GMatchLoginPage({
             <div className="text-center space-y-2">
               <span className="font-sans font-black text-4xl sm:text-5xl tracking-tighter text-retro-fg select-none inline-block">
                 <span>goon</span>
-                <span className="font-light tracking-normal text-chrome">Match</span>
+                <span className="font-light tracking-normal text-retro-fg">Match</span>
               </span>
               <h1 className="text-sm font-extrabold text-retro-fg">
                 {mode === 'signup' ? 'Create Your Profile' : 'Import Secret Key'}

@@ -84,7 +84,7 @@ export function ProfileSetupForm({
       {/* Profile picture */}
       <div className="flex flex-col items-center justify-center space-y-2">
         <div className="relative group">
-          <div className="w-20 h-20 rounded-full p-[2px] bg-gradient-to-tr from-[#9fe3ff] via-[#d6c6ff] to-[#ffd6f0] transition-transform">
+          <div className="w-20 h-20 rounded-full p-[2px] bg-retro-accent transition-transform">
             <div className="w-full h-full rounded-full bg-retro-bg overflow-hidden flex items-center justify-center border border-border-glass">
               {pfpUrl ? (
                 <img src={pfpUrl} alt="Avatar" className="w-full h-full object-cover" />

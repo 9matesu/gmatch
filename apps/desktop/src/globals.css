@@ -40,9 +40,9 @@
   --z-toast: 70;
   --z-system: 80;
 
-  /* Accent: Steam Deck Cyber Blue */
-  --color-retro-accent: #ffffff;
-  --color-retro-accent-hover: #e4e4e7;
+  /* Accent: Steam Deck Cyber Blue — THE accent (DESIGN v1.1) */
+  --color-retro-accent: #388bfd;
+  --color-retro-accent-hover: #58a6ff;
   --color-retro-accent-text: #0b0e14;
   --color-hud-accent: #388bfd;
   --color-hud-accent-hover: #58a6ff;
@@ -660,22 +660,14 @@
 .icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .glass-action-primary {
-  background: linear-gradient(180deg, #ffffff, #d4d4d8);
-  border-color: rgba(255, 255, 255, 0.86);
+  background: var(--color-retro-accent);
+  border-color: transparent;
   color: var(--color-retro-accent-text);
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.18);
 }
 
 .glass-action-primary:hover {
-  background: linear-gradient(180deg, #ffffff, #e4e4e7);
-  border-color: #ffffff;
-  box-shadow:
-    0 12px 30px rgba(0, 0, 0, 0.40),
-    inset 0 1px 0 rgba(255, 255, 255, 0.98),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.22);
+  background: var(--color-retro-accent-hover);
+  border-color: transparent;
 }
 
 .glass-action-danger {
@@ -789,76 +781,22 @@
 
 /* Metro rule: thin separator line */
 /* Skeuomorphic control: tactile buttons */
-.skeuo-control {
-  background: linear-gradient(180deg, rgba(255, 255, 255, calc(0.08 * var(--panel-alpha))) 0%, rgba(255, 255, 255, calc(0.02 * var(--panel-alpha))) 100%), var(--color-surface-raised);
-  border: 1px solid var(--color-border-glass);
-  border-radius: var(--radius-md);
-  box-shadow:
-    0 4px 14px rgba(0, 0, 0, 0.38),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
-  transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.skeuo-control:hover {
-  background: linear-gradient(180deg, rgba(255, 255, 255, calc(0.12 * var(--panel-alpha))) 0%, rgba(255, 255, 255, calc(0.04 * var(--panel-alpha))) 100%), var(--color-surface-elevated);
-  border-color: var(--color-border-strong);
-  box-shadow:
-    0 6px 18px rgba(0, 0, 0, 0.48),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
-  transform: translateY(-1px);
-}
-
-.skeuo-control:active {
-  background: var(--color-surface-raised);
-  transform: translateY(1px) scale(0.97);
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.6),
-    inset 0 2px 4px rgba(0, 0, 0, 0.5);
-}
-
 /* Accent control: primary action buttons — animated chrome spark */
 .accent-control {
-  background-image: linear-gradient(
-    120deg,
-    #eaf6ff 0%,
-    #9fe3ff 18%,
-    #d6c6ff 38%,
-    #ffd6f0 55%,
-    #c9ffe2 72%,
-    #eaf6ff 100%
-  );
-  background-size: 220% 100%;
-  background-position: 0% 50%;
+  background: var(--color-retro-accent);
   color: var(--color-retro-accent-text);
-  border: 1px solid rgba(255, 255, 255, 0.38);
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
-  box-shadow:
-    0 4px 12px rgba(159, 227, 255, 0.20),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
   font-weight: 600;
-  transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
-  animation-name: chrome-sheen;
-  animation-duration: 4s;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-  animation-play-state: var(--chrome-sheen, paused);
+  transition: background-color 150ms ease-out;
 }
 
 .accent-control:hover {
-  box-shadow:
-    0 6px 18px rgba(159, 227, 255, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  transform: translateY(-1px);
-  animation-duration: 2.4s;
+  background: var(--color-retro-accent-hover);
 }
 
 .accent-control:active {
-  transform: translateY(1px) scale(0.97);
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.4),
-    inset 0 2px 4px rgba(0, 0, 0, 0.3);
+  transform: scale(0.98);
 }
 
 /* Solid panel: content-heavy cards, tables */
@@ -1173,76 +1111,17 @@
 
 /* Moving multichrome gradient fill for surfaces / buttons */
 .chrome-accent {
-  background-image: linear-gradient(
-    120deg,
-    #eaf6ff 0%,
-    #9fe3ff 18%,
-    #d6c6ff 38%,
-    #ffd6f0 55%,
-    #c9ffe2 72%,
-    #eaf6ff 100%
-  );
-  background-size: 220% 100%;
-  background-position: 0% 50%;
-  animation-name: chrome-sheen;
-  animation-duration: 4s;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-  animation-play-state: var(--chrome-sheen, paused);
+  background: var(--color-retro-accent);
+  color: var(--color-retro-accent-text) !important;
+  border-radius: var(--radius-lg);
+  transition: background-color 150ms ease-out;
 }
 
-/* Animated gradient text (headings, prices, badges) */
-.text-chrome {
-  display: inline-block;
-  background-image: linear-gradient(
-    100deg,
-    #ffffff 0%,
-    #9fe3ff 25%,
-    #d6c6ff 50%,
-    #ffd6f0 72%,
-    #ffffff 100%
-  );
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation-name: chrome-sheen;
-  animation-duration: 5s;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-  animation-play-state: var(--chrome-sheen, paused);
-}
-
-/* Chrome border treatment for prominent cards */
-.chrome-border {
-  position: relative;
-  isolation: isolate;
-}
-.chrome-border::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1.5px;
-  background: linear-gradient(135deg, #ffffff, #9fe3ff 30%, #ffd6f0 60%, #d6c6ff 100%);
-  background-size: 300% 300%;
-  animation-name: chrome-sheen;
-  animation-duration: 5s;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-  animation-play-state: var(--chrome-sheen, paused);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask-composite: exclude;
-  pointer-events: none;
+.chrome-accent:hover {
+  background: var(--color-retro-accent-hover);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chrome-accent,
-  .text-chrome,
-  .chrome-border::before,
-  .accent-control,
   .create-action {
     animation: none;
     background-size: 100% 100%;

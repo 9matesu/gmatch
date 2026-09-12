@@ -448,7 +448,7 @@ export function CommandIsland({
               title="Custom Wallpaper Settings"
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
             >
-              <PaintBrush className="w-3.5 h-3.5 text-chrome-pink shrink-0" />
+              <PaintBrush className="w-3.5 h-3.5 text-retro-muted shrink-0" />
               <span className="text-xs hidden sm:inline">Theme</span>
             </button>
 
