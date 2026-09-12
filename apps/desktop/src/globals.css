@@ -40,6 +40,10 @@
   --z-toast: 70;
   --z-system: 80;
 
+  /* Vertical clearance for the floating command island (bottom-5 + pill).
+     Side rails and tall modals stop above it so the pill bar is never covered. */
+  --island-clearance: 76px;
+
   /* Accent: classic monochrome (user revert 2026-09-12: blue felt off) */
   --color-retro-accent: #ffffff;
   --color-retro-accent-hover: #e4e4e7;

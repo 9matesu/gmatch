@@ -309,7 +309,7 @@ describe('ServersView', () => {
     spy.mockRestore()
   })
 
-  it('hides central admin button for non-admin callers', async () => {
+  it('central admin door renders in client mode too (panel self-gates)', async () => {
     mockFetch(async (url) => {
       if (url.includes('/api/servers/dashboard')) return json({ name: 'hub', users: [], posts_24h: 0, members_total: 0 })
       if (url.includes('/api/servers/node')) return json({ name: 'hub', description: '', isAdmin: false })
@@ -318,7 +318,10 @@ describe('ServersView', () => {
     })
     render(<ServersView identity={identity} toast={() => {}} />)
     await screen.findByText('Server browser (0)')
-    expect(screen.queryByRole('button', { name: /central admin/i })).toBeNull()
+    // The button no longer pre-gates on node.isAdmin: the user's .exe is the
+    // central admin. CentralAdminPanel itself refuses until the PIN unlocks.
+    expect(screen.getByRole('button', { name: /central admin/i })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Central admin login')).not.toBeInTheDocument()
   })
 
   it('anonymous browser fetches directory only, never dashboard/node', async () => {

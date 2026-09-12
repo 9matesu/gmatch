@@ -2888,6 +2888,35 @@ export default function Home() {
             <div className="app-glass relative z-10 w-full h-full min-h-0 bg-transparent text-retro-fg shadow-2xl flex flex-col overflow-hidden">
               <NativeHeaderBar />
               <div className="flex-1 min-w-0 min-h-0 flex flex-row overflow-hidden relative">
+
+                {/* Notifications dock: LEFT side panel sibling (mirrors chat) */}
+                <MessagesRail open={notifOpen} side="left" widthClass="w-[min(420px,32vw)]">
+                  <div className="glass-card w-full h-full min-h-0 flex flex-col overflow-hidden rounded-xl">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-border-glass shrink-0">
+                      <span className="text-xs font-bold text-retro-fg uppercase tracking-wider">Notifications</span>
+                      <button
+                        type="button"
+                        onClick={() => setNotifOpen(false)}
+                        aria-label="Close notifications"
+                        className="p-1.5 rounded-md hover:bg-glass-w8 text-retro-muted hover:text-retro-fg cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar">
+                      <NotificationsPanel
+                        notifications={lobby.notifications}
+                        unreadCount={lobby.unreadCount}
+                        invites={lobby.invites}
+                        onMarkAllRead={() => lobby.markNotificationsRead()}
+                        onRespondInvite={(id, accept) => lobby.respondToInvite(id, accept)}
+                        onRespondBabecock={handleRespondBabecock}
+                        onOpenBabecock={() => { setNotifOpen(false); setGamesSubTab('babecock'); setMainView('games'); }}
+                      />
+                    </div>
+                  </div>
+                </MessagesRail>
+
                 <div ref={mainScrollRef} className="mobile-app-scroll flex-1 min-w-0 min-h-0 w-full flex flex-col relative z-10 overflow-y-auto styled-scrollbar pb-24">
 
                   {/* Modals & Config */}
@@ -3300,12 +3329,8 @@ export default function Home() {
                   {/* Decision Overlay deactivated — matching cards are shown directly inside the match tab */}
                 </div>
 
-                {/* Desktop messages dock: full-height side panel sibling */}
-                <MessagesRail
-                  open={chatOpen}
-                  onToggle={() => { playPress(860); setChatOpen((v) => !v); }}
-                  unreadCount={pmUnreadCount}
-                >
+                {/* Desktop messages dock: right side panel sibling */}
+                <MessagesRail open={chatOpen}>
                   <SocialPanel
                     onClose={() => setChatOpen(false)}
                     chatUnread={pmUnreadCount}
@@ -3427,7 +3452,7 @@ export default function Home() {
                 )}
 
                 {/* Notifications modal (sidebar/header bell) */}
-                {notifOpen && (
+                {notifOpen && !isDesktopViewport() && (
                   <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4" role="dialog" aria-label="Notifications">
                     <div className="absolute inset-0 bg-black/70" onClick={() => setNotifOpen(false)} />
                     <div className="relative w-full max-w-md h-[70vh] glass-card rounded-xl overflow-hidden flex flex-col">

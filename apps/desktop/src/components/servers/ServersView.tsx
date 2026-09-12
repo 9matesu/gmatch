@@ -17,6 +17,7 @@ import { decodeNodeMask } from '../../utils/nodeMask'
 import { buildNodeCode } from '../../utils/nodeShare'
 import { PromptDialog } from '../PromptDialog'
 import { claimPendingHost } from '../../hooks/usePendingServerHost'
+import { SERVER_MARKER_KEY } from '../../firstRun/onboardingState'
 import { playPress } from '../../utils/sounds'
 import { CentralAdminPanel } from './CentralAdminPanel'
 import type { User } from '@orbit/shared'
@@ -858,7 +859,7 @@ export function ServersView({
                           toast('Switched to local 8790', 'info')
                           void refresh()
                         }}
-                        className={`px-1.5 py-0.2 rounded text-[9px] font-mono cursor-pointer ${
+                        className={`px-1.5 py-0.2 rounded text-[10px] font-mono cursor-pointer ${
                           central === 'http://127.0.0.1:8790'
                             ? 'bg-retro-accent text-white font-bold'
                             : 'bg-glass-w10 text-retro-muted hover:text-retro-fg'
@@ -874,7 +875,7 @@ export function ServersView({
                           toast('Switched to fly.dev', 'info')
                           void refresh()
                         }}
-                        className={`px-1.5 py-0.2 rounded text-[9px] font-mono cursor-pointer ${
+                        className={`px-1.5 py-0.2 rounded text-[10px] font-mono cursor-pointer ${
                           central === 'https://gmatch.fly.dev'
                             ? 'bg-retro-accent text-white font-bold'
                             : 'bg-glass-w10 text-retro-muted hover:text-retro-fg'
@@ -889,7 +890,9 @@ export function ServersView({
             </div>
 
             <div className="flex items-center gap-1.5 ml-auto">
-              {central && node?.isAdmin && (
+              {/* CentralAdminPanel self-gates on central's answer; render the
+                  door in client mode too (user's .exe is the central admin). */}
+              {central && (
                 <button
                   type="button"
                   onClick={() => { playPress(760); setShowAdmin((v) => !v) }}

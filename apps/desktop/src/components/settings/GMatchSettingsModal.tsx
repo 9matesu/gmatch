@@ -323,7 +323,7 @@ export function GMatchSettingsModal({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 select-none font-sans animate-orbit-fade-in"
+      className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 pb-[var(--island-clearance)] select-none font-sans animate-orbit-fade-in"
       onClick={onClose}
     >
       <div

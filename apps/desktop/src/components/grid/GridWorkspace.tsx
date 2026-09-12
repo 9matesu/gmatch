@@ -105,7 +105,7 @@ export default function GridWorkspace({
   }
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-surface-canvas p-1 sm:p-2">
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-surface-canvas p-3 sm:p-4 pb-[var(--island-clearance)]">
       <main className="relative flex min-h-0 flex-1 items-stretch gap-0 overflow-hidden">
         {/* Game Stage — expands, centers, left side */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden pr-1">
