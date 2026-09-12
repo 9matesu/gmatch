@@ -111,4 +111,40 @@ describe('DeckService', () => {
   it('rejects deck creation for an unknown game id', async () => {
     await expect(decks.createDeck(OWNER, 'Ghost Deck', 'no-such-game')).rejects.toMatchObject({ code: 'NOT_FOUND' })
   })
+
+  describe('getQueueEligibleDeck', () => {
+    async function seedActiveDeck(name: string) {
+      const deck = await decks.createDeck(OWNER, name)
+      for (let i = 0; i < 5; i++) {
+        const mid = `media-${name}-${i}`
+        await seedMedia(db, mid, OWNER)
+        const card = await cards.createCard({ creatorId: OWNER, mediaObjectId: mid })
+        await decks.addCard(OWNER, deck.id, card.id)
+      }
+      return deck
+    }
+
+    it('returns the deck when owned with exactly 5 eligible cards', async () => {
+      const deck = await seedActiveDeck('Queue OK')
+      const got = await decks.getQueueEligibleDeck(deck.id, OWNER, 5)
+      expect(got.id).toBe(deck.id)
+    })
+
+    it('404s for unknown or foreign decks', async () => {
+      const deck = await seedActiveDeck('Queue Own')
+      await expect(decks.getQueueEligibleDeck('no-such-deck', OWNER, 5)).rejects.toMatchObject({ code: 'NOT_FOUND' })
+      await expect(decks.getQueueEligibleDeck(deck.id, OTHER, 5)).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    })
+
+    it('rejects wrong size and ineligible members', async () => {
+      const small = await decks.createDeck(OWNER, 'Queue Small')
+      await expect(decks.getQueueEligibleDeck(small.id, OWNER, 5)).rejects.toMatchObject({ code: 'CONFLICT' })
+
+      const deck = await seedActiveDeck('Queue Ban')
+      // moderate one member out
+      const removed = deck.cards[0]
+      await db.prepare("UPDATE Cards SET moderation_state = 'banned' WHERE id = ?").bind(removed).run()
+      await expect(decks.getQueueEligibleDeck(deck.id, OWNER, 5)).rejects.toMatchObject({ code: 'CONFLICT' })
+    })
+  })
 })

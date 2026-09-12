@@ -195,6 +195,26 @@ export class DeckService {
     return (await this.getDeck(deckId, ownerId))!
   }
 
+  /** The deck a player queues with: must exist, belong to them, hold exactly
+   * `minSize` cards, and every member must still be owned + active. getDeck
+   * already 404s foreign decks via the caller filter. */
+  async getQueueEligibleDeck(deckId: string, ownerId: string, minSize: number): Promise<DeckRecord> {
+    const deck = await this.getDeck(deckId, ownerId)
+    if (!deck) throw notFound('deck not found')
+    if (deck.cards.length !== minSize) throw conflict(`deck must have exactly ${minSize} cards`)
+    const bad = await this.db
+      .prepare(`
+        SELECT COUNT(*) AS n FROM DeckCards dc
+        LEFT JOIN Cards c ON c.id = dc.card_id
+        LEFT JOIN CardOwnership co ON co.card_id = c.id AND co.owner_id = ?
+        WHERE dc.deck_id = ? AND (c.id IS NULL OR c.moderation_state != 'active' OR co.card_id IS NULL)
+      `)
+      .bind(ownerId, deckId)
+      .first<{ n: number }>()
+    if ((bad?.n ?? 0) > 0) throw conflict('deck contains ineligible cards')
+    return deck
+  }
+
   // Validate a deck against the given rules and current ownership/moderation
   // state. Uses LEFT JOINs so cards whose ownership row is missing are reported
   // as violations rather than silently omitted.
