@@ -167,7 +167,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
         toast?.(data.error || 'Cashout failed', 'error');
         return;
       }
-      toast?.(`Cashed out for ${formatGc(data.payout)}!`, 'success');
+      toast?.(`Cashed out for ${formatGc(data.payout)}.`, 'success');
       setConfirmCashout(false);
       window.dispatchEvent(new CustomEvent('orbit-cards-refresh'));
       window.dispatchEvent(new CustomEvent('orbit-score-refresh'));
@@ -181,7 +181,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
         <div className="glass-card p-8 max-w-2xl w-full mx-4">
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-surface-elevated rounded w-3/4"></div>
@@ -194,10 +194,10 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
 
   if (error || !card) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
         <div className="glass-card p-8 max-w-2xl w-full mx-4">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-retro-fg">Card Details</h2>
+            <h2 className="text-xl font-bold text-retro-fg">Card details</h2>
             <button onClick={onClose} className="glass-action glass-action-danger h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer">
               <X className="w-6 h-6" />
             </button>
@@ -213,12 +213,12 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
   const statusLabel = card.marketStatus === 'none' ? 'Not Listed' : card.marketStatus === 'cashed_out' ? 'Cashed Out' : card.marketStatus === 'listed' ? 'On Market' : card.marketStatus;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 overflow-y-auto" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 overflow-y-auto" onClick={onClose}>
       <div className="glass-card max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="glass-header flex items-center justify-between px-5 py-4 shrink-0">
           <div className="min-w-0">
             <h2 className="text-lg font-bold text-retro-fg truncate">{card.name || 'Unnamed Card'}</h2>
-            <p className="text-[11px] text-retro-muted mt-0.5">
+            <p className="text-xs text-retro-muted mt-0.5">
               {new Date(card.createdAt).toLocaleDateString()} · <span className="capitalize">{statusLabel}</span>
             </p>
           </div>
@@ -261,7 +261,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
                 type="button"
                 onClick={() => onOpenProfile?.(card.creatorId)}
                 disabled={!onOpenProfile}
-                className={`glass-inset ml-auto px-2.5 py-1.5 rounded-full text-[11px] font-mono text-retro-muted ${onOpenProfile ? 'cursor-pointer' : 'cursor-default'}`}
+                className={`glass-inset ml-auto px-2.5 py-1.5 rounded-full text-xs font-mono text-retro-muted ${onOpenProfile ? 'cursor-pointer' : 'cursor-default'}`}
                 title="View creator"
               >
                 by {card.creatorId.slice(0, 8)}…

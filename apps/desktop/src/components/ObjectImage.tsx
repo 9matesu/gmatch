@@ -132,7 +132,7 @@ export function ObjectImage({
     // blank placeholder instead of "No preview" to avoid a misleading flash.
     const waiting = signed && !img.failed
     return (
-      <div ref={placeholderRef} className={className || 'w-full aspect-[4/3] bg-retro-bg flex items-center justify-center text-[9px] text-retro-muted'}>
+      <div ref={placeholderRef} className={className || 'w-full aspect-[4/3] bg-retro-bg flex items-center justify-center text-[10px] text-retro-muted'}>
         {waiting ? '' : 'No preview'}
       </div>
     )
@@ -142,7 +142,7 @@ export function ObjectImage({
 
   if (hasError) {
     return (
-      <div ref={placeholderRef} className={className || 'w-full aspect-[4/3] bg-retro-bg flex items-center justify-center text-[9px] text-retro-muted'}>
+      <div ref={placeholderRef} className={className || 'w-full aspect-[4/3] bg-retro-bg flex items-center justify-center text-[10px] text-retro-muted'}>
         Image unavailable
       </div>
     )
@@ -159,7 +159,7 @@ export function ObjectImage({
         controls={controls}
         playsInline={playsInline}
         preload={preload}
-        onError={(e) => {
+        onError={(_e) => {
           onError?.()
           setHasError(true)
         }}
@@ -174,7 +174,7 @@ export function ObjectImage({
       className={className}
       loading={loading}
       fetchPriority={fetchPriority}
-      onError={(e) => {
+      onError={(_e) => {
         onError?.()
         setHasError(true)
       }}

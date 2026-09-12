@@ -94,7 +94,7 @@ export function PostCreatorModal({
     }
 
     playWin();
-    toast?.('Post published successfully!', 'success');
+    toast?.('Posted.', 'success');
     onClose();
     setMedia([]);
     setCaption('');
@@ -103,18 +103,18 @@ export function PostCreatorModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 select-none animate-orbit-fade-in"
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 select-none animate-orbit-fade-in"
       onClick={onClose}
     >
       <div
-        className="bg-glass backdrop-blur-2xl text-retro-fg w-full max-w-lg rounded-2xl border border-border-glass shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-orbit-slide-up"
+        className="bg-glass backdrop-blur-2xl text-retro-fg w-full max-w-lg rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-orbit-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="p-4 border-b border-border-glass flex items-center justify-between">
           <div className="flex items-center gap-2">
             <PlusSquare className="w-5 h-5 text-retro-fg" />
-            <h3 className="text-sm font-extrabold text-retro-fg">Create New Post</h3>
+            <h3 className="text-sm font-extrabold text-retro-fg">Create new post</h3>
           </div>
           <button
             type="button"
@@ -160,7 +160,7 @@ export function PostCreatorModal({
                     title="Upload from device"
                   >
                     <Upload className="w-4 h-4" />
-                    <span className="text-[9px] font-bold">Add</span>
+                    <span className="text-[10px] font-bold">Add</span>
                   </button>
 
                   {/* Snap with Camera */}
@@ -174,7 +174,7 @@ export function PostCreatorModal({
                     title="Take live photo"
                   >
                     <Camera className="w-4 h-4 text-retro-warning" />
-                    <span className="text-[9px] font-bold">Snap</span>
+                    <span className="text-[10px] font-bold">Snap</span>
                   </button>
                 </>
               )}
@@ -191,7 +191,7 @@ export function PostCreatorModal({
           </div>
 
           {/* Mandatory Tags Section */}
-          <div className="space-y-1.5 p-3.5 bg-retro-warning/10 border border-retro-warning/30 rounded-2xl">
+          <div className="space-y-1.5 p-3.5 bg-retro-warning/10 border border-retro-warning/30 rounded-xl">
             <div className="flex items-center justify-between">
               <label className="text-xs font-black text-retro-warning flex items-center gap-1.5">
                 <span>Required Tags *</span>

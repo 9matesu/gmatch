@@ -91,7 +91,6 @@ export function GMatchProfile({
 
   const isFlashing = activePowerups.includes('powerup_flash') || activePowerups.includes('flash');
   const isVerified = activePowerups.includes('powerup_verified') || activePowerups.includes('verified') || myUser?.is_admin;
-  const isGlitched = activePowerups.includes('powerup_hack') || activePowerups.includes('hack');
 
   const myPosts = posts.filter(
     (p) => identity && p.author_id === identity.orbitId && !p.is_archived && !p.id.startsWith('stream_') && !p.id.startsWith('booru_') && !p.is_sponsored
@@ -145,7 +144,7 @@ export function GMatchProfile({
     });
   };
 
-  const effectiveFollowersCount = followersCount ?? myUser?.followers_count ?? myUser?.likes_received ?? 0;
+  const effectiveFollowersCount = followersCount ?? myUser?.followers_count ?? 0;
   const effectiveFollowingCount = followingCount ?? myUser?.following_count ?? 0;
 
   const stats = [
@@ -167,9 +166,9 @@ export function GMatchProfile({
   ];
 
   return (
-    <div className="w-full bg-surface-canvas font-sans select-none border border-retro-border rounded-xl overflow-hidden text-retro-fg animate-orbit-fade-in shadow-xl">
+    <div className="w-full bg-surface-canvas font-sans select-none border border-border-glass rounded-xl overflow-hidden text-retro-fg animate-orbit-fade-in shadow-xl">
       {/* Profile Header */}
-      <div className="bg-surface-raised border-b border-retro-border p-4 sm:p-6 flex flex-col gap-4">
+      <div className="bg-surface-raised border-b border-border-glass p-4 sm:p-6 flex flex-col gap-4">
         {/* Avatar & Stats */}
         <div className="flex items-center gap-5 sm:gap-6">
           {/* Avatar */}
@@ -179,7 +178,7 @@ export function GMatchProfile({
             }}
             className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden shrink-0 cursor-pointer group border-2 ${isFlashing
                 ? 'border-retro-accent'
-                : 'border-retro-border'
+                : 'border-border-glass'
               }`}
           >
             {pfp ? (
@@ -212,7 +211,7 @@ export function GMatchProfile({
                 <span className="text-sm sm:text-base font-semibold text-retro-fg tabular-nums">
                   {stat.value}
                 </span>
-                <span className="text-[11px] text-retro-muted">{stat.label}</span>
+                <span className="text-xs text-retro-muted">{stat.label}</span>
               </div>
             ))}
           </div>
@@ -264,7 +263,7 @@ export function GMatchProfile({
           <button
             type="button"
             onClick={() => { playPress(800); setShowEditor(true); }}
-            className="flex-1 py-2 px-3 rounded-lg bg-surface-interactive border border-retro-border hover:border-zinc-500 text-retro-body font-medium text-xs transition-colors cursor-pointer"
+            className="flex-1 py-2 px-3 rounded-lg bg-surface-interactive border border-border-glass hover:border-border-glass text-retro-body font-medium text-xs transition-colors cursor-pointer"
           >
             Edit profile
           </button>
@@ -272,7 +271,7 @@ export function GMatchProfile({
           <button
             type="button"
             onClick={handleShareProfile}
-            className="flex-1 py-2 px-3 rounded-lg bg-surface-interactive border border-retro-border hover:border-zinc-500 text-retro-body font-medium text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+            className="flex-1 py-2 px-3 rounded-lg bg-surface-interactive border border-border-glass hover:border-border-glass text-retro-body font-medium text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
           >
             <Share2 className="w-3.5 h-3.5" />
             <span>Share</span>
@@ -283,7 +282,7 @@ export function GMatchProfile({
             onClick={() => { playPress(750); onOpenSettings?.(); }}
             title="Settings"
             aria-label="Settings"
-            className="p-2 rounded-lg bg-surface-interactive border border-retro-border hover:border-zinc-500 text-retro-body cursor-pointer transition-colors"
+            className="p-2 rounded-lg bg-surface-interactive border border-border-glass hover:border-border-glass text-retro-body cursor-pointer transition-colors"
           >
             <Settings className="w-4 h-4" />
           </button>
@@ -291,7 +290,7 @@ export function GMatchProfile({
       </div>
 
       {/* Tabs */}
-      <div className="bg-surface-raised border-b border-retro-border flex items-center">
+      <div className="bg-surface-raised border-b border-border-glass flex items-center gap-1 px-2 py-2">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = profileTab === tab.id;
@@ -300,9 +299,9 @@ export function GMatchProfile({
               key={tab.id}
               type="button"
               onClick={() => { playPress(750); setProfileTab(tab.id as any); }}
-              className={`py-3 flex-1 flex items-center justify-center gap-1.5 text-xs font-medium border-b-2 transition-colors cursor-pointer ${isActive
-                  ? 'border-retro-accent text-retro-accent'
-                  : 'border-transparent text-retro-muted hover:text-retro-body'
+              className={`py-1.5 px-3 flex items-center justify-center gap-1.5 text-xs font-medium rounded-md transition-colors cursor-pointer ${isActive
+                  ? 'bg-glass-w12 text-retro-fg'
+                  : 'text-retro-muted hover:text-retro-body'
                 }`}
             >
               <Icon className="w-4 h-4" />
@@ -329,14 +328,14 @@ export function GMatchProfile({
                   contentUrl={post.url}
                   identity={identity}
                   alt=""
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                  videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
+                  videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
                   muted
                   autoPlay={false}
                   playsInline
                 />
                 {isMediaVideo(post.url) && (
-                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-sm p-1 pointer-events-none text-white z-10">
+                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
                 )}
@@ -375,14 +374,14 @@ export function GMatchProfile({
                   contentUrl={post.url}
                   identity={identity}
                   alt=""
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                  videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
+                  videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
                   muted
                   autoPlay={false}
                   playsInline
                 />
                 {isMediaVideo(post.url) && (
-                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-sm p-1 pointer-events-none text-white z-10">
+                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
                 )}
@@ -414,14 +413,14 @@ export function GMatchProfile({
                   objectId={post.id}
                   identity={identity}
                   alt=""
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                  videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
+                  videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
                   muted
                   autoPlay={false}
                   playsInline
                 />
                 {isMediaVideo(post.url) && (
-                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-sm p-1 pointer-events-none text-white z-10">
+                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
                 )}
@@ -451,14 +450,14 @@ export function GMatchProfile({
                   objectId={card.id}
                   identity={identity}
                   alt=""
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                  videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
+                  videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
                   muted
                   autoPlay={false}
                   playsInline
                 />
                 {isMediaVideo(card.content_url || (card as any).url) && (
-                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-sm p-1 pointer-events-none text-white z-10">
+                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
                 )}

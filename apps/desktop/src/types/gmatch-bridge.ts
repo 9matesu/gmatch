@@ -1,0 +1,50 @@
+import type { BooruRequest, BooruResponse } from '../services/booru'
+
+/** Phases of the portable self-update state machine (main pushes update:status). */
+export interface GmatchUpdateStatus {
+  phase: 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'ready' | 'error' | 'unsupported'
+  current?: string
+  latest?: string
+  version?: string
+  percent?: number
+  bytes?: number
+  verified?: boolean | null
+  error?: string
+  manual?: boolean
+}
+
+/** The single source of truth for the preload bridge surface. */
+export interface GmatchBridge {
+  booruFetch?: (req: BooruRequest) => Promise<BooruResponse>
+  cacheImage?: (url: string) => Promise<{ local: string | null }>
+  cacheStats?: () => Promise<{ files: number; bytes: number }>
+  clearCache?: () => Promise<{ files: number; bytes: number }>
+  evictImage?: (url: string) => Promise<{ ok: boolean }>
+  customPickFolder?: () => Promise<{ ok: boolean; id?: string; path?: string; error?: string }>
+  customListFolder?: (id: string) => Promise<{ ok: boolean; files?: { name: string; url: string }[]; error?: string }>
+  customRemoveFolder?: (id: string) => Promise<{ ok: boolean }>
+  secureAvailable?: () => Promise<boolean>
+  secureGet?: (key: string) => Promise<string | null>
+  secureSet?: (key: string, value: string) => Promise<void>
+  secureDelete?: (key: string) => Promise<void>
+  serverState?: () => Promise<{ packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[] }>
+  appVersion?: () => Promise<string>
+  openExternal?: (url: string) => Promise<void>
+  serverSet?: (payload: { mode: 'host' | 'client'; url?: string }) => Promise<{ ok: boolean; error?: string }>
+  serverRelaunch?: () => Promise<void>
+  updateCheck?: () => Promise<GmatchUpdateStatus>
+  updateState?: () => Promise<GmatchUpdateStatus>
+  updateInstall?: () => Promise<{ ok: boolean; error?: string }>
+  onUpdateStatus?: (cb: (status: GmatchUpdateStatus) => void) => () => void
+  wallpaperSetData?: (buf: ArrayBuffer, mime: string) => Promise<{ ok: boolean; hadPrevious?: boolean }>
+  wallpaperRestore?: () => Promise<{ ok: boolean }>
+  wallpaperCleanupFiles?: () => Promise<{ ok: boolean }>
+  grantCameraOnce?: () => Promise<{ ok: boolean }>
+}
+
+declare global {
+  interface Window {
+    gmatch?: GmatchBridge
+  }
+}
+export {}

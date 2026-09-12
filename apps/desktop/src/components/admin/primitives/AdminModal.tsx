@@ -54,7 +54,7 @@ export function AdminActionMenu<T>({
       {trigger || defaultTrigger}
       {open && (
         <div className="absolute right-0 top-full mt-1 z-50 min-w-[160px] bg-surface-elevated border border-border-glass rounded-lg shadow-lg overflow-hidden animate-orbit-pop">
-          {visibleActions.map((action, index) => {
+          {visibleActions.map((action, _index) => {
               const actionIcon = action.icon;
               const isIconFunction = typeof actionIcon === 'function';
               const ActionIcon = isIconFunction ? (actionIcon as (row: T) => React.ComponentType<{ className?: string }>)(row) : actionIcon;
@@ -132,7 +132,7 @@ export function BulkActionBar<T>({
               }}
               disabled={action.disabled?.(selectedRows)}
               className={cn(
-                "px-3 py-1.5 text-xs font-bold uppercase rounded transition-colors flex items-center gap-1.5",
+                "px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded transition-colors flex items-center gap-1.5",
                 action.variant === "danger" && "bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30",
                 action.variant === "primary" && "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/30",
                 action.variant !== "danger" && action.variant !== "primary" && "bg-surface-interactive text-retro-fg border border-border-glass hover:bg-glass-w10",
@@ -175,7 +175,7 @@ export function ConfirmDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 animate-orbit-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 animate-orbit-fade-in">
       <div className="w-full max-w-md bg-surface-elevated border border-border-glass rounded-xl shadow-2xl overflow-hidden animate-orbit-pop">
         <div className="p-5 space-y-4">
           <div className="flex items-start justify-between">
@@ -311,7 +311,7 @@ export function FormModal<T extends Record<string, unknown>>({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 animate-orbit-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 animate-orbit-fade-in">
       <div className={cn(
         "w-full max-w-lg bg-surface-elevated border border-border-glass rounded-xl shadow-2xl overflow-hidden animate-orbit-pop max-h-[90vh] flex flex-col",
         className
@@ -491,15 +491,7 @@ interface DetailModalProps {
   size?: "sm" | "md" | "lg" | "xl" | "full";
 }
 
-export function DetailModal({
-  isOpen,
-  onClose,
-  title,
-  subtitle,
-  children,
-  className,
-  size = "md",
-}: DetailModalProps) {
+export function DetailModal({ isOpen, onClose, title, subtitle, children, size = "md" }: DetailModalProps) {
   if (!isOpen) return null;
 
   const sizeClasses = {
@@ -511,7 +503,7 @@ export function DetailModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 animate-orbit-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 animate-orbit-fade-in">
       <div className={cn(
         "w-full bg-surface-elevated border border-border-glass rounded-xl shadow-2xl overflow-hidden animate-orbit-pop max-h-[90vh] flex flex-col",
         sizeClasses[size]

@@ -1,6 +1,6 @@
 # Adult Content & Records (18 U.S.C. §2257-adjacent)
 
-_Binding text (EN)_: **2026-09-09.2** · updated: 2026-09-09
+_Binding text (EN)_: **2026-09-11.2** · updated: 2026-09-09
 Jurisdiction: US (for publishers of explicit content under US jurisdiction); analogous local laws
 
 ## 1. Who is the "publisher"
@@ -9,11 +9,11 @@ In the courier/P2P model there is NO central publisher: whoever submits is the p
 
 ## 2. Where records live
 
-With the publisher — on their device. The software distributors receive, see and store none of your records. We offer no records-custody service and must not be treated as one.
+With the publisher, on their device. The software distributors receive, see and store none of your records. We offer no records-custody service and must not be treated as one.
 
 ## 3. App tooling
 
-The app records locally the timestamp and signing key of every submission (signature inside the sealed envelope) — provenance evidence that stays IN THE KEY HOLDER'S HANDS, useful to prove authorship/date.
+The app records locally the timestamp and signing key of every submission (signature inside the sealed envelope), provenance evidence that stays IN THE KEY HOLDER'S HANDS, useful to prove authorship/date.
 
 ## 4. No licence for illegality
 

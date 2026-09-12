@@ -167,20 +167,6 @@ describe('routes/inbox.ts failure path', () => {
   })
 })
 
-describe('routes/economy-idle.ts debit handler', () => {
-  it('POST /idle-debit runs the handler end-to-end', async () => {
-    const body = JSON.stringify({ amount: 1, reference: 'unit-check', idempotency_key: 'idle-debit-unit-1' })
-    const res = await app.request('/api/economy/idle-debit', {
-      method: 'POST',
-      headers: { ...authHeaders(carol, 'POST', '/api/economy/idle-debit', body), 'Content-Type': 'application/json' },
-      body,
-    }, env)
-    // Carol has no funds -> insufficient funds surfaces as 400 via onError.
-    expect(res.status).toBe(400)
-    expect((await res.json()).error).toBe('Insufficient funds')
-  })
-})
-
 describe('pm.ts defensive catch paths', () => {
   const brokenDb = {
     prepare: () => {

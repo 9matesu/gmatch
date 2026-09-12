@@ -28,7 +28,7 @@ export function SectionHelpButton({ title, description, onOpenFullHelp }: Sectio
       <button
         type="button"
         onClick={() => setOpen(prev => !prev)}
-        className="w-5 h-5 flex items-center justify-center text-[10px] font-bold border border-retro-border text-retro-muted hover:text-retro-fg hover:border-retro-accent transition-colors"
+        className="w-5 h-5 flex items-center justify-center text-[10px] font-bold border border-border-glass text-retro-muted hover:text-retro-fg hover:border-retro-accent transition-colors"
         aria-label={`Help: ${title}`}
         title={`Help: ${title}`}
       >
@@ -36,14 +36,14 @@ export function SectionHelpButton({ title, description, onOpenFullHelp }: Sectio
       </button>
 
       {open && (
-        <div className="absolute left-0 top-7 z-50 w-64 bg-retro-panel border border-retro-border p-3 space-y-2 animate-orbit-fade-in">
-          <h4 className="text-[11px] font-bold text-retro-fg tracking-wider uppercase">{title}</h4>
+        <div className="absolute left-0 top-7 z-50 w-64 bg-retro-panel border border-border-glass p-3 space-y-2 animate-orbit-fade-in">
+          <h4 className="text-xs font-bold text-retro-fg tracking-wider uppercase">{title}</h4>
           <p className="text-[10px] text-retro-muted leading-relaxed">{description}</p>
           {onOpenFullHelp && (
             <button
               type="button"
               onClick={() => { setOpen(false); onOpenFullHelp() }}
-              className="text-[9px] font-bold text-retro-accent hover:underline transition-colors"
+              className="text-[10px] font-bold text-retro-accent hover:underline transition-colors"
             >
               View full help guide →
             </button>

@@ -4,16 +4,15 @@ import { logger } from './logger';
 
 function computeApiBase(): string {
   // Desktop merge (D3): VITE_API_URL, or the Electron preload's __API_BASE__
-  // (local sidecar). Default: sidecar on 8790.
+  // (local sidecar). Default: central node; local sidecar is opt-in via the
+  // server-mode switch in Settings.
   const envUrl =
     (import.meta.env.VITE_API_URL as string | undefined) ||
     (typeof window !== 'undefined' && (window as unknown as { __API_BASE__?: string }).__API_BASE__)
   if (envUrl) return envUrl.replace(/\/+$/, '')
-  if (typeof window !== 'undefined' && window.location.origin.startsWith('http')) {
-    // Browser dev (vite): same-origin, API proxied or sidecar on 8790.
-    return 'http://127.0.0.1:8790'
-  }
-  return 'http://127.0.0.1:8790'
+  // Dev (vite) and packaged builds both default to the gmatch central node;
+  // the local sidecar is opt-in via VITE_API_URL / __API_BASE__ / server-mode.
+  return 'https://gmatch.fly.dev'
 }
 
 export const API_BASE = computeApiBase();
@@ -167,10 +166,12 @@ export async function orbitFetch(
 
   async function buildHeaders(): Promise<Headers> {
     const signed = signRequestHeaders(method, pathname, bodyForSig, identity, options.headers)
-    // Sealed mutation (security plan T2): signed headers + JSON body travel
-    // ECIES-encrypted to the node key; only X-Orbit-Sealed is visible on the
-    // wire. GET and multipart uploads stay as-is (idempotent reads / binary).
-    if (method !== 'GET' && !isFormUpload && identity.encryptionPrivHex && identity.encryptionPubHex) {
+    // Sealed request (security plan T2 + wave 2 B2): signed headers + JSON
+    // body travel ECIES-encrypted to the node key; only X-Orbit-Sealed is
+    // visible on the wire. GETs seal their identity headers too (empty body)
+    // so an observer never sees WHO asks. Multipart uploads stay as-is
+    // (binary streaming; identity headers ride plaintext there).
+    if (!isFormUpload && identity.encryptionPrivHex && identity.encryptionPubHex) {
       const nodePub = await getNodePubkey(fetchImpl, url)
       if (nodePub) {
         const headersRecord: Record<string, string> = {}
@@ -218,7 +219,11 @@ export async function orbitFetch(
     const isUpload = options.body instanceof FormData
     const timeout = setTimeout(() => controller.abort(), isUpload ? 120000 : 30000)
     try {
-      const res = await fetchImpl(url, { ...options, headers, ...(headers.has('X-Orbit-Sealed') ? { body: sealedBody } : {}), signal: controller.signal })
+      // GET must never carry a body (real fetch throws) — the seal lives in
+      // the header alone; only non-GET sealed requests send the placeholder.
+      const bodyInitFor = (h: Headers) =>
+        h.has('X-Orbit-Sealed') && method !== 'GET' && method !== 'HEAD' ? { body: sealedBody } : {}
+      const res = await fetchImpl(url, { ...options, headers, ...bodyInitFor(headers), signal: controller.signal })
       clearTimeout(timeout)
       if (res.ok) {
         if (method === 'GET') {
@@ -237,7 +242,7 @@ export async function orbitFetch(
       // while and the X-Orbit-Timestamp expired before the request arrived).
       if (res.status === 401 && !isUpload) {
         const retryHeaders = await buildHeaders()
-        const retryRes = await fetch(url, { ...options, headers: retryHeaders, ...(retryHeaders.has('X-Orbit-Sealed') ? { body: 'sealed' } : {}), signal: controller.signal })
+        const retryRes = await fetchImpl(url, { ...options, headers: retryHeaders, ...bodyInitFor(retryHeaders), signal: controller.signal })
         if (retryRes.ok) {
           if (method === 'GET') {
             responseCache.set(ck, { data: retryRes.clone(), expiry: Date.now() + CACHE_TTL })
@@ -252,7 +257,7 @@ export async function orbitFetch(
         await new Promise(r => setTimeout(r, Math.min(retryAfter * 1000, 10000)))
         // Re-sign with a fresh timestamp so the retry is not rejected as expired.
         const retryHeaders = await buildHeaders()
-        const retryRes = await fetch(url, { ...options, headers: retryHeaders, ...(retryHeaders.has('X-Orbit-Sealed') ? { body: 'sealed' } : {}), signal: controller.signal })
+        const retryRes = await fetchImpl(url, { ...options, headers: retryHeaders, ...bodyInitFor(retryHeaders), signal: controller.signal })
         if (retryRes.ok) {
           if (method === 'GET') {
             responseCache.set(ck, { data: retryRes.clone(), expiry: Date.now() + CACHE_TTL })

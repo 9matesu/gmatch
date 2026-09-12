@@ -52,7 +52,7 @@ export function AdminMediaThumbnail({
           <LinkIcon className="w-5 h-5 text-cyan-300" />
         </div>
       ) : !canOpen ? (
-        <div className="w-full h-full flex items-center justify-center text-[7px] font-mono text-retro-muted">
+        <div className="w-full h-full flex items-center justify-center text-[10px] font-mono text-retro-muted">
           {fallbackLabel}
         </div>
       ) : isVideo ? (

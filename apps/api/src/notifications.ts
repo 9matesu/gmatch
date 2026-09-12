@@ -17,7 +17,7 @@ import { MIN_GAME_CARDS } from '@orbit/shared'
  * fresh GameMatches duel via lobby.createDirectMatch.
  */
 
-export type NotificationType = 'match_invite' | 'match_result' | 'pm' | 'babecock_invite' | 'babecock_start' | 'like' | 'comment' | 'follow' | 'card_received' | 'system'
+export type NotificationType = 'match_invite' | 'match_result' | 'pm' | 'babecock_invite' | 'babecock_start' | 'like' | 'comment' | 'follow' | 'card_received' | 'card_purchase' | 'system'
 
 export interface NotificationRow {
   id: string
@@ -63,7 +63,7 @@ export async function createNotification(
       .bind(id, userId, type, title.slice(0, 200), body ? body.slice(0, 500) : null, data ? JSON.stringify(data) : null, now)
       .run()
     return { id, user_id: userId, type, title, body: body ?? null, data: data ? JSON.stringify(data) : null, read: 0, created_at: now }
-  } catch (err) {
+  } catch  {
     return null
   }
 }
@@ -262,7 +262,7 @@ export async function acceptMatchInvite(
 
   const { createDirectMatch } = await import('./lobby')
   const match = await createDirectMatch(db, invite.inviter_id, inviteeId, now)
-  if (!match) return { error: 'Failed to start the match', status: 500 }
+  if (!match) return { error: "The match couldn't start", status: 500 }
 
   await db.prepare("UPDATE MatchInvites SET status = 'accepted', updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(inviteId).run()
 

@@ -6,19 +6,11 @@
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { User } from '@orbit/shared';
 import type { ChatMessage } from '../../hooks/useP2P';
-import type { useLobby } from '../../hooks/useLobby';
-import { SocialPanel, type SocialPanelTab } from '../chat/SocialPanel';
-import { GMatchDMs, type PeerInfo, type ThreadItem, type GroupInfo } from '../chat/GMatchDMs';
+import { SocialPanel } from '../chat/SocialPanel';
+import { GMatchDMs, type ThreadItem, type GroupInfo } from '../chat/GMatchDMs';
 import type { GroupMember } from '../chat/GroupMembersPopover';
-import { NotificationsPanel } from '../NotificationsPanel';
-import type { MainViewType } from '../home/HomeFooter';
-
-type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
-type GamesSubTab = 'duel' | 'cards' | 'babecock' | 'ranks' | 'store';
 
 export function MessagesView({
-  panelTab,
-  setPanelTab,
   identity,
   chatMessages,
   pmPeer,
@@ -52,13 +44,7 @@ export function MessagesView({
   setViewerMessage,
   setDmMinimized,
   pmUnreadCount,
-  lobby,
-  handleRespondBabecock,
-  setGamesSubTab,
-  setMainView,
 }: {
-  panelTab: SocialPanelTab;
-  setPanelTab: (tab: SocialPanelTab) => void;
   identity: OrbitIdentity | null;
   chatMessages: ChatMessage[];
   pmPeer: User | null;
@@ -92,19 +78,12 @@ export function MessagesView({
   setViewerMessage: (msg: ChatMessage | null) => void;
   setDmMinimized: (v: boolean) => void;
   pmUnreadCount: number;
-  lobby: ReturnType<typeof useLobby>;
-  handleRespondBabecock: (id: string, accept: boolean) => Promise<void> | void;
-  setGamesSubTab: (tab: GamesSubTab) => void;
-  setMainView: React.Dispatch<React.SetStateAction<MainViewType>>;
 }) {
   return (
     <div className="p-2 sm:p-4 h-full flex-1 flex flex-col min-h-0">
       <SocialPanel
-        tab={panelTab}
-        onTabChange={setPanelTab}
         onClose={() => setDmMinimized(true)}
         chatUnread={pmUnreadCount}
-        notificationUnread={lobby.unreadCount}
         dm={
           <GMatchDMs
             identity={identity}
@@ -169,17 +148,6 @@ export function MessagesView({
             onLoadHistory={loadPmHistory}
           />
         }
-        notifications={
-          <NotificationsPanel
-            notifications={lobby.notifications}
-            unreadCount={lobby.unreadCount}
-            invites={lobby.invites}
-            onMarkAllRead={() => lobby.markNotificationsRead()}
-            onRespondInvite={(id, accept) => lobby.respondToInvite(id, accept)}
-            onRespondBabecock={handleRespondBabecock}
-            onOpenBabecock={() => { setGamesSubTab('babecock'); setMainView('games'); }}
-          />
-        }
       />
     </div>
   );
@@ -209,7 +177,7 @@ export function DmMinimizedView({
           </div>
         </div>
         <p className="text-xs font-bold text-retro-body">Direct Messages minimized</p>
-        <p className="text-[11px] text-retro-muted">Open the chat bubble at the bottom to keep talking.</p>
+        <p className="text-xs text-retro-muted">Open the chat bubble at the bottom to keep talking.</p>
       </div>
     </div>
   );

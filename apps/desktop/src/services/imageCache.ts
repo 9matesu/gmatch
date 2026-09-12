@@ -26,6 +26,7 @@ interface Bridge {
   cacheImage?: (url: string) => Promise<{ local: string | null }>
   cacheStats?: () => Promise<{ files: number; bytes: number }>
   clearCache?: () => Promise<{ files: number; bytes: number }>
+  evictImage?: (url: string) => Promise<{ ok: boolean }>
 }
 
 function bridge(): Bridge | null {
@@ -101,7 +102,17 @@ export function devFetchable(url: string): string | null {
     if (u.hostname === 'tbib.org') return `/booru/tbib${path}`
     if (u.hostname === 'xbooru.com') return `/booru/xbooru${path}`
     if (u.hostname === 'rule34.paheal.net') return `/booru/paheal${path}`
+    if (u.hostname === 'konachan.com') return `/booru/kona${path}`
+    if (u.hostname === 'yande.re' || u.hostname === 'files.yande.re') {
+      // yande.re 302s image bytes to files.yande.re; vite proxy passes the
+      // 302 through and the browser then dies on CORS. /px fetches
+      // server-side (follows redirect) and streams bytes same-origin.
+      return `/px?u=${encodeURIComponent(url)}`
+    }
     if (u.hostname === 'imhentai.xxx' || u.hostname.endsWith('.imhentai.xxx')) {
+      return `/px?u=${encodeURIComponent(url)}`
+    }
+    if (u.hostname === 'realbooru.com' || u.hostname.endsWith('.booru.org')) {
       return `/px?u=${encodeURIComponent(url)}`
     }
     return null
@@ -172,13 +183,12 @@ export async function resolveImage(url: string): Promise<string> {
 }
 
 /**
- * Best-effort prefetch so back/skip arrows show instantly.
- * Callers pass the 5-up/5-down window; capped at 11 so a long queue can't
- * stampede the network.
+ * Best-effort prefetch so back/skip arrows and 3x3 grids show instantly.
+ * Default cap is 11 for legacy tests; caller can request up to 27 for full 3x3 ahead.
  */
-export function prefetchImages(urls: string[]): void {
+export function prefetchImages(urls: string[], limit = 11): void {
   try {
-    for (const u of urls.slice(0, 11)) {
+    for (const u of urls.slice(0, limit)) {
       if (u) void resolveImage(u)
     }
   } catch {
@@ -214,6 +224,21 @@ export async function clearImageCache(): Promise<ImageCacheStats> {
   session.clear()
   destroyLegacyIdb()
   return { files: 0, bytes: 0, backend: 'memory' }
+}
+
+/** Evict a single image from cache and free its memory. */
+export async function evictImage(url: string): Promise<void> {
+  if (!url) return
+  revokeUrl(url)
+  session.delete(url)
+  const b = bridge()
+  if (b?.evictImage) {
+    try {
+      await b.evictImage(url)
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 // --- test seams --------------------------------------------------------------

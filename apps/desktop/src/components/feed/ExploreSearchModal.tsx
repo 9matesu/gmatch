@@ -84,11 +84,11 @@ export function ExploreSearchModal({
 
   return (
     <div
-      className="fixed inset-0 z-[99999] bg-black/70 backdrop-blur-md flex items-start sm:items-center justify-center p-0 sm:p-4 font-sans select-none animate-orbit-fade-in"
+      className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-md flex items-start sm:items-center justify-center p-0 sm:p-4 font-sans select-none animate-orbit-fade-in"
       onClick={onClose}
     >
       <div
-        className="bg-surface-raised w-full sm:max-w-lg h-full sm:h-[80vh] max-h-[80vh] rounded-none sm:rounded-3xl border border-border-glass shadow-2xl overflow-hidden flex flex-col text-retro-fg animate-orbit-pop"
+        className="bg-surface-raised w-full sm:max-w-lg h-full sm:h-[80vh] max-h-[80vh] rounded-none sm:rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col text-retro-fg animate-orbit-pop"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -145,7 +145,7 @@ export function ExploreSearchModal({
                 return (
                   <div
                     key={id}
-                    className="flex items-center justify-between p-2 rounded-2xl hover:bg-glass-w5 transition-colors group"
+                    className="flex items-center justify-between p-2 rounded-xl hover:bg-glass-w5 transition-colors group"
                   >
                     <div
                       className="flex items-center gap-3 cursor-pointer min-w-0 flex-1"
@@ -155,7 +155,7 @@ export function ExploreSearchModal({
                         onClose();
                       }}
                     >
-                      <div className="w-10 h-10 rounded-full bg-zinc-700 overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold">
+                      <div className="w-10 h-10 rounded-full bg-glass-w20 overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold">
                         {pfp ? (
                           <img src={pfp} alt="" className="w-full h-full object-cover" />
                         ) : (
@@ -200,14 +200,14 @@ export function ExploreSearchModal({
               {matchedPosts.slice(0, 8).map((p) => (
                 <div
                   key={p.id}
-                  className="flex items-center gap-3 p-2 rounded-2xl hover:bg-glass-w5 transition-colors cursor-pointer"
+                  className="flex items-center gap-3 p-2 rounded-xl hover:bg-glass-w5 transition-colors cursor-pointer"
                   onClick={() => {
                     playPress(700);
                     onOpenPost?.(p);
                     onClose();
                   }}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-zinc-700 overflow-hidden shrink-0 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-glass-w20 overflow-hidden shrink-0 flex items-center justify-center">
                     {p.url ? (
                       <ObjectImage contentUrl={p.url} identity={identity} alt="" className="w-full h-full object-cover" />
                     ) : (
@@ -216,7 +216,7 @@ export function ExploreSearchModal({
                   </div>
                   <div className="min-w-0 flex-1">
                     <span className="text-xs font-bold text-retro-fg block truncate">{p.author_name}</span>
-                    {p.caption && <p className="text-[11px] text-retro-muted truncate">{p.caption}</p>}
+                    {p.caption && <p className="text-xs text-retro-muted truncate">{p.caption}</p>}
                   </div>
                 </div>
               ))}

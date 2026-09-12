@@ -2,7 +2,7 @@
 
 // Extracted verbatim from App.tsx `mainView === 'profile'` branch.
 import type { OrbitIdentity } from '@orbit/crypto';
-import { getSecureItem, setSecureItem } from '../../utils/secure-storage'
+import { setSecureItem } from '../../utils/secure-storage'
 import type { OrbitObject, User } from '@orbit/shared';
 import { GMatchProfile } from '../profile/GMatchProfile';
 import type { FeedPost } from '../feed/GMatchFeed';
@@ -55,7 +55,7 @@ export function ProfileView({
   deletePostOnServer: (postId: string) => void;
 }) {
   return (
-    <div className="p-2 sm:p-6 max-w-4xl mx-auto w-full">
+    <div className="p-4 sm:p-8 w-full max-w-[1600px] mx-auto">
       <GMatchProfile
         identity={identity}
         myUser={myUser}

@@ -25,23 +25,7 @@ export interface QueueControlsProps {
   now: number
 }
 
-export function QueueControls({
-  state,
-  match,
-  matchRoundInfo,
-  autoQueueEnabled,
-  soundEnabled,
-  myCardsCount,
-  queuedSinceMs,
-  showLeagueTab,
-  onToggleAutoQueue,
-  onOpenCreateCard,
-  onOpenDeckBuilder,
-  onShowLeagueTab,
-  onOpenCardChat,
-  toast,
-  now,
-}: QueueControlsProps) {
+export function QueueControls({ state, match, matchRoundInfo, autoQueueEnabled, myCardsCount, queuedSinceMs, showLeagueTab, onToggleAutoQueue, onOpenCreateCard, onOpenDeckBuilder, onShowLeagueTab, onOpenCardChat, toast, now }: QueueControlsProps) {
   const hasMatch = Boolean(match)
 
   return (
@@ -49,7 +33,7 @@ export function QueueControls({
       <button
         type="button"
         onClick={onOpenCardChat}
-        className="border border-retro-border px-2.5 py-1.5 text-xs font-medium text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors flex items-center gap-1.5"
+        className="border border-border-glass px-2.5 py-1.5 text-xs font-medium text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors flex items-center gap-1.5"
       >
         <MessageSquare className="w-3.5 h-3.5" />
         Card Chat
@@ -69,7 +53,7 @@ export function QueueControls({
         <button
           type="button"
           onClick={() => { void onToggleAutoQueue(false); }}
-          className="px-3 py-1.5 text-xs font-medium border transition-colors cursor-pointer rounded-lg whitespace-nowrap bg-surface-interactive text-retro-muted border-retro-border hover:border-retro-fg hover:text-retro-fg flex items-center gap-1.5"
+          className="px-3 py-1.5 text-xs font-medium border transition-colors cursor-pointer rounded-lg whitespace-nowrap bg-surface-interactive text-retro-muted border-border-glass hover:border-retro-fg hover:text-retro-fg flex items-center gap-1.5"
         >
           <Pause className="w-3.5 h-3.5" />
           Leave Queue
@@ -113,7 +97,7 @@ export function QueueControls({
         onClick={() => onShowLeagueTab(!showLeagueTab)}
         aria-pressed={showLeagueTab}
         title={showLeagueTab ? 'Back to player roster' : 'View league standings'}
-        className={`px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap border border-retro-border rounded-lg ${showLeagueTab
+        className={`px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap border border-border-glass rounded-lg ${showLeagueTab
           ? 'bg-surface-interactive text-retro-fg'
           : 'bg-transparent text-retro-muted hover:text-retro-fg'
           }`}

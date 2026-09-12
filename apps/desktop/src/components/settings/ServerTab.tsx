@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { Server, Wifi } from 'lucide-react'
 import { playPress } from '../../utils/sounds'
 import { isServerUrl, normalizeServerUrl } from '../../utils/serverUrl'
+import { maskedServerUrl } from '../../utils/ipMask'
 import { ServerPasswordSection } from './ServerPasswordSection'
 import { SnapshotSection } from './SnapshotSection'
 import { useIdentity } from '../../hooks/useIdentity'
@@ -64,11 +65,11 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
             {state.mode.toUpperCase()}
           </span>
         </div>
-        <p className="text-[11px] text-retro-muted font-mono break-all">{state.url}</p>
+        <p className="text-xs text-retro-muted font-mono break-all">{maskedServerUrl(state.url)}</p>
         {state.packaged && (
-          <p className="text-[11px] text-retro-muted">
+          <p className="text-xs text-retro-muted">
             {state.mode === 'host'
-              ? 'Friends running gMatch can enter one of the addresses below in their Settings → Server to join your world. Keep the app open and your firewall allows the port.'
+              ? 'Enter one of these addresses into your friend’s Settings → Server to join your world. Click a row to copy the real address.'
               : 'All social data lives on the server you connected to. Switch back to Host anytime.'}
           </p>
         )}
@@ -78,11 +79,11 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
               <button
                 key={u}
                 type="button"
-                className="block w-full text-left font-mono text-[11px] text-retro-fg hover:text-retro-accent cursor-pointer"
+                className="block w-full text-left font-mono text-xs text-retro-fg hover:text-retro-accent cursor-pointer"
                 onClick={() => { void navigator.clipboard.writeText(u); toast?.('Address copied', 'success') }}
                 title="Copy address"
               >
-                <Wifi className="inline w-3 h-3 mr-1.5" />{u}
+                <Wifi className="inline w-3 h-3 mr-1.5" />{maskedServerUrl(u)}
               </button>
             ))}
           </div>
@@ -90,7 +91,7 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
       </div>
 
       {state.packaged && (
-        <div className="p-4 bg-surface-interactive border border-retro-border rounded-lg space-y-3">
+        <div className="p-4 bg-surface-interactive border border-border-glass rounded-lg space-y-3">
           <div className="text-xs font-medium text-retro-fg">Connect to a friend instead</div>
           <div className="flex gap-2">
             <input
@@ -115,7 +116,7 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
               type="button"
               disabled={saving}
               onClick={() => { playPress(700); void save('host', '') }}
-              className="text-[11px] text-retro-muted hover:text-retro-fg underline cursor-pointer"
+              className="text-xs text-retro-muted hover:text-retro-fg underline cursor-pointer"
             >
               Stop connecting — host my own server again
             </button>

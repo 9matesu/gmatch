@@ -9,6 +9,7 @@ import { maybeResetDailyScores } from '../cleanup'
 import { broadcastToRoom } from '../ws-bus'
 import { reportContent, ReportError } from '../reports'
 import { EconomyService, buildDebitStatements, type BalanceOpResult } from '../economy'
+import { stripImageMetadata } from '../metadata-strip'
 import { mintCardStatements } from '../cards'
 import crypto from 'crypto'
 
@@ -145,7 +146,7 @@ users.get('/', async (c) => {
 
     const res = await c.env.DB.prepare(queryStr).bind(...params).all()
     results = res.results || []
-  } catch (err) {
+  } catch  {
     let queryStr = `
       SELECT u.id, u.public_key, u.encryption_pub_key, u.display_name, u.tags, u.last_seen, u.attention_at,
              COALESCE(u.objects_sent_count, 0) as objects_sent_count,
@@ -460,9 +461,30 @@ users.on(['PATCH', 'PUT'], '/profile', async (c) => {
     updates.push('tags = ?')
     values.push(JSON.stringify(cleanTags ?? []))
   }
+  let cleanPfp: string | null | undefined
   if (pfp_url !== undefined) {
+    // Wave 2 / F20+F24: avatars never carry file metadata and never point at
+    // a third-party host (the old 302 leaked the viewer's IP upstream).
+    // data: URIs get stripped in place; http(s) gets proxied through our own
+    // storage; anything else is rejected.
+    if (typeof pfp_url === 'string' && pfp_url.startsWith('data:image/')) {
+      const comma = pfp_url.indexOf(',')
+      const meta = pfp_url.slice(5, comma)
+      if (!meta.includes('base64')) return c.json({ error: 'Avatar must be a base64 data URL' }, 400)
+      const raw = new Uint8Array(Buffer.from(pfp_url.slice(comma + 1), 'base64'))
+      const mime = meta.split(';')[0]
+      const clean = stripImageMetadata(raw, mime)
+      cleanPfp = `data:${mime};base64,${Buffer.from(clean).toString('base64')}`
+    } else if (typeof pfp_url === 'string' && /^https?:\/\//i.test(pfp_url)) {
+      const { proxyAndStoreExternal } = await import('../proxy')
+      const proxied = await proxyAndStoreExternal(pfp_url, c.env.BUCKET, 'objects', crypto.randomUUID())
+      if (!proxied) return c.json({ error: 'Could not fetch or validate the URL' }, 400)
+      cleanPfp = proxied.storedUrl
+    } else {
+      cleanPfp = pfp_url === null || pfp_url === '' ? null : pfp_url
+    }
     updates.push('pfp_url = ?')
-    values.push(pfp_url)
+    values.push(cleanPfp)
   }
   if (cleanBio !== undefined) {
     updates.push('bio = ?')
@@ -487,7 +509,7 @@ users.on(['PATCH', 'PUT'], '/profile', async (c) => {
     const push: any = { type: 'PROFILE', user: { id: orbitId } }
     if (cleanName !== undefined) push.user.display_name = cleanName
     if (tags !== undefined) push.user.tags = cleanTags ?? []
-    if (pfp_url !== undefined) push.user.pfp_url = pfp_url
+    if (pfp_url !== undefined) push.user.pfp_url = cleanPfp
     broadcastToRoom('global', push)
     broadcastToRoom('lobby', { type: 'lobby', action: 'profile_updated', user: push.user })
   }
@@ -830,7 +852,9 @@ users.post('/:id/report', async (c) => {
 })
 
 // Purchase a store item with the user's live score. Deducts points and records
-// Active in-memory hack debuffs with expiration
+// Active hack debuffs (paid, server-enforced). Durable in HackDebuffs so a
+// sidecar restart (every app relaunch) cannot eat a victim's effect or the
+// attacker's spy session whose purchase already charged g$.
 interface ServerHackDebuff {
   id: string
   type: 'deny' | 'mobile_virus'
@@ -842,15 +866,21 @@ interface ServerHackDebuff {
   expires_at: number
 }
 
-const activeServerHacks: ServerHackDebuff[] = []
+async function pruneExpiredHacks(db: D1Turso) {
+  await db.prepare('DELETE FROM HackDebuffs WHERE expires_at <= ?').bind(Date.now()).run()
+}
 
-function pruneExpiredHacks() {
-  const now = Date.now()
-  for (let i = activeServerHacks.length - 1; i >= 0; i--) {
-    if (activeServerHacks[i].expires_at <= now) {
-      activeServerHacks.splice(i, 1)
-    }
-  }
+async function listHacksFor(db: D1Turso, userId: string): Promise<ServerHackDebuff[]> {
+  const { results } = await db.prepare(
+    'SELECT id, type, attacker_id, attacker_name, target_id, target_name, created_at, expires_at FROM HackDebuffs WHERE (target_id = ? OR attacker_id = ?) AND expires_at > ?',
+  ).bind(userId, userId, Date.now()).all<ServerHackDebuff>()
+  return results || []
+}
+
+async function findActiveHack(db: D1Turso, attackerId: string, targetId: string): Promise<ServerHackDebuff | null> {
+  return await db.prepare(
+    'SELECT id, type, attacker_id, attacker_name, target_id, target_name, created_at, expires_at FROM HackDebuffs WHERE attacker_id = ? AND target_id = ? AND expires_at > ?',
+  ).bind(attackerId, targetId, Date.now()).first<ServerHackDebuff>() ?? null
 }
 
 async function getDynamicItemPrices(db: any): Promise<Record<string, number>> {
@@ -892,8 +922,8 @@ users.get('/store/items', async (c) => {
 })
 
 // Purchase a store item with g$ from the authoritative economy wallet. The
-// debit and the item effect (inventory/unlock) run in one atomic batch; hacks
-// apply an in-memory effect after the debit commits. Idempotent via
+// debit and the item side effects (inventory/unlock/hack debuff) run in one
+// atomic batch, each gated on changes(). Idempotent via
 // Idempotency-Key so a retry cannot double-charge or double-grant.
 users.post('/store/purchase', async (c) => {
   const orbitId = c.get('orbitId')
@@ -957,11 +987,10 @@ users.post('/store/purchase', async (c) => {
     return c.json({ ok: true, item_id: baseItem.id, cost, score: balance, balance, replayed: true })
   }
 
-  // Build the item effect. DB-backed effects (inventory/unlock) attach to the
-  // debit batch atomically; hacks register an in-memory debuff after commit.
+  // Build the item side effects. All attach to the debit batch atomically
+  // (inventory/unlock/hack debuff), each gated on changes().
   let extra: AtomicStatement[] = []
   let debitGate: { clause: string; args: any[] } | undefined
-  let effect: (() => void) | null = null
 
 if (baseItem.id === 'item-flash-drop') {
     // Flash Drop is a broadcast, not a targeted debuff: buying it grants an
@@ -1012,10 +1041,13 @@ if (baseItem.id === 'item-flash-drop') {
       created_at: now,
       expires_at: now + durationMs,
     }
-    effect = () => {
-      pruneExpiredHacks()
-      activeServerHacks.push(debuff)
-    }
+    // Durable: the INSERT rides the same atomic batch as the debit, gated on
+    // changes() like every other store side effect (a failed debit mints no
+    // debuff).
+    extra.push({
+      sql: 'INSERT INTO HackDebuffs (id, type, attacker_id, attacker_name, target_id, target_name, created_at, expires_at) SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE changes() = 1',
+      args: [debuff.id, debuff.type, debuff.attacker_id, debuff.attacker_name, debuff.target_id, debuff.target_name, debuff.created_at, debuff.expires_at],
+    })
   } else if (baseItem.consumable) {
     extra = [
       {
@@ -1069,7 +1101,6 @@ if (baseItem.id === 'item-flash-drop') {
   }
 
   const balance = (res[balanceIndex].rows[0]?.balance as number) ?? 0
-  if (effect) effect()
 
   return c.json({ ok: true, item_id: baseItem.id, cost, score: balance, balance })
 })
@@ -1077,9 +1108,8 @@ if (baseItem.id === 'item-flash-drop') {
 // Query active hack debuffs affecting the current user or launched by current user
 users.get('/hacks/active', async (c) => {
   const orbitId = c.get('orbitId')
-  pruneExpiredHacks()
-  const myDebuffs = activeServerHacks.filter((h) => h.target_id === orbitId || h.attacker_id === orbitId)
-  return c.json({ active_hacks: myDebuffs })
+  await pruneExpiredHacks(c.env.DB)
+  return c.json({ active_hacks: await listHacksFor(c.env.DB, orbitId) })
 })
 
 /**
@@ -1090,11 +1120,8 @@ users.get('/hacks/active', async (c) => {
 users.get('/hacks/spy-feed/:targetId', async (c) => {
   const orbitId = c.get('orbitId')
   const targetId = c.req.param('targetId') || ''
-  pruneExpiredHacks()
-  const now = Date.now()
-  const session = activeServerHacks.find(
-    (h) => h.attacker_id === orbitId && h.target_id === targetId && h.expires_at > now,
-  )
+  await pruneExpiredHacks(c.env.DB)
+  const session = await findActiveHack(c.env.DB, orbitId, targetId)
   if (!session) return c.json({ error: 'No active hack session on that target' }, 403)
 
   const db = c.env.DB

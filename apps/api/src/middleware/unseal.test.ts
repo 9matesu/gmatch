@@ -22,6 +22,7 @@ describe('sealed api request middleware', () => {
       const body = await c.req.json()
       return c.json({ echo: body })
     })
+    app.get('/api/test', orbitAuth, async (c) => c.json({ echo: 'get' }))
     return app
   }
 
@@ -75,6 +76,34 @@ describe('sealed api request middleware', () => {
     })
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ echo: { caption: 'plain' } })
+  })
+
+  // Wave 2 (B2): GET identity headers seal too; API_SEALED_ONLY covers GET.
+  it('sealed GET with empty body authenticates through the rewrite', async () => {
+    const env = await createMockEnv()
+    const app = buildApp(env)
+    const client = createClientIdentity()
+    const headers = await signedInnerHeaders(client, 'GET', '/api/test', '')
+    const sealHeader = sealApiRequest(
+      { headers, body: '' },
+      { privateKeyHex: client.privateKeyHex, publicKeyHex: client.publicKeyHex, encryptionPrivHex: client.encryptionPrivHex, encryptionPubHex: client.encryptionPubHex },
+      node.encryptionPubHex,
+    )
+    const res = await app.request('http://localhost/api/test', {
+      method: 'GET',
+      headers: { 'X-Orbit-Sealed': sealHeader },
+    })
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ echo: 'get' })
+  })
+
+  it('API_SEALED_ONLY rejects plaintext GET', async () => {
+    const env = await createMockEnv()
+    const app = buildApp({ ...env, API_SEALED_ONLY: '1' })
+    const client = createClientIdentity()
+    const headers = await signedInnerHeaders(client, 'GET', '/api/test', '')
+    const res = await app.request('http://localhost/api/test', { method: 'GET', headers })
+    expect(res.status).toBe(400)
   })
 })
 

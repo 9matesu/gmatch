@@ -3,145 +3,324 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>gMatch — adult P2P network with end-to-end encryption</title>
-<meta name="description" content="A single-file Windows app: an adult social network + card arcade between consenting adults. Everything is encrypted between you and the recipient — the server reads nothing. Download it, verify the SHA-256, run it.">
+<title>gMatch, adult P2P network with end-to-end encryption</title>
+<meta name="description" content="A single-file Windows app: an adult social network + card arcade between consenting adults. Everything is encrypted between you and the recipient, and the server reads nothing. Download it, verify the SHA-256, run it.">
+<style>
+:root { color-scheme: dark; }
+html { background: #09090b; scroll-behavior: smooth; }
+body {
+  margin: 0;
+  padding: 56px 32px 96px;
+  background: #09090b;
+  color: #d4d4d8;
+  font: 13px/1.7 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  letter-spacing: -0.08em;
+  text-align: left;
+  -webkit-font-smoothing: antialiased;
+}
+.layout {
+  display: flex;
+  gap: 48px;
+  align-items: flex-start;
+  max-width: 960px;
+  margin: 0 auto;
+}
+aside.sidebar {
+  position: sticky;
+  top: 40px;
+  flex: 0 0 168px;
+  font-size: 12px;
+  line-height: 2;
+  border-left: 1px solid #1f1f23;
+  padding-left: 16px;
+}
+aside.sidebar .group { color: #52525b; text-transform: uppercase; letter-spacing: 0.08em; font-size: 10px; margin: 18px 0 2px; }
+aside.sidebar .group:first-child { margin-top: 0; }
+aside.sidebar a { color: #71717a; text-decoration: none; display: block; }
+aside.sidebar a:hover { color: #fafafa; }
+.content { flex: 1 1 auto; min-width: 0; max-width: 560px; }
+h1, h2, h3, strong { color: #fafafa; font-weight: 600; }
+h1 { font-size: 21px; line-height: 1.25; margin: 0 0 16px; }
+h2 { font-size: 14px; margin: 56px 0 14px; scroll-margin-top: 24px; }
+h3 { font-size: 13px; margin: 30px 0 10px; }
+p { margin: 0 0 14px; }
+em { color: #71717a; }
+a {
+  color: #fafafa;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: #3f3f46;
+}
+a:hover { color: #fff; text-decoration-color: #fff; }
+nav.topnav { margin: 20px 0 0; line-height: 2; }
+nav.topnav a { color: #71717a; text-decoration: none; }
+nav.topnav a:hover { color: #fafafa; text-decoration: underline; text-underline-offset: 3px; }
+ul { margin: 0 0 16px; padding-left: 20px; }
+li { margin: 7px 0; }
+ol { margin: 0 0 16px; padding-left: 20px; }
+ol li { margin: 8px 0; }
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: normal;
+  background: #121215;
+  border: 1px solid #1f1f23;
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: #e4e4e7;
+}
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: normal;
+  line-height: 1.65;
+  background: #121215;
+  border: 1px solid #27272a;
+  border-radius: 6px;
+  padding: 14px 16px;
+  margin: 0 0 16px;
+  color: #fafafa;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #27272a;
+  border-radius: 6px;
+  margin: 26px 0 10px;
+}
+footer {
+  margin-top: 72px;
+  padding-top: 20px;
+  border-top: 1px solid #1f1f23;
+  color: #71717a;
+}
+::selection { background: rgba(255, 255, 255, 0.15); }
+@media (max-width: 820px) {
+  body { padding: 40px 20px 72px; }
+  .layout { display: block; }
+  aside.sidebar { position: static; flex: none; border-left: 0; padding-left: 0; margin: 0 0 32px; columns: 2; }
+}
+</style>
 </head>
 <body>
+<div class="layout">
+<aside class="sidebar" aria-label="Page sections">
+<nav>
+<div class="group">Get it</div>
+<a href="#download">Download</a>
+<a href="#verify">Verify the file</a>
+<a href="#updates">Updates</a>
+<div class="group">Product</div>
+<a href="#what-it-is">What it is</a>
+<a href="#looks-like">Screenshots</a>
+<a href="#faq">FAQ</a>
+<div class="group">Docs</div>
+<a href="#security">Security</a>
+<a href="#crypto">Cryptography</a>
+<a href="#masks">Masks &amp; metadata</a>
+<a href="#topology">Server topology</a>
+<a href="#admin">Admin model</a>
+<a href="#limits">Honest limits</a>
+<a href="legal/security.html">Full audit report</a>
+<div class="group">Legal</div>
+<a href="#terms">Terms &amp; documents</a>
+<a href="#privacy">Privacy at a glance</a>
+</nav>
+</aside>
+<div class="content">
 <header>
 <h1>gMatch</h1>
 <p><strong>Adult content: 18+ only.</strong> By downloading and using gMatch you declare you are a consenting adult in your jurisdiction.</p>
-<p>Built by two people who got annoyed that every "adult" platform keeps a copy of your most private moments on someone's server. gMatch is open code, no ads, no data sales, no sign-up. The server you'll talk to is, by design, almost blind.</p>
-<nav aria-label="Sections">
+<p>Built by two people who got annoyed that every "adult" platform keeps a copy of your most private moments on someone's server. gMatch has no ads, no data sales, no sign-up. The server you'll talk to is, by design, almost blind.</p>
+<nav class="topnav" aria-label="Sections">
+<a href="#download">Download</a> ·
+<a href="#verify">Verify the file</a> ·
 <a href="#what-it-is">What it is</a> ·
 <a href="#looks-like">What it looks like</a> ·
 <a href="#security">Security</a> ·
 <a href="#crypto">Cryptography</a> ·
-<a href="#download">Download</a> ·
-<a href="#verify">Verify the file</a> ·
+<a href="#masks">Masks</a> ·
+<a href="#topology">Topology</a> ·
+<a href="#admin">Admin</a> ·
 <a href="#terms">Terms of Service</a> ·
 <a href="#privacy">Privacy</a> ·
-<a href="#faq">FAQ</a> ·
-<a href="en.html">Português</a>
+<a href="#faq">FAQ</a>
 </nav>
 </header>
 
 <main>
-<section id="what-it-is">
-<h2>What this application is</h2>
-<p>gMatch is a Windows program — one <code>.exe</code>, no installer — that works as an adult social network plus a card-game arcade. Inside it you get:</p>
-<ul>
-<li>A feed of photos/videos that <strong>you</strong> publish, and you pick who sees each post;</li>
-<li>Private chat and group rooms, end-to-end encrypted;</li>
-<li>An adult idle-clicker and a 1v1 card game with decks, a store and a player-to-player market;</li>
-<li>Denunciation-based moderation: if someone sends you something offensive, you report it and <em>only then</em> reveal that one message to a moderator. The admin suite implements exactly that: cases opened by reports — never bulk browsing of anyone's private messages.</li>
-</ul>
-<p>There is no sign-up, no e-mail, no phone. Your "account" is a pair of cryptographic keys generated on your own computer. Nobody can reset your password because there is no password to reset — that's on purpose, and the app makes you back your key up to a file so you can restore it later.</p>
-</section>
-
-<section id="looks-like">
-<h2>What it looks like</h2>
-<p>Real screenshots from the current build. One honest note first: the image tiles inside the feed and arena are <strong>synthetic 1×1 placeholders our automated tests use</strong>, not adult content — because this is a public page and we keep our promises about moderation here too. On your machine the feed shows what your own tags pull, and it stays between you and whoever you share it with.</p>
-<p><img src="img/idle-grid.png" alt="gMatch idle-clicker arena: sidebar navigation, foe stage, balance and upgrade column"></p>
-<p><em>The Idle Clicker arena — the sidebar on the left, the stage in the middle, your wallet and upgrades on the right. Everything you see runs locally.</em></p>
-<p><img src="img/games-hub.png" alt="gMatch games hub with sub-tabs: Play Cards, Gallery and Cards, Idle Clicker, Store, Babecock, Rankings"></p>
-<p><em>The Games hub — every mode reachable from the nested sidebar: Play Cards, Gallery &amp; Cards, Idle Clicker, Store, Babecock, Rankings.</em></p>
-<p><img src="img/cards.png" alt="gMatch card arena lobby with matchmaking queue and collection"></p>
-<p><em>The 1v1 card arena — queue up, spectate, and trade cards on the player market.</em></p>
-<p><img src="img/feed.png" alt="gMatch social feed with posts, stories row and right-side utility dock"></p>
-<p><em>The social feed — posts, stories, likes. The envelopes that cross the internet are encrypted; the server relays them without opening them.</em></p>
-<p><img src="img/servers.png" alt="gMatch server browser: joined nodes, public directory, host-your-own panel"></p>
-<p><em>The server browser — join a friend's node, browse the public directory, or host your own. You are never forced onto our infrastructure.</em></p>
-</section>
-
-<section id="security">
-<h2>Security: what the server can and cannot see</h2>
-<p>The server behind this page runs only the download and a minimal "blind courier". By design (and audited — report linked below):</p>
-<ul>
-<li>All content (messages, photos, captions, rooms) travels <strong>encrypted</strong>. The server forwards opaque envelopes addressed to tokens: it does not know who sends, to whom, or what is inside.</li>
-<li>The server keeps <strong>no list of who is online</strong>. Connections are anonymous; presence exists only between you and your contacts.</li>
-<li>The app caches nothing to your disk: feed images live only in session memory, and every server response is marked <code>no-store</code>.</li>
-<li>Your private keys sit inside Windows' own crypto vault (DPAPI) — never in plaintext, never on any server.</li>
-<li>IP addresses are not recorded in application logs; the optional TURN relay hands out random short-lived credentials unlinked to your identity.</li>
-<li>You can skip our server entirely: gMatch can host its own node (your machine holds all data) or join a friend's. The public directory lists only server names and descriptions — content and user lists never touch it. Password-protected nodes verify the password on the <em>host's</em> machine (scrypt, lockout on failed attempts), never centrally.</li>
-</ul>
-<p>Read the full report: <a href="legal/security.html">security audit</a>. The code is open: <a href="https://github.com/9matesu/goongrid">github.com/9matesu/goongrid</a>.</p>
-</section>
-
-<section id="crypto">
-<h2>Cryptography and how it works (no mystery)</h2>
-<ul>
-<li><strong>Identity:</strong> on first start the app generates two keypairs — Ed25519 (signs everything you do) and X25519 (encrypts content). Your "ID" is a SHA-256 digest of the public key. The private key never leaves your device.</li>
-<li><strong>1:1 messages:</strong> ECIES (X25519 + BLAKE3 + XChaCha20-Poly1305). Mathematically, only the holder of your private key can open what was sent to you — not the server, not even the sender afterwards.</li>
-<li><strong>Group rooms:</strong> a shared secret (DEK) circulates encrypted member-to-member; when someone leaves, the secret rotates (epoch) — the past stays readable to members, nothing new opens with the old key.</li>
-<li><strong>Request sealing:</strong> every API call is signed and timestamped (replays rejected), and when a node advertises a transport key, the request body and headers travel ECIES-encrypted to that node — someone watching your network sees ciphertext, not which post you liked or whom you followed.</li>
-<li><strong>P2P privacy:</strong> ICE candidates containing literal IPs are dropped before they ever leave the app; the relay is optional and its labels are randomised per session.</li>
-<li><strong>The honest limit:</strong> cryptography protects content from third parties. It does NOT protect against someone grabbing your unlocked computer or your exported key file. Keep the backup somewhere safe, and lock your screen.</li>
-</ul>
-</section>
-
 <section id="download">
 <h2>Download (Windows x64, single file)</h2>
-<p>Version <strong id="version">1.1.3</strong> · file <code>gMatch-1.1.3-portable.exe</code> · 114,146,607 bytes (108.9 MiB) · built <span id="build-date">2026-09-10T13:13:50.630Z</span> (UTC).</p>
-<p><a href="releases/gMatch-1.1.3-portable.exe" download>Download gMatch-1.1.3-portable.exe</a></p>
-<p>Expected <strong>SHA-256</strong> — copy the value below and check it against the next section before running anything:</p>
-<pre id="sha256">f5d5ffd80d863d94004c43b7e292eae67e401f2c4312ed61c912ac491938d7ca</pre>
-<p>Expected <strong>SHA-512</strong> (extra paranoia is a virtue when the file is 109 MB):</p>
-<pre id="sha512">cf0b512b5199a924d0e255763e374a95b3afcab3552a6602252dd6828d0a57395dd6003ba4a26a4a52be343bce1aea9c7d7282b29b1bc6d74c1cf1f3b7865339</pre>
-<p><em>(Both hashes — plus the build date and byte count above — are derived mechanically from the shipped file at publish time, never hand-typed. The same data lives at <code>release.json</code> on this server.)</em></p>
+<p>Version <strong id="version">1.1.4</strong> · file <code>gMatch-1.1.4-portable.exe</code> · 114,165,417 bytes (108.9 MiB) · built <span id="build-date">2026-09-10T23:13:29.193Z</span> (UTC).</p>
+<p><a href="releases/gMatch-1.1.4-portable.exe" download>gMatch-1.1.4-portable.exe</a></p>
+<p>Expected <strong>SHA-256</strong>. Copy the value below and check it against the next section before running anything:</p>
+<pre id="sha256">8a5dee388df7f8ac2407e97711e8f000853cee44c722f828451f5c568fa19161</pre>
+<p>Expected <strong>SHA-512</strong>, for extra paranoia (the file is 109 MB):</p>
+<pre id="sha512">83f5f284c49a8f32edcc6111a60b9bac0ec6a1a5a3090df4b4c923dd877007d15b38e8ed08da28ac98c071e1ecd8e8cebf31153e69a67e533c3a2d01ff180120</pre>
+<p><em>(Both hashes, plus the build date and byte count above, are derived mechanically from the shipped file at publish time, never hand-typed. The same data lives at <code>release.json</code> on this server.)</em></p>
 <h3>Code signing: what we do and don't have</h3>
-<p>This binary is <strong>not Authenticode-signed</strong>. A commercial code-signing certificate costs hundreds of dollars a year; we fund this project with donations, not data sales, so instead we publish the cryptographic integrity you can verify yourself: SHA-256 and SHA-512 digests derived from the exact bytes served on this page. There is no macOS or Linux build yet.</p>
-<h3>"Windows said it might be dangerous" — why, and what to do</h3>
-<p>The <strong>SmartScreen</strong> warning appears for ANY legitimate unsigned program — it is a missing-receipt indicator, not a virus detector. To trust this file independently:</p>
+<p>This binary is <strong>not Authenticode-signed</strong>. A commercial code-signing certificate costs hundreds of dollars a year, and we fund this project with donations rather than data sales. So instead we publish the cryptographic integrity you can verify yourself: SHA-256 and SHA-512 digests derived from the exact bytes served on this page. There is no macOS or Linux build yet.</p>
+<h3>"Windows said it might be dangerous". Why, and what to do</h3>
+<p>The <strong>SmartScreen</strong> warning appears for ANY legitimate unsigned program. It is a missing-receipt indicator, not a virus detector. To trust this file independently:</p>
 <ol>
-<li>Verify the SHA-256 (next section) — proof the downloaded file is byte-for-byte what we published;</li>
-<li>Paste the hash (or upload the file) at <a href="https://www.virustotal.com">VirusTotal</a> — a public scan by ~70 antivirus engines;</li>
-<li>Or skip the .exe entirely: clone the open-source code and build it yourself: <a href="https://github.com/9matesu/goongrid">github.com/9matesu/goongrid</a> (<code>npm install</code>, then <code>npm run dist</code> — the exact commands are in <code>README.md</code>).</li>
+<li>Verify the SHA-256 (next section). That proves the downloaded file is byte-for-byte what we published;</li>
+<li>Paste the hash (or upload the file) at <a href="https://www.virustotal.com">VirusTotal</a> for a public scan by ~70 antivirus engines;</li>
+<li>Report anything that doesn't match through the app (Settings → Help) or the abuse contact below.</li>
 </ol>
 </section>
 
 <section id="verify">
 <h2>Verify the hash on Windows (20 seconds, nothing to install)</h2>
 <p>Open the Start menu, type <code>PowerShell</code>, and run (adjust the path if you saved elsewhere):</p>
-<pre>Get-FileHash "$env:USERPROFILE\Downloads\gMatch-1.1.3-portable.exe" -Algorithm SHA256</pre>
-<p>Compare the <code>Hash</code> value with the one published above. If it differs by even ONE character, do NOT run the file: delete it and report at <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a>.</p>
+<pre>Get-FileHash "$env:USERPROFILE\Downloads\gMatch-1.1.4-portable.exe" -Algorithm SHA256</pre>
+<p>Compare the <code>Hash</code> value with the one published above. If it differs by even ONE character, do NOT run the file: delete it and report it through the abuse page linked under Terms below.</p>
 <p>Same idea, any algorithm you prefer: <code>Get-FileHash ... -Algorithm SHA512</code> must match the SHA-512 block above.</p>
+</section>
+
+<section id="updates">
+<h2>Staying current (updates)</h2>
+<p>From version 1.1.4, gMatch checks this server's <code>release.json</code> shortly after each start and once a day after that. When a newer build exists it downloads it automatically, verifies it against the SHA-256 published for that file, and a single <strong>Install &amp; Restart</strong> button in Settings swaps the .exe you already run and relaunches it. Same file, same folder, no installer, nothing else changes. If antivirus or SmartScreen refuses the swap, the app keeps running the old build and the exact downloaded file is left next to it; every step is written to <code>%APPDATA%\gMatch\main.log</code>. Builds 1.1.3 and older cannot self-update: download the new file once and it inherits everything.</p>
+</section>
+
+<section id="what-it-is">
+<h2>What this application is</h2>
+<p>gMatch is a Windows program. One <code>.exe</code>, no installer. It works as an adult social network plus a card-game arcade, and inside it you get:</p>
+<ul>
+<li>A feed of photos/videos that <strong>you</strong> publish, and you pick who sees each post;</li>
+<li>Private chat and group rooms, end-to-end encrypted, addressed only through rotating masks (see <a href="#masks">Masks &amp; metadata</a>);</li>
+<li>An adult idle-clicker and a 1v1 card game with decks, a store and a player-to-player market;</li>
+<li>Denunciation-based moderation: if someone sends you something offensive, you report it and <em>only then</em> reveal that one message to a moderator. The admin suite implements exactly that. Cases open by reports, never by browsing anyone's private messages.</li>
+</ul>
+<p>There is no sign-up, no e-mail, no phone. Your "account" is a pair of cryptographic keys generated on your own computer. Nobody can reset your password because there is no password to reset. That's on purpose, and the app makes you back your key up to a file so you can restore it later.</p>
+</section>
+
+<section id="looks-like">
+<h2>What it looks like</h2>
+<p>Real screenshots from the current build. One honest note first: the image tiles inside the feed and arena are <strong>synthetic 1×1 placeholders our automated tests use</strong>, not adult content. This is a public page, and we keep our moderation promises here too. On your machine the feed shows what your own tags pull, and it stays between you and whoever you share it with.</p>
+<p><img src="img/idle-grid.png" alt="gMatch idle-clicker arena: sidebar navigation, foe stage, balance and upgrade column"></p>
+<p><em>The Idle Clicker arena. Sidebar on the left, stage in the middle, your wallet and upgrades on the right. Everything you see runs locally.</em></p>
+<p><img src="img/games-hub.png" alt="gMatch games hub with sub-tabs: Play Cards, Gallery and Cards, Idle Clicker, Store, Babecock, Rankings"></p>
+<p><em>The Games hub. Every mode reachable from the nested sidebar: Play Cards, Gallery &amp; Cards, Idle Clicker, Store, Babecock, Rankings.</em></p>
+<p><img src="img/cards.png" alt="gMatch card arena lobby with matchmaking queue and collection"></p>
+<p><em>The 1v1 card arena. Queue up, spectate, and trade cards on the player market.</em></p>
+<p><img src="img/feed.png" alt="gMatch social feed with posts, stories row and right-side utility dock"></p>
+<p><em>The social feed. Posts, stories, likes. The envelopes that cross the internet are encrypted, and the server relays them without opening them.</em></p>
+<p><img src="img/servers.png" alt="gMatch server browser: joined nodes, public directory, host-your-own panel"></p>
+<p><em>The server browser. Join a friend's node, browse the public directory, or host your own. You are never forced onto our infrastructure.</em></p>
+</section>
+
+<section id="security">
+<h2>Security: what the server can and cannot see</h2>
+<p>The server behind this page runs only the download and a minimal "blind courier". By design, and audited (report linked below):</p>
+<ul>
+<li>All content (messages, photos, captions, rooms) travels <strong>encrypted</strong>. The server forwards opaque envelopes addressed to tokens. It does not know who sends, to whom, or what is inside.</li>
+<li>The server keeps <strong>no list of who is online</strong>. Connections are anonymous; presence exists only between you and your contacts.</li>
+<li>Every API call, reads included, seals its identity headers to the node's transport key. Anyone watching your network sees ciphertext, not who you are or which route you hit.</li>
+<li>The app caches nothing to your disk: feed images live only in session memory, and every server response is marked <code>no-store</code>.</li>
+<li>Your private keys sit inside Windows' own crypto vault (DPAPI). Never in plaintext, never on any server.</li>
+<li>IP addresses are never stored, echoed, logged or rendered by the application layer; the optional TURN relay hands out random short-lived credentials unlinked to your identity. See <a href="#limits">honest limits</a> for what that does not cover.</li>
+<li>You can skip our server entirely: gMatch can host its own node (your machine holds all data) or join a friend's. The public directory lists only server names and descriptions; content and user lists never touch it. Password-protected nodes verify the password on the <em>host's</em> machine (scrypt, lockout on failed attempts), never centrally.</li>
+</ul>
+<p>Read the full report: <a href="legal/security.html">security audit</a>, four rounds, every finding cites code.</p>
+</section>
+
+<section id="crypto">
+<h2>Cryptography and how it works (no mystery)</h2>
+<ul>
+<li><strong>Identity:</strong> on first start the app generates two keypairs, Ed25519 (signs everything you do) and X25519 (encrypts content). Your "ID" is a SHA-256 digest of the public key. The private key never leaves your device.</li>
+<li><strong>1:1 messages:</strong> ECIES (X25519 + BLAKE3 + XChaCha20-Poly1305). Mathematically, only the holder of your private key can open what was sent to you. Not the server, not even the sender afterwards.</li>
+<li><strong>Group rooms:</strong> a shared secret (DEK) circulates encrypted member-to-member. When someone leaves, the secret rotates (epoch), so the past stays readable to members and nothing new opens with the old key.</li>
+<li><strong>Request sealing:</strong> every API call is signed and timestamped (replays rejected), and both mutations and reads travel ECIES-encrypted to the node's transport key. Someone watching your network sees ciphertext, not which post you liked or whom you followed.</li>
+<li><strong>P2P privacy:</strong> ICE candidates containing literal IPs are dropped before they ever leave the app. With TURN configured the connection is forced relay-only, and relay labels are randomised per session.</li>
+<li><strong>The honest limit:</strong> cryptography protects content from third parties. It does NOT protect against someone grabbing your unlocked computer or your exported key file. Keep the backup somewhere safe, and lock your screen.</li>
+</ul>
+</section>
+
+<section id="masks">
+<h2>Masks, handles and metadata</h2>
+<p>gMatch borrows the Session/SimpleX idea: nobody talks to "you". They talk to a mask.</p>
+<ul>
+<li><strong>Peer addressing is mask-only.</strong> Every conversation, receipt and room invite is addressed to an opaque delivery token rendered as <code>handle.gmatch.com/&lt;token&gt;</code>. Hosts, IPs and account ids never appear in the peer layer.</li>
+<li><strong>Tokens rotate.</strong> Your permanent address is <code>blake3(pubkey)</code>. Each app session also derives a fresh <code>blake3(pubkey‖epoch)</code> box, and the epoch travels to your contacts sealed inside the encrypted message bodies themselves. The courier therefore cannot link yesterday's traffic to today's for the same key. Old boxes stay readable for one boot as a fallback, so nothing is lost mid-rotation.</li>
+<li><strong>Images carry pixels only.</strong> Every image entering the app is stripped of all metadata containers (EXIF/GPS, XMP, ICC profiles, text chunks, comments) across JPEG, PNG, GIF and WebP, on every path: upload, avatar, external-URL proxy. Post tags live in the database, never in the file. What leaves the app is the stripped copy. Video containers are the documented exception, see <a href="#limits">limits</a>.</li>
+<li><strong>Addresses never render raw.</strong> Server coordinates shown anywhere in the UI are masked (<code>203.0.•••.•••</code>). The real value is only ever used to connect, never displayed.</li>
+</ul>
+</section>
+
+<section id="topology">
+<h2>Server topology: courier, nodes, and life without the hub</h2>
+<ul>
+<li><strong>Default (courier mode):</strong> the packaged app talks to <code>gmatch.fly.dev</code>, which runs only a blind courier (encrypted mail + TURN relay) and the download. It writes no content tables, verified by an automated "site blindness" test, and does not know who connects.</li>
+<li><strong>Host mode (opt-in):</strong> every copy bundles a complete server, no install needed. Turn it on in Settings → Server and your machine becomes the node: friends join by address, and the host administers their world. What a host can see is stated plainly in the <a href="legal/e2e.html">encryption disclaimer</a>.</li>
+<li><strong>Nodes without the hub:</strong> the server directory gossips. Whichever node you join hands you its list of other nodes, cached locally. A node can also be joined directly from a shareable <code>gmatch://node/…</code> code the host gives you out-of-band. If the central node disappears tomorrow, the mesh of community nodes keeps working.</li>
+<li><strong>Updates</strong> come from this server's <code>release.json</code> and are hash-verified before install (see <a href="#updates">Staying current</a>).</li>
+</ul>
+</section>
+
+<section id="admin">
+<h2>The admin model (why moderation can't read your mail)</h2>
+<ul>
+<li><strong>Report-driven only.</strong> The admin suite has no bulk view of private messages. A moderator sees a reported item only when the victim chooses to disclose it: the app hands over the message key for exactly that envelope, and the server verifies the disclosure opens nothing else.</li>
+<li><strong>Unlocking the panel</strong> requires the passcode and, on the official node, the allowlisted admin identity. The grant expires after 12 hours and every moderation action is written to an append-only audit log.</li>
+<li><strong>On a community node</strong> the host is the admin of their own world. The software disciplines what the panel exposes, and the <a href="legal/e2e.html">disclaimer</a> is honest that a host with raw database access is trusted, not policed.</li>
+</ul>
+</section>
+
+<section id="limits">
+<h2>Honest limits (what we did NOT solve)</h2>
+<ul>
+<li><strong>TCP-layer IP:</strong> the network edge (this server's host, and any CDN in front of it) still sees client IPs. No application code can change that. What the code guarantees is that the application layer never stores, echoes, logs or renders an IP. The official node is being moved behind a front proxy as an ops step.</li>
+<li><strong>Traffic analysis:</strong> without onion routing, a powerful observer can still correlate timing and volume of courier traffic. Envelope padding and jitter reduce it; they do not eliminate it.</li>
+<li><strong>Video metadata</strong> (mp4/webm) is not stripped. That is a parser limitation, documented in the audit.</li>
+<li><strong>No forward secrecy yet:</strong> keys are static per account. Ratcheting is planned hardening.</li>
+<li><strong>The audit is static:</strong> four white-box rounds with reproducible checks, not a third-party dynamic pentest.</li>
+<li><strong>Malware on your own machine</strong> and physical access defeat any client-side crypto. Lock your screen; keep the key backup safe.</li>
+</ul>
 </section>
 
 <section id="terms">
 <h2>Terms of Service &amp; Privacy (all documents)</h2>
 <ul>
-<li><a href="legal/terms.html">Terms of Service</a> — eligibility (18+), self-custodied keys, prohibited conduct, content responsibility, termination.</li>
-<li><a href="legal/privacy.html">Privacy Policy (LGPD)</a> — exactly which data exists, legal bases, your rights (art. 18) and how to exercise them.</li>
-<li><a href="legal/community.html">Community rules</a> — what the app blocks technically, not just rhetorically.</li>
-<li><a href="legal/abuse.html">Abuse &amp; reports</a> — how reporting works and how optional key-disclosure for moderation works.</li>
-<li><a href="legal/records.html">Adult content records</a> — who the publisher of your media is (you) and what that means.</li>
-<li><a href="legal/e2e.html">Encryption &amp; self-custody disclaimer</a> — the limits of what we can do for you (short: very little, by design).</li>
+<li><a href="legal/terms.html">Terms of Service</a>: eligibility (18+), self-custodied keys, prohibited conduct, content responsibility, termination.</li>
+<li><a href="legal/privacy.html">Privacy Policy (LGPD)</a>: exactly which data exists, legal bases, your rights (art. 18) and how to exercise them.</li>
+<li><a href="legal/community.html">Community rules</a>: what the app blocks technically, not just rhetorically.</li>
+<li><a href="legal/abuse.html">Abuse &amp; reports</a>: how reporting works and how optional key-disclosure for moderation works.</li>
+<li><a href="legal/records.html">Adult content records</a>: who the publisher of your media is (you) and what that means.</li>
+<li><a href="legal/e2e.html">Encryption &amp; self-custody disclaimer</a>: the limits of what we can do for you (short: very little, by design).</li>
+<li><a href="legal/security.html">Security audit</a>: the full four-round white-box report.</li>
 </ul>
-<p>Current document version: <code>2026-09-09.1</code>. Changes are recorded in <a href="legal/changelog.html">legal/changelog.html</a>. Inside the app (Settings → Legal), logged-in users read and confirm acceptance of the current version.</p>
+<p>Current document version: <code>2026-09-11.2</code>. Changes are recorded in <a href="legal/changelog.html">legal/changelog.html</a>. Inside the app (Settings → Legal), logged-in users read and confirm acceptance of the current version.</p>
 </section>
 
 <section id="privacy">
 <h2>Privacy at a glance</h2>
 <ul>
-<li>This page: zero JavaScript, zero CSS, zero external fonts, zero cookies, zero analytics. Nothing here tracks you. (The screenshots are plain PNG files served from this same page's directory — no CDNs.)</li>
-<li>The app: no personal data is collected because there is nothing to collect — no sign-up. What crosses the internet is only encrypted envelopes with an expiry (max 7 days on the official server).</li>
+<li>This page: zero JavaScript, zero external fonts, zero cookies, zero analytics, and no requests to anyone but this server. The styling is a single inline block in this file; nothing loads from outside. The screenshots are plain PNG files served from this same page's directory, no CDNs.</li>
+<li>The app: no personal data is collected because there is nothing to collect. No sign-up. What crosses the internet is only encrypted envelopes with an expiry (max 7 days on the official server).</li>
 <li>On your computer: keys and history are encrypted by Windows (DPAPI); images are never written to disk; when the app closes, no content lingers.</li>
-<li>Your LGPD/GDPR rights (access, deletion, portability) are exercised <em>locally</em> in the app — you export your identity, and you delete it. Full explanation at <a href="legal/privacy.html">legal/privacy.html</a>.</li>
+<li>Your LGPD/GDPR rights (access, deletion, portability) are exercised <em>locally</em> in the app. You export your identity, and you delete it. Full explanation at <a href="legal/privacy.html">legal/privacy.html</a>.</li>
 </ul>
 </section>
 
 <section id="faq">
 <h2>Questions you would ask</h2>
-<h3>Why an .exe instead of a website?</h3><p>So adult content never passes through — or sits on — a third-party web host. The app runs on your machine and only ever sends encrypted envelopes. A normal website cannot hide from its host what it displays.</p>
-<h3>Can I recover my account if I lose my key?</h3><p>No — and that is on purpose: nobody, not even us, can get into your account. That is exactly why the app insists you export a key backup.</p>
+<h3>Why an .exe instead of a website?</h3><p>So adult content never passes through, or sits on, a third-party web host. The app runs on your machine and only ever sends encrypted envelopes. A normal website cannot hide from its host what it displays.</p>
+<h3>Can I recover my account if I lose my key?</h3><p>No, and that is on purpose: nobody, not even us, can get into your account. That is exactly why the app insists you export a key backup.</p>
 <h3>Any telemetry, ads, sign-up?</h3><p>No. Zero analytics, zero cookies on this page, zero registration.</p>
-<h3>What does the server actually store?</h3><p>In official mode: encrypted envelopes with an expiry (up to 7 days until the recipient fetches them) and a delivery token that is a mathematical digest of the recipient's public key. Nothing that points to a person.</p>
-<h3>Why are the screenshots placeholder-tiled?</h3><p>Because this is a public marketing page for an adult app, and we moderate our own product boundaries too. The UI chrome, panels, balances and flows in the pictures are 100% real — the test imagery is intentionally blank.</p>
+<h3>What does the server actually store?</h3><p>In courier mode: encrypted envelopes with an expiry (up to 7 days until the recipient fetches them) and delivery tokens that are mathematical digests of the recipient's public key, rotating per session. Nothing that points to a person.</p>
+<h3>Why are the screenshots placeholder-tiled?</h3><p>Because this is a public page for an adult app, and we moderate our own product boundaries too. The UI chrome, panels, balances and flows in the pictures are 100% real. The test imagery is intentionally blank.</p>
+<h3>Does the server see my IP?</h3><p>The network edge sees it like any website visit does. The application never stores, logs or shows it, and your conversations address each other through rotating masks, not addresses. Full answer in <a href="#limits">honest limits</a>.</p>
+<h3>How do I report abuse or a mismatched download?</h3><p>Through the app (Settings → Help) or the <a href="legal/abuse.html">abuse page</a>. It explains what to include and how fast it gets handled.</p>
 </section>
 </main>
+</div>
+</div>
 
 <footer>
-<p>Contact: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · Code: <a href="https://github.com/9matesu/goongrid">MIT / see LICENSE in the repository</a> · This page uses no JavaScript, no CSS, no external fonts, no cookies, no analytics.</p>
+<p>Contact: <a href="legal/abuse.html">abuse &amp; reports</a> · This page uses no JavaScript, no external fonts, no cookies, no analytics.</p>
 </footer>
 </body>
 </html>

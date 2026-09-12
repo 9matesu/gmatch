@@ -34,10 +34,10 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
   const [reportsTotal, setReportsTotal] = useState(0);
   const [comments, setComments] = useState<AdminLobbyComment[]>([]);
   const [chatMessages, setChatMessages] = useState<AdminChatMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading,] = useState(false);
   const [reportsParams, setReportsParams] = useState<TableParams>({ page: 1, pageSize: 50, filters: { status: "open" } });
   const [chatParams, setChatParams] = useState<TableParams>({ page: 1, pageSize: 50, filters: { channel: "all" } });
-  const [selectedReport, setSelectedReport] = useState<AdminReport | null>(null);
+  
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   // Case detail (report-scoped evidence + parties) fetched on expand —
@@ -222,7 +222,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
               </div>
             )}
             <div className="flex-1 min-w-0 space-y-2.5">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
                 <div>
                   <span className="text-retro-muted block text-[10px]">Report ID</span>
                   <span className="font-mono text-retro-fg break-all text-[10px]">{report.id}</span>
@@ -241,7 +241,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                 </div>
                 <div>
                   <span className="text-retro-muted block text-[10px]">Category</span>
-                  <span className="text-retro-fg font-semibold uppercase">{report.category || "Uncategorized"}</span>
+                  <span className="text-retro-fg font-semibold uppercase tracking-wider">{report.category || "Uncategorized"}</span>
                 </div>
                 <div>
                   <span className="text-retro-muted block text-[10px]">Timestamp</span>
@@ -325,7 +325,6 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
 
   const renderCommentRow = (comment: AdminLobbyComment) => {
     const isExpanded = expandedId === comment.id;
-    const hasImage = Boolean(comment.image_content_url || comment.image_id);
     const mediaUrl = comment.image_content_url ? resolveMediaUrl(comment.image_content_url) : comment.image_id ? resolveMediaUrl(`/api/lobby/images/${comment.image_id}/content`) : null;
 
     return (
@@ -405,7 +404,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
               </div>
             )}
             <div className="flex-1 min-w-0 space-y-2.5">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
                 <div>
                   <span className="text-retro-muted block text-[10px]">Comment ID</span>
                   <span className="font-mono text-retro-fg break-all text-[10px]">{comment.id}</span>
@@ -482,7 +481,6 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
 
   const renderChatRow = (msg: AdminChatMessage) => {
     const isExpanded = expandedId === `${msg.channel}:${msg.id}`;
-    const hasAttachment = Boolean(msg.attachment_url || msg.attachment_id);
     const attachmentUrl = msg.attachment_url ? resolveMediaUrl(msg.attachment_url) : msg.attachment_id ? resolveMediaUrl(`/api/objects/${msg.attachment_id}/content`) : null;
 
     return (
@@ -549,7 +547,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
               </div>
             )}
             <div className="flex-1 min-w-0 space-y-2.5">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
                 <div>
                   <span className="text-retro-muted block text-[10px]">Message ID</span>
                   <span className="font-mono text-retro-fg break-all text-[10px]">{msg.id}</span>
@@ -561,7 +559,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                 <div>
                   <span className="text-retro-muted block text-[10px]">Sender</span>
                   <span className="font-semibold text-retro-fg">{msg.sender_name || msg.sender_id.slice(0, 10)}</span>
-                  <span className="font-mono text-cyan-300 block text-[9px] break-all">{msg.sender_id}</span>
+                  <span className="font-mono text-cyan-300 block text-[10px] break-all">{msg.sender_id}</span>
                 </div>
                 <div>
                   <span className="text-retro-muted block text-[10px]">Recipient</span>
@@ -611,7 +609,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-retro-fg">Moderation Center</h1>
+          <h1 className="text-lg font-bold text-retro-fg">Moderation center</h1>
           <p className="text-xs text-retro-muted mt-1">Unified report queue and in-loco content moderation</p>
         </div>
       </div>

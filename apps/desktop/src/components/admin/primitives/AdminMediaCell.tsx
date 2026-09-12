@@ -79,7 +79,7 @@ export function AdminMediaCell({
           className
         )}
       >
-        <span className="text-[8px] text-retro-muted uppercase font-mono">
+        <span className="text-[10px] text-retro-muted uppercase tracking-wider font-mono">
           {obj.failed || loadError ? "N/A" : "…"}
         </span>
       </div>
@@ -98,7 +98,7 @@ export function AdminMediaCell({
       {isVideo ? (
         <>
           <video src={url} muted className="w-full h-full object-cover" />
-          <span className="absolute top-0.5 left-0.5 px-1 py-0.5 bg-black/80 border border-border-glass text-retro-fg font-mono font-bold text-[6px] rounded">
+          <span className="absolute top-0.5 left-0.5 px-1 py-0.5 bg-black/80 border border-border-glass text-retro-fg font-mono font-bold text-[10px] rounded">
             VIDEO
           </span>
         </>
@@ -107,7 +107,7 @@ export function AdminMediaCell({
           src={url}
           alt=""
           onError={() => setLoadError(true)}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
         />
       )}
       {showZoom && (
@@ -137,16 +137,7 @@ interface AdminRowMediaProps {
   className?: string;
 }
 
-export function AdminRowMedia({
-  id,
-  contentUrl,
-  mimeType,
-  identity,
-  onZoom,
-  title,
-  subtitle,
-  className,
-}: AdminRowMediaProps) {
+export function AdminRowMedia({ id, contentUrl, mimeType, identity, onZoom, title, className }: AdminRowMediaProps) {
   return (
     <AdminMediaCell
       id={id}

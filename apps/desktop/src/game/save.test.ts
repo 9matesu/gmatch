@@ -20,8 +20,8 @@ describe('serialize / deserialize round-trip', () => {
   it('preserves all fields', () => {
     const data = {
       ...defaultSave(123),
-      gc: 4200,
-      totalEarnedGc: 99_000,
+      points: 4200,
+      totalEarned: 99_000,
       xp: 1_600,
       clickCount: 300,
       critCount: 12,
@@ -49,30 +49,37 @@ describe('serialize / deserialize round-trip', () => {
   })
 
   it('fills missing fields with defaults', () => {
-    const back = deserialize(JSON.stringify({ version: SAVE_VERSION, gc: 7 }))
+    const back = deserialize(JSON.stringify({ version: SAVE_VERSION, points: 7 }))
     expect(back).not.toBeNull()
-    expect(back!.gc).toBe(7)
+    expect(back!.points).toBe(7)
     expect(back!.tags).toEqual([])
     expect(back!.defeated).toBe(0)
   })
 
-  it('migrates legacy gp saves 1:1 to gc (plan D4)', () => {
+  it('migrates legacy gp saves 1:1 to points (plan D4)', () => {
     const back = deserialize(JSON.stringify({ version: SAVE_VERSION, gp: 1500, totalEarnedGP: 9000 }))
     expect(back).not.toBeNull()
-    expect(back!.gc).toBe(1500)
-    expect(back!.totalEarnedGc).toBe(9000)
+    expect(back!.points).toBe(1500)
+    expect(back!.totalEarned).toBe(9000)
+  })
+
+  it('migrates legacy gc saves 1:1 to points', () => {
+    const back = deserialize(JSON.stringify({ version: SAVE_VERSION, gc: 777, totalEarnedGc: 888 }))
+    expect(back).not.toBeNull()
+    expect(back!.points).toBe(777)
+    expect(back!.totalEarned).toBe(888)
   })
 })
 
-describe('offline earnings (SPEC §11)', () => {
-  it('elapsed * g$/s * 50%', () => {
-    expect(offlineEarnings(10, 60_000)).toBe(300)
+describe('offline earnings (SPEC §11) nerfed 25%/25%', () => {
+  it('elapsed * pts/s * 25%', () => {
+    expect(offlineEarnings(10, 60_000)).toBe(150)
     expect(offlineEarnings(0, 60_000)).toBe(0)
   })
 
   it('caps at 8 hours', () => {
     expect(OFFLINE_CAP_MS).toBe(8 * 60 * 60 * 1000)
-    expect(offlineEarnings(10, OFFLINE_CAP_MS)).toBe(10 * 8 * 3600 * 0.5)
+    expect(offlineEarnings(10, OFFLINE_CAP_MS)).toBe(10 * 8 * 3600 * 0.25)
     expect(offlineEarnings(10, OFFLINE_CAP_MS * 10)).toBe(offlineEarnings(10, OFFLINE_CAP_MS))
   })
 

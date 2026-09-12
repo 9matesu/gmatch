@@ -3,16 +3,59 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Privacy Policy — gMatch</title>
+<title>Privacy Policy, gMatch</title>
+<style>
+:root { color-scheme: dark; }
+html { background: #09090b; }
+body {
+  margin: 0;
+  padding: 56px 32px 96px;
+  max-width: 560px;
+  background: #09090b;
+  color: #d4d4d8;
+  font: 13px/1.7 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  letter-spacing: -0.08em;
+  text-align: left;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, strong { color: #fafafa; font-weight: 600; }
+h1 { font-size: 21px; line-height: 1.25; margin: 0 0 16px; }
+h2 { font-size: 14px; margin: 40px 0 12px; }
+h3 { font-size: 13px; margin: 28px 0 10px; }
+p { margin: 0 0 14px; }
+em { color: #71717a; }
+a { color: #fafafa; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: #3f3f46; }
+a:hover { color: #fff; text-decoration-color: #fff; }
+ul { margin: 0 0 16px; padding-left: 20px; }
+li { margin: 7px 0; }
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px; letter-spacing: normal;
+  background: #121215; border: 1px solid #1f1f23; border-radius: 4px;
+  padding: 1px 5px; color: #e4e4e7;
+}
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px; letter-spacing: normal; line-height: 1.65;
+  background: #121215; border: 1px solid #27272a; border-radius: 6px;
+  padding: 14px 16px; margin: 0 0 16px; color: #fafafa;
+  overflow-wrap: anywhere; white-space: pre-wrap;
+}
+hr { border: 0; border-top: 1px solid #1f1f23; margin: 56px 0 20px; }
+table { border-collapse: collapse; margin: 0 0 16px; }
+th, td { border: 1px solid #27272a; padding: 6px 12px; text-align: left; font-weight: 500; }
+::selection { background: rgba(255, 255, 255, 0.15); }
+@media (max-width: 480px) { body { padding: 40px 20px 72px; } }
+</style>
 </head>
 <body>
 <p><a href="../index.html#terms">← back to the main page</a></p>
-<p><em>Generated from the canonical in-app source — do not edit here.</em></p>
+<p><em>Generated from the canonical in-app source. Do not edit here.</em></p>
 <h1>Privacy Policy (LGPD/GDPR)</h1>
-<p>_Binding text (EN)_: <strong>2026-09-09.2</strong> · updated: 2026-09-09</p>
+<p>_Binding text (EN)_: <strong>2026-09-11.2</strong> · updated: 2026-09-09</p>
 <p>Jurisdiction: LGPD (Lei 13.709/2018); GDPR for EU users</p>
 <h2>1. Who is the controller</h2>
-<p>For the OFFICIAL SITE (blind courier + TURN): the maintainers of the 9matesu/goongrid repository, contactable via the GitHub project. For FULL-NODES: the administrator of that server is the controller of the data it holds; the software only implements what the host runs.</p>
+<p>For the OFFICIAL SITE (blind courier + TURN): the maintainers of the official site, contactable through the in-app abuse channel (Settings → Help). For FULL-NODES: the administrator of that server is the controller of the data it holds; the software only implements what the host runs.</p>
 <h2>2. Legal bases</h2>
 <p>Contract performance (delivering the service you asked for) + legitimate interest (security/anti-abuse) + consent (accepting the Terms and enabling optional features such as uploads).</p>
 <h2>3. What we do NOT collect (minimisation statement)</h2>
@@ -23,7 +66,7 @@
 <li>No presence: site mode exposes nothing about who is online, the social graph, profiles or posts.</li>
 </ul>
 <ul>
-<li>No IP: TURN credential requests use an ephemeral random identity per session; server logs record redacted IPs (last octet removed).</li>
+<li>No IP: TURN credential requests use an ephemeral random identity per session; server logs record redacted IPs (last octet removed); the rate limiter keys buckets on a salted one-way hash, never the address itself; the app never displays a raw server address (masked as 203.0.•••.•••).</li>
 </ul>
 <ul>
 <li>No telemetry: the application makes zero analytics, crash-report or beacon requests to third parties.</li>
@@ -42,12 +85,12 @@
 <li><strong>Your machine:</strong> the full identity, keys, threads, rooms, settings, game save. It never leaves to the site.</li>
 </ul>
 <ul>
-<li><strong>Full-node (if you use one):</strong> it stores posts, profiles, legacy DMs (encrypted with the SERVER key — the host can read them), economies and admin logs. Check your host's policy.</li>
+<li><strong>Full-node (if you use one):</strong> it stores posts, profiles, legacy DMs (encrypted with the SERVER key, so the host can read them), economies and admin logs. Check your host's policy.</li>
 </ul>
 <h2>5. Data subject rights (art. 18 LGPD / arts. 15-22 GDPR)</h2>
-<p>Confirmation, access, rectification, portability, deletion and consent withdrawal are exercised LOCALLY: export your identity in the app (portability) and delete it (deletion on your device); in courier mode envelopes expire by themselves. For the official site, since data is only hashes and sealed bytes, it cannot be linked to you — deletion is baked into the architecture. For full-nodes, contact the host administrator.</p>
+<p>Confirmation, access, rectification, portability, deletion and consent withdrawal are exercised LOCALLY: export your identity in the app (portability) and delete it (deletion on your device); in courier mode envelopes expire by themselves. For the official site, since data is only hashes and sealed bytes, it cannot be linked to you, and deletion is baked into the architecture. For full-nodes, contact the host administrator.</p>
 <h2>6. Security</h2>
-<p>Ed25519 signatures on every mutation with anti-replay nonces; ECIES (X25519 + XChaCha20-Poly1305 + BLAKE3 KDF); short-lived HMAC TURN credentials; shape-only validation without content reads; strict CSP; ICE candidate sanitisation against IP leaks (mDNS/relay). Full public audit at docs/SECURITY-AUDIT.md in the repository.</p>
+<p>Ed25519 signatures on every mutation with anti-replay nonces; ECIES (X25519 + XChaCha20-Poly1305 + BLAKE3 KDF); short-lived HMAC TURN credentials; shape-only validation without content reads; strict CSP; ICE candidate sanitisation against IP leaks (mDNS/relay). The full audit is published at legal/security.html on the official site.</p>
 <h2>7. International transfers and subprocessors</h2>
 <p>The official site may be hosted on cloud outside Brazil; the only data processed there are opaque envelopes and hashes, without any decryption key. Self-hosted TURN is optional; we never use third-party clouds for content.</p>
 <h2>8. Minors</h2>
@@ -55,6 +98,6 @@
 <h2>9. Changes</h2>
 <p>Substantial changes require fresh in-app acceptance. Current version: above and in the Legal Center screen.</p>
 <hr>
-<p>Contact: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · This page uses no JavaScript, CSS, cookies or analytics.</p>
+<p>Contact: <a href="abuse.html">abuse &amp; reports</a> · This page uses no JavaScript, no external fonts, no cookies and no analytics.</p>
 </body>
 </html>

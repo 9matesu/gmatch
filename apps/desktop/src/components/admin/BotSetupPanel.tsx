@@ -294,7 +294,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
 
   const handleApplyGlobalTagsToAllProviders = () => {
     setProviders(providers.map((p) => ({ ...p, tags: [...globalTags] })));
-    toast('Applied default query to all active API providers!', 'success');
+    toast('Applied default query to all active providers.', 'success');
   };
 
   const handleApplyTagPreset = (presetTags: string[]) => {
@@ -327,7 +327,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
         const result: ApiTestResult = await res.json();
         setTestResult(result);
         if (result.ok) {
-          toast(`Connected to ${provider.name}! Found ${result.foundCount} images (${result.latencyMs}ms)`, 'success');
+          toast(`Connected to ${provider.name}. Found ${result.foundCount} images (${result.latencyMs}ms)`, 'success');
         } else {
           toast(`Test Failed: ${result.error || 'Check diagnostics logs'}`, 'error');
         }
@@ -347,7 +347,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
       const res = await orbitFetch('/api/admin/bot-config/sync-images', { method: 'POST' }, identity);
       if (res.ok) {
         const data = await res.json();
-        toast(`Synced ${data.cachedCount} fresh cards across active providers!`, 'success');
+        toast(`Synced ${data.cachedCount} fresh cards across active providers.`, 'success');
       } else {
         toast('Failed to sync bot images', 'error');
       }
@@ -379,7 +379,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
 
   const handleDeleteProvider = (id: string) => {
     if (providers.length <= 1) {
-      toast('You must have at least one provider in the pool', 'error');
+      toast('Keep at least one provider in the pool.', 'error');
       return;
     }
 
@@ -431,7 +431,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
 
   const handleBatchDelete = () => {
     if (selectedProviderIds.size >= providers.length) {
-      toast('You must have at least one provider in the pool', 'error');
+      toast('Keep at least one provider in the pool.', 'error');
       return;
     }
     setProviders((current) => {
@@ -550,7 +550,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
 
   if (loading) {
     return (
-      <div className="p-8 text-center text-xs font-mono text-zinc-500 animate-pulse">
+      <div className="p-8 text-center text-xs font-mono text-retro-muted animate-pulse">
         Loading Bot Multi-API configuration...
       </div>
     );
@@ -559,19 +559,19 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
   return (
     <div className="space-y-6 font-sans select-none">
       {/* Header Banner */}
-      <section className="bg-[#18181b] border border-[#27272a] rounded-2xl p-5 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <section className="bg-[#18181b] border border-[#27272a] rounded-xl p-5 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-purple-500/30 flex items-center justify-center text-cyan-300 shadow-md">
             <Bot className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base font-extrabold text-zinc-100 uppercase tracking-wider flex items-center gap-2">
+            <h2 className="text-base font-extrabold text-retro-fg uppercase tracking-wider flex items-center gap-2">
               <span>Bot Duelist &amp; Multi-API Management</span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${enabled ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-red-500/20 text-red-300 border border-red-500/40'}`}>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${enabled ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-red-500/20 text-red-300 border border-red-500/40'}`}>
                 {enabled ? 'Bots Active' : 'Bots Disabled'}
               </span>
             </h2>
-            <p className="text-xs text-zinc-500 mt-0.5">
+            <p className="text-xs text-retro-muted mt-0.5">
               Multi-API image search, booru query formatting, opponent tag matching, and ephemeral placeholder isolation.
             </p>
           </div>
@@ -583,7 +583,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
             type="button"
             onClick={handleSyncImages}
             disabled={syncing}
-            className="px-3 py-2 bg-[#27272a] hover:bg-glass-w10 text-zinc-300 border border-[#27272a] rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95 shadow-sm"
+            className="px-3 py-2 bg-[#27272a] hover:bg-glass-w10 text-retro-fg border border-[#27272a] rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95 shadow-sm"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin text-cyan-300' : ''}`} />
             <span>{syncing ? 'Syncing...' : 'Sync Card Cache'}</span>
@@ -602,65 +602,65 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
       </section>
 
       {/* Info Notice: Tag Matching & Ephemeral Storage */}
-      <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-2xl p-4 flex items-start gap-3 text-xs text-zinc-300">
+      <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-4 flex items-start gap-3 text-xs text-retro-fg">
         <Sparkles className="w-5 h-5 text-cyan-300 shrink-0 mt-0.5" />
         <div className="space-y-1">
-          <span className="font-bold text-zinc-100">Dynamic Player Tag Matching Active</span>
-          <p className="text-zinc-400 leading-relaxed">
+          <span className="font-bold text-retro-fg">Dynamic Player Tag Matching Active</span>
+          <p className="text-retro-muted leading-relaxed">
             During arcade matches, AI bots automatically inspect the human opponent&apos;s tags (e.g. <code className="text-cyan-300 font-semibold">#cyberpunk</code>, <code className="text-cyan-300 font-semibold">#waifu</code>) and search the active API pool for matching cards. If no tags are set or 0 results match, bots seamlessly fall back to each provider&apos;s tag pool. Bot cards remain ephemeral and never pollute database storage.
           </p>
         </div>
       </div>
 
       {/* Activation Rules */}
-      <section className="bg-[#18181b] border border-[#27272a] rounded-2xl p-5 space-y-4 shadow-xs">
+      <section className="bg-[#18181b] border border-[#27272a] rounded-xl p-5 space-y-4 shadow-xs">
         <div className="flex items-center gap-2 border-b border-[#27272a] pb-3">
           <Sliders className="w-4 h-4 text-cyan-300" />
-          <span className="text-xs font-bold uppercase tracking-wider text-zinc-100">Bot Activation Rules</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-retro-fg">Bot Activation Rules</span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Activation Rule</label>
+            <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider">Activation Rule</label>
             <select
               value={activationRule}
               onChange={(e) => setActivationRule(e.target.value as BotActivationRule)}
-              className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-2 text-xs text-zinc-100 outline-none focus:border-purple-500"
+              className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-purple-500"
             >
               <option value="immediate">Immediate — bots duel instantly</option>
               <option value="fallback">Fallback — bots join after wait time</option>
               <option value="manual_only">Manual Only — admin-triggered bots</option>
               <option value="disabled">Disabled — no bots</option>
             </select>
-            <p className="text-[10px] text-zinc-500 leading-relaxed">
+            <p className="text-[10px] text-retro-muted leading-relaxed">
               Controls when bots may pair with waiting players and the Quick Match button.
             </p>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Fallback Wait (seconds)</label>
+            <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider">Fallback Wait (seconds)</label>
             <input
               type="number"
               min={0}
               value={fallbackSeconds}
               onChange={(e) => setFallbackSeconds(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-              className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-2 text-xs text-zinc-100 font-mono outline-none focus:border-purple-500"
+              className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-2 text-xs text-retro-fg font-mono outline-none focus:border-purple-500"
             />
-            <p className="text-[10px] text-zinc-500 leading-relaxed">
+            <p className="text-[10px] text-retro-muted leading-relaxed">
               How long a lone player waits before a bot fills in (fallback rule).
             </p>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Landing Page Models (one per line)</label>
+            <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider">Landing Page Models (one per line)</label>
             <textarea
               value={modelsText}
               onChange={(e) => setModelsText(e.target.value)}
               rows={3}
               placeholder={'flux\nsd-xl\nanime\nphotoreal'}
-              className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-2 text-xs text-zinc-100 font-mono outline-none focus:border-purple-500 resize-y"
+              className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-2 text-xs text-retro-fg font-mono outline-none focus:border-purple-500 resize-y"
             />
-            <p className="text-[10px] text-zinc-500 leading-relaxed">
+            <p className="text-[10px] text-retro-muted leading-relaxed">
               Model choices surfaced on the public login-page slideshow selector.
             </p>
           </div>
@@ -673,16 +673,16 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
         <div className="lg:col-span-7 space-y-6">
 
           {/* 0. Global Search Tags Manager */}
-          <div className="bg-[#18181b] border border-[#27272a] rounded-2xl p-5 space-y-4 shadow-xs">
+          <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-5 space-y-4 shadow-xs">
 <div className="flex items-center justify-between border-b border-[#27272a] pb-3">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-100">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-retro-fg">
                 <Tag className="w-4 h-4 text-cyan-300" />
                 <span>Default API Search & Bot Query ({globalTags.length})</span>
               </div>
               <button
                 type="button"
                 onClick={handleApplyGlobalTagsToAllProviders}
-                className="px-2.5 py-1 bg-cyan-500/10 hover:bg-cyan-500/15 text-cyan-300 border border-purple-300 rounded-lg text-[11px] font-bold uppercase tracking-wide transition-all cursor-pointer shadow-xs active:scale-95"
+                className="px-2.5 py-1 bg-cyan-500/10 hover:bg-cyan-500/15 text-cyan-300 border border-purple-300 rounded-lg text-xs font-bold uppercase tracking-wide transition-all cursor-pointer shadow-xs active:scale-95"
                 title="Sync this query to all API providers below"
               >
                 Apply to All Providers
@@ -691,7 +691,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
 
             {/* Quick Query Presets */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Quick Presets:</label>
+              <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider">Quick Presets:</label>
               <div className="flex flex-wrap gap-1.5">
                 {[
                   { name: 'Anime / Waifu', tags: ['1girl', 'solo', 'scenery', 'highres'] },
@@ -704,7 +704,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                     key={preset.name}
                     type="button"
                     onClick={() => handleApplyTagPreset(preset.tags)}
-                    className="px-2 py-0.5 text-[11px] font-medium rounded-lg border border-[#27272a] bg-[#27272a] hover:bg-cyan-500/10 hover:border-purple-300 text-zinc-300 hover:text-cyan-300 transition-all cursor-pointer"
+                    className="px-2 py-0.5 text-xs font-medium rounded-lg border border-[#27272a] bg-[#27272a] hover:bg-cyan-500/10 hover:border-purple-300 text-retro-fg hover:text-cyan-300 transition-all cursor-pointer"
                   >
                     + {preset.name}
                   </button>
@@ -736,13 +736,13 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
           </div>
 
           {/* 1. Multi-API Provider Manager */}
-          <div className="bg-[#18181b] border border-[#27272a] rounded-2xl p-5 space-y-4 shadow-xs">
+          <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-5 space-y-4 shadow-xs">
             <div className="flex items-center justify-between border-b border-[#27272a] pb-3">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-100">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-retro-fg">
                 <Globe className="w-4 h-4 text-cyan-300" />
                 <span>1. Multi-API Image Providers Pool ({providers.length})</span>
               </div>
-              <label className="flex items-center gap-2 cursor-pointer text-xs text-zinc-300 font-semibold">
+              <label className="flex items-center gap-2 cursor-pointer text-xs text-retro-fg font-semibold">
                 <input
                   type="checkbox"
                   checked={enabled}
@@ -769,28 +769,28 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                   <button
                     type="button"
                     onClick={() => handleBatchEnable(true)}
-                    className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/50 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer"
+                    className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/50 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer"
                   >
                     Enable
                   </button>
                   <button
                     type="button"
                     onClick={() => handleBatchEnable(false)}
-                    className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer"
+                    className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer"
                   >
                     Disable
                   </button>
                   <button
                     type="button"
                     onClick={handleBatchApplyGlobalQuery}
-                    className="px-2.5 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/50 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer"
+                    className="px-2.5 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/50 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer"
                   >
                     Apply Global Query
                   </button>
                   <button
                     type="button"
                     onClick={handleBatchDelete}
-                    className="px-2.5 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/50 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer"
+                    className="px-2.5 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/50 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer"
                   >
                     Delete Selected
                   </button>
@@ -800,14 +800,14 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
 
             {/* Quick Add Preset Bar */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Quick Add Provider Preset:</label>
+              <label className="text-xs font-bold text-retro-muted uppercase tracking-wider">Quick Add Provider Preset:</label>
               <div className="flex flex-wrap gap-1.5">
                 {PRESET_PROVIDERS.map((preset) => (
                   <button
                     key={preset.name}
                     type="button"
                     onClick={() => handleAddPreset(preset)}
-                    className="px-2.5 py-1 text-[11px] font-medium rounded-lg border border-[#27272a] bg-[#27272a] hover:bg-cyan-500/10 hover:border-purple-300 text-zinc-300 hover:text-cyan-300 transition-all flex items-center gap-1 cursor-pointer"
+                    className="px-2.5 py-1 text-xs font-medium rounded-lg border border-[#27272a] bg-[#27272a] hover:bg-cyan-500/10 hover:border-purple-300 text-retro-fg hover:text-cyan-300 transition-all flex items-center gap-1 cursor-pointer"
                   >
                     <Plus className="w-3 h-3 text-cyan-300" />
                     <span>{preset.name}</span>
@@ -846,7 +846,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                         <button
                           type="button"
                           onClick={() => handleUpdateProvider(prov.id, { enabled: !prov.enabled })}
-                          className={`w-5 h-5 rounded-md flex items-center justify-center transition-colors cursor-pointer ${prov.enabled ? 'bg-emerald-500 text-white' : 'bg-zinc-700 text-zinc-500'
+                          className={`w-5 h-5 rounded-md flex items-center justify-center transition-colors cursor-pointer ${prov.enabled ? 'bg-emerald-500 text-white' : 'bg-glass-w20 text-retro-muted'
                             }`}
                           title={prov.enabled ? 'Active provider' : 'Disabled provider'}
                         >
@@ -855,12 +855,12 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
 
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-zinc-100 truncate">{prov.name}</span>
-                            <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded bg-[#27272a] text-zinc-400 border border-[#27272a]">
+                            <span className="text-xs font-bold text-retro-fg truncate">{prov.name}</span>
+                            <span className="text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.2 rounded bg-[#27272a] text-retro-muted border border-[#27272a]">
                               {prov.providerType}
                             </span>
                           </div>
-                          <p className="text-[10px] text-zinc-500 truncate font-mono mt-0.5">
+                          <p className="text-[10px] text-retro-muted truncate font-mono mt-0.5">
                             {prov.url}
                           </p>
                         </div>
@@ -875,7 +875,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                             handleTestConnection(prov);
                           }}
                           disabled={testing}
-                          className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                          className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
                           title="Run live diagnostic for this provider"
                         >
                           <Play className="w-3 h-3 fill-current" />
@@ -887,7 +887,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                           onClick={() => setEditingProviderId(isEditing ? null : prov.id)}
                           className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${isEditing
                               ? 'bg-cyan-500 text-white border-purple-500'
-                              : 'bg-[#27272a] text-zinc-400 hover:text-zinc-100 border-[#27272a]'
+                              : 'bg-[#27272a] text-retro-muted hover:text-retro-fg border-[#27272a]'
                             }`}
                           title="Edit provider settings"
                         >
@@ -897,7 +897,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                         <button
                           type="button"
                           onClick={() => handleDeleteProvider(prov.id)}
-                          className="p-1.5 rounded-lg bg-[#27272a] hover:bg-red-50 text-zinc-500 hover:text-red-600 border border-[#27272a] transition-colors cursor-pointer"
+                          className="p-1.5 rounded-lg bg-[#27272a] hover:bg-red-50 text-retro-muted hover:text-red-600 border border-[#27272a] transition-colors cursor-pointer"
                           title="Remove provider"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -911,22 +911,22 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {/* Name */}
                           <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-zinc-500 uppercase">Provider Label:</label>
+                            <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider">Provider Label:</label>
                             <input
                               type="text"
                               value={prov.name}
                               onChange={(e) => handleUpdateProvider(prov.id, { name: e.target.value })}
-                              className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-1.5 text-xs text-zinc-100 outline-none focus:border-purple-500"
+                              className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-1.5 text-xs text-retro-fg outline-none focus:border-purple-500"
                             />
                           </div>
 
                           {/* Provider Type */}
                           <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-zinc-500 uppercase">Provider Engine:</label>
+                            <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider">Provider Engine:</label>
                             <select
                               value={prov.providerType}
                               onChange={(e) => handleUpdateProvider(prov.id, { providerType: e.target.value as ProviderType })}
-                              className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-2.5 py-1.5 text-xs text-zinc-100 outline-none focus:border-purple-500"
+                              className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-2.5 py-1.5 text-xs text-retro-fg outline-none focus:border-purple-500"
                             >
                               <option value="gelbooru">Gelbooru (api_key + user_id)</option>
                               <option value="danbooru">Danbooru (Basic Auth / login)</option>
@@ -940,27 +940,27 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
 
                           {/* Weight / Priority */}
                           <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-zinc-500 uppercase">Weight (Priority):</label>
+                            <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider">Weight (Priority):</label>
                             <input
                               type="number"
                               min={1}
                               max={100}
                               value={prov.weight || 10}
                               onChange={(e) => handleUpdateProvider(prov.id, { weight: Math.max(1, Math.min(100, Number(e.target.value) || 10)) })}
-                              className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-1.5 text-xs text-zinc-100 font-mono outline-none focus:border-purple-500"
+                              className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-1.5 text-xs text-retro-fg font-mono outline-none focus:border-purple-500"
                             />
-                            <p className="text-[10px] text-zinc-500">Higher weight = more likely to be selected for image fetching.</p>
+                            <p className="text-[10px] text-retro-muted">Higher weight = more likely to be selected for image fetching.</p>
                           </div>
                         </div>
 
                         {/* URL */}
                         <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-zinc-500 uppercase">API URL Endpoint:</label>
+                          <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider">API URL Endpoint:</label>
                           <input
                             type="text"
                             value={prov.url}
                             onChange={(e) => handleUpdateProvider(prov.id, { url: e.target.value })}
-                            className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-100 outline-none focus:border-purple-500"
+                            className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-1.5 text-xs font-mono text-retro-fg outline-none focus:border-purple-500"
                           />
                         </div>
 
@@ -969,7 +969,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                           {/* API Key */}
                           <div className="space-y-1">
                             <div className="flex items-center justify-between">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase">API Key / Token:</label>
+                              <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider">API Key / Token:</label>
                               <button
                                 type="button"
                                 onClick={() => setShowKeyFor({ ...showKeyFor, [prov.id]: !isShowKey })}
@@ -984,19 +984,19 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                               value={prov.apiKey || ''}
                               onChange={(e) => handleUpdateProvider(prov.id, { apiKey: e.target.value })}
                               placeholder="api_key parameter or token..."
-                              className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-100 outline-none focus:border-purple-500"
+                              className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-1.5 text-xs font-mono text-retro-fg outline-none focus:border-purple-500"
                             />
                           </div>
 
                           {/* User ID / Login (Crucial for Gelbooru & Danbooru) */}
                           <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-zinc-500 uppercase">User ID / Login (Gelbooru &amp; Danbooru):</label>
+                            <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider">User ID / Login (Gelbooru &amp; Danbooru):</label>
                             <input
                               type="text"
                               value={prov.userId || ''}
                               onChange={(e) => handleUpdateProvider(prov.id, { userId: e.target.value })}
                               placeholder="Gelbooru user_id or Danbooru login username..."
-                              className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-100 outline-none focus:border-purple-500"
+                              className="w-full bg-[#18181b] border border-[#27272a] rounded-lg px-3 py-1.5 text-xs font-mono text-retro-fg outline-none focus:border-purple-500"
                             />
                           </div>
                         </div>
@@ -1032,9 +1032,9 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
           </div>
 
           {/* 2. Bot Names List Configuration */}
-          <div className="bg-[#18181b] border border-[#27272a] rounded-2xl p-5 space-y-4 shadow-lg">
+          <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-5 space-y-4 shadow-lg">
             <div className="flex items-center justify-between border-b border-[#27272a] pb-3">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-100">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-retro-fg">
                 <Users className="w-4 h-4 text-amber-400" />
                 <span>2. Dynamic Bot Identities &amp; Names Pool</span>
               </div>
@@ -1044,7 +1044,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                     key={cat}
                     type="button"
                     onClick={() => handleApplyNamePreset(cat)}
-                    className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-[#27272a] hover:bg-glass-w10 text-zinc-500 hover:text-zinc-100 border border-[#27272a] transition-colors cursor-pointer"
+                    className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-[#27272a] hover:bg-glass-w10 text-retro-muted hover:text-retro-fg border border-[#27272a] transition-colors cursor-pointer"
                   >
                     {cat}
                   </button>
@@ -1053,7 +1053,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
+              <label className="text-xs font-bold text-retro-muted uppercase tracking-wider">
                 Bot Name Pool (One name per line):
               </label>
               <textarea
@@ -1061,21 +1061,21 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                 onChange={(e) => setNamesText(e.target.value)}
                 rows={4}
                 placeholder="Aria&#10;Chrono&#10;Eclipse&#10;Valkyrie&#10;Sol..."
-                className="w-full bg-[#18181b] border border-[#27272a] focus:border-purple-500 rounded-xl p-3 text-xs text-zinc-100 font-mono outline-none resize-y leading-relaxed transition-colors"
+                className="w-full bg-[#18181b] border border-[#27272a] focus:border-purple-500 rounded-xl p-3 text-xs text-retro-fg font-mono outline-none resize-y leading-relaxed transition-colors"
               />
-              <p className="text-[10px] text-zinc-500">
+              <p className="text-[10px] text-retro-muted">
                 Bots randomly pick names from this pool instead of generic tags, creating dynamic, lively duelists.
               </p>
             </div>
           </div>
 
           {/* Bot Duelist Profiles: persistent per-bot identity */}
-          <div className="bg-[#18181b] border border-[#27272a] rounded-2xl p-5 space-y-4 shadow-lg">
+          <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-5 space-y-4 shadow-lg">
             <div className="flex items-center justify-between border-b border-[#27272a] pb-3">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-100">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-retro-fg">
                 <Bot className="w-4 h-4 text-emerald-400" />
                 <span>Bot Duelist Profiles</span>
-                <span className="text-[10px] font-normal text-zinc-500 normal-case">({bots.filter((b) => b.enabled).length} active)</span>
+                <span className="text-[10px] font-normal text-retro-muted normal-case">({bots.filter((b) => b.enabled).length} active)</span>
                 {dirtyBotIds.size > 0 && (
                   <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
                     {dirtyBotIds.size} unsaved
@@ -1085,7 +1085,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => orbitFetch('/api/admin/bots', {}, identity).then((r) => (r.ok ? r.json() : null)).then((d) => { if (Array.isArray(d?.bots)) setBots(d.bots); })}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium text-zinc-300 hover:text-white bg-[#1f1f23] hover:bg-[#27272a] border border-[#27272a] rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium text-retro-fg hover:text-white bg-[#1f1f23] hover:bg-[#27272a] border border-[#27272a] rounded-lg transition-colors"
                 >
                   <RefreshCw className="w-3 h-3" />
                   Refresh
@@ -1102,14 +1102,14 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
               </div>
             </div>
 
-            <p className="text-[11px] text-zinc-400 leading-relaxed">
+            <p className="text-xs text-retro-muted leading-relaxed">
               Each duelist has its own name, booru search tags, and picture. Pictures are generated from the bot&apos;s
               tags against your active providers, or you can paste a manual URL. Changes are saved persistently and
               appear in the match queue roster immediately.
             </p>
 
             {bots.length === 0 && (
-              <div className="text-center py-6 text-xs font-mono text-zinc-500 animate-pulse">
+              <div className="text-center py-6 text-xs font-mono text-retro-muted animate-pulse">
                 Loading bot profiles...
               </div>
             )}
@@ -1133,7 +1133,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                       />
                     ) : (
-                      <ImageIcon className="w-5 h-5 text-zinc-500" />
+                      <ImageIcon className="w-5 h-5 text-retro-muted" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0 space-y-2">
@@ -1141,7 +1141,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                       value={bot.name}
                       onChange={(e) => updateBotLocal(bot.id, { name: e.target.value })}
                       placeholder="Bot name"
-                      className="w-full bg-[#18181b] border border-[#27272a] focus:border-emerald-500 rounded-lg px-2.5 py-2 text-xs text-zinc-100 outline-none transition-colors"
+                      className="w-full bg-[#18181b] border border-[#27272a] focus:border-emerald-500 rounded-lg px-2.5 py-2 text-xs text-retro-fg outline-none transition-colors"
                     />
                     <BooruQueryBox
                       value={bot.tags}
@@ -1164,7 +1164,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                       label="Search Query"
                       showPreview={false}
                     />
-                    <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer">
+                    <label className="flex items-center gap-1.5 text-[10px] text-retro-muted cursor-pointer">
                       <input
                         type="checkbox"
                         checked={bot.enabled}
@@ -1180,7 +1180,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                   <button
                     onClick={() => runBotPicture(bot)}
                     disabled={botsBusyId === bot.id}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium text-zinc-300 hover:text-white bg-[#1f1f23] hover:bg-[#27272a] border border-[#27272a] rounded-lg transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium text-retro-fg hover:text-white bg-[#1f1f23] hover:bg-[#27272a] border border-[#27272a] rounded-lg transition-colors disabled:opacity-50"
                   >
                     <RefreshCw className={`w-3 h-3 ${botsBusyId === bot.id ? 'animate-spin' : ''}`} />
                     {botsBusyId === bot.id ? 'Working...' : 'Generate picture'}
@@ -1189,12 +1189,12 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                     value={customUrlFor[bot.id] || ''}
                     onChange={(e) => setCustomUrlFor((prev) => ({ ...prev, [bot.id]: e.target.value }))}
                     placeholder="Manual picture URL (optional)"
-                    className="flex-1 min-w-[180px] bg-[#18181b] border border-[#27272a] focus:border-purple-500 rounded-lg px-2.5 py-1.5 text-[11px] text-zinc-100 outline-none transition-colors"
+                    className="flex-1 min-w-[180px] bg-[#18181b] border border-[#27272a] focus:border-purple-500 rounded-lg px-2.5 py-1.5 text-xs text-retro-fg outline-none transition-colors"
                   />
                   <button
                     onClick={() => runBotPicture(bot, customUrlFor[bot.id]?.trim())}
                     disabled={botsBusyId === bot.id}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium text-zinc-300 hover:text-white bg-[#1f1f23] hover:bg-[#27272a] border border-[#27272a] rounded-lg transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium text-retro-fg hover:text-white bg-[#1f1f23] hover:bg-[#27272a] border border-[#27272a] rounded-lg transition-colors disabled:opacity-50"
                   >
                     <Check className="w-3 h-3" />
                     Set URL
@@ -1211,24 +1211,24 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
             ))}
 
             <div className="border-t border-[#27272a] pt-4 space-y-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Create new duelist</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">Create new duelist</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <input
                   value={newBotName}
                   onChange={(e) => setNewBotName(e.target.value)}
                   placeholder="Bot name"
-                  className="w-full bg-[#18181b] border border-[#27272a] focus:border-emerald-500 rounded-lg px-2.5 py-2 text-xs text-zinc-100 outline-none transition-colors"
+                  className="w-full bg-[#18181b] border border-[#27272a] focus:border-emerald-500 rounded-lg px-2.5 py-2 text-xs text-retro-fg outline-none transition-colors"
                 />
                 <input
                   value={newBotTags}
                   onChange={(e) => setNewBotTags(e.target.value)}
                   placeholder="tags, comma separated"
-                  className="w-full bg-[#18181b] border border-[#27272a] focus:border-emerald-500 rounded-lg px-2.5 py-2 text-xs text-zinc-100 font-mono outline-none transition-colors"
+                  className="w-full bg-[#18181b] border border-[#27272a] focus:border-emerald-500 rounded-lg px-2.5 py-2 text-xs text-retro-fg font-mono outline-none transition-colors"
                 />
               </div>
               <button
                 onClick={addBot}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-white bg-purple-600/80 hover:bg-purple-500 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-purple-600/80 hover:bg-purple-500 rounded-lg transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Add bot
@@ -1239,9 +1239,9 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
 
         {/* Right Column: Live Test Diagnostics & Sample Image Previews */}
         <div className="lg:col-span-5 space-y-6">
-          <div className="bg-[#18181b] border border-[#27272a] rounded-2xl p-5 space-y-4 shadow-lg">
+          <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-5 space-y-4 shadow-lg">
             <div className="flex items-center justify-between border-b border-[#27272a] pb-3">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-100">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-retro-fg">
                 <Terminal className="w-4 h-4 text-emerald-400" />
                 <span>Connection Diagnostics</span>
               </div>
@@ -1267,10 +1267,10 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                       <XCircle className="w-5 h-5 text-rose-600 shrink-0" />
                     )}
                     <div>
-                      <h4 className="text-xs font-extrabold uppercase tracking-wide text-zinc-100">
+                      <h4 className="text-xs font-extrabold uppercase tracking-wide text-retro-fg">
                         {testResult.ok ? 'API Connected Cleanly' : 'Connection Failed'}
                       </h4>
-                      <p className="text-[11px] text-zinc-400 font-mono">
+                      <p className="text-xs text-retro-muted font-mono">
                         HTTP {testResult.status} {testResult.statusText} • {testResult.latencyMs}ms
                       </p>
                     </div>
@@ -1283,7 +1283,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
 
                 {testResult.error && (
                   <div className="p-2.5 bg-rose-100/80 border border-rose-300 rounded-lg text-xs text-rose-900 font-mono leading-relaxed">
-                    ⚠️ {testResult.error}
+                    {testResult.error}
                   </div>
                 )}
               </div>
@@ -1292,7 +1292,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
             {/* Live Sample Images Preview Grid */}
             {testResult?.sampleUrls && testResult.sampleUrls.length > 0 && (
               <div className="space-y-2">
-                <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
+                <label className="text-xs font-bold text-retro-muted uppercase tracking-wider">
                   Extracted Image Previews ({testResult.sampleUrls.length}):
                 </label>
                 <div className="grid grid-cols-3 gap-2">
@@ -1311,7 +1311,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
             {/* Terminal Log Box Header & Copy Action */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
+                <label className="text-xs font-bold text-retro-muted uppercase tracking-wider">
                   Execution Logs &amp; Diagnostics Output:
                 </label>
                 {testResult && (
@@ -1321,7 +1321,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                       const text = (testResult.logs || []).join('\n') + (testResult.error ? `\n[ERROR] ${testResult.error}` : '');
                       if (navigator.clipboard) {
                         navigator.clipboard.writeText(text);
-                        toast('Diagnostic logs copied to clipboard!', 'success');
+                        toast('Logs copied.', 'success');
                       }
                     }}
                     className="text-[10px] font-bold text-cyan-300 hover:text-cyan-300 flex items-center gap-1 cursor-pointer"
@@ -1330,7 +1330,7 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                   </button>
                 )}
               </div>
-              <div className="w-full h-56 bg-[#18181b] border border-[#27272a] rounded-xl p-3 font-mono text-[11px] text-zinc-300 overflow-y-auto custom-scrollbar space-y-1">
+              <div className="w-full h-56 bg-[#18181b] border border-[#27272a] rounded-xl p-3 font-mono text-xs text-retro-fg overflow-y-auto custom-scrollbar space-y-1">
                 {testResult?.logs?.map((line, idx) => (
                   <div
                     key={idx}
@@ -1343,14 +1343,14 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
                             ? 'text-emerald-600 font-bold'
                             : line.startsWith('[REQ]') || line.startsWith('[RES]')
                               ? 'text-cyan-300'
-                              : 'text-zinc-400'
+                              : 'text-retro-muted'
                     }
                   >
                     {line}
                   </div>
                 ))}
                 {!testResult && (
-                  <div className="text-zinc-400 italic py-4 text-center">
+                  <div className="text-retro-muted italic py-4 text-center">
                     Select a provider and click &ldquo;Test Selected API&rdquo; to view real-time diagnostics.
                   </div>
                 )}
@@ -1359,22 +1359,22 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
           </div>
 
           {/* 3. Pre-Defined Cards for Newcomers Settings */}
-          <div className="bg-[#18181b] border border-[#27272a] rounded-2xl p-5 space-y-4 shadow-lg">
+          <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-5 space-y-4 shadow-lg">
             <div className="flex items-center justify-between border-b border-[#27272a] pb-3">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-100">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-retro-fg">
                 <Sparkles className="w-4 h-4 text-cyan-300" />
                 <span>3. Newcomer Starter Deck (5 Cards)</span>
               </div>
               <button
                 type="button"
                 onClick={async () => {
-                  toast('Generating 5 unique starter cards...', 'info');
+                  toast('Generating 5 starter cards…', 'info');
                   try {
                     const res = await orbitFetch('/api/starter-deck/test', { method: 'POST' }, identity);
                     if (res.ok) {
                       const data = await res.json();
                       if (Array.isArray(data?.cards)) {
-                        toast(`Generated ${data.cards.length} starter cards!`, 'success');
+                        toast(`Generated ${data.cards.length} starter cards.`, 'success');
                       }
                     }
                   } catch {
@@ -1387,20 +1387,20 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
               </button>
             </div>
 
-            <p className="text-[11px] text-zinc-500 leading-relaxed">
+            <p className="text-xs text-retro-muted leading-relaxed">
               When a newcomer registers on gMatch, a pre-defined starter deck of 5 unique cards is automatically minted for their account so they can immediately participate in duels.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">Primary Source Provider:</label>
+                <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider block mb-1">Primary Source Provider:</label>
                 <select
                   value={providers[0]?.id || 'prov_gelbooru'}
                   onChange={(e) => {
                     const prov = providers.find((p) => p.id === e.target.value);
                     if (prov) setSelectedTestProviderId(prov.id);
                   }}
-                  className="w-full p-2 bg-[#18181b] border border-[#27272a] rounded-xl text-xs text-zinc-100 font-medium outline-none"
+                  className="w-full p-2 bg-[#18181b] border border-[#27272a] rounded-xl text-xs text-retro-fg font-medium outline-none"
                 >
                   {providers.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -1411,14 +1411,14 @@ export function BotSetupPanel({ identity }: { identity: OrbitIdentity }) {
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">Starter Card Tags Filter:</label>
+                <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider block mb-1">Starter Card Tags Filter:</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={starterTagsText}
                     onChange={(e) => setStarterTagsText(e.target.value)}
                     placeholder="highres, 1girl, solo, aesthetic"
-                    className="flex-1 p-2 bg-[#18181b] border border-[#27272a] rounded-xl text-xs text-zinc-100 font-mono outline-none"
+                    className="flex-1 p-2 bg-[#18181b] border border-[#27272a] rounded-xl text-xs text-retro-fg font-mono outline-none"
                   />
                   <button
                     type="button"

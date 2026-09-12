@@ -5,6 +5,7 @@ import type { LocalBlobStore } from '../blob'
 import { purgeObjectLikes } from '../game'
 import { reportContent, ReportError } from '../reports'
 import { promoteLobbyImageToPost } from '../lobby'
+import { generateFallbackName } from '@orbit/shared'
 
 type Bindings = {
   DB: D1Turso
@@ -45,6 +46,7 @@ async function postRow(db: D1Turso, orbitId: string, id: string): Promise<any> {
       SELECT o.id, o.owner_id, o.size_bytes, o.mime_type, o.created_at, o.content_url,
              COALESCE(o.post_caption, o.caption) as caption, o.location, o.post_tags,
              o.like_count, o.comment_count, o.share_count, o.is_story, o.hidden_at, o.post_group,
+             COALESCE(o.is_archived, 0) as is_archived,
              u.display_name as author_name, u.pfp_url as author_pfp,
              (SELECT COUNT(*) FROM PostLikes pl WHERE pl.object_id = o.id AND pl.user_id = ?) as is_liked,
              (SELECT COUNT(*) FROM Saves s WHERE s.object_id = o.id AND s.user_id = ?) as is_saved,
@@ -52,8 +54,9 @@ async function postRow(db: D1Turso, orbitId: string, id: string): Promise<any> {
       FROM Objects o
       LEFT JOIN Users u ON u.id = o.owner_id
       WHERE o.id = ? AND o.is_public = 1 AND o.hidden_at IS NULL
+        AND (o.owner_id = ? OR COALESCE(o.is_archived, 0) = 0)
     `)
-    .bind(orbitId, orbitId, orbitId, id)
+    .bind(orbitId, orbitId, orbitId, id, orbitId)
     .first<any>()
 }
 
@@ -61,7 +64,7 @@ function serializePost(row: any): any {
   return {
     id: row.id,
     author_id: row.owner_id,
-    author_name: row.author_name?.trim() || 'Unknown User',
+    author_name: row.author_name?.trim() || generateFallbackName(row.owner_id),
     author_avatar: row.author_pfp || null,
     url: row.content_url || `/api/objects/${row.id}`,
     mime_type: row.mime_type || 'image/jpeg',
@@ -73,6 +76,7 @@ function serializePost(row: any): any {
     like_count: Number(row.like_count || 0),
     comment_count: Number(row.comment_count || 0),
     share_count: Number(row.share_count || 0),
+    is_archived: Number(row.is_archived || 0),
     is_story: Number(row.is_story || 0),
     is_liked: Number(row.is_liked || 0) > 0,
     is_saved: Number(row.is_saved || 0) > 0,
@@ -116,8 +120,8 @@ posts.get('/', async (c) => {
   const limit = Math.min(Math.max(parseInt(c.req.query('limit') || '50', 10) || 50, 1), 200)
   const offset = Math.max(parseInt(c.req.query('offset') || '0', 10) || 0, 0)
 
-  const where: string[] = ['o.is_public = 1', 'o.hidden_at IS NULL']
-  const args: any[] = [orbitId, orbitId]
+  const where: string[] = ['o.is_public = 1', 'o.hidden_at IS NULL', '(o.owner_id = ? OR COALESCE(o.is_archived, 0) = 0)']
+  const args: any[] = [orbitId, orbitId, orbitId]
 
   if (following) {
     where.push('EXISTS (SELECT 1 FROM Followers f WHERE f.follower_id = ? AND f.followee_id = o.owner_id AND f.accepted = 1)')
@@ -150,6 +154,7 @@ posts.get('/', async (c) => {
     SELECT o.id, o.owner_id, o.size_bytes, o.mime_type, o.created_at, o.content_url,
            COALESCE(o.post_caption, o.caption) as caption, o.location, o.post_tags,
            o.like_count, o.comment_count, o.share_count, o.is_story, o.hidden_at, o.post_group,
+           COALESCE(o.is_archived, 0) as is_archived,
            u.display_name as author_name, u.pfp_url as author_pfp,
            (SELECT COUNT(*) FROM PostLikes pl WHERE pl.object_id = o.id AND pl.user_id = ?) as is_liked,
            (SELECT COUNT(*) FROM Saves s WHERE s.object_id = o.id AND s.user_id = ?) as is_saved
@@ -227,7 +232,7 @@ posts.get('/:id', async (c) => {
     comments: (comments.results || []).map((c: any) => ({
       id: c.id,
       author_id: c.author_id,
-      author_name: c.author_name?.trim() || 'Unknown User',
+      author_name: c.author_name?.trim() || generateFallbackName(c.author_id),
       author_avatar: c.author_pfp || null,
       text: c.body,
       like_count: Number(c.like_count || 0),
@@ -325,7 +330,7 @@ posts.get('/:id/comments', async (c) => {
   return c.json((rows.results || []).map((c: any) => ({
     id: c.id,
     author_id: c.author_id,
-      author_name: c.author_name?.trim() || 'Unknown User',
+      author_name: c.author_name?.trim() || generateFallbackName(c.author_id),
     author_avatar: c.author_pfp || null,
     text: c.body,
     like_count: Number(c.like_count || 0),

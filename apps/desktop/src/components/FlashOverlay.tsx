@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { FLASH_POPUP_SECONDS, type FlashEvent } from '@orbit/shared'
 import { ObjectImage } from './ObjectImage'
+import { Zap, X, Heart } from 'lucide-react'
 
 export function FlashOverlay({
   flash,
@@ -27,26 +28,27 @@ export function FlashOverlay({
   }, [flash.id, onDismiss])
 
   return (
-    <div className="fixed inset-0 z-[9998] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-orbit-fade-in">
-      <div className="relative max-w-md w-full rounded-2xl overflow-hidden border-4 border-yellow-400 shadow-[0_0_80px_rgba(250,204,21,0.45)]">
+    <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-orbit-fade-in">
+      <div className="relative max-w-md w-full rounded-xl overflow-hidden border-4 border-yellow-400 shadow-[0_0_80px_rgba(250,204,21,0.45)]">
         <div className="absolute top-0 inset-x-0 bg-gradient-to-b from-black/80 to-transparent p-3 z-10 flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
             {flash.pfp_url ? (
-              <img src={flash.pfp_url} alt="" className="w-7 h-7 rounded-full border border-retro-border shrink-0" />
+              <img src={flash.pfp_url} alt="" className="w-7 h-7 rounded-full border border-border-glass shrink-0" />
             ) : (
-              <div className="w-7 h-7 rounded-full bg-retro-panel border border-retro-border flex items-center justify-center text-xs shrink-0">⚡</div>
+              <div className="w-7 h-7 rounded-full bg-retro-panel border border-border-glass flex items-center justify-center text-xs shrink-0"><Zap className="w-3.5 h-3.5 fill-current" /></div>
             )}
             <div className="min-w-0">
-              <div className="text-xs font-black text-yellow-300 uppercase tracking-widest">⚡ Flash Drop</div>
+              <div className="text-xs font-black text-yellow-300 uppercase tracking-widest">Flash Drop</div>
               <div className="text-[10px] text-white/80 font-mono truncate">{flash.owner_name || 'Anonymous'}</div>
             </div>
           </div>
           <button
             type="button"
             onClick={onDismiss}
-            className="text-[10px] font-bold text-white/70 hover:text-white px-2 py-1 border border-white/30 rounded cursor-pointer"
+            aria-label="Dismiss flash"
+            className="text-white/70 hover:text-white p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer"
           >
-            ✕
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
@@ -70,7 +72,7 @@ export function FlashOverlay({
             disabled={flash.liked_by_me}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-400/20 border border-yellow-400/40 text-yellow-300 text-xs font-bold cursor-pointer disabled:opacity-50"
           >
-            <span>{flash.liked_by_me ? '★' : '☆'}</span>
+            <Heart className={`w-3.5 h-3.5 ${flash.liked_by_me ? 'fill-current' : ''}`} />
             <span>{flash.likes_count}</span>
           </button>
           <div className="text-[10px] text-white/60 font-mono">

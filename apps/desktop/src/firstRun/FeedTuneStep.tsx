@@ -1,41 +1,39 @@
 import { useEffect, useState } from 'react';
 import { useGame, SETUP_TAG_COUNT } from '../game/store';
-import { normalizeCustomTag, validateCustomTag } from '../game/tags';
+import { normalizeCustomTag } from '../game/tags';
 import { SUGGESTED_EXCLUDES } from '../game/tagFilter';
 import { fetchPosts } from '../services/booru';
 
 /**
- * "Tune your feed" onboarding step (folded in from the legacy idle
- * SetupScreen): the player picks exactly SETUP_TAG_COUNT starter tags — no
- * hardcoded defaults exist. Each pick is validity-gated instantly and
- * live-probed (debounced) before the forward action unlocks. Optional extra
+ * "Pick your pleasure" onboarding step: the player taps exactly
+ * SETUP_TAG_COUNT starter pills — no typing, no hardcoded defaults
+ * committed anywhere. Each pick is validity-gated instantly and
+ * live-probed (debounced) before Start unlocks. Optional one-tap
  * excludes are collected here and editable later in Settings → Feed.
  */
 
-type FieldStatus = 'empty' | 'invalid' | 'checking' | 'live' | 'unverified';
+/** Curated, safe starter suggestions — all pass validateCustomTag. */
+const STARTER_PILLS = [
+  'milf', 'creampie', 'ahegao', 'doggystyle',
+  'paizuri', 'cowgirl_position', 'femdom', 'bondage',
+  'lingerie', 'stockings', 'cosplay', 'blowjob',
+  'deepthroat', 'cum', 'anal', 'masturbation',
+  'solo', 'pov', 'threesome', 'huge_breasts',
+  'futanari', 'feet',
+] as const;
 
-interface Field {
-  value: string;
-  status: FieldStatus;
-  detail: string;
+type PickStatus = 'checking' | 'live' | 'unverified';
+
+interface Pick {
+  name: string;
+  status: PickStatus;
 }
 
-const BLANK: Field = { value: '', status: 'empty', detail: '' };
-
-const DOT_STYLE: Record<FieldStatus, string> = {
-  empty: 'bg-glass-w20',
-  invalid: 'bg-red-500',
+const DOT: Record<PickStatus, string> = {
   checking: 'bg-amber-400 animate-pulse',
   live: 'bg-emerald-500',
-  unverified: 'bg-zinc-500',
+  unverified: 'bg-retro-muted',
 };
-
-function splitExcludes(raw: string): string[] {
-  return raw
-    .split(/[\s,]+/)
-    .map((t) => t.toLowerCase().trim())
-    .filter(Boolean);
-}
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -47,102 +45,75 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
   const alreadyDone = useGame((s) => s.setupComplete);
   const [editing, setEditing] = useState(false);
-  const [fields, setFields] = useState<Field[]>(() => {
+  const [picks, setPicks] = useState<Pick[]>(() => {
     const owned = useGame
       .getState()
       .tags.filter((t) => t.selected !== false)
       .map((t) => t.name)
       .slice(0, SETUP_TAG_COUNT);
-    return Array.from({ length: SETUP_TAG_COUNT }, (_, i) => ({ ...BLANK, value: owned[i] ?? '' }));
+    return owned.map((name) => ({ name, status: 'checking' as PickStatus }));
   });
-  const [excludeInput, setExcludeInput] = useState('');
   const [excludes, setExcludes] = useState<string[]>(() => {
     const stored = useGame.getState().userExcludes;
     return Array.isArray(stored) ? [...stored] : [];
   });
   const [note, setNote] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
-  const valuesKey = fields.map((f) => f.value).join('\n');
+  const picksKey = picks.map((p) => p.name).join('\n');
 
-  // Debounced validity + live probe per field (cancelled on re-type/unmount).
+  // Debounced live probe per pick (cancelled on change/unmount).
   useEffect(() => {
     let cancelled = false;
-    const values = fields.map((f) => f.value);
+    const names = picks.map((p) => p.name);
+    if (names.length === 0) return;
     const t = window.setTimeout(() => {
       void (async () => {
-        const next: Field[] = [];
-        const probeJobs: { index: number; name: string }[] = [];
-        values.forEach((raw, i) => {
-          if (!raw.trim()) {
-            next[i] = { value: raw, status: 'empty', detail: '' };
-            return;
-          }
-          const verdict = validateCustomTag(raw);
-          if (!verdict.ok) {
-            const why =
-              verdict.reason === 'blocked'
-                ? 'blocked'
-                : verdict.reason === 'noise'
-                  ? 'no content'
-                  : verdict.reason === 'too-long'
-                    ? 'too long'
-                    : 'too short';
-            next[i] = { value: raw, status: 'invalid', detail: why };
-            return;
-          }
-          next[i] = { value: raw, status: 'checking', detail: 'probing…' };
-          probeJobs.push({ index: i, name: verdict.name });
-        });
-        if (!cancelled) setFields(next);
         const results = await Promise.all(
-          probeJobs.map(async (job) => {
+          names.map(async (name) => {
             try {
-              const res = await withTimeout(fetchPosts({ tags: job.name, limit: 3 }), 2500);
-              return { ...job, ok: res.ok, count: res.posts.length };
+              const res = await withTimeout(fetchPosts({ tags: name, limit: 3 }), 2500);
+              const live = res.ok && res.posts.length > 0;
+              return { name, status: (live ? 'live' : 'unverified') as PickStatus };
             } catch {
-              return { ...job, ok: false, count: 0 };
+              return { name, status: 'unverified' as PickStatus };
             }
           }),
         );
         if (cancelled) return;
-        setFields((prev) =>
-          prev.map((f, i) => {
-            const r = results.find((x) => x.index === i);
-            if (!r || f.status !== 'checking') return f;
-            const live = r.ok && r.count > 0;
-            return {
-              ...f,
-              status: live ? 'live' : 'unverified',
-              detail: live ? 'live' : r.ok ? 'no results' : 'offline',
-            };
+        setPicks((prev) =>
+          prev.map((p) => {
+            const r = results.find((x) => x.name === p.name);
+            return r ? { ...p, status: r.status } : p;
           }),
         );
       })();
-    }, 600);
+    }, 400);
     return () => {
       cancelled = true;
       window.clearTimeout(t);
     };
-  }, [valuesKey]);
+  }, [picksKey]);
 
-  const setFieldValue = (index: number, value: string) => {
-    setFields((prev) => prev.map((f, i) => (i === index ? { ...f, value } : f)));
+  const togglePill = (raw: string) => {
+    const name = normalizeCustomTag(raw);
+    if (!name) return;
+    setPicks((prev) => {
+      if (prev.some((p) => p.name === name)) {
+        return prev.filter((p) => p.name !== name);
+      }
+      if (prev.length >= SETUP_TAG_COUNT) return prev;
+      return [...prev, { name, status: 'checking' as PickStatus }];
+    });
   };
 
-  const addExcludes = () => {
-    const fresh = splitExcludes(excludeInput).filter((t) => t.length <= 40 && !excludes.includes(t));
-    if (fresh.length > 0) setExcludes((prev) => [...prev, ...fresh].slice(0, 100));
-    setExcludeInput('');
+  const removePick = (name: string) => {
+    setPicks((prev) => prev.filter((p) => p.name !== name));
   };
 
-  const isValid = (f: Field) =>
-    f.status === 'live' || f.status === 'unverified' || f.status === 'checking';
-  // Commit every syntactically-valid pick (live or merely unverified).
-  const uniqueValid = [...new Set(fields.filter(isValid).map((f) => normalizeCustomTag(f.value)))];
-  const allLive = fields.every((f) => f.status === 'live');
-  // Validity gate (plan §7): exactly N distinct valid tags. Probe failures
-  // (mirror offline / no results) only warn — they must never block progress.
-  const ready = fields.every(isValid) && uniqueValid.length === SETUP_TAG_COUNT;
+  // Commit every pick — probe failures only warn, never block progress.
+  const uniqueValid = [...new Set(picks.map((p) => p.name))];
+  const allLive = picks.length > 0 && picks.every((p) => p.status === 'live');
+  const ready = uniqueValid.length === SETUP_TAG_COUNT;
 
   const start = () => {
     const tuned = useGame.getState().setupComplete;
@@ -152,7 +123,7 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
       onFinished();
       return;
     }
-    // Enter must obey the exact same gate as the Start button.
+    // Start obeys the same gate as the button state.
     if (!ready) return;
     // Excludes must not blank the picks (substring rule both ways).
     const clash = excludes.find((x) => uniqueValid.some((n) => n.includes(x) || x.includes(n)));
@@ -199,97 +170,86 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
     );
   }
 
+  const pickedNames = new Set(picks.map((p) => p.name));
+
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="min-h-0 flex-1 overflow-y-auto styled-scrollbar pr-1 space-y-3">
-        <div className="space-y-2">
-          {fields.map((f, i) => (
-            <div key={i} className="grid grid-cols-[1.25rem_minmax(0,1fr)_5rem] items-center gap-2">
-              <span className="text-center font-mono text-xs text-retro-muted">{i + 1}</span>
-              <input
-                className="glass-field min-w-0 px-3 py-2 text-xs"
-                value={f.value}
-                placeholder={`Starter tag ${i + 1} — e.g. creampie`}
-                aria-label={`Starter tag ${i + 1}`}
-                onChange={(e) => setFieldValue(i, e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    start();
-                  }
-                }}
-              />
-              <span
-                className="flex min-w-0 items-center gap-1.5 text-[10px] text-retro-muted"
-                title={f.detail || f.status}
+    <div className="flex h-full min-h-0 flex-col gap-4">
+      <div className="min-h-0 flex-1 overflow-y-auto styled-scrollbar pr-1 space-y-4">
+        {/* Chosen slots — big, tappable to remove */}
+        <div aria-label="Chosen starter tags">
+          <div className="flex flex-wrap gap-2 min-h-[44px]">
+            {picks.map((p) => (
+              <button
+                key={p.name}
+                type="button"
+                onClick={() => removePick(p.name)}
+                title={`${p.name} — tap to remove (${p.status === 'live' ? 'live' : p.status === 'checking' ? 'probing…' : 'unverified'})`}
+                aria-label={`Remove ${p.name}`}
+                className="inline-flex items-center gap-2 rounded-full border border-retro-accent/60 bg-retro-accent/15 px-4 py-2 text-sm font-bold text-retro-fg cursor-pointer transition-colors hover:bg-retro-accent/30"
               >
-                <span className={`w-2 h-2 shrink-0 rounded-full ${DOT_STYLE[f.status]}`} aria-hidden="true" />
-                <span className="truncate font-mono">{f.detail}</span>
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex gap-2">
-          <input
-            className="glass-field flex-1 min-w-0 px-3 py-2 text-xs"
-            value={excludeInput}
-            placeholder="Extra excludes — comma/space separated"
-            aria-label="Extra excluded tags"
-            onChange={(e) => setExcludeInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                addExcludes();
-              }
-            }}
-          />
-          <button
-            type="button"
-            disabled={!excludeInput.trim() || excludes.length >= 100}
-            onClick={addExcludes}
-            className="glass-action shrink-0 px-3 py-2 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-30"
-          >
-            Add
-          </button>
-        </div>
-        {excludes.length >= 100 && (
-          <p className="text-[10px] text-retro-muted">Maximum 100 personal excludes reached — remove one before adding another.</p>
-        )}
-
-        {excludes.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {excludes.map((x) => (
+                <span className={`w-2.5 h-2.5 shrink-0 rounded-full ${DOT[p.status]}`} aria-hidden="true" />
+                {p.name}
+                <span aria-hidden="true" className="text-retro-muted font-normal">×</span>
+              </button>
+            ))}
+            {Array.from({ length: SETUP_TAG_COUNT - picks.length }, (_, i) => (
               <span
-                key={x}
-                className="glass-inset inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-mono"
+                key={`empty-${i}`}
+                className="inline-flex items-center rounded-full border border-dashed border-border-glass px-4 py-2 text-sm text-retro-muted"
               >
-                <span className="truncate">{x}</span>
-                <button
-                  type="button"
-                  aria-label={`Remove exclude ${x}`}
-                  onClick={() => setExcludes((prev) => prev.filter((t) => t !== x))}
-                  className="shrink-0 text-retro-muted hover:text-rose-300 cursor-pointer"
-                >
-                  ×
-                </button>
+                pick {picks.length + i + 1}
               </span>
             ))}
           </div>
-        )}
+        </div>
 
+        {/* Suggestion cloud — tap to fill slots, no typing */}
+        <div>
+          <p className="text-xs uppercase tracking-wider text-retro-muted mb-2">
+            Tap to add
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {STARTER_PILLS.filter((t) => !pickedNames.has(t)).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => togglePill(t)}
+                disabled={picks.length >= SETUP_TAG_COUNT}
+                aria-pressed={false}
+                className="rounded-full border border-border-glass bg-surface-raised px-4 py-2 text-sm text-retro-muted cursor-pointer transition-colors hover:text-retro-fg hover:border-retro-accent/50 disabled:opacity-30 disabled:cursor-default"
+              >
+                + {t}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* One-tap excludes */}
         <div className="space-y-1.5">
-          <p className="text-[10px] uppercase tracking-wider text-retro-muted">
-            One-tap excludes
+          <p className="text-xs uppercase tracking-wider text-retro-muted">
+            Never show
           </p>
           <div className="flex flex-wrap gap-1.5">
+            {excludes.map((x) => (
+              <button
+                key={x}
+                type="button"
+                onClick={() => setExcludes((prev) => prev.filter((t) => t !== x))}
+                aria-label={`Remove exclude ${x}`}
+                title={`${x} — tap to remove`}
+                className="inline-flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs font-mono text-red-200 cursor-pointer hover:bg-red-500/25"
+              >
+                {x}
+                <span aria-hidden="true">×</span>
+              </button>
+            ))}
             {SUGGESTED_EXCLUDES.filter((x) => !excludes.includes(x)).map((x) => (
               <button
                 key={x}
                 type="button"
                 disabled={excludes.length >= 100}
                 onClick={() => setExcludes((prev) => [...prev, x].slice(0, 100))}
-                className="glass-action rounded-full px-2 py-1 text-[10px] font-mono text-retro-muted disabled:opacity-30 cursor-pointer"
+                className="rounded-full border border-border-subtle px-3 py-1.5 text-xs font-mono text-retro-muted disabled:opacity-30 cursor-pointer hover:text-retro-fg hover:border-border-strong"
               >
                 + {x}
               </button>
@@ -310,25 +270,25 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
         )}
       </div>
 
-      <div className="glass-header shrink-0 -mx-5 -mb-5 px-5 py-4">
+      <div className="shrink-0">
         <button
           type="button"
           disabled={!ready || starting}
           onClick={start}
           title={
             !ready
-              ? `Enter ${SETUP_TAG_COUNT} distinct, valid starter tags`
+              ? `Tap ${SETUP_TAG_COUNT} pills to continue`
               : allLive
                 ? 'Start the grid'
                 : 'Tags not verified live — start anyway'
           }
-          className="glass-action glass-action-primary w-full px-5 py-2.5 rounded-lg text-sm font-bold cursor-pointer"
+          className="glass-action glass-action-primary w-full px-5 py-3 rounded-xl text-base font-bold cursor-pointer"
         >
-          {starting ? 'Starting…' : allLive ? 'Start' : 'Start anyway'}
+          {starting ? 'Starting…' : allLive ? `Start (${picks.length}/${SETUP_TAG_COUNT})` : 'Start anyway'}
         </button>
         {!ready && (
-          <p className="mt-1 text-center text-[10px] text-retro-muted">
-            Enter {SETUP_TAG_COUNT} distinct starter tags to continue.
+          <p className="mt-1.5 text-center text-xs text-retro-muted">
+            {picks.length}/{SETUP_TAG_COUNT} picked — tap {SETUP_TAG_COUNT - picks.length} more.
           </p>
         )}
       </div>

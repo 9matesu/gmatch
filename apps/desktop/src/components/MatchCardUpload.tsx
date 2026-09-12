@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { DropZone } from './DropZone'
 import { isMediaVideo, resolveMediaUrl } from '../utils/media'
+import { Check } from 'lucide-react'
 import { ObjectImage } from './ObjectImage'
 import { computeCardRarity, formatGc } from '@orbit/shared'
 
@@ -121,7 +122,7 @@ export function MatchCardUpload({
       onChange={(e) => setCardName(e.target.value)}
       maxLength={80}
       placeholder="Card name"
-      className="flex-1 bg-retro-bg border border-retro-border px-3 py-1.5 text-[10px] text-retro-fg outline-none placeholder:text-retro-muted rounded"
+      className="flex-1 bg-retro-bg border border-border-glass px-3 py-1.5 text-[10px] text-retro-fg outline-none placeholder:text-retro-muted rounded"
     />
   )
 
@@ -135,7 +136,7 @@ export function MatchCardUpload({
         onFiles={(list) => { if (list[0]) void pickFile(list[0]) }}
         onPasteUrl={(url) => void importLink(url)}
       >
-        <div className="text-[11px] text-retro-fg flex items-center justify-center gap-2">
+        <div className="text-xs text-retro-fg flex items-center justify-center gap-2">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-retro-accent">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="17 8 12 3 7 8" />
@@ -151,7 +152,7 @@ export function MatchCardUpload({
             onChange={(e) => setLinkInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') void importLink() }}
             placeholder={pending ? 'or paste a new link to replace it' : linkPlaceholder}
-            className="flex-1 bg-retro-bg border border-retro-border px-3 py-1.5 text-[10px] text-retro-fg outline-none placeholder:text-retro-muted rounded"
+            className="flex-1 bg-retro-bg border border-border-glass px-3 py-1.5 text-[10px] text-retro-fg outline-none placeholder:text-retro-muted rounded"
           />
           <button
             type="button"
@@ -212,10 +213,10 @@ export function MatchCardUpload({
               )}
               {pending.status === 'ready' && (
                 <div className="absolute top-1.5 left-1.5 flex items-center gap-1">
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-retro-accent text-black">
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-retro-accent text-black">
                     Card preview
                   </span>
-                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/80 text-amber-300 border border-amber-500/40">
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/80 text-amber-300 border border-amber-500/40">
                     {formatGc(pending.value ?? 0)}
                   </span>
                 </div>
@@ -229,21 +230,21 @@ export function MatchCardUpload({
             <div className="p-3 space-y-2">
               {pending.status === 'uploading' && (
                 <div className="space-y-1">
-                  <div className="h-1.5 w-full bg-retro-surface border border-retro-border rounded-full overflow-hidden">
+                  <div className="h-1.5 w-full bg-retro-surface border border-border-glass rounded-full overflow-hidden">
                     <div
                       className="h-full bg-retro-accent transition-all duration-150"
                       style={{ width: `${Math.min(100, Math.max(2, pending.progress))}%` }}
                     />
                   </div>
-                  <div className="text-[9px] font-mono text-retro-muted tabular-nums">Uploading… {pending.progress}%</div>
-                  <div className="text-[9px] text-retro-muted">Image is being uploaded to the orbit.</div>
+                  <div className="text-[10px] font-mono text-retro-muted tabular-nums">Uploading… {pending.progress}%</div>
+                  <div className="text-[10px] text-retro-muted">Image is being uploaded to the orbit.</div>
                 </div>
               )}
               {pending.status === 'error' && (
-                <div className="text-[9px] font-bold text-red-400">{pending.error}</div>
+                <div className="text-[10px] font-bold text-red-400">{pending.error}</div>
               )}
               {pending.status === 'sent' && (
-                <div className="text-[9px] font-black tracking-widest text-retro-accent uppercase">✓ Card sent</div>
+                <div className="text-[10px] font-black tracking-widest text-retro-accent uppercase flex items-center gap-1">Card sent<Check className="w-3.5 h-3.5" /></div>
               )}
 
               {(pending.status === 'ready' || pending.status === 'sent') && (
@@ -251,8 +252,8 @@ export function MatchCardUpload({
                   <div className="min-w-0">
                     <div className="text-[10px] font-bold text-retro-fg truncate">{pending.name || 'Unnamed Card'}</div>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded border ${rarity.badgeClass}`}>{rarity.label}</span>
-                      <span className="text-[9px] font-mono text-amber-300/90">{pending.value ?? 0} value</span>
+                      <span className={`text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${rarity.badgeClass}`}>{rarity.label}</span>
+                      <span className="text-[10px] font-mono text-amber-300/90">{pending.value ?? 0} value</span>
                     </div>
                   </div>
                 </div>

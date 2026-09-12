@@ -73,11 +73,11 @@ export function canBuyTag(tag: OwnedTag): boolean {
 }
 
 /** Buy one level of a tag; returns a new tag or null if maxed/unaffordable. Buying selects it for the feed. */
-export function buyTag(tag: OwnedTag, gc: number): { tag: OwnedTag; gc: number } | null {
+export function buyTag(tag: OwnedTag, points: number): { tag: OwnedTag; points: number } | null {
   if (!canBuyTag(tag)) return null
   const cost = tagCost(tag.base, tag.level)
-  if (gc < cost) return null
-  return { tag: { ...tag, level: tag.level + 1, selected: true }, gc: gc - cost }
+  if (points < cost) return null
+  return { tag: { ...tag, level: tag.level + 1, selected: true }, points: points - cost }
 }
 
 /** Toggle feed selection on an owned tag; null when unowned. */
@@ -108,7 +108,7 @@ export function isTagSelected(tag: OwnedTag): boolean {
 
 /**
  * Discover new market offers from a drained foe's tags (auto-generated as
- * you progress — pay g$ to buy the picture types you want). Blocklist/noise
+ * you progress — pay pts to buy the picture types you want). Blocklist/noise
  * filtered via rankTags; owned levels + selection preserved; unowned offers
  * capped, owned tags always kept.
  */
@@ -133,4 +133,34 @@ export function feedQuery(tags: OwnedTag[], limit = 5): string[] {
     .sort((a, b) => b.level - a.level || a.name.localeCompare(b.name))
     .slice(0, limit)
     .map((t) => t.name)
+}
+
+/**
+ * Permanently drop an owned tag (player cleanup). Refuses the unowned and the
+ * last selected pill — an empty feed starves the round-robin.
+ */
+export function removeTag(tags: OwnedTag[], name: string): OwnedTag[] | null {
+  const target = tags.find((t) => t.name === name)
+  if (!target || target.level <= 0) return null
+  const rest = tags.filter((t) => t.name !== name)
+  if (isTagSelected(target) && !rest.some(isTagSelected)) return null
+  return rest
+}
+
+/**
+ * Merge two owned pills into one combined-search tag (booru AND: the feed
+ * sends "a b"; the query-ladder in services/booru degrades long combos).
+ * Level = best of the two (capped); the loser is consumed. Income follows the
+ * merged name's own stats, boosted by the surviving level.
+ */
+export function mergeTags(tags: OwnedTag[], a: string, b: string): OwnedTag[] | null {
+  if (a === b) return null
+  const ta = tags.find((t) => t.name === a)
+  const tb = tags.find((t) => t.name === b)
+  if (!ta || !tb || ta.level <= 0 || tb.level <= 0) return null
+  const name = `${a} ${b}`
+  const level = Math.min(MAX_TAG_LEVEL, Math.max(ta.level, tb.level))
+  const stats = deriveTagStats(name, 1)
+  const merged: OwnedTag = { name, level, selected: true, base: stats.base, income: stats.income + ta.income + tb.income, weight: stats.weight }
+  return [...tags.filter((t) => t.name !== a && t.name !== b), merged]
 }

@@ -65,18 +65,18 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     <Ctx.Provider value={confirm}>
       {children}
       {pending && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 animate-orbit-fade-in">
+        <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-orbit-fade-in">
           <div
-            className="bg-zinc-900 border border-zinc-800 rounded-lg p-5 w-[380px] max-w-[90vw] shadow-2xl animate-orbit-pop"
+            className="bg-retro-panel border border-border-glass rounded-lg p-5 w-[380px] max-w-[90vw] shadow-2xl animate-orbit-pop"
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirm-title"
           >
-            <h2 id="confirm-title" className="font-semibold text-sm text-zinc-100 mb-1.5">
+            <h2 id="confirm-title" className="font-semibold text-sm text-retro-fg mb-1.5">
               {pending.options.title}
             </h2>
             {pending.options.description && (
-              <p className="text-xs text-zinc-400 leading-relaxed mb-4">
+              <p className="text-xs text-retro-muted leading-relaxed mb-4">
                 {pending.options.description}
               </p>
             )}
@@ -84,7 +84,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={() => settle(false)}
-                className="px-3 py-1.5 text-xs font-medium border border-zinc-700/80 rounded-md text-zinc-300 hover:bg-zinc-800 hover:text-white transition-all duration-150 active:scale-[0.96] cursor-pointer"
+                className="px-3 py-1.5 text-xs font-medium border border-border-glass rounded-md text-retro-fg hover:bg-glass-w12 hover:text-white transition-all duration-150 active:scale-[0.96] cursor-pointer"
               >
                 {pending.options.cancelLabel}
               </button>
@@ -95,8 +95,8 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                   pending.options.tone === 'danger'
                     ? 'border border-red-500/30 text-red-300 bg-red-500/15 hover:bg-red-500/25'
                     : pending.options.tone === 'accent'
-                      ? 'bg-white text-zinc-950 hover:bg-zinc-200'
-                      : 'bg-white text-zinc-950 hover:bg-zinc-200'
+                      ? 'bg-white text-retro-bg hover:bg-retro-fg'
+                      : 'bg-white text-retro-bg hover:bg-retro-fg'
                 }`}
               >
                 {pending.options.confirmLabel}

@@ -29,6 +29,10 @@ export interface AppSettings {
   idleEnabled: boolean
   // Shell chrome transparency (0.35 – 1). Drives the --panel-alpha CSS var.
   panelOpacity: number
+  // Glass blur multiplier (0 – 1). Drives --glass-blur on every backdrop site.
+  glassBlur: number
+  // Infinite chrome sheen animations (paused by default; CDP perf sweep).
+  animatedChrome: boolean
   // PC Domination (opt-in remote effects)
   pcDominationEnabled: boolean
   allowDesktopBackgroundChange: boolean
@@ -77,6 +81,8 @@ const DEFAULTS: AppSettings = {
   idleTimeout: 5,
   idleEnabled: false,
   panelOpacity: 1,
+  glassBlur: 0.7,
+  animatedChrome: false,
   pcDominationEnabled: false,
   allowDesktopBackgroundChange: true,
   allowGameBackgroundChange: true,

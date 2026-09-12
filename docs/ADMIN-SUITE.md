@@ -11,7 +11,10 @@ published privacy policy:
 - this landing is zero-analytics; the app may not ship referrer tracking.
 
 Server-side gate facts: `/verify-pin` 503s without ADMIN_PIN(_HASH) (fly has
-none ⇒ suite dark on the official site by configuration); with
+none ⇒ suite dark on the official site by configuration); with `ADMIN_ORBIT_ID`
+set, the PIN unlocks ONLY for that identity (wave 2 E1) and the grant expires
+after 12h (E3 — re-enter the passcode to continue); without it, the node keeps
+the host-is-admin model (self-host/LAN, SECURITY-AUDIT F5); with
 `SITE_SERVICES=mail,turn` every `/api/admin/*` 404s at the edge — optional
 one-command hardening: `fly secrets set SITE_SERVICES=mail,turn -a gmatch`.
 

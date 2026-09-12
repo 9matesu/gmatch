@@ -142,7 +142,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-retro-fg">User Management</h1>
+          <h1 className="text-lg font-bold text-retro-fg">User management</h1>
           <p className="text-xs text-retro-muted mt-1">User moderation, bans, balances, and inspection</p>
         </div>
       </div>
@@ -417,10 +417,10 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                         title={selectedUser.display_name || selectedUser.id}
                         subtitle={obj.mime_type || "Media"}
                         className="aspect-square cursor-pointer"
-                        imageClassName="group-hover:scale-105 transition-transform duration-200"
+                        imageClassName="group-hover:scale-105 transition-transform duration-150"
                         onZoom={onZoom}
                         badge={obj.is_story === 1 && (
-                          <span className="absolute top-1 right-1 px-1 py-0.5 bg-cyan-500/10 border border-purple-300 text-cyan-300 font-mono font-bold text-[6px] rounded">STORY</span>
+                          <span className="absolute top-1 right-1 px-1 py-0.5 bg-cyan-500/10 border border-purple-300 text-cyan-300 font-mono font-bold text-[10px] rounded">STORY</span>
                         )}
                       />
                     </div>

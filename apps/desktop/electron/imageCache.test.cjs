@@ -23,4 +23,7 @@ assert.ok(Array.isArray(newest) && newest.length === 1, 'newest query survives')
 // TTL staleness prunes too: rewrite tag40, read immediately (fresh) — sanity.
 assert.ok(cache.getFeedCache('tag40'), 'fresh hit')
 
+// evict() drops a single URL entry from mem, false when absent.
+assert.strictEqual(cache.evict('http://x/nope.jpg'), false)
+
 console.log('imageCache feed-memo tests OK')

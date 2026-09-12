@@ -114,16 +114,16 @@ export function ProfilePicModal({
 
   return (
     <div
-      className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg"
+      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg"
       onClick={(e) => e.stopPropagation()}
     >
       <div
-        className="w-full max-w-md bg-surface-raised border border-retro-border rounded-lg shadow-xl overflow-hidden flex flex-col max-h-[85vh] animate-orbit-pop"
+        className="w-full max-w-md bg-surface-raised border border-border-glass rounded-lg shadow-xl overflow-hidden flex flex-col max-h-[85vh] animate-orbit-pop"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-retro-border">
-          <h3 className="text-sm font-medium text-retro-fg">Profile Photo</h3>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass">
+          <h3 className="text-sm font-medium text-retro-fg">Profile photo</h3>
           <button
             type="button"
             onClick={onClose}
@@ -137,7 +137,7 @@ export function ProfilePicModal({
         <div className="p-5 space-y-4 overflow-y-auto flex-1 styled-scrollbar">
           {/* Avatar Preview */}
           <div className="flex flex-col items-center py-2">
-            <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-retro-border bg-surface-interactive flex items-center justify-center">
+            <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-border-glass bg-surface-interactive flex items-center justify-center">
               {preview ? (
                 <img src={preview} alt="Preview" className="w-full h-full object-cover" />
               ) : (
@@ -147,7 +147,7 @@ export function ProfilePicModal({
           </div>
 
           {/* Mode Tabs */}
-          <div className="flex bg-surface-interactive border border-retro-border p-0.5 rounded-md text-xs">
+          <div className="flex bg-surface-interactive border border-border-glass p-0.5 rounded-md text-xs">
             {tabs.map((t) => {
               const Icon = t.icon;
               const isActive = tab === t.id;
@@ -177,7 +177,7 @@ export function ProfilePicModal({
             >
               <div className="space-y-1 text-center py-4">
                 <p className="text-xs text-retro-body font-medium">Drop image here</p>
-                <p className="text-[11px] text-retro-muted">JPG, PNG, WebP, GIF</p>
+                <p className="text-xs text-retro-muted">JPG, PNG, WebP, GIF</p>
               </div>
             </DropZone>
           )}
@@ -185,7 +185,7 @@ export function ProfilePicModal({
           {tab === 'url' && (
             <div className="space-y-3">
               <label className="text-xs font-medium text-retro-body block">Image URL</label>
-              <div className="flex items-center gap-2 bg-surface-interactive border border-retro-border rounded-lg px-3 py-2">
+              <div className="flex items-center gap-2 bg-surface-interactive border border-border-glass rounded-lg px-3 py-2">
                 <LinkIcon className="w-4 h-4 text-retro-muted shrink-0" />
                 <input
                   type="url"
@@ -204,7 +204,7 @@ export function ProfilePicModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-retro-border">
+        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border-glass">
           <button
             type="button"
             onClick={onClose}

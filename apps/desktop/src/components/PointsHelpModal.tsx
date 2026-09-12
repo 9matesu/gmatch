@@ -5,14 +5,14 @@ import { X, Sparkles, Coins } from 'lucide-react';
 export function PointsHelpModal({ onClose }: { onClose: () => void }) {
   return (
     <div
-      className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 select-none font-sans"
+      className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 select-none font-sans"
       onClick={onClose}
     >
       <div
-        className="bg-surface-raised border border-retro-border rounded-lg max-w-lg w-full max-h-[85vh] flex flex-col shadow-xl overflow-hidden text-retro-fg"
+        className="bg-surface-raised border border-border-glass rounded-lg max-w-lg w-full max-h-[85vh] flex flex-col shadow-xl overflow-hidden text-retro-fg"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-retro-border">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass">
           <div className="flex items-center gap-2">
             <Coins className="w-4 h-4 text-retro-accent" />
             <h2 className="text-sm font-medium text-retro-fg">How g$ works</h2>
@@ -32,7 +32,7 @@ export function PointsHelpModal({ onClose }: { onClose: () => void }) {
               <Sparkles className="w-3.5 h-3.5 text-retro-online" />
               <span>Earning g$</span>
             </h3>
-            <div className="bg-surface-interactive border border-retro-border rounded-lg p-3 space-y-1.5">
+            <div className="bg-surface-interactive border border-border-glass rounded-lg p-3 space-y-1.5">
               {[
                 ['Mutual like in a match', '+50 g$ each'],
                 ['League match win', '+50 g$'],
@@ -48,7 +48,7 @@ export function PointsHelpModal({ onClose }: { onClose: () => void }) {
                 </div>
               ))}
             </div>
-            <p className="text-[11px] text-retro-muted leading-relaxed">
+            <p className="text-xs text-retro-muted leading-relaxed">
               Single likes earn no g$ — only mutual matches and duel results reward points.
             </p>
           </section>
@@ -57,7 +57,7 @@ export function PointsHelpModal({ onClose }: { onClose: () => void }) {
             <h3 className="font-medium text-rose-400 text-xs">
               Store spending
             </h3>
-            <div className="bg-surface-interactive border border-retro-border rounded-lg p-3 space-y-1.5">
+            <div className="bg-surface-interactive border border-border-glass rounded-lg p-3 space-y-1.5">
               {[
                 ['Vision Jam', '\u2212800 g$'],
                 ['Flash Drop', '\u22121,000 g$'],
@@ -71,7 +71,7 @@ export function PointsHelpModal({ onClose }: { onClose: () => void }) {
             </div>
           </section>
 
-          <p className="text-[11px] text-retro-muted leading-relaxed text-center pt-1">
+          <p className="text-xs text-retro-muted leading-relaxed text-center pt-1">
             g$ are in-game currency. They cannot be purchased with real money.
           </p>
         </div>

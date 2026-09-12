@@ -45,23 +45,35 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
+  // Skip dynamic routes: APIs, proxies, and media streams (Range / 206)
+  if (
+    url.pathname.startsWith('/api/') ||
+    url.pathname.startsWith('/rg-') ||
+    url.pathname.startsWith('/booru/') ||
+    url.pathname.startsWith('/px') ||
+    event.request.headers.has('range')
+  ) {
+    return;
+  }
+
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const networkFetch = fetch(event.request)
+    caches.match(event.request).then((cachedResponse) =>
+      fetch(event.request)
         .then((networkResponse) => {
-          // Cache successful responses
-          if (networkResponse.ok) {
+          // Cache only complete, successful 200 responses (206 partial content unsupported by Cache API)
+          if (networkResponse.status === 200) {
             const responseClone = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseClone);
-            });
+              cache.put(event.request, responseClone).catch(() => {});
+            }).catch(() => {});
           }
           return networkResponse;
         })
-        .catch(() => cachedResponse);
-
-      return networkFetch || cachedResponse;
-    })
+        .catch(() => {
+          if (cachedResponse) return cachedResponse;
+          return new Response('offline', { status: 503, statusText: 'Service Unavailable' });
+        }),
+    ),
   );
 });
 

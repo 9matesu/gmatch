@@ -27,15 +27,17 @@ async function userVersion(client: Awaited<ReturnType<typeof createClient>>): Pr
 }
 
 describe('gMatch Phase 1 migrations', () => {
-  it('migrates a fresh in-memory DB to user_version 47 with all new tables/columns', async () => {
+  it('migrates a fresh in-memory DB to user_version 49 with all new tables/columns', async () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)
 
-    expect(await userVersion(client)).toBe(47)
+    expect(await userVersion(client)).toBe(49)
 
     // Followers table (migration 014)
     expect(await tableExists(client, 'Followers')).toBe(true)
     expect(await indexExists(client, 'idx_followers_followee')).toBe(true)
+    expect(await tableExists(client, 'HackDebuffs')).toBe(true)
+    expect(await indexExists(client, 'idx_hack_debuffs_target')).toBe(true)
     expect(await indexExists(client, 'idx_followers_follower')).toBe(true)
 
     // Posts columns on Objects (migration 015)
@@ -223,7 +225,7 @@ describe('gMatch Phase 1 migrations', () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)
     const versionAfterFirst = await userVersion(client)
-    expect(versionAfterFirst).toBe(47)
+    expect(versionAfterFirst).toBe(49)
 
     // Running migrate() again is a no-op
     await migrate(client)
@@ -234,10 +236,10 @@ describe('gMatch Phase 1 migrations', () => {
     expect(await columnExists(client, 'Users', 'is_moderator')).toBe(true)
   })
 
-  it('upgrades a pre-gMatch snapshot (user_version 13) by applying 014-047', async () => {
+  it('upgrades a pre-gMatch snapshot (user_version 13) by applying 014-049', async () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)
-    expect(await userVersion(client)).toBe(47)
+    expect(await userVersion(client)).toBe(49)
 
     // Tear down gMatch additions so we're effectively at pre-014 state.
     await client.execute('DROP TABLE IF EXISTS Saves')
@@ -260,10 +262,10 @@ describe('gMatch Phase 1 migrations', () => {
     // Pretend we're still on the pre-gMatch migration version.
     await client.execute('PRAGMA user_version = 13')
 
-    // Re-run migrate — it should detect user_version=13 and apply 014-045 in order
+    // Re-run migrate — it should detect user_version=13 and apply 014-049 in order
     await migrate(client)
 
-    expect(await userVersion(client)).toBe(47)
+    expect(await userVersion(client)).toBe(49)
     expect(await tableExists(client, 'Followers')).toBe(true)
     expect(await tableExists(client, 'Comments')).toBe(true)
     expect(await tableExists(client, 'CommentLikes')).toBe(true)

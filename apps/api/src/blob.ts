@@ -1,5 +1,5 @@
 import { unlink, writeFile, readFile, mkdir, readdir } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+
 import { join, dirname } from 'node:path'
 
 export class LocalBlobStore {
@@ -13,7 +13,7 @@ export class LocalBlobStore {
     return join(this.baseDir, key)
   }
 
-  async put(key: string, data: Uint8Array, options?: { httpMetadata?: { contentType?: string } }): Promise<void> {
+  async put(key: string, data: Uint8Array, _options?: { httpMetadata?: { contentType?: string } }): Promise<void> {
     const filePath = this.resolve(key)
     await mkdir(dirname(filePath), { recursive: true })
     await writeFile(filePath, Buffer.from(data))

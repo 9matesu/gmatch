@@ -1,5 +1,5 @@
 import type { D1Turso } from './db'
-import { tierForMatches, tierColor, VOTE_POINTS, calculateDiscoveryReward, type CardVoteAction } from '@orbit/shared'
+import { tierForMatches, tierColor, VOTE_POINTS, calculateDiscoveryReward, computeCardRarity, type CardVoteAction } from '@orbit/shared'
 import { ScoreService } from './score'
 
 /**

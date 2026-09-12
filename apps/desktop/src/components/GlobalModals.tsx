@@ -95,80 +95,7 @@ export interface GlobalModalsProps {
 }
 
 export function GlobalModals(props: GlobalModalsProps) {
-  const {
-    identity,
-    users,
-    profilePics,
-    settings,
-    updateSettings,
-    myProfile,
-    setMyProfile,
-    stories,
-    activeVirusHack,
-    setActiveHacks,
-    relationships,
-    followingIds,
-    items,
-
-    identityModalMode,
-    setIdentityModalMode,
-    exportIdentity,
-    loginWithExportedId,
-    clearIdentity,
-    handleFullConfigDownload,
-    handleFullConfigRestore,
-
-    showHelpModal,
-    setShowHelpModal,
-    showPointsHelpModal,
-    setShowPointsHelpModal,
-    showFlashModal,
-    setShowFlashModal,
-    showSettingsModal,
-    setShowSettingsModal,
-    settingsInitialTab = 'preferences',
-    showCreatePostModal,
-    setShowCreatePostModal,
-    showStoryModal,
-    setShowStoryModal,
-    showMaxGoonerModal,
-    setShowMaxGoonerModal,
-    showRecommendations,
-    setShowRecommendations,
-    followersModalState,
-    setFollowersModalState,
-
-    showCoffee,
-    manualCoffeeOpen,
-    triggerReason,
-    dismissCoffee,
-    setManualCoffeeOpen,
-
-    handleSetMainView,
-    setMainView,
-    setDmMinimized,
-    setPmPeer,
-    setSelectedProfileUser,
-    setSelectedIds,
-    setExpandedItemId,
-    setStoryViewerUserId,
-
-    loadUsers,
-    loadGallery,
-    loadStories,
-    loadServerFeed,
-    handleAddStory,
-
-    toggleFollowUser,
-
-    toast,
-
-    storyFileInputRef,
-    pfpInputRef,
-    handleSetProfilePic,
-
-    lobby,
-  } = props;
+  const { identity, users, profilePics, settings, updateSettings, setMyProfile, stories, activeVirusHack, setActiveHacks, relationships, followingIds, items, identityModalMode, setIdentityModalMode, exportIdentity, loginWithExportedId, clearIdentity, handleFullConfigDownload, handleFullConfigRestore, showHelpModal, setShowHelpModal, showPointsHelpModal, setShowPointsHelpModal, showFlashModal, setShowFlashModal, showSettingsModal, setShowSettingsModal, settingsInitialTab = 'preferences', showCreatePostModal, setShowCreatePostModal, showStoryModal, setShowStoryModal, showMaxGoonerModal, setShowMaxGoonerModal, showRecommendations, setShowRecommendations, followersModalState, setFollowersModalState, showCoffee, manualCoffeeOpen, triggerReason, dismissCoffee, setManualCoffeeOpen, handleSetMainView, setMainView, setDmMinimized, setPmPeer, setSelectedProfileUser, setSelectedIds, setExpandedItemId, setStoryViewerUserId, loadUsers, loadGallery, loadStories, loadServerFeed, handleAddStory, toggleFollowUser, toast, storyFileInputRef, pfpInputRef, handleSetProfilePic, lobby } = props;
 
   const { crop, cropper } = useCropper();
 
@@ -236,7 +163,7 @@ export function GlobalModals(props: GlobalModalsProps) {
 
       {showStoryModal && (
         <Modal title="Post a Story" onClose={() => setShowStoryModal(false)}>
-          <p className="text-[11px] text-retro-muted mb-3">
+          <p className="text-xs text-retro-muted mb-3">
             Stories live for <span className="text-retro-accent font-bold">12 hours</span> and then wipe — posting one earns{' '}
             <span className="text-retro-accent font-bold">+10 PTS</span>. Drop an image or click to browse:
           </p>
@@ -244,7 +171,7 @@ export function GlobalModals(props: GlobalModalsProps) {
             compact
             onFiles={(list) => { if (list[0]) void handleAddStoryCropped(list[0]) }}
           >
-            <div className="text-[11px] text-retro-fg flex items-center justify-center gap-2">
+            <div className="text-xs text-retro-fg flex items-center justify-center gap-2">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-retro-accent"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
               <span>Drop an image here or click to browse</span>
             </div>
@@ -264,7 +191,7 @@ export function GlobalModals(props: GlobalModalsProps) {
               <div className="font-bold text-retro-fg">12h Story</div>
               <div className="text-[10px] text-retro-muted">Expires in 12 hours</div>
             </div>
-            <span className="px-2.5 py-1 border text-[11px] font-bold bg-retro-bg text-retro-accent border-retro-accent">
+            <span className="px-2.5 py-1 border text-xs font-bold bg-retro-bg text-retro-accent border-retro-accent">
               +10 PTS
             </span>
           </div>
@@ -273,13 +200,13 @@ export function GlobalModals(props: GlobalModalsProps) {
 
       {showMaxGoonerModal && (
         <Modal title="Maximum Gooner Hardcore" onClose={() => setShowMaxGoonerModal(false)}>
-          <div className="p-3 bg-retro-bg border border-retro-border text-[11px] text-retro-fg space-y-1 mb-3">
-            <p className="font-bold uppercase tracking-wider">⚠ YOU&apos;VE BEEN WARNED</p>
+          <div className="p-3 bg-retro-bg border border-border-glass text-xs text-retro-fg space-y-1 mb-3">
+            <p className="font-bold uppercase tracking-wider">You&apos;ve been warned</p>
             <p>Maximum Gooner Mode turns on automatic image reception, chime audio alerts, blinking sender highlights, and auto-forwarding.</p>
           </div>
           <div className="space-y-3">
-            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-retro-border cursor-pointer hover:border-retro-accent transition-colors">
-              <span className="font-bold text-retro-fg">♦ Master Hardcore Switch</span>
+            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-border-glass cursor-pointer hover:border-retro-accent transition-colors">
+              <span className="font-bold text-retro-fg">Master Hardcore Switch</span>
               <input
                 type="checkbox"
                 checked={settings.maximumGooner}
@@ -296,19 +223,19 @@ export function GlobalModals(props: GlobalModalsProps) {
                 className="w-4 h-4 accent-retro-accent cursor-pointer"
               />
             </label>
-            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-retro-border cursor-pointer hover:border-retro-accent transition-colors">
-              <span className="text-retro-fg">♪ Sound Effect on Image Arrival</span>
+            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-border-glass cursor-pointer hover:border-retro-accent transition-colors">
+              <span className="text-retro-fg">Sound effect on image arrival</span>
               <input type="checkbox" checked={settings.soundEffects} onChange={(e) => updateSettings('soundEffects', e.target.checked)} className="w-4 h-4 accent-retro-accent cursor-pointer" />
             </label>
-            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-retro-border cursor-pointer hover:border-retro-accent transition-colors">
+            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-border-glass cursor-pointer hover:border-retro-accent transition-colors">
               <span className="text-retro-fg">▣ Auto-Open Image Lightbox</span>
               <input type="checkbox" checked={settings.autoOpenImages} onChange={(e) => updateSettings('autoOpenImages', e.target.checked)} className="w-4 h-4 accent-retro-accent cursor-pointer" />
             </label>
-            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-retro-border cursor-pointer hover:border-retro-accent transition-colors">
+            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-border-glass cursor-pointer hover:border-retro-accent transition-colors">
               <span className="text-retro-fg">⇄ Auto-Forward to All Friends</span>
               <input type="checkbox" checked={settings.autoForwardAll} onChange={(e) => updateSettings('autoForwardAll', e.target.checked)} className="w-4 h-4 accent-retro-accent cursor-pointer" />
             </label>
-            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-retro-border cursor-pointer hover:border-retro-accent transition-colors">
+            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-border-glass cursor-pointer hover:border-retro-accent transition-colors">
               <span className="text-retro-fg">▣ Allow Remote Wallpaper</span>
               <input type="checkbox" checked={settings.allowRemoteWallpaper} onChange={(e) => updateSettings('allowRemoteWallpaper', e.target.checked)} className="w-4 h-4 accent-retro-accent cursor-pointer" />
             </label>
@@ -322,7 +249,7 @@ export function GlobalModals(props: GlobalModalsProps) {
           attackerName={activeVirusHack.attacker_name}
           onComplete={() => {
             setActiveHacks((prev) => prev.filter((h) => h.id !== activeVirusHack.id));
-            toast('Virus lock expired! System restored.', 'info');
+            toast('Virus lock expired. System restored.', 'info');
           }}
         />
       )}

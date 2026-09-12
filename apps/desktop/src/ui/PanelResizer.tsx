@@ -71,7 +71,7 @@ export function PanelResizer({
       className="group shrink-0 w-1.5 -mx-[3px] z-30 cursor-col-resize relative touch-none outline-none focus-visible:bg-sky-400/60"
     >
       {/* invisible hit area + discreet grip line on hover/focus */}
-      <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-transparent group-hover:bg-zinc-600 group-focus-visible:bg-sky-400 transition-colors" />
+      <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-transparent group-hover:bg-glass-w20 group-focus-visible:bg-sky-400 transition-colors" />
     </div>
   )
 }

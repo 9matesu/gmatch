@@ -31,4 +31,18 @@ describe('courier-mode detection', () => {
     await detectMailMode('http://site.test', fetchReturning(200))
     expect(cachedMailMode('http://site.test')).toBe('courier')
   })
+
+  it('concurrent detects share one request', async () => {
+    const slowFn = vi.fn(async () => {
+      await new Promise((r) => setTimeout(r, 20))
+      return new Response('{}', { status: 401 })
+    }) as unknown as typeof fetch
+    const [a, b] = await Promise.all([
+      detectMailMode('http://x.test', slowFn),
+      detectMailMode('http://x.test', slowFn),
+    ])
+    expect(a).toBe('legacy')
+    expect(b).toBe('legacy')
+    expect(slowFn).toHaveBeenCalledTimes(1)
+  })
 })

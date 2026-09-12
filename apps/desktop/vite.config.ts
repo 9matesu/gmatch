@@ -9,7 +9,7 @@ import { randomBytes } from 'node:crypto'
 import path, { join } from 'node:path'
 
 // Hosts the dev /px byte-proxy may fetch (allowlist — no open proxy).
-const PX_ALLOW = /(^|\.)(imhentai\.xxx|paheal\.net|tbib\.org|xbooru\.com|redgifs\.com)$/
+const PX_ALLOW = /(^|\.)(imhentai\.xxx|paheal\.net|tbib\.org|xbooru\.com|redgifs\.com|konachan\.com|yande\.re|files\.yande\.re|realbooru\.com|booru\.org)$/
 
 const DEV_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36'
@@ -94,8 +94,16 @@ function devPxPlugin(): Plugin {
             res.end('forbidden')
             return
           }
+          const headers: Record<string, string> = { 'User-Agent': DEV_UA }
+          if (target.hostname === 'realbooru.com') {
+            headers['Referer'] = 'https://realbooru.com/'
+          } else if (target.hostname.endsWith('.booru.org')) {
+            headers['Referer'] = `https://${target.hostname}/`
+          } else if (target.hostname.includes('imhentai.xxx')) {
+            headers['Referer'] = 'https://imhentai.xxx/'
+          }
           const r = await fetch(target.toString(), {
-            headers: { 'User-Agent': DEV_UA },
+            headers,
             signal: AbortSignal.timeout(15000),
           })
           if (!r.ok) {
@@ -150,26 +158,80 @@ export default defineConfig({
         target: 'https://imhentai.xxx',
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/booru\/imh/, ''),
-        // Cloudflare challenges the Node-proxied request when it carries a
-        // foreign Origin/Referer — strip them so gallery pages return 200.
+        headers: { Referer: 'https://imhentai.xxx/' },
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq) => {
             proxyReq.removeHeader('origin')
-            proxyReq.removeHeader('referer')
+            proxyReq.setHeader('referer', 'https://imhentai.xxx/')
+            proxyReq.setHeader('user-agent', DEV_UA)
           })
         },
       },
       '^/rg-media': {
         // Same-origin RedGifs bytes: dodges host-based adblockers that
         // ERR_FAILED media.redgifs.com <video> loads in dev browsers.
+        // CDN77-Turbo 403s on foreign localhost Origin — strip it and set redgifs Referer.
         target: 'https://media.redgifs.com',
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/rg-media/, ''),
+        headers: { Referer: 'https://www.redgifs.com/' },
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.removeHeader('origin')
+            proxyReq.setHeader('referer', 'https://www.redgifs.com/')
+          })
+        },
       },
       '^/rg-auth': {
         target: 'https://api.redgifs.com',
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/rg-auth/, ''),
+      },
+      '^/booru/kona': {
+        target: 'https://konachan.com',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/booru\/kona/, ''),
+      },
+      '^/booru/yand': {
+        target: 'https://yande.re',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/booru\/yand/, ''),
+      },
+      '^/booru/yandimg': {
+        target: 'https://files.yande.re',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/booru\/yandimg/, ''),
+      },
+      '^/booru/real': {
+        target: 'https://realbooru.com',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/booru\/real/, ''),
+        headers: { Referer: 'https://realbooru.com/' },
+      },
+      '^/booru/hgoon': {
+        target: 'https://hgoon.booru.org',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/booru\/hgoon/, ''),
+      },
+      '^/booru/qoh': {
+        target: 'https://qoh.booru.org',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/booru\/qoh/, ''),
+      },
+      '^/booru/celeb': {
+        target: 'https://celeb.booru.org',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/booru\/celeb/, ''),
+      },
+      '^/booru/foot': {
+        target: 'https://footfetishbooru.booru.org',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/booru\/foot/, ''),
+      },
+      '^/booru/blacked': {
+        target: 'https://blacked.booru.org',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/booru\/blacked/, ''),
       },
     },
   },

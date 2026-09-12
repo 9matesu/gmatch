@@ -90,7 +90,7 @@ function AdminActionMenu<T>({ actions, row }: { actions: RowAction<T>[]; row: T 
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-1 z-50 min-w-[160px] bg-surface-elevated border border-border-glass rounded-lg shadow-lg overflow-hidden animate-orbit-pop">
-          {visibleActions.map((action, index) => {
+          {visibleActions.map((action, _index) => {
               const actionIcon = action.icon;
               const isIconFunction = typeof actionIcon === 'function';
               const ActionIcon = isIconFunction ? (actionIcon as (row: T) => React.ComponentType<{ className?: string }>)(row) : actionIcon;
@@ -143,7 +143,7 @@ export function AdminTable<T extends Record<string, unknown>>({
   const [data, setData] = useState<T[]>(() => normalizeTableRows<T>(initialData));
   const [total, setTotal] = useState(initialTotal);
   const [isFetching, setIsFetching] = useState(false);
-  const parentRef = useRef<HTMLDivElement>(null);
+  
   const lastNotifiedParamsRef = useRef<string>("");
 
   const fetchData = useCallback(async () => {
@@ -419,7 +419,7 @@ export function AdminTable<T extends Record<string, unknown>>({
                   )}
                   disabled={action.disabled?.(data.filter(row => rowSelection[getRowId(row)]))}
                   className={cn(
-                    "px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors",
+                    "px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors",
                     action.variant === "danger" && "bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30",
                     action.variant === "primary" && "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/30",
                     action.variant !== "danger" && action.variant !== "primary" && "bg-surface-interactive text-retro-fg border border-border-glass hover:bg-glass-w10"

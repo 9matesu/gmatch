@@ -36,6 +36,13 @@
   /* Borders and highlights */
   --color-border-glass: #27272a;
   --color-border-subtle: #1f1f23;
+
+  /* Z scale (V1): arbitrary 3+ digit z-index banned — see docs/DESIGN.md */
+  --z-dropdown: 40;
+  --z-modal: 50;
+  --z-lightbox: 60;
+  --z-toast: 70;
+  --z-system: 80;
   --color-border-strong: #3f3f46;
 
   /* Accent: Clean high-contrast monochrome (Vercel style) */
@@ -147,7 +154,15 @@
 }
 
 :root {
-  --glass-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.012'/%3E%3C/svg%3E");
+
+  /* Chrome sheen gate: 'none' removes the infinite animation entirely
+     (paused still costs a main-thread recalc tick per frame — measured).
+     html[data-motion="on"] restores it. */
+  --chrome-sheen: paused;
+  /* Glass blur multiplier (Settings → Glass blur): 0 = off, 1 = full.
+     Applied to every backdrop-filter blur site via calc. */
+  --glass-blur: 0.7;
+ --glass-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.012'/%3E%3C/svg%3E");
 }
 
 @layer base {
@@ -275,8 +290,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .glass-panel {
-    -webkit-backdrop-filter: blur(18px) saturate(115%);
-    backdrop-filter: blur(18px) saturate(115%);
+    -webkit-backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7))) saturate(115%);
+    backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7))) saturate(115%);
   }
 }
 
@@ -309,8 +324,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .glass-surface {
-    -webkit-backdrop-filter: blur(22px) saturate(135%);
-    backdrop-filter: blur(22px) saturate(135%);
+    -webkit-backdrop-filter: blur(calc(22px * var(--glass-blur, 0.7))) saturate(135%);
+    backdrop-filter: blur(calc(22px * var(--glass-blur, 0.7))) saturate(135%);
   }
 }
 
@@ -398,8 +413,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .glass-toolbar {
-    -webkit-backdrop-filter: blur(14px) saturate(110%);
-    backdrop-filter: blur(14px) saturate(110%);
+    -webkit-backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7))) saturate(110%);
+    backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7))) saturate(110%);
   }
 }
 
@@ -414,8 +429,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .glass-sidebar {
-    -webkit-backdrop-filter: blur(24px) saturate(125%);
-    backdrop-filter: blur(24px) saturate(125%);
+    -webkit-backdrop-filter: blur(calc(24px * var(--glass-blur, 0.7))) saturate(125%);
+    backdrop-filter: blur(calc(24px * var(--glass-blur, 0.7))) saturate(125%);
   }
 }
 
@@ -435,8 +450,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .glass-card {
-    -webkit-backdrop-filter: blur(20px) saturate(120%);
-    backdrop-filter: blur(20px) saturate(120%);
+    -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7))) saturate(120%);
+    backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7))) saturate(120%);
   }
 }
 
@@ -567,6 +582,26 @@
   transform: none;
 }
 
+/* Loose-icon style (user: prefer bare icons over encapsulated buttons for
+   small controls): no border, no shadow, hover tint only. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--color-retro-muted);
+  border-radius: 6px;
+  transition: background 120ms ease, color 120ms ease;
+  cursor: pointer;
+}
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-retro-fg);
+}
+.icon-btn:active { background: rgba(255, 255, 255, 0.12); }
+.icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
 .glass-action-primary {
   background: linear-gradient(180deg, #ffffff, #d4d4d8);
   border-color: rgba(255, 255, 255, 0.86);
@@ -627,8 +662,8 @@
   .app-glass .bg-surface-interactive,
   .app-glass .bg-surface-elevated,
   .app-glass .bg-surface-elevated\/50 {
-    -webkit-backdrop-filter: blur(18px) saturate(115%);
-    backdrop-filter: blur(18px) saturate(115%);
+    -webkit-backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7))) saturate(115%);
+    backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7))) saturate(115%);
   }
 }
 
@@ -646,8 +681,8 @@
 @supports (backdrop-filter: blur(1px)) {
   .module,
   .module-primary {
-    -webkit-backdrop-filter: blur(20px) saturate(120%);
-    backdrop-filter: blur(20px) saturate(120%);
+    -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7))) saturate(120%);
+    backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7))) saturate(120%);
   }
 }
 
@@ -686,16 +721,13 @@
   padding: 1px;
 }
 
-/* Grain overlay: shell-level noise texture */
+/* Grain overlay: REMOVED (CDP perf sweep 2026-09-10). A fixed full-viewport
+   layer with mix-blend-mode: soft-light forced a blend-readback on every
+   composited frame — attribution showed it owned the entire RecalcStyle cost
+   (0.28s -> 0.00s removed, task 1.22s -> 0.07s) for a texture at opacity
+   0.025, i.e. invisible anyway. Keep the class inert for legacy mounts. */
 .grain-overlay::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0.025;
-  mix-blend-mode: soft-light;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.8'/%3E%3C/svg%3E");
+  content: none;
 }
 
 /* Metro rule: thin separator line */
@@ -758,7 +790,11 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.55);
   font-weight: 600;
   transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
-  animation: chrome-sheen 4s linear infinite;
+  animation-name: chrome-sheen;
+  animation-duration: 4s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-play-state: var(--chrome-sheen, paused);
 }
 
 .accent-control:hover {
@@ -786,8 +822,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .solid-panel {
-    -webkit-backdrop-filter: blur(18px) saturate(115%);
-    backdrop-filter: blur(18px) saturate(115%);
+    -webkit-backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7))) saturate(115%);
+    backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7))) saturate(115%);
   }
 }
 
@@ -1100,7 +1136,11 @@
   );
   background-size: 220% 100%;
   background-position: 0% 50%;
-  animation: chrome-sheen 4s linear infinite;
+  animation-name: chrome-sheen;
+  animation-duration: 4s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-play-state: var(--chrome-sheen, paused);
 }
 
 /* Animated gradient text (headings, prices, badges) */
@@ -1118,7 +1158,11 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: chrome-sheen 5s linear infinite;
+  animation-name: chrome-sheen;
+  animation-duration: 5s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-play-state: var(--chrome-sheen, paused);
 }
 
 /* Chrome border treatment for prominent cards */
@@ -1134,7 +1178,11 @@
   padding: 1.5px;
   background: linear-gradient(135deg, #ffffff, #9fe3ff 30%, #ffd6f0 60%, #d6c6ff 100%);
   background-size: 300% 300%;
-  animation: chrome-sheen 5s linear infinite;
+  animation-name: chrome-sheen;
+  animation-duration: 5s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-play-state: var(--chrome-sheen, paused);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -1152,6 +1200,16 @@
     background-size: 100% 100%;
     background-position: 0% 50%;
   }
+}
+
+/* Perf gate (CDP sweep 2026-09-10): the infinite sheen loops animate
+   background-position — non-composited — forcing a main-thread style recalc
+   every frame (RecalcStyle 3.09s on the standard walk). The media query
+   below (prefers-reduced-motion) already removed them fully; this var gate
+   makes the SAME removal user-reversible: Settings -> Animated chrome sets
+   html[data-motion="on"]. */
+html[data-motion="on"] {
+  --chrome-sheen: running;
 }
 
 .sidebar-create {
@@ -1203,7 +1261,11 @@
 .metallic-card-border[data-frame="holo"] {
   background: linear-gradient(135deg, #ff007f 0%, #7928ca 25%, #0070f3 50%, #00dfd8 75%, #ff0080 100%);
   background-size: 200% 200%;
-  animation: orbit-shimmer 4s ease infinite;
+  animation-name: orbit-shimmer;
+  animation-duration: 4s;
+  animation-timing-function: ease;
+  animation-iteration-count: infinite;
+  animation-play-state: var(--chrome-sheen, paused);
   box-shadow:
     0 12px 32px -8px rgba(0, 0, 0, 0.6),
     0 0 20px rgba(121, 40, 202, 0.4),
@@ -1336,10 +1398,6 @@
    scrolling on mobile GPUs. Keep the fixed chrome, but make content surfaces
    opaque and static on constrained devices. */
 @media (max-width: 700px), (prefers-reduced-transparency: reduce) {
-  .grain-overlay::after {
-    opacity: 0.012;
-  }
-
   .glass-panel,
   .glass-toolbar,
   .btn-skeuo {
@@ -1418,10 +1476,6 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
-  }
-
-  .grain-overlay::after {
-    opacity: 0.02;
   }
 }
 

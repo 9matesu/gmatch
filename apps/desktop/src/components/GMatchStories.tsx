@@ -42,18 +42,7 @@ interface GroupedUserStories {
   lastCreatedAt: string;
 }
 
-export function GMatchStories({
-  stories,
-  loading = false,
-  relationships = [],
-  currentUserId,
-  identity,
-  profilePics = {},
-  activeUserId,
-  onCloseActiveUser,
-  onAddStory,
-  onStartPm,
-}: GMatchStoriesProps) {
+export function GMatchStories({ stories, loading = false, currentUserId, identity, profilePics = {}, activeUserId, onCloseActiveUser, onAddStory, onStartPm }: GMatchStoriesProps) {
   const { toast } = useToast();
   const [seenStoryIds, setSeenStoryIds] = useState<Set<string>>(() => {
     if (typeof window === 'undefined') return new Set();
@@ -200,6 +189,7 @@ export function GMatchStories({
     const step = (INTERVAL_MS / DURATION_MS) * 100;
 
     const timer = setInterval(() => {
+      if (document.hidden) return
       setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(timer);
@@ -317,7 +307,7 @@ export function GMatchStories({
               <Plus className="w-3 h-3 stroke-[3]" />
             </div>
           </div>
-          <span className="text-[11px] font-medium text-retro-body truncate max-w-[64px]">Your story</span>
+          <span className="text-xs font-medium text-retro-body truncate max-w-[64px]">Your story</span>
         </div>
 
         {/* Grouped User Story Circles */}
@@ -335,7 +325,7 @@ export function GMatchStories({
               className={`p-[2.5px] rounded-full transition-transform group-hover:scale-105 ${
                 group.hasUnseen
                   ? 'bg-gradient-to-tr from-cyan-500 via-teal-500 to-amber-500'
-                  : 'bg-zinc-700'
+                  : 'bg-glass-w20'
               }`}
             >
               <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-surface-raised p-[2px] overflow-hidden">
@@ -350,7 +340,7 @@ export function GMatchStories({
                 </div>
               </div>
             </div>
-            <span className="text-[11px] font-medium text-retro-body truncate max-w-[64px]">
+            <span className="text-xs font-medium text-retro-body truncate max-w-[64px]">
               {group.displayName}
             </span>
           </div>
@@ -365,7 +355,7 @@ export function GMatchStories({
       {/* ── 2. Fullscreen Instagram Story Viewer Lightbox ── */}
       {openUserId && activeGroup && currentStory && createPortal(
         <div
-          className="fixed inset-0 z-[100000] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-0 animate-orbit-fade-in"
+          className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-2xl flex items-center justify-center p-0 animate-orbit-fade-in"
           onClick={closeStoryViewer}
           onMouseDown={() => setIsPaused(true)}
           onMouseUp={() => setIsPaused(false)}
@@ -387,7 +377,7 @@ export function GMatchStories({
                 return (
                   <div key={s.id || sIdx} className="flex-1 h-1 rounded-full bg-surface-raised/20 overflow-hidden backdrop-blur-xs">
                     <div
-                      className="h-full bg-surface-raised transition-all duration-75"
+                      className="h-full bg-surface-raised transition-all duration-150"
                       style={{ width: `${fillPercent}%` }}
                     />
                   </div>

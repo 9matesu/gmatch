@@ -4,7 +4,7 @@ import { useEffect, useCallback, useState, useRef } from 'react';
 import { useIdentity } from './useIdentity';
 import { useSettings } from './useSettings';
 import type { LobbyState } from '@orbit/shared';
-import { playMatch, playMsgReceive, playQueueJoin, playPress } from '../utils/sounds';
+import { playMatchOnce, playMsgReceive, playQueueJoin, playPress } from '../utils/sounds';
 
 interface NotificationData {
   type: 'match_invite' | 'match_start' | 'match_result' | 'pm' | 'babecock_invite' | 'system';
@@ -110,7 +110,7 @@ export function useNotifications(lobbyState?: LobbyState | null) {
     
     switch (soundType) {
       case 'match':
-        playMatch();
+        playMatchOnce();
         break;
       case 'message':
         playMsgReceive();
@@ -257,7 +257,7 @@ export function useNotifications(lobbyState?: LobbyState | null) {
 
     // Play match start SFX only when tab is in background (foreground is handled by MatchRoundPanel)
     if (!matchStartSoundPlayedRef.current && settings.soundEffects && typeof document !== 'undefined' && document.hidden) {
-      playMatch();
+      playMatchOnce();
       matchStartSoundPlayedRef.current = true;
     }
 
@@ -330,7 +330,7 @@ export function useNotifications(lobbyState?: LobbyState | null) {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'PLAY_SOUND' && settings.soundEffects) {
         const soundMap: Record<string, () => void> = {
-          match: playMatch,
+          match: playMatchOnce,
           message: playMsgReceive,
           queue: playQueueJoin,
           press: playPress,

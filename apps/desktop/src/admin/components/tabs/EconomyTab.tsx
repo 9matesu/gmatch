@@ -38,12 +38,12 @@ export function EconomyTab({ identity, pinVerified, onZoom, onAction }: EconomyT
   const [ledger, setLedger] = useState<Array<{ id: string; user_id: string; display_name?: string | null; kind: string; delta: number; balance_after: number; created_at: string }>>([]);
   const [marketplace, setMarketplace] = useState<Array<{ id: string; card_id: string; seller_name?: string | null; price: number; status: string; name?: string | null }>>([]);
   const [decks, setDecks] = useState<Array<{ id: string; owner_name?: string | null; name: string; game_id: string; card_count: number }>>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading,] = useState(false);
   const [cardsParams, setCardsParams] = useState<TableParams>({ page: 1, pageSize: 50, filters: {} });
-  const [walletsParams, setWalletsParams] = useState<TableParams>({ page: 1, pageSize: 50 });
-  const [ledgerParams, setLedgerParams] = useState<TableParams>({ page: 1, pageSize: 100 });
+  const [walletsParams,] = useState<TableParams>({ page: 1, pageSize: 50 });
+  const [ledgerParams,] = useState<TableParams>({ page: 1, pageSize: 100 });
   const [marketParams, setMarketParams] = useState<TableParams>({ page: 1, pageSize: 50, filters: { status: "open" } });
-  const [decksParams, setDecksParams] = useState<TableParams>({ page: 1, pageSize: 100 });
+  const [decksParams,] = useState<TableParams>({ page: 1, pageSize: 100 });
   const [selectedCard, setSelectedCard] = useState<AdminCard | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -196,7 +196,7 @@ export function EconomyTab({ identity, pinVerified, onZoom, onAction }: EconomyT
               </button>
             </div>
             <div className="flex-1 min-w-0 space-y-2.5">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
                 <div>
                   <span className="text-retro-muted block text-[10px]">Card ID</span>
                   <span className="font-mono text-retro-fg break-all text-[10px]">{card.id}</span>
@@ -357,7 +357,7 @@ export function EconomyTab({ identity, pinVerified, onZoom, onAction }: EconomyT
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-retro-fg">Cards & Economy</h1>
+          <h1 className="text-lg font-bold text-retro-fg">Cards & economy</h1>
           <p className="text-xs text-retro-muted mt-1">Inspect canonical ownership, valuation, listings, and in-loco card moderation</p>
         </div>
       </div>

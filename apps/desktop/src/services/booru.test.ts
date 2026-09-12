@@ -1,13 +1,50 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { __resetFeedState, fetchPosts } from './booru'
+import { __resetFeedState, fetchPosts, markSeen } from './booru'
+import { setCoRules, setFeedIntent, __resetCoRules } from '../game/tagCooccur'
+import { setUserExcludes } from '../game/tagFilter'
 
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.unstubAllEnvs()
+  vi.useRealTimers()
   __resetFeedState()
+  __resetCoRules()
+  setCoRules([])
+  setFeedIntent([])
+  setUserExcludes([])
+})
+
+describe('seen-set persistence', () => {
+  it('persists at most once per burst (debounced)', async () => {
+    vi.useFakeTimers()
+    const setItem = vi.fn()
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem, removeItem: () => {} })
+    markSeen('a', 'u1')
+    markSeen('b', 'u2')
+    markSeen('c', 'u3')
+    expect(setItem).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(5_000)
+    expect(setItem).toHaveBeenCalledTimes(1)
+    const written = JSON.parse(String(setItem.mock.calls[0][1]))
+    expect(written.ids).toEqual(expect.arrayContaining(['a', 'b', 'c']))
+  })
 })
 
 describe('fetchPosts (SPEC §6/§8)', () => {
+  it('ipc path marks posts seen so the next round returns only fresh ones', async () => {
+    const p1 = { id: 'x1', url: 'https://e.test/1.jpg', tags: ['skylar_vox'], rating: 'e' }
+    const p2 = { id: 'x2', url: 'https://e.test/2.jpg', tags: ['skylar_vox'], rating: 'e' }
+    const p3 = { id: 'x3', url: 'https://e.test/3.jpg', tags: ['skylar_vox'], rating: 'e' }
+    const booruFetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, posts: [p1, p2], source: 'hgoon' })
+      .mockResolvedValueOnce({ ok: true, posts: [p1, p3], source: 'hgoon' })
+    vi.stubGlobal('window', { gmatch: { booruFetch } })
+    const first = await fetchPosts({ tags: 'skylar_vox', limit: 5 })
+    expect(first.posts.map((p) => p.id)).toEqual(['x1', 'x2'])
+    const second = await fetchPosts({ tags: 'skylar_vox', limit: 5 })
+    expect(second.posts.map((p) => p.id)).toEqual(['x3'])
+  })
   it('uses the Electron IPC bridge when present', async () => {
     const booruFetch = vi.fn().mockResolvedValue({
       posts: [{ id: '1', url: 'https://x/1.png', tags: ['gangbang'], rating: 'e' }],
@@ -327,10 +364,83 @@ describe('fetchPosts (SPEC §6/§8)', () => {
     const first = await fetchPosts({ tags: 'creampie', limit: 5 })
     expect(first.ok).toBe(false) // everything exhausted -> offline
     const galleryHits = fetchMock.mock.calls.filter((a) => String(a[0]).startsWith('/booru/imh/gallery')).length
-    expect(galleryHits).toBe(2) // both dead galleries tried once
+    expect(galleryHits).toBe(1) // fail-fast: first 403 cools imh-direct, no further galleries this round
     // Second round: imh-direct is cooling down — no gallery fetches at all.
     await fetchPosts({ tags: 'creampie', limit: 5 })
     const galleryHits2 = fetchMock.mock.calls.filter((a) => String(a[0]).startsWith('/booru/imh/gallery')).length
-    expect(galleryHits2).toBe(2)
+    expect(galleryHits2).toBe(1)
+  })
+
+  it('browser mode scrapes booru.org sub without tags query to dodge Cloudflare 403 WAF', async () => {
+    vi.stubGlobal('window', {})
+    const booruHtml = `
+      <img src="https://thumbs.booru.org/blacked/thumbnails//105/thumbnail_ecc2af25bfbdf61e9eb509839676dcc53553c731.png" alt="post" border="0" title=" 1girl big_breasts cum interracial score:0 rating:Explicit"/>
+    `
+    const fetchMock = vi.fn(async (url: string) => {
+      const u = String(url)
+      if (u.startsWith('/booru/blacked')) {
+        expect(u).not.toContain('tags=')
+        expect(u).toMatch(/[?&]pid=\d+/)
+        return { ok: true, text: () => Promise.resolve(booruHtml) }
+      }
+      if (
+        u.startsWith('/booru/tbib/') ||
+        u.startsWith('/booru/xbooru/') ||
+        u.startsWith('/booru/kona') ||
+        u.startsWith('/booru/yand') ||
+        u.startsWith('/booru/real')
+      ) {
+        return { ok: true, json: () => Promise.resolve([]), text: () => Promise.resolve('') }
+      }
+      return { ok: false }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await fetchPosts({ tags: 'interracial', limit: 5 })
+    expect(res.ok).toBe(true)
+    expect(res.posts[0].url).toContain(
+      'img.booru.org/blacked//images/105/ecc2af25bfbdf61e9eb509839676dcc53553c731.png',
+    )
+  })
+
+  it('drops booru.org posts carrying none of the query tokens', async () => {
+    vi.stubGlobal('window', {})
+    const junk = `<img src="https://thumbs.booru.org/blacked/thumbnails//105/thumbnail_abc123def456.png" alt="post" border="0" title=" 1girl big_breasts score:0 rating:Explicit"/>`
+    const fetchMock = vi.fn(async (url: string) => {
+      const u = String(url)
+      if (
+        u.startsWith('/booru/tbib/') ||
+        u.startsWith('/booru/xbooru/') ||
+        u.startsWith('/booru/kona') ||
+        u.startsWith('/booru/yand') ||
+        u.startsWith('/booru/real')
+      ) {
+        return { ok: false }
+      }
+      if (u.startsWith('/booru/')) {
+        return { ok: true, text: () => Promise.resolve(junk) }
+      }
+      return { ok: false }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await fetchPosts({ tags: 'skylar_vox', limit: 5 })
+    expect(res.ok).toBe(false) // junk filtered everywhere → no usable posts
+  })
+})
+
+describe('co-occurrence gate (T4)', () => {
+  it('drops posts carrying a learned pair, keeps feed-intent posts', async () => {
+    setCoRules([{ a: 'heterochromia', b: 'odd_eyes', count: 2 }])
+    setFeedIntent([])
+    const bad = { id: 'c1', url: 'https://e.test/c1.jpg', tags: ['skylar_vox', 'heterochromia', 'odd_eyes'], rating: 'e' }
+    const good = { id: 'c2', url: 'https://e.test/c2.jpg', tags: ['skylar_vox', 'heterochromia'], rating: 'e' }
+    vi.stubGlobal('window', { gmatch: { booruFetch: vi.fn().mockResolvedValue({ ok: true, posts: [bad, good], source: 'hgoon' }) } })
+    const res = await fetchPosts({ tags: 'heterochromia', limit: 5 })
+    expect(res.posts.map((p) => p.id)).toEqual(['c2'])
+    // same rule, but the tag is active feed intent -> stand down
+    setFeedIntent(['heterochromia'])
+    __resetFeedState()
+    vi.stubGlobal('window', { gmatch: { booruFetch: vi.fn().mockResolvedValue({ ok: true, posts: [bad], source: 'hgoon' }) } })
+    const res2 = await fetchPosts({ tags: 'odd_eyes', limit: 5 })
+    expect(res2.posts.map((p) => p.id)).toEqual(['c1'])
   })
 })

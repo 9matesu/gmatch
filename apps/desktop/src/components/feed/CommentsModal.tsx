@@ -58,11 +58,11 @@ export function CommentsModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-orbit-fade-in"
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-orbit-fade-in"
       onClick={onClose}
     >
       <div
-        className="bg-surface-raised w-full max-w-md rounded-t-3xl sm:rounded-3xl border border-border-glass shadow-2xl overflow-hidden flex flex-col h-[75vh] max-h-[600px] animate-orbit-slide-up"
+        className="bg-surface-raised w-full max-w-md rounded-t-3xl sm:rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col h-[75vh] max-h-[600px] animate-orbit-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Comments Header */}
@@ -86,7 +86,7 @@ export function CommentsModal({
           {post.caption && (
             <div className="flex items-start gap-3 pb-3 border-b border-border-glass">
               <div
-                className="w-8 h-8 rounded-full bg-zinc-700 overflow-hidden shrink-0 cursor-pointer hover:scale-105 transition-transform"
+                className="w-8 h-8 rounded-full bg-glass-w20 overflow-hidden shrink-0 cursor-pointer hover:scale-105 transition-transform"
                 onClick={() => handleAvatarClick(post.author_id)}
               >
                 {profilePics[post.author_id] ? (
@@ -113,7 +113,7 @@ export function CommentsModal({
             <div key={c.id} className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-3">
                 <div
-                  className="w-8 h-8 rounded-full bg-zinc-700 overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold cursor-pointer hover:scale-105 transition-transform"
+                  className="w-8 h-8 rounded-full bg-glass-w20 overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold cursor-pointer hover:scale-105 transition-transform"
                   onClick={() => handleAvatarClick(c.author_id || post.author_id)}
                 >
                   {c.author_avatar ? (
@@ -142,7 +142,7 @@ export function CommentsModal({
                 className="p-1 text-retro-muted hover:text-red-500 cursor-pointer shrink-0"
               >
                 <Heart className={`w-4 h-4 ${c.is_liked ? 'text-red-500 fill-red-500' : ''}`} />
-                {c.like_count > 0 && <span className="text-[9px] font-bold block text-center mt-0.5">{c.like_count}</span>}
+                {c.like_count > 0 && <span className="text-[10px] font-bold block text-center mt-0.5">{c.like_count}</span>}
               </button>
 
               <button

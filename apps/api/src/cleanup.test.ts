@@ -100,6 +100,23 @@ describe('deleteExpiredContent', () => {
     expect(await blobStore.get('lobby/expired-lobby-1')).toBeNull()
     expect(await blobStore.get('lobby/active-lobby-1')).not.toBeNull()
   })
+
+  it('flips never-acked domination actions to expired after 30 min', async () => {
+    const db = await makeDb()
+    await db.prepare("INSERT INTO Users (id, public_key) VALUES ('d1', 'p'), ('v1', 'p')").run()
+    const old = new Date(Date.now() - 31 * 60_000).toISOString()
+    const fresh = new Date(Date.now() - 2 * 60_000).toISOString()
+    await db.prepare("INSERT INTO DominationActions (id, dominator_id, victim_id, action, status, created_at) VALUES ('stale', 'd1', 'v1', 'blur', 'sent', ?)").bind(old).run()
+    await db.prepare("INSERT INTO DominationActions (id, dominator_id, victim_id, action, status, created_at) VALUES ('live', 'd1', 'v1', 'blur', 'sent', ?)").bind(fresh).run()
+    await db.prepare("INSERT INTO DominationActions (id, dominator_id, victim_id, action, status, created_at, executed_at) VALUES ('done', 'd1', 'v1', 'blur', 'executed', ?, ?)").bind(old, old).run()
+
+    await deleteExpiredContent(db, undefined, Date.now())
+
+    const row = (id: string) => db.prepare('SELECT status FROM DominationActions WHERE id = ?').bind(id).first<{ status: string }>()
+    expect((await row('stale'))?.status).toBe('expired')
+    expect((await row('live'))?.status).toBe('sent')
+    expect((await row('done'))?.status).toBe('executed')
+  })
 })
 
 describe('sweepOrphanedBlobs', () => {

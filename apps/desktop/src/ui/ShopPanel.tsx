@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { X } from 'lucide-react'
 import { useGame } from '../game/store'
 import { MAX_TAG_LEVEL, tagCost } from '../game/tags'
 import { CAPS, capEffectLabel, capStacks } from '../game/caps'
@@ -14,7 +15,6 @@ import { ACHIEVEMENTS } from '../game/achievements'
 import { CAP_SKINS } from './capSkins'
 import { formatNum } from './format'
 import { Skeleton } from '../components/Skeleton'
-import { EmptyState } from '../components/EmptyState'
 import {
   BTN,
   BTN_DANGER,
@@ -88,16 +88,21 @@ const TAG_INPUT =
 
 function TagsTab() {
   const tags = useGame((s) => s.tags)
-  const gc = useGame((s) => s.gc)
+  const points = useGame((s) => s.points)
   const fetching = useGame((s) => s.fetching)
   const buyTag = useGame((s) => s.buyTag)
   const toggleTag = useGame((s) => s.toggleTag)
   const soloTag = useGame((s) => s.soloTag)
+  const deleteTag = useGame((s) => s.deleteTag)
+  const mergeTags = useGame((s) => s.mergeTags)
   const refreshTagMarket = useGame((s) => s.refreshTagMarket)
   const addCustomTag = useGame((s) => s.addCustomTag)
   const owned = tags.filter((t) => t.level > 0).length
   const [custom, setCustom] = useState('')
   const [note, setNote] = useState<string | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [mergeSel, setMergeSel] = useState<string | null>(null)
+
   const submitCustom = () => {
     const q = custom
     if (!q.trim()) return
@@ -107,142 +112,157 @@ function TagsTab() {
       if (r.added) setCustom('')
     })
   }
+
   return (
     <div className={TAB_BODY}>
-      <div className="mb-2.5 flex items-center justify-between gap-2.5">
-        <span className={MUTED}>
-          Pills steer the feed — buy the picture types you want, toggle owned pills ON/OFF.
-          New tags drop from drained foes. {owned} owned.
+      <div className="flex items-center justify-between gap-1.5">
+        <span className="text-xs font-bold uppercase tracking-wider text-retro-muted">
+          Feed Tags ({owned})
         </span>
         <button
           type="button"
-          className={`${BTN} ${BTN_SMALL} flex-none`}
-          disabled={fetching}
-          onClick={() => void refreshTagMarket()}
+          className={`${BTN} ${BTN_SMALL} !py-0.5 !px-2 text-[10px]`}
+          onClick={() => setDrawerOpen((v) => !v)}
+          title="Open tag search & booru market drawer"
         >
-          <IconRefresh size={12} /> {fetching ? 'Parsing…' : 'Refresh'}
+          {drawerOpen ? 'Close Search' : '+ Market / Search'}
         </button>
       </div>
-      <div className="mb-2.5 flex items-center gap-2.5">
-        <input
-          className={TAG_INPUT}
-          value={custom}
-          disabled={fetching}
-          placeholder="Custom tag — try skylar vox, bbc, goon caption…"
-          aria-label="Search a custom tag"
-          onChange={(e) => setCustom(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              submitCustom()
-            }
-          }}
-        />
-        <button
-          type="button"
-          className={`${BTN} ${BTN_SMALL} flex-none`}
-          disabled={fetching || !custom.trim()}
-          onClick={submitCustom}
-        >
-          Add
-        </button>
-      </div>
-      {note && <div className={`${MUTED} -mt-1 mb-2.5`}>{note}</div>}
-      {/* Market refresh: shell skeleton pills while the fetch is in flight. */}
-      {fetching && (
-        <div className="mb-2.5 flex gap-2" role="status" aria-label="Refreshing tag market">
-          <Skeleton className="h-9 w-36 rounded-full" />
-          <Skeleton className="h-9 w-28 rounded-full" />
-          <Skeleton className="h-9 w-32 rounded-full" />
+
+      {drawerOpen && (
+        <div className="space-y-2 rounded-xl border border-border-glass bg-surface-elevated p-2 shadow-inner">
+          <div className="flex items-center gap-1.5">
+            <input
+              className={`${TAG_INPUT} !py-1 text-xs`}
+              value={custom}
+              disabled={fetching}
+              placeholder="Add tag (e.g. milf, bbc)…"
+              aria-label="Search a custom tag"
+              onChange={(e) => setCustom(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  submitCustom()
+                }
+              }}
+            />
+            <button
+              type="button"
+              className={`${BTN} ${BTN_SMALL} !py-1 flex-none text-xs`}
+              disabled={fetching || !custom.trim()}
+              onClick={submitCustom}
+            >
+              Add
+            </button>
+            <button
+              type="button"
+              className={`${BTN} ${BTN_SMALL} !py-1 flex-none text-xs`}
+              disabled={fetching}
+              onClick={() => void refreshTagMarket()}
+              title="Refresh market offers"
+            >
+              <IconRefresh size={11} />
+            </button>
+          </div>
+          {note && <div className={`${MUTED} text-xs`}>{note}</div>}
         </div>
       )}
-      {tags.length === 0 && !fetching && (
-        <EmptyState
-          icon="🏷️"
-          title="Tag market is empty"
-          description="Hit Refresh to pull fresh pills from the boorus."
-        />
+
+      {/* Market refresh skeleton */}
+      {fetching && (
+        <div className="flex gap-1.5" role="status" aria-label="Refreshing tag market">
+          <Skeleton className="h-7 w-24 rounded-lg" />
+          <Skeleton className="h-7 w-20 rounded-lg" />
+        </div>
       )}
+
       {(() => {
         const ownedTags = tags.filter((t) => t.level > 0)
         const marketTags = tags.filter((t) => t.level <= 0)
-        const renderPill = (t: (typeof tags)[number]) => {
+
+        const renderLittlePill = (t: (typeof tags)[number]) => {
           const isOwned = t.level > 0
           const on = isOwned && t.selected !== false
           const maxed = t.level >= MAX_TAG_LEVEL
           const cost = tagCost(t.base, t.level)
-          const afford = !maxed && gc >= cost
+          const afford = !maxed && points >= cost
           return (
-            <div
-              key={t.name}
-              className={`flex max-w-full items-stretch overflow-hidden rounded-full border shadow-sm transition-[transform,box-shadow] duration-75 active:translate-y-px ${
-                on
-                  ? 'border-white/50 bg-retro-accent'
-                  : 'border-border-glass bg-surface-elevated'
-              } ${afford ? 'animate-[gg-pulse_1.6s_ease-in-out_infinite]' : ''}`}
-            >
-              <button
-                type="button"
-                className="flex min-w-0 cursor-pointer flex-col gap-px border-0 bg-transparent px-3 py-1.5 text-left text-retro-fg disabled:cursor-not-allowed disabled:opacity-45"
-                disabled={isOwned ? false : !afford}
-                onClick={() => (isOwned ? toggleTag(t.name) : buyTag(t.name))}
-                title={
-                  isOwned
-                    ? `${t.name} — click to switch ${on ? 'OFF' : 'ON'} in the feed`
-                    : `Buy ${t.name} for ${formatNum(cost)} g$`
+            <span key={t.name} className="relative inline-flex group">
+            <button
+              type="button"
+              onClick={() => {
+                if (mergeSel && isOwned) {
+                  if (mergeSel === t.name) setMergeSel(null)
+                  else { mergeTags(mergeSel, t.name); setMergeSel(null) }
+                } else if (!mergeSel) {
+                  if (isOwned) toggleTag(t.name)
+                  else buyTag(t.name)
                 }
-              >
-                <span
-                  className={`${DISPLAY} truncate text-xs font-bold ${on ? 'text-retro-accent-text' : ''}`}
-                >
-                  {t.name}
-                </span>
-                <span
-                  className={`${MONO} whitespace-nowrap text-[10px] ${on ? 'text-retro-accent-text' : 'text-retro-muted'}`}
-                >
-                  Lv {t.level} · +{formatNum(t.income)}/s ·{' '}
-                  {isOwned ? (on ? 'ON' : 'OFF') : `${formatNum(cost)} g$`}
-                </span>
-              </button>
+              }}
+              onDoubleClick={() => {
+                if (isOwned) { setMergeSel(mergeSel === t.name ? null : t.name) }
+              }}
+              onContextMenu={(e) => {
+                if (isOwned) { e.preventDefault(); soloTag(t.name) }
+              }}
+              title={
+                isOwned
+                  ? `${t.name} · Lv${t.level} · +${formatNum(t.income)}/s · click ${on ? 'OFF' : 'ON'} · right-click = solo · double-click = pick for merge`
+                  : `${t.name} · buy for ${formatNum(cost)} pts`
+              }
+              onAuxClick={(e) => {
+                if (e.button === 1 && isOwned) {
+                  e.preventDefault()
+                  soloTag(t.name)
+                }
+              }}
+              className={`inline-flex max-w-full cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 text-xs leading-tight transition-colors ${on
+                ? 'border-retro-accent/50 bg-surface-interactive text-retro-fg'
+                : isOwned
+                  ? 'border-border-subtle bg-surface-raised text-retro-muted hover:text-retro-fg hover:border-border-strong'
+                  : 'border-border-dashed bg-transparent text-retro-muted hover:text-retro-fg hover:border-retro-accent/50'
+                } ${!isOwned && !afford ? 'opacity-50' : ''} ${mergeSel === t.name ? 'ring-1 ring-retro-accent' : ''}`}
+            >
+              <span
+                className={`h-1.5 w-1.5 shrink-0 rounded-full ${on
+                  ? 'bg-retro-online'
+                  : isOwned
+                    ? 'bg-glass-w20'
+                    : afford
+                      ? 'bg-retro-accent'
+                      : 'bg-glass-w20'
+                  }`}
+                aria-hidden="true"
+              />
+              <span className="truncate font-medium">{t.name}</span>
               {isOwned && (
-                <button
-                  type="button"
-                  className={`${MONO} cursor-pointer border-0 border-l border-black/50 bg-black/25 px-2.5 text-[10px] text-retro-fg enabled:hover:brightness-125 disabled:cursor-not-allowed disabled:opacity-45 ${on ? 'text-retro-accent-text' : ''}`}
-                  onClick={() => soloTag(t.name)}
-                  title={`Solo ${t.name} — feed ONLY this tag`}
+                <span
+                  role="button"
+                  tabIndex={-1}
+                  aria-label={`Delete ${t.name}`}
+                  onClick={(e) => { e.stopPropagation(); deleteTag(t.name) }}
+                  className="-mr-1 hidden shrink-0 rounded p-0.5 text-retro-muted hover:text-rose-400 group-hover:inline-flex"
                 >
-                  SOLO
-                </button>
-              )}
-              {isOwned && !maxed && (
-                <button
-                  type="button"
-                  className={`${MONO} cursor-pointer border-0 border-l border-black/50 bg-black/25 px-2.5 text-[10px] text-retro-fg enabled:hover:brightness-125 disabled:cursor-not-allowed disabled:opacity-45 ${on ? 'text-retro-accent-text' : ''}`}
-                  disabled={!afford}
-                  onClick={() => buyTag(t.name)}
-                  title={`Level up ${t.name} — ${formatNum(cost)} g$`}
-                >
-                  +{formatNum(cost)}
-                </button>
-              )}
-              {maxed && (
-                <span className={`${MONO} self-center py-0 pl-2 pr-3 text-[10px] font-bold text-[#ffd75e]`}>
-                  MAX
+                  <X className="h-3 w-3" />
                 </span>
               )}
-            </div>
+            </button>
+            </span>
           )
         }
+
         return (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {ownedTags.length > 0 && (
-              <FoldSection id="owned" title="Owned — steer the feed" count={ownedTags.length}>
-                {ownedTags.map(renderPill)}
-              </FoldSection>
+              <div className="flex flex-wrap gap-1">
+                {ownedTags.map(renderLittlePill)}
+              </div>
             )}
-            {marketTags.length > 0 && (
-              <FoldSection id="market" title="Market — buy to earn" count={marketTags.length}>
-                {marketTags.map(renderPill)}
+            {drawerOpen && marketTags.length > 0 && (
+              <FoldSection id="market" title="Market Offers" count={marketTags.length} wrap={false}>
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {marketTags.map(renderLittlePill)}
+                </div>
               </FoldSection>
             )}
           </div>
@@ -253,7 +273,7 @@ function TagsTab() {
 }
 
 function CapsTab() {
-  const gc = useGame((s) => s.gc)
+  const points = useGame((s) => s.points)
   const caps = useGame((s) => s.caps)
   const popCap = useGame((s) => s.popCap)
   const now = Date.now()
@@ -265,7 +285,7 @@ function CapsTab() {
       <div className="flex flex-col gap-2">
         {(Object.keys(CAPS) as CapId[]).map((id) => {
           const def = CAPS[id]
-          const afford = gc >= def.cost
+          const afford = points >= def.cost
           const st = capStacks(caps, id, now)
           return (
             <div
@@ -278,7 +298,7 @@ function CapsTab() {
               }}
             >
               <div>
-                <div className={`${DISPLAY} text-[11px] font-bold tracking-[0.5px]`}>
+                <div className={`${DISPLAY} text-xs font-bold tracking-[0.5px]`}>
                   {def.name}
                   {st.count > 0 && <span className={MONO}> x{st.count}</span>}
                 </div>
@@ -293,7 +313,7 @@ function CapsTab() {
                 disabled={!afford}
                 onClick={() => popCap(id)}
               >
-                {formatNum(def.cost)} g$
+                {formatNum(def.cost)} pts
               </button>
             </div>
           )
@@ -305,13 +325,13 @@ function CapsTab() {
 
 function PrestigeTab() {
   const xp = useGame((s) => s.xp)
-  const totalEarnedGc = useGame((s) => s.totalEarnedGc)
+  const totalEarned = useGame((s) => s.totalEarned)
   const shards = useGame((s) => s.shards)
   const achievements = useGame((s) => s.achievements)
   const brainmelt = useGame((s) => s.brainmelt)
   const tier = tierForXp(xp)
   const ready = canBrainmelt(tier)
-  const preview = shardsFromEarned(totalEarnedGc)
+  const preview = shardsFromEarned(totalEarned)
   return (
     <div className={TAB_BODY}>
       <div className="mb-3.5 rounded-[10px] border border-border-glass bg-retro-bg p-3">
@@ -320,7 +340,7 @@ function PrestigeTab() {
           global multiplier.
         </p>
         <ul className="my-2 list-none text-xs">
-          <li className="text-retro-error">Resets: g$, XP/tier, tags, caps</li>
+          <li className="text-retro-error">Resets: points, XP/tier, tags, caps</li>
           <li className="text-retro-online">Keeps: gallery, shards, achievements</li>
         </ul>
         <div className={`${MONO} mb-2.5 mt-2 text-[13px] text-[#ffd75e]`}>
@@ -341,7 +361,7 @@ function PrestigeTab() {
           return (
             <div
               key={a.id}
-              className={`flex items-center gap-1.5 rounded-lg border bg-retro-bg p-2 text-[11px] ${
+              className={`flex items-center gap-1.5 rounded-lg border bg-retro-bg p-2 text-xs ${
                 got ? 'border-[rgba(255,215,94,0.5)] text-[#ffd75e]' : 'border-border-subtle text-retro-muted'
               }`}
               title={got ? 'Unlocked' : 'Locked'}

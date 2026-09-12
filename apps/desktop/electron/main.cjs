@@ -3,10 +3,34 @@
 // Endpoints per docs/SPEC.md §6. 10s timeout, browser UA, round-robin health.
 const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage, session, shell } = require('electron')
 const https = require('https')
-const path = require('path')
+const fs = require('node:fs')
+const path = require('node:path')
 const imageCache = require('./imageCache.cjs')
 const customFolders = require('./customFolders.cjs')
 const wallpaperWin = require('./wallpaperWin.cjs')
+
+// A portable exe can run twice from one double-click (and did: two sidecars
+// fight over :8790 and the second window never appeared). One install, one
+// process — the second launch just focuses the first window.
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+  app.exit(0)
+}
+
+// Never die silently: "app doesn't open" was unsolvable without this. Every
+// fatal lands in %APPDATA%/gMatch/main.log AND a native dialog.
+function mainLog(line) {
+  try { fs.appendFileSync(path.join(app.getPath('userData'), 'main.log'), `[${new Date().toISOString()}] ${line}\r\n`) } catch { /* last resort only */ }
+}
+process.on('uncaughtException', (err) => {
+  mainLog(`uncaught: ${err?.stack || err}`)
+  try { dialog.showErrorBox('gMatch hit an unexpected error', `${String(err?.message || err)}\n\nDetails were written to:\n%APPDATA%\\gMatch\\main.log`) } catch { /* headless edge */ }
+})
+process.on('unhandledRejection', (reason) => mainLog(`unhandledRejection: ${reason?.stack || reason}`))
+
+// Update handoff: once the swap script is spawned, quitting must not be
+// blocked by the renderer's save-your-keys unload gate.
+let updateHandoff = false
 
 // One-shot camera permission consumed by setPermissionRequestHandler.
 let cameraGrantOnce = false
@@ -43,6 +67,9 @@ let packagedServer = null // { mode, url } when app.isPackaged
 // (%APPDATA%/@gmatch/desktop). For existing installs, move the old profile
 // ONCE before anything reads it — keys (DPAPI), snapshot DB, blobs and local
 // storage all live under this folder and must survive the rename.
+// Boot must NEVER die silently: this block used to run (and throw) before any
+// error handler existed — a failed rename/mkdir here meant "double-click,
+// nothing happens, no log". One catch, loud dialog + log, then a safe boot.
 ;(function migrateUserData() {
   const fs = require('fs')
   try {
@@ -57,8 +84,10 @@ let packagedServer = null // { mode, url } when app.isPackaged
         fs.cpSync(oldPath, newPath, { recursive: true })
       }
     }
-  } catch {
-    /* first run or locked — the default path just works */
+  } catch (err) {
+    mainLog(`userData migration failed: ${err?.stack || err}`)
+    try { dialog.showErrorBox('gMatch could not start', `${String(err?.message || err)}\n\nDetails were written to:\n%APPDATA%\\gMatch\\main.log`) } catch { /* headless edge */ }
+    // Continue on the default path: worse than a rename, but never a zombie.
   }
 })()
 
@@ -205,12 +234,12 @@ function hasBadTag(tags, captions) {
 }
 
 function httpGet(url, headers) {
-  // imhentai's Cloudflare front challenges bare-Node fetches — a site
-  // Referer makes gallery/search pages answer 200 like a real browser tab.
-  const ref =
-    typeof url === 'string' && url.includes('imhentai.xxx')
-      ? { Referer: 'https://imhentai.xxx/' }
-      : {}
+  let ref = {}
+  if (typeof url === 'string') {
+    if (url.includes('imhentai.xxx')) ref = { Referer: 'https://imhentai.xxx/' }
+    else if (url.includes('realbooru.com')) ref = { Referer: 'https://realbooru.com/' }
+    else if (url.includes('booru.org')) ref = { Referer: 'https://booru.org/' }
+  }
   return new Promise((resolve, reject) => {
     const req = https.get(
       url,
@@ -294,6 +323,103 @@ function parsePahealXml(body, captions) {
   )
 }
 
+// --- konachan / yandere (Moebooru JSON: explicit hentai pools, no key) -------
+// Verified live: konachan.com answers rating:explicit server-side; yandere
+// ignores the rating filter, so rating is enforced client-side below.
+// Both paginate with ?page=N — random page per call keeps rounds fresh.
+function moebooruUrl(base, variant, n) {
+  const page = 1 + Math.floor(Math.random() * 5)
+  const tags = base.includes('konachan') ? `${variant} rating:explicit` : variant
+  return `${base}/post.json?tags=${encodeURIComponent(tags)}&limit=${n}&page=${page}`
+}
+
+function parseMoebooruJson(body, prefix, captions) {
+  let data
+  try {
+    data = JSON.parse(body)
+  } catch {
+    return []
+  }
+  const list = Array.isArray(data) ? data : []
+  return list
+    .filter((p) => p && typeof p === 'object')
+    .map((p) => ({
+      id: `${prefix}-${p.id ?? ''}`,
+      url: typeof p.file_url === 'string' ? p.file_url : '',
+      tags: typeof p.tags === 'string' ? p.tags.split(/[^a-z0-9_]+/i).filter(Boolean) : [],
+      rating: typeof p.rating === 'string' ? p.rating : 'e',
+      width: Number(p.width) || 0,
+      height: Number(p.height) || 0,
+    }))
+    .filter((p) => p.id !== `${prefix}-` && p.url)
+    .filter(
+      (p) =>
+        /\.(jpe?g|png)$/i.test(p.url) &&
+        (p.rating === 'explicit' || p.rating === 'e') &&
+        p.width >= MIN_WIDTH &&
+        p.height >= MIN_HEIGHT &&
+        p.width * p.height >= MIN_PIXELS &&
+        !hasBadTag(p.tags, captions),
+    )
+}
+
+// --- realbooru (HTML scraper: images/videos with Referer) --------------------
+function parseRealbooruHtml(html, captions) {
+  const posts = []
+  const imgRegex =
+    /<img\s+[^>]*src="https:\/\/realbooru\.com\/thumbnails\/([^/]+)\/([^/]+)\/thumbnail_([^."]+)\.jpg"[^>]*title="([^"]*)"[^>]*alt="Image:\s*(\d+)"/gi
+  let m
+  while ((m = imgRegex.exec(html)) !== null) {
+    const [, dir1, dir2, hash, rawTitle, postId] = m
+    const tags = rawTitle
+      .split(/,\s*/)
+      .map((t) => t.trim().replace(/\s+/g, '_'))
+      .filter(Boolean)
+    const isVideo = tags.includes('video') || tags.includes('mp4') || tags.includes('webm')
+    const isGif = tags.includes('gif')
+    const ext = isVideo ? 'mp4' : isGif ? 'gif' : 'jpeg'
+    const url = `https://realbooru.com/images/${dir1}/${dir2}/${hash}.${ext}`
+    if (!hasBadTag(tags, captions)) {
+      posts.push({ id: `rb-${postId}`, url, tags, rating: 'e', width: 1200, height: 1200 })
+    }
+  }
+  return posts
+}
+
+// --- booru.org subdomains (hgoon, blacked, allgirl, rule34) ------------------
+function parseBooruOrgHtml(html, sub, captions, query) {
+  const posts = []
+  const imgRegex =
+    /<img\s+[^>]*src="https:\/\/thumbs\.booru\.org\/([^/]+)\/thumbnails\/\/([^/]+)\/thumbnail_([^."]+)\.([^"]+)"[^>]*title="([^"]*)"/gi
+  // WAF forces tagless browsing; enforce the query locally so the feed still
+  // shows what the player asked for (mirror of matchesQuery in booru.ts).
+  const tokens = String(query || '').toLowerCase().split(/\s+/).filter(Boolean)
+  let m
+  while ((m = imgRegex.exec(html)) !== null) {
+    const [, bSub, dir, hash, ext, rawTitle] = m
+    const ratingMatch = /rating:([a-z]+)/i.exec(rawTitle)
+    const rating = ratingMatch ? ratingMatch[1].toLowerCase() : 'e'
+    const tagsPart = rawTitle
+      .replace(/score:\d+/i, '')
+      .replace(/rating:[a-z]+/i, '')
+      .trim()
+    const tags = tagsPart.split(/\s+/).filter(Boolean)
+    if (tokens.length) {
+      const tagSet = tags.map((t) => t.toLowerCase().replace(/[\s-]+/g, '_'))
+      const ok = tokens.some((tok) => tagSet.some((t) => t === tok || t.includes(tok) || tok.includes(t)))
+      if (!ok) continue
+    }
+    const url = `https://img.booru.org/${bSub}//images/${dir}/${hash}.${ext}`
+    const id = `${bSub}-${hash.slice(0, 10)}`
+    if (rating === 'explicit' || rating === 'e' || rating === 'questionable') {
+      if (!hasBadTag(tags, captions)) {
+        posts.push({ id, url, tags, rating: 'e', width: 1200, height: 1200 })
+      }
+    }
+  }
+  return posts
+}
+
 // --- redgifs (real/hardcore porn: pornstars, BBC, mp4s/gifs) ------------------
 // Public v2 API: temporary token (verified live) → gif search. Shape:
 // gifs[] with urls.hd (.mp4), urls.poster (.jpg), id, tags[], niches[].
@@ -366,13 +492,23 @@ function parseRedgifsJson(body, captions) {
 }
 
 async function fetchRedgifs(variant, n, captions) {
-  const token = await redgifsAuth()
   const page = 1 + Math.floor(Math.random() * 5)
   const url =
     `${REDGIFS_API}/v2/gifs/search?search_text=${encodeURIComponent(redgifsWords(variant))}` +
     `&order=trending&count=${n}&page=${page}`
-  const body = await httpGet(url, { Authorization: `Bearer ${token}` })
-  return parseRedgifsJson(body, captions)
+  try {
+    const token = await redgifsAuth()
+    const body = await httpGet(url, { Authorization: `Bearer ${token}` })
+    return parseRedgifsJson(body, captions)
+  } catch (e) {
+    if (!/401/.test(String((e && e.message) || e))) throw e
+    // ponytail: stale cached temp token; drop it and retry once.
+    redgifsToken = null
+    redgifsTokenExp = 0
+    const token = await redgifsAuth()
+    const body = await httpGet(url, { Authorization: `Bearer ${token}` })
+    return parseRedgifsJson(body, captions)
+  }
 }
 
 // --- imhentai (hentai galleries: captions, hardcore doujins) ------------------
@@ -492,18 +628,22 @@ async function fetchImhentai(variant, n, captions) {
 const SOURCES = [
   {
     id: 'tbib',
-    url: (tags, limit) =>
-      `https://tbib.org/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
+    url: (tags, limit) => {
+      const pid = Math.floor(Math.random() * 25)
+      return `https://tbib.org/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
         tags + ' rating:explicit ' + NEGATIVES,
-      )}&limit=${limit}&json=1`,
+      )}&limit=${limit}&json=1&pid=${pid}`
+    },
     parse: (body, captions) => parseDanbooruJson(body, 'https://tbib.org', captions),
   },
   {
     id: 'xbooru',
-    url: (tags, limit) =>
-      `https://xbooru.com/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
+    url: (tags, limit) => {
+      const pid = Math.floor(Math.random() * 25)
+      return `https://xbooru.com/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
         tags + ' rating:explicit ' + NEGATIVES,
-      )}&limit=${limit}&json=1`,
+      )}&limit=${limit}&json=1&pid=${pid}`
+    },
     parse: (body, captions) => parseDanbooruJson(body, 'https://xbooru.com', captions),
   },
   {
@@ -524,6 +664,93 @@ const SOURCES = [
     // Slow (multi-fetch scrape) — last resort before giving up.
     id: 'imhentai',
     fetch: (variant, n, captions) => fetchImhentai(variant, n, captions),
+  },
+  {
+    // Explicit hentai pools (Moebooru JSON, no key): biggest anime/hentai
+    // archive of the bunch. Serves uncensored per yandere/konachan probes.
+    id: 'konachan',
+    fetch: async (variant, n, captions) =>
+      parseMoebooruJson(await httpGet(moebooruUrl('https://konachan.com', variant, n)), 'kona', captions),
+  },
+  {
+    id: 'yandere',
+    fetch: async (variant, n, captions) =>
+      parseMoebooruJson(await httpGet(moebooruUrl('https://yande.re', variant, n)), 'yand', captions),
+  },
+  {
+    // realbooru: real/hardcore porn (jav uncensored, pov, homemade).
+    // DAPI offline (API deliberately disabled) — HTML list scraper.
+    id: 'realbooru',
+    fetch: async (variant, n, captions) => {
+      // Preserve multi-word tags with underscores (e.g. skylar_vox),
+      // don't drop the rest of the query with split(/\s+/)[0].
+      const tagParam = variant.trim().replace(/\s+/g, '_')
+      const pid = Math.floor(Math.random() * 5)
+      const html = await httpGet(
+        `https://realbooru.com/index.php?page=post&s=list&tags=${encodeURIComponent(tagParam)}&pid=${pid}`
+      )
+      return parseRealbooruHtml(html, captions).slice(0, n)
+    },
+  },
+  {
+    // booru.org subdomains — same engine, shared parse:
+    // hgoon (goon hentai), blacked (interracial), allgirl, rule34, qoh, celeb, footfetish.
+    // Cloudflare WAF challenges `tags=` with 403; omitting `tags=` and paginating
+    // via random `pid` returns 200 OK. Each sub is dedicated to its niche theme.
+    id: 'hgoon',
+    fetch: async (variant, n, captions) => {
+      const pid = Math.floor(Math.random() * 10) * 20
+      const html = await httpGet(`https://hgoon.booru.org/index.php?page=post&s=list&pid=${pid}`)
+      return parseBooruOrgHtml(html, 'hgoon', captions, variant).slice(0, n)
+    },
+  },
+  {
+    id: 'blacked',
+    fetch: async (variant, n, captions) => {
+      const pid = Math.floor(Math.random() * 10) * 20
+      const html = await httpGet(`https://blacked.booru.org/index.php?page=post&s=list&pid=${pid}`)
+      return parseBooruOrgHtml(html, 'blacked', captions, variant).slice(0, n)
+    },
+  },
+  {
+    id: 'allgirl',
+    fetch: async (variant, n, captions) => {
+      const pid = Math.floor(Math.random() * 10) * 20
+      const html = await httpGet(`https://allgirl.booru.org/index.php?page=post&s=list&pid=${pid}`)
+      return parseBooruOrgHtml(html, 'allgirl', captions, variant).slice(0, n)
+    },
+  },
+  {
+    id: 'rule34-org',
+    fetch: async (variant, n, captions) => {
+      const pid = Math.floor(Math.random() * 10) * 20
+      const html = await httpGet(`https://rule34.booru.org/index.php?page=post&s=list&pid=${pid}`)
+      return parseBooruOrgHtml(html, 'rule34', captions, variant).slice(0, n)
+    },
+  },
+  {
+    id: 'qoh',
+    fetch: async (variant, n, captions) => {
+      const pid = Math.floor(Math.random() * 10) * 20
+      const html = await httpGet(`https://qoh.booru.org/index.php?page=post&s=list&pid=${pid}`)
+      return parseBooruOrgHtml(html, 'qoh', captions, variant).slice(0, n)
+    },
+  },
+  {
+    id: 'celeb',
+    fetch: async (variant, n, captions) => {
+      const pid = Math.floor(Math.random() * 10) * 20
+      const html = await httpGet(`https://celeb.booru.org/index.php?page=post&s=list&pid=${pid}`)
+      return parseBooruOrgHtml(html, 'celeb', captions, variant).slice(0, n)
+    },
+  },
+  {
+    id: 'footfetish',
+    fetch: async (variant, n, captions) => {
+      const pid = Math.floor(Math.random() * 10) * 20
+      const html = await httpGet(`https://footfetishbooru.booru.org/index.php?page=post&s=list&pid=${pid}`)
+      return parseBooruOrgHtml(html, 'footfetishbooru', captions, variant).slice(0, n)
+    },
   },
 ]
 
@@ -546,12 +773,9 @@ async function fetchBooru({ tags, limit }) {
   if (!query || isQueryBlocked(query)) {
     return { posts: [], source: null, ok: false, error: 'blocked-or-empty query' }
   }
-  // Feed-response cache: repeat tag queries reuse parsed posts for 10 min,
-  // no API round-trip at all.
-  const hit = imageCache.getFeedCache(query)
-  if (hit) {
-    return { posts: hit, source: 'cache', ok: true, cached: true }
-  }
+  // Never serve stale posts to the idle game: always ask the boorus for fresh
+  // images (the renderer filters seen ones itself). Feed cache survives only
+  // as a write-once store so the game never blocks on it.
   const variants = queryVariants(query)
   const captions = isCaptionQuery(query)
   const ordered = SOURCES.map((_, i) => SOURCES[(rrIndex + i) % SOURCES.length])
@@ -601,6 +825,7 @@ function createWindow() {
   // unload just cancels the window close). Surface the page's message as a
   // real native dialog instead: Stay saves nothing, Leave closes.
   win.webContents.on('will-prevent-unload', (event) => {
+    if (updateHandoff) { event.preventDefault(); return }
     const choice = dialog.showMessageBoxSync(win, {
       type: 'warning',
       buttons: ['Stay', 'Leave anyway'],
@@ -636,6 +861,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('cache:image', (_event, url) => imageCache.cacheImage(url).then((local) => ({ local })))
   ipcMain.handle('cache:stats', () => imageCache.cacheStats())
   ipcMain.handle('cache:clear', () => imageCache.clearCache())
+  ipcMain.handle('cache:evict', (_event, url) => ({ ok: imageCache.evict(String(url ?? '')) }))
   // Update check (Settings): installed version + open the download in the OS browser.
   ipcMain.handle('app:version', () => app.getVersion())
   ipcMain.handle('shell:open', (_event, url) => {
@@ -680,6 +906,23 @@ app.whenReady().then(async () => {
     app.relaunch()
     app.exit(0)
   })
+  // Portable self-update (GitHub Releases): check + auto-download in main,
+  // the renderer's "Install & Restart" triggers the exe swap + relaunch.
+  let updater = null
+  if (app.isPackaged) {
+    updater = require('./updater.cjs').createUpdater({
+      app,
+      webContents: () => BrowserWindow.getAllWindows().map((w) => w.webContents),
+      log: mainLog,
+    })
+  }
+  ipcMain.handle('update:check', () => (updater ? updater.check(true) : { phase: 'unsupported', current: app.getVersion() }))
+  ipcMain.handle('update:state', () => (updater ? updater.getState() : { phase: 'unsupported', current: app.getVersion() }))
+  ipcMain.handle('update:install', () => {
+    if (!updater) return { ok: false, error: 'updates only work in packaged builds' }
+    updateHandoff = true
+    return updater.install()
+  })
   // 1.0 topology (no central server): packaged builds ALWAYS run the bundled
   // server (host mode, default) unless the user configured client mode in
   // Settings. Dev keeps the repo-local sidecar path unchanged.
@@ -703,9 +946,26 @@ app.whenReady().then(async () => {
     }
   }
   createWindow()
+  updater?.schedule()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+  .catch((err) => {
+    // A fatal during boot used to leave a windowless zombie: no window, no
+    // error. Log it, show it, and let the process exit.
+    mainLog(`boot failed: ${err?.stack || err}`)
+    try { dialog.showErrorBox('gMatch could not start', `${String(err?.message || err)}\n\nDetails were written to:\n%APPDATA%\\gMatch\\main.log`) } catch { /* headless edge */ }
+  })
+
+// Portable double-launch (or a stale lock): focus the running window instead
+// of starting a second sidecar fight.
+app.on('second-instance', () => {
+  const w = BrowserWindow.getAllWindows()[0]
+  if (w) {
+    if (w.isMinimized()) w.restore()
+    w.focus()
+  }
 })
 
 app.on('before-quit', () => { apiSidecar.stopApi(); try { if (secureKV) secureKV.flush() } catch { /* best effort */ } })

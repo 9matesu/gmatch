@@ -41,7 +41,7 @@ async function newPeerContext(page: import('@playwright/test').Page, name: strin
 
 async function publishPost(page: import('@playwright/test').Page, caption: string) {
   await page.goto('/#/feed')
-  await page.getByRole('button', { name: /^Create$/ }).click()
+  await page.getByRole('button', { name: 'Create post', exact: true }).click()
   const drop = page.getByText('Drag & drop photos or click to browse')
   await expect(drop).toBeVisible({ timeout: 20_000 })
   // Real user flow: clicking the dropzone opens the OS file chooser; other
@@ -57,7 +57,7 @@ async function publishPost(page: import('@playwright/test').Page, caption: strin
   await apply.click()
   await page.getByPlaceholder('Write a caption...').fill(caption)
   await page.getByRole('button', { name: 'Share', exact: true }).click()
-  await expect(page.getByText('Post shared to gMatch!')).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText('Post shared.')).toBeVisible({ timeout: 20_000 })
   await page.waitForTimeout(3500) // outlast the 3s orbitFetch GET cache
   await page.reload()
   await expect(page.getByText(caption).first()).toBeVisible({ timeout: 20_000 })

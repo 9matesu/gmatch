@@ -101,7 +101,7 @@ export function GameView({
             onTransferComplete={() => {
               setTransferProgress(null)
               setForwardedStashFile(null)
-              toast('Image card sent successfully!', 'success')
+              toast('Card sent.', 'success')
               loadGallery()
               loadUsers()
               window.dispatchEvent(new CustomEvent('orbit-relationships-refresh'))

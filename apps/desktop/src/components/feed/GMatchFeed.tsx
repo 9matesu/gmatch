@@ -3,7 +3,9 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useCropper } from '../../hooks/useCropper';
-import { playPress, playWin, playMsgReceive } from '../../utils/sounds';
+import { DEFAULT_FEED_SORT, FEED_SORT_LABELS, firstLikeCrossed, type FeedSort } from './feedSort'
+import { suggestFollows } from './suggestFollows'
+import { playPress, playWin, playMsgReceive, playLikeOnce } from '../../utils/sounds';
 import {
   Heart,
   MessageCircle,
@@ -12,7 +14,6 @@ import {
   MoreHorizontal,
   Sparkles,
   Repeat,
-  Camera,
   PlusSquare,
   Coffee,
   Swords,
@@ -22,6 +23,7 @@ import {
   Gamepad2,
   ChevronLeft,
   ChevronRight,
+  Zap,
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject as StoryItem } from '@orbit/shared';
@@ -29,8 +31,9 @@ import { GMatchStories } from '../GMatchStories';
 import { InstagramPostModal } from './InstagramPostModal';
 import { LiveCameraModal } from '../camera/LiveCameraModal';
 import { ObjectImage } from '../ObjectImage';
+import CachedImg from '../../ui/CachedImg';
 import { LazyVideo } from '../LazyVideo';
-import { isMediaVideo, resolveMediaUrl } from '../../utils/media';
+import { isMediaVideo } from '../../utils/media';
 import { orbitFetch, postShareUrl } from '../../utils/api';
 import { GAME_AD_TEMPLATES } from '../../utils/gameAds';
 import { ExploreSearchModal } from './ExploreSearchModal';
@@ -96,73 +99,6 @@ const AD_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> =
   store: ShoppingBag,
 }
 
-/**
- * LCP-critical first feed image. Object-backed posts normally render via a
- * signed JS fetch → blob URL, which the browser cannot prioritise. Instead we
- * mint a one-time signed URL (GET /api/objects/:id/signed-url) and let the
- * <img> load it directly with fetchpriority=high + eager so the largest paint
- * happens as early as possible. Falls back to ObjectImage if the mint fails.
- */
-function SignedPostImage({
-  id,
-  url,
-  identity,
-  alt,
-  className,
-}: {
-  id: string
-  url?: string | null
-  identity: OrbitIdentity | null
-  alt?: string
-  className?: string
-}) {
-  const [signedUrl, setSignedUrl] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    setSignedUrl(null)
-    if (!id) return
-    // Only attempt signed URL fetch when identity is available (for auth-protected objects)
-    // For public objects, the regular /api/objects/:id endpoint with CORS works fine
-    if (!identity) return
-    orbitFetch(`/api/objects/${id}/signed-url`, { method: 'GET' }, identity)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { url?: string } | null) => {
-        if (!cancelled && d?.url) setSignedUrl(d.url)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [id, identity])
-
-  if (signedUrl) {
-    return (
-      <img
-        src={resolveMediaUrl(signedUrl)}
-        alt={alt || 'Post image'}
-        className={className}
-        loading="eager"
-        fetchPriority="high"
-        draggable={false}
-        crossOrigin="use-credentials"
-      />
-    )
-  }
-  return (
-    <ObjectImage
-      contentUrl={url}
-      objectId={id}
-      identity={identity}
-      alt={alt}
-      className={className}
-      videoClassName={className}
-      loading="eager"
-      fetchPriority="high"
-    />
-  )
-}
-
 export function GMatchFeed({
   identity,
   posts,
@@ -175,11 +111,11 @@ export function GMatchFeed({
   onOpenStory,
   activeStoryUserId = null,
   onActiveStoryClose,
-  onOpenDMs,
-  onOpenPostCreator,
+  onOpenPostCreator,  onFollowSuggestion,
+  myProfileTags = [],
   onSelectUser,
-  onToggleTools,
   onOpenGameAd,
+  shareGroups = [],
   onStartPm,
   onPersistLike,
   onPersistSave,
@@ -194,7 +130,7 @@ export function GMatchFeed({
   onLoadMore,
   hasMore = true,
   isLoadingMore = false,
-  feedSort = 'latest',
+  feedSort = DEFAULT_FEED_SORT,
   onFeedSortChange,
   feedCols = '1',
   onFeedColsChange,
@@ -211,16 +147,18 @@ export function GMatchFeed({
   storiesLoading?: boolean;
   followingIds?: string[];
   profilePics?: Record<string, string>;
-  users?: Array<{ id: string; display_name?: string; orbitId?: string; pfp_url?: string | null }>;
+  users?: Array<{ id: string; display_name?: string; orbitId?: string; pfp_url?: string | null; tags?: string[]; online?: boolean; followers_count?: number }>;
   onAddStory?: () => void;
   onOpenStory?: (userId: string) => void;
   activeStoryUserId?: string | null;
   onActiveStoryClose?: () => void;
-  onOpenDMs?: () => void;
   onOpenPostCreator?: () => void;
+  onFollowSuggestion?: (userId: string) => void | Promise<void>;
+  myProfileTags?: string[];
   onSelectUser?: (userId: string) => void;
-  onToggleTools?: () => void;
   onOpenGameAd?: (mode: 'duel' | 'babecock' | 'ranks' | 'store' | 'discord' | 'coffee') => void;
+  /** Real groups for the share sheet. */
+  shareGroups?: { id: string; name: string; member_count: number }[];
   onStartPm?: (user: { id: string; display_name?: string }) => void;
   onPersistLike?: (postId: string, liked: boolean) => Promise<number | undefined>;
   onPersistSave?: (postId: string, saved: boolean) => void;
@@ -235,8 +173,8 @@ export function GMatchFeed({
   onLoadMore?: () => Promise<void | boolean>;
   hasMore?: boolean;
   isLoadingMore?: boolean;
-  feedSort?: 'latest' | 'trending';
-  onFeedSortChange?: (sort: 'latest' | 'trending') => void;
+  feedSort?: FeedSort;
+  onFeedSortChange?: (sort: FeedSort) => void;
   feedCols?: '1' | '2' | '3' | '4' | '5';
   onFeedColsChange?: (cols: '1' | '2' | '3' | '4' | '5') => void;
   toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
@@ -448,6 +386,40 @@ export function GMatchFeed({
     });
   }, [posts, likeCounts, commentsMap, tagAffinities, now, feedSort]);
 
+  const followSuggestions = useMemo(
+    () => displayPosts.length === 0
+      ? suggestFollows(users ?? [], identity?.orbitId, myProfileTags, new Set(followingIds))
+      : [],
+    [displayPosts.length, users, identity?.orbitId, myProfileTags, followingIds],
+  );
+
+  // First-like flash: session-local celebration when MY post crosses 0 -> 1
+  // likes after mount. Pre-liked posts at mount are seeded into the baseline
+  // ref so reloads don't re-celebrate old news.
+  const firstLikedBaseline = useRef<Set<string> | null>(null)
+  const [firstLikeId, setFirstLikeId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!identity?.orbitId) return
+    if (firstLikedBaseline.current === null) {
+      firstLikedBaseline.current = new Set(
+        posts.filter((p) => p.author_id === identity.orbitId && (p.like_count ?? 0) > 0).map((p) => p.id),
+      )
+      return
+    }
+    for (const p of posts) {
+      if (p.author_id !== identity.orbitId) continue
+      const prev = p.like_count ?? 0
+      const next = likeCounts[p.id] ?? prev
+      if (firstLikeCrossed(prev, next) && !firstLikedBaseline.current.has(p.id)) {
+        firstLikedBaseline.current.add(p.id)
+        playLikeOnce()
+        setFirstLikeId(p.id)
+        const timer = setTimeout(() => setFirstLikeId(null), 1500)
+        return () => clearTimeout(timer)
+      }
+    }
+  }, [posts, likeCounts, identity?.orbitId])
+
   const toggleLike = useCallback((post: FeedPost) => {
     playPress(820);
     setLikedPosts((prev) => {
@@ -590,27 +562,15 @@ export function GMatchFeed({
         />
       </div>
 
-      {/* Feed Top Header - Seamless, 0 upper gap, sticky with navigation */}
+      {/* Feed Top Header — the only bar: brand, sort tabs, search, alerts */}
       <FeedHeader
         unreadCount={unreadCount}
-        onOpenCamera={() => setShowCameraModal(true)}
-        onCreatePost={() => {
-          if (onOpenPostCreator) onOpenPostCreator();
-          else setShowCustomPostCreator(true);
-        }}
-        onToggleTools={onToggleTools}
         onOpenSearch={() => setShowExploreSearch(true)}
         onOpenNotifications={() => {
           if (onOpenNotifications) onOpenNotifications();
           onRefreshNotifications?.();
         }}
-        onOpenDMs={onOpenDMs}
-      />
-
-      {/* Feed Content Column (Posts) */}
-      <div className="w-full max-w-[1400px] mx-auto flex flex-col px-2 sm:px-4 py-2 space-y-4">
-        {/* Feed Sort / Filter Bar */}
-        <div className="flex items-center justify-between px-3 sm:px-6 py-2 gap-2 border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm sticky top-[57px] z-20">
+        sortTabs={
           <div className="flex items-center gap-1 text-xs">
             {(['latest', 'trending'] as const).map((mode) => (
               <button
@@ -618,27 +578,34 @@ export function GMatchFeed({
                 type="button"
                 onClick={() => { playPress(720); onFeedSortChange?.(mode); }}
                 className={`px-3 py-1.5 rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer font-medium ${feedSort === mode
-                    ? 'bg-zinc-800 text-zinc-100 shadow-xs border border-zinc-700'
-                    : 'text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-glass-w12 text-retro-fg shadow-xs border border-border-glass'
+                    : 'text-retro-muted hover:text-retro-fg'
                   }`}
               >
-                {mode === 'latest' ? 'Latest' : 'Trending'}
+                {FEED_SORT_LABELS[mode]}
               </button>
             ))}
           </div>
+        }
+      />
+
+      {/* Feed Content Column (Posts) */}
+      <div className="w-full max-w-[1400px] mx-auto flex flex-col px-2 sm:px-4 py-2 space-y-3">
+        {/* Density bar: post count + column picker */}
+        <div className="flex items-center justify-end px-3 sm:px-6 py-1 gap-2 border-b border-border-glass">
           <div className="flex items-center gap-3">
-            <span className="text-xs text-zinc-400">
+            <span className="text-xs text-retro-muted">
               {displayPosts.length} posts
             </span>
-            <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-md p-0.5 text-xs">
+            <div className="flex items-center bg-retro-panel border border-border-glass rounded-md p-0.5 text-xs">
               {(['1', '2', '3', '4', '5'] as const).map((cols) => (
                 <button
                   key={cols}
                   type="button"
                   onClick={() => { playPress(720); onFeedColsChange?.(cols); }}
                   className={`px-2 py-1 rounded transition-all duration-150 active:scale-[0.96] cursor-pointer font-medium ${feedCols === cols
-                      ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
-                      : 'text-zinc-400 hover:text-zinc-200'
+                      ? 'bg-retro-fg text-retro-bg font-semibold shadow-xs'
+                      : 'text-retro-muted hover:text-retro-fg'
                     }`}
                   title={`${cols}-column feed`}
                   aria-label={`${cols}-column feed`}
@@ -651,8 +618,8 @@ export function GMatchFeed({
         </div>
 
         {/* Feed Posts List with Sharp Square Images */}
-        <div className={`mt-3 ${feedCols === '1' ? 'space-y-4' : 'grid grid-cols-1 sm:grid-cols-2 gap-4' + (feedCols === '3' ? ' lg:grid-cols-3' : feedCols === '4' ? ' lg:grid-cols-3 xl:grid-cols-4' : feedCols === '5' ? ' lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5' : '')}`}>
-          {displayPosts.map((post, idx) => {
+        <div className={`mt-3 ${feedCols === '1' ? 'space-y-3' : 'grid grid-cols-1 sm:grid-cols-2 gap-3' + (feedCols === '3' ? ' lg:grid-cols-3' : feedCols === '4' ? ' lg:grid-cols-3 xl:grid-cols-4' : feedCols === '5' ? ' lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5' : '')}`}>
+          {displayPosts.map((post, _idx) => {
             const isLiked = !!likedPosts[post.id];
             const isSaved = !!savedPosts[post.id];
             const currentLikes = likeCounts[post.id] ?? post.like_count ?? 0;
@@ -667,20 +634,20 @@ export function GMatchFeed({
             return post.is_sponsored ? (
               <article
                 key={post.id}
-                className={`bg-zinc-900/60 border border-zinc-800 rounded-lg overflow-hidden flex flex-col [content-visibility:auto] [contain-intrinsic-size:0_560px] shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
+                className={`bg-retro-panel border border-border-glass rounded-lg overflow-hidden flex flex-col [content-visibility:auto] [contain-intrinsic-size:0_560px] shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
                 {/* Sponsored Banner */}
-                <div className="bg-zinc-950 px-4 py-2 flex items-center gap-2 text-xs text-zinc-400 border-b border-zinc-800">
-                  <Sparkles className="w-3.5 h-3.5 text-zinc-300" />
+                <div className="bg-retro-bg px-4 py-2 flex items-center gap-2 text-xs text-retro-muted border-b border-border-glass">
+                  <Sparkles className="w-3.5 h-3.5 text-retro-fg" />
                   <span>Sponsored</span>
-                  <span className="ml-auto text-zinc-500">
+                  <span className="ml-auto text-retro-muted">
                     {GAME_AD_TEMPLATES.find((t) => t.mode === post.game_mode)?.gameName || 'gMatch Arcade'}
                   </span>
                 </div>
 
                 {/* Ad Visual */}
                 <div
-                  className={`relative w-full aspect-[4/5] max-h-[65vh] bg-gradient-to-br ${GAME_AD_TEMPLATES.find((t) => t.mode === post.game_mode)?.gradient || 'from-zinc-800 to-zinc-900'} flex flex-col items-center justify-center text-white overflow-hidden`}
+                  className={`relative w-full aspect-[4/5] max-h-[min(420px,60vh)] bg-gradient-to-br ${GAME_AD_TEMPLATES.find((t) => t.mode === post.game_mode)?.gradient || 'from-zinc-800 to-zinc-900'} flex flex-col items-center justify-center text-white overflow-hidden`}
                 >
                   {(() => {
                     const AdIcon = (post.game_mode && AD_ICON_MAP[post.game_mode]) || Gamepad2;
@@ -691,7 +658,7 @@ export function GMatchFeed({
                           <h3 className="text-xl font-black tracking-tight">{post.caption}</h3>
                           {post.players_playing && (
                             <p className="text-xs text-white/80 font-mono">
-                              ⚡ {post.players_playing.toLocaleString()} players online now
+                              <Zap className="inline w-3 h-3" /> {post.players_playing.toLocaleString()} online
                             </p>
                           )}
                           <button
@@ -702,7 +669,7 @@ export function GMatchFeed({
                               // the vercel-style refactor dropped these handlers).
                               onOpenGameAd?.(post.game_mode || 'duel');
                             }}
-                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-zinc-950 font-bold text-xs uppercase tracking-wider hover:bg-zinc-100 transition-transform active:scale-95 shadow-lg"
+                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-retro-bg font-bold text-xs uppercase tracking-wider hover:bg-retro-fg transition-transform active:scale-95 shadow-lg"
                           >
                             <span>{post.cta_label || 'Play Now'}</span>
                             <ChevronRight className="w-3.5 h-3.5" />
@@ -716,13 +683,13 @@ export function GMatchFeed({
             ) : (
               <article
                 key={post.id}
-                className={`bg-zinc-900/60 border border-zinc-800 rounded-lg overflow-hidden flex flex-col [content-visibility:auto] [contain-intrinsic-size:0_560px] shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
+                className={`bg-retro-panel border border-border-glass rounded-lg overflow-hidden flex flex-col [content-visibility:auto] [contain-intrinsic-size:0_560px] shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
                 {/* Repost Header Banner */}
                 {post.is_reposted && (
-                  <div className="bg-zinc-950 border-b border-zinc-800 px-4 py-2 flex items-center gap-1.5 text-xs text-zinc-400">
-                    <Repeat className="w-3.5 h-3.5 text-zinc-300" />
-                    <span>Reposted by <strong className="text-zinc-200 font-medium">@{post.reposted_by || 'Peer'}</strong></span>
+                  <div className="bg-retro-bg border-b border-border-glass px-4 py-2 flex items-center gap-1.5 text-xs text-retro-muted">
+                    <Repeat className="w-3.5 h-3.5 text-retro-fg" />
+                    <span>Reposted by <strong className="text-retro-fg font-medium">@{post.reposted_by || 'Peer'}</strong></span>
                   </div>
                 )}
 
@@ -734,8 +701,8 @@ export function GMatchFeed({
                     onContextMenu={(e) => onUserContext?.(e, post.author_id, post.author_name)}
                     title={authorHasStory ? 'Watch story' : 'View profile'}
                   >
-                    <div className={`w-8 h-8 rounded-full p-[1.5px] flex-shrink-0 ${authorHasStory ? 'bg-gradient-to-tr from-zinc-300 to-zinc-600' : 'bg-zinc-800 border border-zinc-700'}`}>
-                      <div className="w-full h-full rounded-full bg-zinc-900 overflow-hidden flex items-center justify-center text-xs font-semibold text-zinc-200">
+                    <div className={`w-8 h-8 rounded-full p-[1.5px] flex-shrink-0 ${authorHasStory ? 'bg-gradient-to-tr from-zinc-300 to-zinc-600' : 'bg-glass-w12 border border-border-glass'}`}>
+                      <div className="w-full h-full rounded-full bg-retro-panel overflow-hidden flex items-center justify-center text-xs font-semibold text-retro-fg">
                         {profilePics[post.author_id] || post.author_avatar ? (
                           <img src={profilePics[post.author_id] || post.author_avatar!} alt="" className="w-full h-full object-cover" />
                         ) : (
@@ -745,13 +712,13 @@ export function GMatchFeed({
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-semibold text-zinc-200 group-hover:underline">{post.author_name}</span>
-                        <time className="text-[11px] text-zinc-500" dateTime={post.created_at}>
+                        <span className="text-xs font-semibold text-retro-fg group-hover:underline">{post.author_name}</span>
+                        <time className="text-xs text-retro-muted" dateTime={post.created_at}>
                           {new Date(post.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                         </time>
                       </div>
                       {post.location && (
-                        <span className="text-[11px] text-zinc-500 block">{post.location}</span>
+                        <span className="text-xs text-retro-muted block">{post.location}</span>
                       )}
                     </div>
                   </div>
@@ -759,7 +726,7 @@ export function GMatchFeed({
                   <button
                     type="button"
                     onClick={() => setOptionsPost(post)}
-                    className="text-zinc-400 hover:text-zinc-200 p-1.5 rounded-md cursor-pointer hover:bg-zinc-800 transition-colors"
+                    className="text-retro-muted hover:text-retro-fg p-1.5 rounded-md cursor-pointer hover:bg-glass-w12 transition-colors"
                     aria-label="Post options"
                   >
                     <MoreHorizontal className="w-4 h-4" />
@@ -768,7 +735,7 @@ export function GMatchFeed({
 
                 {/* Post Media with Click to Lightbox & Double Tap Like */}
                 <div
-                  className="relative w-full aspect-[4/5] max-h-[65vh] bg-surface-canvas flex items-center justify-center overflow-hidden cursor-pointer rounded-none"
+                  className="relative w-full bg-surface-canvas flex items-center justify-center overflow-hidden cursor-pointer rounded-none"
                   onClick={() => {
                     playPress(700);
                     setActiveLightboxPost(post);
@@ -791,23 +758,23 @@ export function GMatchFeed({
                             objectId={item.id}
                             contentUrl={url}
                             identity={identity}
-                            className="w-full h-full object-cover rounded-none"
-                            videoClassName="w-full h-full object-cover rounded-none"
+                            className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
+                            videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
                           />
                         ) : isVid ? (
                           <LazyVideo
                             src={url}
-                            videoClassName="w-full h-full object-cover rounded-none"
+                            videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
                             controls
                             muted={false}
                             playOnHover={false}
                             preload="metadata"
                           />
                         ) : (
-                          <img
+                          <CachedImg
                             src={url}
                             alt={post.caption || 'Post image'}
-                            className="w-full h-full object-cover rounded-none"
+                            className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
                             loading="lazy"
                           />
                         )}
@@ -818,23 +785,23 @@ export function GMatchFeed({
                       objectId={post.id}
                       contentUrl={post.url}
                       identity={identity}
-                      className="w-full h-full object-cover rounded-none"
-                      videoClassName="w-full h-full object-cover rounded-none"
+                      className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
+                      videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
                     />
 ) : isVideo ? (
                       <LazyVideo
                         src={post.url}
-                        videoClassName="w-full h-full object-cover rounded-none"
+                        videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
                         controls
                         muted={false}
                         playOnHover={false}
                         preload="metadata"
                       />
                   ) : (
-                    <img
+                    <CachedImg
                       src={post.url}
                       alt={post.caption || 'Post image'}
-                      className="w-full h-full object-cover rounded-none"
+                      className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
                       loading="lazy"
                     />
                   )}
@@ -876,6 +843,11 @@ export function GMatchFeed({
                       <Heart className="w-20 h-20 text-white fill-white opacity-90" />
                     </div>
                   )}
+                  {firstLikeId === post.id && (
+                    <span className="absolute left-2 top-2 z-20 text-[10px] font-bold text-retro-fg bg-retro-panel border border-border-glass rounded-md px-1.5 py-0.5 animate-orbit-pop">
+                      First like
+                    </span>
+                  )}
                 </div>
 
                 {/* Action Bar (Like, Comment, Share, Save) */}
@@ -889,7 +861,7 @@ export function GMatchFeed({
                         className="cursor-pointer transition-transform duration-150 active:scale-[0.92]"
                       >
                         <Heart
-                          className={`w-4 h-4 transition-colors stroke-[1.75] ${isLiked ? 'text-rose-500 fill-rose-500' : 'text-zinc-400 hover:text-zinc-200'
+                          className={`w-4 h-4 transition-colors stroke-[1.75] ${isLiked ? 'text-rose-500 fill-rose-500' : 'text-retro-muted hover:text-retro-fg'
                             }`}
                         />
                       </button>
@@ -901,7 +873,7 @@ export function GMatchFeed({
                           setActiveLightboxPost(post);
                         }}
                         aria-label="Comment"
-                        className="text-zinc-400 hover:text-zinc-200 cursor-pointer transition-transform duration-150 active:scale-[0.92]"
+                        className="text-retro-muted hover:text-retro-fg cursor-pointer transition-transform duration-150 active:scale-[0.92]"
                       >
                         <MessageCircle className="w-4 h-4 stroke-[1.75]" />
                       </button>
@@ -910,7 +882,7 @@ export function GMatchFeed({
                         type="button"
                         onClick={() => setSharingPost(post)}
                         aria-label="Share post"
-                        className="text-zinc-400 hover:text-zinc-200 cursor-pointer transition-transform duration-150 active:scale-[0.92]"
+                        className="text-retro-muted hover:text-retro-fg cursor-pointer transition-transform duration-150 active:scale-[0.92]"
                       >
                         <Send className="w-4 h-4 stroke-[1.75]" />
                       </button>
@@ -923,7 +895,7 @@ export function GMatchFeed({
                       className="cursor-pointer transition-transform duration-150 active:scale-[0.92]"
                     >
                       <Bookmark
-                        className={`w-4 h-4 transition-colors stroke-[1.75] ${isSaved ? 'text-zinc-100 fill-zinc-100' : 'text-zinc-400 hover:text-zinc-200'
+                        className={`w-4 h-4 transition-colors stroke-[1.75] ${isSaved ? 'text-retro-fg fill-retro-fg' : 'text-retro-muted hover:text-retro-fg'
                           }`}
                       />
                     </button>
@@ -931,16 +903,16 @@ export function GMatchFeed({
 
                   {/* Likes Count */}
                   {currentLikes > 0 && (
-                    <div className="text-xs font-semibold text-zinc-300 font-mono tracking-tight">
+                    <div className="text-xs font-semibold text-retro-fg tracking-tight">
                       {currentLikes.toLocaleString()} {currentLikes === 1 ? 'like' : 'likes'}
                     </div>
                   )}
 
                   {/* Caption & Tags */}
                   {post.caption && (
-                    <div className="text-xs text-zinc-300 leading-relaxed">
+                    <div className="text-xs text-retro-fg leading-relaxed">
                       <span
-                        className="font-semibold text-zinc-100 mr-1.5 cursor-pointer hover:underline"
+                        className="font-semibold text-retro-fg mr-1.5 cursor-pointer hover:underline"
                         onClick={() => onSelectUser?.(post.author_id)}
                       >
                         {post.author_name}
@@ -956,7 +928,7 @@ export function GMatchFeed({
                         <span
                           key={t}
                           onClick={() => boostTagAffinity([t])}
-                          className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800/70 text-zinc-400 hover:text-zinc-200 cursor-pointer transition-colors"
+                          className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-glass-w12 text-retro-muted hover:text-retro-fg cursor-pointer transition-colors"
                         >
                           #{t.replace(/^#/, '')}
                         </span>
@@ -970,16 +942,16 @@ export function GMatchFeed({
                       <button
                         type="button"
                         onClick={() => { playPress(750); setActiveLightboxPost(post); }}
-                        className="text-left text-[11px] text-zinc-400 hover:text-zinc-200 cursor-pointer font-medium block"
+                        className="text-left text-xs text-retro-muted hover:text-retro-fg cursor-pointer font-medium block"
                       >
                         View all {postComments.length} comments
                       </button>
 
                       {/* Show top recent comment snippet */}
-                      <div className="text-xs text-zinc-300 flex items-center justify-between">
+                      <div className="text-xs text-retro-fg flex items-center justify-between">
                         <div className="truncate">
-                          <strong className="font-semibold text-zinc-100 mr-1.5">{postComments[postComments.length - 1].author_name}</strong>
-                          <span className="text-zinc-400">{postComments[postComments.length - 1].text}</span>
+                          <strong className="font-semibold text-retro-fg mr-1.5">{postComments[postComments.length - 1].author_name}</strong>
+                          <span className="text-retro-muted">{postComments[postComments.length - 1].text}</span>
                         </div>
                       </div>
                     </div>
@@ -987,7 +959,7 @@ export function GMatchFeed({
                     <button
                       type="button"
                       onClick={() => { playPress(750); setActiveLightboxPost(post); }}
-                      className="text-left text-[11px] text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                      className="text-left text-xs text-retro-muted hover:text-retro-fg cursor-pointer"
                     >
                       Add a comment...
                     </button>
@@ -998,25 +970,50 @@ export function GMatchFeed({
           })}
 
           {displayPosts.length === 0 && (
-            <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-8 text-center space-y-3 shadow-xs my-4">
-              <div className="w-12 h-12 rounded-full bg-zinc-800/60 border border-zinc-700/60 flex items-center justify-center mx-auto text-zinc-400">
-                <Camera className="w-5 h-5 stroke-[1.75]" />
+            <div className="bg-retro-panel border border-border-glass rounded-lg p-8 text-center space-y-4 shadow-xs my-4 max-w-md mx-auto">
+              <div>
+                <h4 className="text-sm font-semibold text-retro-fg">Empty in here? Start posting and get things moving.</h4>
+                <p className="text-xs text-retro-muted mt-1 leading-relaxed">
+                  One upload, three tags. Posts are what grow followers.
+                </p>
               </div>
-              <h4 className="text-sm font-semibold text-zinc-100">No Posts Yet</h4>
-              <p className="text-xs text-zinc-400 max-w-xs mx-auto leading-relaxed">
-                Capture or upload your first photo or video post to start sharing with your friends!
-              </p>
               <button
                 type="button"
                 onClick={() => {
                   if (onOpenPostCreator) onOpenPostCreator();
                   else setShowCustomPostCreator(true);
                 }}
-                 className="create-action px-4 py-2 text-xs font-semibold rounded-md transition-all duration-150 active:scale-[0.96] shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+                className="create-action px-4 py-2 text-xs font-semibold rounded-md transition-all duration-150 active:scale-[0.96] shadow-xs cursor-pointer inline-flex items-center gap-1.5"
               >
                 <PlusSquare className="w-4 h-4 stroke-[2]" />
-                 <span>Drop your first moment</span>
+                <span>Upload your first post</span>
               </button>
+              {followSuggestions.length > 0 && (
+                <div className="pt-2 border-t border-border-glass">
+                  <p className="text-[10px] uppercase tracking-wider text-retro-muted mb-2">Or follow someone</p>
+                  <div className="flex items-center justify-center gap-3">
+                    {followSuggestions.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => { void onFollowSuggestion?.(s.id); }}
+                        className="flex flex-col items-center gap-1 cursor-pointer group"
+                        aria-label={`Follow ${s.display_name || s.id}`}
+                      >
+                        <span className="w-10 h-10 rounded-full overflow-hidden border border-border-glass flex items-center justify-center text-xs text-retro-fg bg-glass-w5">
+                          {profilePics?.[s.id] ? (
+                            <img src={profilePics[s.id]} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            (s.display_name || s.id).slice(0, 2).toUpperCase()
+                          )}
+                        </span>
+                        <span className="text-[10px] text-retro-muted truncate max-w-[72px] group-hover:text-retro-fg">{s.display_name}</span>
+                        <span className="text-[10px] text-retro-fg border border-border-glass rounded-md px-1.5 py-0.5 group-hover:bg-glass-w10">Follow</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1024,8 +1021,8 @@ export function GMatchFeed({
           {displayPosts.length > 0 && hasMore !== false && (
             <div ref={sentinelRef} className="py-6 flex flex-col items-center justify-center gap-2">
               {(internalLoadingMore || isLoadingMore) ? (
-                <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-800 shadow-xs text-xs font-medium text-zinc-300">
-                  <span className="w-3.5 h-3.5 border-2 border-zinc-700 border-t-zinc-200 rounded-full animate-spin" />
+                <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-retro-panel border border-border-glass shadow-xs text-xs font-medium text-retro-fg">
+                  <span className="w-3.5 h-3.5 border-2 border-border-glass border-t-retro-fg rounded-full animate-spin" />
                   <span>Loading more moments…</span>
                 </div>
               ) : (
@@ -1046,6 +1043,7 @@ export function GMatchFeed({
           userNames={Object.fromEntries(users.map((u) => [u.id, u.display_name || '']))}
           identity={identity}
           toast={toast}
+          groups={shareGroups}
         />,
         document.body,
       )}

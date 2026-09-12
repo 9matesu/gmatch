@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { generateIdentity } from '@orbit/crypto'
-import { open1to1 } from '@orbit/protocol'
+
 import { RoomManager, type Room } from './rooms'
 import { DmStore } from './mail-dm'
 import type { MailClient } from './mail-client'

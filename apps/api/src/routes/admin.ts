@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { Hono } from 'hono'
 import { orbitAuth } from '../middleware/auth'
-import { adminAuth } from '../middleware/admin'
+import { adminAuth, ADMIN_GRANT_KEY } from '../middleware/admin'
 import type { D1Turso } from '../db'
 import type { LocalBlobStore } from '../blob'
 import { purgeObjectLikes } from '../game'
@@ -25,6 +25,7 @@ type Bindings = {
   BUCKET?: LocalBlobStore
   ADMIN_PIN?: string
   ADMIN_PIN_HASH?: string
+  ADMIN_ORBIT_ID?: string
 }
 
 const admin = new Hono<{ Bindings: Bindings, Variables: { orbitId: string, publicKeyHex: string } }>()
@@ -42,6 +43,18 @@ announcements.use('*', orbitAuth)
 const PIN_WINDOW_MS = 15 * 60 * 1000
 const PIN_MAX_FAILS = 5
 const pinFails = new Map<string, number[]>() // orbitId -> failure timestamps
+
+// Wave 2 (F1.4): the map keys are attacker-chosen (orbitAuth auto-creates
+// identities), so it needs a ceiling. Past 10k identities, drop the oldest
+// half — a locked-out attacker just cost themselves their own history.
+function prunePinFails(): void {
+  if (pinFails.size <= 10_000) return
+  let i = 0
+  for (const k of pinFails.keys()) {
+    pinFails.delete(k)
+    if (++i >= 5_000) break
+  }
+}
 
 export function _resetPinLockout(): void {
   pinFails.clear()
@@ -80,10 +93,24 @@ admin.post('/verify-pin', async (c) => {
 
   // lockout check (sliding window)
   const now = Date.now()
+  prunePinFails()
   const fails = (pinFails.get(orbitId) || []).filter((t) => now - t < PIN_WINDOW_MS)
   if (fails.length >= PIN_MAX_FAILS) {
     pinFails.set(orbitId, fails)
-    return c.json({ error: 'Too many failed attempts — try again in 15 minutes' }, 429)
+    return c.json({ error: 'Too many failed attempts. Try again in 15 minutes' }, 429)
+  }
+
+  // Wave 2 (E1): when ADMIN_ORBIT_ID is configured, the PIN unlocks ONLY for
+  // that identity — knowing the PIN is no longer becoming the admin. The
+  // identity check runs BEFORE the pin compare so a non-admin cannot even
+  // probe the PIN; the response is the same 401 as a wrong PIN and counts
+  // toward this caller's lockout window. Without ADMIN_ORBIT_ID the node
+  // keeps the host-is-admin model (self-host/LAN), documented in SECURITY-AUDIT.
+  const adminOrbit = (c.env.ADMIN_ORBIT_ID || '').trim()
+  if (adminOrbit && adminOrbit !== orbitId) {
+    fails.push(now)
+    pinFails.set(orbitId, fails)
+    return c.json({ error: 'Invalid secret admin passcode' }, 401)
   }
 
   const presentedHash = sha256hexSync(pin)
@@ -102,6 +129,9 @@ admin.post('/verify-pin', async (c) => {
   await c.env.DB.prepare('UPDATE Users SET is_admin = 0').run()
   await c.env.DB.prepare('INSERT INTO Users (id, public_key, is_admin) VALUES (?, ?, 1) ON CONFLICT(id) DO UPDATE SET is_admin = 1')
     .bind(orbitId, c.get('publicKeyHex')).run()
+  // Wave 2 (E3): stamp the grant; adminAuth expires it after 12h.
+  await c.env.DB.prepare('INSERT INTO SystemMeta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+    .bind(ADMIN_GRANT_KEY, String(Date.now())).run()
 
   return c.json({ success: true })
 })
@@ -1564,11 +1594,9 @@ admin.post('/users/:id/ban', async (c) => {
   ).bind(banId, userId, orbitId, reason, scope, banScopeChat ? 1 : 0, banScopePm ? 1 : 0).run()
 
   // Wipe all content (cards, stories, likes, PMs, chats) but keep the account.
-  let wipedObjects = 0
   if (wipe) {
     try {
-      const affected = await wipeUserContent(c.env.DB, userId, { BUCKET: c.env.BUCKET })
-      wipedObjects = affected.length
+      await wipeUserContent(c.env.DB, userId, { BUCKET: c.env.BUCKET })
     } catch (error) {
       console.warn('[admin] wipe failed on ban:', error)
     }

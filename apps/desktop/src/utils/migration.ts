@@ -3,7 +3,7 @@
 const STORAGE_PREFIX_OLD = "goonorbit";
 const STORAGE_PREFIX_NEW = "goonmatch";
 const INDEXEDDB_NAME_OLD = "goonorbit";
-const INDEXEDDB_NAME_NEW = "goonmatch";
+
 const MIGRATION_FLAG = "goonmatch_migration_done";
 
 const localStorageKeys = [
@@ -20,12 +20,7 @@ const localStorageKeys = [
   "matches_total",
 ];
 
-const configBackupKeys = [
-  "settings",
-  "friends",
-  "blocked",
-  "relationships",
-];
+
 
 function migrateLocalStorage(): void {
   if (typeof window === "undefined") return;

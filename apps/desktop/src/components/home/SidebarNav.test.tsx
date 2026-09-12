@@ -115,3 +115,24 @@ describe('SidebarNav user-requested chrome', () => {
     forward.mockRestore()
   })
 })
+
+describe('SidebarNav logout', () => {
+  it('renders a logout control next to the user chip and fires the callback', () => {
+    const onLogout = vi.fn()
+    render(<SidebarNav setMainView={vi.fn()} onLogout={onLogout} />)
+    const btn = screen.getByRole('button', { name: /log out/i })
+    fireEvent.click(btn)
+    expect(onLogout).toHaveBeenCalledOnce()
+  })
+  it('hidden when no callback given', () => {
+    render(<SidebarNav />)
+    expect(screen.queryByRole('button', { name: /log out/i })).not.toBeInTheDocument()
+  })
+})
+// One function, one control: desktop chat lives in the bottom-right rail only.
+describe('SidebarNav messages entry removal', () => {
+  it('renders no Messages nav button', () => {
+    render(<SidebarNav />)
+    expect(screen.queryByRole('button', { name: /messages/i })).not.toBeInTheDocument()
+  })
+})

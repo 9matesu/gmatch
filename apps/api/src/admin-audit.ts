@@ -23,6 +23,6 @@ export async function logAdminAction(
       )
       .bind(id, adminId, action, target?.id || null, target?.type || null, reason || null)
       .run()
-  } catch (err) {
+  } catch  {
   }
 }

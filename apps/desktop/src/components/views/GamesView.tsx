@@ -13,7 +13,7 @@ import CustomSourcesModal from '../grid/CustomSourcesModal';
 import type { MainViewType } from '../home/HomeFooter';
 
 type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
-type GamesSubTab = 'duel' | 'cards' | 'babecock' | 'ranks' | 'store' | 'idle';
+type GamesSubTab = 'duel' | 'babecock' | 'ranks' | 'idle';
 
 export function GamesView({
   gamesSubTab,
@@ -24,7 +24,7 @@ export function GamesView({
   toggleAutoQueue,
   sendInvite,
   soundEnabled,
-  toast,
+  toast: _toast,
   setSelectedProfileUser,
   setLobbyLightboxUrl,
   setExpandedItemId,
@@ -35,7 +35,7 @@ export function GamesView({
   setSpectateViewerItems,
   openCreateCardModal,
   navigateToDeckBuilder,
-  handleSetMainView,
+  handleSetMainView: _handleSetMainView,
 }: {
   gamesSubTab: GamesSubTab;
   identity: OrbitIdentity | null;
@@ -64,7 +64,6 @@ export function GamesView({
     <GamesHub
       key={`games-${gamesSubTab}`}
       identity={identity}
-      cards={myCards as any}
       users={users}
       onSelectUser={(uId) => {
         const target = users.find((u) => u.id === uId || (u as any).orbitId === uId);
@@ -97,9 +96,7 @@ export function GamesView({
           users={users}
         />
       )}
-      onOpenStore={() => handleSetMainView('store')}
       onOpenSources={() => setShowSources(true)}
-      toast={toast}
     />
     {showSources && <CustomSourcesModal onClose={() => setShowSources(false)} />}
     </>

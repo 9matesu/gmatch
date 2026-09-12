@@ -7,6 +7,7 @@ import { orbitFetch } from '../utils/api'
 import type { OrbitIdentity } from '@orbit/crypto'
 import type { FlashEvent } from '@orbit/shared'
 import { userFacingResponse, userFacingError } from '../utils/userError'
+import { Zap, X } from 'lucide-react'
 
 export function FlashModal({
   identity,
@@ -35,7 +36,7 @@ export function FlashModal({
       const res = await orbitFetch('/api/flash', { method: 'POST', body: form }, identity)
       if (res.ok) {
         const data = await res.json().catch(() => null)
-        toast('⚡ Flash sent to everyone online!', 'success')
+        toast('Flash sent to everyone online.', 'success')
         onFired?.(data?.flash || null)
         onClose()
       } else {
@@ -73,14 +74,14 @@ export function FlashModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-orbit-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[var(--z-toast)] bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-orbit-fade-in" onClick={onClose}>
       <div
         className="bg-retro-panel border-2 border-yellow-500 rounded-xl max-w-md w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 border-b border-retro-border bg-retro-bg/90">
+        <div className="flex items-center justify-between p-4 border-b border-border-glass bg-retro-bg/90">
           <div className="flex items-center gap-2">
-            <span className="text-xl">⚡</span>
+            <Zap className="w-5 h-5 fill-current" />
             <div>
               <h2 className="text-sm font-black text-retro-fg uppercase tracking-widest">FIRE A FLASH DROP</h2>
               <p className="text-[10px] text-retro-muted font-sans">Your photo pops up on every online screen for 5 seconds</p>
@@ -89,13 +90,13 @@ export function FlashModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-xs font-bold text-retro-muted hover:text-retro-fg px-2.5 py-1 border border-retro-border rounded hover:border-retro-fg transition-colors cursor-pointer"
+            className="text-xs font-bold text-retro-muted hover:text-retro-fg px-2.5 py-1 border border-border-glass rounded hover:border-retro-fg transition-colors cursor-pointer"
           >
-            ✕
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        <div className="flex items-center gap-1.5 p-2.5 border-b border-retro-border bg-retro-bg text-[10px] font-bold">
+        <div className="flex items-center gap-1.5 p-2.5 border-b border-border-glass bg-retro-bg text-[10px] font-bold">
           {(['camera', 'upload'] as const).map((m) => (
             <button
               key={m}
@@ -106,11 +107,11 @@ export function FlashModal({
                 fileRef.current = null
                 setHasFile(false)
               }}
-              className={`px-3 py-1 rounded transition-colors uppercase cursor-pointer ${
+              className={`px-3 py-1 rounded transition-colors uppercase tracking-wider cursor-pointer ${
                 mode === m ? 'bg-retro-accent text-black font-black' : 'text-retro-muted hover:text-retro-fg'
               }`}
             >
-              {m === 'camera' ? '📷 Camera' : '📁 Upload'}
+              {m === 'camera' ? 'Camera' : 'Upload'}
             </button>
           ))}
         </div>
@@ -127,20 +128,20 @@ export function FlashModal({
                 </div>
               </DropZone>
               {preview && (
-                <img src={preview} alt="Preview" className="w-full max-h-56 object-contain rounded-lg border border-retro-border bg-black" />
+                <img src={preview} alt="Preview" className="w-full max-h-56 object-contain rounded-lg border border-border-glass bg-black" />
               )}
             </>
           )}
         </div>
 
-        <div className="p-3.5 border-t border-retro-border bg-retro-bg/90 flex items-center gap-2">
+        <div className="p-3.5 border-t border-border-glass bg-retro-bg/90 flex items-center gap-2">
           <button
             type="button"
             disabled={sending || (!hasFile && !preview)}
             onClick={submit}
             className="flex-1 px-3 py-2 text-[10px] font-black tracking-wider bg-yellow-500 text-black hover:bg-yellow-400 disabled:opacity-40 rounded cursor-pointer uppercase transition-colors"
           >
-            {sending ? 'Firing...' : '⚡ FIRE FLASH'}
+            {sending ? 'Firing...' : 'Fire flash'}
           </button>
         </div>
       </div>

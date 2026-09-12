@@ -118,14 +118,14 @@ export function ProfileSetupForm({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="text-[11px] text-retro-accent hover:text-retro-accent-hover font-semibold cursor-pointer"
+          className="text-xs text-retro-accent hover:text-retro-accent-hover font-semibold cursor-pointer"
         >
           {pfpUrl ? 'Change profile picture' : 'Upload profile picture'}
         </button>
         {pfpError ? (
-          <span className="text-[11px] text-red-400 font-semibold">{pfpError}</span>
+          <span className="text-xs text-red-400 font-semibold">{pfpError}</span>
         ) : (
-          !pfpUrl && <span className="text-[11px] text-retro-muted font-medium">Required</span>
+          !pfpUrl && <span className="text-xs text-retro-muted font-medium">Required</span>
         )}
       </div>
 
@@ -176,7 +176,7 @@ export function ProfileSetupForm({
           />
         </div>
         {tags.length === 0 && (
-          <p className="text-[11px] text-retro-muted">Add at least one tag to continue.</p>
+          <p className="text-xs text-retro-muted">Add at least one tag to continue.</p>
         )}
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 pt-1">
@@ -185,7 +185,7 @@ export function ProfileSetupForm({
                 key={tag}
                 type="button"
                 onClick={() => { playPress(700); onTags(tags.filter((t) => t !== tag)); }}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-retro-accent/15 border border-retro-accent/30 text-retro-accent text-[11px] font-bold cursor-pointer hover:bg-retro-accent/25 transition-colors"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-retro-accent/15 border border-retro-accent/30 text-retro-accent text-xs font-bold cursor-pointer hover:bg-retro-accent/25 transition-colors"
               >
                 #{tag}
                 <X className="w-3 h-3" />
@@ -202,7 +202,7 @@ export function ProfileSetupForm({
                   key={tag}
                   type="button"
                   onClick={() => { playPress(700); addTag(tag); }}
-                  className="px-2 py-1 rounded-md bg-surface-interactive border border-border-glass text-retro-body text-[11px] font-semibold cursor-pointer hover:border-retro-accent/50 hover:text-retro-fg transition-colors"
+                  className="px-2 py-1 rounded-md bg-surface-interactive border border-border-glass text-retro-body text-xs font-semibold cursor-pointer hover:border-retro-accent/50 hover:text-retro-fg transition-colors"
                 >
                   + #{tag}
                 </button>

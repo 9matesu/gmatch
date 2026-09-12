@@ -1,7 +1,7 @@
 // Run from site/: node build-legal.mjs
 // Renders the legal .md corpus (generated from the canonical TS source by
-// apps/desktop/scripts/gen-legal.cjs) into plain-text HTML in legal/.
-// NO styling, NO scripts — the honesty gate (check.mjs) enforces that.
+// apps/desktop/scripts/gen-legal.cjs) into HTML in legal/.
+// Inline styling only, NO scripts; the honesty gate (check.mjs) enforces that.
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -19,6 +19,13 @@ function mdToHtml(md) {
   const out = []
   let inList = false
   let inPre = false
+  let inTable = false
+  const closeTable = () => {
+    if (inTable) {
+      out.push('</table>')
+      inTable = false
+    }
+  }
   const closeList = () => {
     if (inList) {
       out.push('</ul>')
@@ -29,6 +36,7 @@ function mdToHtml(md) {
     const line = raw.trimEnd()
     if (line.startsWith('```')) {
       closeList()
+      closeTable()
       if (inPre) {
         out.push('</pre>')
         inPre = false
@@ -43,15 +51,19 @@ function mdToHtml(md) {
       continue
     }
     if (/^\|.*\|$/.test(line.trim())) {
-      // tables (audit findings): render verbatim inside a pre for alignment
-      if (!out.at(-1) || !out.at(-1).endsWith('<pre>')) {
+      // markdown table -> real <table>; first row is the header, |---| separator skipped
+      const cells = line.trim().slice(1, -1).split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, '|'))
+      if (cells.every((c) => /^:?-{1,}:?$/.test(c))) continue
+      if (!inTable) {
         closeList()
-        out.push('<pre>')
+        out.push('<table>')
+        inTable = true
       }
-      out.push(esc(line.trim()))
-      if (!/^\|/.test(lines[lines.indexOf(raw) + 1]?.trim() ?? '')) out.push('</pre>')
+      const tag = out.at(-1)?.includes('<table>') ? 'th' : 'td'
+      out.push(`<tr>${cells.map((c) => `<${tag}>${inline(c)}</${tag}>`).join('')}</tr>`)
       continue
     }
+    closeTable()
     let m
     if ((m = /^### (.*)$/.exec(line))) {
       closeList()
@@ -76,6 +88,7 @@ function mdToHtml(md) {
     }
   }
   closeList()
+  closeTable()
   if (inPre) out.push('</pre>')
   return out.join('\n')
 }
@@ -92,14 +105,57 @@ function page(title, bodyHtml, note) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(title)} — gMatch</title>
+<title>${esc(title)}, gMatch</title>
+<style>
+:root { color-scheme: dark; }
+html { background: #09090b; }
+body {
+  margin: 0;
+  padding: 56px 32px 96px;
+  max-width: 560px;
+  background: #09090b;
+  color: #d4d4d8;
+  font: 13px/1.7 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  letter-spacing: -0.08em;
+  text-align: left;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, strong { color: #fafafa; font-weight: 600; }
+h1 { font-size: 21px; line-height: 1.25; margin: 0 0 16px; }
+h2 { font-size: 14px; margin: 40px 0 12px; }
+h3 { font-size: 13px; margin: 28px 0 10px; }
+p { margin: 0 0 14px; }
+em { color: #71717a; }
+a { color: #fafafa; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: #3f3f46; }
+a:hover { color: #fff; text-decoration-color: #fff; }
+ul { margin: 0 0 16px; padding-left: 20px; }
+li { margin: 7px 0; }
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px; letter-spacing: normal;
+  background: #121215; border: 1px solid #1f1f23; border-radius: 4px;
+  padding: 1px 5px; color: #e4e4e7;
+}
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px; letter-spacing: normal; line-height: 1.65;
+  background: #121215; border: 1px solid #27272a; border-radius: 6px;
+  padding: 14px 16px; margin: 0 0 16px; color: #fafafa;
+  overflow-wrap: anywhere; white-space: pre-wrap;
+}
+hr { border: 0; border-top: 1px solid #1f1f23; margin: 56px 0 20px; }
+table { border-collapse: collapse; margin: 0 0 16px; }
+th, td { border: 1px solid #27272a; padding: 6px 12px; text-align: left; font-weight: 500; }
+::selection { background: rgba(255, 255, 255, 0.15); }
+@media (max-width: 480px) { body { padding: 40px 20px 72px; } }
+</style>
 </head>
 <body>
 <p><a href="../index.html#terms">← back to the main page</a></p>
 ${note ? `<p><em>${esc(note)}</em></p>` : ''}
 ${bodyHtml}
 <hr>
-<p>Contact: <a href="https://github.com/9matesu/goongrid/issues">github.com/9matesu/goongrid/issues</a> · This page uses no JavaScript, CSS, cookies or analytics.</p>
+<p>Contact: <a href="abuse.html">abuse &amp; reports</a> · This page uses no JavaScript, no external fonts, no cookies and no analytics.</p>
 </body>
 </html>
 `
@@ -121,7 +177,7 @@ const mapped = {
 let n = 0
 for (const [html, [md, title, note]] of Object.entries(mapped)) {
   const src = readFileSync(join(MD, md), 'utf8')
-  writeFileSync(join(OUT, html), page(title, mdToHtml(src), note ?? 'Generated from the canonical in-app source — do not edit here.'))
+  writeFileSync(join(OUT, html), page(title, mdToHtml(src), note ?? 'Generated from the canonical in-app source. Do not edit here.'))
   n++
 }
 
@@ -133,9 +189,11 @@ const cl = [
   `<table><tr><th>document</th><th>version</th></tr>` +
     version.docs.map((d) => `<tr><td><a href="${d === 'e2e-disclaimer' ? 'e2e' : d}.html">${esc(d)}</a></td><td>${esc(version.version)}</td></tr>`).join('') +
     '</table>',
-  '<p>2026-09-09.2 — English-only binding corpus (terms, LGPD/GDPR privacy, community, abuse reports, adult records, E2E notice).</p>',
+  '<p>2026-09-09.2: English-only binding corpus (terms, LGPD/GDPR privacy, community, abuse reports, adult records, E2E notice).</p>',
+  '<p>2026-09-11.1: wave-2 privacy facts: rotating session delivery addresses, salted-hash rate-limit keys, masked server addresses, image metadata stripped on ingress.</p>',
+  '<p>2026-09-11.2: contact channels moved in-app (Settings → Help); audit published on this site; no other substantive changes.</p>',
 ].join('\n')
-writeFileSync(join(OUT, 'changelog.html'), page('Legal changelog', cl, 'Generated from legal/version.json — canonical source: apps/desktop/src/legal/documents.ts.'))
+writeFileSync(join(OUT, 'changelog.html'), page('Legal changelog', cl, 'Generated from legal/version.json. Canonical source: apps/desktop/src/legal/documents.ts.'))
 n++
 
 // security page: the audit report itself

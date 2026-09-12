@@ -159,18 +159,18 @@ export function LiveCameraModal({
 
   return (
     <div
-      className="fixed inset-0 z-[99999] bg-black/80 backdrop-blur-md flex items-center justify-center p-0 sm:p-4 animate-orbit-fade-in select-none"
+      className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-md flex items-center justify-center p-0 sm:p-4 animate-orbit-fade-in select-none"
       onClick={onClose}
     >
       <div
-        className="bg-surface-raised text-retro-fg w-full max-w-lg rounded-none sm:rounded-3xl border border-border-glass shadow-2xl overflow-hidden flex flex-col h-full sm:h-auto max-h-screen sm:max-h-[90vh]"
+        className="bg-surface-raised text-retro-fg w-full max-w-lg rounded-none sm:rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col h-full sm:h-auto max-h-screen sm:max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="p-4 bg-surface-raised border-b border-border-glass flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Camera className="w-5 h-5 text-retro-fg" />
-            <h3 className="text-sm font-black text-retro-fg tracking-tight">Camera Snapshot</h3>
+            <h3 className="text-sm font-black text-retro-fg tracking-tight">Camera snapshot</h3>
           </div>
           <button
             type="button"
@@ -200,7 +200,7 @@ export function LiveCameraModal({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-4 py-2 bg-surface-elevated text-white text-xs font-bold rounded-xl cursor-pointer hover:bg-zinc-700 flex items-center gap-1.5"
+                  className="px-4 py-2 bg-surface-elevated text-white text-xs font-bold rounded-xl cursor-pointer hover:bg-glass-w20 flex items-center gap-1.5"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   <span>Upload File</span>
@@ -244,7 +244,7 @@ export function LiveCameraModal({
               <button
                 type="button"
                 onClick={handleRetake}
-                className="flex-1 py-3 bg-surface-interactive hover:bg-[#e4e4e7] text-retro-fg rounded-2xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors border border-border-glass"
+                className="flex-1 py-3 bg-surface-interactive hover:bg-[#e4e4e7] text-retro-fg rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors border border-border-glass"
               >
                 <RefreshCw className="w-4 h-4" />
                 <span>Retake</span>
@@ -252,7 +252,7 @@ export function LiveCameraModal({
               <button
                 type="button"
                 onClick={handleConfirmPhoto}
-                className="flex-1 py-3 bg-gradient-to-r from-cyan-500 via-teal-500 to-amber-500 hover:opacity-95 text-white rounded-2xl text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md"
+                className="flex-1 py-3 bg-gradient-to-r from-cyan-500 via-teal-500 to-amber-500 hover:opacity-95 text-white rounded-xl text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md"
               >
                 <Check className="w-4 h-4" />
                 <span>Attach to Post</span>

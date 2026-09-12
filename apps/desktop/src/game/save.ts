@@ -2,17 +2,14 @@ import type { ActiveCap, CapId, CustomSource, GalleryImage, OwnedTag, ViewMode }
 
 export const SAVE_KEY = 'gmatch.save.v1'
 export const SAVE_VERSION = 3
-export const OFFLINE_RATE = 0.5
+export const OFFLINE_RATE = 0.25
 export const OFFLINE_CAP_MS = 8 * 60 * 60 * 1000
 
 export interface SaveData {
   version: number
-  gc: number
-  /** Whole g$ already flushed to the server ledger (plan D4). */
-  credited: number
-  /** Whole g$ already mirrored as spend on the server ledger (plan D4). */
-  debited: number
-  totalEarnedGc: number
+  /** Idle-game points (local only; legacy saves call this gp/gc). */
+  points: number
+  totalEarned: number
   xp: number
   clickCount: number
   critCount: number
@@ -33,6 +30,8 @@ export interface SaveData {
   /** Player's feed starter picks + extra excludes (setup screen / config tab). */
   setupComplete: boolean
   userExcludes: string[]
+  /** Co-occurrence pairs learned from purges (T4). */
+  coRules: { a: string; b: string; count: number }[]
   /** Player-owned idle feed sources (custom URLs / local folders). */
   customSources: CustomSource[]
   lastSeenAt: number
@@ -41,10 +40,8 @@ export interface SaveData {
 export function defaultSave(now = Date.now()): SaveData {
   return {
     version: SAVE_VERSION,
-    gc: 0,
-    credited: 0,
-    debited: 0,
-    totalEarnedGc: 0,
+    points: 0,
+    totalEarned: 0,
     xp: 0,
     clickCount: 0,
     critCount: 0,
@@ -63,6 +60,7 @@ export function defaultSave(now = Date.now()): SaveData {
     viewMode: 'single',
     setupComplete: false,
     userExcludes: [],
+    coRules: [],
     customSources: [],
     lastSeenAt: now,
   }
@@ -82,18 +80,16 @@ export function deserialize(raw: string | null | undefined): SaveData | null {
     return null
   }
   if (typeof parsed !== 'object' || parsed === null) return null
-  const d = parsed as Partial<SaveData> & { gp?: unknown; totalEarnedGP?: unknown }
+  const d = parsed as Partial<SaveData> & { gp?: unknown; totalEarnedGP?: unknown; gc?: unknown; totalEarnedGc?: unknown }
   if (d.version !== SAVE_VERSION) return null
   const num = (v: unknown, fallback: number): number =>
     typeof v === 'number' && Number.isFinite(v) ? v : fallback
   const arr = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
   return {
     version: SAVE_VERSION,
-    // 1:1 GP→g$ rename (plan D4): old saves carry `gp`/`totalEarnedGP`.
-    gc: num(d.gc, num(d.gp, 0)),
-    credited: num(d.credited, 0),
-    debited: num(d.debited, 0),
-    totalEarnedGc: num(d.totalEarnedGc, num(d.totalEarnedGP, 0)),
+    // Legacy saves carry gp/gc/totalEarnedGP/totalEarnedGc — same value, renamed.
+    points: num(d.points, num(d.gc, num(d.gp, 0))),
+    totalEarned: num(d.totalEarned, num(d.totalEarnedGc, num(d.totalEarnedGP, 0))),
     xp: num(d.xp, 0),
     clickCount: num(d.clickCount, 0),
     critCount: num(d.critCount, 0),
@@ -109,9 +105,12 @@ export function deserialize(raw: string | null | undefined): SaveData | null {
     defeated: num(d.defeated, 0),
     maxHeatStreak: num(d.maxHeatStreak, 0),
     backgroundUrl: typeof d.backgroundUrl === 'string' ? d.backgroundUrl : null,
-    viewMode: d.viewMode === 'grid' ? 'grid' : 'single',
+    viewMode: (['single', 'grid', '1x1', '1x2', '2x2', '3x3'].includes(d.viewMode as string)
+      ? d.viewMode
+      : 'single') as ViewMode,
     setupComplete: d.setupComplete === true,
     userExcludes: arr<string>(d.userExcludes),
+    coRules: (Array.isArray(d.coRules) ? d.coRules : []).filter((r: any) => typeof r?.a === 'string' && typeof r?.b === 'string').slice(0, 200),
     customSources: sanitizeCustomSources((d as Partial<SaveData>).customSources),
     lastSeenAt: num(d.lastSeenAt, 0),
   }
@@ -142,7 +141,7 @@ function sanitizeCustomSources(v: unknown): CustomSource[] {
 }
 
 /**
- * Offline earnings = elapsed * g$/s * 50%, capped at 8h (SPEC §11).
+ * Offline earnings = elapsed * pts/s * 25%, capped at 8h (SPEC §11).
  * elapsedMs is clamped to [0, capMs].
  */
 export function offlineEarnings(

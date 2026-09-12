@@ -126,8 +126,8 @@ interface FooterSecondaryItem {
      <footer className="relative shrink-0 w-full glass-surface border-0 border-t border-border-glass rounded-none px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] flex items-center justify-center font-sans select-none z-30">
       {moreOpen && (
         <>
-          <button type="button" aria-label="Close more menu" onClick={() => setMoreOpen(false)} className="fixed inset-0 z-40 bg-black/45" />
-           <div className="absolute bottom-full left-2 right-2 z-50 mb-2 rounded-2xl glass-surface p-2">
+          <button type="button" aria-label="Close more menu" onClick={() => setMoreOpen(false)} className="fixed inset-0 z-40 bg-black/70" />
+           <div className="absolute bottom-full left-2 right-2 z-50 mb-2 rounded-xl glass-surface p-2">
             <div className="grid grid-cols-3 gap-2">
               {secondaryItems.map((item) => {
                 const Icon = item.icon;
@@ -139,7 +139,7 @@ interface FooterSecondaryItem {
                      className="glass-button relative min-h-16 rounded-xl px-2 py-2 text-retro-body active:scale-95 flex flex-col items-center justify-center gap-1"
                   >
                     <Icon className="w-5 h-5 text-retro-accent" />
-                    <span className="text-[11px] font-medium">{item.label}</span>
+                    <span className="text-xs font-medium">{item.label}</span>
                     {'badge' in item && Boolean(item.badge && item.badge > 0) && <span className="absolute right-2 top-2 w-2 h-2 rounded-full bg-retro-accent" />}
                   </button>
                 );
@@ -159,7 +159,7 @@ interface FooterSecondaryItem {
               aria-label={item.label}
                className={`glass-button relative flex flex-col items-center justify-center w-full max-w-[100px] h-11 sm:h-12 rounded-md transition-all cursor-pointer group border touch-manipulation ${
                 item.highlight
-                  ? 'create-action -mt-3 h-14 sm:h-16 rounded-2xl border-transparent shadow-lg'
+                  ? 'create-action -mt-3 h-14 sm:h-16 rounded-xl border-transparent shadow-lg'
                   : ('isHack' in item && item.isHack)
                   ? item.active
                     ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
@@ -183,7 +183,7 @@ interface FooterSecondaryItem {
                 <Icon className={`w-4 h-4 sm:w-5 sm:h-5 transition-colors ${item.highlight ? 'text-current' : item.active ? 'text-retro-accent' : ''}`} />
               )}
 
-              <span className={`text-[9px] sm:text-[10px] font-medium mt-0.5 whitespace-nowrap ${
+              <span className={`text-[10px] sm:text-[10px] font-medium mt-0.5 whitespace-nowrap ${
                   item.highlight ? 'text-current font-black uppercase tracking-wider' : item.active ? 'text-retro-accent' : 'text-retro-muted group-hover:text-retro-fg'
               }`}>
                 {item.label}

@@ -150,6 +150,10 @@ describe('Special tier match lifecycle', () => {
     expect(body.ended).toBe(true)
     expect(body.rematch).toBeUndefined()
 
+    // Card-driven economy: a rejected match still pays the small consolation.
+    expect(body.payout?.gp).toBe(10)
+    expect(body.payout?.reason).toBe('no_match')
+
     const list = await getSpecial(ids[0])
     // No auto-rematch is created for the same pair.
     const activeForPair = list.active.filter((m) => m.user_a === ids[0].orbitId || m.user_b === ids[0].orbitId)
@@ -166,6 +170,33 @@ describe('Special tier match lifecycle', () => {
     expect(queuedIds).not.toContain(ids[0].orbitId)
     expect(queuedIds).not.toContain(ids[1].orbitId)
   })
+
+  it('mutual-like credits card-scaled g$ to both players', async () => {
+    const matchId = await seedMatch(ids[0].orbitId, ids[1].orbitId)
+    await playBothCards(matchId, ids[0], ids[1])
+    await app.request(`/api/lobby/special/${matchId}/decision`, {
+      method: 'POST',
+      headers: auth(ids[0], 'POST', `/api/lobby/special/${matchId}/decision`, JSON.stringify({ decision: 'like' })),
+      body: JSON.stringify({ decision: 'like' }),
+    }, env)
+    const beforeB = await balanceOf(ids[1])
+    const resB = await app.request(`/api/lobby/special/${matchId}/decision`, {
+      method: 'POST',
+      headers: auth(ids[1], 'POST', `/api/lobby/special/${matchId}/decision`, JSON.stringify({ decision: 'like' })),
+      body: JSON.stringify({ decision: 'like' }),
+    }, env)
+    expect(resB.status).toBe(200)
+    const body = await resB.json() as any
+    expect(body.payout?.gp).toBe(50) // common vs common win
+    expect(await balanceOf(ids[1])).toBe(beforeB + 50)
+    expect(await balanceOf(ids[0])).toBe(beforeB + 50)
+  })
+
+  async function balanceOf(identity: TestIdentity): Promise<number> {
+    const r = await app.request('/api/economy/balance', { headers: auth(identity, 'GET', '/api/economy/balance') }, env)
+    return Number(((await r.json()) as any).balance)
+  }
+
 
   it('quit via /end marks the match ended with no rematch and rejoins the lobby', async () => {
     const matchId = await seedMatch(ids[0].orbitId, ids[1].orbitId)

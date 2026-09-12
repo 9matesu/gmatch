@@ -1,7 +1,7 @@
 // Spy-feed gate: only the attacker of an ACTIVE hack may read the target's
 // posts/PM peeks. The hack itself is purchased via /store/purchase (in-memory
 // debuff), so this test drives the real purchase path.
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import app from '../index'
 import { createTestIdentity, signRequestHeaders, createMockEnv } from '../test-utils'
 
@@ -69,5 +69,29 @@ describe('GET /api/users/hacks/spy-feed/:targetId', () => {
     expect(j.target.id).toBe(victim.orbitId)
     expect(j.posts.some((p: any) => p.caption === 'my secret deck')).toBe(true)
     expect(j.intercepted.some((m: any) => m.body.includes('secret deck'))).toBe(true)
+  })
+
+  it('debuff survives a module re-init (app relaunch restarts the sidecar)', async () => {
+    const { EconomyService } = await import('../economy')
+    await new EconomyService(env.DB).credit(attacker.orbitId, 50_000, {
+      idempotencyKey: 'fund-restart-test', kind: 'reward', reference: 'test',
+    })
+    await env.DB.prepare('UPDATE Users SET last_seen = ?, pc_domination_settings = ? WHERE id = ?')
+      .bind(new Date().toISOString(), JSON.stringify({ allowHacks: true }), victim.orbitId).run()
+    const buyBody = JSON.stringify({ item_id: 'item-hack-deny', target_id: victim.orbitId, idempotency_key: 'restart-buy-1' })
+    const buy = await app.request('/api/users/store/purchase', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...auth(attacker, 'POST', '/api/users/store/purchase', buyBody) },
+      body: buyBody,
+    }, env)
+    expect(buy.status).toBe(200)
+    // Fresh module graph = what a sidecar restart gives the route code.
+    vi.resetModules()
+    const freshApp = (await import('../index')).default
+    const { signRequestHeaders: sign } = await import('../test-utils')
+    const res = await freshApp.request(`/api/users/hacks/spy-feed/${victim.orbitId}`, {
+      headers: sign(attacker, 'GET', `/api/users/hacks/spy-feed/${victim.orbitId}`),
+    }, env)
+    expect(res.status).toBe(200)
   })
 })

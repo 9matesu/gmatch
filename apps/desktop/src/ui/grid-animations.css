@@ -38,6 +38,14 @@
   }
 }
 
+/* Click feedback — subtle shake on the clicked tile, triggers once per click */
+@keyframes gg-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  50% { transform: translateX(2px); }
+  75% { transform: translateX(-1px); }
+}
+
 /* Low HP blink — game semantics */
 @keyframes gg-hp-low {
   0%,

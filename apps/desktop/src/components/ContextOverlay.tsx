@@ -2,6 +2,7 @@
 
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { User, OrbitObject } from '@orbit/shared';
+import { Star } from 'lucide-react'
 
 interface ContextMenuState {
   x: number;
@@ -61,12 +62,12 @@ export function ContextOverlay({
 
   return (
     <div
-      className="fixed inset-0 z-[200]"
+      className="fixed inset-0 z-[var(--z-modal)]"
       onClick={onDismiss}
       onContextMenu={(e) => { e.preventDefault(); onDismiss() }}
     >
       <div
-        className="fixed bg-retro-panel border border-retro-border p-1.5 w-48 text-xs z-[210] space-y-0.5"
+        className="fixed bg-retro-panel border border-border-glass p-1.5 w-48 text-xs z-[var(--z-modal)] space-y-0.5"
         style={{ top: Math.min(contextMenu.y, window.innerHeight - 180), left: Math.min(contextMenu.x, window.innerWidth - 200) }}
         onClick={e => e.stopPropagation()}
       >
@@ -91,7 +92,7 @@ export function ContextOverlay({
               className="w-full text-left px-3 py-2 hover:bg-retro-bg text-retro-fg flex items-center justify-between transition-colors font-bold"
             >
               <span>{friendsIds.includes(contextMenu.data.id) ? 'Remove Contact' : 'Add Contact'}</span>
-              <span className="text-[10px] text-retro-accent">★</span>
+              <Star className="w-3 h-3 fill-current text-retro-accent" />
             </button>
             <button
               type="button"
@@ -277,7 +278,7 @@ export function ReportModal({
   if (!reportModal) return null;
 
   return (
-    <div className="fixed inset-0 z-[300] bg-black/80 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[var(--z-modal)] bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
       <div
         className="bg-retro-panel border border-retro-error max-w-sm w-full p-5 space-y-3"
         onClick={e => e.stopPropagation()}
@@ -296,10 +297,10 @@ export function ReportModal({
               key={cat}
               type="button"
               onClick={() => setReportCategory(cat)}
-              className={`px-3 py-1 border font-bold uppercase transition-colors ${
+              className={`px-3 py-1 border font-bold uppercase tracking-wider transition-colors ${
                 reportCategory === cat
                   ? 'bg-retro-accent text-black border-retro-accent'
-                  : 'bg-retro-bg text-retro-muted border-retro-border hover:text-retro-fg'
+                  : 'bg-retro-bg text-retro-muted border-border-glass hover:text-retro-fg'
               }`}
             >
               {cat}
@@ -311,7 +312,7 @@ export function ReportModal({
           value={reportReason}
           onChange={e => setReportReason(e.target.value)}
           placeholder="Describe the issue (optional)..."
-          className="w-full p-2.5 bg-retro-bg border border-retro-border text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none"
+          className="w-full p-2.5 bg-retro-bg border border-border-glass text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none"
           maxLength={200}
         />
         <div className="flex gap-2 pt-1">

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { orbitFetch } from '../../utils/api';
+import { isMediaVideo } from '../../utils/media';
 
 interface PostMediaItem {
   id: string;
@@ -48,7 +49,7 @@ export function CreatePostModal({
   const [uploading, setUploading] = useState(false);
 
   // Camera state
-  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [,setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -120,10 +121,19 @@ export function CreatePostModal({
     }, 'image/jpeg', 0.9);
   };
 
+  const MAX_MEDIA = 10;
+
   const handleFilesSelected = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    for (let i = 0; i < files.length; i++) {
-      let file = files[i];
+    const room = MAX_MEDIA - mediaList.length;
+    if (room <= 0) {
+      toast?.(`Max ${MAX_MEDIA} items per post`, 'warning');
+      return;
+    }
+    const picked = files.length > room ? (toast?.(`Max ${MAX_MEDIA} items per post`, 'warning'), Array.from(files).slice(0, room)) : Array.from(files);
+    for (let i = 0; i < picked.length; i++) {
+      const f = picked[i];
+      let file = f;
       let previewUrl = URL.createObjectURL(file);
       if (isCropableImage(file)) {
         const res = await crop(file, { aspect: '4:5', title: 'Crop post image' });
@@ -182,59 +192,47 @@ export function CreatePostModal({
     playPress(880);
 
     try {
-      const primaryItem = mediaList[0];
-      let objectId = 'post_' + Math.random().toString(36).substring(2, 9);
-
-      if (primaryItem.file) {
+      // Sequential uploads keep insertion order; one shared post_group turns
+      // the N objects into a single coalesced post server-side. Only the
+      // first row carries caption/location/tags.
+      const postGroup = crypto.randomUUID();
+      const ids: string[] = [];
+      let primaryId = '';
+      for (let i = 0; i < mediaList.length; i++) {
+        const item = mediaList[i];
         const formData = new FormData();
-        formData.append('image', primaryItem.file);
+        if (item.file) formData.append('image', item.file);
+        else formData.append('url', item.previewUrl);
         formData.append('is_public', '1');
-        formData.append('post_caption', caption.trim());
-        formData.append('location', location.trim());
-        formData.append('tags', tags.trim());
-
-        const res = await orbitFetch('/api/objects', {
-          method: 'POST',
-          body: formData,
-        }, identity);
-
+        formData.append('post_group', postGroup);
+        if (i === 0) {
+          formData.append('post_caption', caption.trim());
+          formData.append('location', location.trim());
+          formData.append('tags', tags.trim());
+        }
+        const res = await orbitFetch('/api/objects', { method: 'POST', body: formData }, identity);
         if (!res.ok) {
           const errData = await res.json().catch(() => null);
-          throw new Error(errData?.error || `Post upload failed (${res.status})`);
+          throw new Error(errData?.error || `Upload failed on item ${i + 1} of ${mediaList.length}`);
         }
         const data = await res.json();
-        objectId = data.id || objectId;
-      } else if (primaryItem.isExternalUrl) {
-        const formData = new FormData();
-        formData.append('url', primaryItem.previewUrl);
-        formData.append('is_public', '1');
-        formData.append('post_caption', caption.trim());
-        formData.append('location', location.trim());
-        formData.append('tags', tags.trim());
-
-        const res = await orbitFetch('/api/objects', {
-          method: 'POST',
-          body: formData,
-        }, identity);
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => null);
-          throw new Error(errData?.error || `Post upload failed (${res.status})`);
+        if (data.id) {
+          ids.push(data.id);
+          if (!primaryId) primaryId = data.id;
         }
-        const data = await res.json();
-        objectId = data.id || objectId;
       }
+      const objectId = primaryId || 'post_' + Math.random().toString(36).substring(2, 9);
 
       playWin();
-      toast?.('Post shared to gMatch!', 'success');
+      toast?.('Post shared.', 'success');
 
       onPostCreated?.({
         id: objectId,
         author_id: identity.orbitId,
         author_name: 'You',
         author_avatar: null,
-        url: primaryItem.previewUrl,
-        media_list: mediaList.map((m) => m.previewUrl),
+        url: primaryId ? `/api/objects/${primaryId}` : mediaList[0].previewUrl,
+        mediaUrls: ids.map((id) => `/api/objects/${id}`),
         caption: caption.trim(),
         location: location.trim(),
         tags: tags.split(/[\s,#]+/).map((t) => t.trim()).filter(Boolean),
@@ -257,24 +255,24 @@ export function CreatePostModal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 font-sans select-none animate-orbit-fade-in"
+      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 font-sans select-none animate-orbit-fade-in"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-3xl bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-zinc-100 animate-orbit-pop"
+        className="w-full max-w-3xl bg-retro-panel border border-border-glass rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-retro-fg animate-orbit-pop"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-zinc-400 hover:text-zinc-100 rounded-md cursor-pointer hover:bg-zinc-800 transition-colors"
+            className="p-1.5 text-retro-muted hover:text-retro-fg rounded-md cursor-pointer hover:bg-glass-w12 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
 
-          <span className="font-semibold text-xs text-zinc-200">
+          <span className="font-semibold text-xs text-retro-fg">
             Create Post {mediaList.length > 0 ? `(${mediaList.length} media)` : ''}
           </span>
 
@@ -282,20 +280,20 @@ export function CreatePostModal({
             type="button"
             onClick={handleShare}
             disabled={uploading || mediaList.length === 0}
-            className="text-xs font-semibold text-zinc-950 bg-white hover:bg-zinc-200 disabled:opacity-40 cursor-pointer transition-all duration-150 active:scale-[0.96] px-4 py-1.5 rounded-md shadow-xs"
+            className="text-xs font-semibold text-retro-bg bg-white hover:bg-retro-fg disabled:opacity-40 cursor-pointer transition-all duration-150 active:scale-[0.96] px-4 py-1.5 rounded-md shadow-xs"
           >
             {uploading ? 'Sharing...' : 'Share'}
           </button>
         </div>
 
         {/* Mode Selector Tabs */}
-        <div className="flex border-b border-zinc-800 px-3 pt-2 gap-2 text-xs">
+        <div className="flex items-center border-b border-border-glass px-3 pt-2 pb-2 gap-1.5 text-xs">
           <button
             type="button"
             onClick={() => { playPress(750); setActiveTab('upload'); }}
-            className={`flex items-center gap-1.5 px-3.5 py-2 border-b-2 transition-all cursor-pointer font-medium ${activeTab === 'upload'
-              ? 'border-white text-white bg-zinc-800/40 rounded-t-md'
-              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all duration-150 cursor-pointer font-medium ${activeTab === 'upload'
+              ? 'bg-glass-w12 text-retro-fg'
+              : 'text-retro-muted hover:text-retro-fg'
               }`}
           >
             <UploadCloud className="w-4 h-4" />
@@ -305,9 +303,9 @@ export function CreatePostModal({
           <button
             type="button"
             onClick={() => { playPress(750); setActiveTab('camera'); }}
-            className={`flex items-center gap-1.5 px-3.5 py-2 border-b-2 transition-all cursor-pointer font-medium ${activeTab === 'camera'
-              ? 'border-white text-white bg-zinc-800/40 rounded-t-md'
-              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all duration-150 cursor-pointer font-medium ${activeTab === 'camera'
+              ? 'bg-glass-w12 text-retro-fg'
+              : 'text-retro-muted hover:text-retro-fg'
               }`}
           >
             <Camera className="w-4 h-4" />
@@ -317,9 +315,9 @@ export function CreatePostModal({
           <button
             type="button"
             onClick={() => { playPress(750); setActiveTab('url'); }}
-            className={`flex items-center gap-1.5 px-3.5 py-2 border-b-2 transition-all cursor-pointer font-medium ${activeTab === 'url'
-              ? 'border-white text-white bg-zinc-800/40 rounded-t-md'
-              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all duration-150 cursor-pointer font-medium ${activeTab === 'url'
+              ? 'bg-glass-w12 text-retro-fg'
+              : 'text-retro-muted hover:text-retro-fg'
               }`}
           >
             <LinkIcon className="w-4 h-4" />
@@ -333,11 +331,11 @@ export function CreatePostModal({
           {activeTab === 'upload' && (
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-border-glass hover:border-retro-accent rounded-2xl bg-surface-interactive hover:bg-glass-w10 p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all text-center group"
+              className="border-2 border-dashed border-border-glass hover:border-retro-accent rounded-xl bg-surface-interactive hover:bg-glass-w10 p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all text-center group"
             >
               <UploadCloud className="w-8 h-8 text-retro-muted group-hover:text-retro-accent group-hover:scale-110 transition-transform" />
               <p className="text-xs font-bold text-retro-body">Drag &amp; drop photos or click to browse</p>
-              <span className="text-[10px] text-retro-muted">Supports JPG, PNG, GIF, WebP (select multiple)</span>
+              <span className="text-[10px] text-retro-muted">Images and video, up to {MAX_MEDIA}. {mediaList.length}/{MAX_MEDIA} added</span>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -350,7 +348,7 @@ export function CreatePostModal({
           )}
 
           {activeTab === 'camera' && (
-            <div className="border border-border-glass rounded-2xl overflow-hidden bg-black p-2 flex flex-col items-center gap-3">
+            <div className="border border-border-glass rounded-xl overflow-hidden bg-black p-2 flex flex-col items-center gap-3">
               {cameraError ? (
                 <div className="p-6 text-center text-xs text-retro-error font-bold">
                   {cameraError}
@@ -372,7 +370,7 @@ export function CreatePostModal({
           )}
 
           {activeTab === 'url' && (
-            <div className="bg-surface-interactive border border-border-glass p-3 rounded-2xl flex gap-2">
+            <div className="bg-surface-interactive border border-border-glass p-3 rounded-xl flex gap-2">
               <input
                 type="url"
                 value={urlInput}
@@ -393,7 +391,11 @@ export function CreatePostModal({
           {/* Carousel & Multi-Media Viewer */}
           {mediaList.length > 0 && currentMedia && (
             <div className="space-y-3">
-              <div className="relative w-full rounded-2xl overflow-hidden bg-black flex items-center justify-center border border-border-glass group">
+              <div className="relative w-full rounded-xl overflow-hidden bg-black flex items-center justify-center border border-border-glass group">
+                {isMediaVideo(currentMedia.file?.type || currentMedia.previewUrl) ? (
+                  <video src={currentMedia.previewUrl} muted playsInline className={`w-full object-cover ${aspectRatio === 'square' ? 'aspect-square' : aspectRatio === 'portrait' ? 'aspect-[4/5]' : 'aspect-[16/9]'}`} />
+                ) : null}
+                {!isMediaVideo(currentMedia.file?.type || currentMedia.previewUrl) && (
                 <img
                   src={currentMedia.previewUrl}
                   alt=""
@@ -404,6 +406,7 @@ export function CreatePostModal({
                       : 'aspect-[16/9]'
                     }`}
                 />
+                )}
 
                 {/* Aspect Ratio Switcher */}
                 <div className="absolute bottom-3 left-3 bg-black/75 backdrop-blur-md rounded-xl p-1 flex items-center gap-1 text-[10px] font-bold text-white z-10">
@@ -455,16 +458,20 @@ export function CreatePostModal({
 
               {/* Thumbnails & Reorder Bar */}
               {mediaList.length > 1 && (
-                <div className="flex items-center gap-2 overflow-x-auto p-1.5 styled-scrollbar bg-zinc-950 border border-zinc-800 rounded-lg">
+                <div className="flex items-center gap-2 overflow-x-auto p-1.5 styled-scrollbar bg-retro-bg border border-border-glass rounded-lg">
                   {mediaList.map((m, idx) => (
                     <div
                       key={m.id}
                       onClick={() => setActiveMediaIndex(idx)}
-                      className={`relative w-14 h-14 rounded-md overflow-hidden shrink-0 border cursor-pointer transition-all duration-150 active:scale-[0.96] ${activeMediaIndex === idx ? 'border-white ring-1 ring-white' : 'border-zinc-800 opacity-60 hover:opacity-100'
+                      className={`relative w-14 h-14 rounded-md overflow-hidden shrink-0 border cursor-pointer transition-all duration-150 active:scale-[0.96] ${activeMediaIndex === idx ? 'border-white ring-1 ring-white' : 'border-border-glass opacity-60 hover:opacity-100'
                         }`}
                     >
-                      <img src={m.previewUrl} alt="" className="w-full h-full object-cover" />
-                      <span className="absolute bottom-0.5 right-0.5 px-1 bg-black/70 text-[8px] font-mono font-bold text-white rounded">
+                      {isMediaVideo(m.file?.type || m.previewUrl) ? (
+                        <video src={m.previewUrl} muted className="w-full h-full object-cover" />
+                      ) : (
+                        <img src={m.previewUrl} alt="" className="w-full h-full object-cover" />
+                      )}
+                      <span className="absolute bottom-0.5 right-0.5 px-1 bg-black/70 text-[10px] font-bold text-white rounded">
                         #{idx + 1}
                       </span>
                     </div>
@@ -475,7 +482,7 @@ export function CreatePostModal({
                       type="button"
                       onClick={() => moveMedia(activeMediaIndex, activeMediaIndex - 1)}
                       disabled={activeMediaIndex === 0}
-                      className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] font-mono font-semibold disabled:opacity-30 hover:bg-zinc-700 cursor-pointer transition-all duration-150 active:scale-[0.96]"
+                      className="px-2 py-1 bg-glass-w12 border border-border-glass rounded text-[10px] font-mono font-semibold disabled:opacity-30 hover:bg-glass-w20 cursor-pointer transition-all duration-150 active:scale-[0.96]"
                       title="Move photo left"
                     >
                       ←
@@ -484,7 +491,7 @@ export function CreatePostModal({
                       type="button"
                       onClick={() => moveMedia(activeMediaIndex, activeMediaIndex + 1)}
                       disabled={activeMediaIndex === mediaList.length - 1}
-                      className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] font-mono font-semibold disabled:opacity-30 hover:bg-zinc-700 cursor-pointer transition-all duration-150 active:scale-[0.96]"
+                      className="px-2 py-1 bg-glass-w12 border border-border-glass rounded text-[10px] font-mono font-semibold disabled:opacity-30 hover:bg-glass-w20 cursor-pointer transition-all duration-150 active:scale-[0.96]"
                       title="Move photo right"
                     >
                       →
@@ -501,34 +508,34 @@ export function CreatePostModal({
                   placeholder="Write a caption..."
                   rows={3}
                   maxLength={1000}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-xs text-zinc-100 focus:outline-none focus:border-zinc-600 transition-colors placeholder:text-zinc-500 resize-none"
+                  className="w-full bg-retro-bg border border-border-glass rounded-lg p-3 text-xs text-retro-fg focus:outline-none focus:border-border-glass transition-colors placeholder:text-retro-muted resize-none"
                 />
-                <div className="text-right text-[10px] font-mono text-zinc-500 mt-0.5">
+                <div className="text-right text-[10px] font-mono text-retro-muted mt-0.5">
                   {caption.length}/1000
                 </div>
               </div>
 
               {/* Location & Tags inputs */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs">
-                  <MapPin className="w-4 h-4 text-zinc-500 shrink-0" />
+                <div className="flex items-center gap-2 bg-retro-bg border border-border-glass rounded-lg px-3 py-2 text-xs">
+                  <MapPin className="w-4 h-4 text-retro-muted shrink-0" />
                   <input
                     type="text"
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                     placeholder="Add location"
-                    className="w-full bg-transparent focus:outline-none placeholder:text-zinc-500 text-zinc-200"
+                    className="w-full bg-transparent focus:outline-none placeholder:text-retro-muted text-retro-fg"
                   />
                 </div>
 
-                <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs">
-                  <Tag className="w-4 h-4 text-zinc-500 shrink-0" />
+                <div className="flex items-center gap-2 bg-retro-bg border border-border-glass rounded-lg px-3 py-2 text-xs">
+                  <Tag className="w-4 h-4 text-retro-muted shrink-0" />
                   <input
                     type="text"
                     value={tags}
                     onChange={(e) => setTags(e.target.value)}
                     placeholder="Tags (e.g. anime, art, arcade)"
-                    className="w-full bg-transparent focus:outline-none placeholder:text-zinc-500 text-zinc-200"
+                    className="w-full bg-transparent focus:outline-none placeholder:text-retro-muted text-retro-fg"
                   />
                 </div>
               </div>

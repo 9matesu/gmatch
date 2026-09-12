@@ -3,36 +3,14 @@ import crypto from 'crypto'
 import { orbitAuth } from '../middleware/auth'
 import type { D1Turso } from '../db'
 import type { LocalBlobStore } from '../blob'
-import {
-  joinLobby,
-  leaveLobby,
-  setAutoQueue,
-  getLobbyState,
-  playMatchCard,
-  setMatchDecision,
-  quitMatch,
-  createQuickBotMatch,
-  getLobbyImages,
-  setLobbyImage,
-  promoteLobbyImageToPost,
-  likeLobbyImage,
-  getLobbyImageLikers,
-  addLobbyComment,
-  getLobbyComments,
-  deleteLobbyComment,
-  advanceLobby,
-  advanceLobbyUnlocked,
-  withMatchLock,
-  expireIdleSpecialMatches,
-  getActiveMatches,
-  getSpectatorSnapshot,
-} from '../lobby'
+import { joinLobby, leaveLobby, setAutoQueue, getLobbyState, playMatchCard, setMatchDecision, quitMatch, createQuickBotMatch, getLobbyImages, setLobbyImage, likeLobbyImage, getLobbyImageLikers, addLobbyComment, getLobbyComments, deleteLobbyComment, advanceLobby, advanceLobbyUnlocked, withMatchLock, expireIdleSpecialMatches, getActiveMatches, getSpectatorSnapshot } from '../lobby'
 import { getLeague } from '../rooms'
 import { createWsTicket, broadcastToRoom, broadcastToUser } from '../ws-bus'
 import { runPeriodicMaintenance } from '../cleanup'
 import { addPoints } from '../game'
 import { reportContent as serviceReportContent, ReportError } from '../reports'
-import { SPECIAL_MAX_TIER, SPECIAL_TIER_POINTS, SPECIAL_FINAL_POINTS, MIN_GAME_CARDS } from '@orbit/shared'
+import { SPECIAL_MAX_TIER, SPECIAL_TIER_POINTS, SPECIAL_FINAL_POINTS, MIN_GAME_CARDS, matchEconomy } from '@orbit/shared'
+import { EconomyService } from '../economy'
 
 type Bindings = {
   DB: D1Turso
@@ -229,6 +207,19 @@ lobby.post('/special/:id/decision', orbitAuth, async (c) => {
     broadcastToRoom('lobby', { type: 'lobby', action: 'updated' })
     const updated = await c.env.DB.prepare('SELECT * FROM TierMatches WHERE id = ?').bind(id).first<any>()
     if (!updated.decision_a || !updated.decision_b) return c.json({ ok: true, waiting: true })
+    // Card-value economy: each side's payout scales with its own card's
+    // reputation plus the opponent's (win). Best-effort — a failed wallet
+    // credit must never wedge the match flow.
+    const vp = async (oid: string) => Number((await c.env.DB.prepare('SELECT COALESCE(gacha_downloads_count, 0) AS v FROM Objects WHERE id = ?').bind(oid).first<{ v: number }>())?.v ?? 0)
+    const [va, vb] = await Promise.all([vp(updated.card_a), vp(updated.card_b)])
+    const econA = matchEconomy(va, vb) // from A's seat
+    const econB = matchEconomy(vb, va)
+    const economy = new EconomyService(c.env.DB)
+    const pay = async (uid: string, gp: number, reason: string, tag: string) => {
+      try {
+        await economy.credit(uid, gp, { idempotencyKey: `tier-${id}-${tag}`, kind: 'reward', reference: `tier-match:${reason}` })
+      } catch (err) { console.warn('[lobby] tier payout failed:', err) }
+    }
     if (updated.decision_a === 'like' && updated.decision_b === 'like') {
       const newTier = Number(match.tier || 1) + 1
       if (newTier > SPECIAL_MAX_TIER) {
@@ -237,25 +228,34 @@ lobby.post('/special/:id/decision', orbitAuth, async (c) => {
         await Promise.all([
           addPoints(c.env.DB, match.user_a, SPECIAL_FINAL_POINTS),
           addPoints(c.env.DB, match.user_b, SPECIAL_FINAL_POINTS),
+          pay(match.user_a, econA.winGp, 'mutual_like', 'final-a'),
+          pay(match.user_b, econB.winGp, 'mutual_like', 'final-b'),
         ])
         await c.env.DB.prepare('DELETE FROM LobbyPlayers WHERE user_id IN (?, ?)').bind(match.user_a, match.user_b).run().catch(() => {})
         await advanceLobbyUnlocked(c.env.DB).catch(() => {})
-        return c.json({ ok: true, final: true, both_like: true, tier: newTier, points: SPECIAL_FINAL_POINTS })
+        return c.json({ ok: true, final: true, both_like: true, tier: newTier, points: SPECIAL_FINAL_POINTS, payout: { gp: userId === match.user_a ? econA.winGp : econB.winGp, reason: 'mutual_like' } })
       }
       // Climb a level: both like -> advance, both must play new cards.
       await c.env.DB.prepare('UPDATE TierMatches SET tier=tier+1, card_a=NULL, card_b=NULL, decision_a=NULL, decision_b=NULL, last_result=\'both_like\', last_card_a=?, last_card_b=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND last_result IS NULL AND status=\'active\'').bind(updated.card_a, updated.card_b, id).run()
       await Promise.all([
         addPoints(c.env.DB, match.user_a, SPECIAL_TIER_POINTS),
         addPoints(c.env.DB, match.user_b, SPECIAL_TIER_POINTS),
+        pay(match.user_a, econA.winGp, 'mutual_like', `t${match.tier}-a`),
+        pay(match.user_b, econB.winGp, 'mutual_like', `t${match.tier}-b`),
       ])
       const fresh = await c.env.DB.prepare('SELECT tier FROM TierMatches WHERE id = ?').bind(id).first<{ tier: number }>()
-      return c.json({ ok: true, advanced: true, both_like: true, tier: Number(fresh?.tier ?? newTier), points: SPECIAL_TIER_POINTS })
+      return c.json({ ok: true, advanced: true, both_like: true, tier: Number(fresh?.tier ?? newTier), points: SPECIAL_TIER_POINTS, payout: { gp: userId === match.user_a ? econA.winGp : econB.winGp, reason: 'mutual_like' } })
     }
-    // Not a mutual like: the match ends (no auto-requeue).
+    // Not a mutual like: the match ends (no auto-requeue). Both played, both
+    // get the small consolation scaled to their own card.
     await c.env.DB.prepare("UPDATE TierMatches SET status='ended', last_result='ended', last_card_a=?, last_card_b=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='active' AND last_result IS NULL").bind(updated.card_a, updated.card_b, id).run()
+    await Promise.all([
+      pay(match.user_a, econA.loseGp, 'no_match', 'end-a'),
+      pay(match.user_b, econB.loseGp, 'no_match', 'end-b'),
+    ])
     await c.env.DB.prepare('DELETE FROM LobbyPlayers WHERE user_id IN (?, ?)').bind(match.user_a, match.user_b).run().catch(() => {})
     await advanceLobbyUnlocked(c.env.DB).catch(() => {})
-    return c.json({ ok: true, ended: true })
+    return c.json({ ok: true, ended: true, payout: { gp: userId === match.user_a ? econA.loseGp : econB.loseGp, reason: 'no_match' } })
   })
 })
 
@@ -481,7 +481,6 @@ lobby.get('/images', orbitAuth, async (c) => {
   const images = await getLobbyImages(c.env.DB)
   // Replace base64 data URLs with a lightweight content endpoint reference
   // to avoid serving megabytes of base64 in the list JSON response.
-  const base = c.req.url.replace(/\/api\/lobby\/images.*$/, '')
   const mapped = images.map((img) => {
     if (img.content_url && img.content_url.startsWith('data:')) {
       return { ...img, content_url: `/api/lobby/images/${img.id}/content` }
@@ -577,7 +576,7 @@ lobby.get('/images/:id/content', async (c) => {
   // from before the proxy — return 410 Gone so clients refresh and the
   // cleanup sweep eventually deletes it.
   if (row.content_url.startsWith('http://') || row.content_url.startsWith('https://')) {
-    return c.json({ error: 'External URL disabled — re-upload required' }, 410)
+    return c.json({ error: 'External URL disabled. Re-upload required' }, 410)
   }
 
   return c.json({ error: 'Invalid content URL' }, 404)

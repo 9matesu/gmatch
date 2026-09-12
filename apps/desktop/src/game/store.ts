@@ -2,9 +2,10 @@ import { create } from 'zustand'
 import { getSecureItem } from '../utils/secure-storage'
 import { clickGain, clickPower, heatMultiplier, heatStreakAfter, isCrit, passiveGps } from './economy'
 import type { EconomyInput } from './economy'
-import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, setupTag, soloTag as soloTagList, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
-import { getUserExcludes, rankTags, setUserExcludes } from './tagFilter'
-import { KILL_XP, foeMaxHp, killBonusGp } from './battle'
+import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, mergeTags as mergeTagList, normalizeCustomTag, removeTag as removeTagList, setupTag, soloTag as soloTagList, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
+import { getUserExcludes, isNoise, isQueryBlocked, rankTags, setUserExcludes } from './tagFilter'
+import { learnPurge, setCoRules, setFeedIntent } from './tagCooccur'
+import { KILL_XP, foeMaxHp, killBonusPoints } from './battle'
 import { CAPS, activeCaps, capAutoClicksPerSec, popCap as popCapList } from './caps'
 import { imageRarity } from './rarity'
 import { applyBrainmelt, canBrainmelt, tierForXp, titleForTier } from './prestige'
@@ -20,8 +21,9 @@ import {
 } from './save'
 import type { SaveData } from './save'
 import { fetchPosts } from '../services/booru'
+import { evictImage } from '../services/imageCache'
 import { isCustomMediaUrl, sampleCustomSources } from '../services/customSources'
-import type { ActiveCap, BooruPost, CapId, CustomSource, GalleryImage, GridCell, OwnedTag, ViewMode } from './types'
+import type { ActiveCap, BooruPost, CapId, CustomSource, GalleryImage, GridCell, KoDrop, OwnedTag, ViewMode } from './types'
 
 export interface Toast {
   id: number
@@ -38,11 +40,9 @@ export interface ClickResult {
 
 export interface GameState {
   loaded: boolean
-  gc: number
-  /** Ledger mirror markers (plan D4) — see game/wallet.ts. */
-  credited: number
-  debited: number
-  totalEarnedGc: number
+  /** Idle-game points — purely local, never the server g$ wallet. */
+  points: number
+  totalEarned: number
   xp: number
   clicks: number
   crits: number
@@ -81,6 +81,7 @@ export interface GameState {
   defeated: number
   /** Round-robin cursor over the tag pool — one tag per fetch, never stacked. */
   feedCursor: number
+  priorityTag: string | null
   feedOffline: boolean
   fetching: boolean
   /** True only while the CURRENT stage image is resolved + decoded. Clicks
@@ -95,9 +96,16 @@ export interface GameState {
   clickCell: (index: number) => ClickResult
   dropCell: (index: number) => void
   setViewMode: (mode: ViewMode) => void
+  reorderGrid: (from: number, to: number) => void
+  /** KO novelty pipeline (session-only): generated per drain from foe tags. */
+  pendingDrops: KoDrop[]
+  claimDropTag: (id: string) => boolean
+  claimDropAntiTag: (id: string) => boolean
+  dismissDrop: (id: string) => void
   /** Player-picked starter tags + extra excludes (setup screen, one shot). */
   setupComplete: boolean
   userExcludes: string[]
+  coRules: { a: string; b: string; count: number }[]
   /** Player-owned feed sources (custom URLs / local folders, tried first). */
   customSources: CustomSource[]
   addUrlSource: (label: string, rawUrls: string[]) => { added: boolean; message: string }
@@ -112,6 +120,8 @@ export interface GameState {
   buyTag: (name: string) => boolean
   toggleTag: (name: string) => boolean
   soloTag: (name: string) => boolean
+  deleteTag: (name: string) => boolean
+  mergeTags: (a: string, b: string) => boolean
   refreshTagMarket: () => Promise<void>
   addCustomTag: (raw: string) => Promise<{ added: boolean; message: string }>
   fetchFeed: () => Promise<void>
@@ -119,16 +129,18 @@ export interface GameState {
   goBack: () => boolean
   /** Grid mode: swap the whole board for a fresh one (session-only history). */
   skipGrid: () => void
+  /** "Never show this again": seen + bytes evicted + rarest content tags
+   * learned as anti-tags (player intent beats algorithm: feed tags never
+   * become excludes). */
+  purgePost: (post: BooruPost) => void
   undoGrid: () => boolean
   setBackground: (url: string | null) => void
   featureImage: (id: string) => void
+  /** Permanently delete a keepsake from the gallery (never blocks play). */
+  removeGalleryImage: (id: string) => boolean
   popCap: (capId: CapId) => boolean
   brainmelt: () => boolean
   tick: (dtMs?: number) => void
-  /** Ledger mirror update from walletBridge (plan D4). gc is only set by
-   * reconcile (server truth); the sync tick writes markers alone so it can
-   * never roll back earnings made during the network round-trip. */
-  setWallet: (w: { gc?: number; credited: number; debited: number }) => void
   save: () => void
   load: () => void
   collectOffline: () => void
@@ -237,16 +249,15 @@ function progress(s: GameState, prevXp: number): Pick<GameState, 'achievements' 
 function freshData() {
   return {
     loaded: false,
-    gc: 0,
-    credited: 0,
-    debited: 0,
-    totalEarnedGc: 0,
+    points: 0,
+    totalEarned: 0,
     xp: 0,
     clicks: 0,
     crits: 0,
     tags: [] as OwnedTag[],
     setupComplete: false,
     userExcludes: [] as string[],
+    coRules: [] as { a: string; b: string; count: number }[],
     customSources: [] as CustomSource[],
     gallery: [] as GalleryImage[],
     caps: [] as ActiveCap[],
@@ -265,6 +276,7 @@ function freshData() {
     backgroundUrl: null as string | null,
     viewMode: 'single' as ViewMode,
     grid: [] as GridCell[],
+    pendingDrops: [] as KoDrop[],
     foeHp: 0,
     foeMaxHp: 0,
     foeClicks: 0,
@@ -273,6 +285,7 @@ function freshData() {
     maxHeatStreak: 0,
     defeated: 0,
     feedCursor: 0,
+    priorityTag: null,
     feedOffline: false,
     fetching: false,
     imageReady: false,
@@ -313,21 +326,67 @@ function pushPast(past: BooruPost[], post: BooruPost | null): BooruPost[] {
   if (!post) return past
   return [...past, post].slice(-HISTORY_CAP)
 }
+
+/** Silent feed retry: sources are never allowed to kill the game.
+ * Backoff 5s → 10s → 20s → 40s → 60s cap (session-only, module timer).
+ * Success clears via clearFeedRetry. Test hook: lastFeedRetryMs + reset. */
+let feedRetryTimer: ReturnType<typeof setTimeout> | null = null
+let feedRetryStep = 0
+export let lastFeedRetryMs = 0
+export function __resetFeedRetryForTests() {
+  if (feedRetryTimer) clearTimeout(feedRetryTimer)
+  feedRetryTimer = null
+  feedRetryStep = 0
+  lastFeedRetryMs = 0
+}
+function clearFeedRetry() {
+  if (feedRetryTimer) clearTimeout(feedRetryTimer)
+  feedRetryTimer = null
+  feedRetryStep = 0
+  lastFeedRetryMs = 0
+}
+function scheduleFeedRetry() {
+  if (feedRetryTimer) return
+  const delay = Math.min(60_000, 5_000 * 2 ** feedRetryStep)
+  feedRetryStep += 1
+  lastFeedRetryMs = delay
+  // ponytail: module timer, unref'd so tests/exit never hang; store.fetchFeed on fire
+  feedRetryTimer = setTimeout(() => {
+    feedRetryTimer = null
+    void useGame.getState().fetchFeed()
+  }, delay)
+  if (typeof feedRetryTimer === 'object' && feedRetryTimer !== null && 'unref' in feedRetryTimer) {
+    ; (feedRetryTimer as { unref: () => void }).unref()
+  }
+}
 /** Session-only snapshots of skipped grids (undo stack for the grid arrows). */
 export const GRID_HISTORY_CAP = 10
 
-/** 3x3 grid size — nine live squares. */
+/** 3x3 grid size — nine live squares (ceiling; per-layout targets below). */
 export const GRID_SIZE = 9
+
+/** Live grid squares per layout: 1x1=1, 1x2=2, 2x2=4, 3x3=9. */
+export function gridSizeForMode(mode: ViewMode): number {
+  switch (mode) {
+    case '1x1': return 1
+    case '1x2': return 2
+    case '2x2': return 4
+    case '3x3': return 9
+    case 'grid': return 9
+    default: return 0
+  }
+}
 
 /** Fill empty grid squares from the queue head (fresh HP per cell). Pure. */
 function fillGrid(
   grid: GridCell[],
   queue: BooruPost[],
   defeated: number,
+  target = GRID_SIZE,
 ): { grid: GridCell[]; queue: BooruPost[] } {
   const g = [...grid]
   const q = [...queue]
-  while (g.length < GRID_SIZE && q.length > 0) {
+  while (g.length < target && q.length > 0) {
     const post = q.shift() as BooruPost
     const maxHp = foeMaxHp(defeated)
     g.push({ post, hp: maxHp, maxHp, clicks: 0 })
@@ -335,11 +394,16 @@ function fillGrid(
   return { grid: g, queue: q }
 }
 
-/** Shared drain reward: gallery keep + market discovery + past + KO count. */
+/** True when the mode shows grid squares (3x3 layouts + legacy 'grid'). */
+export function isGridMode(mode: ViewMode): boolean {
+  return mode !== 'single' && mode !== '1x1'
+}
+
+/** Shared drain reward: gallery keep + market discovery + past + KO count + novelty drop. */
 function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: number) {
   const defeated = s.defeated + 1
   const rarityBase = rarityBaseForPost(post.id)
-  const bonus = killBonusGp(rarityBase)
+  const bonus = killBonusPoints(rarityBase)
   const img: GalleryImage = {
     id: `${post.id}:${now}`,
     url: post.url,
@@ -351,6 +415,28 @@ function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: 
     kind: post.kind,
     preview: post.preview,
   }
+  // Novelty drop (non-blocking): one suggested tag + one anti-tag from the foe.
+  const ownedNames = new Set(s.tags.map((t) => t.name.toLowerCase()))
+  const cleanFoeTags = post.tags
+    .map((t) => normalizeCustomTag(String(t)))
+    .filter((t) => t.length >= 2 && !isQueryBlocked(t) && !isNoise(t))
+  const candidateTag = cleanFoeTags.find((t) => !ownedNames.has(t))
+  const candidateAntiTag = cleanFoeTags.find(
+    (t) => t !== candidateTag && !s.userExcludes.includes(t),
+  )
+  const newDrop: KoDrop | null =
+    candidateTag || candidateAntiTag
+      ? {
+          id: `drop:${post.id}:${now}`,
+          foeTitle: cleanFoeTags[0] ?? 'foe',
+          suggestedTag: candidateTag,
+          suggestedAntiTag: candidateAntiTag,
+          timestamp: now,
+        }
+      : null
+  const pendingDrops = newDrop
+    ? [newDrop, ...s.pendingDrops.filter((d) => d.id !== newDrop.id)].slice(0, 8)
+    : s.pendingDrops
   return {
     defeated,
     bonus,
@@ -360,6 +446,7 @@ function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: 
     tags: discoverTags(s.tags, post.tags),
     // The drained foe stays reachable via the back arrow (shown beaten, no HP).
     past: pushPast(s.past, post),
+    pendingDrops,
   }
 }
 
@@ -389,30 +476,30 @@ export const useGame = create<GameState>((set, get) => ({
     const s = get()
     const now = Date.now()
     // The game never runs blind: no current post or its picture is not
-    // cached + decoded yet — click is dead (no g$, no counters).
+    // cached + decoded yet — click is dead (no pts, no counters).
     if (!s.current || !s.imageReady) return { gain: 0, crit: false, killed: false, heat: 1 }
     const clickNumber = s.clicks + 1
     const crit = isCrit(clickNumber)
     // Heat combo: rapid clicks stack up to x3; idling past the window resets.
     const streak = heatStreakAfter(s.heatStreak, s.lastClickAt, now)
     const heat = heatMultiplier(streak)
-    // Damage equals the click's g$ gain — store power-ups (caps, shards,
+    // Damage equals the click's pts gain — store power-ups (caps, shards,
     // achievements) hit harder, crits deal x10, heat stacks on top.
     const gain = clickGain(econ(s), clickNumber, now, streak)
     const clickXp = crit ? 5 : 1
-    // No live foe (re-featured gallery piece): clicks just pay g$.
+    // No live foe (re-featured gallery piece): clicks just pay pts.
     if (s.foeMaxHp <= 0) {
       const next: GameState = {
         ...s,
-        gc: s.gc + gain,
-        totalEarnedGc: s.totalEarnedGc + gain,
+        points: s.points + gain,
+        totalEarned: s.totalEarned + gain,
         clicks: clickNumber,
         crits: s.crits + (crit ? 1 : 0),
         xp: s.xp + clickXp,
       }
       set({
-        gc: next.gc,
-        totalEarnedGc: next.totalEarnedGc,
+        points: next.points,
+        totalEarned: next.totalEarned,
         clicks: next.clicks,
         crits: next.crits,
         xp: next.xp,
@@ -428,8 +515,8 @@ export const useGame = create<GameState>((set, get) => ({
     if (hpLeft > 0) {
       const next: GameState = {
         ...s,
-        gc: s.gc + gain,
-        totalEarnedGc: s.totalEarnedGc + gain,
+        points: s.points + gain,
+        totalEarned: s.totalEarned + gain,
         clicks: clickNumber,
         crits: s.crits + (crit ? 1 : 0),
         xp: s.xp + clickXp,
@@ -437,8 +524,8 @@ export const useGame = create<GameState>((set, get) => ({
         foeClicks: clicksOnFoe,
       }
       set({
-        gc: next.gc,
-        totalEarnedGc: next.totalEarnedGc,
+        points: next.points,
+        totalEarned: next.totalEarned,
         clicks: next.clicks,
         crits: next.crits,
         xp: next.xp,
@@ -451,12 +538,12 @@ export const useGame = create<GameState>((set, get) => ({
       })
       return { gain, crit, killed: false, heat }
     }
-    // KO: the drained foe joins the gallery with a g$ kill bonus.
+    // KO: the drained foe joins the gallery with a pts kill bonus.
     const ko = koFoe(s, now, clicksOnFoe)
     const next: GameState = {
       ...s,
-      gc: s.gc + gain + ko.bonus,
-      totalEarnedGc: s.totalEarnedGc + gain + ko.bonus,
+      points: s.points + gain + ko.bonus,
+      totalEarned: s.totalEarned + gain + ko.bonus,
       clicks: clickNumber,
       crits: s.crits + (crit ? 1 : 0),
       xp: s.xp + clickXp + KILL_XP,
@@ -464,16 +551,17 @@ export const useGame = create<GameState>((set, get) => ({
       past: ko.past,
       gallery: ko.gallery,
       defeated: ko.defeated,
+      pendingDrops: ko.pendingDrops,
       current: ko.current,
       queue: ko.queue,
       foeHp: ko.foeHp,
       foeMaxHp: ko.foeMaxHp,
       foeClicks: ko.foeClicks,
     }
-    next.toasts = pushToast(next, `Drained ${ko.img.rarity} foe (+${ko.bonus} g$) — kept in gallery`)
+    next.toasts = pushToast(next, `Drained ${ko.img.rarity} foe (+${ko.bonus} pts) — kept in gallery`)
     set({
-      gc: next.gc,
-      totalEarnedGc: next.totalEarnedGc,
+      points: next.points,
+      totalEarned: next.totalEarned,
       clicks: next.clicks,
       crits: next.crits,
       xp: next.xp,
@@ -481,6 +569,7 @@ export const useGame = create<GameState>((set, get) => ({
       past: next.past,
       gallery: next.gallery,
       defeated: next.defeated,
+      pendingDrops: next.pendingDrops,
       current: next.current,
       queue: next.queue,
       foeHp: next.foeHp,
@@ -513,16 +602,16 @@ export const useGame = create<GameState>((set, get) => ({
       const grid = s.grid.map((c, i) => (i === index ? { ...c, hp: hpLeft, clicks: clicksOnCell } : c))
       const next: GameState = {
         ...s,
-        gc: s.gc + gain,
-        totalEarnedGc: s.totalEarnedGc + gain,
+        points: s.points + gain,
+        totalEarned: s.totalEarned + gain,
         clicks: clickNumber,
         crits: s.crits + (crit ? 1 : 0),
         xp: s.xp + clickXp,
         grid,
       }
       set({
-        gc: next.gc,
-        totalEarnedGc: next.totalEarnedGc,
+        points: next.points,
+        totalEarned: next.totalEarned,
         clicks: next.clicks,
         crits: next.crits,
         xp: next.xp,
@@ -540,11 +629,12 @@ export const useGame = create<GameState>((set, get) => ({
       s.grid.filter((_, i) => i !== index),
       s.queue,
       spoil.defeated,
+      gridSizeForMode(s.viewMode),
     )
     const next: GameState = {
       ...s,
-      gc: s.gc + gain + spoil.bonus,
-      totalEarnedGc: s.totalEarnedGc + gain + spoil.bonus,
+      points: s.points + gain + spoil.bonus,
+      totalEarned: s.totalEarned + gain + spoil.bonus,
       clicks: clickNumber,
       crits: s.crits + (crit ? 1 : 0),
       xp: s.xp + clickXp + KILL_XP,
@@ -552,13 +642,14 @@ export const useGame = create<GameState>((set, get) => ({
       past: spoil.past,
       gallery: spoil.gallery,
       defeated: spoil.defeated,
+      pendingDrops: spoil.pendingDrops,
       queue: filled.queue,
       grid: filled.grid,
     }
-    next.toasts = pushToast(next, `Drained ${spoil.img.rarity} square (+${spoil.bonus} g$) — kept in gallery`)
+    next.toasts = pushToast(next, `Drained ${spoil.img.rarity} square (+${spoil.bonus} pts) — kept in gallery`)
     set({
-      gc: next.gc,
-      totalEarnedGc: next.totalEarnedGc,
+      points: next.points,
+      totalEarned: next.totalEarned,
       clicks: next.clicks,
       crits: next.crits,
       xp: next.xp,
@@ -573,7 +664,7 @@ export const useGame = create<GameState>((set, get) => ({
       maxHeatStreak: Math.max(s.maxHeatStreak, streak),
       ...progress(next, s.xp),
     })
-    if (filled.grid.length < GRID_SIZE) void get().fetchFeed()
+    if (filled.grid.length < gridSizeForMode(get().viewMode)) void get().fetchFeed()
     return { gain, crit, killed: true, heat }
   },
 
@@ -581,41 +672,85 @@ export const useGame = create<GameState>((set, get) => ({
     const s = get()
     const cell = s.grid[index]
     if (!cell) return
-    // Broken image: no reward, no KO — the square just slides a fresh foe in.
+    // Broken image: no reward, no KO — drop its bytes, slide a fresh foe in.
+    void evictImage(cell.post.url)
+    const target = gridSizeForMode(s.viewMode)
     const filled = fillGrid(
       s.grid.filter((_, i) => i !== index),
       s.queue,
       s.defeated,
+      target,
     )
     set({
       past: pushPast(s.past, cell.post),
       queue: filled.queue,
       grid: filled.grid,
     })
-    if (filled.grid.length < GRID_SIZE && !get().fetching) void get().fetchFeed()
+    if (filled.grid.length < target && !get().fetching) void get().fetchFeed()
   },
 
   setViewMode: (mode) => {
     const s = get()
-    if (mode !== 'grid') {
+    if (!isGridMode(mode)) {
       if (s.viewMode !== mode) set({ viewMode: mode })
       return
     }
-    const filled = fillGrid(s.grid, s.queue, s.defeated)
+    const target = gridSizeForMode(mode)
+    // Trim oversized boards when shrinking layouts; preserve order.
+    const grid = s.grid.slice(0, target)
+    const filled = fillGrid(grid, s.queue, s.defeated, target)
     set({ viewMode: mode, queue: filled.queue, grid: filled.grid })
-    if (filled.grid.length < GRID_SIZE && !get().fetching) void get().fetchFeed()
+    if (filled.grid.length < target && !get().fetching) void get().fetchFeed()
+  },
+
+  reorderGrid: (from, to) => {
+    const s = get()
+    if (from === to || from < 0 || to < 0 || from >= s.grid.length || to >= s.grid.length) return
+    const grid = [...s.grid]
+    const [cell] = grid.splice(from, 1)
+    grid.splice(to, 0, cell)
+    set({ grid })
+  },
+
+  claimDropTag: (id) => {
+    const s = get()
+    const drop = s.pendingDrops.find((d) => d.id === id)
+    if (!drop?.suggestedTag) return false
+    const name = drop.suggestedTag
+    if (s.tags.some((t) => t.name.toLowerCase() === name)) {
+      set({ pendingDrops: s.pendingDrops.filter((d) => d.id !== id) })
+      return true
+    }
+    const stats = deriveTagStats(name, 1)
+    const tags = [...s.tags, { name, level: 1, selected: true, ...stats }]
+    set({ tags, pendingDrops: s.pendingDrops.filter((d) => d.id !== id) })
+    get().save()
+    return true
+  },
+
+  claimDropAntiTag: (id) => {
+    const s = get()
+    const drop = s.pendingDrops.find((d) => d.id === id)
+    if (!drop?.suggestedAntiTag) return false
+    const ok = get().addUserExclude(drop.suggestedAntiTag)
+    set({ pendingDrops: get().pendingDrops.filter((d) => d.id !== id) })
+    return ok
+  },
+
+  dismissDrop: (id) => {
+    set((s) => ({ pendingDrops: s.pendingDrops.filter((d) => d.id !== id) }))
   },
 
   buyTag: (name) => {
     const s = get()
     const idx = s.tags.findIndex((t) => t.name === name)
     if (idx === -1) return false
-    const res = buyTagLevel(s.tags[idx], s.gc)
+    const res = buyTagLevel(s.tags[idx], s.points)
     if (!res) return false
     const tags = [...s.tags]
     tags[idx] = res.tag
-    const next = { ...s, tags, gc: res.gc }
-    set({ tags, gc: res.gc, ...progress(next, s.xp) })
+    const next = { ...s, tags, points: res.points }
+    set({ tags, points: res.points, ...progress(next, s.xp) })
     return true
   },
 
@@ -634,7 +769,24 @@ export const useGame = create<GameState>((set, get) => ({
   soloTag: (name) => {
     const next = soloTagList(get().tags, name)
     if (!next) return false
-    set({ tags: next })
+    set({ tags: next, priorityTag: name })
+    return true
+  },
+
+  deleteTag: (name) => {
+    const s = get()
+    const next = removeTagList(s.tags, name)
+    if (!next) return false
+    set({ tags: next, toasts: pushToast(s, `Tag ${name} removed.`) })
+    return true
+  },
+
+  mergeTags: (a, b) => {
+    const s = get()
+    const next = mergeTagList(s.tags, a, b)
+    if (!next) return false
+    const name = `${a} ${b}`
+    set({ tags: next, priorityTag: name, toasts: pushToast(s, `Merged into ${name} — combined search, best level kept.`) })
     return true
   },
 
@@ -675,6 +827,7 @@ export const useGame = create<GameState>((set, get) => ({
     const prog = progress(next, s.xp)
     set({
       tags: next.tags,
+      priorityTag: verdict.name,
       achievements: prog.achievements,
       toasts: [...prog.toasts, { id: toastSeq++, msg: `Custom tag added: ${verdict.name}` }],
     })
@@ -751,57 +904,102 @@ export const useGame = create<GameState>((set, get) => ({
       // Stacked AND-queries truncate on the mirrors and repeat the same top
       // posts — rotation keeps the feed fresh and online.
       const pool = owned.slice(0, 4)
-      const first = pool[s.feedCursor % pool.length]
-      let res = await fetchPosts({ tags: first, limit: 10 })
+      setFeedIntent(pool)
+      const priority = s.priorityTag && owned.includes(s.priorityTag) ? s.priorityTag : null
+      // A freshly added/picked tag steers the very next fetch (priority first),
+      // then hands back to rotation once its batch lands.
+      const first = priority ?? pool[s.feedCursor % pool.length]
+      // ponytail: in grid mode pull a larger batch (30) so queue stays ahead of the 3x3 grid
+      const batchLimit = isGridMode(get().viewMode) ? 30 : 15
+      let res = await fetchPosts({ tags: first, limit: batchLimit })
       cursor = s.feedCursor + 1
       if (!res.ok || res.posts.length === 0) {
         // Flaky round — retry once with the NEXT tag, never the same one.
         const second = pool[cursor % pool.length]
-        res = await fetchPosts({ tags: second, limit: 10 })
+        res = await fetchPosts({ tags: second, limit: batchLimit })
         cursor += 1
       }
       if (res.ok && res.posts.length > 0) {
         // Random order every round — never push API sequence straight to the feed.
         posts = shufflePosts(res.posts)
+        if (priority) set({ priorityTag: null })
       }
     }
     if (posts && posts.length > 0) {
+      // Success: clear the offline flag + reset the retry backoff.
+      clearFeedRetry()
       const foe = foeMaxHp(s.defeated)
-      if (get().viewMode === 'grid') {
-        // Grid consumes the whole batch: append to the queue, top up squares.
-        const q = [...get().queue, ...posts]
-        const filled = fillGrid(get().grid, q, get().defeated)
+      // Filter any post already known (queue/grid/past/gallery/current): never repeat
+      const existingUrls = new Set([
+        ...get().past.map((p) => p.url),
+        ...get().gallery.map((g) => g.url),
+        ...get().grid.map((c) => c.post.url),
+        ...get().queue.map((p) => p.url),
+        ...(get().current ? [get().current!.url] : []),
+      ])
+      const freshPosts = posts.filter((p) => !existingUrls.has(p.url))
+      if (freshPosts.length > 0) {
+        if (isGridMode(get().viewMode)) {
+          // Grid consumes the whole batch: append to the queue, top up squares.
+          const target = gridSizeForMode(get().viewMode)
+          const q = [...get().queue, ...freshPosts]
+          const filled = fillGrid(get().grid, q, get().defeated, target)
+          set({
+            queue: filled.queue,
+            grid: filled.grid,
+            feedCursor: cursor,
+            feedOffline: false,
+            fetching: false,
+          })
+          return
+        }
         set({
-          queue: filled.queue,
-          grid: filled.grid,
+          current: posts[0],
+          queue: posts.slice(1),
+          foeHp: foe,
+          foeMaxHp: foe,
+          foeClicks: 0,
           feedCursor: cursor,
           feedOffline: false,
           fetching: false,
         })
-        return
-      }
-      set({
-        current: posts[0],
-        queue: posts.slice(1),
-        foeHp: foe,
-        foeMaxHp: foe,
-        foeClicks: 0,
-        feedCursor: cursor,
-        feedOffline: false,
-        fetching: false,
-      })
-    } else {
-      if (get().viewMode === 'grid') {
-        // Offline in grid mode: keep live squares + remaining queue, just flag it.
-        set({ feedCursor: cursor, feedOffline: true, fetching: false })
       } else {
-        set({ current: null, queue: [], foeHp: 0, foeMaxHp: 0, foeClicks: 0, feedCursor: cursor, feedOffline: true, fetching: false })
+        scheduleFeedRetry()
+        set({ fetching: false })
+      }
+    } else {
+      // Sources unreachable: keep the game playable without EVER repeating past.
+      scheduleFeedRetry()
+      if (isGridMode(get().viewMode)) {
+        // Only use live, unseen queue posts — never recycle past.
+        const target = gridSizeForMode(get().viewMode)
+        const filled = fillGrid(get().grid, get().queue, get().defeated, target)
+        set({
+          feedCursor: cursor,
+          fetching: false,
+          feedOffline: filled.grid.length === 0,
+          grid: filled.grid,
+          queue: filled.queue,
+        })
+      } else {
+        const keep = get().current
+        set({
+          current: keep,
+          queue: get().queue, // NEVER pull from past
+          foeHp: keep ? get().foeHp : 0,
+          foeMaxHp: keep ? get().foeMaxHp : 0,
+          foeClicks: keep ? get().foeClicks : 0,
+          feedCursor: cursor,
+          feedOffline: !keep && get().queue.length === 0,
+          fetching: false,
+        })
       }
     }
   },
 
   advanceFeed: () => {
     const s = get()
+    if (s.current) void evictImage(s.current.url)
     if (s.queue.length > 0) {
       // Skipping is free but pays nothing — the beaten-or-not choice is the player's.
       // The skipped foe stays reachable via the back arrow at full HP.
@@ -844,12 +1042,39 @@ export const useGame = create<GameState>((set, get) => ({
 
   skipGrid: () => {
     const s = get()
-    if (s.viewMode !== 'grid' || s.grid.length === 0) return
+    if (!isGridMode(s.viewMode) || s.grid.length === 0) return
+    for (const c of s.grid) void evictImage(c.post.url)
     const gridPast = [...s.gridPast, s.grid].slice(-GRID_HISTORY_CAP)
     // Fresh board: every square refills from the queue head (fetch tops up).
-    const filled = fillGrid([], s.queue, s.defeated)
+    const target = gridSizeForMode(s.viewMode)
+    const filled = fillGrid([], s.queue, s.defeated, target)
     set({ grid: filled.grid, queue: filled.queue, gridPast, feedOffline: false })
-    if (filled.grid.length < GRID_SIZE && !s.fetching) void s.fetchFeed()
+    // ponytail: refill when board has gaps OR queue falls below 2 boards ahead (18)
+    if ((filled.grid.length < target || filled.queue.length < target * 2) && !s.fetching) void s.fetchFeed()
+  },
+
+  purgePost: (post) => {
+    const s = get()
+    void evictImage(post.url)
+    // Pull it off-screen instantly; the queue head refills if one exists.
+    if (s.current && s.current.id === post.id) set({ current: s.queue[0] ?? null, queue: s.queue.slice(1) })
+    if (isGridMode(s.viewMode)) set({ grid: s.grid.filter((c) => c.post.id !== post.id) })
+    // Learn: the 3 rarest content tags become anti-tags, but never a tag the
+    // player is actively feeding on (intent beats the algorithm).
+    const feed = new Set(feedQuery(s.tags))
+    const content = rankTags(post.tags)
+      .map((t) => t.name)
+      .filter((t) => !isNoise(t) && !feed.has(t))
+    const learn = content.filter((t) => !s.userExcludes.includes(t)).slice(0, 3)
+    for (const t of learn) get().addUserExclude(t)
+    // Pairs are learned from ALL content tags (not just the newly excluded
+    // ones): the co-occurrence gate fires at count>=2 even if intent later
+    // frees a tag from exclusion.
+    const coRules = learnPurge(content.slice(0, 6), get().coRules)
+    setCoRules(coRules)
+    const cur = get()
+    set({ coRules, toasts: pushToast(cur, learn.length ? `Purged — excluded: ${learn.join(', ')}` : 'Purged — will not return.') })
+    cur.save()
   },
 
   undoGrid: () => {
@@ -878,14 +1103,28 @@ export const useGame = create<GameState>((set, get) => ({
     set({ backgroundUrl: url })
   },
 
+  /** Permanently delete a keepsake from the gallery (never blocks play). */
+  removeGalleryImage: (id) => {
+    const s = get()
+    const img = s.gallery.find((g) => g.id === id)
+    if (!img) return false
+    const gallery = s.gallery.filter((g) => g.id !== id)
+    set({
+      gallery,
+      backgroundUrl: s.backgroundUrl === img.url ? null : s.backgroundUrl,
+    })
+    get().save()
+    return true
+  },
+
   popCap: (capId) => {
     const s = get()
     const def = CAPS[capId]
-    if (s.gc < def.cost) return false
+    if (s.points < def.cost) return false
     const now = Date.now()
     const next: GameState = {
       ...s,
-      gc: s.gc - def.cost,
+      points: s.points - def.cost,
       caps: popCapList(activeCaps(s.caps, now), capId, now),
       capsUsed: s.capsUsed.includes(capId) ? s.capsUsed : [...s.capsUsed, capId],
     }
@@ -894,7 +1133,7 @@ export const useGame = create<GameState>((set, get) => ({
       `${def.name} popped — permanent`,
     )
     set({
-      gc: next.gc,
+      points: next.points,
       caps: next.caps,
       capsUsed: next.capsUsed,
       ...progress(next, s.xp),
@@ -906,8 +1145,8 @@ export const useGame = create<GameState>((set, get) => ({
     const s = get()
     if (!canBrainmelt(tierForXp(s.xp))) return false
     const out = applyBrainmelt({
-      gc: s.gc,
-      totalEarnedGc: s.totalEarnedGc,
+      points: s.points,
+      totalEarned: s.totalEarned,
       xp: s.xp,
       tags: s.tags,
       caps: s.caps,
@@ -918,10 +1157,8 @@ export const useGame = create<GameState>((set, get) => ({
     })
     const next: GameState = {
       ...s,
-      gc: 0,
-      credited: 0,
-      debited: 0,
-      totalEarnedGc: 0,
+      points: 0,
+      totalEarned: 0,
       xp: 0,
       tags: [],
       caps: [],
@@ -930,10 +1167,8 @@ export const useGame = create<GameState>((set, get) => ({
     }
     next.toasts = pushToast(next, `BRAINMELT — +${out.shardsGained} corruption shards`)
     set({
-      gc: 0,
-      credited: 0,
-      debited: 0,
-      totalEarnedGc: 0,
+      points: 0,
+      totalEarned: 0,
       xp: 0,
       tags: [],
       caps: [],
@@ -954,63 +1189,66 @@ export const useGame = create<GameState>((set, get) => ({
     const autoDmg = clickPower(input, now) * auto * (dtMs / 1000)
     const gain = (gps + clickPower(input, now) * auto) * (dtMs / 1000)
     // Grid mode: auto-clicks batter the first square (one KO per tick at most).
-    if (s.viewMode === 'grid') {
+    if (isGridMode(s.viewMode)) {
       const cell = s.grid[0]
       if (cell && autoDmg > 0) {
         if (cell.hp - autoDmg <= 0) {
           const spoil = gallerySpoils(s, cell.post, cell.clicks, now)
-          const filled = fillGrid(s.grid.slice(1), s.queue, spoil.defeated)
+          const target = gridSizeForMode(s.viewMode)
+          const filled = fillGrid(s.grid.slice(1), s.queue, spoil.defeated, target)
           const next: GameState = {
             ...s,
             caps,
-            gc: s.gc + gain + spoil.bonus,
-            totalEarnedGc: s.totalEarnedGc + gain + spoil.bonus,
+            points: s.points + gain + spoil.bonus,
+            totalEarned: s.totalEarned + gain + spoil.bonus,
             xp: s.xp + gain * 0.01 + KILL_XP,
             tags: spoil.tags,
             past: spoil.past,
             gallery: spoil.gallery,
             defeated: spoil.defeated,
+            pendingDrops: spoil.pendingDrops,
             queue: filled.queue,
             grid: filled.grid,
             lastSeenAt: now,
           }
-          next.toasts = pushToast(next, `Auto-drained ${spoil.img.rarity} square (+${spoil.bonus} g$)`)
+          next.toasts = pushToast(next, `Auto-drained ${spoil.img.rarity} square (+${spoil.bonus} pts)`)
           set({
             caps: next.caps,
-            gc: next.gc,
-            totalEarnedGc: next.totalEarnedGc,
+            points: next.points,
+            totalEarned: next.totalEarned,
             xp: next.xp,
             tags: next.tags,
             past: next.past,
             gallery: next.gallery,
             defeated: next.defeated,
+            pendingDrops: next.pendingDrops,
             queue: next.queue,
             grid: next.grid,
             lastSeenAt: next.lastSeenAt,
             ...progress(next, s.xp),
           })
-          if (filled.grid.length < GRID_SIZE && !get().fetching) void get().fetchFeed()
+          if (filled.grid.length < target && !get().fetching) void get().fetchFeed()
           return
         }
         const grid = s.grid.map((c, i) => (i === 0 ? { ...c, hp: c.hp - autoDmg } : c))
         set({
           caps,
-          gc: s.gc + gain,
-          totalEarnedGc: s.totalEarnedGc + gain,
+          points: s.points + gain,
+          totalEarned: s.totalEarned + gain,
           xp: s.xp + gain * 0.01,
           grid,
           lastSeenAt: now,
-          ...progress({ ...s, gc: s.gc + gain }, s.xp),
+          ...progress({ ...s, points: s.points + gain }, s.xp),
         })
         return
       }
       set({
         caps,
-        gc: s.gc + gain,
-        totalEarnedGc: s.totalEarnedGc + gain,
+        points: s.points + gain,
+        totalEarned: s.totalEarned + gain,
         xp: s.xp + gain * 0.01,
         lastSeenAt: now,
-        ...progress({ ...s, gc: s.gc + gain }, s.xp),
+        ...progress({ ...s, points: s.points + gain }, s.xp),
       })
       return
     }
@@ -1021,8 +1259,8 @@ export const useGame = create<GameState>((set, get) => ({
       const next: GameState = {
         ...s,
         caps,
-        gc: s.gc + gain + ko.bonus,
-        totalEarnedGc: s.totalEarnedGc + gain + ko.bonus,
+        points: s.points + gain + ko.bonus,
+        totalEarned: s.totalEarned + gain + ko.bonus,
         xp: s.xp + gain * 0.01 + KILL_XP,
         tags: ko.tags,
         past: ko.past,
@@ -1035,11 +1273,11 @@ export const useGame = create<GameState>((set, get) => ({
         foeClicks: ko.foeClicks,
         lastSeenAt: now,
       }
-      next.toasts = pushToast(next, `Auto-drained ${ko.img.rarity} foe (+${ko.bonus} g$)`)
+      next.toasts = pushToast(next, `Auto-drained ${ko.img.rarity} foe (+${ko.bonus} pts)`)
       set({
         caps: next.caps,
-        gc: next.gc,
-        totalEarnedGc: next.totalEarnedGc,
+        points: next.points,
+        totalEarned: next.totalEarned,
         xp: next.xp,
         tags: next.tags,
         past: next.past,
@@ -1059,16 +1297,16 @@ export const useGame = create<GameState>((set, get) => ({
     const next: GameState = {
       ...s,
       caps,
-      gc: s.gc + gain,
-      totalEarnedGc: s.totalEarnedGc + gain,
+      points: s.points + gain,
+      totalEarned: s.totalEarned + gain,
       xp: s.xp + gain * 0.01,
       foeHp: s.foeMaxHp > 0 ? Math.max(0, s.foeHp - autoDmg) : s.foeHp,
       lastSeenAt: now,
     }
     set({
       caps: next.caps,
-      gc: next.gc,
-      totalEarnedGc: next.totalEarnedGc,
+      points: next.points,
+      totalEarned: next.totalEarned,
       xp: next.xp,
       foeHp: next.foeHp,
       lastSeenAt: next.lastSeenAt,
@@ -1082,10 +1320,8 @@ export const useGame = create<GameState>((set, get) => ({
     const data: SaveData = {
       ...defaultSave(now),
       version: SAVE_VERSION,
-      gc: s.gc,
-      credited: s.credited,
-      debited: s.debited,
-      totalEarnedGc: s.totalEarnedGc,
+      points: s.points,
+      totalEarned: s.totalEarned,
       xp: s.xp,
       clickCount: s.clicks,
       critCount: s.crits,
@@ -1104,6 +1340,7 @@ export const useGame = create<GameState>((set, get) => ({
       viewMode: s.viewMode,
       setupComplete: s.setupComplete,
       userExcludes: s.userExcludes,
+      coRules: s.coRules,
       customSources: s.customSources,
       lastSeenAt: now,
     }
@@ -1120,6 +1357,7 @@ export const useGame = create<GameState>((set, get) => ({
     const tags = d.tags
     const userExcludes = d.userExcludes
     setUserExcludes(userExcludes)
+    setCoRules(d.coRules)
     // JSON turns Infinity into null — restore permanent pops; legacy timed
     // entries keep their expiry and prune via activeCaps as before.
     const caps = activeCaps(
@@ -1142,10 +1380,8 @@ export const useGame = create<GameState>((set, get) => ({
     const gain = d.ageAccepted ? offlineEarnings(gps, now - d.lastSeenAt) : 0
     set({
       loaded: true,
-      gc: d.gc,
-      credited: d.credited,
-      debited: d.debited,
-      totalEarnedGc: d.totalEarnedGc,
+      points: d.points,
+      totalEarned: d.totalEarned,
       xp: d.xp,
       clicks: d.clickCount,
       crits: d.critCount,
@@ -1154,6 +1390,7 @@ export const useGame = create<GameState>((set, get) => ({
       tags,
       setupComplete: d.setupComplete,
       userExcludes,
+      coRules: d.coRules,
       customSources: d.customSources,
       gallery: d.gallery,
       caps,
@@ -1176,15 +1413,15 @@ export const useGame = create<GameState>((set, get) => ({
     if (s.offlineGain <= 0) return
     const next: GameState = {
       ...s,
-      gc: s.gc + s.offlineGain,
-      totalEarnedGc: s.totalEarnedGc + s.offlineGain,
+      points: s.points + s.offlineGain,
+      totalEarned: s.totalEarned + s.offlineGain,
       xp: s.xp + s.offlineGain * 0.01,
       collectedOfflineEarnings: true,
       offlineGain: 0,
     }
     set({
-      gc: next.gc,
-      totalEarnedGc: next.totalEarnedGc,
+      points: next.points,
+      totalEarned: next.totalEarned,
       xp: next.xp,
       collectedOfflineEarnings: true,
       offlineGain: 0,
@@ -1234,6 +1471,7 @@ export const useGame = create<GameState>((set, get) => ({
     set({
       tags: picked,
       setupComplete: true,
+      priorityTag: clean[clean.length - 1] ?? null,
       userExcludes: next.userExcludes,
       achievements: prog.achievements,
       toasts: [...prog.toasts, { id: toastSeq++, msg: `Feed tuned: ${clean.join(', ')}` }],
@@ -1334,9 +1572,5 @@ export const useGame = create<GameState>((set, get) => ({
   resetGame: () => {
     setUserExcludes([])
     set({ ...freshData() })
-  },
-
-  setWallet: (w) => {
-    set({ credited: w.credited, debited: w.debited, ...(w.gc !== undefined ? { gc: w.gc } : {}) })
   },
 }))

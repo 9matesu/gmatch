@@ -1,7 +1,6 @@
 import { Hono } from 'hono'
 import type { D1Turso } from '../db'
 import type { LocalBlobStore } from '../blob'
-import crypto from 'crypto'
 
 type Bindings = {
   DB: D1Turso

@@ -1,4 +1,5 @@
 import { Context, Next } from 'hono'
+import { createHash } from 'node:crypto'
 
 interface Bucket {
   count: number
@@ -9,6 +10,10 @@ const stores = new Map<string, Bucket>()
 const WINDOW_MS = 60_000
 const AUTH_MAX_REQUESTS = 1200
 const ANON_MAX_REQUESTS = 180
+// Wave 2 (B1): the limiter must never hold a raw IP, even as a map key.
+// Per-boot salt + truncated SHA-256: unlinkable across restarts, useless to
+// anyone dumping the process, and stable within the 60s window it keys.
+const IP_BUCKET_SALT = createHash('sha256').update(String(process.pid) + Date.now() + Math.random()).digest('hex')
 
 // Lightweight polling & user actions exempt from rate limiting
 const EXEMPT_PATHS = new Set([
@@ -38,7 +43,8 @@ function isExempt(c: Context): boolean {
   const method = c.req.method
   const url = c.req.path
   if (EXEMPT_PATHS.has(`${method}:${url}`)) return true
-  if (method === 'GET' && url.startsWith('/api/admin/')) return true
+  // Wave 2 (F1.6): GET /api/admin/* is no longer exempt — signed callers
+  // already get the per-orbitId bucket (1200/min), plenty for panel polling.
   if (method === 'GET' && url.startsWith('/api/objects/')) return true
   if (method === 'GET' && url.endsWith('/pfp')) return true
   if (url.startsWith('/api/lobby/match/') || url.startsWith('/api/lobby/special/')) return true
@@ -52,8 +58,14 @@ function cleanupStores() {
   }
 }
 
-function getClientIp(c: Context): string {
-  return c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || c.req.header('x-real-ip') || 'unknown'
+function hashedIpKey(c: Context): string {
+  const raw = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || c.req.header('x-real-ip') || 'unknown'
+  return createHash('sha256').update(`${IP_BUCKET_SALT}|${raw}`).digest('hex').slice(0, 16)
+}
+
+/** Test seam: the limiter's live bucket keys (wave 2 B1 asserts none is a raw IP). */
+export function __storeKeysForTest(): string[] {
+  return [...stores.keys()]
 }
 
 function getRateLimitSubject(c: Context): { key: string; max: number } {
@@ -61,7 +73,7 @@ function getRateLimitSubject(c: Context): { key: string; max: number } {
   if (orbitId && /^[a-zA-Z0-9_-]{8,128}$/.test(orbitId)) {
     return { key: `id:${orbitId}`, max: AUTH_MAX_REQUESTS }
   }
-  return { key: `ip:${getClientIp(c)}`, max: ANON_MAX_REQUESTS }
+  return { key: `ip:${hashedIpKey(c)}`, max: ANON_MAX_REQUESTS }
 }
 
 export async function rateLimit(c: Context, next: Next) {

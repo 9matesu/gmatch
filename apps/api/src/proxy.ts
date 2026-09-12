@@ -14,6 +14,7 @@ const PROXY_MAX_BYTES = 50 * 1024 * 1024
 const INLINE_THRESHOLD = 128 * 1024
 
 import { isValidMediaMagicBytes, detectMediaMime } from './routes/objects'
+import { stripImageMetadata } from './metadata-strip'
 
 export type ProxyOutcome = {
   /** /api/lobby/images/<id>/content or /api/objects/<id> path. */
@@ -150,68 +151,8 @@ export async function classifyAndResolve(rawUrl: string): Promise<string | null>
 }
 
 // ---------------------------------------------------------------------------
-// EXIF stripping (pure JS — no WASM dependency kept around).
-// JPEG: drop APP1 (0xFFE1) segments that begin with "Exif\0".
-// PNG: drop eXIf chunks.
-// Minimal byte-level parsers — preserve the rest of the image.
+// EXIF stripping lives in ./metadata-strip.ts (shared with the upload path).
 // ---------------------------------------------------------------------------
-
-function stripJpegExif(bytes: Uint8Array): Uint8Array {
-  if (bytes.length < 4 || bytes[0] !== 0xFF || bytes[1] !== 0xD8) return bytes
-  const out: number[] = []
-  out.push(bytes[0], bytes[1])
-  let i = 2
-  while (i < bytes.length) {
-    if (bytes[i] !== 0xFF) { out.push(bytes[i]); i += 1; continue }
-    // standalone markers
-    const marker = bytes[i + 1]
-    if (marker === 0xD8 || marker === 0xD9 || (marker >= 0xD0 && marker <= 0xD7)) { out.push(bytes[i], bytes[i + 1]); i += 2; continue }
-    if (i + 3 >= bytes.length) return bytes // corrupt — bail
-    const segLen = (bytes[i + 2] << 8) | bytes[i + 3]
-    if (segLen < 2 || i + 2 + segLen > bytes.length) return bytes
-    // APP1 (0xFFE1) AND starts with "Exif\0" — drop it. Keep APP0/JFIF, APP2 ICC, etc.
-    if (marker === 0xE1 && segLen >= 6 && bytes[i + 4] === 0x45 && bytes[i + 5] === 0x78 && bytes[i + 6] === 0x69 && bytes[i + 7] === 0x66) {
-      // skip only
-    } else {
-      for (let k = 0; k < 2 + segLen; k += 1) out.push(bytes[i + k])
-    }
-    i += 2 + segLen
-    // After SOS (0xFFDA), the rest is entropy-coded — stop scanning segments.
-    if (marker === 0xDA) {
-      while (i < bytes.length) { out.push(bytes[i]); i += 1 }
-      break
-    }
-  }
-  return new Uint8Array(out)
-}
-
-function stripPngExif(bytes: Uint8Array): Uint8Array {
-  if (bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50 || bytes[2] !== 0x4E || bytes[3] !== 0x47) return bytes
-  // PNG: 8-byte signature, then chunks TYPE/LEN/CRC. Drop eXIf chunk type.
-  const out: number[] = []
-  for (let k = 0; k < 8; k += 1) out.push(bytes[k])
-  let i = 8
-  while (i + 8 <= bytes.length) {
-    const len = (bytes[i] << 24) | (bytes[i + 1] << 16) | (bytes[i + 2] << 8) | bytes[i + 3]
-    const type = String.fromCharCode(bytes[i + 4], bytes[i + 5], bytes[i + 6], bytes[i + 7])
-    if (type === 'eXIf') {
-      i += 8 + len + 4
-      continue
-    }
-    const end = i + 8 + len + 4
-    if (end > bytes.length) return bytes
-    for (let k = i; k < end; k += 1) out.push(bytes[k])
-    i = end
-    if (type === 'IEND') break
-  }
-  return new Uint8Array(out)
-}
-
-function stripExif(bytes: Uint8Array, mime: string): Uint8Array {
-  if (mime === 'image/jpeg') return stripJpegExif(bytes)
-  if (mime === 'image/png') return stripPngExif(bytes)
-  return bytes
-}
 
 // ---------------------------------------------------------------------------
 // Public entry points used by routes/lobby.ts and routes/objects.ts.
@@ -250,7 +191,7 @@ export async function proxyAndStoreExternal(
   if (!isValidMediaMagicBytes(buf)) return null
 
   const mimeType = detectMediaMime(buf, parsed.pathname)
-  const stripped = stripExif(buf, mimeType)
+  const stripped = stripImageMetadata(buf, mimeType)
   const isVideo = mimeType.startsWith('video/')
 
   let storedUrl: string

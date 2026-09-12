@@ -64,7 +64,7 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
       }, identity)
       if (res.ok) { toast(label, 'success'); await load() }
       else toast('Update failed', 'error')
-    } catch { toast('Network error', 'error') } finally { setBusyId(null) }
+    } catch { toast('Couldn\'t reach the server.', 'error') } finally { setBusyId(null) }
   }
 
   const remove = async (row: DirRow) => {
@@ -73,9 +73,9 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
     setBusyId(row.id)
     try {
       const res = await orbitFetch(`${central}/api/servers/admin/directory/${row.id}`, { method: 'DELETE' }, identity)
-      if (res.ok) { toast('Unregistered', 'success'); await load() }
+      if (res.ok) { toast('Server unregistered.', 'success'); await load() }
       else toast('Only the central master can unregister', 'error')
-    } catch { toast('Network error', 'error') } finally { setBusyId(null) }
+    } catch { toast('Couldn\'t reach the server.', 'error') } finally { setBusyId(null) }
   }
 
   if (!authorized) return null
@@ -88,14 +88,14 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
         <button
           type="button"
           onClick={() => { playPress(700); void load() }}
-          className="glass-action ml-auto px-3 py-1.5 rounded-lg text-retro-muted hover:text-retro-fg text-[11px] font-bold cursor-pointer flex items-center gap-1"
+          className="glass-action ml-auto px-3 py-1.5 rounded-lg text-retro-muted hover:text-retro-fg text-xs font-bold cursor-pointer flex items-center gap-1"
         >
           <RefreshCw className="w-3 h-3" /> Refresh
         </button>
       </div>
 
       {totals && (
-        <div className="flex flex-wrap gap-1.5 text-[11px] font-mono text-retro-muted">
+        <div className="flex flex-wrap gap-1.5 text-xs font-mono text-retro-muted">
           <span className="glass-inset px-2 py-1 rounded-full">total {totals.total}</span>
           <span className="glass-inset px-2 py-1 rounded-full">online {totals.online}</span>
           <span className="glass-inset px-2 py-1 rounded-full">stale {totals.stale}</span>
@@ -105,15 +105,15 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
       )}
 
       <ul className="space-y-2">
-        {loading && rows.length === 0 && <li className="text-[11px] text-retro-muted">Loading directory…</li>}
-        {!loading && rows.length === 0 && <li className="text-[11px] text-retro-muted">Directory is empty.</li>}
+        {loading && rows.length === 0 && <li className="text-xs text-retro-muted">Loading directory…</li>}
+        {!loading && rows.length === 0 && <li className="text-xs text-retro-muted">Directory is empty.</li>}
         {rows.map((row) => (
           <li key={row.id} className={`glass-card p-3 flex items-start gap-3 ${row.hidden ? 'opacity-60' : ''}`}>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium text-retro-fg truncate">{row.name}</span>
-                {!!row.hidden && <span className="text-[9px] px-1.5 py-0.5 rounded-full glass-inset text-retro-muted font-mono">HIDDEN</span>}
-                {!!row.blocked && <span className="text-[9px] px-1.5 py-0.5 rounded-full glass-action-danger font-mono">BLOCKED</span>}
+                {!!row.hidden && <span className="text-[10px] px-1.5 py-0.5 rounded-full glass-inset text-retro-muted font-mono">HIDDEN</span>}
+                {!!row.blocked && <span className="text-[10px] px-1.5 py-0.5 rounded-full glass-action-danger font-mono">BLOCKED</span>}
               </div>
               <p className="text-[10px] font-mono text-retro-muted mt-0.5 truncate">{row.endpoint_hint || 'no address'} · {row.id.slice(0, 8)}</p>
             </div>

@@ -1,7 +1,7 @@
 import crypto from 'crypto'
 import type { D1Turso } from './db'
 import type { LocalBlobStore } from './blob'
-import { PICTURE_WIPE_SECONDS, STORY_TTL_SECONDS, normalizeTags, OFFLINE_DELETION_SECONDS, OFFLINE_WARNING_SECONDS } from '@orbit/shared'
+import { PICTURE_WIPE_SECONDS, normalizeTags, OFFLINE_DELETION_SECONDS, OFFLINE_WARNING_SECONDS } from '@orbit/shared'
 import { purgeExpiredBabecock } from './babecock'
 
 const PICTURE_WIPE_MS = PICTURE_WIPE_SECONDS * 1000
@@ -135,6 +135,16 @@ export async function deleteExpiredContent(
   await db
     .prepare("DELETE FROM MatchInvites WHERE datetime(expires_at) < datetime(?) OR datetime(updated_at) < datetime(?, '-1 day')")
     .bind(nowIso, nowIso)
+    .run()
+    .catch(() => {})
+
+  // 3d. Domination actions that were never acked (victim closed the app,
+  // camera blocked at OS level...) get a TERMINAL status after 30 min so the
+  // sender's "awaiting" chip resolves honestly instead of hanging forever.
+  // 'executed' rows (acked) are untouched; ack after this point no-ops.
+  await db
+    .prepare("UPDATE DominationActions SET status = 'expired' WHERE status = 'sent' AND datetime(created_at) < datetime(?, '-30 minutes')")
+    .bind(nowIso)
     .run()
     .catch(() => {})
 
@@ -493,6 +503,7 @@ export async function deleteOfflineUsers(
       await db.prepare('DELETE FROM StoreUnlocks WHERE user_id = ?').bind(userId).run()
       await db.prepare('DELETE FROM UserInventory WHERE user_id = ?').bind(userId).run()
       await db.prepare('DELETE FROM DominationActions WHERE dominator_id = ? OR victim_id = ?').bind(userId, userId).run()
+      await db.prepare('DELETE FROM HackDebuffs WHERE attacker_id = ? OR target_id = ?').bind(userId, userId).run()
       await db.prepare('DELETE FROM LeagueRank WHERE user_id = ?').bind(userId).run()
       await db.prepare('DELETE FROM MatchArchive WHERE user_a = ? OR user_b = ?').bind(userId, userId).run()
       await db.prepare('DELETE FROM Wallets WHERE user_id = ?').bind(userId).run()

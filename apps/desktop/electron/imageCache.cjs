@@ -13,6 +13,8 @@ const mem = require('./imageCacheMemory.cjs')
 
 const SCHEME = 'gmcache'
 const MAX_SINGLE_BYTES = 25 * 1024 * 1024
+// ponytail: 10min list TTL — a deduped query must refresh; the 24h "one call"
+// guarantee lives in the image-BYTES cache, not the feed list.
 const FEED_TTL_MS = 10 * 60 * 1000
 const FEED_MAX_QUERIES = 40
 const IMG_TIMEOUT_MS = 15_000
@@ -80,10 +82,23 @@ function fetchBinary(url, redirects = 3) {
       reject(new Error('bad protocol'))
       return
     }
+    const isImh = typeof url === 'string' && url.includes('imhentai.xxx')
+    const isPaheal = typeof url === 'string' && url.includes('paheal')
+    const isRealbooru = typeof url === 'string' && url.includes('realbooru.com')
+    const isBooruOrg = typeof url === 'string' && url.includes('booru.org')
     const mod = u.protocol === 'https:' ? https : http
     const req = mod.get(
       url,
-      { headers: { 'User-Agent': UA, Accept: 'image/*,video/*,*/*' } },
+      {
+        headers: {
+          'User-Agent': UA,
+          Accept: 'image/*,video/*,*/*',
+          ...(isImh ? { Referer: 'https://imhentai.xxx/' } : {}),
+          ...(isPaheal ? { Referer: 'https://rule34.paheal.net/' } : {}),
+          ...(isRealbooru ? { Referer: 'https://realbooru.com/' } : {}),
+          ...(isBooruOrg ? { Referer: 'https://booru.org/' } : {}),
+        },
+      },
       (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirects > 0) {
           res.resume()
@@ -148,6 +163,27 @@ function clear() {
   return stats()
 }
 
+/** Evict a single image from cache and free its memory. Also prunes any cached feed lists. */
+function evict(url) {
+  try {
+    if (!url) return false
+    for (const q in feed) {
+      if (feed[q] && Array.isArray(feed[q].posts)) {
+        feed[q].posts = feed[q].posts.filter((p) => p && p.url !== url)
+      }
+    }
+    const hit = meta[url]
+    if (hit) {
+      mem.del(hit.key)
+      delete meta[url]
+      return true
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
 /** Feed-response cache: parsed posts per query, 10-minute TTL, RAM only. */
 function getFeedCache(query) {
   try {
@@ -202,6 +238,7 @@ module.exports = {
   cacheImage,
   cacheStats: stats,
   clearCache: clear,
+  evict,
   getFeedCache,
   setFeedCache,
   serveImage,

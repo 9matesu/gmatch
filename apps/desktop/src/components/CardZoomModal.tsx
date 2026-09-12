@@ -144,7 +144,7 @@ export function CardZoomModal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col justify-between p-3 sm:p-6 animate-orbit-fade-in select-none"
+      className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-md flex flex-col justify-between p-3 sm:p-6 animate-orbit-fade-in select-none"
       onClick={onClose}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
@@ -248,7 +248,7 @@ export function CardZoomModal({
         onClick={handleImageClick}
       >
         <div
-          className="relative max-w-full max-h-full flex items-center justify-center transition-transform duration-100 ease-out"
+          className="relative max-w-full max-h-full flex items-center justify-center transition-transform duration-150 ease-out"
           style={{
             transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
             cursor: scale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'zoom-in',
@@ -295,13 +295,13 @@ export function CardZoomModal({
 
       {/* Bottom Caption Bar / Instructions */}
       <div
-        className="flex flex-wrap items-center justify-between gap-2 z-10 bg-retro-panel/80 border border-retro-border px-4 py-2 rounded-lg text-retro-muted text-[10px]"
+        className="flex flex-wrap items-center justify-between gap-2 z-10 bg-retro-panel/80 border border-border-glass px-4 py-2 rounded-lg text-retro-muted text-[10px]"
         onClick={e => e.stopPropagation()}
       >
         <span>
           {caption ? <strong className="text-retro-fg">{caption}</strong> : 'Click image to toggle 2x zoom · Drag to pan when zoomed'}
         </span>
-        <span className="font-mono text-[9px] text-retro-muted hidden sm:inline">
+        <span className="font-mono text-[10px] text-retro-muted hidden sm:inline">
           [Esc] to close · [+] / [−] to zoom
         </span>
       </div>

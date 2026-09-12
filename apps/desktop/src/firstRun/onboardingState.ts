@@ -1,8 +1,12 @@
 export const ONBOARDING_STEPS = [
-  'welcome',
-  'feed',
+  'server',
+  'profile',
   'ready',
 ] as const;
+
+// Set by joinServer before relaunch so the post-restart OnboardingFlow skips
+// the picker (same node chosen). Wiped by clearIdentity (logout).
+export const SERVER_MARKER_KEY = 'gmatch.onboarding.serverUrl';
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
@@ -19,7 +23,7 @@ export function onboardingStorageKey(identityId?: string | null) {
 }
 
 export function initialOnboardingState(): OnboardingState {
-  return { version: 1, current: 'welcome', completed: [] };
+  return { version: 1, current: 'server', completed: [] };
 }
 
 export function readOnboardingState(identityId?: string | null): OnboardingState {
@@ -45,7 +49,7 @@ export function readOnboardingState(identityId?: string | null): OnboardingState
       ? (parsed.current as OnboardingStep)
       : isLegacyDone
       ? 'ready'
-      : 'welcome';
+      : 'server';
 
     return { version: 1, current, completed: Array.from(new Set(completed)) };
   } catch {

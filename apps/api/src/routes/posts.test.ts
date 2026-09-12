@@ -357,3 +357,17 @@ describe('Post vs Card separation', () => {
     expect(cardsJson.cards.some((c: any) => c.mediaObjectId === pubPostId)).toBe(false)
   })
 })
+
+it('names a nameless post author with the generated fallback, never "Unknown User"', async () => {
+  const namelessEnv = await createMockEnv()
+  await registerUser(namelessEnv, bob) // no setDisplayName call
+  const pid = await createPublicPost(namelessEnv, bob, 'no name here')
+  const res = await app.request('/api/posts', {
+    headers: authHeaders(bob, 'GET', '/api/posts'),
+  }, namelessEnv)
+  const json: any = await res.json()
+  const post = json.posts.find((p: any) => p.id === pid)
+  expect(post).toBeTruthy()
+  expect(post.author_name).not.toBe('Unknown User')
+  expect(post.author_name).toMatch(/^User_/)
+})

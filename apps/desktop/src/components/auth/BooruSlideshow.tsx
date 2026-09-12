@@ -136,12 +136,13 @@ export function BooruSlideshow({ className = '' }: { className?: string }) {
 
   const goTo = useCallback((idx: number) => {
     playPress(700);
-    setActiveIndex((prev) => (images.length === 0 ? 0 : (idx + images.length) % images.length));
+    setActiveIndex((_prev) => (images.length === 0 ? 0 : (idx + images.length) % images.length));
   }, [images.length]);
 
   useEffect(() => {
     if (images.length < 2) return;
     const id = setInterval(() => {
+      if (document.hidden) return
       setActiveIndex((prev) => (prev + 1) % images.length);
     }, SLIDE_INTERVAL_MS);
     return () => clearInterval(id);
@@ -152,7 +153,7 @@ export function BooruSlideshow({ className = '' }: { className?: string }) {
   return (
     <div className={`relative mx-auto flex flex-col items-center shrink-0 ${className}`}>
       {/* Outer Smartphone Bezel */}
-      <div className="relative w-[clamp(220px,40vw,340px)] aspect-[9/16] rounded-[2.5rem] p-2.5 bg-gradient-to-b from-zinc-800 via-zinc-900 to-zinc-950 shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-zinc-700/50 shrink-0">
+      <div className="relative w-[clamp(220px,40vw,340px)] aspect-[9/16] rounded-[2.5rem] p-2.5 bg-gradient-to-b from-zinc-800 via-zinc-900 to-zinc-950 shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-border-glass shrink-0">
         <div className="absolute inset-[1px] rounded-[2.4rem] bg-gradient-to-b from-zinc-700/20 via-transparent to-transparent pointer-events-none" />
 
         {/* Inner Phone Screen */}
@@ -161,7 +162,7 @@ export function BooruSlideshow({ className = '' }: { className?: string }) {
           {/* Top Notch / Dynamic Island */}
           <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 w-20 h-3.5 bg-black rounded-full flex items-center justify-end px-2 gap-1.5 shadow-md">
             <span className="w-1.5 h-1.5 rounded-full bg-surface-elevated" />
-            <span className="w-1.5 h-1.5 rounded-full bg-surface-canvas border border-zinc-700" />
+            <span className="w-1.5 h-1.5 rounded-full bg-surface-canvas border border-border-glass" />
           </div>
 
           {/* Bottom Home Indicator Bar */}
@@ -185,11 +186,11 @@ export function BooruSlideshow({ className = '' }: { className?: string }) {
 
           {/* Top Navigation & Status Bar */}
           <div className="absolute top-7 left-3 right-3 z-20 flex items-center justify-between pointer-events-none">
-            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-[9px] font-bold text-white">
+            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-[10px] font-bold text-white">
               <span className="w-1.5 h-1.5 rounded-full bg-retro-accent animate-pulse shadow-[0_0_6px_rgba(159,227,255,0.5)]" />
               <span>Live Feed</span>
             </div>
-            <div className="px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-[9px] font-mono font-bold text-white/90">
+            <div className="px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-[10px] font-mono font-bold text-white/90">
               <ImageIcon className="w-2.5 h-2.5 inline mr-1 -mt-0.5" />
               {activeIndex + 1}/{images.length}
             </div>
@@ -197,7 +198,7 @@ export function BooruSlideshow({ className = '' }: { className?: string }) {
 
           {/* Caption Overlay */}
           <div className="absolute bottom-6 left-3 right-3 z-20">
-            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/30 backdrop-blur-md text-[9px] font-black uppercase tracking-wider text-white mb-1.5">
+            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/30 backdrop-blur-md text-[10px] font-black uppercase tracking-wider text-white mb-1.5">
               <Sparkles className="w-2.5 h-2.5 text-retro-accent" />
               <span>Trending</span>
             </div>

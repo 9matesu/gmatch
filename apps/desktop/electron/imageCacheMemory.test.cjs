@@ -28,6 +28,15 @@ assert.ok(mem.totalBytes() <= 100, `respect budget: ${mem.totalBytes()}`)
 assert.strictEqual(mem.put('huge', Buffer.alloc(500, 9)), false, 'entry > budget refused')
 assert.strictEqual(mem.get('huge'), null)
 
+// del() drops entry and updates totalBytes
+mem.clear()
+mem.put('del-me', Buffer.alloc(50, 1))
+assert.strictEqual(mem.totalBytes(), 50)
+assert.strictEqual(mem.del('del-me'), true)
+assert.strictEqual(mem.get('del-me'), null)
+assert.strictEqual(mem.totalBytes(), 0)
+assert.strictEqual(mem.del('non-existent'), false)
+
 // clear() releases everything
 mem.clear()
 assert.strictEqual(mem.totalBytes(), 0)

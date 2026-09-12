@@ -131,7 +131,7 @@ export class OrbitPeer {
     return offerId
   }
 
-  async sendFile(file: File, identity: OrbitIdentity, recipientId: string): Promise<void> {
+  async sendFile(file: File, identity: OrbitIdentity, _recipientId: string): Promise<void> {
     logger.log('[ORBIT WebRTC] Preparing to stream file over WebRTC DataChannel:', file.name, 'Size:', file.size)
     if (!this.channel || this.channel.readyState !== 'open') {
       await new Promise<void>((resolve, reject) => {
@@ -178,7 +178,7 @@ export class OrbitPeer {
       if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
     }
     if (!offerRes || !offerRes.ok) throw new Error('[phase:fetch-offer] Failed to fetch WebRTC offer')
-    const { offer, sender_id } = await offerRes.json()
+    const { offer } = await offerRes.json()
 
     this.pc = new RTCPeerConnection(defaultIceConfig(readTurnEnv()))
     this.pc.ondatachannel = (e) => {
@@ -219,7 +219,7 @@ export class OrbitPeer {
     this.startIcePoll(offerId, identity)
   }
 
-  private setupDataChannel(identity: OrbitIdentity) {
+  private setupDataChannel(_identity: OrbitIdentity) {
     if (!this.channel) return
     this.channel.binaryType = 'arraybuffer'
 

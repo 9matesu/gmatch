@@ -169,7 +169,7 @@ export function GamesTab({ identity, pinVerified, onZoom, onAction }: GamesTabPr
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-surface-canvas/60 p-3 rounded-lg border border-border-glass space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-cyan-300 uppercase">Player A: {match.user_a_name || match.user_a.slice(0, 8)}</span>
+                  <span className="text-xs font-bold text-cyan-300 uppercase tracking-wider">Player A: {match.user_a_name || match.user_a.slice(0, 8)}</span>
                   <span className="text-xs font-mono font-bold text-retro-fg">Score: {match.score_a || 0}</span>
                 </div>
                 <div className="flex items-start gap-3">
@@ -192,7 +192,7 @@ export function GamesTab({ identity, pinVerified, onZoom, onAction }: GamesTabPr
 
               <div className="bg-surface-canvas/60 p-3 rounded-lg border border-border-glass space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-purple-300 uppercase">Player B: {match.user_b_name || match.user_b.slice(0, 8)}</span>
+                  <span className="text-xs font-bold text-purple-300 uppercase tracking-wider">Player B: {match.user_b_name || match.user_b.slice(0, 8)}</span>
                   <span className="text-xs font-mono font-bold text-retro-fg">Score: {match.score_b || 0}</span>
                 </div>
                 <div className="flex items-start gap-3">
@@ -220,21 +220,21 @@ export function GamesTab({ identity, pinVerified, onZoom, onAction }: GamesTabPr
                 <button
                   type="button"
                   onClick={() => onAction("override", match.id, "winner_a")}
-                  className="px-2.5 py-1 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/30 font-bold text-[11px]"
+                  className="px-2.5 py-1 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/30 font-bold text-xs"
                 >
                   Win Player A
                 </button>
                 <button
                   type="button"
                   onClick={() => onAction("override", match.id, "winner_b")}
-                  className="px-2.5 py-1 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30 font-bold text-[11px]"
+                  className="px-2.5 py-1 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30 font-bold text-xs"
                 >
                   Win Player B
                 </button>
                 <button
                   type="button"
                   onClick={() => onAction("override", match.id, "draw")}
-                  className="px-2.5 py-1 rounded bg-surface-interactive text-retro-fg border border-border-glass hover:bg-glass-w10 font-bold text-[11px]"
+                  className="px-2.5 py-1 rounded bg-surface-interactive text-retro-fg border border-border-glass hover:bg-glass-w10 font-bold text-xs"
                 >
                   Draw
                 </button>
@@ -280,7 +280,7 @@ export function GamesTab({ identity, pinVerified, onZoom, onAction }: GamesTabPr
 
         {isExpanded && (
           <div className="px-4 pb-4 pt-1 bg-surface-elevated/40 border-t border-border-subtle/50 space-y-3 animate-orbit-fade-in">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
               <div>
                 <span className="text-retro-muted block text-[10px]">Match ID</span>
                 <span className="font-mono text-retro-fg break-all text-[10px]">{match.id}</span>
@@ -330,7 +330,7 @@ export function GamesTab({ identity, pinVerified, onZoom, onAction }: GamesTabPr
                       <div className="min-w-0 flex-1 text-[10px]">
                         <p className="font-bold text-retro-fg">Round {r.round}</p>
                         <p className="text-retro-muted">{r.decision_a || "—"} vs {r.decision_b || "—"}</p>
-                        <p className={cn("font-semibold", r.matched ? "text-emerald-400" : "text-retro-muted")}>{r.matched ? "Matched ♥" : "No Match"}</p>
+                        <p className={cn("font-semibold", r.matched ? "text-emerald-400" : "text-retro-muted")}>{r.matched ? "Matched" : "No Match"}</p>
                       </div>
                     </div>
                   ))}
@@ -455,7 +455,7 @@ export function GamesTab({ identity, pinVerified, onZoom, onAction }: GamesTabPr
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-retro-fg">Games Operations</h1>
+          <h1 className="text-lg font-bold text-retro-fg">Games operations</h1>
           <p className="text-xs text-retro-muted mt-1">Live matches, queue, rooms, and tournament operations</p>
         </div>
         <button

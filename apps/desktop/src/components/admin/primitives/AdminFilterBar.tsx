@@ -180,7 +180,7 @@ export function AdminFilterBar({
             <button
               type="button"
               onClick={handleClearAll}
-              className="px-2.5 py-1 text-[10px] font-bold uppercase rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 transition-colors"
+              className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 transition-colors"
             >
               <X className="w-3 h-3 mr-1" />
               Clear All
@@ -190,7 +190,7 @@ export function AdminFilterBar({
             type="button"
             onClick={() => setExpanded(!expanded)}
             className={cn(
-              "px-3 py-1.5 text-xs font-bold uppercase rounded border transition-colors flex items-center gap-1.5",
+              "px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded border transition-colors flex items-center gap-1.5",
               expanded
                 ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/30"
                 : "bg-surface-interactive text-retro-fg border-border-glass hover:bg-glass-w10"
@@ -202,7 +202,7 @@ export function AdminFilterBar({
         </div>
       </div>
 
-      <div className={cn("space-y-3 transition-all duration-200", expanded ? "opacity-100 max-h-96" : "opacity-0 max-h-0 overflow-hidden")}>
+      <div className={cn("space-y-3 transition-all duration-150", expanded ? "opacity-100 max-h-96" : "opacity-0 max-h-0 overflow-hidden")}>
         <div className="flex flex-wrap gap-3">
           {filterConfigs.map(config => <Fragment key={config.key}>{renderFilter(config)}</Fragment>)}
         </div>
@@ -285,7 +285,7 @@ function DateRangePicker({ value, onChange }: {
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1">
-        <label className="text-[9px] text-retro-faint uppercase tracking-wider mb-0.5 block">From</label>
+        <label className="text-[10px] text-retro-faint uppercase tracking-wider mb-0.5 block">From</label>
         <input
           type="date"
           value={value.from || ""}
@@ -294,7 +294,7 @@ function DateRangePicker({ value, onChange }: {
         />
       </div>
       <div className="flex-1">
-        <label className="text-[9px] text-retro-faint uppercase tracking-wider mb-0.5 block">To</label>
+        <label className="text-[10px] text-retro-faint uppercase tracking-wider mb-0.5 block">To</label>
         <input
           type="date"
           value={value.to || ""}

@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('gmatch', {
   cacheImage: (url) => ipcRenderer.invoke('cache:image', url),
   cacheStats: () => ipcRenderer.invoke('cache:stats'),
   clearCache: () => ipcRenderer.invoke('cache:clear'),
+  evictImage: (url) => ipcRenderer.invoke('cache:evict', url),
   // Player-owned idle folders (dialog-picked, served over idle-file://).
   customPickFolder: () => ipcRenderer.invoke('custom:pick-folder'),
   customListFolder: (id) => ipcRenderer.invoke('custom:list-folder', id),
@@ -24,6 +25,15 @@ contextBridge.exposeInMainWorld('gmatch', {
   openExternal: (url) => ipcRenderer.invoke('shell:open', url),
   serverSet: (payload) => ipcRenderer.invoke('server:set', payload),
   serverRelaunch: () => ipcRenderer.invoke('server:relaunch'),
+  // Portable self-update (GitHub Releases).
+  updateCheck: () => ipcRenderer.invoke('update:check'),
+  updateState: () => ipcRenderer.invoke('update:state'),
+  updateInstall: () => ipcRenderer.invoke('update:install'),
+  onUpdateStatus: (cb) => {
+    const listener = (_event, status) => cb(status)
+    ipcRenderer.on('update:status', listener)
+    return () => ipcRenderer.removeListener('update:status', listener)
+  },
   // OS integration for consented domination effects (Windows only, best-effort).
   wallpaperSetData: (buf, mime) => ipcRenderer.invoke('wallpaper:set-data', buf, mime),
   wallpaperRestore: () => ipcRenderer.invoke('wallpaper:restore'),

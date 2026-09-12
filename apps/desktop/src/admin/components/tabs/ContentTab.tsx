@@ -9,6 +9,7 @@ import { resolveMediaUrl } from "../../../utils/media";
 import { AdminMediaThumbnail } from "../AdminMediaThumbnail";
 import type { AdminObject, AdminPost, AdminLobbyImage, TableParams } from "../../../utils/adminTypes";
 import type { OrbitIdentity } from "@orbit/crypto";
+import { Star } from 'lucide-react'
 
 interface ContentTabProps {
   identity: OrbitIdentity | null;
@@ -36,7 +37,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
   const [posts, setPosts] = useState<AdminPost[]>([]);
   const [postsTotal, setPostsTotal] = useState(0);
   const [lobbyImages, setLobbyImages] = useState<AdminLobbyImage[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading,] = useState(false);
   const [objectsParams, setObjectsParams] = useState<TableParams>({ page: 1, pageSize: 50 });
   const [postsParams, setPostsParams] = useState<TableParams>({ page: 1, pageSize: 50, filters: { visibility: "all" } });
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -115,7 +116,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
             className="w-10 h-10"
             onZoom={onZoom}
             badge={obj.is_story === 1 && (
-              <span className="absolute top-0.5 right-0.5 px-1 py-0.5 bg-cyan-500/10 border border-purple-300 text-cyan-300 font-mono font-bold text-[6px] rounded">STORY</span>
+              <span className="absolute top-0.5 right-0.5 px-1 py-0.5 bg-cyan-500/10 border border-purple-300 text-cyan-300 font-mono font-bold text-[10px] rounded">STORY</span>
             )}
           />
           <div className="min-w-0 flex-1 cursor-pointer" onClick={() => toggleExpand(obj.id)}>
@@ -126,8 +127,8 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
             </p>
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-retro-muted shrink-0">
-            <Badge variant="neutral" size="sm">♥ {obj.likes_count || 0}</Badge>
-            <Badge variant="neutral" size="sm">★ {obj.favorites_count || 0}</Badge>
+            <Badge variant="neutral" size="sm">{obj.likes_count || 0} likes</Badge>
+            <Badge variant="neutral" size="sm"><Star className="inline w-3 h-3 mr-0.5" />{obj.favorites_count || 0}</Badge>
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <button
@@ -171,7 +172,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
               </button>
             </div>
             <div className="flex-1 min-w-0 space-y-2.5">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
                 <div>
                   <span className="text-retro-muted block text-[10px]">Object ID</span>
                   <span className="font-mono text-retro-fg break-all text-[10px]">{obj.id}</span>
@@ -269,7 +270,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
             </p>
           </div>
           <div className="flex items-center gap-2 text-[10px] text-retro-muted shrink-0">
-            <Badge variant="neutral" size="sm">♥ {post.like_count || 0}</Badge>
+            <Badge variant="neutral" size="sm">{post.like_count || 0} likes</Badge>
             <Badge variant="neutral" size="sm">{post.comment_count || 0} comments</Badge>
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -315,7 +316,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
               </button>
             </div>
             <div className="flex-1 min-w-0 space-y-2.5">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
                 <div>
                   <span className="text-retro-muted block text-[10px]">Post ID</span>
                   <span className="font-mono text-retro-fg break-all text-[10px]">{post.id}</span>
@@ -348,7 +349,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                 </div>
               )}
               {post.post_tags && (
-                <div className="text-[11px] text-retro-muted">
+                <div className="text-xs text-retro-muted">
                   <span>Tags: </span>
                   <span className="text-cyan-300 font-mono">{post.post_tags}</span>
                 </div>
@@ -417,7 +418,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
             <p className="text-[10px] text-retro-muted truncate">{img.user_name || img.user_id.slice(0, 10)} · {new Date(img.created_at).toLocaleString()}</p>
           </div>
           <div className="flex items-center gap-2 text-[10px] text-retro-muted shrink-0">
-            <Badge variant="neutral" size="sm">♥ {img.likes_count || 0}</Badge>
+            <Badge variant="neutral" size="sm">{img.likes_count || 0} likes</Badge>
           </div>
           <button
             type="button"
@@ -446,7 +447,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
               </button>
             </div>
             <div className="flex-1 min-w-0 space-y-2.5">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
                 <div>
                   <span className="text-retro-muted block text-[10px]">Image ID</span>
                   <span className="font-mono text-retro-fg break-all text-[10px]">{img.id}</span>
@@ -461,7 +462,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                 </div>
                 <div>
                   <span className="text-retro-muted block text-[10px]">Likes</span>
-                  <span className="text-retro-fg">♥ {img.likes_count || 0}</span>
+                  <span className="text-retro-fg">{img.likes_count || 0} likes</span>
                 </div>
                 <div>
                   <span className="text-retro-muted block text-[10px]">Created At</span>
@@ -507,7 +508,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-retro-fg">Content Explorer</h1>
+          <h1 className="text-lg font-bold text-retro-fg">Content explorer</h1>
           <p className="text-xs text-retro-muted mt-1">Browse all media: objects, posts, and lobby board with inline inspection & moderation</p>
         </div>
       </div>

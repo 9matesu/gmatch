@@ -78,15 +78,15 @@ export function MobileVirusOverlay({
   }, [onComplete]);
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black flex flex-col items-center justify-between p-4 select-none overflow-hidden font-sans cursor-default">
-      <div className="w-full z-20 bg-red-950/90 text-white p-3 rounded-2xl border border-red-500/50 shadow-2xl flex items-center justify-between gap-3">
+    <div className="fixed inset-0 z-[var(--z-toast)] bg-black flex flex-col items-center justify-between p-4 select-none overflow-hidden font-sans cursor-default">
+      <div className="w-full z-20 bg-red-950/90 text-white p-3 rounded-xl border border-red-500/50 shadow-2xl flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
           <ShieldAlert className="w-6 h-6 text-red-400 shrink-0" />
           <div className="min-w-0">
             <h1 className="text-sm font-bold">
               Your screen is locked
             </h1>
-            <p className="text-[11px] text-red-200/80 truncate">
+            <p className="text-xs text-red-200/80 truncate">
               <strong>@{attackerName}</strong> used a hack from the store on you
             </p>
           </div>
@@ -98,16 +98,16 @@ export function MobileVirusOverlay({
         </div>
       </div>
 
-      <div className="relative w-full max-w-md aspect-square rounded-3xl overflow-hidden border border-red-500/40 shadow-2xl z-10">
+      <div className="relative w-full max-w-md aspect-square rounded-xl overflow-hidden border border-red-500/40 shadow-2xl z-10">
         <img
           src={images[activeImageIndex] || SAMPLE_IMAGES[0]}
           alt=""
-          className={`w-full h-full object-cover ${reduceMotion ? '' : 'transition-transform duration-1000'}`}
+          className={`w-full h-full object-cover ${reduceMotion ? '' : 'transition-transform duration-700'}`}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/40 pointer-events-none" />
       </div>
 
-      <p className="text-[11px] text-zinc-400 z-20 text-center">
+      <p className="text-xs text-retro-muted z-20 text-center">
         Navigation unlocks when the timer runs out &mdash; or press Escape.
       </p>
     </div>

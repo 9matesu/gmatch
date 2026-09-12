@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { createMailStore, putEnvelope, listEnvelopes, ackEnvelopes, sweepMail } from './mail-store'
 import { generateIdentity, signMessage } from '@orbit/crypto'
-import { deliveryToken } from '@orbit/protocol'
+import { deliveryToken, sessionDeliveryToken } from '@orbit/protocol'
 
 const bob = generateIdentity()
 const TOKEN = deliveryToken(bob.publicKeyHex)
@@ -13,7 +13,7 @@ function envelope(id: string, sealed = 'c2VjcmV0') {
 
 function ack(identity = bob, ids: string[], token = TOKEN) {
   const msg = new TextEncoder().encode(`${token}|${ids.join(',')}`)
-  return { ids, pubkey: identity.publicKeyHex, sig: Buffer.from(signMessage(msg, identity.privateKeyHex)).toString('hex') }
+  return { ids, pubkey: identity.publicKeyHex, token, sig: Buffer.from(signMessage(msg, identity.privateKeyHex)).toString('hex') }
 }
 
 describe('blind mail store (courier-side, Session-swarm semantics)', () => {
@@ -96,5 +96,22 @@ describe('blind mail store (courier-side, Session-swarm semantics)', () => {
     expect(putEnvelope(s, { ...envelope('b3db3db3d'), sealed: '' }, 0)).toBe(false)
     expect(putEnvelope(s, { ...envelope('b4db4db4d'), sealed: 'x'.repeat(400_000) }, 0)).toBe(false)
     expect(s.size()).toBe(0)
+  })
+
+  // Wave 2 (C2): rotating session tokens drain with epoch proof.
+  it('ack of a session token requires the epoch it was derived with', () => {
+    const epoch = 'c'.repeat(32)
+    const sessionTok = sessionDeliveryToken(bob.publicKeyHex, epoch)
+    const s = createMailStore()
+    putEnvelope(s, { ...envelope('s1ess1on'), to: sessionTok }, 1000)
+    expect(listEnvelopes(s, sessionTok, 1000)).toHaveLength(1)
+    // right sig but no epoch => token derivation fails
+    expect(ackEnvelopes(s, { ...ack(bob, ['s1ess1on'], sessionTok) })).toBe(false)
+    // epoch present => drains
+    expect(ackEnvelopes(s, { ...ack(bob, ['s1ess1on'], sessionTok), epoch })).toBe(true)
+    expect(listEnvelopes(s, sessionTok, 1000)).toHaveLength(0)
+    // wrong epoch never works
+    putEnvelope(s, { ...envelope('s2ess2on'), to: sessionTok }, 1000)
+    expect(ackEnvelopes(s, { ...ack(bob, ['s2ess2on'], sessionTok), epoch: 'd'.repeat(32) })).toBe(false)
   })
 })

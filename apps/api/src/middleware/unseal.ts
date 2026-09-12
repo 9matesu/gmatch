@@ -12,13 +12,13 @@ import { openApiRequest } from '@orbit/protocol'
 export async function unsealRequest(c: Context, next: Next) {
   const sealed = c.req.header('X-Orbit-Sealed')
   if (!sealed) {
-    if ((c.env as { API_SEALED_ONLY?: string })?.API_SEALED_ONLY && ['POST', 'PUT', 'PATCH'].includes(c.req.method)) {
+    if ((c.env as { API_SEALED_ONLY?: string })?.API_SEALED_ONLY && ['GET', 'POST', 'PUT', 'PATCH'].includes(c.req.method)) {
       return c.json({ error: 'sealed requests required (API_SEALED_ONLY)' }, 400)
     }
     return next()
   }
   const nodePrivHex = (c.env as { NODE_PRIV_HEX?: string })?.NODE_PRIV_HEX
-  if (!nodePrivHex) return c.json({ error: 'node key unavailable — server misconfigured' }, 500)
+  if (!nodePrivHex) return c.json({ error: 'node key unavailable. Server misconfigured' }, 500)
   let opened: { headers: Record<string, string>; body: string }
   try {
     opened = openApiRequest(sealed, nodePrivHex)

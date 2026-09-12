@@ -74,7 +74,7 @@ export function DeleteAccountSection({
   const copyKey = async () => {
     try {
       await navigator.clipboard.writeText(identityKeyPayload(identity, displayName));
-      toast('Secret key copied — store it somewhere outside gMatch.', 'success');
+      toast('Secret key copied. Store it somewhere outside gMatch.', 'success');
     } catch {
       toast('Clipboard blocked; reveal the key and copy it manually.', 'warning');
     }
@@ -84,9 +84,9 @@ export function DeleteAccountSection({
     <div className="rounded-xl border border-red-900/60 bg-red-950/20 p-4 space-y-3">
       <div className="flex items-center gap-2">
         <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-        <h4 className="text-xs font-semibold text-red-300">Delete Account &amp; Erase This Device</h4>
+        <h4 className="text-xs font-semibold text-red-300">Delete account &amp; erase this device</h4>
       </div>
-      <p className="text-[11px] text-retro-muted leading-relaxed">
+      <p className="text-xs text-retro-muted leading-relaxed">
         Deletes your account and everything it touched on the server: profile, cards, posts,
         stories, messages, decks, wallet balance and marketplace listings. This device is wiped
         too: your secret key, sign-in, saved game, images held in memory, folder permissions and
@@ -108,7 +108,7 @@ export function DeleteAccountSection({
 
       {(phase === 'confirm' || phase === 'erasing') && (
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2 text-[11px]">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             <button
               type="button"
               onClick={() => setKeyShown((v) => !v)}
@@ -140,13 +140,13 @@ export function DeleteAccountSection({
               onChange={(e) => { setAck(e.target.checked); }}
               className="mt-0.5 w-4 h-4 rounded border-red-800 bg-black/40 accent-red-500 cursor-pointer"
             />
-            <span className="text-[11px] text-retro-fg leading-snug">
+            <span className="text-xs text-retro-fg leading-snug">
               I understand this permanently deletes my account and wipes every local trace on this device.
             </span>
           </label>
 
           <div className="space-y-1.5">
-            <label htmlFor="delete-confirm-name" className="text-[11px] text-retro-muted">
+            <label htmlFor="delete-confirm-name" className="text-xs text-retro-muted">
               Type <span className="font-mono text-retro-fg">{expected}</span> to confirm
             </label>
             <input
@@ -159,7 +159,7 @@ export function DeleteAccountSection({
           </div>
 
           {error && (
-            <div role="alert" className="rounded-lg border border-red-800 bg-red-950/40 p-2.5 text-[11px] text-red-300">
+            <div role="alert" className="rounded-lg border border-red-800 bg-red-950/40 p-2.5 text-xs text-red-300">
               {error}
             </div>
           )}

@@ -29,10 +29,10 @@ export function CoffeeModal({ open, reason, onDismiss }: Props) {
       : "You've spent over an hour in duels. Server snapshots, encrypted blob storage, and bandwidth aren't free — if GMatch has been worth your time, consider supporting development."
 
   return (
-    <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/80 backdrop-blur-md animate-orbit-fade-in p-4">
-      <div className="bg-surface-canvas/95 border border-zinc-800 rounded-2xl w-[440px] max-w-[92vw] shadow-2xl animate-orbit-pop overflow-hidden backdrop-blur-md">
+    <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 backdrop-blur-md animate-orbit-fade-in p-4">
+      <div className="bg-surface-canvas/95 border border-border-glass rounded-xl w-[440px] max-w-[92vw] shadow-2xl animate-orbit-pop overflow-hidden backdrop-blur-md">
         {/* Header */}
-        <div className="bg-surface-canvas/60 px-5 py-3.5 border-b border-zinc-800 flex items-center justify-between">
+        <div className="bg-surface-canvas/60 px-5 py-3.5 border-b border-border-glass flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
               <Coffee className="w-4 h-4" />
@@ -47,11 +47,11 @@ export function CoffeeModal({ open, reason, onDismiss }: Props) {
         <div className="px-5 py-5 space-y-4">
           <p className="text-xs leading-relaxed text-retro-body">{blurb}</p>
 
-          <div className="bg-surface-canvas/50 border border-zinc-800/80 rounded-xl p-3.5 space-y-2">
+          <div className="bg-surface-canvas/50 border border-border-glass rounded-xl p-3.5 space-y-2">
             <p className="text-[10px] uppercase tracking-wider text-retro-muted font-bold">
               Infrastructure & Maintenance
             </p>
-            <ul className="text-[11px] text-retro-muted space-y-1.5">
+            <ul className="text-xs text-retro-muted space-y-1.5">
               <li className="flex items-center gap-2">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                 <span>AES-GCM at-rest encryption + SSRF-guarded media streaming</span>
@@ -85,14 +85,14 @@ export function CoffeeModal({ open, reason, onDismiss }: Props) {
             <button
               type="button"
               onClick={() => onDismiss('later')}
-              className="flex-1 py-1.5 text-[11px] font-semibold text-retro-muted hover:text-retro-body border border-zinc-800 hover:bg-surface-canvas rounded-lg transition-colors cursor-pointer"
+              className="flex-1 py-1.5 text-xs font-semibold text-retro-muted hover:text-retro-body border border-border-glass hover:bg-surface-canvas rounded-lg transition-colors cursor-pointer"
             >
               Maybe later
             </button>
             <button
               type="button"
               onClick={() => onDismiss('never')}
-              className="flex-1 py-1.5 text-[11px] font-semibold text-retro-muted hover:text-retro-body border border-transparent hover:border-zinc-800 rounded-lg transition-colors cursor-pointer"
+              className="flex-1 py-1.5 text-xs font-semibold text-retro-muted hover:text-retro-body border border-transparent hover:border-border-glass rounded-lg transition-colors cursor-pointer"
             >
               Don&apos;t show again
             </button>

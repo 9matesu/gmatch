@@ -13,6 +13,7 @@ import {
   UserPlus,
   Sparkles,
 } from "lucide-react";
+import { groupNotifications, groupTitle, type NotifItem } from "../utils/groupNotifications";
 import { playPress } from "../utils/sounds";
 
 export interface NotificationItem {
@@ -81,6 +82,9 @@ export function NotificationsPanel({
         .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || "")),
     [notifications]
   );
+  // Instagram-style fold: "Rafael and 3 others liked your card" — pure view
+  // logic; read-state plumbing stays as-is (mark-all), no per-group action.
+  const groups = useMemo(() => groupNotifications(items as unknown as NotifItem[]), [items]);
 
   const openInvites = invites.filter((invite) => new Date(invite.expires_at).getTime() > now);
 
@@ -137,7 +141,7 @@ export function NotificationsPanel({
                     <p className="text-xs font-medium text-retro-fg truncate">
                       {inv.inviter_name?.trim() || 'Unknown User'}
                     </p>
-                    <p className="text-[11px] text-retro-muted">
+                    <p className="text-xs text-retro-muted">
                       Challenged you to a duel · expires in {secondsLeft}s
                     </p>
                   </div>
@@ -167,19 +171,21 @@ export function NotificationsPanel({
           <div className="py-12 text-center space-y-2">
             <Bell className="w-6 h-6 mx-auto text-retro-muted" />
             <p className="text-xs font-medium text-retro-body">No notifications</p>
-            <p className="text-[11px] text-retro-muted">
+            <p className="text-xs text-retro-muted">
               Match invites and results will appear here.
             </p>
           </div>
         ) : (
-          items.map((n) => {
+          groups.map((g) => {
+            const n = g.items[0];
             const isBabecockInvite = n.type === "babecock_invite";
-            const inviteId = typeof n.data === 'string' ? (() => { try { return JSON.parse(n.data)?.invite_id; } catch { return undefined; } })() : n.data?.invite_id;
+            const inviteId = typeof n.data === 'string' ? (() => { try { return JSON.parse(n.data)?.invite_id; } catch { return undefined; } })() : (n.data as { invite_id?: string })?.invite_id;
+            const title = g.items.length > 1 ? groupTitle(g.type, g.actors) : n.title;
             return (
               <div
-                key={n.id}
+                key={g.key}
                 className={`p-3 rounded-lg flex items-start gap-3 border ${
-                  n.read
+                  g.unread === 0
                     ? "border-white/5 bg-glass-w5"
                     : "glass-inset border-white/14"
                 }`}
@@ -190,14 +196,17 @@ export function NotificationsPanel({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-xs font-medium text-retro-fg truncate">
-                      {n.title}
+                      {title}
+                      {g.items.length > 1 && (
+                        <span className="text-retro-muted"> · {g.items.length}</span>
+                      )}
                     </p>
-                    {!n.read && (
+                    {g.unread > 0 && (
                       <span className="w-1.5 h-1.5 rounded-full bg-retro-accent shrink-0" />
                     )}
                   </div>
                   {n.body && (
-                    <p className="text-[11px] text-retro-muted mt-0.5">
+                    <p className="text-xs text-retro-muted mt-0.5">
                       {n.body}
                     </p>
                   )}
@@ -210,14 +219,14 @@ export function NotificationsPanel({
                           onRespondBabecock?.(inviteId, true);
                           onOpenBabecock?.();
                         }}
-                        className="glass-action glass-action-primary inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer"
+                        className="glass-action glass-action-primary inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer"
                       >
                         <LogIn className="w-3 h-3" /> Accept &amp; join
                       </button>
                       <button
                         type="button"
                         onClick={() => { onRespondBabecock?.(inviteId, false); }}
-                        className="px-2.5 py-1.5 rounded bg-surface-interactive border border-retro-border text-retro-body text-[11px] font-medium cursor-pointer"
+                        className="px-2.5 py-1.5 rounded bg-surface-interactive border border-border-glass text-retro-body text-xs font-medium cursor-pointer"
                       >
                         Decline
                       </button>

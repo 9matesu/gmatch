@@ -162,8 +162,8 @@ export function AttachmentUploadModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-surface-raised border border-border-glass rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl space-y-4 p-5">
+    <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-surface-raised border border-border-glass rounded-xl max-w-lg w-full overflow-hidden shadow-2xl space-y-4 p-5">
         <div className="flex items-center justify-between border-b border-border-glass pb-3">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center text-orange-600">
@@ -195,7 +195,7 @@ export function AttachmentUploadModal({
                 fileRef.current = null
                 setHasFile(false)
               }}
-              className={`flex-1 py-1.5 rounded-lg transition-all uppercase cursor-pointer flex items-center justify-center gap-1.5 ${mode === m ? 'bg-surface-raised text-retro-fg shadow-xs font-black' : 'text-retro-muted hover:text-retro-body'
+              className={`flex-1 py-1.5 rounded-lg transition-all uppercase tracking-wider cursor-pointer flex items-center justify-center gap-1.5 ${mode === m ? 'bg-surface-raised text-retro-fg shadow-xs font-black' : 'text-retro-muted hover:text-retro-body'
                 }`}>
               {m === 'upload' && <UploadCloud className="w-3.5 h-3.5" />}
               {m === 'url' && <LinkIcon className="w-3.5 h-3.5" />}
@@ -288,7 +288,7 @@ export function AttachmentUploadModal({
             className="px-5 py-2 bg-black hover:bg-surface-elevated text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-            <span>{uploading ? 'Uploading...' : 'Attach'}</span>
+            <span>{uploading ? 'Uploading…' : 'Attach'}</span>
           </button>
         </div>
       </div>

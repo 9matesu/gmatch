@@ -70,7 +70,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-bold text-retro-fg">Dashboard Overview</h1>
+        <h1 className="text-lg font-bold text-retro-fg">Dashboard overview</h1>
         <p className="text-xs text-retro-muted mt-1">Platform health and key metrics at a glance. Auto-refreshes every 15s.</p>
       </div>
 
@@ -121,7 +121,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
                       className="w-10 h-10"
                       onZoom={onZoom}
                       badge={obj.is_story === 1 && (
-                        <span className="absolute top-0.5 right-0.5 px-1 py-0.5 bg-cyan-500/10 border border-purple-300 text-cyan-300 font-mono font-bold text-[6px] rounded">STORY</span>
+                        <span className="absolute top-0.5 right-0.5 px-1 py-0.5 bg-cyan-500/10 border border-purple-300 text-cyan-300 font-mono font-bold text-[10px] rounded">STORY</span>
                       )}
                     />
                     <div className="min-w-0 flex-1">
@@ -130,7 +130,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
                     </div>
                     <div className="flex items-center gap-1.5 text-[10px] text-retro-muted">
                       <Badge variant="neutral" size="sm">{obj.recipients_count || 0}</Badge>
-                      <Badge variant="neutral" size="sm">♥ {obj.likes_count || 0}</Badge>
+                      <Badge variant="neutral" size="sm">{obj.likes_count || 0} likes</Badge>
                     </div>
                   </div>
                 );

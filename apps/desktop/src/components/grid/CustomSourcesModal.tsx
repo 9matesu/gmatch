@@ -54,8 +54,8 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-label="Custom image sources">
-      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-border-glass bg-surface-canvas shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-label="Custom image sources">
+      <div className="w-full max-w-lg overflow-hidden rounded-xl border border-border-glass bg-surface-canvas shadow-2xl">
         <div className="flex items-center justify-between gap-2 border-b border-border-glass p-4">
           <div>
             <h2 className="text-sm font-bold text-retro-fg">Custom image sources</h2>
@@ -78,9 +78,16 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
                 aria-checked={s.enabled}
                 aria-label={`${s.enabled ? 'Disable' : 'Enable'} ${s.label}`}
                 onClick={() => toggleCustomSource(s.id)}
-                className={`relative h-5 w-9 shrink-0 rounded-full transition-colors cursor-pointer ${s.enabled ? 'bg-retro-accent' : 'bg-glass-w10'}`}
+                className="relative flex h-4 w-9 shrink-0 cursor-pointer items-center border-0 p-0"
               >
-                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${s.enabled ? 'left-[18px]' : 'left-0.5'}`} />
+                <span
+                  aria-hidden="true"
+                  className={`absolute inset-x-0 h-1 rounded-full transition-colors ${s.enabled ? 'bg-retro-accent/50' : 'bg-surface-interactive'}`}
+                />
+                <span
+                  aria-hidden="true"
+                  className={`absolute left-0 h-3 w-3 rounded-full shadow transition-transform ${s.enabled ? 'translate-x-6 bg-retro-accent' : 'translate-x-0 bg-retro-muted'}`}
+                />
               </button>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-xs font-bold text-retro-fg">{s.label}</div>
@@ -136,7 +143,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
             </button>
           </div>
 
-          {notice && <p className="text-[11px] text-retro-body">{notice}</p>}
+          {notice && <p className="text-xs text-retro-body">{notice}</p>}
         </div>
       </div>
     </div>

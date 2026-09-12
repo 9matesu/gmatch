@@ -31,7 +31,7 @@ export function PlatformTab({ identity, pinVerified, onAction }: PlatformTabProp
   const [isLoading, setIsLoading] = useState(false);
   const [newAnnouncement, setNewAnnouncement] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [editingRec, setEditingRec] = useState<AdminRecommendation | null>(null);
+  const [,setEditingRec] = useState<AdminRecommendation | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!identity || !pinVerified) return;
@@ -64,14 +64,7 @@ export function PlatformTab({ identity, pinVerified, onAction }: PlatformTabProp
     }
   };
 
-  const handleDeleteAnnouncement = async (id: string) => {
-    if (!identity) return;
-    try {
-      await adminApi.deleteAnnouncement(identity, id);
-      fetchData();
-    } catch {
-    }
-  };
+  
 
   const handleUpdateRecommendation = async (id: string, status: string) => {
     if (!identity) return;
@@ -100,7 +93,7 @@ export function PlatformTab({ identity, pinVerified, onAction }: PlatformTabProp
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-retro-fg">Platform Management</h1>
+          <h1 className="text-lg font-bold text-retro-fg">Platform management</h1>
           <p className="text-xs text-retro-muted mt-1">Announcements, recommendations, and feedback</p>
         </div>
       </div>
@@ -131,7 +124,7 @@ export function PlatformTab({ identity, pinVerified, onAction }: PlatformTabProp
       {activeSubTab === "announcements" && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-retro-fg">System Announcements</h2>
+            <h2 className="text-sm font-bold text-retro-fg">System announcements</h2>
             <button
               type="button"
               onClick={() => setShowCreateModal(true)}
@@ -194,7 +187,7 @@ export function PlatformTab({ identity, pinVerified, onAction }: PlatformTabProp
 
       {activeSubTab === "recommendations" && (
         <div className="space-y-4">
-          <h2 className="text-sm font-bold text-retro-fg">Community Feedback & Recommendations</h2>
+          <h2 className="text-sm font-bold text-retro-fg">Community feedback & recommendations</h2>
 
           <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
             {recommendations.length === 0 ? (

@@ -192,9 +192,9 @@ export function ValuationSummary({
   const spotlightCard = summary.cardOfTheMatch;
 
   return (
-    <div className="space-y-4 animate-orbit-slide-up bg-surface-canvas/70 border border-zinc-800 rounded-xl p-4 font-sans text-retro-fg backdrop-blur-md">
+    <div className="space-y-4 animate-orbit-slide-up bg-surface-canvas/70 border border-border-glass rounded-xl p-4 font-sans text-retro-fg backdrop-blur-md">
       {/* Header: Social Valuation Summary banner */}
-      <div className="p-4 bg-surface-canvas/60 border border-zinc-800/80 rounded-xl text-center space-y-2">
+      <div className="p-4 bg-surface-canvas/60 border border-border-glass rounded-xl text-center space-y-2">
         <div className="flex items-center justify-center gap-1.5 text-xs font-bold uppercase tracking-wider text-retro-body">
           <Trophy className="w-4 h-4 text-amber-400" />
           <span>Match Valuation Complete</span>
@@ -222,7 +222,7 @@ export function ValuationSummary({
           </div>
           {summary.promotions.map((p) => (
             <div key={p.id} className="text-xs font-medium text-retro-body">
-              Card upgraded from <span className="uppercase text-amber-300 font-bold">{p.oldRarity}</span> to <span className="uppercase text-amber-400 font-extrabold">{p.newRarity}</span>
+              Card upgraded from <span className="uppercase tracking-wider text-amber-300 font-bold">{p.oldRarity}</span> to <span className="uppercase text-amber-400 font-extrabold">{p.newRarity}</span>
             </div>
           ))}
         </div>
@@ -230,8 +230,8 @@ export function ValuationSummary({
 
       {/* Card of the Match Spotlight */}
       {spotlightCard && spotlightCard.delta > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-surface-canvas/50 border border-zinc-800 rounded-xl">
-          <div className="w-14 h-14 rounded-lg border border-zinc-700 overflow-hidden shrink-0 bg-black">
+        <div className="flex items-center gap-3 p-3 bg-surface-canvas/50 border border-border-glass rounded-xl">
+          <div className="w-14 h-14 rounded-lg border border-border-glass overflow-hidden shrink-0 bg-black">
             <ObjectImage
               contentUrl={spotlightCard.url}
               objectId={spotlightCard.id}
@@ -247,7 +247,7 @@ export function ValuationSummary({
             <div className="text-xs font-bold text-retro-fg truncate mt-0.5">
               {spotlightCard.isMine ? 'Your Card' : `${opponentName}'s Card`}
             </div>
-            <div className="text-[11px] text-emerald-400 font-mono font-bold">
+            <div className="text-xs text-emerald-400 font-mono font-bold">
               +{spotlightCard.delta} Points Gain
             </div>
           </div>
@@ -262,8 +262,8 @@ export function ValuationSummary({
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {/* My Played Cards */}
-          <div className="p-3 bg-surface-canvas/50 border border-zinc-800/80 rounded-xl space-y-2">
-            <div className="text-xs font-bold text-retro-body border-b border-zinc-800 pb-1.5">
+          <div className="p-3 bg-surface-canvas/50 border border-border-glass rounded-xl space-y-2">
+            <div className="text-xs font-bold text-retro-body border-b border-border-glass pb-1.5">
               Your Cards Valuation:
             </div>
             {summary.myCardDeltas.map((c) => {
@@ -271,9 +271,9 @@ export function ValuationSummary({
               return (
                 <div key={c.round} className="flex items-center justify-between text-xs py-0.5">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-retro-muted text-[11px]">R{c.round}:</span>
-                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase ${rarity.badgeClass}`}>{rarity.label}</span>
-                    <span className="text-retro-muted text-[11px] flex items-center gap-1">
+                    <span className="font-mono text-retro-muted text-xs">R{c.round}:</span>
+                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold uppercase tracking-wider ${rarity.badgeClass}`}>{rarity.label}</span>
+                    <span className="text-retro-muted text-xs flex items-center gap-1">
                       {c.vote === 'boost' ? <><Zap className="w-3 h-3 text-amber-400" /> Boosted</> : c.vote === 'like' ? <><Heart className="w-3 h-3 text-amber-400 fill-rose-400" /> Liked</> : <><X className="w-3 h-3 text-retro-muted" /> Rejected</>}
                     </span>
                   </div>
@@ -286,15 +286,15 @@ export function ValuationSummary({
           </div>
 
           {/* Opponent Cards */}
-          <div className="p-3 bg-surface-canvas/50 border border-zinc-800/80 rounded-xl space-y-2">
-            <div className="text-xs font-bold text-retro-muted border-b border-zinc-800 pb-1.5">
+          <div className="p-3 bg-surface-canvas/50 border border-border-glass rounded-xl space-y-2">
+            <div className="text-xs font-bold text-retro-muted border-b border-border-glass pb-1.5">
               {opponentName}&apos;s Cards:
             </div>
             {summary.oppCardDeltas.map((c) => (
               <div key={c.round} className="flex items-center justify-between text-xs py-0.5">
                 <div className="flex items-center gap-1.5">
-                  <span className="font-mono text-retro-muted text-[11px]">R{c.round}:</span>
-                  <span className="text-retro-muted text-[11px] flex items-center gap-1">
+                  <span className="font-mono text-retro-muted text-xs">R{c.round}:</span>
+                  <span className="text-retro-muted text-xs flex items-center gap-1">
                     {c.vote === 'boost' ? <><Zap className="w-3 h-3 text-amber-400" /> You Boosted</> : c.vote === 'like' ? <><Heart className="w-3 h-3 text-amber-400 fill-rose-400" /> You Liked</> : <><X className="w-3 h-3 text-retro-muted" /> You Rejected</>}
                   </span>
                 </div>
@@ -313,7 +313,7 @@ export function ValuationSummary({
           type="button"
           onClick={onReturnToLobby}
           disabled={submitting}
-          className="flex-1 py-2.5 text-xs font-semibold uppercase tracking-wider bg-surface-canvas hover:bg-surface-elevated text-retro-body border border-zinc-700 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+          className="flex-1 py-2.5 text-xs font-semibold uppercase tracking-wider bg-surface-canvas hover:bg-surface-elevated text-retro-body border border-border-glass rounded-lg transition-colors cursor-pointer disabled:opacity-50"
         >
           Return to Lobby
         </button>

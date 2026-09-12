@@ -29,19 +29,7 @@ interface PortfolioCard {
 
 const RARITY_ORDER = ['common', 'copper', 'silver', 'gold', 'diamond'] as const;
 
-export function StoreTab({
-  points,
-  onPurchase,
-  onUseConsumable,
-  onDeployHack,
-  identity,
-  onOpenCardCollection,
-  onOpenFlash,
-  users = [],
-  profilePics = {},
-  toast,
-  arsenalOnly = false,
-}: {
+export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCardCollection, onOpenFlash, users = [], profilePics = {}, toast, arsenalOnly = false }: {
   points: number;
   onPurchase?: (item: StoreItem) => void;
   onUseConsumable?: (item: StoreItem) => void;
@@ -224,7 +212,7 @@ export function StoreTab({
 
     const cashedCount = cashable.length - failed;
     if (cashedCount > 0) {
-      toast?.(`Cashed out ${cashedCount} card${cashedCount === 1 ? '' : 's'} for ${formatGc(payout)}!`, 'success');
+      toast?.(`Cashed out ${cashedCount} card${cashedCount === 1 ? '' : 's'} for ${formatGc(payout)}.`, 'success');
     } else {
       toast?.('No cards were cashed out', 'error');
     }
@@ -289,7 +277,7 @@ export function StoreTab({
       );
       if (res.ok) {
         playLike();
-        toast?.(`Purchased ${item.name}!`, 'success');
+        toast?.(`Purchased ${item.name}`, 'success');
         onPurchase?.(item);
 
         if (item.category === 'hack' && targetId) {
@@ -348,7 +336,7 @@ export function StoreTab({
       {!arsenalOnly && (
       <>
       {/* Header */}
-      <section className="w-full bg-surface-raised border border-retro-border rounded-lg p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <section className="w-full bg-surface-raised border border-border-glass rounded-lg p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-surface-interactive flex items-center justify-center text-retro-muted">
             <ShoppingBag className="w-4 h-4" />
@@ -363,7 +351,7 @@ export function StoreTab({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-interactive border border-retro-border rounded-lg">
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-interactive border border-border-glass rounded-lg">
           <Coins className="w-3.5 h-3.5 text-retro-accent" />
           <span className="text-xs text-retro-muted">Balance:</span>
           <span className="text-sm font-medium font-mono text-retro-fg tabular-nums">g$ {points.toLocaleString()}</span>
@@ -372,7 +360,7 @@ export function StoreTab({
 
       {/* Economy Dashboard */}
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-surface-raised border border-retro-border rounded-lg p-3.5 col-span-2 lg:col-span-1">
+        <div className="bg-surface-raised border border-border-glass rounded-lg p-3.5 col-span-2 lg:col-span-1">
           <div className="flex items-center gap-1.5 text-retro-muted text-[10px] font-semibold uppercase tracking-wider">
             <Coins className="w-3.5 h-3.5 text-retro-accent" />
             Balance
@@ -380,7 +368,7 @@ export function StoreTab({
           <div className="mt-1 text-lg font-bold font-mono tabular-nums text-retro-fg">{formatGc(points)}</div>
         </div>
 
-        <div className="bg-surface-raised border border-retro-border rounded-lg p-3.5">
+        <div className="bg-surface-raised border border-border-glass rounded-lg p-3.5">
           <div className="flex items-center gap-1.5 text-retro-muted text-[10px] font-semibold uppercase tracking-wider">
             <Layers className="w-3.5 h-3.5" />
             Portfolio Value
@@ -398,13 +386,13 @@ export function StoreTab({
           <div className="text-[10px] text-retro-muted mt-0.5">{(cashoutRate / 100).toFixed(1)}% rate</div>
 
           {cashingOutAll && cashoutProgress ? (
-            <div className="mt-2.5 flex items-center gap-2 text-[11px] text-amber-300 font-medium">
+            <div className="mt-2.5 flex items-center gap-2 text-xs text-amber-300 font-medium">
               <span className="w-3 h-3 border border-amber-400 border-t-transparent rounded-full animate-spin" />
               Cashing out {cashoutProgress.done}/{cashoutProgress.total}…
             </div>
           ) : confirmCashoutAll ? (
             <div className="mt-2.5 space-y-2">
-              <p className="text-[11px] text-retro-body font-medium">
+              <p className="text-xs text-retro-body font-medium">
                 Cash out {cashableCount} card{cashableCount === 1 ? '' : 's'} for ~{formatGc(cashoutEstimate)}?
                 {skippedCount > 0 && (
                   <span className="text-retro-muted"> ({skippedCount} listed skipped)</span>
@@ -414,14 +402,14 @@ export function StoreTab({
                 <button
                   type="button"
                   onClick={() => void handleCashOutAll()}
-                  className="px-2.5 py-1.5 rounded bg-amber-500 text-black text-[11px] font-bold cursor-pointer transition-colors hover:bg-amber-400"
+                  className="px-2.5 py-1.5 rounded bg-amber-500 text-black text-xs font-bold cursor-pointer transition-colors hover:bg-amber-400"
                 >
                   Confirm
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmCashoutAll(false)}
-                  className="px-2.5 py-1.5 rounded bg-surface-interactive border border-retro-border text-retro-body text-[11px] font-medium cursor-pointer transition-colors hover:text-retro-fg"
+                  className="px-2.5 py-1.5 rounded bg-surface-interactive border border-border-glass text-retro-body text-xs font-medium cursor-pointer transition-colors hover:text-retro-fg"
                 >
                   Cancel
                 </button>
@@ -435,7 +423,7 @@ export function StoreTab({
                 setConfirmCashoutAll(true);
               }}
               disabled={cashableCount === 0}
-              className="mt-2.5 w-full px-2.5 py-1.5 rounded bg-amber-500/15 hover:bg-amber-500/25 disabled:opacity-40 text-amber-300 text-[11px] font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              className="mt-2.5 w-full px-2.5 py-1.5 rounded bg-amber-500/15 hover:bg-amber-500/25 disabled:opacity-40 text-amber-300 text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
             >
               <Coins className="w-3 h-3" />
               Cash Out All
@@ -443,7 +431,7 @@ export function StoreTab({
           )}
         </div>
 
-        <div className="bg-surface-raised border border-retro-border rounded-lg p-3.5 col-span-2 lg:col-span-1">
+        <div className="bg-surface-raised border border-border-glass rounded-lg p-3.5 col-span-2 lg:col-span-1">
           <div className="text-retro-muted text-[10px] font-semibold uppercase tracking-wider mb-1.5">Rarity Mix</div>
           <div className="flex flex-wrap gap-1.5">
             {RARITY_ORDER.map((r) => {
@@ -453,7 +441,7 @@ export function StoreTab({
               return (
                 <span
                   key={r}
-                  className="text-[9px] font-bold px-1.5 py-0.5 rounded border tabular-nums"
+                  className="text-[10px] font-bold px-1.5 py-0.5 rounded border tabular-nums"
                   style={{ color: tier.accentColor, borderColor: `${tier.accentColor}66`, backgroundColor: `${tier.accentColor}14` }}
                 >
                   {tier.label} {count}
@@ -469,14 +457,14 @@ export function StoreTab({
       {!arsenalOnly && (
       <>
       {/* Most valuable cards */}
-      <section className="bg-surface-raised border border-retro-border rounded-lg p-4">
+      <section className="bg-surface-raised border border-border-glass rounded-lg p-4">
         <div className="flex items-center justify-between gap-2 mb-3">
           <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Most valuable cards</h3>
           {onOpenCardCollection && (
             <button
               type="button"
               onClick={onOpenCardCollection}
-              className="px-2.5 py-1.5 text-[11px] font-medium border border-retro-border text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors whitespace-nowrap"
+              className="px-2.5 py-1.5 text-xs font-medium border border-border-glass text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors whitespace-nowrap"
             >
               View collection
             </button>
@@ -489,17 +477,17 @@ export function StoreTab({
             {[...portfolio].sort((a, b) => b.value - a.value).slice(0, 8).map((c, i) => {
               const tier = RARITY_TIERS[c.rarity as keyof typeof RARITY_TIERS];
               return (
-                <div key={c.id} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-surface-interactive border border-retro-border">
-                  <span className="text-[11px] font-mono text-retro-muted tabular-nums w-5 shrink-0">#{i + 1}</span>
+                <div key={c.id} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-surface-interactive border border-border-glass">
+                  <span className="text-xs font-mono text-retro-muted tabular-nums w-5 shrink-0">#{i + 1}</span>
                   {tier && (
                     <span
-                      className="text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide shrink-0"
+                      className="text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide shrink-0"
                       style={{ color: tier.accentColor, borderColor: `${tier.accentColor}66`, backgroundColor: `${tier.accentColor}14` }}
                     >
                       {tier.label}
                     </span>
                   )}
-                  <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-retro-muted">{c.id.slice(0, 12)}…</span>
+                  <span className="min-w-0 flex-1 truncate font-mono text-xs text-retro-muted">{c.id.slice(0, 12)}…</span>
                   <span className="text-xs font-bold font-mono tabular-nums text-retro-fg shrink-0">{formatGc(c.value)}</span>
                   <span className="text-[10px] font-mono tabular-nums text-amber-300 shrink-0">→ {formatGc(computeCashoutPayout(c.value, cashoutRate))}</span>
                 </div>
@@ -510,7 +498,7 @@ export function StoreTab({
       </section>
 
       {/* Inventory (read-only) */}
-      <section className="bg-surface-raised border border-retro-border rounded-lg p-4">
+      <section className="bg-surface-raised border border-border-glass rounded-lg p-4">
         <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider mb-3">Inventory</h3>
         {(() => {
           const owned = storeItems.filter((item) => (inventory[item.id] || 0) > 0);
@@ -518,9 +506,9 @@ export function StoreTab({
           return (
             <div className="space-y-1.5">
               {owned.map((item) => (
-                <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-surface-interactive border border-retro-border">
+                <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-surface-interactive border border-border-glass">
                   <span className="min-w-0 flex-1 truncate text-xs text-retro-body">{item.name}</span>
-                  <span className="text-[11px] font-mono tabular-nums text-retro-muted shrink-0">×{inventory[item.id]}</span>
+                  <span className="text-xs font-mono tabular-nums text-retro-muted shrink-0">×{inventory[item.id]}</span>
                 </div>
               ))}
             </div>
@@ -529,7 +517,7 @@ export function StoreTab({
       </section>
 
       {/* Community Market — Steam-style buy/sell between players */}
-      <section className="bg-surface-raised border border-retro-border rounded-lg p-4">
+      <section className="bg-surface-raised border border-border-glass rounded-lg p-4">
         <div className="flex items-center justify-between gap-2 mb-3">
           <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Community Market</h3>
           <span className="text-[10px] text-retro-muted">{marketListings.length} open listing{marketListings.length === 1 ? '' : 's'}</span>
@@ -539,7 +527,7 @@ export function StoreTab({
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {marketListings.map((l) => (
-              <div key={l.listingId} className="rounded-lg border border-retro-border bg-surface-interactive overflow-hidden flex flex-col">
+              <div key={l.listingId} className="rounded-lg border border-border-glass bg-surface-interactive overflow-hidden flex flex-col">
                 <button
                   type="button"
                   onClick={() => setMarketCardId(l.cardId)}
@@ -558,20 +546,24 @@ export function StoreTab({
                     />
                   </div>
                   <div className="p-2">
-                    <div className="text-[11px] font-bold text-retro-fg truncate">{l.card?.name || 'Unnamed Card'}</div>
-                    <div className="text-[9px] capitalize text-retro-muted">{l.card?.rarity}</div>
+                    <div className="text-xs font-bold text-retro-fg truncate">{l.card?.name || 'Unnamed Card'}</div>
+                    <div className="text-[10px] capitalize text-retro-muted">{l.card?.rarity}</div>
                   </div>
                 </button>
                 <div className="flex items-center justify-between gap-1.5 px-2 pb-2">
-                  <span className="text-[11px] font-mono font-bold text-cyan-300 tabular-nums">{formatGc(l.price)} g$</span>
-                  <button
-                    type="button"
-                    disabled={buyingCardId !== null}
-                    onClick={() => void buyListing(l)}
-                    className="px-2 py-1 rounded bg-cyan-500/20 hover:bg-cyan-500/30 disabled:opacity-40 text-cyan-300 text-[10px] font-bold cursor-pointer transition-colors"
-                  >
-                    {buyingCardId === l.cardId ? '…' : 'Buy'}
-                  </button>
+                  <span className="text-xs font-mono font-bold text-cyan-300 tabular-nums">{formatGc(l.price)} g$</span>
+                  {l.sellerId === identity?.orbitId ? (
+                    <span className="px-2 py-1 rounded bg-retro-interactive text-retro-muted text-[10px] font-bold" title="This is your own listing — cancel it from your card page instead">Yours</span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={buyingCardId !== null}
+                      onClick={() => void buyListing(l)}
+                      className="px-2 py-1 rounded bg-cyan-500/20 hover:bg-cyan-500/30 disabled:opacity-40 text-cyan-300 text-[10px] font-bold cursor-pointer transition-colors"
+                    >
+                      {buyingCardId === l.cardId ? '…' : 'Buy'}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -614,7 +606,7 @@ export function StoreTab({
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-retro-border mt-3 flex items-center justify-between gap-2">
+              <div className="pt-3 border-t border-border-glass mt-3 flex items-center justify-between gap-2">
                 <span className="text-sm font-medium font-mono tabular-nums text-rose-400">
                   g$ {item.cost.toLocaleString()}
                 </span>

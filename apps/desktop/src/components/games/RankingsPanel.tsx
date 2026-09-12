@@ -9,7 +9,7 @@ type Board = 'idle' | 'arena' | 'social';
 type SocialMetric = 'all' | 'today';
 
 const BOARDS: { id: Board; label: string; icon: typeof Trophy }[] = [
-  { id: 'idle', label: 'Idle Clicker', icon: MousePointerClick },
+  { id: 'idle', label: 'Wallet', icon: MousePointerClick },
   { id: 'arena', label: 'Card Duel', icon: Swords },
   { id: 'social', label: 'Social', icon: Heart },
 ];
@@ -82,12 +82,12 @@ export function RankingsPanel({
 
   return (
     <div className="glass-surface rounded-lg p-4 space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-retro-border pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-glass pb-3">
         <div className="flex items-center gap-2">
           <Trophy className="w-4 h-4 text-retro-accent" />
           <h2 className="text-sm font-medium text-retro-fg">Rankings</h2>
         </div>
-        <div className="flex bg-surface-interactive border border-retro-border p-0.5 rounded-md text-xs">
+        <div className="flex bg-surface-interactive border border-border-glass p-0.5 rounded-md text-xs">
           {BOARDS.map((b) => {
             const Icon = b.icon;
             return (
@@ -115,7 +115,7 @@ export function RankingsPanel({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search players"
             aria-label="Search players"
-            className="w-full bg-surface-interactive border border-retro-border rounded-md pl-8 pr-3 py-1.5 text-xs text-retro-fg outline-none focus:border-zinc-500 placeholder:text-retro-muted"
+            className="w-full bg-surface-interactive border border-border-glass rounded-md pl-8 pr-3 py-1.5 text-xs text-retro-fg outline-none focus:border-border-glass placeholder:text-retro-muted"
           />
         </div>
         <button
@@ -124,13 +124,13 @@ export function RankingsPanel({
           aria-pressed={onlineOnly}
           className={`px-2.5 py-1.5 rounded-md text-xs border transition-colors cursor-pointer ${onlineOnly
             ? 'border-retro-accent text-retro-fg bg-surface-raised'
-            : 'border-retro-border text-retro-muted hover:text-retro-fg bg-surface-interactive'
+            : 'border-border-glass text-retro-muted hover:text-retro-fg bg-surface-interactive'
             }`}
         >
           Online only
         </button>
         {board === 'social' && (
-          <div className="flex bg-surface-interactive border border-retro-border p-0.5 rounded-md text-xs">
+          <div className="flex bg-surface-interactive border border-border-glass p-0.5 rounded-md text-xs">
             {(['all', 'today'] as const).map((m) => (
               <button
                 key={m}
@@ -160,9 +160,9 @@ export function RankingsPanel({
                 key={user.id}
                 type="button"
                 onClick={() => onSelectUser(user.id)}
-                className="w-full text-left bg-surface-interactive border border-retro-border rounded-lg p-2.5 flex items-center gap-3 hover:border-zinc-500 transition-colors cursor-pointer"
+                className="w-full text-left bg-surface-interactive border border-border-glass rounded-lg p-2.5 flex items-center gap-3 hover:border-border-glass transition-colors cursor-pointer"
               >
-                <span className="w-6 flex-shrink-0 text-center text-[11px] font-mono text-retro-muted">
+                <span className="w-6 flex-shrink-0 text-center text-xs font-mono text-retro-muted">
                   {rank <= 3 && rank === 1 ? (
                     <Trophy className="w-3.5 h-3.5 text-retro-accent mx-auto" />
                   ) : (
@@ -172,7 +172,7 @@ export function RankingsPanel({
                 <div className="relative flex-shrink-0">
                   <Avatar id={user.id} imageUrl={user.pfp_url || undefined} size={32} />
                   <span
-                    className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-surface-interactive ${user.online ? 'bg-retro-online' : 'bg-zinc-500'
+                    className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-surface-interactive ${user.online ? 'bg-retro-online' : 'bg-retro-muted'
                       }`}
                   />
                 </div>

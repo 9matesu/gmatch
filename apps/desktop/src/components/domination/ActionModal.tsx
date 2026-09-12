@@ -85,33 +85,33 @@ export function ActionModal({
     await onSubmit(payload);
   };
 
-  const field = "w-full bg-zinc-950/60 border border-zinc-800 rounded-md p-2.5 text-xs outline-none focus:border-zinc-600 placeholder:text-zinc-600";
+  const field = "w-full glass-field rounded-md p-2.5 text-xs outline-none placeholder:text-retro-muted";
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black/70 flex items-center justify-center p-4 select-none font-sans" onClick={onClose}>
+    <div className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 select-none font-sans" onClick={onClose}>
       <div
-        className="bg-zinc-900 border border-zinc-800 rounded-xl max-w-lg w-full shadow-2xl overflow-hidden"
+        className="glass-surface rounded-xl max-w-lg w-full shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-label={`${actionTitle} settings`}
       >
         {/* Header */}
-        <div className="px-5 py-3.5 border-b border-zinc-800 flex items-center justify-between">
+        <div className="px-5 py-3.5 border-b border-border-subtle flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-md bg-zinc-800 flex items-center justify-center">
-              <Sparkles className="w-3.5 h-3.5 text-zinc-400" />
+            <div className="w-7 h-7 rounded-md glass-inset flex items-center justify-center">
+              <Sparkles className="w-3.5 h-3.5 text-retro-muted" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold tracking-tight">{actionTitle}</h3>
+              <h3 className="text-sm font-semibold tracking-tight text-retro-fg">{actionTitle}</h3>
               {targetName && (
-                <p className="text-[11px] text-zinc-500">to {targetName}</p>
+                <p className="text-xs text-retro-muted">to {targetName}</p>
               )}
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-zinc-500 hover:text-zinc-200 p-1.5 rounded-md hover:bg-zinc-800 transition-colors cursor-pointer"
+            className="text-retro-muted hover:text-retro-fg p-1.5 rounded-md hover:bg-glass-w10 transition-colors cursor-pointer"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
@@ -122,7 +122,7 @@ export function ActionModal({
         <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
           {needsUrl && (
             <div className="space-y-1.5">
-              <label className="block text-[11px] font-medium text-zinc-300">
+              <label className="block text-xs font-medium text-retro-fg">
                 {action === 'popup_video' ? 'Video URL (mp4/webm)' : 'Image URL'}
               </label>
               <input
@@ -132,13 +132,13 @@ export function ActionModal({
                 onChange={(e) => { setUrl(e.target.value); setFormError(null); }}
                 className={field}
               />
-              <p className="text-[10px] text-zinc-600">Paste a direct media link — their client loads it straight.</p>
+              <p className="text-[10px] text-retro-muted">Paste a direct media link — their client loads it straight.</p>
             </div>
           )}
 
           {needsText && (
             <div className="space-y-1.5">
-              <label className="block text-[11px] font-medium text-zinc-300">Message</label>
+              <label className="block text-xs font-medium text-retro-fg">Message</label>
               <textarea
                 rows={3}
                 maxLength={action === 'text_overlay' ? 120 : 280}
@@ -151,9 +151,9 @@ export function ActionModal({
           )}
 
           {action === 'text_overlay' && (
-            <div className="grid grid-cols-3 gap-2.5 p-3 rounded-lg border border-zinc-800 bg-zinc-950/40">
+            <div className="grid grid-cols-3 gap-2.5 p-3 rounded-lg glass-inset">
               <div>
-                <label className="block text-[10px] text-zinc-500 mb-1 flex items-center gap-1">
+                <label className="block text-[10px] text-retro-muted mb-1 flex items-center gap-1">
                   <Layers className="w-3 h-3" /> Position
                 </label>
                 <select
@@ -169,7 +169,7 @@ export function ActionModal({
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] text-zinc-500 mb-1 flex items-center gap-1">
+                <label className="block text-[10px] text-retro-muted mb-1 flex items-center gap-1">
                   <Sliders className="w-3 h-3" /> Size
                 </label>
                 <select
@@ -183,24 +183,24 @@ export function ActionModal({
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] text-zinc-500 mb-1 flex items-center gap-1">
+                <label className="block text-[10px] text-retro-muted mb-1 flex items-center gap-1">
                   <Palette className="w-3 h-3" /> Color
                 </label>
                 <input
                   type="color"
                   value={color}
                   onChange={(e) => setColor(e.target.value)}
-                  className="w-full h-[34px] bg-zinc-950/60 border border-zinc-800 rounded-md p-1 cursor-pointer"
+                  className="w-full h-[34px] glass-field rounded-md p-1 cursor-pointer"
                 />
               </div>
             </div>
           )}
 
           {action === 'blur' && (
-            <div className="p-3.5 rounded-lg border border-zinc-800 bg-zinc-950/40 space-y-2">
+            <div className="p-3.5 rounded-lg glass-inset space-y-2">
               <div className="flex justify-between items-center text-xs">
-                <label className="font-medium text-zinc-300">Blur strength</label>
-                <span className="font-mono text-zinc-400">{intensity}px</span>
+                <label className="font-medium text-retro-fg">Blur strength</label>
+                <span className="font-mono text-retro-muted">{intensity}px</span>
               </div>
               <input
                 type="range"
@@ -208,16 +208,16 @@ export function ActionModal({
                 max="24"
                 value={intensity}
                 onChange={(e) => setIntensity(Number(e.target.value))}
-                className="w-full accent-zinc-300 cursor-pointer"
+                className="w-full accent-retro-accent cursor-pointer"
               />
             </div>
           )}
 
           {action !== 'camera' && (
-            <div className="p-3.5 rounded-lg border border-zinc-800 bg-zinc-950/40 space-y-2">
+            <div className="p-3.5 rounded-lg glass-inset space-y-2">
               <div className="flex justify-between items-center text-xs">
-                <label className="font-medium text-zinc-300">Duration</label>
-                <span className="font-mono text-zinc-400">{duration}s</span>
+                <label className="font-medium text-retro-fg">Duration</label>
+                <span className="font-mono text-retro-muted">{duration}s</span>
               </div>
               <input
                 type="range"
@@ -225,36 +225,37 @@ export function ActionModal({
                 max="60"
                 value={duration}
                 onChange={(e) => setDuration(Number(e.target.value))}
-                className="w-full accent-zinc-300 cursor-pointer"
+                className="w-full accent-retro-accent cursor-pointer"
               />
             </div>
           )}
 
           {action === 'camera' && (
-            <label className="flex items-start gap-3 p-3.5 rounded-lg border border-zinc-800 bg-zinc-950/40 cursor-pointer">
+            <label className="flex items-start gap-3 p-3.5 rounded-lg glass-inset cursor-pointer">
               <input
                 type="checkbox"
                 checked={isPublicCamera}
                 onChange={(e) => setIsPublicCamera(e.target.checked)}
-                className="w-4 h-4 mt-0.5 accent-zinc-300 rounded cursor-pointer shrink-0"
+                className="w-4 h-4 mt-0.5 accent-retro-accent rounded cursor-pointer shrink-0"
               />
               <div className="min-w-0">
-                <div className="font-medium text-zinc-200 text-xs">Ask for a public photo</div>
-                <div className="text-[11px] text-zinc-500 leading-snug mt-0.5">
+                <div className="font-medium text-retro-fg text-xs">Ask for a public photo</div>
+                <div className="text-xs text-retro-muted leading-snug mt-0.5">
                   Off: the snapshot goes only to you. Either way the target approves the capture, and
-                  their consent decides whether public is even possible.
+                  their consent decides whether public is even possible. If their OS blocks the camera,
+                  this quietly fizzles &mdash; check your Outbox.
                 </div>
               </div>
             </label>
           )}
 
           {formError && (
-            <p className="text-[11px] text-rose-400" role="alert">{formError}</p>
+            <p className="text-xs text-rose-400" role="alert">{formError}</p>
           )}
 
           {/* Footer: honest cost line */}
           <div className="pt-1 flex items-center justify-between gap-2">
-            <span className="text-[11px] text-zinc-500">
+            <span className="text-xs text-retro-muted">
               {price != null
                 ? <><span className="font-mono">{price} g$</span> charged only if the send is accepted.</>
                 : 'Charged only if the send is accepted.'}
@@ -263,14 +264,14 @@ export function ActionModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-3.5 py-1.5 border border-zinc-800 rounded-md text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 font-medium cursor-pointer transition-colors"
+                className="glass-action px-3.5 py-1.5 text-retro-muted font-medium cursor-pointer transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="px-4 py-1.5 bg-zinc-100 text-zinc-900 font-semibold rounded-md hover:bg-white flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-wait cursor-pointer transition-colors"
+                className="glass-action glass-action-primary px-4 py-1.5 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-wait cursor-pointer transition-colors"
               >
                 {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 <span>{loading ? 'Sending…' : 'Send'}</span>

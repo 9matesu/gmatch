@@ -29,14 +29,14 @@ export function ReportPostModal({ post, onClose, onReport, toast }: ReportPostMo
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-orbit-fade-in"
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-orbit-fade-in"
       onClick={onClose}
     >
       <div
-        className="bg-surface-raised w-full max-w-sm rounded-t-3xl sm:rounded-3xl border border-border-glass shadow-2xl overflow-hidden animate-orbit-slide-up p-5 space-y-4"
+        className="bg-surface-raised w-full max-w-sm rounded-t-3xl sm:rounded-xl border border-border-glass shadow-2xl overflow-hidden animate-orbit-slide-up p-5 space-y-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+        <div className="flex items-center justify-between border-b border-border-glass pb-3">
           <h3 className="text-sm font-extrabold text-retro-fg flex items-center gap-2">
             <Flag className="w-4 h-4 text-red-500" />
             <span>Report Inappropriate Post</span>

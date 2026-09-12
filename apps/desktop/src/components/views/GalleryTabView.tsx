@@ -96,7 +96,7 @@ export function GalleryTabView({
       aria-pressed={subTab === id}
       className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
         subTab === id
-          ? 'bg-surface-interactive text-retro-fg border-retro-border'
+          ? 'bg-surface-interactive text-retro-fg border-border-glass'
           : 'bg-transparent text-retro-muted border-transparent hover:text-retro-fg'
       }`}
     >
@@ -150,7 +150,7 @@ export function GalleryTabView({
           onOpenProfile={onOpenOwnerProfile}
         />
       ) : (
-        <div className="bg-surface-raised border border-retro-border rounded-xl p-4">
+        <div className="bg-surface-raised border border-border-glass rounded-xl p-4">
           <DeckBuilder
             identity={identity}
             cards={myCards as any}

@@ -2,8 +2,8 @@ import { Hono } from 'hono'
 import { bytesToHex, hexToBytes } from '../hexio'
 import { Context, Next } from 'hono'
 import { scrypt } from '@noble/hashes/scrypt'
-import { hmac } from '@noble/hashes/hmac'
-import { sha256 } from '@noble/hashes/sha256'
+
+
 import { randomBytes } from 'crypto'
 import { orbitAuth } from '../middleware/auth'
 import type { D1Turso } from '../db'
@@ -146,7 +146,7 @@ passwordRoutes.post('/verify', orbitAuth, async (c) => {
   if (!caller) return c.json({ error: 'signature required' }, 401)
   const lock = attempts.get(caller)
   if (lock && lock.lockedUntil > Date.now()) {
-    return c.json({ error: 'too many attempts — locked', locked_until: lock.lockedUntil }, 429)
+    return c.json({ error: 'too many attempts. Locked', locked_until: lock.lockedUntil }, 429)
   }
   let body: { password?: unknown } = {}
   try { body = await c.req.json() } catch { return c.json({ error: 'invalid json' }, 400) }

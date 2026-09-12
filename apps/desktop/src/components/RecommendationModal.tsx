@@ -31,7 +31,7 @@ export function RecommendationModal({
       }, identity)
 
       if (res.ok) {
-        toast('Recommendation submitted! Thank you.', 'success')
+        toast('Recommendation submitted.', 'success')
         onClose()
       } else {
         const errText = await res.text()
@@ -45,11 +45,11 @@ export function RecommendationModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 select-none font-sans" onClick={onClose}>
-      <div className="bg-surface-canvas border border-zinc-800 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl backdrop-blur-md" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 select-none font-sans" onClick={onClose}>
+      <div className="bg-surface-canvas border border-border-glass rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl backdrop-blur-md" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-border-glass pb-3">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-surface-canvas border border-zinc-800 flex items-center justify-center text-retro-body">
+            <div className="w-7 h-7 rounded-lg bg-surface-canvas border border-border-glass flex items-center justify-center text-retro-body">
               <Lightbulb className="w-4 h-4" />
             </div>
             <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider">
@@ -83,7 +83,7 @@ export function RecommendationModal({
                   className={`py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
                     category === cat
                       ? 'bg-surface-interactive text-retro-fg font-bold border-border-glass shadow-sm'
-                      : 'bg-surface-canvas/60 text-retro-muted border-zinc-800 hover:text-retro-body hover:bg-surface-elevated'
+                      : 'bg-surface-canvas/60 text-retro-muted border-border-glass hover:text-retro-body hover:bg-surface-elevated'
                   }`}
                 >
                   {cat}
@@ -100,7 +100,7 @@ export function RecommendationModal({
               rows={4}
               value={content}
               onChange={e => setContent(e.target.value)}
-              className="w-full p-3 bg-surface-canvas/80 border border-zinc-800 text-xs text-retro-fg placeholder:text-retro-muted rounded-lg outline-none focus:border-retro-accent resize-none transition-colors"
+              className="w-full p-3 bg-surface-canvas/80 border border-border-glass text-xs text-retro-fg placeholder:text-retro-muted rounded-lg outline-none focus:border-retro-accent resize-none transition-colors"
               placeholder="Describe your idea, feedback, or improvement in detail..."
               required
             />
@@ -110,7 +110,7 @@ export function RecommendationModal({
             <button
               type="button"
               onClick={onClose}
-              className="py-2 px-4 text-xs font-semibold text-retro-muted hover:text-retro-body border border-zinc-800 hover:bg-surface-canvas rounded-lg transition-colors cursor-pointer"
+              className="py-2 px-4 text-xs font-semibold text-retro-muted hover:text-retro-body border border-border-glass hover:bg-surface-canvas rounded-lg transition-colors cursor-pointer"
             >
               Cancel
             </button>

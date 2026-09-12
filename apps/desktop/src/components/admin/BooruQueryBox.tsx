@@ -89,13 +89,13 @@ export function BooruQueryBox({
   return (
     <div className="space-y-3">
       {label && (
-        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+        <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider">
           {label}
         </label>
       )}
 
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-retro-muted pointer-events-none" />
         <input
           type="text"
           value={input}
@@ -104,7 +104,7 @@ export function BooruQueryBox({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholder={placeholder}
-          className="w-full bg-[#18181b] border border-[#27272a] rounded-xl pl-10 pr-4 py-2 text-xs text-zinc-100 outline-none focus:border-purple-500 transition-colors"
+          className="w-full bg-[#18181b] border border-[#27272a] rounded-xl pl-10 pr-4 py-2 text-xs text-retro-fg outline-none focus:border-purple-500 transition-colors"
           aria-label="Booru query input"
         />
       </div>
@@ -139,7 +139,7 @@ export function BooruQueryBox({
             <button
               type="button"
               onClick={() => handleRemove(t)}
-              className="text-zinc-400 hover:text-red-500 font-bold ml-0.5 cursor-pointer"
+              className="text-retro-muted hover:text-red-500 font-bold ml-0.5 cursor-pointer"
               title="Remove tag"
             >
               <X className="w-3 h-3" />
@@ -155,7 +155,7 @@ export function BooruQueryBox({
             <button
               type="button"
               onClick={() => handleRemove(t)}
-              className="text-zinc-400 hover:text-red-500 font-bold ml-0.5 cursor-pointer"
+              className="text-retro-muted hover:text-red-500 font-bold ml-0.5 cursor-pointer"
               title="Remove anti-tag"
             >
               <X className="w-3 h-3" />
@@ -163,13 +163,13 @@ export function BooruQueryBox({
           </span>
         ))}
         {value.length === 0 && (
-          <span className="text-xs text-zinc-400 italic py-0.5">No tags set. Type a query above or click suggestions.</span>
+          <span className="text-xs text-retro-muted italic py-0.5">No tags set. Type a query above or click suggestions.</span>
         )}
       </div>
 
       {showPreview && value.length > 0 && (
         <div className="p-2 bg-[#18181b] border border-[#27272a] rounded-lg">
-          <code className="text-[10px] font-mono text-zinc-400">{queryPreview}</code>
+          <code className="text-[10px] font-mono text-retro-muted">{queryPreview}</code>
         </div>
       )}
     </div>

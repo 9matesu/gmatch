@@ -19,6 +19,7 @@ export interface ExportedIdentityPayload extends OrbitIdentity {
 
 const USER_STORAGE_KEYS = [
   'orbit_identity',
+  'orbit_share_recent',
   'orbit_display_name',
   'orbit_tags',
   'orbit_pending_tags',
@@ -40,6 +41,22 @@ const USER_STORAGE_KEYS = [
   'orbit_unlocked_store',
   'orbit_unlocked_stories',
 ];
+
+export function wipeUserStorage() {
+  if (typeof window === 'undefined') return;
+  for (const key of USER_STORAGE_KEYS) {
+    try { localStorage.removeItem(key); } catch {}
+    removeSecureItem(key)
+  }
+  // Logout must restart the social flow at the server picker: wipe per-identity
+  // onboarding progress and the chosen-server marker. (goonMatch_age_verified
+  // intentionally survives — the 18+ confirmation is device-level.)
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (k.startsWith('orbit_onboarding_v2:') || k.startsWith('orbit_tour_v1:') || k === 'gmatch.onboarding.serverUrl') localStorage.removeItem(k);
+    }
+  } catch { /* private mode */ }
+}
 
 export function useIdentity() {
   const [identity, setIdentity] = useState<OrbitIdentity | null>(null);
@@ -213,10 +230,7 @@ export function useIdentity() {
 
   const clearIdentity = useCallback(() => {
     if (typeof window !== 'undefined') {
-      for (const key of USER_STORAGE_KEYS) {
-        try { localStorage.removeItem(key); } catch {}
-        removeSecureItem(key)
-      }
+      wipeUserStorage();
       try { sessionStorage.clear(); } catch {}
       void clearObjects();
     }

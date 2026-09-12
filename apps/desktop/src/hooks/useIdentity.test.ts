@@ -1,16 +1,22 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { generateIdentity, restoreIdentity } from '@orbit/crypto'
 
-// Mock localStorage for node test environment
+// Mock localStorage for node test environment. Proxy-backed so Object.keys()
+// returns stored keys (as real localStorage does) — wipeUserStorage scans it.
 const mockStorage: Record<string, string> = {}
-global.localStorage = {
+const storageImpl = {
   getItem: (key: string) => mockStorage[key] || null,
   setItem: (key: string, val: string) => { mockStorage[key] = String(val) },
   removeItem: (key: string) => { delete mockStorage[key] },
   clear: () => { for (const k of Object.keys(mockStorage)) delete mockStorage[k] },
-  length: 0,
-  key: () => null,
-} as unknown as Storage
+}
+global.localStorage = new Proxy(storageImpl, {
+  ownKeys: () => Object.keys(mockStorage),
+  getOwnPropertyDescriptor: (_t, k) =>
+    typeof k === 'string' && k in mockStorage
+      ? { enumerable: true, configurable: true, value: mockStorage[k] }
+      : undefined,
+}) as unknown as Storage
 
 describe('Identity Export, Import and Logout Cleanup', () => {
   beforeEach(() => {
@@ -34,7 +40,7 @@ describe('Identity Export, Import and Logout Cleanup', () => {
     expect(restored.encryptionPubHex).toBe(original.encryptionPubHex)
   })
 
-  it('clears all user-specific metadata and tags on logout', () => {
+  it('clears all user-specific metadata and tags on logout', async () => {
     // Populate user metadata
     mockStorage['orbit_identity'] = JSON.stringify(generateIdentity())
     mockStorage['orbit_display_name'] = 'TestUser'
@@ -42,29 +48,17 @@ describe('Identity Export, Import and Logout Cleanup', () => {
     mockStorage['orbit_pending_tags'] = JSON.stringify(['pending'])
     mockStorage['goonmatch-friends'] = JSON.stringify(['friend-1'])
     mockStorage['orbit_chat_messages'] = JSON.stringify([{ text: 'hi' }])
+    // Social-onboarding state (mirrors wipeUserStorage in useIdentity.ts):
+    mockStorage['orbit_onboarding_v2:anonymous'] = '{"version":1,"current":"ready","completed":["server","profile","ready"]}'
+    mockStorage['orbit_onboarding_v2:deadbeef'] = '{"version":1,"current":"ready","completed":["ready"]}'
+    mockStorage['gmatch.onboarding.serverUrl'] = 'http://192.168.0.42:8790'
+    mockStorage['orbit_tour_v1:deadbeef'] = '{"version":1,"index":3,"status":"active"}'
+    mockStorage['goonMatch_age_verified'] = 'true'
 
-    // Simulate clearIdentity
-    const USER_STORAGE_KEYS = [
-      'orbit_identity',
-      'orbit_display_name',
-      'orbit_tags',
-      'orbit_pending_tags',
-      'orbit_pfp_url',
-      'orbit_chat_messages',
-      'orbit_p2p_gallery',
-      'orbit_p2p_known_peers',
-      'orbit_unlocked_stories',
-      'goonmatch-friends',
-      'goonmatch-blocked',
-      'orbit_admin_pin_unlocked',
-      'goonmail_name_prompt_dismissed',
-      'goonmail_ribbon_dismissed',
-      'goonmatch-relationships',
-      'goonmatch-decisions',
-    ]
-    for (const key of USER_STORAGE_KEYS) {
-      delete mockStorage[key]
-    }
+    // Run the REAL wipe (wipeUserStorage is what clearIdentity calls)
+    const { wipeUserStorage } = await import('./useIdentity')
+    globalThis.window = globalThis as unknown as Window & typeof globalThis
+    wipeUserStorage()
 
     expect(mockStorage['orbit_identity']).toBeUndefined()
     expect(mockStorage['orbit_display_name']).toBeUndefined()
@@ -72,6 +66,11 @@ describe('Identity Export, Import and Logout Cleanup', () => {
     expect(mockStorage['orbit_pending_tags']).toBeUndefined()
     expect(mockStorage['goonmatch-friends']).toBeUndefined()
     expect(mockStorage['orbit_chat_messages']).toBeUndefined()
+    expect(mockStorage['orbit_onboarding_v2:anonymous']).toBeUndefined()
+    expect(mockStorage['orbit_onboarding_v2:deadbeef']).toBeUndefined()
+    expect(mockStorage['gmatch.onboarding.serverUrl']).toBeUndefined()
+    expect(mockStorage['orbit_tour_v1:deadbeef']).toBeUndefined()
+    expect(mockStorage['goonMatch_age_verified']).toBe('true') // age survives logout
   })
 
   it('restores exported JSON identity with tags and display name', () => {

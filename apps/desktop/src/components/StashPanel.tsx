@@ -34,12 +34,9 @@ export function StashPanel({
 
     setImporting(true)
     const mediaFiles = Array.from(files).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'))
-    let count = 0
-
     for (const file of mediaFiles) {
       try {
         await addToStash(file)
-        count++
       } catch (err) {
         logger.error('Failed to stash', file.name, err)
       }
@@ -93,11 +90,11 @@ export function StashPanel({
       {loading ? (
         <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="aspect-square bg-retro-bg border border-retro-border animate-pulse" />
+            <div key={i} className="aspect-square bg-retro-bg border border-border-glass animate-pulse" />
           ))}
         </div>
       ) : entries.length === 0 ? (
-        <div className="text-center py-12 text-retro-muted text-xs border border-dashed border-retro-border bg-retro-bg">
+        <div className="text-center py-12 text-retro-muted text-xs border border-dashed border-border-glass bg-retro-bg">
           No images stashed yet. Click &quot;Load Folder&quot; to add images for quick sending.
         </div>
       ) : (
@@ -105,14 +102,14 @@ export function StashPanel({
           {entries.map(entry => (
             <div
               key={entry.id}
-              className="bg-retro-bg border border-retro-border overflow-hidden group relative"
+              className="bg-retro-bg border border-border-glass overflow-hidden group relative"
             >
               <div className="aspect-square overflow-hidden bg-black">
                 {entry.dataUrl ? (
                   entry.mimeType.startsWith('video/') ? (
                     <div className="relative w-full h-full">
                       <img src={entry.dataUrl} alt={entry.name} className="w-full h-full object-cover" />
-                      <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/80 text-white text-[8px] font-bold rounded font-mono">VIDEO</span>
+                      <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/80 text-white text-[10px] font-bold rounded font-mono">VIDEO</span>
                     </div>
                   ) : (
                     <img src={entry.dataUrl} alt={entry.name} className="w-full h-full object-cover" />
@@ -133,14 +130,14 @@ export function StashPanel({
                 <button
                   type="button"
                   onClick={() => handleSend(entry.id)}
-                  className="bg-retro-accent hover:bg-retro-fg hover:text-retro-bg text-white text-[9px] font-bold px-2 py-1 transition-colors"
+                  className="bg-retro-accent hover:bg-retro-fg hover:text-retro-bg text-white text-[10px] font-bold px-2 py-1 transition-colors"
                 >
                   Send
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDelete(entry.id)}
-                  className="bg-retro-error text-white text-[9px] font-bold px-2 py-1 transition-colors"
+                  className="bg-retro-error text-white text-[10px] font-bold px-2 py-1 transition-colors"
                 >
                   Del
                 </button>

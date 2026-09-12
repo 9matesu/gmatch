@@ -30,10 +30,10 @@ export function CardBack({ label, className = '', ticking = false }: CardBackPro
       <div className={`absolute inset-1.5 border-2 rounded-xl pointer-events-none transition-all duration-700 ${
         isTicking
           ? 'border-purple-500/60 shadow-[0_0_15px_rgba(168,85,247,0.3)] animate-pulse'
-          : 'border-zinc-800'
+          : 'border-border-glass'
       }`} />
       
-      <div className="absolute inset-3 border border-zinc-800/60 rounded-lg pointer-events-none" />
+      <div className="absolute inset-3 border border-border-glass rounded-lg pointer-events-none" />
 
       {/* Shimmer Scanline */}
       {isTicking && (
@@ -42,14 +42,14 @@ export function CardBack({ label, className = '', ticking = false }: CardBackPro
 
       {/* Center Icon & Holographic Symbol */}
       <div className="relative flex flex-col items-center justify-center gap-1.5 z-10">
-        <div className={`w-10 h-10 rounded-2xl bg-surface-canvas border border-zinc-800 flex items-center justify-center shadow-lg transition-transform ${
-          isTicking ? 'scale-105 border-purple-500/50 text-cyan-300 animate-bounce' : 'text-zinc-600'
+        <div className={`w-10 h-10 rounded-xl bg-surface-canvas border border-border-glass flex items-center justify-center shadow-lg transition-transform ${
+          isTicking ? 'scale-105 border-purple-500/50 text-cyan-300 animate-bounce' : 'text-retro-muted'
         }`}>
           {isTicking ? <Clock className="w-5 h-5 animate-spin" style={{ animationDuration: '4s' }} /> : <Sparkles className="w-5 h-5" />}
         </div>
 
         {label && (
-          <span className={`text-[9px] font-bold tracking-wider uppercase text-center px-2 py-0.5 rounded-md ${
+          <span className={`text-[10px] font-bold tracking-wider uppercase text-center px-2 py-0.5 rounded-md ${
             isTicking ? 'text-cyan-300 bg-purple-950/60 border border-purple-500/30 animate-pulse' : 'text-retro-muted'
           }`}>
             {label}

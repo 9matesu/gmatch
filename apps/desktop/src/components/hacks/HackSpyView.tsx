@@ -124,7 +124,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
   return (
     <div className="relative w-full h-full flex flex-col font-sans select-none overflow-hidden bg-surface-canvas text-retro-fg">
       {flashWhite && (
-        <div className="fixed inset-0 z-[99999] bg-glass-w20 pointer-events-none" />
+        <div className="fixed inset-0 z-[var(--z-system)] bg-glass-w20 pointer-events-none" />
       )}
 
       {/* Session header */}
@@ -140,7 +140,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
           </button>
 
           <div className="flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full ${feedError ? 'bg-zinc-500' : 'bg-retro-online'}`} />
+            <span className={`w-2.5 h-2.5 rounded-full ${feedError ? 'bg-retro-muted' : 'bg-retro-online'}`} />
             <span className="text-xs font-bold tracking-wide text-retro-fg flex items-center gap-1.5">
               <IconComponent className="w-3.5 h-3.5 inline text-retro-accent" />
               <span>{feed?.target?.display_name || session.targetUserName}</span>
@@ -158,7 +158,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
 
       {/* Content */}
       <div className="relative z-10 flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 styled-scrollbar">
-        <div className="glass-surface border border-border-glass rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4">
+        <div className="glass-surface border border-border-glass rounded-xl p-5 sm:p-6 shadow-2xl space-y-4">
           <div className="flex items-center justify-between border-b border-border-glass pb-3">
             <div>
               <span className="text-[10px] font-mono text-retro-muted uppercase tracking-wider">In session</span>
@@ -166,7 +166,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
             </div>
             <span className={`px-3 py-1 rounded-full font-mono text-[10px] font-bold tracking-wider border ${
               feedError
-                ? 'bg-zinc-500/10 border-zinc-600 text-zinc-400'
+                ? 'bg-glass-w5 border-border-glass text-retro-muted'
                 : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
             }`}>
               {feedError ? 'OFFLINE' : 'LIVE'}
@@ -174,16 +174,16 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-            <div className="bg-black/40 p-3.5 rounded-2xl border border-border-glass space-y-1">
-              <span className="text-retro-muted block text-[10px] uppercase font-bold">Player</span>
+            <div className="bg-black/40 p-3.5 rounded-xl border border-border-glass space-y-1">
+              <span className="text-retro-muted block text-[10px] uppercase tracking-wider font-bold">Player</span>
               <p className="text-retro-fg font-bold truncate">{feed?.target?.display_name || session.targetUserName}</p>
               {feed?.target?.bio ? (
                 <p className="text-[10px] text-retro-body italic mt-1 line-clamp-2">&quot;{feed.target.bio}&quot;</p>
               ) : null}
             </div>
 
-            <div className="bg-black/40 p-3.5 rounded-2xl border border-border-glass space-y-1">
-              <span className="text-retro-muted block text-[10px] uppercase font-bold">Session</span>
+            <div className="bg-black/40 p-3.5 rounded-xl border border-border-glass space-y-1">
+              <span className="text-retro-muted block text-[10px] uppercase tracking-wider font-bold">Session</span>
               <p className={feedError ? 'text-amber-300 font-bold' : 'text-emerald-300 font-bold'}>
                 {feedError || 'Live'}
               </p>
@@ -193,7 +193,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
         </div>
 
         {/* Recent messages (real, server-gated) */}
-        <div className="glass-surface border border-border-glass rounded-3xl p-5 space-y-4 shadow-2xl">
+        <div className="glass-surface border border-border-glass rounded-xl p-5 space-y-4 shadow-2xl">
           <div className="flex items-center gap-2 text-xs font-bold text-retro-fg tracking-wide">
             <MessageSquare className="w-4 h-4 text-retro-muted" />
             <span>Recent messages</span>
@@ -202,7 +202,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
           {feed && feed.intercepted.length > 0 ? (
             <div className="space-y-3 text-xs">
               {feed.intercepted.map((m, i) => (
-                <div key={`${m.created_at}-${i}`} className="p-3 rounded-2xl bg-black/40 border border-border-glass space-y-1">
+                <div key={`${m.created_at}-${i}`} className="p-3 rounded-xl bg-black/40 border border-border-glass space-y-1">
                   <div className="flex items-center justify-between text-[10px] text-retro-muted">
                     <span className="font-bold text-retro-fg">{feed.target.display_name}</span>
                     <span>{timeAgo(m.created_at)}</span>
@@ -219,7 +219,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
         </div>
 
         {/* Their posts (real) */}
-        <div className="glass-surface border border-border-glass rounded-3xl p-5 space-y-4 shadow-2xl">
+        <div className="glass-surface border border-border-glass rounded-xl p-5 space-y-4 shadow-2xl">
           <div className="flex items-center gap-2 text-xs font-bold text-retro-fg tracking-wide">
             <ImageIcon className="w-4 h-4 text-retro-muted" />
             <span>Their posts</span>
@@ -228,7 +228,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
           {feed && feed.posts.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {feed.posts.map((p) => (
-                <div key={p.id} className="p-3 rounded-2xl bg-black/40 border border-border-glass space-y-1">
+                <div key={p.id} className="p-3 rounded-xl bg-black/40 border border-border-glass space-y-1">
                   <p className="text-xs text-retro-body line-clamp-2 break-words">
                     {p.caption || <span className="text-retro-muted italic">(no caption)</span>}
                   </p>

@@ -80,4 +80,55 @@ describe('B.4 — admin PIN hardening', () => {
     const src = readFileSync(join(__dirname, 'admin.ts'), 'utf8')
     expect(src).not.toMatch(/Ionw\w+/)
   })
+
+  // Wave 2 (E1): PIN + allowlisted identity, or nothing.
+  it('ADMIN_ORBIT_ID set: correct PIN from a NON-admin identity → 401 + lockout counts', async () => {
+    const hash = await sha256hex('s3cret')
+    const intruder = createTestIdentity()
+    const req = (id: typeof adminId) => app.request(
+      '/api/admin/verify-pin',
+      { method: 'POST', headers: signRequestHeaders(id, 'POST', '/api/admin/verify-pin', JSON.stringify({ pin: 's3cret' })), body: JSON.stringify({ pin: 's3cret' }) },
+      { ...env, ADMIN_PIN_HASH: hash, ADMIN_ORBIT_ID: adminId.orbitId },
+    )
+    expect((await req(intruder)).status).toBe(401)
+    // 5 attempts → the intruder is locked out like any pin-guesser
+    for (let i = 0; i < 4; i++) expect((await req(intruder)).status).toBe(401)
+    expect((await req(intruder)).status).toBe(429)
+    // the real admin still passes
+    expect((await req(adminId)).status).toBe(200)
+  })
+
+  // Wave 2 (E3): a PIN grant expires after 12h.
+  it('grant older than 12h → admin routes 403 until re-unlock', async () => {
+    const hash = await sha256hex('ttl-pin')
+    // register + self-grant via the real path (fresh env per beforeEach, so
+    // the unlock and the probes share one env here)
+    await app.request('/api/users', { headers: signRequestHeaders(adminId, 'GET', '/api/users') }, { ...env, ADMIN_PIN_HASH: hash })
+    const ok = await app.request(
+      '/api/admin/verify-pin',
+      { method: 'POST', headers: signRequestHeaders(adminId, 'POST', '/api/admin/verify-pin', JSON.stringify({ pin: 'ttl-pin' })), body: JSON.stringify({ pin: 'ttl-pin' }) },
+      { ...env, ADMIN_PIN_HASH: hash },
+    )
+    expect(ok.status).toBe(200)
+    const dash = () => app.request(
+      '/api/admin/dashboard',
+      { headers: signRequestHeaders(adminId, 'GET', '/api/admin/dashboard') },
+      { ...env, ADMIN_PIN_HASH: hash },
+    )
+    expect((await dash()).status).toBe(200)
+    // age the stamp beyond the window
+    await env.DB.prepare("UPDATE SystemMeta SET value = ? WHERE key = 'admin_grant_at'")
+      .bind(String(Date.now() - 13 * 60 * 60 * 1000)).run()
+    const expired = await dash()
+    expect(expired.status).toBe(403)
+    expect(String((await expired.json()).error)).toContain('expired')
+    // re-unlock refreshes the grant
+    const again = await app.request(
+      '/api/admin/verify-pin',
+      { method: 'POST', headers: signRequestHeaders(adminId, 'POST', '/api/admin/verify-pin', JSON.stringify({ pin: 'ttl-pin' })), body: JSON.stringify({ pin: 'ttl-pin' }) },
+      { ...env, ADMIN_PIN_HASH: hash },
+    )
+    expect(again.status).toBe(200)
+    expect((await dash()).status).toBe(200)
+  })
 })

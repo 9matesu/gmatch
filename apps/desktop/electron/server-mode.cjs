@@ -1,7 +1,7 @@
-// Server-mode config for packaged builds (1.0: NO central server).
-// Each copy of the app bundles its own API server (bun.exe + api-stage).
-//   host   (default): run the bundled server locally; friends connect to us.
-//   client: skip the local server; point the renderer at a friend's URL.
+// Server-mode config for packaged builds.
+//   client (default): talk to the central node (gmatch.fly.dev); no local
+//     bun sidecar process — leaner RAM/CPU for the portable app.
+//   host: run the bundled server locally; friends connect to us.
 // Persisted in userData/server-mode.json so the choice survives restarts.
 const { app } = require('electron')
 const path = require('node:path')
@@ -27,9 +27,9 @@ function readServerMode() {
       return { mode: 'client', url: raw.url.replace(/\/+$/, '') }
     }
   } catch {
-    /* first run / unreadable -> host */
+    /* first run / unreadable -> central node (host stays opt-in in Settings) */
   }
-  return { mode: 'host', url: `http://127.0.0.1:${PORT}` }
+  return { mode: 'client', url: 'https://gmatch.fly.dev' }
 }
 
 function writeServerMode(mode, url) {

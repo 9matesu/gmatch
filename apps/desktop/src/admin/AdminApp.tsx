@@ -415,7 +415,7 @@ export default function AdminPageClient() {
             </div>
             <a
               href="/"
-              className="text-[11px] font-bold text-retro-muted hover:text-retro-fg transition-colors border border-border-glass px-2 py-0.5 rounded-md"
+              className="text-xs font-bold text-retro-muted hover:text-retro-fg transition-colors border border-border-glass px-2 py-0.5 rounded-md"
             >
               Back to App
             </a>

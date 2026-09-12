@@ -53,21 +53,21 @@ export function ServerPasswordSection({
         toast(e.error || 'Could not change the password', 'error')
       }
     } catch {
-      toast('Network error', 'error')
+      toast('Couldn\'t reach the server.', 'error')
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <div className="p-4 bg-surface-interactive border border-retro-border rounded-lg space-y-2">
+    <div className="p-4 bg-surface-interactive border border-border-glass rounded-lg space-y-2">
       <div className="flex items-center gap-2">
         {enabled ? <Lock className="w-4 h-4 text-amber-400" /> : <Unlock className="w-4 h-4 text-retro-muted" />}
         <span className="text-xs font-medium text-retro-fg">
           {enabled ? 'Password required to join' : 'Open server (no password)'}
         </span>
       </div>
-      <p className="text-[11px] text-retro-muted">
+      <p className="text-xs text-retro-muted">
         New players must enter this password once; existing members keep access. The password never leaves your machine — only its hash is stored.
       </p>
       <div className="flex gap-2">
@@ -94,7 +94,7 @@ export function ServerPasswordSection({
             type="button"
             disabled={busy}
             onClick={() => { playPress(600); void submit(true) }}
-            className="px-3 py-2 rounded-lg text-xs text-retro-muted hover:text-rose-400 border border-retro-border cursor-pointer"
+            className="px-3 py-2 rounded-lg text-xs text-retro-muted hover:text-rose-400 border border-border-glass cursor-pointer"
           >
             Remove
           </button>

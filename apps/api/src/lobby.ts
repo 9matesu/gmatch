@@ -19,16 +19,18 @@ import {
   computeCardRarity,
   checkRarityPromotion,
   calculateDiscoveryReward,
+  matchEconomy,
   type CardEvaluationDelta,
   type MatchValuationSummary,
   type CardRarity,
 } from '@orbit/shared'
 import { applyLikeDecision, addPoints } from './game'
+import { EconomyService } from './economy'
 import { broadcastToUser, broadcastToRoom } from './ws-bus'
 import { advanceRooms } from './rooms'
-import { getBotConfig, getBotProfiles, pickBotDuelCard, type BotConfig } from './bot-image-api'
+import { getBotConfig, getBotProfiles, pickBotDuelCard } from './bot-image-api'
 import { generateFallbackName } from '@orbit/shared'
-import { canUseBots, botFallbackWaitMs } from './bots/policy'
+import { canUseBots } from './bots/policy'
 import crypto from 'node:crypto'
 import { encryptBlob } from './crypto'
 import type { LocalBlobStore } from './blob'
@@ -636,7 +638,7 @@ async function pushMatchEvent(db: D1Turso, match: GameMatch, action: MatchAction
 // ---------------------------------------------------------------------------
 
 /** Create fresh matches for all pairs of eligible waiting players. */
-async function pairFromQueue(db: D1Turso, now: number, skipBots = false): Promise<boolean> {
+async function pairFromQueue(db: D1Turso, now: number, _skipBots = false): Promise<boolean> {
   // Find users currently in active matches
   const activeRows = await db
     .prepare("SELECT user_a, user_b FROM GameMatches WHERE status IN ('lobby', 'playing')")
@@ -867,7 +869,7 @@ export async function resolveMatch(db: D1Turso, match: GameMatch, now: number, r
         endedAt
       )
       .run()
-  } catch (err) {
+  } catch  {
   }
 
   // Persistent notification for both players when the duel resolves (the bell
@@ -893,7 +895,7 @@ export async function resolveMatch(db: D1Turso, match: GameMatch, now: number, r
       const notif = await createNotification(db, uid, 'match_result', title, body, { match_id: match.id, result })
       if (notif) broadcastToUser(uid, { type: 'notification', action: 'new', notification: notif })
     }
-  } catch (err) {
+  } catch  {
   }
 }
 
@@ -1316,6 +1318,25 @@ export async function setMatchDecision(
       const pendingMine = myCol === 'decision_a' ? match.decision_a : match.decision_b
       if (boostsUsed + (pendingMine === 'boost' ? 1 : 0) >= DEFAULT_BOOST_CHARGES) {
         throw lobbyError('No boosts remaining this match', 400)
+      }
+      // A boost costs g$ scaled to YOUR card's rarity — stacking boosts on a
+      // diamond card is never cheap (card-driven economy, single knob).
+      const myCardId = match.user_a === userId ? match.card_a : match.card_b
+      const val = async (oid: string | null | undefined) =>
+        oid ? Number((await db.prepare('SELECT COALESCE(gacha_downloads_count, 0) AS v FROM Objects WHERE id = ?').bind(oid).first<{ v: number }>())?.v ?? 0) : 0
+      const cost = matchEconomy(await val(myCardId), 0).boostCost
+      try {
+        await new EconomyService(db).debit(userId, cost, {
+          idempotencyKey: `boost-${matchId}-${boostsUsed}`,
+          kind: 'purchase',
+          reference: 'match-boost',
+        })
+      } catch (err: any) {
+        const msg = String(err?.message || '').toLowerCase()
+        if (msg.includes('insufficient') || msg.includes('balance')) {
+          throw lobbyError(`Not enough g$ — a boost with this card costs ${cost} g$`, 402)
+        }
+        throw err
       }
     }
 

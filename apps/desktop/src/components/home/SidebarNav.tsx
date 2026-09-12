@@ -12,7 +12,6 @@ import {
   Home,
   Gamepad2,
   PlusSquare,
-  Send,
   User,
   LayoutGrid,
   Settings,
@@ -20,8 +19,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Bell,
-  Coins,
-  Zap,
   Trophy,
   Monitor,
   MousePointerClick,
@@ -31,6 +28,7 @@ import {
   ChevronRight,
   Server,
   ShieldCheck,
+  LogOut,
   ArrowLeft,
   ArrowRight,
 } from 'lucide-react';
@@ -52,20 +50,16 @@ export function SidebarNav({
   onOpenHome,
   onOpenCreatePost,
   onOpenGallery,
-  onOpenChat,
-  chatOpen = false,
   onOpenSettings,
+  onLogout,
   onOpenStore,
-  unreadMessagesCount = 0,
   notificationUnreadCount = 0,
   onOpenNotifications,
   notificationsOpen = false,
   profilePic,
   displayName = 'You',
   activeHack = null,
-  balance = 0,
-  score = 0,
-  reputation = 0,
+  balance: _balance = 0,
   wsConnected = false,
   showRooms = false,
   gamesSubTab = 'duel',
@@ -80,11 +74,9 @@ export function SidebarNav({
   onOpenHome?: () => void;
   onOpenCreatePost?: () => void;
   onOpenGallery?: () => void;
-  onOpenChat?: () => void;
-  chatOpen?: boolean;
   onOpenSettings?: () => void;
+  onLogout?: () => void;
   onOpenStore?: () => void;
-  unreadMessagesCount?: number;
   notificationUnreadCount?: number;
   onOpenNotifications?: () => void;
   notificationsOpen?: boolean;
@@ -126,10 +118,14 @@ export function SidebarNav({
     if (typeof window === 'undefined') return false;
     try { return localStorage.getItem('goonmatch_sidebar_collapsed') === '1'; } catch { return false; }
   });
+  // Perf: the 1s clock exists ONLY for the hack-glow expiry check (isHack).
+  // Ticking the whole sidebar nav once per second — forever — was a free
+  // re-render budget nobody spent. Run it only while a session is active.
   useEffect(() => {
+    if (!activeHack) return;
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [activeHack]);
 
   const toggleCollapsed = () => {
     setCollapsed((v) => {
@@ -252,8 +248,8 @@ export function SidebarNav({
       id: 'games',
       label: 'Porn Games',
       icon: Gamepad2,
-      active: mainView === 'games' || mainView === 'grid',
-      action: () => openGamesTab('idle'),
+      active: mainView === 'games' || mainView === 'grid' || mainView === 'gallery',
+      action: () => (onOpenGallery ? onOpenGallery() : openGamesTab('idle')),
       badge: onlineBadge,
       children: [
         {
@@ -310,14 +306,6 @@ export function SidebarNav({
         },
       ],
     },
-    {
-      id: 'messages',
-      label: 'Messages',
-      icon: Send,
-      active: chatOpen || mainView === 'messages',
-      action: () => (onOpenChat ? onOpenChat() : setMainView?.('messages')),
-      badge: unreadMessagesCount,
-    },
     ...(onOpenNotifications
       ? [
         {
@@ -368,19 +356,33 @@ export function SidebarNav({
 
   const dropIndicator = (id: string) =>
     overId === id && dragId && dragId !== id
-      ? ' outline outline-1 -outline-offset-1 outline-zinc-500/70'
+      ? ' outline outline-1 -outline-offset-1 outline-border-strong'
       : '';
 
   return (
-    <aside className={`desktop-sidebar glass-sidebar shrink-0 flex flex-col font-sans select-none h-full min-h-0 transition-[width] duration-200 ${collapsed ? 'w-[3.75rem]' : 'w-48'}`}>
+    <aside className={`desktop-sidebar glass-sidebar shrink-0 flex flex-col font-sans select-none h-full min-h-0 transition-[width] duration-150 ${collapsed ? 'w-[3.75rem]' : 'w-48'}`}>
       {/* Header: brand + collapse toggle */}
       <div className="flex items-center justify-between gap-1 px-3 py-3 border-b border-white/10 shrink-0">
+        {collapsed ? (
+          // Collapsed rail is 60px: three history buttons + padding overflow it
+          // and the expand toggle lands outside the visible box (dead click).
+          // In rail mode only the toggle is rendered, centered.
+          <button
+            type="button"
+            onClick={() => { playPress(700); toggleCollapsed(); }}
+            aria-label="Expand sidebar"
+            title="Expand sidebar"
+            className="icon-btn p-1.5 mx-auto"
+          >
+            <PanelLeftOpen className="w-4 h-4" />
+          </button>
+        ) : (<>
         {!collapsed && (
           <button
             type="button"
             onClick={() => { playPress(700); onOpenHome?.(); }}
             aria-label="Go to gMatch home"
-            className="text-sm font-bold text-zinc-100 tracking-tight leading-none hover:text-white transition-colors cursor-pointer"
+            className="text-sm font-bold text-retro-fg tracking-tight leading-none hover:text-white transition-colors cursor-pointer"
           >
             gMatch
           </button>
@@ -392,7 +394,7 @@ export function SidebarNav({
             onClick={() => { playPress(700); window.history.back(); }}
             aria-label="Back"
             title="Back"
-            className="glass-action p-1.5 rounded-md text-retro-muted hover:text-retro-fg cursor-pointer"
+            className="icon-btn p-1.5"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
@@ -401,7 +403,7 @@ export function SidebarNav({
             onClick={() => { playPress(700); window.history.forward(); }}
             aria-label="Forward"
             title="Forward"
-            className="glass-action p-1.5 rounded-md text-retro-muted hover:text-retro-fg cursor-pointer"
+            className="icon-btn p-1.5"
           >
             <ArrowRight className="w-4 h-4" />
           </button>
@@ -410,11 +412,12 @@ export function SidebarNav({
             onClick={() => { playPress(700); toggleCollapsed(); }}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className="glass-action p-1.5 rounded-md text-retro-muted hover:text-retro-fg cursor-pointer"
+            className="icon-btn p-1.5"
           >
             {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
           </button>
         </div>
+        </>)}
       </div>
 
       <nav className="flex-1 min-h-0 overflow-y-auto styled-scrollbar p-2 space-y-1">
@@ -422,16 +425,13 @@ export function SidebarNav({
         <button
           type="button"
           onClick={() => { playPress(920); if (onOpenCreatePost) onOpenCreatePost(); else setMainView?.('create'); }}
-          aria-label="Create"
-          title="Create"
+          aria-label="Create post"
+          title="Create post"
           className={`create-action sidebar-create w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-left cursor-pointer transition-all duration-150 active:scale-[0.96] group mb-2 ${collapsed ? 'justify-center' : ''}`}
         >
           <PlusSquare className="w-4 h-4 shrink-0 text-current stroke-[2]" />
           {!collapsed && (
-            <span className="flex items-center justify-between gap-2 w-full text-xs font-semibold tracking-wide">
-              <span>Create</span>
-              <span className="text-[9px] font-normal normal-case opacity-75">post</span>
-            </span>
+            <span className="w-full text-xs font-semibold tracking-wide">Create post</span>
           )}
         </button>
 
@@ -446,7 +446,7 @@ export function SidebarNav({
                 <div
                   draggable={!collapsed}
                   {...dragHandlers(item.id)}
-                  className={`glass-nav-item ${item.active ? 'glass-nav-active' : ''} w-full flex items-center gap-1 pl-3 pr-1.5 py-0.5 rounded-md border transition-all duration-150 ${collapsed ? 'justify-center px-0' : ''}${dropIndicator(item.id)}`}
+                  className={`glass-nav-item ${item.active ? 'glass-nav-active' : ''} w-full flex items-center gap-1 py-0.5 rounded-md border transition-all duration-150 ${collapsed ? 'justify-center px-0' : 'pl-3 pr-1.5'}${dropIndicator(item.id)}`}
                 >
                   <button
                     type="button"
@@ -466,7 +466,7 @@ export function SidebarNav({
                     <GroupIcon className="w-4 h-4 shrink-0 opacity-85 stroke-[1.75]" />
                     {!collapsed && <span className="truncate">{item.label}</span>}
                     {!collapsed && Boolean(item.badge && item.badge > 0) && (
-                      <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-emerald-400 text-[9px] font-bold text-zinc-950 tabular-nums">
+                      <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-retro-fg text-[10px] font-bold text-retro-bg tabular-nums">
                         {item.badge! > 99 ? '99+' : item.badge}
                       </span>
                     )}
@@ -498,7 +498,7 @@ export function SidebarNav({
                           <ChildIcon className="w-3.5 h-3.5 shrink-0 opacity-85 stroke-[1.75]" />
                           <span className="truncate">{child.label}</span>
                           {Boolean(child.badge && child.badge > 0) && (
-                            <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-zinc-100 text-[9px] font-bold text-zinc-950 tabular-nums">
+                            <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-retro-fg text-[10px] font-bold text-retro-bg tabular-nums">
                               {child.badge! > 9 ? '9+' : child.badge}
                             </span>
                           )}
@@ -531,7 +531,7 @@ export function SidebarNav({
               )}
 
               {!collapsed && Boolean(item.badge && item.badge > 0) && (
-                <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-zinc-100 text-[9px] font-bold text-zinc-950 tabular-nums">
+                <span className="ml-auto flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-retro-fg text-[10px] font-bold text-retro-bg tabular-nums">
                   {item.badge! > 9 ? '9+' : item.badge}
                 </span>
               )}
@@ -547,7 +547,7 @@ export function SidebarNav({
           <button
             type="button"
             onClick={() => { playPress(600); setMainView?.('admin'); }}
-            className={`glass-action ${mainView === 'admin' ? 'glass-nav-active text-amber-200 border-amber-300/30' : ''} w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] cursor-pointer transition-all active:scale-[0.96] border ${collapsed ? 'justify-center' : ''}`}
+            className={`glass-action ${mainView === 'admin' ? 'glass-nav-active text-amber-200 border-amber-300/30' : ''} w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs cursor-pointer transition-all active:scale-[0.96] border ${collapsed ? 'justify-center' : ''}`}
             title="Open Admin Panel"
             aria-label="Open Admin Panel"
           >
@@ -559,10 +559,11 @@ export function SidebarNav({
 
       {/* User panel: avatar + name, click to open profile */}
       <div className="p-2 border-t border-white/10 shrink-0">
+        <div className="flex items-center gap-1">
         <button
           type="button"
           onClick={() => { playPress(800); setMainView?.('profile'); }}
-          className={`glass-nav-item ${mainView === 'profile' ? 'glass-nav-active' : ''} w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-left cursor-pointer transition-all duration-150 active:scale-[0.96] border ${collapsed ? 'justify-center' : ''}`}
+          className={`glass-nav-item ${mainView === 'profile' ? 'glass-nav-active' : ''} flex-1 min-w-0 flex items-center gap-2.5 px-2 py-1.5 rounded-md text-left cursor-pointer transition-all duration-150 active:scale-[0.96] border ${collapsed ? 'justify-center' : ''}`}
           aria-label="Open your profile"
         >
           <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-xs font-medium border shrink-0 bg-glass-w5 border-white/10 text-retro-fg">
@@ -584,34 +585,20 @@ export function SidebarNav({
             </div>
           )}
         </button>
-      </div>
-
-      {/* Currency HUD — g$ + a single lifetime XP tile (today's gain in the
-          tooltip). Reputation and XP are one progression now (plan §3). */}
-      <div className="px-2 pb-2 shrink-0">
-        <div className={`flex gap-1.5 ${collapsed ? 'flex-col items-center' : 'flex-row'}`}>
-          {[
-            { icon: Coins, label: 'g$', value: balance, accent: 'text-amber-400', title: 'Balance (g$)' },
-            { icon: Zap, label: 'XP', value: reputation, accent: 'text-sky-400', title: `${reputation.toLocaleString()} lifetime XP · +${score.toLocaleString()} today` },
-          ].map((c) => {
-            const Icon = c.icon;
-            return (
-              <div
-                key={c.label}
-                title={c.title}
-                className={`glass-inset flex items-center gap-1.5 px-2 py-1.5 rounded-md min-w-0 ${collapsed ? 'justify-center' : 'flex-1 justify-center'}`}
-              >
-                <Icon className={`w-3.5 h-3.5 shrink-0 ${c.accent} stroke-[1.75]`} />
-                {!collapsed && (
-                  <span className="text-[11px] font-semibold text-retro-fg font-mono tabular-nums tracking-tight truncate">
-                    {c.value.toLocaleString()}
-                  </span>
-                )}
-              </div>
-            );
-          })}
+        {onLogout && !collapsed && (
+          <button
+            type="button"
+            onClick={onLogout}
+            aria-label="Log out"
+            title="Log out"
+            className="p-1.5 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer shrink-0"
+          >
+            <LogOut className="w-3.5 h-3.5" strokeWidth={1.75} />
+          </button>
+        )}
         </div>
       </div>
+
     </aside>
   );
 }

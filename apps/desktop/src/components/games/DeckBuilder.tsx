@@ -310,7 +310,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
           </button>
         </div>
 
-        <div className="bg-surface-raised border border-border-glass rounded-2xl p-4">
+        <div className="bg-surface-raised border border-border-glass rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
             <div>
                <div className="flex items-center gap-2">
@@ -447,7 +447,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
 
           {addingCards && (
             <div className="mt-6">
-              <h3 className="text-sm font-bold text-retro-body mb-2">Available Cards</h3>
+              <h3 className="text-sm font-bold text-retro-body mb-2">Available cards</h3>
               <div className="mb-3 flex items-center gap-2 bg-[#0a0a0a] border border-border-glass rounded-lg px-3 py-2">
                 <Search className="w-4 h-4 text-retro-muted shrink-0" />
                 <input
@@ -495,8 +495,8 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
 
   return (
     <div className="space-y-4">
-      <div className="bg-surface-raised border border-border-glass rounded-2xl p-4">
-        <h2 className="text-lg font-bold text-retro-fg mb-4">Create New Deck</h2>
+      <div className="bg-surface-raised border border-border-glass rounded-xl p-4">
+        <h2 className="text-lg font-bold text-retro-fg mb-4">Create new deck</h2>
         <div className="flex gap-2">
           <input
             type="text"
@@ -517,8 +517,8 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
         </div>
       </div>
 
-      <div className="bg-surface-raised border border-border-glass rounded-2xl p-4">
-        <h2 className="text-lg font-bold text-retro-fg mb-4">Your Decks</h2>
+      <div className="bg-surface-raised border border-border-glass rounded-xl p-4">
+        <h2 className="text-lg font-bold text-retro-fg mb-4">Your decks</h2>
         {loading ? (
           <div className="text-center py-8 text-retro-muted text-xs">Loading decks...</div>
         ) : decks.length === 0 ? (
@@ -542,7 +542,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                       {deck.cards.length}/5 cards
                     </span>
                     {activeDeckId === deck.id && (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono text-[9px] font-bold flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono text-[10px] font-bold flex items-center gap-1">
                         <Star className="w-2.5 h-2.5 fill-emerald-400 text-emerald-400" /> Active
                       </span>
                     )}

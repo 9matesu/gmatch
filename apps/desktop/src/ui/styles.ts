@@ -4,7 +4,7 @@
  * (bg-retro-panel/bg-retro-bg, text-retro-fg, text-retro-muted,
  * border-border-glass) plus the shell's own .glass-button / .glass-tab /
  * .accent-control classes from globals.css. Literal pink remains ONLY where
- * it is game semantics: HP fill, crit flash, +g$ float, cap-active glow,
+ * it is game semantics: HP fill, crit flash, +pts float, cap-active glow,
  * rarity badges (see HP_FILL / FLOAT_GC / RARITY below).
  */
 

@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
 import { useGame } from '../game/store'
-import { GRID_SIZE } from '../game/store'
+import { gridSizeForMode, isGridMode } from '../game/store'
 import { CAPS, capEffectLabel, capStacks } from '../game/caps'
 import { HEAT_WINDOW_MS, heatMultiplier } from '../game/economy'
-import type { CapId } from '../game/types'
+import type { CapId, ViewMode } from '../game/types'
 import { offlineSvg } from '../services/offlineSvg'
 import { prefetchImages, resolveImage } from '../services/imageCache'
 import { isVideoUrl } from '../services/postFilter'
 import { redgifsPlayable } from '../services/redgifs'
-import { CAP_SKINS } from './capSkins'
 import { formatNum } from './format'
 import {
   BTN,
@@ -24,12 +23,12 @@ import {
   MUTED,
   PANEL,
   PLATE,
-  SKIN,
   STAGE_FRAME,
 } from './styles'
 import CachedImg from './CachedImg'
 import OfflineCard from './OfflineCard'
 import { Badge } from '../components/Badge'
+import { Ban, X } from 'lucide-react'
 import { Skeleton } from '../components/Skeleton'
 import { IconChevronL, IconChevronR } from './icons'
 
@@ -58,11 +57,11 @@ function useReducedMotion(): boolean {
   return reduce
 }
 
-export default function GoonPanel() {
+export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNode }) {
   const current = useGame((s) => s.current)
   const feedOffline = useGame((s) => s.feedOffline)
   const fetching = useGame((s) => s.fetching)
-  const gc = useGame((s) => s.gc)
+  const points = useGame((s) => s.points)
   const foeHp = useGame((s) => s.foeHp)
   const foeMaxHp = useGame((s) => s.foeMaxHp)
   const defeated = useGame((s) => s.defeated)
@@ -75,11 +74,17 @@ export default function GoonPanel() {
   const clickCell = useGame((s) => s.clickCell)
   const dropCell = useGame((s) => s.dropCell)
   const setViewMode = useGame((s) => s.setViewMode)
+  const reorderGrid = useGame((s) => s.reorderGrid)
+  const pendingDrops = useGame((s) => s.pendingDrops)
+  const claimDropTag = useGame((s) => s.claimDropTag)
+  const claimDropAntiTag = useGame((s) => s.claimDropAntiTag)
+  const dismissDrop = useGame((s) => s.dismissDrop)
   const fetchFeed = useGame((s) => s.fetchFeed)
   const advanceFeed = useGame((s) => s.advanceFeed)
   const goBack = useGame((s) => s.goBack)
   const canGoBack = useGame((s) => s.past.length > 0)
   const skipGrid = useGame((s) => s.skipGrid)
+  const purgePost = useGame((s) => s.purgePost)
   const undoGrid = useGame((s) => s.undoGrid)
   const canGridBack = useGame((s) => s.gridPast.length > 0)
   const queue = useGame((s) => s.queue)
@@ -92,7 +97,13 @@ export default function GoonPanel() {
   const [critFlash, setCritFlash] = useState(false)
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
   const [shownUrl, setShownUrl] = useState<string | null>(null)
+  const [dropsOpen, setDropsOpen] = useState(false)
+  const [dragFrom, setDragFrom] = useState<number | null>(null)
+  const [dragOver, setDragOver] = useState<number | null>(null)
+  const [shakeKey, setShakeKey] = useState(0)
+  const [shakeCell, setShakeCell] = useState<number | null>(null)
   const floatId = useRef(0)
+  const stageRef = useRef<HTMLElement | null>(null)
   const reduceMotion = useReducedMotion()
 
   const now = Date.now()
@@ -102,46 +113,111 @@ export default function GoonPanel() {
     advanceFeed()
   }, [advanceFeed, current])
 
-  // Warm the cache 5 up / 5 down (past 5 + queue 5 + previews + grid) so
-  // back/skip arrows and grid squares show instantly for images AND videos.
+  // Warm the cache so player never waits: prefetch active grid + next 18 queue items (2 full 3x3 boards ahead)
   useEffect(() => {
     const urls = [
-      ...past.slice(-5).flatMap((p) => [p.url, ...(p.preview ? [p.preview] : [])]),
-      ...queue.slice(0, 5).flatMap((p) => [p.url, ...(p.preview ? [p.preview] : [])]),
       ...grid.flatMap((c) => [c.post.url, ...(c.post.preview ? [c.post.preview] : [])]),
+      ...queue.slice(0, 18).flatMap((p) => [p.url, ...(p.preview ? [p.preview] : [])]),
+      ...past.slice(-3).flatMap((p) => [p.url, ...(p.preview ? [p.preview] : [])]),
     ]
-    prefetchImages(urls)
+    prefetchImages(urls, 27)
   }, [queue, past, grid])
 
   // Grid top-up: after load (persisted grid mode) or whenever squares run dry.
   // Stops once the feed flags offline — the Retry button takes it from there.
   useEffect(() => {
-    if (viewMode === 'grid' && grid.length < GRID_SIZE && !fetching && !feedOffline) {
-      setViewMode('grid')
+    const target = gridSizeForMode(viewMode)
+    if (isGridMode(viewMode) && grid.length < target && !fetching && !feedOffline) {
+      setViewMode(viewMode)
     }
   }, [viewMode, grid.length, fetching, feedOffline, setViewMode])
 
+  // One-hand keyboard: Space clicks the foe, 1-4 pop caps, arrows navigate.
+  // Skipped inside inputs/textareas/selects so typing stays safe.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target
+      if (
+        t instanceof HTMLInputElement ||
+        t instanceof HTMLTextAreaElement ||
+        t instanceof HTMLSelectElement ||
+        (t instanceof HTMLElement && t.isContentEditable)
+      ) {
+        return
+      }
+      const st = useGame.getState()
+      if (e.code === 'Space') {
+        e.preventDefault()
+        if (isGridMode(st.viewMode)) {
+          if (st.grid.length > 0) st.clickCell(0)
+        } else {
+          st.clickImage()
+        }
+        return
+      }
+      if (e.key === '1' || e.key === '2' || e.key === '3' || e.key === '4') {
+        e.preventDefault()
+        st.popCap(CAP_ORDER[Number(e.key) - 1])
+        return
+      }
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        if (isGridMode(st.viewMode)) void st.undoGrid()
+        else void st.goBack()
+        return
+      }
+      if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        if (isGridMode(st.viewMode)) st.skipGrid()
+        else st.advanceFeed()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // Float budget: rapid clicking (or heat spam) used to append unbounded
+  // DOM spans + orphan timers on unmount. Cap live floats at 20 and clear
+  // every timer on unmount — the stage can't be the thing that leaks.
+  const floatTimers = useRef<number[]>([])
+  useEffect(() => () => { for (const t of floatTimers.current) window.clearTimeout(t); floatTimers.current = [] }, [])
   const spawnFloat = (x: number, y: number, gain: number, crit: boolean, cell: number | null, heatMult = 1) => {
     const id = ++floatId.current
     const heatTag = heatMult > 1 ? ` x${heatMult}` : ''
-    setFloats((f) => [...f, { id, x, y, text: `+${formatNum(gain)}${heatTag}`, crit, cell }])
-    window.setTimeout(() => setFloats((f) => f.filter((fl) => fl.id !== id)), 900)
+    setFloats((f) => [...f.slice(-19), { id, x, y, text: `+${formatNum(gain)}${heatTag}`, crit, cell }])
+    floatTimers.current.push(window.setTimeout(() => setFloats((f) => f.filter((fl) => fl.id !== id)), 900))
     if (crit) {
       setCritFlash(true)
-      window.setTimeout(() => setCritFlash(false), 350)
+      floatTimers.current.push(window.setTimeout(() => setCritFlash(false), 350))
     }
+  }
+
+  const triggerShake = (cell: number | null) => {
+    if (reduceMotion) return
+    setShakeCell(cell)
+    setShakeKey((k) => k + 1)
   }
 
   const handleClick = (e: MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
     const { gain, crit, heat } = clickImage()
     spawnFloat(e.clientX - rect.left, e.clientY - rect.top, gain, crit, null, heat)
+    triggerShake(null)
   }
 
   const handleCellClick = (index: number, e: MouseEvent<HTMLButtonElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
     const { gain, crit, heat } = clickCell(index)
     if (gain > 0) spawnFloat(e.clientX - rect.left, e.clientY - rect.top, gain, crit, index, heat)
+    triggerShake(index)
+  }
+
+  /** Middle-click anywhere on the stage advances to the next foe — no reward. */
+  const handleAuxClick = (e: React.MouseEvent) => {
+    if (e.button !== 1) return
+    e.preventDefault()
+    if (isGridMode(useGame.getState().viewMode)) useGame.getState().skipGrid()
+    else useGame.getState().advanceFeed()
   }
 
   const showOffline = feedOffline || !current || failedUrl === current.url
@@ -177,7 +253,10 @@ export default function GoonPanel() {
         const probe = new Image()
         probe.referrerPolicy = 'no-referrer'
         probe.src = resolved
-        await probe.decode()
+        await Promise.race([
+          probe.decode(),
+          new Promise((resolve) => setTimeout(resolve, 2500)),
+        ])
         if (!live) return
         setShownUrl(resolved)
         setImageReady(true)
@@ -186,16 +265,31 @@ export default function GoonPanel() {
         onImageError()
       }
     })()
+    // ponytail: pre-warm next 3 queue images so they're cached before the KO
+    try {
+      for (const next of queue.slice(0, 3)) {
+        if (next?.url) {
+          const img = new Image()
+          img.referrerPolicy = 'no-referrer'
+          img.src = next.url
+        }
+      }
+    } catch {
+      /* best-effort */
+    }
     return () => {
       live = false
     }
-  }, [current, showOffline, isMotion, setImageReady, onImageError])
+  }, [current, queue, showOffline, isMotion, setImageReady, onImageError])
   const hpPct = inBattle ? Math.max(0, (foeHp / foeMaxHp) * 100) : 0
   // Heat combo HUD: live multiplier + whether the streak is still inside the
   // 2s window (goes cold visually the moment you stop clicking).
   const heat = heatMultiplier(heatStreak)
   const heatLive = heat > 1 && Date.now() - lastClickAt <= HEAT_WINDOW_MS
-  const isGrid = viewMode === 'grid'
+  const isGrid = isGridMode(viewMode)
+  const gridTarget = gridSizeForMode(viewMode)
+  const gridCols =
+    viewMode === '2x2' || viewMode === '1x2' ? 'grid-cols-2' : 'grid-cols-3'
 
   const critFlashEl = critFlash && (
     <div className="pointer-events-none absolute inset-0 z-[3] flex items-center justify-center bg-[rgba(255,45,120,0.28)] font-sans text-7xl font-bold tracking-[6px] text-white shadow-[inset_0_0_60px_rgba(255,45,120,0.5)] animate-[gg-crit_0.35s_ease-out_forwards]">
@@ -204,11 +298,55 @@ export default function GoonPanel() {
   )
 
   return (
-    <section className={`${PLATE} ${PANEL} flex flex-col gap-2 overflow-hidden`}>
+    <section
+      ref={stageRef as React.RefObject<HTMLElement>}
+      // flex-1 min-h-0: the stage keeps ONE fixed box between images; the
+      // old auto height resized to each picture's intrinsic ratio and made
+      // the click target jump under the cursor every advance.
+      className={`${PLATE} ${PANEL} flex min-h-0 flex-1 flex-col gap-2 overflow-hidden`}
+    >
+      {/* Integrated panel toolbar: gallery + sources + fullscreen live here, never floating */}
+      <div className="flex flex-none items-center justify-between gap-2 px-1 pt-0.5">
+        <div
+          className="inline-flex flex-none overflow-hidden rounded-lg border border-border-glass"
+          role="group"
+          aria-label="Feed layout"
+        >
+          {(['1x1', '1x2', '2x2', '3x3'] as ViewMode[]).map((mode) => {
+            const active = viewMode === mode
+              || (mode === '1x1' && viewMode === 'single')
+              || (mode === '3x3' && viewMode === 'grid')
+            return (
+            <button
+              key={mode}
+              type="button"
+              className={`${MONO} cursor-pointer border-0 bg-transparent px-2 py-0.5 text-xs font-bold ${active
+                ? 'bg-retro-accent text-retro-accent-text'
+                : 'bg-transparent text-retro-muted hover:text-retro-fg'
+                }`}
+              aria-pressed={active}
+              onClick={() => setViewMode(mode)}
+              title={
+                mode === '1x1'
+                  ? 'Single foe view'
+                  : mode === '1x2'
+                    ? 'Split — two foes side by side'
+                    : mode === '2x2'
+                      ? 'Four foes at once'
+                      : '3×3 grid — nine foes at once'
+              }
+            >
+              {mode === '1x1' ? '1×1' : mode === '1x2' ? '1×2' : mode === '2x2' ? '2×2' : '3×3'}
+            </button>
+            )
+          })}
+        </div>
+        {headerRight}
+      </div>
       {isGrid ? (
         <div
-          className={`${STAGE_FRAME} relative min-h-0 flex-1 grid auto-rows-fr grid-cols-3 gap-2 p-2`}
-          aria-label="3x3 goon grid"
+          className={`${STAGE_FRAME} relative min-h-0 flex-1 grid auto-rows-fr ${gridCols} gap-2 p-2`}
+          aria-label={`${viewMode} goon grid`}
         >
           {critFlashEl}
           {grid.map((cell, i) => {
@@ -218,11 +356,40 @@ export default function GoonPanel() {
             const pct = Math.max(0, (cell.hp / cell.maxHp) * 100)
             return (
               <button
-                key={`${cell.post.id}:${i}`}
+                key={`${cell.post.id}:${i}:${shakeCell === i ? shakeKey : 0}`}
                 type="button"
-                className="relative min-h-0 cursor-pointer overflow-hidden rounded-lg border border-border-glass bg-black p-0 text-left font-[inherit] text-[color:inherit] active:cursor-grabbing"
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('text/plain', String(i))
+                  e.dataTransfer.effectAllowed = 'move'
+                  setDragFrom(i)
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                  if (dragOver !== i) setDragOver(i)
+                }}
+                onDragLeave={() => {
+                  if (dragOver === i) setDragOver(null)
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  const raw = e.dataTransfer.getData('text/plain')
+                  const from = Number(raw)
+                  if (!Number.isNaN(from)) reorderGrid(from, i)
+                  setDragFrom(null)
+                  setDragOver(null)
+                }}
+                onDragEnd={() => {
+                  setDragFrom(null)
+                  setDragOver(null)
+                }}
+                className={`relative min-h-0 cursor-grab overflow-hidden rounded-lg border bg-black p-0 text-left font-[inherit] text-[color:inherit] active:cursor-grabbing ${dragOver === i ? 'border-retro-accent ring-2 ring-retro-accent/60' : 'border-border-glass'
+                  } ${dragFrom === i ? 'opacity-50' : ''} ${shakeCell === i ? 'animate-[gg-shake_0.18s_ease-out]' : ''}`}
                 onClick={(e) => handleCellClick(i, e)}
-                aria-label={`Foe ${i + 1}: ${Math.ceil(cell.hp)} of ${cell.maxHp} HP — activate to attack`}
+                onAuxClick={handleAuxClick}
+                onContextMenu={(e) => { e.preventDefault(); purgePost(cell.post) }}
+                aria-label={`Foe ${i + 1}: ${Math.ceil(cell.hp)} of ${cell.maxHp} HP — activate to attack, drag to reorder, right-click to purge`}
               >
                 {motion ? (
                   <video
@@ -247,8 +414,8 @@ export default function GoonPanel() {
                     draggable={false}
                   />
                 )}
-                <span className="absolute bottom-1.5 left-1.5 right-1.5 z-[2]">
-                  <span className={`${HP_BAR} h-2`}>
+                <span className="pointer-events-none absolute inset-x-0 bottom-0 z-[2]">
+                  <span className={`${HP_BAR} h-[2px] rounded-none`}>
                     <span
                       className={`${HP_FILL} ${pct <= 30 ? HP_FILL_LOW : ''}`}
                       style={{ width: `${pct}%` }}
@@ -269,7 +436,7 @@ export default function GoonPanel() {
               </button>
             )
           })}
-          {Array.from({ length: Math.max(0, GRID_SIZE - grid.length) }, (_, k) => (
+          {Array.from({ length: Math.max(0, gridTarget - grid.length) }, (_, k) => (
             <div
               key={`empty-${k}`}
               className="relative flex min-h-0 cursor-default items-center justify-center overflow-hidden rounded-lg border border-dashed border-border-glass bg-black"
@@ -281,7 +448,7 @@ export default function GoonPanel() {
               )}
             </div>
           ))}
-          {feedOffline && (
+          {feedOffline && grid.length > 0 && (
             <Badge variant="warning" className={`${MONO} absolute right-2.5 top-2.5`}>
               OFFLINE
             </Badge>
@@ -293,7 +460,7 @@ export default function GoonPanel() {
             <>
               <button
                 type="button"
-                className="glass-button absolute left-2.5 top-1/2 z-[4] flex h-20 w-12 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-35"
+                className="icon-btn absolute left-1.5 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-[2px] hover:bg-black/65 disabled:opacity-25"
                 aria-label="Previous image"
                 title={canGridBack ? 'Back to the previous board' : 'Nothing behind you yet'}
                 disabled={!canGridBack}
@@ -303,7 +470,7 @@ export default function GoonPanel() {
               </button>
               <button
                 type="button"
-                className="glass-button absolute right-2.5 top-1/2 z-[4] flex h-20 w-12 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100"
+                className="icon-btn absolute right-1.5 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-[2px] hover:bg-black/65 disabled:opacity-25"
                 aria-label="Next image"
                 title="Skip this round — no reward"
                 onClick={() => skipGrid()}
@@ -315,8 +482,10 @@ export default function GoonPanel() {
         </div>
       ) : (
         <div
-          className={`${STAGE_FRAME} relative min-h-0 flex-1 ${imageReady ? 'cursor-pointer active:cursor-grabbing' : 'cursor-progress'} max-[1100px]:min-h-[320px]`}
+          key={shakeCell === null ? shakeKey : 0}
+          className={`${STAGE_FRAME} relative min-h-0 flex-1 ${imageReady ? 'cursor-pointer active:cursor-grabbing' : 'cursor-progress'} max-[1100px]:min-h-[320px] ${shakeCell === null && shakeKey > 0 ? 'animate-[gg-shake_0.18s_ease-out]' : ''}`}
           onClick={handleClick}
+          onAuxClick={handleAuxClick}
           role="button"
           tabIndex={0}
           aria-label="Attack the current foe"
@@ -328,6 +497,16 @@ export default function GoonPanel() {
           }}
         >
           {critFlashEl}
+          {inBattle && (
+            <span className="pointer-events-none absolute inset-x-0 bottom-0 z-[5]">
+              <span className={`${HP_BAR} h-[2px] rounded-none`}>
+                <span
+                  className={`${HP_FILL} ${hpPct <= 30 ? HP_FILL_LOW : ''}`}
+                  style={{ width: `${hpPct}%` }}
+                />
+              </span>
+            </span>
+          )}
           {/* Blurred cover fill so the stage reads as an image, not a
               letterbox — the foreground stays 100% visible (object-contain). */}
           {!showOffline && (
@@ -370,16 +549,11 @@ export default function GoonPanel() {
             </span>
           )}
           {showOffline && (
-            <Badge variant="warning" className={`${MONO} absolute right-2.5 top-2.5`}>
-              OFFLINE
-            </Badge>
-          )}
-          {showOffline && (
             <OfflineCard fetching={fetching} feedOffline={feedOffline} onRetry={() => void fetchFeed()} />
           )}
           <button
             type="button"
-            className="glass-button absolute left-2.5 top-1/2 z-[5] flex h-20 w-12 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-35"
+            className="icon-btn absolute left-1.5 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-[2px] hover:bg-black/65 disabled:opacity-25"
             aria-label="Previous image"
             title={canGoBack ? 'Back to the skipped foe' : 'Nothing behind you yet'}
             disabled={!canGoBack}
@@ -392,7 +566,7 @@ export default function GoonPanel() {
           </button>
           <button
             type="button"
-            className="glass-button absolute right-2.5 top-1/2 z-[5] flex h-20 w-12 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl opacity-85 hover:opacity-100"
+            className="icon-btn absolute right-1.5 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-[2px] hover:bg-black/65 disabled:opacity-25"
               aria-label="Next image"
               title="Skip this foe — no reward"
               onClick={(e) => {
@@ -401,6 +575,19 @@ export default function GoonPanel() {
               }}
             >
               <IconChevronR size={26} />
+          </button>
+          <button
+            type="button"
+            className="icon-btn absolute right-1.5 top-1.5 z-[6] flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-[2px] hover:bg-rose-600/70"
+            aria-label="Never show this again"
+            title="Purge — this image and its rarest tags never return"
+            hidden={!current}
+            onClick={(e) => {
+              e.stopPropagation()
+              if (current) purgePost(current)
+            }}
+          >
+            <Ban className="h-4 w-4" />
           </button>
           {floats
             .filter((f) => f.cell === null)
@@ -415,38 +602,76 @@ export default function GoonPanel() {
             ))}
         </div>
       )}
-      <div className="flex flex-none items-center gap-2 rounded-[10px] border border-border-glass bg-retro-bg px-2 py-1.5">
-        <div
-          className="inline-flex flex-none overflow-hidden rounded-lg border border-border-glass"
-          role="group"
-          aria-label="Feed layout"
-        >
-          <button
-            type="button"
-            className={`${MONO} cursor-pointer border-0 bg-transparent px-2.5 py-1 text-xs font-bold ${
-              viewMode === 'single' ? 'bg-retro-accent text-retro-accent-text' : 'bg-transparent text-retro-muted hover:text-retro-fg'
-            }`}
-            aria-pressed={viewMode === 'single'}
-            onClick={() => setViewMode('single')}
-            title="Single foe view"
-          >
-            1×1
-          </button>
-          <button
-            type="button"
-            className={`${MONO} cursor-pointer border-0 bg-transparent px-2.5 py-1 text-xs font-bold ${
-              viewMode === 'grid' ? 'bg-retro-accent text-retro-accent-text' : 'bg-transparent text-retro-muted hover:text-retro-fg'
-            }`}
-            aria-pressed={viewMode === 'grid'}
-            onClick={() => setViewMode('grid')}
-            title="3×3 grid — nine foes at once"
-          >
-            3×3
-          </button>
-        </div>
+      <div className="flex flex-none flex-wrap items-center gap-2 px-1 py-0.5">
+        {/* Hoverable novelty tray: KO drops never pause gameplay. */}
+        {pendingDrops.length > 0 && (
+          <div className="relative flex-none" onMouseEnter={() => setDropsOpen(true)} onMouseLeave={() => setDropsOpen(false)}>
+            <button
+              type="button"
+              onClick={() => setDropsOpen((v) => !v)}
+              aria-expanded={dropsOpen}
+              aria-label={`${pendingDrops.length} novelty drops waiting`}
+              title="KO drops — adopt a tag, ban an anti-tag, one click each"
+              className={`${MONO} inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#ff2d78]/40 bg-[#ff2d78]/10 px-2 py-0.5 text-xs font-bold text-retro-fg`}
+            >
+              Drops
+              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ff2d78] px-1 text-[10px] font-black text-white">
+                {pendingDrops.length}
+              </span>
+            </button>
+            {dropsOpen && (
+              <div className="absolute bottom-full left-0 z-30 mb-1.5 w-64 space-y-1.5 rounded-xl border border-border-glass bg-surface-elevated p-2 shadow-xl">
+                {pendingDrops.slice(0, 4).map((drop) => (
+                  <div key={drop.id} className="rounded-lg border border-border-subtle bg-surface-raised p-1.5">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className={`${MONO} truncate text-[10px] font-bold text-retro-muted`}>
+                        from {drop.foeTitle}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => dismissDrop(drop.id)}
+                        aria-label="Dismiss drop"
+                        className="shrink-0 cursor-pointer border-0 bg-transparent p-0.5 text-retro-muted hover:text-retro-fg"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {drop.suggestedTag && (
+                        <button
+                          type="button"
+                          onClick={() => claimDropTag(drop.id)}
+                          title={`Adopt +${drop.suggestedTag} into your feed`}
+                          className={`${MONO} cursor-pointer rounded-md border border-retro-accent/40 bg-retro-accent/15 px-1.5 py-0.5 text-[10px] font-bold text-retro-fg hover:bg-retro-accent/30`}
+                        >
+                          + {drop.suggestedTag}
+                        </button>
+                      )}
+                      {drop.suggestedAntiTag && (
+                        <button
+                          type="button"
+                          onClick={() => claimDropAntiTag(drop.id)}
+                          title={`Ban ${drop.suggestedAntiTag} from your feed`}
+                          className={`${MONO} cursor-pointer rounded-md border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-[10px] font-bold text-red-300 hover:bg-red-500/25`}
+                        >
+                          <X className="w-3 h-3 shrink-0" /> {drop.suggestedAntiTag}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {pendingDrops.length > 4 && (
+                  <div className={`${MONO} text-center text-[10px] text-retro-muted`}>
+                    +{pendingDrops.length - 4} more…
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         {isGrid ? (
           <span className={MUTED}>
-            {grid.length}/{GRID_SIZE} live{feedOffline ? ' · offline' : ''}
+            {grid.length}/{gridTarget} live{feedOffline ? ' · offline' : ''}
           </span>
         ) : inBattle ? (
           <div className="flex min-w-0 flex-1 items-center gap-2" title={`${Math.ceil(foeHp)} / ${foeMaxHp} HP`}>
@@ -462,11 +687,11 @@ export default function GoonPanel() {
         )}
         {heatLive && (
           <span
-            className={`${MONO} inline-flex min-w-0 shrink items-center gap-1 whitespace-nowrap rounded-lg border border-[rgba(255,120,40,0.5)] bg-[rgba(255,80,0,0.15)] px-2 py-0.5 text-[11px] font-black text-[#ffb066]${reduceMotion ? '' : ' animate-pulse'}`}
+            className={`${MONO} inline-flex min-w-0 shrink items-center gap-1 whitespace-nowrap rounded-lg border border-[rgba(255,120,40,0.5)] bg-[rgba(255,80,0,0.15)] px-2 py-0.5 text-xs font-black text-[#ffb066]${reduceMotion ? '' : ' animate-pulse'}`}
             title={`Heat combo: ${heatStreak} rapid clicks — x${heat} click power`}
             aria-label={`Heat combo x${heat}`}
           >
-            🔥 x{heat}
+            x{heat}
           </span>
         )}
         {feedOffline && (
@@ -482,15 +707,20 @@ export default function GoonPanel() {
           </button>
         )}
         <span
-          className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border-glass bg-retro-bg px-2 py-0.5 text-[11px] font-bold text-retro-fg [&_svg]:text-retro-accent`}
+          className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border-glass bg-retro-bg px-2 py-0.5 text-xs font-bold text-retro-fg [&_svg]:text-retro-accent`}
           title="Lifetime KOs — each foe hits harder"
         >
           KOs: {formatNum(defeated)}
         </span>
       </div>
 
-      <div className="grid flex-none grid-cols-4 gap-2">
-        {CAP_ORDER.map((id) => {
+      {/* Thumb-sized compact bottom dock with [1] [2] [3] [4] keyboard triggers */}
+      <div
+        className="flex flex-none items-center gap-1.5 overflow-x-auto rounded-xl border border-border-glass bg-surface-elevated/70 p-1 backdrop-blur-md styled-scrollbar"
+        role="group"
+        aria-label="Powerups dock"
+      >
+        {CAP_ORDER.map((id, idx) => {
           const def = CAPS[id]
           const st = capStacks(caps, id, now)
           const isLive = st.count > 0
@@ -498,29 +728,33 @@ export default function GoonPanel() {
             <button
               key={id}
               type="button"
-              className={`${SKIN} flex cursor-pointer flex-col gap-0 rounded-[10px] border border-border-glass bg-surface-elevated p-1.5 text-left text-retro-fg shadow-sm transition-[transform,box-shadow,border-color] duration-75 enabled:hover:border-retro-accent enabled:active:translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none ${
-                isLive
-                  ? 'border-[#ff2d78] shadow-[0_0_12px_rgba(255,45,120,0.35)]'
-                  : ''
-              }`}
-              style={{
-                backgroundImage: `linear-gradient(rgba(5,5,12,0.72), rgba(5,5,12,0.72)), url("${CAP_SKINS[id]}")`,
-              }}
-              disabled={gc < def.cost}
+              className={`flex flex-1 min-w-[120px] cursor-pointer items-center gap-1.5 rounded-lg border px-2 py-1 text-left text-retro-fg transition-all duration-150 enabled:hover:border-retro-accent enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${isLive
+                ? 'border-[#ff2d78] bg-[#ff2d78]/15 shadow-[0_0_8px_rgba(255,45,120,0.25)]'
+                : 'border-border-glass bg-surface-raised hover:bg-surface-interactive'
+                }`}
+              disabled={points < def.cost}
               onClick={() => popCap(id)}
-              title={`${def.name} — ${capEffectLabel(id)} — ${formatNum(def.cost)} g$ — permanent, pops stack${st.count > 0 ? ` (x${st.count} live)` : ''}`}
+              title={`${def.name} — ${capEffectLabel(id)} — ${formatNum(def.cost)} pts — Press [${idx + 1}]`}
             >
-              <span className={`${DISPLAY} text-[10px] font-bold tracking-[0.5px]`}>
-                {def.name}
-                {st.count > 1 ? ` x${st.count}` : ''}
-              </span>
-              <span className={`text-[9px] leading-tight ${isLive ? 'text-retro-fg' : 'text-retro-muted'}`}>
-                {capEffectLabel(id)}
-              </span>
-              <span className={`${MONO} text-[10px] text-retro-muted`}>{formatNum(def.cost)} g$</span>
-              <span className={`${MONO} min-h-[12px] text-[10px] font-bold text-[#ff2d78]`}>
-                {isLive ? '∞' : ''}
-              </span>
+              <kbd className={`${MONO} inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border border-white/20 bg-black/60 text-[10px] font-bold text-retro-muted`}>
+                {idx + 1}
+              </kbd>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-1">
+                  <span className={`${DISPLAY} truncate text-xs font-bold leading-tight`}>
+                    {def.name}
+                  </span>
+                  {st.count > 0 && (
+                    <span className={`${MONO} text-[10px] font-black text-[#ff2d78]`}>
+                      x{st.count}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between gap-1 text-[10px] text-retro-muted leading-tight">
+                  <span className="truncate">{capEffectLabel(id)}</span>
+                  <span className={`${MONO} shrink-0 font-semibold`}>{formatNum(def.cost)}</span>
+                </div>
+              </div>
             </button>
           )
         })}

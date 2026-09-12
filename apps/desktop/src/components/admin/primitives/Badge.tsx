@@ -29,18 +29,18 @@ const variantClasses: Record<BadgeVariant, string> = {
   danger: "bg-red-500/15 text-red-400 border border-red-500/30",
   info: "bg-cyan-500/15 text-cyan-400 border border-cyan-500/30",
   primary: "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40",
-  neutral: "bg-zinc-700 text-zinc-400 border border-zinc-600",
+  neutral: "bg-glass-w20 text-retro-muted border border-border-glass",
   active: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
-  inactive: "bg-zinc-700 text-zinc-400 border border-zinc-600",
+  inactive: "bg-glass-w20 text-retro-muted border border-border-glass",
   pending: "bg-amber-500/15 text-amber-400 border border-amber-500/30",
   completed: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
-  draft: "bg-zinc-700 text-zinc-400 border border-zinc-600",
+  draft: "bg-glass-w20 text-retro-muted border border-border-glass",
   released: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
   archived: "bg-amber-500/15 text-amber-400 border border-amber-500/30",
   banned: "bg-red-500/15 text-red-400 border border-red-500/30",
   hidden: "bg-amber-500/15 text-amber-400 border border-amber-500/30",
   online: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
-  offline: "bg-zinc-700 text-zinc-400 border border-zinc-600",
+  offline: "bg-glass-w20 text-retro-muted border border-border-glass",
 };
 
 interface BadgeProps {
@@ -61,7 +61,7 @@ export function Badge({
   onClick,
 }: BadgeProps) {
   const sizeClasses = {
-    sm: "px-1.5 py-0.5 text-[9px]",
+    sm: "px-1.5 py-0.5 text-[10px]",
     md: "px-2 py-0.5 text-[10px]",
     lg: "px-2.5 py-1 text-xs",
   };
@@ -73,18 +73,18 @@ export function Badge({
     danger: "bg-red-400",
     info: "bg-cyan-400",
     primary: "bg-cyan-400",
-    neutral: "bg-zinc-500",
+    neutral: "bg-retro-muted",
     active: "bg-emerald-400",
-    inactive: "bg-zinc-500",
+    inactive: "bg-retro-muted",
     pending: "bg-amber-400",
     completed: "bg-emerald-400",
-    draft: "bg-zinc-500",
+    draft: "bg-retro-muted",
     released: "bg-emerald-400",
     archived: "bg-amber-400",
     banned: "bg-red-400",
     hidden: "bg-amber-400",
     online: "bg-emerald-400",
-    offline: "bg-zinc-500",
+    offline: "bg-retro-muted",
   };
 
   return (

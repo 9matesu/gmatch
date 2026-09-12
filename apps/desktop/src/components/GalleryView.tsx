@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { User, OrbitObject } from '@orbit/shared';
 import { CardTile } from './home/CardTile';
@@ -93,6 +93,11 @@ export function GalleryView({
   onSetWallpaper,
 }: GalleryViewProps) {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedGalleryIds(new Set()) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [setSelectedGalleryIds])
   const [showSlideshows, setShowSlideshows] = useState(false);
   const [dndCardHover, setDndCardHover] = useState(false);
   const idleKeepsakes = useGame((s) => s.gallery);
@@ -153,7 +158,7 @@ export function GalleryView({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap text-xs">
-            <div className="glass-inset flex p-0.5 rounded-lg text-[11px] font-semibold">
+            <div className="glass-inset flex p-0.5 rounded-lg text-xs font-semibold">
               {(['all', 'received', 'sent', 'starred'] as const).map(t => (
                 <button
                   key={t}
@@ -162,7 +167,7 @@ export function GalleryView({
                     setGalleryFilter(t)
                     setGalleryPage(0)
                   }}
-                  className={`px-2.5 py-1 rounded-md cursor-pointer uppercase transition-colors ${
+                  className={`px-2.5 py-1 rounded-md cursor-pointer uppercase tracking-wider transition-colors ${
                     galleryFilter === t ? 'bg-white/14 text-retro-fg font-bold shadow-sm' : 'text-retro-muted hover:text-retro-body'
                   }`}
                 >
@@ -171,15 +176,15 @@ export function GalleryView({
               ))}
             </div>
 
-            <div className="glass-field flex items-center gap-1 px-2 py-1 text-[11px]">
-              <span className="text-retro-muted font-semibold text-[10px] uppercase">Sort:</span>
+            <div className="glass-field flex items-center gap-1 px-2 py-1 text-xs">
+              <span className="text-retro-muted font-semibold text-[10px] uppercase tracking-wider">Sort:</span>
               <select
                 value={gallerySort}
                 onChange={(e) => {
                   setGallerySort(e.target.value as any)
                   setGalleryPage(0)
                 }}
-                className="bg-transparent text-retro-body text-[11px] font-semibold outline-none cursor-pointer"
+                className="bg-transparent text-retro-body text-xs font-semibold outline-none cursor-pointer"
               >
                 <option value="newest" className="bg-surface-raised text-retro-body">Newest</option>
                 <option value="oldest" className="bg-surface-raised text-retro-body">Oldest</option>
@@ -188,24 +193,24 @@ export function GalleryView({
               </select>
             </div>
 
-            <div className="glass-field flex items-center gap-1 px-2 py-1 text-[11px]">
+            <div className="glass-field flex items-center gap-1 px-2 py-1 text-xs">
               <Search className="w-3.5 h-3.5 text-retro-muted" />
               <input
                 type="text"
                 value={cardSearch}
                 onChange={(e) => { setCardSearch(e.target.value); setGalleryPage(0) }}
                 placeholder="Filter cards…"
-                className="bg-transparent text-retro-body text-[11px] font-semibold outline-none placeholder:text-retro-muted w-24 sm:w-32"
+                className="bg-transparent text-retro-body text-xs font-semibold outline-none placeholder:text-retro-muted w-24 sm:w-32"
               />
             </div>
 
-            <div className="glass-inset flex p-0.5 rounded-lg text-[11px] font-semibold">
+            <div className="glass-inset flex p-0.5 rounded-lg text-xs font-semibold">
               {(['all', 'image', 'video'] as const).map(t => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => { setCardTypeFilter(t); setGalleryPage(0) }}
-                  className={`px-2.5 py-1 rounded-md cursor-pointer uppercase transition-colors ${
+                  className={`px-2.5 py-1 rounded-md cursor-pointer uppercase tracking-wider transition-colors ${
                     cardTypeFilter === t ? 'bg-white/14 text-retro-fg font-bold shadow-sm' : 'text-retro-muted hover:text-retro-body'
                   }`}
                 >
@@ -218,7 +223,7 @@ export function GalleryView({
               type="button"
               disabled={batchDownloading || filteredItems.length === 0}
               onClick={handleDownloadAll}
-              className="glass-action px-3 py-1 rounded-lg font-semibold text-[11px] flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
+              className="glass-action px-3 py-1 rounded-lg font-semibold text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
               title="Download all cards in current filter"
             >
               <Download className="w-3.5 h-3.5" />
@@ -228,7 +233,7 @@ export function GalleryView({
             <button
               type="button"
               onClick={() => setShowSlideshows((v) => !v)}
-              className={`glass-action ${showSlideshows ? 'glass-nav-active' : ''} px-3 py-1 rounded-lg font-semibold text-[11px] flex items-center gap-1.5 cursor-pointer`}
+              className={`glass-action ${showSlideshows ? 'glass-nav-active' : ''} px-3 py-1 rounded-lg font-semibold text-xs flex items-center gap-1.5 cursor-pointer`}
               title="Create and play slideshows"
             >
               <Film className="w-3.5 h-3.5" />
@@ -247,7 +252,7 @@ export function GalleryView({
               <button
                 type="button"
                 onClick={handleBatchDownload}
-                className="glass-action glass-action-primary px-3 py-1.5 rounded-lg font-bold text-[11px] cursor-pointer flex items-center gap-1"
+                className="glass-action glass-action-primary px-3 py-1.5 rounded-lg font-bold text-xs cursor-pointer flex items-center gap-1"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Download Selected</span>
@@ -255,7 +260,7 @@ export function GalleryView({
               <button
                 type="button"
                 onClick={handleBatchDelete}
-                className="glass-action glass-action-danger px-3 py-1.5 rounded-lg font-bold text-[11px] cursor-pointer flex items-center gap-1"
+                className="glass-action glass-action-danger px-3 py-1.5 rounded-lg font-bold text-xs cursor-pointer flex items-center gap-1"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Delete</span>
@@ -263,7 +268,7 @@ export function GalleryView({
               <button
                 type="button"
                 onClick={() => setSelectedGalleryIds(new Set())}
-                className="text-[11px] text-retro-muted hover:text-retro-body px-2 py-1 cursor-pointer"
+                className="text-xs text-retro-muted hover:text-retro-body px-2 py-1 cursor-pointer"
               >
                 Clear
               </button>
@@ -420,7 +425,7 @@ export function GalleryView({
                     >
                       ← Prev
                     </button>
-                    <span className="text-retro-muted font-mono text-[11px]">
+                    <span className="text-retro-muted font-mono text-xs">
                       Page <strong className="text-retro-body">{galleryPage + 1}</strong> of {totalPages}
                     </span>
                     <button

@@ -24,24 +24,27 @@ import { enqueueableItems, isP2pLocal, shouldEnqueue } from "./utils/game";
 import { mergeMyCards, type CanonicalCard } from "./utils/cardCollection";
 import { collectConfigBundle, applyConfigBundle, applyStashFromBundle, parseConfigBundle, configDownloadFilename, bundleToString } from "./utils/configBackup";
 import { runMigrations } from "./utils/migration";
-import { startWalletSync } from "./game/walletBridge";
 import { useGame as useIdleGame } from "./game/store";
 import { ROUTE_VIEWS, hashForView, viewFromHash, type RoutedView } from "./utils/routing";
 import { playChime, playPress, playMsgReceive } from "./utils/sounds";
 import { useLobby } from "./hooks/useLobby";
 import { UserProfileModal } from "./components/UserProfileModal";
-import { MIN_GAME_CARDS, type User, type OrbitObject } from "@orbit/shared";
+import { MIN_GAME_CARDS, generateFallbackName, type User, type OrbitObject } from "@orbit/shared";
 import { applyCanonicalCard } from "./game/galleryMapping";
 import { areItemsStructurallyEqual, areUsersStructurallyEqual, areAnnouncementsStructurallyEqual } from "./utils/compare";
 import { OnboardingFlow } from "./firstRun/OnboardingFlow";
+import { isOnboardingComplete, readOnboardingState } from "./firstRun/onboardingState";
+import { TourDock } from "./components/tour/TourDock";
+import { TourDeck } from "./components/tour/TourDeck";
+import { DEFAULT_FEED_SORT, isFeedSort, type FeedSort } from "./components/feed/feedSort";
+import { TOUR_STEPS, isTourOver, nextTourStep, readTourState, writeTourState, type TourState } from "./firstRun/tourState";
 import { GMatchFeed, type FeedPost } from "./components/feed/GMatchFeed";
 import { GMatchDMs } from "./components/chat/GMatchDMs";
 import type { GroupMember } from "./components/chat/GroupMembersPopover";
 import { AttachmentUploadModal } from "./components/AttachmentUploadModal";
 import { ProfileView } from "./components/views/ProfileView";
 import { MessagesView, DmMinimizedView } from "./components/views/MessagesView";
-import { useResizablePanel } from "./hooks/useResizablePanel";
-import { PanelResizer } from "./ui/PanelResizer";
+import { MessagesRail } from "./components/chat/MessagesRail";
 import { GameView } from "./components/views/GameView";
 import { AgeGateModal } from "./components/auth/AgeGateModal";
 import { LegalCenter, isLegalAccepted } from "./components/LegalCenter";
@@ -67,17 +70,33 @@ import GridWorkspace from "./components/grid/GridWorkspace";
 import AdminApp from "./admin/AdminApp";
 import { StoreView } from "./components/views/StoreView";
 import { NotificationsPanel } from "./components/NotificationsPanel";
-import { SocialPanel, type SocialPanelTab } from "./components/chat/SocialPanel";
+import { SocialPanel } from "./components/chat/SocialPanel";
 import { logger } from './utils/logger';
 import { useNotifications } from './hooks/useNotifications';
 import { useCourierDms } from './hooks/useCourierDms';
 import { useServerHeartbeat } from './hooks/useServerHeartbeat';
 import { usePendingJoinVerify } from './hooks/usePendingJoinVerify';
+import { usePendingServerHost } from './hooks/usePendingServerHost';
 import { OfflineWarningBanner } from "./components/OfflineWarningBanner";
 import { dataUrlToBlob, localObjectBlobUrl } from "./utils/mediaData";
+import { mediaUrlToCachedFile } from "./utils/cacheMedia";
 
 const MAX_GALLERY_ITEMS_IN_MEMORY = 80;
 const MAX_PROFILE_PICS_IN_MEMORY = 120;
+
+const isDesktopViewport = () =>
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(min-width: 768px)').matches
+
+// Desktop has no inline messages view: #/messages (or a persisted 'messages'
+// main view) opens the bottom-right rail instead.
+const desktopChatOnLoad = () => {
+  if (!isDesktopViewport()) return false
+  const fromHash = viewFromHash(window.location.hash)
+  const saved = localStorage.getItem('orbit_main_view')
+  return fromHash === 'messages' || (!fromHash && saved === 'messages')
+}
 
 export default function Home() {
   useEffect(() => {
@@ -86,31 +105,35 @@ export default function Home() {
 
   const { identity, isLoaded, createIdentity, exportIdentity, loginWithExportedId, clearIdentity } = useIdentity();
   // Idle game loop (merged from gmatch App): load save, tick economy, autosave.
+  // Wall-clock dt so a throttled/hidden window accrues honestly in one catch-up
+  // tick instead of silently losing seconds to Chromium timer clamping.
   useEffect(() => {
     useIdleGame.getState().load();
-    const t = setInterval(() => useIdleGame.getState().tick(1000), 1000);
+    let lastBeat = Date.now()
+    const beat = () => {
+      const now = Date.now()
+      const dt = now - lastBeat
+      lastBeat = now
+      if (document.hidden && dt < 60_000) return
+      useIdleGame.getState().tick(Math.min(dt, 8 * 3600_000))
+    }
+    const t = setInterval(beat, 1000);
+    const onVis = () => {
+      if (!document.hidden) {
+        beat()
+      }
+    }
+    document.addEventListener('visibilitychange', onVis)
     const save = () => useIdleGame.getState().save();
     const ts = setInterval(save, 10_000);
     window.addEventListener('beforeunload', save);
     return () => {
       clearInterval(t);
       clearInterval(ts);
+      document.removeEventListener('visibilitychange', onVis)
       window.removeEventListener('beforeunload', save);
     };
   }, []);
-  // Idle wallet <-> ledger mirror (plan D4): flush net deltas every 30s once
-  // an identity exists; reconcile server balance on identity change.
-  useEffect(() => {
-    if (!identity) return;
-    const stop = startWalletSync(
-      () => {
-        const s = useIdleGame.getState();
-        return { gc: s.gc, credited: s.credited, debited: s.debited, setWallet: s.setWallet };
-      },
-      identity,
-    );
-    return stop;
-  }, [identity]);
   const { peers, p2pItems, sendP2PItem, sendChatMessage, chatMessages, isWsConnected } = useP2P(identity);
   const { settings, update: updateSettings } = useSettings();
   const [users, setUsers] = useState<User[]>([]);
@@ -120,6 +143,18 @@ export default function Home() {
     const alpha = Math.min(1, Math.max(0.35, settings.panelOpacity ?? 1));
     document.documentElement.style.setProperty('--panel-alpha', String(alpha));
   }, [settings.panelOpacity]);
+
+  // Glass blur preference (Settings → Glass blur): 0 disables backdrop blur.
+  useEffect(() => {
+    const b = Math.min(1, Math.max(0, settings.glassBlur ?? 0.7));
+    document.documentElement.style.setProperty('--glass-blur', String(b));
+  }, [settings.glassBlur]);
+
+  // Animated chrome toggle (paused by default — see globals.css perf gate).
+  useEffect(() => {
+    if (settings.animatedChrome) document.documentElement.setAttribute('data-motion', 'on');
+    else document.documentElement.removeAttribute('data-motion');
+  }, [settings.animatedChrome]);
 
   const game = useGame({ users, identity });
   const {
@@ -150,13 +185,13 @@ export default function Home() {
   const [canonicalCards, setCanonicalCards] = useState<CanonicalCard[]>([]);
   const [itemsLoading, setItemsLoading] = useState(true);
   const [mainView, setMainView] = useState<MainViewType>(() => {
-    if (typeof window === 'undefined') return 'feed'
+    if (typeof window === 'undefined') return 'servers'
     // Direct URL wins over the last-visited persisted view (plan §5).
     const fromHash = viewFromHash(window.location.hash)
-    if (fromHash) return fromHash
     const saved = localStorage.getItem('orbit_main_view') as MainViewType | null
-    if (saved && ROUTE_VIEWS.includes(saved as RoutedView)) return saved
-    return 'feed'
+    const resolved = fromHash || (saved && ROUTE_VIEWS.includes(saved as RoutedView) ? saved : 'servers')
+    // Desktop never renders the inline messages view (rail only).
+    return resolved === 'messages' && isDesktopViewport() ? 'servers' : resolved
   });
   const [showCreatePostModal, setShowCreatePostModal] = useState(false);
 
@@ -167,12 +202,10 @@ export default function Home() {
     }
   }, [mainView]);
   const [dmMinimized, setDmMinimized] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(() => desktopChatOnLoad());
   // UI-3: resizable messages sidebar (width persisted; smooth only when not dragging)
-  const chatPanel = useResizablePanel('chat')
-  const [chatResizing, setChatResizing] = useState(false)
-  const [panelTab, setPanelTab] = useState<SocialPanelTab>('chat');
-  const [gamesSubTab, setGamesSubTab] = useState<'duel' | 'cards' | 'babecock' | 'ranks' | 'store' | 'idle'>('idle');
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [gamesSubTab, setGamesSubTab] = useState<'duel' | 'babecock' | 'ranks' | 'idle'>('idle');
   const [collapsedModules, setCollapsedModules] = useState<Record<string, boolean>>({});
   const toggleModule = (key: string) => setCollapsedModules((prev) => ({ ...prev, [key]: !prev[key] }));
   const [nowTick, setNowTick] = useState<number>(() => Date.now());
@@ -216,11 +249,6 @@ export default function Home() {
   useEffect(() => {
     try { localStorage.setItem('orbit_main_view', mainView) } catch { }
   }, [mainView]);
-
-  useEffect(() => {
-    const id = setInterval(() => setNowTick(Date.now()), 5000);
-    return () => clearInterval(id);
-  }, []);
 
   useEffect(() => {
     try { localStorage.setItem('orbit_gallery_filter', galleryFilter) } catch { }
@@ -268,13 +296,17 @@ export default function Home() {
   useEffect(() => { decisionMapRef.current = decisionMap }, [decisionMap])
 
   const handleSetMainView = useCallback((view: MainViewType) => {
-    setChatOpen(false)
+    const isDesktop = isDesktopViewport();
+    if (view === 'messages' && isDesktop) {
+      setDmMinimized(false);
+      setChatOpen(true);
+      return;
+    }
     if (view === 'feed' && mainView === 'feed') {
       mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
     }
     if (view === 'messages') {
       setDmMinimized(false);
-      setPanelTab('chat');
     }
     if (view === 'games') setGamesSubTab('duel');
     setMainView(view);
@@ -283,11 +315,46 @@ export default function Home() {
     if (window.location.hash !== want) window.history.pushState(null, '', want)
   }, [mainView]);
 
+  // Guided tour: resumable per identity, skippable, teleports only on user click.
+  const tourIdentityId = identity?.orbitId ?? null;
+  const [tourState, setTourState] = useState<TourState>(() => readTourState(tourIdentityId));
+
+  useEffect(() => {
+    setTourState(readTourState(tourIdentityId));
+  }, [tourIdentityId]);
+
+  useEffect(() => {
+    const onReset = () => setTourState(readTourState(tourIdentityId));
+    window.addEventListener('orbit_tour_reset', onReset);
+    return () => window.removeEventListener('orbit_tour_reset', onReset);
+  }, [tourIdentityId]);
+
+  const advanceTour = useCallback((dir: 1 | -1) => {
+    const step = TOUR_STEPS[tourState.index];
+    if (dir === 1 && step?.view) {
+      if (step.gamesTab === 'cards') { handleSetMainView('gallery'); }
+      else {
+        handleSetMainView(step.view);
+        if (step.gamesTab) setGamesSubTab(step.gamesTab);
+      }
+    }
+    const next = dir === 1 ? nextTourStep(tourState) : { ...tourState, index: Math.max(0, tourState.index - 1) };
+    writeTourState(tourIdentityId, next);
+    setTourState(next);
+  }, [handleSetMainView, tourIdentityId, tourState]);
+
+  const skipTour = useCallback(() => {
+    const next: TourState = { version: 1, index: tourState.index, status: 'skipped' };
+    writeTourState(tourIdentityId, next);
+    setTourState(next);
+  }, [tourIdentityId, tourState.index]);
+
   // Browser back/forward -> view. pushState entries surface via popstate;
   // manual hash edits via hashchange. Listen to both.
   useEffect(() => {
     const onNav = () => {
       const v = viewFromHash(window.location.hash)
+      if (v === 'messages' && isDesktopViewport()) { setChatOpen(true); return }
       if (v && v !== mainView) setMainView(v)
     }
     window.addEventListener('hashchange', onNav)
@@ -302,7 +369,6 @@ export default function Home() {
     setMainView('feed');
     setChatOpen(false);
     setDmMinimized(false);
-    setPanelTab('chat');
     setGamesSubTab('duel');
     mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
@@ -315,39 +381,12 @@ export default function Home() {
     }
   }, [identity, lobby]);
 
-  const openNotificationsOnDesktop = useCallback(() => {
-    setPanelTab('notifications');
-    setDmMinimized(false);
-    setChatOpen(true);
+  // Notifications are their own modal, opened from any bell (sidebar/feed
+  // header) — no longer a tab inside the messages dock.
+  const openNotifications = useCallback(() => {
+    setNotifOpen(true);
     lobby.markNotificationsRead();
   }, [lobby]);
-
-  const openNotificationsOnMobile = useCallback(() => {
-    setPanelTab('notifications');
-    setDmMinimized(false);
-    handleSetMainView('messages');
-    lobby.markNotificationsRead();
-  }, [handleSetMainView, lobby]);
-
-  const toggleNotifications = useCallback(() => {
-    setDmMinimized(false);
-    if (chatOpen && panelTab === 'notifications') {
-      setChatOpen(false);
-    } else {
-      setChatOpen(true);
-      setPanelTab('notifications');
-      lobby.markNotificationsRead();
-    }
-  }, [chatOpen, panelTab, lobby]);
-
-  const openNotifications = useCallback(() => {
-    const isDesktop =
-      typeof window !== 'undefined' &&
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(min-width: 768px)').matches;
-    if (isDesktop) openNotificationsOnDesktop();
-    else openNotificationsOnMobile();
-  }, [openNotificationsOnDesktop, openNotificationsOnMobile]);
 
   const [userDecks, setUserDecks] = useState<Deck[]>([]);
   const [activeDeckId, setActiveDeckId] = useState<string | null>(() => getStoredActiveDeckId());
@@ -398,9 +437,9 @@ export default function Home() {
   }, [items, canonicalCards, identity, activeDeckId, userDecks])
 
   const navigateToDeckBuilder = useCallback(() => {
-    setGamesSubTab('cards');
-    setMainView('games');
-  }, []);
+    handleSetMainView('gallery');
+    // mount-once handler: handleSetMainView identity is stable enough here
+  }, [handleSetMainView]);
 
   const openCreateCardModal = () => {
     setCreateCardNeeded(Math.max(0, MIN_GAME_CARDS - myCards.length))
@@ -442,6 +481,14 @@ export default function Home() {
   const resolveWallpaperUrl = useCallback((url: string): Promise<string> => {
     if (!url) return Promise.resolve('')
     if (url.startsWith('data:') || url.startsWith('blob:')) return Promise.resolve(url)
+    if (/^https?:/i.test(url)) {
+      // Remote booru bytes: no ACAO there, so orbitFetch's signed headers
+      // would preflight-block it. cacheMedia's ladder (gmcache bridge →
+      // dev proxy → direct fetch) is the byte path for exactly this.
+      return mediaUrlToCachedFile(url)
+        .then(f => URL.createObjectURL(f))
+        .catch(() => url)
+    }
     if (!identity) return Promise.resolve(url)
     return orbitFetch(url, {}, identity)
       .then(r => r.ok ? r.blob() : null)
@@ -601,8 +648,8 @@ export default function Home() {
       return { displayName: '', tags: [] as string[], isAdmin: false, pfpUrl: '' }
     }
   });
-  const [announcements, setAnnouncements] = useState<{ id: string; message: string; created_at: string; created_by_name: string | null }[]>([])
-  const [showPasskeys, setShowPasskeys] = useState(false);
+  const [,setAnnouncements] = useState<{ id: string; message: string; created_at: string; created_by_name: string | null }[]>([])
+  const [showPasskeys,] = useState(false);
   const [identityModalMode, setIdentityModalMode] = useState<'export' | 'login' | 'logout' | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [followersModalState, setFollowersModalState] = useState<{
@@ -611,12 +658,6 @@ export default function Home() {
     targetUserId?: string | null;
     targetName?: string | null;
   }>({ isOpen: false, initialTab: 'followers', targetUserId: null, targetName: null });
-
-  useEffect(() => {
-    const handleOpenTools = () => setShowSettingsModal(true);
-    window.addEventListener('orbit_open_tools', handleOpenTools);
-    return () => window.removeEventListener('orbit_open_tools', handleOpenTools);
-  }, []);
 
   // Active Server Hacking Debuffs
   const [activeHacks, setActiveHacks] = useState<ActiveHackDebuff[]>([]);
@@ -647,6 +688,14 @@ export default function Home() {
       clearInterval(interval);
     };
   }, [identity]);
+
+  // Perf: nowTick only feeds the hack-expiry memos below; ticking the whole
+  // 4k-line App every 5s while no hack exists is pure waste. Gate it.
+  useEffect(() => {
+    if (!activeHacks.length) return;
+    const id = setInterval(() => setNowTick(Date.now()), 5000);
+    return () => clearInterval(id);
+  }, [activeHacks.length]);
 
   // Check if current player is vision jammed (Deny hack)
   const isVisionJammed = useMemo(() => {
@@ -739,6 +788,7 @@ export default function Home() {
   const [showCreateCardModal, setShowCreateCardModal] = useState(false)
   const [createCardNeeded, setCreateCardNeeded] = useState(0)
   const [cardPrefill, setCardPrefill] = useState<{ url: string; tags: string[]; name: string } | null>(null)
+  const [forgeFile, setForgeFile] = useState<File | null>(null)
   const [dragAnchorId, setDragAnchorId] = useState<string | null>(null)
   const [dragActive, setDragActive] = useState(false)
   // Root card-detail host (plan §12): any view dispatches 'gmatch:open-card'
@@ -751,6 +801,30 @@ export default function Home() {
     }
     window.addEventListener('gmatch:open-card', onOpenCard)
     return () => window.removeEventListener('gmatch:open-card', onOpenCard)
+  }, [])
+  // Drag an image/video anywhere onto the app -> open the Card Forge with it.
+  // Drops that already landed on a DropZone are defaultPrevented there; skip
+  // those so the two handlers never both eat one drop.
+  useEffect(() => {
+    const allow = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes('Files')) e.preventDefault()
+    }
+    const onDrop = (e: DragEvent) => {
+      if (e.defaultPrevented) return
+      const f = e.dataTransfer?.files?.[0]
+      if (!f || !(/^image\//.test(f.type) || /^video\//.test(f.type))) return
+      e.preventDefault()
+      setForgeFile(f)
+      setCardPrefill(null)
+      setShowCreateCardModal(true)
+      playPress(820)
+    }
+    window.addEventListener('dragover', allow)
+    window.addEventListener('drop', onDrop)
+    return () => {
+      window.removeEventListener('dragover', allow)
+      window.removeEventListener('drop', onDrop)
+    }
   }, [])
   const [profilePics, setProfilePics] = useState<Record<string, string>>(() => {
     if (typeof window === 'undefined') return {}
@@ -811,7 +885,12 @@ export default function Home() {
 
   // ─── Public posts feed (server) ───
   const [isLoadingMoreFeed, setIsLoadingMoreFeed] = useState(false)
-  const [feedSort, setFeedSort] = useState<'latest' | 'trending'>('latest')
+  const [feedSort, setFeedSort] = useState<FeedSort>(() => {
+    try { const s = localStorage.getItem('orbit_feed_sort'); return isFeedSort(s) ? s : DEFAULT_FEED_SORT } catch { return DEFAULT_FEED_SORT }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('orbit_feed_sort', feedSort) } catch { }
+  }, [feedSort])
 
   useEffect(() => {
     if (!selectedProfileUser) {
@@ -968,7 +1047,7 @@ export default function Home() {
   // Unified report for any content type. Reporting hides the item instantly.
   const reportTarget = useCallback((targetType: string, targetId: string, reason?: string) => {
     if (!identity) return
-    toast('Reported — content hidden pending admin review', 'info')
+    toast('Reported. Content hidden until an admin reviews it.', 'info')
     orbitFetch('/api/report', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1069,6 +1148,16 @@ export default function Home() {
   // active only when the API 404s /api/pm (official SITE).
   useServerHeartbeat(identity ?? null);
   usePendingJoinVerify(identity, toast);
+  usePendingServerHost(identity ?? null, toast);
+  // Global update toasts: the portable self-update runs whether or not the
+  // Settings modal is open — nudge the user toward Install & Restart.
+  useEffect(() => {
+    const off = window.gmatch?.onUpdateStatus?.((s) => {
+      if (s.phase === 'available' && s.version) toast(`gMatch ${s.version} is downloading. Finish it in Settings → Updates.`, 'info');
+      else if (s.phase === 'ready' && s.version) toast(`gMatch ${s.version} is ready. Install & Restart in Settings → Updates.`, 'success');
+    });
+    return () => { off?.() };
+  }, [toast]);
 
   const courier = useCourierDms(identity, {
     onNotify: (msg) => {
@@ -1182,11 +1271,11 @@ export default function Home() {
     // never a server inbox. Attachments ride the sealed body as object refs.
     if (courier.courierActive) {
       if (replyToId || attachment) {
-        toast('Replies/attachments over the courier need a direct connection — send text for now', 'warning')
+        toast('Replies and attachments need a direct connection. Send text for now.', 'warning')
       }
       const msg = await courier.send(peerId, text.trim())
       if (!msg || msg.status === 'failed') {
-        toast('Peer key unknown — message held locally. It will NOT deliver until you meet their key.', 'error')
+        toast('Peer key unknown. The message stays local and won\'t deliver until you have their key.', 'error')
       }
       void loadPmMessages(peerId)
       loadPmThreads()
@@ -1231,7 +1320,7 @@ export default function Home() {
       loadPmThreads()
     } catch {
       setPmMessagesByPeer(prev => ({ ...prev, [peerId]: (prev[peerId] || []).filter(m => m.id !== optimisticId) }))
-      toast('Could not send message — the server is unreachable', 'error')
+      toast('Couldn\'t send the message. The server is unreachable.', 'error')
     }
   }, [identity, myProfile.displayName, loadPmMessages, loadPmThreads, toast, courierActive, courierSend])
 
@@ -1361,12 +1450,16 @@ export default function Home() {
     const handleIncomingNotif = (e: Event) => {
       const detail = (e as CustomEvent<unknown>).detail as Record<string, unknown> | null
       if (!detail) return
+      // PMs arrive on their own socket channel too (message + sound there);
+      // the server's 'pm' notification row exists for the panel/reload, so
+      // re-announcing it here is the duplicate the user reported.
+      if (detail.type === 'pm') return
       playChime()
       openNotifications()
 
       if (typeof document !== 'undefined' && document.hidden) {
         const oldTitle = document.title
-        document.title = '🔔 (1) New Interaction · gMatch'
+        document.title = '(1) New interaction · gMatch'
         const restore = () => {
           document.title = oldTitle
           window.removeEventListener('focus', restore)
@@ -1578,12 +1671,7 @@ export default function Home() {
     }
   }, [])
 
-  const selectGroupForAttachment = useCallback((groupId: string) => {
-    const replyToId = (window as any).__pendingGroupReplyToId
-      ; (window as any).__pendingGroupReplyToId = null
-    setGroupPickerOpen(false)
-    setAttachmentModal({ isOpen: true, target: 'group', groupId, replyToId })
-  }, [])
+  
 
   const closeAttachmentModal = useCallback(() => {
     setAttachmentModal(null)
@@ -1648,7 +1736,7 @@ export default function Home() {
 
   const handleSetProfilePic = async (file: File) => {
     if (!identity) return
-    toast('Updating profile picture...', 'info')
+    toast('Updating profile picture…', 'info')
 
     try {
       // 1. Generate a lightweight 256x256 thumbnail data URL via canvas
@@ -1697,7 +1785,7 @@ export default function Home() {
         return
       }
 
-      toast('Profile picture updated!', 'success')
+      toast('Profile picture updated.', 'success')
       loadUsers()
       void lobby.refresh()
 
@@ -1716,23 +1804,9 @@ export default function Home() {
   const sendPanelRef = useRef<SendPanelHandle>(null)
   const storyFileInputRef = useRef<HTMLInputElement>(null)
 
-  const onDropOnUser = useCallback((userId: string, fileMeta: unknown) => {
-    setSelectedIds(new Set([userId]))
-    setTimeout(() => sendPanelRef.current?.triggerUpload(), 100)
-  }, [])
+  
 
-  const syncFriendsIds = useCallback(async () => {
-    if (!identity) return
-    try {
-      const res = await orbitFetch('/api/friends', {}, identity)
-      if (res.ok) {
-        const data = await res.json()
-        const ids = Array.isArray(data) ? data.map((f: { id: string }) => f.id) : []
-        setFriendsIds(ids)
-        try { localStorage.setItem('goonmatch-friends', JSON.stringify(ids)) } catch { }
-      }
-    } catch { }
-  }, [identity])
+  
 
   const p2pItemsRef = useRef(p2pItems);
   const settingsRef = useRef(settings);
@@ -1981,7 +2055,9 @@ export default function Home() {
           mime_type: dbObj.mime_type,
           created_at: dbObj.created_at,
           content_url: contentUrl,
-          display_name: 'Unknown User',
+          display_name: dbObj.owner_id === identity.orbitId
+            ? (myProfile.displayName || 'You')
+            : (usersRef.current.find((u) => u.id === dbObj.owner_id)?.display_name?.trim() || generateFallbackName(dbObj.owner_id)),
           sender_pubkey: dbObj.sender_pubkey,
           sender_enc_pubkey: dbObj.sender_enc_pubkey,
         })
@@ -2031,7 +2107,7 @@ export default function Home() {
             const currentUsers = usersRef.current;
             const sender = currentUsers.find(u => u.id === newest.owner_id);
             const senderName = sender?.display_name?.trim() || 'Unknown User';
-            toast(`◈ ${senderName} sent you an image`, 'info');
+            toast(`${senderName} sent you an image`, 'info');
           }
         }
       }
@@ -2057,7 +2133,7 @@ export default function Home() {
         setItems(prev => areItemsStructurallyEqual(prev, payloadList) ? prev : payloadList);
         setItemsLoading(false);
       });
-  }, [identity, updateSettings, toast, enqueueDecision]);
+  }, [identity, updateSettings, toast, enqueueDecision, myProfile.displayName]);
 
   const loadStories = useCallback(() => {
     if (!identity) return Promise.resolve()
@@ -2161,7 +2237,7 @@ export default function Home() {
       loadGallery()
     } catch (err) {
       logger.error(err)
-      toast('Story upload failed - try again.', 'error')
+      toast('Story upload failed. Try again.', 'error')
     }
   }
 
@@ -2305,7 +2381,7 @@ export default function Home() {
                 mime_type: meta.mime_type || 'image/jpeg',
                 created_at: new Date().toISOString(),
                 content_url: dataUrl,
-                display_name: 'Unknown User',
+                display_name: usersRef.current.find((u) => u.id === offer.sender_id)?.display_name?.trim() || generateFallbackName(offer.sender_id),
                 sender_pubkey: meta.sender_pubkey,
                 sender_enc_pubkey: meta.sender_enc_pubkey,
               }
@@ -2328,7 +2404,7 @@ export default function Home() {
               const currentUsers = usersRef.current;
               const wrtcSender = currentUsers.find(u => u.id === offer.sender_id);
               const wrtcName = wrtcSender?.display_name?.trim() || 'Unknown User';
-              toast(`◈ ${wrtcName} sent you an image (P2P)`, 'info')
+              toast(`${wrtcName} sent you an image (P2P)`, 'info')
               peer.close()
             }
           }
@@ -2403,11 +2479,11 @@ export default function Home() {
   // `u.online` only — the API sets this to true when last_seen is within
   // 60s (apps/api/src/routes/users.ts:120). Drop the prior 15-min fallback
   // so the count never lists stale/idle users as "online".
-  const onlineCount = useMemo(() => users.filter(u => u.online).length, [users])
+  
 
   // Current node name for the Servers sidebar group. The API always answers
   // /api/servers/dashboard from whichever node this client is attached to.
-  const [serverName, setServerName] = useState('gmatch')
+  const [,setServerName] = useState('gmatch')
   useEffect(() => {
     if (!identity) return
     let alive = true
@@ -2504,7 +2580,7 @@ export default function Home() {
     },
   });
 
-  const ITEMS_PER_PAGE = 24
+  const ITEMS_PER_PAGE = 18
 
   const filteredItems = useMemo(() => {
     const rawList = items.filter(item => {
@@ -2580,12 +2656,14 @@ export default function Home() {
         created_at: img.created_at,
         caption: img.caption,
         content_url: img.content_url,
-        display_name: 'Unknown User',
+        display_name: img.owner_id === identity?.orbitId
+          ? (myProfile.displayName || 'You')
+          : (users.find((u) => u.id === img.owner_id)?.display_name?.trim() || 'Unknown User'),
         expires_at: img.expires_at,
       } as OrbitObject)
     }
     return Array.from(map.values())
-  }, [items, stories, lobby.images])
+  }, [items, stories, lobby.images, users, identity?.orbitId, myProfile.displayName])
 
   const myUser = useMemo(() => {
     return users.find(u => u.id === identity?.orbitId)
@@ -2611,64 +2689,16 @@ export default function Home() {
     setGalleryPage(0)
   }, [galleryFilter])
 
-  const handleForwardItem = useCallback(async (item: OrbitObject) => {
-    try {
-      if (item.content_url && item.content_url.startsWith('data:')) {
-        const res = await fetch(item.content_url)
-        const blob = await res.blob()
-        const file = new File([blob], `forward_${item.id.slice(0, 6)}.jpg`, { type: item.mime_type || 'image/jpeg' })
-        setForwardedStashFile(file)
-      } else if (identity) {
-        const res = await orbitFetch(`/api/objects/${item.id}`, {}, identity)
-        if (res.ok) {
-          const blob = await res.blob()
-          const file = new File([blob], `forward_${item.id.slice(0, 6)}.jpg`, { type: item.mime_type || 'image/jpeg' })
-          setForwardedStashFile(file)
-        }
-      }
-      toast('Image loaded into Send Panel for fast-forwarding!', 'info')
-    } catch {
-      toast('Failed to prepare image for forwarding', 'error')
-    }
-  }, [identity, toast])
+  
 
-  const handleSaveToCards = useCallback(async (contentUrl: string): Promise<boolean> => {
-    if (!identity) return false
-    try {
-      const res = await fetch(contentUrl)
-      if (!res.ok) throw new Error('fetch failed')
-      const blob = await res.blob()
-      const ext = blob.type.includes('png') ? 'png' : 'jpg'
-      const file = new File([blob], `saved_${Date.now()}.${ext}`, { type: blob.type || 'image/jpeg' })
-      const form = new FormData()
-      form.append('image', file)
-      const up = await orbitFetch('/api/objects', { method: 'POST', body: form }, identity)
-      if (!up.ok) return false
-      loadGallery()
-      return true
-    } catch {
-      return false
-    }
-  }, [identity, loadGallery])
+  
 
-  const handleSelectAllGallery = () => {
-    const currentPageIds = new Set(paginatedItems.map(i => i.id))
-    const allSelectedOnPage = paginatedItems.every(i => selectedGalleryIds.has(i.id))
-    if (allSelectedOnPage) {
-      const next = new Set(selectedGalleryIds)
-      for (const id of currentPageIds) next.delete(id)
-      setSelectedGalleryIds(next)
-    } else {
-      const next = new Set(selectedGalleryIds)
-      for (const id of currentPageIds) next.add(id)
-      setSelectedGalleryIds(next)
-    }
-  }
+  
 
   const handleBatchDownload = async () => {
     if (selectedGalleryIds.size === 0) return
     const targets = items.filter(i => selectedGalleryIds.has(i.id))
-    toast(`Downloading ${targets.length} items...`, 'info')
+    toast(`Downloading ${targets.length} items…`, 'info')
     for (const item of targets) {
       try {
         const res = await orbitFetch(`/api/objects/${item.id}`, {}, identity!)
@@ -2688,7 +2718,7 @@ export default function Home() {
   const handleDownloadAll = async () => {
     if (filteredItems.length === 0 || !identity) return
     setBatchDownloading(true)
-    toast(`Starting download of ${filteredItems.length} cards...`, 'info')
+    toast(`Starting download of ${filteredItems.length} cards…`, 'info')
     let count = 0
     for (const item of filteredItems) {
       try {
@@ -2706,7 +2736,7 @@ export default function Home() {
       } catch { }
     }
     setBatchDownloading(false)
-    toast(`Downloaded ${count} cards!`, 'success')
+    toast(`Downloaded ${count} cards.`, 'success')
   }
 
   const toggleFavorite = useCallback(async (item: OrbitObject) => {
@@ -2717,12 +2747,7 @@ export default function Home() {
     return true
   }, [identity])
 
-  const handleBatchFavorite = async () => {
-    if (selectedGalleryIds.size === 0) return
-    const targets = items.filter(i => selectedGalleryIds.has(i.id))
-    await Promise.all(targets.map(item => toggleFavorite(item).catch(() => false)))
-    toast(`Updated starred status for ${targets.length} items`, 'success')
-  }
+  
 
   const handleBatchDelete = async () => {
     if (selectedGalleryIds.size === 0) return
@@ -2752,42 +2777,7 @@ export default function Home() {
     loadGallery()
   }
 
-  const handleDeleteFailed = async () => {
-    if (!identity) return
-    const owned: string[] = []
-    const received: string[] = []
-    for (const item of items) {
-      try {
-        const res = await orbitFetch(`/api/objects/${item.id}`, { method: 'GET' }, identity)
-        if (!res.ok) {
-          if (item.owner_id === identity.orbitId) {
-            owned.push(item.id)
-          } else {
-            received.push(item.id)
-          }
-        }
-      } catch {
-        if (item.owner_id === identity.orbitId) {
-          owned.push(item.id)
-        } else {
-          received.push(item.id)
-        }
-      }
-    }
-    let deleted = 0
-    for (const id of owned) {
-      try { await orbitFetch(`/api/objects/${id}`, { method: 'DELETE' }, identity); deleted++ } catch { }
-    }
-    for (const id of received) {
-      try { await orbitFetch(`/api/inbox/${id}/remove`, { method: 'POST' }, identity); deleted++ } catch { }
-    }
-    if (deleted > 0) {
-      toast(`Cleaned up ${deleted} inaccessible item(s)`, 'success')
-      loadGallery()
-    } else {
-      toast('All items accessible', 'info')
-    }
-  }
+  
 
   const handleDelete = useCallback(async (item: OrbitObject) => {
     if (!await confirm({
@@ -2810,7 +2800,6 @@ export default function Home() {
 
   if (!isLoaded) return <PageSkeleton />;
 
-  const myDisplayName = myProfile.displayName || ''
   const myPostTags = identity ? deriveProfileTags(serverPosts.filter(p => p.author_id === identity.orbitId), []) : []
 
   return (
@@ -2825,12 +2814,23 @@ export default function Home() {
 
       <OfflineWarningBanner identity={identity} />
 
+      {identity && tourState.status === 'active' && tourState.index > 0 && isOnboardingComplete(readOnboardingState(identity.orbitId)) && (
+        <TourDock
+          steps={TOUR_STEPS}
+          state={tourState}
+          onNext={() => advanceTour(1)}
+          onBack={() => advanceTour(-1)}
+          onSkip={skipTour}
+        />
+      )}
+
       <div className={hideUiForWallpaper ? "opacity-0 pointer-events-none transition-opacity duration-150 w-full h-full min-h-0 flex flex-col items-center" : spaceUiDimmed ? "opacity-[0.15] pointer-events-none transition-opacity duration-150 w-full h-full min-h-0 flex flex-col items-center" : "transition-opacity duration-150 w-full h-full min-h-0 flex flex-col items-center"}>
         {!identity ? (
           <ErrorBoundary>
             <OnboardingFlow
               identity={null}
               initialProfile={myProfile}
+              ensureIdentity={() => createIdentity()}
               onOpenTos={() => { setLegalDoc('terms'); setShowTosModal(true) }}
               tagSuggestions={myPostTags}
               onLogin={async (name, tags, customKey, pfpUrl) => {
@@ -2851,7 +2851,7 @@ export default function Home() {
                   }
                   setMyProfile({ displayName: effectiveName, tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [], isAdmin: false, pfpUrl: pfpUrl || '' });
                 }
-                toast('Logged in to gMatch!', 'success');
+                toast('Logged in.', 'success');
                 loadUsers();
                 loadGallery();
               }}
@@ -2879,7 +2879,7 @@ export default function Home() {
                     },
                   );
                 }
-                toast(`Welcome to gMatch, ${name}!`, 'success');
+                toast(`Welcome to gMatch, ${name}.`, 'success');
                 loadUsers();
                 loadGallery();
               }}
@@ -2887,7 +2887,7 @@ export default function Home() {
                 setMyProfile((prev) => ({ ...prev, displayName: profile.displayName, tags: profile.tags, pfpUrl: profile.pfpUrl || prev.pfpUrl }));
               }}
               onComplete={() => {
-                toast('Your account is ready to play!', 'success');
+                toast('Account ready.', 'success');
               }}
             />
           </ErrorBoundary>
@@ -2899,30 +2899,22 @@ export default function Home() {
                 setMainView={handleSetMainView}
                 onOpenHome={handleOpenHome}
                 onOpenCreatePost={() => { setChatOpen(false); setShowCreatePostModal(true); }}
-                onOpenChat={() => {
-                  if (chatOpen && panelTab === 'chat') {
-                    setChatOpen(false);
-                  } else {
-                    setChatOpen(true);
-                    setPanelTab('chat');
-                  }
-                  setDmMinimized(false);
-                  if (mainView === 'messages') setMainView('feed');
-                }}
-                chatOpen={chatOpen && panelTab === 'chat'}
                 onOpenGallery={() => handleSetMainView('gallery')}
                 onOpenSettings={() => { setChatOpen(false); setShowSettingsModal(true); }}
+                onLogout={() => { setChatOpen(false); setIdentityModalMode('logout'); }}
                 onOpenStore={() => handleSetMainView('store')}
                 gamesSubTab={gamesSubTab}
-                onOpenGamesTab={(tab) => { handleSetMainView('games'); setGamesSubTab(tab); }}
+                onOpenGamesTab={(tab) => {
+                  if (tab === 'cards') { handleSetMainView('gallery'); return; }
+                  handleSetMainView('games'); setGamesSubTab(tab);
+                }}
                 onlineBadge={lobbyRoomCount}
                 gameBadges={{ duel: duelBadge }}
                 isAdmin={myProfile.isAdmin}
                 onGroupToggle={() => setChatOpen(false)}
-                unreadMessagesCount={pmUnreadCount}
                 notificationUnreadCount={lobby.unreadCount}
-                onOpenNotifications={toggleNotifications}
-                notificationsOpen={chatOpen && panelTab === 'notifications'}
+                onOpenNotifications={openNotifications}
+                notificationsOpen={notifOpen}
                 profilePic={profilePics[identity?.orbitId || '']}
                 displayName={myProfile.displayName || myUser?.display_name || 'You'}
                 activeHack={activeHack}
@@ -2932,96 +2924,7 @@ export default function Home() {
                 wsConnected={isWsConnected}
                 showRooms={courierActive}
               />
-              <div
-                className={`hidden md:flex shrink-0 min-h-0 overflow-hidden ${chatResizing ? '' : 'transition-[width] duration-300 ease-out'}`}
-                style={{ width: chatOpen ? `min(${chatPanel.width}px, 92vw)` : 0 }}
-                aria-hidden={!chatOpen}
-              >
-                {chatOpen && (
-                  <div className="w-full h-full min-h-0 p-2 glass-sidebar">
-                    <SocialPanel
-                      tab={panelTab}
-                      onTabChange={setPanelTab}
-                      onClose={() => setChatOpen(false)}
-                      chatUnread={pmUnreadCount}
-                      notificationUnread={lobby.unreadCount}
-                      dm={
-                        <GMatchDMs
-                          identity={identity}
-                          chatMessages={chatMessages}
-                          pmMessages={pmPeer ? pmMessagesByPeer[pmPeer.id || (pmPeer as any).orbitId || ''] || [] : []}
-                          activePmPeer={pmPeer ? { orbitId: pmPeer.id || (pmPeer as any).orbitId, name: pmPeer.display_name || (pmPeer as any).name || 'User' } : null}
-                          peers={users.map((u) => ({ orbitId: u.id || (u as any).orbitId, name: u.display_name || (u as any).name || 'User' }))}
-                          threads={pmThreads}
-                          profilePics={profilePics}
-                          myDisplayName={myProfile.displayName || 'You'}
-                          groups={chatGroups}
-                          groupMessages={groupMessagesByGroup}
-                          activeGroupId={activeGroupId}
-                          onSelectGroup={setActiveGroupId}
-                          onSendMessage={sendChatMessage}
-                          onSendPm={(peerId, text, replyToId, attachment) => {
-                            void sendPm(peerId, text, replyToId, attachment);
-                          }}
-                          onSelectPeer={(p) => {
-                            if (p) {
-                              const found = users.find((u) => u.id === p.orbitId || (u as any).orbitId === p.orbitId);
-                              setPmPeer(found || ({ id: p.orbitId, display_name: p.name } as any));
-                              if (p.orbitId !== 'global_lobby' && p.orbitId !== 'card_queue') {
-                                loadPmMessages(p.orbitId);
-                              }
-                            } else {
-                              setPmPeer(null);
-                            }
-                          }}
-                          onReportMessage={reportPmMessage}
-                          onReportUser={reportPmUser}
-                          onDeleteMessage={(messageId, peerId) => {
-                            if (peerId) void deletePmMessage(messageId, peerId);
-                          }}
-                          onCreateGroup={createGroup}
-                          onOpenAttachment={openAttachmentModal}
-                          onSendGroupMessage={(groupId, text, replyToId, attachment) => {
-                            void sendGroupMessage(groupId, text, replyToId, attachment);
-                          }}
-                          onLeaveGroup={leaveGroup}
-                          onLoadGroupMessages={loadGroupMessages}
-                          onLoadGroupMembers={loadGroupMembers}
-                          onAddGroupMembers={addGroupMembers}
-                          onOpenProfile={(userId) => {
-                            const t = users.find((u) => u.id === userId || (u as any).orbitId === userId);
-                            if (t) setSelectedProfileUser(t);
-                          }}
-                          onOpenImage={(msg) => setViewerMessage(msg)}
-                          onDeleteThread={deleteThread}
-                          onBackToThreads={() => { setPmPeer(null); loadPmThreads(); }}
-                          onLoadHistory={loadPmHistory}
-                        />
-                      }
-                      notifications={
-                        <NotificationsPanel
-                          notifications={lobby.notifications}
-                          unreadCount={lobby.unreadCount}
-                          invites={lobby.invites}
-                          onMarkAllRead={() => lobby.markNotificationsRead()}
-                          onRespondInvite={(id, accept) => lobby.respondToInvite(id, accept)}
-                          onRespondBabecock={handleRespondBabecock}
-                          onOpenBabecock={() => { setGamesSubTab('babecock'); setMainView('games'); }}
-                        />
-                      }
-                    />
-                  </div>
-                )}
-              </div>
-              {/* UI-3: drag handle between the messages panel and content */}
-              <PanelResizer
-                disabled={!chatOpen}
-                side="right"
-                onResizeStart={() => setChatResizing(true)}
-                onResizeEnd={() => setChatResizing(false)}
-                onDelta={chatPanel.dragBy}
-              />
-              <div className="flex-1 min-h-0 flex flex-col">
+              <div className="flex-1 min-w-0 min-h-0 flex flex-col">
                 <div ref={mainScrollRef} className="mobile-app-scroll flex-1 min-h-0 w-full flex flex-col relative z-10 overflow-y-auto styled-scrollbar">
 
                   {/* Modals & Config */}
@@ -3043,6 +2946,12 @@ export default function Home() {
                   )}
 
                   {/* gMatch Main Feed View */}
+                  {mainView === 'feed' && identity && tourState.status === 'active' && tourState.index === 0 && isOnboardingComplete(readOnboardingState(identity.orbitId)) && (
+                    <TourDeck
+                      onOpen={(step) => advanceTour(1)}
+                      onDismiss={skipTour}
+                    />
+                  )}
                   {mainView === 'feed' && (
                     <div className={isVisionJammed ? "relative" : ""}>
                       {isVisionJammed && (
@@ -3051,7 +2960,7 @@ export default function Home() {
                         </div>
                       )}
                       <div className={isVisionJammed ? "blur-md select-none pointer-events-none transition-all duration-300" : ""}>
-                        <div className="w-full max-w-5xl mx-auto px-3 sm:px-4 flex flex-col gap-4 pb-24 lg:pb-16">
+                        <div className="w-full max-w-5xl mx-auto px-3 sm:px-4 pt-3 sm:pt-4 flex flex-col gap-4 pb-24 lg:pb-16">
                           {/* ── Feed ── */}
                           <section className="module module-primary module-glass glass-surface overflow-visible order-1">
                             <div className="module-header flex items-center justify-between sticky top-0 z-20">
@@ -3084,13 +2993,14 @@ export default function Home() {
                                 }}
                                 activeStoryUserId={storyViewerUserId}
                                 onActiveStoryClose={() => setStoryViewerUserId(null)}
-                                onOpenDMs={() => handleSetMainView('messages')}
                                 onOpenPostCreator={() => setShowCreatePostModal(true)}
+                                shareGroups={chatGroups.map((g) => ({ id: g.id, name: g.name, member_count: g.member_count }))}
+                                onFollowSuggestion={(id) => { void toggleFollowUser(id); }}
+                                myProfileTags={myProfile.tags}
                                 onSelectUser={(uId) => {
                                   const target = users.find((u) => u.id === uId || (u as any).orbitId === uId);
                                   if (target) setSelectedProfileUser(target);
                                 }}
-                                onToggleTools={() => window.dispatchEvent(new CustomEvent('orbit_open_tools'))}
                                 users={users}
                                 onStartPm={(user) => {
                                   const target = users.find((u) => u.id === user.id || (u as any).orbitId === user.id);
@@ -3100,6 +3010,8 @@ export default function Home() {
                                 onOpenGameAd={(mode) => {
                                   if (mode === 'coffee') {
                                     setManualCoffeeOpen(true);
+                                  } else if (mode === 'store') {
+                                    handleSetMainView('store');
                                   } else if (mode !== 'discord') {
                                     setGamesSubTab(mode);
                                     setMainView('games');
@@ -3120,9 +3032,21 @@ export default function Home() {
                                   const u = users.find((x) => x.id === userId)
                                   openContextMenu('user', u || { id: userId, display_name: displayName })(e)
                                 }}
-                                onArchivePost={(id) => {
-                                  setArchivedPostIds((prev) => new Set(prev).add(id));
-                                  toast('Post archived', 'info');
+                                onArchivePost={async (id) => {
+                                  if (!identity) return
+                                  try {
+                                    const res = await orbitFetch(`/api/objects/${id}/archive`, { method: 'POST' }, identity)
+                                    if (!res.ok) throw new Error(String(res.status))
+                                    const { is_archived } = await res.json()
+                                    setArchivedPostIds((prev) => {
+                                      const next = new Set(prev)
+                                      if (is_archived) next.add(id); else next.delete(id)
+                                      return next
+                                    })
+                                    toast(is_archived ? 'Post archived' : 'Post unarchived', 'info')
+                                  } catch {
+                                    toast('Archive failed. Try again.', 'error')
+                                  }
                                 }}
                                 onDeletePost={(id) => {
                                   setDeletedPostIds((prev) => new Set(prev).add(id));
@@ -3162,8 +3086,6 @@ export default function Home() {
                   {/* gMatch Direct Messages View */}
                   {mainView === 'messages' && !chatOpen && !dmMinimized && (
                     <MessagesView
-                      panelTab={panelTab}
-                      setPanelTab={setPanelTab}
                       identity={identity}
                       chatMessages={chatMessages}
                       pmPeer={pmPeer}
@@ -3197,10 +3119,6 @@ export default function Home() {
                       setViewerMessage={setViewerMessage}
                       setDmMinimized={setDmMinimized}
                       pmUnreadCount={pmUnreadCount}
-                      lobby={lobby}
-                      handleRespondBabecock={handleRespondBabecock}
-                      setGamesSubTab={setGamesSubTab}
-                      setMainView={setMainView}
                     />
                   )}
 
@@ -3259,13 +3177,20 @@ export default function Home() {
                   )}
 
                   {mainView === 'servers' && (
-                    <div className="flex-1 min-h-0 w-full overflow-y-auto">
+                    <div className="flex-1 min-h-0 w-full overflow-hidden">
                       {identity ? (
                         <ServersView
                           identity={identity as never}
                           toast={toast}
                           showRooms={courierActive}
                           onOpenRooms={() => handleSetMainView('rooms')}
+                          onSelectUser={(u) => {
+                            const full = users.find((existing) => existing.id === u.id || (existing as any).orbitId === u.id)
+                            setSelectedProfileUser(full || u)
+                          }}
+                          profilePics={profilePics}
+                          rooms={courier.rooms.map((r) => ({ id: r.id, name: r.name, membersCount: r.members.length }))}
+                          onOpenRoom={(_roomId) => handleSetMainView('rooms')}
                         />
                       ) : (
                         <div className="p-6 text-xs text-retro-muted">Sign in to browse servers.</div>
@@ -3448,7 +3373,7 @@ export default function Home() {
                 {/* Lobby Image Fallback Lightbox */}
                 {lobbyLightboxUrl && !expandedItemId && (
                   <div
-                    className="fixed inset-0 z-[99999] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 cursor-pointer animate-orbit-fade-in"
+                    className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-md flex items-center justify-center p-4 cursor-pointer animate-orbit-fade-in"
                     onClick={() => setLobbyLightboxUrl(null)}
                   >
                     <div className="relative max-w-4xl max-h-[90vh] flex items-center justify-center" onClick={e => e.stopPropagation()}>
@@ -3456,16 +3381,42 @@ export default function Home() {
                       <img
                         src={lobbyLightboxUrl}
                         alt="Lobby image"
-                        className="max-w-full max-h-[85vh] object-contain rounded-lg border-2 border-retro-border shadow-2xl"
+                        className="max-w-full max-h-[85vh] object-contain rounded-lg border-2 border-border-glass shadow-2xl"
                       />
                       <button
                         type="button"
                         onClick={() => setLobbyLightboxUrl(null)}
-                        className="absolute top-2 right-2 bg-retro-panel border border-retro-border text-retro-muted hover:text-retro-fg p-1.5 transition-colors cursor-pointer"
+                        className="absolute top-2 right-2 bg-retro-panel border border-border-glass text-retro-muted hover:text-retro-fg p-1.5 transition-colors cursor-pointer"
                         aria-label="Close image"
                       >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
                       </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Notifications modal (sidebar/header bell) */}
+                {notifOpen && (
+                  <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4" role="dialog" aria-label="Notifications">
+                    <div className="absolute inset-0 bg-black/70" onClick={() => setNotifOpen(false)} />
+                    <div className="relative w-full max-w-md h-[70vh] glass-card rounded-xl overflow-hidden flex flex-col">
+                      <button
+                        type="button"
+                        onClick={() => setNotifOpen(false)}
+                        aria-label="Close notifications"
+                        className="absolute top-2 right-2 z-10 p-1.5 rounded-md hover:bg-glass-w8 text-retro-muted hover:text-retro-fg cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                      <NotificationsPanel
+                        notifications={lobby.notifications}
+                        unreadCount={lobby.unreadCount}
+                        invites={lobby.invites}
+                        onMarkAllRead={() => lobby.markNotificationsRead()}
+                        onRespondInvite={(id, accept) => lobby.respondToInvite(id, accept)}
+                        onRespondBabecock={handleRespondBabecock}
+                        onOpenBabecock={() => { setNotifOpen(false); setGamesSubTab('babecock'); setMainView('games'); }}
+                      />
                     </div>
                   </div>
                 )}
@@ -3577,6 +3528,71 @@ export default function Home() {
                 setReportCategory={setReportCategory}
               />
 
+              {/* Desktop messages dock: bottom tab, full-height side panel */}
+              <MessagesRail
+                open={chatOpen}
+                onToggle={() => { playPress(860); setChatOpen((v) => !v); }}
+                unreadCount={pmUnreadCount}
+              >
+<SocialPanel
+                      onClose={() => setChatOpen(false)}
+                      chatUnread={pmUnreadCount}
+                      dm={
+                        <GMatchDMs
+                          identity={identity}
+                          chatMessages={chatMessages}
+                          pmMessages={pmPeer ? pmMessagesByPeer[pmPeer.id || (pmPeer as any).orbitId || ''] || [] : []}
+                          activePmPeer={pmPeer ? { orbitId: pmPeer.id || (pmPeer as any).orbitId, name: pmPeer.display_name || (pmPeer as any).name || 'User' } : null}
+                          peers={users.map((u) => ({ orbitId: u.id || (u as any).orbitId, name: u.display_name || (u as any).name || 'User' }))}
+                          threads={pmThreads}
+                          profilePics={profilePics}
+                          myDisplayName={myProfile.displayName || 'You'}
+                          groups={chatGroups}
+                          groupMessages={groupMessagesByGroup}
+                          activeGroupId={activeGroupId}
+                          onSelectGroup={setActiveGroupId}
+                          onSendMessage={sendChatMessage}
+                          onSendPm={(peerId, text, replyToId, attachment) => {
+                            void sendPm(peerId, text, replyToId, attachment);
+                          }}
+                          onSelectPeer={(p) => {
+                            if (p) {
+                              const found = users.find((u) => u.id === p.orbitId || (u as any).orbitId === p.orbitId);
+                              setPmPeer(found || ({ id: p.orbitId, display_name: p.name } as any));
+                              if (p.orbitId !== 'global_lobby' && p.orbitId !== 'card_queue') {
+                                loadPmMessages(p.orbitId);
+                              }
+                            } else {
+                              setPmPeer(null);
+                            }
+                          }}
+                          onReportMessage={reportPmMessage}
+                          onReportUser={reportPmUser}
+                          onDeleteMessage={(messageId, peerId) => {
+                            if (peerId) void deletePmMessage(messageId, peerId);
+                          }}
+                          onCreateGroup={createGroup}
+                          onOpenAttachment={openAttachmentModal}
+                          onSendGroupMessage={(groupId, text, replyToId, attachment) => {
+                            void sendGroupMessage(groupId, text, replyToId, attachment);
+                          }}
+                          onLeaveGroup={leaveGroup}
+                          onLoadGroupMessages={loadGroupMessages}
+                          onLoadGroupMembers={loadGroupMembers}
+                          onAddGroupMembers={addGroupMembers}
+                          onOpenProfile={(userId) => {
+                            const t = users.find((u) => u.id === userId || (u as any).orbitId === userId);
+                            if (t) setSelectedProfileUser(t);
+                          }}
+                          onOpenImage={(msg) => setViewerMessage(msg)}
+                          onDeleteThread={deleteThread}
+                          onBackToThreads={() => { setPmPeer(null); loadPmThreads(); }}
+                          onLoadHistory={loadPmHistory}
+                        />
+                      }
+                    />
+              </MessagesRail>
+
               {/* Floating Minimized DM Dock Bubble */}
               {dmMinimized && (
                 <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-40 flex justify-center px-3 pb-2 pointer-events-none">
@@ -3601,10 +3617,10 @@ export default function Home() {
                       </span>
                     </span>
                     <span className="flex flex-col items-start leading-tight">
-                      <span className="text-[11px] font-bold">
+                      <span className="text-xs font-bold">
                         {pmPeer ? pmPeer.display_name || 'Direct Message' : 'Direct Messages'}
                       </span>
-                      <span className="text-[9px] text-retro-muted">Tap to reopen</span>
+                      <span className="text-[10px] text-retro-muted">Tap to reopen</span>
                     </span>
                     {chatMessages.length > 0 && (
                       <span className="w-2 h-2 rounded-full bg-[#e1306c] ring-2 ring-white shrink-0" />
@@ -3696,6 +3712,7 @@ export default function Home() {
               <OnboardingFlow
                 identity={identity}
                 initialProfile={{ displayName: myProfile.displayName, tags: myProfile.tags, pfpUrl: myProfile.pfpUrl }}
+                ensureIdentity={() => createIdentity()}
                 tagSuggestions={myPostTags}
                 onLogin={async (name, tags, customKey, pfpUrl) => {
                   if (!customKey) throw new Error('Missing secret key');
@@ -3711,7 +3728,7 @@ export default function Home() {
                   setMyProfile((prev) => ({ ...prev, displayName: profile.displayName, tags: profile.tags, pfpUrl: profile.pfpUrl || prev.pfpUrl }));
                 }}
                 onComplete={() => {
-                  toast('Your account is ready to play!', 'success');
+                  toast('Account ready.', 'success');
                 }}
                 onOpenTos={() => { setLegalDoc('terms'); setShowTosModal(true) }}
               />
@@ -3724,10 +3741,10 @@ export default function Home() {
                 recipientId={attachmentModal?.peerId}
               />
               {groupPickerOpen && chatGroups.length > 0 && (
-                <div className="fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-                  <div className="bg-surface-raised border border-border-glass rounded-3xl max-w-md w-full shadow-2xl overflow-hidden">
+                <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+                  <div className="bg-surface-raised border border-border-glass rounded-xl max-w-md w-full shadow-2xl overflow-hidden">
                     <div className="p-4 border-b border-border-glass flex items-center justify-between">
-                      <h3 className="text-sm font-bold text-retro-fg">Select Group Chat</h3>
+                      <h3 className="text-sm font-bold text-retro-fg">Select group chat</h3>
                       <button onClick={() => setGroupPickerOpen(false)} className="text-retro-muted hover:text-retro-body p-1">
                         <X className="w-5 h-5" />
                       </button>
@@ -3773,7 +3790,7 @@ export default function Home() {
                 onOpenSettings={() => setShowSettingsModal(true)}
                 onOpenStore={() => handleSetMainView('store')}
                 onOpenPlayers={() => { setGamesSubTab('duel'); handleSetMainView('games'); }}
-                onOpenNotifications={openNotificationsOnMobile}
+                onOpenNotifications={openNotifications}
                 unreadMessagesCount={pmUnreadCount}
                 unreadNotificationsCount={lobby.unreadCount}
                 profilePic={profilePics[identity?.orbitId || '']}
@@ -3788,10 +3805,12 @@ export default function Home() {
           identity={identity}
           cardsNeeded={createCardNeeded}
           initialMedia={cardPrefill}
-          onClose={() => { setShowCreateCardModal(false); setCardPrefill(null); }}
+          initialFile={forgeFile}
+          onClose={() => { setShowCreateCardModal(false); setCardPrefill(null); setForgeFile(null); }}
           onCreated={() => {
             setCreateCardNeeded(Math.max(0, MIN_GAME_CARDS - (myCards.length + 1)))
-            toast('Unique card created!', 'success')
+            setForgeFile(null)
+            toast('Card created.', 'success')
           }}
         />
       )}
@@ -3819,7 +3838,7 @@ export default function Home() {
       {/* Versioned acceptance (C.2): once logged in, the CURRENT legal suite
           must be read + accepted before the app reveals itself. Re-triggers
           on every version bump (key = full doc@version map). */}
-      {isLoaded && identity && !legalAccepted && (
+      {isLoaded && identity && !legalAccepted && isOnboardingComplete(readOnboardingState(identity.orbitId)) && (
         <LegalCenter
           isOpen
           requireAccept

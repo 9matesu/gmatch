@@ -66,7 +66,7 @@ function PlayerTile({
           ? 'border-retro-warning/50'
           : player.id === selfId
           ? 'border-retro-accent/30'
-          : 'border-retro-border'
+          : 'border-border-glass'
       } hover:border-retro-accent/60`}
     >
       <Avatar id={player.id} imageUrl={player.pfp_url || undefined} fill />
@@ -74,7 +74,7 @@ function PlayerTile({
       <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
 
       <span
-        className={`absolute top-1.5 left-1.5 z-20 text-[9px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap ${
+        className={`absolute top-1.5 left-1.5 z-20 text-[10px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap ${
           isPlaying
             ? 'bg-surface-raised/90 text-retro-accent'
             : player.queueStatus === 'in_queue'
@@ -94,7 +94,7 @@ function PlayerTile({
       </span>
 
       {player.id === selfId && (
-        <span className="absolute top-1.5 right-1.5 z-20 text-[9px] font-semibold text-retro-accent">
+        <span className="absolute top-1.5 right-1.5 z-20 text-[10px] font-semibold text-retro-accent">
           You
         </span>
       )}
@@ -106,7 +106,7 @@ function PlayerTile({
             event.stopPropagation()
             handleClick()
           }}
-          className="text-[11px] font-medium truncate text-white drop-shadow"
+          className="text-xs font-medium truncate text-white drop-shadow"
           title={player.display_name || player.id}
         >
           <span className="truncate">
@@ -117,7 +117,7 @@ function PlayerTile({
           {(() => {
             const tags = parseTags(player.tags)
             return tags.length > 0 ? (
-              <span className="text-[9px] text-retro-muted truncate">
+              <span className="text-[10px] text-retro-muted truncate">
                 {tags.slice(0, 2).map((t) => `#${t}`).join(' ')}
               </span>
             ) : null
@@ -147,8 +147,8 @@ function DuelPair({
 }) {
   return (
     <div className="col-span-2 sm:col-span-3 md:col-span-4 lg:col-span-5">
-      <div className="flex items-center justify-between gap-3 bg-surface-raised border border-retro-border rounded-lg px-3 py-2 mb-1.5">
-        <div className="flex items-center gap-2 min-w-0 text-[11px] font-medium text-retro-muted truncate">
+      <div className="flex items-center justify-between gap-3 bg-surface-raised border border-border-glass rounded-lg px-3 py-2 mb-1.5">
+        <div className="flex items-center gap-2 min-w-0 text-xs font-medium text-retro-muted truncate">
           <span className="w-1.5 h-1.5 rounded-full bg-retro-accent flex-shrink-0" />
           {players.map((m, index) => (
             <span key={m.id} className="inline-flex min-w-0 items-center">
@@ -229,7 +229,7 @@ export function PlayerRoster({
       <div className="space-y-3">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="border border-retro-border p-3 flex flex-col items-center gap-2 rounded">
+            <div key={i} className="border border-border-glass p-3 flex flex-col items-center gap-2 rounded">
               <div className="skeleton w-8 h-8 rounded-full" />
               <div className="skeleton w-full h-3" />
               <div className="skeleton w-16 h-2.5" />
@@ -242,7 +242,7 @@ export function PlayerRoster({
 
   if (players.length === 0) {
     return (
-      <div className="border border-dashed border-retro-border rounded-lg p-8 text-center">
+      <div className="border border-dashed border-border-glass rounded-lg p-8 text-center">
         <p className="text-xs text-retro-muted">Nobody online yet.</p>
       </div>
     )

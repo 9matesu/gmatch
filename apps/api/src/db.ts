@@ -75,22 +75,21 @@ export class D1Turso {
     first<T = any>(): Promise<T | null>
     all<T = any>(): Promise<{ results: T[] }>
   } {
-    const self = this
     const exec = async (args?: any[]) => {
       const cleanArgs = sanitizeArgs(args)
-      const result = await self.exec(sql, cleanArgs)
+      const result = await this.exec(sql, cleanArgs)
       return { success: true, meta: { changes: result?.rowsAffected ?? 0 } }
     }
 
     const getFirst = async <T>(args?: any[]): Promise<T | null> => {
       const cleanArgs = sanitizeArgs(args)
-      const result = await self.exec(sql, cleanArgs)
+      const result = await this.exec(sql, cleanArgs)
       return (result.rows[0] as T) || null
     }
 
     const getAll = async <T>(args?: any[]): Promise<{ results: T[] }> => {
       const cleanArgs = sanitizeArgs(args)
-      const result = await self.exec(sql, cleanArgs)
+      const result = await this.exec(sql, cleanArgs)
       return { results: (result?.rows || []) as T[] }
     }
 

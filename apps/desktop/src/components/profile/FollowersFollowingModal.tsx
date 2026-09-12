@@ -214,15 +214,15 @@ export function FollowersFollowingModal({
 
   return (
     <div
-      className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/75 backdrop-blur-md p-3 sm:p-4 select-none font-sans animate-orbit-fade-in"
+      className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/70 backdrop-blur-md p-3 sm:p-4 select-none font-sans animate-orbit-fade-in"
       onClick={onClose}
     >
       <div
-        className="bg-surface-raised border border-retro-border w-full max-w-md rounded-lg overflow-hidden shadow-xl flex flex-col text-retro-fg max-h-[85vh] animate-orbit-pop"
+        className="bg-glass backdrop-blur-2xl border border-border-glass w-full max-w-md rounded-xl overflow-hidden shadow-2xl flex flex-col text-retro-fg max-h-[88vh] animate-orbit-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header Bar */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-retro-border shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <Users className="w-4 h-4 text-retro-muted shrink-0" />
             <div className="min-w-0">
@@ -248,16 +248,16 @@ export function FollowersFollowingModal({
         </div>
 
         {/* Tab Selector */}
-        <div className="flex border-b border-retro-border shrink-0">
+        <div className="flex border-b border-border-glass shrink-0">
           <button
             type="button"
             onClick={() => {
               playPress(650);
               setActiveTab('followers');
             }}
-            className={`flex-1 py-2.5 text-xs font-medium transition-colors cursor-pointer text-center relative border-b-2 ${activeTab === 'followers'
-                ? 'text-retro-fg border-retro-accent'
-                : 'text-retro-muted hover:text-retro-fg border-transparent'
+            className={`flex-1 py-1.5 text-xs font-medium transition-colors cursor-pointer text-center rounded-md ${activeTab === 'followers'
+                ? 'bg-glass-w12 text-retro-fg'
+                : 'text-retro-muted hover:text-retro-fg'
               }`}
           >
             <span>{isTargetMode ? networkFollowers.length : followersUsers.length} Followers</span>
@@ -269,9 +269,9 @@ export function FollowersFollowingModal({
               playPress(650);
               setActiveTab('following');
             }}
-            className={`flex-1 py-2.5 text-xs font-medium transition-colors cursor-pointer text-center relative border-b-2 ${activeTab === 'following'
-                ? 'text-retro-fg border-retro-accent'
-                : 'text-retro-muted hover:text-retro-fg border-transparent'
+            className={`flex-1 py-1.5 text-xs font-medium transition-colors cursor-pointer text-center rounded-md ${activeTab === 'following'
+                ? 'bg-glass-w12 text-retro-fg'
+                : 'text-retro-muted hover:text-retro-fg'
               }`}
           >
             <span>{isTargetMode ? networkFollowing.length : followingUsers.length} Following</span>
@@ -279,8 +279,8 @@ export function FollowersFollowingModal({
         </div>
 
         {/* Search Bar Input */}
-        <div className="px-3 py-2 border-b border-retro-border shrink-0">
-          <div className="flex items-center gap-2 bg-surface-interactive rounded-lg px-3 py-1.5 text-xs text-retro-fg focus-within:border-zinc-500 border border-retro-border transition-colors">
+        <div className="px-3 py-2 border-b border-border-glass shrink-0">
+          <div className="flex items-center gap-2 bg-surface-interactive rounded-lg px-3 py-1.5 text-xs text-retro-fg focus-within:border-border-glass border border-border-glass transition-colors">
             <Search className="w-3.5 h-3.5 text-retro-muted shrink-0" />
             <input
               type="text"
@@ -324,7 +324,7 @@ export function FollowersFollowingModal({
             return (
               <div
                 key={user.id}
-                className="flex items-center justify-between p-2 rounded-2xl hover:bg-glass-w5 transition-colors group"
+                className="flex items-center justify-between p-2 rounded-xl hover:bg-glass-w5 transition-colors group"
               >
                 {/* User Avatar + Display Name */}
                 <div
@@ -335,7 +335,7 @@ export function FollowersFollowingModal({
                   <div
                     className={`w-11 h-11 rounded-full p-[2px] shrink-0 transition-transform group-hover:scale-105 ${hasStory
                         ? 'bg-gradient-to-tr from-cyan-500 via-teal-500 to-amber-500 shadow-xs'
-                        : 'bg-zinc-700'
+                        : 'bg-glass-w20'
                       }`}
                   >
                     <div className="w-full h-full rounded-full bg-surface-raised overflow-hidden border border-white flex items-center justify-center text-xs font-black text-retro-fg">
@@ -360,7 +360,7 @@ export function FollowersFollowingModal({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2 text-[11px] text-retro-muted truncate font-mono">
+                    <div className="flex items-center gap-2 text-xs text-retro-muted truncate font-mono">
                       <span>{user.id.slice(0, 12)}...</span>
                       {(user as any).score ? (
                         <span className="text-amber-600 font-bold font-sans">
@@ -438,7 +438,7 @@ export function FollowersFollowingModal({
             <div className="py-12 text-center space-y-2">
               <Search className="w-8 h-8 text-retro-body mx-auto" />
               <p className="text-xs font-bold text-retro-body">No results found</p>
-              <p className="text-[11px] text-retro-muted">
+              <p className="text-xs text-retro-muted">
                 No users found matching &ldquo;{searchQuery}&rdquo;
               </p>
             </div>

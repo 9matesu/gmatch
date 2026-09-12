@@ -213,7 +213,7 @@ export function GMatchDMs({
         body: JSON.stringify({ body: newText }),
       }, identity);
       if (res.ok) {
-        const data = await res.json();
+        await res.json();
         // Message updated via WS push
       }
     } catch {}
@@ -398,12 +398,13 @@ export function GMatchDMs({
   const canShowMembers = openTarget === 'group' && !!activeGroupId && !!onLoadGroupMembers;
 
   return (
-    <div className="flex-1 min-h-[480px] h-full w-full solid-panel overflow-hidden flex flex-col md:flex-row font-sans text-retro-fg animate-orbit-fade-in">
-      {/* Left Column */}
-      <div className={`w-full md:w-80 lg:w-88 border-r border-border-glass flex flex-col bg-surface-canvas/80 shrink-0 min-h-0 select-none ${openTarget ? 'hidden md:flex' : 'flex'}`}>
+    <div className="flex-1 min-h-0 h-full w-full solid-panel overflow-hidden flex flex-col md:flex-row-reverse font-sans text-retro-fg animate-orbit-fade-in">
+      {/* Thread list column — right side on desktop, coupled with the rail's
+          players/groups aside; chat panel owns the left. */}
+      <div className={`w-full md:w-60 lg:w-64 border-r md:border-r-0 md:border-l border-border-glass flex flex-col bg-surface-canvas/80 shrink-0 min-h-0 select-none ${openTarget ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-3 sm:p-4 metro-rule flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            <h2 className="font-semibold text-sm text-zinc-50 truncate">
+            <h2 className="font-semibold text-sm text-retro-fg truncate">
               {myDisplayName || 'Messages'}
             </h2>
           </div>
@@ -479,7 +480,7 @@ export function GMatchDMs({
                 <span className="text-xs font-medium text-retro-body truncate flex items-center gap-1"><Globe className="w-3 h-3 text-retro-muted" /> Lobby Lounge</span>
                 <span className="text-[10px] text-retro-muted shrink-0 tabular-nums">{lobbyMessages.length}</span>
               </div>
-              <p className="text-[11px] truncate mt-0.5 text-retro-muted">{lastLobbyMsg}</p>
+              <p className="text-xs truncate mt-0.5 text-retro-muted">{lastLobbyMsg}</p>
             </div>
           </button>
 
@@ -496,7 +497,7 @@ export function GMatchDMs({
                 <span className="text-xs font-medium text-retro-body truncate flex items-center gap-1"><Gamepad2 className="w-3 h-3 text-retro-muted" /> Card Queue</span>
                 <span className="text-[10px] text-retro-muted shrink-0 tabular-nums">{queueMessages.length}</span>
               </div>
-              <p className="text-[11px] truncate mt-0.5 text-retro-muted">{lastQueueMsg}</p>
+              <p className="text-xs truncate mt-0.5 text-retro-muted">{lastQueueMsg}</p>
             </div>
           </button>
 
@@ -513,7 +514,7 @@ export function GMatchDMs({
                   <div className="w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center"><Users className="w-4 h-4" /></div>
                   <div className="flex-1 min-w-0">
                     <span className="text-xs font-medium text-retro-body truncate block">{g.name}</span>
-                    <p className="text-[11px] truncate mt-0.5 text-retro-muted">{g.member_count} members</p>
+                    <p className="text-xs truncate mt-0.5 text-retro-muted">{g.member_count} members</p>
                   </div>
                 </button>
               ))}
@@ -593,7 +594,7 @@ export function GMatchDMs({
                           </span>
                         )}
                       </div>
-                      <p className={`text-[11px] truncate mt-0.5 ${isUnread ? 'text-retro-body font-medium' : 'text-retro-muted'}`}>{thread.last_body || 'No messages yet'}</p>
+                      <p className={`text-xs truncate mt-0.5 ${isUnread ? 'text-retro-body font-medium' : 'text-retro-muted'}`}>{thread.last_body || 'No messages yet'}</p>
                     </div>
                   </button>
                   {showThreadActions && (
@@ -693,7 +694,7 @@ export function GMatchDMs({
                 <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-2 text-retro-muted my-auto select-none">
                   <MessageSquare className="w-6 h-6" />
                   <p className="text-xs text-retro-body">{headerTitle}</p>
-                  <p className="text-[11px] text-retro-muted">Send a message to start chatting</p>
+                  <p className="text-xs text-retro-muted">Send a message to start chatting</p>
                   {isLobbyGroup && (
                     <p className="text-[10px] text-retro-muted flex items-center gap-1"><Clock3 className="w-3 h-3" /> Clears every 12 hours</p>
                   )}
@@ -708,7 +709,7 @@ export function GMatchDMs({
                       disabled={loadingHistory}
                       className="px-3 py-1.5 rounded-md bg-glass-w8 border border-border-glass text-[10px] text-retro-muted hover:text-retro-fg hover:bg-glass-w12 transition-colors cursor-pointer disabled:opacity-40"
                     >
-                      {loadingHistory ? 'Loading...' : 'Load earlier messages'}
+                      {loadingHistory ? 'Loading…' : 'Load earlier messages'}
                     </button>
                   </div>
                 )}
@@ -794,14 +795,14 @@ export function GMatchDMs({
                               </div>
                               {isLast && (
                                 <div className={`mt-0.5 flex items-center gap-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                                  <time className="text-[9px] text-retro-muted select-none" dateTime={new Date(msg.timestamp).toISOString()}>
+                                  <time className="text-[10px] text-retro-muted select-none" dateTime={new Date(msg.timestamp).toISOString()}>
                                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                   </time>
                                   {isOwn && msg.readByRecipient && (
                                     <span title="Seen"><CheckCheck className="w-3 h-3 text-retro-accent" /></span>
                                   )}
                                   {msg.editedAt && (
-                                    <span className="text-[9px] text-retro-muted">Edited</span>
+                                    <span className="text-[10px] text-retro-muted">Edited</span>
                                   )}
                                 </div>
                               )}
