@@ -62,8 +62,8 @@ import { ServersView } from "./components/servers/ServersView";
 import { PCDominationView } from "./components/views/PCDominationView";
 import { DominationEffects } from "./components/domination/DominationEffects";
 import type { ActiveHackDebuff } from "@orbit/shared";
-import { ChevronDown, ChevronRight, X, MessageSquare } from "lucide-react";
-
+import { ChevronDown, ChevronRight, X } from "lucide-react";
+import { ChatCircleText } from "@phosphor-icons/react";
 import { WallpaperBackground } from "./components/WallpaperBackground";
 import { ContextOverlay, ReportModal } from "./components/ContextOverlay";
 import { GlobalModals } from "./components/GlobalModals";
@@ -3717,13 +3717,13 @@ export default function Home() {
                             <p className="font-medium text-retro-fg truncate">{group.name}</p>
                             <p className="text-xs text-retro-muted">{group.member_count} members</p>
                           </div>
-                          <MessageSquare className="w-5 h-5 text-retro-muted" />
+                          <ChatCircleText className="w-5 h-5 text-retro-muted" />
                         </button>
                       ))}
                     </div>
                     {chatGroups.length === 0 && (
                       <div className="p-6 text-center text-retro-muted">
-                        <MessageSquare className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                        <ChatCircleText className="w-10 h-10 mx-auto mb-2 opacity-50" />
                         <p className="text-sm">No group chats available</p>
                         <p className="text-xs mt-1">Create a group chat first to share images</p>
                       </div>

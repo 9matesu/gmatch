@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageSquare } from "lucide-react";
+import { ChatCircleText } from "@phosphor-icons/react";
 import { playPress } from "../../utils/sounds";
 
 export interface SocialPanelProps {
@@ -16,7 +16,7 @@ export function SocialPanel({ onClose, chatUnread = 0, dm }: SocialPanelProps) {
     <div className="glass-card w-full h-full min-h-0 flex flex-col overflow-hidden rounded-xl">
       <div className="flex items-center justify-between border-b border-white/10 shrink-0 bg-glass-w5 px-3 py-2">
         <span className="flex items-center gap-1.5 text-xs font-medium text-retro-fg">
-          <MessageSquare className="w-3.5 h-3.5" />
+          <ChatCircleText className="w-3.5 h-3.5" />
           Messages
           {chatUnread > 0 && (
             <span className="px-1 py-0.5 rounded-full text-[10px] font-bold leading-none bg-retro-accent text-black tabular-nums">
