@@ -28,6 +28,7 @@ interface Props {
   lobby: ReturnType<typeof useLobby>
   identity: IdentityLike | null
   myCards: OrbitObject[]
+  hasActiveDeck: boolean
   soundEnabled: boolean
   onOpenImage?: (url: string) => void
   onExpandItem?: (itemId: string) => void
@@ -43,7 +44,7 @@ interface Props {
   sendInvite?: (userId: string) => Promise<{ ok: boolean; error?: string }>
 }
 
-export function LobbyPanel({ lobby, identity, myCards, soundEnabled, onExpandItem, onOpenProfile, users, onOpenSpectateItem, onOpenCardChat, onOpenCreateCard, onOpenDeckBuilder, toggleAutoQueue }: Props) {
+export function LobbyPanel({ lobby, identity, myCards, hasActiveDeck, soundEnabled, onExpandItem, onOpenProfile, users, onOpenSpectateItem, onOpenCardChat, onOpenCreateCard, onOpenDeckBuilder, toggleAutoQueue }: Props) {
 const { state, joined, autoQueueEnabled, loading, toggleAutoQueue: lobbyToggleAutoQueue, spectateMatch, closeSpectate, spectatingMatchId, spectatingSnapshot, liveMatches, pickCard, decide, quitMatch, activeSpecials, submitSpecialCard, endSpecialMatch, decideSpecialMatch, onlineUsers } = lobby
 
   // Use passed-in override functions if provided, otherwise fall back to lobby functions
@@ -488,6 +489,7 @@ const selfId = identity?.orbitId || ''
                 autoQueueEnabled={autoQueueEnabled}
                 soundEnabled={soundEnabled}
                 myCardsCount={myCards.length}
+                hasActiveDeck={hasActiveDeck}
                 queuedSinceMs={queuedSinceMs}
                 showLeagueTab={showLeagueTab}
                 onToggleAutoQueue={effectiveToggleAutoQueue}

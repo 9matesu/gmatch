@@ -7,6 +7,7 @@ import { contentHash } from '../utils/media'
 import { createCardFromMedia } from '../utils/cardCollection'
 import { subscribeOrbitWebSocket } from '../utils/orbitWebSocket'
 import { logger } from '../utils/logger';
+import { getStoredActiveDeckId } from '../components/games/DeckBuilder';
 
 interface OrbitIdentity {
   orbitId: string
@@ -237,7 +238,12 @@ export function useLobby({
 
   const join = useCallback(async () => {
     if (!identity) return
-    const res = await orbitFetch('/api/lobby/join', { method: 'POST' }, identity)
+    const body = JSON.stringify({ deck_id: getStoredActiveDeckId() })
+    const res = await orbitFetch('/api/lobby/join', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    }, identity)
     if (res.ok) {
       setJoined(true)
       setAutoQueueEnabled(true)
@@ -264,7 +270,7 @@ export function useLobby({
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled }),
+        body: JSON.stringify({ enabled, ...(enabled ? { deck_id: getStoredActiveDeckId() } : {}) }),
       },
       identity
     )
@@ -277,18 +283,6 @@ export function useLobby({
     // are still queued.
     setAutoQueueEnabled(!enabled)
     setJoined(!enabled)
-    let err: string | undefined
-    try { const b = await res.json(); err = b?.error } catch { /* ignore */ }
-    return { ok: false, error: err }
-  }, [identity, refresh])
-
-  const quickMatch = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
-    if (!identity) return { ok: false }
-    const res = await orbitFetch('/api/lobby/quick-match', { method: 'POST' }, identity)
-    if (res.ok) {
-      refresh({ force: true })
-      return { ok: true }
-    }
     let err: string | undefined
     try { const b = await res.json(); err = b?.error } catch { /* ignore */ }
     return { ok: false, error: err }
@@ -958,7 +952,6 @@ export function useLobby({
     join,
     leave,
     toggleAutoQueue,
-    quickMatch,
     spectateMatch,
     closeSpectate,
     pickCard,

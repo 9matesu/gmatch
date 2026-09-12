@@ -1,39 +1,33 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import { QueueControls, type QueueControlsProps } from './QueueControls'
-import { MIN_GAME_CARDS } from '@orbit/shared'
+import { render, screen, fireEvent } from '@testing-library/react'
+import { QueueControls } from './QueueControls'
 
-function props(over: Record<string, unknown> = {}): QueueControlsProps {
-  return {
-    state: null,
-    match: null,
-    matchRoundInfo: null,
-    autoQueueEnabled: false,
-    soundEnabled: false,
-    queuedSinceMs: 0,
-    showLeagueTab: false,
-    onToggleAutoQueue: async () => ({ ok: true }),
-    onShowLeagueTab: () => {},
-    toast: () => {},
-    now: Date.now(),
-    ...over,
-  } as unknown as QueueControlsProps
-}
+const base = {
+  state: null, match: null, matchRoundInfo: null, autoQueueEnabled: false,
+  soundEnabled: false, queuedSinceMs: 0, showLeagueTab: false,
+  onToggleAutoQueue: vi.fn().mockResolvedValue({ ok: true }),
+  onOpenCreateCard: vi.fn(), onOpenDeckBuilder: vi.fn(),
+  onShowLeagueTab: vi.fn(), onOpenCardChat: vi.fn(),
+  toast: vi.fn(), now: Date.now(),
+} as const
 
-describe('QueueControls', () => {
-  it('shows a disabled Quick Play grouped with an enabled Build Deck when under threshold', () => {
-    render(<QueueControls {...props({ myCardsCount: MIN_GAME_CARDS - 1, onOpenDeckBuilder: vi.fn() })} />)
-    const quick = screen.getByRole('button', { name: /quick play/i })
-    expect(quick).toBeDisabled()
-    const build = screen.getByRole('button', { name: /build deck/i })
-    expect(build).toBeEnabled()
-    expect(build).toHaveTextContent(`${MIN_GAME_CARDS - 1}/${MIN_GAME_CARDS}`)
+describe('QueueControls deck gate', () => {
+  it('without a chosen deck the queue action is a CTA into Deck Builder', () => {
+    render(<QueueControls {...base} myCardsCount={5} hasActiveDeck={false} />)
+    fireEvent.click(screen.getByText(/choose deck/i))
+    expect(base.onOpenDeckBuilder).toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: /queue for/i })).toBeNull()
   })
 
-  it('shows an enabled queue button once the deck threshold is met', () => {
-    render(<QueueControls {...props({ myCardsCount: MIN_GAME_CARDS })} />)
-    expect(screen.queryByRole('button', { name: /quick play/i })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /queue for perverts/i })).toBeEnabled()
+  it('with a chosen deck, queueing joins the hopper', () => {
+    render(<QueueControls {...base} myCardsCount={5} hasActiveDeck={true} />)
+    fireEvent.click(screen.getByRole('button', { name: /queue/i }))
+    expect(base.onToggleAutoQueue).toHaveBeenCalledWith(true)
+  })
+
+  it('a too-small library still offers Build Deck (count CTA)', () => {
+    render(<QueueControls {...base} myCardsCount={2} hasActiveDeck={false} />)
+    expect(screen.getByText(/2\/5/)).toBeInTheDocument()
   })
 })

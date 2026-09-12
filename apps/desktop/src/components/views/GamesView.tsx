@@ -20,6 +20,7 @@ export function GamesView({
   setGamesSubTab,
   identity,
   myCards,
+  hasActiveDeck,
   users,
   lobby,
   toggleAutoQueue,
@@ -42,6 +43,7 @@ export function GamesView({
   setGamesSubTab: (tab: GamesSubTab) => void;
   identity: OrbitIdentity | null;
   myCards: OrbitObject[];
+  hasActiveDeck: boolean;
   users: User[];
   lobby: ReturnType<typeof useLobby>;
   toggleAutoQueue: (enabled: boolean) => Promise<{ ok: boolean; error?: string }>;
@@ -80,6 +82,7 @@ export function GamesView({
           sendInvite={sendInvite}
           identity={identity}
           myCards={myCards}
+        hasActiveDeck={hasActiveDeck}
           soundEnabled={soundEnabled}
           onOpenImage={(url) => setLobbyLightboxUrl(url)}
           onExpandItem={(id) => setExpandedItemId(id)}

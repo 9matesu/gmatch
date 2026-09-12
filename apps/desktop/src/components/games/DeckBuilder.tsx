@@ -78,7 +78,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
   const setActiveDeck = (deckId: string) => {
     setActiveDeckIdState(deckId);
     setStoredActiveDeckId(deckId);
-    toast?.('Deck set as active for duels!', 'success');
+    toast?.('Deck active for duels.', 'success');
   };
 
   const loadDecks = useCallback(async () => {

@@ -14,6 +14,8 @@ export interface QueueControlsProps {
   autoQueueEnabled: boolean
   soundEnabled: boolean
   myCardsCount: number
+  /** True when an active 5-card deck is chosen (server requires one to queue). */
+  hasActiveDeck: boolean
   queuedSinceMs: number
   showLeagueTab: boolean
   onToggleAutoQueue: (enabled: boolean) => Promise<{ ok: boolean; error?: string }>
@@ -25,7 +27,7 @@ export interface QueueControlsProps {
   now: number
 }
 
-export function QueueControls({ state, match, matchRoundInfo, autoQueueEnabled, myCardsCount, queuedSinceMs, showLeagueTab, onToggleAutoQueue, onOpenCreateCard, onOpenDeckBuilder, onShowLeagueTab, onOpenCardChat, toast, now }: QueueControlsProps) {
+export function QueueControls({ state, match, matchRoundInfo, autoQueueEnabled, myCardsCount, hasActiveDeck, queuedSinceMs, showLeagueTab, onToggleAutoQueue, onOpenCreateCard, onOpenDeckBuilder, onShowLeagueTab, onOpenCardChat, toast, now }: QueueControlsProps) {
   const hasMatch = Boolean(match)
 
   return (
@@ -58,16 +60,18 @@ export function QueueControls({ state, match, matchRoundInfo, autoQueueEnabled, 
           <Pause className="w-3.5 h-3.5" />
           Leave Queue
         </button>
-      ) : myCardsCount < MIN_GAME_CARDS ? (
+      ) : !hasActiveDeck ? (
         <div
-          className="flex items-stretch rounded-lg border border-cyan-500/40 overflow-hidden whitespace-nowrap"
-          title={`Quick Play needs ${MIN_GAME_CARDS} cards in your active deck. You have ${myCardsCount}. Build one to continue.`}
+          className="flex items-stretch rounded-lg border border-border-glass overflow-hidden whitespace-nowrap"
+          title={myCardsCount < MIN_GAME_CARDS
+            ? `Quick Play needs ${MIN_GAME_CARDS} cards in your active deck. You have ${myCardsCount}. Build one to continue.`
+            : `Pick your ${MIN_GAME_CARDS}-card deck in Deck Builder before queueing.`}
         >
           <button
             type="button"
             disabled
             aria-disabled="true"
-            className="px-4 py-1.5 text-xs font-medium bg-surface-interactive text-retro-muted/60 cursor-not-allowed flex items-center gap-1.5"
+            className="px-4 py-1.5 text-xs font-medium bg-glass-w8 text-retro-muted/60 cursor-not-allowed flex items-center gap-1.5"
           >
             <Play className="w-3.5 h-3.5" />
             Quick Play
@@ -75,10 +79,10 @@ export function QueueControls({ state, match, matchRoundInfo, autoQueueEnabled, 
           <button
             type="button"
             onClick={() => onOpenDeckBuilder ? onOpenDeckBuilder() : onOpenCreateCard?.()}
-            className="px-4 py-1.5 text-xs font-bold bg-cyan-500/10 text-cyan-300 border-l border-cyan-500/40 hover:bg-cyan-500/20 cursor-pointer transition-colors flex items-center gap-1.5"
+            className="px-4 py-1.5 text-xs font-bold bg-glass-w8 text-retro-accent border-l border-border-glass hover:bg-glass-w12 cursor-pointer transition-colors flex items-center gap-1.5"
           >
             <LayoutGrid className="w-3.5 h-3.5" />
-            Build Deck ({myCardsCount}/{MIN_GAME_CARDS})
+            {myCardsCount < MIN_GAME_CARDS ? `Build Deck (${myCardsCount}/${MIN_GAME_CARDS})` : 'Choose Deck'}
           </button>
         </div>
       ) : (

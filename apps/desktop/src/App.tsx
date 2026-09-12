@@ -63,7 +63,7 @@ import { ServersView } from "./components/servers/ServersView";
 import { PCDominationView } from "./components/views/PCDominationView";
 import { DominationEffects } from "./components/domination/DominationEffects";
 import type { ActiveHackDebuff } from "@orbit/shared";
-import { ChevronDown, ChevronRight, X } from "lucide-react";
+import { ChevronDown, ChevronRight, X, Bell } from "lucide-react";
 import { ChatCircleText } from "@phosphor-icons/react";
 import { WallpaperBackground } from "./components/WallpaperBackground";
 import { ContextOverlay, ReportModal } from "./components/ContextOverlay";
@@ -145,7 +145,7 @@ export default function Home() {
 
   // Panel opacity preference drives the glass chrome through a CSS variable.
   useEffect(() => {
-    const alpha = Math.min(1, Math.max(0.35, settings.panelOpacity ?? 1));
+    const alpha = Math.min(1, Math.max(0.35, settings.panelOpacity ?? 0.75));
     document.documentElement.style.setProperty('--panel-alpha', String(alpha));
   }, [settings.panelOpacity]);
 
@@ -432,6 +432,13 @@ export default function Home() {
     }
     return allCards
   }, [items, canonicalCards, identity, activeDeckId, userDecks])
+
+  // Queue gate: the server requires a registered deck of exactly
+  // MIN_GAME_CARDS eligible cards (DeckService.getQueueEligibleDeck).
+  const hasActiveDeck = useMemo(
+    () => userDecks.some(d => d.id === activeDeckId && d.cards.length === MIN_GAME_CARDS),
+    [userDecks, activeDeckId],
+  )
 
   const navigateToDeckBuilder = useCallback(() => {
     handleSetMainView('gallery');
@@ -2893,20 +2900,46 @@ export default function Home() {
 
                 {/* Notifications dock: LEFT side panel sibling (mirrors chat) */}
                 <MessagesRail open={notifOpen} side="left" widthClass="w-[min(420px,32vw)]">
-                  <div className="glass-card w-full h-full min-h-0 flex flex-col overflow-hidden rounded-xl">
-                    <div className="flex items-center justify-between px-3 py-2 border-b border-border-glass shrink-0">
-                      <span className="text-xs font-bold text-retro-fg uppercase tracking-wider">Notifications</span>
-                      <button
-                        type="button"
-                        onClick={() => setNotifOpen(false)}
-                        aria-label="Close notifications"
-                        className="p-1.5 rounded-md hover:bg-glass-w8 text-retro-muted hover:text-retro-fg cursor-pointer"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                  <div className="solid-panel w-full h-full min-h-0 flex flex-col overflow-hidden rounded-xl">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-border-glass shrink-0 bg-glass-w5">
+                      <span className="flex items-center gap-1.5 text-xs font-medium text-retro-fg">
+                        <Bell className="w-3.5 h-3.5" />
+                        Notifications
+                        {lobby.unreadCount > 0 && (
+                          <span className="px-1 py-0.5 rounded-full text-[10px] font-bold leading-none bg-retro-accent text-black tabular-nums">
+                            {lobby.unreadCount}
+                          </span>
+                        )}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        {lobby.notifications.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              playPress(700);
+                              lobby.markNotificationsRead();
+                            }}
+                            className="glass-action px-2 py-0.5 rounded text-[11px] cursor-pointer text-retro-muted hover:text-retro-fg"
+                          >
+                            Mark all read
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            playPress(700);
+                            setNotifOpen(false);
+                          }}
+                          aria-label="Close notifications"
+                          className="p-1 rounded-md hover:bg-glass-w8 text-retro-muted hover:text-retro-fg cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar">
+                    <div className="flex-1 min-h-0 overflow-hidden">
                       <NotificationsPanel
+                        embedded
                         notifications={lobby.notifications}
                         unreadCount={lobby.unreadCount}
                         invites={lobby.invites}
@@ -3151,6 +3184,7 @@ export default function Home() {
                       setGamesSubTab={setGamesSubTab}
                       identity={identity}
                       myCards={myCards}
+                      hasActiveDeck={hasActiveDeck}
                       users={users}
                       lobby={lobby}
                       toggleAutoQueue={toggleAutoQueue}
@@ -3289,6 +3323,7 @@ export default function Home() {
                       sendInvite={sendInvite}
                       identity={identity}
                       myCards={myCards}
+                      hasActiveDeck={hasActiveDeck}
                       soundEnabled={settings.soundEffects}
                       users={users}
                       spinTarget={spinTarget}
@@ -3457,24 +3492,55 @@ export default function Home() {
                 {notifOpen && !isDesktopViewport() && (
                   <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4" role="dialog" aria-label="Notifications">
                     <div className="absolute inset-0 bg-black/70" onClick={() => setNotifOpen(false)} />
-                    <div className="relative w-full max-w-md h-[70vh] glass-card rounded-xl overflow-hidden flex flex-col">
-                      <button
-                        type="button"
-                        onClick={() => setNotifOpen(false)}
-                        aria-label="Close notifications"
-                        className="absolute top-2 right-2 z-10 p-1.5 rounded-md hover:bg-glass-w8 text-retro-muted hover:text-retro-fg cursor-pointer"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                      <NotificationsPanel
-                        notifications={lobby.notifications}
-                        unreadCount={lobby.unreadCount}
-                        invites={lobby.invites}
-                        onMarkAllRead={() => lobby.markNotificationsRead()}
-                        onRespondInvite={(id, accept) => lobby.respondToInvite(id, accept)}
-                        onRespondBabecock={handleRespondBabecock}
-                        onOpenBabecock={() => { setNotifOpen(false); setGamesSubTab('babecock'); setMainView('games'); }}
-                      />
+                    <div className="relative w-full max-w-md h-[70vh] solid-panel rounded-xl overflow-hidden flex flex-col">
+                      <div className="flex items-center justify-between px-3 py-2 border-b border-border-glass shrink-0 bg-glass-w5">
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-retro-fg">
+                          <Bell className="w-3.5 h-3.5" />
+                          Notifications
+                          {lobby.unreadCount > 0 && (
+                            <span className="px-1 py-0.5 rounded-full text-[10px] font-bold leading-none bg-retro-accent text-black tabular-nums">
+                              {lobby.unreadCount}
+                            </span>
+                          )}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          {lobby.notifications.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                playPress(700);
+                                lobby.markNotificationsRead();
+                              }}
+                              className="glass-action px-2 py-0.5 rounded text-[11px] cursor-pointer text-retro-muted hover:text-retro-fg"
+                            >
+                              Mark all read
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              playPress(700);
+                              setNotifOpen(false);
+                            }}
+                            aria-label="Close notifications"
+                            className="p-1 rounded-md hover:bg-glass-w8 text-retro-muted hover:text-retro-fg cursor-pointer"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex-1 min-h-0 overflow-hidden">
+                        <NotificationsPanel
+                          embedded
+                          notifications={lobby.notifications}
+                          unreadCount={lobby.unreadCount}
+                          invites={lobby.invites}
+                          onMarkAllRead={() => lobby.markNotificationsRead()}
+                          onRespondInvite={(id, accept) => lobby.respondToInvite(id, accept)}
+                          onRespondBabecock={handleRespondBabecock}
+                          onOpenBabecock={() => { setNotifOpen(false); setGamesSubTab('babecock'); setMainView('games'); }}
+                        />
+                      </div>
                     </div>
                   </div>
                 )}

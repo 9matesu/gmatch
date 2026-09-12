@@ -17,6 +17,7 @@ export function GameView({
   sendInvite,
   identity,
   myCards,
+  hasActiveDeck,
   soundEnabled,
   users,
   spinTarget,
@@ -43,6 +44,7 @@ export function GameView({
   sendInvite: (userId: string) => Promise<{ ok: boolean; error?: string }>;
   identity: OrbitIdentity;
   myCards: OrbitObject[];
+  hasActiveDeck: boolean;
   soundEnabled: boolean;
   users: User[];
   spinTarget: User | null;
@@ -72,6 +74,7 @@ export function GameView({
         sendInvite={sendInvite}
         identity={identity}
         myCards={myCards}
+        hasActiveDeck={hasActiveDeck}
         soundEnabled={soundEnabled}
         onOpenImage={(url) => setLobbyLightboxUrl(url)}
         onExpandItem={(id) => setExpandedItemId(id)}
