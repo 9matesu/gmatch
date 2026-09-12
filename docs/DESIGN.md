@@ -1,13 +1,26 @@
-# gMatch V1 UI Standard
+# gMatch Design System v1.1 (Cyber-Slate HUD)
 
 One design system for every tab, page, modal, button, settings and admin panel.
 Convergence contract — tokens already exist in `src/globals.css` (@theme) and
 `src/ui/styles.ts`; components consume them, they never re-inline equivalents.
 
+Reviewed absorption of the Antigravity "Social-Native Gaming HUD" plan
+(2026-09-12): cyber-slate canvas + electric-blue interactive accent + floating
+CommandIsland are the system. Sheets/drawers and the second audio engine were
+rejected (dead code). Everything decorative that does not carry information
+(glow, hover-float, saturate tricks, emoji, hype copy) is banned.
+
 ## Surfaces (pick by role)
-- app bg: `bg-retro-bg` · card/panel: `PLATE` (`rounded-lg border border-border-glass bg-retro-panel`)
+- app bg: `bg-retro-bg` · card/panel: `PLATE` (`rounded-lg border border-border-glass bg-glass-w5`)
 - inset field: `glass-inset` · scrim: `bg-black/70` (the ONLY scrim value)
 - hover fill: `bg-glass-w10`
+- media overlay chip (label ON image/video): `bg-black/60` — the only black-alpha
+  outside scrims
+
+## Accent — one color, one role
+`--color-retro-accent` IS the blue (#388bfd family). There is exactly one interactive
+accent; `hud-accent`/`chrome-cyan` are aliases, not a second palette. White is text,
+never an accent fill. Focus ring = `--ring` (hud-accent-hover).
 
 ## Borders
 `border-border-glass`, 1px. `border-retro-border` is deprecated (exception line
@@ -40,6 +53,16 @@ use `z-[var(--z-toast)]` etc. Coexistence order: modal < lightbox < toast < syst
   the orbit set (or stay UA `animate-pulse`/`animate-spin` when that's the job).
 - Interruptible transitions only (Tailwind duration classes, not JS timelines);
   `prefers-reduced-motion` kill-switch already lives in globals.css — keep it first.
+- tw-animate classes (`animate-in`/`animate-out`/`fade-in`/`slide-in-from-*`) are
+  banned — the `orbit-*` keyframe family only. No JS timelines.
+
+## Tactile rules (the anti-cafonho clause)
+- NO glow on chrome: box-shadow `0 0 Npx rgba(...)` outside the game-semantics
+  exemption list. Buttons/panels/island: flat fills + 1px borders only.
+- NO hover scale/translate on nav pills or cards (press = `active:scale-[0.98]` on
+  buttons only). Exception: `CardTile` 3D tilt + holo foil = game semantics (loot).
+- NO backdrop saturate/filter tricks; `backdrop-blur` allowed ONLY on
+  `.command-island` and scrims.
 
 ## Buttons (ui/styles.ts is the only factory)
 primary `BTN + BTN_PRIMARY` · secondary `BTN` · small `BTN + BTN_SMALL` ·
@@ -63,7 +86,9 @@ distinct features into menus.
 
 ## Exemptions (game semantics — do not tokenize)
 HP fill, crit flash, +g$ float, rarity badge colors (shared card-valuation),
-GAME_AD_TEMPLATES gradients, NSFW media itself.
+GAME_AD_TEMPLATES gradients, NSFW media itself, `gg-*` grid keyframes,
+`.holo-*` foil + CardTile 3D tilt, island backdrop blur,
+media overlay chips (`bg-black/*` on image/video, not dialog roots).
 
 ## Acceptance greps (must read 0)
 ```
@@ -71,9 +96,18 @@ grep -rc "border-retro-border" src --include=*.tsx | grep -v ':0'
 grep -rhoE "z-\[[0-9]{3,}\]" src --include=*.tsx
 grep -rhoE "text-\[(6|7|8|9|11)px\]" src --include=*.tsx
 grep -rho "rounded-3xl" src --include=*.tsx
+grep -rhoE "rounded-(2xl|3xl)" src --include=*.tsx
+grep -rhoE "#[0-9a-fA-F]{6}" src --include=*.tsx | grep -viE "e08a4c|cfd6e6|ffd75e|5ee0ff|b8b8c4"
+grep -rn "bg-white/\|border-white/" src --include=*.tsx | grep -v test | grep -v holo
+grep -rhoE "duration-(75|100|200|1000)\b" src --include=*.tsx
+grep -rhoE "duration-\[[0-9]+ms\]" src --include=*.tsx
+grep -rhoE "scale-\[1\.0" src --include=*.tsx
+grep -rn "animate-in \|animate-out \|slide-in-from" src --include=*.tsx | grep -v orbit
+grep -rn "shadow-\[0_0" src --include=*.tsx | grep -v test | grep -vE "CardBack|FlashOverlay|CardTile|Babecock|styles.ts"
+grep -rn "Welcome to\|successfully\|seamless\|effortless\|unleash\|cutting-edge\|Dive into" src --include=*.tsx | grep -v test
+grep -rn "metro-rule" src
 # Exemption (2026-09-11 audit): CommentsModal quick-reaction buttons insert emoji
 # into the user's comment BODY (content, not chrome); their chrome is lucide.
 grep -rn "❤️\|⚡\|★\|✕" src --include=*.tsx | grep -v test | grep -v CommentsModal
-grep -rhoE "duration-(75|100|200|1000)\b" src --include=*.tsx
 grep -rn "animate-fade-in\|animate-slide-up\|animate-slide-down" src --include=*.tsx | grep -v orbit
 ```
