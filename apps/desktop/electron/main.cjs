@@ -9,6 +9,7 @@ const imageCache = require('./imageCache.cjs')
 const customFolders = require('./customFolders.cjs')
 const wallpaperWin = require('./wallpaperWin.cjs')
 const { sanitizeBounds } = require('./window-bounds-core.cjs')
+const { dapiSource, booruOrgSource } = require('./booru-sources-core.cjs')
 
 // A portable exe can run twice from one double-click (and did: two sidecars
 // fight over :8790 and the second window never appeared). One install, one
@@ -636,44 +637,8 @@ async function fetchImhentai(variant, n, captions) {
 // (boorus), redgifs (real/hardcore mp4s+gifs), imhentai (hentai galleries).
 // e621 (furry) and safebooru (safe-only) were removed on purpose.
 const SOURCES = [
-  {
-    id: 'tbib',
-    fetch: async (variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 8)
-      const negs = getQueryNegatives()
-      const query = (variant + ' rating:explicit ' + negs).trim()
-      let body = await httpGet(
-        `https://tbib.org/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(query)}&limit=${n}&json=1&pid=${pid}`
-      )
-      let posts = parseDanbooruJson(body, 'https://tbib.org', captions)
-      if (posts.length === 0 && pid > 0) {
-        body = await httpGet(
-          `https://tbib.org/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(query)}&limit=${n}&json=1&pid=0`
-        )
-        posts = parseDanbooruJson(body, 'https://tbib.org', captions)
-      }
-      return posts
-    },
-  },
-  {
-    id: 'xbooru',
-    fetch: async (variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 8)
-      const negs = getQueryNegatives()
-      const query = (variant + ' rating:explicit ' + negs).trim()
-      let body = await httpGet(
-        `https://xbooru.com/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(query)}&limit=${n}&json=1&pid=${pid}`
-      )
-      let posts = parseDanbooruJson(body, 'https://xbooru.com', captions)
-      if (posts.length === 0 && pid > 0) {
-        body = await httpGet(
-          `https://xbooru.com/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(query)}&limit=${n}&json=1&pid=0`
-        )
-        posts = parseDanbooruJson(body, 'https://xbooru.com', captions)
-      }
-      return posts
-    },
-  },
+  dapiSource('tbib', 'https://tbib.org', { httpGet, parse: parseDanbooruJson, negatives: getQueryNegatives }),
+  dapiSource('xbooru', 'https://xbooru.com', { httpGet, parse: parseDanbooruJson, negatives: getQueryNegatives }),
   {
     // Real/hardcore porn: pornstars (skylar vox), BBC, mp4s/gifs.
     id: 'redgifs',
@@ -730,66 +695,13 @@ const SOURCES = [
       return parseRealbooruHtml(html, captions).slice(0, n)
     },
   },
-  {
-    // booru.org subdomains — same engine, shared parse:
-    // hgoon (goon hentai), blacked (interracial), allgirl, rule34, qoh, celeb, footfetish.
-    // Cloudflare WAF challenges `tags=` with 403; omitting `tags=` and paginating
-    // via random `pid` returns 200 OK. Each sub is dedicated to its niche theme.
-    id: 'hgoon',
-    fetch: async (variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 10) * 20
-      const html = await httpGet(`https://hgoon.booru.org/index.php?page=post&s=list&pid=${pid}`)
-      return parseBooruOrgHtml(html, 'hgoon', captions, variant).slice(0, n)
-    },
-  },
-  {
-    id: 'blacked',
-    fetch: async (variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 10) * 20
-      const html = await httpGet(`https://blacked.booru.org/index.php?page=post&s=list&pid=${pid}`)
-      return parseBooruOrgHtml(html, 'blacked', captions, variant).slice(0, n)
-    },
-  },
-  {
-    id: 'allgirl',
-    fetch: async (variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 10) * 20
-      const html = await httpGet(`https://allgirl.booru.org/index.php?page=post&s=list&pid=${pid}`)
-      return parseBooruOrgHtml(html, 'allgirl', captions, variant).slice(0, n)
-    },
-  },
-  {
-    id: 'rule34-org',
-    fetch: async (variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 10) * 20
-      const html = await httpGet(`https://rule34.booru.org/index.php?page=post&s=list&pid=${pid}`)
-      return parseBooruOrgHtml(html, 'rule34', captions, variant).slice(0, n)
-    },
-  },
-  {
-    id: 'qoh',
-    fetch: async (variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 10) * 20
-      const html = await httpGet(`https://qoh.booru.org/index.php?page=post&s=list&pid=${pid}`)
-      return parseBooruOrgHtml(html, 'qoh', captions, variant).slice(0, n)
-    },
-  },
-  {
-    id: 'celeb',
-    fetch: async (variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 10) * 20
-      const html = await httpGet(`https://celeb.booru.org/index.php?page=post&s=list&pid=${pid}`)
-      return parseBooruOrgHtml(html, 'celeb', captions, variant).slice(0, n)
-    },
-  },
-  {
-    id: 'footfetish',
-    fetch: async (variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 10) * 20
-      const html = await httpGet(`https://footfetishbooru.booru.org/index.php?page=post&s=list&pid=${pid}`)
-      return parseBooruOrgHtml(html, 'footfetishbooru', captions, variant).slice(0, n)
-    },
-  },
+  booruOrgSource('hgoon.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'hgoon'),
+  booruOrgSource('blacked.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'blacked'),
+  booruOrgSource('allgirl.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'allgirl'),
+  booruOrgSource('rule34.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'rule34-org'),
+  booruOrgSource('qoh.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'qoh'),
+  booruOrgSource('celeb.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'celeb'),
+  booruOrgSource('footfetishbooru.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'footfetish'),
 ]
 
 // AND-combos of narrow pervert tags often return 0 on DAPI mirrors, so each
