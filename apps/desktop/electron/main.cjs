@@ -1018,6 +1018,27 @@ app.whenReady().then(async () => {
   // 1.0 topology (no central server): packaged builds ALWAYS run the bundled
   // server (host mode, default) unless the user configured client mode in
   // Settings. Dev keeps the repo-local sidecar path unchanged.
+  let sidecarRestartTried = false
+  const onSidecarCrash = async (code) => {
+    mainLog(`sidecar crashed code=${code}`)
+    if (!sidecarRestartTried) {
+      sidecarRestartTried = true
+      try {
+        await apiSidecar.startApi()
+        mainLog('sidecar restarted ok')
+        return
+      } catch (e) {
+        mainLog(`sidecar restart failed: ${e?.message || e}`)
+      }
+    }
+    try {
+      dialog.showErrorBox(
+        'The local server stopped',
+        `gMatch could not keep its bundled server running.\n\nRestart the app, or switch to a friend's server in Settings > Server.\n\n${LOG_HINT}`,
+      )
+    } catch { /* headless edge */ }
+  }
+  apiSidecar.sidecarEvents.on('crashed', (code) => void onSidecarCrash(code))
   if (app.isPackaged) {
     packagedServer = serverMode.readServerMode()
     if (packagedServer.mode === 'host') {
@@ -1025,7 +1046,13 @@ app.whenReady().then(async () => {
       try {
         await apiSidecar.startApi()
       } catch (err) {
-        console.error('[api] bundled server start failed:', err.message)
+        mainLog(`bundled server start failed: ${err?.message || err}`)
+        try {
+          dialog.showErrorBox(
+            'gMatch could not start its server',
+            `${String(err?.message || err)}\n\nOpen Settings > Server to switch to a friend's server, then restart.\n\n${LOG_HINT}`,
+          )
+        } catch { /* headless edge */ }
       }
     }
   } else {
