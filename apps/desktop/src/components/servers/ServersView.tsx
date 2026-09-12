@@ -5,7 +5,7 @@
 // 2-column coupled layout: Left = current node dashboard (24h users, rooms, stats);
 // Right = public directory browser (search, join, create).
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Lock, Globe, UserPlus, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, ArrowLeft, Clock, MessageSquare, Plus } from 'lucide-react'
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
 import { orbitFetch, getApiBaseUrl } from '../../utils/api'
@@ -15,6 +15,7 @@ import { rememberPendingHost } from '../../utils/server-host-pending'
 import { maskedServerUrl } from '../../utils/ipMask'
 import { mergeDirectory, readDirectoryCache, writeDirectoryCache } from './directoryMerge'
 import { decodeNodeMask } from '../../utils/nodeMask'
+import { PromptDialog } from '../PromptDialog'
 import { claimPendingHost } from '../../hooks/usePendingServerHost'
 import { playPress } from '../../utils/sounds'
 import { CentralAdminPanel } from './CentralAdminPanel'
@@ -123,6 +124,11 @@ export function ServersView({
   const [renaming, setRenaming] = useState(false)
   const [serverMode, setServerMode] = useState<'host' | 'client' | null>(null)
   const [userTab, setUserTab] = useState<'online' | 'all24h'>('online')
+  // Join prompts (Electron has no window.prompt): one pending resolver ref,
+  // one dialog kind at a time (password during join, or the paste-code modal).
+  const pendingAsk = useRef<((v: string | null) => void) | null>(null)
+  const [askPasswordFor, setAskPasswordFor] = useState<string | null>(null)
+  const [codeAskOpen, setCodeAskOpen] = useState(false)
 
   const refresh = useCallback(async () => {
     // Anonymous browser: public directory only — never touch node routes
@@ -387,19 +393,20 @@ export function ServersView({
     }
   }
 
-  const join = async (s: DirectoryServer) => { void joinServer(s, toast) }
+  const askPassword = (name: string) =>
+    new Promise<string | null>((resolve) => { pendingAsk.current = resolve; setAskPasswordFor(name) })
+
+  const join = async (s: DirectoryServer) => { void joinServer(s, toast, askPassword) }
 
   // Wave 2 (D2): out-of-band join — paste a gmatch://node/ code shared by the
   // host directly (no hub coordination needed to reach a node).
-  const joinByCode = async () => {
-    const entered = window.prompt('Paste a node code (gmatch://node/...):')
-    if (!entered) return
+  const joinByCode = async (entered: string) => {
     const coord = decodeNodeMask(entered)
     if (!coord) { toast('That is not a valid node code.', 'error'); return }
     const host = coord.port ? `${coord.host}:${coord.port}` : coord.host
     // Persist before the relaunch kills the process.
     writeDirectoryCache(mergeDirectory(readDirectoryCache(), [{ id: `mask:${host}`, name: coord.name, owner_id: '', password_required: 0, endpoint_hint: host }]))
-    await joinServer({ id: `mask:${host}`, name: coord.name, owner_id: '', password_required: 0, endpoint_hint: host }, toast)
+    await joinServer({ id: `mask:${host}`, name: coord.name, owner_id: '', password_required: 0, endpoint_hint: host }, toast, askPassword)
   }
 
   const leave = async () => {
@@ -835,7 +842,7 @@ export function ServersView({
                 </button>
                 <button
                   type="button"
-                  onClick={() => void joinByCode()}
+                  onClick={() => { playPress(700); setCodeAskOpen(true) }}
                   className="glass-action h-8 px-2.5 rounded-lg text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1"
                 >
                   <Plus className="w-3 h-3" /> Node code
@@ -932,6 +939,25 @@ export function ServersView({
 
               {/* Central master admin drawer */}
               {showAdmin && identity && <CentralAdminPanel central={central} identity={identity} toast={toast} />}
+
+      {askPasswordFor !== null && (
+        <PromptDialog
+          title="Server password"
+          description={`${askPasswordFor} is password-protected. Enter the password the host gave you.`}
+          submitLabel="Join"
+          onSubmit={(v) => { pendingAsk.current?.(v); pendingAsk.current = null; setAskPasswordFor(null) }}
+          onCancel={() => { pendingAsk.current?.(null); pendingAsk.current = null; setAskPasswordFor(null) }}
+        />
+      )}
+      {codeAskOpen && (
+        <PromptDialog
+          title="Node code"
+          description="Paste the gmatch://node/ code your friend copied from their Servers tab."
+          submitLabel="Connect"
+          onSubmit={(v) => { setCodeAskOpen(false); void joinByCode(v) }}
+          onCancel={() => setCodeAskOpen(false)}
+        />
+      )}
             </>
           )}
         </main>
