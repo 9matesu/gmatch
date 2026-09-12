@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Volume2, VolumeX } from 'lucide-react';
+import { SpeakerHigh, SpeakerSlash } from '@phosphor-icons/react';
 import { isAudioMuted, setAudioMuted } from '../../utils/sounds';
 
 export interface NativeHeaderBarProps {
@@ -71,9 +71,9 @@ export function NativeHeaderBar({
           title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
         >
           {isMuted ? (
-            <VolumeX className="w-3.5 h-3.5 text-retro-error" />
+            <SpeakerSlash className="w-3.5 h-3.5 text-retro-error" />
           ) : (
-            <Volume2 className="w-3.5 h-3.5" />
+            <SpeakerHigh className="w-3.5 h-3.5" />
           )}
         </button>
       </div>
