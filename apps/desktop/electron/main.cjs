@@ -8,6 +8,7 @@ const path = require('node:path')
 const imageCache = require('./imageCache.cjs')
 const customFolders = require('./customFolders.cjs')
 const wallpaperWin = require('./wallpaperWin.cjs')
+const { sanitizeBounds } = require('./window-bounds-core.cjs')
 
 // A portable exe can run twice from one double-click (and did: two sidecars
 // fight over :8790 and the second window never appeared). One install, one
@@ -837,10 +838,17 @@ async function fetchBooru({ tags, limit }) {
 }
 
 function createWindow() {
+  // Restore the last size/position when it is still usable; a 1440x900
+  // default on a 1366x768 laptop pushed the title bar off-screen.
+  let bounds = { width: 1440, height: 900 }
+  try {
+    const { screen } = require('electron')
+    const saved = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'window-bounds.json'), 'utf8'))
+    bounds = sanitizeBounds(saved, screen.getPrimaryDisplay().workArea) || bounds
+  } catch { /* first run */ }
   const win = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    minWidth: 1200,
+    ...bounds,
+    minWidth: 1000,
     backgroundColor: '#080A0D',
     title: 'gMatch',
     webPreferences: {
@@ -851,6 +859,15 @@ function createWindow() {
       additionalArguments: [`--api-base=${app.isPackaged ? (packagedServer || serverMode.readServerMode()).url : apiSidecar.API_BASE}`],
     },
   })
+  let boundsTimer = null
+  const persistBounds = () => {
+    clearTimeout(boundsTimer)
+    boundsTimer = setTimeout(() => {
+      try { fs.writeFileSync(path.join(app.getPath('userData'), 'window-bounds.json'), JSON.stringify(win.getBounds())) } catch { /* best effort */ }
+    }, 500)
+  }
+  win.on('moved', persistBounds)
+  win.on('resized', persistBounds)
   win.removeMenu()
   // The renderer's beforeunload key-save gate must NEVER silently block the
   // close button (1.0.1 bug: "cant close app" — in Electron, a prevented
