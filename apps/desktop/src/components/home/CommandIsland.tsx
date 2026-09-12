@@ -209,186 +209,13 @@ export function CommandIsland({
 
   return (
     <>
-      {/* Floating Satellite Deck (Secondary Tools & Views, pinned directly above the pill) */}
-      {satelliteOpen && (
-        <div
-          role="toolbar"
-          aria-label="Secondary navigation"
-          className="satellite-dock fixed bottom-[4.25rem] sm:bottom-[4.5rem] left-1/2 -translate-x-1/2 z-[var(--z-dropdown)] flex max-w-[95vw] items-center gap-1 sm:gap-1.5 overflow-x-auto px-2.5 py-1.5 rounded-full bg-[#131722]/90 border border-white/10 backdrop-blur-md shadow-2xl select-none animate-in fade-in zoom-in-95 duration-150 styled-scrollbar"
-        >
-          {/* Store */}
-          <button
-            type="button"
-            onClick={() => {
-              playPress(800);
-              if (onOpenStore) onOpenStore();
-              else handleNavClick('store');
-            }}
-            aria-label="Store"
-            aria-current={mainView === 'store' ? 'page' : undefined}
-            title="Store & Boosters"
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-              mainView === 'store'
-                ? 'bg-hud-accent text-retro-fg scale-[1.02]'
-                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
-            }`}
-          >
-            <ShoppingBag className="w-3.5 h-3.5 text-retro-warning shrink-0" weight={mainView === 'store' ? 'fill' : 'regular'} />
-            <span className="text-[11px] hidden sm:inline">Store</span>
-          </button>
-
-          {/* Servers */}
-          <button
-            type="button"
-            onClick={() => handleNavClick('servers')}
-            aria-label="Servers"
-            aria-current={mainView === 'servers' ? 'page' : undefined}
-            title="Public & Private Servers"
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-              mainView === 'servers'
-                ? 'bg-hud-accent text-retro-fg scale-[1.02]'
-                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
-            }`}
-          >
-            <HardDrives className="w-3.5 h-3.5 text-retro-online shrink-0" weight={mainView === 'servers' ? 'fill' : 'regular'} />
-            <span className="text-[11px] hidden sm:inline">Servers</span>
-          </button>
-
-          {/* Domination */}
-          <button
-            type="button"
-            onClick={() => handleNavClick('pc_domination')}
-            aria-label="Domination"
-            aria-current={mainView === 'pc_domination' ? 'page' : undefined}
-            title="PC Domination Battles"
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-              mainView === 'pc_domination'
-                ? 'bg-hud-accent text-retro-fg scale-[1.02]'
-                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
-            }`}
-          >
-            <Monitor className="w-3.5 h-3.5 text-retro-info shrink-0" weight={mainView === 'pc_domination' ? 'fill' : 'regular'} />
-            <span className="text-[11px] hidden sm:inline">Domination</span>
-          </button>
-
-          {/* Rooms (conditional on courier active) */}
-          {showRooms && (
-            <button
-              type="button"
-              onClick={() => handleNavClick('rooms')}
-              aria-label="Rooms"
-              aria-current={mainView === 'rooms' ? 'page' : undefined}
-              title="Blind Courier Rooms"
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-                mainView === 'rooms'
-                  ? 'bg-hud-accent text-retro-fg scale-[1.02]'
-                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5 text-retro-muted shrink-0" weight={mainView === 'rooms' ? 'fill' : 'regular'} />
-              <span className="text-[11px] hidden sm:inline">Rooms</span>
-            </button>
-          )}
-
-          {/* Notifications */}
-          <button
-            type="button"
-            onClick={() => {
-              playPress(800);
-              onOpenNotifications?.();
-            }}
-            aria-label="Notifications"
-            title="Activity Notifications"
-            className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
-          >
-            <Bell className="w-3.5 h-3.5 text-retro-accent shrink-0" />
-            <span className="text-[11px] hidden sm:inline">Alerts</span>
-            {unreadNotificationsCount > 0 && (
-              <span className="w-1.5 h-1.5 rounded-full bg-retro-error ring-1 ring-retro-panel" />
-            )}
-          </button>
-
-          {/* Wallpaper */}
-          <button
-            type="button"
-            onClick={() => {
-              playPress(800);
-              onOpenWallpaper?.();
-            }}
-            aria-label="Wallpaper"
-            title="Custom Wallpaper Settings"
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
-          >
-            <PaintBrush className="w-3.5 h-3.5 text-chrome-pink shrink-0" />
-            <span className="text-[11px] hidden sm:inline">Theme</span>
-          </button>
-
-          {/* Settings */}
-          <button
-            type="button"
-            onClick={() => {
-              playPress(800);
-              onOpenSettings?.();
-            }}
-            aria-label="Settings"
-            title="Application Settings"
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
-          >
-            <Gear className="w-3.5 h-3.5 text-retro-muted shrink-0" />
-            <span className="text-[11px] hidden sm:inline">Settings</span>
-          </button>
-
-          {/* Admin (conditional on admin flag) */}
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={() => {
-                playPress(840);
-                handleNavClick('admin');
-              }}
-              aria-label="Admin"
-              aria-current={mainView === 'admin' ? 'page' : undefined}
-              title="Admin Control Panel"
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-                mainView === 'admin'
-                  ? 'bg-hud-accent text-retro-fg scale-[1.02]'
-                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-retro-error shrink-0" weight={mainView === 'admin' ? 'fill' : 'regular'} />
-              <span className="text-[11px] hidden sm:inline">Admin</span>
-            </button>
-          )}
-
-          {/* Logout (conditional on onLogout) */}
-          {onLogout && (
-            <>
-              <div className="h-3.5 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
-              <button
-                type="button"
-                onClick={() => {
-                  playPress(700);
-                  onLogout();
-                }}
-                aria-label="Log out"
-                title="Log out"
-                className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-error/80 hover:text-retro-error hover:bg-retro-error/10 active:scale-95 transition-all"
-              >
-                <SignOut className="w-3.5 h-3.5 shrink-0" />
-                <span className="text-[11px] hidden sm:inline">Logout</span>
-              </button>
-            </>
-          )}
-        </div>
-      )}
-
       {/* Primary Floating Command Island Dock */}
       <nav
         aria-label="Command Island"
-        className="command-island fixed bottom-5 left-1/2 -translate-x-1/2 z-[var(--z-dropdown)] flex items-center gap-1 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-full select-none transition-all duration-300"
+        className="command-island fixed bottom-5 left-1/2 -translate-x-1/2 z-[var(--z-dropdown)] flex max-w-[calc(100vw-1.5rem)] items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full select-none transition-all duration-300 overflow-x-auto styled-scrollbar"
       >
         {/* Left Telemetry: $G Balance & Socket Status */}
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-glass-w5 border border-border-glass text-[11px] font-mono tabular-nums text-retro-body">
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-glass-w5 border border-border-glass text-[11px] font-mono tabular-nums text-retro-body shrink-0">
           <span
             className={`w-1.5 h-1.5 rounded-full shrink-0 ${
               wsConnected ? 'bg-retro-online' : 'bg-retro-warning'
@@ -400,10 +227,10 @@ export function CommandIsland({
           </span>
         </div>
 
-        <div className="h-4 w-[1px] bg-glass-w10 mx-0.5" />
+        <div className="h-4 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
 
         {/* Center Primary Nav Tabs */}
-        <div className="flex items-center gap-0.5 sm:gap-1">
+        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.active;
@@ -485,28 +312,199 @@ export function CommandIsland({
           </button>
         </div>
 
-        <div className="h-4 w-[1px] bg-glass-w10 mx-0.5" />
+        <div className="h-4 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
 
-        {/* Right Contextual Capsule */}
-        <div className="flex items-center gap-1">
+        {/* Contextual Capsule */}
+        <div className="flex items-center gap-1 shrink-0">
           {renderContextualAction()}
-
-          {/* More Options / Satellite Deck Toggle */}
-          <button
-            type="button"
-            onClick={toggleSatellite}
-            aria-label="More options"
-            aria-pressed={satelliteOpen}
-            title={satelliteOpen ? 'Hide secondary bar' : 'Show secondary bar'}
-            className={`p-1.5 rounded-full transition-all active:scale-95 ${
-              satelliteOpen
-                ? 'bg-glass-w15 text-retro-fg shadow-inner'
-                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8'
-            }`}
-          >
-            <DotsThree className="w-4 h-4" weight="bold" />
-          </button>
         </div>
+
+        {/* More Options / Expand-Collapse Toggle */}
+        <button
+          type="button"
+          onClick={toggleSatellite}
+          aria-label="More options"
+          aria-pressed={satelliteOpen}
+          title={satelliteOpen ? 'Collapse extra tools' : 'Expand extra tools to the right'}
+          className={`p-1.5 rounded-full transition-all shrink-0 active:scale-95 ${
+            satelliteOpen
+              ? 'bg-glass-w15 text-retro-fg shadow-inner'
+              : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8'
+          }`}
+        >
+          <DotsThree className="w-4 h-4" weight="bold" />
+        </button>
+
+        {/* Expanded Right Section of the Pill Bar */}
+        {satelliteOpen && (
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 animate-in fade-in slide-in-from-left-2 duration-200">
+            <div className="h-4 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
+
+            {/* Store */}
+            <button
+              type="button"
+              onClick={() => {
+                playPress(800);
+                if (onOpenStore) onOpenStore();
+                else handleNavClick('store');
+              }}
+              aria-label="Store"
+              aria-current={mainView === 'store' ? 'page' : undefined}
+              title="Store & Boosters"
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                mainView === 'store'
+                  ? 'bg-hud-accent text-retro-fg scale-[1.02]'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+              }`}
+            >
+              <ShoppingBag className="w-3.5 h-3.5 text-retro-warning shrink-0" weight={mainView === 'store' ? 'fill' : 'regular'} />
+              <span className="text-[11px] hidden sm:inline">Store</span>
+            </button>
+
+            {/* Servers */}
+            <button
+              type="button"
+              onClick={() => handleNavClick('servers')}
+              aria-label="Servers"
+              aria-current={mainView === 'servers' ? 'page' : undefined}
+              title="Public & Private Servers"
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                mainView === 'servers'
+                  ? 'bg-hud-accent text-retro-fg scale-[1.02]'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+              }`}
+            >
+              <HardDrives className="w-3.5 h-3.5 text-retro-online shrink-0" weight={mainView === 'servers' ? 'fill' : 'regular'} />
+              <span className="text-[11px] hidden sm:inline">Servers</span>
+            </button>
+
+            {/* Domination */}
+            <button
+              type="button"
+              onClick={() => handleNavClick('pc_domination')}
+              aria-label="Domination"
+              aria-current={mainView === 'pc_domination' ? 'page' : undefined}
+              title="PC Domination Battles"
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                mainView === 'pc_domination'
+                  ? 'bg-hud-accent text-retro-fg scale-[1.02]'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+              }`}
+            >
+              <Monitor className="w-3.5 h-3.5 text-retro-info shrink-0" weight={mainView === 'pc_domination' ? 'fill' : 'regular'} />
+              <span className="text-[11px] hidden sm:inline">Domination</span>
+            </button>
+
+            {/* Rooms (conditional on courier active) */}
+            {showRooms && (
+              <button
+                type="button"
+                onClick={() => handleNavClick('rooms')}
+                aria-label="Rooms"
+                aria-current={mainView === 'rooms' ? 'page' : undefined}
+                title="Blind Courier Rooms"
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                  mainView === 'rooms'
+                    ? 'bg-hud-accent text-retro-fg scale-[1.02]'
+                    : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5 text-retro-muted shrink-0" weight={mainView === 'rooms' ? 'fill' : 'regular'} />
+                <span className="text-[11px] hidden sm:inline">Rooms</span>
+              </button>
+            )}
+
+            {/* Notifications */}
+            <button
+              type="button"
+              onClick={() => {
+                playPress(800);
+                onOpenNotifications?.();
+              }}
+              aria-label="Notifications"
+              title="Activity Notifications"
+              className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
+            >
+              <Bell className="w-3.5 h-3.5 text-retro-accent shrink-0" />
+              <span className="text-[11px] hidden sm:inline">Alerts</span>
+              {unreadNotificationsCount > 0 && (
+                <span className="w-1.5 h-1.5 rounded-full bg-retro-error ring-1 ring-retro-panel" />
+              )}
+            </button>
+
+            {/* Wallpaper */}
+            <button
+              type="button"
+              onClick={() => {
+                playPress(800);
+                onOpenWallpaper?.();
+              }}
+              aria-label="Wallpaper"
+              title="Custom Wallpaper Settings"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
+            >
+              <PaintBrush className="w-3.5 h-3.5 text-chrome-pink shrink-0" />
+              <span className="text-[11px] hidden sm:inline">Theme</span>
+            </button>
+
+            {/* Settings */}
+            <button
+              type="button"
+              onClick={() => {
+                playPress(800);
+                onOpenSettings?.();
+              }}
+              aria-label="Settings"
+              title="Application Settings"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
+            >
+              <Gear className="w-3.5 h-3.5 text-retro-muted shrink-0" />
+              <span className="text-[11px] hidden sm:inline">Settings</span>
+            </button>
+
+            {/* Admin (conditional on admin flag) */}
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  playPress(840);
+                  handleNavClick('admin');
+                }}
+                aria-label="Admin"
+                aria-current={mainView === 'admin' ? 'page' : undefined}
+                title="Admin Control Panel"
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                  mainView === 'admin'
+                    ? 'bg-hud-accent text-retro-fg scale-[1.02]'
+                    : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+                }`}
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-retro-error shrink-0" weight={mainView === 'admin' ? 'fill' : 'regular'} />
+                <span className="text-[11px] hidden sm:inline">Admin</span>
+              </button>
+            )}
+
+            {/* Logout (conditional on onLogout) */}
+            {onLogout && (
+              <>
+                <div className="h-3.5 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    playPress(700);
+                    onLogout();
+                  }}
+                  aria-label="Log out"
+                  title="Log out"
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-error/80 hover:text-retro-error hover:bg-retro-error/10 active:scale-95 transition-all"
+                >
+                  <SignOut className="w-3.5 h-3.5 shrink-0" />
+                  <span className="text-[11px] hidden sm:inline">Logout</span>
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </nav>
     </>
   );
