@@ -46,3 +46,26 @@ optional SITE_SERVICES hardening on fly.
 Removed capabilities are recoverable from git history; their removal is a
 product decision: the software must not be ABLE to bulk-read private
 messages, so that no host configuration or admin mistake can do it.
+
+## Wave 2 follow-through (2026-09-12)
+
+The ledger's DELETE verdicts were executed, plus three doors the audit found
+still open:
+
+- `GET /api/objects/:id` admin bypass (`isAdminUser`) REMOVED from
+  `apps/api/src/routes/objects.ts` — an admin reading a stranger's private
+  object now 404s like any stranger. The only admin door to a private object
+  is `GET /api/admin/cases/:id/evidence`: a 300s signed token for the ONE
+  object the reporter disclosed on THAT case, audited as
+  `view_case_evidence`.
+- `GET /api/admin/users/:id/objects` (bulk per-user asset sweep) REMOVED;
+  client action + modal gone from UsersTab.
+- `GET /api/admin/objects` now filters `o.is_public = 1`;
+  `/objects/:id/delete|redact` scoped to public objects.
+- `DELETE /api/admin/chat/messages/dm/:id` branch REMOVED (unknown channel
+  now 400s); `GET /api/admin/cases/:id` no longer points at a phantom
+  `/content` route.
+- Spy hack (`GET /api/users/hacks/spy-feed/:id`) no longer peeks DM bodies —
+  a paid game item never had a right the admin suite lacks.
+- Gates: `scripts/security-greps.sh` + `adminEndpointParity.test.ts` fail if
+  any of these resurface.

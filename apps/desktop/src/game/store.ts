@@ -938,11 +938,12 @@ export const useGame = create<GameState>((set, get) => ({
         ...(get().current ? [get().current!.url] : []),
       ])
       const freshPosts = posts.filter((p) => !existingUrls.has(p.url))
-      if (freshPosts.length > 0) {
+      const usablePosts = freshPosts.length > 0 ? freshPosts : posts
+      if (usablePosts.length > 0) {
         if (isGridMode(get().viewMode)) {
           // Grid consumes the whole batch: append to the queue, top up squares.
           const target = gridSizeForMode(get().viewMode)
-          const q = [...get().queue, ...freshPosts]
+          const q = [...get().queue, ...usablePosts]
           const filled = fillGrid(get().grid, q, get().defeated, target)
           set({
             queue: filled.queue,
@@ -954,8 +955,8 @@ export const useGame = create<GameState>((set, get) => ({
           return
         }
         set({
-          current: posts[0],
-          queue: posts.slice(1),
+          current: usablePosts[0],
+          queue: usablePosts.slice(1),
           foeHp: foe,
           foeMaxHp: foe,
           foeClicks: 0,

@@ -1,21 +1,20 @@
 "use client";
 
-import { AdminTable, AdminFilterBar, AdminEmptyState, AdminLoadingState, Badge, StatusBadge, ConfirmDialog, DetailModal } from "../../../components/admin/primitives";
+import { AdminTable, AdminFilterBar, AdminLoadingState, Badge, StatusBadge, ConfirmDialog, DetailModal } from "../../../components/admin/primitives";
 import { adminApi } from "../../../utils/adminApi";
 import { useState, useCallback, useEffect } from "react";
-import {  Ban, Shield, DollarSign, Tag, Trash2, Eye, Settings } from "lucide-react";
-import { AdminMediaThumbnail } from "../AdminMediaThumbnail";
-import type { AdminUser, AdminObject, TableParams } from "../../../utils/adminTypes";
+import {  Ban, Shield, DollarSign, Tag, Trash2, Settings } from "lucide-react";
+import type { AdminUser, TableParams } from "../../../utils/adminTypes";
 import type { OrbitIdentity } from "@orbit/crypto";
 
 interface UsersTabProps {
   identity: OrbitIdentity | null;
   pinVerified: boolean;
-  onZoom: (url: string, isVideo: boolean, title: string, subtitle: string) => void;
+  onZoom?: (url: string, isVideo: boolean, title: string, subtitle: string) => void;
   onAction: (action: string, ...args: unknown[]) => void;
 }
 
-export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabProps) {
+export function UsersTab({ identity, pinVerified, onAction }: UsersTabProps) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -25,9 +24,6 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
     sort: { column: "last_seen", direction: "desc" },
     filters: {},
   });
-  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
-  const [userObjects, setUserObjects] = useState<AdminObject[]>([]);
-  const [showUserDetail, setShowUserDetail] = useState(false);
   const [showBanModal, setShowBanModal] = useState<{ user: AdminUser } | null>(null);
   const [banReason, setBanReason] = useState("");
   const [banWipe, setBanWipe] = useState(true);
@@ -123,16 +119,6 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
     }
   };
 
-  const handleViewObjects = async (user: AdminUser) => {
-    if (!identity) return;
-    try {
-      const objects = await adminApi.userObjects(identity, user.id);
-      setUserObjects(objects);
-      setSelectedUser(user);
-      setShowUserDetail(true);
-    } catch {
-    }
-  };
 
   if (isLoading && users.length === 0) {
     return <AdminLoadingState rows={10} columns={8} />;
@@ -280,7 +266,6 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
             return response;
           },
           rowActions: [
-            { label: "View Objects", icon: Eye, onClick: (row: AdminUser) => handleViewObjects(row) },
             { label: "Ban / Unban", icon: (row: AdminUser) => row.is_banned ? Shield : Ban, variant: (row: AdminUser) => row.is_banned ? "ghost" : "danger", onClick: (row: AdminUser) => handleRowAction(row.is_banned ? "unban" : "ban", row) },
             { label: "Moderator", icon: Shield, variant: (row: AdminUser) => row.is_moderator ? "primary" : "default", onClick: (row: AdminUser) => handleRowAction("moderator", row) },
             { label: "Admin", icon: Settings, variant: (row: AdminUser) => row.is_admin ? "primary" : "default", onClick: (row: AdminUser) => handleRowAction("admin", row) },
@@ -390,47 +375,6 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
         </DetailModal>
       )}
 
-      {showUserDetail && selectedUser && (
-        <DetailModal
-          isOpen={true}
-          onClose={() => setShowUserDetail(false)}
-          title={`Objects for ${selectedUser.display_name || selectedUser.id.slice(0, 8)}`}
-          size="xl"
-        >
-          <div className="space-y-3">
-            {userObjects.length === 0 ? (
-              <AdminEmptyState title="No objects" description="This user has no uploaded objects" illustration="folder" />
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                {userObjects.map(obj => {
-                  const objectProtected = !obj.content_url || obj.content_url?.startsWith("/api/objects/");
-                  const objectId = objectProtected ? obj.id : null;
-                  const directUrl = obj.content_url && !obj.content_url.startsWith("/api/objects/") ? obj.content_url : null;
-
-                  return (
-                    <div key={obj.id} className="group relative">
-                      <AdminMediaThumbnail
-                        objectId={objectId}
-                        directUrl={directUrl}
-                        identity={identity}
-                        mimeType={obj.mime_type}
-                        title={selectedUser.display_name || selectedUser.id}
-                        subtitle={obj.mime_type || "Media"}
-                        className="aspect-square cursor-pointer"
-                        imageClassName="group-hover:scale-105 transition-transform duration-150"
-                        onZoom={onZoom}
-                        badge={obj.is_story === 1 && (
-                          <span className="absolute top-1 right-1 px-1 py-0.5 bg-cyan-500/10 border border-purple-300 text-cyan-300 font-mono font-bold text-[10px] rounded">STORY</span>
-                        )}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </DetailModal>
-      )}
     </div>
   );
 }

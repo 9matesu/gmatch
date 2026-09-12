@@ -27,4 +27,13 @@ G "telemetry/analytics network calls" \
 G "raw endpoint_hint rendered as JSX text" \
   "grep -rn '>{s.endpoint_hint\\|{s.endpoint_hint ||' apps/desktop/src --include='*.tsx' | grep -v maskedServerUrl | grep -v test"
 
+G "admin bypass on the object read path" \
+  "grep -rn 'isAdminUser' apps/api/src/routes/objects.ts"
+G "bulk per-user asset sweep route" \
+  "grep -n \"admin.get('/users/:id/objects\" apps/api/src/routes/admin.ts"
+G "admin chat touching private messages" \
+  "grep -n "channel === 'dm'" apps/api/src/routes/admin.ts"
+G "spy hack reading DM bodies" \
+  "grep -n 'SELECT body.*FROM PrivateMessages\|SELECT.*FROM PrivateMessages' apps/api/src/routes/users.ts"
+
 if [ "$FAIL" -eq 0 ]; then echo "ALL GREPS CLEAN"; else exit 1; fi

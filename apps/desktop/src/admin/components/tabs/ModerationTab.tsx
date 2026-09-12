@@ -2,6 +2,7 @@
 
 import {  AdminFilterBar, AdminEmptyState, AdminLoadingState, Badge, StatusBadge } from "../../../components/admin/primitives";
 import { adminApi } from "../../../utils/adminApi";
+import { getApiBaseUrl } from "../../../utils/api";
 import { useState, useCallback, useEffect } from "react";
 import { Flag, MessageSquare, Hash, Trash2,  Shield, Ban,  Check,  ChevronDown, ChevronUp, Maximize2, ShieldAlert } from "lucide-react";
 import { cn } from "../../../lib/utils";
@@ -43,12 +44,18 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
   // Case detail (report-scoped evidence + parties) fetched on expand —
   // the only door to disclosed private content, per docs/ADMIN-SUITE.md.
   const [caseDetail, setCaseDetail] = useState<Record<string, any>>({});
+  const [evidenceUrl, setEvidenceUrl] = useState<Record<string, string>>({});
 
   const toggleExpand = (id: string) => {
     setExpandedId(prev => {
       const next = prev === id ? null : id;
       if (next && identity && !caseDetail[next]) {
-        adminApi.caseDetail(identity, next).then(d => setCaseDetail(prev2 => ({ ...prev2, [next]: d }))).catch(() => { });
+        adminApi.caseDetail(identity, next).then((d) => {
+          setCaseDetail(prev2 => ({ ...prev2, [next]: d }));
+          if (d?.evidence?.evidence_path && !evidenceUrl[next]) {
+            adminApi.caseEvidence(identity, next).then(e => setEvidenceUrl(prev2 => ({ ...prev2, [next]: `${getApiBaseUrl()}${e.url}` }))).catch(() => { });
+          }
+        }).catch(() => { });
       }
       return next;
     });
@@ -262,8 +269,17 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                       </div>
                     )}
                     {evidence && (
-                      <div className="text-retro-fg font-mono text-[10px] break-all">
-                        evidence object {String(evidence.id).slice(0, 12)} · {evidence.mime_type} · {(evidence.size_bytes / 1024).toFixed(0)} KiB
+                      <div className="text-retro-fg font-mono text-[10px] break-all space-y-1">
+                        <div>
+                          evidence object {String(evidence.id).slice(0, 12)} · {evidence.mime_type} · {(evidence.size_bytes / 1024).toFixed(0)} KiB
+                        </div>
+                        {evidenceUrl[report.id] && evidence.mime_type?.startsWith('image/') && (
+                          <img
+                            src={evidenceUrl[report.id]}
+                            alt="disclosed evidence"
+                            className="max-h-48 rounded border border-border-glass object-contain"
+                          />
+                        )}
                       </div>
                     )}
                   </div>

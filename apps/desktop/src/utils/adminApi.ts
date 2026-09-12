@@ -166,9 +166,6 @@ export const adminApi = {
     return fetchTable<AdminObject>(`${ADMIN_BASE}/objects?${searchParams}`, identity, params);
   },
 
-  userObjects: (identity: OrbitIdentity, userId: string) =>
-    fetchArray<AdminObject>(`${ADMIN_BASE}/users/${userId}/objects`, identity),
-
   posts: (identity: OrbitIdentity, params: TableParams) => {
     const searchParams = new URLSearchParams();
     searchParams.set("limit", String(params.pageSize));
@@ -368,6 +365,10 @@ export const adminApi = {
   /** Case = one report, seen legally: report + disclosed evidence + parties. */
   caseDetail: (identity: OrbitIdentity, reportId: string) =>
     fetchJson<Record<string, any>>(`${ADMIN_BASE}/cases/${reportId}`, identity),
+
+  /** Short-lived signed URL for the ONE disclosed evidence object (audited). */
+  caseEvidence: (identity: OrbitIdentity, reportId: string) =>
+    fetchJson<{ url: string }>(`${ADMIN_BASE}/cases/${reportId}/evidence`, identity),
 
   hideLobbyComment: (identity: OrbitIdentity, commentId: string) =>
     fetchJson<{ ok: boolean }>(`${ADMIN_BASE}/lobby-comments/${commentId}/hide`, identity, { method: "POST" }),

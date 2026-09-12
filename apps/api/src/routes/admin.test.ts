@@ -656,6 +656,17 @@ describe('Admin API — content-report resolution (instant-hide triage)', () => 
   })
 
   it('GET /api/admin/cases/:id/evidence mints a short-lived token for the DISCLOSED object only', async () => {
+    env = await createMockEnv()
+    await seed()
+    await env.DB.prepare(
+      "INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url) VALUES (?, ?, 4, 'image/jpeg', 'data:image/jpeg;base64,/9j/4AAQ')"
+    ).bind('report-evidence-obj', regularId.orbitId).run()
+    const repBody = JSON.stringify({ reason: 'Spam images', category: 'spam', object_id: 'report-evidence-obj' })
+    await app.request(`/api/users/${reportedUser.orbitId}/report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(regularId, 'POST', `/api/users/${reportedUser.orbitId}/report`, repBody) },
+      body: repBody,
+    }, env)
     const r = await findOpenReport(reportedUser.orbitId)
     const res = await app.request(`/api/admin/cases/${r.id}/evidence`, {
       headers: authHeaders(adminId, 'GET', `/api/admin/cases/${r.id}/evidence`),

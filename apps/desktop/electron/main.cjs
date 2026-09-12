@@ -301,7 +301,13 @@ async function httpGet(url, headers) {
 // --- source parsers -------------------------------------------------------
 
 function parseDanbooruJson(body, baseUrl, captions) {
-  const data = JSON.parse(body)
+  if (!body || typeof body !== 'string' || !body.trim()) return []
+  let data
+  try {
+    data = JSON.parse(body)
+  } catch {
+    return []
+  }
   const raw = Array.isArray(data) ? data : (data.posts && (data.posts.post ?? data.posts)) ?? []
   const list = Array.isArray(raw) ? raw : [raw]
   return list
@@ -317,17 +323,17 @@ function parseDanbooruJson(body, baseUrl, captions) {
     .filter((p) => p.id && p.url)
     .filter(
       (p) =>
-        /\.(jpe?g|png)$/i.test(p.url) &&
+        /\.(jpe?g|png|webp)(?:[?#]|$)/i.test(p.url) &&
         // DAPI spells it 'explicit'; e621-style sources use 'e'
         (p.rating === 'explicit' || p.rating === 'e') &&
-        p.width >= MIN_WIDTH &&
-        p.height >= MIN_HEIGHT &&
-        p.width * p.height >= MIN_PIXELS &&
+        (p.width === 0 || p.width >= 500) &&
+        (p.height === 0 || p.height >= 500) &&
         !hasBadTag(p.tags, captions),
     )
 }
 
 function parsePahealXml(body, captions) {
+  if (!body || typeof body !== 'string') return []
   const posts = []
   const elRe = /<tag\b([^>]*)>/g
   const attr = (attrs, name) => {
@@ -338,11 +344,13 @@ function parsePahealXml(body, captions) {
   while ((m = elRe.exec(body))) {
     const fileUrl = attr(m[1], 'file_url')
     if (!fileUrl) continue
+    const fileName = attr(m[1], 'file_name')
     const width = Number(attr(m[1], 'width')) || 0
     const height = Number(attr(m[1], 'height')) || 0
     posts.push({
       id: attr(m[1], 'id') || fileUrl,
       url: fileUrl,
+      fileName,
       tags: attr(m[1], 'tags') ? attr(m[1], 'tags').split(/\s+/).filter(Boolean) : [],
       rating: 'e',
       width,
@@ -351,10 +359,9 @@ function parsePahealXml(body, captions) {
   }
   return posts.filter(
     (p) =>
-      /\.(jpe?g|png)$/i.test(p.url) &&
-      p.width >= MIN_WIDTH &&
-      p.height >= MIN_HEIGHT &&
-      p.width * p.height >= MIN_PIXELS &&
+      (!p.fileName || /\.(jpe?g|png|webp)$/i.test(p.fileName) || /\.(jpe?g|png|webp)$/i.test(p.url)) &&
+      (p.width === 0 || p.width >= 500) &&
+      (p.height === 0 || p.height >= 500) &&
       !hasBadTag(p.tags, captions),
   )
 }
@@ -664,23 +671,45 @@ async function fetchImhentai(variant, n, captions) {
 const SOURCES = [
   {
     id: 'tbib',
-    url: (tags, limit) => {
-      const pid = Math.floor(Math.random() * 25)
-      return `https://tbib.org/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
-        tags + ' rating:explicit ' + NEGATIVES,
-      )}&limit=${limit}&json=1&pid=${pid}`
+    fetch: async (variant, n, captions) => {
+      const pid = Math.floor(Math.random() * 8)
+      let body = await httpGet(
+        `https://tbib.org/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
+          variant + ' rating:explicit ' + NEGATIVES,
+        )}&limit=${n}&json=1&pid=${pid}`
+      )
+      let posts = parseDanbooruJson(body, 'https://tbib.org', captions)
+      if (posts.length === 0 && pid > 0) {
+        body = await httpGet(
+          `https://tbib.org/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
+            variant + ' rating:explicit ' + NEGATIVES,
+          )}&limit=${n}&json=1&pid=0`
+        )
+        posts = parseDanbooruJson(body, 'https://tbib.org', captions)
+      }
+      return posts
     },
-    parse: (body, captions) => parseDanbooruJson(body, 'https://tbib.org', captions),
   },
   {
     id: 'xbooru',
-    url: (tags, limit) => {
-      const pid = Math.floor(Math.random() * 25)
-      return `https://xbooru.com/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
-        tags + ' rating:explicit ' + NEGATIVES,
-      )}&limit=${limit}&json=1&pid=${pid}`
+    fetch: async (variant, n, captions) => {
+      const pid = Math.floor(Math.random() * 8)
+      let body = await httpGet(
+        `https://xbooru.com/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
+          variant + ' rating:explicit ' + NEGATIVES,
+        )}&limit=${n}&json=1&pid=${pid}`
+      )
+      let posts = parseDanbooruJson(body, 'https://xbooru.com', captions)
+      if (posts.length === 0 && pid > 0) {
+        body = await httpGet(
+          `https://xbooru.com/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
+            variant + ' rating:explicit ' + NEGATIVES,
+          )}&limit=${n}&json=1&pid=0`
+        )
+        posts = parseDanbooruJson(body, 'https://xbooru.com', captions)
+      }
+      return posts
     },
-    parse: (body, captions) => parseDanbooruJson(body, 'https://xbooru.com', captions),
   },
   {
     // Real/hardcore porn: pornstars (skylar vox), BBC, mp4s/gifs.
@@ -690,11 +719,21 @@ const SOURCES = [
   {
     // paheal combos return 0 results — query a single tag only.
     id: 'paheal',
-    url: (tags, limit) =>
-      `https://rule34.paheal.net/api/danbooru/find_posts?tags=${encodeURIComponent(
-        tags.split(/\s+/)[0],
-      )}&limit=${limit}`,
-    parse: parsePahealXml,
+    fetch: async (variant, n, captions) => {
+      const tag = variant.split(/\s+/)[0]
+      const page = 1 + Math.floor(Math.random() * 5)
+      let xml = await httpGet(
+        `https://rule34.paheal.net/api/danbooru/find_posts?tags=${encodeURIComponent(tag)}&limit=${n}&page=${page}`
+      )
+      let posts = parsePahealXml(xml, captions)
+      if (posts.length === 0 && page > 1) {
+        xml = await httpGet(
+          `https://rule34.paheal.net/api/danbooru/find_posts?tags=${encodeURIComponent(tag)}&limit=${n}&page=1`
+        )
+        posts = parsePahealXml(xml, captions)
+      }
+      return posts
+    },
   },
   {
     // Slow (multi-fetch scrape) — last resort before giving up.
@@ -817,11 +856,6 @@ async function fetchBooru({ tags, limit }) {
   const ordered = SOURCES.map((_, i) => SOURCES[(rrIndex + i) % SOURCES.length])
   for (const source of ordered) {
     for (const variant of variants) {
-      const vhit = imageCache.getFeedCache(variant)
-      if (vhit) {
-        rrIndex = (SOURCES.indexOf(source) + 1) % SOURCES.length
-        return { posts: vhit, source: 'cache', ok: true, query: variant, cached: true }
-      }
       try {
         const posts = source.fetch
           ? await source.fetch(variant, n, captions)

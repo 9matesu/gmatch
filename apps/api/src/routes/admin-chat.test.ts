@@ -136,11 +136,12 @@ describe('Admin chat moderation — /chat/messages', () => {
     expect(body.some((m) => m.id === 'lobby-2')).toBe(false)
   })
 
-  it('deletes a dm message by soft-deleting it', async () => {
+  it('dm channel is GONE: admins cannot touch private messages at all', async () => {
     const { res } = await del('/api/admin/chat/messages/dm/pm-1')
-    expect(res.status).toBe(200)
-    const row = await env.DB.prepare('SELECT deleted_by FROM PrivateMessages WHERE id = ?').bind('pm-1').first<{ deleted_by: string | null }>()
-    expect(row?.deleted_by).toBe(admin.orbitId)
+    expect(res.status).toBe(400)
+    const row = await env.DB.prepare('SELECT deleted_by, hidden_at FROM PrivateMessages WHERE id = ?').bind('pm-1').first<{ deleted_by: string | null; hidden_at: string | null }>()
+    expect(row?.deleted_by).toBeNull()
+    expect(row?.hidden_at).toBeNull()
   })
 
   it('rejects non-admin access with 403', async () => {

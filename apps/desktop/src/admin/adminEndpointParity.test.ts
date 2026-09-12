@@ -41,5 +41,7 @@ describe('admin endpoint parity (client -> server)', () => {
       expect(client).not.toContain(banned);
     }
     expect(client).not.toMatch(/\/chat[^/]*'?\s*\?[^)]*channel=dm/);
+    // denunciation protocol: no bulk per-user asset sweep from the panel
+    expect(client).not.toMatch(/users\/\$\{[^}]+\}\/objects/);
   });
 });

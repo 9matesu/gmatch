@@ -577,10 +577,9 @@ export async function fetchPosts(req: BooruRequest): Promise<BooruResponse> {
   try {
     if (typeof window !== 'undefined' && window.gmatch?.booruFetch) {
       const res = await window.gmatch.booruFetch(req)
-      if (res.ok && res.posts.length > 0) {
-        const fresh = remember(sanitize(res.posts, req.tags))
-        // All repeats → report offline so the caller rotates to the next tag.
-        if (fresh.length > 0) return { ...res, posts: fresh }
+      if (res.ok) {
+        const fresh = remember(sanitize(res.posts || [], req.tags))
+        return { ...res, posts: fresh }
       }
       return { ...offline }
     }

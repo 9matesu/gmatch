@@ -1407,6 +1407,8 @@ admin.get('/cases/:id', async (c) => {
     }
   }
   await logAdminAction(c.env.DB, c.get('orbitId'), 'view_case', { id, type: 'content_report' })
+  return c.json(caseOut)
+})
 
 // The consented door: a short-lived signed token for the ONE object the
 // reporter disclosed on THIS case. Audited; nothing else is reachable.
@@ -1416,10 +1418,8 @@ admin.get('/cases/:id/evidence', async (c) => {
     .bind(id).first<{ object_id: string | null }>()
   if (!r?.object_id) return c.json({ error: 'No evidence on this case' }, 404)
   const { sig, exp, jti } = createSignedObjectToken(r.object_id, 300)
-  await logAdminAction(c.env.DB, c.get('orbitId'), 'view_case_evidence', { id, object_id: r.object_id })
+  await logAdminAction(c.env.DB, c.get('orbitId'), 'view_case_evidence', { id, type: 'content_report' }, r.object_id)
   return c.json({ url: `/api/objects/${r.object_id}?sig=${sig}&exp=${exp}&jti=${jti}` })
-})
-  return c.json(caseOut)
 })
 
 // List all users with ban status + identification + activity stamps
@@ -2509,6 +2509,9 @@ admin.delete('/chat/messages/:channel/:id', async (c) => {
     await c.env.DB.prepare('DELETE FROM MatchChat WHERE id = ?').bind(id).run().catch(() => { })
   } else if (channel === 'group') {
     await c.env.DB.prepare('DELETE FROM GroupMessages WHERE id = ?').bind(id).run().catch(() => { })
+  } else {
+    // 'dm' and anything else: admins never touch private messages.
+    return c.json({ error: 'Unknown channel' }, 400)
   }
 
   await logAdminAction(c.env.DB, adminId, 'delete_chat_message', { id, type: channel })
