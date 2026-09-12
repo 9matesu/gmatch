@@ -13,12 +13,10 @@ function report(level: string, scope: unknown, args: unknown[]): void {
 }
 
 export const logger = {
-  log(...args: unknown[]) {
-    report('log', args[0], args.slice(1));
-  },
-  info(...args: unknown[]) {
-    report('info', args[0], args.slice(1));
-  },
+  // log/info stay local: main.log must never persist routine identity/session
+  // chatter (the app's no-trace promise). Only warn/error reach the bridge.
+  log(..._args: unknown[]) {},
+  info(..._args: unknown[]) {},
   warn(...args: unknown[]) {
     report('warn', args[0], args.slice(1));
   },
