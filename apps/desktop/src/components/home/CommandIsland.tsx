@@ -244,7 +244,7 @@ export function CommandIsland({
                   onClick={() => {
                     playPress(800);
                     setMoreMenuOpen(false);
-                    onOpenProfile ? onOpenProfile() : handleNavClick('profile');
+                    if (onOpenProfile) onOpenProfile(); else handleNavClick('profile');
                   }}
                   className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] active:scale-95 transition-all text-xs text-retro-body hover:text-white"
                 >
@@ -257,7 +257,7 @@ export function CommandIsland({
                   onClick={() => {
                     playPress(800);
                     setMoreMenuOpen(false);
-                    onOpenStore ? onOpenStore() : handleNavClick('store');
+                    if (onOpenStore) onOpenStore(); else handleNavClick('store');
                   }}
                   className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] active:scale-95 transition-all text-xs text-retro-body hover:text-white"
                 >
