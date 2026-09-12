@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { SpeakerHigh, SpeakerSlash } from '@phosphor-icons/react';
+import { SpeakerHigh, SpeakerSlash, Minus, Square, X } from '@phosphor-icons/react';
 import { isAudioMuted, setAudioMuted } from '../../utils/sounds';
 
 export interface NativeHeaderBarProps {
@@ -47,8 +47,8 @@ export function NativeHeaderBar({
         )}
       </div>
 
-      {/* Right: presence dot + mute (ponytail: window controls live natively —
-          frameless wiring is a separate wave, see plan 2026-09-12 HUD review T6) */}
+      {/* Right: presence + mute + window controls (frameless: buttons render
+          only when the preload bridge exposes them — browser/dev = no bridge) */}
       <div
         className="flex items-center gap-2 text-retro-muted"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
@@ -76,6 +76,35 @@ export function NativeHeaderBar({
             <SpeakerHigh className="w-3.5 h-3.5" />
           )}
         </button>
+
+        {window.gmatch?.winClose && (
+          <div className="flex items-center gap-0.5 ml-1 border-l border-border-glass pl-1.5">
+            <button
+              type="button"
+              onClick={window.gmatch.winMinimize}
+              className="p-1.5 rounded-md hover:bg-glass-w10 hover:text-retro-fg transition-colors cursor-pointer"
+              aria-label="Minimize window"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={window.gmatch.winToggleMaximize}
+              className="p-1.5 rounded-md hover:bg-glass-w10 hover:text-retro-fg transition-colors cursor-pointer"
+              aria-label="Maximize window"
+            >
+              <Square className="w-3 h-3" />
+            </button>
+            <button
+              type="button"
+              onClick={window.gmatch.winClose}
+              className="p-1.5 rounded-md hover:bg-retro-error hover:text-retro-fg transition-colors cursor-pointer"
+              aria-label="Close window"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );

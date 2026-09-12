@@ -28,6 +28,9 @@ export interface GmatchBridge {
   secureSet?: (key: string, value: string) => Promise<void>
   secureDelete?: (key: string) => Promise<void>
   serverState?: () => Promise<{ packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[]; adminPin?: string }>
+  winMinimize?: () => void
+  winToggleMaximize?: () => void
+  winClose?: () => void
   appVersion?: () => Promise<string>
   openExternal?: (url: string) => Promise<void>
   serverSet?: (payload: { mode: 'host' | 'client'; url?: string }) => Promise<{ ok: boolean; error?: string }>

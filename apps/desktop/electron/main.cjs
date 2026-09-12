@@ -797,6 +797,8 @@ function createWindow() {
   const win = new BrowserWindow({
     ...bounds,
     minWidth: 1000,
+    // Frameless: NativeHeaderBar is the titlebar (drag strip + win controls).
+    frame: false,
     backgroundColor: '#080A0D',
     title: 'gMatch',
     webPreferences: {
@@ -847,6 +849,17 @@ function createWindow() {
 app.whenReady().then(async () => {
   const secureAvailable = initSecureKV()
   ipcMain.on('log:renderer', (_event, { scope, msg }) => mainLog(`[renderer:${scope}] ${msg}`))
+  // Frameless window controls: NativeHeaderBar draws min/max/close and gates
+  // them on the bridge exposing winMinimize/winToggleMaximize/winClose (browser
+  // dev has no preload -> no buttons). close() routes through the same
+  // will-prevent-unload key-save gate as the native titlebar.
+  ipcMain.on('window:minimize', (e) => BrowserWindow.fromWebContents(e.sender)?.minimize())
+  ipcMain.on('window:toggle-maximize', (e) => {
+    const w = BrowserWindow.fromWebContents(e.sender)
+    if (!w) return
+    if (w.isMaximized()) w.unmaximize(); else w.maximize()
+  })
+  ipcMain.on('window:close', (e) => BrowserWindow.fromWebContents(e.sender)?.close())
   imageCache.init(app.getPath('userData'), UA)
   protocol.handle(imageCache.SCHEME, (request) => imageCache.serveImage(request))
   customFolders.init(app.getPath('userData'), { ipcMain, BrowserWindow })

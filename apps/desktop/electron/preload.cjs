@@ -21,6 +21,11 @@ contextBridge.exposeInMainWorld('gmatch', {
   secureSet: (key, value) => ipcRenderer.invoke('secure:set', key, value),
   secureDelete: (key) => ipcRenderer.invoke('secure:delete', key),
   serverState: () => ipcRenderer.invoke('server:state'),
+  // Frameless window controls (renderer draws its own titlebar; absence of
+  // these = plain browser/dev, chrome hides the buttons).
+  winMinimize: () => ipcRenderer.send('window:minimize'),
+  winToggleMaximize: () => ipcRenderer.send('window:toggle-maximize'),
+  winClose: () => ipcRenderer.send('window:close'),
   appVersion: () => ipcRenderer.invoke('app:version'),
   openExternal: (url) => ipcRenderer.invoke('shell:open', url),
   serverSet: (payload) => ipcRenderer.invoke('server:set', payload),
