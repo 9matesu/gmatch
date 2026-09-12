@@ -89,11 +89,38 @@ export function OnboardingFlow(props: Props) {
   };
 
   // Server step = native browser, full-bleed, no ID: join stamps the marker
-  // and relaunches; post-restart lands on profile.
+  // and relaunches (or in browser/dev mode transitions directly to profile).
   if (step === 'server') {
+    const isDev = Boolean(import.meta.env.DEV) ||
+      (typeof window !== 'undefined' &&
+        (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1'));
+
     return (
-      <div className="fixed inset-0 z-[var(--z-lightbox)] overflow-y-auto bg-retro-bg font-sans animate-orbit-fade-in text-retro-fg">
-        <ServersView identity={null} toast={() => { /* relaunches; toasts irrelevant */ }} />
+      <div className="fixed inset-0 z-[var(--z-lightbox)] overflow-y-auto bg-retro-bg font-sans animate-orbit-fade-in text-retro-fg flex flex-col">
+        {isDev && (
+          <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center justify-between text-xs text-amber-300 z-50 shrink-0">
+            <span>Dev mode: running against local central node (127.0.0.1:8790)</span>
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  localStorage.setItem(SERVER_MARKER_KEY, API_BASE);
+                } catch { /* private mode */ }
+                setStep('profile');
+              }}
+              className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-bold cursor-pointer text-xs flex items-center gap-1"
+            >
+              Skip to Profile setup &rarr;
+            </button>
+          </div>
+        )}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <ServersView
+            identity={null}
+            toast={() => { /* toasts */ }}
+            onServerJoined={() => setStep('profile')}
+          />
+        </div>
       </div>
     );
   }

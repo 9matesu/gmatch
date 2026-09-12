@@ -9,6 +9,8 @@ import { ShieldCheck, EyeOff, Eye, Trash2, RefreshCw } from 'lucide-react'
 import { orbitFetch } from '../../utils/api'
 import { playPress } from '../../utils/sounds'
 
+import { generateIdentity } from '@orbit/crypto'
+
 interface DirRow {
   id: string
   name: string
@@ -26,7 +28,7 @@ interface Totals { total: number; online: number; stale: number; hidden: number;
 type Identity = Parameters<typeof orbitFetch>[2]
 type Toast = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void
 
-export function CentralAdminPanel({ central, identity, toast }: { central: string; identity: Identity; toast: Toast }) {
+export function CentralAdminPanel({ central, identity, toast }: { central: string; identity?: Identity | null; toast: Toast }) {
   const [totals, setTotals] = useState<Totals | null>(null)
   const [rows, setRows] = useState<DirRow[]>([])
   const [authorized, setAuthorized] = useState(false)
@@ -36,6 +38,12 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
   const load = useCallback(async () => {
     setLoading(true)
     try {
+      if (!identity) {
+        setAuthorized(false)
+        setTotals(null)
+        setRows([])
+        return
+      }
       const dash = await orbitFetch(`${central}/api/servers/admin/dashboard`, { method: 'GET' }, identity)
       if (!dash.ok) { setAuthorized(false); setTotals(null); setRows([]); return }
       setAuthorized(true)
@@ -86,11 +94,21 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
     if (!unlockPin.trim() || unlocking) return
     setUnlocking(true)
     try {
+      let activeIdentity = identity
+      if (!activeIdentity) {
+        const created = generateIdentity()
+        try {
+          localStorage.setItem('orbit_identity', JSON.stringify(created))
+          localStorage.setItem('orbit_display_name', 'DevAdmin')
+          window.dispatchEvent(new CustomEvent('orbit-identity-changed', { detail: created }))
+        } catch { /* private mode */ }
+        activeIdentity = created
+      }
       const res = await orbitFetch(`${central}/api/admin/verify-pin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pin: unlockPin.trim() }),
-      }, identity)
+      }, activeIdentity)
       if (res.ok) {
         toast('Central admin unlocked', 'success')
         setUnlockPin('')

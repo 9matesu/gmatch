@@ -173,7 +173,7 @@ function signRequestHeaders(
 export async function orbitFetch(
   endpoint: string,
   options: RequestInit,
-  identity: OrbitIdentityLike,
+  identity?: OrbitIdentityLike | null,
   fetchImpl: typeof globalThis.fetch = globalThis.fetch,
 ): Promise<Response> {
   const url = resolveEndpoint(endpoint)
@@ -191,6 +191,9 @@ export async function orbitFetch(
   const isFormUpload = typeof FormData !== 'undefined' && options.body instanceof FormData
 
   async function buildHeaders(): Promise<Headers> {
+    if (!identity) {
+      return new Headers(options.headers)
+    }
     const signed = signRequestHeaders(method, pathname, bodyForSig, identity, options.headers)
     // Sealed request (security plan T2 + wave 2 B2): signed headers + JSON
     // body travel ECIES-encrypted to the node key; only X-Orbit-Sealed is
@@ -224,7 +227,7 @@ export async function orbitFetch(
   }
   const headers = await buildHeaders()
   const sealedBody = headers.has('X-Orbit-Sealed') ? 'sealed' : bodyForSig
-  const ck = cacheKey(method, endpoint, identity.orbitId)
+  const ck = cacheKey(method, endpoint, identity?.orbitId || 'anon')
 
   // In-flight dedup for GET requests
   if (method === 'GET') {

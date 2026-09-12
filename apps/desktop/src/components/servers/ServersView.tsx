@@ -99,6 +99,7 @@ export function ServersView({
   profilePics = {},
   rooms = [],
   onOpenRoom,
+  onServerJoined,
 }: {
   identity: Parameters<typeof orbitFetch>[2] | null
   toast: Toast
@@ -108,6 +109,7 @@ export function ServersView({
   profilePics?: Record<string, string>
   rooms?: ServerRoomPreview[]
   onOpenRoom?: (roomId: string) => void
+  onServerJoined?: (server: DirectoryServer) => void
 }) {
   const [central, setCentral] = useState(() => getCentralApiUrl())
   const [servers, setServers] = useState<DirectoryServer[]>([])
@@ -142,6 +144,27 @@ export function ServersView({
   const pendingAsk = useRef<((v: string | null) => void) | null>(null)
   const [askPasswordFor, setAskPasswordFor] = useState<string | null>(null)
   const [codeAskOpen, setCodeAskOpen] = useState(false)
+
+  const isDev = Boolean(import.meta.env.DEV) ||
+    (typeof window !== 'undefined' &&
+      (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1'))
+
+  const isLocalHost = (url: string) => url.includes('127.0.0.1') || url.includes('localhost')
+
+  const centralServer = useMemo((): DirectoryServer => ({
+    id: 'central-node',
+    name: isLocalHost(central) ? 'Central Node (Local)' : 'gMatch Central',
+    description: isLocalHost(central)
+      ? 'Local dev node (127.0.0.1:8790)'
+      : 'Official central network directory & public node',
+    owner_id: 'central',
+    endpoint_hint: central,
+    password_required: 0,
+    is_private: 0,
+    user_count: dash?.members_total ?? 1,
+    online_count: dash?.users ? dash.users.filter((u) => u.online).length : 1,
+    last_seen: new Date().toISOString(),
+  }), [central, dash])
 
   const refresh = useCallback(async () => {
     // Anonymous browser: public directory only — never touch node routes
@@ -426,7 +449,43 @@ export function ServersView({
   const askPassword = (name: string) =>
     new Promise<string | null>((resolve) => { pendingAsk.current = resolve; setAskPasswordFor(name) })
 
-  const join = async (s: DirectoryServer) => { void joinServer(s, toast, askPassword) }
+  const connectToCentral = async () => {
+    if (!central) return
+    const target = normalizeServerUrl(central) || normalizeServerUrl('http://' + central) || central
+    try {
+      localStorage.setItem(SERVER_MARKER_KEY, target)
+      localStorage.setItem('gmatch.api.url', target)
+    } catch { /* private mode */ }
+    if (!window.gmatch?.serverSet) {
+      toast(`Connected to ${centralServer.name}.`, 'success')
+      onServerJoined?.(centralServer)
+      return
+    }
+    const res = await window.gmatch.serverSet({ mode: 'client', url: target })
+    if (!res.ok) { toast(res.error || 'Could not switch servers', 'error'); return }
+    toast(`Switching to ${centralServer.name}. The app restarts.`, 'success')
+    window.gmatch.serverRelaunch?.()
+  }
+
+  const join = async (s: DirectoryServer) => {
+    if (s.id === 'central-node' || (s.endpoint_hint && s.endpoint_hint === central)) {
+      await connectToCentral()
+      return
+    }
+    if (!window.gmatch?.serverSet) {
+      const url = s.endpoint_hint
+      if (!url) { toast('This server has no address to join (owner is offline?)', 'warning'); return }
+      const target = normalizeServerUrl(url) || normalizeServerUrl('http://' + url) || url
+      try {
+        localStorage.setItem(SERVER_MARKER_KEY, target)
+        localStorage.setItem('gmatch.api.url', target)
+      } catch { /* private mode */ }
+      toast(`Connected to ${s.name}.`, 'success')
+      onServerJoined?.(s)
+      return
+    }
+    void joinServer(s, toast, askPassword)
+  }
 
   // Copy the gmatch://node/ code a friend pastes into "Node code" here.
   // The clipboard carries the code alone (the paste-side decoder is strict).
@@ -448,8 +507,12 @@ export function ServersView({
     if (!coord) { toast('That is not a valid node code.', 'error'); return }
     const host = coord.port ? `${coord.host}:${coord.port}` : coord.host
     // Persist before the relaunch kills the process.
-    writeDirectoryCache(mergeDirectory(readDirectoryCache(), [{ id: `mask:${host}`, name: coord.name, owner_id: '', password_required: 0, endpoint_hint: host }]))
-    await joinServer({ id: `mask:${host}`, name: coord.name, owner_id: '', password_required: 0, endpoint_hint: host }, toast, askPassword)
+    const serverObj = { id: `mask:${host}`, name: coord.name, owner_id: '', password_required: 0, endpoint_hint: host }
+    writeDirectoryCache(mergeDirectory(readDirectoryCache(), [serverObj]))
+    const res = await joinServer(serverObj, toast, askPassword)
+    if (res === 'connected') {
+      onServerJoined?.(serverObj)
+    }
   }
 
   const leave = async () => {
@@ -773,9 +836,55 @@ export function ServersView({
                 <h2 className="text-xs font-bold text-retro-fg uppercase tracking-wider truncate">
                   Server browser ({visibleServers.length})
                 </h2>
-                <p className="text-[10px] text-retro-muted truncate">
-                  {central ? `Every public node on ${central.replace(/^https?:\/\//, '')}` : 'Every public node on this central'}
-                </p>
+                <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                  <p className="text-[10px] text-retro-muted truncate">
+                    {central ? `Every public node on ${central.replace(/^https?:\/\//, '')}` : 'Every public node on this central'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => { setSetupUrl(central || ''); setSetupError('') }}
+                    className="text-[10px] text-retro-accent hover:underline cursor-pointer"
+                    title="Change central node address"
+                  >
+                    (change)
+                  </button>
+                  {isDev && (
+                    <div className="flex items-center gap-1 ml-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCentralApiUrl('http://127.0.0.1:8790')
+                          setCentral('http://127.0.0.1:8790')
+                          toast('Switched to local 8790', 'info')
+                          void refresh()
+                        }}
+                        className={`px-1.5 py-0.2 rounded text-[9px] font-mono cursor-pointer ${
+                          central === 'http://127.0.0.1:8790'
+                            ? 'bg-retro-accent text-white font-bold'
+                            : 'bg-glass-w10 text-retro-muted hover:text-retro-fg'
+                        }`}
+                      >
+                        local:8790
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCentralApiUrl('https://gmatch.fly.dev')
+                          setCentral('https://gmatch.fly.dev')
+                          toast('Switched to fly.dev', 'info')
+                          void refresh()
+                        }}
+                        className={`px-1.5 py-0.2 rounded text-[9px] font-mono cursor-pointer ${
+                          central === 'https://gmatch.fly.dev'
+                            ? 'bg-retro-accent text-white font-bold'
+                            : 'bg-glass-w10 text-retro-muted hover:text-retro-fg'
+                        }`}
+                      >
+                        fly.dev
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -800,6 +909,47 @@ export function ServersView({
               </button>)}
             </div>
           </div>
+
+          {/* Featured Central Node */}
+          {central && (
+            <div className="glass-panel p-3 sm:p-3.5 rounded-xl border border-retro-accent/40 bg-retro-accent/5 flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-2 rounded-lg bg-retro-accent/10 text-retro-accent shrink-0">
+                  <Globe className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-retro-fg truncate">
+                      {isLocalHost(central) ? 'Central Node (Local)' : 'gMatch Central'}
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded font-mono uppercase tracking-wider text-cyan-200 border border-cyan-400/30 bg-cyan-400/10 shrink-0">
+                      CENTRAL HUB
+                    </span>
+                  </div>
+                  <p className="text-xs text-retro-muted truncate mt-0.5">
+                    {isLocalHost(central)
+                      ? `Local development server running on ${central}`
+                      : `Official public central network directory and node on ${central}`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 ml-auto">
+                {isCurrent(centralServer) && identity ? (
+                  <span className="glass-action px-3 py-1.5 rounded-lg text-xs font-bold text-retro-muted cursor-default">
+                    Connected
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void join(centralServer)}
+                    className="glass-action glass-action-primary h-8 px-3.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" /> {!identity ? 'Connect to Central Node' : 'Connect'}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Create-server drawer — always available: hosting is local, the
               directory listing (central) is optional. */}
@@ -879,7 +1029,7 @@ export function ServersView({
           )}
 
           {/* Directory Setup / Not configured notice */}
-          {!central ? (
+          {!central || setupUrl ? (
             <div className="glass-inset p-4 space-y-2 rounded-xl">
               <p className="text-xs text-retro-muted">
                 No central node is configured, so there is no public server
@@ -1089,7 +1239,7 @@ export function ServersView({
                               <Share2 className="w-3 h-3" /> Share
                             </button>
                             </>
-                          ) : isCurrent(s) ? (
+                          ) : isCurrent(s) && identity ? (
                             <button
                               type="button"
                               disabled
@@ -1103,7 +1253,7 @@ export function ServersView({
                               onClick={() => void join(s)}
                               className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
                             >
-                              <UserPlus className="w-3 h-3" /> Join
+                              <UserPlus className="w-3 h-3" /> {!identity ? 'Enter' : 'Join'}
                             </button>
                           )}
                         </div>
@@ -1120,7 +1270,7 @@ export function ServersView({
               </div>
 
               {/* Central master admin drawer */}
-              {showAdmin && identity && <CentralAdminPanel central={central} identity={identity} toast={toast} />}
+              {showAdmin && <CentralAdminPanel central={central} identity={identity} toast={toast} />}
 
       {askPasswordFor !== null && (
         <PromptDialog
