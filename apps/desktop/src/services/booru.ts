@@ -332,7 +332,7 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
     '-ai_generated -ai-generated -furry -anthro -feral -scalie -monochrome -greyscale -sketch -comic -lowres -worst_quality -jpeg_artifacts -watermark -censored'
   // Random result page per call — the same tag yields fresh posts, not the
   // same top-10 on every fetch.
-  const pid = Math.floor(Math.random() * 5)
+  const pid = Math.floor(Math.random() * 25)
   const healthy = DIRECT_SOURCES.filter((s) => isHealthy(s.id))
   for (const src of healthy.length > 0 ? healthy : DIRECT_SOURCES) {
     let reachable = true
@@ -487,7 +487,7 @@ export async function redgifsDirect(query: string, limit: number, retried = fals
       if (!redgifsToken) return null
       redgifsTokenExp = Date.now() + 20 * 3600 * 1000
     }
-    const page = 1 + Math.floor(Math.random() * 5)
+    const page = 1 + Math.floor(Math.random() * 20)
     const url = toProxy(redgifsSearchUrl(query, limit, page), REDGIFS_API, '/rg-auth')
     const res = await fetch(url, {
       signal: AbortSignal.timeout(TIMEOUT_MS),
@@ -527,6 +527,10 @@ async function imhentaiDirect(query: string, limit: number): Promise<BooruPost[]
         const gRes = await fetch(toProxy(imhentaiGalleryUrl(id), IMHENTAI_ROOT, '/booru/imh'), {
           signal: AbortSignal.timeout(TIMEOUT_MS),
         })
+        if (gRes.status === 403) {
+          markUnhealthy('imh-direct')
+          break
+        }
         if (!gRes.ok || typeof gRes.text !== 'function') continue
         const cover = parseImhentaiCover(await gRes.text())
         if (!cover) continue

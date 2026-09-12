@@ -364,11 +364,11 @@ describe('fetchPosts (SPEC §6/§8)', () => {
     const first = await fetchPosts({ tags: 'creampie', limit: 5 })
     expect(first.ok).toBe(false) // everything exhausted -> offline
     const galleryHits = fetchMock.mock.calls.filter((a) => String(a[0]).startsWith('/booru/imh/gallery')).length
-    expect(galleryHits).toBe(2) // both dead galleries tried once
+    expect(galleryHits).toBe(1) // fail-fast: first 403 cools imh-direct, no further galleries this round
     // Second round: imh-direct is cooling down — no gallery fetches at all.
     await fetchPosts({ tags: 'creampie', limit: 5 })
     const galleryHits2 = fetchMock.mock.calls.filter((a) => String(a[0]).startsWith('/booru/imh/gallery')).length
-    expect(galleryHits2).toBe(2)
+    expect(galleryHits2).toBe(1)
   })
 
   it('browser mode scrapes booru.org sub without tags query to dodge Cloudflare 403 WAF', async () => {

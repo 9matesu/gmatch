@@ -628,18 +628,22 @@ async function fetchImhentai(variant, n, captions) {
 const SOURCES = [
   {
     id: 'tbib',
-    url: (tags, limit) =>
-      `https://tbib.org/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
+    url: (tags, limit) => {
+      const pid = Math.floor(Math.random() * 25)
+      return `https://tbib.org/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
         tags + ' rating:explicit ' + NEGATIVES,
-      )}&limit=${limit}&json=1`,
+      )}&limit=${limit}&json=1&pid=${pid}`
+    },
     parse: (body, captions) => parseDanbooruJson(body, 'https://tbib.org', captions),
   },
   {
     id: 'xbooru',
-    url: (tags, limit) =>
-      `https://xbooru.com/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
+    url: (tags, limit) => {
+      const pid = Math.floor(Math.random() * 25)
+      return `https://xbooru.com/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
         tags + ' rating:explicit ' + NEGATIVES,
-      )}&limit=${limit}&json=1`,
+      )}&limit=${limit}&json=1&pid=${pid}`
+    },
     parse: (body, captions) => parseDanbooruJson(body, 'https://xbooru.com', captions),
   },
   {
@@ -769,12 +773,9 @@ async function fetchBooru({ tags, limit }) {
   if (!query || isQueryBlocked(query)) {
     return { posts: [], source: null, ok: false, error: 'blocked-or-empty query' }
   }
-  // Feed-response cache: repeat tag queries reuse parsed posts for 10 min,
-  // no API round-trip at all.
-  const hit = imageCache.getFeedCache(query)
-  if (hit) {
-    return { posts: hit, source: 'cache', ok: true, cached: true }
-  }
+  // Never serve stale posts to the idle game: always ask the boorus for fresh
+  // images (the renderer filters seen ones itself). Feed cache survives only
+  // as a write-once store so the game never blocks on it.
   const variants = queryVariants(query)
   const captions = isCaptionQuery(query)
   const ordered = SOURCES.map((_, i) => SOURCES[(rrIndex + i) % SOURCES.length])

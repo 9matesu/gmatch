@@ -253,7 +253,10 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
         const probe = new Image()
         probe.referrerPolicy = 'no-referrer'
         probe.src = resolved
-        await probe.decode()
+        await Promise.race([
+          probe.decode(),
+          new Promise((resolve) => setTimeout(resolve, 2500)),
+        ])
         if (!live) return
         setShownUrl(resolved)
         setImageReady(true)
@@ -262,10 +265,22 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
         onImageError()
       }
     })()
+    // ponytail: pre-warm next 3 queue images so they're cached before the KO
+    try {
+      for (const next of queue.slice(0, 3)) {
+        if (next?.url) {
+          const img = new Image()
+          img.referrerPolicy = 'no-referrer'
+          img.src = next.url
+        }
+      }
+    } catch {
+      /* best-effort */
+    }
     return () => {
       live = false
     }
-  }, [current, showOffline, isMotion, setImageReady, onImageError])
+  }, [current, queue, showOffline, isMotion, setImageReady, onImageError])
   const hpPct = inBattle ? Math.max(0, (foeHp / foeMaxHp) * 100) : 0
   // Heat combo HUD: live multiplier + whether the streak is still inside the
   // 2s window (goes cold visually the moment you stop clicking).
