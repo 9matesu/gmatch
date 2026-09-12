@@ -214,7 +214,7 @@ export function FollowersFollowingModal({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/70 backdrop-blur-md p-3 sm:p-4 select-none font-sans animate-orbit-fade-in"
+      className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-4 select-none font-sans animate-orbit-fade-in"
       onClick={onClose}
     >
       <div
@@ -383,7 +383,7 @@ export function FollowersFollowingModal({
                         onStartPm({ id: user.id, display_name: user.display_name || undefined });
                       }}
                       title="Send Private Message"
-                      className="p-2 text-retro-muted hover:text-retro-fg rounded-xl hover:bg-white/15/80 transition-colors cursor-pointer"
+                      className="p-2 text-retro-muted hover:text-retro-fg rounded-xl hover:bg-glass-w12/80 transition-colors cursor-pointer"
                     >
                       <MessageCircle className="w-4 h-4" />
                     </button>

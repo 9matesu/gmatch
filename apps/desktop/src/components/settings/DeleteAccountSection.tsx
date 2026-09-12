@@ -66,7 +66,7 @@ export function DeleteAccountSection({
       toast('Account and local traces deleted.', 'success');
       onDeleted();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed — nothing was erased locally until the server confirmed.');
+      setError(e instanceof Error ? e.message : 'Delete failed. Nothing was erased locally until the server confirmed.');
       setPhase('confirm');
     }
   };
@@ -91,7 +91,7 @@ export function DeleteAccountSection({
         stories, messages, decks, wallet balance and marketplace listings. This device is wiped
         too: your secret key, sign-in, saved game, images held in memory, folder permissions and
         all local settings. <strong className="text-red-300">There is no undo and no recovery
-        without your exported secret key</strong> — and even with it, a deleted account cannot be
+        without your exported secret key</strong>. And even with it, a deleted account cannot be
         restored. Report and ban records tied to safety enforcement are kept in anonymized form.
       </p>
 

@@ -54,7 +54,7 @@ import { legalDocFromHash, isLegalDocId, type LegalDocId } from "./utils/legal-r
 import { saveUserProfile, deriveProfileTags } from "./utils/profile";
 import { GamesView } from "./components/views/GamesView";
 import { getStoredActiveDeckId, type Deck } from "./components/games/DeckBuilder";
-import { type MainViewType, type ActiveHackSession } from "./components/home/HomeFooter";
+import { type MainViewType, type ActiveHackSession } from "./components/home/CommandIsland";
 import { CommandIsland } from "./components/home/CommandIsland";
 import { NativeHeaderBar } from "./components/home/NativeHeaderBar";
 import { RoomsView } from "./components/rooms/RoomsView";
@@ -2795,7 +2795,7 @@ export default function Home() {
   const myPostTags = identity ? deriveProfileTags(serverPosts.filter(p => p.author_id === identity.orbitId), []) : []
 
   return (
-    <main id="main-content" className="h-[100dvh] max-h-[100dvh] min-h-0 w-full flex flex-col items-center justify-start relative overflow-hidden" style={{ background: '#080A0D' }}>
+    <main id="main-content" className="h-[100dvh] max-h-[100dvh] min-h-0 w-full flex flex-col items-center justify-start relative overflow-hidden" style={{ background: 'var(--color-retro-bg)' }}>
       <WallpaperBackground
         wallpaperBg={wallpaperBg}
         wallpaperFit={settings.wallpaperFit}
@@ -2871,7 +2871,7 @@ export default function Home() {
                     },
                   );
                 }
-                toast(`Welcome to gMatch, ${name}.`, 'success');
+                toast('You are in.', 'success');
                 loadUsers();
                 loadGallery();
               }}
@@ -3404,7 +3404,7 @@ export default function Home() {
                 {/* Lobby Image Fallback Lightbox */}
                 {lobbyLightboxUrl && !expandedItemId && (
                   <div
-                    className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-md flex items-center justify-center p-4 cursor-pointer animate-orbit-fade-in"
+                    className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer animate-orbit-fade-in"
                     onClick={() => setLobbyLightboxUrl(null)}
                   >
                     <div className="relative max-w-4xl max-h-[90vh] flex items-center justify-center" onClick={e => e.stopPropagation()}>
@@ -3567,7 +3567,7 @@ export default function Home() {
                     onClick={() => { playPress(900); setDmMinimized(false); }}
                     title="Expand Direct Messages"
                     aria-label="Expand Direct Messages"
-                    className="pointer-events-auto flex items-center gap-2.5 bg-black text-white pl-2 pr-4 py-2 rounded-full shadow-2xl border border-white/20 hover:bg-surface-canvas transition-colors cursor-pointer active:scale-95"
+                    className="pointer-events-auto flex items-center gap-2.5 bg-black text-white pl-2 pr-4 py-2 rounded-full shadow-2xl border border-border-strong hover:bg-surface-canvas transition-colors cursor-pointer active:scale-95"
                   >
                     <span className="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-500 via-teal-500 to-amber-500 p-[2px] shrink-0">
                       <span className="w-full h-full rounded-full bg-black overflow-hidden flex items-center justify-center text-xs font-bold text-white">
@@ -3589,7 +3589,7 @@ export default function Home() {
                       <span className="text-[10px] text-retro-muted">Tap to reopen</span>
                     </span>
                     {chatMessages.length > 0 && (
-                      <span className="w-2 h-2 rounded-full bg-[#e1306c] ring-2 ring-white shrink-0" />
+                      <span className="w-2 h-2 rounded-full bg-retro-accent ring-2 ring-retro-fg shrink-0" />
                     )}
                   </button>
                 </div>

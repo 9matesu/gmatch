@@ -60,19 +60,19 @@ export default function StatsPanel() {
   return (
     <aside className={`${PLATE} p-3.5 space-y-3`}>
       {/* Primary Balance Header */}
-      <div className="flex items-baseline justify-between gap-2 border-b border-white/[0.06] pb-2.5">
+      <div className="flex items-baseline justify-between gap-2 border-b border-border-glass pb-2.5">
         <div className="flex flex-col">
           <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">
             Total Points
           </span>
           <div
-            className={`${MONO} text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-none mt-1`}
+            className={`${MONO} text-2xl sm:text-3xl font-extrabold text-retro-fg tracking-tight leading-none mt-1`}
             data-testid="gc-balance"
           >
             {formatNum(s.points)}
           </div>
         </div>
-        <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-white/[0.06] text-retro-accent border border-white/[0.08]">
+        <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-glass-w8 text-retro-accent border border-border-glass">
           PTS
         </span>
       </div>
@@ -80,7 +80,7 @@ export default function StatsPanel() {
       {/* Modern 2x2 Telemetry Grid */}
       <div className="grid grid-cols-2 gap-1.5">
         {/* Passive Income */}
-        <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-2 flex flex-col justify-between">
+        <div className="rounded-xl border border-border-glass bg-glass-w5 p-2 flex flex-col justify-between">
           <div className="flex items-center gap-1 text-[10px] font-medium text-retro-muted truncate">
             <Coins className="w-3.5 h-3.5 text-amber-400 shrink-0" weight="fill" />
             <span>Passive</span>
@@ -91,7 +91,7 @@ export default function StatsPanel() {
         </div>
 
         {/* Click Power */}
-        <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-2 flex flex-col justify-between">
+        <div className="rounded-xl border border-border-glass bg-glass-w5 p-2 flex flex-col justify-between">
           <div className="flex items-center gap-1 text-[10px] font-medium text-retro-muted truncate">
             <Lightning className="w-3.5 h-3.5 text-cyan-400 shrink-0" weight="fill" />
             <span>Click Power</span>
@@ -102,7 +102,7 @@ export default function StatsPanel() {
         </div>
 
         {/* Clicks & Crits */}
-        <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-2 flex flex-col justify-between">
+        <div className="rounded-xl border border-border-glass bg-glass-w5 p-2 flex flex-col justify-between">
           <div className="flex items-center gap-1 text-[10px] font-medium text-retro-muted truncate">
             <CursorClick className="w-3.5 h-3.5 text-emerald-400 shrink-0" weight="fill" />
             <span>Clicks / Crits</span>
@@ -113,7 +113,7 @@ export default function StatsPanel() {
         </div>
 
         {/* Corruption Shards */}
-        <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-2 flex flex-col justify-between">
+        <div className="rounded-xl border border-border-glass bg-glass-w5 p-2 flex flex-col justify-between">
           <div className="flex items-center gap-1 text-[10px] font-medium text-retro-muted truncate">
             <Sparkle className="w-3.5 h-3.5 text-purple-400 shrink-0" weight="fill" />
             <span>Shards</span>
@@ -125,7 +125,7 @@ export default function StatsPanel() {
       </div>
 
       {/* Cache Telemetry Bar */}
-      <div className="flex items-center justify-between gap-2 pt-1 border-t border-white/[0.06] text-[11px] text-retro-muted">
+      <div className="flex items-center justify-between gap-2 pt-1 border-t border-border-glass text-xs text-retro-muted">
         <div className="flex items-center gap-1.5 truncate">
           <Images className="w-3.5 h-3.5 text-retro-muted shrink-0" />
           <span className="font-mono text-[10px]">
@@ -137,7 +137,7 @@ export default function StatsPanel() {
             type="button"
             onClick={handleClearCache}
             disabled={clearing}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-lg border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:text-rose-300 text-[10px] font-medium text-retro-muted transition-colors cursor-pointer disabled:opacity-40"
+            className="flex items-center gap-1 px-2 py-0.5 rounded-lg border border-border-glass bg-glass-w5 hover:bg-glass-w10 hover:text-rose-300 text-[10px] font-medium text-retro-muted transition-colors cursor-pointer disabled:opacity-40"
             title="Clean local cached picture files"
           >
             <Trash className="w-3 h-3" />

@@ -8,9 +8,8 @@
  * rarity badges (see HP_FILL / FLOAT_GC / RARITY below).
  */
 
-/** Monospace + tabular figures for every number readout. */
-export const MONO =
-  "font-['JetBrains_Mono',ui-monospace,'Cascadia_Mono',Consolas,monospace] tabular-nums"
+/** Monospace + tabular figures for every number readout (theme token = one mono). */
+export const MONO = 'font-mono tabular-nums'
 
 /** Small uppercase-muted helper text (was .muted). */
 export const MUTED = 'text-xs text-retro-muted'
@@ -18,33 +17,33 @@ export const MUTED = 'text-xs text-retro-muted'
 /** Display face for headings/labels — the shell's sans (Outfit). */
 export const DISPLAY = 'font-sans'
 
-/** Panel surface — sleek Cyber-Slate card with hairline specular border. */
-export const PLATE =
-  'rounded-2xl border border-white/[0.06] bg-[#131722]/85 shadow-2xl backdrop-blur-md'
+/** Panel surface — flat cyber-slate card on the hairline border token. */
+export const PLATE = 'rounded-lg border border-border-glass bg-glass-w5'
 
 /** Scrollable panel body. */
 export const PANEL = 'min-h-0 overflow-y-auto p-3.5 sm:p-4'
 
-/** Modern tactile button with micro-border and subtle hover elevation. */
+/** Contract button: flat glass fill, 1px border, press = 0.98 scale. */
 export const BTN =
-  'cursor-pointer rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] hover:border-white/20 active:scale-[0.98] px-3.5 py-2 text-xs font-semibold text-retro-fg transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white/[0.04] disabled:active:scale-100'
+  'cursor-pointer rounded-lg border border-border-glass bg-glass-w8 hover:bg-glass-w12 active:scale-[0.98] px-3.5 py-2 text-xs font-semibold text-retro-fg transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100'
 
 export const BTN_SMALL = 'rounded-lg px-2.5 py-1 text-xs'
 
-/** Primary action — cyber electric blue accent button. */
-export const BTN_PRIMARY = 'bg-retro-accent text-retro-accent-text hover:brightness-110 border-retro-accent/40 shadow-[0_0_12px_rgba(56,139,253,0.25)]'
+/** Primary action — the one blue accent, ink label. No glow. */
+export const BTN_PRIMARY =
+  'bg-retro-accent text-retro-accent-text hover:bg-retro-accent-hover border-transparent font-bold'
 
-/** Destructive prestige action — cyber warning tone. */
+/** Destructive prestige action. */
 export const BTN_DANGER =
-  'bg-rose-500/15 border-rose-500/30 text-rose-300 hover:bg-rose-500/25 font-bold tracking-wider'
+  'bg-retro-error/15 border-retro-error/40 text-retro-error hover:bg-retro-error/25'
 
 /** Bundled skin behind an inline backgroundImage. */
 export const SKIN =
   'bg-cover bg-center bg-no-repeat [text-shadow:0_1px_3px_#000]'
 
-/** Feed stage frame: deep obsidian well with hairline specular border. */
+/** Feed stage frame: canvas well with hairline border. */
 export const STAGE_FRAME =
-  'overflow-hidden rounded-2xl border border-white/[0.08] bg-[#07090e] shadow-[0_16px_36px_rgba(0,0,0,0.6)] select-none'
+  'overflow-hidden rounded-lg border border-border-glass bg-surface-canvas shadow-xl select-none'
 
 /** HP bar track + fill. Modern precision gauge. */
 export const HP_BAR =

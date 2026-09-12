@@ -11,13 +11,13 @@ export default function OfflineModal() {
   return (
     <Modal title="Welcome back" onClose={collectOffline} maxWidth="max-w-md" dismissable={false}>
       <div className="flex flex-col gap-3.5">
-        <h2 className={`${DISPLAY} m-0 text-[22px] font-bold uppercase tracking-[1px] text-balance text-retro-fg`}>
+        <h2 className={`${DISPLAY} m-0 text-2xl font-bold uppercase tracking-[1px] text-balance text-retro-fg`}>
           Welcome back, degenerate
         </h2>
-        <p className="m-0 text-[13px] leading-relaxed text-retro-muted">
+        <p className="m-0 text-xs leading-relaxed text-retro-muted">
           Your tags kept working while you were gone:
         </p>
-        <div className={`${MONO} ${DISPLAY} text-[34px] font-bold text-[#3fd68c]`}>
+        <div className={`${MONO} ${DISPLAY} text-2xl font-bold text-retro-online`}>
           +{formatNum(gain)} pts
         </div>
         <button type="button" className={`${BTN} ${BTN_PRIMARY}`} onClick={collectOffline}>

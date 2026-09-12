@@ -26,7 +26,7 @@ import type { User } from '@orbit/shared';
 import { isDefaultPeerName } from '@orbit/shared';
 import { ActionModal } from './ActionModal';
 import { HacksPanel } from './HacksPanel';
-import type { ActiveHackSession } from '../home/HomeFooter';
+import type { ActiveHackSession } from '../home/CommandIsland';
 
 type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 
@@ -79,7 +79,7 @@ const ACTION_LABELS: Record<string, {
   message: { label: 'Message', icon: AlertTriangle, description: 'A short note pops on their screen.', consent: 'allowPopupMessage' },
   text_overlay: { label: 'Banner text', icon: Layers, description: 'Large text sitting over their screen.', consent: 'allowTextOverlay' },
   blur: { label: 'Blur', icon: Eye, description: 'Blurs their whole view until they dismiss it.', consent: 'allowBlurEverything' },
-  camera: { label: 'Photo request', icon: Camera, description: 'Asks their camera for one photo — they approve every request.', consent: 'allowRemoteCamera' },
+  camera: { label: 'Photo request', icon: Camera, description: 'Asks their camera for one photo. They approve every request.', consent: 'allowRemoteCamera' },
 };
 
 const ACTION_ORDER = Object.keys(ACTION_LABELS);
@@ -338,12 +338,12 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
         if (res.status === 402) {
           toastFn(msg || `Not enough g$ for ${label}.`, 'error');
         } else if (res.status === 409) {
-          toastFn(`${selectedTarget.displayName} just went offline — nothing was charged. Pick someone online.`, 'warning');
+          toastFn(`${selectedTarget.displayName} just went offline. Nothing was charged. Pick someone online.`, 'warning');
           void loadTargets();
         } else if (res.status === 403) {
           toastFn(msg || `${selectedTarget.displayName} has that effect turned off.`, 'warning');
         } else if (res.status === 429) {
-          toastFn(msg || 'Slow down — that one was just sent.', 'warning');
+          toastFn(msg || 'Slow down. That one was just sent.', 'warning');
         } else {
           toastFn(msg || `Could not send ${label}.`, 'error');
         }
@@ -351,7 +351,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
     } catch {
       // We do NOT know if the server processed it. Blind retry could double
       // charge — point the user at the authoritative Outbox instead.
-      toastFn('Connection dropped before the server answered. Check Outbox before sending again — you may already have been charged.', 'warning');
+      toastFn('Connection dropped before the server answered. Check Outbox before sending again. You may already have been charged.', 'warning');
       void loadHistory();
     } finally {
       setSending(null);
@@ -393,7 +393,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
               <h2 className="text-xs font-bold text-retro-fg uppercase tracking-wider">
                 PC Domination
               </h2>
-              <p className="text-[10px] text-retro-muted">Opt-in pranks between friends — every effect costs g$ and needs consent</p>
+              <p className="text-[10px] text-retro-muted">Opt-in pranks between friends. Every effect costs g$ and needs consent</p>
             </div>
           </div>
           <div className="p-8 text-center max-w-md mx-auto space-y-2">
@@ -433,13 +433,13 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
             <h2 className="text-xs font-bold text-retro-fg uppercase tracking-wider">
               PC Domination
             </h2>
-            <p className="text-[10px] text-retro-muted truncate">Opt-in pranks between friends — every effect costs g$ and needs consent</p>
+            <p className="text-[10px] text-retro-muted truncate">Opt-in pranks between friends. Every effect costs g$ and needs consent</p>
           </div>
         </div>
         <div className="flex items-center gap-2 rounded-xl glass-panel px-3 py-2">
           <Radio className={`w-3.5 h-3.5 ${receiving && !paused ? 'text-emerald-400' : 'text-retro-muted'}`} />
           <div className="text-xs leading-tight">
-            <div className="font-medium">{receiving ? (paused ? 'Receiving — paused' : 'Receiving effects') : 'Not receiving'}</div>
+            <div className="font-medium">{receiving ? (paused ? 'Receiving (paused)' : 'Receiving effects') : 'Not receiving'}</div>
             <div className="text-retro-muted">Sending is always available</div>
           </div>
           <button
@@ -621,7 +621,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                         disabled={!sendable || sending === action}
                         title={
                           !selectedTarget.enabled ? 'They have Domination switched off'
-                            : !selectedTarget.online ? 'They are offline — nothing would be charged'
+                            : !selectedTarget.online ? 'They are offline. Nothing would be charged'
                               : !allowed ? `They have "${label}" turned off in their consent`
                                 : undefined
                         }
@@ -694,7 +694,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
             <div className="px-4 py-3 border-b border-border-subtle flex items-center gap-1.5">
               <Shield className="w-3.5 h-3.5 text-retro-muted" />
               <span className="text-xs font-medium text-retro-fg">What others may send you</span>
-              {!receiving && <span className="text-[10px] text-retro-muted ml-2">(saved — inactive while Receiving is off)</span>}
+              {!receiving && <span className="text-[10px] text-retro-muted ml-2">(saved. Inactive while Receiving is off)</span>}
             </div>
             <div className="divide-y divide-border-subtle">
               {CONSENT_ROWS.map(({ key, label, desc }) => {
@@ -801,7 +801,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                   <div className="min-w-0 flex-1">
                     <div className="text-xs font-medium truncate text-retro-fg">
                       {meta?.label || action.action}
-                      {summary && <span className="text-retro-muted font-normal"> — {summary}</span>}
+                      {summary && <span className="text-retro-muted font-normal">. {summary}</span>}
                     </div>
                     <div className="text-xs text-retro-muted truncate">
                       {historyPane === 'outgoing' ? `to ${other || 'unknown'}` : `from ${other || 'unknown'}`}

@@ -90,7 +90,7 @@ export function NotificationsPanel({
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden solid-panel">
-      <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between shrink-0 bg-glass-w5">
+      <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between shrink-0 bg-glass-w5">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-medium text-retro-fg">Notifications</h3>
           {unreadCount > 0 && (
@@ -186,8 +186,8 @@ export function NotificationsPanel({
                 key={g.key}
                 className={`p-3 rounded-lg flex items-start gap-3 border ${
                   g.unread === 0
-                    ? "border-white/5 bg-glass-w5"
-                    : "glass-inset border-white/14"
+                    ? "border-border-glass bg-glass-w5"
+                    : "glass-inset border-border-glass"
                 }`}
               >
                 <div className="w-8 h-8 rounded-full glass-inset flex items-center justify-center shrink-0">

@@ -142,7 +142,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
       window.dispatchEvent(new CustomEvent('orbit-score-refresh'));
       return true;
     } catch (e: unknown) {
-      toast?.(userFacingError(e, { fallback: 'Network error — try again' }), 'error');
+      toast?.(userFacingError(e, { fallback: 'Network error. Try again' }), 'error');
       return false;
     } finally {
       setBusy(false);
@@ -181,7 +181,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+      <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70">
         <div className="glass-card p-8 max-w-2xl w-full mx-4">
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-surface-elevated rounded w-3/4"></div>
@@ -194,7 +194,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
 
   if (error || !card) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+      <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70">
         <div className="glass-card p-8 max-w-2xl w-full mx-4">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-retro-fg">Card details</h2>
@@ -213,7 +213,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
   const statusLabel = card.marketStatus === 'none' ? 'Not Listed' : card.marketStatus === 'cashed_out' ? 'Cashed Out' : card.marketStatus === 'listed' ? 'On Market' : card.marketStatus;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 overflow-y-auto" onClick={onClose}>
+    <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 p-4 overflow-y-auto" onClick={onClose}>
       <div className="glass-card max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="glass-header flex items-center justify-between px-5 py-4 shrink-0">
           <div className="min-w-0">
@@ -309,7 +309,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
           )}
 
           {isOwner && card.marketStatus !== 'cashed_out' && (
-            <div className="space-y-3 pt-3 border-t border-white/10">
+            <div className="space-y-3 pt-3 border-t border-border-glass">
               <div className="flex gap-3">
                 {card.marketStatus === 'none' && (
                   <button

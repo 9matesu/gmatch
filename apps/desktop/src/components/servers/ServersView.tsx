@@ -175,7 +175,7 @@ export function ServersView({
           if (typeof dj?.name === 'string' && dj.name.trim()) setServerName(dj.name.trim())
         }
       }
-    } catch { /* node without dashboard route — fine */ }
+    } catch { /* node without dashboard route. Fine */ }
 
     try {
       const n = await orbitFetch('/api/servers/node', { method: 'GET' }, identity)
@@ -208,7 +208,7 @@ export function ServersView({
               const d2 = (await r2.json()) as { servers?: DirectoryServer[] }
               if (Array.isArray(d2.servers)) merged = mergeDirectory(merged, d2.servers)
             }
-          } catch { /* node offline or legacy — cache stays as-is */ }
+          } catch { /* node offline or legacy. Cache stays as-is */ }
         }
         writeDirectoryCache(merged)
         setServers(merged)
@@ -486,7 +486,7 @@ export function ServersView({
       const raw = localStorage.getItem(REG_KEY)
       if (raw) localStorage.setItem(REG_KEY, JSON.stringify({ ...JSON.parse(raw), private: v }))
     } catch { /* session-only */ }
-    toast(v ? 'Server is private — reachable only via your code.' : 'Server is public again.', 'success')
+    toast(v ? 'Server is private. Reachable only via your code.' : 'Server is public again.', 'success')
     void refresh()
   }
 
@@ -579,7 +579,7 @@ export function ServersView({
               <div role="alert" data-testid="admin-pin-banner" className="glass-inset p-2.5 rounded-lg space-y-1.5">
                 <p className="text-xs text-retro-fg font-bold">You are the admin of this server</p>
                 <p className="text-xs text-retro-muted">
-                  Your admin passcode (unlocks the console — store it somewhere safe):{' '}
+                  Your admin passcode (unlocks the console. Store it somewhere safe):{' '}
                   <button
                     type="button"
                     className="font-mono text-amber-200 hover:text-amber-100 cursor-pointer"
@@ -722,7 +722,7 @@ export function ServersView({
                       key={u.id}
                       onClick={() => handleUserClick(u)}
                       className="group flex items-center justify-between gap-2 p-2 rounded-lg glass-inset hover:border-border-strong transition-colors cursor-pointer"
-                      title={`${u.display_name || u.id} — click to view profile`}
+                      title={`${u.display_name || u.id}. Click to view profile`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="relative w-7 h-7 rounded-full overflow-hidden glass-inset border-border-subtle shrink-0 flex items-center justify-center text-[10px] font-bold text-retro-muted">
@@ -761,7 +761,7 @@ export function ServersView({
         {/* RIGHT COLUMN: Public Directory Browser */}
         <main className="flex flex-col min-h-0 h-full gap-2.5 overflow-hidden p-4 sm:p-5" aria-label="Server directory">
           {!identity && (
-            <p className="text-xs text-retro-muted shrink-0">No account yet — one is created for you on the server you pick.</p>
+            <p className="text-xs text-retro-muted shrink-0">No account yet. One is created for you on the server you pick.</p>
           )}
           {/* Header & Controls */}
           <div className="flex flex-wrap items-center justify-between gap-3 shrink-0 pb-2 border-b border-border-subtle">
@@ -806,7 +806,7 @@ export function ServersView({
           {showCreate && (
             <div className="glass-panel p-3.5 space-y-2 shrink-0 rounded-xl border-retro-accent/40">
               <div className="flex items-center justify-between pb-1 border-b border-border-subtle">
-                <span className="text-xs font-bold text-retro-fg">Create a server — hosted on this computer</span>
+                <span className="text-xs font-bold text-retro-fg">Create a server. Hosted on this computer</span>
                 <button
                   type="button"
                   onClick={closeCreateForm}
@@ -855,7 +855,7 @@ export function ServersView({
               </label>
               <label className="flex items-center gap-2 text-xs text-retro-muted cursor-pointer pt-0.5">
                 <input type="checkbox" aria-label="Private server" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
-                Private — hide from the public browser (friends join with your code)
+                Private. Hide from the public browser (friends join with your code)
               </label>
               {needsPassword && (
                 <input
@@ -1115,7 +1115,7 @@ export function ServersView({
 
               <div className="flex items-center justify-between text-[10px] text-retro-muted shrink-0 pt-1">
                 <span className="flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-retro-muted" /> Private: directory mirrors only metadata — never private content.
+                  <ShieldCheck className="w-3.5 h-3.5 text-retro-muted" /> Private: directory mirrors only metadata. Never private content.
                 </span>
               </div>
 

@@ -443,7 +443,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
           <div className="min-w-0">
             <div className="text-[10px] font-medium text-retro-accent">Sending to</div>
             <div className="text-xs text-retro-fg truncate">
-              {recipientNames.length > 0 ? recipientNames.join(', ') : 'No player selected — choose a player before sending'}
+              {recipientNames.length > 0 ? recipientNames.join(', ') : 'No player selected. Choose a player before sending'}
             </div>
           </div>
         </div>
@@ -539,7 +539,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
               ) : allFiles.length > 0 ? (
                 <div className="text-xs text-retro-fg flex items-center justify-center gap-2">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-retro-accent"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                  {allFiles.length} file{allFiles.length !== 1 ? 's' : ''} ready — drag more or click to add
+                  {allFiles.length} file{allFiles.length !== 1 ? 's' : ''} ready. Drag more or click to add
                 </div>
               ) : undefined}
             </DropZone>

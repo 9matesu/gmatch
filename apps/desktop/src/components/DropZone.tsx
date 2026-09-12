@@ -47,7 +47,7 @@ export function DropZone({
         try {
           onPayloadDrop(type, JSON.parse(raw) as Record<string, unknown>)
           return
-        } catch { /* malformed payload — ignore */ }
+        } catch { /* malformed payload. Ignore */ }
       }
     }
   }

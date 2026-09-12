@@ -135,7 +135,7 @@ export function CropModal({
         </div>
         <div ref={boxRef} className="h-[46vh] w-full flex items-center justify-center">
           {loadError ? (
-            <div className="text-xs text-retro-muted text-center">Could not load this image — it will be used uncropped.</div>
+            <div className="text-xs text-retro-muted text-center">Could not load this image. It will be used uncropped.</div>
           ) : (
             <div className="relative overflow-hidden rounded-lg border border-border-glass bg-black touch-none select-none" style={{ width: fw || 'auto', height: fh || 'auto' }}>
               {img && (

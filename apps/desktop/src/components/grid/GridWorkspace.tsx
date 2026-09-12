@@ -117,7 +117,7 @@ export default function GridWorkspace({
                   onClick={() => { playPress(750); setGalleryOpen(true); }}
                   title="Keepsakes Gallery (drained foes)"
                   aria-label="Keepsakes Gallery"
-                  className="h-7 px-2 rounded-md border border-white/10 bg-[#131722]/80 text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
+                  className="h-7 px-2 rounded-md border border-border-glass bg-glass-w8 text-retro-muted hover:text-white hover:bg-glass-w10 hover:border-border-strong transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
                 >
                   <Images size={14} weight="bold" className="text-retro-accent" />
                   <span className="hidden sm:inline">Gallery</span>
@@ -126,9 +126,9 @@ export default function GridWorkspace({
                   <button
                     type="button"
                     onClick={() => { playPress(700); onOpenSources(); }}
-                    title="Custom image sources — add your own URLs or folders"
+                    title="Custom image sources: add your own URLs or folders"
                     aria-label="Custom image sources"
-                    className="h-7 px-2 rounded-md border border-white/10 bg-[#131722]/80 text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
+                    className="h-7 px-2 rounded-md border border-border-glass bg-glass-w8 text-retro-muted hover:text-white hover:bg-glass-w10 hover:border-border-strong transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
                   >
                     <FolderOpen size={14} weight="bold" />
                     <span className="hidden sm:inline">Sources</span>
@@ -143,7 +143,7 @@ export default function GridWorkspace({
                     aria-pressed={idleFullscreen}
                     className={`h-7 w-7 rounded-md border transition-all cursor-pointer flex items-center justify-center ${idleFullscreen
                       ? 'border-retro-accent/60 bg-retro-accent/20 text-retro-accent'
-                      : 'border-white/10 bg-[#131722]/80 text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20'
+                      : 'border-border-glass bg-glass-w8 text-retro-muted hover:text-white hover:bg-glass-w10 hover:border-border-strong'
                       }`}
                   >
                     {idleFullscreen ? <ArrowsIn size={14} weight="bold" /> : <ArrowsOut size={14} weight="bold" />}
@@ -157,7 +157,7 @@ export default function GridWorkspace({
                   aria-pressed={collapsed}
                   className={`h-7 w-7 rounded-md border transition-all cursor-pointer flex items-center justify-center ${collapsed
                     ? 'border-retro-accent/60 bg-retro-accent/20 text-retro-accent'
-                    : 'border-white/10 bg-[#131722]/80 text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20'
+                    : 'border-border-glass bg-glass-w8 text-retro-muted hover:text-white hover:bg-glass-w10 hover:border-border-strong'
                     }`}
                 >
                   <SidebarSimple size={14} weight={collapsed ? 'fill' : 'bold'} />
@@ -191,17 +191,17 @@ export default function GridWorkspace({
       {/* Keepsakes Gallery Modal */}
       {galleryOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-6 backdrop-blur-md"
+          className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 p-3 sm:p-6 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-label="Keepsakes Gallery"
           onClick={() => setGalleryOpen(false)}
         >
           <div
-            className="relative flex h-full max-h-[90dvh] w-full max-w-4xl flex-col rounded-2xl border border-white/10 bg-[#0b0e14] p-5 shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden"
+            className="relative flex h-full max-h-[90dvh] w-full max-w-4xl flex-col rounded-xl border border-border-glass bg-retro-panel p-5 shadow-xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+            <div className="flex items-center justify-between pb-3 border-b border-border-glass">
               <div className="flex items-center gap-2.5">
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-retro-accent/15 text-retro-accent border border-retro-accent/30">
                   <Images size={16} weight="bold" />
@@ -210,13 +210,13 @@ export default function GridWorkspace({
                   <h3 className="text-sm font-bold text-white tracking-wide uppercase">
                     Drained Foes Gallery
                   </h3>
-                  <p className="text-[11px] text-white/40">Collected keepsake archive & cards</p>
+                  <p className="text-xs text-white/40">Collected keepsake archive & cards</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setGalleryOpen(false)}
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/50 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer"
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-border-glass bg-glass-w5 text-retro-muted hover:text-white hover:bg-glass-w10 hover:border-border-strong transition-all cursor-pointer"
                 aria-label="Close gallery"
               >
                 <X size={14} weight="bold" />

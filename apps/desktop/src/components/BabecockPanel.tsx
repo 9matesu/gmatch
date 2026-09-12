@@ -259,7 +259,7 @@ export function BabecockPanel({
       if (res.ok) {
         const data = await res.json()
         setRound(data.round || null)
-        toast(modal === 'start' ? 'Babecock round started — challengers can now join!' : 'You joined the round!', 'success')
+        toast(modal === 'start' ? 'Babecock round started. Challengers can now join' : 'You joined the round!', 'success')
         setModal(null)
       } else {
         const data = await res.json().catch(() => null)
@@ -333,7 +333,7 @@ export function BabecockPanel({
         setPostingToFeed(false)
         return
       }
-      ctx.fillStyle = '#080A0D'
+      ctx.fillStyle = '#0b0e14'  // canvas raster (exempt: computed, not a class)
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
       const loadImage = async (entry: BabecockEntry): Promise<HTMLImageElement | null> => {
@@ -526,13 +526,13 @@ export function BabecockPanel({
     <div className="space-y-4 font-sans select-none">
       {/* Tutorial overlay */}
       {showTutorial && (
-        <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-surface-raised border border-border-glass rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center text-orange-600">
                 <Flame className="w-4 h-4" />
               </div>
-              <h2 className="text-sm font-black text-retro-fg uppercase tracking-wider">Welcome to Babecock</h2>
+              <h2 className="text-sm font-black text-retro-fg uppercase tracking-wider">Babecock</h2>
             </div>
             <ol className="text-xs text-retro-muted space-y-2 leading-relaxed list-decimal list-inside">
               <li>A host starts the round with an <strong className="text-retro-fg">OP picture</strong>.</li>
@@ -600,7 +600,7 @@ export function BabecockPanel({
               <h2 className="text-xs font-semibold text-retro-fg">Live Babecock</h2>
               <p className="text-[10px] text-retro-muted font-sans">
                 {round
-                  ? `Hosted by ${round.host_name || 'Anonymous'} — ${round.entries.length} entr${round.entries.length === 1 ? 'y' : 'ies'}`
+                  ? `Hosted by ${round.host_name || 'Anonymous'}. ${round.entries.length} entr${round.entries.length === 1 ? 'y' : 'ies'}`
                   : 'No round running right now'}
               </p>
             </div>
@@ -678,7 +678,7 @@ export function BabecockPanel({
                       className="bg-black rounded-xl overflow-hidden w-full flex flex-col"
                       style={{ aspectRatio: `${cols} / ${rows}`, minHeight: 280, maxHeight: 'min(62vh, 560px)' }}
                     >
-                      <div className="text-[10px] uppercase font-bold text-retro-muted tracking-wider p-3 flex items-center justify-between border-b border-white/5">
+                      <div className="text-[10px] uppercase font-bold text-retro-muted tracking-wider p-3 flex items-center justify-between border-b border-border-glass">
                         <span>Grid ({cols}×{rows}, {n} images)</span>
                         {amHost && <span className="text-retro-muted text-[10px] flex items-center gap-1"><Move className="w-2.5 h-2.5" /> Drag to rearrange</span>}
                       </div>
@@ -897,7 +897,7 @@ export function BabecockPanel({
                     {modal === 'start' ? 'Post the OP Picture' : 'Join with your Picture'}
                   </h2>
                   <p className="text-[10px] text-retro-muted">
-                    {modal === 'start' ? 'You start the round — challengers will compare against yours' : `Round finishes in ${fmt(secsLeft)}`}
+                    {modal === 'start' ? 'You start the round. Challengers compare against yours' : `Round finishes in ${fmt(secsLeft)}`}
                   </p>
                 </div>
               </div>
@@ -967,7 +967,7 @@ export function BabecockPanel({
                   {urlInput && (
                     <div className="p-3 rounded-xl border border-border-glass bg-surface-raised text-xs text-retro-body flex items-center gap-2">
                       <LinkIcon className="w-4 h-4 text-cyan-600 shrink-0" />
-                      <span className="truncate">URL ready — will be fetched and stored on submit</span>
+                      <span className="truncate">URL ready. Will be fetched and stored on submit</span>
                     </div>
                   )}
                 </div>

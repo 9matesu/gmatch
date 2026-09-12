@@ -14,7 +14,7 @@ export interface SocialPanelProps {
 export function SocialPanel({ onClose, chatUnread = 0, dm }: SocialPanelProps) {
   return (
     <div className="glass-card w-full h-full min-h-0 flex flex-col overflow-hidden rounded-xl">
-      <div className="flex items-center justify-between border-b border-white/10 shrink-0 bg-glass-w5 px-3 py-2">
+      <div className="flex items-center justify-between border-b border-border-glass shrink-0 bg-glass-w5 px-3 py-2">
         <span className="flex items-center gap-1.5 text-xs font-medium text-retro-fg">
           <ChatCircleText className="w-3.5 h-3.5" />
           Messages

@@ -45,7 +45,7 @@ export function RecommendationModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 select-none font-sans" onClick={onClose}>
+    <div className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 select-none font-sans" onClick={onClose}>
       <div className="bg-surface-canvas border border-border-glass rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl backdrop-blur-md" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-border-glass pb-3">
           <div className="flex items-center gap-2">
@@ -117,7 +117,7 @@ export function RecommendationModal({
             <button
               type="submit"
               disabled={submitting || !content.trim()}
-              className="py-2 px-4 bg-surface-interactive hover:bg-white/15 text-retro-fg font-bold text-xs rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5 shadow-md"
+              className="py-2 px-4 bg-surface-interactive hover:bg-glass-w12 text-retro-fg font-bold text-xs rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5 shadow-md"
             >
               <Send className="w-3.5 h-3.5" />
               <span>{submitting ? 'Submitting...' : 'Submit Suggestion'}</span>

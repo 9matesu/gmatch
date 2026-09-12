@@ -10,7 +10,7 @@ import type { useLobby } from '../../hooks/useLobby';
 import { GamesHub } from '../games/GamesHub';
 import { LobbyPanel } from '../LobbyPanel';
 import CustomSourcesModal from '../grid/CustomSourcesModal';
-import type { MainViewType } from '../home/HomeFooter';
+import type { MainViewType } from '../home/CommandIsland';
 
 type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 type GamesSubTab = 'duel' | 'babecock' | 'ranks' | 'idle';

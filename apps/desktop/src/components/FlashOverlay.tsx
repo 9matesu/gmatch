@@ -28,7 +28,7 @@ export function FlashOverlay({
   }, [flash.id, onDismiss])
 
   return (
-    <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-orbit-fade-in">
+    <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-orbit-fade-in">
       <div className="relative max-w-md w-full rounded-xl overflow-hidden border-4 border-yellow-400 shadow-[0_0_80px_rgba(250,204,21,0.45)]">
         <div className="absolute top-0 inset-x-0 bg-gradient-to-b from-black/80 to-transparent p-3 z-10 flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
@@ -39,14 +39,14 @@ export function FlashOverlay({
             )}
             <div className="min-w-0">
               <div className="text-xs font-black text-yellow-300 uppercase tracking-widest">Flash Drop</div>
-              <div className="text-[10px] text-white/80 font-mono truncate">{flash.owner_name || 'Anonymous'}</div>
+              <div className="text-[10px] text-retro-body font-mono truncate">{flash.owner_name || 'Anonymous'}</div>
             </div>
           </div>
           <button
             type="button"
             onClick={onDismiss}
             aria-label="Dismiss flash"
-            className="text-white/70 hover:text-white p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer"
+            className="text-retro-body hover:text-white p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -75,7 +75,7 @@ export function FlashOverlay({
             <Heart className={`w-3.5 h-3.5 ${flash.liked_by_me ? 'fill-current' : ''}`} />
             <span>{flash.likes_count}</span>
           </button>
-          <div className="text-[10px] text-white/60 font-mono">
+          <div className="text-[10px] text-retro-muted font-mono">
             {flash.mime_type.startsWith('video') ? 'VIDEO' : 'IMAGE'} · Flash Drop
           </div>
         </div>

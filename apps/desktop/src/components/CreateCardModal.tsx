@@ -205,7 +205,7 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
   };
 
   return (
-    <div className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-6" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6" onMouseDown={onClose}>
       <div className="glass-surface w-full max-w-5xl max-h-[92dvh] overflow-y-auto rounded-xl p-4 sm:p-6 text-retro-fg" onMouseDown={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-4 mb-5">
           <div>
@@ -270,7 +270,7 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
                 <textarea value={description} onChange={(event) => setDescription(event.target.value.slice(0, 240))} placeholder="What's all that about? Describe your gooning material if you feel like so." rows={3} className="w-full px-3 py-2.5 text-sm resize-none" />
               </label>
               <div className="sm:col-span-2 space-y-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">Tags <span className="normal-case font-normal">({tags.length}/{MAX_TAGS}) — comma or space separated</span></span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">Tags <span className="normal-case font-normal">({tags.length}/{MAX_TAGS}). Comma or space separated</span></span>
                 <div className="flex gap-2">
                   <div className="relative flex-1"><Tag className="absolute left-3 top-3 w-4 h-4 text-retro-muted" /><input value={tagInput} maxLength={MAX_TAGS * 25} onChange={(event) => setTagInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ',') { event.preventDefault(); addTag(); } }} onBlur={() => { if (tagInput.trim()) addTag(); }} placeholder="futa, bbc, BWNO, hentai" className="w-full pl-9 pr-3 py-2.5 text-sm" /></div>
                   <button type="button" onClick={addTag} disabled={tags.length >= MAX_TAGS || !tagInput.trim()} className="glass-button px-3 rounded-xl disabled:opacity-40" aria-label="Add tag"><Plus className="w-4 h-4" /></button>

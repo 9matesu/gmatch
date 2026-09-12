@@ -27,7 +27,7 @@ export default function OfflineCard({ fetching, feedOffline, onRetry }: OfflineC
       ? 'Loading feed…'
       : state === 'offline'
         ? 'Sources offline. Check your connection.'
-        : 'No image — pull the feed'
+        : 'No image. Pull the feed'
   return (
     <div
       className="pointer-events-auto absolute left-1/2 top-1/2 z-[4] flex -translate-x-1/2 -translate-y-1/2 items-center gap-2.5 rounded-xl border border-border-glass bg-glass-strong px-4 py-3"

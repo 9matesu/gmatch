@@ -47,7 +47,7 @@ export function TargetSelectorModal({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-md flex items-center justify-center p-4 select-none animate-orbit-fade-in font-sans"
+      className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 select-none animate-orbit-fade-in font-sans"
       onClick={onClose}
     >
       <div
@@ -77,13 +77,13 @@ export function TargetSelectorModal({
         {/* Search */}
         <div className="p-3 border-b border-border-glass bg-surface-raised">
           <div className="relative">
-            <Search className="w-4 h-4 text-[#8e8e8e] absolute left-3.5 top-2.5" />
+            <Search className="w-4 h-4 text-retro-muted absolute left-3.5 top-2.5" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search players..."
-              className="w-full bg-surface-raised border border-border-glass rounded-xl pl-9 pr-3 py-2 text-xs text-retro-fg outline-none focus:border-rose-500 transition-colors placeholder:text-[#8e8e8e]"
+              className="w-full bg-surface-raised border border-border-glass rounded-xl pl-9 pr-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-error transition-colors placeholder:text-retro-muted"
             />
           </div>
         </div>
@@ -116,7 +116,7 @@ export function TargetSelectorModal({
                   </div>
                   <div>
                     <span className="text-xs font-black text-retro-fg block truncate max-w-[180px]">@{peerName}</span>
-                    <span className="text-[10px] text-[#8e8e8e] font-mono">{peerId.substring(0, 10)}...</span>
+                    <span className="text-[10px] text-retro-muted font-mono">{peerId.substring(0, 10)}...</span>
                   </div>
                 </div>
 
@@ -130,7 +130,7 @@ export function TargetSelectorModal({
           })}
 
           {filteredPeers.length === 0 && (
-            <div className="py-8 text-center text-xs text-[#8e8e8e] italic">
+            <div className="py-8 text-center text-xs text-retro-muted italic">
               Nobody is online to target right now.
             </div>
           )}

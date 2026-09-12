@@ -604,7 +604,7 @@ export function GMatchFeed({
                   type="button"
                   onClick={() => { playPress(720); onFeedColsChange?.(cols); }}
                   className={`px-2 py-1 rounded transition-all duration-150 active:scale-[0.96] cursor-pointer font-medium ${feedCols === cols
-                      ? 'bg-retro-fg text-retro-bg font-semibold shadow-xs'
+                      ? 'bg-retro-accent text-retro-accent-text font-semibold'
                       : 'text-retro-muted hover:text-retro-fg'
                     }`}
                   title={`${cols}-column feed`}
@@ -657,7 +657,7 @@ export function GMatchFeed({
                         <div className="text-center p-6 space-y-3 z-10">
                           <h3 className="text-xl font-black tracking-tight">{post.caption}</h3>
                           {post.players_playing && (
-                            <p className="text-xs text-white/80 font-mono">
+                            <p className="text-xs text-retro-body font-mono">
                               <Zap className="inline w-3 h-3" /> {post.players_playing.toLocaleString()} online
                             </p>
                           )}
@@ -669,7 +669,7 @@ export function GMatchFeed({
                               // the vercel-style refactor dropped these handlers).
                               onOpenGameAd?.(post.game_mode || 'duel');
                             }}
-                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-retro-bg font-bold text-xs uppercase tracking-wider hover:bg-retro-fg transition-transform active:scale-95 shadow-lg"
+                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-retro-accent text-retro-accent-text font-bold text-xs uppercase tracking-wider hover:bg-retro-accent-hover transition-colors active:scale-[0.98] shadow-lg"
                           >
                             <span>{post.cta_label || 'Play Now'}</span>
                             <ChevronRight className="w-3.5 h-3.5" />

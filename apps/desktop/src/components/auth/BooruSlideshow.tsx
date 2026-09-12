@@ -236,7 +236,7 @@ export function BooruSlideshow({ className = '' }: { className?: string }) {
                 onClick={() => goTo(idx)}
                 aria-label={`Slide ${idx + 1}`}
                 className={`h-0.5 flex-1 rounded-full transition-all cursor-pointer ${
-                  idx === activeIndex ? 'bg-retro-accent shadow-[0_0_4px_rgba(159,227,255,0.4)]' : 'bg-white/30 hover:bg-white/50'
+                  idx === activeIndex ? 'bg-retro-accent' : 'bg-white/30 hover:bg-white/50'
                 }`}
               />
             ))}

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { STORE_ITEMS, type StoreItem, type User, formatGc, computeCashoutPayout, clampCashoutRateBps, DEFAULT_CASHOUT_RATE_BPS, RARITY_TIERS } from '@orbit/shared';
 import { orbitFetch } from '../utils/api';
 import type { OrbitIdentity } from '@orbit/crypto';
-import type { ActiveHackSession } from './home/HomeFooter';
+import type { ActiveHackSession } from './home/CommandIsland';
 import { playPress, playLike } from '../utils/sounds';
 import { TargetSelectorModal } from './hacks/TargetSelectorModal';
 import { ObjectImage } from './ObjectImage';
@@ -87,7 +87,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
         toast?.(data?.error || 'Could not buy this card', 'error');
         return;
       }
-      toast?.(`Bought for ${formatGc(listing.price)} g$ — it's in your collection`, 'success');
+      toast?.(`Bought for ${formatGc(listing.price)} g$. It's in your collection`, 'success');
       refreshMarket();
       window.dispatchEvent(new CustomEvent('orbit-cards-refresh'));
       window.dispatchEvent(new CustomEvent('orbit-score-refresh'));
@@ -346,7 +346,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
             <p className="text-xs text-retro-muted">
               {arsenalOnly
                 ? 'Deploy cyber hacks with g$.'
-                : 'Cash out your collection — buying retired; hacks live under PC Domination.'}
+                : 'Cash out your collection. Buying retired; hacks live under PC Domination.'}
             </p>
           </div>
         </div>
@@ -471,7 +471,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
           )}
         </div>
         {portfolio.length === 0 ? (
-          <p className="text-xs text-retro-muted">No cards yet — forge, trade or win some to build value.</p>
+          <p className="text-xs text-retro-muted">No cards yet. Forge, trade or win some to build value.</p>
         ) : (
           <div className="space-y-1.5">
             {[...portfolio].sort((a, b) => b.value - a.value).slice(0, 8).map((c, i) => {
@@ -502,7 +502,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
         <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider mb-3">Inventory</h3>
         {(() => {
           const owned = storeItems.filter((item) => (inventory[item.id] || 0) > 0);
-          if (owned.length === 0) return <p className="text-xs text-retro-muted">Empty — nothing owned.</p>;
+          if (owned.length === 0) return <p className="text-xs text-retro-muted">Empty. Nothing owned.</p>;
           return (
             <div className="space-y-1.5">
               {owned.map((item) => (
@@ -523,7 +523,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
           <span className="text-[10px] text-retro-muted">{marketListings.length} open listing{marketListings.length === 1 ? '' : 's'}</span>
         </div>
         {marketListings.length === 0 ? (
-          <p className="text-xs text-retro-muted">Nothing listed yet — open one of your cards and list it for g$.</p>
+          <p className="text-xs text-retro-muted">Nothing listed yet. Open one of your cards and list it for g$.</p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {marketListings.map((l) => (
@@ -553,7 +553,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                 <div className="flex items-center justify-between gap-1.5 px-2 pb-2">
                   <span className="text-xs font-mono font-bold text-cyan-300 tabular-nums">{formatGc(l.price)} g$</span>
                   {l.sellerId === identity?.orbitId ? (
-                    <span className="px-2 py-1 rounded bg-retro-interactive text-retro-muted text-[10px] font-bold" title="This is your own listing — cancel it from your card page instead">Yours</span>
+                    <span className="px-2 py-1 rounded bg-retro-interactive text-retro-muted text-[10px] font-bold" title="This is your own listing. Cancel it from your card page instead">Yours</span>
                   ) : (
                     <button
                       type="button"

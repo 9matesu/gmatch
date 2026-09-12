@@ -5,7 +5,7 @@
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { User } from '@orbit/shared';
 import { StoreTab } from '../StoreTab';
-import type { ActiveHackSession, MainViewType } from '../home/HomeFooter';
+import type { ActiveHackSession, MainViewType } from '../home/CommandIsland';
 
 type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 

@@ -67,7 +67,7 @@ export function StashPanel({
             type="button"
             onClick={() => folderInputRef.current?.click()}
             disabled={importing}
-            className="bg-retro-accent hover:bg-retro-fg hover:text-retro-bg text-white text-xs font-bold px-3 py-1.5 transition-colors disabled:opacity-50"
+            className="bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text text-xs font-bold px-3 py-1.5 transition-colors disabled:opacity-50"
           >
             {importing ? 'Importing...' : 'Load Folder'}
           </button>
@@ -130,7 +130,7 @@ export function StashPanel({
                 <button
                   type="button"
                   onClick={() => handleSend(entry.id)}
-                  className="bg-retro-accent hover:bg-retro-fg hover:text-retro-bg text-white text-[10px] font-bold px-2 py-1 transition-colors"
+                  className="bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text text-[10px] font-bold px-2 py-1 transition-colors"
                 >
                   Send
                 </button>

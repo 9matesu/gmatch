@@ -78,7 +78,7 @@ export function GMatchLoginPage({
   };
 
   return (
-    <div className="min-h-[100dvh] w-full text-retro-fg flex flex-col justify-between overflow-x-hidden font-sans select-none" style={{ background: '#080A0D' }}>
+    <div className="min-h-[100dvh] w-full text-retro-fg flex flex-col justify-between overflow-x-hidden font-sans select-none" style={{ background: 'var(--color-retro-bg)' }}>
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60" />
         <div className="absolute top-1/4 left-1/4 w-64 h-64 rounded-full bg-retro-accent/3 blur-3xl" />
@@ -96,7 +96,7 @@ export function GMatchLoginPage({
             <div className="text-center space-y-2">
               <span className="font-sans font-black text-4xl sm:text-5xl tracking-tighter text-retro-fg select-none inline-block">
                 <span>goon</span>
-                <span className="font-light tracking-normal text-chrome">Match</span>
+                <span className="font-light tracking-normal text-retro-fg">Match</span>
               </span>
               <h1 className="text-sm font-extrabold text-retro-fg">
                 {mode === 'signup' ? 'Create Your Profile' : 'Import Secret Key'}
@@ -196,7 +196,7 @@ export function GMatchLoginPage({
               </button>
             </form>
 
-            <div className="pt-2 text-center metro-rule-top">
+            <div className="pt-2 text-center border-t border-border-glass">
               {mode === 'signup' ? (
                 <button
                   type="button"

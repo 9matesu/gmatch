@@ -37,7 +37,7 @@ export function TourDeck({ onOpen, onDismiss }: { onOpen: (step: TourStep) => vo
             className="text-left rounded-lg border border-border-glass bg-retro-panel p-3 hover:bg-glass-w10 transition-colors cursor-pointer"
           >
             <span className="block text-xs font-semibold text-retro-fg">{step.title}</span>
-            <span className="block mt-1 text-[11px] leading-relaxed text-retro-muted line-clamp-2">{step.text}</span>
+            <span className="block mt-1 text-xs leading-relaxed text-retro-muted line-clamp-2">{step.text}</span>
           </button>
         ))}
       </div>

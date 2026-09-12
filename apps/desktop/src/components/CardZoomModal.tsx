@@ -144,7 +144,7 @@ export function CardZoomModal({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-md flex flex-col justify-between p-3 sm:p-6 animate-orbit-fade-in select-none"
+      className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex flex-col justify-between p-3 sm:p-6 animate-orbit-fade-in select-none"
       onClick={onClose}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}

@@ -135,7 +135,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
               <h3 className="text-xs font-bold text-rose-300 uppercase tracking-wider">
                 {pendingReports} Pending Moderation Case{pendingReports === 1 ? '' : 's'}
               </h3>
-              <p className="text-[11px] text-retro-muted mt-0.5">
+              <p className="text-xs text-retro-muted mt-0.5">
                 Unresolved user reports or flagged content require review in the Moderation queue.
               </p>
             </div>
@@ -157,7 +157,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           <button
             type="button"
             onClick={() => onNavigate?.("moderation")}
-            className="text-[11px] text-retro-muted hover:text-retro-fg cursor-pointer underline"
+            className="text-xs text-retro-muted hover:text-retro-fg cursor-pointer underline"
           >
             View Cases
           </button>

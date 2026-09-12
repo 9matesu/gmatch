@@ -382,15 +382,15 @@ export default function AdminPageClient() {
   // Passcode gate view
   if (!pinVerified) {
     return (
-      <div className="min-h-screen bg-[#080A0D] text-retro-fg flex items-center justify-center p-4 font-sans">
+      <div className="min-h-screen bg-retro-bg text-retro-fg flex items-center justify-center p-4 font-sans">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60" />
           <div className="absolute top-1/4 left-1/4 w-48 h-48 rounded-full bg-retro-accent/3 blur-3xl" />
         </div>
         <div className="relative z-10 w-full max-w-sm glass-panel p-6 space-y-4">
-          <div className="flex items-center justify-between metro-rule pb-3">
+          <div className="flex items-center justify-between border-b border-border-glass pb-3">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-retro-accent shadow-[0_0_6px_rgba(159,227,255,0.5)]" />
+              <span className="w-2 h-2 rounded-full bg-retro-accent" />
               <h1 className="text-sm font-bold text-retro-fg uppercase tracking-wider">Admin Operations</h1>
             </div>
             <a
@@ -406,7 +406,7 @@ export default function AdminPageClient() {
           </p>
 
           {(Boolean(import.meta.env.DEV) || (typeof window !== 'undefined' && (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1'))) && (
-            <div className="flex items-center justify-between text-[11px] bg-amber-500/10 border border-amber-500/20 text-amber-300 px-2.5 py-1.5 rounded">
+            <div className="flex items-center justify-between text-xs bg-amber-500/10 border border-amber-500/20 text-amber-300 px-2.5 py-1.5 rounded">
               <span>Dev mode: default passcode is <code className="font-mono font-bold bg-black/30 px-1 py-0.5 rounded">admin</code></span>
               <button
                 type="button"

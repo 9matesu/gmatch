@@ -149,8 +149,8 @@ export function SpectateModal({
     add(pA.card, pA.id, `${pA.display_name || 'Player 1'}'s Card`)
     add(pB.card, pB.id, `${pB.display_name || 'Player 2'}'s Card`)
     for (const h of history) {
-      add(h.card_a_url, pA.id, `R${h.round} — ${pA.display_name || 'Player 1'}'s Card`)
-      add(h.card_b_url, pB.id, `R${h.round} — ${pB.display_name || 'Player 2'}'s Card`)
+      add(h.card_a_url, pA.id, `R${h.round} · ${pA.display_name || 'Player 1'}'s Card`)
+      add(h.card_b_url, pB.id, `R${h.round} · ${pB.display_name || 'Player 2'}'s Card`)
     }
     return Array.from(map.values())
   }
@@ -307,7 +307,7 @@ export function SpectateModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/70 backdrop-blur-xl animate-orbit-fade-in font-sans select-none"
+        className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/70 backdrop-blur-sm animate-orbit-fade-in font-sans select-none"
         onClick={onClose}
       >
         <div
@@ -492,7 +492,7 @@ export function SpectateModal({
                           <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-surface-canvas relative overflow-hidden text-retro-muted">
                             <div className={`absolute inset-0 bg-gradient-to-br from-cyan-900/60 via-teal-900/40 to-cyan-900/50 blur-xl opacity-70 animate-pulse transition-all duration-300`} />
                             <div className="relative z-10 flex flex-col items-center gap-2 text-center">
-                              <div className="w-10 h-14 rounded-xl border border-white/20 bg-surface-raised/10 backdrop-blur-md flex items-center justify-center shadow-lg animate-bounce">
+                              <div className="w-10 h-14 rounded-xl border border-border-strong bg-surface-raised/10 backdrop-blur-md flex items-center justify-center shadow-lg animate-bounce">
                                 <Sparkles className="w-4 h-4 text-cyan-300 animate-spin" />
                               </div>
                               <span className="text-[10px] font-mono font-black text-purple-200 uppercase tracking-wider">
@@ -552,7 +552,7 @@ export function SpectateModal({
                           <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-surface-canvas relative overflow-hidden text-retro-muted">
                             <div className={`absolute inset-0 bg-gradient-to-br from-amber-900/60 via-orange-900/40 to-rose-900/50 blur-xl opacity-70 animate-pulse transition-all duration-300`} />
                             <div className="relative z-10 flex flex-col items-center gap-2 text-center">
-                              <div className="w-10 h-14 rounded-xl border border-white/20 bg-surface-raised/10 backdrop-blur-md flex items-center justify-center shadow-lg animate-bounce">
+                              <div className="w-10 h-14 rounded-xl border border-border-strong bg-surface-raised/10 backdrop-blur-md flex items-center justify-center shadow-lg animate-bounce">
                                 <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />
                               </div>
                               <span className="text-[10px] font-mono font-black text-amber-200 uppercase tracking-wider">

@@ -15,14 +15,14 @@ export function Modal({
 }) {
   return (
     <div
-      className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 bg-black/70 animate-orbit-fade-in backdrop-blur-sm"
+      className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 bg-black/70 animate-orbit-fade-in"
       onClick={dismissable ? onClose : () => {}}
     >
       <div
         onClick={e => e.stopPropagation()}
         className={`w-full ${maxWidth} glass-panel shadow-xl animate-orbit-pop`}
       >
-        <div className="flex items-center justify-between px-4 py-3 metro-rule">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass">
           <h3 className="text-sm font-semibold text-retro-fg">{title}</h3>
           {dismissable && (
             <button type="button" onClick={onClose} aria-label="Close" className="text-retro-muted hover:text-retro-fg p-1 rounded-md transition-colors cursor-pointer">

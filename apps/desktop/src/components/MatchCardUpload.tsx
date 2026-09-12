@@ -82,7 +82,7 @@ export function MatchCardUpload({
       if (res.ok && res.cardId) {
         return { status: 'ready', previewUrl, isVideo, cardId: res.cardId, name: res.name ?? nameValue, value: res.value }
       }
-      return { status: 'error', previewUrl, isVideo, error: res.error || 'Upload failed — try again.', name: nameValue }
+      return { status: 'error', previewUrl, isVideo, error: res.error || 'Upload failed. Try again.', name: nameValue }
     })
   }
 

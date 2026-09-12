@@ -209,7 +209,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
                   value={discordLink}
                   onChange={e => setDiscordLink(e.target.value)}
                   placeholder="https://discord.gg/..."
-                  className="flex-1 bg-[#18181b] border border-[#27272a] rounded-xl px-3 py-2 text-xs text-retro-fg outline-none focus:border-cyan-500"
+                  className="flex-1 bg-glass-w8 border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent"
                 />
                 <button
                   type="button"
@@ -240,7 +240,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
                   onChange={e => setCashoutRateBps(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
                   min={0}
                   max={100000}
-                  className="flex-1 bg-[#18181b] border border-[#27272a] rounded-xl px-3 py-2 text-xs text-retro-fg outline-none focus:border-cyan-500 font-mono"
+                  className="flex-1 bg-glass-w8 border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent font-mono"
                 />
                 <button
                   type="button"
@@ -265,7 +265,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
               onClick={() => setAuditSubTab("log")}
               className={cn(
                 "px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer",
-                auditSubTab === "log" ? "bg-white/10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
+                auditSubTab === "log" ? "bg-glass-w10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
               )}
             >
               Audit Log ({auditLog.length})
@@ -275,7 +275,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
               onClick={() => setAuditSubTab("daily")}
               className={cn(
                 "px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer",
-                auditSubTab === "daily" ? "bg-white/10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
+                auditSubTab === "daily" ? "bg-glass-w10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
               )}
             >
               Daily Activity Stats ({dailyStats.length} days)

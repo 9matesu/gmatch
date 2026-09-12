@@ -80,7 +80,7 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
           <div ref={scrollRef} className="max-h-40 overflow-y-auto styled-scrollbar p-2.5 space-y-2 bg-surface-raised select-text">
             {list.length === 0 ? (
               <div className="text-center text-xs text-retro-muted py-3 select-none">
-                No messages yet — say hello to your opponent.
+                No messages yet. Say hello to your opponent.
               </div>
             ) : (
               list.map((m) => {
@@ -100,7 +100,7 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
                         </div>
                       )}
                       <div className="break-words whitespace-pre-wrap leading-relaxed select-text cursor-text">{m.body}</div>
-                      <time className={`mt-1 block text-[10px] select-none ${mine ? 'text-white/60 text-right' : 'text-retro-muted'}`} dateTime={m.created_at}>
+                      <time className={`mt-1 block text-[10px] select-none ${mine ? 'text-retro-muted text-right' : 'text-retro-muted'}`} dateTime={m.created_at}>
                         {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </time>
                     </div>

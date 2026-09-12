@@ -323,7 +323,7 @@ export function GMatchSettingsModal({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 select-none font-sans animate-orbit-fade-in"
+      className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 select-none font-sans animate-orbit-fade-in"
       onClick={onClose}
     >
       <div
@@ -518,7 +518,7 @@ export function GMatchSettingsModal({
                   </div>
 
                   {/* Display Toggles */}
-                  <div className="space-y-3 pt-2 border-t border-border-glass divide-y divide-[#27272a]">
+                  <div className="space-y-3 pt-2 border-t border-border-glass divide-y divide-border-glass">
                     {([
                       {
                         label: 'Auto-Refresh Heartbeat Sync',

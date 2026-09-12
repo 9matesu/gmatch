@@ -84,7 +84,7 @@ export function SnapshotSection({
       <div className="text-xs font-medium text-retro-fg">Server snapshot (admin)</div>
       <p className="text-xs text-retro-muted">
         Back up or hand over this server's world (posts, economy, chats) as a single JSON file.
-        Only you, the host, can export it — and it never passes through the central directory.
+        Only you, the host, can export it. And it never passes through the central directory.
       </p>
       <div className="flex gap-2">
         <button

@@ -49,7 +49,7 @@ export function PointsHelpModal({ onClose }: { onClose: () => void }) {
               ))}
             </div>
             <p className="text-xs text-retro-muted leading-relaxed">
-              Single likes earn no g$ — only mutual matches and duel results reward points.
+              Single likes earn no g$. Only mutual matches and duel results reward points.
             </p>
           </section>
 

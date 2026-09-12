@@ -167,7 +167,7 @@ function ProfileStep(props: Props & { onBack: () => void; onDone: () => void }) 
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-white">Set up your profile</h1>
-          <p className="text-xs text-retro-muted">Only your name is required — everything else you can add later.</p>
+          <p className="text-xs text-retro-muted">Only your name is required. Everything else you can add later.</p>
         </div>
         <button
           type="button"

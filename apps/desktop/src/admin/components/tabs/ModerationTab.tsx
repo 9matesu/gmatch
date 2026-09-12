@@ -278,20 +278,20 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                 <span className="font-mono text-retro-fg">{report.target_type}:{report.target_id}</span>
               </div>
               {caseDetail[report.id]?.reported_user && (
-                <div className="p-2 rounded bg-surface-canvas border border-border-glass text-[11px]">
+                <div className="p-2 rounded bg-surface-canvas border border-border-glass text-xs">
                   <span className="text-retro-muted uppercase tracking-wider font-bold">Reported Account:</span>{" "}
                   <span className="text-retro-fg font-semibold">{caseDetail[report.id].reported_user.display_name}</span>{" "}
                   <span className="text-retro-muted font-mono">({caseDetail[report.id].reported_user.id.slice(0, 10)})</span>
                 </div>
               )}
               {report.reason && (
-                <div className="p-2 rounded bg-surface-canvas border border-border-glass text-[11px]">
+                <div className="p-2 rounded bg-surface-canvas border border-border-glass text-xs">
                   <span className="text-retro-muted uppercase tracking-wider font-bold">Reason:</span>{" "}
                   <span className="text-retro-fg">{report.reason}</span>
                 </div>
               )}
               {caseDetail[report.id]?.target?.caption && (
-                <div className="p-2 rounded bg-surface-canvas border border-border-glass text-[11px]">
+                <div className="p-2 rounded bg-surface-canvas border border-border-glass text-xs">
                   <span className="text-retro-muted uppercase tracking-wider font-bold">Content Text:</span>{" "}
                   <span className="text-retro-fg">{caseDetail[report.id].target.caption}</span>
                 </div>
@@ -395,7 +395,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
               onClick={() => setCommType("comments")}
               className={cn(
                 "px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer",
-                commType === "comments" ? "bg-white/10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
+                commType === "comments" ? "bg-glass-w10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
               )}
             >
               Lobby Comments ({comments.length})
@@ -405,7 +405,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
               onClick={() => setCommType("chat")}
               className={cn(
                 "px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer",
-                commType === "chat" ? "bg-white/10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
+                commType === "chat" ? "bg-glass-w10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
               )}
             >
               Chat Messages ({chatMessages.length})
@@ -433,7 +433,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                           <button
                             type="button"
                             onClick={() => { onAction("unhideComment", c.id); setTimeout(fetchComments, 300); }}
-                            className="px-2 py-1 text-[10px] font-semibold rounded border border-white/10 text-retro-muted hover:text-retro-fg cursor-pointer"
+                            className="px-2 py-1 text-[10px] font-semibold rounded border border-border-glass text-retro-muted hover:text-retro-fg cursor-pointer"
                           >
                             Unhide
                           </button>

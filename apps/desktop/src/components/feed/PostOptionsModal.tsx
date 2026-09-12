@@ -40,11 +40,11 @@ export function PostOptionsModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-0 sm:p-4 animate-orbit-fade-in select-none"
+      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 animate-orbit-fade-in select-none"
       onClick={onClose}
     >
       <div
-        className="bg-surface-raised w-full max-w-sm rounded-xl border border-border-glass shadow-2xl overflow-hidden animate-orbit-slide-up divide-y divide-[#27272a] text-center text-xs font-semibold relative"
+        className="bg-surface-raised w-full max-w-sm rounded-xl border border-border-glass shadow-2xl overflow-hidden animate-orbit-slide-up divide-y divide-border-glass text-center text-xs font-semibold relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close button in top-right */}

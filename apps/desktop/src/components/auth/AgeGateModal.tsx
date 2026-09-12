@@ -65,7 +65,7 @@ export function AgeGateModal({
             className="w-full py-2.5 px-4 rounded-lg bg-white hover:bg-retro-fg active:scale-[0.99] text-black font-semibold text-xs shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2"
           >
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>I am 18 or Older — Enter</span>
+            <span>I am 18 or Older. Enter</span>
           </button>
 
           <button
@@ -74,7 +74,7 @@ export function AgeGateModal({
             className="w-full py-2 px-4 rounded-lg bg-retro-panel hover:bg-glass-w12 active:scale-[0.99] text-retro-fg font-medium text-xs border border-border-glass transition-all cursor-pointer flex items-center justify-center gap-2"
           >
             <XCircle className="w-4 h-4 text-retro-muted" />
-            <span>Under 18 — Exit</span>
+            <span>Under 18. Exit</span>
           </button>
         </div>
 

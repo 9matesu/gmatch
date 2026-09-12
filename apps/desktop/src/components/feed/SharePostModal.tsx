@@ -131,7 +131,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-orbit-fade-in"
+      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-orbit-fade-in"
       onClick={onClose}
     >
       <div
@@ -192,7 +192,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                 {profilePics[r.id] ? (
                   <img src={profilePics[r.id]} alt="" className="w-4 h-4 rounded-full object-cover" />
                 ) : (
-                  <span className="w-4 h-4 rounded-full bg-glass-w10 flex items-center justify-center text-[8px]">{r.name.slice(0, 1).toUpperCase()}</span>
+                  <span className="w-4 h-4 rounded-full bg-glass-w10 flex items-center justify-center text-[10px]">{r.name.slice(0, 1).toUpperCase()}</span>
                 )}
                 <span className="max-w-[110px] truncate">{r.name}</span>
               </button>

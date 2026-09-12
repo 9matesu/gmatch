@@ -277,7 +277,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
       }
 
       if (typeof payload.victimReward === 'number' && payload.victimReward > 0) {
-        useGame.getState().notify(`Effect from a player — you earned +${payload.victimReward} g$ for putting up with it`);
+        useGame.getState().notify(`Effect from a player. You earned +${payload.victimReward} g$ for putting up with it`);
       }
     };
 
@@ -295,7 +295,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
     <>
       {blurEffect && (
         <div
-          className="fixed inset-0 z-50 cursor-pointer"
+          className="fixed inset-0 z-[var(--z-modal)] cursor-pointer"
           style={{
             backdropFilter: `blur(${blurEffect.data.intensity}px)`,
             backgroundColor: 'rgba(0,0,0,0.1)',
@@ -337,7 +337,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
       )}
 
       {popupVideoEffect && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => removeEffect(popupVideoEffect.id)}>
+        <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70" onClick={() => removeEffect(popupVideoEffect.id)}>
           <video
             ref={videoRef}
             src={popupVideoEffect.data.url}
@@ -384,7 +384,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
 
       {textOverlayEffect && (
         <div
-          className="fixed inset-0 z-40 flex pointer-events-none"
+          className="fixed inset-0 z-[var(--z-dropdown)] flex pointer-events-none"
           style={{
             alignItems: textOverlayEffect.data.position === 'top' ? 'flex-start'
               : textOverlayEffect.data.position === 'bottom' ? 'flex-end' : 'center',

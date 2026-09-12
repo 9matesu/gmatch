@@ -1,5 +1,5 @@
-import type { MainViewType } from '../components/home/HomeFooter';
-import type { GamesNavTab } from '../components/home/SidebarNav';
+import type { MainViewType } from '../components/home/CommandIsland';
+import type { GamesNavTab } from '../components/home/CommandIsland';
 
 export const TOUR_KEY_PREFIX = 'orbit_tour_v1:';
 

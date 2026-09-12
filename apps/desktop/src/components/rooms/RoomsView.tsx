@@ -79,7 +79,7 @@ export function RoomsView({
       return;
     }
     const ok = await onInvite(activeRoom.id, target.id);
-    toast(ok ? `${target.display_name || 'Peer'} invited (sealed)` : 'Invite failed — unknown keys or already inside', ok ? 'success' : 'error');
+    toast(ok ? `${target.display_name || 'Peer'} invited (sealed)` : 'Invite failed. Unknown keys or already inside', ok ? 'success' : 'error');
     if (ok) setInvitePeer('');
   };
 
@@ -93,7 +93,7 @@ export function RoomsView({
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {rooms.length === 0 && (
             <p className="text-xs text-retro-muted p-2 leading-relaxed">
-              No rooms yet. A room is an end-to-end encrypted group chat — its key lives only on your devices and the members you invite.
+              No rooms yet. A room is an end-to-end encrypted group chat. Its key lives only on your devices and the members you invite.
             </p>
           )}
           {rooms.map((r) => (
@@ -128,7 +128,7 @@ export function RoomsView({
           <>
             <header className="px-4 py-2.5 border-b border-border-glass flex items-center gap-3">
               <h2 className="text-sm font-bold truncate">{activeRoom.name}</h2>
-              <span className="text-[10px] text-retro-muted flex items-center gap-1" title="Room key epoch — bumps when a member leaves">
+              <span className="text-[10px] text-retro-muted flex items-center gap-1" title="Room key epoch. Bumps when a member leaves">
                 <KeyRound className="w-3 h-3" /> epoch {activeRoom.epoch}
               </span>
               <div className="ml-auto flex items-center gap-2 text-[10px] text-retro-muted">
@@ -154,7 +154,7 @@ export function RoomsView({
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {messages.length === 0 && (
                 <div className="h-full flex items-center justify-center text-xs text-retro-muted">
-                  No messages yet — everything typed here is sealed with the room key; {activeRoom.members.length - 1} other device(s) can open it.
+                  No messages yet. Everything typed here is sealed with the room key; {activeRoom.members.length - 1} other device(s) can open it.
                 </div>
               )}
               {messages.map((m) => (
