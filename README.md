@@ -7,7 +7,8 @@ earn g$, buy tags that steer your feed, collect a gallery, pop GoonCaps,
 brainmelt for prestige. Idle earnings share the server g$ ledger with duels,
 lootboxes, hacks and trades.
 
-See `docs/SPEC.md` for the full product spec and
+See `docs/SPEC.md` for the full product spec, `docs/DESKTOP.md` for the
+exe's architecture, log locations and troubleshooting, and
 `AGENTS.md` for dev rules.
 
 ## Run
