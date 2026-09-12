@@ -18,7 +18,8 @@
       "@orbit/crypto": ["../../packages/crypto/src/index.ts"],
       "@orbit/protocol": ["../../packages/protocol/src/index.ts"],
       "@orbit/shared": ["../../packages/shared/src/index.ts"]
-    }
+    },
+    "typeRoots": ["./node_modules/@types", "../../node_modules/@types"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"],
   "exclude": ["node_modules", "dist"]

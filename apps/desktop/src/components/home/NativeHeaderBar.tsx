@@ -2,15 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Wifi,
-  WifiOff,
-  Volume2,
-  VolumeX,
+  SpeakerHigh,
+  SpeakerSlash,
   Minus,
   Square,
   X,
-  Sparkles,
-} from 'lucide-react';
+} from '@phosphor-icons/react';
 import { playPress } from '../../utils/sounds';
 
 export interface NativeHeaderBarProps {
@@ -75,9 +72,9 @@ export function NativeHeaderBar({
         className="flex items-center gap-2"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
-        <div className="flex items-center gap-1.5 font-bold tracking-tight text-white/90">
-          <Sparkles className="w-3.5 h-3.5 text-[#58a6ff]" />
-          <span className="text-[13px] font-black tracking-wider">gMatch</span>
+        <div className="flex items-center gap-2 font-bold tracking-tight text-white/90">
+          <span className="w-2 h-2 rounded-sm bg-[#58a6ff]" />
+          <span className="text-[13px] font-bold tracking-wide text-white">gMatch</span>
         </div>
 
         {activeRoomName && (
@@ -120,9 +117,9 @@ export function NativeHeaderBar({
           title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
         >
           {isMuted ? (
-            <VolumeX className="w-3.5 h-3.5 text-[#f85149]" />
+            <SpeakerSlash className="w-3.5 h-3.5 text-[#f85149]" />
           ) : (
-            <Volume2 className="w-3.5 h-3.5 text-retro-muted hover:text-white" />
+            <SpeakerHigh className="w-3.5 h-3.5 text-retro-muted hover:text-white" />
           )}
         </button>
 

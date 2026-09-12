@@ -63,7 +63,8 @@ import { ServersView } from "./components/servers/ServersView";
 import { PCDominationView } from "./components/views/PCDominationView";
 import { DominationEffects } from "./components/domination/DominationEffects";
 import type { ActiveHackDebuff } from "@orbit/shared";
-import { ChevronDown, ChevronRight, MessageSquare, X } from "lucide-react";
+import { ChevronDown, ChevronRight, X } from "lucide-react";
+import { ChatCircleText } from "@phosphor-icons/react";
 import { WallpaperBackground } from "./components/WallpaperBackground";
 import { ContextOverlay, ReportModal } from "./components/ContextOverlay";
 import { GlobalModals } from "./components/GlobalModals";
@@ -2919,8 +2920,8 @@ export default function Home() {
                 activeRoomName={mainView.charAt(0).toUpperCase() + mainView.slice(1)}
                 onOpenSettings={() => { setChatOpen(false); setShowSettingsModal(true); }}
               />
-              <div className="flex-1 min-w-0 min-h-0 flex flex-col relative">
-                <div ref={mainScrollRef} className="mobile-app-scroll flex-1 min-h-0 w-full flex flex-col relative z-10 overflow-y-auto styled-scrollbar pb-24">
+              <div className="flex-1 min-w-0 min-h-0 flex flex-row overflow-hidden relative">
+                <div ref={mainScrollRef} className="mobile-app-scroll flex-1 min-w-0 min-h-0 w-full flex flex-col relative z-10 overflow-y-auto styled-scrollbar pb-24">
 
                   {/* Modals & Config */}
                   {isIdle && settings.idleEnabled && (
@@ -3331,6 +3332,71 @@ export default function Home() {
                   {/* Decision Overlay deactivated — matching cards are shown directly inside the match tab */}
                 </div>
 
+                {/* Desktop messages dock: full-height side panel sibling */}
+                <MessagesRail
+                  open={chatOpen}
+                  onToggle={() => { playPress(860); setChatOpen((v) => !v); }}
+                  unreadCount={pmUnreadCount}
+                >
+                  <SocialPanel
+                    onClose={() => setChatOpen(false)}
+                    chatUnread={pmUnreadCount}
+                    dm={
+                      <GMatchDMs
+                        identity={identity}
+                        chatMessages={chatMessages}
+                        pmMessages={pmPeer ? pmMessagesByPeer[pmPeer.id || (pmPeer as any).orbitId || ''] || [] : []}
+                        activePmPeer={pmPeer ? { orbitId: pmPeer.id || (pmPeer as any).orbitId, name: pmPeer.display_name || (pmPeer as any).name || 'User' } : null}
+                        peers={users.map((u) => ({ orbitId: u.id || (u as any).orbitId, name: u.display_name || (u as any).name || 'User' }))}
+                        threads={pmThreads}
+                        profilePics={profilePics}
+                        myDisplayName={myProfile.displayName || 'You'}
+                        groups={chatGroups}
+                        groupMessages={groupMessagesByGroup}
+                        activeGroupId={activeGroupId}
+                        onSelectGroup={setActiveGroupId}
+                        onSendMessage={sendChatMessage}
+                        onSendPm={(peerId, text, replyToId, attachment) => {
+                          void sendPm(peerId, text, replyToId, attachment);
+                        }}
+                        onSelectPeer={(p) => {
+                          if (p) {
+                            const found = users.find((u) => u.id === p.orbitId || (u as any).orbitId === p.orbitId);
+                            setPmPeer(found || ({ id: p.orbitId, display_name: p.name } as any));
+                            if (p.orbitId !== 'global_lobby' && p.orbitId !== 'card_queue') {
+                              loadPmMessages(p.orbitId);
+                            }
+                          } else {
+                            setPmPeer(null);
+                          }
+                        }}
+                        onReportMessage={reportPmMessage}
+                        onReportUser={reportPmUser}
+                        onDeleteMessage={(messageId, peerId) => {
+                          if (peerId) void deletePmMessage(messageId, peerId);
+                        }}
+                        onCreateGroup={createGroup}
+                        onOpenAttachment={openAttachmentModal}
+                        onSendGroupMessage={(groupId, text, replyToId, attachment) => {
+                          void sendGroupMessage(groupId, text, replyToId, attachment);
+                        }}
+                        onLeaveGroup={leaveGroup}
+                        onLoadGroupMessages={loadGroupMessages}
+                        onLoadGroupMembers={loadGroupMembers}
+                        onAddGroupMembers={addGroupMembers}
+                        onOpenProfile={(userId) => {
+                          const t = users.find((u) => u.id === userId || (u as any).orbitId === userId);
+                          if (t) setSelectedProfileUser(t);
+                        }}
+                        onOpenImage={(msg) => setViewerMessage(msg)}
+                        onDeleteThread={deleteThread}
+                        onBackToThreads={() => { setPmPeer(null); loadPmThreads(); }}
+                        onLoadHistory={loadPmHistory}
+                      />
+                    }
+                  />
+                </MessagesRail>
+
                 {/* Root-Level Lightbox & Profile Overlays */}
                 {expandedItemId && (
                   <ImageViewer
@@ -3525,71 +3591,6 @@ export default function Home() {
                 setReportCategory={setReportCategory}
               />
 
-              {/* Desktop messages dock: bottom tab, full-height side panel */}
-              <MessagesRail
-                open={chatOpen}
-                onToggle={() => { playPress(860); setChatOpen((v) => !v); }}
-                unreadCount={pmUnreadCount}
-              >
-<SocialPanel
-                      onClose={() => setChatOpen(false)}
-                      chatUnread={pmUnreadCount}
-                      dm={
-                        <GMatchDMs
-                          identity={identity}
-                          chatMessages={chatMessages}
-                          pmMessages={pmPeer ? pmMessagesByPeer[pmPeer.id || (pmPeer as any).orbitId || ''] || [] : []}
-                          activePmPeer={pmPeer ? { orbitId: pmPeer.id || (pmPeer as any).orbitId, name: pmPeer.display_name || (pmPeer as any).name || 'User' } : null}
-                          peers={users.map((u) => ({ orbitId: u.id || (u as any).orbitId, name: u.display_name || (u as any).name || 'User' }))}
-                          threads={pmThreads}
-                          profilePics={profilePics}
-                          myDisplayName={myProfile.displayName || 'You'}
-                          groups={chatGroups}
-                          groupMessages={groupMessagesByGroup}
-                          activeGroupId={activeGroupId}
-                          onSelectGroup={setActiveGroupId}
-                          onSendMessage={sendChatMessage}
-                          onSendPm={(peerId, text, replyToId, attachment) => {
-                            void sendPm(peerId, text, replyToId, attachment);
-                          }}
-                          onSelectPeer={(p) => {
-                            if (p) {
-                              const found = users.find((u) => u.id === p.orbitId || (u as any).orbitId === p.orbitId);
-                              setPmPeer(found || ({ id: p.orbitId, display_name: p.name } as any));
-                              if (p.orbitId !== 'global_lobby' && p.orbitId !== 'card_queue') {
-                                loadPmMessages(p.orbitId);
-                              }
-                            } else {
-                              setPmPeer(null);
-                            }
-                          }}
-                          onReportMessage={reportPmMessage}
-                          onReportUser={reportPmUser}
-                          onDeleteMessage={(messageId, peerId) => {
-                            if (peerId) void deletePmMessage(messageId, peerId);
-                          }}
-                          onCreateGroup={createGroup}
-                          onOpenAttachment={openAttachmentModal}
-                          onSendGroupMessage={(groupId, text, replyToId, attachment) => {
-                            void sendGroupMessage(groupId, text, replyToId, attachment);
-                          }}
-                          onLeaveGroup={leaveGroup}
-                          onLoadGroupMessages={loadGroupMessages}
-                          onLoadGroupMembers={loadGroupMembers}
-                          onAddGroupMembers={addGroupMembers}
-                          onOpenProfile={(userId) => {
-                            const t = users.find((u) => u.id === userId || (u as any).orbitId === userId);
-                            if (t) setSelectedProfileUser(t);
-                          }}
-                          onOpenImage={(msg) => setViewerMessage(msg)}
-                          onDeleteThread={deleteThread}
-                          onBackToThreads={() => { setPmPeer(null); loadPmThreads(); }}
-                          onLoadHistory={loadPmHistory}
-                        />
-                      }
-                    />
-              </MessagesRail>
-
               {/* Floating Minimized DM Dock Bubble */}
               {dmMinimized && (
                 <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-40 flex justify-center px-3 pb-2 pointer-events-none">
@@ -3746,13 +3747,13 @@ export default function Home() {
                             <p className="font-medium text-retro-fg truncate">{group.name}</p>
                             <p className="text-xs text-retro-muted">{group.member_count} members</p>
                           </div>
-                          <MessageSquare className="w-5 h-5 text-retro-muted" />
+                          <ChatCircleText className="w-5 h-5 text-retro-muted" />
                         </button>
                       ))}
                     </div>
                     {chatGroups.length === 0 && (
                       <div className="p-6 text-center text-retro-muted">
-                        <MessageSquare className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                        <ChatCircleText className="w-10 h-10 mx-auto mb-2 opacity-50" />
                         <p className="text-sm">No group chats available</p>
                         <p className="text-xs mt-1">Create a group chat first to share images</p>
                       </div>
@@ -3779,7 +3780,11 @@ export default function Home() {
               onOpenNotifications={openNotifications}
               onToggleMessages={() => {
                 playPress(860);
-                setChatOpen((v) => !v);
+                if (isDesktopViewport()) {
+                  setChatOpen((v) => !v);
+                } else {
+                  handleSetMainView(mainView === 'messages' ? 'feed' : 'messages');
+                }
               }}
               messagesOpen={chatOpen}
               onOpenWallpaper={() => {
