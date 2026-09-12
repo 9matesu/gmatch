@@ -37,6 +37,48 @@ export function parseImhentaiSearch(html: unknown, limit = 5): string[] {
   }
 }
 
+export interface ImhentaiSearchResult {
+  id: string
+  coverUrl: string
+}
+
+/**
+ * Direct search result parsing: extracts both gallery ID and cover thumbnail
+ * directly from search results HTML in one pass. Avoids secondary /gallery/<id>
+ * requests that trigger Cloudflare WAF challenges.
+ */
+export function parseImhentaiSearchResults(html: unknown, limit = 5): ImhentaiSearchResult[] {
+  try {
+    if (typeof html !== 'string') return []
+    const out: ImhentaiSearchResult[] = []
+    const seen = new Set<string>()
+    const thumbRe = /<div class="thumb"[\s\S]*?href="\/gallery\/(\d+)\/?"[\s\S]*?<img[^>]+data-src="([^"]+)"/g
+    let m: RegExpExecArray | null
+    while ((m = thumbRe.exec(html))) {
+      const [, id, coverUrl] = m
+      if (!seen.has(id)) {
+        seen.add(id)
+        out.push({ id, coverUrl })
+        if (out.length >= Math.max(1, limit)) break
+      }
+    }
+    if (out.length === 0) {
+      const linkRe = /href="\/gallery\/(\d+)\/?"[^>]*>[\s\S]*?<img[^>]+(?:data-src|src)="([^"]+)"/g
+      while ((m = linkRe.exec(html))) {
+        const [, id, coverUrl] = m
+        if (!seen.has(id)) {
+          seen.add(id)
+          out.push({ id, coverUrl })
+          if (out.length >= Math.max(1, limit)) break
+        }
+      }
+    }
+    return out
+  } catch {
+    return []
+  }
+}
+
 export interface ImhentaiCover {
   url: string
   width: number

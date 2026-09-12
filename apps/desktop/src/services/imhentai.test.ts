@@ -4,6 +4,7 @@ import {
   imhentaiSearchUrl,
   parseImhentaiCover,
   parseImhentaiSearch,
+  parseImhentaiSearchResults,
   toImhentaiPost,
 } from './imhentai'
 
@@ -12,6 +13,11 @@ const SEARCH_HTML =
   '<div class="gallery"><a href="/gallery/12345/"><img/></a></div>' +
   '<div class="gallery"><a href="/gallery/67890">caption gallery</a></div>' +
   '<a href="/tag/bbc">not a gallery</a>'
+
+const SEARCH_THUMB_HTML =
+  '<div class="thumb"><div class="inner_thumb"><a href="/gallery/12345/"><img class="lazy" data-src="https://m1.imhentai.xxx/001/a/thumb.jpg" /></a></div></div>' +
+  '<div class="thumb"><div class="inner_thumb"><a href="/gallery/12345/"><img class="lazy" data-src="https://m1.imhentai.xxx/001/a/thumb.jpg" /></a></div></div>' +
+  '<div class="thumb"><div class="inner_thumb"><a href="/gallery/67890/"><img class="lazy" data-src="https://m2.imhentai.xxx/002/b/thumb.jpg" /></a></div></div>'
 
 const DQ = String.fromCharCode(34)
 const SQ = String.fromCharCode(39)
@@ -31,6 +37,16 @@ describe('imhentai adapter', () => {
   it('extracts gallery IDs, deduped and capped', () => {
     expect(parseImhentaiSearch(SEARCH_HTML)).toEqual(['12345', '67890'])
     expect(parseImhentaiSearch(SEARCH_HTML, 1)).toEqual(['12345'])
+  })
+
+  it('extracts gallery IDs and cover thumbnails directly from search HTML', () => {
+    expect(parseImhentaiSearchResults(SEARCH_THUMB_HTML)).toEqual([
+      { id: '12345', coverUrl: 'https://m1.imhentai.xxx/001/a/thumb.jpg' },
+      { id: '67890', coverUrl: 'https://m2.imhentai.xxx/002/b/thumb.jpg' },
+    ])
+    expect(parseImhentaiSearchResults(SEARCH_THUMB_HTML, 1)).toEqual([
+      { id: '12345', coverUrl: 'https://m1.imhentai.xxx/001/a/thumb.jpg' },
+    ])
   })
 
   it('resolves the cover via the parseJSON ext map', () => {

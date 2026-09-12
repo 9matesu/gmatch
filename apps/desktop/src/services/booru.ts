@@ -18,6 +18,7 @@ import {
   imhentaiSearchUrl,
   parseImhentaiCover,
   parseImhentaiSearch,
+  parseImhentaiSearchResults,
   toImhentaiPost,
 } from './imhentai'
 
@@ -122,8 +123,8 @@ function isHealthy(id: string): boolean {
   return (unhealthyUntil.get(id) ?? 0) <= Date.now()
 }
 
-function markUnhealthy(id: string): void {
-  unhealthyUntil.set(id, Date.now() + COOLDOWN_HARD_MS)
+function markUnhealthy(id: string, durationMs = COOLDOWN_HARD_MS): void {
+  unhealthyUntil.set(id, Date.now() + durationMs)
 }
 
 /** Test hook: reset mirror health + no-repeat memory. */
@@ -336,7 +337,10 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
   const healthy = DIRECT_SOURCES.filter((s) => isHealthy(s.id))
   for (const src of healthy.length > 0 ? healthy : DIRECT_SOURCES) {
     let reachable = true
-    for (const variant of queryVariants(req.tags)) {
+    // booru.org subdomains are tagless and dedicated to niche themes;
+    // querying once avoids hammering *.booru.org with redundant requests per round.
+    const variants = src.type === 'booruorg' ? [req.tags] : queryVariants(req.tags)
+    for (const variant of variants) {
       if (!reachable) break
       let url: string
       let kind: 'dapi' | 'moe' | 'html' = 'dapi'
@@ -376,7 +380,19 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
       }
       if (!res.ok) {
         // HTTP error = sick mirror: cool it down, move to the next one.
-        markUnhealthy(src.id)
+        if (res.status === 429) {
+          // 429 Too Many Requests: cool down for 5 minutes.
+          // booru.org subdomains share an IP rate limit; cool down all of them.
+          const duration = 300_000
+          markUnhealthy(src.id, duration)
+          if (src.type === 'booruorg') {
+            for (const s of DIRECT_SOURCES) {
+              if (s.type === 'booruorg') markUnhealthy(s.id, duration)
+            }
+          }
+        } else {
+          markUnhealthy(src.id)
+        }
         reachable = false
         continue
       }
@@ -401,7 +417,16 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
         }
         parsed = kind === 'moe' ? toMoePosts(data, src.origin) : toPosts(data, src.origin)
       }
-      const clean = sanitize(parsed, variant)
+      let clean: BooruPost[] = []
+      if (src.type === 'booruorg') {
+        // Single tagless fetch; check all variants against the page's posts in memory
+        for (const v of queryVariants(req.tags)) {
+          clean = sanitize(parsed, v)
+          if (clean.length > 0) break
+        }
+      } else {
+        clean = sanitize(parsed, variant)
+      }
       if (clean.length === 0) continue
       const fresh = remember(clean)
       if (fresh.length === 0) continue // all repeats — narrower pages may be new
@@ -516,7 +541,20 @@ async function imhentaiDirect(query: string, limit: number): Promise<BooruPost[]
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
     if (!searchRes.ok || typeof searchRes.text !== 'function') return []
-    const ids = parseImhentaiSearch(await searchRes.text(), 3)
+    const html = await searchRes.text()
+
+    // 1. First extract gallery covers directly from the search HTML in one pass.
+    // The search page contains thumbnails; using them directly avoids secondary
+    // /gallery/<id>/ requests that trigger Cloudflare 403 WAF challenges.
+    const directResults = parseImhentaiSearchResults(html, Math.max(limit, 3))
+    if (directResults.length > 0) {
+      return directResults
+        .slice(0, limit)
+        .map((r) => toImhentaiPost(r.id, { url: r.coverUrl, width: 0, height: 0 }, query))
+    }
+
+    // 2. Fallback to individual gallery fetches only when direct thumbnails were absent.
+    const ids = parseImhentaiSearch(html, 3)
     const posts: BooruPost[] = []
     for (const id of ids) {
       if (posts.length >= limit) break

@@ -561,6 +561,33 @@ function parseImhentaiSearch(html, limit) {
   return out
 }
 
+function parseImhentaiSearchResults(html, limit) {
+  const out = []
+  const seen = new Set()
+  const thumbRe = /<div class="thumb"[\s\S]*?href="\/gallery\/(\d+)\/?"[\s\S]*?<img[^>]+data-src="([^"]+)"/g
+  let m
+  while ((m = thumbRe.exec(html))) {
+    const [, id, coverUrl] = m
+    if (!seen.has(id)) {
+      seen.add(id)
+      out.push({ id, coverUrl })
+      if (out.length >= limit) break
+    }
+  }
+  if (out.length === 0) {
+    const linkRe = /href="\/gallery\/(\d+)\/?"[^>]*>[\s\S]*?<img[^>]+(?:data-src|src)="([^"]+)"/g
+    while ((m = linkRe.exec(html))) {
+      const [, id, coverUrl] = m
+      if (!seen.has(id)) {
+        seen.add(id)
+        out.push({ id, coverUrl })
+        if (out.length >= limit) break
+      }
+    }
+  }
+  return out
+}
+
 function parseImhentaiCover(html) {
   const srcTag = 'data-src="'
   const srcStart = html.indexOf(srcTag)
@@ -602,6 +629,24 @@ async function fetchImhentai(variant, n) {
   // net stack is Chromium TLS and passes like a real browser tab. Plain-node
   // fallback stays for contexts without Electron.
   const searchBody = await imhGet(`${IMHENTAI_ROOT}/search/?key=${encodeURIComponent(key)}`)
+  const tags = key
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 2)
+  if (hasBadTag(tags)) return []
+
+  // Direct results from search HTML (fast path, avoids gallery fetches)
+  const directResults = parseImhentaiSearchResults(searchBody, n)
+  if (directResults.length > 0) {
+    const directPosts = []
+    for (const { id, coverUrl } of directResults) {
+      directPosts.push({ id: `imh-${id}`, url: coverUrl, tags, rating: 'e', kind: 'image' })
+      if (directPosts.length >= n) break
+    }
+    if (directPosts.length > 0) return directPosts
+  }
+
+  // Fallback to gallery inspection
   const ids = parseImhentaiSearch(searchBody, 3)
   const posts = []
   for (const id of ids) {
@@ -615,11 +660,6 @@ async function fetchImhentai(variant, n) {
         if (cover.width < MIN_WIDTH || cover.height < MIN_HEIGHT) continue
         if (cover.width * cover.height < MIN_PIXELS) continue
       }
-      const tags = key
-        .toLowerCase()
-        .split(/[^a-z0-9]+/)
-        .filter((t) => t.length >= 2)
-      if (hasBadTag(tags)) continue
       posts.push({ id: `imh-${id}`, url: cover.url, tags, rating: 'e', kind: 'image' })
     } catch {
       /* one dead gallery never kills the round */

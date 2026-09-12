@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, type Plugin, type ProxyOptions } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
@@ -125,6 +125,22 @@ function devPxPlugin(): Plugin {
   }
 }
 
+function booruOrgProxy(target: string, prefix: string): ProxyOptions {
+  return {
+    target,
+    changeOrigin: true,
+    rewrite: (p) => p.replace(new RegExp(`^${prefix}`), ''),
+    headers: { Referer: `${target}/` },
+    configure: (proxy) => {
+      proxy.on('proxyReq', (proxyReq) => {
+        proxyReq.removeHeader('origin')
+        proxyReq.setHeader('referer', `${target}/`)
+        proxyReq.setHeader('user-agent', DEV_UA)
+      })
+    },
+  }
+}
+
 // base './' so Electron can load dist/index.html over file://
 export default defineConfig({
   base: './',
@@ -208,31 +224,11 @@ export default defineConfig({
         rewrite: (p) => p.replace(/^\/booru\/real/, ''),
         headers: { Referer: 'https://realbooru.com/' },
       },
-      '^/booru/hgoon': {
-        target: 'https://hgoon.booru.org',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/booru\/hgoon/, ''),
-      },
-      '^/booru/qoh': {
-        target: 'https://qoh.booru.org',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/booru\/qoh/, ''),
-      },
-      '^/booru/celeb': {
-        target: 'https://celeb.booru.org',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/booru\/celeb/, ''),
-      },
-      '^/booru/foot': {
-        target: 'https://footfetishbooru.booru.org',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/booru\/foot/, ''),
-      },
-      '^/booru/blacked': {
-        target: 'https://blacked.booru.org',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/booru\/blacked/, ''),
-      },
+      '^/booru/hgoon': booruOrgProxy('https://hgoon.booru.org', '/booru/hgoon'),
+      '^/booru/qoh': booruOrgProxy('https://qoh.booru.org', '/booru/qoh'),
+      '^/booru/celeb': booruOrgProxy('https://celeb.booru.org', '/booru/celeb'),
+      '^/booru/foot': booruOrgProxy('https://footfetishbooru.booru.org', '/booru/foot'),
+      '^/booru/blacked': booruOrgProxy('https://blacked.booru.org', '/booru/blacked'),
     },
   },
   build: {

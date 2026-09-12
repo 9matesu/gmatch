@@ -423,7 +423,56 @@ describe('fetchPosts (SPEC §6/§8)', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
     const res = await fetchPosts({ tags: 'skylar_vox', limit: 5 })
-    expect(res.ok).toBe(false) // junk filtered everywhere → no usable posts
+    expect(res.ok).toBe(false)
+  })
+
+  it('extracts imhentai covers directly from search HTML without requesting /gallery/<id>', async () => {
+    vi.stubGlobal('window', {})
+    const searchHtml =
+      '<div class="thumb"><div class="inner_thumb"><a href="/gallery/777/"><img class="lazy" data-src="https://m1.imhentai.xxx/001/a/thumb.jpg" /></a></div></div>'
+    const fetchMock = vi.fn(async (url: string) => {
+      const u = String(url)
+      if (u.startsWith('/booru/imh/search')) {
+        return { ok: true, text: () => Promise.resolve(searchHtml) }
+      }
+      if (u.startsWith('/booru/imh/gallery')) {
+        throw new Error('should not fetch individual gallery when thumbnails are in search')
+      }
+      return { ok: false }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await fetchPosts({ tags: 'doujin_caption', limit: 5 })
+    expect(res.ok).toBe(true)
+    expect(res.source).toBe('imh-direct')
+    expect(res.posts[0].id).toBe('imh-777')
+    expect(res.posts[0].url).toBe('https://m1.imhentai.xxx/001/a/thumb.jpg')
+    const galleryCalls = fetchMock.mock.calls.filter((c) => String(c[0]).startsWith('/booru/imh/gallery'))
+    expect(galleryCalls.length).toBe(0)
+  })
+
+  it('cools down all booru.org subdomains when any subdomain returns 429', async () => {
+    vi.stubGlobal('window', {})
+    const fetchMock = vi.fn(async (url: string) => {
+      const u = String(url)
+      if (u.startsWith('/booru/blacked')) {
+        return { ok: false, status: 429 }
+      }
+      return { ok: false }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await fetchPosts({ tags: 'interracial', limit: 5 })
+    expect(res.ok).toBe(false)
+    // Both blacked-direct and other booruorg subdomains (hgoon, qoh, etc.) should be cooling down
+    fetchMock.mockClear()
+    fetchMock.mockImplementation(async (url: string) => {
+      const u = String(url)
+      if (u.includes('booru.org') || u.startsWith('/booru/hgoon') || u.startsWith('/booru/blacked') || u.startsWith('/booru/qoh')) {
+        throw new Error('booru.org should not be queried during shared 429 cooldown')
+      }
+      return { ok: false }
+    })
+    const res2 = await fetchPosts({ tags: 'interracial', limit: 5 })
+    expect(res2.ok).toBe(false)
   })
 })
 
