@@ -678,6 +678,10 @@ async function pairFromQueue(db: D1Turso, now: number, _skipBots = false): Promi
     .bind(eligibleNow, isoFromMs(now - QUEUE_MAX_IDLE_MS), bucketActive, bucketIdle)
     .all<{ user_id: string; queued_at: string }>()
 
+  // Pairing is NOT the deck gate: /join and /autoqueue refuse deckless
+  // registrations at the entry point. Rows without deck_id here are legacy or
+  // service-level re-queues (expireIdleSpecialMatches) whose play pool falls
+  // back to owned objects in playMatchCard.
   // Filter out any user who is already locked in a duel
   const eligible = waiting.results.filter((p) => !inMatchUserIds.has(p.user_id))
   if (eligible.length === 0) return false
