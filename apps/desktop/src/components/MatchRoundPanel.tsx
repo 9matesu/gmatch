@@ -668,7 +668,7 @@ export function MatchRoundPanel({
                   <div
                     className={`metallic-card-border w-full aspect-[3/4.2] mx-auto select-none transition-all ${
                       isRoundResult && match.matched ? 'ring-2 ring-emerald-400 shadow-2xl' : ''
-                    } ${opponentImg.url ? 'cursor-pointer hover:scale-[1.02]' : ''}`}
+                    } ${opponentImg.url ? 'cursor-pointer hover:opacity-80' : ''}`}
                     data-rarity={oppRarity.rarity}
                     onClick={() => {
                       if (opponentImg.url) {

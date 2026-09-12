@@ -72,7 +72,7 @@ export function GamesHub({
                 aria-pressed={subTab === mode.id}
                 className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                   subTab === mode.id
-                    ? 'bg-hud-accent text-retro-accent-text '
+                    ? 'bg-retro-accent text-retro-accent-text '
                     : 'text-retro-muted hover:text-retro-fg'
                 }`}
               >

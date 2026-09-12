@@ -141,7 +141,7 @@ export function CommandIsland({
             playPress(920);
             onOpenCreatePost?.();
           }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-hud-accent text-retro-fg hover:bg-hud-accent-hover active:scale-95 transition-all text-xs font-semibold"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-retro-accent text-retro-accent-text hover:bg-retro-accent-hover active:scale-95 transition-all text-xs font-semibold"
           title="Create Post"
           aria-label="Create Post"
         >
@@ -238,7 +238,7 @@ export function CommandIsland({
                 aria-current={isActive ? 'page' : undefined}
                 className={`relative flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                   isActive
-                    ? 'bg-hud-accent text-retro-fg scale-[1.02]'
+                    ? 'bg-retro-accent text-retro-accent-text'
                     : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
                 }`}
               >
@@ -264,7 +264,7 @@ export function CommandIsland({
             aria-label="Messages"
             className={`relative flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
               messagesOpen || mainView === 'messages'
-                ? 'bg-hud-accent text-retro-fg scale-[1.02]'
+                ? 'bg-retro-accent text-retro-accent-text'
                 : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
             }`}
           >
@@ -291,7 +291,7 @@ export function CommandIsland({
             title={`Profile (${displayName})`}
             className={`relative flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
               mainView === 'profile'
-                ? 'bg-hud-accent text-retro-fg scale-[1.02]'
+                ? 'bg-retro-accent text-retro-accent-text'
                 : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
             }`}
           >
@@ -331,7 +331,7 @@ export function CommandIsland({
 
         {/* Expanded Right Section of the Pill Bar */}
         {satelliteOpen && (
-          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 animate-in fade-in slide-in-from-left-2 duration-200">
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 animate-orbit-fade-in duration-300">
             <div className="h-4 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
 
             {/* Store */}
@@ -347,7 +347,7 @@ export function CommandIsland({
               title="Store & Boosters"
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
                 mainView === 'store'
-                  ? 'bg-hud-accent text-retro-fg scale-[1.02]'
+                  ? 'bg-retro-accent text-retro-accent-text'
                   : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
               }`}
             >
@@ -364,7 +364,7 @@ export function CommandIsland({
               title="Public & Private Servers"
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
                 mainView === 'servers'
-                  ? 'bg-hud-accent text-retro-fg scale-[1.02]'
+                  ? 'bg-retro-accent text-retro-accent-text'
                   : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
               }`}
             >
@@ -381,7 +381,7 @@ export function CommandIsland({
               title="PC Domination Battles"
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
                 mainView === 'pc_domination'
-                  ? 'bg-hud-accent text-retro-fg scale-[1.02]'
+                  ? 'bg-retro-accent text-retro-accent-text'
                   : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
               }`}
             >
@@ -399,7 +399,7 @@ export function CommandIsland({
                 title="Blind Courier Rooms"
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
                   mainView === 'rooms'
-                    ? 'bg-hud-accent text-retro-fg scale-[1.02]'
+                    ? 'bg-retro-accent text-retro-accent-text'
                     : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
                 }`}
               >
@@ -469,7 +469,7 @@ export function CommandIsland({
                 title="Admin Control Panel"
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
                   mainView === 'admin'
-                    ? 'bg-hud-accent text-retro-fg scale-[1.02]'
+                    ? 'bg-retro-accent text-retro-accent-text'
                     : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
                 }`}
               >
