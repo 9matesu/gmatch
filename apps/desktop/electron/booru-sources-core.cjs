@@ -7,13 +7,13 @@
 function dapiSource(id, base, { httpGet, parse, negatives }) {
   return {
     id,
-    fetch: async (variant, n, captions) => {
+    fetch: async (variant, n) => {
       const pid = Math.floor(Math.random() * 8)
       const query = (variant + ' rating:explicit ' + negatives()).trim()
       const url = (p) => `${base}/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(query)}&limit=${n}&json=1&pid=${p}`
-      let posts = parse(await httpGet(url(pid)), base, captions)
+      let posts = parse(await httpGet(url(pid)), base)
       if (posts.length === 0 && pid > 0) {
-        posts = parse(await httpGet(url(0)), base, captions)
+        posts = parse(await httpGet(url(0)), base)
       }
       return posts
     },
@@ -24,10 +24,10 @@ function dapiSource(id, base, { httpGet, parse, negatives }) {
 function booruOrgSource(sub, { httpGet, parse }, id = sub.split('.')[0]) {
   return {
     id,
-    fetch: async (variant, n, captions) => {
+    fetch: async (variant, n) => {
       const pid = Math.floor(Math.random() * 10) * 20
       const html = await httpGet(`https://${sub}/index.php?page=post&s=list&pid=${pid}`)
-      return parse(html, captions, variant).slice(0, n)
+      return parse(html, variant).slice(0, n)
     },
   }
 }

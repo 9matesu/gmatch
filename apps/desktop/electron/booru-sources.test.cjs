@@ -11,7 +11,7 @@ const { dapiSource, booruOrgSource } = require('./booru-sources-core.cjs')
     calls++
     return calls === 1 ? '{"posts":[]}' : JSON.stringify([{ id: 1, file_url: 'https://x/a.jpg', tags: 'a', rating: 'e', width: 800, height: 800 }])
   }
-  const parse = (body, base) => {
+  const parse = (body, baseUrl) => { assert.ok(baseUrl);
     const d = JSON.parse(body)
     const list = Array.isArray(d) ? d : (d.posts && (d.posts.post ?? d.posts)) ?? []
     return list.length ? list.map((p) => ({ id: String(p.id), url: p.file_url })) : []
@@ -29,7 +29,7 @@ const { dapiSource, booruOrgSource } = require('./booru-sources-core.cjs')
   // booruOrgSource: pid multiple of 20, parse receives (html, bSub, captions, variant)
   const seen = []
   const httpGet2 = async (u) => { seen.push(u); return 'HTML' }
-  const parse2 = (html, captions, query) => { assert.equal(html, 'HTML'); assert.equal(query, 'q1'); return [{ id: '1' }] }
+  const parse2 = (html, query) => { assert.equal(html, 'HTML'); assert.equal(query, 'q1'); return [{ id: '1' }] }
   Math.random = () => 0.5
   const s2 = booruOrgSource('hgoon.booru.org', { httpGet: httpGet2, parse: parse2 })
   const r2 = await s2.fetch('q1', 5, false)
