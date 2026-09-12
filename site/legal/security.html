@@ -178,6 +178,15 @@ curl -sI "$API_BASE/api/objects/&lt;own-id&gt;" | grep -i cache-control         
 <li><code>API_SEALED_ONLY</code> covering GET is only flipped AFTER the seal-GET client</li>
 </ul>
 <p>  release is distributed (support kill-switch, same policy as round 2).</p>
+<h2>Round 5 (2026-09-12, admin separation, main)</h2>
+<table>
+<tr><th>#</th><th>Sev</th><th>Finding</th><th>Repro</th><th>Status</th></tr>
+<tr><td>F26</td><td>HIGH</td><td>Four doors let an admin (or a stolen admin session) read private assets with NO case: <code>isAdminUser</code> bypass on the object read path, <code>GET /admin/users/:id/objects</code> bulk sweep, <code>GET /admin/objects</code> listing private rows, the <code>dm</code> branch of the chat-delete route. The spy hack additionally sold DM-body peeks to any paying player.</td><td>historical <code>objects.ts:446/532</code>, <code>admin.ts</code> users/:id/objects</td><td>✅ all removed; the ONLY door to a private object is <code>GET /admin/cases/:id/evidence</code> (300s signed token for the reporter-disclosed object, audited <code>view_case_evidence</code>); <code>/admin/objects</code> + delete/redact scoped to <code>is_public=1</code>; spy feed returns <code>intercepted: []</code></td></tr>
+</table>
+<p><strong>Protocol note:</strong> this enforces docs/ADMIN-SUITE.md as CODE, not convention.</p>
+<p>Gates: <code>security-greps.sh</code> (4 new greps), <code>adminEndpointParity.test.ts</code></p>
+<p>(no <code>users/{id}/objects</code> in the client), flipped regression tests in</p>
+<p><code>objects-security</code>, <code>admin.test</code>, <code>admin-chat.test</code>, <code>spy-feed.test</code>.</p>
 <h2>Runtime gate (wave 2)</h2>
 <pre>
 bash scripts/security-greps.sh          # expected: ALL GREPS CLEAN

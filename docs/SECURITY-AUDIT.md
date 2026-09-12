@@ -127,6 +127,18 @@ phase" becomes implemented reality). Full ledger in `docs/ADMIN-SUITE.md`.
 - `API_SEALED_ONLY` covering GET is only flipped AFTER the seal-GET client
   release is distributed (support kill-switch, same policy as round 2).
 
+
+## Round 5 (2026-09-12, admin separation, main)
+
+| # | Sev | Finding | Repro | Status |
+|---|-----|---------|-------|--------|
+| F26 | HIGH | Four doors let an admin (or a stolen admin session) read private assets with NO case: `isAdminUser` bypass on the object read path, `GET /admin/users/:id/objects` bulk sweep, `GET /admin/objects` listing private rows, the `dm` branch of the chat-delete route. The spy hack additionally sold DM-body peeks to any paying player. | historical `objects.ts:446/532`, `admin.ts` users/:id/objects | ✅ all removed; the ONLY door to a private object is `GET /admin/cases/:id/evidence` (300s signed token for the reporter-disclosed object, audited `view_case_evidence`); `/admin/objects` + delete/redact scoped to `is_public=1`; spy feed returns `intercepted: []` |
+
+**Protocol note:** this enforces docs/ADMIN-SUITE.md as CODE, not convention.
+Gates: `security-greps.sh` (4 new greps), `adminEndpointParity.test.ts`
+(no `users/{id}/objects` in the client), flipped regression tests in
+`objects-security`, `admin.test`, `admin-chat.test`, `spy-feed.test`.
+
 ## Runtime gate (wave 2)
 
 ```bash
