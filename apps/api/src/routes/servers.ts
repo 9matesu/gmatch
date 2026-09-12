@@ -71,7 +71,7 @@ function validHint(hint: string): boolean {
 
 servers.get('/', softAuth, async (c) => {
   const { results } = await c.env.DB.prepare(
-    `SELECT id, name, description, owner_id, password_required, endpoint_hint, user_count, online_count, created_at, last_seen
+    `SELECT id, name, description, owner_id, owner_name, password_required, endpoint_hint, user_count, online_count, created_at, last_seen
      FROM ServerDirectory
      WHERE last_seen >= datetime('now', ?)
        AND COALESCE(hidden, 0) = 0 AND COALESCE(blocked, 0) = 0
@@ -92,6 +92,7 @@ servers.post('/', orbitAuth, async (c) => {
   let passwordRequired = 0
   let userCount: number | null = null
   let onlineCount: number | null = null
+  let ownerName = ''
   try {
     const body = await c.req.json()
     if (typeof body?.name === 'string') name = body.name.trim().slice(0, MAX_NAME)
@@ -104,6 +105,9 @@ servers.post('/', orbitAuth, async (c) => {
       typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.min(Math.floor(v), 1_000_000) : null
     userCount = clamp(body?.user_count)
     onlineCount = clamp(body?.online_count)
+    // Host-reported display handle for the row (share flows); clamped, same
+    // best-effort class as the counts. Absent never erases a known name.
+    if (typeof body?.owner_name === 'string') ownerName = body.owner_name.trim().slice(0, 40)
   } catch {
     return c.json({ error: 'invalid json' }, 400)
   }
@@ -116,16 +120,17 @@ servers.post('/', orbitAuth, async (c) => {
   if (!mine && (existing?.n ?? 0) >= MAX_PER_OWNER) return c.json({ error: `max ${MAX_PER_OWNER} servers per owner` }, 429)
 
   await c.env.DB.prepare(`
-    INSERT INTO ServerDirectory (id, name, description, owner_id, owner_pubkey, endpoint_hint, password_required, user_count, online_count, created_at, last_seen)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    INSERT INTO ServerDirectory (id, name, description, owner_id, owner_pubkey, owner_name, endpoint_hint, password_required, user_count, online_count, created_at, last_seen)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
     ON CONFLICT(id) DO UPDATE SET description = excluded.description, endpoint_hint = excluded.endpoint_hint,
       password_required = excluded.password_required,
+      owner_name = COALESCE(excluded.owner_name, ServerDirectory.owner_name),
       user_count = COALESCE(excluded.user_count, ServerDirectory.user_count),
       online_count = COALESCE(excluded.online_count, ServerDirectory.online_count),
       last_seen = datetime('now')
-  `).bind(id, name, description, orbitId, ownerPub, endpointHint, passwordRequired, userCount, onlineCount).run()
+  `).bind(id, name, description, orbitId, ownerPub, ownerName || null, endpointHint, passwordRequired, userCount, onlineCount).run()
 
-  const row = await c.env.DB.prepare('SELECT id, name, description, owner_id, password_required, created_at FROM ServerDirectory WHERE id = ?').bind(id).first()
+  const row = await c.env.DB.prepare('SELECT id, name, description, owner_id, owner_name, password_required, created_at FROM ServerDirectory WHERE id = ?').bind(id).first()
   return c.json({ server: row }, 201)
 })
 
