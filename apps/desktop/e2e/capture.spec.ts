@@ -25,7 +25,7 @@ test('capture landing screenshots', async ({ browser }) => {
   const page = await ctx.newPage()
 
   // 1. Idle grid (clicker stage).
-  await seedApp(page, { gc: 15234 })
+  await seedApp(page, { points: 15234 })
   await mockBooruFeed(page)
   await page.goto('/#/grid')
   await page.getByRole('button', { name: /attack the current foe/i }).waitFor({ timeout: 30_000 })

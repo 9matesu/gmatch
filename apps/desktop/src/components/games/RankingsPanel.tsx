@@ -9,7 +9,7 @@ type Board = 'idle' | 'arena' | 'social';
 type SocialMetric = 'all' | 'today';
 
 const BOARDS: { id: Board; label: string; icon: typeof Trophy }[] = [
-  { id: 'idle', label: 'Idle Clicker', icon: MousePointerClick },
+  { id: 'idle', label: 'Wallet', icon: MousePointerClick },
   { id: 'arena', label: 'Card Duel', icon: Swords },
   { id: 'social', label: 'Social', icon: Heart },
 ];

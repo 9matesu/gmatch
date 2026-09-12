@@ -1,6 +1,6 @@
 const UNITS = ['k', 'M', 'B', 'T', 'Qa', 'Qi']
 
-/** Compact monospace-friendly number formatting for g$ displays. */
+/** Compact monospace-friendly number formatting for in-game point displays. */
 export function formatNum(n: number): string {
   if (!Number.isFinite(n) || n < 0) return '0'
   if (n < 1000) return n < 100 && n % 1 !== 0 ? n.toFixed(1) : String(Math.floor(n))

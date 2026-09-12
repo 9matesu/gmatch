@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import domination from './domination'
 import { economy } from './economy'
-import { economyIdle } from './economy-idle'
 import { EconomyService } from '../economy'
 import { createMockEnv, type TestIdentity, createTestIdentity, signRequestHeaders } from '../test-utils'
 
@@ -199,7 +198,6 @@ describe('domination economy (cost + victim payout)', () => {
     app.use('*', async (c2, next) => { c2.env = env as any; await next() })
     app.route('/api/domination', domination)
     app.route('/api/economy', economy)
-    app.route('/api/economy', economyIdle)
   })
 
   function auth(identity: TestIdentity, method: string, path: string, body = '') {

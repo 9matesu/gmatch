@@ -3,11 +3,12 @@
 One Electron desktop app, one multiplayer game. The **gMatch shell** (feed,
 card duels, chat, P2P, hacks, moderation, admin — vendored from the orbit repo
 in the 2026-09 merge) wraps the **Babecock · Idle** game (ex-GoonGrid): click
-pictures to earn **g$**, buy **tags** (parsed live from booru sources) that
+pictures to earn **pts**, buy **tags** (parsed live from booru sources) that
 generate passive income and reshape your idle feed, buy images into your
 **Gallery**, pop **GoonCaps**, climb the **Pornification** ladder, and
-**Brainmelt** (prestige). Idle earnings and spends share the server g$ ledger
-with duels, lootboxes, hacks and trades — one wallet, one economy.
+**Brainmelt** (prestige). Idle pts are a local-only currency (the save file);
+the server g$ ledger (`EconomyService`) backs duels, lootboxes, hacks and
+trades — two separate economies, no bridge between them.
 
 ## 0. Architecture (merge plan D1–D9)
 
@@ -36,12 +37,12 @@ with duels, lootboxes, hacks and trades — one wallet, one economy.
 ## 1. Core loop
 
 1. An image fills the center "Goon Panel" (fetched from a booru by owned tags).
-2. Click it → +clickPower GP, splat animation, +XP. Every 25th click is a
+2. Click it → +clickPower pts, splat animation, +XP. Every 25th click is a
    **CRIT** ("cumshot flash") worth x10.
-3. Spend GP in the Tag Market / Image Shop / GoonCap Vending Machine.
-4. Owned tags tick passive GP/s and bias which images appear.
+3. Spend pts in the Tag Market / Image Shop / GoonCap Vending Machine.
+4. Owned tags tick passive pts/s and bias which images appear.
 5. Reach Pornification tier thresholds → new titles, UI accents, unlocks.
-6. Brainmelt (prestige) resets GP/tags for Corruption shards (+10% global mult each).
+6. Brainmelt (prestige) resets pts/tags for Corruption shards (+10% global mult each).
 7. **Heat combo**: clicks within 2s of each other stack a streak; every 10
    clicks adds +0.25x click power (cap x3). Idling past the window resets it.
    Session-only streak; the best streak ever persists (`maxHeatStreak`) and
@@ -49,18 +50,16 @@ with duels, lootboxes, hacks and trades — one wallet, one economy.
 
 ## 2. Currencies
 
-- **g$** — the ONE currency (plan D4): idle clicks + passive income, duel
-  stakes, lootboxes, hacks, trades, tags/caps/gallery buys. Server ledger
-  (`EconomyService`) is authoritative; the idle game mirrors into it via
-  `POST /api/economy/idle-credit` / `idle-debit` (idempotent, 60s throttle).
-  Credits are envelope-checked (economy-idle.ts `idleEnvelope`): after the
-  first trusted flush per server start, each credit must fit 1.5× the client's
-  claimed g$/s elapsed rate (claim ceiling 50k/s).
-  Honest offline resumes (25% rule) always fit; a modified client on someone
-  else's node is bounded to 1.5× the 50k/s claim ceiling (not unlimited, not
-  zero — best-effort by design, documented, protects casual leaderboard
-  integrity); on a node you host it only disciplines honest crashes.
-  Legacy GP was a 1:1 rename (GP retired; old saves migrate `gp`→`gc`).
+- **pts** — the idle game's currency, LOCAL ONLY (2026-09-11 simplification):
+  earned by clicks + passive income, spent in the Tag Market / Image Shop /
+  GoonCap Vending Machine. Lives in the localStorage save; never synced to the
+  server. The old `idle-credit`/`idle-debit` ledger bridge (plan D4) was
+  removed with `economy-idle.ts`, `walletBridge` and `walletSync`.
+  Legacy saves migrate `gp`/`gc`/`totalEarnedGP`/`totalEarnedGc` →
+  `points`/`totalEarned` (same value, renamed).
+- **g$** — the server ledger currency (`EconomyService` is authoritative):
+  duel stakes, lootboxes, hacks, trades, store purchases. Idle no longer
+  feeds it; you earn g$ through the shell's social/game loops only.
 - **XP** — drives Pornification tier (never resets within a run).
 - **Corruption shards** — prestige currency, persists through Brainmelt.
 
@@ -69,7 +68,7 @@ with duels, lootboxes, hacks and trades — one wallet, one economy.
 - On boot the client fetches ~60 posts from a random healthy source, splits the
   booru `tags` field, filters blocklist (§8) + noise, ranks by frequency, and
   offers the top ~24 as purchasable tags (refresh button re-parses).
-- Each tag: `cost = base * 1.15^owned`, `income` GP/s, `weight` (feed bias).
+- Each tag: `cost = base * 1.15^owned`, `income` pts/s, `weight` (feed bias).
   base/income derived from tag length + frequency (rarer tag = pricier = better).
 - Max 20 owned levels per tag. Owned tags list = the feed query (top 5 by level).
 - No hardcoded starter tags: the player picks exactly 4 on the setup screen
@@ -81,7 +80,7 @@ with duels, lootboxes, hacks and trades — one wallet, one economy.
 - "Buy this image" button on the current image: cost = `rarityBase * 1.1^gallerySize`.
 - Rarity ladder from clicks+price (ORBIT-style): Common 0-99, Copper 100-499,
   Silver 500-1499, Gold 1500-4999, Diamond 5000+.
-- Owned images: +GP/s each (by rarity: 1/3/10/30/100), shown in Gallery tab,
+- Owned images: +pts/s each (by rarity: 1/3/10/30/100), shown in Gallery tab,
   click any owned image in the gallery to re-feature it in the Goon Panel.
 - Gallery persists through Brainmelt (the "keepsakes").
 
@@ -98,10 +97,10 @@ with duels, lootboxes, hacks and trades — one wallet, one economy.
 
 | Cap | Cost | Effect |
 |---|---|---|
-| E-Girl Spit | 150 GP | x2 click power, permanent |
-| Braceface | 900 GP | auto-click 1/s, permanent |
-| Pornmeat | 5k GP | x2 passive GP/s, permanent |
-| Brain Drain | 50k GP | x10 everything, permanent |
+| E-Girl Spit | 150 pts | x2 click power, permanent |
+| Braceface | 900 pts | auto-click 1/s, permanent |
+| Pornmeat | 5k pts | x2 passive pts/s, permanent |
+| Brain Drain | 50k pts | x10 everything, permanent |
 
 Stacking: different caps stack; same-cap pops stack permanently (no timers, no wear).
 
@@ -166,7 +165,7 @@ text overlays kept for caption hunts, §6).
   shop (Tags / Gallery / Caps / Prestige).
 - Style: `bg-black` app shell, panels `bg-surface-raised`-like `rgba(255,255,255,0.04)`
   + `border-white/10` + `rounded-2xl` + `backdrop-blur`, accent hot pink→violet
-  gradient, monospace numbers, floating `+GP` texts, subtle pulse on affordable items.
+  gradient, monospace numbers, floating `+pts` texts, subtle pulse on affordable items.
 - Age-gate overlay on first launch (must tick "I am 18+"). NSFW blur toggle in
   header (blurs images until hover) — default ON.
 - Toasts for purchases/unlocks live in the header 🔔 tab (capped at 50, no
@@ -193,8 +192,8 @@ src/game/tagFilter.ts — it is the most important tested module in the repo.
 ## 9. Prestige — Brainmelt
 
 - Available at Pornification tier 5+ ("Pervert").
-- Shards = floor(sqrt(totalEarnedGP / 1e6)); each shard +10% global multiplier.
-- Resets: GP, XP/tier, tags, caps. Keeps: gallery images, shards, achievements.
+- Shards = floor(sqrt(totalEarned / 1e6)); each shard +10% global multiplier.
+- Resets: pts, XP/tier, tags, caps. Keeps: gallery images, shards, achievements.
 
 ## 10. Achievements (small, spicy, 13 total)
 
@@ -243,7 +242,7 @@ offline earnings). Each +5% click power. Persist across prestige.
 ## 11. Save
 
 - zustand state → localStorage `gmatch.save.v1`, autosave every 10s + on unload.
-- Offline earnings = elapsed * GP/s * 25%, capped 8h, shown in modal on load.
+- Offline earnings = elapsed * pts/s * 25%, capped 8h, shown in modal on load.
 
 ## 12. Server topology (central courier + opt-in host mode)
 

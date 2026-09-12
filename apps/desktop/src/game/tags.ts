@@ -73,11 +73,11 @@ export function canBuyTag(tag: OwnedTag): boolean {
 }
 
 /** Buy one level of a tag; returns a new tag or null if maxed/unaffordable. Buying selects it for the feed. */
-export function buyTag(tag: OwnedTag, gc: number): { tag: OwnedTag; gc: number } | null {
+export function buyTag(tag: OwnedTag, points: number): { tag: OwnedTag; points: number } | null {
   if (!canBuyTag(tag)) return null
   const cost = tagCost(tag.base, tag.level)
-  if (gc < cost) return null
-  return { tag: { ...tag, level: tag.level + 1, selected: true }, gc: gc - cost }
+  if (points < cost) return null
+  return { tag: { ...tag, level: tag.level + 1, selected: true }, points: points - cost }
 }
 
 /** Toggle feed selection on an owned tag; null when unowned. */
@@ -108,7 +108,7 @@ export function isTagSelected(tag: OwnedTag): boolean {
 
 /**
  * Discover new market offers from a drained foe's tags (auto-generated as
- * you progress — pay g$ to buy the picture types you want). Blocklist/noise
+ * you progress — pay pts to buy the picture types you want). Blocklist/noise
  * filtered via rankTags; owned levels + selection preserved; unowned offers
  * capped, owned tags always kept.
  */

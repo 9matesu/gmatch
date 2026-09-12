@@ -12,8 +12,8 @@ import {
 
 function state(over: Partial<PrestigeState> = {}): PrestigeState {
   return {
-    gc: 500,
-    totalEarnedGc: 4_000_000,
+    points: 500,
+    totalEarned: 4_000_000,
     xp: 9_000,
     tags: [{ name: 'wet', level: 3, base: 10, income: 1, weight: 1 }],
     caps: [{ capId: 'blue', expiresAt: 1e12 }],
@@ -26,7 +26,7 @@ function state(over: Partial<PrestigeState> = {}): PrestigeState {
 }
 
 describe('shards (SPEC §9)', () => {
-  it('shards = floor(sqrt(totalEarnedGc / 1e6))', () => {
+  it('shards = floor(sqrt(totalEarned / 1e6))', () => {
     expect(shardsFromEarned(0)).toBe(0)
     expect(shardsFromEarned(999_999)).toBe(0)
     expect(shardsFromEarned(1_000_000)).toBe(1)
@@ -54,11 +54,11 @@ describe('tier gating', () => {
 })
 
 describe('applyBrainmelt (SPEC §9)', () => {
-  it('resets g$/XP/tags/caps, keeps gallery/shards/achievements', () => {
+  it('resets pts/XP/tags/caps, keeps gallery/shards/achievements', () => {
     const out = applyBrainmelt(state())
-    expect(out.gc).toBe(0)
+    expect(out.points).toBe(0)
     expect(out.xp).toBe(0)
-    expect(out.totalEarnedGc).toBe(0)
+    expect(out.totalEarned).toBe(0)
     expect(out.tags).toEqual([])
     expect(out.caps).toEqual([])
     expect(out.gallery).toHaveLength(1)
@@ -66,7 +66,7 @@ describe('applyBrainmelt (SPEC §9)', () => {
   })
 
   it('grants shards and increments prestige count', () => {
-    const out = applyBrainmelt(state({ totalEarnedGc: 9_000_000 }))
+    const out = applyBrainmelt(state({ totalEarned: 9_000_000 }))
     expect(out.shardsGained).toBe(3)
     expect(out.shards).toBe(5)
     expect(out.prestigeCount).toBe(1)

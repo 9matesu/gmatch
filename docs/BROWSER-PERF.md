@@ -111,7 +111,7 @@ session is established; the app retries successfully after. DevTools counts
 these as insight noise; the walk reproduces it, fix = defer the first poll
 until session-ready (follow-up, not in this sweep).
 
-User-reported follow-up (same class, fixed): `429 /api/economy/idle-credit`
+User-reported follow-up (same class, fixed; later mooted — the idle→ledger bridge was removed 2026-09-11): `429 /api/economy/idle-credit`
 spammed the console because the wallet sync loop (30s) hammered the server's
 60s credit throttle blind, and `orbitFetch`'s own 429 retry used the GLOBAL
 fetch instead of the injected impl (double bug: untestable + double-traffic

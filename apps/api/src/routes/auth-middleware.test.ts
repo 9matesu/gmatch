@@ -5,7 +5,6 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import app from '../index'
 import { createTestIdentity, signRequestHeaders, createMockEnv } from '../test-utils'
 import { issueNonce } from '../middleware/auth'
-import { __resetIdleThrottle } from './economy-idle'
 import { signMessage } from '@orbit/crypto'
 import crypto from 'crypto'
 
@@ -47,11 +46,6 @@ beforeAll(async () => {
   await app.request('/api/economy/balance', { headers: signRequestHeaders(bob, 'GET', '/api/economy/balance') }, env)
 })
 
-beforeEach(() => {
-  // idle-credit has a 60s in-memory throttle per identity; keep the nonce
-  // tests independent of each other's credits.
-  __resetIdleThrottle()
-})
 
 describe('missing / malformed authentication headers', () => {
   it('401 when no headers at all', async () => {
@@ -88,17 +82,12 @@ describe('missing / malformed authentication headers', () => {
 
 describe('timestamp windows', () => {
   it('rejects a POST older than 30s', async () => {
-    const body = JSON.stringify({ amount: 1, session: 's', idempotencyKey: 'ts-win-key-0001' })
     const old = (Date.now() - 45_000).toString()
     const res = await app.request(
-      '/api/economy/idle-credit',
+      '/api/auth/cleanup',
       {
         method: 'POST',
-        headers: {
-          ...signRequestHeaders(alice, 'POST', '/api/economy/idle-credit', body, old),
-          'Content-Type': 'application/json',
-        },
-        body,
+        headers: signRequestHeaders(alice, 'POST', '/api/auth/cleanup', '', old),
       },
       env,
     )
@@ -132,15 +121,12 @@ describe('timestamp windows', () => {
     const form = new FormData()
     form.append('amount', '5')
     const res = await app.request(
-      '/api/economy/idle-credit',
-      { method: 'POST', headers: signRequestHeaders(alice, 'POST', '/api/economy/idle-credit', undefined, old), body: form },
+      '/api/auth/cleanup',
+      { method: 'POST', headers: signRequestHeaders(alice, 'POST', '/api/auth/cleanup', undefined, old), body: form },
       env,
     )
-    // Auth passed (not 401 'Request expired'); the handler then rejects the
-    // non-JSON body with its own 400 — proving the multipart window applied.
-    expect(res.status).toBe(400)
-    const json: any = await res.json()
-    expect(json.error).not.toBe('Request expired')
+    // Auth passed (not 401 'Request expired') — proving the multipart window applied.
+    expect(res.status).toBe(200)
   })
 })
 

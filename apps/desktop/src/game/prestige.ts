@@ -31,9 +31,9 @@ export function titleForTier(tier: number): string {
   return TITLES[Math.min(Math.max(1, tier), TITLES.length) - 1]
 }
 
-/** Shards = floor(sqrt(totalEarnedGc / 1e6)) (SPEC §9). */
-export function shardsFromEarned(totalEarnedGc: number): number {
-  return Math.floor(Math.sqrt(Math.max(0, totalEarnedGc) / SHARD_DIVISOR))
+/** Shards = floor(sqrt(totalEarned / 1e6)) (SPEC §9). */
+export function shardsFromEarned(totalEarned: number): number {
+  return Math.floor(Math.sqrt(Math.max(0, totalEarned) / SHARD_DIVISOR))
 }
 
 export function canBrainmelt(tier: number): boolean {
@@ -41,8 +41,8 @@ export function canBrainmelt(tier: number): boolean {
 }
 
 export interface PrestigeState {
-  gc: number
-  totalEarnedGc: number
+  points: number
+  totalEarned: number
   xp: number
   tags: OwnedTag[]
   caps: ActiveCap[]
@@ -57,15 +57,15 @@ export interface BrainmeltResult extends PrestigeState {
 }
 
 /**
- * Brainmelt (SPEC §9): resets g$/XP/tags/caps; keeps gallery, shards,
+ * Brainmelt (SPEC §9): resets pts/XP/tags/caps; keeps gallery, shards,
  * achievements. Returns the new run state.
  */
 export function applyBrainmelt(state: PrestigeState): BrainmeltResult {
-  const shardsGained = shardsFromEarned(state.totalEarnedGc)
+  const shardsGained = shardsFromEarned(state.totalEarned)
   return {
     ...state,
-    gc: 0,
-    totalEarnedGc: 0,
+    points: 0,
+    totalEarned: 0,
     xp: 0,
     tags: [],
     caps: [],

@@ -1,10 +1,9 @@
-// Coverage for src/routes/economy.ts (balance/transactions/transfer/cashout-rate),
-// src/routes/economy-idle.ts validation edges, and src/common/{errors,validation}.ts.
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
+// Coverage for src/routes/economy.ts (balance/transactions/transfer/cashout-rate)
+// and src/common/{errors,validation}.ts.
+import { describe, it, expect, beforeAll } from 'vitest'
 import app from '../index'
 import { createTestIdentity, signRequestHeaders, createMockEnv } from '../test-utils'
 import { EconomyService } from '../economy'
-import { __resetIdleThrottle } from './economy-idle'
 import {
   DomainError,
   badRequest,
@@ -44,10 +43,6 @@ beforeAll(async () => {
   await app.request('/api/economy/balance', { headers: authHeaders('GET', '/api/economy/balance', undefined, bob) }, env)
 })
 
-beforeEach(() => {
-  __resetIdleThrottle()
-})
-
 describe('GET /api/economy/balance', () => {
   it('returns 0 for a fresh wallet', async () => {
     const res = await app.request('/api/economy/balance', { headers: authHeaders('GET', '/api/economy/balance') }, env)
@@ -55,14 +50,12 @@ describe('GET /api/economy/balance', () => {
     expect(typeof (await res.json()).balance).toBe('number')
   })
 
-  it('reflects idle credits', async () => {
-    const body = JSON.stringify({ amount: 77, session: 'bal-1', idempotency_key: 'bal-route-key-01' })
-    const creditRes = await app.request(
-      '/api/economy/idle-credit',
-      { method: 'POST', headers: { ...authHeaders('POST', '/api/economy/idle-credit', body), 'Content-Type': 'application/json' }, body },
-      env,
-    )
-    expect(creditRes.status).toBe(200)
+  it('reflects ledger credits', async () => {
+    await new EconomyService(env.DB).credit(alice.orbitId, 77, {
+      idempotencyKey: 'bal-route-key-01',
+      kind: 'reward',
+      reference: 'test-fund',
+    })
     const res = await app.request('/api/economy/balance', { headers: authHeaders('GET', '/api/economy/balance') }, env)
     const json = await res.json() as { balance: number }
     expect(json.balance).toBeGreaterThanOrEqual(77)
@@ -195,91 +188,6 @@ describe('POST /api/economy/transfer', () => {
     expect(second.status).toBe(200)
     const json = await second.json() as { replayed?: boolean }
     expect(json.replayed).toBe(true)
-  })
-})
-
-describe('idle route validation edges', () => {
-  async function credit(body: unknown, key?: string) {
-    const text = JSON.stringify(body)
-    const headers: Record<string, string> = {
-      ...authHeaders('POST', '/api/economy/idle-credit', text),
-      'Content-Type': 'application/json',
-    }
-    if (key) headers['Idempotency-Key'] = key
-    return app.request('/api/economy/idle-credit', { method: 'POST', headers, body: text }, env)
-  }
-
-  async function debit(body: unknown, key?: string) {
-    const text = JSON.stringify(body)
-    const headers: Record<string, string> = {
-      ...authHeaders('POST', '/api/economy/idle-debit', text),
-      'Content-Type': 'application/json',
-    }
-    if (key) headers['Idempotency-Key'] = key
-    return app.request('/api/economy/idle-debit', { method: 'POST', headers, body: text }, env)
-  }
-
-  it('rejects an over-long session string', async () => {
-    const res = await credit({ amount: 1, session: 's'.repeat(129) }, 'idle-sess-long-01')
-    expect(res.status).toBe(400)
-    expect((await res.json()).error).toContain('session')
-  })
-
-  it('rejects an empty session string', async () => {
-    const res = await credit({ amount: 1, session: '   ' }, 'idle-sess-empty-01')
-    expect(res.status).toBe(400)
-  })
-
-  it('rejects an over-long reference on debit', async () => {
-    const res = await debit({ amount: 1, reference: 'r'.repeat(101) }, 'idle-ref-long-01')
-    expect(res.status).toBe(400)
-    expect((await res.json()).error).toContain('reference')
-  })
-
-  it('rejects an empty reference on debit', async () => {
-    const res = await debit({ amount: 1, reference: '' }, 'idle-ref-empty-01')
-    expect(res.status).toBe(400)
-  })
-
-  it('accepts the X-Idempotency-Key header and body key variants', async () => {
-    const text = JSON.stringify({ amount: 2, session: 'h1' })
-    const viaHeader = await app.request('/api/economy/idle-credit', {
-      method: 'POST',
-      headers: {
-        ...authHeaders('POST', '/api/economy/idle-credit', text),
-        'Content-Type': 'application/json',
-        'X-Idempotency-Key': 'idle-xheader-key-01',
-      },
-      body: text,
-    }, env)
-    expect(viaHeader.status).toBe(200)
-    __resetIdleThrottle()
-
-    const bodyText = JSON.stringify({ amount: 2, session: 'h2', idempotency_key: 'idle-bodykey-0001' })
-    const viaBody = await app.request('/api/economy/idle-credit', {
-      method: 'POST',
-      headers: { ...authHeaders('POST', '/api/economy/idle-credit', bodyText), 'Content-Type': 'application/json' },
-      body: bodyText,
-    }, env)
-    expect(viaBody.status).toBe(200)
-  })
-
-  it('lets a same-key retry through the 60s throttle (replay, no double-pay)', async () => {
-    const first = await credit({ amount: 10, session: 'th1' }, 'idle-throttle-key1')
-    expect(first.status).toBe(200)
-    const retry = await credit({ amount: 10, session: 'th1' }, 'idle-throttle-key1')
-    expect(retry.status).toBe(200)
-    expect((await retry.json()).replayed).toBe(true)
-  })
-
-  it('survives a malformed JSON body (catch -> {} -> validation 400)', async () => {
-    const text = '[oops'
-    const res = await app.request('/api/economy/idle-credit', {
-      method: 'POST',
-      headers: { ...authHeaders('POST', '/api/economy/idle-credit', text), 'Content-Type': 'application/json' },
-      body: text,
-    }, env)
-    expect(res.status).toBe(400)
   })
 })
 

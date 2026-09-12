@@ -3,8 +3,6 @@
 import { useState, useEffect } from 'react';
 import { STORE_ITEMS, type StoreItem, type User, formatGc, computeCashoutPayout, clampCashoutRateBps, DEFAULT_CASHOUT_RATE_BPS, RARITY_TIERS } from '@orbit/shared';
 import { orbitFetch } from '../utils/api';
-import { adoptServerBalance } from '../game/walletBridge';
-import { useGame as useIdleGame } from '../game/store';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { ActiveHackSession } from './home/HomeFooter';
 import { playPress, playLike } from '../utils/sounds';
@@ -280,14 +278,6 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
       if (res.ok) {
         playLike();
         toast?.(`Purchased ${item.name}`, 'success');
-        // Keep the idle clicker mirror in step immediately: the purchase
-        // debited the server ledger, and the sync tick is 65s away.
-        const body = await res.json().catch(() => ({}) as Record<string, unknown>)
-        const bal = Number(body.balance)
-        if (Number.isFinite(bal)) {
-          const s = useIdleGame.getState()
-          adoptServerBalance({ gc: s.gc, credited: s.credited, debited: s.debited, totalEarned: s.totalEarnedGc, setWallet: s.setWallet }, bal)
-        }
         onPurchase?.(item);
 
         if (item.category === 'hack' && targetId) {

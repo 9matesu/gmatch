@@ -88,7 +88,7 @@ const TAG_INPUT =
 
 function TagsTab() {
   const tags = useGame((s) => s.tags)
-  const gc = useGame((s) => s.gc)
+  const points = useGame((s) => s.points)
   const fetching = useGame((s) => s.fetching)
   const buyTag = useGame((s) => s.buyTag)
   const toggleTag = useGame((s) => s.toggleTag)
@@ -185,7 +185,7 @@ function TagsTab() {
           const on = isOwned && t.selected !== false
           const maxed = t.level >= MAX_TAG_LEVEL
           const cost = tagCost(t.base, t.level)
-          const afford = !maxed && gc >= cost
+          const afford = !maxed && points >= cost
           return (
             <span key={t.name} className="relative inline-flex group">
             <button
@@ -208,7 +208,7 @@ function TagsTab() {
               title={
                 isOwned
                   ? `${t.name} · Lv${t.level} · +${formatNum(t.income)}/s · click ${on ? 'OFF' : 'ON'} · right-click = solo · double-click = pick for merge`
-                  : `${t.name} · buy for ${formatNum(cost)} g$`
+                  : `${t.name} · buy for ${formatNum(cost)} pts`
               }
               onAuxClick={(e) => {
                 if (e.button === 1 && isOwned) {
@@ -273,7 +273,7 @@ function TagsTab() {
 }
 
 function CapsTab() {
-  const gc = useGame((s) => s.gc)
+  const points = useGame((s) => s.points)
   const caps = useGame((s) => s.caps)
   const popCap = useGame((s) => s.popCap)
   const now = Date.now()
@@ -285,7 +285,7 @@ function CapsTab() {
       <div className="flex flex-col gap-2">
         {(Object.keys(CAPS) as CapId[]).map((id) => {
           const def = CAPS[id]
-          const afford = gc >= def.cost
+          const afford = points >= def.cost
           const st = capStacks(caps, id, now)
           return (
             <div
@@ -313,7 +313,7 @@ function CapsTab() {
                 disabled={!afford}
                 onClick={() => popCap(id)}
               >
-                {formatNum(def.cost)} g$
+                {formatNum(def.cost)} pts
               </button>
             </div>
           )
@@ -325,13 +325,13 @@ function CapsTab() {
 
 function PrestigeTab() {
   const xp = useGame((s) => s.xp)
-  const totalEarnedGc = useGame((s) => s.totalEarnedGc)
+  const totalEarned = useGame((s) => s.totalEarned)
   const shards = useGame((s) => s.shards)
   const achievements = useGame((s) => s.achievements)
   const brainmelt = useGame((s) => s.brainmelt)
   const tier = tierForXp(xp)
   const ready = canBrainmelt(tier)
-  const preview = shardsFromEarned(totalEarnedGc)
+  const preview = shardsFromEarned(totalEarned)
   return (
     <div className={TAB_BODY}>
       <div className="mb-3.5 rounded-[10px] border border-border-glass bg-retro-bg p-3">
@@ -340,7 +340,7 @@ function PrestigeTab() {
           global multiplier.
         </p>
         <ul className="my-2 list-none text-xs">
-          <li className="text-retro-error">Resets: g$, XP/tier, tags, caps</li>
+          <li className="text-retro-error">Resets: points, XP/tier, tags, caps</li>
           <li className="text-retro-online">Keeps: gallery, shards, achievements</li>
         </ul>
         <div className={`${MONO} mb-2.5 mt-2 text-[13px] text-[#ffd75e]`}>

@@ -51,12 +51,12 @@ export default function StatsPanel() {
           className={`${DISPLAY} text-[30px] font-bold leading-none break-all text-retro-fg [font-variant-numeric:tabular-nums]`}
           data-testid="gc-balance"
         >
-          {formatNum(s.gc)}
+          {formatNum(s.points)}
         </div>
-        <div className="text-xs font-bold uppercase tracking-[2px] text-retro-muted">g$</div>
+        <div className="text-xs font-bold uppercase tracking-[2px] text-retro-muted">pts</div>
       </div>
       <div className="mt-2">
-        {statRow(<IconCoin size={12} />, 'g$/s', formatNum(gps))}
+        {statRow(<IconCoin size={12} />, 'pts/s', formatNum(gps))}
         {statRow(<IconBolt size={12} />, 'Click power', formatNum(cp))}
         {statRow(
           <IconCursor size={12} />,

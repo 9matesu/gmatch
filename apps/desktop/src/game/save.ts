@@ -7,12 +7,9 @@ export const OFFLINE_CAP_MS = 8 * 60 * 60 * 1000
 
 export interface SaveData {
   version: number
-  gc: number
-  /** Whole g$ already flushed to the server ledger (plan D4). */
-  credited: number
-  /** Whole g$ already mirrored as spend on the server ledger (plan D4). */
-  debited: number
-  totalEarnedGc: number
+  /** Idle-game points (local only; legacy saves call this gp/gc). */
+  points: number
+  totalEarned: number
   xp: number
   clickCount: number
   critCount: number
@@ -43,10 +40,8 @@ export interface SaveData {
 export function defaultSave(now = Date.now()): SaveData {
   return {
     version: SAVE_VERSION,
-    gc: 0,
-    credited: 0,
-    debited: 0,
-    totalEarnedGc: 0,
+    points: 0,
+    totalEarned: 0,
     xp: 0,
     clickCount: 0,
     critCount: 0,
@@ -85,18 +80,16 @@ export function deserialize(raw: string | null | undefined): SaveData | null {
     return null
   }
   if (typeof parsed !== 'object' || parsed === null) return null
-  const d = parsed as Partial<SaveData> & { gp?: unknown; totalEarnedGP?: unknown }
+  const d = parsed as Partial<SaveData> & { gp?: unknown; totalEarnedGP?: unknown; gc?: unknown; totalEarnedGc?: unknown }
   if (d.version !== SAVE_VERSION) return null
   const num = (v: unknown, fallback: number): number =>
     typeof v === 'number' && Number.isFinite(v) ? v : fallback
   const arr = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
   return {
     version: SAVE_VERSION,
-    // 1:1 GP→g$ rename (plan D4): old saves carry `gp`/`totalEarnedGP`.
-    gc: num(d.gc, num(d.gp, 0)),
-    credited: num(d.credited, 0),
-    debited: num(d.debited, 0),
-    totalEarnedGc: num(d.totalEarnedGc, num(d.totalEarnedGP, 0)),
+    // Legacy saves carry gp/gc/totalEarnedGP/totalEarnedGc — same value, renamed.
+    points: num(d.points, num(d.gc, num(d.gp, 0))),
+    totalEarned: num(d.totalEarned, num(d.totalEarnedGc, num(d.totalEarnedGP, 0))),
     xp: num(d.xp, 0),
     clickCount: num(d.clickCount, 0),
     critCount: num(d.critCount, 0),
@@ -148,7 +141,7 @@ function sanitizeCustomSources(v: unknown): CustomSource[] {
 }
 
 /**
- * Offline earnings = elapsed * g$/s * 25%, capped at 8h (SPEC §11).
+ * Offline earnings = elapsed * pts/s * 25%, capped at 8h (SPEC §11).
  * elapsedMs is clamped to [0, capMs].
  */
 export function offlineEarnings(

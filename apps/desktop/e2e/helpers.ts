@@ -8,15 +8,13 @@ import { legalVersionKey } from '../src/legal/documents'
  */
 export async function seedApp(
   page: import('@playwright/test').Page,
-  overrides: { gc?: number } = {},
+  overrides: { points?: number } = {},
 ) {
   const identity = generateIdentity()
   const idleSave = {
     version: 3,
-    gc: overrides.gc ?? 1000,
-    credited: 0,
-    debited: 0,
-    totalEarnedGc: 1000,
+    points: overrides.points ?? 1000,
+    totalEarned: 1000,
     xp: 0,
     clickCount: 0,
     critCount: 0,

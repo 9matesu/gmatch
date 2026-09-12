@@ -35,15 +35,15 @@ describe('clickImage', () => {
     foeHp: 0,
     foeMaxHp: 0,
   })
-  it('every 25th click is a CRIT and banks g$/XP', () => {
+  it('every 25th click is a CRIT and banks pts/XP', () => {
     stageReady()
     const g = useGame.getState()
     for (let i = 0; i < 25; i++) g.clickImage()
     const s = useGame.getState()
     expect(s.clicks).toBe(25)
     expect(s.crits).toBe(1)
-    expect(s.gc).toBeGreaterThan(30)
-    expect(s.totalEarnedGc).toBeCloseTo(s.gc, 6)
+    expect(s.points).toBeGreaterThan(30)
+    expect(s.totalEarned).toBeCloseTo(s.points, 6)
     expect(s.xp).toBe(29) // 24 normal + 5 for the crit
     expect(s.achievements).toContain('first_click')
   })
@@ -58,34 +58,34 @@ describe('clickImage', () => {
     useGame.setState({
       current: { id: 't2', url: 'https://x/t2.jpg', tags: [] },
       imageReady: false,
-      gc: 0,
+      points: 0,
     })
     expect(useGame.getState().clickImage().gain).toBe(0)
-    expect(useGame.getState().gc).toBe(0)
+    expect(useGame.getState().points).toBe(0)
     expect(useGame.getState().clicks).toBe(0)
   })
 
   it('pays nothing with no current post at all', () => {
-    useGame.setState({ current: null, imageReady: true, gc: 0 })
+    useGame.setState({ current: null, imageReady: true, points: 0 })
     expect(useGame.getState().clickImage().gain).toBe(0)
-    expect(useGame.getState().gc).toBe(0)
+    expect(useGame.getState().points).toBe(0)
   })
 })
 
 describe('buyTag', () => {
   it('levels a tag and deducts cost', () => {
-    useGame.setState({ gc: 10_000, tags: [setupTag('gangbang')] })
-    const before = useGame.getState().gc
+    useGame.setState({ points: 10_000, tags: [setupTag('gangbang')] })
+    const before = useGame.getState().points
     expect(useGame.getState().buyTag('gangbang')).toBe(true)
     const t = useGame.getState().tags.find((x) => x.name === 'gangbang')
     expect(t?.level).toBe(2)
-    expect(useGame.getState().gc).toBeLessThan(before)
+    expect(useGame.getState().points).toBeLessThan(before)
     expect(useGame.getState().achievements).toContain('first_tag')
   })
 
   it('refuses when broke', () => {
     useGame.setState({
-      gc: 0,
+      points: 0,
       tags: [{ name: 'gangbang', level: 0, base: 100, income: 5, weight: 2 }],
     })
     expect(useGame.getState().buyTag('gangbang')).toBe(false)
@@ -131,17 +131,17 @@ describe('fetchFeed tag rotation', () => {
 })
 
 describe('popCap', () => {
-  it('charges g$, activates the buff, records usage', () => {
-    useGame.setState({ gc: 200 })
+  it('charges pts, activates the buff, records usage', () => {
+    useGame.setState({ points: 200 })
     expect(useGame.getState().popCap('blue')).toBe(true)
     const s = useGame.getState()
-    expect(s.gc).toBe(50)
+    expect(s.points).toBe(50)
     expect(s.caps).toHaveLength(1)
     expect(s.capsUsed).toContain('blue')
   })
 
   it('refuses when unaffordable', () => {
-    useGame.setState({ gc: 10 })
+    useGame.setState({ points: 10 })
     expect(useGame.getState().popCap('melt')).toBe(false)
     expect(useGame.getState().caps).toHaveLength(0)
   })
@@ -159,7 +159,7 @@ describe('feed battle', () => {
       foeMaxHp: 8,
       foeClicks: 0,
       defeated: 0,
-      gc: 0,
+      points: 0,
     })
     let killed = false
     for (let i = 0; i < 20 && !killed; i++) killed = useGame.getState().clickImage().killed
@@ -167,7 +167,7 @@ describe('feed battle', () => {
     const s = useGame.getState()
     expect(s.gallery).toHaveLength(1)
     expect(s.defeated).toBe(1)
-    expect(s.gc).toBeGreaterThan(0) // click g$ + kill bonus
+    expect(s.points).toBeGreaterThan(0) // click pts + kill bonus
     expect(s.current?.id).toBe('b2') // next foe steps up at full scaled HP
     expect(s.foeMaxHp).toBeGreaterThan(8)
     expect(s.foeHp).toBe(s.foeMaxHp)
@@ -181,7 +181,7 @@ describe('feed battle', () => {
       foeMaxHp: 8,
       foeClicks: 0,
       defeated: 0,
-      gc: 0,
+      points: 0,
       tags: [{ name: 'gangbang', level: 1, base: 10, income: 1, weight: 1, selected: true }],
     })
     let killed = false
@@ -243,7 +243,7 @@ describe('feed battle', () => {
       foeMaxHp: 8,
       foeClicks: 0,
       defeated: 0,
-      gc: 0,
+      points: 0,
       gallery: [],
     })
     let killed = false
@@ -282,19 +282,19 @@ describe('feed battle', () => {
       foeMaxHp: 8,
       foeClicks: 0,
       defeated: 3,
-      gc: 0,
+      points: 0,
     })
     useGame.getState().advanceFeed()
     const s = useGame.getState()
     expect(s.gallery).toHaveLength(0)
     expect(s.defeated).toBe(3)
-    expect(s.gc).toBe(0)
+    expect(s.points).toBe(0)
     expect(s.current?.id).toBe('s2')
   })
 
-  it('featured gallery pieces have no battle — clicks just pay g$', () => {
+  it('featured gallery pieces have no battle — clicks just pay pts', () => {
     useGame.setState({
-      gc: 100_000,
+      points: 100_000,
       current: foe('42'),
       imageReady: true,
       queue: [],
@@ -317,7 +317,7 @@ describe('feed battle', () => {
   })
 
   it('does nothing battle-wise without a current image', () => {
-    useGame.setState({ gc: 0, current: null })
+    useGame.setState({ points: 0, current: null })
     const res = useGame.getState().clickImage()
     expect(res.killed).toBe(false)
     expect(useGame.getState().gallery).toHaveLength(0)
@@ -369,15 +369,15 @@ describe('shufflePosts (never sequential)', () => {
 })
 
 describe('tick', () => {
-  it('pays passive g$/s from owned tags (quartered)', () => {
+  it('pays passive pts/s from owned tags (quartered)', () => {
     useGame.setState({
-      gc: 0,
+      points: 0,
       tags: [{ name: 'wet', level: 2, base: 10, income: 5, weight: 2 }],
     })
     useGame.getState().tick(1000)
     const s = useGame.getState()
-    expect(s.gc).toBeGreaterThanOrEqual(2.5)
-    expect(s.totalEarnedGc).toBeGreaterThanOrEqual(2.5)
+    expect(s.points).toBeGreaterThanOrEqual(2.5)
+    expect(s.totalEarned).toBeGreaterThanOrEqual(2.5)
   })
 
   it('legacy timed caps still prune, permanent pops persist', () => {
@@ -393,18 +393,18 @@ describe('tick', () => {
 describe('brainmelt', () => {
   it('resets the run, keeps gallery, grants shards', () => {
     useGame.setState({
-      gc: 500,
+      points: 500,
       xp: 1600,
-      totalEarnedGc: 4_000_000,
+      totalEarned: 4_000_000,
       tags: [{ name: 'wet', level: 3, base: 10, income: 1, weight: 1 }],
       caps: [{ capId: 'blue', expiresAt: Date.now() + 60_000 }],
       gallery: [{ id: 'g1', url: 'u', tags: ['a'], rarityBase: 10, clicks: 0, rarity: 'Gold' }],
     })
     expect(useGame.getState().brainmelt()).toBe(true)
     const s = useGame.getState()
-    expect(s.gc).toBe(0)
+    expect(s.points).toBe(0)
     expect(s.xp).toBe(0)
-    expect(s.totalEarnedGc).toBe(0)
+    expect(s.totalEarned).toBe(0)
     expect(s.shards).toBe(2)
     expect(s.prestigeCount).toBe(1)
     expect(s.gallery).toHaveLength(1)
@@ -414,7 +414,7 @@ describe('brainmelt', () => {
   })
 
   it('blocked below tier 5', () => {
-    useGame.setState({ xp: 0, totalEarnedGc: 5_000_000 })
+    useGame.setState({ xp: 0, totalEarned: 5_000_000 })
     expect(useGame.getState().brainmelt()).toBe(false)
     expect(useGame.getState().shards).toBe(0)
   })
@@ -422,11 +422,11 @@ describe('brainmelt', () => {
 
 describe('save / load / offline earnings', () => {
   it('round-trips through localStorage', () => {
-    useGame.setState({ gc: 777, ageVerified: true })
+    useGame.setState({ points: 777, ageVerified: true })
     useGame.getState().save()
     useGame.getState().resetGame()
     useGame.getState().load()
-    expect(useGame.getState().gc).toBe(777)
+    expect(useGame.getState().points).toBe(777)
     expect(useGame.getState().ageVerified).toBe(true)
   })
 
@@ -436,7 +436,7 @@ describe('save / load / offline earnings', () => {
       SAVE_KEY,
       serialize({
         ...defaultSave(past),
-        gc: 123,
+        points: 123,
         ageAccepted: true,
         tags: [{ name: 'wet', level: 1, base: 10, income: 5, weight: 1 }],
         lastSeenAt: past,
@@ -444,19 +444,19 @@ describe('save / load / offline earnings', () => {
     )
     useGame.getState().load()
     const s = useGame.getState()
-    expect(s.gc).toBe(123)
+    expect(s.points).toBe(123)
     expect(s.offlineGain).toBeCloseTo(18.75, 0) // 60s * 1.25 gps * 25% (passive+offline quartered)
     s.collectOffline()
-    expect(useGame.getState().gc).toBeCloseTo(141.75, 0)
+    expect(useGame.getState().points).toBeCloseTo(141.75, 0)
     expect(useGame.getState().collectedOfflineEarnings).toBe(true)
     expect(useGame.getState().achievements).toContain('offline_slut')
   })
 
   it('load is idempotent (StrictMode-safe)', () => {
-    mem.set(SAVE_KEY, serialize({ ...defaultSave(), gc: 42, ageAccepted: true }))
+    mem.set(SAVE_KEY, serialize({ ...defaultSave(), points: 42, ageAccepted: true }))
     useGame.getState().load()
     useGame.getState().load()
-    expect(useGame.getState().gc).toBe(42)
+    expect(useGame.getState().points).toBe(42)
   })
 })
 
@@ -526,7 +526,7 @@ describe('3x3 grid mode', () => {
   const mocked = vi.mocked(fetchPosts)
   const offline: BooruResponse = { posts: [], source: null, ok: false, offline: true }
   const post = (id: string) => ({ id, url: `https://x/${id}.jpg`, tags: ['gangbang'] })
-  const dozen = () => Array.from({ length: 12 }, (_, i) => post(`g${i}`))
+  const dozen = () => Array.from({ length: 12 }, (_, i) => post(`pts${i}`))
 
   it('setViewMode fills 9 squares from the queue with full HP', () => {
     mocked.mockResolvedValue(offline)
@@ -539,7 +539,7 @@ describe('3x3 grid mode', () => {
     for (const c of s.grid) expect(c.hp).toBe(c.maxHp)
   })
 
-  it('clickCell damages a square and banks g$', () => {
+  it('clickCell damages a square and banks pts', () => {
     useGame.setState({ queue: dozen(), grid: [] })
     useGame.getState().setViewMode('grid')
     const before = useGame.getState().grid[0].hp
@@ -594,11 +594,11 @@ describe('3x3 grid mode', () => {
   it('dropCell swaps a broken square with no reward', () => {
     useGame.setState({ queue: dozen(), grid: [] })
     useGame.getState().setViewMode('grid')
-    const gc = useGame.getState().gc
+    const points = useGame.getState().points
     const firstId = useGame.getState().grid[0].post.id
     useGame.getState().dropCell(0)
     const s = useGame.getState()
-    expect(s.gc).toBe(gc)
+    expect(s.points).toBe(points)
     expect(s.defeated).toBe(0)
     expect(s.grid).toHaveLength(GRID_SIZE)
     expect(s.grid.some((c) => c.post.id === firstId)).toBe(false)

@@ -2,8 +2,8 @@ import { expect, test } from '@playwright/test'
 import { seedApp, mockBooruFeed } from './helpers'
 
 // Journey 1: open -> navigate to Idle -> play -> state updates.
-test('idle: click the stage, g$ balance grows', async ({ page }) => {
-  await seedApp(page, { gc: 0 })
+test('idle: click the stage, points balance grows', async ({ page }) => {
+  await seedApp(page, { points: 0 })
   await mockBooruFeed(page)
   await page.goto('/#/grid')
   const stage = page.getByRole('button', { name: /attack the current foe/i })
@@ -31,7 +31,7 @@ test('games: hub reachable with sub-tabs', async ({ page }) => {
 // Journey 3: Games hub -> Idle Clicker tab -> play -> duel tab -> back; state preserved.
 // (Idle Clicker moved from the top-level sidebar into Porn Games in 1.0.1.)
 test('navigation round-trip preserves idle state', async ({ page }) => {
-  await seedApp(page, { gc: 0 })
+  await seedApp(page, { points: 0 })
   await mockBooruFeed(page)
   await page.goto('/#/games')
   await page.getByRole('button', { name: 'Idle Clicker' }).click()

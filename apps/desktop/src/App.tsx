@@ -24,7 +24,6 @@ import { enqueueableItems, isP2pLocal, shouldEnqueue } from "./utils/game";
 import { mergeMyCards, type CanonicalCard } from "./utils/cardCollection";
 import { collectConfigBundle, applyConfigBundle, applyStashFromBundle, parseConfigBundle, configDownloadFilename, bundleToString } from "./utils/configBackup";
 import { runMigrations } from "./utils/migration";
-import { startWalletSync } from "./game/walletBridge";
 import { useGame as useIdleGame } from "./game/store";
 import { ROUTE_VIEWS, hashForView, viewFromHash, type RoutedView } from "./utils/routing";
 import { playChime, playPress, playMsgReceive } from "./utils/sounds";
@@ -135,19 +134,6 @@ export default function Home() {
       window.removeEventListener('beforeunload', save);
     };
   }, []);
-  // Idle wallet <-> ledger mirror (plan D4): flush net deltas every 65s (above the server 60s credit throttle) once
-  // an identity exists; reconcile server balance on identity change.
-  useEffect(() => {
-    if (!identity) return;
-    const stop = startWalletSync(
-      () => {
-        const s = useIdleGame.getState();
-        return { gc: s.gc, credited: s.credited, debited: s.debited, totalEarned: s.totalEarnedGc, setWallet: s.setWallet };
-      },
-      identity,
-    );
-    return stop;
-  }, [identity]);
   const { peers, p2pItems, sendP2PItem, sendChatMessage, chatMessages, isWsConnected } = useP2P(identity);
   const { settings, update: updateSettings } = useSettings();
   const [users, setUsers] = useState<User[]>([]);

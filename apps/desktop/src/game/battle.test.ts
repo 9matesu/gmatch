@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FOE_HP_BASE, foeMaxHp, killBonusGp } from './battle'
+import { FOE_HP_BASE, foeMaxHp, killBonusPoints } from './battle'
 
 describe('foeMaxHp', () => {
   it('starts at base HP', () => {
@@ -21,10 +21,10 @@ describe('foeMaxHp', () => {
   })
 })
 
-describe('killBonusGp', () => {
+describe('killBonusPoints', () => {
   it('pays the rarity base, floored, minimum 1', () => {
-    expect(killBonusGp(250)).toBe(250)
-    expect(killBonusGp(49.7)).toBe(49)
-    expect(killBonusGp(0)).toBe(1)
+    expect(killBonusPoints(250)).toBe(250)
+    expect(killBonusPoints(49.7)).toBe(49)
+    expect(killBonusPoints(0)).toBe(1)
   })
 })

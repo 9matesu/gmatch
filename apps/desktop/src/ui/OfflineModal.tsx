@@ -18,7 +18,7 @@ export default function OfflineModal() {
           Your tags kept working while you were gone:
         </p>
         <div className={`${MONO} ${DISPLAY} text-[34px] font-bold text-[#3fd68c]`}>
-          +{formatNum(gain)} g$
+          +{formatNum(gain)} pts
         </div>
         <button type="button" className={`${BTN} ${BTN_PRIMARY}`} onClick={collectOffline}>
           Collect

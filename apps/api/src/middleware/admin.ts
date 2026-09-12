@@ -13,7 +13,7 @@ export async function adminAuth(c: Context, next: Next) {
   const row = (await c.env.DB.prepare('SELECT is_admin FROM Users WHERE id = ?').bind(orbitId).first()) as { is_admin: number } | null
   if (!row || !row.is_admin) return c.json({ error: 'Forbidden' }, 403)
 
-  const meta = await c.env.DB.prepare('SELECT value FROM SystemMeta WHERE key = ?').bind(ADMIN_GRANT_KEY).first<{ value: string | null }>()
+  const meta = (await c.env.DB.prepare('SELECT value FROM SystemMeta WHERE key = ?').bind(ADMIN_GRANT_KEY).first()) as { value: string | null } | null
   // A grant stamped by verify-pin expires; a bare is_admin=1 (self-host
   // bootstrap or direct DB write) has no stamp and stays — whoever can write
   // the DB already owns the node, so there is nothing to defend there.

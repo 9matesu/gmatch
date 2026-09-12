@@ -61,7 +61,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   const current = useGame((s) => s.current)
   const feedOffline = useGame((s) => s.feedOffline)
   const fetching = useGame((s) => s.fetching)
-  const gc = useGame((s) => s.gc)
+  const points = useGame((s) => s.points)
   const foeHp = useGame((s) => s.foeHp)
   const foeMaxHp = useGame((s) => s.foeMaxHp)
   const defeated = useGame((s) => s.defeated)
@@ -717,9 +717,9 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                 ? 'border-[#ff2d78] bg-[#ff2d78]/15 shadow-[0_0_8px_rgba(255,45,120,0.25)]'
                 : 'border-border-glass bg-surface-raised hover:bg-surface-interactive'
                 }`}
-              disabled={gc < def.cost}
+              disabled={points < def.cost}
               onClick={() => popCap(id)}
-              title={`${def.name} — ${capEffectLabel(id)} — ${formatNum(def.cost)} g$ — Press [${idx + 1}]`}
+              title={`${def.name} — ${capEffectLabel(id)} — ${formatNum(def.cost)} pts — Press [${idx + 1}]`}
             >
               <kbd className={`${MONO} inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border border-white/20 bg-black/60 text-[10px] font-bold text-retro-muted`}>
                 {idx + 1}

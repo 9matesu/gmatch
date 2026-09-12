@@ -8,7 +8,7 @@ import { seedApp, mockBooruFeed } from './helpers'
 test('memory baseline: heap growth under 60s of idle clicking', async ({ page }) => {
   test.setTimeout(180_000)
   const cdp = await page.context().newCDPSession(page)
-  await seedApp(page, { gc: 50000 })
+  await seedApp(page, { points: 50000 })
   await mockBooruFeed(page)
   await page.goto('/#/grid')
   const stage = page.getByRole('button', { name: /attack the current foe/i })

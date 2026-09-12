@@ -35,7 +35,7 @@ export function clickPower(input: EconomyInput, now: number): number {
   )
 }
 
-/** g$ gained by click #clickNumber (applies x10 crit and the heat combo). */
+/** pts gained by click #clickNumber (applies x10 crit and the heat combo). */
 export function clickGain(input: EconomyInput, clickNumber: number, now: number, heatStreak = 0): number {
   return clickPower(input, now) * (isCrit(clickNumber) ? CRIT_MULT : 1) * heatMultiplier(heatStreak)
 }
@@ -48,7 +48,7 @@ export function galleryIncome(gallery: GalleryImage[]): number {
   return gallery.reduce((sum, img) => sum + rarityIncome(img.rarity), 0)
 }
 
-/** Passive g$/s from tags + gallery, scaled by shards and passive caps. Nerfed to 25% so clicking stays king. */
+/** Passive pts/s from tags + gallery, scaled by shards and passive caps. Nerfed to 25% so clicking stays king. */
 export function passiveGps(input: EconomyInput, now: number): number {
   return (
     (tagIncome(input.tags) + galleryIncome(input.gallery)) *

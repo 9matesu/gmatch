@@ -16,7 +16,7 @@ const mocked = vi.mocked(fetchPosts)
 const offline: BooruResponse = { posts: [], source: null, ok: false, offline: true }
 const foe = (id: string): BooruPost => ({ id, url: `https://x/${id}.jpg`, tags: ['gangbang'] })
 const post = (id: string) => ({ id, url: `https://x/${id}.jpg`, tags: ['gangbang'] })
-const dozen = () => Array.from({ length: 12 }, (_, i) => post(`g${i}`))
+const dozen = () => Array.from({ length: 12 }, (_, i) => post(`pts{i}`))
 const settle = async (): Promise<void> => {
   for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0))
 }
@@ -53,7 +53,7 @@ describe('storage edge paths (saveKey / read / write)', () => {
     expect(() => useGame.getState().save()).not.toThrow()
     useGame.getState().load()
     expect(useGame.getState().loaded).toBe(true)
-    expect(useGame.getState().gc).toBe(0)
+    expect(useGame.getState().points).toBe(0)
   })
 
   it('swallows a throwing localStorage (saveKey/read/write catches)', () => {
@@ -72,18 +72,18 @@ describe('storage edge paths (saveKey / read / write)', () => {
 
   it('keys the save slot by the active Orbit identity', () => {
     mem.set('orbit_identity', JSON.stringify({ orbitId: 'o1' }))
-    useGame.setState({ gc: 991 })
+    useGame.setState({ points: 991 })
     useGame.getState().save()
     expect(mem.has(`${SAVE_KEY}:o1`)).toBe(true)
     expect(mem.has(SAVE_KEY)).toBe(false)
     useGame.getState().resetGame()
     useGame.getState().load()
-    expect(useGame.getState().gc).toBe(991)
+    expect(useGame.getState().points).toBe(991)
   })
 
   it('falls back to the plain slot when the identity JSON is corrupt', () => {
     mem.set('orbit_identity', '{not json')
-    useGame.setState({ gc: 5 })
+    useGame.setState({ points: 5 })
     useGame.getState().save()
     expect(mem.has(SAVE_KEY)).toBe(true)
   })
@@ -314,7 +314,7 @@ describe('advanceFeed / goBack / featureImage edges', () => {
 
 describe('popCap stacking', () => {
   it('repeat pops compound without duplicating capsUsed', () => {
-    useGame.setState({ gc: 1000 })
+    useGame.setState({ points: 1000 })
     expect(useGame.getState().popCap('blue')).toBe(true)
     expect(useGame.getState().popCap('blue')).toBe(true)
     const s = useGame.getState()
@@ -399,12 +399,12 @@ describe('tick auto-battle paths', () => {
       caps: filterCap,
       grid: useGame.getState().grid.map((c, i) => (i === 0 ? { ...c, hp: 1 } : c)),
     })
-    const gc = useGame.getState().gc
+    const points = useGame.getState().points
     useGame.getState().tick(1000)
     const s = useGame.getState()
     expect(s.defeated).toBe(1)
     expect(s.gallery).toHaveLength(1)
-    expect(s.gc).toBeGreaterThan(gc)
+    expect(s.points).toBeGreaterThan(points)
     expect(s.grid).toHaveLength(GRID_SIZE)
     expect(s.toasts.some((t) => t.msg.includes('Auto-drained'))).toBe(true)
   })
@@ -417,10 +417,10 @@ describe('tick auto-battle paths', () => {
       tags: [{ name: 'wet', level: 2, base: 10, income: 5, weight: 2 }],
       caps: [],
     })
-    const before = useGame.getState().gc
+    const before = useGame.getState().points
     useGame.getState().tick(1000)
     const s = useGame.getState()
-    expect(s.gc).toBeGreaterThan(before)
+    expect(s.points).toBeGreaterThan(before)
     expect(s.grid[0].hp).toBe(5) // untouched
   })
 
@@ -435,7 +435,7 @@ describe('tick auto-battle paths', () => {
       foeHp: 1,
       foeMaxHp: 8,
       defeated: 0,
-      gc: 0,
+      points: 0,
     })
     useGame.getState().tick(1000)
     const s = useGame.getState()
@@ -494,14 +494,14 @@ describe('load edges', () => {
   })
 
   it('collectOffline is a no-op without a pending gain', () => {
-    useGame.setState({ offlineGain: 0, gc: 7 })
+    useGame.setState({ offlineGain: 0, points: 7 })
     useGame.getState().collectOffline()
-    expect(useGame.getState().gc).toBe(7)
+    expect(useGame.getState().points).toBe(7)
     expect(useGame.getState().collectedOfflineEarnings).toBe(false)
   })
 })
 
-describe('setup / excludes / wallet edges', () => {
+describe('setup / excludes edges', () => {
   it('verifyAge flips the gate and persists immediately', () => {
     useGame.getState().verifyAge()
     expect(useGame.getState().ageVerified).toBe(true)
@@ -537,19 +537,8 @@ describe('setup / excludes / wallet edges', () => {
     expect(getUserExcludes()).toEqual([])
   })
 
-  it('setWallet writes markers with and without a gc override', () => {
-    useGame.setState({ gc: 10 })
-    useGame.getState().setWallet({ credited: 3, debited: 1 })
-    expect(useGame.getState().gc).toBe(10) // gc untouched when omitted
-    useGame.getState().setWallet({ gc: 42, credited: 5, debited: 2 })
-    const s = useGame.getState()
-    expect(s.gc).toBe(42)
-    expect(s.credited).toBe(5)
-    expect(s.debited).toBe(2)
-  })
-
   it('toast log caps at 50 entries', () => {
-    useGame.setState({ gc: 100_000 })
+    useGame.setState({ points: 100_000 })
     for (let i = 0; i < 60; i++) useGame.getState().popCap('blue')
     expect(useGame.getState().toasts.length).toBeLessThanOrEqual(50)
     useGame.getState().dismissToast(useGame.getState().toasts[0].id)

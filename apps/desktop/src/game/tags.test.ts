@@ -50,7 +50,7 @@ describe('buyTag', () => {
     const res = buyTag(tag('wet', 0, 100), 150)
     expect(res).not.toBeNull()
     expect(res!.tag.level).toBe(1)
-    expect(res!.gc).toBe(50)
+    expect(res!.points).toBe(50)
   })
 
   it('refuses when unaffordable', () => {
