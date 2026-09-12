@@ -14,7 +14,7 @@ import { FlashModal } from './FlashModal';
 import { FlashOverlay } from './FlashOverlay';
 import { MobileVirusOverlay } from './hacks/MobileVirusOverlay';
 import { CreatePostModal } from './feed/CreatePostModal';
-import { GMatchSettingsModal } from './settings/GMatchSettingsModal';
+import { GMatchSettingsModal, type SettingsOpenTarget } from './settings/GMatchSettingsModal';
 import { FollowersFollowingModal } from './profile/FollowersFollowingModal';
 import { CoffeeModal } from './CoffeeModal';
 import { RecommendationModal } from './RecommendationModal';
@@ -50,7 +50,7 @@ export interface GlobalModalsProps {
   setShowFlashModal: (v: boolean) => void;
   showSettingsModal: boolean;
   setShowSettingsModal: (v: boolean) => void;
-  settingsInitialTab?: 'preferences' | 'wallpaper';
+  settingsInitialTab?: SettingsOpenTarget;
   showCreatePostModal: boolean;
   setShowCreatePostModal: (v: boolean) => void;
   showStoryModal: boolean;

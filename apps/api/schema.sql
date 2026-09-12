@@ -867,6 +867,7 @@ CREATE TABLE IF NOT EXISTS ServerDirectory (
   description TEXT NOT NULL DEFAULT '',
   owner_id TEXT NOT NULL,
   owner_pubkey TEXT NOT NULL,
+  owner_name TEXT,
   endpoint_hint TEXT NOT NULL DEFAULT '',
   password_required INTEGER NOT NULL DEFAULT 0,
   user_count INTEGER,

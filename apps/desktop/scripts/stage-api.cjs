@@ -58,6 +58,9 @@ writeFileSync(join(STAGE, 'package.json'), JSON.stringify({ name: 'gmatch-api-st
 cpSync(join(ROOT, 'packages', 'crypto'), join(STAGE, 'packages', 'crypto'), { recursive: true, filter: (s) => !s.includes('node_modules') })
 cpSync(join(ROOT, 'packages', 'shared'), join(STAGE, 'packages', 'shared'), { recursive: true, filter: (s) => !s.includes('node_modules') })
 cpSync(join(ROOT, 'packages', 'protocol'), join(STAGE, 'packages', 'protocol'), { recursive: true, filter: (s) => !s.includes('node_modules') })
+// packages/shared/src/index.ts imports ../../../shared/blocklist.json (single
+// source of truth, 84f4d68) — the stage is only complete with the root file.
+cpSync(join(ROOT, 'shared'), join(STAGE, 'shared'), { recursive: true, filter: (s) => !s.includes('node_modules') })
 cpSync(join(ROOT, 'apps', 'api'), join(STAGE, 'apps', 'api'), {
   recursive: true,
   filter: (s) => !s.includes('node_modules') && !s.includes('test-blobs-') && !s.includes('coverage') && !s.endsWith('.sqlite') && !s.endsWith('.sqlite.tmp'),
@@ -104,6 +107,14 @@ execFileSync('npm', ['install', '--omit=dev', '--no-audit', '--no-fund', '--igno
   shell: true, // npm is a .cmd shim on Windows
   env: { ...process.env, NODE_ENV: 'development' },
 })
+
+// packages/shared/src/index.ts imports ../../../shared/blocklist.json, which
+// only resolves when @orbit/shared stays a symlink (dev, smoke). npm's file:
+// install PHYSICALLY COPIES it into node_modules, so inside the packaged
+// bundle ../../../shared lands on node_modules/shared. Mirror it there.
+if (existsSync(join(STAGE, 'apps', 'api', 'node_modules', '@orbit', 'shared'))) {
+  cpSync(join(STAGE, 'shared'), join(STAGE, 'apps', 'api', 'node_modules', 'shared'), { recursive: true })
+}
 
 // Smoke check: the staged server's module graph must fully resolve. bun build
 // imports nothing at runtime — it only walks the dependency graph — so the

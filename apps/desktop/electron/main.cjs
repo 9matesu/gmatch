@@ -8,6 +8,8 @@ const path = require('node:path')
 const imageCache = require('./imageCache.cjs')
 const customFolders = require('./customFolders.cjs')
 const wallpaperWin = require('./wallpaperWin.cjs')
+const { sanitizeBounds } = require('./window-bounds-core.cjs')
+const { dapiSource, booruOrgSource } = require('./booru-sources-core.cjs')
 
 // A portable exe can run twice from one double-click (and did: two sidecars
 // fight over :8790 and the second window never appeared). One install, one
@@ -18,13 +20,19 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 // Never die silently: "app doesn't open" was unsolvable without this. Every
-// fatal lands in %APPDATA%/gMatch/main.log AND a native dialog.
+// fatal lands in %APPDATA%/gMatch/main.log AND a native dialog. The log
+// rotates at ~1MB (keeps one .1 generation) so it can never starve the disk.
+const { appendWithRotation } = require('./mainlog-core.cjs')
+const LOG_HINT = 'Details were written to:\n%APPDATA%\\gMatch\\main.log'
+function mainLogPath() {
+  return path.join(app.getPath('userData'), 'main.log')
+}
 function mainLog(line) {
-  try { fs.appendFileSync(path.join(app.getPath('userData'), 'main.log'), `[${new Date().toISOString()}] ${line}\r\n`) } catch { /* last resort only */ }
+  try { appendWithRotation(mainLogPath(), line) } catch { /* last resort only */ }
 }
 process.on('uncaughtException', (err) => {
   mainLog(`uncaught: ${err?.stack || err}`)
-  try { dialog.showErrorBox('gMatch hit an unexpected error', `${String(err?.message || err)}\n\nDetails were written to:\n%APPDATA%\\gMatch\\main.log`) } catch { /* headless edge */ }
+  try { dialog.showErrorBox('gMatch hit an unexpected error', `${String(err?.message || err)}\n\n${LOG_HINT}`) } catch { /* headless edge */ }
 })
 process.on('unhandledRejection', (reason) => mainLog(`unhandledRejection: ${reason?.stack || reason}`))
 
@@ -59,7 +67,7 @@ function initSecureKV() {
   return available
 }
 
-// Packaged topology (1.0, no central server): either we HOST the bundled
+// Packaged topology: either we HOST the bundled
 // server (default) or we're a CLIENT of a friend's. Decided once at startup.
 let packagedServer = null // { mode, url } when app.isPackaged
 
@@ -86,7 +94,7 @@ let packagedServer = null // { mode, url } when app.isPackaged
     }
   } catch (err) {
     mainLog(`userData migration failed: ${err?.stack || err}`)
-    try { dialog.showErrorBox('gMatch could not start', `${String(err?.message || err)}\n\nDetails were written to:\n%APPDATA%\\gMatch\\main.log`) } catch { /* headless edge */ }
+    try { dialog.showErrorBox('gMatch could not start', `${String(err?.message || err)}\n\n${LOG_HINT}`) } catch { /* headless edge */ }
     // Continue on the default path: worse than a rename, but never a zombie.
   }
 })()
@@ -181,9 +189,6 @@ function isQueryBlocked(query) {
   return currentBlocklist.some((bad) => q.includes(bad))
 }
 
-function isCaptionQuery(query) {
-  return /caption/i.test(String(query))
-}
 
 // Post tag filter: strictly checks the active blocklist JSON — no hard blocks.
 function hasBadTag(tags) {
@@ -260,7 +265,7 @@ async function httpGet(url, headers) {
 
 // --- source parsers -------------------------------------------------------
 
-function parseDanbooruJson(body, baseUrl, captions) {
+function parseDanbooruJson(body, baseUrl) {
   if (!body || typeof body !== 'string' || !body.trim()) return []
   let data
   try {
@@ -288,11 +293,11 @@ function parseDanbooruJson(body, baseUrl, captions) {
         (p.rating === 'explicit' || p.rating === 'e') &&
         (p.width === 0 || p.width >= 500) &&
         (p.height === 0 || p.height >= 500) &&
-        !hasBadTag(p.tags, captions),
+        !hasBadTag(p.tags),
     )
 }
 
-function parsePahealXml(body, captions) {
+function parsePahealXml(body) {
   if (!body || typeof body !== 'string') return []
   const posts = []
   const elRe = /<tag\b([^>]*)>/g
@@ -322,7 +327,7 @@ function parsePahealXml(body, captions) {
       (!p.fileName || /\.(jpe?g|png|webp)$/i.test(p.fileName) || /\.(jpe?g|png|webp)$/i.test(p.url)) &&
       (p.width === 0 || p.width >= 500) &&
       (p.height === 0 || p.height >= 500) &&
-      !hasBadTag(p.tags, captions),
+      !hasBadTag(p.tags),
   )
 }
 
@@ -336,7 +341,7 @@ function moebooruUrl(base, variant, n) {
   return `${base}/post.json?tags=${encodeURIComponent(tags)}&limit=${n}&page=${page}`
 }
 
-function parseMoebooruJson(body, prefix, captions) {
+function parseMoebooruJson(body, prefix) {
   let data
   try {
     data = JSON.parse(body)
@@ -362,12 +367,12 @@ function parseMoebooruJson(body, prefix, captions) {
         p.width >= MIN_WIDTH &&
         p.height >= MIN_HEIGHT &&
         p.width * p.height >= MIN_PIXELS &&
-        !hasBadTag(p.tags, captions),
+        !hasBadTag(p.tags),
     )
 }
 
 // --- realbooru (HTML scraper: images/videos with Referer) --------------------
-function parseRealbooruHtml(html, captions) {
+function parseRealbooruHtml(html) {
   const posts = []
   const imgRegex =
     /<img\s+[^>]*src="https:\/\/realbooru\.com\/thumbnails\/([^/]+)\/([^/]+)\/thumbnail_([^."]+)\.jpg"[^>]*title="([^"]*)"[^>]*alt="Image:\s*(\d+)"/gi
@@ -382,7 +387,7 @@ function parseRealbooruHtml(html, captions) {
     const isGif = tags.includes('gif')
     const ext = isVideo ? 'mp4' : isGif ? 'gif' : 'jpeg'
     const url = `https://realbooru.com/images/${dir1}/${dir2}/${hash}.${ext}`
-    if (!hasBadTag(tags, captions)) {
+    if (!hasBadTag(tags)) {
       posts.push({ id: `rb-${postId}`, url, tags, rating: 'e', width: 1200, height: 1200 })
     }
   }
@@ -390,7 +395,7 @@ function parseRealbooruHtml(html, captions) {
 }
 
 // --- booru.org subdomains (hgoon, blacked, allgirl, rule34) ------------------
-function parseBooruOrgHtml(html, sub, captions, query) {
+function parseBooruOrgHtml(html, query) {
   const posts = []
   const imgRegex =
     /<img\s+[^>]*src="https:\/\/thumbs\.booru\.org\/([^/]+)\/thumbnails\/\/([^/]+)\/thumbnail_([^."]+)\.([^"]+)"[^>]*title="([^"]*)"/gi
@@ -415,7 +420,7 @@ function parseBooruOrgHtml(html, sub, captions, query) {
     const url = `https://img.booru.org/${bSub}//images/${dir}/${hash}.${ext}`
     const id = `${bSub}-${hash.slice(0, 10)}`
     if (rating === 'explicit' || rating === 'e' || rating === 'questionable') {
-      if (!hasBadTag(tags, captions)) {
+      if (!hasBadTag(tags)) {
         posts.push({ id, url, tags, rating: 'e', width: 1200, height: 1200 })
       }
     }
@@ -455,7 +460,7 @@ async function redgifsAuth() {
   return token
 }
 
-function parseRedgifsJson(body, captions) {
+function parseRedgifsJson(body) {
   let data
   try {
     data = JSON.parse(body)
@@ -490,11 +495,11 @@ function parseRedgifsJson(body, captions) {
         /\.(mp4|webm|gif|webp)(?:[?#]|$)/i.test(p.url) &&
         p.width >= MIN_WIDTH &&
         p.height >= MIN_HEIGHT &&
-        !hasBadTag(p.tags, captions),
+        !hasBadTag(p.tags),
     )
 }
 
-async function fetchRedgifs(variant, n, captions) {
+async function fetchRedgifs(variant, n) {
   const page = 1 + Math.floor(Math.random() * 5)
   const url =
     `${REDGIFS_API}/v2/gifs/search?search_text=${encodeURIComponent(redgifsWords(variant))}` +
@@ -502,7 +507,7 @@ async function fetchRedgifs(variant, n, captions) {
   try {
     const token = await redgifsAuth()
     const body = await httpGet(url, { Authorization: `Bearer ${token}` })
-    return parseRedgifsJson(body, captions)
+    return parseRedgifsJson(body)
   } catch (e) {
     if (!/401/.test(String((e && e.message) || e))) throw e
     // ponytail: stale cached temp token; drop it and retry once.
@@ -510,7 +515,7 @@ async function fetchRedgifs(variant, n, captions) {
     redgifsTokenExp = 0
     const token = await redgifsAuth()
     const body = await httpGet(url, { Authorization: `Bearer ${token}` })
-    return parseRedgifsJson(body, captions)
+    return parseRedgifsJson(body)
   }
 }
 
@@ -591,7 +596,7 @@ function parseImhentaiCover(html) {
   return { url: src, width: 0, height: 0 }
 }
 
-async function fetchImhentai(variant, n, captions) {
+async function fetchImhentai(variant, n) {
   const key = redgifsWords(variant)
   // Cloudflare challenges Node-TLS fetches (403 "Just a moment") — Electron's
   // net stack is Chromium TLS and passes like a real browser tab. Plain-node
@@ -614,7 +619,7 @@ async function fetchImhentai(variant, n, captions) {
         .toLowerCase()
         .split(/[^a-z0-9]+/)
         .filter((t) => t.length >= 2)
-      if (hasBadTag(tags, captions)) continue
+      if (hasBadTag(tags)) continue
       posts.push({ id: `imh-${id}`, url: cover.url, tags, rating: 'e', kind: 'image' })
     } catch {
       /* one dead gallery never kills the round */
@@ -629,64 +634,28 @@ async function fetchImhentai(variant, n, captions) {
 // (boorus), redgifs (real/hardcore mp4s+gifs), imhentai (hentai galleries).
 // e621 (furry) and safebooru (safe-only) were removed on purpose.
 const SOURCES = [
-  {
-    id: 'tbib',
-    fetch: async (variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 8)
-      const negs = getQueryNegatives()
-      const query = (variant + ' rating:explicit ' + negs).trim()
-      let body = await httpGet(
-        `https://tbib.org/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(query)}&limit=${n}&json=1&pid=${pid}`
-      )
-      let posts = parseDanbooruJson(body, 'https://tbib.org', captions)
-      if (posts.length === 0 && pid > 0) {
-        body = await httpGet(
-          `https://tbib.org/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(query)}&limit=${n}&json=1&pid=0`
-        )
-        posts = parseDanbooruJson(body, 'https://tbib.org', captions)
-      }
-      return posts
-    },
-  },
-  {
-    id: 'xbooru',
-    fetch: async (variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 8)
-      const negs = getQueryNegatives()
-      const query = (variant + ' rating:explicit ' + negs).trim()
-      let body = await httpGet(
-        `https://xbooru.com/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(query)}&limit=${n}&json=1&pid=${pid}`
-      )
-      let posts = parseDanbooruJson(body, 'https://xbooru.com', captions)
-      if (posts.length === 0 && pid > 0) {
-        body = await httpGet(
-          `https://xbooru.com/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(query)}&limit=${n}&json=1&pid=0`
-        )
-        posts = parseDanbooruJson(body, 'https://xbooru.com', captions)
-      }
-      return posts
-    },
-  },
+  dapiSource('tbib', 'https://tbib.org', { httpGet, parse: parseDanbooruJson, negatives: getQueryNegatives }),
+  dapiSource('xbooru', 'https://xbooru.com', { httpGet, parse: parseDanbooruJson, negatives: getQueryNegatives }),
   {
     // Real/hardcore porn: pornstars (skylar vox), BBC, mp4s/gifs.
     id: 'redgifs',
-    fetch: (variant, n, captions) => fetchRedgifs(variant, n, captions),
+    fetch: (variant, n) => fetchRedgifs(variant, n),
   },
   {
     // paheal combos return 0 results — query a single tag only.
     id: 'paheal',
-    fetch: async (variant, n, captions) => {
+    fetch: async (variant, n) => {
       const tag = variant.split(/\s+/)[0]
       const page = 1 + Math.floor(Math.random() * 5)
       let xml = await httpGet(
         `https://rule34.paheal.net/api/danbooru/find_posts?tags=${encodeURIComponent(tag)}&limit=${n}&page=${page}`
       )
-      let posts = parsePahealXml(xml, captions)
+      let posts = parsePahealXml(xml)
       if (posts.length === 0 && page > 1) {
         xml = await httpGet(
           `https://rule34.paheal.net/api/danbooru/find_posts?tags=${encodeURIComponent(tag)}&limit=${n}&page=1`
         )
-        posts = parsePahealXml(xml, captions)
+        posts = parsePahealXml(xml)
       }
       return posts
     },
@@ -694,25 +663,25 @@ const SOURCES = [
   {
     // Slow (multi-fetch scrape) — last resort before giving up.
     id: 'imhentai',
-    fetch: (variant, n, captions) => fetchImhentai(variant, n, captions),
+    fetch: (variant, n) => fetchImhentai(variant, n),
   },
   {
     // Explicit hentai pools (Moebooru JSON, no key): biggest anime/hentai
     // archive of the bunch. Serves uncensored per yandere/konachan probes.
     id: 'konachan',
-    fetch: async (variant, n, captions) =>
-      parseMoebooruJson(await httpGet(moebooruUrl('https://konachan.com', variant, n)), 'kona', captions),
+    fetch: async (variant, n) =>
+      parseMoebooruJson(await httpGet(moebooruUrl('https://konachan.com', variant, n)), 'kona'),
   },
   {
     id: 'yandere',
-    fetch: async (variant, n, captions) =>
-      parseMoebooruJson(await httpGet(moebooruUrl('https://yande.re', variant, n)), 'yand', captions),
+    fetch: async (variant, n) =>
+      parseMoebooruJson(await httpGet(moebooruUrl('https://yande.re', variant, n)), 'yand'),
   },
   {
     // realbooru: real/hardcore porn (jav uncensored, pov, homemade).
     // DAPI offline (API deliberately disabled) — HTML list scraper.
     id: 'realbooru',
-    fetch: async (variant, n, captions) => {
+    fetch: async (variant, n) => {
       // Preserve multi-word tags with underscores (e.g. skylar_vox),
       // don't drop the rest of the query with split(/\s+/)[0].
       const tagParam = variant.trim().replace(/\s+/g, '_')
@@ -720,69 +689,16 @@ const SOURCES = [
       const html = await httpGet(
         `https://realbooru.com/index.php?page=post&s=list&tags=${encodeURIComponent(tagParam)}&pid=${pid}`
       )
-      return parseRealbooruHtml(html, captions).slice(0, n)
+      return parseRealbooruHtml(html).slice(0, n)
     },
   },
-  {
-    // booru.org subdomains — same engine, shared parse:
-    // hgoon (goon hentai), blacked (interracial), allgirl, rule34, qoh, celeb, footfetish.
-    // Cloudflare WAF challenges `tags=` with 403; omitting `tags=` and paginating
-    // via random `pid` returns 200 OK. Each sub is dedicated to its niche theme.
-    id: 'hgoon',
-    fetch: async (variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 10) * 20
-      const html = await httpGet(`https://hgoon.booru.org/index.php?page=post&s=list&pid=${pid}`)
-      return parseBooruOrgHtml(html, 'hgoon', captions, variant).slice(0, n)
-    },
-  },
-  {
-    id: 'blacked',
-    fetch: async (variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 10) * 20
-      const html = await httpGet(`https://blacked.booru.org/index.php?page=post&s=list&pid=${pid}`)
-      return parseBooruOrgHtml(html, 'blacked', captions, variant).slice(0, n)
-    },
-  },
-  {
-    id: 'allgirl',
-    fetch: async (variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 10) * 20
-      const html = await httpGet(`https://allgirl.booru.org/index.php?page=post&s=list&pid=${pid}`)
-      return parseBooruOrgHtml(html, 'allgirl', captions, variant).slice(0, n)
-    },
-  },
-  {
-    id: 'rule34-org',
-    fetch: async (variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 10) * 20
-      const html = await httpGet(`https://rule34.booru.org/index.php?page=post&s=list&pid=${pid}`)
-      return parseBooruOrgHtml(html, 'rule34', captions, variant).slice(0, n)
-    },
-  },
-  {
-    id: 'qoh',
-    fetch: async (variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 10) * 20
-      const html = await httpGet(`https://qoh.booru.org/index.php?page=post&s=list&pid=${pid}`)
-      return parseBooruOrgHtml(html, 'qoh', captions, variant).slice(0, n)
-    },
-  },
-  {
-    id: 'celeb',
-    fetch: async (variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 10) * 20
-      const html = await httpGet(`https://celeb.booru.org/index.php?page=post&s=list&pid=${pid}`)
-      return parseBooruOrgHtml(html, 'celeb', captions, variant).slice(0, n)
-    },
-  },
-  {
-    id: 'footfetish',
-    fetch: async (variant, n, captions) => {
-      const pid = Math.floor(Math.random() * 10) * 20
-      const html = await httpGet(`https://footfetishbooru.booru.org/index.php?page=post&s=list&pid=${pid}`)
-      return parseBooruOrgHtml(html, 'footfetishbooru', captions, variant).slice(0, n)
-    },
-  },
+  booruOrgSource('hgoon.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'hgoon'),
+  booruOrgSource('blacked.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'blacked'),
+  booruOrgSource('allgirl.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'allgirl'),
+  booruOrgSource('rule34.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'rule34-org'),
+  booruOrgSource('qoh.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'qoh'),
+  booruOrgSource('celeb.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'celeb'),
+  booruOrgSource('footfetishbooru.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'footfetish'),
 ]
 
 // AND-combos of narrow pervert tags often return 0 on DAPI mirrors, so each
@@ -808,14 +724,13 @@ async function fetchBooru({ tags, limit }) {
   // images (the renderer filters seen ones itself). Feed cache survives only
   // as a write-once store so the game never blocks on it.
   const variants = queryVariants(query)
-  const captions = isCaptionQuery(query)
   const ordered = SOURCES.map((_, i) => SOURCES[(rrIndex + i) % SOURCES.length])
   for (const source of ordered) {
     for (const variant of variants) {
       try {
         const posts = source.fetch
-          ? await source.fetch(variant, n, captions)
-          : source.parse(await httpGet(source.url(variant, n)), captions)
+          ? await source.fetch(variant, n)
+          : source.parse(await httpGet(source.url(variant, n)))
         if (posts.length > 0) {
           rrIndex = (SOURCES.indexOf(source) + 1) % SOURCES.length
           imageCache.setFeedCache(variant, posts)
@@ -831,10 +746,17 @@ async function fetchBooru({ tags, limit }) {
 }
 
 function createWindow() {
+  // Restore the last size/position when it is still usable; a 1440x900
+  // default on a 1366x768 laptop pushed the title bar off-screen.
+  let bounds = { width: 1440, height: 900 }
+  try {
+    const { screen } = require('electron')
+    const saved = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'window-bounds.json'), 'utf8'))
+    bounds = sanitizeBounds(saved, screen.getPrimaryDisplay().workArea) || bounds
+  } catch { /* first run */ }
   const win = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    minWidth: 1200,
+    ...bounds,
+    minWidth: 1000,
     backgroundColor: '#080A0D',
     title: 'gMatch',
     webPreferences: {
@@ -845,6 +767,15 @@ function createWindow() {
       additionalArguments: [`--api-base=${app.isPackaged ? (packagedServer || serverMode.readServerMode()).url : apiSidecar.API_BASE}`],
     },
   })
+  let boundsTimer = null
+  const persistBounds = () => {
+    clearTimeout(boundsTimer)
+    boundsTimer = setTimeout(() => {
+      try { fs.writeFileSync(path.join(app.getPath('userData'), 'window-bounds.json'), JSON.stringify(win.getBounds())) } catch { /* best effort */ }
+    }, 500)
+  }
+  win.on('moved', persistBounds)
+  win.on('resized', persistBounds)
   win.removeMenu()
   // The renderer's beforeunload key-save gate must NEVER silently block the
   // close button (1.0.1 bug: "cant close app" — in Electron, a prevented
@@ -875,6 +806,7 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   const secureAvailable = initSecureKV()
+  ipcMain.on('log:renderer', (_event, { scope, msg }) => mainLog(`[renderer:${scope}] ${msg}`))
   imageCache.init(app.getPath('userData'), UA)
   protocol.handle(imageCache.SCHEME, (request) => imageCache.serveImage(request))
   customFolders.init(app.getPath('userData'), { ipcMain, BrowserWindow })
@@ -890,6 +822,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('cache:evict', (_event, url) => ({ ok: imageCache.evict(String(url ?? '')) }))
   // Update check (Settings): installed version + open the download in the OS browser.
   ipcMain.handle('app:version', () => app.getVersion())
+  ipcMain.handle('app:open-log', () => shell.openPath(app.getPath('userData')))
   ipcMain.handle('shell:open', (_event, url) => {
     if (typeof url === 'string' && /^https?:\/\//i.test(url)) return shell.openExternal(url)
     return Promise.reject(new Error('only http(s) URLs'))
@@ -1007,9 +940,35 @@ app.whenReady().then(async () => {
     updateHandoff = true
     return updater.install()
   })
-  // 1.0 topology (no central server): packaged builds ALWAYS run the bundled
-  // server (host mode, default) unless the user configured client mode in
+  // Topology: packaged builds default to CLIENT mode on the central node
+  // (gmatch.fly.dev); host mode (the bundled server) is the opt-in in
   // Settings. Dev keeps the repo-local sidecar path unchanged.
+  let sidecarRestartTried = false
+  const onSidecarCrash = async (code) => {
+    mainLog(`sidecar crashed code=${code}`)
+    if (!sidecarRestartTried) {
+      sidecarRestartTried = true
+      try {
+        await apiSidecar.startApi()
+        mainLog('sidecar restarted ok')
+        return
+      } catch (e) {
+        mainLog(`sidecar restart failed: ${e?.message || e}`)
+      }
+    }
+    try {
+      dialog.showErrorBox(
+        'The local server stopped',
+        `gMatch could not keep its bundled server running.\n\nRestart the app, or switch to a friend's server in Settings > Server.\n\n${LOG_HINT}`,
+      )
+    } catch { /* headless edge */ }
+  }
+  let sidecarLogCount = 0
+  apiSidecar.sidecarEvents.on('stderr', (line) => {
+    // Crash forensics without letting a chatty server fill main.log.
+    if (sidecarLogCount++ < 40) mainLog(`[sidecar] ${line}`)
+  })
+  apiSidecar.sidecarEvents.on('crashed', (code) => void onSidecarCrash(code))
   if (app.isPackaged) {
     packagedServer = serverMode.readServerMode()
     if (packagedServer.mode === 'host') {
@@ -1017,7 +976,13 @@ app.whenReady().then(async () => {
       try {
         await apiSidecar.startApi()
       } catch (err) {
-        console.error('[api] bundled server start failed:', err.message)
+        mainLog(`bundled server start failed: ${err?.message || err}`)
+        try {
+          dialog.showErrorBox(
+            'gMatch could not start its server',
+            `${String(err?.message || err)}\n\nOpen Settings > Server to switch to a friend's server, then restart.\n\n${LOG_HINT}`,
+          )
+        } catch { /* headless edge */ }
       }
     }
   } else {
@@ -1039,7 +1004,7 @@ app.whenReady().then(async () => {
     // A fatal during boot used to leave a windowless zombie: no window, no
     // error. Log it, show it, and let the process exit.
     mainLog(`boot failed: ${err?.stack || err}`)
-    try { dialog.showErrorBox('gMatch could not start', `${String(err?.message || err)}\n\nDetails were written to:\n%APPDATA%\\gMatch\\main.log`) } catch { /* headless edge */ }
+    try { dialog.showErrorBox('gMatch could not start', `${String(err?.message || err)}\n\n${LOG_HINT}`) } catch { /* headless edge */ }
   })
 
 // Portable double-launch (or a stale lock): focus the running window instead

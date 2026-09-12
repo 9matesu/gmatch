@@ -1,6 +1,7 @@
 // API sidecar: spawns the vendored Orbit Hono/Bun server as a child process,
 // persists to userData, waits for /api/health. (Plan D3.)
 const { spawn } = require('node:child_process')
+const { EventEmitter } = require('node:events')
 const { app } = require('electron')
 const path = require('node:path')
 const { adminPin } = require('./admin-pin.cjs')
@@ -9,6 +10,9 @@ const PORT = Number(process.env.GMATCH_API_PORT || 8790)
 const API_BASE = `http://127.0.0.1:${PORT}`
 
 let proc = null
+let intentionalStop = false
+/** Emits 'crashed' (exit code) when the child dies outside a planned stop. */
+const sidecarEvents = new EventEmitter()
 
 /** Resolve the real bun executable (npm shims are .cmd wrappers that
  *  child_process.spawn can't exec directly on Windows). */
@@ -29,6 +33,7 @@ function bunBin() {
 }
 
 async function startApi() {
+  intentionalStop = false
   // At-rest encryption key for blobs/PMs (apps/api/src/crypto.ts hard-requires
   // a 64-hex key). Generate once per install and persist in userData so a raw
   // DB dump never yields plaintext — and so packaged host mode can take
@@ -47,7 +52,7 @@ async function startApi() {
       try { fs.writeFileSync(keyPath, storageKey) } catch (e) { console.warn('[api] could not persist storage key:', e.message) }
     }
   }
-  // Packaged (1.0, no-central-server plan): the app IS the server. Spawn the
+  // Host mode: the app IS the server. Spawn the
   // BUNDLED api-stage (bun.exe + self-contained server) so nothing needs to
   // be installed on the machine. Dev keeps the repo-local sidecar path.
   const resourcesApi = app.isPackaged
@@ -92,15 +97,21 @@ async function startApi() {
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
-  proc.stdout.on('data', (d) => console.log('[api]', d.toString().trim()))
-  proc.stderr.on('data', (d) => console.error('[api!]', d.toString().trim()))
+  const childLog = (kind) => (d) => {
+    const line = String(d).trim()
+    if (!line) return
+    (kind === 'out' ? console.log : console.error)(`[api${kind === 'err' ? '!' : ''}]`, line)
+    sidecarEvents.emit('stderr', `${kind}:${line}`.slice(0, 500))
+  }
+  proc.stdout.on('data', childLog('out'))
+  proc.stderr.on('data', childLog('err'))
   proc.on('error', (err) => {
     console.error('[api] sidecar spawn failed:', err.message)
     proc = null
   })
   proc.on('exit', (code) => {
     proc = null
-    if (code !== 0 && code !== null) console.error(`[api] sidecar exited code=${code}`)
+    if (!intentionalStop && code !== 0) sidecarEvents.emit('crashed', code)
   })
   for (let i = 0; i < 60; i++) {
     // If the child died or failed to spawn, stop waiting — a stale listener
@@ -121,17 +132,18 @@ async function startApi() {
 }
 
 function stopApi() {
+  intentionalStop = true
   if (proc) {
     const pid = proc.pid
     try {
       if (process.platform === 'win32' && pid) {
         const { execSync } = require('node:child_process')
-        try { execSync(`taskkill /pid ${pid} /T /F`, { stdio: 'ignore' }) } catch {}
+        try { execSync(`taskkill /pid ${pid} /T /F`, { stdio: 'ignore' }) } catch { /* already dead */ }
       }
-    } catch {}
+    } catch { /* best effort */ }
     try {
       proc.kill('SIGKILL')
-    } catch {}
+    } catch { /* already dead */ }
     proc = null
   }
 }
@@ -140,4 +152,4 @@ process.on('exit', () => stopApi())
 process.on('SIGINT', () => { stopApi(); process.exit(0) })
 process.on('SIGTERM', () => { stopApi(); process.exit(0) })
 
-module.exports = { startApi, stopApi, API_BASE, PORT }
+module.exports = { startApi, stopApi, API_BASE, PORT, sidecarEvents }

@@ -52,12 +52,14 @@ describe('ServersView', () => {
     mockFetch(async (url) => {
       if (url.includes('/api/servers/dashboard')) return json({ name: 'central', users: [{ id: 'abcdef12', display_name: 'Alice', online: true }], posts_24h: 3, members_total: 9 })
       if (url.includes('/api/servers')) return json({ servers: [
-        { id: 'aaa', name: 'Friend World', description: 'chill', owner_id: 'owner1', password_required: 1, endpoint_hint: '192.168.0.9:8790', last_seen: 'x' },
+        { id: 'aaa', name: 'Friend World', description: 'chill', owner_id: 'owner1', owner_name: 'Alice', password_required: 1, endpoint_hint: '192.168.0.9:8790', last_seen: 'x' },
       ] })
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
     await waitFor(() => expect(screen.getByText('Friend World')).toBeInTheDocument())
+    // share wave: the host handle shows on the row, never a raw address
+    expect(screen.getByText('by Alice')).toBeInTheDocument()
     expect(screen.getByText('chill')).toBeInTheDocument()
     // password_required => visible lock marker
     expect(screen.getByLabelText('password required')).toBeInTheDocument()
@@ -242,7 +244,6 @@ describe('ServersView', () => {
       serverRelaunch: vi.fn().mockResolvedValue(undefined),
       serverState: vi.fn().mockResolvedValue({ packaged: true, mode: 'host', url: 'http://127.0.0.1:8790', lanUrls: [] }),
     }
-    vi.spyOn(window, 'prompt').mockReturnValue('s3cret')
     mockFetch(async (url) => {
       if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
       if (url.includes('/api/servers')) return json({ servers: [
@@ -253,7 +254,11 @@ describe('ServersView', () => {
     render(<ServersView identity={identity} toast={() => {}} />)
     const joinBtn = await screen.findByRole('button', { name: /join/i })
     fireEvent.click(joinBtn)
-    await waitFor(() => expect(window.prompt).toHaveBeenCalled())
+    // Join passwords now go through the in-app PromptDialog (Electron has no
+    // window.prompt): type it and submit.
+    const pwInput = await screen.findByRole('textbox', { name: 'Server password' })
+    fireEvent.change(pwInput, { target: { value: 's3cret' } })
+    fireEvent.keyDown(pwInput, { key: 'Enter' })
     await waitFor(() => expect((window as unknown as { gmatch: { serverSet: ReturnType<typeof vi.fn> } }).gmatch.serverSet)
       .toHaveBeenCalledWith({ mode: 'client', url: 'https://locked.test:8790' }))
     // one-shot handoff persisted locally for the post-restart verify

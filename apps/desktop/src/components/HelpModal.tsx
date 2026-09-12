@@ -96,6 +96,21 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                   Redo the guided tour
                 </button>
               </section>
+              <section className="space-y-1.5">
+                <h3 className="text-xs font-medium text-retro-fg">Troubleshooting</h3>
+                <p className="text-xs text-retro-muted leading-relaxed">
+                  Something broke? Everything worth knowing is written to a log file on this computer. Open it and attach the files if you contact us.
+                </p>
+                {window.gmatch?.openLogFolder && (
+                  <button
+                    type="button"
+                    onClick={() => void window.gmatch?.openLogFolder?.()}
+                    className="text-xs text-retro-muted hover:text-retro-fg underline underline-offset-2 cursor-pointer"
+                  >
+                    Open log folder
+                  </button>
+                )}
+              </section>
             </div>
           )}
 
@@ -134,6 +149,14 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                 <p className="text-xs text-retro-muted leading-relaxed">
                   The directory shows all users connected to the relay. Users are sorted by online status first, then by activity.
                 </p>
+              </section>
+              <section className="space-y-1.5">
+                <h3 className="text-xs font-medium text-retro-fg">Servers</h3>
+                <ul className="text-xs text-retro-muted space-y-1.5 list-disc list-inside leading-relaxed">
+                  <li><span className="text-retro-body font-medium">Host a world</span>: Settings, Server, switch to host. Your node lists itself on the directory while it runs; Servers tab, Share, copies your node code for friends.</li>
+                  <li><span className="text-retro-body font-medium">Join a friend</span>: Servers tab, Node code, paste what they sent. Passwords go through an in-app dialog.</li>
+                  <li><span className="text-retro-body font-medium">Reachability</span>: node codes carry a LAN address, so joining works on the same network unless the host port-forwards.</li>
+                </ul>
               </section>
               <section className="space-y-1.5">
                 <h3 className="text-xs font-medium text-retro-fg">P2P Transfers</h3>

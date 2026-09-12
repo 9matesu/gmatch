@@ -20,7 +20,7 @@ describe('joinServer', () => {
   it('refuses in a browser build without the desktop bridge', async () => {
     const toast = vi.fn()
     vi.stubGlobal('window', {})
-    expect(await joinServer(row, toast)).toBe('failed')
+    expect(await joinServer(row, toast, async () => null)).toBe('failed')
     expect(toast).toHaveBeenCalledWith(expect.stringContaining('desktop app'), 'warning')
   })
 
@@ -28,7 +28,7 @@ describe('joinServer', () => {
     const serverSet = vi.fn(async () => ({ ok: true }))
     const serverRelaunch = vi.fn()
     vi.stubGlobal('window', { gmatch: { serverSet, serverRelaunch } })
-    expect(await joinServer(row, vi.fn())).toBe('relaunching')
+    expect(await joinServer(row, vi.fn(), async () => null)).toBe('relaunching')
     expect(storage.get(SERVER_MARKER_KEY)).toBe('http://192.168.0.42:8790')
     expect(serverSet).toHaveBeenCalledWith({ mode: 'client', url: 'http://192.168.0.42:8790' })
     expect(serverRelaunch).toHaveBeenCalledOnce()

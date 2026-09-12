@@ -1,0 +1,18 @@
+// node mainlog-core.cjs test — plain asserts, mirrors admin-pin.test.cjs.
+const assert = require('assert')
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
+const { appendWithRotation } = require('./mainlog-core.cjs')
+
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mainlog-'))
+const file = path.join(dir, 'main.log')
+const big = 'x'.repeat(100)
+for (let i = 0; i < 15; i++) appendWithRotation(file, big, 1000)
+assert.ok(fs.existsSync(file), 'log exists')
+assert.ok(fs.statSync(file).size <= 1000 + 200, `current log capped: ${fs.statSync(file).size}`)
+assert.ok(fs.existsSync(file + '.1'), 'rotated copy kept')
+appendWithRotation(file, 'after rotation')
+assert.match(fs.readFileSync(file, 'utf8'), /after rotation/)
+assert.ok(!fs.existsSync(file + '.2'), 'only one generation kept')
+console.log('mainlog tests passed')

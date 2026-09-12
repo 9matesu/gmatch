@@ -43,6 +43,10 @@ export interface GmatchBridge {
   blocklistGet?: () => Promise<{ current: BlocklistData; defaults: BlocklistData; isCustom?: boolean }>
   blocklistSet?: (data: BlocklistData | string) => Promise<{ ok: boolean; data?: BlocklistData; error?: string }>
   blocklistReset?: () => Promise<{ ok: boolean; data?: BlocklistData; error?: string }>
+  /** Fire-and-forget renderer log line; main appends it to userData/main.log. */
+  logError?: (scope: string, msg: string) => void
+  /** Opens the userData folder (main.log, saves) in the OS file manager. */
+  openLogFolder?: () => Promise<string>
 }
 
 export interface BlocklistData {

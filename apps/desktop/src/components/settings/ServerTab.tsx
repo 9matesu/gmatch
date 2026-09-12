@@ -1,6 +1,6 @@
 "use client";
 
-// Server tab (1.0 no-central-server topology): show what this install is —
+// Server tab (client/host topology): show what this install is —
 // HOST (bundled server, shareable LAN addresses) or CLIENT (connected to a
 // friend's server) — and let the user switch. Dev builds see read-only info.
 import { useEffect, useState } from 'react'
@@ -19,6 +19,7 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
   const [state, setState] = useState<State | null>(null)
   const [clientUrl, setClientUrl] = useState('')
   const [saving, setSaving] = useState(false)
+  const [restartPending, setRestartPending] = useState(false)
 
   useEffect(() => {
     window.gmatch?.serverState?.().then((s) => {
@@ -40,10 +41,10 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
     setSaving(true)
     const res = await window.gmatch.serverSet({ mode, url })
     setSaving(false)
-    if (!res.ok) { toast?.(res.error || 'Could not save', 'error'); return }
-    toast?.(mode === 'host' ? 'Now hosting — restart to apply' : 'Connecting to friend — restart to apply', 'success')
+    if (!res.ok) { toast?.(res.error || 'Could not save.'); return }
+    toast?.(mode === 'host' ? 'Now hosting. Restart to apply.' : 'Connecting to a friend. Restart to apply.', 'success')
     if (window.gmatch.serverRelaunch && state.packaged) {
-      window.gmatch.serverRelaunch()
+      setRestartPending(true)
     }
   }
 
@@ -131,9 +132,29 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
               onClick={() => { playPress(700); void save('host', '') }}
               className="text-xs text-retro-muted hover:text-retro-fg underline cursor-pointer"
             >
-              Stop connecting — host my own server again
+              Stop connecting and host my own server again
             </button>
           )}
+        </div>
+      )}
+
+      {restartPending && (
+        <div className="glass-panel p-3 flex items-center gap-3">
+          <p className="text-xs text-retro-fg">Saved. Restart now to switch servers.</p>
+          <button
+            type="button"
+            onClick={() => window.gmatch?.serverRelaunch?.()}
+            className="ml-auto rounded-lg bg-retro-accent px-3 py-1.5 text-xs font-bold text-black hover:bg-retro-fg cursor-pointer"
+          >
+            Restart now
+          </button>
+          <button
+            type="button"
+            onClick={() => setRestartPending(false)}
+            className="rounded-lg border border-border-glass px-3 py-1.5 text-xs text-retro-muted hover:text-retro-fg cursor-pointer"
+          >
+            Later
+          </button>
         </div>
       )}
     </div>

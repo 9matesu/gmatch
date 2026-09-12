@@ -16,3 +16,11 @@ Data: 2026-09-09 · Status: aceito · Plano: `.hermes/plans/2026-09-09_161233-po
 - "Novo player entra sem transferência → servidor vazio" é o comportamento esperado de um diretório: o conteúdo nunca esteve no central; entra-se no nó do host que já tem os dados, ou num nó vazio recém-criado.
 - `endpoint_hint` não resolve NAT: criar servidor atrás de CGNAT permanece não-joinável de fora (a UI avisa; port-forwarding é do usuário).
 - Servidor privado com senha: metadados do diretório (nome/dono) são públicos por design — se o dono quer lista privada, é host-and-share-fora-de-band, não diretório.
+
+## Share flows (2026-09-12, onda de release)
+
+- **Codigo do no** (`gmatch://node/...`, `src/utils/nodeMask.ts`): coordenada compartilhavel que o HOST copia (Servers -> Share, no hero ou na linha do diretorio) e o amigo cola (Servers -> Node code). Nao e fronteira de seguranca; carrega host:port e so o `GET /api/servers` autenticado entrega `endpoint_hint`.
+- **Prompt de join e in-app** (`PromptDialog.tsx`): Electron nao implementa `window.prompt` (retorna null), entao senha de join e cola-codigo usam dialogos proprios.
+- **`owner_name` na linha do diretorio** (migracao 050): handle reportado pelo HOST, clampado a 40; classe best-effort identica a `user_count`/`online_count` (um host pode mentir sobre o proprio nome). Renderiza como by <nome>.
+- **Vivacidade**: o heartbeat regrava a linha a cada 15min e agora bootstrapa o registro para instalacoes em modo host sem Create no jogo (troca via Settings -> Server). Linhas morrem em 24h de silencio; a UI mostra seen Xm ago.
+- **Alcance**: o codigo carrega endereco LAN; join entre redes diferentes segue dependendo de port-forwarding (limite ja documentado acima para `endpoint_hint`).

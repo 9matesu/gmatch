@@ -11,13 +11,15 @@ type Toast = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => v
 export async function joinServer(
   s: DirectoryServer,
   toast: Toast,
+  askPassword: (name: string) => Promise<string | null>,
 ): Promise<'relaunching' | 'cancelled' | 'failed'> {
   const url = s.endpoint_hint
   if (!url) { toast('This server has no address to join (owner is offline?)', 'warning'); return 'failed' }
   if (!window.gmatch?.serverSet) { toast('Joining servers works in the desktop app', 'warning'); return 'failed' }
   let password: string | undefined
   if (s.password_required) {
-    const entered = window.prompt(`"${s.name}" is password-protected. Enter the password:`)
+    // Electron has no window.prompt; the caller renders a PromptDialog.
+    const entered = await askPassword(s.name)
     if (entered === null) return 'cancelled'
     password = entered
   }

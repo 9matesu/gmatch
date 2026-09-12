@@ -27,11 +27,11 @@ async function userVersion(client: Awaited<ReturnType<typeof createClient>>): Pr
 }
 
 describe('gMatch Phase 1 migrations', () => {
-  it('migrates a fresh in-memory DB to user_version 49 with all new tables/columns', async () => {
+  it('migrates a fresh in-memory DB to user_version 50 with all new tables/columns', async () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)
 
-    expect(await userVersion(client)).toBe(49)
+    expect(await userVersion(client)).toBe(50)
 
     // Followers table (migration 014)
     expect(await tableExists(client, 'Followers')).toBe(true)
@@ -225,7 +225,7 @@ describe('gMatch Phase 1 migrations', () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)
     const versionAfterFirst = await userVersion(client)
-    expect(versionAfterFirst).toBe(49)
+    expect(versionAfterFirst).toBe(50)
 
     // Running migrate() again is a no-op
     await migrate(client)
@@ -236,10 +236,10 @@ describe('gMatch Phase 1 migrations', () => {
     expect(await columnExists(client, 'Users', 'is_moderator')).toBe(true)
   })
 
-  it('upgrades a pre-gMatch snapshot (user_version 13) by applying 014-049', async () => {
+  it('upgrades a pre-gMatch snapshot (user_version 13) by applying 014-050', async () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)
-    expect(await userVersion(client)).toBe(49)
+    expect(await userVersion(client)).toBe(50)
 
     // Tear down gMatch additions so we're effectively at pre-014 state.
     await client.execute('DROP TABLE IF EXISTS Saves')
@@ -262,10 +262,10 @@ describe('gMatch Phase 1 migrations', () => {
     // Pretend we're still on the pre-gMatch migration version.
     await client.execute('PRAGMA user_version = 13')
 
-    // Re-run migrate — it should detect user_version=13 and apply 014-049 in order
+    // Re-run migrate — it should detect user_version=13 and apply 014-050 in order
     await migrate(client)
 
-    expect(await userVersion(client)).toBe(49)
+    expect(await userVersion(client)).toBe(50)
     expect(await tableExists(client, 'Followers')).toBe(true)
     expect(await tableExists(client, 'Comments')).toBe(true)
     expect(await tableExists(client, 'CommentLikes')).toBe(true)

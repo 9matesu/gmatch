@@ -51,7 +51,7 @@ describe('Server directory API', () => {
   })
 
   it('directory carries host-reported counts; junk counts stay null', async () => {
-    const good = await register(env, owner, { name: 'Counted Node', user_count: 42, online_count: 7 })
+    const good = await register(env, owner, { name: 'Counted Node', user_count: 42, online_count: 7, owner_name: 'x'.repeat(80) })
     expect(good.status).toBe(201)
     const bad = await register(env, other, { name: 'Junk Counts', user_count: -5, online_count: 'x' })
     expect(bad.status).toBe(201)
@@ -60,9 +60,12 @@ describe('Server directory API', () => {
     const counted = list.servers.find((s) => s.name === 'Counted Node')
     expect(counted?.user_count).toBe(42)
     expect(counted?.online_count).toBe(7)
+    // owner_name is host-reported display metadata, clamped to 40
+    expect(counted?.owner_name).toBe('x'.repeat(40))
     const junked = list.servers.find((s) => s.name === 'Junk Counts')
     expect(junked?.user_count).toBeNull()
     expect(junked?.online_count).toBeNull()
+    expect(junked?.owner_name ?? null).toBe(null)
   })
 
   it('re-register with the same owner+name upserts (no duplicates)', async () => {

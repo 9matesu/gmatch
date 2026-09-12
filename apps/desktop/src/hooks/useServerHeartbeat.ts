@@ -21,9 +21,28 @@ export function useServerHeartbeat(identity: Parameters<typeof orbitFetch>[2] | 
       if (!central) return
       let raw: string | null = null
       try { raw = localStorage.getItem(REG_KEY) } catch { /* session-only */ }
-      if (!raw) return
       let body: Record<string, unknown>
-      try { body = JSON.parse(raw) } catch { return }
+      if (!raw) {
+        // Host mode without an in-game Create (switched via Settings): the
+        // node still belongs on the directory. Claim it with its own name
+        // and a LAN address; the normal replay takes over from here on.
+        try {
+          const n = await orbitFetch('/api/servers/node', { method: 'GET' }, identity)
+          if (!n.ok) return
+          const nj = (await n.json()) as { name?: string; description?: string }
+          const hint = String(st.lanUrls?.[0] || '').replace(/^https?:\/\//, '').replace(/\/+$/, '')
+          if (!hint) return // nothing shareable yet; next tick retries
+          body = {
+            name: (nj.name || 'gmatch').slice(0, 60),
+            description: (nj.description || '').slice(0, 200),
+            endpoint_hint: hint,
+            password_required: false,
+          }
+          localStorage.setItem(REG_KEY, JSON.stringify(body))
+        } catch { return }
+      } else {
+        try { body = JSON.parse(raw) } catch { return }
+      }
       // Game-browser metadata: report our own node's counts (dashboard route
       // answers locally on the host node). Failure = register without counts.
       try {
@@ -34,6 +53,10 @@ export function useServerHeartbeat(identity: Parameters<typeof orbitFetch>[2] | 
           if (Array.isArray(dj?.users)) body.online_count = dj.users.filter((u: { online?: boolean }) => u?.online).length
         }
       } catch { /* counts optional */ }
+      try {
+        const dn = localStorage.getItem('orbit_display_name')
+        if (dn?.trim()) body.owner_name = dn.trim().slice(0, 40)
+      } catch { /* session-only */ }
       try {
         await orbitFetch(central + '/api/servers', {
           method: 'POST',

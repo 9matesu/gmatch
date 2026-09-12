@@ -6,6 +6,7 @@ import { orbitFetch } from '../utils/api'
 import { ObjectImage } from './ObjectImage'
 import { resolveMediaUrl, contentHash } from '../utils/media'
 import { useToast } from './Toast'
+import { userFacingError } from '../utils/userError'
 import { DropZone } from './DropZone'
 import { CameraCapture } from './CameraCapture'
 import {
@@ -102,7 +103,7 @@ export function BabecockPanel({
           toast(data?.error || 'Failed to add images', 'error')
         }
       } catch (err: any) {
-        toast(err?.message || 'Failed to add images', 'error')
+        toast(userFacingError(err, { fallback: 'Could not add the images.' }), 'error')
       } finally {
         setAddingImages(false)
       }
@@ -268,7 +269,7 @@ export function BabecockPanel({
         }
       }
     } catch (err: any) {
-      toast(err?.message || 'Action failed', 'error')
+      toast(userFacingError(err, { fallback: 'That action did not go through.' }), 'error')
     } finally {
       setSubmitting(false)
     }

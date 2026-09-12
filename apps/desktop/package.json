@@ -1,6 +1,6 @@
 {
   "name": "@gmatch/desktop",
-  "version": "1.1.4",
+  "version": "1.2.1",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -66,7 +66,7 @@
     "vitest": "^2.1.8"
   },
   "build": {
-    "appId": "dev.goonmatch.grid",
+    "appId": "dev.gmatch.desktop",
     "productName": "gMatch",
     "electronVersion": "33.4.11",
     "artifactName": "gMatch-${version}-portable.${ext}",

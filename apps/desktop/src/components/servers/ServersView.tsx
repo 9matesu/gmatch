@@ -5,8 +5,8 @@
 // 2-column coupled layout: Left = current node dashboard (24h users, rooms, stats);
 // Right = public directory browser (search, join, create).
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Lock, Globe, UserPlus, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, ArrowLeft, Clock, MessageSquare, Plus } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Lock, Globe, UserPlus, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, Share2, ArrowLeft, Clock, MessageSquare, Plus } from 'lucide-react'
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
 import { orbitFetch, getApiBaseUrl } from '../../utils/api'
 import { normalizeServerUrl } from '../../utils/serverUrl'
@@ -15,6 +15,8 @@ import { rememberPendingHost } from '../../utils/server-host-pending'
 import { maskedServerUrl } from '../../utils/ipMask'
 import { mergeDirectory, readDirectoryCache, writeDirectoryCache } from './directoryMerge'
 import { decodeNodeMask } from '../../utils/nodeMask'
+import { buildNodeCode } from '../../utils/nodeShare'
+import { PromptDialog } from '../PromptDialog'
 import { claimPendingHost } from '../../hooks/usePendingServerHost'
 import { playPress } from '../../utils/sounds'
 import { CentralAdminPanel } from './CentralAdminPanel'
@@ -25,6 +27,7 @@ export interface DirectoryServer {
   name: string
   description?: string
   owner_id: string
+  owner_name?: string
   password_required: number
   endpoint_hint?: string
   user_count?: number | null
@@ -67,6 +70,11 @@ const DIRECTORY_ID_KEY = 'gmatch.server.directoryId'
 // heartbeat replays this registration while in host mode; its presence also
 // blocks a second Create (one server per install — use Rename instead).
 const REG_KEY = 'gmatch.server.register'
+
+/** The host's local display name, best-effort (private mode returns ''). */
+function localDisplayName(): string {
+  try { return (localStorage.getItem('orbit_display_name') || '').trim().slice(0, 40) } catch { return '' }
+}
 
 function formatRelativeTime(iso?: string | null): string {
   if (!iso) return 'recently'
@@ -123,6 +131,11 @@ export function ServersView({
   const [renaming, setRenaming] = useState(false)
   const [serverMode, setServerMode] = useState<'host' | 'client' | null>(null)
   const [userTab, setUserTab] = useState<'online' | 'all24h'>('online')
+  // Join prompts (Electron has no window.prompt): one pending resolver ref,
+  // one dialog kind at a time (password during join, or the paste-code modal).
+  const pendingAsk = useRef<((v: string | null) => void) | null>(null)
+  const [askPasswordFor, setAskPasswordFor] = useState<string | null>(null)
+  const [codeAskOpen, setCodeAskOpen] = useState(false)
 
   const refresh = useCallback(async () => {
     // Anonymous browser: public directory only — never touch node routes
@@ -231,7 +244,7 @@ export function ServersView({
     const q = query.trim().toLowerCase()
     return servers
       .filter((s) => !passwordOnly || s.password_required)
-      .filter((s) => !q || `${s.name} ${s.description ?? ''} ${s.endpoint_hint ?? ''}`.toLowerCase().includes(q))
+      .filter((s) => !q || `${s.name} ${s.description ?? ''} ${s.owner_name ?? ''} ${s.endpoint_hint ?? ''}`.toLowerCase().includes(q))
       .sort((a, b) => {
         if (sort === 'name') return a.name.localeCompare(b.name)
         if (sort === 'online') return (b.online_count ?? -1) - (a.online_count ?? -1)
@@ -254,7 +267,7 @@ export function ServersView({
       const res = await orbitFetch(`${central}/api/servers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: n, description: d, endpoint_hint: h, password_required: pwRequired }),
+        body: JSON.stringify({ name: n, description: d, endpoint_hint: h, password_required: pwRequired, owner_name: localDisplayName() || undefined }),
       }, identity)
       if (res.ok) {
         const created = (await res.json().catch(() => ({}))) as { server?: DirectoryServer }
@@ -387,19 +400,33 @@ export function ServersView({
     }
   }
 
-  const join = async (s: DirectoryServer) => { void joinServer(s, toast) }
+  const askPassword = (name: string) =>
+    new Promise<string | null>((resolve) => { pendingAsk.current = resolve; setAskPasswordFor(name) })
+
+  const join = async (s: DirectoryServer) => { void joinServer(s, toast, askPassword) }
+
+  // Copy the gmatch://node/ code a friend pastes into "Node code" here.
+  // The clipboard carries the code alone (the paste-side decoder is strict).
+  const shareServer = async (address: string, name: string) => {
+    const code = buildNodeCode(address, name)
+    if (!code) { toast('No shareable address yet. Check Settings, Server.', 'warning'); return }
+    try {
+      await navigator.clipboard.writeText(code)
+      toast('Server code copied. Send it to your friends.', 'success')
+    } catch {
+      toast('Could not reach the clipboard.', 'error')
+    }
+  }
 
   // Wave 2 (D2): out-of-band join — paste a gmatch://node/ code shared by the
   // host directly (no hub coordination needed to reach a node).
-  const joinByCode = async () => {
-    const entered = window.prompt('Paste a node code (gmatch://node/...):')
-    if (!entered) return
+  const joinByCode = async (entered: string) => {
     const coord = decodeNodeMask(entered)
     if (!coord) { toast('That is not a valid node code.', 'error'); return }
     const host = coord.port ? `${coord.host}:${coord.port}` : coord.host
     // Persist before the relaunch kills the process.
     writeDirectoryCache(mergeDirectory(readDirectoryCache(), [{ id: `mask:${host}`, name: coord.name, owner_id: '', password_required: 0, endpoint_hint: host }]))
-    await joinServer({ id: `mask:${host}`, name: coord.name, owner_id: '', password_required: 0, endpoint_hint: host }, toast)
+    await joinServer({ id: `mask:${host}`, name: coord.name, owner_id: '', password_required: 0, endpoint_hint: host }, toast, askPassword)
   }
 
   const leave = async () => {
@@ -473,6 +500,20 @@ export function ServersView({
                     className="glass-action glass-action-danger h-8 px-2.5 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" /> Leave
+                  </button>
+                )}
+                {serverMode === 'host' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playPress(820)
+                      void window.gmatch?.serverState?.()
+                        .then((st) => void shareServer(st?.lanUrls?.[0] || '', serverName))
+                        .catch(() => void shareServer('', serverName))
+                    }}
+                    className="glass-action h-8 px-2.5 rounded-lg text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1"
+                  >
+                    <Share2 className="w-3 h-3" /> Share
                   </button>
                 )}
                 <button
@@ -835,7 +876,7 @@ export function ServersView({
                 </button>
                 <button
                   type="button"
-                  onClick={() => void joinByCode()}
+                  onClick={() => { playPress(700); setCodeAskOpen(true) }}
                   className="glass-action h-8 px-2.5 rounded-lg text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1"
                 >
                   <Plus className="w-3 h-3" /> Node code
@@ -892,6 +933,8 @@ export function ServersView({
                           )}
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[10px] text-retro-muted font-mono">
                             <span>{s.endpoint_hint ? maskedServerUrl(s.endpoint_hint) : 'no address published'}</span>
+                            {s.owner_name && <span>by {s.owner_name}</span>}
+                            <span>seen {formatRelativeTime(s.last_seen)}</span>
                             {(typeof s.online_count === 'number' || typeof s.user_count === 'number') && (
                               <span className="text-retro-fg">
                                 <strong>{s.online_count ?? 0}</strong> online · {s.user_count ?? '?'} members
@@ -901,6 +944,7 @@ export function ServersView({
                         </div>
                         <div className="flex flex-col gap-1 shrink-0 self-center">
                           {mine(s) ? (
+                            <>
                             <button
                               type="button"
                               onClick={() => void unregister(s)}
@@ -908,6 +952,14 @@ export function ServersView({
                             >
                               unregister
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => { playPress(820); void shareServer(s.endpoint_hint || '', s.name) }}
+                              className="glass-action px-2.5 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer flex items-center gap-1"
+                            >
+                              <Share2 className="w-3 h-3" /> Share
+                            </button>
+                            </>
                           ) : (
                             <button
                               type="button"
@@ -932,6 +984,25 @@ export function ServersView({
 
               {/* Central master admin drawer */}
               {showAdmin && identity && <CentralAdminPanel central={central} identity={identity} toast={toast} />}
+
+      {askPasswordFor !== null && (
+        <PromptDialog
+          title="Server password"
+          description={`${askPasswordFor} is password-protected. Enter the password the host gave you.`}
+          submitLabel="Join"
+          onSubmit={(v) => { pendingAsk.current?.(v); pendingAsk.current = null; setAskPasswordFor(null) }}
+          onCancel={() => { pendingAsk.current?.(null); pendingAsk.current = null; setAskPasswordFor(null) }}
+        />
+      )}
+      {codeAskOpen && (
+        <PromptDialog
+          title="Node code"
+          description="Paste the gmatch://node/ code your friend copied from their Servers tab."
+          submitLabel="Connect"
+          onSubmit={(v) => { setCodeAskOpen(false); void joinByCode(v) }}
+          onCancel={() => setCodeAskOpen(false)}
+        />
+      )}
             </>
           )}
         </main>
