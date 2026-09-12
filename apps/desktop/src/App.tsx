@@ -39,7 +39,7 @@ import { isOnboardingComplete, readOnboardingState } from "./firstRun/onboarding
 import { TourDock } from "./components/tour/TourDock";
 import { TourDeck } from "./components/tour/TourDeck";
 import { DEFAULT_FEED_SORT, isFeedSort, type FeedSort } from "./components/feed/feedSort";
-import { TOUR_STEPS, isTourOver, nextTourStep, readTourState, writeTourState, type TourState } from "./firstRun/tourState";
+import { TOUR_STEPS, nextTourStep, readTourState, writeTourState, type TourState } from "./firstRun/tourState";
 import { GMatchFeed, type FeedPost } from "./components/feed/GMatchFeed";
 import { GMatchDMs } from "./components/chat/GMatchDMs";
 import type { GroupMember } from "./components/chat/GroupMembersPopover";
@@ -54,8 +54,7 @@ import { legalDocFromHash, isLegalDocId, type LegalDocId } from "./utils/legal-r
 import { saveUserProfile, deriveProfileTags } from "./utils/profile";
 import { GamesView } from "./components/views/GamesView";
 import { getStoredActiveDeckId, type Deck } from "./components/games/DeckBuilder";
-import { HomeFooter, type MainViewType, type ActiveHackSession } from "./components/home/HomeFooter";
-import { SidebarNav } from "./components/home/SidebarNav";
+import { type MainViewType, type ActiveHackSession } from "./components/home/HomeFooter";
 import { CommandIsland } from "./components/home/CommandIsland";
 import { NativeHeaderBar } from "./components/home/NativeHeaderBar";
 import { RoomsView } from "./components/rooms/RoomsView";
@@ -369,14 +368,6 @@ export default function Home() {
       window.removeEventListener('popstate', onNav)
     }
   }, [mainView]);
-
-  const handleOpenHome = useCallback(() => {
-    setMainView('feed');
-    setChatOpen(false);
-    setDmMinimized(false);
-    setGamesSubTab('duel');
-    mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
 
   const handleRespondBabecock = useCallback(async (id: string, accept: boolean) => {
     if (!identity) return;
@@ -2517,26 +2508,6 @@ export default function Home() {
     return () => { alive = false }
   }, [identity])
 
-  // Sidebar "Porn Games" badge: deduped headcount of the lobby game room —
-  // queued players + live online users + self. Mirrors the roster merge in
-  // LobbyPanel without pulling the whole merge in.
-  const lobbyRoomCount = useMemo(() => {
-    const ids = new Set<string>();
-    for (const p of lobby.state?.players || []) if (p.user_id) ids.add(p.user_id);
-    for (const u of lobby.onlineUsers || []) if (u.id) ids.add(u.id);
-    if (identity?.orbitId) ids.add(identity.orbitId);
-    return ids.size;
-  }, [lobby.state?.players, lobby.onlineUsers, identity?.orbitId])
-
-  // Sidebar per-game counters: waiting/in-match players on the duel board.
-  const duelBadge = useMemo(() => {
-    const selfId = identity?.orbitId
-    return (lobby.state?.players || []).filter(
-      (p: { user_id?: string; status?: string }) =>
-        p.user_id && p.user_id !== selfId && (p.status === 'waiting' || p.status === 'in_match'),
-    ).length
-  }, [lobby.state?.players, identity?.orbitId])
-
   // Hold Space to fade the interface while keeping the wallpaper visible.
   // Editable controls keep their native spacebar behavior.
   useEffect(() => {
@@ -3795,6 +3766,7 @@ export default function Home() {
               onLogout={() => { setChatOpen(false); setIdentityModalMode('logout'); }}
               onOpenProfile={() => handleSetMainView('profile')}
               onOpenCreateCard={() => { setChatOpen(false); setShowCreateCardModal(true); }}
+              showRooms={courierActive}
             />
           </ErrorBoundary>
         )}

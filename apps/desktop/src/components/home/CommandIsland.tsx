@@ -16,6 +16,8 @@ import {
   ShieldCheck,
   SignOut,
   PaintBrush,
+  Monitor,
+  Users,
   User,
   Bell,
   X,
@@ -43,6 +45,7 @@ export interface CommandIslandProps {
   onLogout?: () => void;
   onOpenProfile?: () => void;
   onOpenCreateCard?: () => void;
+  showRooms?: boolean;
 }
 
 export function CommandIsland({
@@ -65,6 +68,7 @@ export function CommandIsland({
   onLogout,
   onOpenProfile,
   onOpenCreateCard,
+  showRooms = false,
 }: CommandIslandProps) {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [isScrolledDown, setIsScrolledDown] = useState(false);
@@ -277,6 +281,34 @@ export function CommandIsland({
                   <HardDrives className="w-4 h-4 text-[#3fb950]" />
                   <span>Servers</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    playPress(800);
+                    setMoreMenuOpen(false);
+                    handleNavClick('pc_domination');
+                  }}
+                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] active:scale-95 transition-all text-xs text-retro-body hover:text-white"
+                >
+                  <Monitor className="w-4 h-4 text-retro-muted" />
+                  <span>Domination</span>
+                </button>
+
+                {showRooms && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playPress(800);
+                      setMoreMenuOpen(false);
+                      handleNavClick('rooms');
+                    }}
+                    className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] active:scale-95 transition-all text-xs text-retro-body hover:text-white"
+                  >
+                    <Users className="w-4 h-4 text-retro-muted" />
+                    <span>Rooms</span>
+                  </button>
+                )}
 
                 <button
                   type="button"
