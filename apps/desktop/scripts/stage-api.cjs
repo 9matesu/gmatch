@@ -98,7 +98,7 @@ for (const junk of ['orbit.snapshot.sqlite', 'orbit.snapshot.sqlite.tmp', 'blobs
 }
 
 console.log('[stage-api] installing production deps (this can take a minute)...')
-execFileSync('npm', ['install', '--omit=dev', '--no-audit', '--no-fund', '--ignore-scripts=false'], {
+execFileSync('npm', ['install', '--omit=dev', '--no-audit', '--no-fund', '--ignore-scripts=false', '--no-package-lock'], {
   cwd: join(STAGE, 'apps', 'api'),
   stdio: 'inherit',
   shell: true, // npm is a .cmd shim on Windows
