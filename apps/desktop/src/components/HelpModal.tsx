@@ -96,6 +96,21 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                   Redo the guided tour
                 </button>
               </section>
+              <section className="space-y-1.5">
+                <h3 className="text-xs font-medium text-retro-fg">Troubleshooting</h3>
+                <p className="text-xs text-retro-muted leading-relaxed">
+                  Something broke? Everything worth knowing is written to a log file on this computer. Open it and attach the files if you contact us.
+                </p>
+                {window.gmatch?.openLogFolder && (
+                  <button
+                    type="button"
+                    onClick={() => void window.gmatch?.openLogFolder?.()}
+                    className="text-xs text-retro-muted hover:text-retro-fg underline underline-offset-2 cursor-pointer"
+                  >
+                    Open log folder
+                  </button>
+                )}
+              </section>
             </div>
           )}
 
