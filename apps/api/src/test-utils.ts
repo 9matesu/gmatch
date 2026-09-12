@@ -59,3 +59,21 @@ export async function createMockEnv() {
 
   return { DB: db, BUCKET: blob, _client: client }
 }
+
+/** Seed an owned, queue-valid deck (size cards, all active) for a user id.
+ * Direct-service seeding — mirrors decks.test.ts, no HTTP round-trips. */
+export async function seedActiveDeck(env: { DB: D1Turso }, ownerId: string, size = 5): Promise<string> {
+  const { DeckService } = await import('./decks')
+  const { CardService } = await import('./cards')
+  const decks = new DeckService(env.DB)
+  const cards = new CardService(env.DB)
+  const deck = await decks.createDeck(ownerId, `Queue Deck ${Math.random().toString(36).slice(2, 8)}`)
+  for (let i = 0; i < size; i++) {
+    const mid = `media-sd-${deck.id.slice(0, 8)}-${i}`
+    await env.DB.prepare('INSERT INTO Objects (id, owner_id, size_bytes, mime_type) VALUES (?, ?, ?, ?)')
+      .bind(mid, ownerId, 1000, 'image/jpeg').run()
+    const card = await cards.createCard({ creatorId: ownerId, mediaObjectId: mid })
+    await decks.addCard(ownerId, deck.id, card.id)
+  }
+  return deck.id
+}

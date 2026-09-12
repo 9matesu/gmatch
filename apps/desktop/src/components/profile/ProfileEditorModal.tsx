@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { playPress, playWin } from '../../utils/sounds';
 import { X, Camera, Globe, Lock } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
@@ -34,6 +35,17 @@ export function ProfileEditorModal({
   const [isPrivate, setIsPrivate] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showPicModal, setShowPicModal] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const handleSave = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -83,10 +95,10 @@ export function ProfileEditorModal({
     }
   };
 
-  return (
+  const modalContent = (
     <div
       className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg"
-      onClick={(e) => e.stopPropagation()}
+      onClick={onClose}
     >
       <div
         className="w-full max-w-md bg-surface-raised border border-border-glass rounded-lg shadow-xl overflow-hidden flex flex-col max-h-[85vh] animate-orbit-pop"
@@ -139,16 +151,6 @@ export function ProfileEditorModal({
               Change photo
             </button>
           </div>
-
-          <ProfilePicModal
-            isOpen={showPicModal}
-            currentPfp={pfpUrl}
-            onClose={() => setShowPicModal(false)}
-            onSave={(newPfp) => {
-              setPfpUrl(newPfp);
-            }}
-            toast={toast}
-          />
 
           {/* Form Fields */}
           <div className="space-y-3">
@@ -214,6 +216,21 @@ export function ProfileEditorModal({
           </div>
         </form>
       </div>
+
+      <ProfilePicModal
+        isOpen={showPicModal}
+        currentPfp={pfpUrl}
+        onClose={() => setShowPicModal(false)}
+        onSave={(newPfp) => {
+          setPfpUrl(newPfp);
+        }}
+        toast={toast}
+      />
     </div>
   );
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+  return modalContent;
 }

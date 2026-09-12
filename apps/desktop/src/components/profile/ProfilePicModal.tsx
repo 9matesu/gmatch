@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Camera, UploadCloud, Link as LinkIcon, X, Check } from 'lucide-react';
 import { CameraCapture } from '../CameraCapture';
 import { DropZone } from '../DropZone';
@@ -29,6 +30,27 @@ export function ProfilePicModal({
   const [urlInput, setUrlInput] = useState('');
   const [rawFile, setRawFile] = useState<File | null>(null);
   const { crop, cropper } = useCropper();
+
+  useEffect(() => {
+    if (isOpen) {
+      setPreview(currentPfp);
+      setUrlInput('');
+      setRawFile(null);
+      setTab('upload');
+    }
+  }, [isOpen, currentPfp]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -77,8 +99,8 @@ export function ProfilePicModal({
       return;
     }
     let finalUrl = preview;
-    // Crop remote URLs too (falls back to the original when CORS taints).
-    if (/^https?:\/\//i.test(preview)) {
+    // Crop remote URLs too if changed (falls back to the original when CORS taints).
+    if (preview !== currentPfp && /^https?:\/\//i.test(preview)) {
       const res = await crop(preview, { aspect: '1:1', title: 'Crop profile photo' });
       if (!res) return;
       finalUrl = res.dataUrl;
@@ -112,10 +134,10 @@ export function ProfilePicModal({
     { id: 'camera', label: 'Camera', icon: Camera },
   ];
 
-  return (
+  const modalContent = (
     <div
-      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg"
-      onClick={(e) => e.stopPropagation()}
+      className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg"
+      onClick={onClose}
     >
       <div
         className="w-full max-w-md bg-surface-raised border border-border-glass rounded-lg shadow-xl overflow-hidden flex flex-col max-h-[85vh] animate-orbit-pop"
@@ -136,7 +158,7 @@ export function ProfilePicModal({
         {/* Content */}
         <div className="p-5 space-y-4 overflow-y-auto flex-1 styled-scrollbar">
           {/* Avatar Preview */}
-          <div className="flex flex-col items-center py-2">
+          <div className="flex flex-col items-center gap-1.5 py-2">
             <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-border-glass bg-surface-interactive flex items-center justify-center">
               {preview ? (
                 <img src={preview} alt="Preview" className="w-full h-full object-cover" />
@@ -144,6 +166,21 @@ export function ProfilePicModal({
                 <span className="text-2xl text-retro-muted">?</span>
               )}
             </div>
+            {preview && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const target = rawFile || preview;
+                  const res = await crop(target, { aspect: '1:1', title: 'Crop profile photo' });
+                  if (!res) return;
+                  if (res.file) setRawFile(res.file);
+                  setPreview(res.dataUrl);
+                }}
+                className="text-[11px] text-retro-muted hover:text-retro-fg cursor-pointer transition-colors"
+              >
+                Adjust crop
+              </button>
+            )}
           </div>
 
           {/* Mode Tabs */}
@@ -191,6 +228,12 @@ export function ProfilePicModal({
                   type="url"
                   value={urlInput}
                   onChange={(e) => handleUrlChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleUrlChange(urlInput);
+                    }
+                  }}
                   placeholder="https://example.com/photo.gif"
                   className="w-full bg-transparent focus:outline-none text-sm text-retro-fg font-mono placeholder:text-retro-muted"
                 />
@@ -225,4 +268,9 @@ export function ProfilePicModal({
       {cropper}
     </div>
   );
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+  return modalContent;
 }

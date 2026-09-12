@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, X } from 'lucide-react';
 import { playPress } from '../utils/sounds';
 
@@ -69,6 +70,17 @@ export function CropModal({
     return () => ro.disconnect();
   }, []);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onCancel();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel]);
+
   const ratio = ASPECTS.find((a) => a.id === aspect)?.ratio ?? (img && img.naturalHeight ? img.naturalWidth / img.naturalHeight : 1);
   // Fit the frame into the measured box (min 220px reserved).
   const avail = { w: Math.max(box.w, 80), h: Math.max(box.h, 80) };
@@ -124,7 +136,7 @@ export function CropModal({
     }
   };
 
-  return (
+  const modalContent = (
     <div className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg" onClick={onCancel}>
       <div className="w-full max-w-sm bg-retro-bg border border-border-glass rounded-xl p-4 space-y-3 animate-orbit-pop" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
@@ -187,13 +199,18 @@ export function CropModal({
           <button type="button" onClick={onCancel} className="px-3 py-2 rounded-lg text-xs font-semibold text-retro-fg hover:bg-retro-panel cursor-pointer transition-colors">
             Cancel
           </button>
-          <button type="button" onClick={exportCrop} disabled={loadError} className="px-4 py-2 rounded-lg bg-retro-fg hover:bg-white disabled:opacity-40 text-black text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5">
-            <Check className="w-3.5 h-3.5" /> Apply
+          <button type="button" onClick={exportCrop} className="px-4 py-2 rounded-lg bg-retro-fg hover:bg-white text-black text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5">
+            <Check className="w-3.5 h-3.5" /> {loadError ? 'Use uncropped' : 'Apply'}
           </button>
         </div>
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+  return modalContent;
 }
 
 export async function dataUrlToFile(dataUrl: string, fallbackName = 'image.jpg'): Promise<File | null> {

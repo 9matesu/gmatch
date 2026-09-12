@@ -111,7 +111,12 @@ export function DropZone({
         type="file"
         multiple={multiple}
         accept={accept}
-        onChange={(e) => { if (e.target.files) onFiles(e.target.files) }}
+        onChange={(e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            onFiles(e.target.files);
+          }
+          e.target.value = '';
+        }}
         className="hidden"
       />
       {children || (

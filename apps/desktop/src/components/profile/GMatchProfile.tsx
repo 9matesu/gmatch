@@ -172,14 +172,21 @@ export function GMatchProfile({
         {/* Avatar & Stats */}
         <div className="flex items-center gap-5 sm:gap-6">
           {/* Avatar */}
-          <div
+          <button
+            type="button"
             onClick={() => {
-              if (isSelf) setShowPfpModal(true);
+              if (isSelf) {
+                playPress(750);
+                setShowPfpModal(true);
+              }
             }}
-            className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden shrink-0 cursor-pointer group border-2 ${isFlashing
-                ? 'border-retro-accent'
-                : 'border-border-glass'
-              }`}
+            disabled={!isSelf}
+            aria-label={isSelf ? 'Change profile photo' : displayName}
+            className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden shrink-0 group border-2 p-0 text-left ${
+              isSelf ? 'cursor-pointer' : 'cursor-default'
+            } ${
+              isFlashing ? 'border-retro-accent' : 'border-border-glass'
+            }`}
           >
             {pfp ? (
               <img
@@ -198,7 +205,7 @@ export function GMatchProfile({
                 <Camera className="w-5 h-5 text-white" />
               </div>
             )}
-          </div>
+          </button>
 
           {/* Stats */}
           <div className="flex-1 flex items-center justify-around text-center gap-2">
@@ -216,16 +223,6 @@ export function GMatchProfile({
             ))}
           </div>
         </div>
-
-        <ProfilePicModal
-          isOpen={showPfpModal}
-          currentPfp={pfp}
-          onClose={() => setShowPfpModal(false)}
-          onSave={(newPfp) => {
-            void handleSavePfp(newPfp);
-          }}
-          toast={toast}
-        />
 
         {/* Name & Bio */}
         <div className="space-y-1">
@@ -471,6 +468,19 @@ export function GMatchProfile({
           </div>
         )}
       </div>
+
+      {/* Profile Picture Modal */}
+      {showPfpModal && (
+        <ProfilePicModal
+          isOpen={showPfpModal}
+          currentPfp={pfp}
+          onClose={() => setShowPfpModal(false)}
+          onSave={(newPfp) => {
+            void handleSavePfp(newPfp);
+          }}
+          toast={toast}
+        />
+      )}
 
       {/* Profile Editor Modal */}
       {showEditor && (
