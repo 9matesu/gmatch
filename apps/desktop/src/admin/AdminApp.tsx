@@ -10,13 +10,9 @@ import { useConfirm } from "../components/ConfirmDialog";
 import { logger } from "../utils/logger";
 import { AdminLayout } from "./components/AdminLayout";
 import { DashboardTab } from "./components/tabs/DashboardTab";
-import { GamesTab } from "./components/tabs/GamesTab";
-import { ContentTab } from "./components/tabs/ContentTab";
-import { UsersTab } from "./components/tabs/UsersTab";
 import { ModerationTab } from "./components/tabs/ModerationTab";
-import { PlatformTab } from "./components/tabs/PlatformTab";
-import { EconomyTab } from "./components/tabs/EconomyTab";
-import { AnalyticsTab } from "./components/tabs/AnalyticsTab";
+import { UsersTab } from "./components/tabs/UsersTab";
+import { ContentTab } from "./components/tabs/ContentTab";
 import { SettingsTab } from "./components/tabs/SettingsTab";
 import { CardZoomModal } from "../components/CardZoomModal";
 import { TAB_REGISTRY, LEGACY_TAB_MAP, getTabBadge } from "../utils/adminTabs";
@@ -105,7 +101,7 @@ export default function AdminPageClient() {
     },
     onMatchUpdate: () => {
       // Trigger a refresh of match data when a match updates
-      if (activeTab === "games") {
+      if (activeTab === "content") {
         void loadDashboardData();
       }
     },
@@ -258,9 +254,6 @@ export default function AdminPageClient() {
         case "forceMatchup":
           await orbitFetch("/api/admin/matches/force-all", { method: "POST" }, identity);
           break;
-        case "syncBotImages":
-          await orbitFetch("/api/admin/bot-config/sync-images", { method: "POST" }, identity);
-          break;
         case "runCleanup":
           await orbitFetch("/api/admin/cleanup", { method: "POST" }, identity);
           break;
@@ -275,19 +268,6 @@ export default function AdminPageClient() {
           break;
         case "viewArchive":
           // Navigate to archive detail
-          break;
-        case "inspectOwner":
-          // Open user objects detail
-          break;
-        case "deleteObject":
-          if (await confirm({ title: "Delete object?", description: "Permanently delete this object and all associated data.", confirmLabel: "Delete", tone: "danger" })) {
-            await orbitFetch(`/api/admin/objects/${args[0]}/delete`, { method: "POST" }, identity);
-          }
-          break;
-        case "redactObject":
-          if (await confirm({ title: "Redact object?", description: "Redact this object content while preserving metadata placeholder.", confirmLabel: "Redact", tone: "danger" })) {
-            await orbitFetch(`/api/admin/objects/${args[0]}/redact`, { method: "POST" }, identity);
-          }
           break;
         case "banUser":
           if (await confirm({ title: `Ban user ${args[0]}?`, description: "Ban this user and wipe/moderate their active content.", confirmLabel: "Ban User", tone: "danger" })) {
@@ -482,32 +462,16 @@ export default function AdminPageClient() {
         <DashboardTab identity={identity} pinVerified={pinVerified} onZoom={handleZoom} onAction={handleAction} onNavigate={handleTabChange} />
       )}
 
-      {activeTab === "games" && (
-        <GamesTab identity={identity} pinVerified={pinVerified} onZoom={handleZoom} onAction={handleAction} />
-      )}
-
-      {activeTab === "content" && (
-        <ContentTab identity={identity} pinVerified={pinVerified} onZoom={handleZoom} onAction={handleAction} />
+      {activeTab === "moderation" && (
+        <ModerationTab identity={identity} pinVerified={pinVerified} onZoom={handleZoom} onAction={handleAction} />
       )}
 
       {activeTab === "users" && (
         <UsersTab identity={identity} pinVerified={pinVerified} onZoom={handleZoom} onAction={handleAction} />
       )}
 
-      {activeTab === "moderation" && (
-        <ModerationTab identity={identity} pinVerified={pinVerified} onZoom={handleZoom} onAction={handleAction} />
-      )}
-
-      {activeTab === "platform" && (
-        <PlatformTab identity={identity} pinVerified={pinVerified} onAction={handleAction} />
-      )}
-
-      {activeTab === "economy" && (
-        <EconomyTab identity={identity} pinVerified={pinVerified} onZoom={handleZoom} onAction={handleAction} />
-      )}
-
-      {activeTab === "analytics" && (
-        <AnalyticsTab identity={identity} pinVerified={pinVerified} onAction={handleAction} />
+      {activeTab === "content" && (
+        <ContentTab identity={identity} pinVerified={pinVerified} onZoom={handleZoom} onAction={handleAction} />
       )}
 
       {activeTab === "settings" && (

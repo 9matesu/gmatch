@@ -1,14 +1,14 @@
 "use client";
 
-import {  AdminFilterBar, AdminEmptyState, AdminLoadingState, Badge, StatusBadge } from "../../../components/admin/primitives";
+import { AdminFilterBar, AdminEmptyState, AdminLoadingState, Badge, StatusBadge } from "../../../components/admin/primitives";
 import { adminApi } from "../../../utils/adminApi";
 import { getApiBaseUrl } from "../../../utils/api";
 import { useState, useCallback, useEffect } from "react";
-import { Flag, MessageSquare, Hash, Trash2,  Shield, Ban,  Check,  ChevronDown, ChevronUp, Maximize2, ShieldAlert } from "lucide-react";
+import { Flag, MessageSquare, Ban, ChevronDown, ChevronUp, Maximize2, CheckCircle2, UserCheck } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { AdminMediaThumbnail } from "../AdminMediaThumbnail";
 import { resolveMediaUrl } from "../../../utils/media";
-import type { AdminReport, AdminLobbyComment, AdminChatMessage, TableParams,  OrbitIdentity } from "../../../utils/adminTypes";
+import type { AdminReport, AdminLobbyComment, AdminChatMessage, AdminUser, TableParams, OrbitIdentity } from "../../../utils/adminTypes";
 
 interface ModerationTabProps {
   identity: OrbitIdentity | null;
@@ -18,9 +18,9 @@ interface ModerationTabProps {
 }
 
 const subTabs = [
-  { id: "reports", label: "Cases (Reports)", icon: Flag },
-  { id: "comments", label: "Lobby Comments", icon: MessageSquare },
-  { id: "chat", label: "Chat Messages", icon: Hash },
+  { id: "reports", label: "Reports & Cases", icon: Flag },
+  { id: "chat_comments", label: "Chat & Comments", icon: MessageSquare },
+  { id: "bans", label: "Bans & Penalties", icon: Ban },
 ] as const;
 
 type SubTab = typeof subTabs[number]["id"];
@@ -31,18 +31,26 @@ function asArray<T>(value: T[] | undefined): T[] {
 
 export function ModerationTab({ identity, pinVerified, onZoom, onAction }: ModerationTabProps) {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>("reports");
+  
+  // Reports
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [reportsTotal, setReportsTotal] = useState(0);
+  const [reportsParams, setReportsParams] = useState<TableParams>({ page: 1, pageSize: 50, filters: { status: "open" } });
+  
+  // Chat & Comments
+  const [commType, setCommType] = useState<"comments" | "chat">("comments");
   const [comments, setComments] = useState<AdminLobbyComment[]>([]);
   const [chatMessages, setChatMessages] = useState<AdminChatMessage[]>([]);
-  const [isLoading,] = useState(false);
-  const [reportsParams, setReportsParams] = useState<TableParams>({ page: 1, pageSize: 50, filters: { status: "open" } });
-  const [chatParams, setChatParams] = useState<TableParams>({ page: 1, pageSize: 50, filters: { channel: "all" } });
+  const [chatParams] = useState<TableParams>({ page: 1, pageSize: 50, filters: { channel: "all" } });
   
+  // Bans
+  const [bannedUsers, setBannedUsers] = useState<AdminUser[]>([]);
+  const [bansTotal, setBansTotal] = useState(0);
+  const [bansParams] = useState<TableParams>({ page: 1, pageSize: 50, filters: { status: "banned" } });
+
+  const [isLoading, setIsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  // Case detail (report-scoped evidence + parties) fetched on expand —
-  // the only door to disclosed private content, per docs/ADMIN-SUITE.md.
   const [caseDetail, setCaseDetail] = useState<Record<string, any>>({});
   const [evidenceUrl, setEvidenceUrl] = useState<Record<string, string>>({});
 
@@ -63,46 +71,70 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
 
   const fetchReports = useCallback(async () => {
     if (!identity || !pinVerified) return;
+    setIsLoading(true);
     try {
       const response = await adminApi.reports(identity, reportsParams);
       const rows = asArray(response.data);
       setReports(rows);
       setReportsTotal(response.total || rows.length);
     } catch {
+    } finally {
+      setIsLoading(false);
     }
   }, [identity, pinVerified, reportsParams]);
 
   const fetchComments = useCallback(async () => {
     if (!identity || !pinVerified) return;
+    setIsLoading(true);
     try {
       const data = await adminApi.lobbyComments(identity);
       setComments(asArray(data));
     } catch {
+    } finally {
+      setIsLoading(false);
     }
   }, [identity, pinVerified]);
 
-
   const fetchChat = useCallback(async () => {
     if (!identity || !pinVerified) return;
+    setIsLoading(true);
     try {
       const response = await adminApi.chat(identity, chatParams);
       setChatMessages(asArray(response.data));
     } catch {
+    } finally {
+      setIsLoading(false);
     }
   }, [identity, pinVerified, chatParams]);
 
-  useEffect(() => {
-    fetchReports();
-  }, [fetchReports]);
+  const fetchBans = useCallback(async () => {
+    if (!identity || !pinVerified) return;
+    setIsLoading(true);
+    try {
+      const response = await adminApi.users(identity, bansParams);
+      const rows = asArray(response.data).filter(u => Boolean(u.is_banned));
+      setBannedUsers(rows);
+      setBansTotal(rows.length);
+    } catch {
+    } finally {
+      setIsLoading(false);
+    }
+  }, [identity, pinVerified, bansParams]);
 
   useEffect(() => {
-    if (activeSubTab === "comments") fetchComments();
-  }, [activeSubTab, fetchComments]);
-
+    if (activeSubTab === "reports") fetchReports();
+  }, [activeSubTab, fetchReports]);
 
   useEffect(() => {
-    if (activeSubTab === "chat") fetchChat();
-  }, [activeSubTab, fetchChat]);
+    if (activeSubTab === "chat_comments") {
+      if (commType === "comments") fetchComments();
+      else fetchChat();
+    }
+  }, [activeSubTab, commType, fetchComments, fetchChat]);
+
+  useEffect(() => {
+    if (activeSubTab === "bans") fetchBans();
+  }, [activeSubTab, fetchBans]);
 
   const handleReportAction = async (report: AdminReport, action: "delete" | "ban" | "deny") => {
     if (!identity) return;
@@ -114,6 +146,11 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const handleUnban = async (userId: string) => {
+    onAction("unban", userId);
+    setTimeout(fetchBans, 300);
   };
 
   const renderReportRow = (report: AdminReport) => {
@@ -142,7 +179,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
           <button
             type="button"
             onClick={() => toggleExpand(report.id)}
-            className="text-retro-muted hover:text-retro-fg transition-transform shrink-0 mt-0.5"
+            className="text-retro-muted hover:text-retro-fg transition-transform shrink-0 mt-0.5 cursor-pointer"
             title={isExpanded ? "Collapse" : "Expand report"}
           >
             {isExpanded ? <ChevronUp className="w-4 h-4 text-cyan-300" /> : <ChevronDown className="w-4 h-4" />}
@@ -179,7 +216,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                   type="button"
                   onClick={() => handleReportAction(report, "delete")}
                   disabled={actionLoading === report.id}
-                  className="px-2 py-1 text-[10px] rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:opacity-40"
+                  className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:opacity-40 cursor-pointer"
                 >
                   {actionLoading === report.id ? "..." : "Delete"}
                 </button>
@@ -187,7 +224,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                   type="button"
                   onClick={() => handleReportAction(report, "ban")}
                   disabled={actionLoading === report.id}
-                  className="px-2 py-1 text-[10px] rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:opacity-40"
+                  className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:opacity-40 cursor-pointer"
                 >
                   {actionLoading === report.id ? "..." : "Ban"}
                 </button>
@@ -195,13 +232,13 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                   type="button"
                   onClick={() => handleReportAction(report, "deny")}
                   disabled={actionLoading === report.id}
-                  className="px-2 py-1 text-[10px] rounded border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-40"
+                  className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-40 cursor-pointer"
                 >
                   {actionLoading === report.id ? "..." : "Dismiss"}
                 </button>
               </div>
             ) : (
-              <span className="text-[10px] text-retro-muted">Resolved: {report.action}</span>
+              <span className="text-[10px] text-retro-muted font-mono">Resolved: {report.action}</span>
             )}
           </div>
         </div>
@@ -221,415 +258,61 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                 />
                 <button
                   type="button"
-                  onClick={() => onZoom(directUrl || (objectId ? `/api/objects/${objectId}/content` : ""), false, `Report: ${report.target_type}`, report.target_id)}
-                  className="absolute bottom-2 right-2 px-2 py-1 bg-black/70 hover:bg-black text-white text-[10px] rounded flex items-center gap-1 border border-border-glass opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const fullUrl = directUrl || (objectId ? resolveMediaUrl(objectId) : "");
+                    onZoom(fullUrl, false, `Report: ${report.target_type}`, report.target_id);
+                  }}
+                  className="absolute bottom-2 right-2 p-1.5 bg-black/70 hover:bg-black text-white text-xs rounded-lg border border-border-glass opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  title="Expand Full Evidence Media"
                 >
-                  <Maximize2 className="w-3 h-3" /> Full View
+                  <Maximize2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             )}
-            <div className="flex-1 min-w-0 space-y-2.5">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
-                <div>
-                  <span className="text-retro-muted block text-[10px]">Report ID</span>
-                  <span className="font-mono text-retro-fg break-all text-[10px]">{report.id}</span>
-                </div>
-                <div>
-                  <span className="text-retro-muted block text-[10px]">Target Type / ID</span>
-                  <span className="font-mono text-cyan-300 break-all text-[10px]">{report.target_type} · {report.target_id}</span>
-                </div>
-                <div>
-                  <span className="text-retro-muted block text-[10px]">Target User</span>
-                  <span className="font-semibold text-retro-fg">{report.target_user_name || "Unknown"}</span>
-                </div>
-                <div>
-                  <span className="text-retro-muted block text-[10px]">Reporter ID</span>
-                  <span className="font-mono text-retro-muted break-all text-[10px]">{report.reporter_id}</span>
-                </div>
-                <div>
-                  <span className="text-retro-muted block text-[10px]">Category</span>
-                  <span className="text-retro-fg font-semibold uppercase tracking-wider">{report.category || "Uncategorized"}</span>
-                </div>
-                <div>
-                  <span className="text-retro-muted block text-[10px]">Timestamp</span>
-                  <span className="text-retro-fg font-mono">{new Date(report.created_at).toLocaleString()}</span>
-                </div>
+            <div className="flex-1 min-w-0 space-y-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-retro-muted font-mono text-[10px]">CASE ID:</span>
+                <span className="font-mono text-retro-fg">{report.id}</span>
+                <span className="text-retro-muted font-mono text-[10px] ml-2">TARGET:</span>
+                <span className="font-mono text-retro-fg">{report.target_type}:{report.target_id}</span>
               </div>
-              {(() => {
-                const cd = caseDetail[report.id];
-                const parties = cd?.dm_parties;
-                const evidence = cd?.evidence;
-                if (!parties && !evidence) return null;
-                return (
-                  <div className="text-xs bg-surface-canvas/40 p-2.5 rounded border border-border-glass space-y-1.5">
-                    <span className="text-retro-muted text-[10px] block">Disclosed with the report:</span>
-                    {parties && (
-                      <div className="text-retro-fg">
-                        DM parties: {parties.sender_name || parties.sender_id.slice(0, 8)} → {parties.recipient_name || parties.recipient_id.slice(0, 8)}
-                      </div>
-                    )}
-                    {evidence && (
-                      <div className="text-retro-fg font-mono text-[10px] break-all space-y-1">
-                        <div>
-                          evidence object {String(evidence.id).slice(0, 12)} · {evidence.mime_type} · {(evidence.size_bytes / 1024).toFixed(0)} KiB
-                        </div>
-                        {evidenceUrl[report.id] && evidence.mime_type?.startsWith('image/') && (
-                          <img
-                            src={evidenceUrl[report.id]}
-                            alt="disclosed evidence"
-                            className="max-h-48 rounded border border-border-glass object-contain"
-                          />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-              {report.preview && (
-                <div className="text-xs bg-surface-canvas/40 p-2.5 rounded border border-border-glass">
-                  <span className="text-retro-muted text-[10px] block mb-0.5">Content Preview / Text:</span>
-                  <p className="text-retro-fg font-sans">{report.preview}</p>
+              {caseDetail[report.id]?.reported_user && (
+                <div className="p-2 rounded bg-surface-canvas border border-border-glass text-[11px]">
+                  <span className="text-retro-muted uppercase tracking-wider font-bold">Reported Account:</span>{" "}
+                  <span className="text-retro-fg font-semibold">{caseDetail[report.id].reported_user.display_name}</span>{" "}
+                  <span className="text-retro-muted font-mono">({caseDetail[report.id].reported_user.id.slice(0, 10)})</span>
                 </div>
               )}
               {report.reason && (
-                <div className="text-xs bg-red-500/10 border border-red-500/20 p-2.5 rounded">
-                  <span className="text-red-300 font-bold text-[10px] block mb-0.5">Report Reason:</span>
-                  <p className="text-retro-fg font-sans">{report.reason}</p>
+                <div className="p-2 rounded bg-surface-canvas border border-border-glass text-[11px]">
+                  <span className="text-retro-muted uppercase tracking-wider font-bold">Reason:</span>{" "}
+                  <span className="text-retro-fg">{report.reason}</span>
                 </div>
               )}
-              <div className="pt-2 flex flex-wrap gap-2 items-center">
-                {report.status === "open" ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => handleReportAction(report, "delete")}
-                      disabled={actionLoading === report.id}
-                      className="px-3 py-1.5 rounded text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 flex items-center gap-1.5 transition-colors disabled:opacity-40"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      Delete Target Content
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleReportAction(report, "ban")}
-                      disabled={actionLoading === report.id}
-                      className="px-3 py-1.5 rounded text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30 flex items-center gap-1.5 transition-colors disabled:opacity-40"
-                    >
-                      <Ban className="w-3.5 h-3.5" />
-                      Ban Offending User
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleReportAction(report, "deny")}
-                      disabled={actionLoading === report.id}
-                      className="px-3 py-1.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 flex items-center gap-1.5 transition-colors disabled:opacity-40"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      Dismiss / Valid Content
-                    </button>
-                  </>
-                ) : (
-                  <Badge variant="success">Resolution: {report.action}</Badge>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const renderCommentRow = (comment: AdminLobbyComment) => {
-    const isExpanded = expandedId === comment.id;
-    const mediaUrl = comment.image_content_url ? resolveMediaUrl(comment.image_content_url) : comment.image_id ? resolveMediaUrl(`/api/lobby/images/${comment.image_id}/content`) : null;
-
-    return (
-      <div key={comment.id} className="border-b border-border-subtle last:border-0 hover:bg-glass-w5 transition-colors">
-        <div className="p-3 flex items-start gap-3">
-          <button
-            type="button"
-            onClick={() => toggleExpand(comment.id)}
-            className="text-retro-muted hover:text-retro-fg transition-transform shrink-0 mt-0.5"
-            title={isExpanded ? "Collapse" : "Expand comment"}
-          >
-            {isExpanded ? <ChevronUp className="w-4 h-4 text-cyan-300" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
-          {mediaUrl && (
-            <div
-              className="w-10 h-10 rounded border border-border-glass bg-black overflow-hidden shrink-0 cursor-pointer"
-              onClick={() => onZoom(mediaUrl, false, comment.image_caption || comment.image_id, comment.user_name || "Comment")}
-            >
-              <img src={mediaUrl} alt="" className="w-full h-full object-cover" />
-            </div>
-          )}
-          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggleExpand(comment.id)}>
-            <div className="flex items-center gap-2">
-              <StatusBadge status={comment.hidden_at ? "hidden" : "active"} size="sm" />
-              <span className="text-xs font-semibold text-retro-fg">{comment.user_name || comment.user_id.slice(0, 8)}</span>
-            </div>
-            <p className="text-xs text-retro-body mt-1">{comment.body}</p>
-            <p className="text-[10px] text-retro-muted mt-1">
-              On image {comment.image_id.slice(0, 8)} · {new Date(comment.created_at).toLocaleString()}
-            </p>
-          </div>
-          <div className="flex flex-col gap-1.5 shrink-0">
-            {comment.hidden_at ? (
-              <button
-                type="button"
-                onClick={() => onAction("unhideComment", comment.id)}
-                className="px-2 py-1 text-[10px] rounded border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
-              >
-                Unhide
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => onAction("hideComment", comment.id)}
-                className="px-2 py-1 text-[10px] rounded border border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
-              >
-                Hide
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => onAction("deleteComment", comment.id)}
-              className="px-2 py-1 text-[10px] rounded border border-red-500/30 text-red-300 hover:bg-red-500/10"
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-
-        {isExpanded && (
-          <div className="px-4 pb-4 pt-1 bg-surface-elevated/40 border-t border-border-subtle/50 flex flex-col md:flex-row gap-4 items-start animate-orbit-fade-in">
-            {mediaUrl && (
-              <div className="relative group shrink-0">
-                <div
-                  className="w-48 h-48 md:w-56 md:h-56 rounded-lg border border-border-glass bg-black overflow-hidden cursor-zoom-in"
-                  onClick={() => onZoom(mediaUrl, false, comment.image_caption || comment.image_id, comment.user_name || "Comment")}
-                >
-                  <img src={mediaUrl} alt="" className="w-full h-full object-contain" />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onZoom(mediaUrl, false, comment.image_caption || comment.image_id, comment.user_name || "Comment")}
-                  className="absolute bottom-2 right-2 px-2 py-1 bg-black/70 hover:bg-black text-white text-[10px] rounded flex items-center gap-1 border border-border-glass opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Maximize2 className="w-3 h-3" /> Full Image
-                </button>
-              </div>
-            )}
-            <div className="flex-1 min-w-0 space-y-2.5">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
-                <div>
-                  <span className="text-retro-muted block text-[10px]">Comment ID</span>
-                  <span className="font-mono text-retro-fg break-all text-[10px]">{comment.id}</span>
-                </div>
-                <div>
-                  <span className="text-retro-muted block text-[10px]">User ID</span>
-                  <span className="font-mono text-cyan-300 break-all text-[10px]">{comment.user_id}</span>
-                </div>
-                <div>
-                  <span className="text-retro-muted block text-[10px]">User Name</span>
-                  <span className="font-semibold text-retro-fg">{comment.user_name || "Unknown"}</span>
-                </div>
-                <div>
-                  <span className="text-retro-muted block text-[10px]">Target Image ID</span>
-                  <span className="font-mono text-retro-fg break-all text-[10px]">{comment.image_id}</span>
-                </div>
-                <div>
-                  <span className="text-retro-muted block text-[10px]">Created At</span>
-                  <span className="text-retro-fg font-mono">{new Date(comment.created_at).toLocaleString()}</span>
-                </div>
-                <div>
-                  <span className="text-retro-muted block text-[10px]">Visibility</span>
-                  <StatusBadge status={comment.hidden_at ? "hidden" : "active"} size="sm" />
-                </div>
-              </div>
-              <div className="text-xs bg-surface-canvas/40 p-2.5 rounded border border-border-glass">
-                <span className="text-retro-muted text-[10px] block mb-0.5">Full Comment Text:</span>
-                <p className="text-retro-fg font-sans whitespace-pre-wrap">{comment.body}</p>
-              </div>
-              <div className="pt-2 flex flex-wrap gap-2 items-center">
-                {comment.hidden_at ? (
-                  <button
-                    type="button"
-                    onClick={() => onAction("unhideComment", comment.id)}
-                    className="px-2.5 py-1.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 flex items-center gap-1.5 transition-colors"
-                  >
-                    <Shield className="w-3.5 h-3.5" />
-                    Unhide Comment
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => onAction("hideComment", comment.id)}
-                    className="px-2.5 py-1.5 rounded text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 flex items-center gap-1.5 transition-colors"
-                  >
-                    <ShieldAlert className="w-3.5 h-3.5" />
-                    Hide Comment
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => onAction("deleteComment", comment.id)}
-                  className="px-2.5 py-1.5 rounded text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 flex items-center gap-1.5 transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Delete Comment
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onAction("banUser", comment.user_id, "Abusive comment: " + comment.body.slice(0, 40))}
-                  className="px-2.5 py-1.5 rounded text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30 flex items-center gap-1.5 transition-colors"
-                >
-                  <Ban className="w-3.5 h-3.5" />
-                  Ban Author
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-
-  const renderChatRow = (msg: AdminChatMessage) => {
-    const isExpanded = expandedId === `${msg.channel}:${msg.id}`;
-    const attachmentUrl = msg.attachment_url ? resolveMediaUrl(msg.attachment_url) : msg.attachment_id ? resolveMediaUrl(`/api/objects/${msg.attachment_id}/content`) : null;
-
-    return (
-      <div key={`${msg.channel}:${msg.id}`} className="border-b border-border-subtle last:border-0 hover:bg-glass-w5 transition-colors">
-        <div className="p-3 flex items-start gap-3">
-          <button
-            type="button"
-            onClick={() => toggleExpand(`${msg.channel}:${msg.id}`)}
-            className="text-retro-muted hover:text-retro-fg transition-transform shrink-0 mt-0.5"
-            title={isExpanded ? "Collapse" : "Expand chat message"}
-          >
-            {isExpanded ? <ChevronUp className="w-4 h-4 text-cyan-300" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
-          {attachmentUrl && (
-            <AdminMediaThumbnail
-              objectId={msg.attachment_id}
-              directUrl={msg.attachment_url}
-              identity={identity}
-              mimeType={msg.attachment_mime}
-              title="Chat Attachment"
-              subtitle={msg.sender_name || msg.sender_id}
-              className="w-10 h-10 shrink-0"
-              onZoom={onZoom}
-            />
-          )}
-          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggleExpand(`${msg.channel}:${msg.id}`)}>
-            <div className="flex items-center gap-2">
-              <Badge variant="info" size="sm">{msg.channel}</Badge>
-              <span className="text-xs font-semibold text-retro-fg">{msg.sender_name || msg.sender_id.slice(0, 8)}</span>
-            </div>
-            <p className="text-xs text-retro-body mt-1">{msg.body || "[attachment]"}</p>
-            <p className="text-[10px] text-retro-muted mt-1">{new Date(msg.created_at).toLocaleString()}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => onAction("deleteChat", msg.channel, msg.id)}
-            className="px-2 py-1 text-[10px] rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 shrink-0"
-          >
-            Delete
-          </button>
-        </div>
-
-        {isExpanded && (
-          <div className="px-4 pb-4 pt-1 bg-surface-elevated/40 border-t border-border-subtle/50 flex flex-col md:flex-row gap-4 items-start animate-orbit-fade-in">
-            {attachmentUrl && (
-              <div className="relative group shrink-0">
-                <AdminMediaThumbnail
-                  objectId={msg.attachment_id}
-                  directUrl={msg.attachment_url}
-                  identity={identity}
-                  mimeType={msg.attachment_mime}
-                  title="Chat Attachment"
-                  subtitle={msg.sender_name || msg.sender_id}
-                  className="w-48 h-48 md:w-56 md:h-56 rounded-lg cursor-zoom-in"
-                  onZoom={onZoom}
-                />
-                <button
-                  type="button"
-                  onClick={() => onZoom(attachmentUrl, Boolean(msg.attachment_mime?.startsWith("video/")), "Chat Attachment", msg.sender_name || msg.sender_id)}
-                  className="absolute bottom-2 right-2 px-2 py-1 bg-black/70 hover:bg-black text-white text-[10px] rounded flex items-center gap-1 border border-border-glass opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Maximize2 className="w-3 h-3" /> Full View
-                </button>
-              </div>
-            )}
-            <div className="flex-1 min-w-0 space-y-2.5">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
-                <div>
-                  <span className="text-retro-muted block text-[10px]">Message ID</span>
-                  <span className="font-mono text-retro-fg break-all text-[10px]">{msg.id}</span>
-                </div>
-                <div>
-                  <span className="text-retro-muted block text-[10px]">Channel</span>
-                  <Badge variant="primary" size="sm">{msg.channel}</Badge>
-                </div>
-                <div>
-                  <span className="text-retro-muted block text-[10px]">Sender</span>
-                  <span className="font-semibold text-retro-fg">{msg.sender_name || msg.sender_id.slice(0, 10)}</span>
-                  <span className="font-mono text-cyan-300 block text-[10px] break-all">{msg.sender_id}</span>
-                </div>
-                <div>
-                  <span className="text-retro-muted block text-[10px]">Recipient</span>
-                  <span className="text-retro-fg">{msg.recipient_name || msg.recipient_id?.slice(0, 10) || "Channel Broadcast"}</span>
-                </div>
-                <div>
-                  <span className="text-retro-muted block text-[10px]">Created At</span>
-                  <span className="text-retro-fg font-mono">{new Date(msg.created_at).toLocaleString()}</span>
-                </div>
-              </div>
-              {msg.body && (
-                <div className="text-xs bg-surface-canvas/40 p-2.5 rounded border border-border-glass">
-                  <span className="text-retro-muted text-[10px] block mb-0.5">Chat Message Body:</span>
-                  <p className="text-retro-fg font-sans whitespace-pre-wrap">{msg.body}</p>
+              {caseDetail[report.id]?.target?.caption && (
+                <div className="p-2 rounded bg-surface-canvas border border-border-glass text-[11px]">
+                  <span className="text-retro-muted uppercase tracking-wider font-bold">Content Text:</span>{" "}
+                  <span className="text-retro-fg">{caseDetail[report.id].target.caption}</span>
                 </div>
               )}
-              <div className="pt-2 flex flex-wrap gap-2 items-center">
-                <button
-                  type="button"
-                  onClick={() => onAction("deleteChat", msg.channel, msg.id)}
-                  className="px-2.5 py-1.5 rounded text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 flex items-center gap-1.5 transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Delete Message
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onAction("banUser", msg.sender_id, "Inappropriate chat message in " + msg.channel)}
-                  className="px-2.5 py-1.5 rounded text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30 flex items-center gap-1.5 transition-colors"
-                >
-                  <Ban className="w-3.5 h-3.5" />
-                  Ban Sender
-                </button>
-              </div>
             </div>
           </div>
         )}
       </div>
     );
   };
-
-  if (isLoading && reports.length === 0 && comments.length === 0 && chatMessages.length === 0) {
-    return <AdminLoadingState rows={5} columns={4} />;
-  }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-retro-fg">Moderation center</h1>
-          <p className="text-xs text-retro-muted mt-1">Unified report queue and in-loco content moderation</p>
+          <h1 className="text-lg font-black text-retro-fg uppercase tracking-wider">Moderation & Safety</h1>
+          <p className="text-xs text-retro-muted mt-0.5">Triage user reports, review chat & comments, and enforce account bans</p>
         </div>
       </div>
 
+      {/* Subtab Navigation */}
       <div className="flex flex-wrap gap-1 bg-surface-raised border border-border-glass rounded-xl p-1">
         {subTabs.map(tab => {
           const Icon = tab.icon;
@@ -638,107 +321,215 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
             <button
               key={tab.id}
               type="button"
-              onClick={() => { setActiveSubTab(tab.id); setExpandedId(null); }}
+              onClick={() => setActiveSubTab(tab.id)}
               className={cn(
-                "px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5",
+                "px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer",
                 active
-                  ? "bg-retro-accent text-retro-accent-text"
+                  ? "bg-retro-accent text-retro-accent-text shadow-sm"
                   : "text-retro-muted hover:text-retro-fg"
               )}
             >
               <Icon className="w-3.5 h-3.5" />
               {tab.label}
+              {tab.id === "reports" && reportsTotal > 0 && (
+                <span className="ml-1 px-1.5 py-0.2 bg-rose-500/20 text-rose-300 rounded-full text-[10px]">
+                  {reportsTotal}
+                </span>
+              )}
+              {tab.id === "bans" && bansTotal > 0 && (
+                <span className="ml-1 px-1.5 py-0.2 bg-glass-w10 text-retro-muted rounded-full text-[10px]">
+                  {bansTotal}
+                </span>
+              )}
             </button>
           );
         })}
       </div>
 
+      {/* Subtab 1: Reports & Cases */}
       {activeSubTab === "reports" && (
         <div className="space-y-4">
           <AdminFilterBar
+            searchPlaceholder="Filter reports by user or target..."
+            searchValue={String(reportsParams.filters?.q || "")}
+            onSearchChange={(q) => setReportsParams(p => ({ ...p, page: 1, filters: { ...p.filters, q } }))}
             filters={reportsParams.filters || {}}
-            onFiltersChange={filters => setReportsParams(p => ({ ...p, filters, page: 1 }))}
+            onFiltersChange={(filters) => setReportsParams(p => ({ ...p, page: 1, filters }))}
             configs={[
-              { key: "q", label: "Search", type: "text", placeholder: "Reporter, reason, target..." },
-              { key: "status", label: "Status", type: "select", options: [
-                { value: "open", label: "Open" },
-                { value: "reviewed", label: "Reviewed" },
-                { value: "resolved", label: "Resolved" },
-                { value: "dismissed", label: "Dismissed" },
-                { value: "", label: "All" },
-              ]},
-              { key: "category", label: "Category", type: "select", options: [
-                { value: "", label: "All" },
-                { value: "spam", label: "Spam" },
-                { value: "harassment", label: "Harassment" },
-                { value: "illegal", label: "Illegal Content" },
-                { value: "sexual", label: "Sexual Content" },
-                { value: "violence", label: "Violence" },
-                { value: "other", label: "Other" },
-              ]},
+              {
+                key: "status",
+                label: "Status",
+                type: "select",
+                options: [
+                  { label: "Open Cases", value: "open" },
+                  { label: "All Cases", value: "all" },
+                  { label: "Resolved", value: "resolved" },
+                  { label: "Dismissed", value: "dismissed" },
+                ],
+              },
             ]}
-            searchValue=""
-            onSearchChange={() => {}}
-            showSearch={false}
           />
+
           <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
-            <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between">
-              <h2 className="text-xs font-bold uppercase tracking-wider">Content Reports ({reportsTotal})</h2>
-            </div>
-            {reports.length === 0 ? (
-              <AdminEmptyState title="No reports" description="Content reports will appear here" illustration="folder" />
+            {isLoading ? (
+              <AdminLoadingState rows={6} columns={4} />
+            ) : reports.length === 0 ? (
+              <AdminEmptyState
+                title="No reports found"
+                description="Zero reports match current status filter"
+                illustration="folder"
+              />
             ) : (
-              <div className="divide-y divide-border-subtle">
-                {reports.map(renderReportRow)}
-              </div>
+              <div>{reports.map(renderReportRow)}</div>
             )}
           </div>
         </div>
       )}
 
-      {activeSubTab === "comments" && (
-        <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
-          <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between">
-            <h2 className="text-xs font-bold uppercase tracking-wider">Lobby Comments ({comments.length})</h2>
+      {/* Subtab 2: Chat & Comments */}
+      {activeSubTab === "chat_comments" && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 border-b border-border-glass pb-3">
+            <button
+              type="button"
+              onClick={() => setCommType("comments")}
+              className={cn(
+                "px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer",
+                commType === "comments" ? "bg-white/10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
+              )}
+            >
+              Lobby Comments ({comments.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setCommType("chat")}
+              className={cn(
+                "px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer",
+                commType === "chat" ? "bg-white/10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
+              )}
+            >
+              Chat Messages ({chatMessages.length})
+            </button>
           </div>
-          {comments.length === 0 ? (
-            <AdminEmptyState title="No lobby comments" description="Comments will appear here" illustration="folder" />
-          ) : (
-            <div className="divide-y divide-border-subtle">
-              {comments.map(renderCommentRow)}
-            </div>
-          )}
+
+          <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+            {commType === "comments" ? (
+              comments.length === 0 ? (
+                <AdminEmptyState title="No comments" description="No lobby comments recorded" illustration="inbox" />
+              ) : (
+                <div className="divide-y divide-border-subtle">
+                  {comments.map(c => (
+                    <div key={c.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-retro-fg">{c.user_name || c.user_id.slice(0, 8)}</span>
+                          <span className="text-[10px] text-retro-muted">{new Date(c.created_at).toLocaleString()}</span>
+                          {c.hidden_at && <Badge variant="warning" size="sm">Hidden</Badge>}
+                        </div>
+                        <p className="text-xs text-retro-body mt-1">{c.body}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {c.hidden_at ? (
+                          <button
+                            type="button"
+                            onClick={() => { onAction("unhideComment", c.id); setTimeout(fetchComments, 300); }}
+                            className="px-2 py-1 text-[10px] font-semibold rounded border border-white/10 text-retro-muted hover:text-retro-fg cursor-pointer"
+                          >
+                            Unhide
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => { onAction("hideComment", c.id); setTimeout(fetchComments, 300); }}
+                            className="px-2 py-1 text-[10px] font-semibold rounded border border-amber-500/30 text-amber-300 hover:bg-amber-500/10 cursor-pointer"
+                          >
+                            Hide
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => { onAction("deleteComment", c.id); setTimeout(fetchComments, 300); }}
+                          className="px-2 py-1 text-[10px] font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            ) : (
+              chatMessages.length === 0 ? (
+                <AdminEmptyState title="No chat messages" description="No messages recorded" illustration="inbox" />
+              ) : (
+                <div className="divide-y divide-border-subtle">
+                  {chatMessages.map(m => (
+                    <div key={m.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="neutral" size="sm">#{m.channel || "lobby"}</Badge>
+                          <span className="text-xs font-bold text-retro-fg">{m.sender_name || m.sender_id.slice(0, 8)}</span>
+                          <span className="text-[10px] text-retro-muted">{new Date(m.created_at).toLocaleString()}</span>
+                        </div>
+                        <p className="text-xs text-retro-body mt-1">{m.body}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { onAction("deleteChatMessage", m.id); setTimeout(fetchChat, 300); }}
+                        className="px-2 py-1 text-[10px] font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+          </div>
         </div>
       )}
 
-
-      {activeSubTab === "chat" && (
+      {/* Subtab 3: Bans & Penalties */}
+      {activeSubTab === "bans" && (
         <div className="space-y-4">
-          <AdminFilterBar
-            filters={chatParams.filters || {}}
-            onFiltersChange={filters => setChatParams(p => ({ ...p, filters, page: 1 }))}
-            configs={[
-              { key: "channel", label: "Channel", type: "select", options: [
-                { value: "all", label: "All Channels" },
-                { value: "lobby", label: "Lobby" },
-                { value: "group", label: "Group Chat" },
-                { value: "match", label: "Match Chat" },
-              ]},
-              { key: "q", label: "Search", type: "text", placeholder: "Message content..." },
-            ]}
-            searchValue=""
-            onSearchChange={() => {}}
-            showSearch={false}
-          />
           <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
-            <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between">
-              <h2 className="text-xs font-bold uppercase tracking-wider">Chat Messages</h2>
-            </div>
-            {chatMessages.length === 0 ? (
-              <AdminEmptyState title="No messages" description="Chat messages will appear here" illustration="folder" />
+            {isLoading ? (
+              <AdminLoadingState rows={4} columns={3} />
+            ) : bannedUsers.length === 0 ? (
+              <div className="p-8 text-center text-xs text-retro-muted">
+                <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
+                <p className="font-semibold text-retro-fg">No Banned Users</p>
+                <p className="text-[10px] text-retro-muted mt-0.5">There are currently no active account bans or suspensions</p>
+              </div>
             ) : (
               <div className="divide-y divide-border-subtle">
-                {chatMessages.map(renderChatRow)}
+                {bannedUsers.map(user => (
+                  <div key={user.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-retro-fg">{user.display_name || user.id.slice(0, 10)}</span>
+                        <Badge variant="danger" size="sm" dot>Banned</Badge>
+                        <span className="text-[10px] text-retro-muted font-mono">{user.id}</span>
+                      </div>
+                      <p className="text-xs text-red-300 mt-1">
+                        Reason: {user.ban_reason || "Admin policy violation"}
+                      </p>
+                      {user.ban_created_at && (
+                        <p className="text-[10px] text-retro-muted mt-0.5">
+                          Banned on {new Date(user.ban_created_at).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleUnban(user.id)}
+                      className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+                    >
+                      <UserCheck className="w-3.5 h-3.5" />
+                      <span>Lift Ban</span>
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
           </div>

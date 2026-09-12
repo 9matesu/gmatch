@@ -337,6 +337,8 @@ export type TabId =
   | "settings";
 
 export type TabSection =
+  | "Operations"
+  | "System"
   | "Overview"
   | "Games"
   | "Content"

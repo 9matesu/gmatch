@@ -84,6 +84,7 @@ let nodeKeyCache: { base: string; pubHex: string | null; at: number } | null = n
 const NODE_KEY_TTL_MS = 60 * 60 * 1000
 
 export function _resetNodeKeyCache(): void { nodeKeyCache = null }
+export function _resetResponseCache(): void { responseCache.clear(); inflightRequests.clear(); }
 
 function originOf(u: string): string {
   try { return new URL(u).origin } catch { return API_BASE }

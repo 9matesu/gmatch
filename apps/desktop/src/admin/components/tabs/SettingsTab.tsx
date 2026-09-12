@@ -1,13 +1,19 @@
 "use client";
 
-import {        ConfirmDialog } from "../../../components/admin/primitives";
+import { ConfirmDialog, AdminEmptyState, AdminLoadingState, Badge } from "../../../components/admin/primitives";
 import { adminApi } from "../../../utils/adminApi";
-import { BotSetupPanel } from "../../../components/admin/BotSetupPanel";
-import { LootboxAdminPanel } from "../../../components/admin/LootboxAdminPanel";
 import { useState, useCallback, useEffect } from "react";
-import { Settings, Bot, Box, AlertTriangle,  Save,     Globe,         Zap as ZapIcon } from "lucide-react";
+import {
+  Settings,
+  AlertTriangle,
+  Save,
+  Globe,
+  Zap as ZapIcon,
+  BarChart2,
+} from "lucide-react";
 import { cn } from "../../../lib/utils";
 import type { OrbitIdentity } from "@orbit/crypto";
+import type { AdminAuditEntry, AdminDailyStat } from "../../../utils/adminTypes";
 
 interface SettingsTabProps {
   identity: OrbitIdentity | null;
@@ -15,13 +21,46 @@ interface SettingsTabProps {
   onAction: (action: string, ...args: unknown[]) => void;
 }
 
+const subTabs = [
+  { id: "platform", label: "Platform Settings", icon: Settings },
+  { id: "audit", label: "Audit Log & Stats", icon: BarChart2 },
+  { id: "danger", label: "Maintenance & Danger Zone", icon: AlertTriangle },
+] as const;
+
+type SubTab = typeof subTabs[number]["id"];
+
+function Sparkline({ data, height = 40, color = "#67e8f9" }: { data: number[]; height?: number; color?: string }) {
+  if (!data.length) return null;
+  const max = Math.max(...data, 1);
+  const min = Math.min(...data, 0);
+  const range = max - min || 1;
+  const width = 100;
+  const step = width / (data.length - 1 || 1);
+  const points = data.map((v, i) => `${(i * step).toFixed(1)},${(height - 3 - ((v - min) / range) * (height - 6)).toFixed(1)}`);
+  const area = `0,${height} ${points.join(" ")} ${width},${height}`;
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="w-full h-full">
+      <polygon points={area} fill={color} opacity={0.12} />
+      <polyline points={points.join(" ")} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" />
+      <circle cx={points[points.length - 1].split(",")[0]} cy={points[points.length - 1].split(",")[1]} r={1.6} fill={color} />
+    </svg>
+  );
+}
+
 export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProps) {
-  const [activeSection, setActiveSection] = useState<"bot" | "lootboxes" | "platform" | "danger">("bot");
+  const [activeSubTab, setActiveSubTab] = useState<SubTab>("platform");
   const [discordLink, setDiscordLink] = useState("");
   const [cashoutRateBps, setCashoutRateBps] = useState(12500);
   const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
   const [showCleanPostsConfirm, setShowCleanPostsConfirm] = useState(false);
   const [showMigrateConfirm, setShowMigrateConfirm] = useState(false);
+
+  // Audit Log & Daily Stats state
+  const [auditSubTab, setAuditSubTab] = useState<"log" | "daily">("log");
+  const [auditLog, setAuditLog] = useState<AdminAuditEntry[]>([]);
+  const [dailyStats, setDailyStats] = useState<AdminDailyStat[]>([]);
+  const [isLoadingAudit, setIsLoadingAudit] = useState(false);
 
   const fetchSettings = useCallback(async () => {
     if (!identity || !pinVerified) return;
@@ -36,9 +75,40 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
     }
   }, [identity, pinVerified]);
 
+  const fetchAuditLog = useCallback(async () => {
+    if (!identity || !pinVerified) return;
+    setIsLoadingAudit(true);
+    try {
+      const data = await adminApi.auditLog(identity, 200);
+      setAuditLog(Array.isArray(data) ? data : []);
+    } catch {
+    } finally {
+      setIsLoadingAudit(false);
+    }
+  }, [identity, pinVerified]);
+
+  const fetchDailyStats = useCallback(async () => {
+    if (!identity || !pinVerified) return;
+    setIsLoadingAudit(true);
+    try {
+      const data = await adminApi.dailyStats(identity, 30);
+      setDailyStats(Array.isArray(data) ? data : []);
+    } catch {
+    } finally {
+      setIsLoadingAudit(false);
+    }
+  }, [identity, pinVerified]);
+
   useEffect(() => {
     fetchSettings();
   }, [fetchSettings]);
+
+  useEffect(() => {
+    if (activeSubTab === "audit") {
+      if (auditSubTab === "log") fetchAuditLog();
+      else fetchDailyStats();
+    }
+  }, [activeSubTab, auditSubTab, fetchAuditLog, fetchDailyStats]);
 
   const handleSaveDiscord = async () => {
     if (!identity) return;
@@ -92,29 +162,25 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-retro-fg">Settings & operations</h1>
-          <p className="text-xs text-retro-muted mt-1">Bot config, platform settings, and danger zone</p>
+          <h1 className="text-lg font-black text-retro-fg uppercase tracking-wider">System & Settings</h1>
+          <p className="text-xs text-retro-muted mt-0.5">Platform configurations, administrative audit log, and database maintenance</p>
         </div>
       </div>
 
+      {/* Subtab Navigation */}
       <div className="flex flex-wrap gap-1 bg-surface-raised border border-border-glass rounded-xl p-1">
-        {[
-          { id: "bot", label: "Bot & Image API", icon: Bot },
-          { id: "lootboxes", label: "Lootboxes", icon: Box },
-          { id: "platform", label: "Platform Settings", icon: Settings },
-          { id: "danger", label: "Danger Zone", icon: AlertTriangle },
-        ].map(section => {
+        {subTabs.map(section => {
           const Icon = section.icon;
-          const active = activeSection === section.id;
+          const active = activeSubTab === section.id;
           return (
             <button
               key={section.id}
               type="button"
-              onClick={() => setActiveSection(section.id as any)}
+              onClick={() => setActiveSubTab(section.id)}
               className={cn(
-                "px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5",
+                "px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer",
                 active
-                  ? "bg-retro-accent text-retro-accent-text"
+                  ? "bg-retro-accent text-retro-accent-text shadow-sm"
                   : "text-retro-muted hover:text-retro-fg"
               )}
             >
@@ -125,21 +191,14 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
         })}
       </div>
 
-      {activeSection === "bot" && (
-        <BotSetupPanel identity={identity!} />
-      )}
-
-      {activeSection === "lootboxes" && (
-        <LootboxAdminPanel identity={identity!} />
-      )}
-
-      {activeSection === "platform" && (
+      {/* Subtab 1: Platform Settings */}
+      {activeSubTab === "platform" && (
         <div className="space-y-6">
           <div className="rounded-xl border border-border-glass bg-surface-raised p-5 space-y-6">
             <div className="flex items-center justify-between border-b border-border-glass pb-3">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-retro-fg">
                 <Globe className="w-4 h-4 text-cyan-300" />
-                <span>Discord Invite</span>
+                <span>Discord Community Invite</span>
               </div>
             </div>
             <div className="space-y-3">
@@ -155,7 +214,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
                 <button
                   type="button"
                   onClick={handleSaveDiscord}
-                  className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                  className="px-4 py-2 bg-retro-accent text-retro-accent-text rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <Save className="w-3.5 h-3.5" />
                   Save
@@ -186,7 +245,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
                 <button
                   type="button"
                   onClick={handleSaveCashout}
-                  className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                  className="px-4 py-2 bg-retro-accent text-retro-accent-text rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <Save className="w-3.5 h-3.5" />
                   Save Rate
@@ -197,29 +256,119 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
         </div>
       )}
 
-      {activeSection === "danger" && (
+      {/* Subtab 2: Audit Log & Daily Stats */}
+      {activeSubTab === "audit" && (
         <div className="space-y-4">
-          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-5 space-y-4">
+          <div className="flex items-center gap-2 border-b border-border-glass pb-3">
+            <button
+              type="button"
+              onClick={() => setAuditSubTab("log")}
+              className={cn(
+                "px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer",
+                auditSubTab === "log" ? "bg-white/10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
+              )}
+            >
+              Audit Log ({auditLog.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setAuditSubTab("daily")}
+              className={cn(
+                "px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer",
+                auditSubTab === "daily" ? "bg-white/10 text-retro-fg" : "text-retro-muted hover:text-retro-body"
+              )}
+            >
+              Daily Activity Stats ({dailyStats.length} days)
+            </button>
+          </div>
+
+          {auditSubTab === "log" ? (
+            <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+              {isLoadingAudit ? (
+                <AdminLoadingState rows={6} columns={4} />
+              ) : auditLog.length === 0 ? (
+                <AdminEmptyState title="No audit entries" description="Zero administrative actions logged" illustration="folder" />
+              ) : (
+                <div className="divide-y divide-border-subtle">
+                  {auditLog.map(entry => (
+                    <div key={entry.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="info" size="sm">{entry.action}</Badge>
+                          <span className="text-xs font-bold text-retro-fg">{entry.admin_name || entry.admin_id.slice(0, 8)}</span>
+                          <span className="text-[10px] text-retro-muted">{new Date(entry.created_at).toLocaleString()}</span>
+                        </div>
+                        <p className="text-xs text-retro-body mt-1">
+                          Target: <span className="font-mono text-retro-fg">{entry.target_type}:{entry.target_id}</span>
+                        </p>
+                        {entry.reason && (
+                          <p className="text-[10px] text-retro-muted font-mono mt-0.5 truncate">
+                            Reason: {entry.reason}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
+                  <span className="text-[10px] font-bold text-retro-muted uppercase block mb-1">Active Users</span>
+                  <div className="h-10">
+                    <Sparkline data={dailyStats.map(d => d.active_users)} color="#34d399" />
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
+                  <span className="text-[10px] font-bold text-retro-muted uppercase block mb-1">Matches Played</span>
+                  <div className="h-10">
+                    <Sparkline data={dailyStats.map(d => d.matches_played)} color="#a855f7" />
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
+                  <span className="text-[10px] font-bold text-retro-muted uppercase block mb-1">Peak Concurrent</span>
+                  <div className="h-10">
+                    <Sparkline data={dailyStats.map(d => d.peak_concurrent)} color="#38bdf8" />
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
+                  <span className="text-[10px] font-bold text-retro-muted uppercase block mb-1">New Signups</span>
+                  <div className="h-10">
+                    <Sparkline data={dailyStats.map(d => d.new_users)} color="#f59e0b" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Subtab 3: Maintenance & Danger Zone */}
+      {activeSubTab === "danger" && (
+        <div className="space-y-4">
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-5 space-y-2">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-red-300">
               <AlertTriangle className="w-4 h-4" />
-              <span>Danger Zone</span>
+              <span>Danger Zone & Server Maintenance</span>
             </div>
             <p className="text-xs text-retro-muted leading-relaxed">
-              These actions are irreversible and can cause permanent data loss. Use with extreme caution.
+              These actions perform irreversible maintenance or data resets. Use with care.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-5 space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-xs font-bold text-red-300 uppercase tracking-wider">Run Database Cleanup</h3>
-                  <p className="text-[10px] text-retro-muted mt-1">Expires stale content, sweeps orphan blobs, resets daily scores. Cheaper than waiting for the next tick.</p>
+                  <p className="text-[10px] text-retro-muted mt-1">Expires stale content, sweeps orphan blobs, and resets daily scores.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowCleanupConfirm(true)}
-                  className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
+                  className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0 cursor-pointer"
                 >
                   Run Cleanup
                 </button>
@@ -227,15 +376,15 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
             </div>
 
             <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-5 space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-xs font-bold text-red-300 uppercase tracking-wider">Clean ALL Posts & Reset</h3>
-                  <p className="text-[10px] text-retro-muted mt-1">Purges all user posts, media objects, likes and comments platform-wide. Cannot be undone.</p>
+                  <p className="text-[10px] text-retro-muted mt-1">Purges all user posts, media objects, likes and comments platform-wide.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowCleanPostsConfirm(true)}
-                  className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
+                  className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0 cursor-pointer"
                 >
                   Clean All
                 </button>
@@ -243,15 +392,15 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
             </div>
 
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 space-y-3 md:col-span-2">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-xs font-bold text-amber-300 uppercase tracking-wider">Migrate Lobby → Posts</h3>
-                  <p className="text-[10px] text-retro-muted mt-1">Transfers all lobby board images into user gMatch profiles under Posts, preserving likes and metadata.</p>
+                  <p className="text-[10px] text-retro-muted mt-1">Transfers all lobby board images into user gMatch profiles under Posts, preserving metadata.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowMigrateConfirm(true)}
-                  className="px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
+                  className="px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0 cursor-pointer"
                 >
                   Migrate Now
                 </button>

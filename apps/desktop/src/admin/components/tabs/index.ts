@@ -1,9 +1,5 @@
 export { DashboardTab } from "./DashboardTab";
-export { GamesTab } from "./GamesTab";
-export { ContentTab } from "./ContentTab";
-export { UsersTab } from "./UsersTab";
 export { ModerationTab } from "./ModerationTab";
-export { PlatformTab } from "./PlatformTab";
-export { EconomyTab } from "./EconomyTab";
-export { AnalyticsTab } from "./AnalyticsTab";
+export { UsersTab } from "./UsersTab";
+export { ContentTab } from "./ContentTab";
 export { SettingsTab } from "./SettingsTab";

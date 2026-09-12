@@ -423,7 +423,7 @@ describe('ServersView', () => {
     // orbitFetch's 3s GET cache would leak a prior test's isAdmin:false —
     // bypass it with a direct spy (same idiom as the tabs test above).
     const orbitApi = await import('../../utils/api')
-    const spy = vi.spyOn(orbitApi, 'orbitFetch').mockImplementation(async (endpoint: string, init?: RequestInit) => {
+    const spy = vi.spyOn(orbitApi, 'orbitFetch').mockImplementation(async (endpoint: string, _init?: RequestInit) => {
       const e = String(endpoint)
       if (e.includes('/api/servers/dashboard')) return json({ name: 'My Realm', users: [], posts_24h: 0, members_total: 1 })
       if (e.includes('/api/servers/node')) return json({ name: 'My Realm', description: '', isAdmin: true })

@@ -159,6 +159,7 @@ interface ConfirmDialogProps {
   cancelLabel?: string;
   variant?: "danger" | "primary" | "default";
   isLoading?: boolean;
+  children?: React.ReactNode;
 }
 
 export function ConfirmDialog({
@@ -171,6 +172,7 @@ export function ConfirmDialog({
   cancelLabel = "Cancel",
   variant = "danger",
   isLoading = false,
+  children,
 }: ConfirmDialogProps) {
   if (!isOpen) return null;
 
@@ -193,6 +195,7 @@ export function ConfirmDialog({
               <X className="w-4 h-4" />
             </button>
           </div>
+          {children}
         </div>
         <div className="flex items-center justify-end gap-2 px-5 pb-5 border-t border-border-glass">
           <button
@@ -486,12 +489,13 @@ interface DetailModalProps {
   onClose: () => void;
   title: string;
   subtitle?: string;
-  children: React.ReactNode;
+  children?: React.ReactNode;
+  data?: Record<string, unknown>;
   className?: string;
   size?: "sm" | "md" | "lg" | "xl" | "full";
 }
 
-export function DetailModal({ isOpen, onClose, title, subtitle, children, size = "md" }: DetailModalProps) {
+export function DetailModal({ isOpen, onClose, title, subtitle, children, data, size = "md" }: DetailModalProps) {
   if (!isOpen) return null;
 
   const sizeClasses = {
@@ -521,8 +525,20 @@ export function DetailModal({ isOpen, onClose, title, subtitle, children, size =
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {children}
+          {data && (
+            <div className="divide-y divide-border-glass">
+              {Object.entries(data).map(([key, val]) => (
+                <div key={key} className="py-2 flex items-center justify-between text-xs gap-3">
+                  <span className="text-retro-muted uppercase text-[10px] font-mono shrink-0">{key}</span>
+                  <span className="font-mono text-retro-fg truncate text-right">
+                    {val === null || val === undefined ? "—" : typeof val === "object" ? JSON.stringify(val) : String(val)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -13,7 +13,7 @@ function makeGalleryImages(count: number): GalleryImage[] {
     tags: [i % 2 === 0 ? 'blonde' : 'brunette', `tag-${i + 1}`],
     rarityBase: i + 1,
     clicks: i * 5,
-    rarity: i > 15 ? 'Legendary' : i > 8 ? 'Rare' : 'Common',
+    rarity: i > 15 ? 'Diamond' : i > 8 ? 'Gold' : 'Common',
     kind: i === 3 ? 'video' : 'image',
     boughtAt: 1000 + i,
   }))
