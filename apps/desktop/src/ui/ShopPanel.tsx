@@ -1,10 +1,8 @@
-import { useState, type ReactNode } from 'react'
-import { X } from 'lucide-react'
+import { useState } from 'react'
 import { useGame } from '../game/store'
 import { MAX_TAG_LEVEL, tagCost } from '../game/tags'
 import { CAPS, capEffectLabel, capStacks } from '../game/caps'
 import type { CapId } from '../game/types'
-import { IconRefresh, IconChevronR } from './icons'
 import {
   PRESTIGE_MIN_TIER,
   canBrainmelt,
@@ -22,69 +20,38 @@ import {
   DISPLAY,
   MONO,
   MUTED,
-  PANEL,
   PLATE,
   SKIN,
 } from './styles'
+import {
+  Tag as TagIcon,
+  Lightning,
+  Fire,
+  MagnifyingGlass,
+  Plus,
+  ArrowClockwise,
+  X,
+  Trophy,
+  Sparkle,
+  CheckCircle,
+  WarningCircle,
+} from '@phosphor-icons/react'
+import { playPress } from '../utils/sounds'
 
-/** Tab body content (stacked under fold headers; outer column scrolls). */
-const TAB_BODY = 'space-y-2.5'
+const TAB_KEY = 'gmatch.shop.tab.v2'
+type ShopTab = 'tags' | 'caps' | 'prestige'
 
-const FOLD_KEY = 'gmatch.shop.folded.v1'
-
-function loadFolded(): Record<string, boolean> {
+function loadSavedTab(): ShopTab {
   try {
-    if (typeof localStorage === 'undefined') return {}
-    const raw = localStorage.getItem(FOLD_KEY)
-    if (!raw) return {}
-    const d = JSON.parse(raw) as unknown
-    if (typeof d === 'object' && d !== null) return d as Record<string, boolean>
-  } catch {
-    /* corrupt — start expanded */
-  }
-  return {}
+    const saved = localStorage.getItem(TAB_KEY)
+    if (saved === 'tags' || saved === 'caps' || saved === 'prestige') return saved
+  } catch { /* session-only */ }
+  return 'tags'
 }
 
-/** Collapsible section (persisted): header toggles, body hides. */
-function FoldSection({ id, title, count, wrap = true, children }: { id: string; title: string; count?: number; wrap?: boolean; children: ReactNode }) {
-  const [foldedMap, setFoldedMap] = useState<Record<string, boolean>>(loadFolded)
-  const folded = foldedMap[id] === true
-  const toggle = () => {
-    setFoldedMap((prev) => {
-      const next = { ...prev, [id]: !prev[id] }
-      try {
-        if (typeof localStorage !== 'undefined') localStorage.setItem(FOLD_KEY, JSON.stringify(next))
-      } catch {
-        /* storage unavailable */
-      }
-      return next
-    })
-  }
-  return (
-    <section aria-label={title} className={folded ? '' : 'border-b border-border-glass pb-3 last:border-0'}>
-      <button
-        type="button"
-        onClick={toggle}
-        aria-expanded={!folded}
-        aria-label={`${folded ? 'Expand' : 'Collapse'} ${title}`}
-        className="flex w-full cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-left"
-      >
-        <span className={`inline-block transition-transform ${folded ? '' : 'rotate-90'}`}>
-          <IconChevronR size={11} />
-        </span>
-        <h4 className={`${MONO} m-0 flex-1 text-[10px] font-bold uppercase tracking-wider text-retro-muted`}>
-          {title}
-          {typeof count === 'number' ? ` (${count})` : ''}
-        </h4>
-      </button>
-      {!folded && (wrap ? <div className="mt-1.5 flex flex-wrap gap-1.5">{children}</div> : <div className="mt-1.5">{children}</div>)}
-    </section>
-  )
-}
-
-/** Tag search / filter input — shell glass tokens (was .custom-tag-input). */
+/** Tag search / filter input — Cyber-Slate styling. */
 const TAG_INPUT =
-  'min-w-0 flex-1 rounded-lg border border-border-glass bg-retro-bg px-2.5 py-1.5 text-[13px] text-retro-fg outline-none placeholder:text-retro-muted focus:border-retro-accent disabled:opacity-50 [@media(pointer:coarse)]:text-[16px]'
+  'min-w-0 flex-1 rounded-xl border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-retro-fg outline-none placeholder:text-retro-muted focus:border-retro-accent/60 transition-colors font-mono'
 
 function TagsTab() {
   const tags = useGame((s) => s.tags)
@@ -98,14 +65,15 @@ function TagsTab() {
   const refreshTagMarket = useGame((s) => s.refreshTagMarket)
   const addCustomTag = useGame((s) => s.addCustomTag)
   const owned = tags.filter((t) => t.level > 0).length
+
   const [custom, setCustom] = useState('')
   const [note, setNote] = useState<string | null>(null)
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [mergeSel, setMergeSel] = useState<string | null>(null)
 
   const submitCustom = () => {
-    const q = custom
-    if (!q.trim()) return
+    const q = custom.trim()
+    if (!q) return
     setNote(null)
     void addCustomTag(q).then((r) => {
       setNote(r.message)
@@ -113,30 +81,104 @@ function TagsTab() {
     })
   }
 
+  const ownedTags = tags.filter((t) => t.level > 0)
+  const marketTags = tags.filter((t) => t.level <= 0)
+
+  const renderTagPill = (t: (typeof tags)[number]) => {
+    const isOwned = t.level > 0
+    const on = isOwned && t.selected !== false
+    const maxed = t.level >= MAX_TAG_LEVEL
+    const cost = tagCost(t.base, t.level)
+    const afford = !maxed && points >= cost
+
+    return (
+      <span key={t.name} className="relative inline-flex group">
+        <button
+          type="button"
+          onClick={() => {
+            playPress(740)
+            if (mergeSel && isOwned) {
+              if (mergeSel === t.name) setMergeSel(null)
+              else { mergeTags(mergeSel, t.name); setMergeSel(null) }
+            } else if (!mergeSel) {
+              if (isOwned) toggleTag(t.name)
+              else buyTag(t.name)
+            }
+          }}
+          onDoubleClick={() => {
+            if (isOwned) { setMergeSel(mergeSel === t.name ? null : t.name) }
+          }}
+          onContextMenu={(e) => {
+            if (isOwned) { e.preventDefault(); soloTag(t.name) }
+          }}
+          title={
+            isOwned
+              ? `${t.name} · Lv${t.level} · +${formatNum(t.income)}/s · click ${on ? 'OFF' : 'ON'} · right-click = solo · double-click = pick for merge`
+              : `${t.name} · buy for ${formatNum(cost)} pts`
+          }
+          className={`inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-all duration-150 ${
+            on
+              ? 'border-retro-accent/50 bg-retro-accent/15 text-white shadow-[0_0_8px_rgba(56,139,253,0.15)]'
+              : isOwned
+                ? 'border-white/10 bg-white/[0.03] text-retro-muted hover:text-white hover:border-white/20'
+                : 'border-dashed border-white/15 bg-transparent text-retro-muted hover:border-retro-accent/40 hover:text-retro-fg'
+          } ${!isOwned && !afford ? 'opacity-40' : ''} ${mergeSel === t.name ? 'ring-1 ring-retro-accent' : ''}`}
+        >
+          <span
+            className={`h-1.5 w-1.5 shrink-0 rounded-full transition-colors ${
+              on
+                ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]'
+                : isOwned
+                  ? 'bg-white/20'
+                  : afford
+                    ? 'bg-retro-accent'
+                    : 'bg-white/20'
+            }`}
+            aria-hidden="true"
+          />
+          <span className="truncate font-medium">{t.name}</span>
+          {isOwned && (
+            <span
+              role="button"
+              tabIndex={-1}
+              aria-label={`Delete ${t.name}`}
+              onClick={(e) => { e.stopPropagation(); deleteTag(t.name) }}
+              className="-mr-1 hidden shrink-0 rounded p-0.5 text-retro-muted hover:text-rose-400 group-hover:inline-flex"
+            >
+              <X className="h-3 w-3" />
+            </span>
+          )}
+        </button>
+      </span>
+    )
+  }
+
   return (
-    <div className={TAB_BODY}>
-      <div className="flex items-center justify-between gap-1.5">
-        <span className="text-xs font-bold uppercase tracking-wider text-retro-muted">
-          Feed Tags ({owned})
+    <div className="space-y-3">
+      {/* Top action bar: count & toggle search drawer */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-retro-muted">
+          Active Tags ({owned})
         </span>
         <button
           type="button"
-          className={`${BTN} ${BTN_SMALL} !py-0.5 !px-2 text-[10px]`}
-          onClick={() => setDrawerOpen((v) => !v)}
-          title="Open tag search & booru market drawer"
+          onClick={() => { playPress(720); setSearchOpen((v) => !v); }}
+          className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] text-[11px] font-medium text-retro-muted hover:text-white transition-colors cursor-pointer"
         >
-          {drawerOpen ? 'Close Search' : '+ Market / Search'}
+          {searchOpen ? <X className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+          <span>{searchOpen ? 'Close' : 'Add Tag'}</span>
         </button>
       </div>
 
-      {drawerOpen && (
-        <div className="space-y-2 rounded-xl border border-border-glass bg-surface-elevated p-2 shadow-inner">
+      {/* Custom Tag Search Input Box */}
+      {searchOpen && (
+        <div className="space-y-2 rounded-xl border border-white/[0.08] bg-black/40 p-2.5 shadow-inner">
           <div className="flex items-center gap-1.5">
             <input
-              className={`${TAG_INPUT} !py-1 text-xs`}
+              className={TAG_INPUT}
               value={custom}
               disabled={fetching}
-              placeholder="Add tag (e.g. milf, bbc)…"
+              placeholder="Tag name (e.g. milf, cyberpunk)…"
               aria-label="Search a custom tag"
               onChange={(e) => setCustom(e.target.value)}
               onKeyDown={(e) => {
@@ -148,126 +190,56 @@ function TagsTab() {
             />
             <button
               type="button"
-              className={`${BTN} ${BTN_SMALL} !py-1 flex-none text-xs`}
               disabled={fetching || !custom.trim()}
               onClick={submitCustom}
+              className="px-3 py-1.5 rounded-xl border border-retro-accent/40 bg-retro-accent/20 hover:bg-retro-accent/30 text-white text-xs font-bold transition-colors disabled:opacity-40 cursor-pointer"
             >
               Add
             </button>
             <button
               type="button"
-              className={`${BTN} ${BTN_SMALL} !py-1 flex-none text-xs`}
               disabled={fetching}
-              onClick={() => void refreshTagMarket()}
+              onClick={() => { playPress(700); void refreshTagMarket(); }}
+              className="p-1.5 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-retro-muted hover:text-white transition-colors cursor-pointer disabled:opacity-40"
               title="Refresh market offers"
             >
-              <IconRefresh size={11} />
+              <ArrowClockwise className="w-3.5 h-3.5" />
             </button>
           </div>
-          {note && <div className={`${MUTED} text-xs`}>{note}</div>}
+          {note && <div className="text-[11px] text-retro-muted px-1">{note}</div>}
         </div>
       )}
 
       {/* Market refresh skeleton */}
       {fetching && (
         <div className="flex gap-1.5" role="status" aria-label="Refreshing tag market">
-          <Skeleton className="h-7 w-24 rounded-lg" />
-          <Skeleton className="h-7 w-20 rounded-lg" />
+          <Skeleton className="h-6 w-20 rounded-full" />
+          <Skeleton className="h-6 w-24 rounded-full" />
         </div>
       )}
 
-      {(() => {
-        const ownedTags = tags.filter((t) => t.level > 0)
-        const marketTags = tags.filter((t) => t.level <= 0)
+      {/* Owned Tags Pills */}
+      {ownedTags.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto styled-scrollbar pr-0.5">
+          {ownedTags.map(renderTagPill)}
+        </div>
+      ) : (
+        <div className="text-xs text-retro-muted italic py-2">
+          No tags unlocked yet. Tap Add Tag or buy from the market below.
+        </div>
+      )}
 
-        const renderLittlePill = (t: (typeof tags)[number]) => {
-          const isOwned = t.level > 0
-          const on = isOwned && t.selected !== false
-          const maxed = t.level >= MAX_TAG_LEVEL
-          const cost = tagCost(t.base, t.level)
-          const afford = !maxed && points >= cost
-          return (
-            <span key={t.name} className="relative inline-flex group">
-            <button
-              type="button"
-              onClick={() => {
-                if (mergeSel && isOwned) {
-                  if (mergeSel === t.name) setMergeSel(null)
-                  else { mergeTags(mergeSel, t.name); setMergeSel(null) }
-                } else if (!mergeSel) {
-                  if (isOwned) toggleTag(t.name)
-                  else buyTag(t.name)
-                }
-              }}
-              onDoubleClick={() => {
-                if (isOwned) { setMergeSel(mergeSel === t.name ? null : t.name) }
-              }}
-              onContextMenu={(e) => {
-                if (isOwned) { e.preventDefault(); soloTag(t.name) }
-              }}
-              title={
-                isOwned
-                  ? `${t.name} · Lv${t.level} · +${formatNum(t.income)}/s · click ${on ? 'OFF' : 'ON'} · right-click = solo · double-click = pick for merge`
-                  : `${t.name} · buy for ${formatNum(cost)} pts`
-              }
-              onAuxClick={(e) => {
-                if (e.button === 1 && isOwned) {
-                  e.preventDefault()
-                  soloTag(t.name)
-                }
-              }}
-              className={`inline-flex max-w-full cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 text-xs leading-tight transition-colors ${on
-                ? 'border-retro-accent/50 bg-surface-interactive text-retro-fg'
-                : isOwned
-                  ? 'border-border-subtle bg-surface-raised text-retro-muted hover:text-retro-fg hover:border-border-strong'
-                  : 'border-border-dashed bg-transparent text-retro-muted hover:text-retro-fg hover:border-retro-accent/50'
-                } ${!isOwned && !afford ? 'opacity-50' : ''} ${mergeSel === t.name ? 'ring-1 ring-retro-accent' : ''}`}
-            >
-              <span
-                className={`h-1.5 w-1.5 shrink-0 rounded-full ${on
-                  ? 'bg-retro-online'
-                  : isOwned
-                    ? 'bg-glass-w20'
-                    : afford
-                      ? 'bg-retro-accent'
-                      : 'bg-glass-w20'
-                  }`}
-                aria-hidden="true"
-              />
-              <span className="truncate font-medium">{t.name}</span>
-              {isOwned && (
-                <span
-                  role="button"
-                  tabIndex={-1}
-                  aria-label={`Delete ${t.name}`}
-                  onClick={(e) => { e.stopPropagation(); deleteTag(t.name) }}
-                  className="-mr-1 hidden shrink-0 rounded p-0.5 text-retro-muted hover:text-rose-400 group-hover:inline-flex"
-                >
-                  <X className="h-3 w-3" />
-                </span>
-              )}
-            </button>
-            </span>
-          )
-        }
-
-        return (
-          <div className="space-y-2">
-            {ownedTags.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {ownedTags.map(renderLittlePill)}
-              </div>
-            )}
-            {drawerOpen && marketTags.length > 0 && (
-              <FoldSection id="market" title="Market Offers" count={marketTags.length} wrap={false}>
-                <div className="flex flex-wrap gap-1 pt-1">
-                  {marketTags.map(renderLittlePill)}
-                </div>
-              </FoldSection>
-            )}
+      {/* Market Offers Section */}
+      {marketTags.length > 0 && (
+        <div className="pt-2 border-t border-white/[0.06] space-y-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted flex items-center justify-between">
+            <span>Market Discoveries ({marketTags.length})</span>
+          </span>
+          <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto styled-scrollbar pr-0.5">
+            {marketTags.map(renderTagPill)}
           </div>
-        )
-      })()}
+        </div>
+      )}
     </div>
   )
 }
@@ -277,43 +249,65 @@ function CapsTab() {
   const caps = useGame((s) => s.caps)
   const popCap = useGame((s) => s.popCap)
   const now = Date.now()
+
   return (
-    <div className={TAB_BODY}>
-      <p className={`${MUTED} m-0 mb-3.5`}>
-        GoonCap vending machine. Pops are permanent — every pop stacks forever, repeats compound.
-      </p>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-retro-muted">
+          Permanent Overclocks
+        </span>
+        <span className="text-[10px] font-mono text-retro-muted">
+          Stacks compound
+        </span>
+      </div>
+
       <div className="flex flex-col gap-2">
-        {(Object.keys(CAPS) as CapId[]).map((id) => {
+        {(Object.keys(CAPS) as CapId[]).map((id, idx) => {
           const def = CAPS[id]
           const afford = points >= def.cost
           const st = capStacks(caps, id, now)
+
           return (
             <div
               key={id}
-              className={`${SKIN} flex items-center justify-between gap-2.5 rounded-[10px] border border-border-glass bg-surface-elevated p-2.5 shadow-sm ${
-                afford ? 'animate-[gg-pulse_1.6s_ease-in-out_infinite]' : ''
+              className={`flex items-center justify-between gap-3 rounded-xl border p-2.5 transition-all duration-150 ${
+                st.count > 0
+                  ? 'border-pink-500/30 bg-pink-500/[0.04] shadow-[0_0_12px_rgba(236,72,153,0.1)]'
+                  : 'border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12]'
               }`}
-              style={{
-                backgroundImage: `linear-gradient(rgba(5,5,12,0.78), rgba(5,5,12,0.78)), url("${CAP_SKINS[id]}")`,
-              }}
             >
-              <div>
-                <div className={`${DISPLAY} text-xs font-bold tracking-[0.5px]`}>
-                  {def.name}
-                  {st.count > 0 && <span className={MONO}> x{st.count}</span>}
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <div className="w-6 h-6 rounded-lg bg-black/50 border border-white/10 flex items-center justify-center font-mono text-[11px] font-bold text-retro-muted shrink-0">
+                  {idx + 1}
                 </div>
-                <div className={MUTED}>
-                  {capEffectLabel(id)} · permanent
-                  {st.count > 0 && ` · x${st.count} stacked`}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-white truncate">
+                      {def.name}
+                    </span>
+                    {st.count > 0 && (
+                      <span className={`${MONO} text-[10px] font-black text-pink-400 bg-pink-500/15 px-1.5 py-0.2 rounded-full`}>
+                        x{st.count}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-retro-muted truncate mt-0.5">
+                    {capEffectLabel(id)}
+                  </p>
                 </div>
               </div>
+
               <button
                 type="button"
-                className={`${BTN} ${BTN_SMALL} flex-none`}
+                className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-bold transition-all cursor-pointer shrink-0 ${
+                  afford
+                    ? 'border-retro-accent/50 bg-retro-accent/20 text-white hover:bg-retro-accent/30 shadow-[0_0_8px_rgba(56,139,253,0.2)]'
+                    : 'border-white/[0.06] bg-white/[0.02] text-retro-muted opacity-40 cursor-not-allowed'
+                }`}
                 disabled={!afford}
-                onClick={() => popCap(id)}
+                onClick={() => { playPress(800); popCap(id); }}
               >
-                {formatNum(def.cost)} pts
+                {formatNum(def.cost)}
               </button>
             </div>
           )
@@ -332,61 +326,177 @@ function PrestigeTab() {
   const tier = tierForXp(xp)
   const ready = canBrainmelt(tier)
   const preview = shardsFromEarned(totalEarned)
+
   return (
-    <div className={TAB_BODY}>
-      <div className="mb-3.5 rounded-[10px] border border-border-glass bg-retro-bg p-3">
-        <p className={`${MUTED} m-0`}>
-          Brainmelt burns the run for <b>Corruption shards</b> — each one is a permanent +10%
-          global multiplier.
-        </p>
-        <ul className="my-2 list-none text-xs">
-          <li className="text-retro-error">Resets: points, XP/tier, tags, caps</li>
-          <li className="text-retro-online">Keeps: gallery, shards, achievements</li>
-        </ul>
-        <div className={`${MONO} mb-2.5 mt-2 text-[13px] text-[#ffd75e]`}>
-          +{preview} shards on melt · held: {shards}
+    <div className="space-y-3">
+      {/* Brainmelt Terminal Card */}
+      <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-b from-purple-950/20 to-black/40 p-3.5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-purple-300 font-bold text-xs">
+            <Sparkle className="w-4 h-4 text-purple-400" weight="fill" />
+            <span>Corruption Shards</span>
+          </div>
+          <span className={`${MONO} text-xs font-bold text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded-full border border-purple-500/30`}>
+            Held: {shards}
+          </span>
         </div>
+
+        <p className="text-[11px] text-retro-muted leading-relaxed">
+          Brainmelt burns your current run to forge permanent Corruption Shards — each granting <b className="text-white">+10% passive multiplier</b> across all future runs.
+        </p>
+
+        {/* Reset vs Keep Rules */}
+        <div className="grid grid-cols-2 gap-2 text-[10px] bg-black/40 rounded-xl p-2 border border-white/[0.04]">
+          <div className="space-y-1">
+            <div className="font-bold text-rose-400 flex items-center gap-1">
+              <WarningCircle className="w-3 h-3" /> Resets
+            </div>
+            <div className="text-retro-muted">Points, XP, Tags, Caps</div>
+          </div>
+          <div className="space-y-1">
+            <div className="font-bold text-emerald-400 flex items-center gap-1">
+              <CheckCircle className="w-3 h-3" /> Keeps
+            </div>
+            <div className="text-retro-muted">Keepsakes, Shards, Trophies</div>
+          </div>
+        </div>
+
+        <div className={`${MONO} text-center text-xs font-bold text-amber-300 bg-amber-500/10 py-1 rounded-lg border border-amber-500/20`}>
+          +{preview} shards on melt
+        </div>
+
         <button
           type="button"
-          className={`${BTN} ${BTN_DANGER}`}
+          className={`w-full py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold tracking-wider uppercase transition-all cursor-pointer ${
+            ready
+              ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-[0_0_16px_rgba(244,63,94,0.4)]'
+              : 'border border-white/10 bg-white/[0.04] text-retro-muted opacity-40 cursor-not-allowed'
+          }`}
           disabled={!ready}
-          onClick={brainmelt}
+          onClick={() => { playPress(900); brainmelt(); }}
         >
-          {ready ? 'BRAINMELT' : `Unlocks at tier ${PRESTIGE_MIN_TIER} (you: ${tier})`}
+          <Fire className="w-4 h-4" weight="fill" />
+          <span>{ready ? 'Trigger Brainmelt' : `Unlocks at Tier ${PRESTIGE_MIN_TIER} (You: ${tier})`}</span>
         </button>
       </div>
-      <div className="grid grid-cols-2 gap-1.5">
-        {ACHIEVEMENTS.map((a) => {
-          const got = achievements.includes(a.id)
-          return (
-            <div
-              key={a.id}
-              className={`flex items-center gap-1.5 rounded-lg border bg-retro-bg p-2 text-xs ${
-                got ? 'border-[rgba(255,215,94,0.5)] text-[#ffd75e]' : 'border-border-subtle text-retro-muted'
-              }`}
-              title={got ? 'Unlocked' : 'Locked'}
-            >
-              {a.name}
-            </div>
-          )
-        })}
+
+      {/* Achievements Showcase */}
+      <div className="space-y-1.5 pt-1">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted flex items-center justify-between">
+          <span>Achievements ({achievements.length}/{ACHIEVEMENTS.length})</span>
+        </span>
+        <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto styled-scrollbar pr-0.5">
+          {ACHIEVEMENTS.map((a) => {
+            const got = achievements.includes(a.id)
+            return (
+              <div
+                key={a.id}
+                className={`flex items-center gap-2 rounded-xl border p-2 text-xs transition-colors ${
+                  got
+                    ? 'border-amber-500/30 bg-amber-500/[0.05] text-amber-200'
+                    : 'border-white/[0.04] bg-white/[0.02] text-retro-muted opacity-50'
+                }`}
+                title={got ? 'Unlocked Trophy' : 'Locked Trophy'}
+              >
+                <Trophy className={`w-3.5 h-3.5 shrink-0 ${got ? 'text-amber-400' : 'text-retro-muted'}`} weight={got ? 'fill' : 'regular'} />
+                <span className="truncate text-[11px] font-medium">{a.name}</span>
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
 }
 
 export default function ShopPanel() {
+  const [tab, setTab] = useState<ShopTab>(loadSavedTab)
+  const tags = useGame((s) => s.tags)
+  const caps = useGame((s) => s.caps)
+  const xp = useGame((s) => s.xp)
+  const now = Date.now()
+
+  const handleTab = (nextTab: ShopTab) => {
+    playPress(700)
+    setTab(nextTab)
+    try {
+      localStorage.setItem(TAB_KEY, nextTab)
+    } catch { /* session-only */ }
+  }
+
+  const ownedTagsCount = tags.filter((t) => t.level > 0).length
+  const totalCapsStacks = Object.keys(CAPS).reduce((acc, k) => acc + capStacks(caps, k as CapId, now).count, 0)
+  const currentTier = tierForXp(xp)
+
   return (
-    <aside className={`${PLATE} ${PANEL} flex flex-col gap-3`}>
-      <FoldSection id="shop-tags" title="Tags" wrap={false}>
-        <TagsTab />
-      </FoldSection>
-      <FoldSection id="shop-caps" title="Caps" wrap={false}>
-        <CapsTab />
-      </FoldSection>
-      <FoldSection id="shop-prestige" title="Prestige" wrap={false}>
-        <PrestigeTab />
-      </FoldSection>
+    <aside className={`${PLATE} flex min-h-0 flex-1 flex-col p-3.5 space-y-3`}>
+      {/* 3-Tab Segmented Switcher */}
+      <div className="flex items-center p-1 rounded-xl bg-black/50 border border-white/[0.06]" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'tags'}
+          onClick={() => handleTab('tags')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            tab === 'tags'
+              ? 'bg-white/[0.1] text-white shadow-sm'
+              : 'text-retro-muted hover:text-retro-fg'
+          }`}
+        >
+          <TagIcon className="w-3.5 h-3.5" />
+          <span>Tags</span>
+          {ownedTagsCount > 0 && (
+            <span className="font-mono text-[10px] px-1 rounded-full bg-white/[0.08] text-retro-fg">
+              {ownedTagsCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'caps'}
+          onClick={() => handleTab('caps')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            tab === 'caps'
+              ? 'bg-white/[0.1] text-white shadow-sm'
+              : 'text-retro-muted hover:text-retro-fg'
+          }`}
+        >
+          <Lightning className="w-3.5 h-3.5" />
+          <span>Caps</span>
+          {totalCapsStacks > 0 && (
+            <span className="font-mono text-[10px] px-1 rounded-full bg-pink-500/20 text-pink-400 font-bold">
+              {totalCapsStacks}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'prestige'}
+          onClick={() => handleTab('prestige')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            tab === 'prestige'
+              ? 'bg-white/[0.1] text-white shadow-sm'
+              : 'text-retro-muted hover:text-retro-fg'
+          }`}
+        >
+          <Fire className="w-3.5 h-3.5" />
+          <span>Prestige</span>
+          <span className="font-mono text-[10px] px-1 rounded-full bg-purple-500/20 text-purple-300 font-bold">
+            T{currentTier}
+          </span>
+        </button>
+      </div>
+
+      {/* Tab Body */}
+      <div className="min-h-0 flex-1 overflow-y-auto styled-scrollbar pr-0.5">
+        {tab === 'tags' && <TagsTab />}
+        {tab === 'caps' && <CapsTab />}
+        {tab === 'prestige' && <PrestigeTab />}
+      </div>
     </aside>
   )
 }

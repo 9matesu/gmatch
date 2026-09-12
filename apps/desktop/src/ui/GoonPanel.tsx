@@ -28,9 +28,18 @@ import {
 import CachedImg from './CachedImg'
 import OfflineCard from './OfflineCard'
 import { Badge } from '../components/Badge'
-import { Ban, X } from 'lucide-react'
 import { Skeleton } from '../components/Skeleton'
-import { IconChevronL, IconChevronR } from './icons'
+import {
+  CaretLeft,
+  CaretRight,
+  Prohibit,
+  X,
+  Gift,
+  Fire,
+  Skull,
+  ArrowClockwise,
+  Lightning,
+} from '@phosphor-icons/react'
 
 interface Float {
   id: number
@@ -290,8 +299,11 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
     viewMode === '2x2' || viewMode === '1x2' ? 'grid-cols-2' : 'grid-cols-3'
 
   const critFlashEl = critFlash && (
-    <div className="pointer-events-none absolute inset-0 z-[3] flex items-center justify-center bg-[rgba(255,45,120,0.28)] font-sans text-7xl font-bold tracking-[6px] text-white shadow-[inset_0_0_60px_rgba(255,45,120,0.5)] animate-[gg-crit_0.35s_ease-out_forwards]">
-      CRIT!
+    <div className="pointer-events-none absolute inset-0 z-[10] flex items-center justify-center bg-rose-500/15 backdrop-blur-[1px] animate-[gg-crit_0.35s_ease-out_forwards]">
+      <div className="flex items-center gap-2 rounded-xl border border-rose-500/60 bg-[#0b0e14]/90 px-6 py-2.5 font-mono text-xl font-black tracking-widest text-rose-400 shadow-[0_0_40px_rgba(244,63,94,0.4)]">
+        <Lightning className="h-5 w-5 text-rose-400" weight="fill" />
+        CRITICAL HIT!
+      </div>
     </div>
   )
 
@@ -306,7 +318,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
       {/* Integrated panel toolbar: gallery + sources + fullscreen live here, never floating */}
       <div className="flex flex-none items-center justify-between gap-2 px-1 pt-0.5">
         <div
-          className="inline-flex flex-none overflow-hidden rounded-lg border border-border-glass"
+          className="inline-flex flex-none items-center bg-[#131722]/90 border border-white/10 rounded-lg p-0.5 gap-0.5 shadow-inner"
           role="group"
           aria-label="Feed layout"
         >
@@ -318,9 +330,9 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             <button
               key={mode}
               type="button"
-              className={`${MONO} cursor-pointer border-0 bg-transparent px-2 py-0.5 text-xs font-bold ${active
-                ? 'bg-retro-accent text-retro-accent-text'
-                : 'bg-transparent text-retro-muted hover:text-retro-fg'
+              className={`${MONO} cursor-pointer rounded-md border-0 px-2.5 py-0.5 text-xs transition-all duration-150 ${active
+                ? 'bg-white/10 text-white shadow-sm font-bold'
+                : 'text-white/45 hover:text-white/80 hover:bg-white/5 font-medium'
                 }`}
               aria-pressed={active}
               onClick={() => setViewMode(mode)}
@@ -458,22 +470,22 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             <>
               <button
                 type="button"
-                className="icon-btn absolute left-1.5 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-[2px] hover:bg-black/65 disabled:opacity-25"
+                className="icon-btn absolute left-2 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-white/80 border border-white/10 backdrop-blur-md hover:bg-white/15 hover:text-white hover:border-white/20 transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
                 aria-label="Previous image"
                 title={canGridBack ? 'Back to the previous board' : 'Nothing behind you yet'}
                 disabled={!canGridBack}
                 onClick={() => undoGrid()}
               >
-                <IconChevronL size={26} />
+                <CaretLeft size={22} weight="bold" />
               </button>
               <button
                 type="button"
-                className="icon-btn absolute right-1.5 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-[2px] hover:bg-black/65 disabled:opacity-25"
+                className="icon-btn absolute right-2 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-white/80 border border-white/10 backdrop-blur-md hover:bg-white/15 hover:text-white hover:border-white/20 transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
                 aria-label="Next image"
                 title="Skip this round — no reward"
                 onClick={() => skipGrid()}
               >
-                <IconChevronR size={26} />
+                <CaretRight size={22} weight="bold" />
               </button>
             </>
           )}
@@ -551,7 +563,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           )}
           <button
             type="button"
-            className="icon-btn absolute left-1.5 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-[2px] hover:bg-black/65 disabled:opacity-25"
+            className="icon-btn absolute left-3 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-white/80 border border-white/10 backdrop-blur-md hover:bg-white/15 hover:text-white hover:border-white/20 transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
             aria-label="Previous image"
             title={canGoBack ? 'Back to the skipped foe' : 'Nothing behind you yet'}
             disabled={!canGoBack}
@@ -560,23 +572,23 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               goBack()
             }}
           >
-            <IconChevronL size={26} />
+            <CaretLeft size={22} weight="bold" />
           </button>
           <button
             type="button"
-            className="icon-btn absolute right-1.5 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-[2px] hover:bg-black/65 disabled:opacity-25"
-              aria-label="Next image"
-              title="Skip this foe — no reward"
-              onClick={(e) => {
-                e.stopPropagation()
-                advanceFeed()
-              }}
-            >
-              <IconChevronR size={26} />
+            className="icon-btn absolute right-3 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-white/80 border border-white/10 backdrop-blur-md hover:bg-white/15 hover:text-white hover:border-white/20 transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
+            aria-label="Next image"
+            title="Skip this foe — no reward"
+            onClick={(e) => {
+              e.stopPropagation()
+              advanceFeed()
+            }}
+          >
+            <CaretRight size={22} weight="bold" />
           </button>
           <button
             type="button"
-            className="icon-btn absolute right-1.5 top-1.5 z-[6] flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-[2px] hover:bg-rose-600/70"
+            className="icon-btn absolute right-3 top-3 z-[6] flex h-8 w-8 items-center justify-center rounded-xl bg-black/60 text-white/70 border border-white/10 backdrop-blur-md hover:bg-rose-600/80 hover:text-white hover:border-rose-500/60 transition-all duration-150 active:scale-95 cursor-pointer"
             aria-label="Never show this again"
             title="Purge — this image and its rarest tags never return"
             hidden={!current}
@@ -585,7 +597,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               if (current) purgePost(current)
             }}
           >
-            <Ban className="h-4 w-4" />
+            <Prohibit size={16} weight="bold" />
           </button>
           {floats
             .filter((f) => f.cell === null)
@@ -610,37 +622,38 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               aria-expanded={dropsOpen}
               aria-label={`${pendingDrops.length} novelty drops waiting`}
               title="KO drops — adopt a tag, ban an anti-tag, one click each"
-              className={`${MONO} inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#ff2d78]/40 bg-[#ff2d78]/10 px-2 py-0.5 text-xs font-bold text-retro-fg`}
+              className={`${MONO} inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-rose-500/40 bg-rose-500/10 px-2.5 py-1 text-xs font-bold text-rose-300 hover:bg-rose-500/20 transition-colors`}
             >
+              <Gift size={14} weight="bold" className="text-rose-400" />
               Drops
-              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ff2d78] px-1 text-[10px] font-black text-white">
+              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black text-white">
                 {pendingDrops.length}
               </span>
             </button>
             {dropsOpen && (
-              <div className="absolute bottom-full left-0 z-30 mb-1.5 w-64 space-y-1.5 rounded-xl border border-border-glass bg-surface-elevated p-2 shadow-xl">
+              <div className="absolute bottom-full left-0 z-30 mb-1.5 w-64 space-y-1.5 rounded-xl border border-white/10 bg-[#131722] p-2.5 shadow-2xl backdrop-blur-md">
                 {pendingDrops.slice(0, 4).map((drop) => (
-                  <div key={drop.id} className="rounded-lg border border-border-subtle bg-surface-raised p-1.5">
+                  <div key={drop.id} className="rounded-lg border border-white/5 bg-[#0b0e14]/80 p-2">
                     <div className="flex items-center justify-between gap-1">
-                      <span className={`${MONO} truncate text-[10px] font-bold text-retro-muted`}>
+                      <span className={`${MONO} truncate text-[10px] font-bold text-white/50`}>
                         from {drop.foeTitle}
                       </span>
                       <button
                         type="button"
                         onClick={() => dismissDrop(drop.id)}
                         aria-label="Dismiss drop"
-                        className="shrink-0 cursor-pointer border-0 bg-transparent p-0.5 text-retro-muted hover:text-retro-fg"
+                        className="shrink-0 cursor-pointer border-0 bg-transparent p-0.5 text-white/40 hover:text-white transition-colors"
                       >
-                        ×
+                        <X size={12} weight="bold" />
                       </button>
                     </div>
-                    <div className="mt-1 flex flex-wrap gap-1">
+                    <div className="mt-1.5 flex flex-wrap gap-1">
                       {drop.suggestedTag && (
                         <button
                           type="button"
                           onClick={() => claimDropTag(drop.id)}
                           title={`Adopt +${drop.suggestedTag} into your feed`}
-                          className={`${MONO} cursor-pointer rounded-md border border-retro-accent/40 bg-retro-accent/15 px-1.5 py-0.5 text-[10px] font-bold text-retro-fg hover:bg-retro-accent/30`}
+                          className={`${MONO} cursor-pointer rounded-md border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-300 hover:bg-emerald-500/25 transition-colors`}
                         >
                           + {drop.suggestedTag}
                         </button>
@@ -650,16 +663,16 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                           type="button"
                           onClick={() => claimDropAntiTag(drop.id)}
                           title={`Ban ${drop.suggestedAntiTag} from your feed`}
-                          className={`${MONO} cursor-pointer rounded-md border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-[10px] font-bold text-red-300 hover:bg-red-500/25`}
+                          className={`${MONO} inline-flex items-center gap-1 cursor-pointer rounded-md border border-rose-500/40 bg-rose-500/10 px-2 py-0.5 text-[10px] font-bold text-rose-300 hover:bg-rose-500/20 transition-colors`}
                         >
-                          <X className="w-3 h-3 shrink-0" /> {drop.suggestedAntiTag}
+                          <X size={10} weight="bold" className="shrink-0" /> {drop.suggestedAntiTag}
                         </button>
                       )}
                     </div>
                   </div>
                 ))}
                 {pendingDrops.length > 4 && (
-                  <div className={`${MONO} text-center text-[10px] text-retro-muted`}>
+                  <div className={`${MONO} text-center text-[10px] text-white/40`}>
                     +{pendingDrops.length - 4} more…
                   </div>
                 )}
@@ -668,53 +681,59 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           </div>
         )}
         {isGrid ? (
-          <span className={MUTED}>
+          <span className={`${MONO} text-xs font-medium text-white/60`}>
             {grid.length}/{gridTarget} live{feedOffline ? ' · offline' : ''}
           </span>
         ) : inBattle ? (
-          <div className="flex min-w-0 flex-1 items-center gap-2" title={`${Math.ceil(foeHp)} / ${foeMaxHp} HP`}>
-            <div className={`${HP_BAR} flex-1`}>
-              <div className={`${HP_FILL} ${hpPct <= 30 ? HP_FILL_LOW : ''}`} style={{ width: `${hpPct}%` }} />
+          <div className="flex min-w-0 flex-1 items-center gap-2.5" title={`${Math.ceil(foeHp)} / ${foeMaxHp} HP`}>
+            <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-black/60 border border-white/5">
+              <div
+                className={`h-full rounded-full transition-all duration-150 ${hpPct <= 30 ? 'bg-gradient-to-r from-rose-500 to-amber-500' : 'bg-gradient-to-r from-emerald-500 to-teal-400'}`}
+                style={{ width: `${hpPct}%` }}
+              />
             </div>
-            <span className={`${MONO} whitespace-nowrap text-[10px] text-retro-muted`}>
-              {formatNum(Math.ceil(foeHp))}/{formatNum(foeMaxHp)} HP
+            <span className={`${MONO} whitespace-nowrap text-xs font-semibold text-white/60`}>
+              {formatNum(Math.ceil(foeHp))}/{formatNum(foeMaxHp)} <span className="text-[10px] text-white/40">HP</span>
             </span>
           </div>
         ) : (
-          <span className={MUTED}>No live foe — take your time.</span>
+          <span className={`${MUTED} text-xs`}>No live foe — take your time.</span>
         )}
         {heatLive && (
           <span
-            className={`${MONO} inline-flex min-w-0 shrink items-center gap-1 whitespace-nowrap rounded-lg border border-[rgba(255,120,40,0.5)] bg-[rgba(255,80,0,0.15)] px-2 py-0.5 text-xs font-black text-[#ffb066]${reduceMotion ? '' : ' animate-pulse'}`}
+            className={`${MONO} inline-flex min-w-0 shrink items-center gap-1.5 whitespace-nowrap rounded-lg border border-amber-500/40 bg-amber-500/15 px-2.5 py-1 text-xs font-black text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.2)]${reduceMotion ? '' : ' animate-pulse'}`}
             title={`Heat combo: ${heatStreak} rapid clicks — x${heat} click power`}
             aria-label={`Heat combo x${heat}`}
           >
+            <Fire size={14} weight="fill" className="text-amber-400" />
             x{heat}
           </span>
         )}
         {feedOffline && (
           <button
             type="button"
-            className={`${BTN} ${BTN_SMALL}`}
+            className={`${BTN} ${BTN_SMALL} inline-flex items-center gap-1`}
             disabled={fetching}
             aria-label="Retry the feed"
             onClick={() => void fetchFeed()}
             title="Retry the feed"
           >
+            <ArrowClockwise size={12} weight="bold" className={fetching ? 'animate-spin' : ''} />
             {fetching ? 'Retrying…' : 'Retry'}
           </button>
         )}
         <span
-          className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border-glass bg-retro-bg px-2 py-0.5 text-xs font-bold text-retro-fg [&_svg]:text-retro-accent`}
+          className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-white/10 bg-[#131722]/80 px-2.5 py-1 text-xs font-bold text-white/70 shadow-sm`}
           title="Lifetime KOs — each foe hits harder"
         >
+          <Skull size={13} weight="bold" className="text-rose-400" />
           KOs: {formatNum(defeated)}
         </span>
       </div>
 
       {/* Thumb-sized compact bottom dock with [1] [2] [3] [4] keyboard triggers */}
       <div
-        className="flex flex-none items-center gap-1.5 overflow-x-auto rounded-xl border border-border-glass bg-surface-elevated/70 p-1 backdrop-blur-md styled-scrollbar"
+        className="flex flex-none items-center gap-2 overflow-x-auto rounded-xl border border-white/10 bg-[#131722]/90 p-1.5 backdrop-blur-md styled-scrollbar"
         role="group"
         aria-label="Powerups dock"
       >
@@ -726,31 +745,31 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             <button
               key={id}
               type="button"
-              className={`flex flex-1 min-w-[120px] cursor-pointer items-center gap-1.5 rounded-lg border px-2 py-1 text-left text-retro-fg transition-all duration-150 enabled:hover:border-retro-accent enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${isLive
-                ? 'border-[#ff2d78] bg-[#ff2d78]/15 shadow-[0_0_8px_rgba(255,45,120,0.25)]'
-                : 'border-border-glass bg-surface-raised hover:bg-surface-interactive'
+              className={`group relative flex flex-1 min-w-[125px] cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-all duration-150 enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${isLive
+                ? 'border-rose-500/50 bg-rose-500/10 shadow-[0_0_12px_rgba(244,63,94,0.15)] hover:border-rose-500/70 hover:bg-rose-500/15'
+                : 'border-white/5 bg-[#0b0e14]/60 hover:border-white/15 hover:bg-white/5'
                 }`}
               disabled={points < def.cost}
               onClick={() => popCap(id)}
               title={`${def.name} — ${capEffectLabel(id)} — ${formatNum(def.cost)} pts — Press [${idx + 1}]`}
             >
-              <kbd className={`${MONO} inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border border-white/20 bg-black/60 text-[10px] font-bold text-retro-muted`}>
+              <kbd className={`${MONO} inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-white/15 bg-black/60 text-[10px] font-bold text-white/60 group-hover:text-white transition-colors`}>
                 {idx + 1}
               </kbd>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-1">
-                  <span className={`${DISPLAY} truncate text-xs font-bold leading-tight`}>
+                  <span className={`${DISPLAY} truncate text-xs font-bold leading-tight text-white group-hover:text-retro-accent transition-colors`}>
                     {def.name}
                   </span>
                   {st.count > 0 && (
-                    <span className={`${MONO} text-[10px] font-black text-[#ff2d78]`}>
+                    <span className={`${MONO} text-[10px] font-black text-rose-400`}>
                       x{st.count}
                     </span>
                   )}
                 </div>
-                <div className="flex items-center justify-between gap-1 text-[10px] text-retro-muted leading-tight">
+                <div className="flex items-center justify-between gap-1 text-[10px] text-white/50 leading-tight">
                   <span className="truncate">{capEffectLabel(id)}</span>
-                  <span className={`${MONO} shrink-0 font-semibold`}>{formatNum(def.cost)}</span>
+                  <span className={`${MONO} shrink-0 font-semibold text-white/70`}>{formatNum(def.cost)}</span>
                 </div>
               </div>
             </button>

@@ -3,8 +3,15 @@
 import { useState } from 'react'
 import { useGame } from '../../game/store'
 import { isCustomMediaUrl } from '../../services/customSources'
-import { BTN, BTN_SMALL, MUTED } from '../../ui/styles'
-import { IconX } from '../../ui/icons'
+import { BTN, BTN_SMALL, MONO, MUTED } from '../../ui/styles'
+import {
+  FolderSimple,
+  Globe,
+  LinkSimple,
+  Plus,
+  Trash,
+  X,
+} from '@phosphor-icons/react'
 
 /**
  * Player-owned idle feed sources: pasted direct media URLs and/or
@@ -54,68 +61,84 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-label="Custom image sources">
-      <div className="w-full max-w-lg overflow-hidden rounded-xl border border-border-glass bg-surface-canvas shadow-2xl">
-        <div className="flex items-center justify-between gap-2 border-b border-border-glass p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-label="Custom image sources">
+      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-[#0b0e14] shadow-[0_0_50px_rgba(0,0,0,0.8)]">
+        <div className="flex items-center justify-between gap-3 border-b border-white/10 p-4 bg-[#131722]/50">
           <div>
-            <h2 className="text-sm font-bold text-retro-fg">Custom image sources</h2>
-            <p className={MUTED}>Tried before the built-in feeds. Used as-is — only add sources you trust.</p>
+            <h2 className="text-sm font-bold text-white tracking-wide">Custom image sources</h2>
+            <p className="text-[11px] text-white/50 mt-0.5">Tried before built-in feeds. Used as-is — only add trusted sources.</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="glass-button rounded-lg p-1.5 cursor-pointer">
-            <IconX size={14} />
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/50 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer"
+          >
+            <X size={14} weight="bold" />
           </button>
         </div>
 
         <div className="max-h-[60vh] space-y-3 overflow-y-auto p-4 styled-scrollbar">
           {sources.length === 0 && (
-            <p className={MUTED}>No custom sources yet — paste links or add a folder below.</p>
+            <p className="text-xs text-white/40 italic py-2">No custom sources yet — paste links or add a folder below.</p>
           )}
           {sources.map((s) => (
-            <div key={s.id} className="flex items-center gap-2.5 rounded-xl border border-border-glass bg-surface-raised px-3 py-2">
+            <div key={s.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-[#131722]/80 px-3.5 py-2.5">
               <button
                 type="button"
                 role="switch"
                 aria-checked={s.enabled}
                 aria-label={`${s.enabled ? 'Disable' : 'Enable'} ${s.label}`}
                 onClick={() => toggleCustomSource(s.id)}
-                className="relative flex h-4 w-9 shrink-0 cursor-pointer items-center border-0 p-0"
+                className="relative flex h-5 w-9 shrink-0 cursor-pointer items-center border-0 p-0 rounded-full transition-colors"
               >
                 <span
                   aria-hidden="true"
-                  className={`absolute inset-x-0 h-1 rounded-full transition-colors ${s.enabled ? 'bg-retro-accent/50' : 'bg-surface-interactive'}`}
+                  className={`absolute inset-0 rounded-full transition-colors ${s.enabled ? 'bg-emerald-500/40' : 'bg-white/10'}`}
                 />
                 <span
                   aria-hidden="true"
-                  className={`absolute left-0 h-3 w-3 rounded-full shadow transition-transform ${s.enabled ? 'translate-x-6 bg-retro-accent' : 'translate-x-0 bg-retro-muted'}`}
+                  className={`absolute left-0.5 h-4 w-4 rounded-full shadow-md transition-transform duration-200 ${s.enabled ? 'translate-x-4 bg-emerald-400' : 'translate-x-0 bg-white/40'}`}
                 />
               </button>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-xs font-bold text-retro-fg">{s.label}</div>
-                <div className={`${MUTED} truncate`}>
-                  {s.kind === 'folder'
-                    ? `Folder · ${s.folderPath ?? 'unlinked'}`
-                    : `${s.urls.length} link${s.urls.length === 1 ? '' : 's'}`}
+                <div className="truncate text-xs font-bold text-white">{s.label}</div>
+                <div className="truncate text-[11px] text-white/40 flex items-center gap-1 mt-0.5">
+                  {s.kind === 'folder' ? (
+                    <>
+                      <FolderSimple size={12} weight="bold" className="text-retro-accent" />
+                      <span>Folder · {s.folderPath ?? 'unlinked'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <LinkSimple size={12} weight="bold" className="text-retro-accent" />
+                      <span>{s.urls.length} link{s.urls.length === 1 ? '' : 's'}</span>
+                    </>
+                  )}
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => removeCustomSource(s.id)}
                 aria-label={`Remove ${s.label}`}
-                className="shrink-0 rounded-lg p-1.5 text-retro-muted hover:text-rose-400 transition-colors cursor-pointer"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-transparent text-white/40 hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/10 transition-all cursor-pointer"
               >
-                <IconX size={13} />
+                <Trash size={14} weight="bold" />
               </button>
             </div>
           ))}
 
-          <div className="space-y-2 rounded-xl border border-border-glass bg-surface-raised p-3">
-            <div className="text-xs font-bold text-retro-fg">Add links</div>
+          <div className="space-y-2.5 rounded-xl border border-white/10 bg-[#131722]/80 p-3.5">
+            <div className="text-xs font-bold text-white flex items-center gap-1.5">
+              <Globe size={13} weight="bold" className="text-retro-accent" />
+              Add direct media links
+            </div>
             <input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="Label (e.g. My collection)"
               aria-label="Source label"
-              className="w-full rounded-lg border border-border-glass bg-retro-bg px-2.5 py-1.5 text-xs text-retro-fg outline-none placeholder:text-retro-muted focus:border-retro-accent"
+              className="w-full rounded-lg border border-white/10 bg-[#0b0e14] px-3 py-2 text-xs text-white outline-none placeholder:text-white/30 focus:border-retro-accent/60 transition-colors"
             />
             <textarea
               value={urlsText}
@@ -123,27 +146,46 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
               placeholder={'Paste direct image/video links, one per line\nhttps://…/a.jpg\nhttps://…/b.mp4'}
               aria-label="Media links"
               rows={3}
-              className="w-full rounded-lg border border-border-glass bg-retro-bg px-2.5 py-1.5 text-xs text-retro-fg outline-none placeholder:text-retro-muted focus:border-retro-accent"
+              className="w-full rounded-lg border border-white/10 bg-[#0b0e14] px-3 py-2 text-xs text-white outline-none placeholder:text-white/30 focus:border-retro-accent/60 transition-colors"
             />
-            <div className="flex items-center justify-between gap-2">
-              <span className={MUTED}>{usable.length} of {pasted.length} usable</span>
-              <button type="button" onClick={submitUrls} disabled={usable.length === 0} className={`${BTN} ${BTN_SMALL} disabled:opacity-40`}>
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <span className={`${MONO} text-[11px] text-white/40`}>{usable.length} of {pasted.length} usable</span>
+              <button
+                type="button"
+                onClick={submitUrls}
+                disabled={usable.length === 0}
+                className={`${BTN} ${BTN_SMALL} inline-flex items-center gap-1 disabled:opacity-40`}
+              >
+                <Plus size={12} weight="bold" />
                 Add links
               </button>
             </div>
           </div>
 
-          <div className="space-y-2 rounded-xl border border-border-glass bg-surface-raised p-3">
-            <div className="text-xs font-bold text-retro-fg">Add a local folder</div>
+          <div className="space-y-2.5 rounded-xl border border-white/10 bg-[#131722]/80 p-3.5">
+            <div className="text-xs font-bold text-white flex items-center gap-1.5">
+              <FolderSimple size={13} weight="bold" className="text-retro-accent" />
+              Add a local folder
+            </div>
             {!canPickFolder && (
-              <p className={MUTED}>Folder sources need the desktop app — links work everywhere.</p>
+              <p className="text-[11px] text-white/40">Folder sources need the desktop app — links work everywhere.</p>
             )}
-            <button type="button" onClick={() => void pickFolder()} disabled={!canPickFolder || picking} className={`${BTN} ${BTN_SMALL} disabled:opacity-40`}>
+            <button
+              type="button"
+              onClick={() => void pickFolder()}
+              disabled={!canPickFolder || picking}
+              className={`${BTN} ${BTN_SMALL} inline-flex items-center gap-1.5 disabled:opacity-40`}
+            >
+              <FolderSimple size={13} weight="bold" />
               {picking ? 'Picking…' : 'Choose folder…'}
             </button>
           </div>
 
-          {notice && <p className="text-xs text-retro-body">{notice}</p>}
+          {notice && (
+            <p className="rounded-lg border border-retro-accent/30 bg-retro-accent/10 px-3 py-2 text-xs text-retro-fg">
+              {notice}
+            </p>
+          )}
         </div>
       </div>
     </div>

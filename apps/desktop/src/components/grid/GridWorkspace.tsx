@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Maximize2, Minimize2, ImagePlus, Images } from 'lucide-react'
+import {
+  ArrowsIn,
+  ArrowsOut,
+  FolderOpen,
+  Images,
+  SidebarSimple,
+  X,
+} from '@phosphor-icons/react'
 import GoonPanel from '../../ui/GoonPanel'
 import ShopPanel from '../../ui/ShopPanel'
 import StatsPanel from '../../ui/StatsPanel'
@@ -12,7 +19,6 @@ import { PanelResizer } from '../../ui/PanelResizer'
 import IdleGalleryView from './IdleGalleryView'
 import { playPress } from '../../utils/sounds'
 import '../../ui/grid-animations.css'
-import { X } from 'lucide-react'
 
 const RIGHT_KEY = 'idle.right.collapsed.v1'
 
@@ -111,9 +117,10 @@ export default function GridWorkspace({
                   onClick={() => { playPress(750); setGalleryOpen(true); }}
                   title="Keepsakes Gallery (drained foes)"
                   aria-label="Keepsakes Gallery"
-                  className="p-1.5 rounded-lg border border-border-glass bg-surface-raised text-retro-muted hover:text-retro-fg hover:bg-surface-interactive transition-colors cursor-pointer"
+                  className="h-7 px-2 rounded-md border border-white/10 bg-[#131722]/80 text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
                 >
-                  <Images className="w-3.5 h-3.5" />
+                  <Images size={14} weight="bold" className="text-retro-accent" />
+                  <span className="hidden sm:inline">Gallery</span>
                 </button>
                 {onOpenSources && (
                   <button
@@ -121,9 +128,10 @@ export default function GridWorkspace({
                     onClick={() => { playPress(700); onOpenSources(); }}
                     title="Custom image sources — add your own URLs or folders"
                     aria-label="Custom image sources"
-                    className="p-1.5 rounded-lg border border-border-glass bg-surface-raised text-retro-muted hover:text-retro-fg hover:bg-surface-interactive transition-colors cursor-pointer"
+                    className="h-7 px-2 rounded-md border border-white/10 bg-[#131722]/80 text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
                   >
-                    <ImagePlus className="w-3.5 h-3.5" />
+                    <FolderOpen size={14} weight="bold" />
+                    <span className="hidden sm:inline">Sources</span>
                   </button>
                 )}
                 {onToggleFullscreen && (
@@ -133,12 +141,12 @@ export default function GridWorkspace({
                     title={idleFullscreen ? 'Exit fullscreen' : 'Play fullscreen'}
                     aria-label={idleFullscreen ? 'Exit fullscreen' : 'Play fullscreen'}
                     aria-pressed={idleFullscreen}
-                    className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${idleFullscreen
-                      ? 'border-retro-accent bg-glass-w20 text-retro-accent'
-                      : 'border-border-glass bg-surface-raised text-retro-muted hover:text-retro-fg hover:bg-surface-interactive'
+                    className={`h-7 w-7 rounded-md border transition-all cursor-pointer flex items-center justify-center ${idleFullscreen
+                      ? 'border-retro-accent/60 bg-retro-accent/20 text-retro-accent'
+                      : 'border-white/10 bg-[#131722]/80 text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20'
                       }`}
                   >
-                    {idleFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                    {idleFullscreen ? <ArrowsIn size={14} weight="bold" /> : <ArrowsOut size={14} weight="bold" />}
                   </button>
                 )}
                 <button
@@ -147,12 +155,12 @@ export default function GridWorkspace({
                   title={collapsed ? 'Show tags & shop' : 'Maximize game stage (hide side column)'}
                   aria-label={collapsed ? 'Show tags & shop' : 'Maximize game stage'}
                   aria-pressed={collapsed}
-                  className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${collapsed
-                    ? 'border-retro-accent/60 bg-retro-accent/15 text-retro-fg'
-                    : 'border-border-glass bg-surface-raised text-retro-muted hover:text-retro-fg hover:bg-surface-interactive'
+                  className={`h-7 w-7 rounded-md border transition-all cursor-pointer flex items-center justify-center ${collapsed
+                    ? 'border-retro-accent/60 bg-retro-accent/20 text-retro-accent'
+                    : 'border-white/10 bg-[#131722]/80 text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20'
                     }`}
                 >
-                  {collapsed ? <Maximize2 className="w-3.5 h-3.5" strokeWidth={1.75} /> : <Minimize2 className="w-3.5 h-3.5" strokeWidth={1.75} />}
+                  <SidebarSimple size={14} weight={collapsed ? 'fill' : 'bold'} />
                 </button>
               </div>
             }
@@ -183,33 +191,38 @@ export default function GridWorkspace({
       {/* Keepsakes Gallery Modal */}
       {galleryOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-6 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-6 backdrop-blur-md"
           role="dialog"
           aria-modal="true"
           aria-label="Keepsakes Gallery"
           onClick={() => setGalleryOpen(false)}
         >
           <div
-            className="glass-card relative flex h-full max-h-[90dvh] w-full max-w-4xl flex-col rounded-xl border border-border-glass bg-surface-canvas p-4 shadow-2xl overflow-hidden"
+            className="relative flex h-full max-h-[90dvh] w-full max-w-4xl flex-col rounded-2xl border border-white/10 bg-[#0b0e14] p-5 shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-              <div className="flex items-center gap-2">
-                <Images className="w-4 h-4 text-retro-accent" />
-                <h3 className="text-sm font-bold text-retro-fg uppercase tracking-wider">
-                  Drained Foes Gallery
-                </h3>
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-retro-accent/15 text-retro-accent border border-retro-accent/30">
+                  <Images size={16} weight="bold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white tracking-wide uppercase">
+                    Drained Foes Gallery
+                  </h3>
+                  <p className="text-[11px] text-white/40">Collected keepsake archive & cards</p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setGalleryOpen(false)}
-                className="p-1 rounded-md text-retro-muted hover:text-retro-fg hover:bg-surface-interactive cursor-pointer"
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/50 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer"
                 aria-label="Close gallery"
               >
-                <X className="w-3.5 h-3.5" />
+                <X size={14} weight="bold" />
               </button>
             </div>
-            <div className="flex-1 min-h-0 overflow-y-auto pt-2">
+            <div className="flex-1 min-h-0 overflow-y-auto pt-3 styled-scrollbar">
               <IdleGalleryView />
             </div>
           </div>

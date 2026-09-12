@@ -18,46 +18,46 @@ export const MUTED = 'text-xs text-retro-muted'
 /** Display face for headings/labels — the shell's sans (Outfit). */
 export const DISPLAY = 'font-sans'
 
-/** Panel surface (was .plate / .glass) — the shell's raised panel token. */
+/** Panel surface — sleek Cyber-Slate card with hairline specular border. */
 export const PLATE =
-  'rounded-lg border border-border-glass bg-retro-panel shadow-[0_12px_28px_rgba(0,0,0,0.5)]'
+  'rounded-2xl border border-white/[0.06] bg-[#131722]/85 shadow-2xl backdrop-blur-md'
 
-/** Scrollable panel body (was .panel). */
-export const PANEL = 'min-h-0 overflow-y-auto p-[18px]'
+/** Scrollable panel body. */
+export const PANEL = 'min-h-0 overflow-y-auto p-3.5 sm:p-4'
 
-/** Shell glass button (was the machined .btn recipe). */
+/** Modern tactile button with micro-border and subtle hover elevation. */
 export const BTN =
-  'glass-button cursor-pointer rounded-xl px-4 py-2.5 text-[13px] font-semibold tracking-[0.5px] disabled:cursor-not-allowed disabled:opacity-40'
+  'cursor-pointer rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] hover:border-white/20 active:scale-[0.98] px-3.5 py-2 text-xs font-semibold text-retro-fg transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white/[0.04] disabled:active:scale-100'
 
-export const BTN_SMALL = 'rounded-lg px-3 py-1.5 text-xs'
+export const BTN_SMALL = 'rounded-lg px-2.5 py-1 text-xs'
 
-/** Primary action — the shell's animated chrome-spark accent control. */
-export const BTN_PRIMARY = 'accent-control'
+/** Primary action — cyber electric blue accent button. */
+export const BTN_PRIMARY = 'bg-retro-accent text-retro-accent-text hover:brightness-110 border-retro-accent/40 shadow-[0_0_12px_rgba(56,139,253,0.25)]'
 
-/** Destructive prestige action — shell error token on the glass button. */
+/** Destructive prestige action — cyber warning tone. */
 export const BTN_DANGER =
-  'bg-retro-error/20 font-bold tracking-[1px] text-retro-error enabled:hover:bg-retro-error/30'
+  'bg-rose-500/15 border-rose-500/30 text-rose-300 hover:bg-rose-500/25 font-bold tracking-wider'
 
-/** Bundled gif skin behind an inline backgroundImage (was .has-skin). */
+/** Bundled skin behind an inline backgroundImage. */
 export const SKIN =
   'bg-cover bg-center bg-no-repeat [text-shadow:0_1px_3px_#000]'
 
-/** Feed stage frame: black well with a glass border (was .image-stage/.grid-board). */
+/** Feed stage frame: deep obsidian well with hairline specular border. */
 export const STAGE_FRAME =
-  'overflow-hidden rounded-xl border border-border-glass bg-black shadow-[0_8px_22px_rgba(0,0,0,0.55)] select-none'
+  'overflow-hidden rounded-2xl border border-white/[0.08] bg-[#07090e] shadow-[0_16px_36px_rgba(0,0,0,0.6)] select-none'
 
-/** HP bar track + fill (was .hp-bar / .hp-fill). Pink fill is game semantics. */
+/** HP bar track + fill. Modern precision gauge. */
 export const HP_BAR =
-  'h-3 overflow-hidden rounded-full border border-white/10 bg-black shadow-[inset_0_2px_4px_rgba(0,0,0,0.8)]'
+  'h-1.5 overflow-hidden rounded-full border border-white/10 bg-black/80 shadow-inner'
 export const HP_FILL =
-  'h-full rounded-full bg-[#ff2d78] shadow-[inset_0_2px_0_rgba(255,255,255,0.35)] transition-[width] duration-[120ms] ease-linear'
+  'h-full rounded-full bg-gradient-to-r from-pink-500 to-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)] transition-[width] duration-[120ms] ease-linear'
 export const HP_FILL_LOW =
-  'bg-[#ffb02e] animate-[gg-hp-low_0.7s_ease-in-out_infinite]'
+  'from-amber-500 to-orange-500 shadow-[0_0_8px_rgba(245,158,11,0.5)] animate-[gg-hp-low_0.7s_ease-in-out_infinite]'
 
-/** Floating +GP popup (was .float-gc). Green/gold gain colors are game semantics. */
+/** Floating +GP popup. Refined tabular figures with clean drop shadow. */
 export const FLOAT_GC =
-  'pointer-events-none absolute z-[2] animate-[gg-float-up_0.9s_ease-out_forwards] text-lg font-bold text-[#3fd68c] [text-shadow:0_2px_4px_rgba(0,0,0,0.8)] [transform:translate(-50%,-50%)]'
-export const FLOAT_GC_CRIT = 'text-[28px] text-[#ffd75e]'
+  'pointer-events-none absolute z-[10] animate-[gg-float-up_0.9s_ease-out_forwards] text-sm font-bold text-emerald-400 font-mono drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] [transform:translate(-50%,-50%)]'
+export const FLOAT_GC_CRIT = 'text-xl text-amber-300 font-black drop-shadow-[0_0_8px_rgba(252,211,77,0.6)]'
 
 /** Full-bleed feed image (was .goon-image). */
 export const GOON_IMAGE = 'block h-full w-full object-contain'
