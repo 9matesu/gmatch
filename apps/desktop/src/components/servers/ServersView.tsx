@@ -69,6 +69,11 @@ const DIRECTORY_ID_KEY = 'gmatch.server.directoryId'
 // blocks a second Create (one server per install — use Rename instead).
 const REG_KEY = 'gmatch.server.register'
 
+/** The host's local display name, best-effort (private mode returns ''). */
+function localDisplayName(): string {
+  try { return (localStorage.getItem('orbit_display_name') || '').trim().slice(0, 40) } catch { return '' }
+}
+
 function formatRelativeTime(iso?: string | null): string {
   if (!iso) return 'recently'
   const ms = Date.now() - new Date(iso).getTime()
@@ -260,7 +265,7 @@ export function ServersView({
       const res = await orbitFetch(`${central}/api/servers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: n, description: d, endpoint_hint: h, password_required: pwRequired }),
+        body: JSON.stringify({ name: n, description: d, endpoint_hint: h, password_required: pwRequired, owner_name: localDisplayName() || undefined }),
       }, identity)
       if (res.ok) {
         const created = (await res.json().catch(() => ({}))) as { server?: DirectoryServer }
