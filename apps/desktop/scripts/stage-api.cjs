@@ -101,12 +101,25 @@ for (const junk of ['orbit.snapshot.sqlite', 'orbit.snapshot.sqlite.tmp', 'blobs
 }
 
 console.log('[stage-api] installing production deps (this can take a minute)...')
-execFileSync('npm', ['install', '--omit=dev', '--no-audit', '--no-fund', '--ignore-scripts=false', '--no-package-lock'], {
-  cwd: join(STAGE, 'apps', 'api'),
-  stdio: 'inherit',
-  shell: true, // npm is a .cmd shim on Windows
-  env: { ...process.env, NODE_ENV: 'development' },
-})
+// npm <=10 (CI windows runners) walks up from the cwd, finds the monorepo
+// ROOT package-lock.json and crashes reconciling the rewritten file: deps
+// against it ("Cannot read properties of null (reading 'edgesOut')").
+// --no-package-lock only stops writing. Hide the root lock for the install.
+const { renameSync } = require('node:fs')
+const rootLock = join(ROOT, 'package-lock.json')
+const lockBak = rootLock + '.stage-bak'
+let lockHidden = false
+try {
+  if (existsSync(rootLock)) { renameSync(rootLock, lockBak); lockHidden = true }
+  execFileSync('npm', ['install', '--omit=dev', '--no-audit', '--no-fund', '--ignore-scripts=false', '--no-package-lock'], {
+    cwd: join(STAGE, 'apps', 'api'),
+    stdio: 'inherit',
+    shell: true, // npm is a .cmd shim on Windows
+    env: { ...process.env, NODE_ENV: 'development' },
+  })
+} finally {
+  if (lockHidden) { try { renameSync(lockBak, rootLock) } catch { /* restore manually */ } }
+}
 
 // packages/shared/src/index.ts imports ../../../shared/blocklist.json, which
 // only resolves when @orbit/shared stays a symlink (dev, smoke). npm's file:
