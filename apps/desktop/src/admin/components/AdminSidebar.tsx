@@ -99,7 +99,7 @@ export function AdminSidebar({
                     {tab.badge && (
                       <span className={cn(
                         "text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold",
-                        active ? "bg-black/25 text-retro-accent" : "bg-glass-w8 text-retro-muted",
+                        active ? "bg-retro-selection text-retro-accent" : "bg-glass-w8 text-retro-muted",
                         tab.id === "reports" && tab.badge && Number(tab.badge) > 0 && "bg-red-500 text-white"
                       )}>
                         {tab.badge}

@@ -54,7 +54,7 @@ import { legalDocFromHash, isLegalDocId, type LegalDocId } from "./utils/legal-r
 import { saveUserProfile, deriveProfileTags } from "./utils/profile";
 import { GamesView } from "./components/views/GamesView";
 import { getStoredActiveDeckId, type Deck } from "./components/games/DeckBuilder";
-import { type MainViewType, type ActiveHackSession } from "./components/home/HomeFooter";
+import { type MainViewType, type ActiveHackSession } from "./components/home/CommandIsland";
 import { CommandIsland } from "./components/home/CommandIsland";
 import { NativeHeaderBar } from "./components/home/NativeHeaderBar";
 import { RoomsView } from "./components/rooms/RoomsView";

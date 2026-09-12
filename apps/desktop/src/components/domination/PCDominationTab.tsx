@@ -26,7 +26,7 @@ import type { User } from '@orbit/shared';
 import { isDefaultPeerName } from '@orbit/shared';
 import { ActionModal } from './ActionModal';
 import { HacksPanel } from './HacksPanel';
-import type { ActiveHackSession } from '../home/HomeFooter';
+import type { ActiveHackSession } from '../home/CommandIsland';
 
 type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 

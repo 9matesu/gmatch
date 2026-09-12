@@ -5,7 +5,7 @@ import { Flame, ShieldAlert, ArrowLeft, Clock, MessageSquare, Image as ImageIcon
 import { playPress, playMatchFound } from '../../utils/sounds';
 import { orbitFetch } from '../../utils/api';
 import type { OrbitIdentity } from '@orbit/crypto';
-import type { ActiveHackSession } from '../home/HomeFooter';
+import type { ActiveHackSession } from '../home/CommandIsland';
 
 interface HackSpyViewProps {
   session: ActiveHackSession;

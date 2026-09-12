@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { STORE_ITEMS, type StoreItem, type User, formatGc, computeCashoutPayout, clampCashoutRateBps, DEFAULT_CASHOUT_RATE_BPS, RARITY_TIERS } from '@orbit/shared';
 import { orbitFetch } from '../utils/api';
 import type { OrbitIdentity } from '@orbit/crypto';
-import type { ActiveHackSession } from './home/HomeFooter';
+import type { ActiveHackSession } from './home/CommandIsland';
 import { playPress, playLike } from '../utils/sounds';
 import { TargetSelectorModal } from './hacks/TargetSelectorModal';
 import { ObjectImage } from './ObjectImage';

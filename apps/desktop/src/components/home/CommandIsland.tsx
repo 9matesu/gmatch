@@ -22,7 +22,18 @@ import {
   Bell,
 } from '@phosphor-icons/react';
 import { playPress } from '../../utils/sounds';
-import type { MainViewType } from './HomeFooter';
+export type MainViewType = 'feed' | 'games' | 'create' | 'messages' | 'profile' | 'game' | 'gallery' | 'store' | 'pc_domination' | 'grid' | 'rooms' | 'servers' | 'admin';
+
+export type GamesNavTab = 'duel' | 'cards' | 'babecock' | 'ranks' | 'idle';
+
+export interface ActiveHackSession {
+  itemId: string;
+  itemName: string;
+  targetUserId: string;
+  targetUserName: string;
+  expiresAt: number;
+}
+
 
 const SATELLITE_KEY = 'gmatch.satellite_bar.visible';
 
