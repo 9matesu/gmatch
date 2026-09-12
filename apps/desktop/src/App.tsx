@@ -2889,7 +2889,6 @@ export default function Home() {
               <NativeHeaderBar
                 wsConnected={isWsConnected}
                 activeRoomName={mainView.charAt(0).toUpperCase() + mainView.slice(1)}
-                onOpenSettings={() => { setChatOpen(false); setShowSettingsModal(true); }}
               />
               <div className="flex-1 min-w-0 min-h-0 flex flex-row overflow-hidden relative">
                 <div ref={mainScrollRef} className="mobile-app-scroll flex-1 min-w-0 min-h-0 w-full flex flex-col relative z-10 overflow-y-auto styled-scrollbar pb-24">
