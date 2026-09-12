@@ -26,8 +26,12 @@ export function GamesHub({
   /** Open the custom image-sources manager (idle clicker). */
   onOpenSources?: () => void;
 }) {
-  // GamesView keys a remount per sub-tab; no local tab state needed.
-  const subTab: GamesTab = initialSubTab;
+  const [subTab, setSubTab] = useState<GamesTab>(initialSubTab);
+
+  // Sync with initialSubTab if parent re-keys or changes it
+  useEffect(() => {
+    setSubTab(initialSubTab);
+  }, [initialSubTab]);
 
   // Idle Clicker fullscreen: Fullscreen API on the workspace box, with an
   // in-app expanded fallback (some hosts deny the request).
@@ -53,7 +57,36 @@ export function GamesHub({
 
   return (
     <div className={`w-full flex flex-col font-sans select-none ${subTab === 'idle' ? 'pb-0 flex-1 min-h-0 h-full max-w-none mx-0' : 'pb-24 max-w-6xl mx-auto'} text-retro-fg animate-orbit-fade-in`}>
-      {/* Tab bar removed — every game is reachable from the sidebar. */}
+      {/* Sleek Arena Mode Pills */}
+      {subTab !== 'idle' && (
+        <div className="flex items-center justify-between gap-2 px-3 sm:px-4 pt-3 pb-1">
+          <div className="flex items-center gap-1 p-1 rounded-full bg-[#131722] border border-white/10" role="tablist" aria-label="Arena Modes">
+            {[
+              { id: 'duel' as const, label: '1v1 Arena' },
+              { id: 'ranks' as const, label: 'Rankings' },
+              { id: 'babecock' as const, label: 'Babecock' },
+            ].map((mode) => (
+              <button
+                key={mode.id}
+                type="button"
+                onClick={() => {
+                  playPress(780);
+                  setSubTab(mode.id);
+                }}
+                aria-pressed={subTab === mode.id}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                  subTab === mode.id
+                    ? 'bg-[#388bfd] text-white shadow-[0_2px_8px_rgba(56,139,253,0.35)]'
+                    : 'text-retro-muted hover:text-white'
+                }`}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Content */}
       <div className={subTab === 'idle' ? 'p-1 sm:p-2 flex-1 min-h-0 h-full w-full flex flex-col overflow-hidden' : 'p-3 sm:p-4'}>
         {subTab === 'duel' && (
