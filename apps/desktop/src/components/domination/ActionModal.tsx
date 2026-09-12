@@ -88,7 +88,7 @@ export function ActionModal({
   const field = "w-full glass-field rounded-md p-2.5 text-xs outline-none placeholder:text-retro-muted";
 
   return (
-    <div className="fixed inset-0 z-[var(--z-toast)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 select-none font-sans" onClick={onClose}>
+    <div className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 select-none font-sans" onClick={onClose}>
       <div
         className="glass-surface rounded-xl max-w-lg w-full shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -111,7 +111,7 @@ export function ActionModal({
           </div>
           <button
             onClick={onClose}
-            className="text-retro-muted hover:text-retro-fg p-1.5 rounded-md hover:bg-surface-interactive/40 transition-colors cursor-pointer"
+            className="text-retro-muted hover:text-retro-fg p-1.5 rounded-md hover:bg-glass-w10 transition-colors cursor-pointer"
             aria-label="Close"
           >
             <X className="w-4 h-4" />

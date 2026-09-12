@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo , useRef} from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   Monitor,
   Shield,
@@ -83,6 +83,10 @@ const ACTION_LABELS: Record<string, {
 };
 
 const ACTION_ORDER = Object.keys(ACTION_LABELS);
+
+/** In-panel subtab ids: Send | My consent | History | Hacks. */
+export const DOMINATION_SUBTABS = ['send', 'consent', 'history', 'hacks'] as const;
+export type DominationSubtab = (typeof DOMINATION_SUBTABS)[number];
 
 export const INTENSITY_PRESETS: Record<string, Record<string, boolean>> = {
   mild: {
@@ -181,6 +185,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
   const [historyState, setHistoryState] = useState<LoadState>('idle');
   const [historyPane, setHistoryPane] = useState<'incoming' | 'outgoing'>('outgoing');
   const [actionModal, setActionModal] = useState<{ action: string; title: string } | null>(null);
+  const [subtab, setSubtab] = useState<DominationSubtab>('send');
 
   const receiving = Boolean(settings.pcDominationEnabled);
   const mutedUntil = settings.dominationInboundMutedUntil || 0;
@@ -378,15 +383,26 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
   // ── unauthenticated shell ─────────────────────────────────────────────
   if (!identity) {
     return (
-      <div className="w-full max-w-3xl mx-auto px-4 py-16 flex flex-col items-center text-center">
-        <div className="w-12 h-12 rounded-lg glass-inset flex items-center justify-center mb-4">
-          <Monitor className="w-6 h-6 text-retro-muted" />
+      <div className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-6 font-sans select-none">
+        <div className="glass-card overflow-hidden">
+          <div className="glass-header p-4 flex items-center gap-2">
+            <div className="glass-inset w-7 h-7 rounded-lg flex items-center justify-center text-retro-muted shrink-0">
+              <Monitor className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-xs font-bold text-retro-fg uppercase tracking-wider">
+                PC Domination
+              </h2>
+              <p className="text-[10px] text-retro-muted">Opt-in pranks between friends — every effect costs g$ and needs consent</p>
+            </div>
+          </div>
+          <div className="p-8 text-center max-w-md mx-auto space-y-2">
+            <p className="text-xs text-retro-muted leading-relaxed">
+              Log in to use Domination. Switch on <span className="text-retro-fg font-medium">Receive</span> to let opted-in
+              effects land on your screen, or send effects to players who have.
+            </p>
+          </div>
         </div>
-        <h2 className="text-base font-semibold tracking-tight">PC Domination</h2>
-        <p className="text-sm text-retro-muted mt-2 max-w-md leading-relaxed">
-          Log in to use Domination. Switch on <span className="text-retro-fg">Receive</span> to let opted-in
-          effects land on your screen, or send effects to players who have.
-        </p>
       </div>
     );
   }
@@ -397,23 +413,30 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
     return { text: `seen ${timeAgo(t.last_seen)}`, cls: 'text-amber-400/80 border-amber-500/20' };
   };
 
-  const dominationTopRef = useRef<HTMLDivElement>(null);
+  const SUBTAB_LABELS: Record<DominationSubtab, string> = {
+    send: 'Send',
+    consent: 'My consent',
+    history: 'History',
+    hacks: 'Hacks',
+  };
 
   return (
-    <div ref={dominationTopRef} className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-6 flex flex-col gap-5 font-sans select-none pb-24 lg:pb-16">
+    <div className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-6 font-sans select-none">
+      <div className="glass-card overflow-hidden">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight flex items-center gap-2">
-            <Monitor className="w-4 h-4 text-retro-muted" />
-            PC Domination
-          </h1>
-          <p className="text-sm text-retro-muted mt-1 max-w-xl leading-relaxed">
-            Playful screen pranks between friends who opted in. Every effect costs g$, needs the
-            target's consent, and shows up in their history. Nothing lands without a switch you control.
-          </p>
+      <div className="glass-header p-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="glass-inset w-7 h-7 rounded-lg flex items-center justify-center text-retro-muted shrink-0">
+            <Monitor className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-xs font-bold text-retro-fg uppercase tracking-wider">
+              PC Domination
+            </h2>
+            <p className="text-[10px] text-retro-muted truncate">Opt-in pranks between friends — every effect costs g$ and needs consent</p>
+          </div>
         </div>
-        <div className="flex items-center gap-2 rounded-xl glass-inset bg-retro-bg/80 px-3 py-2">
+        <div className="flex items-center gap-2 rounded-xl glass-panel px-3 py-2">
           <Radio className={`w-3.5 h-3.5 ${receiving && !paused ? 'text-emerald-400' : 'text-retro-muted'}`} />
           <div className="text-xs leading-tight">
             <div className="font-medium">{receiving ? (paused ? 'Receiving — paused' : 'Receiving effects') : 'Not receiving'}</div>
@@ -449,11 +472,35 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
         </div>
       </div>
 
+      {/* Subtabs Bar */}
+      <div className="px-4 py-2.5 border-b border-border-subtle flex items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center gap-1.5" role="tablist" aria-label="Domination categories">
+          {DOMINATION_SUBTABS.map((tab) => {
+            const isSel = subtab === tab;
+            return (
+              <button
+                key={tab}
+                role="tab"
+                aria-selected={isSel}
+                type="button"
+                onClick={() => setSubtab(tab)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize cursor-pointer transition-colors ${
+                  isSel ? 'glass-nav-active text-retro-fg shadow-sm' : 'glass-action text-retro-muted hover:text-retro-fg'
+                }`}
+              >
+                {SUBTAB_LABELS[tab]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="p-4 sm:p-5">
+      {subtab === 'send' && (
       <section aria-label="Send">
-        <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider mt-1">Send</h3>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
           {/* Target column */}
-          <div className="lg:col-span-2 rounded-xl glass-surface flex flex-col overflow-hidden">
+          <div className="lg:col-span-2 rounded-xl glass-panel flex flex-col overflow-hidden">
             <div className="px-4 py-3 border-b border-border-subtle flex items-center justify-between gap-2">
               <div className="text-xs font-medium flex items-center gap-1.5 text-retro-fg">
                 <Target className="w-3.5 h-3.5 text-retro-muted" /> Target
@@ -505,7 +552,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                   {!search && (
                     <button
                       type="button"
-                      onClick={() => document.getElementById('pc-dom-consent')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                      onClick={() => setSubtab('consent')}
                       className="glass-action glass-action-primary px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors"
                     >
                       Set up my consent
@@ -522,7 +569,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     type="button"
                     onClick={() => setSelectedTarget(t)}
                     className={`w-full flex items-center gap-3 px-4 py-2.5 text-left border-b border-border-subtle transition-colors cursor-pointer ${
-                      isSel ? 'glass-nav-active' : 'hover:bg-surface-interactive/60'
+                      isSel ? 'glass-nav-active' : 'hover:bg-glass-w10'
                     }`}
                   >
                     {t.pfpUrl ? (
@@ -551,7 +598,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
               </div>
             ) : (
               <>
-                <div className="flex items-center justify-between rounded-xl glass-inset bg-retro-bg/80 px-4 py-2.5">
+                <div className="flex items-center justify-between rounded-xl glass-panel px-4 py-2.5">
                   <div className="text-xs text-retro-fg">
                     Effects for <span className="font-semibold">{selectedTarget.displayName}</span>
                     {selectedTarget.enabled && !selectedTarget.online && (
@@ -578,12 +625,12 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                               : !allowed ? `They have "${label}" turned off in their consent`
                                 : undefined
                         }
-                        className={`rounded-xl border p-4 text-left transition-colors relative ${
+                        className={`rounded-xl border p-4 text-left transition-colors relative glass-action ${
                           sending === action
-                            ? 'border-retro-accent glass-inset bg-retro-bg/80 cursor-wait'
+                            ? 'border-retro-accent cursor-wait'
                             : sendable
-                              ? 'border-border-glass glass-inset bg-retro-bg/80 hover:border-retro-accent/60 cursor-pointer'
-                              : 'border-border-subtle glass-inset opacity-45 cursor-not-allowed'
+                              ? 'border-border-glass hover:border-retro-accent/60 cursor-pointer'
+                              : 'border-border-subtle opacity-45 cursor-not-allowed'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
@@ -612,11 +659,12 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
           </div>
         </div>
       </section>
+      )}
 
+      {subtab === 'consent' && (
       <section id="pc-dom-consent" aria-label="My consent">
-        <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider mt-1">My consent</h3>
-        <div className="space-y-5">
-          <div className="rounded-xl glass-surface p-4 space-y-3">
+        <div className="space-y-4">
+          <div className="rounded-xl glass-panel p-4 space-y-3">
             <div className="text-xs font-medium flex items-center gap-1.5 text-retro-fg">
               <Zap className="w-3.5 h-3.5 text-retro-muted" /> Preset
             </div>
@@ -642,7 +690,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
             </div>
           </div>
 
-          <div className="rounded-xl glass-surface overflow-hidden">
+          <div className="rounded-xl glass-panel overflow-hidden">
             <div className="px-4 py-3 border-b border-border-subtle flex items-center gap-1.5">
               <Shield className="w-3.5 h-3.5 text-retro-muted" />
               <span className="text-xs font-medium text-retro-fg">What others may send you</span>
@@ -652,7 +700,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
               {CONSENT_ROWS.map(({ key, label, desc }) => {
                 const value = Boolean((settings as any)[key]);
                 return (
-                  <label key={key} className="flex items-start gap-3 px-4 py-3 hover:bg-surface-interactive/20 cursor-pointer transition-colors">
+                  <label key={key} className="flex items-start gap-3 px-4 py-3 hover:bg-glass-w10 cursor-pointer transition-colors">
                       <button
                         type="button"
                         role="switch"
@@ -684,19 +732,20 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
           </div>
         </div>
       </section>
+      )}
 
+      {subtab === 'history' && (
       <section aria-label="History">
-        <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider mt-1">History</h3>
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1 glass-inset p-0.5 rounded-lg">
+            <div className="flex items-center gap-1.5" role="tablist" aria-label="History direction">
               {(['outgoing', 'incoming'] as const).map((pane) => (
                 <button
                   key={pane}
                   type="button"
                   onClick={() => setHistoryPane(pane)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium capitalize cursor-pointer transition-colors ${
-                    historyPane === pane ? 'glass-nav-active text-retro-fg' : 'text-retro-muted hover:text-retro-fg'
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize cursor-pointer transition-colors ${
+                    historyPane === pane ? 'glass-nav-active text-retro-fg' : 'glass-action text-retro-muted hover:text-retro-fg'
                   }`}
                 >
                   {pane === 'outgoing' ? 'Sent by you' : 'Received'}
@@ -792,9 +841,10 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
           )}
         </div>
       </section>
+      )}
 
+      {subtab === 'hacks' && (
       <section aria-label="Hacks">
-        <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider mt-1">Hacks</h3>
         <HacksPanel
           identity={identity}
           users={allUsers}
@@ -804,9 +854,13 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
           activeHack={activeHack}
           setActiveHack={setActiveHack}
           onOpenFlash={onOpenFlash}
-          onExitSpy={() => dominationTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          onExitSpy={() => setSubtab('send')}
         />
       </section>
+      )}
+
+      </div>
+      </div>
 
       {actionModal && (
         <ActionModal

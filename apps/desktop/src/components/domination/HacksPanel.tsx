@@ -41,7 +41,7 @@ export function HacksPanel({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {activeHack ? (
         <HackSpyView
           session={activeHack}
@@ -50,7 +50,7 @@ export function HacksPanel({
           onExpire={expireHack}
         />
       ) : (
-        <div className="glass-panel p-4 rounded-xl border border-border-glass bg-surface-raised/40">
+        <div className="glass-inset p-4 rounded-xl">
           <p className="text-xs text-retro-muted">
             No hack running. Buy one below to open a spy session on a player.
           </p>
@@ -58,7 +58,6 @@ export function HacksPanel({
       )}
 
       <div>
-        <h3 className="text-xs font-black uppercase tracking-wider text-retro-fg mb-3">Hacks</h3>
         <StoreTab
           arsenalOnly
           points={points}

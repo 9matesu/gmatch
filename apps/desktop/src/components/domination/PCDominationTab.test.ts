@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { INTENSITY_PRESETS } from './PCDominationTab'
+import { INTENSITY_PRESETS, DOMINATION_SUBTABS } from './PCDominationTab'
 
 describe('PCDominationTab constants', () => {
+  it('defines valid subtabs for category navigation', () => {
+    expect(DOMINATION_SUBTABS).toEqual(['send', 'consent', 'history', 'hacks'])
+  })
+
   it('defines valid intensity presets with expected consent keys', () => {
     expect(INTENSITY_PRESETS.mild).toBeDefined()
     expect(INTENSITY_PRESETS.medium).toBeDefined()
