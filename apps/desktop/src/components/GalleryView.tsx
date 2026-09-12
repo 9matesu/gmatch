@@ -11,7 +11,7 @@ import { SlideshowManager } from './slideshows/SlideshowManager';
 import IdleGalleryView from './grid/IdleGalleryView';
 import { useGame } from '@/game/store';
 import type { FeedPost } from './feed/GMatchFeed';
-import { Layers, Download, Trash2, CheckSquare, Search, Film, ImagePlus, ImageIcon, Tag } from 'lucide-react';
+import { Layers, Download, Trash2, CheckSquare, Search, Film, ImagePlus, Tag } from 'lucide-react';
 import { DND_KEEPSAKE } from './DropZone';
 
 export interface GalleryViewProps {
@@ -52,6 +52,8 @@ export interface GalleryViewProps {
   /** Right-click on a collection card → shared context menu. */
   onItemContextMenu?: (e: React.MouseEvent, item: OrbitObject) => void;
   onSetWallpaper?: (url: string) => void;
+  onRepostGalleryImage?: (media: { url: string; tags: string[]; name?: string }) => void;
+  onAddGalleryImageToStory?: (media: { url: string; tags: string[]; name?: string }) => void;
 }
 
 export function GalleryView({
@@ -69,7 +71,7 @@ export function GalleryView({
   setGalleryPage,
   selectedGalleryIds,
   setSelectedGalleryIds,
-  totalPages,
+  totalPages: _totalPages,
   paginatedItems,
   batchDownloading,
   handleDownloadAll,
@@ -91,6 +93,8 @@ export function GalleryView({
   onCreateCardFromMedia,
   onItemContextMenu,
   onSetWallpaper,
+  onRepostGalleryImage,
+  onAddGalleryImageToStory,
 }: GalleryViewProps) {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   useEffect(() => {
@@ -112,35 +116,40 @@ export function GalleryView({
     }
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20);
   }, [filteredItems]);
-  const toggleTag = (t: string) => setActiveTags(prev => {
-    const next = new Set(prev);
-    if (next.has(t)) next.delete(t); else next.add(t);
-    return next;
-  });
-  const shownItems = activeTags.size === 0
-    ? paginatedItems
-    : filteredItems.filter((item) => {
-        const tags = (item as { tags?: string[] }).tags;
-        return Array.isArray(tags) && [...activeTags].every((t) => tags.includes(t));
-      });
+  const toggleTag = (t: string) => {
+    setActiveTags(prev => {
+      const next = new Set(prev);
+      if (next.has(t)) next.delete(t); else next.add(t);
+      return next;
+    });
+    setGalleryPage(0);
+  };
+
+  const tagFilteredItems = useMemo(() => {
+    if (activeTags.size === 0) return filteredItems;
+    return filteredItems.filter((item) => {
+      const tags = (item as { tags?: string[] }).tags;
+      return Array.isArray(tags) && [...activeTags].every((t) => tags.includes(t));
+    });
+  }, [filteredItems, activeTags]);
+
+  const effectiveTotalPages = Math.max(1, Math.ceil(tagFilteredItems.length / 18));
+  const shownItems = useMemo(() => {
+    if (activeTags.size === 0) return paginatedItems;
+    return tagFilteredItems.slice(galleryPage * 18, (galleryPage + 1) * 18);
+  }, [activeTags.size, paginatedItems, tagFilteredItems, galleryPage]);
 
   return (
     <>
     <div id="gallery-section" className="space-y-4 font-sans select-none">
       {idleKeepsakes.length > 0 && (
         <div className="glass-card overflow-hidden">
-          <div className="glass-header p-4 flex items-center gap-2">
-            <div className="glass-inset w-7 h-7 rounded-lg flex items-center justify-center text-retro-muted">
-              <ImageIcon className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-xs font-bold text-retro-fg uppercase tracking-wider">
-                Gallery ({idleKeepsakes.length})
-              </h2>
-              <p className="text-[10px] text-retro-muted">Idle spoils from the Grid — view them, set a backdrop, or turn them into cards</p>
-            </div>
-          </div>
-          <IdleGalleryView onCreateCard={onCreateCardFromMedia} onSetWallpaper={onSetWallpaper} />
+          <IdleGalleryView
+            onCreateCard={onCreateCardFromMedia}
+            onSetWallpaper={onSetWallpaper}
+            onRepostImage={onRepostGalleryImage}
+            onAddToStory={onAddGalleryImageToStory}
+          />
         </div>
       )}
       <div className="glass-card overflow-hidden">
@@ -371,7 +380,7 @@ export function GalleryView({
                       onDoubleClick={() => setExpandedItemId(item.id)}
                       onSelect={(id) => {
                         if (dragAnchorId) {
-                          const ids = paginatedItems.map(i => i.id)
+                          const ids = shownItems.map(i => i.id)
                           const ai = ids.indexOf(dragAnchorId)
                           const bi = ids.indexOf(id)
                           if (ai > -1 && bi > -1) {
@@ -404,15 +413,26 @@ export function GalleryView({
                 <button
                   type="button"
                   onClick={() => {
-                    if (selectedGalleryIds.size === paginatedItems.length) setSelectedGalleryIds(new Set())
-                    else setSelectedGalleryIds(new Set(paginatedItems.map(i => i.id)))
+                    const pageIds = shownItems.map(i => i.id);
+                    const allSelected = pageIds.length > 0 && pageIds.every(id => selectedGalleryIds.has(id));
+                    setSelectedGalleryIds(prev => {
+                      const next = new Set(prev);
+                      if (allSelected) {
+                        pageIds.forEach(id => next.delete(id));
+                      } else {
+                        pageIds.forEach(id => next.add(id));
+                      }
+                      return next;
+                    });
                   }}
                   className="text-xs font-semibold text-retro-muted hover:text-retro-body cursor-pointer"
                 >
-                  {selectedGalleryIds.size === paginatedItems.length ? 'Deselect all on page' : 'Select all on page'}
+                  {shownItems.length > 0 && shownItems.every(i => selectedGalleryIds.has(i.id))
+                    ? 'Deselect all on page'
+                    : 'Select all on page'}
                 </button>
 
-                {totalPages > 1 && (
+                {effectiveTotalPages > 1 && (
                   <div className="flex items-center gap-2 text-xs">
                     <button
                       type="button"
@@ -426,13 +446,13 @@ export function GalleryView({
                       ← Prev
                     </button>
                     <span className="text-retro-muted font-mono text-xs">
-                      Page <strong className="text-retro-body">{galleryPage + 1}</strong> of {totalPages}
+                      Page <strong className="text-retro-body">{galleryPage + 1}</strong> of {effectiveTotalPages}
                     </span>
                     <button
                       type="button"
-                      disabled={galleryPage >= totalPages - 1}
+                      disabled={galleryPage >= effectiveTotalPages - 1}
                       onClick={() => {
-                        setGalleryPage(p => Math.min(totalPages - 1, p + 1))
+                        setGalleryPage(p => Math.min(effectiveTotalPages - 1, p + 1))
                         document.getElementById('gallery-section')?.scrollIntoView({ behavior: 'smooth' })
                       }}
                       className="glass-action px-3 py-1.5 text-xs font-semibold rounded-lg disabled:opacity-30 cursor-pointer"

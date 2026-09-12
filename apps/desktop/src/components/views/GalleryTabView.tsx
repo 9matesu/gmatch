@@ -49,6 +49,8 @@ export function GalleryTabView({
   onOpenOwnerProfile,
   myCards,
   onEnterArena,
+  onRepostGalleryImage,
+  onAddGalleryImageToStory,
 }: {
   filteredItems: OrbitObject[];
   itemsLoading: boolean;
@@ -87,6 +89,8 @@ export function GalleryTabView({
   onOpenOwnerProfile: (ownerId: string) => void;
   myCards: OrbitObject[];
   onEnterArena: () => void;
+  onRepostGalleryImage?: (media: { url: string; tags: string[]; name?: string }) => void;
+  onAddGalleryImageToStory?: (media: { url: string; tags: string[]; name?: string }) => void;
 }) {
   const [subTab, setSubTab] = useState<'cards' | 'deck'>('cards');
   const tab = (id: 'cards' | 'deck', label: string) => (
@@ -148,6 +152,8 @@ export function GalleryTabView({
           cardByMedia={cardByMedia}
           onOpenOwnerProfile={onOpenOwnerProfile}
           onOpenProfile={onOpenOwnerProfile}
+          onRepostGalleryImage={onRepostGalleryImage}
+          onAddGalleryImageToStory={onAddGalleryImageToStory}
         />
       ) : (
         <div className="bg-surface-raised border border-border-glass rounded-xl p-4">

@@ -2243,16 +2243,25 @@ export default function Home() {
     }
   }
 
-  // Gallery quick actions from the context menu: pull the object's bytes
-  // once, then reuse the existing story/post upload paths.
-  const shareObjectAs = useCallback(async (item: { id: string }, mode: 'story' | 'repost') => {
+  // Share media (either from an API object or direct URL) to story or feed.
+  const shareMediaAs = useCallback(async (media: { url: string; tags?: string[] }, mode: 'story' | 'repost') => {
     if (!identity) return
     try {
-      const res = await orbitFetch(`/api/objects/${item.id}`, {}, identity)
-      if (!res.ok) { toast('Could not load the image', 'error'); return }
-      const blob = await res.blob()
+      let blob: Blob
+      if (media.url.startsWith('data:')) {
+        blob = dataUrlToBlob(media.url)
+      } else {
+        const res = media.url.startsWith('/api/')
+          ? await orbitFetch(media.url, {}, identity)
+          : await fetch(media.url)
+        if (!res.ok) {
+          toast('Could not load the image', 'error')
+          return
+        }
+        blob = await res.blob()
+      }
       const mime = blob.type || 'image/jpeg'
-      const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg'
+      const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : mime.includes('gif') ? 'gif' : mime.includes('mp4') ? 'mp4' : 'jpg'
       if (mode === 'story') {
         await handleAddStory(new File([blob], `story_${Date.now()}.${ext}`, { type: mime }))
         toast('Added to your story', 'success')
@@ -2264,11 +2273,18 @@ export default function Home() {
         reader.onerror = () => reject(reader.error)
         reader.readAsDataURL(blob)
       })
-      await publishPost([dataUrl], '', [])
+      const ok = await publishPost([dataUrl], '', media.tags || [])
+      if (ok) toast('Reposted to feed', 'success')
     } catch {
       toast(mode === 'story' ? 'Story upload failed' : 'Repost failed', 'error')
     }
-  }, [identity, toast])
+  }, [identity, toast, publishPost, handleAddStory])
+
+  // Gallery quick actions from the context menu: pull the object's bytes
+  // once, then reuse the existing story/post upload paths.
+  const shareObjectAs = useCallback((item: { id: string }, mode: 'story' | 'repost') => {
+    return shareMediaAs({ url: `/api/objects/${item.id}`, tags: (item as any).tags }, mode)
+  }, [shareMediaAs])
 
   const fetchAnnouncements = useCallback(() => {
     if (!identity) return Promise.resolve()
@@ -3294,6 +3310,8 @@ export default function Home() {
                       onOpenOwnerProfile={openProfileById}
                       myCards={myCards as any}
                       onEnterArena={() => { setGamesSubTab('duel'); setMainView('games'); }}
+                      onRepostGalleryImage={(media) => void shareMediaAs(media, 'repost')}
+                      onAddGalleryImageToStory={(media) => void shareMediaAs(media, 'story')}
                     />
                   )}
 
