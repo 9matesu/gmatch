@@ -99,6 +99,8 @@ dark by design.
 | Friends cannot join | host mode + same LAN/VPN; Settings → Server shows the shareable addresses |
 | Switched server, nothing changed | Settings → Server → Restart now |
 | Locked out of admin console | Settings → Server (host mode) shows the passcode |
+| Friend node code rejected | the code is ONE line starting `gmatch://node/`; re-copy via Servers -> Share. Joining needs the same LAN (or a port-forwarded host) |
+| Server missing from the directory | host mode must be running (the heartbeat lists it while online); rows expire after 24h of silence |
 | Update says "sha256 mismatch" | network middlebox; retry, or grab the .exe from the releases link |
 
 ## Release checklist

@@ -67,7 +67,7 @@ function initSecureKV() {
   return available
 }
 
-// Packaged topology (1.0, no central server): either we HOST the bundled
+// Packaged topology: either we HOST the bundled
 // server (default) or we're a CLIENT of a friend's. Decided once at startup.
 let packagedServer = null // { mode, url } when app.isPackaged
 
@@ -940,8 +940,8 @@ app.whenReady().then(async () => {
     updateHandoff = true
     return updater.install()
   })
-  // 1.0 topology (no central server): packaged builds ALWAYS run the bundled
-  // server (host mode, default) unless the user configured client mode in
+  // Topology: packaged builds default to CLIENT mode on the central node
+  // (gmatch.fly.dev); host mode (the bundled server) is the opt-in in
   // Settings. Dev keeps the repo-local sidecar path unchanged.
   let sidecarRestartTried = false
   const onSidecarCrash = async (code) => {

@@ -52,7 +52,7 @@ async function startApi() {
       try { fs.writeFileSync(keyPath, storageKey) } catch (e) { console.warn('[api] could not persist storage key:', e.message) }
     }
   }
-  // Packaged (1.0, no-central-server plan): the app IS the server. Spawn the
+  // Host mode: the app IS the server. Spawn the
   // BUNDLED api-stage (bun.exe + self-contained server) so nothing needs to
   // be installed on the machine. Dev keeps the repo-local sidecar path.
   const resourcesApi = app.isPackaged

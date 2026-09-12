@@ -151,6 +151,14 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                 </p>
               </section>
               <section className="space-y-1.5">
+                <h3 className="text-xs font-medium text-retro-fg">Servers</h3>
+                <ul className="text-xs text-retro-muted space-y-1.5 list-disc list-inside leading-relaxed">
+                  <li><span className="text-retro-body font-medium">Host a world</span>: Settings, Server, switch to host. Your node lists itself on the directory while it runs; Servers tab, Share, copies your node code for friends.</li>
+                  <li><span className="text-retro-body font-medium">Join a friend</span>: Servers tab, Node code, paste what they sent. Passwords go through an in-app dialog.</li>
+                  <li><span className="text-retro-body font-medium">Reachability</span>: node codes carry a LAN address, so joining works on the same network unless the host port-forwards.</li>
+                </ul>
+              </section>
+              <section className="space-y-1.5">
                 <h3 className="text-xs font-medium text-retro-fg">P2P Transfers</h3>
                 <p className="text-xs text-retro-muted leading-relaxed">
                   Files are sent via WebRTC directly between browsers whenever possible. If a direct connection cannot be established, the relay server facilitates the transfer securely.

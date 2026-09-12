@@ -1,6 +1,6 @@
 "use client";
 
-// Server tab (1.0 no-central-server topology): show what this install is —
+// Server tab (client/host topology): show what this install is —
 // HOST (bundled server, shareable LAN addresses) or CLIENT (connected to a
 // friend's server) — and let the user switch. Dev builds see read-only info.
 import { useEffect, useState } from 'react'
