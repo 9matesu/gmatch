@@ -108,6 +108,14 @@ execFileSync('npm', ['install', '--omit=dev', '--no-audit', '--no-fund', '--igno
   env: { ...process.env, NODE_ENV: 'development' },
 })
 
+// packages/shared/src/index.ts imports ../../../shared/blocklist.json, which
+// only resolves when @orbit/shared stays a symlink (dev, smoke). npm's file:
+// install PHYSICALLY COPIES it into node_modules, so inside the packaged
+// bundle ../../../shared lands on node_modules/shared. Mirror it there.
+if (existsSync(join(STAGE, 'apps', 'api', 'node_modules', '@orbit', 'shared'))) {
+  cpSync(join(STAGE, 'shared'), join(STAGE, 'apps', 'api', 'node_modules', 'shared'), { recursive: true })
+}
+
 // Smoke check: the staged server's module graph must fully resolve. bun build
 // imports nothing at runtime — it only walks the dependency graph — so the
 // noble-drop regression ("Cannot find module '@noble/curves/ed25519'", which
