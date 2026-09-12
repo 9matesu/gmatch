@@ -314,7 +314,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
       if (parsed) {
         setData(parsed)
         setJsonText(JSON.stringify(parsed, null, 2))
-        toast?.(`Loaded ${file.name} successfully. Click "Save Changes" to apply.`, 'success')
+        toast?.(`Loaded ${file.name}. Click "Save Changes" to apply.`, 'success')
       } else {
         toast?.(`Invalid JSON format in ${file.name}.`, 'error')
       }

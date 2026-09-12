@@ -66,7 +66,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
         <div className="flex items-center justify-between gap-3 border-b border-border-glass p-4 bg-glass-w5">
           <div>
             <h2 className="text-sm font-bold text-white tracking-wide">Custom image sources</h2>
-            <p className="text-xs text-retro-muted mt-0.5">Tried before built-in feeds. Used as-is — only add trusted sources.</p>
+            <p className="text-xs text-retro-muted mt-0.5">Tried before built-in feeds. Used as-is. Only add trusted sources.</p>
           </div>
           <button
             type="button"
@@ -80,7 +80,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
 
         <div className="max-h-[60vh] space-y-3 overflow-y-auto p-4 styled-scrollbar">
           {sources.length === 0 && (
-            <p className="text-xs text-white/40 italic py-2">No custom sources yet — paste links or add a folder below.</p>
+            <p className="text-xs text-white/40 italic py-2">No custom sources yet. Paste links or add a folder below.</p>
           )}
           {sources.map((s) => (
             <div key={s.id} className="flex items-center gap-3 rounded-xl border border-border-glass bg-glass-w8 px-3.5 py-2.5">
@@ -168,7 +168,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
               Add a local folder
             </div>
             {!canPickFolder && (
-              <p className="text-xs text-white/40">Folder sources need the desktop app — links work everywhere.</p>
+              <p className="text-xs text-white/40">Folder sources need the desktop app. Links work everywhere.</p>
             )}
             <button
               type="button"

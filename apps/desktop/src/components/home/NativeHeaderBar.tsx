@@ -41,7 +41,7 @@ export function NativeHeaderBar({
       </div>
 
       {/* Right: mute + window controls (frameless: buttons render
-          only when the preload bridge exposes them — browser/dev = no bridge) */}
+          only when the preload bridge exposes them. Browser/dev = no bridge) */}
       <div
         className="flex items-center gap-2 text-retro-muted"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}

@@ -2871,7 +2871,7 @@ export default function Home() {
                     },
                   );
                 }
-                toast(`Welcome to gMatch, ${name}.`, 'success');
+                toast('You are in.', 'success');
                 loadUsers();
                 loadGallery();
               }}

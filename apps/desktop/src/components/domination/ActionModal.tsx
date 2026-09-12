@@ -132,7 +132,7 @@ export function ActionModal({
                 onChange={(e) => { setUrl(e.target.value); setFormError(null); }}
                 className={field}
               />
-              <p className="text-[10px] text-retro-muted">Paste a direct media link — their client loads it straight.</p>
+              <p className="text-[10px] text-retro-muted">Paste a direct media link. Their client loads it straight.</p>
             </div>
           )}
 

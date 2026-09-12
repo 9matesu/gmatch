@@ -238,7 +238,7 @@ export function AttachmentUploadModal({
               {urlInput && (
                 <div className="p-3 rounded-xl border border-border-glass bg-surface-raised text-xs text-retro-body flex items-center gap-2">
                   <LinkIcon className="w-4 h-4 text-cyan-600 shrink-0" />
-                  <span className="truncate">URL ready — will be fetched and stored on submit</span>
+                  <span className="truncate">URL ready. Will be fetched and stored on submit</span>
                 </div>
               )}
             </div>

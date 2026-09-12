@@ -119,7 +119,7 @@ export function YourMatchTab({
     setError(null)
     const ok = await onPlayCard(match.id, cardId)
     setSubmitting(false)
-    if (!ok) setError('Failed to play card — it may have expired.')
+    if (!ok) setError('Failed to play card. It may have expired.')
     return ok
   }
 
@@ -232,7 +232,7 @@ export function YourMatchTab({
               {celebrate.final ? 'Match complete' : specialTierLine(celebrate.tier)}
             </div>
             <div className="text-xs text-retro-fg">
-              +{celebrate.points} pts {celebrate.final ? '— Match complete' : `— Tier ${celebrate.tier}`}
+              +{celebrate.points} pts {celebrate.final ? 'Match complete' : `Tier ${celebrate.tier}`}
               {lastPayout?.reason === 'mutual_like' ? ` · +${lastPayout.gp} g$` : ''}
             </div>
           </div>
@@ -354,7 +354,7 @@ export function YourMatchTab({
 
         {st.phase === 'decide' && st.myDecision && (
           <div className="border border-border-glass p-3 text-center text-xs text-retro-muted rounded-lg">
-            Decision recorded — waiting for {opponentName}...
+            Decision recorded. Waiting for {opponentName}...
           </div>
         )}
       </div>

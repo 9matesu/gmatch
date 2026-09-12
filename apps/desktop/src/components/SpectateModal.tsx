@@ -149,8 +149,8 @@ export function SpectateModal({
     add(pA.card, pA.id, `${pA.display_name || 'Player 1'}'s Card`)
     add(pB.card, pB.id, `${pB.display_name || 'Player 2'}'s Card`)
     for (const h of history) {
-      add(h.card_a_url, pA.id, `R${h.round} — ${pA.display_name || 'Player 1'}'s Card`)
-      add(h.card_b_url, pB.id, `R${h.round} — ${pB.display_name || 'Player 2'}'s Card`)
+      add(h.card_a_url, pA.id, `R${h.round} · ${pA.display_name || 'Player 1'}'s Card`)
+      add(h.card_b_url, pB.id, `R${h.round} · ${pB.display_name || 'Player 2'}'s Card`)
     }
     return Array.from(map.values())
   }

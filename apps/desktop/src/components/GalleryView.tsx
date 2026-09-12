@@ -305,7 +305,7 @@ export function GalleryView({
               try {
                 const raw = e.dataTransfer.getData(DND_KEEPSAKE)
                 if (raw) onCreateCardFromMedia(JSON.parse(raw))
-              } catch { /* malformed payload — ignore */ }
+              } catch { /* malformed payload. Ignore */ }
             }}
             className={`glass-action glass-action-primary w-full sm:w-auto px-4 py-2 font-bold text-xs uppercase tracking-wider rounded-lg cursor-pointer flex items-center gap-2 ${dndCardHover ? 'ring-2 ring-retro-accent' : ''}`}
           >

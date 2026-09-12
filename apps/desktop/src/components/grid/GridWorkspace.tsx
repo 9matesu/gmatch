@@ -126,7 +126,7 @@ export default function GridWorkspace({
                   <button
                     type="button"
                     onClick={() => { playPress(700); onOpenSources(); }}
-                    title="Custom image sources — add your own URLs or folders"
+                    title="Custom image sources: add your own URLs or folders"
                     aria-label="Custom image sources"
                     className="h-7 px-2 rounded-md border border-border-glass bg-glass-w8 text-retro-muted hover:text-white hover:bg-glass-w10 hover:border-border-strong transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
                   >

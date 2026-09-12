@@ -277,7 +277,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
       }
 
       if (typeof payload.victimReward === 'number' && payload.victimReward > 0) {
-        useGame.getState().notify(`Effect from a player — you earned +${payload.victimReward} g$ for putting up with it`);
+        useGame.getState().notify(`Effect from a player. You earned +${payload.victimReward} g$ for putting up with it`);
       }
     };
 

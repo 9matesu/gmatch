@@ -80,7 +80,7 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
           <div ref={scrollRef} className="max-h-40 overflow-y-auto styled-scrollbar p-2.5 space-y-2 bg-surface-raised select-text">
             {list.length === 0 ? (
               <div className="text-center text-xs text-retro-muted py-3 select-none">
-                No messages yet — say hello to your opponent.
+                No messages yet. Say hello to your opponent.
               </div>
             ) : (
               list.map((m) => {

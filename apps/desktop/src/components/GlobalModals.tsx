@@ -164,7 +164,7 @@ export function GlobalModals(props: GlobalModalsProps) {
       {showStoryModal && (
         <Modal title="Post a Story" onClose={() => setShowStoryModal(false)}>
           <p className="text-xs text-retro-muted mb-3">
-            Stories live for <span className="text-retro-accent font-bold">12 hours</span> and then wipe — posting one earns{' '}
+            Stories live for <span className="text-retro-accent font-bold">12 hours</span> and then wipe. Posting one earns{' '}
             <span className="text-retro-accent font-bold">+10 PTS</span>. Drop an image or click to browse:
           </p>
           <DropZone

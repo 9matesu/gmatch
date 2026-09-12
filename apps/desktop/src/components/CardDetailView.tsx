@@ -142,7 +142,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
       window.dispatchEvent(new CustomEvent('orbit-score-refresh'));
       return true;
     } catch (e: unknown) {
-      toast?.(userFacingError(e, { fallback: 'Network error — try again' }), 'error');
+      toast?.(userFacingError(e, { fallback: 'Network error. Try again' }), 'error');
       return false;
     } finally {
       setBusy(false);

@@ -128,7 +128,7 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
     // Excludes must not blank the picks (substring rule both ways).
     const clash = excludes.find((x) => uniqueValid.some((n) => n.includes(x) || x.includes(n)));
     if (clash) {
-      setNote(`Exclude “${clash}” would block a starter tag — remove the exclude or change that tag.`);
+      setNote(`Exclude “${clash}” would block a starter tag. Remove the exclude or change that tag.`);
       return;
     }
     setNote(null);
@@ -147,7 +147,7 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
     return (
       <div className="space-y-3">
         <div className="glass-inset p-5 text-sm text-retro-muted">
-          Your feed is already tuned — {SETUP_TAG_COUNT} starter tags steer every fetch. Adjust
+          Your feed is already tuned. {SETUP_TAG_COUNT} starter tags steer every fetch. Adjust
           excludes any time in <strong className="text-retro-fg">Settings → Feed</strong>.
         </div>
         <div className="flex gap-2">
@@ -183,7 +183,7 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
                 key={p.name}
                 type="button"
                 onClick={() => removePick(p.name)}
-                title={`${p.name} — tap to remove (${p.status === 'live' ? 'live' : p.status === 'checking' ? 'probing…' : 'unverified'})`}
+                title={`${p.name}. Tap to remove (${p.status === 'live' ? 'live' : p.status === 'checking' ? 'probing…' : 'unverified'})`}
                 aria-label={`Remove ${p.name}`}
                 className="inline-flex items-center gap-2 rounded-full border border-retro-accent/60 bg-retro-accent/15 px-4 py-2 text-sm font-bold text-retro-fg cursor-pointer transition-colors hover:bg-retro-accent/30"
               >
@@ -236,7 +236,7 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
                 type="button"
                 onClick={() => setExcludes((prev) => prev.filter((t) => t !== x))}
                 aria-label={`Remove exclude ${x}`}
-                title={`${x} — tap to remove`}
+                title={`${x}. Tap to remove`}
                 className="inline-flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs font-mono text-red-200 cursor-pointer hover:bg-red-500/25"
               >
                 {x}
@@ -265,7 +265,7 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
 
         {ready && !allLive && (
           <div className="glass-inset rounded-lg p-3 text-xs text-amber-100">
-            Some starter tags could not be verified live. You can still start — the grid falls back until they resolve.
+            Some starter tags could not be verified live. You can still start. The grid falls back until they resolve.
           </div>
         )}
       </div>
@@ -280,7 +280,7 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
               ? `Tap ${SETUP_TAG_COUNT} pills to continue`
               : allLive
                 ? 'Start the grid'
-                : 'Tags not verified live — start anyway'
+                : 'Tags not verified live. Start anyway'
           }
           className="glass-action glass-action-primary w-full px-5 py-3 rounded-xl text-base font-bold cursor-pointer"
         >
@@ -288,7 +288,7 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
         </button>
         {!ready && (
           <p className="mt-1.5 text-center text-xs text-retro-muted">
-            {picks.length}/{SETUP_TAG_COUNT} picked — tap {SETUP_TAG_COUNT - picks.length} more.
+            {picks.length}/{SETUP_TAG_COUNT} picked. Tap {SETUP_TAG_COUNT - picks.length} more.
           </p>
         )}
       </div>

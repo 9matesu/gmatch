@@ -259,7 +259,7 @@ export function BabecockPanel({
       if (res.ok) {
         const data = await res.json()
         setRound(data.round || null)
-        toast(modal === 'start' ? 'Babecock round started — challengers can now join!' : 'You joined the round!', 'success')
+        toast(modal === 'start' ? 'Babecock round started. Challengers can now join' : 'You joined the round!', 'success')
         setModal(null)
       } else {
         const data = await res.json().catch(() => null)
@@ -532,7 +532,7 @@ export function BabecockPanel({
               <div className="w-8 h-8 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center text-orange-600">
                 <Flame className="w-4 h-4" />
               </div>
-              <h2 className="text-sm font-black text-retro-fg uppercase tracking-wider">Welcome to Babecock</h2>
+              <h2 className="text-sm font-black text-retro-fg uppercase tracking-wider">Babecock</h2>
             </div>
             <ol className="text-xs text-retro-muted space-y-2 leading-relaxed list-decimal list-inside">
               <li>A host starts the round with an <strong className="text-retro-fg">OP picture</strong>.</li>
@@ -600,7 +600,7 @@ export function BabecockPanel({
               <h2 className="text-xs font-semibold text-retro-fg">Live Babecock</h2>
               <p className="text-[10px] text-retro-muted font-sans">
                 {round
-                  ? `Hosted by ${round.host_name || 'Anonymous'} — ${round.entries.length} entr${round.entries.length === 1 ? 'y' : 'ies'}`
+                  ? `Hosted by ${round.host_name || 'Anonymous'}. ${round.entries.length} entr${round.entries.length === 1 ? 'y' : 'ies'}`
                   : 'No round running right now'}
               </p>
             </div>
@@ -897,7 +897,7 @@ export function BabecockPanel({
                     {modal === 'start' ? 'Post the OP Picture' : 'Join with your Picture'}
                   </h2>
                   <p className="text-[10px] text-retro-muted">
-                    {modal === 'start' ? 'You start the round — challengers will compare against yours' : `Round finishes in ${fmt(secsLeft)}`}
+                    {modal === 'start' ? 'You start the round. Challengers compare against yours' : `Round finishes in ${fmt(secsLeft)}`}
                   </p>
                 </div>
               </div>
@@ -967,7 +967,7 @@ export function BabecockPanel({
                   {urlInput && (
                     <div className="p-3 rounded-xl border border-border-glass bg-surface-raised text-xs text-retro-body flex items-center gap-2">
                       <LinkIcon className="w-4 h-4 text-cyan-600 shrink-0" />
-                      <span className="truncate">URL ready — will be fetched and stored on submit</span>
+                      <span className="truncate">URL ready. Will be fetched and stored on submit</span>
                     </div>
                   )}
                 </div>

@@ -340,10 +340,10 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                 mode === '1x1'
                   ? 'Single foe view'
                   : mode === '1x2'
-                    ? 'Split — two foes side by side'
+                    ? 'Split. Two foes side by side'
                     : mode === '2x2'
                       ? 'Four foes at once'
-                      : '3×3 grid — nine foes at once'
+                      : '3×3 grid. Nine foes at once'
               }
             >
               {mode === '1x1' ? '1×1' : mode === '1x2' ? '1×2' : mode === '2x2' ? '2×2' : '3×3'}
@@ -399,7 +399,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                 onClick={(e) => handleCellClick(i, e)}
                 onAuxClick={handleAuxClick}
                 onContextMenu={(e) => { e.preventDefault(); purgePost(cell.post) }}
-                aria-label={`Foe ${i + 1}: ${Math.ceil(cell.hp)} of ${cell.maxHp} HP — activate to attack, drag to reorder, right-click to purge`}
+                aria-label={`Foe ${i + 1}: ${Math.ceil(cell.hp)} of ${cell.maxHp} HP. Activate to attack, drag to reorder, right-click to purge`}
               >
                 {motion ? (
                   <video
@@ -482,7 +482,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                 type="button"
                 className="icon-btn absolute right-2 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-white/80 border border-white/10 backdrop-blur-md hover:bg-white/15 hover:text-white hover:border-white/20 transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
                 aria-label="Next image"
-                title="Skip this round — no reward"
+                title="Skip this round. No reward"
                 onClick={() => skipGrid()}
               >
                 <CaretRight size={22} weight="bold" />
@@ -518,7 +518,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             </span>
           )}
           {/* Blurred cover fill so the stage reads as an image, not a
-              letterbox — the foreground stays 100% visible (object-contain). */}
+              letterbox. The foreground stays 100% visible (object-contain). */}
           {!showOffline && shownUrl && (
             <img
               src={shownUrl}
@@ -578,7 +578,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             type="button"
             className="icon-btn absolute right-3 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-white/80 border border-white/10 backdrop-blur-md hover:bg-white/15 hover:text-white hover:border-white/20 transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
             aria-label="Next image"
-            title="Skip this foe — no reward"
+            title="Skip this foe. No reward"
             onClick={(e) => {
               e.stopPropagation()
               advanceFeed()
@@ -590,7 +590,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             type="button"
             className="icon-btn absolute right-3 top-3 z-[6] flex h-8 w-8 items-center justify-center rounded-xl bg-black/60 text-white/70 border border-white/10 backdrop-blur-md hover:bg-rose-600/80 hover:text-white hover:border-rose-500/60 transition-all duration-150 active:scale-95 cursor-pointer"
             aria-label="Never show this again"
-            title="Purge — this image and its rarest tags never return"
+            title="Purge. This image and its rarest tags never return"
             hidden={!current}
             onClick={(e) => {
               e.stopPropagation()
@@ -621,7 +621,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               onClick={() => setDropsOpen((v) => !v)}
               aria-expanded={dropsOpen}
               aria-label={`${pendingDrops.length} novelty drops waiting`}
-              title="KO drops — adopt a tag, ban an anti-tag, one click each"
+              title="KO drops. Adopt a tag, ban an anti-tag, one click each"
               className={`${MONO} inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-rose-500/40 bg-rose-500/10 px-2.5 py-1 text-xs font-bold text-rose-300 hover:bg-rose-500/20 transition-colors`}
             >
               <Gift size={14} weight="bold" className="text-rose-400" />
@@ -697,12 +697,12 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             </span>
           </div>
         ) : (
-          <span className={`${MUTED} text-xs`}>No live foe — take your time.</span>
+          <span className={`${MUTED} text-xs`}>No live foe. Take your time.</span>
         )}
         {heatLive && (
           <span
             className={`${MONO} inline-flex min-w-0 shrink items-center gap-1.5 whitespace-nowrap rounded-lg border border-amber-500/40 bg-amber-500/15 px-2.5 py-1 text-xs font-black text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.2)]${reduceMotion ? '' : ' animate-pulse'}`}
-            title={`Heat combo: ${heatStreak} rapid clicks — x${heat} click power`}
+            title={`Heat combo: ${heatStreak} rapid clicks. X${heat} click power`}
             aria-label={`Heat combo x${heat}`}
           >
             <Fire size={14} weight="fill" className="text-amber-400" />
@@ -724,7 +724,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
         )}
         <span
           className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border-glass bg-glass-w8 px-2.5 py-1 text-xs font-bold text-retro-body shadow-sm`}
-          title="Lifetime KOs — each foe hits harder"
+          title="Lifetime KOs. Each foe hits harder"
         >
           <Skull size={13} weight="bold" className="text-rose-400" />
           KOs: {formatNum(defeated)}
@@ -751,7 +751,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                 }`}
               disabled={points < def.cost}
               onClick={() => popCap(id)}
-              title={`${def.name} — ${capEffectLabel(id)} — ${formatNum(def.cost)} pts — Press [${idx + 1}]`}
+              title={`${def.name}. ${capEffectLabel(id)}. ${formatNum(def.cost)} pts. Press [${idx + 1}]`}
             >
               <kbd className={`${MONO} inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-white/15 bg-black/60 text-[10px] font-bold text-white/60 group-hover:text-white transition-colors`}>
                 {idx + 1}

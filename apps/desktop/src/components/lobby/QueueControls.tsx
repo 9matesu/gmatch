@@ -61,7 +61,7 @@ export function QueueControls({ state, match, matchRoundInfo, autoQueueEnabled, 
       ) : myCardsCount < MIN_GAME_CARDS ? (
         <div
           className="flex items-stretch rounded-lg border border-cyan-500/40 overflow-hidden whitespace-nowrap"
-          title={`Quick Play needs ${MIN_GAME_CARDS} cards in your active deck — you have ${myCardsCount}. Build one to continue.`}
+          title={`Quick Play needs ${MIN_GAME_CARDS} cards in your active deck. You have ${myCardsCount}. Build one to continue.`}
         >
           <button
             type="button"

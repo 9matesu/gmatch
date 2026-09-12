@@ -25,8 +25,8 @@ export function CoffeeModal({ open, reason, onDismiss }: Props) {
 
   const blurb =
     reason === 'matches'
-      ? "You've played more than a dozen duels. Server snapshots, encrypted blob storage, and bandwidth aren't free — if GMatch has been worth your time, consider supporting development."
-      : "You've spent over an hour in duels. Server snapshots, encrypted blob storage, and bandwidth aren't free — if GMatch has been worth your time, consider supporting development."
+      ? "You've played more than a dozen duels. Server snapshots, encrypted blob storage, and bandwidth aren't free. If GMatch has been worth your time, consider supporting development."
+      : "You've spent over an hour in duels. Server snapshots, encrypted blob storage, and bandwidth aren't free. If GMatch has been worth your time, consider supporting development."
 
   return (
     <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 backdrop-blur-md animate-orbit-fade-in p-4">

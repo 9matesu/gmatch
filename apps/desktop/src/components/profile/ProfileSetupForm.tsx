@@ -67,7 +67,7 @@ export function ProfileSetupForm({
       setPfpError('');
       onPfp(dataUrl);
     } catch {
-      setPfpError('Could not read that image — try a JPG or PNG');
+      setPfpError('Could not read that image. Try a JPG or PNG');
     }
   };
 

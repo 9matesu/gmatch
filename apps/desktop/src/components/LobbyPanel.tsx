@@ -540,7 +540,7 @@ const selfId = identity?.orbitId || ''
             <div className="module-body">
               {myCards.length === 0 ? (
                 <div className="flex flex-wrap items-center gap-3">
-                  <p className="text-xs text-retro-muted">No cards yet — forge one or win duels to build your deck.</p>
+                  <p className="text-xs text-retro-muted">No cards yet. Forge one or win duels to build your deck.</p>
                   {onOpenCreateCard && (
                     <button
                       type="button"

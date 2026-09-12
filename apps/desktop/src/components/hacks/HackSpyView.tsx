@@ -87,8 +87,8 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
           if (!cancelled) {
             setFeedError(
               res.status === 403
-                ? 'Your session ended — buy another to keep looking.'
-                : 'Connection dropped — retrying…',
+                ? 'Your session ended. Buy another to keep looking.'
+                : 'Connection dropped. Retrying…',
             )
           }
           return;
@@ -99,7 +99,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
           setFeedError(null);
         }
       } catch {
-        if (!cancelled) setFeedError('Could not load — retrying…');
+        if (!cancelled) setFeedError('Could not load. Retrying…');
       }
     };
     void load();

@@ -166,7 +166,7 @@ export function MatchRoundPanel({
     if (submitting) return false
     setSubmitting(true)
     setSelectedCard(cardId)
-    setNotices((n) => [...n, `Round ${currentRound} card played — waiting for reveal.`])
+    setNotices((n) => [...n, `Round ${currentRound} card played. Waiting for reveal.`])
     const ok = await onPick(match.id, cardId)
     if (ok && soundEnabled) playUpload()
     setSubmitting(false)
@@ -196,9 +196,9 @@ export function MatchRoundPanel({
     } else if (result && 'ok' in result) {
       setLocalDecidedRound(null)
       if (result.status === 410) {
-        setDecideError('Match already ended — a new one is coming.')
+        setDecideError('Match already ended. A new one is coming.')
       } else {
-        setDecideError(result.error || 'Couldn\'t record your decision — try again.')
+        setDecideError(result.error || 'Couldn\'t record your decision. Try again.')
       }
     } else {
       setLocalDecidedRound(null)
@@ -352,7 +352,7 @@ export function MatchRoundPanel({
               <span className="font-medium text-retro-fg">Round {currentRound}/{maxRounds}:</span>
               <span>
                 {deckExhausted
-                  ? 'Deck exhausted — cards can be replayed.'
+                  ? 'Deck exhausted. Cards can be replayed.'
                   : 'Pick a card to play.'}
               </span>
             </div>
@@ -432,14 +432,14 @@ export function MatchRoundPanel({
                 </div>
 
                 <div className="p-2.5 bg-surface-interactive border border-border-glass rounded-lg text-center text-xs text-retro-fg">
-                  {match.opponent_played ? 'Both cards submitted — revealing soon' : `Waiting for ${opponentName}...`}
+                  {match.opponent_played ? 'Both cards submitted. Revealing soon' : `Waiting for ${opponentName}...`}
                 </div>
               </div>
             ) : (
               <>
                 {match.opponent_played && (
                   <div className="border border-retro-accent/30 bg-glass-w5 p-2 text-center text-xs text-retro-fg animate-orbit-fade-in rounded-lg">
-                    {opponentName} played — select your card!
+                    {opponentName} played. Select your card!
                   </div>
                 )}
 
@@ -521,7 +521,7 @@ export function MatchRoundPanel({
                   onClick={() => selectedCard && handlePick(selectedCard)}
                   className="w-full py-2.5 text-xs font-medium bg-retro-fg text-retro-bg disabled:opacity-30 hover:opacity-90 cursor-pointer rounded-lg transition-opacity"
                 >
-                  {submitting ? 'Playing...' : `Play card — Round ${currentRound}`}
+                  {submitting ? 'Playing...' : `Play card. Round ${currentRound}`}
                 </button>
               </>
             )}
@@ -532,11 +532,11 @@ export function MatchRoundPanel({
           <div className="border border-border-glass p-3 text-center text-xs text-retro-muted animate-orbit-fade-in rounded-lg">
             {phase === 'reveal' ? (
               <>
-                <span className="font-medium text-retro-fg">Cards revealed</span> — deciding in {countdown}
+                <span className="font-medium text-retro-fg">Cards revealed</span>. Deciding in {countdown}
               </>
             ) : (
               <>
-                <span className="font-medium">Decision recorded</span> — waiting for {opponentName}
+                <span className="font-medium">Decision recorded</span>. Waiting for {opponentName}
               </>
             )}
           </div>
@@ -762,7 +762,7 @@ export function MatchRoundPanel({
         {phase === 'decide' && !isMyDecided && (
           <>
             <p className="text-center text-xs text-retro-muted">
-              Both cards revealed — decide if you like <span className="text-retro-fg font-medium">{opponentName}</span>&apos;s card
+              Both cards revealed. Decide if you like <span className="text-retro-fg font-medium">{opponentName}</span>&apos;s card
             </p>
             {lastResult && (
               <div className={`border p-3 text-center text-sm font-medium animate-orbit-slide-up rounded-lg ${lastResult.matched ? 'text-retro-fg border-retro-accent bg-glass-w10 animate-orbit-match-flux' : 'text-retro-muted border-border-glass'}`}>
@@ -803,7 +803,7 @@ export function MatchRoundPanel({
                     ? 'bg-glass-w10 text-retro-accent border-retro-accent/30 hover:bg-glass-w20'
                     : 'opacity-40 border-border-glass text-retro-muted cursor-not-allowed bg-surface-interactive'
                   }`}
-                title={boostsRemaining > 0 ? `Conviction Boost (+25 pts) — costs ${formatGc(matchEconomy(myCardVal, 0).boostCost)} g$` : 'No boosts remaining'}
+                title={boostsRemaining > 0 ? `Conviction Boost (+25 pts). Costs ${formatGc(matchEconomy(myCardVal, 0).boostCost)} g$` : 'No boosts remaining'}
               >
                 <Zap className="w-3.5 h-3.5 fill-current" />
                 <span>Boost {boostsRemaining > 0 ? `(${boostsRemaining} · ${formatGc(matchEconomy(myCardVal, 0).boostCost)} g$)` : ''}</span>

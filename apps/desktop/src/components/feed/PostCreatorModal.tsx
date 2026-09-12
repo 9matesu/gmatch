@@ -88,7 +88,7 @@ export function PostCreatorModal({
     if (onPublish) {
       const ok = await onPublish(media, caption, tags);
       if (!ok) {
-        toast?.('Failed to upload post — please try again.', 'error');
+        toast?.('Failed to upload post. Try again.', 'error');
         return;
       }
     }

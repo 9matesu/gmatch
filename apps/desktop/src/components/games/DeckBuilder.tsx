@@ -425,7 +425,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
             <h3 className="text-sm font-bold text-retro-body mb-2">Cards in Deck{deckDropOver && <span className="ml-2 text-xs font-semibold text-cyan-300 animate-pulse">Drop to add</span>}</h3>
             {getCardsInDeck().length === 0 ? (
               <div className="text-center py-8 text-retro-muted text-xs">
-                No cards in this deck yet. Click &quot;Add Cards&quot; — or drag a card here.
+                No cards in this deck yet. Click &quot;Add Cards&quot;. Or drag a card here.
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
