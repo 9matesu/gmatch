@@ -108,7 +108,7 @@ function createUpdater({ app, webContents, log = () => {} }) {
     const dir = pickDestDir(portableExePath(), app.getPath('temp'))
     if (!dir) {
       downloading = false
-      setStatus({ phase: 'error', error: 'no writable folder to place the update — run gMatch from your Downloads folder' })
+      setStatus({ phase: 'error', error: 'no writable folder to place the update. Run gMatch from your Downloads folder and retry' })
       return
     }
     const dest = path.join(dir, plan.name)
@@ -121,7 +121,7 @@ function createUpdater({ app, webContents, log = () => {} }) {
       }, { insecure: insecureOverride })
       const expected = plan.digest || null
       const verified = expected ? sha256 === expected : null
-      if (verified === false) throw new Error('sha256 mismatch — download discarded')
+      if (verified === false) throw new Error('sha256 mismatch. The download was discarded.')
       fs.renameSync(partial, dest)
       log(`[updater] downloaded ${plan.name} sha256=${sha256} verified=${verified}`)
       setStatus({ phase: 'ready', version: plan.version, destPath: dest, bytes, verified: verified === true })
