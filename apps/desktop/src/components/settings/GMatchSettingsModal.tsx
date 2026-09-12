@@ -10,10 +10,12 @@ import { FeedTuneStep } from '../../firstRun/FeedTuneStep';
 import { ServerTab } from './ServerTab';
 import { DeleteAccountSection } from './DeleteAccountSection';
 import { UpdateSection } from './UpdateSection';
+import { BlocklistSection } from './BlocklistSection';
 import {
   Settings,
   User,
   Shield,
+  ShieldAlert,
   Image,
   X,
   Check,
@@ -33,6 +35,7 @@ export type SettingsTabId =
   | 'preferences'
   | 'account'
   | 'feed'
+  | 'blocklist'
   | 'wallpaper'
   | 'server';
 
@@ -56,7 +59,13 @@ const WALLPAPER_PRESETS = [
   { id: 'minimal', name: 'Studio Gradient', url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1920&q=80' },
 ];
 
-function FeedSettingsTab({ toast }: { toast?: (msg: string, type?: string) => void }) {
+function FeedSettingsTab({
+  toast,
+  onNavigateTab,
+}: {
+  toast?: (msg: string, type?: string) => void
+  onNavigateTab?: (tab: SettingsTabId) => void
+}) {
   const tags = useGame((s) => s.tags);
   const userExcludes = useGame((s) => s.userExcludes);
   const addUserExclude = useGame((s) => s.addUserExclude);
@@ -170,6 +179,24 @@ function FeedSettingsTab({ toast }: { toast?: (msg: string, type?: string) => vo
           </div>
         )}
       </div>
+
+      <div className="p-4 bg-surface-raised border border-border-glass rounded-xl space-y-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h4 className="text-xs font-medium text-retro-fg">Content Blocklist (blocklist.json)</h4>
+          <p className="text-xs text-retro-muted">
+            Configure hard blocked terms, suggested exclude categories, and noise filter tags.
+          </p>
+        </div>
+        {onNavigateTab && (
+          <button
+            type="button"
+            onClick={() => onNavigateTab('blocklist')}
+            className="px-3 py-1.5 bg-retro-accent hover:bg-retro-accent-hover text-black rounded-xl text-xs font-bold cursor-pointer shrink-0"
+          >
+            Configure blocklist.json
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -185,8 +212,14 @@ export function GMatchSettingsModal({
   toast,
   initialTab = 'preferences',
 }: GMatchSettingsModalProps) {
-  const [activeTab, setActiveTab] = useState<'preferences' | 'account' | 'feed' | 'server'>(() => {
-    if (initialTab === 'account' || initialTab === 'feed' || initialTab === 'server') return initialTab as 'account' | 'feed' | 'server';
+  const [activeTab, setActiveTab] = useState<SettingsTabId>(() => {
+    if (
+      initialTab === 'account' ||
+      initialTab === 'feed' ||
+      initialTab === 'blocklist' ||
+      initialTab === 'server'
+    )
+      return initialTab;
     return 'preferences';
   });
   const [wallpaperExpanded, setWallpaperExpanded] = useState(() => initialTab === 'wallpaper');
@@ -197,7 +230,12 @@ export function GMatchSettingsModal({
     if (initialTab === 'wallpaper') {
       setActiveTab('preferences');
       setWallpaperExpanded(true);
-    } else if (initialTab === 'account' || initialTab === 'feed') {
+    } else if (
+      initialTab === 'account' ||
+      initialTab === 'feed' ||
+      initialTab === 'blocklist' ||
+      initialTab === 'server'
+    ) {
       setActiveTab(initialTab);
     } else {
       setActiveTab('preferences');
@@ -289,10 +327,11 @@ export function GMatchSettingsModal({
     toast?.('Wallpaper reset to default', 'info');
   };
 
-  const navItems: { id: 'preferences' | 'account' | 'feed' | 'server'; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  const navItems: { id: SettingsTabId; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'preferences', label: 'Preferences', icon: Settings },
     { id: 'account', label: 'Account & Security', icon: User },
     { id: 'feed', label: 'Feed & Tags', icon: Rss },
+    { id: 'blocklist', label: 'Blocklist (JSON)', icon: ShieldAlert },
     { id: 'server', label: 'Server', icon: Server },
   ];
 
@@ -824,9 +863,12 @@ export function GMatchSettingsModal({
             )}
 
             {/* ──────── 3. FEED & TAGS ──────── */}
-            {activeTab === 'feed' && <FeedSettingsTab toast={toast} />}
+            {activeTab === 'feed' && <FeedSettingsTab toast={toast} onNavigateTab={setActiveTab} />}
 
-            {/* ──────── 4. SERVER (no central server topology) ──────── */}
+            {/* ──────── 4. BLOCKLIST (JSON) ──────── */}
+            {activeTab === 'blocklist' && <BlocklistSection toast={toast} />}
+
+            {/* ──────── 5. SERVER (no central server topology) ──────── */}
             {activeTab === 'server' && <ServerTab toast={toast} />}
           </div>
         </div>

@@ -1,4 +1,5 @@
 import blocklistData from '../../../../shared/blocklist.json'
+import type { BlocklistData } from '../types/gmatch-bridge'
 
 /**
  * HARD blocklist (SPEC §8) — the illegal-content line only (minors,
@@ -8,12 +9,131 @@ import blocklistData from '../../../../shared/blocklist.json'
  * import TS). Everything legal-but-polarising lives in SUGGESTED_EXCLUDES
  * and is blocked only when the player adds it to their own exclude list.
  */
-export const BLOCKLIST: readonly string[] = blocklistData.blocklist
-export const NOISE_TAGS: readonly string[] = blocklistData.noise
-/** Legal-but-polarising categories offered as one-tap excludes (off by default). */
-export const SUGGESTED_EXCLUDES: readonly string[] = blocklistData.suggested ?? []
+export const DEFAULT_BLOCKLIST_DATA: BlocklistData = blocklistData as BlocklistData
 
-const NOISE = new Set(NOISE_TAGS)
+export let BLOCKLIST: readonly string[] = [...blocklistData.blocklist]
+export let NOISE_TAGS: readonly string[] = [...blocklistData.noise]
+export let SUGGESTED_EXCLUDES: readonly string[] = [...(blocklistData.suggested ?? [])]
+
+let NOISE = new Set(NOISE_TAGS.map((t) => t.toLowerCase()))
+
+const STORAGE_KEY = 'gmatch_custom_blocklist'
+
+export function getActiveBlocklistData(): BlocklistData {
+  return {
+    ...blocklistData,
+    blocklist: [...BLOCKLIST],
+    suggested: [...SUGGESTED_EXCLUDES],
+    noise: [...NOISE_TAGS],
+  }
+}
+
+export function updateActiveBlocklist(data: Partial<BlocklistData>): void {
+  if (Array.isArray(data.blocklist)) {
+    BLOCKLIST = [...data.blocklist]
+  }
+  if (Array.isArray(data.noise)) {
+    NOISE_TAGS = [...data.noise]
+    NOISE = new Set(NOISE_TAGS.map((t) => t.toLowerCase()))
+  }
+  if (Array.isArray(data.suggested)) {
+    SUGGESTED_EXCLUDES = [...data.suggested]
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('gmatch:blocklist-updated', { detail: data }))
+  }
+}
+
+export function loadSavedBlocklist(): BlocklistData {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed && typeof parsed === 'object') {
+          updateActiveBlocklist(parsed)
+          return {
+            ...blocklistData,
+            ...parsed,
+          }
+        }
+      }
+    }
+  } catch {
+    /* fallback to default */
+  }
+  return { ...blocklistData } as BlocklistData
+}
+
+export async function syncBlocklistFromBridge(): Promise<BlocklistData> {
+  if (typeof window !== 'undefined' && window.gmatch?.blocklistGet) {
+    try {
+      const res = await window.gmatch.blocklistGet()
+      if (res?.current) {
+        updateActiveBlocklist(res.current)
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(res.current))
+        } catch {
+          /* ignore */
+        }
+        return res.current
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return loadSavedBlocklist()
+}
+
+export async function saveBlocklist(data: BlocklistData): Promise<boolean> {
+  updateActiveBlocklist(data)
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    }
+  } catch {
+    /* ignore */
+  }
+  if (typeof window !== 'undefined' && window.gmatch?.blocklistSet) {
+    try {
+      const res = await window.gmatch.blocklistSet(data)
+      return Boolean(res?.ok)
+    } catch {
+      return false
+    }
+  }
+  return true
+}
+
+export async function resetBlocklist(): Promise<BlocklistData> {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEY)
+    }
+  } catch {
+    /* ignore */
+  }
+  let defaultData: BlocklistData = { ...blocklistData } as BlocklistData
+  if (typeof window !== 'undefined' && window.gmatch?.blocklistReset) {
+    try {
+      const res = await window.gmatch.blocklistReset()
+      if (res?.data) defaultData = res.data
+    } catch {
+      /* ignore */
+    }
+  }
+  updateActiveBlocklist(defaultData)
+  return defaultData
+}
+
+export function __resetBlocklist(): void {
+  updateActiveBlocklist(blocklistData as BlocklistData)
+}
+
+// Initial bootstrap from localStorage if present
+if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+  loadSavedBlocklist()
+}
 
 /**
  * User excludes: extra blocked terms the player adds on the setup screen or

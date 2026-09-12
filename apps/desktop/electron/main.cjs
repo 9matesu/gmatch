@@ -113,7 +113,49 @@ protocol.registerSchemesAsPrivileged([
 const blocklistPath = app.isPackaged
   ? path.join(process.resourcesPath, 'shared', 'blocklist.json')
   : path.join(__dirname, '..', '..', '..', 'shared', 'blocklist.json')
-const { blocklist } = require(blocklistPath)
+
+let currentBlocklistData = null
+let currentBlocklist = []
+
+function userBlocklistPath() {
+  try {
+    return path.join(app.getPath('userData'), 'blocklist.json')
+  } catch {
+    return null
+  }
+}
+
+function getDefaultBlocklistData() {
+  try {
+    const raw = fs.readFileSync(blocklistPath, 'utf8')
+    return JSON.parse(raw)
+  } catch (err) {
+    mainLog(`Failed to read default blocklist.json: ${err?.message || err}`)
+    return { blocklist: [], suggested: [], noise: [] }
+  }
+}
+
+function loadBlocklistData() {
+  const userPath = userBlocklistPath()
+  if (userPath && fs.existsSync(userPath)) {
+    try {
+      const raw = fs.readFileSync(userPath, 'utf8')
+      const parsed = JSON.parse(raw)
+      if (parsed && Array.isArray(parsed.blocklist)) {
+        currentBlocklistData = parsed
+        currentBlocklist = parsed.blocklist
+        return currentBlocklistData
+      }
+    } catch (err) {
+      mainLog(`Failed to parse userData blocklist.json: ${err?.message || err}`)
+    }
+  }
+  currentBlocklistData = getDefaultBlocklistData()
+  currentBlocklist = Array.isArray(currentBlocklistData.blocklist) ? currentBlocklistData.blocklist : []
+  return currentBlocklistData
+}
+
+loadBlocklistData()
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -212,7 +254,7 @@ const BAD_TAG_FRAGMENTS = [
 
 function isQueryBlocked(query) {
   const q = String(query).toLowerCase()
-  return blocklist.some((bad) => q.includes(bad))
+  return currentBlocklist.some((bad) => q.includes(bad))
 }
 
 // Caption hunts (query carries caption/goon_caption) keep text-overlay tags
@@ -937,6 +979,57 @@ app.whenReady().then(async () => {
   ipcMain.handle('shell:open', (_event, url) => {
     if (typeof url === 'string' && /^https?:\/\//i.test(url)) return shell.openExternal(url)
     return Promise.reject(new Error('only http(s) URLs'))
+  })
+  // Dynamic blocklist control (Settings -> Blocklist): full edit/reset.
+  ipcMain.handle('blocklist:get', () => {
+    const userPath = userBlocklistPath()
+    return {
+      current: currentBlocklistData || loadBlocklistData(),
+      defaults: getDefaultBlocklistData(),
+      isCustom: Boolean(userPath && fs.existsSync(userPath)),
+    }
+  })
+  ipcMain.handle('blocklist:set', (_event, payload) => {
+    try {
+      let data = payload
+      if (typeof data === 'string') data = JSON.parse(data)
+      if (!data || typeof data !== 'object') {
+        return { ok: false, error: 'Payload must be a JSON object' }
+      }
+      if (!Array.isArray(data.blocklist)) {
+        return { ok: false, error: 'Payload must contain a "blocklist" array' }
+      }
+      const userPath = userBlocklistPath()
+      if (userPath) {
+        fs.mkdirSync(path.dirname(userPath), { recursive: true })
+        fs.writeFileSync(userPath, JSON.stringify(data, null, 2), 'utf8')
+      }
+      if (!app.isPackaged && fs.existsSync(blocklistPath)) {
+        try {
+          fs.writeFileSync(blocklistPath, JSON.stringify(data, null, 2), 'utf8')
+        } catch {
+          /* best effort in dev */
+        }
+      }
+      currentBlocklistData = data
+      currentBlocklist = data.blocklist
+      return { ok: true, data: currentBlocklistData }
+    } catch (err) {
+      return { ok: false, error: err?.message || String(err) }
+    }
+  })
+  ipcMain.handle('blocklist:reset', () => {
+    try {
+      const userPath = userBlocklistPath()
+      if (userPath && fs.existsSync(userPath)) {
+        fs.unlinkSync(userPath)
+      }
+      currentBlocklistData = getDefaultBlocklistData()
+      currentBlocklist = Array.isArray(currentBlocklistData.blocklist) ? currentBlocklistData.blocklist : []
+      return { ok: true, data: currentBlocklistData }
+    } catch (err) {
+      return { ok: false, error: err?.message || String(err) }
+    }
   })
   // OS wallpaper swap for consented domination effects (Windows; no-op else).
   ipcMain.handle('wallpaper:set-data', (_event, buf, mime) => wallpaperWin.setWallpaperFromBuffer(Buffer.from(buf), String(mime || '')))

@@ -39,4 +39,7 @@ contextBridge.exposeInMainWorld('gmatch', {
   wallpaperRestore: () => ipcRenderer.invoke('wallpaper:restore'),
   wallpaperCleanupFiles: () => ipcRenderer.invoke('wallpaper:cleanup-files'),
   grantCameraOnce: () => ipcRenderer.invoke('camera:grant-once'),
+  blocklistGet: () => ipcRenderer.invoke('blocklist:get'),
+  blocklistSet: (data) => ipcRenderer.invoke('blocklist:set', data),
+  blocklistReset: () => ipcRenderer.invoke('blocklist:reset'),
 })

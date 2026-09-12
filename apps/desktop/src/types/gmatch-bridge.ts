@@ -40,6 +40,19 @@ export interface GmatchBridge {
   wallpaperRestore?: () => Promise<{ ok: boolean }>
   wallpaperCleanupFiles?: () => Promise<{ ok: boolean }>
   grantCameraOnce?: () => Promise<{ ok: boolean }>
+  blocklistGet?: () => Promise<{ current: BlocklistData; defaults: BlocklistData; isCustom?: boolean }>
+  blocklistSet?: (data: BlocklistData | string) => Promise<{ ok: boolean; data?: BlocklistData; error?: string }>
+  blocklistReset?: () => Promise<{ ok: boolean; data?: BlocklistData; error?: string }>
+}
+
+export interface BlocklistData {
+  _comment_hard?: string
+  blocklist: string[]
+  _comment_suggested?: string
+  suggested: string[]
+  _comment_noise?: string
+  noise: string[]
+  [key: string]: any
 }
 
 declare global {
