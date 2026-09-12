@@ -17,8 +17,19 @@ export function getCentralApiUrl(): string {
       return value.replace(/\/+$/, '')
     }
   } catch { /* private mode */ }
-  const fromEnv = (import.meta.env.VITE_CENTRAL_URL as string | undefined) || DEFAULT_CENTRAL_URL
-  return fromEnv.replace(/\/+$/, '')
+  if (import.meta.env.VITE_CENTRAL_URL) {
+    return (import.meta.env.VITE_CENTRAL_URL as string).replace(/\/+$/, '')
+  }
+  // In dev / localhost browser mode, default central to local dev sidecar
+  if (
+    typeof window !== 'undefined' &&
+    (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1') &&
+    import.meta.env.DEV &&
+    import.meta.env.MODE !== 'test'
+  ) {
+    return 'http://127.0.0.1:8790'
+  }
+  return DEFAULT_CENTRAL_URL
 }
 
 export function setCentralApiUrl(url: string): void {

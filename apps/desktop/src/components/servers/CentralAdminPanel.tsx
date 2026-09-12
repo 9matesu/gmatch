@@ -78,7 +78,79 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
     } catch { toast('Couldn\'t reach the server.', 'error') } finally { setBusyId(null) }
   }
 
-  if (!authorized) return null
+  const [unlockPin, setUnlockPin] = useState('')
+  const [unlocking, setUnlocking] = useState(false)
+
+  const handleUnlock = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!unlockPin.trim() || unlocking) return
+    setUnlocking(true)
+    try {
+      const res = await orbitFetch(`${central}/api/admin/verify-pin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: unlockPin.trim() }),
+      }, identity)
+      if (res.ok) {
+        toast('Central admin unlocked', 'success')
+        setUnlockPin('')
+        await load()
+      } else {
+        const data = await res.json().catch(() => null)
+        toast(data?.error || 'Invalid secret passcode', 'error')
+      }
+    } catch {
+      toast('Failed to reach central node', 'error')
+    } finally {
+      setUnlocking(false)
+    }
+  }
+
+  if (!authorized) {
+    const isDev = Boolean(import.meta.env.DEV) ||
+      (typeof window !== 'undefined' &&
+        (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1'))
+
+    return (
+      <div className="glass-card p-3 space-y-2.5" aria-label="Central admin login">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-amber-400" />
+          <span className="text-xs font-medium text-retro-fg">Central Node Authentication</span>
+        </div>
+        <p className="text-[11px] text-retro-muted leading-relaxed">
+          Authenticate with the central node passcode to manage the directory.
+        </p>
+        {isDev && (
+          <div className="flex items-center justify-between text-[11px] bg-amber-500/10 border border-amber-500/20 text-amber-300 px-2.5 py-1.5 rounded">
+            <span>Dev mode: default passcode is <code className="font-mono font-bold bg-black/30 px-1 py-0.5 rounded">admin</code></span>
+            <button
+              type="button"
+              onClick={() => setUnlockPin('admin')}
+              className="text-[10px] font-bold underline hover:text-white cursor-pointer ml-2 shrink-0"
+            >
+              Use admin
+            </button>
+          </div>
+        )}
+        <form onSubmit={handleUnlock} className="flex items-center gap-2">
+          <input
+            type="password"
+            value={unlockPin}
+            onChange={(e) => setUnlockPin(e.target.value)}
+            placeholder="Central admin passcode"
+            className="flex-1 bg-surface-raised border border-border-glass focus:border-retro-accent/60 px-2.5 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted rounded-md outline-none font-mono"
+          />
+          <button
+            type="submit"
+            disabled={unlocking || !unlockPin.trim()}
+            className="glass-action glass-action-primary px-3 py-1.5 rounded-md text-xs font-bold disabled:opacity-40 cursor-pointer"
+          >
+            {unlocking ? 'Verifying…' : 'Unlock'}
+          </button>
+        </form>
+      </div>
+    )
+  }
 
   return (
     <section className="space-y-2" aria-label="Central admin">

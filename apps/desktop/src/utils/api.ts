@@ -6,10 +6,28 @@ function computeApiBase(): string {
   // Desktop merge (D3): VITE_API_URL, or the Electron preload's __API_BASE__
   // (local sidecar). Default: central node; local sidecar is opt-in via the
   // server-mode switch in Settings.
+  try {
+    const manual = typeof localStorage !== 'undefined' ? localStorage.getItem('gmatch.api.url') : null
+    if (manual?.trim()) {
+      return manual.trim().replace(/\/+$/, '')
+    }
+  } catch { /* private mode */ }
+
   const envUrl =
     (import.meta.env.VITE_API_URL as string | undefined) ||
     (typeof window !== 'undefined' && (window as unknown as { __API_BASE__?: string }).__API_BASE__)
   if (envUrl) return envUrl.replace(/\/+$/, '')
+
+  // Dev mode in browser (npm run dev): default to local dev sidecar on 8790
+  if (
+    typeof window !== 'undefined' &&
+    (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1') &&
+    import.meta.env.DEV &&
+    import.meta.env.MODE !== 'test'
+  ) {
+    return 'http://127.0.0.1:8790'
+  }
+
   // Dev (vite) and packaged builds both default to the gmatch central node;
   // the local sidecar is opt-in via VITE_API_URL / __API_BASE__ / server-mode.
   return 'https://gmatch.fly.dev'
@@ -59,6 +77,13 @@ function cloneResponse(res: Response): Promise<Response> {
 
 export function getApiBaseUrl(): string {
   return API_BASE
+}
+
+export function setApiBaseUrl(url: string): void {
+  try {
+    if (url.trim()) localStorage.setItem('gmatch.api.url', url.trim())
+    else localStorage.removeItem('gmatch.api.url')
+  } catch { /* session-only */ }
 }
 
 function toHex(bytes: Uint8Array): string {

@@ -116,12 +116,14 @@ const bucket = new LocalBlobStore(BLOB_STORE_DIR)
 // ADMIN_PIN / ADMIN_PIN_HASH must reach routes via c.env — pre-B.4 neither was
 // wired here, so verify-pin silently ran on the hardcoded fallback forever.
 const nodeKey = resolveNodeKey(SNAPSHOT_PATH)
+const isDev = !process.env.FLY_APP_NAME && process.env.NODE_ENV !== 'production'
+const devAdminPin = isDev && !process.env.ADMIN_PIN && !process.env.ADMIN_PIN_HASH ? 'admin' : undefined
 const env = {
   DB: db,
   BUCKET: bucket,
   NODE_PRIV_HEX: nodeKey.privHex,
   NODE_PUB_HEX: nodeKey.pubHex,
-  ...(process.env.ADMIN_PIN ? { ADMIN_PIN: process.env.ADMIN_PIN } : {}),
+  ...(process.env.ADMIN_PIN || devAdminPin ? { ADMIN_PIN: process.env.ADMIN_PIN || devAdminPin } : {}),
   ...(process.env.ADMIN_PIN_HASH ? { ADMIN_PIN_HASH: process.env.ADMIN_PIN_HASH } : {}),
   ...(process.env.ADMIN_ORBIT_ID ? { ADMIN_ORBIT_ID: process.env.ADMIN_ORBIT_ID } : {}),
   ...(process.env.API_SEALED_ONLY ? { API_SEALED_ONLY: process.env.API_SEALED_ONLY } : {}),

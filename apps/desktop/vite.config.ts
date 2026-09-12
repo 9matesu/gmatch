@@ -63,7 +63,12 @@ function devApiPlugin(): Plugin {
         }
         proc = spawn(bunBin(), ['run', 'src/serve.ts'], {
           cwd: apiDir,
-          env: { ...process.env, PORT: '8790', STORAGE_ENCRYPTION_KEY: storageKey },
+          env: {
+            ...process.env,
+            PORT: '8790',
+            STORAGE_ENCRYPTION_KEY: storageKey,
+            ADMIN_PIN: process.env.ADMIN_PIN || 'admin',
+          },
           stdio: ['ignore', 'pipe', 'pipe'],
         })
         proc.stdout?.on('data', (d) => console.log('[api]', d.toString().trim()))

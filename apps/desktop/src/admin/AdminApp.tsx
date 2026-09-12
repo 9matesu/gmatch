@@ -4,7 +4,7 @@ import { generateIdentity } from "@orbit/crypto";
 import { getSecureItem, setSecureItem, removeSecureItem } from '../utils/secure-storage'
 import { useEffect, useState, useCallback, useMemo } from "react";
 
-import { orbitFetch } from "../utils/api";
+import { orbitFetch, getApiBaseUrl } from "../utils/api";
 import { useToast } from "../components/Toast";
 import { useConfirm } from "../components/ConfirmDialog";
 import { logger } from "../utils/logger";
@@ -405,6 +405,19 @@ export default function AdminPageClient() {
             Enter the secret administrative passcode to access the moderation console.
           </p>
 
+          {(Boolean(import.meta.env.DEV) || (typeof window !== 'undefined' && (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1'))) && (
+            <div className="flex items-center justify-between text-[11px] bg-amber-500/10 border border-amber-500/20 text-amber-300 px-2.5 py-1.5 rounded">
+              <span>Dev mode: default passcode is <code className="font-mono font-bold bg-black/30 px-1 py-0.5 rounded">admin</code></span>
+              <button
+                type="button"
+                onClick={() => setPin('admin')}
+                className="text-[10px] font-bold underline hover:text-white cursor-pointer ml-2 shrink-0"
+              >
+                Use admin
+              </button>
+            </div>
+          )}
+
           <form onSubmit={handleVerifyPin} className="space-y-3">
             <div>
               <input
@@ -426,8 +439,9 @@ export default function AdminPageClient() {
             </button>
           </form>
 
-          <div className="text-[10px] text-retro-muted font-mono text-center pt-1">
-            Signed as: {identity?.orbitId ? `${identity.orbitId.slice(0, 12)}...` : "Anonymous"}
+          <div className="text-[10px] text-retro-muted font-mono text-center pt-1 space-y-0.5">
+            <div>Target: {getApiBaseUrl()}</div>
+            <div>Signed as: {identity?.orbitId ? `${identity.orbitId.slice(0, 12)}...` : "Anonymous"}</div>
           </div>
         </div>
       </div>

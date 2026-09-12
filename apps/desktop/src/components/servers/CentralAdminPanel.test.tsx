@@ -21,7 +21,10 @@ function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } })
 }
 
+import { _resetResponseCache } from '../../utils/api'
+
 beforeEach(() => {
+  _resetResponseCache()
   const store = new Map<string, string>()
   vi.stubGlobal('localStorage', {
     getItem: (k: string) => store.get(k) ?? null,
@@ -33,7 +36,7 @@ beforeEach(() => {
   } as Storage)
   vi.stubGlobal('matchMedia', vi.fn().mockImplementation(() => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} })))
 })
-afterEach(() => { cleanup(); vi.unstubAllGlobals() })
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); _resetResponseCache(); })
 
 describe('CentralAdminPanel', () => {
   it('renders nothing when the caller is not the central admin (403)', async () => {
@@ -65,5 +68,31 @@ describe('CentralAdminPanel', () => {
     await waitFor(() => expect(calls.some((c) => c.method === 'PATCH' && c.url.includes('/admin/directory/s1'))).toBe(true))
     const patch = calls.find((c) => c.method === 'PATCH')
     expect(JSON.parse(patch!.body!)).toMatchObject({ hidden: true })
+  })
+
+  it('allows unlocking central admin with PIN and renders dashboard upon verification', async () => {
+    let unlocked = false
+    stubFetch(async (url, init) => {
+      if (url.includes('/api/admin/verify-pin')) {
+        unlocked = true
+        return json({ success: true })
+      }
+      if (url.includes('/admin/dashboard')) {
+        if (!unlocked) return json({ error: 'Forbidden' }, 403)
+        return json({ totals: { total: 1, online: 1, stale: 0, hidden: 0, blocked: 0 }, recent: [] })
+      }
+      if (url.includes('/admin/directory')) {
+        return json({ servers: [{ id: 's2', name: 'Beta Node', endpoint_hint: 'b.test:1', hidden: 0, blocked: 0 }] })
+      }
+      return json({})
+    })
+    render(<CentralAdminPanel central={CENTRAL} identity={identity} toast={() => {}} />)
+    const pinInput = await screen.findByPlaceholderText(/central admin passcode/i)
+    fireEvent.change(pinInput, { target: { value: 'admin' } })
+    fireEvent.click(screen.getByRole('button', { name: /unlock/i }))
+
+    await waitFor(() => expect(calls.some((c) => c.url.includes('/api/admin/verify-pin'))).toBe(true))
+    await waitFor(() => expect(screen.getByText('Beta Node')).toBeInTheDocument())
+    expect(screen.getByLabelText('Central admin')).toBeInTheDocument()
   })
 })
