@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   House,
   SquaresFour,
@@ -71,24 +71,6 @@ export function CommandIsland({
   showRooms = false,
 }: CommandIslandProps) {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
-  const [isScrolledDown, setIsScrolledDown] = useState(false);
-  const lastScrollY = useRef(0);
-
-  // Auto-collapse slightly on fast downward scroll to maximize viewing area
-  useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      if (currentScrollY > lastScrollY.current + 30 && currentScrollY > 100) {
-        setIsScrolledDown(true);
-      } else if (currentScrollY < lastScrollY.current - 15) {
-        setIsScrolledDown(false);
-      }
-      lastScrollY.current = currentScrollY;
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   const handleNavClick = (view: MainViewType, soundFreq = 780) => {
     playPress(soundFreq);
@@ -374,9 +356,7 @@ export function CommandIsland({
       {/* Primary Floating Command Island Dock */}
       <nav
         aria-label="Command Island"
-        className={`command-island fixed bottom-5 left-1/2 -translate-x-1/2 z-[var(--z-modal)] flex items-center gap-1 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-full select-none transition-all duration-300 ${
-          isScrolledDown ? 'opacity-80 scale-95 hover:opacity-100 hover:scale-100' : 'opacity-100 scale-100'
-        }`}
+        className="command-island fixed bottom-5 left-1/2 -translate-x-1/2 z-[var(--z-dropdown)] flex items-center gap-1 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-full select-none transition-all duration-300"
       >
         {/* Left Telemetry: $G Balance & Socket Status */}
         <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/[0.04] border border-white/5 text-[11px] font-mono tabular-nums text-retro-body">
