@@ -56,6 +56,8 @@ import { GamesView } from "./components/views/GamesView";
 import { getStoredActiveDeckId, type Deck } from "./components/games/DeckBuilder";
 import { HomeFooter, type MainViewType, type ActiveHackSession } from "./components/home/HomeFooter";
 import { SidebarNav } from "./components/home/SidebarNav";
+import { CommandIsland } from "./components/home/CommandIsland";
+import { NativeHeaderBar } from "./components/home/NativeHeaderBar";
 import { RoomsView } from "./components/rooms/RoomsView";
 import { ServersView } from "./components/servers/ServersView";
 import { PCDominationView } from "./components/views/PCDominationView";
@@ -2911,50 +2913,14 @@ export default function Home() {
           </ErrorBoundary>
         ) : (
           <ErrorBoundary>
-            <div className="app-glass relative z-10 w-full h-full min-h-0 bg-transparent text-retro-fg shadow-2xl flex overflow-hidden">
-              <SidebarNav
-                mainView={mainView}
-                setMainView={handleSetMainView}
-                onOpenHome={handleOpenHome}
-                onOpenCreatePost={() => { setChatOpen(false); setShowCreatePostModal(true); }}
-                onOpenGallery={() => handleSetMainView('gallery')}
-                onOpenSettings={() => { setChatOpen(false); setShowSettingsModal(true); }}
-                onLogout={() => { setChatOpen(false); setIdentityModalMode('logout'); }}
-                onOpenStore={() => handleSetMainView('store')}
-                gamesSubTab={gamesSubTab}
-                onOpenGamesTab={(tab) => {
-                  if (tab === 'cards') { handleSetMainView('gallery'); return; }
-                  handleSetMainView('games'); setGamesSubTab(tab);
-                }}
-                onlineBadge={lobbyRoomCount}
-                gameBadges={{ duel: duelBadge }}
-                isAdmin={myProfile.isAdmin}
-                onGroupToggle={() => setChatOpen(false)}
-                notificationUnreadCount={lobby.unreadCount}
-                onOpenNotifications={openNotifications}
-                notificationsOpen={notifOpen}
-                onToggleMessages={() => {
-                  playPress(860);
-                  setChatOpen((v) => !v);
-                }}
-                messagesOpen={chatOpen}
-                messagesUnreadCount={pmUnreadCount}
-                onOpenWallpaper={() => {
-                  playPress(760);
-                  setSettingsInitialTab('wallpaper');
-                  setShowSettingsModal(true);
-                }}
-                profilePic={profilePics[identity?.orbitId || '']}
-                displayName={myProfile.displayName || myUser?.display_name || 'You'}
-                activeHack={activeHack}
-                balance={myUser?.balance ?? 0}
-                score={myUser?.score ?? 0}
-                reputation={myUser?.reputation ?? 0}
+            <div className="app-glass relative z-10 w-full h-full min-h-0 bg-transparent text-retro-fg shadow-2xl flex flex-col overflow-hidden">
+              <NativeHeaderBar
                 wsConnected={isWsConnected}
-                showRooms={courierActive}
+                activeRoomName={mainView.charAt(0).toUpperCase() + mainView.slice(1)}
+                onOpenSettings={() => { setChatOpen(false); setShowSettingsModal(true); }}
               />
-              <div className="flex-1 min-w-0 min-h-0 flex flex-col">
-                <div ref={mainScrollRef} className="mobile-app-scroll flex-1 min-h-0 w-full flex flex-col relative z-10 overflow-y-auto styled-scrollbar">
+              <div className="flex-1 min-w-0 min-h-0 flex flex-col relative">
+                <div ref={mainScrollRef} className="mobile-app-scroll flex-1 min-h-0 w-full flex flex-col relative z-10 overflow-y-auto styled-scrollbar pb-24">
 
                   {/* Modals & Config */}
                   {isIdle && settings.idleEnabled && (
@@ -3796,22 +3762,35 @@ export default function Home() {
               )}
             </div>
 
-            {/* Mobile-only bottom navigation (desktop uses the left sidebar) */}
-            <div className="mobile-footer fixed inset-x-0 bottom-0 z-50">
-              <HomeFooter
-                mainView={mainView}
-                setMainView={handleSetMainView}
-                onOpenCreatePost={() => setShowCreatePostModal(true)}
-                onOpenGallery={() => handleSetMainView('gallery')}
-                onOpenSettings={() => setShowSettingsModal(true)}
-                onOpenStore={() => handleSetMainView('store')}
-                onOpenPlayers={() => { setGamesSubTab('duel'); handleSetMainView('games'); }}
-                onOpenNotifications={openNotifications}
-                unreadMessagesCount={pmUnreadCount}
-                unreadNotificationsCount={lobby.unreadCount}
-                profilePic={profilePics[identity?.orbitId || '']}
-              />
-            </div>
+            {/* Centered Floating Dynamic Island Navigation HUD */}
+            <CommandIsland
+              mainView={mainView}
+              setMainView={handleSetMainView}
+              balance={myUser?.balance ?? 0}
+              wsConnected={isWsConnected}
+              unreadMessagesCount={pmUnreadCount}
+              unreadNotificationsCount={lobby.unreadCount}
+              displayName={myProfile.displayName || myUser?.display_name || 'You'}
+              profilePic={profilePics[identity?.orbitId || '']}
+              isAdmin={myProfile.isAdmin}
+              onOpenCreatePost={() => { setChatOpen(false); setShowCreatePostModal(true); }}
+              onOpenSettings={() => { setChatOpen(false); setShowSettingsModal(true); }}
+              onOpenStore={() => handleSetMainView('store')}
+              onOpenNotifications={openNotifications}
+              onToggleMessages={() => {
+                playPress(860);
+                setChatOpen((v) => !v);
+              }}
+              messagesOpen={chatOpen}
+              onOpenWallpaper={() => {
+                playPress(760);
+                setSettingsInitialTab('wallpaper');
+                setShowSettingsModal(true);
+              }}
+              onLogout={() => { setChatOpen(false); setIdentityModalMode('logout'); }}
+              onOpenProfile={() => handleSetMainView('profile')}
+              onOpenCreateCard={() => { setChatOpen(false); setShowCreateCardModal(true); }}
+            />
           </ErrorBoundary>
         )}
       </div>

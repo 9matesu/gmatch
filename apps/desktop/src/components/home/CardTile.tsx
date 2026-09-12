@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef } from 'react'
 import { isMediaVideo } from '../../utils/media'
 import { MediaBadge } from '../MediaBadge'
 import { getApiBaseUrl } from '../../utils/api'
@@ -107,14 +108,39 @@ export function CardTile({
   const itemTags = (Array.isArray(item.tags) ? item.tags : parseTags(item.tags)).slice(0, 3)
 
   const frameType = item.frame || 'chrome'
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [tilt, setTilt] = useState({ rotateX: 0, rotateY: 0 })
+  const [mousePos, setMousePos] = useState({ x: 50, y: 50 })
+  const [isHovered, setIsHovered] = useState(false)
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!cardRef.current) return
+    const rect = cardRef.current.getBoundingClientRect()
+    const x = (e.clientX - rect.left) / rect.width
+    const y = (e.clientY - rect.top) / rect.height
+    setTilt({
+      rotateX: (0.5 - y) * 12,
+      rotateY: (x - 0.5) * 12,
+    })
+    setMousePos({ x: x * 100, y: y * 100 })
+  }
 
   return (
     <div
+      ref={cardRef}
       data-rarity={rarity.rarity}
       data-frame={frameType}
-      className={`group relative select-none cursor-pointer transition-all duration-150 active:scale-[0.96] rounded-lg border border-border-glass bg-retro-bg overflow-hidden shadow-xs hover:border-border-glass ${
+      style={{
+        '--mouse-x': `${mousePos.x}%`,
+        '--mouse-y': `${mousePos.y}%`,
+        transform: isHovered
+          ? `perspective(1000px) rotateX(${tilt.rotateX.toFixed(2)}deg) rotateY(${tilt.rotateY.toFixed(2)}deg) scale3d(1.02, 1.02, 1.02)`
+          : undefined,
+      } as React.CSSProperties}
+      className={`holo-card group relative select-none cursor-pointer transition-transform duration-100 ease-out active:scale-[0.96] rounded-xl border border-border-glass bg-retro-bg overflow-hidden shadow-xs hover:border-white/20 ${
         selected ? 'ring-2 ring-white shadow-xl scale-[1.02] z-10' : ''
       }`}
+      onMouseMove={handleMouseMove}
       onClick={() => {
         if (onSelect) onSelect(item.id)
         onClick?.()
@@ -123,10 +149,16 @@ export function CardTile({
         if (onDoubleClick) onDoubleClick()
       }}
       onMouseEnter={() => {
+        setIsHovered(true)
         if (onSelect && dragActive && selected === false) onSelect(item.id)
       }}
+      onMouseLeave={() => {
+        setIsHovered(false)
+        setTilt({ rotateX: 0, rotateY: 0 })
+      }}
     >
-      <div className="flex flex-col h-full rounded-[6px] overflow-hidden" style={{ boxShadow: `inset 0 0 0 1.5px ${accent}66` }}>
+      <div className="holo-sheen" />
+      <div className="holo-card-inner flex flex-col h-full rounded-[6px] overflow-hidden" style={{ boxShadow: `inset 0 0 0 1.5px ${accent}66` }}>
         {/* Top Badges */}
         <div className="absolute top-2 left-2 z-20 flex flex-wrap items-center gap-1">
           <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-md ${rarity.badgeClass}`}>
