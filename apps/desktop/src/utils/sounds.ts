@@ -38,8 +38,19 @@ export function throttled<T extends (...a: never[]) => unknown>(
   }) as unknown as T;
 }
 
+export const MUTE_KEY = '***';
+
+export function isAudioMuted(): boolean {
+  try { return localStorage.getItem(MUTE_KEY) === 'true'; } catch { return false; }
+}
+
+export function setAudioMuted(muted: boolean): void {
+  try { localStorage.setItem(MUTE_KEY, String(muted)); } catch { /* private mode */ }
+}
+
 function ensureCtx(): AudioContext | null {
   if (typeof window === 'undefined') return null;
+  if (isAudioMuted()) return null;
   const AC = window.AudioContext || (window as any).webkitAudioContext;
   if (!AC) return null;
   if (!ctx) {

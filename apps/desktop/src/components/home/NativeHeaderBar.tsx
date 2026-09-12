@@ -8,7 +8,7 @@ import {
   Square,
   X,
 } from '@phosphor-icons/react';
-import { playPress } from '../../utils/sounds';
+import { playPress, isAudioMuted, setAudioMuted } from '../../utils/sounds';
 
 export interface NativeHeaderBarProps {
   wsConnected?: boolean;
@@ -24,16 +24,9 @@ export function NativeHeaderBar({
   onOpenSettings,
 }: NativeHeaderBarProps) {
   const [isMuted, setIsMuted] = useState(false);
-  const [isPackaged, setIsPackaged] = useState(false);
 
   useEffect(() => {
-    // Check if running in Electron
-    const gmatch = (window as unknown as { gmatch?: { serverState?: () => Promise<{ packaged: boolean }> } }).gmatch;
-    if (gmatch?.serverState) {
-      gmatch.serverState().then((state) => {
-        if (state?.packaged) setIsPackaged(true);
-      }).catch(() => {});
-    }
+    setIsMuted(isAudioMuted());
   }, []);
 
   const handleMinimize = () => {
@@ -55,11 +48,9 @@ export function NativeHeaderBar({
   };
 
   const toggleSound = () => {
-    playPress(isMuted ? 880 : 440);
-    setIsMuted(!isMuted);
-    // Hook to global audio mute if available
-    const audioState = (window as unknown as { __GMATCH_AUDIO_MUTED__?: boolean });
-    audioState.__GMATCH_AUDIO_MUTED__ = !isMuted;
+    const next = !isMuted;
+    setAudioMuted(next);
+    setIsMuted(next);
   };
 
   return (
