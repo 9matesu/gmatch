@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, cleanup, within } from '@testing-library/react'
 import { ServersView } from './ServersView'
 
 type FetchCall = { url: string; init?: RequestInit }
@@ -36,7 +36,10 @@ function stubLocalStorage(initial: Record<string, string> = {}) {
   } as Storage)
 }
 
+import { _resetResponseCache } from '../../utils/api'
+
 beforeEach(() => {
+  _resetResponseCache()
   delete (window as unknown as { gmatch?: unknown }).gmatch
   stubLocalStorage({ 'gmatch.central.url': 'https://central.test' })
   vi.stubGlobal('matchMedia', vi.fn().mockImplementation(() => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} })))
@@ -58,8 +61,11 @@ describe('ServersView', () => {
     })
     render(<ServersView identity={identity} toast={() => {}} />)
     await waitFor(() => expect(screen.getByText('Friend World')).toBeInTheDocument())
-    // share wave: the host handle shows on the row, never a raw address
-    expect(screen.getByText('by Alice')).toBeInTheDocument()
+    // create-node cycle: the row shows the shareable HANDLE, never an address
+    // or the admin's name.
+    expect(screen.queryByText('by Alice')).not.toBeInTheDocument()
+    expect(screen.queryByText(/192\.168/)).not.toBeInTheDocument()
+    expect(screen.getByTitle('Copy node code')).toBeInTheDocument()
     expect(screen.getByText('chill')).toBeInTheDocument()
     // password_required => visible lock marker
     expect(screen.getByLabelText('password required')).toBeInTheDocument()
@@ -327,5 +333,112 @@ describe('ServersView', () => {
     expect(screen.getByText(/server browser \(1\)/i)).toBeInTheDocument()
     expect(calls.some((c) => c.url.includes('/api/servers/dashboard'))).toBe(false)
     expect(calls.some((c) => c.url.includes('/api/servers/node'))).toBe(false)
+  })
+
+  it('create drawer previews the node handle before creating and offers a private toggle', async () => {
+    ;(window as unknown as { gmatch?: unknown }).gmatch = {
+      serverState: async () => ({ packaged: true, mode: 'client', url: 'https://central.test', lanUrls: ['http://192.168.0.42:8790'], adminPin: 'abcd1234' }),
+      serverSet: async () => ({ ok: true }),
+      serverRelaunch: () => {},
+    }
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'central', users: [], posts_24h: 0, members_total: 0 })
+      return json({ servers: [] })
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: /create server/i }))
+    fireEvent.change(screen.getByLabelText(/^Server name$/), { target: { value: 'My Realm' } })
+    const preview = await screen.findByTestId('create-handle-preview')
+    expect(preview.textContent).toContain('gmatch://node/')
+    // the LAN IP lives only inside the opaque code, never rendered as text
+    expect(preview.textContent).not.toMatch(/192\.168/)
+    expect(screen.getByLabelText(/Private server/i)).toBeInTheDocument()
+    delete (window as unknown as { gmatch?: unknown }).gmatch
+  })
+
+  it('create with Private checked sends private:true and stores it for the heartbeat', async () => {
+    stubLocalStorage({ 'gmatch.central.url': 'https://central.test' })
+    const ownId = (identity as unknown as { orbitId: string }).orbitId
+    ;(window as unknown as { gmatch?: unknown }).gmatch = {
+      serverState: async () => ({ packaged: true, mode: 'client', url: 'https://central.test', lanUrls: ['http://192.168.0.42:8790'] }),
+      serverSet: async () => ({ ok: true }),
+      serverRelaunch: () => {},
+    }
+    mockFetch(async (url, init) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers') && init?.method === 'POST') {
+        return json({ server: { id: 'p'.repeat(64), name: 'My Realm', owner_id: ownId, password_required: 0, is_private: 1, endpoint_hint: '' } }, 201)
+      }
+      return json({ servers: [] })
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: /create server/i }))
+    fireEvent.change(screen.getByLabelText(/^Server name$/), { target: { value: 'My Realm' } })
+    fireEvent.click(screen.getByLabelText(/Private server/i))
+    fireEvent.click(screen.getByRole('button', { name: /^create$/i }))
+    await waitFor(() => {
+      const post = calls.find((c) => c.init?.method === 'POST')
+      expect(JSON.parse(String(post?.init?.body))).toMatchObject({ name: 'My Realm', private: true })
+    })
+    expect(JSON.parse(localStorage.getItem('gmatch.server.register') || '{}')).toMatchObject({ private: true })
+  })
+
+  it('unregistering my server clears the host claim so create works again', async () => {
+    const ownId = (identity as unknown as { orbitId: string }).orbitId
+    stubLocalStorage({
+      'gmatch.central.url': 'https://central.test',
+      'gmatch.server.register': JSON.stringify({ name: 'My Realm', private: false }),
+      'gmatch.server.directoryId': 'bbb',
+    })
+    ;(window as unknown as { confirm: () => boolean }).confirm = () => true
+    mockFetch(async (url, init) => {
+      if (init?.method === 'DELETE' && url.includes('/api/servers/bbb')) return json({ ok: true })
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'My Realm', users: [], posts_24h: 0, members_total: 1 })
+      if (url.includes('/api/servers/node')) return json({ name: 'My Realm', description: '', isAdmin: true })
+      return json({ servers: [{ id: 'bbb', name: 'My Realm', owner_id: ownId, password_required: 0, endpoint_hint: '10.0.0.1:8790' }] })
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    fireEvent.click(await screen.findByText('unregister'))
+    await waitFor(() => expect(localStorage.getItem('gmatch.server.register')).toBeNull())
+    expect(localStorage.getItem('gmatch.server.directoryId')).toBeNull()
+  })
+
+  it('my directory row gets rename / make private / switch controls', async () => {
+    const ownId = (identity as unknown as { orbitId: string }).orbitId
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers/node')) return json({ name: 'n', description: '', isAdmin: true })
+      return json({ servers: [{ id: 'bbb', name: 'My Realm', owner_id: ownId, password_required: 0, is_private: 0, endpoint_hint: 'my.host:8790' }] })
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    expect(await screen.findByText('Make private')).toBeInTheDocument()
+    // the button row per owner row: rename + switch sit next to share/unregister
+    expect(within(screen.getByRole('listitem')).getAllByRole('button').length).toBeGreaterThanOrEqual(4)
+  })
+
+  it('shows the admin passcode once on first host login and never again after dismiss', async () => {
+    ;(window as unknown as { gmatch?: unknown }).gmatch = {
+      serverState: async () => ({ packaged: true, mode: 'host', url: 'http://127.0.0.1:8790', lanUrls: [], adminPin: 'beefcafe' }),
+    }
+    // orbitFetch's 3s GET cache would leak a prior test's isAdmin:false —
+    // bypass it with a direct spy (same idiom as the tabs test above).
+    const orbitApi = await import('../../utils/api')
+    const spy = vi.spyOn(orbitApi, 'orbitFetch').mockImplementation(async (endpoint: string, init?: RequestInit) => {
+      const e = String(endpoint)
+      if (e.includes('/api/servers/dashboard')) return json({ name: 'My Realm', users: [], posts_24h: 0, members_total: 1 })
+      if (e.includes('/api/servers/node')) return json({ name: 'My Realm', description: '', isAdmin: true })
+      return json({ servers: [] })
+    })
+    const { unmount } = render(<ServersView identity={identity} toast={() => {}} />)
+    const banner = await screen.findByTestId('admin-pin-banner')
+    expect(banner.textContent).toContain('beefcafe')
+    fireEvent.click(screen.getByRole('button', { name: /got it/i }))
+    expect(screen.queryByTestId('admin-pin-banner')).toBeNull()
+    unmount()
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await screen.findByText('Server browser (0)')
+    expect(screen.queryByTestId('admin-pin-banner')).toBeNull()
+    spy.mockRestore()
+    delete (window as unknown as { gmatch?: unknown }).gmatch
   })
 })

@@ -9,10 +9,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Lock, Globe, UserPlus, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, Share2, ArrowLeft, Clock, MessageSquare, Plus } from 'lucide-react'
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
 import { orbitFetch, getApiBaseUrl } from '../../utils/api'
-import { normalizeServerUrl } from '../../utils/serverUrl'
+import { normalizeServerUrl, isCurrentServerUrl } from '../../utils/serverUrl'
 import { joinServer } from '../../utils/join-server'
 import { rememberPendingHost } from '../../utils/server-host-pending'
-import { maskedServerUrl } from '../../utils/ipMask'
 import { mergeDirectory, readDirectoryCache, writeDirectoryCache } from './directoryMerge'
 import { decodeNodeMask } from '../../utils/nodeMask'
 import { buildNodeCode } from '../../utils/nodeShare'
@@ -27,9 +26,9 @@ export interface DirectoryServer {
   name: string
   description?: string
   owner_id: string
-  owner_name?: string
   password_required: number
   endpoint_hint?: string
+  is_private?: number
   user_count?: number | null
   online_count?: number | null
   last_seen?: string
@@ -70,6 +69,9 @@ const DIRECTORY_ID_KEY = 'gmatch.server.directoryId'
 // heartbeat replays this registration while in host mode; its presence also
 // blocks a second Create (one server per install — use Rename instead).
 const REG_KEY = 'gmatch.server.register'
+// One-shot marker: the host-mode admin has seen their minted passcode. The
+// PIN itself comes from serverState().adminPin (electron/admin-pin.cjs).
+const PIN_SEEN_KEY = 'gmatch.server.pinSeen'
 
 /** The host's local display name, best-effort (private mode returns ''). */
 function localDisplayName(): string {
@@ -116,6 +118,7 @@ export function ServersView({
   const [description, setDescription] = useState('')
   const [hint, setHint] = useState('')
   const [needsPassword, setNeedsPassword] = useState(false)
+  const [isPrivate, setIsPrivate] = useState(false)
   const [serverPassword, setServerPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [dirError, setDirError] = useState(false)
@@ -130,6 +133,9 @@ export function ServersView({
   const [serverDescription, setServerDescription] = useState('')
   const [renaming, setRenaming] = useState(false)
   const [serverMode, setServerMode] = useState<'host' | 'client' | null>(null)
+  type ServerBridgeState = { packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[]; adminPin?: string }
+  const [hostState, setHostState] = useState<ServerBridgeState | null>(null)
+  const [pinToDismiss, setPinToDismiss] = useState('')
   const [userTab, setUserTab] = useState<'online' | 'all24h'>('online')
   // Join prompts (Electron has no window.prompt): one pending resolver ref,
   // one dialog kind at a time (password during join, or the paste-code modal).
@@ -221,7 +227,13 @@ export function ServersView({
   useEffect(() => { void refresh() }, [refresh])
   useEffect(() => {
     window.gmatch?.serverState?.()
-      .then((s) => setServerMode(s?.mode ?? null))
+      .then((s) => {
+        setServerMode(s?.mode ?? null)
+        setHostState(s ?? null)
+        let seen = false
+        try { seen = Boolean(localStorage.getItem(PIN_SEEN_KEY)) } catch { /* private mode */ }
+        if (!seen && s?.mode === 'host' && s?.adminPin) setPinToDismiss(s.adminPin)
+      })
       .catch(() => setServerMode(null))
   }, [])
 
@@ -244,7 +256,7 @@ export function ServersView({
     const q = query.trim().toLowerCase()
     return servers
       .filter((s) => !passwordOnly || s.password_required)
-      .filter((s) => !q || `${s.name} ${s.description ?? ''} ${s.owner_name ?? ''} ${s.endpoint_hint ?? ''}`.toLowerCase().includes(q))
+      .filter((s) => !q || `${s.name} ${s.description ?? ''} ${s.endpoint_hint ?? ''}`.toLowerCase().includes(q))
       .sort((a, b) => {
         if (sort === 'name') return a.name.localeCompare(b.name)
         if (sort === 'online') return (b.online_count ?? -1) - (a.online_count ?? -1)
@@ -253,21 +265,21 @@ export function ServersView({
   }, [servers, query, sort, passwordOnly])
 
   const closeCreateForm = () => {
-    setShowCreate(false); setName(''); setDescription(''); setHint(''); setNeedsPassword(false); setServerPassword('')
+    setShowCreate(false); setName(''); setDescription(''); setHint(''); setNeedsPassword(false); setIsPrivate(false); setServerPassword('')
   }
 
   // Best-effort: list the (public) registration on the central directory.
   // Returns the created row (or null). The host heartbeat replays the saved
   // registration every 15min, so a dead directory here self-heals later.
   const registerDirectory = async (
-    n: string, d: string, h: string, pwRequired: boolean,
+    n: string, d: string, h: string, pwRequired: boolean, isPrivate: boolean,
   ): Promise<DirectoryServer | null> => {
     if (!central || !identity) return null
     try {
       const res = await orbitFetch(`${central}/api/servers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: n, description: d, endpoint_hint: h, password_required: pwRequired, owner_name: localDisplayName() || undefined }),
+        body: JSON.stringify({ name: n, description: d, endpoint_hint: h, password_required: pwRequired, private: isPrivate, owner_name: localDisplayName() || undefined }),
       }, identity)
       if (res.ok) {
         const created = (await res.json().catch(() => ({}))) as { server?: DirectoryServer }
@@ -312,10 +324,10 @@ export function ServersView({
         // will replay the registration once the host is reachable again.
         try {
           localStorage.setItem(REG_KEY, JSON.stringify({
-            name: trimmed, description: desc, endpoint_hint: hintFinal, password_required: needsPassword,
+            name: trimmed, description: desc, endpoint_hint: hintFinal, password_required: needsPassword, private: isPrivate,
           }))
         } catch { /* session-only */ }
-        const listed = await registerDirectory(trimmed, desc, hintFinal, needsPassword)
+        const listed = await registerDirectory(trimmed, desc, hintFinal, needsPassword, isPrivate)
         rememberPendingHost({ name: trimmed, description: desc, password: pw || undefined, directoryId: listed?.id })
         if (st?.mode === 'client') {
           const res = await window.gmatch!.serverSet!({ mode: 'host', url: '' })
@@ -335,7 +347,7 @@ export function ServersView({
       // Browser/dev build without the desktop bridge: directory-only listing;
       // hosting your own node needs the packaged app.
       if (!central) { toast('Configure a central node to list a server here. Hosting runs in the desktop app.', 'warning'); return }
-      const listed = await registerDirectory(trimmed, desc, hintFinal, needsPassword)
+      const listed = await registerDirectory(trimmed, desc, hintFinal, needsPassword, isPrivate)
       if (listed) {
         toast('Server registered. Signed-in users can see it in the directory.', 'success')
         closeCreateForm()
@@ -349,6 +361,17 @@ export function ServersView({
   }
 
   const mine = (s: DirectoryServer) => !!identity && s.owner_id === (identity as unknown as { orbitId: string }).orbitId
+
+  const isCurrent = (s: DirectoryServer) => isCurrentServerUrl(getApiBaseUrl(), s.endpoint_hint || '')
+
+  // Switch = join another node, or hop back to this machine's own host node.
+  const switchTo = async (s: DirectoryServer) => {
+    if (!mine(s)) { void joinServer(s, toast, askPassword); return }
+    if (!window.gmatch?.serverSet) return
+    const res = await window.gmatch.serverSet({ mode: 'host', url: '' })
+    if (res.ok) { toast('Switching to your own server. The app restarts.', 'success'); window.gmatch.serverRelaunch?.() }
+    else toast(res.error || 'Could not switch servers', 'error')
+  }
 
   const renameServer = async () => {
     if (!identity) return
@@ -441,9 +464,30 @@ export function ServersView({
     const res = await orbitFetch(`${central}/api/servers/${s.id}`, { method: 'DELETE' }, identity)
     if (res.ok) {
       try { if (localStorage.getItem(DIRECTORY_ID_KEY) === s.id) localStorage.removeItem(DIRECTORY_ID_KEY) } catch { /* session-only */ }
+      // Un-stick the create cycle: the claim marker must die with the row, or
+      // create() refuses forever ("This computer already hosts").
+      try {
+        const raw = localStorage.getItem(REG_KEY)
+        const myDirectoryId = localStorage.getItem(DIRECTORY_ID_KEY) || ''
+        if (raw && (!myDirectoryId || s.id === myDirectoryId)) localStorage.removeItem(REG_KEY)
+      } catch { /* session-only */ }
       toast('Server unregistered.', 'success'); void refresh()
     }
     else toast('Only the owner can unregister a server', 'error')
+  }
+
+  const setPrivate = async (s: DirectoryServer, v: boolean) => {
+    if (!identity || !central) return
+    const res = await orbitFetch(`${central}/api/servers/${s.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ private: v }),
+    }, identity)
+    if (!res.ok) { toast('Could not change privacy for this server', 'error'); return }
+    try {
+      const raw = localStorage.getItem(REG_KEY)
+      if (raw) localStorage.setItem(REG_KEY, JSON.stringify({ ...JSON.parse(raw), private: v }))
+    } catch { /* session-only */ }
+    toast(v ? 'Server is private — reachable only via your code.' : 'Server is public again.', 'success')
+    void refresh()
   }
 
   const allUsers = dash?.users || []
@@ -527,6 +571,32 @@ export function ServersView({
                 </button>
               </div>
             </div>
+
+            {/* First-login admin passcode: shown once while hosting as admin,
+                until dismissed (this node's console PIN, never the PIN of a
+                node you merely joined). */}
+            {serverMode === 'host' && node?.isAdmin && pinToDismiss && (
+              <div role="alert" data-testid="admin-pin-banner" className="glass-inset p-2.5 rounded-lg space-y-1.5">
+                <p className="text-xs text-retro-fg font-bold">You are the admin of this server</p>
+                <p className="text-xs text-retro-muted">
+                  Your admin passcode (unlocks the console — store it somewhere safe):{' '}
+                  <button
+                    type="button"
+                    className="font-mono text-amber-200 hover:text-amber-100 cursor-pointer"
+                    onClick={() => { void navigator.clipboard.writeText(pinToDismiss); toast('Passcode copied', 'success') }}
+                  >
+                    {pinToDismiss}
+                  </button>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { try { localStorage.setItem(PIN_SEEN_KEY, '1') } catch { /* session-only */ } setPinToDismiss('') }}
+                  className="glass-action glass-action-primary px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer"
+                >
+                  Got it
+                </button>
+              </div>
+            )}
 
             {/* Inline Editor */}
             {editingServer && (
@@ -757,11 +827,23 @@ export function ServersView({
                     className="glass-field mt-0.5 w-full px-2.5 py-1 text-xs" />
                 </label>
                 <label className="block text-xs text-retro-muted">
-                  Address friends use (optional — LAN or origin)
-                  <input aria-label="Address hint" value={hint} onChange={(e) => setHint(e.target.value)} maxLength={120} placeholder="192.168.0.42:8790"
+                  Advanced address override (optional)
+                  <input aria-label="Address hint" value={hint} onChange={(e) => setHint(e.target.value)} maxLength={120} placeholder=""
                     className="glass-field mt-0.5 w-full px-2.5 py-1 text-xs font-mono" />
                 </label>
               </div>
+              {/* Live share-handle preview — the address exists only inside the
+                  opaque code; the IP itself is never rendered or typed. */}
+              {(() => {
+                const preview = buildNodeCode(hint.trim() || hostState?.lanUrls?.[0] || '', name.trim())
+                return preview ? (
+                  <div data-testid="create-handle-preview" className="flex items-center gap-2 text-xs font-mono text-retro-muted">
+                    <span className="truncate max-w-[240px]">{preview.slice(0, 28)}…</span>
+                    <button type="button" onClick={() => void navigator.clipboard.writeText(preview)}
+                      className="glass-action px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer">Copy code</button>
+                  </div>
+                ) : <p className="text-xs text-retro-muted">Type a name to get your share code.</p>
+              })()}
               <label className="block text-xs text-retro-muted">
                 Description (public)
                 <input aria-label="Description" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={200}
@@ -770,6 +852,10 @@ export function ServersView({
               <label className="flex items-center gap-2 text-xs text-retro-muted cursor-pointer pt-0.5">
                 <input type="checkbox" checked={needsPassword} onChange={(e) => setNeedsPassword(e.target.checked)} />
                 Ask visitors for a join password
+              </label>
+              <label className="flex items-center gap-2 text-xs text-retro-muted cursor-pointer pt-0.5">
+                <input type="checkbox" aria-label="Private server" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
+                Private — hide from the public browser (friends join with your code)
               </label>
               {needsPassword && (
                 <input
@@ -927,13 +1013,32 @@ export function ServersView({
                                 YOURS · ADMIN
                               </span>
                             )}
+                            {!!s.is_private && (
+                              <span className="text-[10px] px-1.5 py-0.2 rounded font-mono uppercase tracking-wider text-amber-200 border border-amber-400/30 bg-amber-400/10">
+                                Private
+                              </span>
+                            )}
                           </div>
                           {s.description && (
                             <p className="text-xs text-retro-muted truncate mt-0.5">{s.description}</p>
                           )}
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[10px] text-retro-muted font-mono">
-                            <span>{s.endpoint_hint ? maskedServerUrl(s.endpoint_hint) : 'no address published'}</span>
-                            {s.owner_name && <span>by {s.owner_name}</span>}
+                            <span className="flex items-center gap-1">
+                              {s.endpoint_hint && buildNodeCode(s.endpoint_hint, s.name) ? (
+                                <>
+                                  <span className="truncate max-w-[140px]">{(buildNodeCode(s.endpoint_hint, s.name) || '').slice(0, 18)}…</span>
+                                  <button
+                                    type="button"
+                                    title="Copy node code"
+                                    aria-label={`Copy code for ${s.name}`}
+                                    onClick={() => { playPress(820); void shareServer(s.endpoint_hint || '', s.name) }}
+                                    className="text-retro-muted hover:text-retro-fg cursor-pointer"
+                                  >
+                                    <Share2 className="w-3 h-3" />
+                                  </button>
+                                </>
+                              ) : 'no address published'}
+                            </span>
                             <span>seen {formatRelativeTime(s.last_seen)}</span>
                             {(typeof s.online_count === 'number' || typeof s.user_count === 'number') && (
                               <span className="text-retro-fg">
@@ -945,6 +1050,30 @@ export function ServersView({
                         <div className="flex flex-col gap-1 shrink-0 self-center">
                           {mine(s) ? (
                             <>
+                            <button
+                              type="button"
+                              onClick={() => { playPress(780); setServerName(s.name); setEditingServer(true) }}
+                              title="Rename this server (hero editor saves it here and in the directory)"
+                              className="glass-action px-2.5 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer flex items-center gap-1"
+                            >
+                              <Pencil className="w-3 h-3" /> rename
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { playPress(740); void setPrivate(s, !s.is_private) }}
+                              className="glass-action px-2.5 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer"
+                            >
+                              {s.is_private ? 'Make public' : 'Make private'}
+                            </button>
+                            {!isCurrent(s) && (
+                              <button
+                                type="button"
+                                onClick={() => { playPress(620); void switchTo(s) }}
+                                className="glass-action px-2.5 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer flex items-center gap-1"
+                              >
+                                <ArrowLeft className="w-3 h-3" /> Switch
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => void unregister(s)}
@@ -960,6 +1089,14 @@ export function ServersView({
                               <Share2 className="w-3 h-3" /> Share
                             </button>
                             </>
+                          ) : isCurrent(s) ? (
+                            <button
+                              type="button"
+                              disabled
+                              className="glass-action px-3 py-1.5 rounded-lg text-xs font-bold text-retro-muted cursor-default"
+                            >
+                              Connected
+                            </button>
                           ) : (
                             <button
                               type="button"
