@@ -18,13 +18,19 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 // Never die silently: "app doesn't open" was unsolvable without this. Every
-// fatal lands in %APPDATA%/gMatch/main.log AND a native dialog.
+// fatal lands in %APPDATA%/gMatch/main.log AND a native dialog. The log
+// rotates at ~1MB (keeps one .1 generation) so it can never starve the disk.
+const { appendWithRotation } = require('./mainlog-core.cjs')
+const LOG_HINT = 'Details were written to:\n%APPDATA%\\gMatch\\main.log'
+function mainLogPath() {
+  return path.join(app.getPath('userData'), 'main.log')
+}
 function mainLog(line) {
-  try { fs.appendFileSync(path.join(app.getPath('userData'), 'main.log'), `[${new Date().toISOString()}] ${line}\r\n`) } catch { /* last resort only */ }
+  try { appendWithRotation(mainLogPath(), line) } catch { /* last resort only */ }
 }
 process.on('uncaughtException', (err) => {
   mainLog(`uncaught: ${err?.stack || err}`)
-  try { dialog.showErrorBox('gMatch hit an unexpected error', `${String(err?.message || err)}\n\nDetails were written to:\n%APPDATA%\\gMatch\\main.log`) } catch { /* headless edge */ }
+  try { dialog.showErrorBox('gMatch hit an unexpected error', `${String(err?.message || err)}\n\n${LOG_HINT}`) } catch { /* headless edge */ }
 })
 process.on('unhandledRejection', (reason) => mainLog(`unhandledRejection: ${reason?.stack || reason}`))
 
@@ -86,7 +92,7 @@ let packagedServer = null // { mode, url } when app.isPackaged
     }
   } catch (err) {
     mainLog(`userData migration failed: ${err?.stack || err}`)
-    try { dialog.showErrorBox('gMatch could not start', `${String(err?.message || err)}\n\nDetails were written to:\n%APPDATA%\\gMatch\\main.log`) } catch { /* headless edge */ }
+    try { dialog.showErrorBox('gMatch could not start', `${String(err?.message || err)}\n\n${LOG_HINT}`) } catch { /* headless edge */ }
     // Continue on the default path: worse than a rename, but never a zombie.
   }
 })()
@@ -875,6 +881,7 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   const secureAvailable = initSecureKV()
+  ipcMain.on('log:renderer', (_event, { scope, msg }) => mainLog(`[renderer:${scope}] ${msg}`))
   imageCache.init(app.getPath('userData'), UA)
   protocol.handle(imageCache.SCHEME, (request) => imageCache.serveImage(request))
   customFolders.init(app.getPath('userData'), { ipcMain, BrowserWindow })
@@ -890,6 +897,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('cache:evict', (_event, url) => ({ ok: imageCache.evict(String(url ?? '')) }))
   // Update check (Settings): installed version + open the download in the OS browser.
   ipcMain.handle('app:version', () => app.getVersion())
+  ipcMain.handle('app:open-log', () => shell.openPath(app.getPath('userData')))
   ipcMain.handle('shell:open', (_event, url) => {
     if (typeof url === 'string' && /^https?:\/\//i.test(url)) return shell.openExternal(url)
     return Promise.reject(new Error('only http(s) URLs'))
@@ -1039,7 +1047,7 @@ app.whenReady().then(async () => {
     // A fatal during boot used to leave a windowless zombie: no window, no
     // error. Log it, show it, and let the process exit.
     mainLog(`boot failed: ${err?.stack || err}`)
-    try { dialog.showErrorBox('gMatch could not start', `${String(err?.message || err)}\n\nDetails were written to:\n%APPDATA%\\gMatch\\main.log`) } catch { /* headless edge */ }
+    try { dialog.showErrorBox('gMatch could not start', `${String(err?.message || err)}\n\n${LOG_HINT}`) } catch { /* headless edge */ }
   })
 
 // Portable double-launch (or a stale lock): focus the running window instead
