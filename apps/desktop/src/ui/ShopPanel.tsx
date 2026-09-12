@@ -118,7 +118,7 @@ function TagsTab() {
           }
           className={`inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-all duration-150 ${
             on
-              ? 'border-retro-accent/50 bg-retro-accent/15 text-white shadow-[0_0_8px_rgba(56,139,253,0.15)]'
+              ? 'border-retro-accent/50 bg-retro-accent/15 text-retro-fg shadow-[0_0_8px_rgba(56,139,253,0.15)]'
               : isOwned
                 ? 'border-white/10 bg-white/[0.03] text-retro-muted hover:text-white hover:border-white/20'
                 : 'border-dashed border-white/15 bg-transparent text-retro-muted hover:border-retro-accent/40 hover:text-retro-fg'
@@ -192,7 +192,7 @@ function TagsTab() {
               type="button"
               disabled={fetching || !custom.trim()}
               onClick={submitCustom}
-              className="px-3 py-1.5 rounded-xl border border-retro-accent/40 bg-retro-accent/20 hover:bg-retro-accent/30 text-white text-xs font-bold transition-colors disabled:opacity-40 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg border border-retro-accent/40 bg-retro-accent/20 hover:bg-retro-accent/30 text-retro-fg text-xs font-bold transition-colors disabled:opacity-40 cursor-pointer"
             >
               Add
             </button>
@@ -301,7 +301,7 @@ function CapsTab() {
                 type="button"
                 className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-bold transition-all cursor-pointer shrink-0 ${
                   afford
-                    ? 'border-retro-accent/50 bg-retro-accent/20 text-white hover:bg-retro-accent/30 shadow-[0_0_8px_rgba(56,139,253,0.2)]'
+                    ? 'border-retro-accent/50 bg-retro-accent/20 text-retro-fg hover:bg-retro-accent/30 shadow-[0_0_8px_rgba(56,139,253,0.2)]'
                     : 'border-white/[0.06] bg-white/[0.02] text-retro-muted opacity-40 cursor-not-allowed'
                 }`}
                 disabled={!afford}

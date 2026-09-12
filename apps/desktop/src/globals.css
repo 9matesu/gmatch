@@ -288,8 +288,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .glass-panel {
-    -webkit-backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7))) saturate(115%);
-    backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7))) saturate(115%);
+    -webkit-backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7)));
+    backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7)));
   }
 }
 
@@ -322,8 +322,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .glass-surface {
-    -webkit-backdrop-filter: blur(calc(22px * var(--glass-blur, 0.7))) saturate(135%);
-    backdrop-filter: blur(calc(22px * var(--glass-blur, 0.7))) saturate(135%);
+    -webkit-backdrop-filter: blur(calc(22px * var(--glass-blur, 0.7)));
+    backdrop-filter: blur(calc(22px * var(--glass-blur, 0.7)));
   }
 }
 
@@ -345,10 +345,7 @@
   color: var(--color-retro-fg);
   border-color: rgba(88, 166, 255, 0.35);
   background: var(--color-surface-elevated);
-  box-shadow:
-    0 4px 14px rgba(0, 0, 0, 0.35),
-    0 0 12px rgba(56, 139, 253, 0.08);
-  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
 .glass-tab:active,
@@ -361,9 +358,7 @@
   color: #ffffff;
   border-color: rgba(88, 166, 255, 0.5);
   background: var(--color-surface-interactive);
-  box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.4),
-    0 0 14px rgba(56, 139, 253, 0.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 .glass-tab-active:hover {
@@ -438,24 +433,17 @@
    Command Island Floating Dock
    ────────────────────────────────────────────────────────────── */
 .command-island {
-  background: rgba(19, 23, 34, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  backdrop-filter: blur(24px) saturate(140%);
-  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  background: rgba(19, 23, 34, 0.94);
+  border: 1px solid var(--color-border-glass);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border-radius: 9999px;
-  box-shadow:
-    0 12px 36px rgba(0, 0, 0, 0.65),
-    0 0 0 1px rgba(255, 255, 255, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  transition: all 250ms cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
+  transition: border-color 150ms ease-out;
 }
 
 .command-island:hover {
-  border-color: rgba(88, 166, 255, 0.35);
-  box-shadow:
-    0 16px 44px rgba(0, 0, 0, 0.75),
-    0 0 24px rgba(56, 139, 253, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  border-color: var(--color-hud-accent-hover);
 }
 
 
@@ -482,8 +470,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .glass-toolbar {
-    -webkit-backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7))) saturate(110%);
-    backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7))) saturate(110%);
+    -webkit-backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
+    backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
   }
 }
 
@@ -498,8 +486,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .glass-sidebar {
-    -webkit-backdrop-filter: blur(calc(24px * var(--glass-blur, 0.7))) saturate(125%);
-    backdrop-filter: blur(calc(24px * var(--glass-blur, 0.7))) saturate(125%);
+    -webkit-backdrop-filter: blur(calc(24px * var(--glass-blur, 0.7)));
+    backdrop-filter: blur(calc(24px * var(--glass-blur, 0.7)));
   }
 }
 
@@ -519,8 +507,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .glass-card {
-    -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7))) saturate(120%);
-    backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7))) saturate(120%);
+    -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7)));
+    backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7)));
   }
 }
 
@@ -731,8 +719,8 @@
   .app-glass .bg-surface-interactive,
   .app-glass .bg-surface-elevated,
   .app-glass .bg-surface-elevated\/50 {
-    -webkit-backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7))) saturate(115%);
-    backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7))) saturate(115%);
+    -webkit-backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7)));
+    backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7)));
   }
 }
 
@@ -750,8 +738,8 @@
 @supports (backdrop-filter: blur(1px)) {
   .module,
   .module-primary {
-    -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7))) saturate(120%);
-    backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7))) saturate(120%);
+    -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7)));
+    backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7)));
   }
 }
 
@@ -891,8 +879,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .solid-panel {
-    -webkit-backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7))) saturate(115%);
-    backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7))) saturate(115%);
+    -webkit-backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7)));
+    backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7)));
   }
 }
 
@@ -902,7 +890,6 @@
   height: 8px;
   border-radius: 50%;
   background: var(--color-retro-accent);
-  box-shadow: 0 0 8px rgba(159, 227, 255, 0.4);
 }
 
 .status-dot-warning {
