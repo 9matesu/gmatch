@@ -52,12 +52,14 @@ describe('ServersView', () => {
     mockFetch(async (url) => {
       if (url.includes('/api/servers/dashboard')) return json({ name: 'central', users: [{ id: 'abcdef12', display_name: 'Alice', online: true }], posts_24h: 3, members_total: 9 })
       if (url.includes('/api/servers')) return json({ servers: [
-        { id: 'aaa', name: 'Friend World', description: 'chill', owner_id: 'owner1', password_required: 1, endpoint_hint: '192.168.0.9:8790', last_seen: 'x' },
+        { id: 'aaa', name: 'Friend World', description: 'chill', owner_id: 'owner1', owner_name: 'Alice', password_required: 1, endpoint_hint: '192.168.0.9:8790', last_seen: 'x' },
       ] })
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
     await waitFor(() => expect(screen.getByText('Friend World')).toBeInTheDocument())
+    // share wave: the host handle shows on the row, never a raw address
+    expect(screen.getByText('by Alice')).toBeInTheDocument()
     expect(screen.getByText('chill')).toBeInTheDocument()
     // password_required => visible lock marker
     expect(screen.getByLabelText('password required')).toBeInTheDocument()

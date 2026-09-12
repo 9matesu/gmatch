@@ -6,7 +6,7 @@
 // Right = public directory browser (search, join, create).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Lock, Globe, UserPlus, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, ArrowLeft, Clock, MessageSquare, Plus } from 'lucide-react'
+import { Lock, Globe, UserPlus, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, Share2, ArrowLeft, Clock, MessageSquare, Plus } from 'lucide-react'
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
 import { orbitFetch, getApiBaseUrl } from '../../utils/api'
 import { normalizeServerUrl } from '../../utils/serverUrl'
@@ -15,6 +15,7 @@ import { rememberPendingHost } from '../../utils/server-host-pending'
 import { maskedServerUrl } from '../../utils/ipMask'
 import { mergeDirectory, readDirectoryCache, writeDirectoryCache } from './directoryMerge'
 import { decodeNodeMask } from '../../utils/nodeMask'
+import { buildNodeCode } from '../../utils/nodeShare'
 import { PromptDialog } from '../PromptDialog'
 import { claimPendingHost } from '../../hooks/usePendingServerHost'
 import { playPress } from '../../utils/sounds'
@@ -26,6 +27,7 @@ export interface DirectoryServer {
   name: string
   description?: string
   owner_id: string
+  owner_name?: string
   password_required: number
   endpoint_hint?: string
   user_count?: number | null
@@ -242,7 +244,7 @@ export function ServersView({
     const q = query.trim().toLowerCase()
     return servers
       .filter((s) => !passwordOnly || s.password_required)
-      .filter((s) => !q || `${s.name} ${s.description ?? ''} ${s.endpoint_hint ?? ''}`.toLowerCase().includes(q))
+      .filter((s) => !q || `${s.name} ${s.description ?? ''} ${s.owner_name ?? ''} ${s.endpoint_hint ?? ''}`.toLowerCase().includes(q))
       .sort((a, b) => {
         if (sort === 'name') return a.name.localeCompare(b.name)
         if (sort === 'online') return (b.online_count ?? -1) - (a.online_count ?? -1)
@@ -403,6 +405,19 @@ export function ServersView({
 
   const join = async (s: DirectoryServer) => { void joinServer(s, toast, askPassword) }
 
+  // Copy the gmatch://node/ code a friend pastes into "Node code" here.
+  // The clipboard carries the code alone (the paste-side decoder is strict).
+  const shareServer = async (address: string, name: string) => {
+    const code = buildNodeCode(address, name)
+    if (!code) { toast('No shareable address yet. Check Settings, Server.', 'warning'); return }
+    try {
+      await navigator.clipboard.writeText(code)
+      toast('Server code copied. Send it to your friends.', 'success')
+    } catch {
+      toast('Could not reach the clipboard.', 'error')
+    }
+  }
+
   // Wave 2 (D2): out-of-band join — paste a gmatch://node/ code shared by the
   // host directly (no hub coordination needed to reach a node).
   const joinByCode = async (entered: string) => {
@@ -485,6 +500,20 @@ export function ServersView({
                     className="glass-action glass-action-danger h-8 px-2.5 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" /> Leave
+                  </button>
+                )}
+                {serverMode === 'host' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playPress(820)
+                      void window.gmatch?.serverState?.()
+                        .then((st) => void shareServer(st?.lanUrls?.[0] || '', serverName))
+                        .catch(() => void shareServer('', serverName))
+                    }}
+                    className="glass-action h-8 px-2.5 rounded-lg text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1"
+                  >
+                    <Share2 className="w-3 h-3" /> Share
                   </button>
                 )}
                 <button
@@ -904,6 +933,8 @@ export function ServersView({
                           )}
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[10px] text-retro-muted font-mono">
                             <span>{s.endpoint_hint ? maskedServerUrl(s.endpoint_hint) : 'no address published'}</span>
+                            {s.owner_name && <span>by {s.owner_name}</span>}
+                            <span>seen {formatRelativeTime(s.last_seen)}</span>
                             {(typeof s.online_count === 'number' || typeof s.user_count === 'number') && (
                               <span className="text-retro-fg">
                                 <strong>{s.online_count ?? 0}</strong> online · {s.user_count ?? '?'} members
@@ -913,6 +944,7 @@ export function ServersView({
                         </div>
                         <div className="flex flex-col gap-1 shrink-0 self-center">
                           {mine(s) ? (
+                            <>
                             <button
                               type="button"
                               onClick={() => void unregister(s)}
@@ -920,6 +952,14 @@ export function ServersView({
                             >
                               unregister
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => { playPress(820); void shareServer(s.endpoint_hint || '', s.name) }}
+                              className="glass-action px-2.5 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer flex items-center gap-1"
+                            >
+                              <Share2 className="w-3 h-3" /> Share
+                            </button>
+                            </>
                           ) : (
                             <button
                               type="button"
