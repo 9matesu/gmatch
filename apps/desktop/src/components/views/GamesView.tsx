@@ -17,6 +17,7 @@ type GamesSubTab = 'duel' | 'babecock' | 'ranks' | 'idle';
 
 export function GamesView({
   gamesSubTab,
+  setGamesSubTab,
   identity,
   myCards,
   users,
@@ -38,6 +39,7 @@ export function GamesView({
   handleSetMainView: _handleSetMainView,
 }: {
   gamesSubTab: GamesSubTab;
+  setGamesSubTab: (tab: GamesSubTab) => void;
   identity: OrbitIdentity | null;
   myCards: OrbitObject[];
   users: User[];
@@ -69,7 +71,8 @@ export function GamesView({
         const target = users.find((u) => u.id === uId || (u as any).orbitId === uId);
         if (target) setSelectedProfileUser(target);
       }}
-      initialSubTab={gamesSubTab}
+      subTab={gamesSubTab}
+      onSubTabChange={setGamesSubTab}
       renderDuelContent={() => (
         <LobbyPanel
           lobby={lobby}

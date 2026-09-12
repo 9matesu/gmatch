@@ -14,24 +14,20 @@ export function GamesHub({
   identity,
   users = [],
   onSelectUser,
-  initialSubTab = 'idle',
+  subTab,
+  onSubTabChange,
   renderDuelContent,
   onOpenSources,
 }: {
   identity: OrbitIdentity | null;
   users?: User[];
   onSelectUser?: (userId: string) => void;
-  initialSubTab?: GamesTab;
+  subTab: GamesTab;
+  onSubTabChange?: (tab: GamesTab) => void;
   renderDuelContent: () => React.ReactNode;
   /** Open the custom image-sources manager (idle clicker). */
   onOpenSources?: () => void;
 }) {
-  const [subTab, setSubTab] = useState<GamesTab>(initialSubTab);
-
-  // Sync with initialSubTab if parent re-keys or changes it
-  useEffect(() => {
-    setSubTab(initialSubTab);
-  }, [initialSubTab]);
 
   // Idle Clicker fullscreen: Fullscreen API on the workspace box, with an
   // in-app expanded fallback (some hosts deny the request).
@@ -71,7 +67,7 @@ export function GamesHub({
                 type="button"
                 onClick={() => {
                   playPress(780);
-                  setSubTab(mode.id);
+                  onSubTabChange?.(mode.id);
                 }}
                 aria-pressed={subTab === mode.id}
                 className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${

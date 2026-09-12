@@ -3120,6 +3120,7 @@ export default function Home() {
                   {mainView === 'games' && (
                     <GamesView
                       gamesSubTab={gamesSubTab}
+                      setGamesSubTab={setGamesSubTab}
                       identity={identity}
                       myCards={myCards}
                       users={users}
