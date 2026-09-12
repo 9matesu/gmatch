@@ -963,6 +963,11 @@ app.whenReady().then(async () => {
       )
     } catch { /* headless edge */ }
   }
+  let sidecarLogCount = 0
+  apiSidecar.sidecarEvents.on('stderr', (line) => {
+    // Crash forensics without letting a chatty server fill main.log.
+    if (sidecarLogCount++ < 40) mainLog(`[sidecar] ${line}`)
+  })
   apiSidecar.sidecarEvents.on('crashed', (code) => void onSidecarCrash(code))
   if (app.isPackaged) {
     packagedServer = serverMode.readServerMode()

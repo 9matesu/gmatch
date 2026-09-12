@@ -97,8 +97,14 @@ async function startApi() {
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
-  proc.stdout.on('data', (d) => console.log('[api]', d.toString().trim()))
-  proc.stderr.on('data', (d) => console.error('[api!]', d.toString().trim()))
+  const childLog = (kind) => (d) => {
+    const line = String(d).trim()
+    if (!line) return
+    (kind === 'out' ? console.log : console.error)(`[api${kind === 'err' ? '!' : ''}]`, line)
+    sidecarEvents.emit('stderr', `${kind}:${line}`.slice(0, 500))
+  }
+  proc.stdout.on('data', childLog('out'))
+  proc.stderr.on('data', childLog('err'))
   proc.on('error', (err) => {
     console.error('[api] sidecar spawn failed:', err.message)
     proc = null
