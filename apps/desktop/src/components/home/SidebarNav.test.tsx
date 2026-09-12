@@ -129,10 +129,22 @@ describe('SidebarNav logout', () => {
     expect(screen.queryByRole('button', { name: /log out/i })).not.toBeInTheDocument()
   })
 })
-// One function, one control: desktop chat lives in the bottom-right rail only.
-describe('SidebarNav messages entry removal', () => {
-  it('renders no Messages nav button', () => {
-    render(<SidebarNav />)
-    expect(screen.queryByRole('button', { name: /messages/i })).not.toBeInTheDocument()
+describe('SidebarNav messages and wallpaper entries', () => {
+  it('renders Messages nav button and fires onToggleMessages on click', () => {
+    const onToggleMessages = vi.fn()
+    render(<SidebarNav onToggleMessages={onToggleMessages} />)
+    const btn = screen.getByRole('button', { name: /messages/i })
+    expect(btn).toBeInTheDocument()
+    fireEvent.click(btn)
+    expect(onToggleMessages).toHaveBeenCalledOnce()
+  })
+
+  it('renders Wallpaper nav button and fires onOpenWallpaper on click', () => {
+    const onOpenWallpaper = vi.fn()
+    render(<SidebarNav onOpenWallpaper={onOpenWallpaper} />)
+    const btn = screen.getByRole('button', { name: /wallpaper/i })
+    expect(btn).toBeInTheDocument()
+    fireEvent.click(btn)
+    expect(onOpenWallpaper).toHaveBeenCalledOnce()
   })
 })

@@ -15,6 +15,7 @@ export const DEFAULT_SIDEBAR_ORDER: readonly string[] = [
   'notifications',
   'servers',
   'pc_domination',
+  'wallpaper',
   'settings',
 ];
 

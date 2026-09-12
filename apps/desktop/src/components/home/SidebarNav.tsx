@@ -31,6 +31,8 @@ import {
   LogOut,
   ArrowLeft,
   ArrowRight,
+  MessageSquare,
+  Image as ImageIcon,
 } from 'lucide-react';
 import type { MainViewType } from './HomeFooter';
 
@@ -68,6 +70,10 @@ export function SidebarNav({
   onlineBadge = 0,
   isAdmin = false,
   onGroupToggle,
+  onToggleMessages,
+  messagesOpen = false,
+  messagesUnreadCount = 0,
+  onOpenWallpaper,
 }: {
   mainView?: MainViewType;
   setMainView?: (view: MainViewType) => void;
@@ -102,6 +108,14 @@ export function SidebarNav({
   isAdmin?: boolean;
   /** Close transient panels before expanding/collapsing a sidebar group. */
   onGroupToggle?: () => void;
+  /** Toggle desktop messages dock from sidebar. */
+  onToggleMessages?: () => void;
+  /** Whether the messages panel is open. */
+  messagesOpen?: boolean;
+  /** Unread PM count badge for messages. */
+  messagesUnreadCount?: number;
+  /** Quick-access wallpaper background settings modal. */
+  onOpenWallpaper?: () => void;
 }) {
   const [now, setNow] = useState(() => Date.now());
   // HOST installs expose the admin suite in the sidebar (plan T4). Dev/browser
@@ -306,6 +320,18 @@ export function SidebarNav({
         },
       ],
     },
+    ...((onToggleMessages || setMainView)
+      ? [
+        {
+          id: 'messages',
+          label: 'Messages',
+          icon: MessageSquare,
+          active: Boolean(messagesOpen || mainView === 'messages'),
+          action: () => (onToggleMessages ? onToggleMessages() : setMainView?.('messages')),
+          badge: messagesUnreadCount,
+        },
+      ]
+      : []),
     ...(onOpenNotifications
       ? [
         {
@@ -334,6 +360,17 @@ export function SidebarNav({
       // Fused hacks: glow rose while a hack session is live (was Spy entry).
       isHack: Boolean(activeHack && activeHack.expiresAt > now),
     },
+    ...(onOpenWallpaper
+      ? [
+        {
+          id: 'wallpaper',
+          label: 'Wallpaper',
+          icon: ImageIcon,
+          active: false,
+          action: () => onOpenWallpaper(),
+        },
+      ]
+      : []),
     ...(onOpenSettings
       ? [
         {

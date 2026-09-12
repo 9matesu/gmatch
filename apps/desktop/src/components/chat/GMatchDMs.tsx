@@ -135,6 +135,7 @@ export function GMatchDMs({
     return new Set<string>();
   });
   const [listMode, setListMode] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [actionFor, setActionFor] = useState<string | null>(null);
   const [showNewGroup, setShowNewGroup] = useState(false);
@@ -356,6 +357,7 @@ export function GMatchDMs({
   const openGroup = (g: GroupInfo) => {
     playPress(800);
     setListMode(false);
+    setSidebarOpen(false);
     setShowMembers(false);
     onSelectGroup?.(g.id);
     setReplyingTo(null);
@@ -371,6 +373,7 @@ export function GMatchDMs({
       setNewGroupMembers(new Set());
       onSelectGroup?.(id);
       setListMode(false);
+      setSidebarOpen(false);
       onLoadGroupMessages?.(id);
     }
   };
@@ -401,7 +404,7 @@ export function GMatchDMs({
     <div className="flex-1 min-h-0 h-full w-full solid-panel overflow-hidden flex flex-col md:flex-row-reverse font-sans text-retro-fg animate-orbit-fade-in">
       {/* Thread list column — right side on desktop, coupled with the rail's
           players/groups aside; chat panel owns the left. */}
-      <div className={`w-full md:w-60 lg:w-64 border-r md:border-r-0 md:border-l border-border-glass flex flex-col bg-surface-canvas/80 shrink-0 min-h-0 select-none ${openTarget ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`w-full md:w-60 lg:w-64 border-r md:border-r-0 md:border-l border-border-glass flex-col bg-surface-canvas/80 shrink-0 min-h-0 select-none ${openTarget ? (sidebarOpen ? 'flex' : 'hidden') : 'flex'}`}>
         <div className="p-3 sm:p-4 metro-rule flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <h2 className="font-semibold text-sm text-retro-fg truncate">
@@ -417,6 +420,15 @@ export function GMatchDMs({
               className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
             >
               <Plus className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => { playPress(700); setSidebarOpen(false); }}
+              title="Collapse sidebar"
+              aria-label="Collapse sidebar"
+              className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -469,7 +481,7 @@ export function GMatchDMs({
         <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar">
           <button
             type="button"
-            onClick={() => { playPress(800); setListMode(false); onSelectGroup?.(null); onSelectPeer({ orbitId: 'global_lobby', name: 'Lobby Lounge (Everyone)' }); }}
+            onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectPeer({ orbitId: 'global_lobby', name: 'Lobby Lounge (Everyone)' }); }}
             className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors metro-rule text-left cursor-pointer ${openTarget === 'lobby' ? 'bg-glass-w8 border-border-glass' : ''}`}
           >
             <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center">
@@ -486,7 +498,7 @@ export function GMatchDMs({
 
           <button
             type="button"
-            onClick={() => { playPress(800); setListMode(false); onSelectGroup?.(null); onSelectPeer({ orbitId: 'card_queue', name: 'Card Game Queue' }); }}
+            onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectPeer({ orbitId: 'card_queue', name: 'Card Game Queue' }); }}
             className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors metro-rule text-left cursor-pointer ${openTarget === 'queue' ? 'bg-glass-w8 border-border-glass' : ''}`}
           >
             <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center">
@@ -535,7 +547,7 @@ export function GMatchDMs({
                     <button
                       key={p.orbitId}
                       type="button"
-                      onClick={() => { playPress(800); setListMode(false); onSelectGroup?.(null); onSelectPeer(p); setSearchQuery(''); }}
+                      onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectPeer(p); setSearchQuery(''); }}
                       className="w-full p-2.5 rounded-md flex items-center gap-3 hover:bg-glass-w5 transition-colors text-left cursor-pointer"
                     >
                       <div className="w-9 h-9 rounded-full bg-surface-raised border border-border-glass text-retro-muted font-medium text-xs flex items-center justify-center overflow-hidden shrink-0">
@@ -576,7 +588,7 @@ export function GMatchDMs({
                 <div key={peerId} onContextMenu={handleThreadContextMenu}>
                   <button
                     type="button"
-                    onClick={() => { playPress(800); setListMode(false); onSelectGroup?.(null); onSelectPeer({ orbitId: peerId, name, pfp }); setDeleteThreadPeerId(null); }}
+                    onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectPeer({ orbitId: peerId, name, pfp }); setDeleteThreadPeerId(null); }}
                     className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors metro-rule text-left cursor-pointer ${isSelected ? 'bg-glass-w8 border-border-glass' : ''}`}
                   >
                     <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center font-medium text-xs">
@@ -673,7 +685,26 @@ export function GMatchDMs({
                     <X className="w-4 h-4" />
                   </button>
                 )}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    playPress(700);
+                    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                      setListMode(true);
+                      onSelectGroup?.(null);
+                      onBackToThreads?.();
+                    } else {
+                      setSidebarOpen((v) => !v);
+                    }
+                  }}
+                  title={sidebarOpen ? "Hide groups and players" : "Show groups and players"}
+                  aria-label={sidebarOpen ? "Hide groups and players" : "Show groups and players"}
+                  aria-expanded={sidebarOpen}
+                  className={`p-1.5 rounded-md transition-colors cursor-pointer ${sidebarOpen ? 'text-retro-accent bg-glass-w10' : 'text-retro-muted hover:text-retro-fg'}`}
+                >
+                  <Users className="w-4 h-4" />
+                </button>
+              </div>
              </div>
 
              {canShowMembers && showMembers && (

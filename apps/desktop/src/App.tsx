@@ -61,7 +61,7 @@ import { ServersView } from "./components/servers/ServersView";
 import { PCDominationView } from "./components/views/PCDominationView";
 import { DominationEffects } from "./components/domination/DominationEffects";
 import type { ActiveHackDebuff } from "@orbit/shared";
-import { ChevronDown, ChevronRight, MessageSquare, X, Image as ImageIcon } from "lucide-react";
+import { ChevronDown, ChevronRight, MessageSquare, X } from "lucide-react";
 import { WallpaperBackground } from "./components/WallpaperBackground";
 import { ContextOverlay, ReportModal } from "./components/ContextOverlay";
 import { GlobalModals } from "./components/GlobalModals";
@@ -2917,6 +2917,17 @@ export default function Home() {
                 notificationUnreadCount={lobby.unreadCount}
                 onOpenNotifications={openNotifications}
                 notificationsOpen={notifOpen}
+                onToggleMessages={() => {
+                  playPress(860);
+                  setChatOpen((v) => !v);
+                }}
+                messagesOpen={chatOpen}
+                messagesUnreadCount={pmUnreadCount}
+                onOpenWallpaper={() => {
+                  playPress(760);
+                  setSettingsInitialTab('wallpaper');
+                  setShowSettingsModal(true);
+                }}
                 profilePic={profilePics[identity?.orbitId || '']}
                 displayName={myProfile.displayName || myUser?.display_name || 'You'}
                 activeHack={activeHack}
@@ -3630,21 +3641,6 @@ export default function Home() {
                   </button>
                 </div>
               )}
-
-              {/* Desktop wallpaper quick-access button (opens settings on the wallpaper tab) */}
-              <button
-                type="button"
-                onClick={() => {
-                  playPress(760);
-                  setSettingsInitialTab('wallpaper');
-                  setShowSettingsModal(true);
-                }}
-                title="Change wallpaper background"
-                aria-label="Change wallpaper background"
-                className="hidden md:flex fixed right-3 top-1/2 -translate-y-1/2 z-40 w-10 h-10 items-center justify-center rounded-xl glass-toolbar border border-border-glass text-retro-muted hover:text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer shadow-2xl pointer-events-auto"
-              >
-                <ImageIcon className="w-4 h-4" />
-              </button>
 
               <GlobalModals
                 identity={identity}
