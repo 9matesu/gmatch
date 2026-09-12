@@ -60,7 +60,9 @@ users.use('*', orbitAuth)
 users.get('/me', async (c) => {
   const orbitId = c.get('orbitId')
   const user = await c.env.DB.prepare(
-    `SELECT u.*, COALESCE(w.balance, 0) as balance, COALESCE(lr.wins, 0) as matches_won, COALESCE(lr.losses, 0) as matches_lost
+    `SELECT u.*, COALESCE(w.balance, 0) as balance, COALESCE(lr.wins, 0) as matches_won, COALESCE(lr.losses, 0) as matches_lost,
+       (SELECT COUNT(*) FROM Followers f WHERE f.followee_id = u.id AND f.accepted = 1) as fc,
+       (SELECT COUNT(*) FROM Followers f WHERE f.follower_id = u.id AND f.accepted = 1) as gc
      FROM Users u
      LEFT JOIN Wallets w ON w.user_id = u.id
      LEFT JOIN LeagueRank lr ON lr.user_id = u.id
@@ -80,8 +82,10 @@ users.get('/me', async (c) => {
     bio: user.bio || '',
     website: user.website || '',
     last_seen: user.last_seen || null,
-    followers_count: Number(user.followers_count || 0),
-    following_count: Number(user.following_count || 0),
+    // Derived from the Followers table (see /:id): the denormalized columns
+    // drift after cascade deletes and admin edits.
+    followers_count: Number(user.fc || 0),
+    following_count: Number(user.gc || 0),
     posts_count: Number(user.posts_count || 0),
     score: Number(user.score || 0),
     reputation: Number(user.score_total || 0),
@@ -117,8 +121,8 @@ users.get('/', async (c) => {
              COALESCE(u.score_total, 0) as score_total,
              COALESCE(u.bio, '') as bio,
              COALESCE(u.website, '') as website,
-             COALESCE(u.followers_count, 0) as followers_count,
-             COALESCE(u.following_count, 0) as following_count,
+             (SELECT COUNT(*) FROM Followers fc WHERE fc.followee_id = u.id AND fc.accepted = 1) as followers_count,
+             (SELECT COUNT(*) FROM Followers gc WHERE gc.follower_id = u.id AND gc.accepted = 1) as following_count,
              COALESCE(u.posts_count, 0) as posts_count,
              COALESCE(u.is_private, 0) as is_private,
              COALESCE(g.sum_downloads, 0) as gacha_downloads_received,
@@ -154,8 +158,8 @@ users.get('/', async (c) => {
              COALESCE(u.score_total, 0) as score_total,
              COALESCE(u.bio, '') as bio,
              COALESCE(u.website, '') as website,
-             COALESCE(u.followers_count, 0) as followers_count,
-             COALESCE(u.following_count, 0) as following_count,
+             (SELECT COUNT(*) FROM Followers fc WHERE fc.followee_id = u.id AND fc.accepted = 1) as followers_count,
+             (SELECT COUNT(*) FROM Followers gc WHERE gc.follower_id = u.id AND gc.accepted = 1) as following_count,
              COALESCE(u.posts_count, 0) as posts_count,
              COALESCE(u.is_private, 0) as is_private,
              COALESCE(u.is_moderator, 0) as is_moderator,
@@ -317,10 +321,14 @@ users.get('/online', async (c) => {
 // returns only public fields.
 users.get('/:id', async (c) => {
   const id = c.req.param('id')
+  // Counts are COUNTed from the Followers table, not the Users columns: the
+  // denormalized followers_count/following_count drift after cascade deletes
+  // and admin edits (and the columns stay there purely as the bump target).
   const row = await c.env.DB.prepare(
     `SELECT id, public_key, encryption_pub_key, display_name, bio, website,
-            tags, pfp_url, last_seen, score, followers_count,
-            following_count, posts_count, likes_received, is_private, is_admin, is_moderator
+            tags, pfp_url, last_seen, score, posts_count, likes_received, is_private, is_admin, is_moderator,
+            (SELECT COUNT(*) FROM Followers f WHERE f.followee_id = Users.id AND f.accepted = 1) as followers_count,
+            (SELECT COUNT(*) FROM Followers f WHERE f.follower_id = Users.id AND f.accepted = 1) as following_count
      FROM Users WHERE id = ? AND hidden_at IS NULL`,
   ).bind(id).first<Record<string, unknown>>()
   if (!row) return c.json({ error: 'User not found' }, 404)

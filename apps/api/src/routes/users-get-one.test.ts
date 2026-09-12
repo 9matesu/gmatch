@@ -15,6 +15,11 @@ describe('GET /api/users/:id', () => {
     await env.DB.prepare(
       'INSERT INTO Users (id, public_key, display_name, bio, followers_count, following_count, posts_count) VALUES (?, ?, ?, ?, ?, ?, ?)',
     ).bind(alice.orbitId, alice.publicKeyHex, 'Alice', 'hi', 3, 2, 5).run()
+    // counts are derived from the Followers table; give bob+alice 3 real rows
+    for (let i = 0; i < 3; i++) {
+      await env.DB.prepare('INSERT INTO Followers (follower_id, followee_id, accepted) VALUES (?, ?, 1)')
+        .bind(`follower-${i}`, alice.orbitId).run()
+    }
   })
 
   it('returns sanitized public profile fields', async () => {
