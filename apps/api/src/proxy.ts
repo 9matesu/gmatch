@@ -177,10 +177,25 @@ export async function proxyAndStoreExternal(
 
   let res: Response
   try {
+    // Hotlink blockers (realbooru, *.booru.org) 302 imageless "hotlink"
+    // pages without a same-site Referer — the same map the client /px proxy
+    // and electron imageCache.cjs keep. Missing entry = plain fetch.
+    const REFERERS: Record<string, string> = {
+      'realbooru.com': 'https://realbooru.com/',
+      'tbib.org': 'https://tbib.org/',
+      'xbooru.com': 'https://xbooru.com/',
+      'yande.re': 'https://yande.re/',
+      'konachan.com': 'https://konachan.com/',
+      'rule34.paheal.net': 'https://rule34.paheal.net/',
+      'media.redgifs.com': 'https://www.redgifs.com/',
+      'imhentai.xxx': 'https://imhentai.xxx/',
+    }
+    const host = parsed.hostname.replace(/^www\./, '')
+    const referer = REFERERS[host] || (host.endsWith('.booru.org') ? `https://${parsed.hostname}/` : undefined)
     res = await fetch(parsed.toString(), {
       signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
       redirect: 'follow',
-      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'image/*,video/*,*/*;q=0.8' },
+      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'image/*,video/*,*/*;q=0.8', ...(referer ? { Referer: referer } : {}) },
     })
   } catch { return null }
   if (!res.ok) return null

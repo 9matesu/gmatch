@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { orbitFetch } from '../../utils/api';
+import { mediaUrlToCachedFile } from '../../utils/cacheMedia';
 import { isMediaVideo } from '../../utils/media';
 
 interface PostMediaItem {
@@ -216,12 +217,26 @@ export function CreatePostModal({
             /* fall back to url */
           }
         }
+        if (!uploadFile && item.previewUrl.includes('/api/objects/')) {
+          // Server-side repost (gallery/feed item): bytes need the signed
+          // headers; a raw `url` reference would 400 at the URL validator.
+          try {
+            const res = await orbitFetch(item.previewUrl, {}, identity);
+            if (res.ok) {
+              const blob = await res.blob();
+              if (blob.size > 0) uploadFile = new File([blob], `media_${i}.bin`, { type: blob.type || 'image/jpeg' });
+            }
+          } catch {
+            /* fall back to url */
+          }
+        }
         if (!uploadFile && /^https?:\/\//i.test(item.previewUrl)) {
           try {
-            const blob = await fetch(item.previewUrl).then((r) => r.blob());
-            if (blob && blob.size > 0) {
-              uploadFile = new File([blob], `media_${i}.jpg`, { type: blob.type || 'image/jpeg' });
-            }
+            // Booru bytes reject raw cross-origin fetches (CORS + hotlink
+            // 403). mediaUrlToCachedFile is the cache-first ladder: Electron
+            // gmcache (local PC bytes, zero re-download for drained idle
+            // images) -> dev /px proxy -> direct fetch.
+            uploadFile = await mediaUrlToCachedFile(item.previewUrl)
           } catch {
             /* fall back to url */
           }
