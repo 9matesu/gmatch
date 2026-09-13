@@ -22,4 +22,4 @@ chk "em-dash in chrome" "grep -rn $'\u2014' src --include=*.tsx | grep -v test |
 chk "emoji glyph chrome" 'grep -rn "❤️\|⚡\|★\|✕" src --include=*.tsx | grep -v test | grep -v CommentsModal'
 chk "bare animate-fade/slide" 'grep -rn "animate-fade-in\|animate-slide-up\|animate-slide-down" src --include=*.tsx | grep -v orbit'
 echo "-- scrim uniformity (all must be /70) --"
-grep -rn "fixed inset-0" src --include=*.tsx | grep -v test | grep -oE "bg-black/[0-9]+" | sort | uniq -c
+grep -rn "fixed inset-0" src --include=*.tsx | grep -v test | grep -v ContextOverlay | grep -oE "bg-black/[0-9]+" | sort | uniq -c

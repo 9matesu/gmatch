@@ -38,6 +38,10 @@ export function GamesView({
   openCreateCardModal,
   navigateToDeckBuilder,
   handleSetMainView: _handleSetMainView,
+  onRepostImage,
+  onAddToStory,
+  onCreateCard,
+  onSetWallpaper,
 }: {
   gamesSubTab: GamesSubTab;
   setGamesSubTab: (tab: GamesSubTab) => void;
@@ -61,6 +65,10 @@ export function GamesView({
   openCreateCardModal: () => void;
   navigateToDeckBuilder: () => void;
   handleSetMainView: (view: MainViewType) => void;
+  onRepostImage?: (media: { url: string; tags: string[]; name?: string }) => void;
+  onAddToStory?: (media: { url: string; tags: string[]; name?: string }) => void;
+  onCreateCard?: (media: { url: string; tags: string[]; name: string }) => void;
+  onSetWallpaper?: (url: string) => void;
 }) {
   const [showSources, setShowSources] = useState(false);
   return (
@@ -103,6 +111,10 @@ export function GamesView({
         />
       )}
       onOpenSources={() => setShowSources(true)}
+      onRepostImage={onRepostImage}
+      onAddToStory={onAddToStory}
+      onCreateCard={onCreateCard}
+      onSetWallpaper={onSetWallpaper}
     />
     {showSources && <CustomSourcesModal onClose={() => setShowSources(false)} />}
     </>

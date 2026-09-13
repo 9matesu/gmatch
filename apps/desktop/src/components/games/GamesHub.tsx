@@ -18,6 +18,10 @@ export function GamesHub({
   onSubTabChange,
   renderDuelContent,
   onOpenSources,
+  onRepostImage,
+  onAddToStory,
+  onCreateCard,
+  onSetWallpaper,
 }: {
   identity: OrbitIdentity | null;
   users?: User[];
@@ -27,6 +31,10 @@ export function GamesHub({
   renderDuelContent: () => React.ReactNode;
   /** Open the custom image-sources manager (idle clicker). */
   onOpenSources?: () => void;
+  onRepostImage?: (media: { url: string; tags: string[]; name?: string }) => void;
+  onAddToStory?: (media: { url: string; tags: string[]; name?: string }) => void;
+  onCreateCard?: (media: { url: string; tags: string[]; name: string }) => void;
+  onSetWallpaper?: (url: string) => void;
 }) {
 
   // Idle Clicker fullscreen: Fullscreen API on the workspace box, with an
@@ -107,6 +115,10 @@ export function GamesHub({
               idleFullscreen={idleFullscreen}
               onToggleFullscreen={toggleIdleFullscreen}
               onOpenSources={onOpenSources}
+              onRepostImage={onRepostImage}
+              onAddToStory={onAddToStory}
+              onCreateCard={onCreateCard}
+              onSetWallpaper={onSetWallpaper}
             />
           </div>
         )}

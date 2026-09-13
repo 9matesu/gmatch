@@ -53,6 +53,12 @@ export interface GlobalModalsProps {
   settingsInitialTab?: SettingsOpenTarget;
   showCreatePostModal: boolean;
   setShowCreatePostModal: (v: boolean) => void;
+  createPostInitialData?: {
+    mediaList?: Array<{ id: string; previewUrl: string; isExternalUrl?: boolean; file?: File }>;
+    tags?: string;
+    caption?: string;
+  } | null;
+  setCreatePostInitialData?: (v: any) => void;
   showStoryModal: boolean;
   setShowStoryModal: (v: boolean) => void;
   showMaxGoonerModal: boolean;
@@ -95,7 +101,7 @@ export interface GlobalModalsProps {
 }
 
 export function GlobalModals(props: GlobalModalsProps) {
-  const { identity, users, profilePics, settings, updateSettings, setMyProfile, stories, activeVirusHack, setActiveHacks, relationships, followingIds, items, identityModalMode, setIdentityModalMode, exportIdentity, loginWithExportedId, clearIdentity, handleFullConfigDownload, handleFullConfigRestore, showHelpModal, setShowHelpModal, showPointsHelpModal, setShowPointsHelpModal, showFlashModal, setShowFlashModal, showSettingsModal, setShowSettingsModal, settingsInitialTab = 'preferences', showCreatePostModal, setShowCreatePostModal, showStoryModal, setShowStoryModal, showMaxGoonerModal, setShowMaxGoonerModal, showRecommendations, setShowRecommendations, followersModalState, setFollowersModalState, showCoffee, manualCoffeeOpen, triggerReason, dismissCoffee, setManualCoffeeOpen, handleSetMainView, setMainView, setDmMinimized, setPmPeer, setSelectedProfileUser, setSelectedIds, setExpandedItemId, setStoryViewerUserId, loadUsers, loadGallery, loadStories, loadServerFeed, handleAddStory, toggleFollowUser, toast, storyFileInputRef, pfpInputRef, handleSetProfilePic, lobby } = props;
+  const { identity, users, profilePics, settings, updateSettings, setMyProfile, stories, activeVirusHack, setActiveHacks, relationships, followingIds, items, identityModalMode, setIdentityModalMode, exportIdentity, loginWithExportedId, clearIdentity, handleFullConfigDownload, handleFullConfigRestore, showHelpModal, setShowHelpModal, showPointsHelpModal, setShowPointsHelpModal, showFlashModal, setShowFlashModal, showSettingsModal, setShowSettingsModal, settingsInitialTab = 'preferences', showCreatePostModal, setShowCreatePostModal, createPostInitialData, setCreatePostInitialData, showStoryModal, setShowStoryModal, showMaxGoonerModal, setShowMaxGoonerModal, showRecommendations, setShowRecommendations, followersModalState, setFollowersModalState, showCoffee, manualCoffeeOpen, triggerReason, dismissCoffee, setManualCoffeeOpen, handleSetMainView, setMainView, setDmMinimized, setPmPeer, setSelectedProfileUser, setSelectedIds, setExpandedItemId, setStoryViewerUserId, loadUsers, loadGallery, loadStories, loadServerFeed, handleAddStory, toggleFollowUser, toast, storyFileInputRef, pfpInputRef, handleSetProfilePic, lobby } = props;
 
   const { crop, cropper } = useCropper();
 
@@ -257,9 +263,17 @@ export function GlobalModals(props: GlobalModalsProps) {
       {showCreatePostModal && (
         <CreatePostModal
           identity={identity}
-          onClose={() => setShowCreatePostModal(false)}
+          initialMedia={createPostInitialData?.mediaList}
+          initialTags={createPostInitialData?.tags}
+          initialCaption={createPostInitialData?.caption}
+          onClose={() => {
+            setShowCreatePostModal(false);
+            setCreatePostInitialData?.(null);
+          }}
           onPostCreated={() => {
             loadServerFeed();
+            setShowCreatePostModal(false);
+            setCreatePostInitialData?.(null);
           }}
           toast={toast}
         />

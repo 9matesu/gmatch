@@ -130,7 +130,10 @@ export function GMatchProfile({
             reader.readAsDataURL(blob);
           });
         }
-        const res = await saveUserProfile(identity, { pfp_url: persisted });
+        const res = await saveUserProfile(identity, {
+          display_name: displayName?.trim() || undefined,
+          pfp_url: persisted,
+        });
         if (!res.ok) throw new Error(`Profile save failed (${res.status})`);
       } catch {
         toast?.('Could not save profile photo', 'error');

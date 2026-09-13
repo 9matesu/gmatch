@@ -39,10 +39,18 @@ export default function GridWorkspace({
   idleFullscreen = false,
   onToggleFullscreen,
   onOpenSources,
+  onRepostImage,
+  onAddToStory,
+  onCreateCard,
+  onSetWallpaper,
 }: {
   idleFullscreen?: boolean
   onToggleFullscreen?: () => void
   onOpenSources?: () => void
+  onRepostImage?: (media: { url: string; tags: string[]; name?: string }) => void
+  onAddToStory?: (media: { url: string; tags: string[]; name?: string }) => void
+  onCreateCard?: (media: { url: string; tags: string[]; name: string }) => void
+  onSetWallpaper?: (url: string) => void
 }) {
   const ageVerified = useGame((s) => s.ageVerified)
   const setupComplete = useGame((s) => s.setupComplete)
@@ -223,7 +231,12 @@ export default function GridWorkspace({
               </button>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto pt-3 styled-scrollbar">
-              <IdleGalleryView />
+              <IdleGalleryView
+                onRepostImage={onRepostImage}
+                onAddToStory={onAddToStory}
+                onCreateCard={onCreateCard}
+                onSetWallpaper={onSetWallpaper}
+              />
             </div>
           </div>
         </div>

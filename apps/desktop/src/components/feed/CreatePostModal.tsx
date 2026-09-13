@@ -32,19 +32,25 @@ export function CreatePostModal({
   onClose,
   onPostCreated,
   toast,
+  initialMedia,
+  initialTags,
+  initialCaption,
 }: {
   identity: OrbitIdentity | null;
   onClose: () => void;
   onPostCreated?: (newPost: any) => void;
   toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
+  initialMedia?: PostMediaItem[];
+  initialTags?: string;
+  initialCaption?: string;
 }) {
   const [activeTab, setActiveTab] = useState<'upload' | 'camera' | 'url'>('upload');
-  const [mediaList, setMediaList] = useState<PostMediaItem[]>([]);
+  const [mediaList, setMediaList] = useState<PostMediaItem[]>(() => initialMedia || []);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [urlInput, setUrlInput] = useState('');
-  const [caption, setCaption] = useState('');
+  const [caption, setCaption] = useState(initialCaption || '');
   const [location, setLocation] = useState('');
-  const [tags, setTags] = useState('');
+  const [tags, setTags] = useState(initialTags || '');
   const [aspectRatio, setAspectRatio] = useState<'square' | 'portrait' | 'landscape'>('square');
   const [uploading, setUploading] = useState(false);
 
@@ -201,7 +207,26 @@ export function CreatePostModal({
       for (let i = 0; i < mediaList.length; i++) {
         const item = mediaList[i];
         const formData = new FormData();
-        if (item.file) formData.append('image', item.file);
+        let uploadFile = item.file;
+        if (!uploadFile && (item.previewUrl.startsWith('data:') || item.previewUrl.startsWith('blob:'))) {
+          try {
+            const blob = await fetch(item.previewUrl).then((r) => r.blob());
+            uploadFile = new File([blob], `media_${i}.jpg`, { type: blob.type || 'image/jpeg' });
+          } catch {
+            /* fall back to url */
+          }
+        }
+        if (!uploadFile && /^https?:\/\//i.test(item.previewUrl)) {
+          try {
+            const blob = await fetch(item.previewUrl).then((r) => r.blob());
+            if (blob && blob.size > 0) {
+              uploadFile = new File([blob], `media_${i}.jpg`, { type: blob.type || 'image/jpeg' });
+            }
+          } catch {
+            /* fall back to url */
+          }
+        }
+        if (uploadFile) formData.append('image', uploadFile);
         else formData.append('url', item.previewUrl);
         formData.append('is_public', '1');
         formData.append('post_group', postGroup);

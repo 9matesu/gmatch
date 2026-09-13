@@ -2,10 +2,11 @@
 
 import { useState, useMemo } from 'react';
 import { playPress } from '../../utils/sounds';
-import { Search, X, MessageCircle, Users, Image as ImageIcon, Hash } from 'lucide-react';
+import { Search, X, MessageCircle, Users, Image as ImageIcon, Hash, Play, Video } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { FeedPost } from './GMatchFeed';
 import { ObjectImage } from '../ObjectImage';
+import { isMediaVideo } from '../../utils/media';
 
 interface PeerUser {
   id: string;
@@ -207,15 +208,29 @@ export function ExploreSearchModal({
                     onClose();
                   }}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-glass-w20 overflow-hidden shrink-0 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-glass-w20 overflow-hidden shrink-0 flex items-center justify-center relative">
                     {p.url ? (
-                      <ObjectImage contentUrl={p.url} identity={identity} alt="" className="w-full h-full object-cover" />
+                      <>
+                        <ObjectImage contentUrl={p.url} identity={identity} alt="" className="w-full h-full object-cover" />
+                        {isMediaVideo(p.url) && (
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white pointer-events-none">
+                            <Play className="w-3.5 h-3.5 fill-white" />
+                          </div>
+                        )}
+                      </>
                     ) : (
                       <ImageIcon className="w-4 h-4 text-retro-muted" />
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <span className="text-xs font-bold text-retro-fg block truncate">{p.author_name}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-retro-fg block truncate">{p.author_name}</span>
+                      {isMediaVideo(p.url) && (
+                        <span className="px-1 py-0.2 rounded bg-black/60 border border-white/10 text-[10px] font-mono text-retro-accent uppercase tracking-wider">
+                          Video
+                        </span>
+                      )}
+                    </div>
                     {p.caption && <p className="text-xs text-retro-muted truncate">{p.caption}</p>}
                   </div>
                 </div>

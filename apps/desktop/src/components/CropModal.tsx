@@ -49,12 +49,27 @@ export function CropModal({
   const dragRef = useRef<{ px: number; py: number; ox: number; oy: number } | null>(null);
 
   useEffect(() => {
+    let active = true;
     const image = new Image();
     image.crossOrigin = 'anonymous';
-    image.onload = () => setImg(image);
-    image.onerror = () => setLoadError(true);
+    image.onload = () => {
+      if (active) setImg(image);
+    };
+    image.onerror = () => {
+      if (!active) return;
+      // If anonymous CORS failed, try without crossOrigin so user can still crop/view
+      const fallback = new Image();
+      fallback.onload = () => {
+        if (active) setImg(fallback);
+      };
+      fallback.onerror = () => {
+        if (active) setLoadError(true);
+      };
+      fallback.src = src;
+    };
     image.src = src;
     return () => {
+      active = false;
       image.onload = null;
       image.onerror = null;
     };
