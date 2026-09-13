@@ -51,9 +51,7 @@ export function FollowersFollowingModal({
   onClose,
   initialTab = 'followers',
   currentUserId = '',
-  users = [],
   followingIds = [],
-  relationships = [],
   profilePics = {},
   stories = [],
   onToggleFollow,
@@ -79,21 +77,25 @@ export function FollowersFollowingModal({
     }
   }, [isOpen, initialTab]);
 
-  // When viewing a specific user's network, fetch their real followers/following.
+  // The list ALWAYS comes from the server (Followers table): the old local
+  // derivation (relationships + users.slice(0,5) fallback) showed a stale,
+  // fabricated network — the "modal desatualizado" bug. Own profile fetches
+  // under currentUserId; viewing someone else fetches under targetUserId.
+  const listUserId = targetUserId || currentUserId
   useEffect(() => {
-    if (!isOpen || !targetUserId || !identity) {
-      setNetworkFollowers([]);
-      setNetworkFollowing([]);
-      setNetworkLoading(false);
+    if (!isOpen || !listUserId || !identity) {
+      setNetworkFollowers([])
+      setNetworkFollowing([])
+      setNetworkLoading(false)
       return;
     }
     let cancelled = false;
     setNetworkLoading(true);
     Promise.all([
-      orbitFetch(`/api/users/${encodeURIComponent(targetUserId)}/followers`, {}, identity)
+      orbitFetch(`/api/users/${encodeURIComponent(listUserId)}/followers`, {}, identity)
         .then((r) => (r.ok ? r.json() : []))
         .catch(() => []),
-      orbitFetch(`/api/users/${encodeURIComponent(targetUserId)}/following`, {}, identity)
+      orbitFetch(`/api/users/${encodeURIComponent(listUserId)}/following`, {}, identity)
         .then((r) => (r.ok ? r.json() : []))
         .catch(() => []),
     ])
@@ -108,71 +110,13 @@ export function FollowersFollowingModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, targetUserId, identity]);
+  }, [isOpen, listUserId, identity]);
 
-  // Derive Following Users: all users whose id is in followingIds
-  const followingUsers = useMemo<User[]>(() => {
-    const set = new Set(followingIds);
-    const matched = users.filter((u) => set.has(u.id) || set.has((u as any).orbitId));
-    // For any ID in followingIds not in users list, provide fallback
-    const matchedIds = new Set(matched.map((u) => u.id));
-    const missing: User[] = followingIds
-      .filter((id) => id && !matchedIds.has(id))
-      .map((id) => ({
-        id,
-        publicKey: id,
-        createdAt: new Date().toISOString(),
-        display_name: 'Unknown User',
-        tags: ['peer'],
-        online: false,
-        score: 0,
-        matches_won: 0,
-        matches_lost: 0,
-        likes_received: 0,
-      }));
-    return [...matched, ...missing];
-  }, [users, followingIds]);
-
-  // Derive Followers Users: users who have liked/interacted with current user or in relationships
-  const followersUsers = useMemo<User[]>(() => {
-    const followerIdSet = new Set<string>();
-
-    // From relationships
-    for (const rel of relationships) {
-      if (rel.user?.id) followerIdSet.add(rel.user.id);
-    }
-
-    // Fallback: If no server relationships yet, provide users with high affinity/interaction
-    if (followerIdSet.size === 0 && users.length > 0) {
-      users.slice(0, 5).forEach((u) => {
-        if (u.id !== currentUserId) followerIdSet.add(u.id);
-      });
-    }
-
-    const matched = users.filter((u) => followerIdSet.has(u.id) || followerIdSet.has((u as any).orbitId));
-    const matchedIds = new Set(matched.map((u) => u.id));
-    const missing: User[] = Array.from(followerIdSet)
-      .filter((id) => id && !matchedIds.has(id))
-      .map((id) => ({
-        id,
-        publicKey: id,
-        createdAt: new Date().toISOString(),
-        display_name: 'Unknown User',
-        tags: ['follower'],
-        online: false,
-        score: 0,
-        matches_won: 0,
-        matches_lost: 0,
-        likes_received: 0,
-      }));
-
-    return [...matched, ...missing];
-  }, [users, relationships, currentUserId]);
+  // Server list for both own and other profiles (one source of truth).
+  const activeList: Array<User | NetworkUser> =
+    activeTab === 'followers' ? networkFollowers : networkFollowing;
 
   const isTargetMode = Boolean(targetUserId);
-  const localList = activeTab === 'followers' ? followersUsers : followingUsers;
-  const targetList = activeTab === 'followers' ? networkFollowers : networkFollowing;
-  const activeList: Array<User | NetworkUser> = isTargetMode ? targetList : localList;
 
   // Filter list by search query
   const filteredList = useMemo(() => {
@@ -205,7 +149,6 @@ export function FollowersFollowingModal({
   const handleToggleFollow = (u: User | NetworkUser) => {
     playPress(800);
     onToggleFollow?.(u.id);
-    if (!isTargetMode) return;
     const flip = (arr: NetworkUser[]) =>
       arr.map((x) => (x.id === u.id ? { ...x, is_following: !x.is_following } : x));
     if (activeTab === 'followers') setNetworkFollowers(flip);
@@ -260,7 +203,7 @@ export function FollowersFollowingModal({
                 : 'text-retro-muted hover:text-retro-fg'
               }`}
           >
-            <span>{isTargetMode ? networkFollowers.length : followersUsers.length} Followers</span>
+            <span>{networkFollowers.length} Followers</span>
           </button>
 
           <button
@@ -274,7 +217,7 @@ export function FollowersFollowingModal({
                 : 'text-retro-muted hover:text-retro-fg'
               }`}
           >
-            <span>{isTargetMode ? networkFollowing.length : followingUsers.length} Following</span>
+            <span>{networkFollowing.length} Following</span>
           </button>
         </div>
 
@@ -303,19 +246,17 @@ export function FollowersFollowingModal({
 
         {/* User Rows List */}
         <div className="flex-1 overflow-y-auto p-3 space-y-1 styled-scrollbar">
-          {isTargetMode && networkLoading && filteredList.length === 0 && (
+          {networkLoading && filteredList.length === 0 && (
             <div className="py-14 text-center space-y-3">
               <div className="w-7 h-7 border-2 border-retro-accent border-t-transparent rounded-full animate-spin mx-auto" />
               <p className="text-xs text-retro-muted">Loading {activeTab}…</p>
             </div>
           )}
           {filteredList.map((user) => {
-            const isFollowing = isTargetMode
-              ? Boolean((user as NetworkUser).is_following)
-              : followingIds.includes(user.id) || followingIds.includes((user as any).orbitId);
-            const userPfp = isTargetMode
-              ? (user as NetworkUser).pfp_url
-              : profilePics[user.id] || (user as any).avatar_url;
+            const isFollowing = Boolean((user as NetworkUser).is_following)
+              || followingIds.includes(user.id) || followingIds.includes((user as any).orbitId);
+            const userPfp = (user as NetworkUser).pfp_url
+              || profilePics[user.id] || (user as any).avatar_url;
             const hasStory = (stories || []).some(
               (s) => s.owner_id === user.id || (s as any).user_id === user.id
             );
@@ -434,7 +375,7 @@ export function FollowersFollowingModal({
           })}
 
           {/* Empty Search Results State */}
-          {filteredList.length === 0 && searchQuery && !(isTargetMode && networkLoading) && (
+          {filteredList.length === 0 && searchQuery && !(networkLoading) && (
             <div className="py-12 text-center space-y-2">
               <Search className="w-8 h-8 text-retro-body mx-auto" />
               <p className="text-xs font-bold text-retro-body">No results found</p>
@@ -445,7 +386,7 @@ export function FollowersFollowingModal({
           )}
 
           {/* Empty List State */}
-          {filteredList.length === 0 && !searchQuery && !(isTargetMode && networkLoading) && (
+          {filteredList.length === 0 && !searchQuery && !networkLoading && (
             <div className="py-14 text-center space-y-3 px-4">
               <div className="w-12 h-12 rounded-full bg-surface-interactive flex items-center justify-center mx-auto text-retro-muted">
                 <Users className="w-6 h-6" />
