@@ -2,9 +2,24 @@ import { Hono } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { orbitAuth } from '../middleware/auth'
 import type { D1Turso } from '../db'
-import { resolveAttachmentId } from '../pm'
 
 type Bindings = { DB: D1Turso }
+
+async function resolveAttachmentId(
+  db: D1Turso,
+  senderId: string,
+  attachmentId: string,
+): Promise<{ id: string } | { error: string; status?: number }> {
+  const obj = await db.prepare(
+    'SELECT id, owner_id, is_public, hidden_at, mime_type FROM Objects WHERE id = ?'
+  ).bind(attachmentId).first<{ id: string; owner_id: string; is_public: number; hidden_at: string | null; mime_type: string }>()
+  if (!obj) return { error: 'Attachment not found', status: 404 }
+  if (obj.hidden_at) return { error: 'Attachment is unavailable', status: 400 }
+  if (obj.owner_id !== senderId && obj.is_public !== 1) {
+    return { error: 'Attachment is not shareable', status: 403 }
+  }
+  return { id: obj.id }
+}
 
 export const groups = new Hono<{ Bindings: Bindings, Variables: { orbitId: string, publicKeyHex: string } }>()
 

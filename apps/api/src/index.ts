@@ -112,7 +112,6 @@ import { lobby, wsTicket } from './routes/lobby'
 import { rooms } from './routes/rooms'
 import { flash } from './routes/flash'
 import { babecock } from './routes/babecock'
-import { pm } from './routes/pm'
 import { stats } from './routes/stats'
 import { notifications, matchInvites } from './routes/notifications'
 import { posts } from './routes/posts'
@@ -162,7 +161,6 @@ app.route('/api/ws-ticket', wsTicket)
 app.route('/api/rooms', rooms)
 app.route('/api/flash', flash)
 app.route('/api/babecock', babecock)
-app.route('/api/pm', pm)
 app.route('/api/stats', stats)
 app.route('/api/notifications', notifications)
 app.route('/api/lobby/invites', matchInvites)

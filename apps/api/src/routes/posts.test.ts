@@ -303,30 +303,6 @@ describe('Follows API', () => {
   })
 })
 
-describe('pm /send alias', () => {
-  let env: Awaited<ReturnType<typeof createMockEnv>>
-
-  beforeAll(async () => {
-    env = await createMockEnv()
-    await registerUser(env, alice)
-    await registerUser(env, bob)
-  })
-
-  it('POST /api/pm/send maps receiver_id/content to recipient_id/body', async () => {
-    const body = JSON.stringify({ receiver_id: bob.orbitId, content: 'replied to your story!' })
-    const res = await app.request('/api/pm/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders(alice, 'POST', '/api/pm/send', body) },
-      body,
-    }, env)
-    expect(res.status).toBe(200)
-    const json: any = await res.json()
-    expect(json.ok).toBe(true)
-    expect(json.message?.body).toBe('replied to your story!')
-    expect(json.message?.recipient_id).toBe(bob.orbitId)
-  })
-})
-
 describe('Post vs Card separation', () => {
   let env: Awaited<ReturnType<typeof createMockEnv>>
 

@@ -36,4 +36,6 @@ G "admin chat touching private messages" \
 G "spy hack reading DM bodies" \
   "grep -n 'SELECT body.*FROM PrivateMessages\|SELECT.*FROM PrivateMessages' apps/api/src/routes/users.ts"
 
+G "legacy /api/pm mount is dead"   "grep -n \"route('/api/pm\" apps/api/src/index.ts"
+
 if [ "$FAIL" -eq 0 ]; then echo "ALL GREPS CLEAN"; else exit 1; fi

@@ -101,23 +101,8 @@ describe('release loops (P4 gaps)', () => {
     expect((await getRes.json()).card.marketStatus).toBe('none')
   })
 
-  it('share DM round trip: message carrying a /p/<id> link arrives intact', async () => {
-    const permalink = 'http://127.0.0.1:8790/p/abc123'
-    const body = JSON.stringify({ recipient_id: victim.orbitId, body: `look ${permalink}` })
-    const url = '/api/pm/send'
-    const res = await app.request(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...auth(attacker, 'POST', url, body) },
-      body,
-    }, env)
-    expect(res.status).toBe(200)
-
-    const inbox = await app.request('/api/pm?peer_id=' + attacker.orbitId, {
-      headers: auth(victim, 'GET', '/api/pm'),
-    }, env)
-    expect(inbox.status).toBe(200)
-    const messages = await inbox.json()
-    const list = Array.isArray(messages) ? messages : messages.messages || []
-    expect(JSON.stringify(list)).toContain('/p/abc123')
+  it('legacy /api/pm path is DEAD (courier-only DM, user directive 2026-09-13)', async () => {
+    const res = await app.request('/api/pm/send', { method: 'POST' }, env)
+    expect(res.status).toBe(404)
   })
 })
