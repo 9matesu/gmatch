@@ -162,4 +162,36 @@ describe('MailClient (blind courier)', () => {
     expect(body.pubkey).toBe(bob.publicKeyHex)
     expect(verifySignature(hexToBytes(body.sig), new TextEncoder().encode(`${BOB_TOKEN}|aabbccdd,eeff0011`), bob.publicKeyHex)).toBe(true)
   })
+
+  it('watches session delivery tokens and supplies epoch in ackBody when draining session mail', async () => {
+    const { sessionDeliveryToken, seal1to1 } = await import('@orbit/protocol')
+    const curEpoch = 'a'.repeat(32)
+    const prevEpoch = 'b'.repeat(32)
+    const curSessionToken = sessionDeliveryToken(bob.publicKeyHex, curEpoch)
+    const prevSessionToken = sessionDeliveryToken(bob.publicKeyHex, prevEpoch)
+
+    const sessionEnv = seal1to1('session message', 'mail', alice, bob, { to: curSessionToken })
+    let ackPayload: any = null
+    const fetchImpl = makeFetch(async (url, init) => {
+      if (url.endsWith('/ack')) {
+        ackPayload = JSON.parse(String(init!.body))
+        return okJson({ ok: true })
+      }
+      if (url.endsWith(`/api/mail/${curSessionToken}`)) {
+        return okJson({ envelopes: [sessionEnv] })
+      }
+      return okJson({ envelopes: [] })
+    })
+
+    const { c } = client({ fetchImpl })
+    c.epoch = { cur: curEpoch, prev: prevEpoch }
+    expect(c.watchedTokens()).toEqual([BOB_TOKEN, curSessionToken, prevSessionToken])
+
+    await c.pull()
+    expect(ackPayload).toBeTruthy()
+    expect(ackPayload.ids).toEqual([sessionEnv.id])
+    expect(ackPayload.epoch).toBe(curEpoch)
+    expect(ackPayload.pubkey).toBe(bob.publicKeyHex)
+  })
 })
+

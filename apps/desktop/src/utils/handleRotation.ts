@@ -33,8 +33,32 @@ export function isEpoch(v: unknown): v is string {
 }
 
 /** Every token this client should watch/pull this session. */
-export function watchedTokens(homeToken: string, epoch: EpochState): string[] {
-  return [homeToken, epoch.cur, epoch.prev].filter(Boolean)
+export function watchedTokens(homeToken: string, epoch: EpochState, pubKeyHex?: string): string[] {
+  const tokens = [homeToken]
+  if (pubKeyHex) {
+    if (isEpoch(epoch.cur)) {
+      try {
+        tokens.push(sessionDeliveryToken(pubKeyHex, epoch.cur))
+      } catch {
+        tokens.push(epoch.cur)
+      }
+    } else if (epoch.cur) {
+      tokens.push(epoch.cur)
+    }
+    if (isEpoch(epoch.prev)) {
+      try {
+        tokens.push(sessionDeliveryToken(pubKeyHex, epoch.prev))
+      } catch {
+        tokens.push(epoch.prev)
+      }
+    } else if (epoch.prev) {
+      tokens.push(epoch.prev)
+    }
+  } else {
+    if (epoch.cur) tokens.push(epoch.cur)
+    if (epoch.prev) tokens.push(epoch.prev)
+  }
+  return tokens.filter(Boolean)
 }
 
 /** Where to address mail for a peer: their session token once we know the

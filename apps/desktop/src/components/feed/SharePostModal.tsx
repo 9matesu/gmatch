@@ -48,9 +48,11 @@ interface SharePostModalProps {
   identity?: IdentityLike | null;
   toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
   groups?: { id: string; name: string; member_count: number }[];
+  /** Courier-aware DM send owned by App (legacy inbox or blind courier). */
+  onSendDm?: (peerId: string, text: string) => Promise<boolean>;
 }
 
-export function SharePostModal({ post, onClose, followingIds = [], profilePics = {}, userNames = {}, identity = null, toast, groups = [] }: SharePostModalProps) {
+export function SharePostModal({ post, onClose, followingIds = [], profilePics = {}, userNames = {}, identity = null, toast, groups = [], onSendDm }: SharePostModalProps) {
   const [shareSearch, setShareSearch] = useState('');
   const [shareMessage, setShareMessage] = useState('');
   const [sentTargets, setSentTargets] = useState<Record<string, boolean>>({});
@@ -70,14 +72,23 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
       const text = shareMessage.trim()
         ? `${shareMessage.trim()}\n\n${permalink}`
         : permalink;
-      const res = await orbitFetch('/api/pm/send', {
-        method: 'POST',
-        body: JSON.stringify({ recipient_id: targetId, body: text }),
-      }, identity);
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}) as { error?: string });
-        toast?.(`Couldn't share with ${targetName}: ${userFacingError(null, { status: res.status, fallback: data.error || 'try again' })}`, 'error');
-        return;
+      if (onSendDm) {
+        // App decides the transport: sealed courier envelope or server inbox.
+        const ok = await onSendDm(targetId, text)
+        if (!ok) {
+          toast?.(`Couldn't share with ${targetName}. The peer may be offline or the key unknown.`, 'error');
+          return;
+        }
+      } else {
+        const res = await orbitFetch('/api/pm/send', {
+          method: 'POST',
+          body: JSON.stringify({ recipient_id: targetId, body: text }),
+        }, identity);
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}) as { error?: string });
+          toast?.(`Couldn't share with ${targetName}: ${userFacingError(null, { status: res.status, fallback: data.error || 'try again' })}`, 'error');
+          return;
+        }
       }
       setSentTargets((prev) => ({ ...prev, [targetId]: true }));
       pushRecent({ id: targetId, name: targetName, kind: 'user' });

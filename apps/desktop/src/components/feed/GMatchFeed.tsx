@@ -33,6 +33,7 @@ import { LiveCameraModal } from '../camera/LiveCameraModal';
 import { ObjectImage } from '../ObjectImage';
 import CachedImg from '../../ui/CachedImg';
 import { LazyVideo } from '../LazyVideo';
+import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
 import { isMediaVideo } from '../../utils/media';
 import { orbitFetch, postShareUrl } from '../../utils/api';
 import { GAME_AD_TEMPLATES } from '../../utils/gameAds';
@@ -106,6 +107,7 @@ export function GMatchFeed({
   storiesLoading = false,
   followingIds = [],
   profilePics = {},
+  onSendDm,
   users = [],
   onAddStory,
   onOpenStory,
@@ -147,6 +149,8 @@ export function GMatchFeed({
   storiesLoading?: boolean;
   followingIds?: string[];
   profilePics?: Record<string, string>;
+  /** Courier-aware DM transport owned by App (server inbox or sealed courier). */
+  onSendDm?: (peerId: string, text: string) => Promise<boolean>;
   users?: Array<{ id: string; display_name?: string; orbitId?: string; pfp_url?: string | null; tags?: string[]; online?: boolean; followers_count?: number }>;
   onAddStory?: () => void;
   onOpenStory?: (userId: string) => void;
@@ -762,13 +766,14 @@ export function GMatchFeed({
                             videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
                           />
                         ) : isVid ? (
-                          <LazyVideo
+                          <NativeVideoPlayer
                             src={url}
                             videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
                             controls
-                            muted={false}
-                            playOnHover={false}
-                            preload="metadata"
+                            muted={true}
+                            loop
+                            onExpand={() => setActiveLightboxPost(post)}
+                            onDoubleTapLike={() => handleDoubleTap(post)}
                           />
                         ) : (
                           <CachedImg
@@ -788,15 +793,16 @@ export function GMatchFeed({
                       className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
                       videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
                     />
-) : isVideo ? (
-                      <LazyVideo
-                        src={post.url}
-                        videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
-                        controls
-                        muted={false}
-                        playOnHover={false}
-                        preload="metadata"
-                      />
+                  ) : isVideo ? (
+                    <NativeVideoPlayer
+                      src={post.url}
+                      videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
+                      controls
+                      muted={true}
+                      loop
+                      onExpand={() => setActiveLightboxPost(post)}
+                      onDoubleTapLike={() => handleDoubleTap(post)}
+                    />
                   ) : (
                     <CachedImg
                       src={post.url}
@@ -1044,6 +1050,7 @@ export function GMatchFeed({
           identity={identity}
           toast={toast}
           groups={shareGroups}
+          onSendDm={onSendDm}
         />,
         document.body,
       )}

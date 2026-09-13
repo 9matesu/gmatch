@@ -72,7 +72,7 @@ const DEFAULTS = {
   maxSealedLen: 64 * 1024,
 } as const
 
-export const TOKEN_RE = /^[0-9a-f]{64}$/
+export const TOKEN_RE = /^[0-9a-f]{32,64}$/i
 const PUBKEY_RE = /^[0-9a-f]{64}$/
 
 export function createMailStore(opts: MailStoreOptions = {}): MailStore {

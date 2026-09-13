@@ -66,7 +66,8 @@ import type { ActiveHackDebuff } from "@orbit/shared";
 import { ChevronDown, ChevronRight, X, Bell } from "lucide-react";
 import { ChatCircleText } from "@phosphor-icons/react";
 import { WallpaperBackground } from "./components/WallpaperBackground";
-import { ContextOverlay, ReportModal } from "./components/ContextOverlay";
+import { ContextOverlay, ReportModal, type ContextMenuState } from "./components/ContextOverlay";
+import { isMediaVideo } from "./utils/media";
 import { GlobalModals } from "./components/GlobalModals";
 import { GalleryTabView } from "./components/views/GalleryTabView";
 import { CreateCardModal } from "./components/CreateCardModal";
@@ -199,6 +200,24 @@ export default function Home() {
     return resolved === 'messages' && isDesktopViewport() ? 'servers' : resolved
   });
   const [showCreatePostModal, setShowCreatePostModal] = useState(false);
+  const [createPostInitialData, setCreatePostInitialData] = useState<{
+    mediaList?: Array<{ id: string; previewUrl: string; isExternalUrl?: boolean; file?: File }>;
+    tags?: string;
+    caption?: string;
+  } | null>(null);
+
+  const openCreatePostWithMedia = useCallback((media: { url: string; tags?: string[]; name?: string }) => {
+    setCreatePostInitialData({
+      mediaList: [{
+        id: 'repost_' + Math.random().toString(36).substring(2, 9),
+        previewUrl: media.url,
+        isExternalUrl: /^https?:\/\//i.test(media.url),
+      }],
+      tags: Array.isArray(media.tags) ? media.tags.slice(0, 5).join(' ') : '',
+      caption: media.name ? `Repost: ${media.name}` : '',
+    });
+    setShowCreatePostModal(true);
+  }, []);
 
   useEffect(() => {
     if (mainView === 'create') {
@@ -564,18 +583,108 @@ export default function Home() {
     }
   }, [settings.wallpaperSlideshow, settings.wallpaperSlideshowInterval, myCards, resolveWallpaperUrl, updateSettings])
 
-  const [contextMenu, setContextMenu] = useState<{
-    x: number
-    y: number
-    type: 'user' | 'item'
-    data: any
-  } | null>(null)
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
   // Opens the shared right-click menu (see ContextOverlay below).
   const openContextMenu = useCallback((type: 'user' | 'item', data: any) => (e: React.MouseEvent) => {
-    e.preventDefault()
-    setContextMenu({ x: e.clientX, y: e.clientY, type, data })
-  }, [])
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, type, data });
+  }, []);
+
+  // Global custom right-click context menu (media, input, selection, link, general)
+  useEffect(() => {
+    const handleGlobalContextMenu = (e: MouseEvent) => {
+      if (e.defaultPrevented) return;
+
+      e.preventDefault();
+      const target = e.target as HTMLElement | null;
+      const x = e.clientX;
+      const y = e.clientY;
+
+      // 1. Input / textarea / editable
+      const inputEl = target?.closest('input, textarea, [contenteditable="true"]') as HTMLInputElement | HTMLTextAreaElement | HTMLElement | null;
+      if (inputEl && (inputEl.tagName === 'INPUT' || inputEl.tagName === 'TEXTAREA' || (inputEl as HTMLElement).isContentEditable)) {
+        const inp = inputEl as HTMLInputElement | HTMLTextAreaElement;
+        const start = inp.selectionStart ?? 0;
+        const end = inp.selectionEnd ?? 0;
+        const hasSelection = end > start;
+        setContextMenu({
+          x,
+          y,
+          type: 'input',
+          data: {
+            element: inp,
+            hasSelection,
+            value: inp.value,
+          },
+        });
+        return;
+      }
+
+      // 2. Highlighted text
+      const selection = window.getSelection()?.toString()?.trim();
+      if (selection && selection.length > 0) {
+        setContextMenu({
+          x,
+          y,
+          type: 'selection',
+          data: { text: selection },
+        });
+        return;
+      }
+
+      // 3. Image or video element
+      const mediaEl = target?.closest('img, video, [data-media-url], [data-media-src]') as HTMLElement | null;
+      if (mediaEl) {
+        const videoEl = mediaEl.tagName === 'VIDEO' ? (mediaEl as HTMLVideoElement) : mediaEl.querySelector('video');
+        const imgEl = mediaEl.tagName === 'IMG' ? (mediaEl as HTMLImageElement) : mediaEl.querySelector('img');
+        const isVideo = Boolean(videoEl) || (mediaEl.tagName === 'VIDEO') || isMediaVideo((mediaEl as any).src || (mediaEl as any).currentSrc || mediaEl.getAttribute('data-media-url'));
+        const src = (videoEl as any)?.currentSrc || (videoEl as any)?.src || (imgEl as any)?.currentSrc || (imgEl as any)?.src || (mediaEl as any).currentSrc || (mediaEl as any).src || mediaEl.getAttribute('data-media-url') || mediaEl.getAttribute('data-media-src');
+        if (src) {
+          setContextMenu({
+            x,
+            y,
+            type: 'media',
+            data: {
+              src,
+              isVideo,
+              videoEl: videoEl || undefined,
+            },
+          });
+          return;
+        }
+      }
+
+      // 4. Link element
+      const linkEl = target?.closest('a') as HTMLAnchorElement | null;
+      if (linkEl && linkEl.href) {
+        setContextMenu({
+          x,
+          y,
+          type: 'link',
+          data: {
+            href: linkEl.href,
+            text: linkEl.innerText || linkEl.title || linkEl.href,
+          },
+        });
+        return;
+      }
+
+      // 5. Default / general
+      setContextMenu({
+        x,
+        y,
+        type: 'general',
+        data: {},
+      });
+    };
+
+    window.addEventListener('contextmenu', handleGlobalContextMenu);
+    return () => {
+      window.removeEventListener('contextmenu', handleGlobalContextMenu);
+    };
+  }, []);
 
   const [blockedIds, setBlockedIds] = useState<string[]>(() => {
     if (typeof window === 'undefined') return []
@@ -1194,6 +1303,27 @@ export default function Home() {
     }
   }, [users, courierActive, registerCourierKeys])
 
+  // Courier mode owns the thread list locally (sealed E2EE store; the server
+  // is blind by design, /api/pm/threads is dead). Legacy nodes keep the fetch.
+  useEffect(() => {
+    if (!courierActive || !identity) return
+    const rows = Object.values(courier.threads)
+      .filter((th) => th.length)
+      .map((th) => {
+        const last = th[th.length - 1]
+        return {
+          peer_id: last.peerId,
+          peer_name: null, // GMatchDMs.displayNameFor resolves it from the users prop
+          last_id: last.id,
+          last_body: last.text,
+          last_sender_id: last.own ? identity.orbitId : last.peerId,
+          last_created_at: new Date(last.ts).toISOString(),
+        }
+      })
+      .sort((a, b) => (b.last_created_at || '').localeCompare(a.last_created_at || ''))
+    setPmThreads(rows)
+  }, [courierActive, courier.threads, identity])
+
   const loadPmThreads = useCallback(() => {
     if (!identity) return Promise.resolve()
     return orbitFetch(`/api/pm/threads?_t=${Date.now()}`, {}, identity)
@@ -1275,9 +1405,9 @@ export default function Home() {
       .catch(() => { })
   }, [identity, users, myProfile.displayName, loadPmUnreadCount, courierActive, courierPull, courierThreadFor])
 
-  const sendPm = useCallback(async (peerId: string, text: string, replyToId?: string, attachment?: { id: string; url: string }) => {
-    if (!identity) return
-    if (!text.trim() && !attachment) return
+  const sendPm = useCallback(async (peerId: string, text: string, replyToId?: string, attachment?: { id: string; url: string }): Promise<boolean> => {
+    if (!identity) return false
+    if (!text.trim() && !attachment) return false
     // Blind-courier mode (official SITE): sealed envelope to the peer's box,
     // never a server inbox. Attachments ride the sealed body as object refs.
     if (courier.courierActive) {
@@ -1285,12 +1415,13 @@ export default function Home() {
         toast('Replies and attachments need a direct connection. Send text for now.', 'warning')
       }
       const msg = await courier.send(peerId, text.trim())
-      if (!msg || msg.status === 'failed') {
+      const ok = !!msg && msg.status !== 'failed'
+      if (!ok) {
         toast('Peer key unknown. The message stays local and won\'t deliver until you have their key.', 'error')
       }
       void loadPmMessages(peerId)
       loadPmThreads()
-      return
+      return ok
     }
     const optimisticId = `local_${Date.now()}`
     const optimistic: ChatMessage = {
@@ -1322,16 +1453,18 @@ export default function Home() {
         setPmMessagesByPeer(prev => ({ ...prev, [peerId]: (prev[peerId] || []).filter(m => m.id !== optimisticId) }))
         const detail = await res.json().catch(() => ({}) as { error?: string })
         toast(detail.error || `Could not send message (HTTP ${res.status})`, 'error')
-        return
+        return false
       }
       // Drop the optimistic copy now the server has confirmed it — the fresh
       // (cache-busted) refetch carries the authoritative row under its real id.
       setPmMessagesByPeer(prev => ({ ...prev, [peerId]: (prev[peerId] || []).filter(m => m.id !== optimisticId) }))
       loadPmMessages(peerId)
       loadPmThreads()
+      return true
     } catch {
       setPmMessagesByPeer(prev => ({ ...prev, [peerId]: (prev[peerId] || []).filter(m => m.id !== optimisticId) }))
       toast('Couldn\'t send the message. The server is unreachable.', 'error')
+      return false
     }
   }, [identity, myProfile.displayName, loadPmMessages, loadPmThreads, toast, courierActive, courierSend])
 
@@ -2251,8 +2384,12 @@ export default function Home() {
   }
 
   // Share media (either from an API object or direct URL) to story or feed.
-  const shareMediaAs = useCallback(async (media: { url: string; tags?: string[] }, mode: 'story' | 'repost') => {
+  const shareMediaAs = useCallback(async (media: { url: string; tags?: string[]; name?: string }, mode: 'story' | 'repost') => {
     if (!identity) return
+    if (mode === 'repost') {
+      openCreatePostWithMedia(media)
+      return
+    }
     try {
       let blob: Blob
       if (media.url.startsWith('data:')) {
@@ -2269,29 +2406,22 @@ export default function Home() {
       }
       const mime = blob.type || 'image/jpeg'
       const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : mime.includes('gif') ? 'gif' : mime.includes('mp4') ? 'mp4' : 'jpg'
-      if (mode === 'story') {
-        await handleAddStory(new File([blob], `story_${Date.now()}.${ext}`, { type: mime }))
-        toast('Added to your story', 'success')
-        return
-      }
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(String(reader.result || ''))
-        reader.onerror = () => reject(reader.error)
-        reader.readAsDataURL(blob)
-      })
-      const ok = await publishPost([dataUrl], '', media.tags || [])
-      if (ok) toast('Reposted to feed', 'success')
+      await handleAddStory(new File([blob], `story_${Date.now()}.${ext}`, { type: mime }))
+      toast('Added to your story', 'success')
     } catch {
-      toast(mode === 'story' ? 'Story upload failed' : 'Repost failed', 'error')
+      toast('Story upload failed', 'error')
     }
-  }, [identity, toast, publishPost, handleAddStory])
+  }, [identity, toast, handleAddStory, openCreatePostWithMedia])
 
   // Gallery quick actions from the context menu: pull the object's bytes
   // once, then reuse the existing story/post upload paths.
   const shareObjectAs = useCallback((item: { id: string }, mode: 'story' | 'repost') => {
+    if (mode === 'repost') {
+      openCreatePostWithMedia({ url: `/api/objects/${item.id}`, tags: (item as any).tags })
+      return
+    }
     return shareMediaAs({ url: `/api/objects/${item.id}`, tags: (item as any).tags }, mode)
-  }, [shareMediaAs])
+  }, [shareMediaAs, openCreatePostWithMedia])
 
   const fetchAnnouncements = useCallback(() => {
     if (!identity) return Promise.resolve()
@@ -2979,6 +3109,7 @@ export default function Home() {
                                 storiesLoading={storiesLoading}
                                 followingIds={followingIds}
                                 profilePics={profilePics}
+                                onSendDm={sendPm}
                                 onAddStory={() => setShowStoryModal(true)}
                                 onOpenStory={(userId) => {
                                   setExpandedItemId(null);
@@ -3169,6 +3300,10 @@ export default function Home() {
                       openCreateCardModal={openCreateCardModal}
                       navigateToDeckBuilder={navigateToDeckBuilder}
                       handleSetMainView={handleSetMainView}
+                      onRepostImage={openCreatePostWithMedia}
+                      onAddToStory={(m) => void shareMediaAs(m, 'story')}
+                      onCreateCard={openCreateCardWithMedia}
+                      onSetWallpaper={handleSetWallpaper}
                     />
                   )}
 
@@ -3210,7 +3345,12 @@ export default function Home() {
                   {/* Babecock · Idle — gMatch workspace (plan D2/D5) */}
                   {mainView === 'grid' && (
                     <div className="flex-1 min-h-0 w-full">
-                      <GridWorkspace />
+                      <GridWorkspace
+                        onRepostImage={openCreatePostWithMedia}
+                        onAddToStory={(m) => void shareMediaAs(m, 'story')}
+                        onCreateCard={openCreateCardWithMedia}
+                        onSetWallpaper={handleSetWallpaper}
+                      />
                     </div>
                   )}
 
@@ -3277,7 +3417,7 @@ export default function Home() {
                       onOpenOwnerProfile={openProfileById}
                       myCards={myCards as any}
                       onEnterArena={() => { setGamesSubTab('duel'); setMainView('games'); }}
-                      onRepostGalleryImage={(media) => void shareMediaAs(media, 'repost')}
+                      onRepostGalleryImage={(media) => openCreatePostWithMedia(media)}
                       onAddGalleryImageToStory={(media) => void shareMediaAs(media, 'story')}
                     />
                   )}
@@ -3571,6 +3711,7 @@ export default function Home() {
                 onReportItem={(ownerId, ownerName, objectId) => openReportModal(ownerId, ownerName, objectId)}
                 onRepostItem={(item) => void shareObjectAs(item, 'repost')}
                 onAddToStory={(item) => void shareObjectAs(item, 'story')}
+                onRepostImage={(url) => openCreatePostWithMedia({ url })}
               />
               <ReportModal
                 reportModal={reportModal}
@@ -3650,6 +3791,8 @@ export default function Home() {
                 settingsInitialTab={settingsInitialTab}
                 showCreatePostModal={showCreatePostModal}
                 setShowCreatePostModal={setShowCreatePostModal}
+                createPostInitialData={createPostInitialData}
+                setCreatePostInitialData={setCreatePostInitialData}
                 showStoryModal={showStoryModal}
                 setShowStoryModal={setShowStoryModal}
                 showMaxGoonerModal={showMaxGoonerModal}

@@ -222,6 +222,8 @@ Bun.serve({
           db_ready: dbReady,
           error: dbInitError,
           timestamp: new Date().toISOString(),
+          mode: siteServices ? 'courier' : 'legacy',
+          services: siteServices ? Array.from(siteServices) : ['all'],
         }, { status })
       }
       if (!dbReady) {

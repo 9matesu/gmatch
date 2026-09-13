@@ -45,4 +45,24 @@ describe('courier-mode detection', () => {
     expect(b).toBe('legacy')
     expect(slowFn).toHaveBeenCalledTimes(1)
   })
+
+  it('identifies official gmatch.fly.dev and goonmatch.fly.dev without probing', async () => {
+    const fetchFn = vi.fn() as unknown as typeof fetch
+    expect(await detectMailMode('https://gmatch.fly.dev', fetchFn)).toBe('courier')
+    expect(await detectMailMode('https://goonmatch.fly.dev/', fetchFn)).toBe('courier')
+    expect(fetchFn).not.toHaveBeenCalled()
+  })
+
+  it('detects mode from /api/health when available', async () => {
+    const fetchHealth = vi.fn(async (url: string) => {
+      if (url.endsWith('/api/health')) {
+        return new Response(JSON.stringify({ status: 'ok', mode: 'courier' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response('{}', { status: 401 })
+    }) as unknown as typeof fetch
+    expect(await detectMailMode('http://custom-courier.test', fetchHealth)).toBe('courier')
+  })
 })

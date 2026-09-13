@@ -29,6 +29,17 @@ describe('handle rotation (wave 2 C2)', () => {
     expect(list).toEqual(['home', 'a'.repeat(32)])
   })
 
+  it('watched tokens derives sessionDeliveryToken when pubKeyHex is provided', () => {
+    const st: EpochState = { cur: 'a'.repeat(32), prev: 'b'.repeat(32) }
+    const home = deliveryToken(PUB)
+    const list = watchedTokens(home, st, PUB)
+    expect(list).toEqual([
+      home,
+      sessionDeliveryToken(PUB, 'a'.repeat(32)),
+      sessionDeliveryToken(PUB, 'b'.repeat(32)),
+    ])
+  })
+
   it('peer addressing falls back to home without a valid epoch', () => {
     const home = (p: string) => deliveryToken(p)
     expect(peerAddressToken({ publicKeyHex: PUB, encryptionPubHex: '' }, home)).toBe(home(PUB))

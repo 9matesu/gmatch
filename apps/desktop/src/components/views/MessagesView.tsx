@@ -58,7 +58,7 @@ export function MessagesView({
   activeGroupId: string | null;
   setActiveGroupId: (id: string | null) => void;
   sendChatMessage: (text: string, channel?: string) => void;
-  sendPm: (peerId: string, text: string, replyToId?: string, attachment?: { id: string; url: string; isVideo?: boolean }) => Promise<void>;
+  sendPm: (peerId: string, text: string, replyToId?: string, attachment?: { id: string; url: string; isVideo?: boolean }) => Promise<boolean>;
   sendGroupMessage: (groupId: string, text: string, replyToId?: string, attachment?: { id: string; url: string; isVideo?: boolean }) => Promise<void>;
   openAttachmentModal: (target: 'pm' | 'group', peerId?: string, groupId?: string, replyToId?: string) => void;
   loadPmMessages: (peerId: string) => Promise<void> | void;

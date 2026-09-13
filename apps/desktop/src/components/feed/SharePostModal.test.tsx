@@ -78,6 +78,24 @@ describe('SharePostModal (P3.4)', () => {
     expect(screen.queryByRole('button', { name: /sent/i })).not.toBeInTheDocument()
   })
 
+  it('routes the DM through onSendDm (courier-aware App sender), never /api/pm/send', async () => {
+    const onSendDm = vi.fn(async () => true)
+    render(
+      <SharePostModal
+        post={post}
+        onClose={() => {}}
+        followingIds={['bob']}
+        identity={identity}
+        toast={vi.fn()}
+        onSendDm={onSendDm}
+      />,
+    )
+    await userEvent.click(await screen.findByRole('button', { name: /^send$/i }))
+    await waitFor(() => expect(onSendDm).toHaveBeenCalledWith('bob', expect.stringContaining('/p/p-9')))
+    // the dead legacy path must NOT be called
+    expect(vi.mocked(orbitFetch)).not.toHaveBeenCalled()
+  })
+
   it('copy link copies a post deep link, never the bare fly.dev root', async () => {
     render(
       <SharePostModal

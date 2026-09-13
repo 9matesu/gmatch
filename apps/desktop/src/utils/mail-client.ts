@@ -4,11 +4,12 @@ import {
   seal1to1,
   open1to1,
   deliveryToken,
+  sessionDeliveryToken,
   type Envelope,
   type EnvelopeKind,
   type OpenedEnvelope,
 } from '@orbit/protocol'
-import { watchedTokens, type EpochState } from './handleRotation'
+import { watchedTokens, isEpoch, type EpochState } from './handleRotation'
 
 /**
  * Blind-courier mail client (plan Phase 3.1).
@@ -89,6 +90,11 @@ export class MailClient {
     this.token = deliveryToken(deps.identity.publicKeyHex)
   }
 
+  /** All delivery tokens watched and pulled this session (home + cur + prev session tokens). */
+  watchedTokens(): string[] {
+    return watchedTokens(this.token, this.epoch, this.deps.identity.publicKeyHex)
+  }
+
   /** Open the anonymous watch channel. Idempotent. */
   start(): void {
     if (this.started || this.closed) return
@@ -139,7 +145,7 @@ export class MailClient {
     this.ws = sock
     sock.onopen = () => {
       this.reconnectAttempt = 0
-      sock.send(JSON.stringify({ type: 'watch', tokens: watchedTokens(this.token, this.epoch) }))
+      sock.send(JSON.stringify({ type: 'watch', tokens: this.watchedTokens() }))
       // Anything that arrived while disconnected is fetched once on connect.
       void this.pull()
     }
@@ -150,7 +156,7 @@ export class MailClient {
       } catch {
         return
       }
-      if (frame.type === 'mail' && watchedTokens(this.token, this.epoch).includes(frame.to || '')) void this.pull()
+      if (frame.type === 'mail' && this.watchedTokens().includes(frame.to || '')) void this.pull()
     }
     sock.onclose = () => {
       this.ws = null
@@ -202,8 +208,12 @@ export class MailClient {
   private async doPull(): Promise<OpenedEnvelope[]> {
     const base = this.deps.apiBase.replace(/\/+$/, '')
     const opened: OpenedEnvelope[] = []
+    const myPub = this.deps.identity.publicKeyHex
+    const curToken = isEpoch(this.epoch.cur) ? sessionDeliveryToken(myPub, this.epoch.cur) : ''
+    const prevToken = isEpoch(this.epoch.prev) ? sessionDeliveryToken(myPub, this.epoch.prev) : ''
+
     // Wave 2 (C2): drain home + current + previous session boxes each pull.
-    for (const token of watchedTokens(this.token, this.epoch)) {
+    for (const token of this.watchedTokens()) {
       const res = await this.fetcher()(`${base}/api/mail/${token}`).catch(() => null)
       if (!res || !res.ok) {
         this.log(`[mail] pull failed (${res ? res.status : 'network'})`)
@@ -224,7 +234,7 @@ export class MailClient {
         }
       }
       if (consumed.length > 0) {
-        const epoch = token === this.token ? undefined : (token === this.epoch.cur ? this.epoch.cur : this.epoch.prev)
+        const epoch = token === curToken ? this.epoch.cur : (token === prevToken ? this.epoch.prev : undefined)
         await this.fetcher()(`${base}/api/mail/${token}/ack`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

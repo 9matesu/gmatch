@@ -63,7 +63,14 @@ import { unsealRequest } from './middleware/unseal'
 app.use('*', unsealRequest)
 
 app.get('/api/health', rateLimit, (c) => {
-  return c.json({ status: 'ok', timestamp: new Date().toISOString() })
+  const raw = (process.env.SITE_SERVICES || 'all').trim().toLowerCase()
+  const isCourier = raw !== 'all'
+  return c.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    mode: isCourier ? 'courier' : 'legacy',
+    services: isCourier ? raw.split(',').map((s) => s.trim()).filter(Boolean) : ['all'],
+  })
 })
 
 // Public Discord invite link (admin-managed via SystemMeta). No auth: the web
