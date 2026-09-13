@@ -337,16 +337,22 @@ export function ContextOverlay({
                     const text = await navigator.clipboard.readText();
                     if (element && text) {
                       element.focus();
-                      const start = element.selectionStart || 0;
-                      const end = element.selectionEnd || 0;
-                      const val = element.value || '';
-                      element.value = val.slice(0, start) + text + val.slice(end);
-                      element.selectionStart = element.selectionEnd = start + text.length;
-                      element.dispatchEvent(new Event('input', { bubbles: true }));
+                      // insertText goes through the native editing path, which
+                      // React's value tracker observes (manual value splicing
+                      // + synthetic 'input' gets deduped and ignored).
+                      const ok = document.execCommand('insertText', false, text);
+                      if (!ok) {
+                        const start = element.selectionStart || 0;
+                        const end = element.selectionEnd || 0;
+                        const val = element.value || '';
+                        element.value = val.slice(0, start) + text + val.slice(end);
+                        element.selectionStart = element.selectionEnd = start + text.length;
+                        element.dispatchEvent(new Event('input', { bubbles: true }));
+                      }
                       toast('Pasted', 'info');
                     }
                   } catch {
-                    document.execCommand('paste');
+                    toast('Could not read the clipboard', 'warning');
                   }
                   onDismiss();
                 }}

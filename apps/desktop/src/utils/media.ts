@@ -2,6 +2,7 @@
 
 import { getApiBaseUrl } from './api';
 import { logger } from './logger';
+import { mediaUrlToCachedFile } from './cacheMedia';
 
 /**
  * Resolves any relative media endpoint (/api/objects/..., /api/lobby/images/...)
@@ -187,9 +188,16 @@ export async function copyImageToClipboard(url: string): Promise<boolean> {
     const resolved = resolveMediaUrl(url);
     if (!resolved) return false;
 
-    const res = await fetch(resolved);
-    if (!res.ok) throw new Error('Fetch failed');
-    const blob = await res.blob();
+    let blob: Blob;
+    if (/^https?:\/\//i.test(resolved)) {
+      // Booru/remote bytes die on raw cross-origin fetch (CORS/hotlink);
+      // same cache-first ladder as reposts (gmcache -> /px -> direct).
+      blob = await mediaUrlToCachedFile(resolved);
+    } else {
+      const res = await fetch(resolved);
+      if (!res.ok) throw new Error('Fetch failed');
+      blob = await res.blob();
+    }
 
     let pngBlob = blob;
     if (blob.type !== 'image/png') {
