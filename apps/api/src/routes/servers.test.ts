@@ -86,7 +86,7 @@ describe('Server directory API', () => {
     expect(junk.status).toBe(400)
   })
 
-  it('dashboard: counts for anonymous, userlist (id-truncated) for signed callers', async () => {
+  it('dashboard: counts for anonymous, userlist with full ids for signed callers', async () => {
     const anon = await app.request('/api/servers/dashboard', {}, env)
     expect(anon.status).toBe(200)
     const anonBody = (await anon.json()) as { users: unknown[]; members_total: number; posts_24h: number }
@@ -98,9 +98,10 @@ describe('Server directory API', () => {
     expect(authed.status).toBe(200)
     const body = (await authed.json()) as { users: Array<{ id: string; online: boolean }> }
     expect(body.users.length).toBeGreaterThanOrEqual(1)
-    // truncated ids: exactly 8 chars, never the full orbitId
-    expect(body.users.every((u) => u.id.length === 8)).toBe(true)
-    expect(JSON.stringify(body)).not.toContain(owner.orbitId.slice(16))
+    // Full ids: the member-only list must resolve profile clicks on the
+    // client (same exposure as GET /api/users, which every member can call).
+    expect(body.users.every((u) => typeof u.id === 'string' && u.id.length > 8)).toBe(true)
+    expect(body.users.some((u) => u.id === owner.orbitId)).toBe(true)
   })
 
   it('delete is owner-only; heartbeat refreshes last_seen', async () => {

@@ -184,8 +184,8 @@ export function ServersView({
     endpoint_hint: central,
     password_required: 0,
     is_private: 0,
-    user_count: dash?.members_total ?? 1,
-    online_count: dash?.users ? dash.users.filter((u) => u.online).length : 1,
+    user_count: dash?.members_total ?? null,
+    online_count: dash?.users ? dash.users.filter((u) => u.online).length : null,
     last_seen: new Date().toISOString(),
   }), [central, dash])
 
@@ -1438,10 +1438,9 @@ export function ServersView({
                             <div className="flex items-center gap-2 text-[11px] text-retro-muted font-mono pb-3 border-b border-border-subtle/50 mb-3">
                               <span className="inline-flex items-center gap-1 text-emerald-400">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                                <span>{centralServer.online_count ?? 1} online</span>
+                                <span>{typeof centralServer.online_count === 'number' ? `${centralServer.online_count} online` : 'sign in for live counts'}</span>
                               </span>
-                              <span>·</span>
-                              <span>{centralServer.user_count ?? 1} members</span>
+                              {typeof centralServer.user_count === 'number' && (<span>· {centralServer.user_count} members</span>)}
                             </div>
                           </div>
 
@@ -1578,11 +1577,11 @@ export function ServersView({
                                 {(typeof s.online_count === 'number' || typeof s.user_count === 'number') ? (
                                   <span className="inline-flex items-center gap-1 text-emerald-400">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                                    <span>{s.online_count ?? 0} online</span>
-                                    <span className="text-retro-muted">· {s.user_count ?? '?'} members</span>
+                                    <span>{typeof s.online_count === 'number' ? `${s.online_count} online` : 'online n/a'}</span>
+                                    {typeof s.user_count === 'number' && (<span className="text-retro-muted">· {s.user_count} members</span>)}
                                   </span>
                                 ) : (
-                                  <span className="text-retro-muted">0 online</span>
+                                  <span className="text-retro-muted">no live counts</span>
                                 )}
 
                                 {s.endpoint_hint && buildNodeCode(s.endpoint_hint, s.name) ? (

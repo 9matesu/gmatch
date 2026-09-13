@@ -248,7 +248,7 @@ servers.get('/dashboard', softAuth, async (c) => {
   const counts = await c.env.DB.prepare(
     `SELECT
        (SELECT COUNT(*) FROM Objects WHERE is_public = 1 AND created_at >= datetime('now', '-1 day')) as posts_24h,
-       (SELECT COUNT(*) FROM Users) as members_total`,
+       (SELECT COUNT(*) FROM Users WHERE (is_admin = 0 OR is_admin IS NULL) AND id NOT LIKE 'bot_%') as members_total`, 
   ).first<{ posts_24h: number; members_total: number }>()
   const authed = !!c.get('orbitId')
   const serverName = (await getMeta(c.env.DB, NODE_NAME_KEY)) || 'gmatch'
@@ -257,7 +257,7 @@ servers.get('/dashboard', softAuth, async (c) => {
     // userlist for signed-in members of any server; counts for anonymous
     users: authed
       ? (users.results || []).map((u) => ({
-          id: u.id.slice(0, 8),
+          id: u.id,
           display_name: u.display_name?.trim() || undefined,
           pfp_url: u.pfp_url || undefined,
           last_seen: u.last_seen,
