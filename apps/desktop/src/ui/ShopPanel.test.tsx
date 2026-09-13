@@ -1,4 +1,4 @@
-﻿// @vitest-environment jsdom
+// @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -12,7 +12,7 @@ vi.mock('../services/booru', () => ({
 describe('ShopPanel category separation tags (REAL / HENTAI)', () => {
   it('renders REAL and HENTAI category tags above all tags', () => {
     useGame.setState({ allowReal: true, allowHentai: true, tags: [] })
-    render(<ShopPanel onClose={() => {}} />)
+    render(<ShopPanel />)
 
     const realBtn = screen.getByRole('button', { name: /real/i })
     const hentaiBtn = screen.getByRole('button', { name: /hentai/i })
@@ -23,7 +23,7 @@ describe('ShopPanel category separation tags (REAL / HENTAI)', () => {
 
   it('clicking REAL and HENTAI toggles their active states in the game store', async () => {
     useGame.setState({ allowReal: true, allowHentai: true, tags: [] })
-    render(<ShopPanel onClose={() => {}} />)
+    render(<ShopPanel />)
 
     const realBtn = screen.getByRole('button', { name: /real/i })
     await userEvent.click(realBtn)

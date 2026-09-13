@@ -119,9 +119,13 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   const now = Date.now()
 
   const onImageError = useCallback(() => {
+    if (current?.preview && shownUrl !== current.preview) {
+      setShownUrl(current.preview)
+      return
+    }
     setFailedUrl(current?.url ?? null)
     advanceFeed()
-  }, [advanceFeed, current])
+  }, [advanceFeed, current, shownUrl])
 
   // Warm the cache so player never waits: prefetch active grid + next 18 queue items (2 full 3x3 boards ahead)
   useEffect(() => {
@@ -417,6 +421,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                   <CachedImg
                     className={GOON_IMAGE}
                     src={cell.post.url}
+                    fallbackSrc={cell.post.preview}
                     alt="goon grid square"
                     referrerPolicy="no-referrer"
                     onError={() => dropCell(i)}

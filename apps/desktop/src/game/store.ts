@@ -818,7 +818,7 @@ export const useGame = create<GameState>((set, get) => ({
     set({ fetching: true })
     let probe: { ok: boolean; posts: { length: number } }
     try {
-      probe = await fetchPosts({ tags: verdict.name, limit: 5 })
+      probe = await fetchPosts({ tags: verdict.name, limit: 20, page: 0, probe: true })
     } finally {
       set({ fetching: false })
     }

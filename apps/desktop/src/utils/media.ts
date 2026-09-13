@@ -41,8 +41,12 @@ export function isMediaVideo(url?: string | null): boolean {
     clean.endsWith('.webm') ||
     clean.endsWith('.mov') ||
     clean.endsWith('.ogg') ||
+    clean.endsWith('.ogv') ||
+    clean.endsWith('.m4v') ||
+    clean.endsWith('.mkv') ||
     url.includes('video/') ||
-    url.includes('twimg.com') && url.includes('.mp4')
+    url.includes('redgifs.com') ||
+    (url.includes('twimg.com') && url.includes('.mp4'))
   );
 }
 
@@ -123,3 +127,111 @@ export async function contentHash(file: Blob): Promise<string> {
   }
   return hex;
 }
+
+/**
+ * Downloads media from a given URL to the user's computer.
+ */
+export async function downloadMedia(url: string, suggestedFilename?: string): Promise<boolean> {
+  try {
+    const resolved = resolveMediaUrl(url);
+    if (!resolved) return false;
+
+    let filename = suggestedFilename;
+    if (!filename) {
+      const cleanUrl = resolved.split('?')[0];
+      filename = cleanUrl.split('/').pop() || 'media';
+    }
+
+    let blob: Blob | null = null;
+    try {
+      const res = await fetch(resolved);
+      if (res.ok) {
+        blob = await res.blob();
+      }
+    } catch {
+      // Direct link fallback
+    }
+
+    if (blob) {
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1500);
+      return true;
+    } else {
+      const a = document.createElement('a');
+      a.href = resolved;
+      a.download = filename;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return true;
+    }
+  } catch (err) {
+    logger.warn('Failed to download media:', err);
+    return false;
+  }
+}
+
+/**
+ * Copies an image from a URL to the system clipboard as a PNG image.
+ */
+export async function copyImageToClipboard(url: string): Promise<boolean> {
+  try {
+    const resolved = resolveMediaUrl(url);
+    if (!resolved) return false;
+
+    const res = await fetch(resolved);
+    if (!res.ok) throw new Error('Fetch failed');
+    const blob = await res.blob();
+
+    let pngBlob = blob;
+    if (blob.type !== 'image/png') {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      const objUrl = URL.createObjectURL(blob);
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Image failed to load'));
+        img.src = objUrl;
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || 400;
+      canvas.height = img.naturalHeight || 400;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0);
+        const converted = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+        if (converted) pngBlob = converted;
+      }
+      URL.revokeObjectURL(objUrl);
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': pngBlob })
+      ]);
+      return true;
+    } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      await navigator.clipboard.writeText(resolved);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    logger.warn('Failed to copy image to clipboard:', err);
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(resolveMediaUrl(url));
+        return true;
+      }
+    } catch {}
+    return false;
+  }
+}
+

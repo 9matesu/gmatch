@@ -189,7 +189,33 @@ async function cacheImage(url) {
     if (!url) return null
     const hit = meta[url]
     if (hit && mem.get(hit.key)) return `${SCHEME}://f/${hit.key}`
-    const { buf, mime } = await fetchBinary(url)
+
+    const urlsToTry = [url]
+    if (url.includes('realbooru.com/images/')) {
+      const rbMatch = url.match(/https:\/\/realbooru\.com\/images\/([^/]+)\/([^/]+)\/([^.]+)\.(jpg|jpeg|png|gif|mp4|webm)/i)
+      if (rbMatch) {
+        const [, d1, d2, h, ext] = rbMatch
+        const lower = ext.toLowerCase()
+        const alts = ['jpeg', 'jpg', 'png', 'gif'].filter((e) => e !== lower)
+        for (const a of alts) {
+          urlsToTry.push(`https://realbooru.com/images/${d1}/${d2}/${h}.${a}`)
+        }
+        urlsToTry.push(`https://realbooru.com/thumbnails/${d1}/${d2}/thumbnail_${h}.jpg`)
+      }
+    }
+
+    let fetched = null
+    for (const tryUrl of urlsToTry) {
+      try {
+        fetched = await fetchBinary(tryUrl)
+        if (fetched) break
+      } catch {
+        /* try next fallback */
+      }
+    }
+    if (!fetched) return null
+
+    const { buf, mime } = fetched
     const key = cacheFileName(url)
     if (!mem.put(key, buf)) return null // over budget: no local copy, remote URL stands
     meta[url] = { key, mime: mime || EXT_MIME[key.split('.').pop()] || 'application/octet-stream', bytes: buf.length }

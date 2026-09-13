@@ -168,7 +168,7 @@ loadBlocklistData()
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
-const TIMEOUT_MS = 10_000
+const TIMEOUT_MS = 3_500
 
 // Build negative query terms directly from the active blocklist (single source of truth).
 function getQueryNegatives() {
@@ -387,8 +387,9 @@ function parseRealbooruHtml(html) {
     const isGif = tags.includes('gif')
     const ext = isVideo ? 'mp4' : isGif ? 'gif' : 'jpg'
     const url = `https://realbooru.com/images/${dir1}/${dir2}/${hash}.${ext}`
+    const preview = `https://realbooru.com/thumbnails/${dir1}/${dir2}/thumbnail_${hash}.jpg`
     if (!hasBadTag(tags)) {
-      posts.push({ id: `rb-${postId}`, url, tags, rating: 'e', width: 1200, height: 1200 })
+      posts.push({ id: `rb-${postId}`, url, preview, tags, rating: 'e', width: 1200, height: 1200 })
     }
   }
   return posts

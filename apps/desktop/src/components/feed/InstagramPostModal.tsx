@@ -17,6 +17,8 @@ import {
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { FeedPost, PostComment } from './GMatchFeed';
 import { ObjectImage } from '../ObjectImage';
+import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
+import { isMediaVideo } from '../../utils/media';
 
 export function InstagramPostModal({ post, isOpen, onClose, identity, profilePics = {}, isLiked = false, isSaved = false, likeCount = 0, comments = [], onToggleLike, onToggleSave, onAddComment, onToggleCommentLike, onOpenShare, onOptionsClick, onSelectUser, onAvatarClick, onOpenNetwork }: {
   post: FeedPost | null;
@@ -108,24 +110,37 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
             className="relative flex-1 bg-black flex items-center justify-center overflow-hidden min-h-[340px] md:min-h-[580px] max-h-[50vh] md:max-h-none"
             onDoubleClick={handleDoubleTap}
           >
-            <div
-              className="w-full h-full flex items-center justify-center transition-transform duration-300 ease-out cursor-zoom-in"
-              style={{ transform: `scale(${zoomLevel})` }}
-              onClick={handleZoomToggle}
-            >
-              <ObjectImage
-                contentUrl={mediaList[activeMediaIndex] || post.url}
-                objectId={null}
-                identity={identity}
-                alt=""
-                className="w-full h-full object-contain max-h-[85vh]"
+            {isMediaVideo(mediaList[activeMediaIndex] || post.url) ? (
+              <NativeVideoPlayer
+                src={mediaList[activeMediaIndex] || post.url}
+                className="w-full h-full max-h-[85vh] object-contain"
+                videoClassName="w-full h-full max-h-[85vh] object-contain"
+                autoPlay={true}
+                controls={true}
+                loop={true}
                 muted={false}
-                autoPlay={false}
-                controls
-                loop
-                playsInline
+                onDoubleTapLike={handleDoubleTap}
               />
-            </div>
+            ) : (
+              <div
+                className="w-full h-full flex items-center justify-center transition-transform duration-300 ease-out cursor-zoom-in"
+                style={{ transform: `scale(${zoomLevel})` }}
+                onClick={handleZoomToggle}
+              >
+                <ObjectImage
+                  contentUrl={mediaList[activeMediaIndex] || post.url}
+                  objectId={null}
+                  identity={identity}
+                  alt=""
+                  className="w-full h-full object-contain max-h-[85vh]"
+                  muted={false}
+                  autoPlay={false}
+                  controls={false}
+                  loop
+                  playsInline
+                />
+              </div>
+            )}
 
             {/* Double Tap Heart Pop */}
             {doubleTapAnimation && (

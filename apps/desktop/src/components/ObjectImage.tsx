@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { isMediaVideo, resolveMediaUrl } from '../utils/media'
 import { useObjectImage } from '../hooks/useObjectImage'
+import { NativeVideoPlayer } from './media/NativeVideoPlayer'
 
 interface IdentityLike {
   orbitId: string
@@ -149,6 +150,24 @@ export function ObjectImage({
   }
 
   if (isVideo) {
+    if (controls) {
+      return (
+        <NativeVideoPlayer
+          src={src}
+          className={videoClassName || className}
+          videoClassName={videoClassName}
+          muted={muted}
+          autoPlay={autoPlay}
+          loop={loop}
+          playsInline={playsInline}
+          onError={(_e) => {
+            onError?.()
+            setHasError(true)
+          }}
+        />
+      )
+    }
+
     return (
       <video
         src={src}
@@ -156,7 +175,7 @@ export function ObjectImage({
         muted={muted}
         autoPlay={autoPlay}
         loop={loop}
-        controls={controls}
+        controls={false}
         playsInline={playsInline}
         preload={preload}
         onError={(_e) => {

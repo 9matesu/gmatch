@@ -27,6 +27,8 @@ export interface BooruRequest {
   limit: number
   allowReal?: boolean
   allowHentai?: boolean
+  page?: number
+  probe?: boolean
 }
 
 export interface BooruResponse {
@@ -41,7 +43,7 @@ export interface BooruResponse {
 // The preload bridge surface (window.gmatch) — including update types — is
 // declared once, centrally, in src/types/gmatch-bridge.ts.
 
-const TIMEOUT_MS = 10_000
+const TIMEOUT_MS = 3_500
 
 // No-repeat memory: ids + file URLs seen this session AND in past sessions
 // (localStorage), capped so it can't grow forever. Same file under a
@@ -303,7 +305,8 @@ function parseRealbooruHtml(html: string): BooruPost[] {
     const isGif = tags.includes('gif')
     const ext = isVideo ? 'mp4' : isGif ? 'gif' : 'jpg'
     const url = `https://realbooru.com/images/${dir1}/${dir2}/${hash}.${ext}`
-    posts.push({ id: `rb-${postId}`, url, tags, rating: 'e' })
+    const preview = `https://realbooru.com/thumbnails/${dir1}/${dir2}/thumbnail_${hash}.jpg`
+    posts.push({ id: `rb-${postId}`, url, preview, tags, rating: 'e' })
   }
   return posts
 }
@@ -344,9 +347,8 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
   const allowHentai = req.allowHentai !== false
   const neg =
     '-ai_generated -ai-generated -furry -anthro -feral -scalie -monochrome -greyscale -sketch -comic -lowres -worst_quality -jpeg_artifacts -watermark -censored'
-  // Random result page per call — the same tag yields fresh posts, not the
-  // same top-10 on every fetch.
-  const pid = Math.floor(Math.random() * 25)
+  const isProbe = req.probe || req.page === 0
+  const pid = req.page !== undefined ? req.page : isProbe ? 0 : Math.floor(Math.random() * 5)
   const filteredSources = DIRECT_SOURCES.filter((s) => {
     if (s.category === 'real' && !allowReal) return false
     if (s.category === 'hentai' && !allowHentai) return false
@@ -363,25 +365,26 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
       if (!reachable) break
       let url: string
       let kind: 'dapi' | 'moe' | 'html' = 'dapi'
+      let pageNum = 1
+      let realPidNum = 0
       if (src.type === 'moebooru') {
         kind = 'moe'
-        const page = 1 + Math.floor(Math.random() * 5)
+        pageNum = isProbe ? 1 : 1 + Math.floor(Math.random() * 5)
         const tags = src.id === 'konachan-direct' ? `${variant} rating:explicit` : variant
-        url = `${src.proxy}/post.json?tags=${encodeURIComponent(tags)}&limit=${req.limit}&page=${page}`
+        url = `${src.proxy}/post.json?tags=${encodeURIComponent(tags)}&limit=${req.limit}&page=${pageNum}`
       } else if (src.type === 'realhtml') {
         kind = 'html'
         // Preserve multi-word tags with underscores (e.g. skylar_vox),
         // don't drop the rest of the query with split(/\s+/)[0].
         const tagParam = variant.trim().replace(/\s+/g, '_')
-        // Random page like electron/main.cjs — page 0 alone dedupes to empty.
-        const realPid = Math.floor(Math.random() * 5)
-        url = `${src.proxy}/index.php?page=post&s=list&tags=${encodeURIComponent(tagParam)}&pid=${realPid}`
+        realPidNum = isProbe ? 0 : Math.floor(Math.random() * 5)
+        url = `${src.proxy}/index.php?page=post&s=list&tags=${encodeURIComponent(tagParam)}&pid=${realPidNum}`
       } else if (src.type === 'booruorg') {
         // booru.org Cloudflare WAF challenges `tags=` queries with 403;
         // omitting `tags=` and paginating via random `pid` bypasses WAF (200 OK).
         // Each booru.org sub is already dedicated to its niche theme.
         kind = 'html'
-        const booruPid = Math.floor(Math.random() * 10) * 20
+        const booruPid = isProbe ? 0 : Math.floor(Math.random() * 5) * 20
         url = `${src.proxy}/index.php?page=post&s=list&pid=${booruPid}`
       } else {
         url = `${src.proxy}/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
@@ -436,6 +439,8 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
         }
         parsed = kind === 'moe' ? toMoePosts(data, src.origin) : toPosts(data, src.origin)
       }
+
+
       let clean: BooruPost[] = []
       if (src.type === 'booruorg') {
         // Single tagless fetch; check all variants against the page's posts in memory

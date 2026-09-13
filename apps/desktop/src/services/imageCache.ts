@@ -112,7 +112,7 @@ export function devFetchable(url: string): string | null {
     if (u.hostname === 'imhentai.xxx' || u.hostname.endsWith('.imhentai.xxx')) {
       return `/px?u=${encodeURIComponent(url)}`
     }
-    if (u.hostname === 'realbooru.com' || u.hostname.endsWith('.booru.org')) {
+    if (u.hostname === 'realbooru.com' || u.hostname.endsWith('.booru.org') || u.hostname.includes('eporner.com')) {
       return `/px?u=${encodeURIComponent(url)}`
     }
     return null
@@ -127,6 +127,41 @@ function isDev(): boolean {
   } catch {
     return false
   }
+}
+
+// Limit concurrent background byte fetches to 2 so browser sockets are never starved
+const MAX_CONCURRENT_BG_FETCHES = 2
+let activeBgFetches = 0
+const bgFetchQueue: Array<() => void> = []
+const inFlightUrls = new Set<string>()
+
+function runNextBgFetch(): void {
+  if (activeBgFetches >= MAX_CONCURRENT_BG_FETCHES || bgFetchQueue.length === 0) return
+  const next = bgFetchQueue.shift()
+  if (next) {
+    activeBgFetches++
+    try {
+      next()
+    } catch {
+      activeBgFetches = Math.max(0, activeBgFetches - 1)
+      runNextBgFetch()
+    }
+  }
+}
+
+function queueBgFetch(url: string, task: () => Promise<void>): void {
+  if (inFlightUrls.has(url)) return
+  inFlightUrls.add(url)
+  bgFetchQueue.push(async () => {
+    try {
+      await task()
+    } finally {
+      inFlightUrls.delete(url)
+      activeBgFetches = Math.max(0, activeBgFetches - 1)
+      runNextBgFetch()
+    }
+  })
+  runNextBgFetch()
 }
 
 /**
@@ -163,14 +198,19 @@ export async function resolveImage(url: string): Promise<string> {
       return url
     }
   }
+
   // Miss: store into SESSION RAM in the background, show remote now.
   // In vite dev, cross-origin byte fetches are CORS-blocked (console spam,
   // zero bytes) — only fetch same-origin proxy URLs there.
   const furl = isDev() ? devFetchable(url) : url
   if (!furl) return url
-  void (async () => {
+  queueBgFetch(url, async () => {
     try {
-      const res = await fetch(furl, { referrerPolicy: 'no-referrer', cache: 'no-store' })
+      const res = await fetch(furl, {
+        referrerPolicy: 'no-referrer',
+        cache: 'no-store',
+        signal: AbortSignal.timeout(4000),
+      })
       if (!res.ok) return
       const blob = await res.blob()
       if (!blob.type.startsWith('image/') && !blob.type.startsWith('video/')) return
@@ -178,7 +218,7 @@ export async function resolveImage(url: string): Promise<string> {
     } catch {
       /* cache is best-effort */
     }
-  })()
+  })
   return url
 }
 
@@ -188,8 +228,12 @@ export async function resolveImage(url: string): Promise<string> {
  */
 export function prefetchImages(urls: string[], limit = 11): void {
   try {
-    for (const u of urls.slice(0, limit)) {
-      if (u) void resolveImage(u)
+    const seen = new Set<string>()
+    for (const u of urls) {
+      if (!u || seen.has(u) || session.has(u)) continue
+      seen.add(u)
+      void resolveImage(u)
+      if (seen.size >= limit) break
     }
   } catch {
     /* never break gameplay */
