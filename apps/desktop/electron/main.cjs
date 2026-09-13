@@ -385,7 +385,8 @@ function parseRealbooruHtml(html) {
       .filter(Boolean)
     const isVideo = tags.includes('video') || tags.includes('mp4') || tags.includes('webm')
     const isGif = tags.includes('gif')
-    const ext = isVideo ? 'mp4' : isGif ? 'gif' : 'jpg'
+    // realbooru stores stills as .jpeg on the full-image path (.jpg 404s).
+    const ext = isVideo ? 'mp4' : isGif ? 'gif' : 'jpeg'
     const url = `https://realbooru.com/images/${dir1}/${dir2}/${hash}.${ext}`
     const preview = `https://realbooru.com/thumbnails/${dir1}/${dir2}/thumbnail_${hash}.jpg`
     if (!hasBadTag(tags)) {
@@ -994,6 +995,13 @@ app.whenReady().then(async () => {
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
     if (permission === 'media' && cameraGrantOnce) {
       cameraGrantOnce = false
+      callback(true)
+      return
+    }
+    // Clipboard read/write: the in-app context menu (Copy Image / Paste rows)
+    // dies silently without these — Electron asks BEFORE clipboard.readText()
+    // resolves. The renderer is our own trusted bundle; same-origin only.
+    if (permission === 'clipboard-read' || permission === 'clipboard-sanitized-write' || permission === 'clipboard-write') {
       callback(true)
       return
     }
