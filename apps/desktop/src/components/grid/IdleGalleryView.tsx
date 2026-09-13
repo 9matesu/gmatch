@@ -9,6 +9,7 @@ import CachedImg from '../../ui/CachedImg'
 import MediaViewerModal from '../../ui/MediaViewerModal'
 import { EmptyState } from '../EmptyState'
 import { SlideshowPlayer, type ResolvedItem } from '../slideshows/SlideshowPlayer'
+import { NativeVideoPlayer } from '../media/NativeVideoPlayer'
 import {
   Image as ImageIcon,
   Search,
@@ -562,7 +563,7 @@ export default function IdleGalleryView({
                         {onRepostImage && (
                           <button
                             type="button"
-                            className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-white/10 transition-colors cursor-pointer"
+                            className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer"
                             title="Repost to feed"
                             aria-label={`Repost ${img.tags.slice(0, 2).join(' ') || 'image'} to feed`}
                             onClick={() => {
@@ -582,7 +583,7 @@ export default function IdleGalleryView({
                         {onAddToStory && (
                           <button
                             type="button"
-                            className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-white/10 transition-colors cursor-pointer"
+                            className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer"
                             title="Add to story"
                             aria-label={`Add ${img.tags.slice(0, 2).join(' ') || 'image'} to story`}
                             onClick={() => {
@@ -602,7 +603,7 @@ export default function IdleGalleryView({
                         {onCreateCard && (
                           <button
                             type="button"
-                            className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-white/10 transition-colors cursor-pointer"
+                            className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer"
                             title="Turn into a card"
                             aria-label={`Turn ${img.tags.slice(0, 2).join(' ') || 'keepsake'} into a card`}
                             onClick={() => {
@@ -621,7 +622,7 @@ export default function IdleGalleryView({
 
                         <button
                           type="button"
-                          className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-white/10 transition-colors cursor-pointer"
+                          className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer"
                           title="Re-feature in the Goon Panel"
                           aria-label={`Re-feature ${img.tags.slice(0, 2).join(' ') || 'keepsake'}`}
                           onClick={() => {
@@ -636,7 +637,7 @@ export default function IdleGalleryView({
                         <button
                           type="button"
                           disabled={isBackdrop}
-                          className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-default"
+                          className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-default"
                           title={isBackdrop ? 'This is the app backdrop' : 'Set as app backdrop'}
                           aria-label={
                             isBackdrop
@@ -741,13 +742,14 @@ export default function IdleGalleryView({
           <figure className="relative flex max-h-[80vh] min-h-0 w-auto max-w-full flex-col items-center">
             <div className="relative min-h-0 w-auto max-w-full">
               {viewer.kind === 'video' ? (
-                <video
+                <NativeVideoPlayer
                   src={viewer.url}
                   poster={viewer.preview || undefined}
-                  className="max-h-[70vh] w-auto max-w-full rounded-lg object-contain"
+                  className="max-h-[70vh] w-auto max-w-full rounded-lg"
+                  videoClassName="max-h-[70vh] w-auto max-w-full rounded-lg object-contain"
                   controls
                   autoPlay
-                  muted
+                  muted={false}
                   loop
                   playsInline
                 />
