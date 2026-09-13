@@ -28,9 +28,8 @@ import { applyLikeDecision, addPoints } from './game'
 import { EconomyService } from './economy'
 import { broadcastToUser, broadcastToRoom } from './ws-bus'
 import { advanceRooms } from './rooms'
-import { getBotConfig, getBotProfiles, pickBotDuelCard } from './bot-image-api'
+import { pickBotDuelCard } from './bot-image-api'
 import { generateFallbackName } from '@orbit/shared'
-import { canUseBots } from './bots/policy'
 import crypto from 'node:crypto'
 import { encryptBlob } from './crypto'
 import type { LocalBlobStore } from './blob'
@@ -121,37 +120,6 @@ export async function resolveCardUrl(db: D1Turso, id: string | null | undefined)
   }
   if (id.startsWith('data:') || id.startsWith('http://') || id.startsWith('https://') || id.startsWith('/api/')) return id
   return `/api/objects/${id}`
-}
-
-/**
- * Create a fresh 1v1 duel between a human player and a random bot (bypassing
- * the queue). Used by the Quick Match button so an impatient player can duel a
- * bot instantly instead of waiting ~2 minutes for the auto bot fallback.
- * Assumes callers already verified the player is not in a duel and has cards.
- */
-export async function createQuickBotMatch(db: D1Turso, userId: string, now: number): Promise<GameMatch | null> {
-  const botConfig = await getBotConfig(db).catch(() => null)
-  if (botConfig) {
-    const policy = canUseBots(botConfig, 'quick_match')
-    if (!policy.allowed) {
-      throw lobbyError(policy.reason || 'Bots are unavailable', 409)
-    }
-  }
-const profiles = await getBotProfiles(db).catch(() => [])
-    const available = profiles.filter((p) => p.enabled)
-    if (available.length === 0) {
-      throw lobbyError('No bot profiles configured', 409)
-    }
-    const bot = available[Math.floor(Math.random() * available.length)]
-    await ensureBotReady(db, { id: bot.id, name: bot.name, tags: bot.tags, col: bot.color || '', pfp_url: bot.pfp_url })
-    const match = await createDirectMatch(db, userId, bot.id, now)
-  if (match) {
-    await db
-      .prepare("UPDATE LobbyPlayers SET auto_queue = 0, status = 'in_match', waiting_since = NULL WHERE user_id = ?")
-      .bind(userId)
-      .run()
-  }
-  return match
 }
 
 export async function joinLobby(db: D1Turso, userId: string, autoQueue: number = 1): Promise<void> {

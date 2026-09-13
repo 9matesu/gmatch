@@ -3,7 +3,7 @@ import crypto from 'crypto'
 import { orbitAuth } from '../middleware/auth'
 import type { D1Turso } from '../db'
 import type { LocalBlobStore } from '../blob'
-import { joinLobby, leaveLobby, setAutoQueue, getLobbyState, playMatchCard, setMatchDecision, quitMatch, createQuickBotMatch, getLobbyImages, setLobbyImage, likeLobbyImage, getLobbyImageLikers, addLobbyComment, getLobbyComments, deleteLobbyComment, advanceLobby, advanceLobbyUnlocked, withMatchLock, expireIdleSpecialMatches, getActiveMatches, getSpectatorSnapshot } from '../lobby'
+import { joinLobby, leaveLobby, setAutoQueue, getLobbyState, playMatchCard, setMatchDecision, quitMatch, getLobbyImages, setLobbyImage, likeLobbyImage, getLobbyImageLikers, addLobbyComment, getLobbyComments, deleteLobbyComment, advanceLobby, advanceLobbyUnlocked, withMatchLock, expireIdleSpecialMatches, getActiveMatches, getSpectatorSnapshot } from '../lobby'
 import { getLeague } from '../rooms'
 import { createWsTicket, broadcastToRoom, broadcastToUser } from '../ws-bus'
 import { runPeriodicMaintenance } from '../cleanup'
@@ -311,37 +311,6 @@ lobby.post('/autoqueue', orbitAuth, async (c) => {
   await advanceLobby(c.env.DB)
   broadcastToRoom('lobby', { type: 'lobby', action: 'updated' })
   return c.json({ ok: true, auto_queue: body.enabled !== false })
-})
-
-lobby.post('/quick-match', orbitAuth, async (c) => {
-  const orbitId = c.get('orbitId')
-  const own = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM Objects WHERE owner_id = ? AND is_story = 0').bind(orbitId).first<{ n: number }>()
-  if (!own || (own.n ?? 0) < MIN_GAME_CARDS) {
-    return c.json({ error: `Upload at least ${MIN_GAME_CARDS} pictures before dueling a bot.` }, 400)
-  }
-  const existing = await c.env.DB
-    .prepare("SELECT id FROM GameMatches WHERE status IN ('lobby', 'playing') AND (user_a = ? OR user_b = ?)")
-    .bind(orbitId, orbitId)
-    .first<{ id: string }>()
-  if (existing) return c.json({ error: 'Finish your active match before starting a Quick Match.' }, 409)
-
-  let match = null
-  try {
-    match = await withMatchLock(async () => {
-      const locked = await c.env.DB
-        .prepare("SELECT id FROM GameMatches WHERE status IN ('lobby', 'playing') AND (user_a = ? OR user_b = ?)")
-        .bind(orbitId, orbitId)
-        .first<{ id: string }>()
-      if (locked) return null
-      return createQuickBotMatch(c.env.DB, orbitId, Date.now())
-    })
-  } catch (err: any) {
-    return c.json({ error: err?.message || 'Could not start a Quick Match.' }, err?.status || 409)
-  }
-  if (!match) return c.json({ error: 'Finish your active match before starting a Quick Match.' }, 409)
-  await advanceLobby(c.env.DB)
-  broadcastToRoom('lobby', { type: 'lobby', action: 'updated' })
-  return c.json({ ok: true, match: { id: match.id } })
 })
 
 lobby.get('/matches', orbitAuth, async (c) => {

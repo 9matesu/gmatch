@@ -429,56 +429,12 @@ describe('1v1 Match Hopper & Queue Lifecycle', () => {
     expect([...opponents].every((id) => !id.startsWith('bot_'))).toBe(true)
   })
 
-  it('Quick Match instantly pairs a player with a bot without waiting', async () => {
-    // Bots are off by default — explicitly enable for this test.
-    await env.DB.prepare("INSERT INTO SystemMeta (key, value) VALUES ('bot_enabled', '1')").run()
-    for (let i = 0; i < 5; i++) await uploadCard(playerB)
+  it('Quick Match bot path is DELETED (no bots for players, directive 2026-09-12)', async () => {
     const res = await app.request('/api/lobby/quick-match', {
       method: 'POST',
       headers: auth(playerB, 'POST', '/api/lobby/quick-match'),
     }, env)
-    expect(res.status).toBe(200)
-    const body: any = await res.json()
-    expect(body.ok).toBe(true)
-    expect(body.match.id).toBeTruthy()
-
-    const matchRow = await env.DB.prepare(
-      "SELECT user_a, user_b, status FROM GameMatches WHERE id = ?"
-    ).bind(body.match.id).first<any>()
-    expect(matchRow).toBeTruthy()
-    expect(matchRow.status).toBe('lobby')
-    const opponent = matchRow.user_a === playerB.orbitId ? matchRow.user_b : matchRow.user_a
-    expect(opponent.startsWith('bot_')).toBe(true)
-
-    const lp = await lobbyPlayer(playerB)
-    expect(lp.status).toBe('in_match')
-  })
-
-  it('rejects Quick Match when already in an active match', async () => {
-    // Bots are off by default — explicitly enable for this test.
-    await env.DB.prepare("INSERT INTO SystemMeta (key, value) VALUES ('bot_enabled', '1')").run()
-    for (let i = 0; i < 5; i++) await uploadCard(playerB)
-    const first = await app.request('/api/lobby/quick-match', {
-      method: 'POST',
-      headers: auth(playerB, 'POST', '/api/lobby/quick-match'),
-    }, env)
-    expect(first.status).toBe(200)
-
-    const second = await app.request('/api/lobby/quick-match', {
-      method: 'POST',
-      headers: auth(playerB, 'POST', '/api/lobby/quick-match'),
-    }, env)
-    expect(second.status).toBe(409)
-  })
-
-  it('rejects Quick Match for players with no cards in their library', async () => {
-    // PlayerB owns zero Objects (table is cleared each test) → card gate fires.
-    const res = await app.request('/api/lobby/quick-match', {
-      method: 'POST',
-      headers: auth(playerB, 'POST', '/api/lobby/quick-match'),
-    }, env)
-    expect(res.status).toBe(400)
-    expect((await res.json() as any).error).toContain('picture')
+    expect(res.status).toBe(404)
   })
 })
 
