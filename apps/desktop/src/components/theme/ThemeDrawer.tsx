@@ -146,7 +146,7 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
       ref={drawerRef}
       role="dialog"
       aria-label="Theme quick settings"
-      className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[var(--z-modal)] w-[94vw] max-w-lg bg-surface-raised/95 border border-border-glass rounded-2xl shadow-2xl backdrop-blur-2xl p-4 sm:p-5 space-y-4 animate-sheet-up text-retro-fg"
+      className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[var(--z-modal)] w-[94vw] max-w-lg bg-surface-raised/95 border border-border-glass rounded-xl shadow-2xl backdrop-blur-2xl p-4 sm:p-5 space-y-4 animate-sheet-up text-retro-fg"
     >
       {/* Header */}
       <div className="flex items-center justify-between pb-2 border-b border-border-glass">
@@ -169,7 +169,7 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
         {/* Panel Opacity */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <label htmlFor="theme-panel-opacity" className="text-[11px] font-medium text-retro-muted flex items-center gap-1">
+            <label htmlFor="theme-panel-opacity" className="text-[10px] font-medium text-retro-muted flex items-center gap-1">
               <Sliders className="w-3.5 h-3.5 text-retro-muted" /> Panel Opacity
             </label>
             <span className="text-xs font-mono font-bold text-retro-fg tabular-nums">{panelOpacityVal}%</span>
@@ -189,7 +189,7 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
         {/* Glass Blur */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <label htmlFor="theme-glass-blur" className="text-[11px] font-medium text-retro-muted flex items-center gap-1">
+            <label htmlFor="theme-glass-blur" className="text-[10px] font-medium text-retro-muted flex items-center gap-1">
               <ImageIcon className="w-3.5 h-3.5 text-retro-muted" /> Glass Blur
             </label>
             <span className="text-xs font-mono font-bold text-retro-fg tabular-nums">{glassBlurVal}%</span>
@@ -210,7 +210,7 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
       {/* Wallpaper */}
       <div className="space-y-2 pt-1 border-t border-border-glass">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-semibold text-retro-muted uppercase tracking-wider">Wallpaper</span>
+          <span className="text-[10px] font-semibold text-retro-muted uppercase tracking-wider">Wallpaper</span>
           {settings.wallpaperUrl && (
             <button
               type="button"
@@ -253,7 +253,7 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
 
       {/* Fit & Slideshow options */}
       <div className="flex items-center justify-between gap-2 pt-1 text-xs">
-        <div className="flex items-center gap-1 text-[11px] text-retro-muted">
+        <div className="flex items-center gap-1 text-[10px] text-retro-muted">
           <ArrowsOut className="w-3.5 h-3.5" />
           <span>Fit:</span>
           {(['cover', 'contain'] as const).map((fit) => (

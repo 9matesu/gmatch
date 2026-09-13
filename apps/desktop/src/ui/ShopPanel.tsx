@@ -166,7 +166,7 @@ function TagsTab() {
             onClick={() => { playPress(760); toggleFeedCategory('real'); }}
             className={`px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider transition-all duration-150 cursor-pointer border ${
               allowReal
-                ? 'border-retro-accent/60 bg-retro-accent/20 text-retro-fg shadow-[0_0_10px_rgba(var(--accent-rgb),0.2)]'
+                ? 'border-retro-accent/60 bg-retro-accent/20 text-retro-fg'
                 : 'border-border-glass bg-glass-w5 text-retro-muted hover:text-retro-fg hover:border-border-strong'
             }`}
             title={allowReal ? 'Real sources active (click to toggle)' : 'Real sources disabled (click to enable)'}
@@ -178,7 +178,7 @@ function TagsTab() {
             onClick={() => { playPress(760); toggleFeedCategory('hentai'); }}
             className={`px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider transition-all duration-150 cursor-pointer border ${
               allowHentai
-                ? 'border-retro-accent/60 bg-retro-accent/20 text-retro-fg shadow-[0_0_10px_rgba(var(--accent-rgb),0.2)]'
+                ? 'border-retro-accent/60 bg-retro-accent/20 text-retro-fg'
                 : 'border-border-glass bg-glass-w5 text-retro-muted hover:text-retro-fg hover:border-border-strong'
             }`}
             title={allowHentai ? 'Hentai sources active (click to toggle)' : 'Hentai sources disabled (click to enable)'}

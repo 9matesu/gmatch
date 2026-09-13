@@ -797,7 +797,7 @@ export function ServersView({
             </div>
 
             {/* Current Node Hero */}
-            <section className="p-4 sm:p-5 bg-surface-raised/80 border border-border-glass rounded-2xl shadow-sm space-y-3" aria-label="Server dashboard">
+            <section className="p-4 sm:p-5 bg-surface-raised/80 border border-border-glass rounded-xl shadow-sm space-y-3" aria-label="Server dashboard">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="min-w-0">
@@ -905,7 +905,7 @@ export function ServersView({
 
             {/* Connected Chat Rooms Preview */}
             {showRooms && (
-              <section className="p-4 bg-surface-raised/80 border border-border-glass rounded-2xl shadow-sm space-y-2">
+              <section className="p-4 bg-surface-raised/80 border border-border-glass rounded-xl shadow-sm space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-retro-fg flex items-center gap-1.5">
                     <MessageSquare className="w-3.5 h-3.5 text-retro-accent" /> Active Rooms
@@ -944,7 +944,7 @@ export function ServersView({
             )}
 
             {/* Active Members & 24h Activity List */}
-            <section className="p-4 bg-surface-raised/80 border border-border-glass rounded-2xl shadow-sm space-y-3" aria-label="Server members">
+            <section className="p-4 bg-surface-raised/80 border border-border-glass rounded-xl shadow-sm space-y-3" aria-label="Server members">
               <div className="flex items-center justify-between pb-2 border-b border-border-glass">
                 <div className="flex items-center gap-1 bg-surface-interactive/60 border border-border-subtle p-0.5 rounded-lg">
                   <button
@@ -1043,7 +1043,7 @@ export function ServersView({
                         </span>
                       )}
                     </div>
-                    <p className="truncate text-[11px] text-retro-muted mt-0.5">
+                    <p className="truncate text-[10px] text-retro-muted mt-0.5">
                       {dash ? `${dash.members_total} members · ${dash.posts_24h} posts/24h` : (serverDescription || 'Connected')}
                     </p>
                   </div>
@@ -1111,7 +1111,7 @@ export function ServersView({
                     type="button"
                     data-menu-trigger
                     onClick={() => setShowCentralPopover((v) => !v)}
-                    className="inline-flex items-center gap-1.5 text-[11px] text-retro-muted hover:text-retro-fg transition-colors cursor-pointer group"
+                    className="inline-flex items-center gap-1.5 text-[10px] text-retro-muted hover:text-retro-fg transition-colors cursor-pointer group"
                     title="Change central node address"
                   >
                     <Globe className="w-3 h-3 text-retro-muted group-hover:text-retro-fg" />
@@ -1123,7 +1123,7 @@ export function ServersView({
                   {showCentralPopover && (
                     <div
                       data-menu-content
-                      className="absolute left-0 top-full mt-2 w-72 bg-surface-raised border border-border-glass rounded-xl p-3 shadow-xl z-30 space-y-2.5 animate-in fade-in duration-150"
+                      className="absolute left-0 top-full mt-2 w-72 bg-surface-raised border border-border-glass rounded-xl p-3 shadow-xl z-30 space-y-2.5 animate-orbit-fade-in"
                     >
                       <div className="flex items-center justify-between border-b border-border-subtle pb-1.5">
                         <span className="text-xs font-bold text-retro-fg">Central Directory Node</span>
@@ -1135,7 +1135,7 @@ export function ServersView({
                           <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
-                      <p className="text-[11px] text-retro-muted">
+                      <p className="text-[10px] text-retro-muted">
                         Central directory address where servers register and publish metadata.
                       </p>
                       <div className="flex items-center gap-1.5">
@@ -1409,7 +1409,7 @@ export function ServersView({
                       {central && !passwordOnly && (!query || `${centralServer.name} ${centralServer.description}`.toLowerCase().includes(query.toLowerCase())) && (
                         <div
                           key="central-node"
-                          className="group relative flex flex-col justify-between bg-surface-raised/90 border border-cyan-500/30 hover:border-cyan-400/50 rounded-2xl p-4 transition-all duration-150 shadow-xs hover:shadow-md"
+                          className="group relative flex flex-col justify-between bg-surface-raised/90 border border-cyan-500/30 hover:border-cyan-400/50 rounded-xl p-4 transition-all duration-150 shadow-xs hover:shadow-md"
                         >
                           <div>
                             <div className="flex items-start justify-between gap-2">
@@ -1435,7 +1435,7 @@ export function ServersView({
                               {centralServer.description}
                             </p>
 
-                            <div className="flex items-center gap-2 text-[11px] text-retro-muted font-mono pb-3 border-b border-border-subtle/50 mb-3">
+                            <div className="flex items-center gap-2 text-[10px] text-retro-muted font-mono pb-3 border-b border-border-subtle/50 mb-3">
                               <span className="inline-flex items-center gap-1 text-emerald-400">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                                 <span>{typeof centralServer.online_count === 'number' ? `${centralServer.online_count} online` : 'sign in for live counts'}</span>
@@ -1485,7 +1485,7 @@ export function ServersView({
                         return (
                           <li
                             key={s.id}
-                            className="group relative flex flex-col justify-between bg-surface-raised/80 hover:bg-surface-elevated border border-border-glass hover:border-retro-muted/40 rounded-2xl p-4 transition-all duration-150 shadow-xs hover:shadow-md"
+                            className="group relative flex flex-col justify-between bg-surface-raised/80 hover:bg-surface-elevated border border-border-glass hover:border-retro-muted/40 rounded-xl p-4 transition-all duration-150 shadow-xs hover:shadow-md"
                           >
                             <div>
                               <div className="flex items-start justify-between gap-2">
@@ -1535,7 +1535,7 @@ export function ServersView({
                                   {isMenuOpen && !isMyServer && (
                                     <div
                                       data-menu-content
-                                      className="absolute right-0 top-full mt-1 w-44 bg-surface-raised border border-border-glass rounded-xl py-1 shadow-2xl z-20 space-y-0.5 animate-in fade-in duration-100"
+                                      className="absolute right-0 top-full mt-1 w-44 bg-surface-raised border border-border-glass rounded-xl py-1 shadow-lg z-20 space-y-0.5 animate-orbit-fade-in"
                                     >
                                       {s.endpoint_hint && (
                                         <button
@@ -1573,7 +1573,7 @@ export function ServersView({
                                 {s.description || 'No description provided.'}
                               </p>
 
-                              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-retro-muted font-mono pb-3 border-b border-border-subtle/50 mb-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-retro-muted font-mono pb-3 border-b border-border-subtle/50 mb-3">
                                 {(typeof s.online_count === 'number' || typeof s.user_count === 'number') ? (
                                   <span className="inline-flex items-center gap-1 text-emerald-400">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
@@ -1717,8 +1717,8 @@ export function ServersView({
         />
       )}
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-md bg-surface-raised border border-border-glass rounded-2xl p-5 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-orbit-fade-in">
+          <div className="w-full max-w-md bg-surface-raised border border-border-glass rounded-xl p-5 shadow-lg space-y-4">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
@@ -1747,7 +1747,7 @@ export function ServersView({
 
               {!mine(deleteTarget) && (
                 <div className="space-y-1.5 pt-1">
-                  <label className="block text-[11px] font-semibold text-retro-fg">
+                  <label className="block text-[10px] font-semibold text-retro-fg">
                     Central Admin Passcode
                   </label>
                   <input

@@ -785,7 +785,7 @@ export function GMatchDMs({
                               <div
                                 onClick={() => setActionFor(showActions ? null : msg.id)}
                                 className={`px-3 py-2 rounded-lg text-xs leading-relaxed select-text cursor-pointer break-words whitespace-pre-wrap ${block.length > 1 ? 'mt-0.5' : ''} ${
-                                  isOwn ? 'bg-retro-accent/25 border border-retro-accent/30 text-retro-fg rounded-br-sm backdrop-blur-sm' : 'bg-glass-w10 border border-white/10 text-retro-body rounded-bl-sm backdrop-blur-sm'
+                                  isOwn ? 'bg-retro-accent/25 border border-retro-accent/30 text-retro-fg rounded-br-sm backdrop-blur-sm' : 'bg-glass-w10 border border-border-glass text-retro-body rounded-bl-sm backdrop-blur-sm'
                                 }`}
                               >
                                 {msg.attachmentUrl && (
@@ -915,12 +915,12 @@ export function GMatchDMs({
                     }
                   }}
                   title="Attach an image or video"
-                  className="p-2 rounded-md bg-glass-w10 border border-white/10 text-retro-muted hover:text-retro-accent cursor-pointer transition-colors"
+                  className="p-2 rounded-md bg-glass-w10 border border-border-glass text-retro-muted hover:text-retro-accent cursor-pointer transition-colors"
                 >
                   <ImagePlus className="w-4 h-4" />
                 </button>
               ) : null}
-              <div className="flex-1 flex items-center gap-2 bg-glass-w10 border border-white/10 rounded-md px-3 py-2 text-xs focus-within:border-retro-accent/50 transition-colors">
+              <div className="flex-1 flex items-center gap-2 bg-glass-w10 border border-border-glass rounded-md px-3 py-2 text-xs focus-within:border-retro-accent/50 transition-colors">
                 <input
                   type="text"
                   value={inputText}

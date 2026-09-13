@@ -176,7 +176,7 @@ export function ProfilePicModal({
                   if (res.file) setRawFile(res.file);
                   setPreview(res.dataUrl);
                 }}
-                className="text-[11px] text-retro-muted hover:text-retro-fg cursor-pointer transition-colors"
+                className="text-[10px] text-retro-muted hover:text-retro-fg cursor-pointer transition-colors"
               >
                 Adjust crop
               </button>

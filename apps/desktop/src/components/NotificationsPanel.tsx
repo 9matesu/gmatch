@@ -113,7 +113,7 @@ export function NotificationsPanel({
                 playPress(700);
                 onMarkAllRead();
               }}
-              className="glass-action px-2 py-0.5 rounded text-[11px] cursor-pointer text-retro-muted hover:text-retro-fg"
+              className="glass-action px-2 py-0.5 rounded text-[10px] cursor-pointer text-retro-muted hover:text-retro-fg"
             >
               Mark all read
             </button>
