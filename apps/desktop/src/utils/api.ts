@@ -239,7 +239,11 @@ export async function orbitFetch(
     // visible on the wire. GETs seal their identity headers too (empty body)
     // so an observer never sees WHO asks. Multipart uploads stay as-is
     // (binary streaming; identity headers ride plaintext there).
-    if (!isFormUpload && identity.encryptionPrivHex && identity.encryptionPubHex) {
+    // Large JSON payloads (>4KB) also stay plaintext-signed: the seal rides
+    // as a request HEADER, and base64-in-JSON-in-base64 inflation (~20x)
+    // tripped the edge's header-size limit (403/431) on profile pictures.
+    const sealBodySizeSafe = bodyForSig.length === 0 || bodyForSig.length <= 4096
+    if (!isFormUpload && sealBodySizeSafe && identity.encryptionPrivHex && identity.encryptionPubHex) {
       const nodePub = await getNodePubkey(fetchImpl, url)
       if (nodePub) {
         const headersRecord: Record<string, string> = {}

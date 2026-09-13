@@ -118,4 +118,25 @@ describe('orbitFetch request sealing', () => {
     expect(headers.get('X-Orbit-Sealed')).toBeTruthy()
   })
 
+  it('large JSON bodies (> 4KB) skip sealing and go out signed in plaintext', async () => {
+    // the edge rejects oversized headers (403/431) — profile pictures hit
+    // this at ~5KB of data: URL. Plaintext-signed is the working path.
+    const node = generateIdentity()
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (String(url).includes('/api/identity')) {
+        return new Response(JSON.stringify({ server_pubkey: node.encryptionPubHex, sealed_available: true }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200 })
+    }) as unknown as typeof globalThis.fetch
+    const big = JSON.stringify({ pfp_url: 'data:image/jpeg;base64,' + 'A'.repeat(9000) })
+    const res = await orbitFetch('/api/users/profile', { method: 'PATCH', body: big }, identityLike(), fetchImpl)
+    expect(res.status).toBe(200)
+    const calls = fetchCalls(fetchImpl)
+    const patch = calls.find(([u]) => String(u).includes('/api/users/profile'))!
+    const headers = new Headers(patch[1]!.headers as HeadersInit)
+    expect(headers.get('X-Orbit-Sealed')).toBeNull()
+    expect(headers.get('X-Orbit-Signature')).toBeTruthy()
+    expect(String(patch[1]!.body)).toBe(big)
+  })
+
 })

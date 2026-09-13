@@ -1362,6 +1362,8 @@ export default function Home() {
           timestamp: m.ts,
           readByRecipient: m.status === 'delivered',
           courierStatus: m.status,
+          attachmentId: m.attachmentId,
+          attachmentUrl: m.attachmentId ? `/api/objects/${m.attachmentId}` : undefined,
         }))
         setPmMessagesByPeer((prev) => ({ ...prev, [peerId]: msgs }))
       })()
@@ -1411,10 +1413,26 @@ export default function Home() {
     // Blind-courier mode (official SITE): sealed envelope to the peer's box,
     // never a server inbox. Attachments ride the sealed body as object refs.
     if (courier.courierActive) {
-      if (replyToId || attachment) {
-        toast('Replies and attachments need a direct connection. Send text for now.', 'warning')
+      if (replyToId) {
+        toast('Replies need a direct connection. Send text for now.', 'warning')
       }
-      const msg = await courier.send(peerId, text.trim())
+      // Attachments ride the sealed body as a private object id (the upload
+      // already added the peer to Recipients, so they can fetch the bytes).
+      let msg = await courier.send(peerId, text.trim(), attachment?.id)
+      if (msg && msg.status === 'failed') {
+        // Roster is capped — the peer's keys may simply never have been
+        // cached. Resolve them from the public profile and retry once.
+        try {
+          const pres = await orbitFetch(`/api/users/${encodeURIComponent(peerId)}`, {}, identity)
+          if (pres.ok) {
+            const pu = ((await pres.json()) as { user?: { public_key?: string; encryption_pub_key?: string } }).user
+            if (pu?.public_key) {
+              registerCourierKeys(peerId, pu.public_key, pu.encryption_pub_key || '')
+              msg = await courier.send(peerId, text.trim(), attachment?.id)
+            }
+          }
+        } catch { /* offline: keep the failed state below */ }
+      }
       const ok = !!msg && msg.status !== 'failed'
       if (!ok) {
         toast('Peer key unknown. The message stays local and won\'t deliver until you have their key.', 'error')
@@ -1466,7 +1484,7 @@ export default function Home() {
       toast('Couldn\'t send the message. The server is unreachable.', 'error')
       return false
     }
-  }, [identity, myProfile.displayName, loadPmMessages, loadPmThreads, toast, courierActive, courierSend])
+  }, [identity, myProfile.displayName, loadPmMessages, loadPmThreads, toast, courierActive, courierSend, registerCourierKeys])
 
   useEffect(() => {
     if (!identity) return
@@ -1916,27 +1934,26 @@ export default function Home() {
         return next
       })
 
-      // 3. Save profile picture thumbnail to user profile
-      const res = await orbitFetch('/api/users/profile', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pfp_url: thumbDataUrl }),
-      }, identity)
+      // 3. Persist via the shared profile path: bytes go up as multipart
+      // (the sealed-JSON route 403s past ~4KB), the row stores the object ref.
+      const res = await saveUserProfile(identity, { pfp_url: thumbDataUrl })
 
       if (!res.ok) {
         toast('Failed to save profile picture to server', 'error')
         return
       }
 
+      // Reflect the server-side ref locally so peers see the same URL.
+      setProfilePics((prev) => {
+        if (typeof res.pfpUrl !== 'string') return prev
+        const next = { ...prev, [identity.orbitId]: res.pfpUrl as string }
+        try { setSecureItem('goonmatch_pfps', JSON.stringify(next)) } catch { }
+        return next
+      })
+
       toast('Profile picture updated.', 'success')
       loadUsers()
       void lobby.refresh()
-
-      // 4. Background upload object record
-      const formData = new FormData()
-      formData.append('image', file)
-      formData.append('is_pfp', 'true')
-      orbitFetch('/api/objects', { method: 'POST', body: formData }, identity).catch(() => { })
     } catch {
       toast('Failed to update profile picture', 'error')
     }
@@ -3656,7 +3673,7 @@ export default function Home() {
                     onToggleFollow={selectedProfileUser.id === identity?.orbitId ? undefined : toggleFollowUser}
                     onBlockUser={selectedProfileUser.id === identity?.orbitId ? undefined : blockUser}
                     onReportUser={selectedProfileUser.id === identity?.orbitId ? undefined : (id, name) => openReportModal(id, name)}
-                    onOpenFollowers={(tab) => setFollowersModalState({ isOpen: true, initialTab: tab, targetUserId: null, targetName: null })}
+                    onOpenFollowers={(tab) => setFollowersModalState({ isOpen: true, initialTab: tab, targetUserId: selectedProfileUser.id, targetName: selectedProfileUser.display_name || null })}
                     onCopyId={(id) => {
                       navigator.clipboard.writeText(id)
                       toast('Copied Orbit ID', 'info')

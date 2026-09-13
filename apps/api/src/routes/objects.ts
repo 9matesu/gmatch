@@ -490,14 +490,21 @@ objects.get('/:id', async (c, next) => {
     `).bind(id, id, id, id, id, id, id, id, id, id).first().catch(() => null)
 
     if (!isMatchOrCard) {
-      if (!orbitId) {
-        return c.json({ error: 'Object not found' }, 404)
-      }
-      const recipient = await c.env.DB.prepare(
-        'SELECT 1 FROM Recipients WHERE object_id = ? AND recipient_id = ? LIMIT 1'
-      ).bind(id, orbitId).first()
-      if (!recipient) {
-        return c.json({ error: 'Object not found' }, 404)
+      // Avatars are public: an object referenced by some user's pfp_url is
+      // renderable by anyone (the same exposure a data: avatar always had).
+      const isAvatar = await c.env.DB.prepare(
+        "SELECT 1 FROM Users WHERE pfp_url = ? AND hidden_at IS NULL LIMIT 1",
+      ).bind(`/api/objects/${id}`).first().catch(() => null)
+      if (!isAvatar) {
+        if (!orbitId) {
+          return c.json({ error: 'Object not found' }, 404)
+        }
+        const recipient = await c.env.DB.prepare(
+          'SELECT 1 FROM Recipients WHERE object_id = ? AND recipient_id = ? LIMIT 1'
+        ).bind(id, orbitId).first()
+        if (!recipient) {
+          return c.json({ error: 'Object not found' }, 404)
+        }
       }
     }
   }
@@ -524,9 +531,25 @@ objects.get('/:id', async (c, next) => {
       const headers = new Headers()
       headers.set('Content-Type', mimeType)
       headers.set('Content-Length', String(bytes.length))
+      headers.set('Accept-Ranges', 'bytes')
       headers.set('Cache-Control', 'no-store')
       headers.set('Access-Control-Allow-Origin', '*')
       headers.set('Access-Control-Allow-Credentials', 'true')
+      const inlineRange = /^bytes=(\d*)-(\d*)$/.exec((c.req.header('Range') || '').trim())
+      if (inlineRange) {
+        const total = bytes.length
+        let start = inlineRange[1] ? parseInt(inlineRange[1], 10) : 0
+        let end = inlineRange[2] ? parseInt(inlineRange[2], 10) : total - 1
+        if (!Number.isFinite(start) || start >= total) start = 0
+        end = Math.min(end, total - 1)
+        if (start <= end) {
+          const slice = bytes.subarray(start, end + 1)
+          const rh = new Headers(headers)
+          rh.set('Content-Length', String(slice.length))
+          rh.set('Content-Range', `bytes ${start}-${end}/${total}`)
+          return new Response(slice, { status: 206, headers: rh })
+        }
+      }
       return new Response(bytes, { headers })
     } catch (err) {
       console.error(`Failed to decode base64 data for object ${id}:`, err)
@@ -623,7 +646,32 @@ objects.get('/:id', async (c, next) => {
   // CORS headers for cross-origin image loading
   headers.set('Access-Control-Allow-Origin', '*')
   headers.set('Access-Control-Allow-Credentials', 'true')
+  headers.set('Accept-Ranges', 'bytes')
   headers.set('Cache-Control', 'no-store')
+
+  // Range support: <video> seeking issues `Range: bytes=x-` / `x-y` and the
+  // element refuses to stream from a server that always answers 200 with the
+  // whole file. Blobs are encrypted at rest, so we decrypt fully then slice.
+  // ponytail: per-request full decrypt; cache decrypted bytes if seeking
+  // latency ever shows up.
+  const rangeHeader = c.req.header('Range')
+  if (rangeHeader) {
+    const m = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim())
+    if (m) {
+      const total = plaintext.length
+      let start = m[1] ? parseInt(m[1], 10) : 0
+      let end = m[2] ? parseInt(m[2], 10) : total - 1
+      if (!Number.isFinite(start) || start >= total) start = 0
+      end = Math.min(end, total - 1)
+      if (start <= end) {
+        const slice = plaintext.subarray(start, end + 1)
+        const rh = new Headers(headers)
+        rh.set('Content-Length', String(slice.length))
+        rh.set('Content-Range', `bytes ${start}-${end}/${total}`)
+        return new Response(Buffer.from(slice), { status: 206, headers: rh })
+      }
+    }
+  }
 
   return new Response(Buffer.from(plaintext), { headers })
 })

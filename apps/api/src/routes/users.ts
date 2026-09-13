@@ -49,6 +49,57 @@ users.get('/:id/pfp', async (c) => {
       return c.redirect(pfp, 302)
     }
 
+    // Object ref (client uploaded bytes via multipart, then patched the ref):
+    // stream the decrypted blob so plain <img> tags render it. Public by
+    // definition here — it is the user's avatar, same exposure as data:.
+    if (pfp.startsWith('/api/objects/')) {
+      const objId = pfp.slice('/api/objects/'.length).split(/[?#]/)[0]
+      if (!/^[0-9a-fA-F-]{36}$/.test(objId)) return c.text('Invalid avatar format', 404)
+      const obj = await c.env.DB.prepare(
+        'SELECT owner_id, mime_type, hidden_at FROM Objects WHERE id = ?',
+      ).bind(objId).first<{ owner_id: string; mime_type: string; hidden_at: string | null }>()
+      if (!obj || obj.owner_id !== userId || obj.hidden_at) return c.text('No avatar set', 404)
+      const blob = c.env.BUCKET ? await c.env.BUCKET.get(`objects/${objId}`) : null
+      if (blob) {
+        const chunks: Uint8Array[] = []
+        const reader = blob.body?.getReader()
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            chunks.push(value)
+          }
+        }
+        const total = chunks.reduce((acc, ch) => acc + ch.length, 0)
+        const enc = new Uint8Array(total)
+        let off = 0
+        for (const ch of chunks) { enc.set(ch, off); off += ch.length }
+        const { decryptBlob } = await import('../crypto')
+        const plain = decryptBlob(enc)
+        return new Response(Buffer.from(plain), {
+          headers: {
+            'Content-Type': obj.mime_type || 'image/jpeg',
+            'Cache-Control': 'no-store',
+            'Access-Control-Allow-Origin': '*',
+          },
+        })
+      }
+      // Small objects store inline data: URLs on the row itself — decode and
+      // stream (a data: Location redirect is blocked by Chromium).
+      const inline = await c.env.DB.prepare('SELECT content_url FROM Objects WHERE id = ?').bind(objId).first<{ content_url: string | null }>()
+      if (inline?.content_url?.startsWith('data:')) {
+        const b64 = inline.content_url.slice(inline.content_url.indexOf(',') + 1)
+        return new Response(Buffer.from(b64, 'base64'), {
+          headers: {
+            'Content-Type': obj.mime_type || 'image/jpeg',
+            'Cache-Control': 'no-store',
+            'Access-Control-Allow-Origin': '*',
+          },
+        })
+      }
+      return c.text('No avatar set', 404)
+    }
+
     return c.text('Invalid avatar format', 404)
   } catch {
     return c.text('Failed to load avatar', 500)
@@ -475,7 +526,18 @@ users.on(['PATCH', 'PUT'], '/profile', async (c) => {
     // a third-party host (the old 302 leaked the viewer's IP upstream).
     // data: URIs get stripped in place; http(s) gets proxied through our own
     // storage; anything else is rejected.
-    if (typeof pfp_url === 'string' && pfp_url.startsWith('data:image/')) {
+    // Exception for /api/objects/ refs: the client uploads the avatar as
+    // multipart BYTES (the same signed-headers stream posts use) and patches
+    // only the tiny ref — data:/JSON payloads over ~4KB inflate the sealed
+    // request header past the edge limit (403/431 on profile picture change).
+    const objectRef = /^\/api\/objects\/[0-9a-fA-F-]{36}$/.exec(String(pfp_url ?? '').trim())
+    if (objectRef) {
+      const obj = await c.env.DB.prepare(
+        'SELECT id FROM Objects WHERE id = ? AND owner_id = ? AND hidden_at IS NULL',
+      ).bind(objectRef[0].split('/').pop() as string, orbitId).first<{ id: string }>()
+      if (!obj) return c.json({ error: 'Avatar object not found' }, 404)
+      cleanPfp = objectRef[0]
+    } else if (typeof pfp_url === 'string' && pfp_url.startsWith('data:image/')) {
       const comma = pfp_url.indexOf(',')
       const meta = pfp_url.slice(5, comma)
       if (!meta.includes('base64')) return c.json({ error: 'Avatar must be a base64 data URL' }, 400)
@@ -607,7 +669,7 @@ users.get('/:id/followers', async (c) => {
 
   return c.json((rows.results || []).map((r: any) => ({
     id: r.id,
-    display_name: r.display_name || null,
+    display_name: r.display_name?.trim() || generateFallbackName(r.id),
     pfp_url: r.pfp_url || null,
     online: r.last_seen ? (Date.now() - new Date(r.last_seen).getTime() < 5 * 60 * 1000) : false,
     is_following: Number(r.is_following || 0) > 0,
@@ -630,7 +692,7 @@ users.get('/:id/following', async (c) => {
 
   return c.json((rows.results || []).map((r: any) => ({
     id: r.id,
-    display_name: r.display_name || null,
+    display_name: r.display_name?.trim() || generateFallbackName(r.id),
     pfp_url: r.pfp_url || null,
     online: r.last_seen ? (Date.now() - new Date(r.last_seen).getTime() < 5 * 60 * 1000) : false,
     is_following: Number(r.is_following || 0) > 0,
