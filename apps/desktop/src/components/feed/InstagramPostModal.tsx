@@ -112,13 +112,14 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
           >
             {isMediaVideo(mediaList[activeMediaIndex] || post.url) ? (
               <NativeVideoPlayer
+                key={mediaList[activeMediaIndex] || post.url}
                 src={mediaList[activeMediaIndex] || post.url}
                 className="w-full h-full max-h-[85vh] object-contain"
                 videoClassName="w-full h-full max-h-[85vh] object-contain"
                 autoPlay={true}
                 controls={true}
                 loop={true}
-                muted={false}
+                muted={true}
                 onDoubleTapLike={handleDoubleTap}
               />
             ) : (
