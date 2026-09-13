@@ -290,7 +290,7 @@ function toMoePosts(data: unknown, _origin: string): BooruPost[] {
     .filter((p) => p.id && p.url)
 }
 
-function parseRealbooruHtml(html: string): BooruPost[] {
+export function parseRealbooruHtml(html: string): BooruPost[] {
   const posts: BooruPost[] = []
   const imgRegex =
     /<img\s+[^>]*src="https:\/\/realbooru\.com\/thumbnails\/([^/]+)\/([^/]+)\/thumbnail_([^."]+)\.jpg"[^>]*title="([^"]*)"[^>]*alt="Image:\s*(\d+)"/gi
@@ -303,7 +303,9 @@ function parseRealbooruHtml(html: string): BooruPost[] {
       .filter(Boolean)
     const isVideo = tags.includes('video') || tags.includes('mp4') || tags.includes('webm')
     const isGif = tags.includes('gif')
-    const ext = isVideo ? 'mp4' : isGif ? 'gif' : 'jpg'
+    // realbooru stores stills as .jpeg on the full-image path (.jpg 404s;
+    // verified live via HEAD). Thumbnails stay .jpg.
+    const ext = isVideo ? 'mp4' : isGif ? 'gif' : 'jpeg'
     const url = `https://realbooru.com/images/${dir1}/${dir2}/${hash}.${ext}`
     const preview = `https://realbooru.com/thumbnails/${dir1}/${dir2}/thumbnail_${hash}.jpg`
     posts.push({ id: `rb-${postId}`, url, preview, tags, rating: 'e' })

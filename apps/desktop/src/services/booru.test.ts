@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { __resetFeedState, fetchPosts, markSeen } from './booru'
+import { __resetFeedState, fetchPosts, markSeen, parseRealbooruHtml } from './booru'
 import { setCoRules, setFeedIntent, __resetCoRules } from '../game/tagCooccur'
 import { setUserExcludes } from '../game/tagFilter'
 
@@ -492,5 +492,18 @@ describe('co-occurrence gate (T4)', () => {
     vi.stubGlobal('window', { gmatch: { booruFetch: vi.fn().mockResolvedValue({ ok: true, posts: [bad], source: 'hgoon' }) } })
     const res2 = await fetchPosts({ tags: 'odd_eyes', limit: 5 })
     expect(res2.posts.map((p) => p.id)).toEqual(['c1'])
+  })
+})
+
+describe('realbooru parser', () => {
+  // realbooru serves stills as .jpeg on the full-image path (.jpg 404s,
+  // verified live); video/gif posts keep their extension.
+  const html = '<img src="https://realbooru.com/thumbnails/a8/9c/thumbnail_a89c.jpg" title="1girl, selfie" alt="Image: 1007254"/><img src="https://realbooru.com/thumbnails/b1/22/thumbnail_b122.jpg" title="creampie, gif" alt="Image: 999"/><img src="https://realbooru.com/thumbnails/c3/44/thumbnail_c344.jpg" title="pov, video" alt="Image: 888"/>'
+  const posts = parseRealbooruHtml(html)
+  it('builds .jpeg full-image URLs for stills and keeps gif/mp4 tags', () => {
+    expect(posts).toHaveLength(3)
+    expect(posts[0].url).toBe('https://realbooru.com/images/a8/9c/a89c.jpeg')
+    expect(posts[1].url).toBe('https://realbooru.com/images/b1/22/b122.gif')
+    expect(posts[2].url).toBe('https://realbooru.com/images/c3/44/c344.mp4')
   })
 })
