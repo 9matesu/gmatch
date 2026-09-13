@@ -30,6 +30,8 @@ export interface DmMessage {
   ts: number
   status: 'sending' | 'sent' | 'delivered' | 'failed'
   envelopeId?: string
+  /** Private object id shared sealed-side; recipient pulls via Recipients. */
+  attachmentId?: string
 }
 
 const THREADS_KEY = 'orbit_mail_threads_v1'
@@ -123,15 +125,16 @@ export class DmStore {
 
 /** Body format for DM envelopes + receipts (all sealed end-to-end).
  * `e` piggybacks the sender's current session epoch (wave 2 C2) so replies
- * address the rotating token instead of the static home token. */
+ * address the rotating token instead of the static home token. `a` carries a
+ * private attachment object id (uploaded with the peer as recipient). */
 export function encodeDmBody(msg: DmMessage, epoch?: string): string {
-  return JSON.stringify({ t: 'dm', id: msg.id, text: msg.text, ts: msg.ts, ...(epoch ? { e: epoch } : {}) })
+  return JSON.stringify({ t: 'dm', id: msg.id, text: msg.text, ts: msg.ts, ...(epoch ? { e: epoch } : {}), ...(msg.attachmentId ? { a: msg.attachmentId } : {}) })
 }
 export function encodeAckBody(refId: string, epoch?: string): string {
   return JSON.stringify({ t: 'dm_ack', id: refId, ...(epoch ? { e: epoch } : {}) })
 }
 
-export function decodeBody(json: string): { t: 'dm' | 'dm_ack'; id: string; text?: string; ts?: number; e?: string } | null {
+export function decodeBody(json: string): { t: 'dm' | 'dm_ack'; id: string; text?: string; ts?: number; e?: string; a?: string } | null {
   try {
     const parsed = JSON.parse(json)
     if ((parsed.t === 'dm' || parsed.t === 'dm_ack') && typeof parsed.id === 'string') return parsed
@@ -152,7 +155,7 @@ export class DmManager {
   constructor(private readonly deps: DmManagerDeps) {}
 
   /** Outgoing DM: optimistic append -> seal+PUT to courier via MailClient. */
-  async send(peerId: string, text: string): Promise<DmMessage> {
+  async send(peerId: string, text: string, attachmentId?: string): Promise<DmMessage> {
     const keys = this.deps.store.peerKeys(peerId)
     const msg: DmMessage = {
       id: `dm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -161,6 +164,7 @@ export class DmManager {
       text,
       ts: Date.now(),
       status: 'sending',
+      ...(attachmentId ? { attachmentId } : {}),
     }
     this.deps.store.appendLocal(msg)
     this.deps.onThreadChanged(peerId)
@@ -224,6 +228,7 @@ export class DmManager {
       ts: body.ts || Date.now(),
       status: 'delivered',
       envelopeId: opened.id,
+      ...(typeof body.a === 'string' && body.a ? { attachmentId: body.a } : {}),
     }
     this.deps.store.appendLocal(inbound)
     this.deps.onThreadChanged(peerId)

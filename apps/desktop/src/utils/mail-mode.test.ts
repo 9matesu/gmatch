@@ -8,21 +8,21 @@ function fetchReturning(status: number) {
 beforeEach(() => _resetMailModeCache())
 
 describe('courier-mode detection', () => {
-  it('404 on /api/pm means SITE (blind courier)', async () => {
+  it('404 on /api/pm (inbox route deleted, v1.2.4+) means courier', async () => {
     expect(await detectMailMode('http://site.test', fetchReturning(404))).toBe('courier')
     expect(cachedMailMode('http://site.test/')).toBe('courier')
   })
 
-  it('401/200/403 on /api/pm means full node (legacy inbox)', async () => {
+  it('OLD node still mounting /api/pm (401/200/403) keeps the legacy inbox', async () => {
     for (const status of [200, 401, 403]) {
       _resetMailModeCache()
       expect(await detectMailMode('http://host.test', fetchReturning(status))).toBe('legacy')
     }
   })
 
-  it('network failure falls back to legacy (never a dead end)', async () => {
+  it('network failure falls back to courier (the only mail path on current nodes)', async () => {
     const boom = vi.fn(async () => { throw new Error('offline') }) as unknown as typeof fetch
-    expect(await detectMailMode('http://down.test', boom)).toBe('legacy')
+    expect(await detectMailMode('http://down.test', boom)).toBe('courier')
   })
 
   it('result is cached after a successful probe', async () => {
@@ -51,18 +51,5 @@ describe('courier-mode detection', () => {
     expect(await detectMailMode('https://gmatch.fly.dev', fetchFn)).toBe('courier')
     expect(await detectMailMode('https://goonmatch.fly.dev/', fetchFn)).toBe('courier')
     expect(fetchFn).not.toHaveBeenCalled()
-  })
-
-  it('detects mode from /api/health when available', async () => {
-    const fetchHealth = vi.fn(async (url: string) => {
-      if (url.endsWith('/api/health')) {
-        return new Response(JSON.stringify({ status: 'ok', mode: 'courier' }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        })
-      }
-      return new Response('{}', { status: 401 })
-    }) as unknown as typeof fetch
-    expect(await detectMailMode('http://custom-courier.test', fetchHealth)).toBe('courier')
   })
 })

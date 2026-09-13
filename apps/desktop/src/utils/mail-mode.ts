@@ -1,13 +1,13 @@
 /**
  * Courier-mode detection (plan P3.3 dual-mode).
  *
- * Official SITE (SITE_SERVICES=mail,turn) 404s every contentful route —
- * including GET /api/pm, which on a FULL node answers 401 (auth headers
- * missing). One unsigned request distinguishes the two without guessing:
- *   404 -> blind courier (E2EE mail only, no server inbox)
- *   any other response -> full node (legacy inbox stays authoritative)
- * Result is cached per API base; failures fall back to 'legacy' (the inbox
- * path is the more forgiving one and self-host/dev keeps working).
+ * The server-inbox route /api/pm is DELETED (v1.2.4, F26) — every node on
+ * this codebase is courier-only for DMs. The probe keeps distinguishing old
+ * pre-1.2.4 nodes (401 = route mounted = legacy inbox exists) from current
+ * ones (404 = dead route = courier is the only mail path). Sending POST
+ * /api/pm to a current node used to 404 with "Could not send message".
+ * Result is cached per API base; failures fall back to 'courier' (the
+ * sealed-envelope path is the only one that still works everywhere).
  */
 
 export type MailMode = 'courier' | 'legacy'
@@ -45,27 +45,16 @@ export async function detectMailMode(
         return 'courier'
       }
 
-      // 2. Query /api/health: never triggers a 404 in DevTools console on live nodes
-      const res = await fetchImpl(`${base}/api/health`, { method: 'GET' })
-      let mode: MailMode = 'legacy'
-
-      if (res.status === 404) {
-        mode = 'courier'
-      } else if (res.ok) {
-        const data = await res.json().catch(() => null) as { mode?: string; services?: string[] } | null
-        if (data?.mode === 'courier' || (Array.isArray(data?.services) && !data.services.includes('all'))) {
-          mode = 'courier'
-        } else {
-          mode = 'legacy'
-        }
-      } else {
-        mode = 'legacy'
-      }
+      // 2. Unsigned GET /api/pm: only OLD (pre-1.2.4) nodes still mount the
+      // inbox route (401 = route exists). Current full nodes 404 it, and
+      // courier (PUT /api/mail/:token, mounted everywhere) is the only mail.
+      const res = await fetchImpl(`${base}/api/pm`, { method: 'GET' }).catch(() => null)
+      const mode: MailMode = res && res.status !== 404 ? 'legacy' : 'courier'
 
       cache.set(base, mode)
       return mode
     } catch {
-      return cache.get(base) ?? 'legacy'
+      return cache.get(base) ?? 'courier'
     } finally {
       inflight.delete(base)
     }

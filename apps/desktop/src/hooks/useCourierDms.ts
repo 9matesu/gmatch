@@ -124,9 +124,9 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
     }
   }, [identity, mode])
 
-  const send = useCallback(async (peerId: string, text: string): Promise<DmMessage | null> => {
+  const send = useCallback(async (peerId: string, text: string, attachmentId?: string): Promise<DmMessage | null> => {
     if (!managerRef.current) return null
-    return managerRef.current.send(peerId, text)
+    return managerRef.current.send(peerId, text, attachmentId)
   }, [])
 
   const pull = useCallback(async () => {
