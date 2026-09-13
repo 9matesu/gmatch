@@ -124,6 +124,9 @@ export interface GameState {
   mergeTags: (a: string, b: string) => boolean
   refreshTagMarket: () => Promise<void>
   addCustomTag: (raw: string) => Promise<{ added: boolean; message: string }>
+  allowReal: boolean
+  allowHentai: boolean
+  toggleFeedCategory: (cat: 'real' | 'hentai') => void
   fetchFeed: () => Promise<void>
   advanceFeed: () => void
   goBack: () => boolean
@@ -289,6 +292,8 @@ function freshData() {
     feedOffline: false,
     fetching: false,
     imageReady: false,
+    allowReal: typeof localStorage !== 'undefined' ? localStorage.getItem('gmatch.feed.allowReal') !== '0' : true,
+    allowHentai: typeof localStorage !== 'undefined' ? localStorage.getItem('gmatch.feed.allowHentai') !== '0' : true,
     toasts: [] as Toast[],
     offlineGain: 0,
   }
@@ -871,6 +876,29 @@ export const useGame = create<GameState>((set, get) => ({
     set({ tags: [...offers, ...keptOwned], fetching: false })
   },
 
+  toggleFeedCategory: (cat: 'real' | 'hentai') => {
+    const s = get()
+    let nextReal = s.allowReal
+    let nextHentai = s.allowHentai
+    if (cat === 'real') {
+      nextReal = !s.allowReal
+    } else {
+      nextHentai = !s.allowHentai
+    }
+    if (!nextReal && !nextHentai) {
+      if (cat === 'real') nextReal = true
+      else nextHentai = true
+    }
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('gmatch.feed.allowReal', nextReal ? '1' : '0')
+        localStorage.setItem('gmatch.feed.allowHentai', nextHentai ? '1' : '0')
+      }
+    } catch { /* ignore */ }
+    set({ allowReal: nextReal, allowHentai: nextHentai, queue: [] })
+    void get().fetchFeed()
+  },
+
   fetchFeed: async () => {
     const s = get()
     if (s.fetching) return
@@ -911,12 +939,12 @@ export const useGame = create<GameState>((set, get) => ({
       const first = priority ?? pool[s.feedCursor % pool.length]
       // ponytail: in grid mode pull a larger batch (30) so queue stays ahead of the 3x3 grid
       const batchLimit = isGridMode(get().viewMode) ? 30 : 15
-      let res = await fetchPosts({ tags: first, limit: batchLimit })
+      let res = await fetchPosts({ tags: first, limit: batchLimit, allowReal: s.allowReal, allowHentai: s.allowHentai })
       cursor = s.feedCursor + 1
       if (!res.ok || res.posts.length === 0) {
         // Flaky round — retry once with the NEXT tag, never the same one.
         const second = pool[cursor % pool.length]
-        res = await fetchPosts({ tags: second, limit: batchLimit })
+        res = await fetchPosts({ tags: second, limit: batchLimit, allowReal: s.allowReal, allowHentai: s.allowHentai })
         cursor += 1
       }
       if (res.ok && res.posts.length > 0) {
@@ -1187,131 +1215,16 @@ export const useGame = create<GameState>((set, get) => ({
     const input: EconomyInput = { ...econ(s), caps }
     const gps = passiveGps(input, now)
     const auto = capAutoClicksPerSec(caps, now)
-    const autoDmg = clickPower(input, now) * auto * (dtMs / 1000)
     const gain = (gps + clickPower(input, now) * auto) * (dtMs / 1000)
-    // Grid mode: auto-clicks batter the first square (one KO per tick at most).
-    if (isGridMode(s.viewMode)) {
-      const cell = s.grid[0]
-      if (cell && autoDmg > 0) {
-        if (cell.hp - autoDmg <= 0) {
-          const spoil = gallerySpoils(s, cell.post, cell.clicks, now)
-          const target = gridSizeForMode(s.viewMode)
-          const filled = fillGrid(s.grid.slice(1), s.queue, spoil.defeated, target)
-          const next: GameState = {
-            ...s,
-            caps,
-            points: s.points + gain + spoil.bonus,
-            totalEarned: s.totalEarned + gain + spoil.bonus,
-            xp: s.xp + gain * 0.01 + KILL_XP,
-            tags: spoil.tags,
-            past: spoil.past,
-            gallery: spoil.gallery,
-            defeated: spoil.defeated,
-            pendingDrops: spoil.pendingDrops,
-            queue: filled.queue,
-            grid: filled.grid,
-            lastSeenAt: now,
-          }
-          next.toasts = pushToast(next, `Auto-drained ${spoil.img.rarity} square (+${spoil.bonus} pts)`)
-          set({
-            caps: next.caps,
-            points: next.points,
-            totalEarned: next.totalEarned,
-            xp: next.xp,
-            tags: next.tags,
-            past: next.past,
-            gallery: next.gallery,
-            defeated: next.defeated,
-            pendingDrops: next.pendingDrops,
-            queue: next.queue,
-            grid: next.grid,
-            lastSeenAt: next.lastSeenAt,
-            ...progress(next, s.xp),
-          })
-          if (filled.grid.length < target && !get().fetching) void get().fetchFeed()
-          return
-        }
-        const grid = s.grid.map((c, i) => (i === 0 ? { ...c, hp: c.hp - autoDmg } : c))
-        set({
-          caps,
-          points: s.points + gain,
-          totalEarned: s.totalEarned + gain,
-          xp: s.xp + gain * 0.01,
-          grid,
-          lastSeenAt: now,
-          ...progress({ ...s, points: s.points + gain }, s.xp),
-        })
-        return
-      }
-      set({
-        caps,
-        points: s.points + gain,
-        totalEarned: s.totalEarned + gain,
-        xp: s.xp + gain * 0.01,
-        lastSeenAt: now,
-        ...progress({ ...s, points: s.points + gain }, s.xp),
-      })
-      return
-    }
-    // Auto-clicks also batter the live foe (one KO per tick at most) — but
-    // only while its picture is cached + on screen (no blind farming).
-    if (s.imageReady && s.current && s.foeMaxHp > 0 && autoDmg > 0 && s.foeHp - autoDmg <= 0) {
-      const ko = koFoe(s, now, s.foeClicks)
-      const next: GameState = {
-        ...s,
-        caps,
-        points: s.points + gain + ko.bonus,
-        totalEarned: s.totalEarned + gain + ko.bonus,
-        xp: s.xp + gain * 0.01 + KILL_XP,
-        tags: ko.tags,
-        past: ko.past,
-        gallery: ko.gallery,
-        defeated: ko.defeated,
-        current: ko.current,
-        queue: ko.queue,
-        foeHp: ko.foeHp,
-        foeMaxHp: ko.foeMaxHp,
-        foeClicks: ko.foeClicks,
-        lastSeenAt: now,
-      }
-      next.toasts = pushToast(next, `Auto-drained ${ko.img.rarity} foe (+${ko.bonus} pts)`)
-      set({
-        caps: next.caps,
-        points: next.points,
-        totalEarned: next.totalEarned,
-        xp: next.xp,
-        tags: next.tags,
-        past: next.past,
-        gallery: next.gallery,
-        defeated: next.defeated,
-        current: next.current,
-        queue: next.queue,
-        foeHp: next.foeHp,
-        foeMaxHp: next.foeMaxHp,
-        foeClicks: next.foeClicks,
-        lastSeenAt: next.lastSeenAt,
-        ...progress(next, s.xp),
-      })
-      if (!ko.current) void get().fetchFeed()
-      return
-    }
-    const next: GameState = {
-      ...s,
+
+    // Passive points income remains, but HP damage and KO only happen via active user clicks.
+    set({
       caps,
       points: s.points + gain,
       totalEarned: s.totalEarned + gain,
       xp: s.xp + gain * 0.01,
-      foeHp: s.foeMaxHp > 0 ? Math.max(0, s.foeHp - autoDmg) : s.foeHp,
       lastSeenAt: now,
-    }
-    set({
-      caps: next.caps,
-      points: next.points,
-      totalEarned: next.totalEarned,
-      xp: next.xp,
-      foeHp: next.foeHp,
-      lastSeenAt: next.lastSeenAt,
-      ...progress(next, s.xp),
+      ...progress({ ...s, points: s.points + gain }, s.xp),
     })
   },
 
@@ -1343,6 +1256,8 @@ export const useGame = create<GameState>((set, get) => ({
       userExcludes: s.userExcludes,
       coRules: s.coRules,
       customSources: s.customSources,
+      allowReal: s.allowReal,
+      allowHentai: s.allowHentai,
       lastSeenAt: now,
     }
     writeStorage(serialize(data))
@@ -1393,6 +1308,8 @@ export const useGame = create<GameState>((set, get) => ({
       userExcludes,
       coRules: d.coRules,
       customSources: d.customSources,
+      allowReal: d.allowReal !== false,
+      allowHentai: d.allowHentai !== false,
       gallery: d.gallery,
       caps,
       capsUsed: d.capsUsed,

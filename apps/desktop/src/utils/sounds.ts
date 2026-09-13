@@ -63,67 +63,66 @@ function ensureCtx(): AudioContext | null {
   return ctx;
 }
 
-/** Short punchy click */
-export function playPress(freq: number = 800) {
+/**
+ * Atonal click: very short noise-based rimshot click with NO tonal oscillator,
+ * at a subtle, comfortable lower volume.
+ */
+export function playAtonalClick(gainVol = 0.12, duration = 0.025) {
   const audio = ensureCtx();
   if (!audio) return;
   const now = audio.currentTime;
-  const osc = audio.createOscillator();
-  const gain = audio.createGain();
 
-  osc.type = 'triangle';
-  osc.frequency.setValueAtTime(freq, now);
-  osc.frequency.exponentialRampToValueAtTime(freq * 0.5, now + 0.04);
+  try {
+    const len = Math.max(64, Math.floor(audio.sampleRate * duration));
+    const buffer = audio.createBuffer(1, len, audio.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < len; i++) {
+      // Rapid decaying noise transient (atonal snap)
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+    }
+    const noise = audio.createBufferSource();
+    noise.buffer = buffer;
 
-  gain.gain.setValueAtTime(0.3, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+    const filter = audio.createBiquadFilter();
+    filter.type = 'bandpass';
+    if (filter.frequency && typeof filter.frequency === 'object' && 'setValueAtTime' in filter.frequency) {
+      filter.frequency.setValueAtTime(3200, now);
+    } else if (filter.frequency && typeof filter.frequency === 'object' && 'value' in filter.frequency) {
+      (filter.frequency as any).value = 3200;
+    }
+    if (filter.Q && typeof filter.Q === 'object' && 'value' in filter.Q) {
+      (filter.Q as any).value = 1.2;
+    }
 
-  osc.connect(gain).connect(audio.destination);
-  osc.start(now);
-  osc.stop(now + 0.05);
+    const gain = audio.createGain();
+    gain.gain.setValueAtTime(gainVol, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+    noise.connect(filter).connect(gain).connect(audio.destination);
+    noise.start(now);
+    noise.stop(now + duration + 0.01);
+  } catch {
+    /* fallback safe */
+  }
+}
+
+/** Short atonal punchy click (no tonal oscillator, lower volume) */
+export function playPress(_freq?: number) {
+  playAtonalClick(0.12, 0.022);
 }
 
 export function playBeep() {
-  playPress(880);
+  playPress();
 }
 
-/** Aggressive rimshot "crack" with body thump */
+/** Short rimshot click (atonal noise crack, lower volume, no tonal oscillator) */
 export function playRimshot() {
-  const audio = ensureCtx();
-  if (!audio) return;
-  const now = audio.currentTime;
+  playAtonalClick(0.15, 0.032);
+}
 
-  // Low body thump
-  const body = audio.createOscillator();
-  body.type = 'sine';
-  body.frequency.setValueAtTime(210, now);
-  body.frequency.exponentialRampToValueAtTime(80, now + 0.12);
-  const bodyGain = audio.createGain();
-  bodyGain.gain.setValueAtTime(0.7, now);
-  bodyGain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
-  body.connect(bodyGain).connect(audio.destination);
-  body.start(now);
-  body.stop(now + 0.16);
-
-  // Sharp noise snap band-passed around high crack
-  const noise = audio.createBufferSource();
-  const buffer = audio.createBuffer(1, Math.floor(audio.sampleRate * 0.12), audio.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
-  noise.buffer = buffer;
-
-  const band = audio.createBiquadFilter();
-  band.type = 'bandpass';
-  band.frequency.value = 4400;
-  band.Q.value = 1.4;
-
-  const noiseGain = audio.createGain();
-  noiseGain.gain.setValueAtTime(0.8, now);
-  noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
-
-  noise.connect(band).connect(noiseGain).connect(audio.destination);
-  noise.start(now);
-  noise.stop(now + 0.13);
+/** Idle clicker hit sound: atonal rimshot click when attacking image or cells */
+export function playHit(crit: boolean = false) {
+  playAtonalClick(crit ? 0.18 : 0.12, crit ? 0.032 : 0.02);
 }
 
 export function playChatMessage() {

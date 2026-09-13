@@ -385,7 +385,7 @@ function parseRealbooruHtml(html) {
       .filter(Boolean)
     const isVideo = tags.includes('video') || tags.includes('mp4') || tags.includes('webm')
     const isGif = tags.includes('gif')
-    const ext = isVideo ? 'mp4' : isGif ? 'gif' : 'jpeg'
+    const ext = isVideo ? 'mp4' : isGif ? 'gif' : 'jpg'
     const url = `https://realbooru.com/images/${dir1}/${dir2}/${hash}.${ext}`
     if (!hasBadTag(tags)) {
       posts.push({ id: `rb-${postId}`, url, tags, rating: 'e', width: 1200, height: 1200 })
@@ -669,21 +669,48 @@ async function fetchImhentai(variant, n) {
   return posts
 }
 
+// --- eporner (real porn website API: HD thumbnails and tags) ------------------
+function parseEpornerJson(body) {
+  if (!body || typeof body !== 'string') return []
+  let data
+  try {
+    data = JSON.parse(body)
+  } catch {
+    return []
+  }
+  const list = Array.isArray(data.videos) ? data.videos : []
+  return list
+    .map((v) => {
+      const thumb = v.default_thumb?.src || v.thumbs?.[0]?.src || ''
+      const tags = (v.keywords || '').split(',').map((t) => t.trim().replace(/\s+/g, '_')).filter(Boolean)
+      return {
+        id: `ep-${v.id}`,
+        url: thumb,
+        tags,
+        rating: 'e',
+        kind: 'image',
+        width: Number(v.default_thumb?.width) || 640,
+        height: Number(v.default_thumb?.height) || 360,
+      }
+    })
+    .filter((p) => p.id && p.url && !hasBadTag(p.tags))
+}
+
 // Round-robin over sources with simple health tracking (SPEC §6).
-// Explicit-rated human sources only (user spec): tbib + xbooru + paheal
-// (boorus), redgifs (real/hardcore mp4s+gifs), imhentai (hentai galleries).
-// e621 (furry) and safebooru (safe-only) were removed on purpose.
+// Explicit-rated human sources categorized as 'real' or 'hentai'.
 const SOURCES = [
-  dapiSource('tbib', 'https://tbib.org', { httpGet, parse: parseDanbooruJson, negatives: getQueryNegatives }),
-  dapiSource('xbooru', 'https://xbooru.com', { httpGet, parse: parseDanbooruJson, negatives: getQueryNegatives }),
+  dapiSource('tbib', 'https://tbib.org', { httpGet, parse: parseDanbooruJson, negatives: getQueryNegatives }, 'hentai'),
+  dapiSource('xbooru', 'https://xbooru.com', { httpGet, parse: parseDanbooruJson, negatives: getQueryNegatives }, 'hentai'),
   {
     // Real/hardcore porn: pornstars (skylar vox), BBC, mp4s/gifs.
     id: 'redgifs',
+    category: 'real',
     fetch: (variant, n) => fetchRedgifs(variant, n),
   },
   {
     // paheal combos return 0 results — query a single tag only.
     id: 'paheal',
+    category: 'hentai',
     fetch: async (variant, n) => {
       const tag = variant.split(/\s+/)[0]
       const page = 1 + Math.floor(Math.random() * 5)
@@ -703,17 +730,20 @@ const SOURCES = [
   {
     // Slow (multi-fetch scrape) — last resort before giving up.
     id: 'imhentai',
+    category: 'hentai',
     fetch: (variant, n) => fetchImhentai(variant, n),
   },
   {
     // Explicit hentai pools (Moebooru JSON, no key): biggest anime/hentai
     // archive of the bunch. Serves uncensored per yandere/konachan probes.
     id: 'konachan',
+    category: 'hentai',
     fetch: async (variant, n) =>
       parseMoebooruJson(await httpGet(moebooruUrl('https://konachan.com', variant, n)), 'kona'),
   },
   {
     id: 'yandere',
+    category: 'hentai',
     fetch: async (variant, n) =>
       parseMoebooruJson(await httpGet(moebooruUrl('https://yande.re', variant, n)), 'yand'),
   },
@@ -721,6 +751,7 @@ const SOURCES = [
     // realbooru: real/hardcore porn (jav uncensored, pov, homemade).
     // DAPI offline (API deliberately disabled) — HTML list scraper.
     id: 'realbooru',
+    category: 'real',
     fetch: async (variant, n) => {
       // Preserve multi-word tags with underscores (e.g. skylar_vox),
       // don't drop the rest of the query with split(/\s+/)[0].
@@ -732,13 +763,26 @@ const SOURCES = [
       return parseRealbooruHtml(html).slice(0, n)
     },
   },
-  booruOrgSource('hgoon.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'hgoon'),
-  booruOrgSource('blacked.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'blacked'),
-  booruOrgSource('allgirl.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'allgirl'),
-  booruOrgSource('rule34.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'rule34-org'),
-  booruOrgSource('qoh.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'qoh'),
-  booruOrgSource('celeb.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'celeb'),
-  booruOrgSource('footfetishbooru.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'footfetish'),
+  {
+    // eporner: real porn website API (video thumbs/tags)
+    id: 'eporner',
+    category: 'real',
+    fetch: async (variant, n) => {
+      const page = 1 + Math.floor(Math.random() * 5)
+      const q = encodeURIComponent(variant.trim().replace(/\s+/g, '+'))
+      const json = await httpGet(
+        `https://www.eporner.com/api/v2/video/search/?query=${q}&per_page=${n}&page=${page}&thumbsize=big&format=json`
+      )
+      return parseEpornerJson(json)
+    },
+  },
+  booruOrgSource('hgoon.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'hgoon', 'hentai'),
+  booruOrgSource('blacked.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'blacked', 'real'),
+  booruOrgSource('allgirl.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'allgirl', 'real'),
+  booruOrgSource('rule34.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'rule34-org', 'hentai'),
+  booruOrgSource('qoh.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'qoh', 'hentai'),
+  booruOrgSource('celeb.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'celeb', 'real'),
+  booruOrgSource('footfetishbooru.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'footfetish', 'real'),
 ]
 
 // AND-combos of narrow pervert tags often return 0 on DAPI mirrors, so each
@@ -754,17 +798,25 @@ function queryVariants(query) {
 
 let rrIndex = 0
 
-async function fetchBooru({ tags, limit }) {
+async function fetchBooru({ tags, limit, allowReal, allowHentai }) {
   const query = String(tags ?? '').trim()
   const n = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100)
   if (!query || isQueryBlocked(query)) {
     return { posts: [], source: null, ok: false, error: 'blocked-or-empty query' }
   }
+  const useReal = allowReal !== false
+  const useHentai = allowHentai !== false
+  const filtered = SOURCES.filter((s) => {
+    if (s.category === 'real' && !useReal) return false
+    if (s.category === 'hentai' && !useHentai) return false
+    return true
+  })
+  const pool = filtered.length > 0 ? filtered : SOURCES
   // Never serve stale posts to the idle game: always ask the boorus for fresh
   // images (the renderer filters seen ones itself). Feed cache survives only
   // as a write-once store so the game never blocks on it.
   const variants = queryVariants(query)
-  const ordered = SOURCES.map((_, i) => SOURCES[(rrIndex + i) % SOURCES.length])
+  const ordered = pool.map((_, i) => pool[(rrIndex + i) % pool.length])
   for (const source of ordered) {
     for (const variant of variants) {
       try {
@@ -772,7 +824,7 @@ async function fetchBooru({ tags, limit }) {
           ? await source.fetch(variant, n)
           : source.parse(await httpGet(source.url(variant, n)))
         if (posts.length > 0) {
-          rrIndex = (SOURCES.indexOf(source) + 1) % SOURCES.length
+          rrIndex = (pool.indexOf(source) + 1) % pool.length
           imageCache.setFeedCache(variant, posts)
           return { posts, source: source.id, ok: true, query: variant }
         }
@@ -781,7 +833,7 @@ async function fetchBooru({ tags, limit }) {
       }
     }
   }
-  rrIndex = (rrIndex + 1) % SOURCES.length
+  rrIndex = (rrIndex + 1) % pool.length
   return { posts: [], source: null, ok: false }
 }
 

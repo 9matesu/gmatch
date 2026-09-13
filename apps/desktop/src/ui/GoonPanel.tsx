@@ -40,6 +40,7 @@ import {
   ArrowClockwise,
   Lightning,
 } from '@phosphor-icons/react'
+import { playHit } from '../utils/sounds'
 
 interface Float {
   id: number
@@ -158,9 +159,13 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
       if (e.code === 'Space') {
         e.preventDefault()
         if (isGridMode(st.viewMode)) {
-          if (st.grid.length > 0) st.clickCell(0)
+          if (st.grid.length > 0) {
+            const res = st.clickCell(0)
+            playHit(res.crit)
+          }
         } else {
-          st.clickImage()
+          const res = st.clickImage()
+          playHit(res.crit)
         }
         return
       }
@@ -210,6 +215,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   const handleClick = (e: MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
     const { gain, crit, heat } = clickImage()
+    playHit(crit)
     spawnFloat(e.clientX - rect.left, e.clientY - rect.top, gain, crit, null, heat)
     triggerShake(null)
   }
@@ -217,6 +223,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   const handleCellClick = (index: number, e: MouseEvent<HTMLButtonElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
     const { gain, crit, heat } = clickCell(index)
+    playHit(crit)
     if (gain > 0) spawnFloat(e.clientX - rect.left, e.clientY - rect.top, gain, crit, index, heat)
     triggerShake(index)
   }
@@ -254,29 +261,21 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
       return
     }
     let live = true
-    setImageReady(false)
     const url = current.url
+    setShownUrl(url)
+    setImageReady(true)
     void (async () => {
       try {
         const resolved = await resolveImage(url)
-        const probe = new Image()
-        probe.referrerPolicy = 'no-referrer'
-        probe.src = resolved
-        await Promise.race([
-          probe.decode(),
-          new Promise((resolve) => setTimeout(resolve, 2500)),
-        ])
         if (!live) return
-        setShownUrl(resolved)
-        setImageReady(true)
+        if (resolved && resolved !== url) setShownUrl(resolved)
       } catch {
-        if (!live) return
-        onImageError()
+        /* best effort background caching */
       }
     })()
-    // ponytail: pre-warm next 3 queue images so they're cached before the KO
+    // Pre-warm next 5 queue images so they're already in RAM before the foe is defeated
     try {
-      for (const next of queue.slice(0, 3)) {
+      for (const next of queue.slice(0, 5)) {
         if (next?.url) {
           void resolveImage(next.url)
         }
@@ -287,7 +286,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
     return () => {
       live = false
     }
-  }, [current, queue, showOffline, isMotion, setImageReady, onImageError])
+  }, [current, queue, showOffline, isMotion, setImageReady])
   const hpPct = inBattle ? Math.max(0, (foeHp / foeMaxHp) * 100) : 0
   // Heat combo HUD: live multiplier + whether the streak is still inside the
   // 2s window (goes cold visually the moment you stop clicking).

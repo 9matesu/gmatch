@@ -45,9 +45,10 @@ export async function issueNonce(c: Context) {
 
 function errorResponse(c: Context, message: string, status: ContentfulStatusCode): Response {
   const origin = c.req.header('Origin') || '*'
+  const reqHeaders = c.req.header('Access-Control-Request-Headers') || 'Content-Type, Authorization, X-Orbit-Id, X-Orbit-Timestamp, X-Orbit-Signature, X-Orbit-PubKey, X-Orbit-PubKey-Enc, X-Orbit-Nonce, Idempotency-Key, X-Idempotency-Key, X-Orbit-Sealed, x-orbit-sealed'
   return c.json({ error: message }, status, {
     'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Orbit-Id, X-Orbit-Timestamp, X-Orbit-Signature, X-Orbit-PubKey, X-Orbit-PubKey-Enc, X-Orbit-Nonce, Idempotency-Key, X-Idempotency-Key',
+    'Access-Control-Allow-Headers': reqHeaders,
     'Access-Control-Allow-Methods': 'POST, PUT, GET, PATCH, DELETE, OPTIONS',
   })
 }

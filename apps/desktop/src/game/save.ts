@@ -34,6 +34,8 @@ export interface SaveData {
   coRules: { a: string; b: string; count: number }[]
   /** Player-owned idle feed sources (custom URLs / local folders). */
   customSources: CustomSource[]
+  allowReal?: boolean
+  allowHentai?: boolean
   lastSeenAt: number
 }
 
@@ -62,6 +64,8 @@ export function defaultSave(now = Date.now()): SaveData {
     userExcludes: [],
     coRules: [],
     customSources: [],
+    allowReal: true,
+    allowHentai: true,
     lastSeenAt: now,
   }
 }
@@ -112,6 +116,8 @@ export function deserialize(raw: string | null | undefined): SaveData | null {
     userExcludes: arr<string>(d.userExcludes),
     coRules: (Array.isArray(d.coRules) ? d.coRules : []).filter((r: any) => typeof r?.a === 'string' && typeof r?.b === 'string').slice(0, 200),
     customSources: sanitizeCustomSources((d as Partial<SaveData>).customSources),
+    allowReal: d.allowReal !== false,
+    allowHentai: d.allowHentai !== false,
     lastSeenAt: num(d.lastSeenAt, 0),
   }
 }

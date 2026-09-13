@@ -210,7 +210,10 @@ export default function Home() {
   const [chatOpen, setChatOpen] = useState(() => desktopChatOnLoad());
   // UI-3: resizable messages sidebar (width persisted; smooth only when not dragging)
   const [notifOpen, setNotifOpen] = useState(false);
-  const [gamesSubTab, setGamesSubTab] = useState<'duel' | 'babecock' | 'ranks' | 'idle'>('idle');
+  const [gamesSubTab, setGamesSubTab] = useState<'duel' | 'babecock' | 'ranks' | 'idle'>(() => {
+    if (typeof window !== 'undefined' && viewFromHash(window.location.hash) === 'games') return 'duel'
+    return 'idle'
+  });
   const [collapsedModules, setCollapsedModules] = useState<Record<string, boolean>>({});
   const toggleModule = (key: string) => setCollapsedModules((prev) => ({ ...prev, [key]: !prev[key] }));
   const [nowTick, setNowTick] = useState<number>(() => Date.now());
@@ -360,7 +363,10 @@ export default function Home() {
     const onNav = () => {
       const v = viewFromHash(window.location.hash)
       if (v === 'messages' && isDesktopViewport()) { setChatOpen(true); return }
-      if (v && v !== mainView) setMainView(v)
+      if (v && v !== mainView) {
+        setMainView(v)
+        if (v === 'games') setGamesSubTab('duel')
+      }
     }
     window.addEventListener('hashchange', onNav)
     window.addEventListener('popstate', onNav)
@@ -1450,7 +1456,7 @@ export default function Home() {
     return () => window.removeEventListener('orbit-group-new', handleGroupNew)
   }, [identity, myProfile.displayName])
 
-  // Real-time notifications push: aggressive SFX, automatic tab opening & tab title flash
+  // Real-time notifications push: SFX & tab title flash (notifications stay inside the notifications tab)
   useEffect(() => {
     const handleIncomingNotif = (e: Event) => {
       const detail = (e as CustomEvent<unknown>).detail as Record<string, unknown> | null
@@ -1460,7 +1466,6 @@ export default function Home() {
       // re-announcing it here is the duplicate the user reported.
       if (detail.type === 'pm') return
       playChime()
-      openNotifications()
 
       if (typeof document !== 'undefined' && document.hidden) {
         const oldTitle = document.title
@@ -1474,7 +1479,7 @@ export default function Home() {
     }
     window.addEventListener('orbit-incoming-notification', handleIncomingNotif)
     return () => window.removeEventListener('orbit-incoming-notification', handleIncomingNotif)
-  }, [openNotifications])
+  }, [])
 
   const reportPmMessage = useCallback(async (messageId: string) => {
     if (!identity) return
@@ -1900,8 +1905,7 @@ export default function Home() {
           const serverTags = selfUser?.tags || [];
           const lastSaved = lastSavedProfileRef.current;
           const localIsFresh = lastSaved !== null
-            && lastSaved.displayName === localName
-            && JSON.stringify(lastSaved.tags) === JSON.stringify(localTags);
+            && lastSaved.displayName === localName;
           const serverDiffers = serverName !== localName || JSON.stringify(serverTags) !== JSON.stringify(localTags);
 
           let displayName: string;
@@ -2901,54 +2905,17 @@ export default function Home() {
                 {/* Notifications dock: LEFT side panel sibling (mirrors chat) */}
                 <MessagesRail open={notifOpen} side="left" widthClass="w-[min(420px,32vw)]">
                   <div className="solid-panel w-full h-full min-h-0 flex flex-col overflow-hidden rounded-xl">
-                    <div className="flex items-center justify-between px-3 py-2 border-b border-border-glass shrink-0 bg-glass-w5">
-                      <span className="flex items-center gap-1.5 text-xs font-medium text-retro-fg">
-                        <Bell className="w-3.5 h-3.5" />
-                        Notifications
-                        {lobby.unreadCount > 0 && (
-                          <span className="px-1 py-0.5 rounded-full text-[10px] font-bold leading-none bg-retro-accent text-black tabular-nums">
-                            {lobby.unreadCount}
-                          </span>
-                        )}
-                      </span>
-                      <div className="flex items-center gap-1">
-                        {lobby.notifications.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              playPress(700);
-                              lobby.markNotificationsRead();
-                            }}
-                            className="glass-action px-2 py-0.5 rounded text-[11px] cursor-pointer text-retro-muted hover:text-retro-fg"
-                          >
-                            Mark all read
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            playPress(700);
-                            setNotifOpen(false);
-                          }}
-                          aria-label="Close notifications"
-                          className="p-1 rounded-md hover:bg-glass-w8 text-retro-muted hover:text-retro-fg cursor-pointer"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex-1 min-h-0 overflow-hidden">
-                      <NotificationsPanel
-                        embedded
-                        notifications={lobby.notifications}
-                        unreadCount={lobby.unreadCount}
-                        invites={lobby.invites}
-                        onMarkAllRead={() => lobby.markNotificationsRead()}
-                        onRespondInvite={(id, accept) => lobby.respondToInvite(id, accept)}
-                        onRespondBabecock={handleRespondBabecock}
-                        onOpenBabecock={() => { setNotifOpen(false); setGamesSubTab('babecock'); setMainView('games'); }}
-                      />
-                    </div>
+                    <NotificationsPanel
+                      embedded
+                      notifications={lobby.notifications}
+                      unreadCount={lobby.unreadCount}
+                      invites={lobby.invites}
+                      onMarkAllRead={() => lobby.markNotificationsRead()}
+                      onRespondInvite={(id, accept) => lobby.respondToInvite(id, accept)}
+                      onRespondBabecock={handleRespondBabecock}
+                      onOpenBabecock={() => { setNotifOpen(false); setGamesSubTab('babecock'); setMainView('games'); }}
+                      onClose={() => setNotifOpen(false)}
+                    />
                   </div>
                 </MessagesRail>
 
@@ -3493,54 +3460,17 @@ export default function Home() {
                   <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4" role="dialog" aria-label="Notifications">
                     <div className="absolute inset-0 bg-black/70" onClick={() => setNotifOpen(false)} />
                     <div className="relative w-full max-w-md h-[70vh] solid-panel rounded-xl overflow-hidden flex flex-col">
-                      <div className="flex items-center justify-between px-3 py-2 border-b border-border-glass shrink-0 bg-glass-w5">
-                        <span className="flex items-center gap-1.5 text-xs font-medium text-retro-fg">
-                          <Bell className="w-3.5 h-3.5" />
-                          Notifications
-                          {lobby.unreadCount > 0 && (
-                            <span className="px-1 py-0.5 rounded-full text-[10px] font-bold leading-none bg-retro-accent text-black tabular-nums">
-                              {lobby.unreadCount}
-                            </span>
-                          )}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          {lobby.notifications.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                playPress(700);
-                                lobby.markNotificationsRead();
-                              }}
-                              className="glass-action px-2 py-0.5 rounded text-[11px] cursor-pointer text-retro-muted hover:text-retro-fg"
-                            >
-                              Mark all read
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              playPress(700);
-                              setNotifOpen(false);
-                            }}
-                            aria-label="Close notifications"
-                            className="p-1 rounded-md hover:bg-glass-w8 text-retro-muted hover:text-retro-fg cursor-pointer"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="flex-1 min-h-0 overflow-hidden">
-                        <NotificationsPanel
-                          embedded
-                          notifications={lobby.notifications}
-                          unreadCount={lobby.unreadCount}
-                          invites={lobby.invites}
-                          onMarkAllRead={() => lobby.markNotificationsRead()}
-                          onRespondInvite={(id, accept) => lobby.respondToInvite(id, accept)}
-                          onRespondBabecock={handleRespondBabecock}
-                          onOpenBabecock={() => { setNotifOpen(false); setGamesSubTab('babecock'); setMainView('games'); }}
-                        />
-                      </div>
+                      <NotificationsPanel
+                        embedded
+                        notifications={lobby.notifications}
+                        unreadCount={lobby.unreadCount}
+                        invites={lobby.invites}
+                        onMarkAllRead={() => lobby.markNotificationsRead()}
+                        onRespondInvite={(id, accept) => lobby.respondToInvite(id, accept)}
+                        onRespondBabecock={handleRespondBabecock}
+                        onOpenBabecock={() => { setNotifOpen(false); setGamesSubTab('babecock'); setMainView('games'); }}
+                        onClose={() => setNotifOpen(false)}
+                      />
                     </div>
                   </div>
                 )}
@@ -3836,9 +3766,17 @@ export default function Home() {
               profilePic={profilePics[identity?.orbitId || '']}
               isAdmin={myProfile.isAdmin}
               onOpenCreatePost={() => { setChatOpen(false); setShowCreatePostModal(true); }}
-              onOpenSettings={() => { setChatOpen(false); setShowSettingsModal(true); }}
+              onOpenSettings={() => { setChatOpen(false); setShowSettingsModal((v) => !v); }}
+              settingsOpen={showSettingsModal}
               onOpenStore={() => handleSetMainView('store')}
-              onOpenNotifications={openNotifications}
+              onOpenNotifications={() => {
+                setNotifOpen((v) => {
+                  const next = !v;
+                  if (next) lobby.markNotificationsRead();
+                  return next;
+                });
+              }}
+              notificationsOpen={notifOpen}
               onToggleMessages={() => {
                 playPress(860);
                 if (isDesktopViewport()) {
@@ -3852,6 +3790,7 @@ export default function Home() {
                 playPress(760);
                 setShowThemeDrawer((v) => !v);
               }}
+              themeOpen={showThemeDrawer}
               onLogout={() => { setChatOpen(false); setIdentityModalMode('logout'); }}
               onOpenProfile={() => handleSetMainView('profile')}
               onOpenCreateCard={() => { setChatOpen(false); setShowCreateCardModal(true); }}

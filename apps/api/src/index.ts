@@ -40,26 +40,6 @@ app.onError((err, c) => {
 
 app.use('*', cors({
   origin: '*',
-  allowHeaders: [
-    'Content-Type',
-    'Authorization',
-    'X-Orbit-Id',
-    'X-Orbit-Timestamp',
-    'X-Orbit-Signature',
-    'X-Orbit-PubKey',
-    'X-Orbit-PubKey-Enc',
-    'X-Orbit-Nonce',
-    'x-orbit-id',
-    'x-orbit-timestamp',
-    'x-orbit-signature',
-    'x-orbit-pubkey',
-    'x-orbit-pubkey-enc',
-    'x-orbit-nonce',
-    'X-Request-ID',
-    'Idempotency-Key',
-    'X-Idempotency-Key',
-    'X-Orbit-Sealed',
-  ],
   allowMethods: [
     'GET',
     'POST',

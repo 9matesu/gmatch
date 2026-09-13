@@ -18,7 +18,17 @@ function computeApiBase(): string {
     (typeof window !== 'undefined' && (window as unknown as { __API_BASE__?: string }).__API_BASE__)
   if (envUrl) return envUrl.replace(/\/+$/, '')
 
-  // Dev (vite) and packaged builds both default to the gmatch central node;
+  // In browser dev mode (e.g. http://localhost:5173 without Electron bridge), use relative ''
+  // so requests hit the Vite dev proxy to https://gmatch.fly.dev, eliminating CORS blocks.
+  if (
+    typeof window !== 'undefined' &&
+    !(window as unknown as { gmatch?: unknown }).gmatch &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ) {
+    return ''
+  }
+
+  // Dev (electron) and packaged builds both default to the gmatch central node;
   // the local sidecar is opt-in via VITE_API_URL / __API_BASE__ / server-mode.
   return 'https://gmatch.fly.dev'
 }
@@ -26,8 +36,8 @@ function computeApiBase(): string {
 export const API_BASE = computeApiBase();
 
 /** Openable share links (P3.5): public HTML pages served by the API host. */
-export const postShareUrl = (id: string) => `${API_BASE}/p/${encodeURIComponent(id)}`
-export const profileShareUrl = (id: string) => `${API_BASE}/u/${encodeURIComponent(id)}`
+export const postShareUrl = (id: string) => `${API_BASE || 'https://gmatch.fly.dev'}/p/${encodeURIComponent(id)}`
+export const profileShareUrl = (id: string) => `${API_BASE || 'https://gmatch.fly.dev'}/u/${encodeURIComponent(id)}`
 
 const inflightRequests = new Map<string, Promise<Response>>()
 const responseCache = new Map<string, { data: Response; expiry: number }>()
@@ -69,6 +79,14 @@ export function getApiBaseUrl(): string {
   return API_BASE
 }
 
+export function getApiWebSocketUrl(path = '/api/ws'): string {
+  const base = (API_BASE || 'https://gmatch.fly.dev').replace(/\/+$/, '')
+  const scheme = base.startsWith('https') ? 'wss' : 'ws'
+  const hostAndPath = base.includes('://') ? base.slice(base.indexOf('://') + 3) : base.replace(/^\/+/, '')
+  const cleanPath = path.startsWith('/') ? path : `/${path}`
+  return `${scheme}://${hostAndPath}${cleanPath}`
+}
+
 export function setApiBaseUrl(url: string): void {
   try {
     if (url.trim()) localStorage.setItem('gmatch.api.url', url.trim())
@@ -100,9 +118,40 @@ const NODE_KEY_TTL_MS = 60 * 60 * 1000
 
 export function _resetNodeKeyCache(): void { nodeKeyCache = null }
 export function _resetResponseCache(): void { responseCache.clear(); inflightRequests.clear(); }
+export function invalidateCache(pathPrefix?: string): void {
+  if (!pathPrefix) {
+    responseCache.clear();
+    inflightRequests.clear();
+    return;
+  }
+  for (const key of responseCache.keys()) {
+    if (key.includes(pathPrefix)) {
+      responseCache.delete(key);
+    }
+  }
+  for (const key of inflightRequests.keys()) {
+    if (key.includes(pathPrefix)) {
+      inflightRequests.delete(key);
+    }
+  }
+}
+
+function getPathname(u: string): string {
+  try {
+    return new URL(u, 'http://localhost').pathname
+  } catch {
+    const withoutQuery = u.split('?')[0] || '/'
+    return withoutQuery.startsWith('/') ? withoutQuery : `/${withoutQuery}`
+  }
+}
 
 function originOf(u: string): string {
-  try { return new URL(u).origin } catch { return API_BASE }
+  try {
+    const fallbackBase = typeof window !== 'undefined' && window.location?.origin ? window.location.origin : (API_BASE || 'http://localhost')
+    return new URL(u, fallbackBase).origin
+  } catch {
+    return API_BASE
+  }
 }
 
 async function getNodePubkey(fetchImpl: typeof globalThis.fetch, targetUrl: string = API_BASE): Promise<string | null> {
@@ -177,7 +226,7 @@ export async function orbitFetch(
   }
 
   // Use only the pathname for signature computation (server uses new URL().pathname)
-  const pathname = new URL(url).pathname;
+  const pathname = getPathname(url);
   const isFormUpload = typeof FormData !== 'undefined' && options.body instanceof FormData
 
   async function buildHeaders(): Promise<Headers> {
@@ -326,7 +375,7 @@ export function uploadWithProgress(
 ): Promise<UploadWithProgressResult> {
   return new Promise((resolve) => {
     const url = resolveEndpoint(endpoint)
-    const pathname = new URL(url).pathname
+    const pathname = getPathname(url)
     const send = (attempt: number) => {
       const headers = signRequestHeaders('POST', pathname, '', identity)
 

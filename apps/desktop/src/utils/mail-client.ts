@@ -120,9 +120,10 @@ export class MailClient {
   }
 
   private wsUrl(): string {
-    const base = this.deps.apiBase.replace(/\/+$/, '')
+    const base = (this.deps.apiBase?.trim() || 'https://gmatch.fly.dev').replace(/\/+$/, '')
     const scheme = base.startsWith('https') ? 'wss' : 'ws'
-    return scheme + base.slice(base.indexOf('://') + 3) + '/api/mail/ws'
+    const hostAndPath = base.includes('://') ? base.slice(base.indexOf('://') + 3) : base.replace(/^\/+/, '')
+    return `${scheme}://${hostAndPath}/api/mail/ws`
   }
 
   private connect(): void {

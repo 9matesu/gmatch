@@ -70,13 +70,15 @@ export function ProfileEditorModal({
       }
 
       if (identity) {
-        const res = await saveUserProfile(identity, {
+        const patch: Parameters<typeof saveUserProfile>[1] = {
           display_name: name.trim(),
-          bio: bio.trim(),
-          website: website.trim(),
-          ...(persistedPfp ? { pfp_url: persistedPfp } : {}),
-        });
-        if (!res.ok) throw new Error(`Profile save failed (${res.status})`);
+        };
+        if (bio !== undefined) patch.bio = bio.trim();
+        if (website !== undefined) patch.website = website.trim();
+        if (persistedPfp) patch.pfp_url = persistedPfp;
+
+        const res = await saveUserProfile(identity, patch);
+        if (!res.ok) throw new Error(res.error || `Profile save failed (${res.status})`);
       }
 
       playWin();
@@ -88,8 +90,8 @@ export function ProfileEditorModal({
         pfpUrl: persistedPfp || undefined,
       });
       onClose();
-    } catch {
-      toast?.('Could not save profile changes', 'error');
+    } catch (err: any) {
+      toast?.(err?.message || 'Could not save profile changes', 'error');
     } finally {
       setSaving(false);
     }

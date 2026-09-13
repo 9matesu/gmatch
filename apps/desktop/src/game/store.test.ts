@@ -620,14 +620,16 @@ describe('3x3 grid mode', () => {
     expect(s.current).toBeNull()
   })
 
-  it('tick auto-clicks batter the first square in grid mode', () => {
+  it('tick generates points passively but does not damage squares without player clicking', () => {
     useGame.setState({ queue: dozen(), grid: [] })
     useGame.getState().setViewMode('grid')
     // Braceface (filter cap): permanent 1 auto-click/s.
     useGame.setState({ caps: [{ capId: 'filter', expiresAt: Number.POSITIVE_INFINITY }] })
     const before = useGame.getState().grid[0].hp
+    const ptsBefore = useGame.getState().points
     useGame.getState().tick(1000)
-    expect(useGame.getState().grid[0].hp).toBeLessThan(before)
+    expect(useGame.getState().grid[0].hp).toBe(before)
+    expect(useGame.getState().points).toBeGreaterThan(ptsBefore)
   })
 
   it('KO on single foe queues a non-blocking KoDrop from foe tags', () => {
@@ -780,5 +782,41 @@ describe('purgePost (T3)', () => {
     // 2+ learned tags leave a count-1 co-occurrence pair behind (T4)
     expect(useGame.getState().coRules.length).toBeGreaterThan(0)
     expect(useGame.getState().coRules[0].count).toBe(1)
+  })
+})
+
+describe('toggleFeedCategory (REAL / HENTAI)', () => {
+  it('toggles categories but keeps at least one active', () => {
+    useGame.setState({ allowReal: true, allowHentai: true })
+    useGame.getState().toggleFeedCategory('real')
+    expect(useGame.getState().allowReal).toBe(false)
+    expect(useGame.getState().allowHentai).toBe(true)
+
+    // Attempting to turn off hentai when real is false should keep hentai active
+    useGame.getState().toggleFeedCategory('hentai')
+    expect(useGame.getState().allowHentai).toBe(true)
+    expect(useGame.getState().allowReal).toBe(false)
+
+    // Turning real back on
+    useGame.getState().toggleFeedCategory('real')
+    expect(useGame.getState().allowReal).toBe(true)
+    expect(useGame.getState().allowHentai).toBe(true)
+  })
+
+  it('passes allowReal and allowHentai to fetchPosts', async () => {
+    vi.mocked(fetchPosts).mockClear()
+    vi.mocked(fetchPosts).mockResolvedValue({ posts: [{ id: 'p1', url: 'https://x/p1.jpg', tags: ['aaa'] }], source: 't', ok: true })
+    useGame.setState({
+      tags: [setupTag('aaa')],
+      allowReal: false,
+      allowHentai: true,
+      current: null,
+      queue: [],
+    })
+    await useGame.getState().fetchFeed()
+    expect(fetchPosts).toHaveBeenCalled()
+    const callArg = vi.mocked(fetchPosts).mock.calls[0][0]
+    expect(callArg.allowReal).toBe(false)
+    expect(callArg.allowHentai).toBe(true)
   })
 })

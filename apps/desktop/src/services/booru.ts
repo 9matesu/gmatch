@@ -25,6 +25,8 @@ import {
 export interface BooruRequest {
   tags: string
   limit: number
+  allowReal?: boolean
+  allowHentai?: boolean
 }
 
 export interface BooruResponse {
@@ -211,18 +213,27 @@ function sanitize(posts: BooruPost[], query?: string): BooruPost[] {
     .filter((p) => matchesQuery(p, query))
 }
 
+export interface DirectSourceDef {
+  id: string
+  origin: string
+  proxy: string
+  type: 'dapi' | 'moebooru' | 'realhtml' | 'booruorg'
+  category: 'real' | 'hentai'
+  sub?: string
+}
+
 /** Mirrors reachable through the Vite dev proxy (same-origin → no CORS). */
-const DIRECT_SOURCES = [
-  { id: 'tbib-direct', origin: 'https://tbib.org', proxy: '/booru/tbib', type: 'dapi' },
-  { id: 'xbooru-direct', origin: 'https://xbooru.com', proxy: '/booru/xbooru', type: 'dapi' },
-  { id: 'konachan-direct', origin: 'https://konachan.com', proxy: '/booru/kona', type: 'moebooru' },
-  { id: 'yandere-direct', origin: 'https://yande.re', proxy: '/booru/yand', type: 'moebooru' },
-  { id: 'realbooru-direct', origin: 'https://realbooru.com', proxy: '/booru/real', type: 'realhtml' },
-  { id: 'hgoon-direct', origin: 'https://hgoon.booru.org', proxy: '/booru/hgoon', type: 'booruorg', sub: 'hgoon' },
-  { id: 'qoh-direct', origin: 'https://qoh.booru.org', proxy: '/booru/qoh', type: 'booruorg', sub: 'qoh' },
-  { id: 'celeb-direct', origin: 'https://celeb.booru.org', proxy: '/booru/celeb', type: 'booruorg', sub: 'celeb' },
-  { id: 'footfetish-direct', origin: 'https://footfetishbooru.booru.org', proxy: '/booru/foot', type: 'booruorg', sub: 'footfetishbooru' },
-  { id: 'blacked-direct', origin: 'https://blacked.booru.org', proxy: '/booru/blacked', type: 'booruorg', sub: 'blacked' },
+export const DIRECT_SOURCES: readonly DirectSourceDef[] = [
+  { id: 'tbib-direct', origin: 'https://tbib.org', proxy: '/booru/tbib', type: 'dapi', category: 'hentai' },
+  { id: 'xbooru-direct', origin: 'https://xbooru.com', proxy: '/booru/xbooru', type: 'dapi', category: 'hentai' },
+  { id: 'konachan-direct', origin: 'https://konachan.com', proxy: '/booru/kona', type: 'moebooru', category: 'hentai' },
+  { id: 'yandere-direct', origin: 'https://yande.re', proxy: '/booru/yand', type: 'moebooru', category: 'hentai' },
+  { id: 'realbooru-direct', origin: 'https://realbooru.com', proxy: '/booru/real', type: 'realhtml', category: 'real' },
+  { id: 'hgoon-direct', origin: 'https://hgoon.booru.org', proxy: '/booru/hgoon', type: 'booruorg', sub: 'hgoon', category: 'hentai' },
+  { id: 'qoh-direct', origin: 'https://qoh.booru.org', proxy: '/booru/qoh', type: 'booruorg', sub: 'qoh', category: 'hentai' },
+  { id: 'celeb-direct', origin: 'https://celeb.booru.org', proxy: '/booru/celeb', type: 'booruorg', sub: 'celeb', category: 'real' },
+  { id: 'footfetish-direct', origin: 'https://footfetishbooru.booru.org', proxy: '/booru/foot', type: 'booruorg', sub: 'footfetishbooru', category: 'real' },
+  { id: 'blacked-direct', origin: 'https://blacked.booru.org', proxy: '/booru/blacked', type: 'booruorg', sub: 'blacked', category: 'real' },
 ] as const
 
 /**
@@ -290,7 +301,7 @@ function parseRealbooruHtml(html: string): BooruPost[] {
       .filter(Boolean)
     const isVideo = tags.includes('video') || tags.includes('mp4') || tags.includes('webm')
     const isGif = tags.includes('gif')
-    const ext = isVideo ? 'mp4' : isGif ? 'gif' : 'jpeg'
+    const ext = isVideo ? 'mp4' : isGif ? 'gif' : 'jpg'
     const url = `https://realbooru.com/images/${dir1}/${dir2}/${hash}.${ext}`
     posts.push({ id: `rb-${postId}`, url, tags, rating: 'e' })
   }
@@ -329,13 +340,21 @@ function parseBooruOrgHtml(html: string): BooruPost[] {
  * shown twice.
  */
 async function directFetch(req: BooruRequest): Promise<BooruResponse> {
+  const allowReal = req.allowReal !== false
+  const allowHentai = req.allowHentai !== false
   const neg =
     '-ai_generated -ai-generated -furry -anthro -feral -scalie -monochrome -greyscale -sketch -comic -lowres -worst_quality -jpeg_artifacts -watermark -censored'
   // Random result page per call — the same tag yields fresh posts, not the
   // same top-10 on every fetch.
   const pid = Math.floor(Math.random() * 25)
-  const healthy = DIRECT_SOURCES.filter((s) => isHealthy(s.id))
-  for (const src of healthy.length > 0 ? healthy : DIRECT_SOURCES) {
+  const filteredSources = DIRECT_SOURCES.filter((s) => {
+    if (s.category === 'real' && !allowReal) return false
+    if (s.category === 'hentai' && !allowHentai) return false
+    return true
+  })
+  const pool = filteredSources.length > 0 ? filteredSources : DIRECT_SOURCES
+  const healthy = pool.filter((s) => isHealthy(s.id))
+  for (const src of healthy.length > 0 ? healthy : pool) {
     let reachable = true
     // booru.org subdomains are tagless and dedicated to niche themes;
     // querying once avoids hammering *.booru.org with redundant requests per round.
@@ -434,9 +453,9 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
       return { posts: fresh, source: src.id, ok: true }
     }
   }
-  // Redgifs (real/hardcore mp4s+gifs), then imhentai (gallery scrape),
+  // Redgifs (real/hardcore mp4s+gifs), then EPORNER, then imhentai (gallery scrape),
   // before the paheal single-tag fallback.
-  if (isHealthy('redgifs-direct')) {
+  if (allowReal && isHealthy('redgifs-direct')) {
     const rg = await redgifsDirect(req.tags, req.limit)
     if (rg) {
       const fresh = remember(sanitize(rg, req.tags))
@@ -448,13 +467,25 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
       markUnhealthy('redgifs-direct')
     }
   }
-  if (isHealthy('imh-direct')) {
+  if (allowReal && isHealthy('eporner-direct')) {
+    try {
+      const ep = await epornerDirect(req.tags, req.limit)
+      if (ep.length > 0) {
+        const fresh = remember(sanitize(ep, req.tags))
+        if (fresh.length > 0) {
+          unhealthyUntil.delete('eporner-direct')
+          return { posts: fresh, source: 'eporner-direct', ok: true }
+        }
+      } else {
+        markUnhealthy('eporner-direct')
+      }
+    } catch {
+      markUnhealthy('eporner-direct')
+    }
+  }
+  if (allowHentai && isHealthy('imh-direct')) {
     try {
       const scraped = await imhentaiDirect(req.tags, req.limit)
-      // Zero scraped posts = every gallery 403'd or the search died — the
-      // same deterministic gallery ids would be retried every round, so cool
-      // the source down instead of spamming 403s. (Posts that came back but
-      // deduped to nothing are NOT a sickness — no cooldown in that case.)
       if (scraped.length === 0) markUnhealthy('imh-direct')
       const fresh = remember(sanitize(scraped, req.tags))
       if (fresh.length > 0) {
@@ -467,7 +498,7 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
   }
   // paheal only answers single tags — use the leading one.
   const single = req.tags.split(/\s+/).filter(Boolean)[0]
-  if (single && isHealthy('paheal-direct')) {
+  if (allowHentai && single && isHealthy('paheal-direct')) {
     try {
       const url = `/booru/paheal/api/danbooru/find_posts?tags=${encodeURIComponent(single)}&limit=${req.limit}`
       const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) })
@@ -528,6 +559,41 @@ export async function redgifsDirect(query: string, limit: number, retried = fals
     return parseRedgifs(await res.json())
   } catch {
     return null
+  }
+}
+
+/** EPORNER API for real porn images / previews */
+export async function epornerDirect(query: string, limit: number): Promise<BooruPost[]> {
+  try {
+    const page = 1 + Math.floor(Math.random() * 5)
+    const q = encodeURIComponent(query.trim().replace(/\s+/g, '+'))
+    const url = `/booru/eporner/api/v2/video/search/?query=${q}&per_page=${limit}&page=${page}&thumbsize=big&format=json`
+    const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) })
+    if (!res.ok) return []
+    const data = (await res.json()) as {
+      videos?: Array<{
+        id: string
+        keywords?: string
+        default_thumb?: { src?: string }
+        thumbs?: Array<{ src?: string }>
+      }>
+    }
+    const list = Array.isArray(data.videos) ? data.videos : []
+    return list
+      .map((v) => {
+        const thumb = v.default_thumb?.src || v.thumbs?.[0]?.src || ''
+        const tags = (v.keywords || '').split(',').map((t) => t.trim().replace(/\s+/g, '_')).filter(Boolean)
+        return {
+          id: `ep-${v.id}`,
+          url: thumb,
+          tags,
+          rating: 'e',
+          kind: 'image' as const,
+        }
+      })
+      .filter((p) => p.id && p.url)
+  } catch {
+    return []
   }
 }
 

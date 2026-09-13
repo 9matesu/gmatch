@@ -12,6 +12,7 @@ import {
   Heart,
   UserPlus,
   Sparkles,
+  X,
 } from "lucide-react";
 import { groupNotifications, groupTitle, type NotifItem } from "../utils/groupNotifications";
 import { playPress } from "../utils/sounds";
@@ -44,6 +45,8 @@ export interface NotificationsPanelProps {
   onRespondInvite?: (inviteId: string, accept: boolean) => void;
   onRespondBabecock?: (inviteId: string, accept: boolean) => void;
   onOpenBabecock?: () => void;
+  embedded?: boolean;
+  onClose?: () => void;
 }
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
@@ -67,6 +70,8 @@ export function NotificationsPanel({
   onRespondInvite,
   onRespondBabecock,
   onOpenBabecock,
+  embedded = false,
+  onClose,
 }: NotificationsPanelProps) {
   const [now, setNow] = useState(() => Date.now());
 
@@ -89,28 +94,44 @@ export function NotificationsPanel({
   const openInvites = invites.filter((invite) => new Date(invite.expires_at).getTime() > now);
 
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden solid-panel">
-      <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between shrink-0 bg-glass-w5">
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-medium text-retro-fg">Notifications</h3>
+    <div className={`flex flex-col h-full min-h-0 overflow-hidden ${embedded ? 'bg-transparent' : 'solid-panel'}`}>
+      <div className="px-3 py-2 border-b border-border-glass flex items-center justify-between shrink-0 bg-glass-w5">
+        <span className="flex items-center gap-1.5 text-xs font-medium text-retro-fg">
+          <Bell className="w-3.5 h-3.5" />
+          Notifications
           {unreadCount > 0 && (
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-glass-w10 text-retro-accent tabular-nums">
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none bg-retro-accent text-black tabular-nums">
               {unreadCount}
             </span>
           )}
+        </span>
+        <div className="flex items-center gap-1">
+          {items.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                playPress(700);
+                onMarkAllRead();
+              }}
+              className="glass-action px-2 py-0.5 rounded text-[11px] cursor-pointer text-retro-muted hover:text-retro-fg"
+            >
+              Mark all read
+            </button>
+          )}
+          {onClose && (
+            <button
+              type="button"
+              onClick={() => {
+                playPress(700);
+                onClose();
+              }}
+              aria-label="Close notifications"
+              className="p-1 rounded-md hover:bg-glass-w8 text-retro-muted hover:text-retro-fg cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
-        {items.length > 0 && (
-          <button
-            type="button"
-            onClick={() => {
-              playPress(700);
-              onMarkAllRead();
-            }}
-            className="glass-action px-3 py-1.5 rounded-lg text-xs cursor-pointer"
-          >
-            Mark all read
-          </button>
-        )}
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar p-2 space-y-1">

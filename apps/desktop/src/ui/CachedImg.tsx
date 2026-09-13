@@ -14,7 +14,7 @@ interface CachedImgProps extends ImgHTMLAttributes<HTMLImageElement> {
  */
 export default function CachedImg({ src, fallbackSrc, onError, ...rest }: CachedImgProps) {
   const isLocal = /^(gmcache|idle-file|blob|data):/i.test(src)
-  const [display, setDisplay] = useState<string>(isLocal ? src : '')
+  const [display, setDisplay] = useState<string>(src)
   const [resolved, setResolved] = useState<boolean>(isLocal)
 
   useEffect(() => {
@@ -24,17 +24,16 @@ export default function CachedImg({ src, fallbackSrc, onError, ...rest }: Cached
       setResolved(true)
       return
     }
-    setResolved(false)
+    setDisplay(src)
     resolveImage(src)
       .then((local) => {
-        if (live) {
-          setDisplay(local || src)
+        if (live && local) {
+          setDisplay(local)
           setResolved(true)
         }
       })
       .catch(() => {
         if (live) {
-          setDisplay(src)
           setResolved(true)
         }
       })

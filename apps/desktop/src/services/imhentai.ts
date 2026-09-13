@@ -139,11 +139,13 @@ export function parseImhentaiCover(html: unknown): ImhentaiCover | null {
   }
 }
 
-/** Feed post for a gallery cover. Tags come from the query (gallery-dl fetches metadata separately — too slow per feed round). */
+/** Feed post for a gallery cover. Converts thumbnail URLs to full-resolution page 1 URLs. */
 export function toImhentaiPost(galleryId: string, cover: ImhentaiCover, query: string): BooruPost {
+  const fullUrl = cover.url.replace(/\/(?:thumb|t)\.([a-z0-9]+)(?:[?#]|$)/i, '/1.$1')
   return {
     id: `imh-${galleryId}`,
-    url: cover.url,
+    url: fullUrl,
+    preview: cover.url,
     tags: query
       .replace(/_/g, ' ')
       .toLowerCase()

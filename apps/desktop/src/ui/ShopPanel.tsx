@@ -64,6 +64,9 @@ function TagsTab() {
   const mergeTags = useGame((s) => s.mergeTags)
   const refreshTagMarket = useGame((s) => s.refreshTagMarket)
   const addCustomTag = useGame((s) => s.addCustomTag)
+  const allowReal = useGame((s) => s.allowReal)
+  const allowHentai = useGame((s) => s.allowHentai)
+  const toggleFeedCategory = useGame((s) => s.toggleFeedCategory)
   const owned = tags.filter((t) => t.level > 0).length
 
   const [custom, setCustom] = useState('')
@@ -155,6 +158,39 @@ function TagsTab() {
 
   return (
     <div className="space-y-3">
+      {/* Category separation tags: REAL / HENTAI */}
+      <div className="flex items-center justify-between gap-2 pb-1 border-b border-border-glass">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => { playPress(760); toggleFeedCategory('real'); }}
+            className={`px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider transition-all duration-150 cursor-pointer border ${
+              allowReal
+                ? 'border-retro-accent/60 bg-retro-accent/20 text-retro-fg shadow-[0_0_10px_rgba(var(--accent-rgb),0.2)]'
+                : 'border-border-glass bg-glass-w5 text-retro-muted hover:text-retro-fg hover:border-border-strong'
+            }`}
+            title={allowReal ? 'Real sources active (click to toggle)' : 'Real sources disabled (click to enable)'}
+          >
+            REAL
+          </button>
+          <button
+            type="button"
+            onClick={() => { playPress(760); toggleFeedCategory('hentai'); }}
+            className={`px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider transition-all duration-150 cursor-pointer border ${
+              allowHentai
+                ? 'border-retro-accent/60 bg-retro-accent/20 text-retro-fg shadow-[0_0_10px_rgba(var(--accent-rgb),0.2)]'
+                : 'border-border-glass bg-glass-w5 text-retro-muted hover:text-retro-fg hover:border-border-strong'
+            }`}
+            title={allowHentai ? 'Hentai sources active (click to toggle)' : 'Hentai sources disabled (click to enable)'}
+          >
+            HENTAI
+          </button>
+        </div>
+        <span className="text-[10px] font-mono uppercase tracking-wider text-retro-muted">
+          Feed Pool
+        </span>
+      </div>
+
       {/* Top action bar: count & toggle search drawer */}
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-bold uppercase tracking-wider text-retro-muted">

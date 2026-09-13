@@ -16,7 +16,7 @@
   --color-surface-interactive: #27272a;
 
   /* Glass surfaces (used with backdrop-filter). --panel-alpha scales uniformly: 1 = solid, opaque */
-  --panel-alpha: 1;
+  --panel-alpha: 0.75;
   --color-glass: rgba(18, 18, 21, var(--panel-alpha));
   --color-glass-strong: rgba(24, 24, 27, var(--panel-alpha));
   --color-glass-solid: rgba(24, 24, 27, var(--panel-alpha));

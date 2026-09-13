@@ -21,7 +21,7 @@ export function MessagesRail({ open, side = 'right', widthClass = 'w-[min(720px,
   return (
     <div
       data-rail-panel
-      className={`hidden md:flex flex-col relative self-stretch ${widthClass} shrink-0 mb-[var(--island-clearance)] border-border-glass bg-retro-panel overflow-hidden ${side === 'right' ? 'border-l' : 'border-r'}`}
+      className={`hidden md:flex flex-col relative self-stretch ${widthClass} shrink-0 mb-[var(--island-clearance)] border-border-glass bg-transparent overflow-hidden ${side === 'right' ? 'border-l' : 'border-r'}`}
     >
       <div className="flex-1 min-h-0 p-1">
         {children}

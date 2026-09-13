@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { deriveProfileTags, profileIsComplete, saveUserProfile } from './profile';
 
-const apiMock = vi.hoisted(() => ({ orbitFetch: vi.fn() }));
-vi.mock('./api', () => ({ orbitFetch: apiMock.orbitFetch }));
+const apiMock = vi.hoisted(() => ({ orbitFetch: vi.fn(), invalidateCache: vi.fn() }));
+vi.mock('./api', () => ({ orbitFetch: apiMock.orbitFetch, invalidateCache: apiMock.invalidateCache }));
 
 const identity = { orbitId: 'a'.repeat(64), publicKeyHex: 'pk', privateKeyHex: 'sk' } as any;
 
@@ -74,6 +74,7 @@ describe('saveUserProfile', () => {
   it('reports failure status', async () => {
     apiMock.orbitFetch.mockResolvedValue({ ok: false, status: 409 });
     const res = await saveUserProfile(identity, { bio: 'x' });
-    expect(res).toEqual({ ok: false, status: 409 });
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(409);
   });
 });

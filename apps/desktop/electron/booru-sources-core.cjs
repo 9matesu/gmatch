@@ -4,9 +4,10 @@
 'use strict'
 
 /** Danbooru-API (JSON) shape with random-pid + pid=0 retry. */
-function dapiSource(id, base, { httpGet, parse, negatives }) {
+function dapiSource(id, base, { httpGet, parse, negatives }, category = 'hentai') {
   return {
     id,
+    category,
     fetch: async (variant, n) => {
       const pid = Math.floor(Math.random() * 8)
       const query = (variant + ' rating:explicit ' + negatives()).trim()
@@ -21,9 +22,10 @@ function dapiSource(id, base, { httpGet, parse, negatives }) {
 }
 
 /** booru.org subdomain HTML-list shape (WAF: no tags=, random pid page). */
-function booruOrgSource(sub, { httpGet, parse }, id = sub.split('.')[0]) {
+function booruOrgSource(sub, { httpGet, parse }, id = sub.split('.')[0], category = 'hentai') {
   return {
     id,
+    category,
     fetch: async (variant, n) => {
       const pid = Math.floor(Math.random() * 10) * 20
       const html = await httpGet(`https://${sub}/index.php?page=post&s=list&pid=${pid}`)

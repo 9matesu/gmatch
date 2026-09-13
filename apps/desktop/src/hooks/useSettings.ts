@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 
 const STORAGE_KEY = 'goonmatch-settings'
 const SFX_MIGRATED_KEY = 'goonmatch-settings-sfx-on'
+const OPACITY_MIGRATED_KEY = 'gmatch.opacity_migrated.v2'
 
 export interface AppSettings {
   galleryCols: '2' | '3'
@@ -80,7 +81,7 @@ const DEFAULTS: AppSettings = {
   headerVisible: false,
   idleTimeout: 5,
   idleEnabled: false,
-  panelOpacity: 1,
+  panelOpacity: 0.75,
   glassBlur: 0.7,
   animatedChrome: false,
   pcDominationEnabled: false,
@@ -115,6 +116,13 @@ function load(): AppSettings {
       stored.soundEffects = true
       stored.chatNotificationSfx = true
       localStorage.setItem(SFX_MIGRATED_KEY, '1')
+      save(stored)
+    }
+    // Default panel opacity to 0.75 (frosted glass) out of the box. Users can
+    // drag the opacity slider up to 1.0 (100%) for fully opaque solid panels.
+    if (!localStorage.getItem(OPACITY_MIGRATED_KEY)) {
+      stored.panelOpacity = 0.75
+      localStorage.setItem(OPACITY_MIGRATED_KEY, '1')
       save(stored)
     }
     return stored

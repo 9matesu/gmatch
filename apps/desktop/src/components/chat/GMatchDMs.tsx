@@ -401,10 +401,10 @@ export function GMatchDMs({
   const canShowMembers = openTarget === 'group' && !!activeGroupId && !!onLoadGroupMembers;
 
   return (
-    <div className="flex-1 min-h-0 h-full w-full solid-panel overflow-hidden flex flex-col md:flex-row-reverse font-sans text-retro-fg animate-orbit-fade-in">
+    <div className="flex-1 min-h-0 h-full w-full bg-transparent overflow-hidden flex flex-col md:flex-row-reverse font-sans text-retro-fg animate-orbit-fade-in">
       {/* Thread list column — right side on desktop, coupled with the rail's
           players/groups aside; chat panel owns the left. */}
-      <div className={`w-full md:w-60 lg:w-64 border-r md:border-r-0 md:border-l border-border-glass flex-col bg-surface-canvas/80 shrink-0 min-h-0 select-none ${openTarget ? (sidebarOpen ? 'flex' : 'hidden') : 'flex'}`}>
+      <div className={`w-full md:w-60 lg:w-64 border-r md:border-r-0 md:border-l border-border-glass flex-col bg-glass-w5 shrink-0 min-h-0 select-none ${openTarget ? (sidebarOpen ? 'flex' : 'hidden') : 'flex'}`}>
         <div className="p-3 sm:p-4 border-b border-border-glass flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <h2 className="font-semibold text-sm text-retro-fg truncate">
@@ -629,7 +629,7 @@ export function GMatchDMs({
       </div>
 
       {/* Right Column */}
-      <div className={`flex-1 min-h-0 flex flex-col bg-surface-canvas/50 min-w-0 overflow-hidden ${openTarget ? 'flex' : 'hidden md:flex'}`}>
+      <div className={`flex-1 min-h-0 flex flex-col bg-transparent min-w-0 overflow-hidden ${openTarget ? 'flex' : 'hidden md:flex'}`}>
         {openTarget ? (
           <>
             <div className="p-3 sm:p-3.5 px-4 border-b border-border-glass flex items-center justify-between shrink-0 select-none">
@@ -708,7 +708,7 @@ export function GMatchDMs({
              </div>
 
              {canShowMembers && showMembers && (
-               <div className="border-b border-border-glass max-h-72 overflow-y-auto styled-scrollbar bg-surface-canvas/60 shrink-0">
+               <div className="border-b border-border-glass max-h-72 overflow-y-auto styled-scrollbar bg-glass-w8 shrink-0">
                  <GroupMembersPopover
                    groupId={activeGroupId as string}
                    loadMembers={onLoadGroupMembers}
@@ -785,7 +785,7 @@ export function GMatchDMs({
                               <div
                                 onClick={() => setActionFor(showActions ? null : msg.id)}
                                 className={`px-3 py-2 rounded-lg text-xs leading-relaxed select-text cursor-pointer break-words whitespace-pre-wrap ${block.length > 1 ? 'mt-0.5' : ''} ${
-                                  isOwn ? 'bg-retro-accent/15 text-retro-fg rounded-br-sm' : 'bg-surface-raised border border-border-glass text-retro-body rounded-bl-sm'
+                                  isOwn ? 'bg-retro-accent/25 border border-retro-accent/30 text-retro-fg rounded-br-sm backdrop-blur-sm' : 'bg-glass-w10 border border-white/10 text-retro-body rounded-bl-sm backdrop-blur-sm'
                                 }`}
                               >
                                 {msg.attachmentUrl && (
@@ -915,12 +915,12 @@ export function GMatchDMs({
                     }
                   }}
                   title="Attach an image or video"
-                  className="p-2 rounded-md bg-surface-raised border border-border-glass text-retro-muted hover:text-retro-accent cursor-pointer transition-colors"
+                  className="p-2 rounded-md bg-glass-w10 border border-white/10 text-retro-muted hover:text-retro-accent cursor-pointer transition-colors"
                 >
                   <ImagePlus className="w-4 h-4" />
                 </button>
               ) : null}
-              <div className="flex-1 flex items-center gap-2 bg-surface-raised border border-border-glass rounded-md px-3 py-2 text-xs focus-within:border-retro-accent/50 transition-colors">
+              <div className="flex-1 flex items-center gap-2 bg-glass-w10 border border-white/10 rounded-md px-3 py-2 text-xs focus-within:border-retro-accent/50 transition-colors">
                 <input
                   type="text"
                   value={inputText}

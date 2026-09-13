@@ -9,7 +9,7 @@ import { randomBytes } from 'node:crypto'
 import path, { join } from 'node:path'
 
 // Hosts the dev /px byte-proxy may fetch (allowlist — no open proxy).
-const PX_ALLOW = /(^|\.)(imhentai\.xxx|paheal\.net|tbib\.org|xbooru\.com|redgifs\.com|konachan\.com|yande\.re|files\.yande\.re|realbooru\.com|booru\.org)$/
+const PX_ALLOW = /(^|\.)(imhentai\.xxx|paheal\.net|tbib\.org|xbooru\.com|redgifs\.com|konachan\.com|yande\.re|files\.yande\.re|realbooru\.com|booru\.org|eporner\.com)$/
 
 const DEV_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36'
@@ -149,17 +149,22 @@ function booruOrgProxy(target: string, prefix: string): ProxyOptions {
 // base './' so Electron can load dist/index.html over file://
 export default defineConfig({
   base: './',
-  plugins: [react(), tailwindcss(), devApiPlugin(), devPxPlugin()],
+  plugins: [react(), tailwindcss(), devPxPlugin()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
   server: {
-    // Dev-only CORS bypass for the Grid feed's booru mirrors (kept from the
-    // pre-merge gmatch config). Never used in packaged builds — Electron
-    // does these fetches in main via IPC.
+    // Dev-only proxy: routes /api directly to central node at gmatch.fly.dev (no CORS issues).
+    // Also proxies Grid feed's booru mirrors for browser dev.
     proxy: {
+      '^/api': {
+        target: 'https://gmatch.fly.dev',
+        changeOrigin: true,
+        secure: true,
+        ws: true,
+      },
       '^/booru/tbib': {
         target: 'https://tbib.org',
         changeOrigin: true,
@@ -234,6 +239,11 @@ export default defineConfig({
       '^/booru/celeb': booruOrgProxy('https://celeb.booru.org', '/booru/celeb'),
       '^/booru/foot': booruOrgProxy('https://footfetishbooru.booru.org', '/booru/foot'),
       '^/booru/blacked': booruOrgProxy('https://blacked.booru.org', '/booru/blacked'),
+      '^/booru/eporner': {
+        target: 'https://www.eporner.com',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/booru\/eporner/, ''),
+      },
     },
   },
   build: {

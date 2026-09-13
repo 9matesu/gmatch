@@ -1,4 +1,4 @@
-import { orbitFetch, getApiBaseUrl } from './api'
+import { orbitFetch, getApiBaseUrl, getApiWebSocketUrl } from './api'
 
 interface OrbitIdentity {
   orbitId: string
@@ -43,7 +43,7 @@ async function connect(identity: OrbitIdentity, expectedGeneration: number): Pro
   const body = await ticketRes.json() as { ticket?: string }
   if (!body.ticket || expectedGeneration !== generation || activeIdentity !== identity.orbitId || listeners.size === 0) return
 
-  const url = getApiBaseUrl().replace(/^http:/, 'ws:').replace(/^https:/, 'wss:') + '/api/ws'
+  const url = getApiWebSocketUrl('/api/ws')
   const next = new WebSocket(url)
   socket = next
 

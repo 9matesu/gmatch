@@ -4,7 +4,7 @@ import { OrbitP2PNode } from '@orbit/protocol';
 import { User, OrbitObject } from '@orbit/shared';
 import { saveObject } from '../utils/storage';
 import { OrbitPeerRelay } from '../utils/peer-relay';
-import { getApiBaseUrl, orbitFetch } from '../utils/api';
+import { getApiBaseUrl, getApiWebSocketUrl, orbitFetch } from '../utils/api';
 import { mergeRoster } from '../utils/peerRoster';
 import { CHAT_WIPE_SECONDS } from '@orbit/shared';
 import { logger } from '../utils/logger';
@@ -312,7 +312,7 @@ export function useP2P(identity: OrbitIdentity | null) {
     };
 
     // 3. Setup WebSocket relay via the API worker
-    const API_WS = getApiBaseUrl().replace(/^http:/, 'ws:').replace(/^https:/, 'wss:') + '/api/ws'
+    const API_WS = getApiWebSocketUrl('/api/ws');
 
     // The WS relay only serves authenticated identities: fetch a one-time
     // ws-ticket and present it right after the socket opens. Heartbeat and any

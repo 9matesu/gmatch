@@ -392,7 +392,7 @@ describe('clickCell / dropCell edges', () => {
 describe('tick auto-battle paths', () => {
   const filterCap = [{ capId: 'filter' as const, expiresAt: Number.POSITIVE_INFINITY }]
 
-  it('grid mode: an auto-click KOs the first square and slides in a fresh foe', () => {
+  it('grid mode: tick banks points without auto-attacking foes (only manual clicks attack)', () => {
     useGame.setState({ queue: dozen(), grid: [] })
     useGame.getState().setViewMode('grid')
     useGame.setState({
@@ -402,11 +402,11 @@ describe('tick auto-battle paths', () => {
     const points = useGame.getState().points
     useGame.getState().tick(1000)
     const s = useGame.getState()
-    expect(s.defeated).toBe(1)
-    expect(s.gallery).toHaveLength(1)
+    expect(s.defeated).toBe(0)
+    expect(s.gallery).toHaveLength(0)
     expect(s.points).toBeGreaterThan(points)
     expect(s.grid).toHaveLength(GRID_SIZE)
-    expect(s.toasts.some((t) => t.msg.includes('Auto-drained'))).toBe(true)
+    expect(s.grid[0].hp).toBe(1)
   })
 
   it('grid mode without auto-clicks just banks passive income', () => {
@@ -424,7 +424,7 @@ describe('tick auto-battle paths', () => {
     expect(s.grid[0].hp).toBe(5) // untouched
   })
 
-  it('single mode: an auto-click KOs the live foe and steps the queue up', async () => {
+  it('single mode: tick banks points without chipping foe or KOing (only clicks attack)', () => {
     mocked.mockClear()
     useGame.setState({
       tags: [setupTag('aaa')],
@@ -439,27 +439,26 @@ describe('tick auto-battle paths', () => {
     })
     useGame.getState().tick(1000)
     const s = useGame.getState()
-    expect(s.defeated).toBe(1)
-    expect(s.gallery).toHaveLength(1)
-    expect(s.current).toBeNull()
-    expect(s.toasts.some((t) => t.msg.includes('Auto-drained'))).toBe(true)
-    await settle()
-    expect(mocked).toHaveBeenCalled() // empty queue -> refetch
+    expect(s.defeated).toBe(0)
+    expect(s.gallery).toHaveLength(0)
+    expect(s.foeHp).toBe(1)
+    expect(s.points).toBeGreaterThan(0)
   })
 
-  it('single mode: auto-clicks chip a tough foe without a KO', () => {
+  it('single mode: auto-clicks generate passive points while preserving foe HP', () => {
     useGame.setState({
       caps: filterCap,
       current: foe('t2'),
       foeHp: 100,
       foeMaxHp: 100,
       defeated: 0,
+      points: 0,
     })
     useGame.getState().tick(1000)
     const s = useGame.getState()
-    expect(s.foeHp).toBeLessThan(100)
-    expect(s.foeHp).toBeGreaterThan(0)
+    expect(s.foeHp).toBe(100)
     expect(s.defeated).toBe(0)
+    expect(s.points).toBeGreaterThan(0)
   })
 })
 

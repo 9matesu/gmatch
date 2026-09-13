@@ -161,11 +161,11 @@ export function CardTile({
       <div className="holo-card-inner flex flex-col h-full rounded-[6px] overflow-hidden" style={{ boxShadow: `inset 0 0 0 1.5px ${accent}66` }}>
         {/* Top Badges */}
         <div className="absolute top-2 left-2 z-20 flex flex-wrap items-center gap-1">
-          <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-md ${rarity.badgeClass}`}>
+          <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md border backdrop-blur-xs ${rarity.badgeClass}`}>
             {rarity.label}
           </span>
           {frameType !== 'chrome' && (
-            <span className={`text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md border shadow-md font-mono ${
+            <span className={`text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded-md border font-mono backdrop-blur-xs ${
               frameType === 'holo'
                 ? 'bg-gradient-to-r from-pink-500/80 via-purple-500/80 to-cyan-500/80 text-white border-pink-400/60'
                 : frameType === 'carbon'
@@ -177,29 +177,22 @@ export function CardTile({
               {frameType}
             </span>
           )}
-          <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded-md bg-black/85 text-amber-300 border border-amber-400/50 shadow-md backdrop-blur-xs">
-            {formatGc(cardValue)}
-          </span>
           {isReceived && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 bg-purple-950/90 text-cyan-300 rounded-md border border-purple-500/50 flex items-center gap-0.5 shadow-md">
+            <span className="text-[10px] font-medium px-1.5 py-0.5 bg-black/75 text-purple-300 rounded-md border border-purple-400/30 flex items-center gap-1 backdrop-blur-xs">
               <Gift className="w-2.5 h-2.5 text-purple-400" />
               <span>RECEIVED</span>
             </span>
           )}
         </div>
 
-        {/* Top-Right Badges: Likes & Expiry Timer & Select Checkbox */}
+        {/* Top-Right Badges: Expiry Timer & Select Checkbox */}
         <div className="absolute top-2 right-2 z-20 flex items-center gap-1">
           {minsLeft !== null && minsLeft > 0 && (
-            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-black/80 text-amber-300 rounded-md border border-amber-500/40 backdrop-blur-xs flex items-center gap-0.5 shadow-md">
+            <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 bg-black/75 text-amber-300 rounded-md border border-amber-400/30 backdrop-blur-xs flex items-center gap-1">
               <Clock className="w-2.5 h-2.5" />
               <span>{minsLeft > 60 ? `${Math.floor(minsLeft / 60)}h` : `${minsLeft}m`}</span>
             </span>
           )}
-          <span className="text-[10px] font-mono font-black px-1.5 py-0.5 bg-black/85 text-rose-300 rounded-md border border-rose-500/40 backdrop-blur-xs flex items-center gap-1 shadow-md">
-            <Heart className="w-2.5 h-2.5 fill-rose-500 text-amber-400" />
-            <span>{likes}</span>
-          </span>
           {/* Selection Checkbox */}
           <div
             onClick={(e) => {
@@ -274,7 +267,7 @@ export function CardTile({
               {itemTags.map((tag) => (
                 <span
                   key={tag}
-                  className="text-[10px] font-mono font-medium px-1.5 py-0.2 rounded bg-retro-panel border border-border-glass text-retro-muted truncate max-w-[90px]"
+                  className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-retro-panel border border-border-glass text-retro-muted truncate max-w-[90px]"
                   style={{ color: accent }}
                 >
                   #{tag}

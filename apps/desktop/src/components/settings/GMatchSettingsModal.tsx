@@ -416,7 +416,7 @@ export function GMatchSettingsModal({
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <label htmlFor="panel-opacity" className="text-xs text-retro-muted">Panel opacity</label>
-                      <span className="text-xs font-mono text-retro-fg tabular-nums">{Math.round((settings.panelOpacity ?? 1) * 100)}%</span>
+                      <span className="text-xs font-mono text-retro-fg tabular-nums">{Math.round((settings.panelOpacity ?? 0.75) * 100)}%</span>
                     </div>
                     <input
                       id="panel-opacity"
@@ -424,7 +424,7 @@ export function GMatchSettingsModal({
                       min={35}
                       max={100}
                       step={5}
-                      value={Math.round((settings.panelOpacity ?? 1) * 100)}
+                      value={Math.round((settings.panelOpacity ?? 0.75) * 100)}
                       onChange={(e) => updateSettings('panelOpacity', Number(e.target.value) / 100)}
                       className="w-full accent-retro-accent cursor-pointer"
                     />

@@ -60,13 +60,16 @@ export interface CommandIslandProps {
   onOpenSettings?: () => void;
   onOpenStore?: () => void;
   onOpenNotifications?: () => void;
+  notificationsOpen?: boolean;
   onToggleMessages?: () => void;
   messagesOpen?: boolean;
   onOpenWallpaper?: () => void;
+  themeOpen?: boolean;
   onLogout?: () => void;
   onOpenProfile?: () => void;
   onOpenCreateCard?: () => void;
   showRooms?: boolean;
+  settingsOpen?: boolean;
 }
 
 export function CommandIsland({
@@ -81,11 +84,14 @@ export function CommandIsland({
   isAdmin = false,
   onOpenCreatePost,
   onOpenSettings,
+  settingsOpen = false,
   onOpenStore,
   onOpenNotifications,
+  notificationsOpen = false,
   onToggleMessages,
   messagesOpen = false,
   onOpenWallpaper,
+  themeOpen = false,
   onLogout,
   onOpenProfile,
   onOpenCreateCard,
@@ -243,6 +249,33 @@ export function CommandIsland({
               </button>
             );
           })}
+
+          {/* Notifications Button directly to the left of Chat */}
+          <button
+            type="button"
+            data-notifications-toggle="true"
+            onClick={() => {
+              playPress();
+              onOpenNotifications?.();
+            }}
+            aria-label="Notifications"
+            aria-pressed={notificationsOpen}
+            title="Activity Notifications"
+            className={`relative flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+              notificationsOpen
+                ? 'bg-retro-accent text-retro-accent-text'
+                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+            }`}
+          >
+            <Bell
+              className="w-4 h-4"
+              weight={notificationsOpen ? 'fill' : 'regular'}
+            />
+            <span className="text-xs font-medium hidden md:inline">Alerts</span>
+            {unreadNotificationsCount > 0 && (
+              <span className="w-2 h-2 rounded-full bg-retro-error ring-2 ring-retro-panel" />
+            )}
+          </button>
 
           {/* Messages Drawer Toggle Button */}
           <button
@@ -407,51 +440,45 @@ export function CommandIsland({
               </button>
             )}
 
-            {/* Notifications */}
-            <button
-              type="button"
-              onClick={() => {
-                playPress(800);
-                onOpenNotifications?.();
-              }}
-              aria-label="Notifications"
-              title="Activity Notifications"
-              className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
-            >
-              <Bell className="w-3.5 h-3.5 text-retro-accent shrink-0" />
-              <span className="text-xs hidden sm:inline">Alerts</span>
-              {unreadNotificationsCount > 0 && (
-                <span className="w-1.5 h-1.5 rounded-full bg-retro-error ring-1 ring-retro-panel" />
-              )}
-            </button>
-
             {/* Wallpaper */}
             <button
               type="button"
+              data-theme-toggle="true"
               onClick={() => {
                 playPress(800);
                 onOpenWallpaper?.();
               }}
               aria-label="Wallpaper"
+              aria-pressed={themeOpen}
               title="Custom Wallpaper Settings"
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                themeOpen
+                  ? 'bg-retro-accent text-retro-accent-text'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+              }`}
             >
-              <PaintBrush className="w-3.5 h-3.5 text-retro-muted shrink-0" />
+              <PaintBrush className="w-3.5 h-3.5 shrink-0" weight={themeOpen ? 'fill' : 'regular'} />
               <span className="text-xs hidden sm:inline">Theme</span>
             </button>
 
             {/* Settings */}
             <button
               type="button"
+              data-settings-toggle="true"
               onClick={() => {
                 playPress(800);
                 onOpenSettings?.();
               }}
               aria-label="Settings"
+              aria-pressed={settingsOpen}
               title="Application Settings"
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                settingsOpen
+                  ? 'bg-retro-accent text-retro-accent-text'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+              }`}
             >
-              <Gear className="w-3.5 h-3.5 text-retro-muted shrink-0" />
+              <Gear className="w-3.5 h-3.5 shrink-0" weight={settingsOpen ? 'fill' : 'regular'} />
               <span className="text-xs hidden sm:inline">Settings</span>
             </button>
 

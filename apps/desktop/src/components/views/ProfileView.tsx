@@ -82,7 +82,7 @@ export function ProfileView({
             });
             try { localStorage.setItem('orbit_pfp_url', updated.pfpUrl); } catch { }
           }
-          window.dispatchEvent(new CustomEvent('orbit_profile_updated', { detail: { displayName: updated.name, tags: myProfile.tags } }));
+          window.dispatchEvent(new CustomEvent('orbit_profile_updated', { detail: { displayName: updated.name, tags: myProfile.tags || [] } }));
           loadUsers();
         }}
         onArchivePost={(id) => {

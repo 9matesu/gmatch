@@ -34,6 +34,7 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
   useEffect(() => {
     if (!isOpen) return;
     const handleDown = (e: MouseEvent) => {
+      if ((e.target as HTMLElement)?.closest?.('[data-theme-toggle]')) return;
       if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) {
         onClose();
       }
@@ -137,7 +138,7 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
     toast?.('Wallpaper reset to default', 'info');
   };
 
-  const panelOpacityVal = Math.round((settings.panelOpacity ?? 1) * 100);
+  const panelOpacityVal = Math.round((settings.panelOpacity ?? 0.75) * 100);
   const glassBlurVal = Math.round((settings.glassBlur ?? 0.7) * 100);
 
   return (

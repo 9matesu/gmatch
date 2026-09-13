@@ -1,5 +1,5 @@
 import { normalizeTags, MAX_TAGS, MAX_TAG_LENGTH, isDefaultPeerName } from '@orbit/shared';
-import { orbitFetch } from './api';
+import { orbitFetch, invalidateCache } from './api';
 import type { OrbitIdentity } from '@orbit/crypto';
 
 export { MAX_TAGS, MAX_TAG_LENGTH };
@@ -26,7 +26,7 @@ export interface ProfilePatch {
 export async function saveUserProfile(
   identity: OrbitIdentity,
   patch: ProfilePatch,
-): Promise<{ ok: boolean; status: number }> {
+): Promise<{ ok: boolean; status: number; error?: string }> {
   const body: ProfilePatch = { ...patch };
   if (body.tags !== undefined) body.tags = normalizeTags(body.tags as (string | null | undefined)[]);
   const res = await orbitFetch('/api/users/profile', {
@@ -34,7 +34,18 @@ export async function saveUserProfile(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   }, identity);
-  return { ok: res.ok, status: res.status };
+  let error: string | undefined;
+  if (res.ok) {
+    invalidateCache('/api/users');
+  } else {
+    try {
+      const data = await res.json();
+      error = data?.error || data?.message;
+    } catch {
+      error = `Profile save failed (HTTP ${res.status})`;
+    }
+  }
+  return { ok: res.ok, status: res.status, error };
 }
 
 /**
