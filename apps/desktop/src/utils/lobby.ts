@@ -52,6 +52,25 @@ export function formatElapsed(ms: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
+/**
+ * Parse a server timestamp to epoch ms. SQLite CURRENT_TIMESTAMP arrives as
+ * `YYYY-MM-DD HH:MM:SS` UTC with no zone designator, which Chromium parses
+ * as LOCAL time — hours in the future west of UTC, freezing elapsed timers
+ * at 0:00 behind the Math.max clamp. Interpret zone-less datetimes as UTC;
+ * pass through ISO strings (with T/Z/offset) and epoch numbers untouched.
+ * Returns 0 when unparseable (caller treats as "unknown", not NaN).
+ */
+export function parseServerTimestampMs(raw: unknown): number {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw
+  if (typeof raw !== 'string') return 0
+  const s = raw.trim()
+  if (!s) return 0
+  const zoneless = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)$/
+  const m = zoneless.exec(s)
+  const t = Date.parse(m ? `${m[1]}T${m[2]}Z` : s)
+  return Number.isFinite(t) ? t : 0
+}
+
 /** The phase's total time budget in ms (lobby vs pick vs decide). */
 export function matchWindowMs(match: MatchSnapshot | null): number {
   if (!match) return LOBBY_DECIDE_SECONDS * 1000

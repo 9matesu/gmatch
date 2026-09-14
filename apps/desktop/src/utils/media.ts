@@ -33,11 +33,14 @@ export function resolveMediaUrl(url?: string | null): string {
 
 /**
  * Detects if a URL points to a playable video (.mp4, .webm, .mov, .ogg, or video MIME).
+ * Fragment suffixes (#t=) are stripped before extension checks; query markers
+ * (?format=mp4) and extension-less redgifs watch/ifr links count as video.
  */
 export function isMediaVideo(url?: string | null): boolean {
   if (!url) return false;
-  const clean = url.split('?')[0].toLowerCase();
-  return (
+  const withoutHash = url.split('#')[0];
+  const clean = withoutHash.split('?')[0].toLowerCase();
+  if (
     clean.endsWith('.mp4') ||
     clean.endsWith('.webm') ||
     clean.endsWith('.mov') ||
@@ -45,10 +48,57 @@ export function isMediaVideo(url?: string | null): boolean {
     clean.endsWith('.ogv') ||
     clean.endsWith('.m4v') ||
     clean.endsWith('.mkv') ||
+    clean.endsWith('.gifv')
+  ) {
+    return true;
+  }
+  if (/[?&](format|f|type)=(mp4|webm|video|gifv)\b/i.test(withoutHash)) return true;
+  if (isVideoPageUrl(url)) return true;
+  return (
     url.includes('video/') ||
     url.includes('redgifs.com') ||
     (url.includes('twimg.com') && url.includes('.mp4'))
   );
+}
+
+/**
+ * Video *page* URLs (watch/embed pages, not direct media bytes). Uploadable
+ * via server-side resolution, and previewed as video placeholders — never
+ * fed to <img> as if they were files.
+ */
+export function isVideoPageUrl(url?: string | null): boolean {
+  if (!url) return false;
+  let host = '';
+  let path = '';
+  try {
+    const parsed = new URL(url);
+    host = parsed.hostname.toLowerCase();
+    path = parsed.pathname.toLowerCase();
+  } catch {
+    return false;
+  }
+  if (host.includes('redgifs.com')) {
+    // Direct CDN bytes (media.redgifs.com/*.mp4) are files, not pages.
+    if (host.startsWith('media.')) return false;
+    if (/\.(mp4|webm|gif|webp|jpg|jpeg|png)(\?|#|$)/i.test(url)) return false;
+    return /\/(watch|ifr)\//.test(path);
+  }
+  if (host === 'youtu.be' || host.endsWith('youtube.com')) return true;
+  if (host.endsWith('vimeo.com')) return true;
+  return false;
+}
+
+/** Gif id from a redgifs watch/ifr URL slug (server resolves it to HD mp4). */
+export function redgifsIdFromUrl(url?: string | null): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (!parsed.hostname.toLowerCase().includes('redgifs.com')) return null;
+    const m = parsed.pathname.match(/\/(?:watch|ifr)\/([A-Za-z0-9]+)/);
+    return m ? m[1].toLowerCase() : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

@@ -20,6 +20,7 @@ import { PromptDialog } from '../PromptDialog'
 import { claimPendingHost } from '../../hooks/usePendingServerHost'
 import { SERVER_MARKER_KEY } from '../../firstRun/onboardingState'
 import { playPress } from '../../utils/sounds'
+import { resolveMediaUrl } from '../../utils/media'
 import { CentralAdminPanel } from './CentralAdminPanel'
 import type { User } from '@orbit/shared'
 
@@ -985,7 +986,7 @@ export function ServersView({
                         <div className="flex items-center gap-2.5 min-w-0">
                           <div className="relative w-8 h-8 rounded-full overflow-hidden bg-surface-raised border border-border-subtle shrink-0 flex items-center justify-center text-xs font-bold text-retro-muted">
                             {u.pfp_url ? (
-                              <img src={u.pfp_url} alt="" className="w-full h-full object-cover" />
+                              <img src={resolveMediaUrl(u.pfp_url)} alt="" className="w-full h-full object-cover" />
                             ) : (
                               <span>{initial}</span>
                             )}

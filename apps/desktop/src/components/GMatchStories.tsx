@@ -9,7 +9,7 @@ import { useToast } from './Toast';
 import { useNow } from '../hooks/useNow';
 import { playPress, playLike } from '../utils/sounds';
 import { ObjectImage } from './ObjectImage';
-import { isMediaVideo } from '../utils/media';
+import { isMediaVideo, resolveMediaUrl } from '../utils/media';
 import { LazyVideo } from './LazyVideo';
 import {
   Heart,
@@ -298,7 +298,7 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
           <div className="relative p-[2px] rounded-full">
             <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-surface-interactive overflow-hidden flex items-center justify-center border border-border-glass">
               {profilePics[currentUserId] ? (
-                <img src={profilePics[currentUserId]} alt="You" className="w-full h-full object-cover" />
+                <img src={resolveMediaUrl(profilePics[currentUserId])} alt="You" className="w-full h-full object-cover" />
               ) : (
                 <span className="text-xs font-black text-retro-muted">YOU</span>
               )}
@@ -320,11 +320,11 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
               openUser(group.userId);
             }}
           >
-            {/* Instagram Style Gradient Glowing / Pulsing Ring */}
+            {/* Unseen story ring (design system: monochrome accent, not color gradient) */}
             <div
               className={`p-[2.5px] rounded-full transition-transform group-hover:scale-105 ${
                 group.hasUnseen
-                  ? 'bg-gradient-to-tr from-cyan-500 via-teal-500 to-amber-500'
+                  ? 'bg-retro-accent'
                   : 'bg-glass-w20'
               }`}
             >
@@ -388,7 +388,7 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
             {/* Top Header Bar: Avatar, Name, Time Ago, and Close */}
             <div className="absolute top-6 left-3 right-3 z-30 flex items-center justify-between text-white drop-shadow-md">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full p-[1.5px] bg-gradient-to-tr from-amber-400 via-teal-500 to-cyan-500">
+                <div className="w-8 h-8 rounded-full p-[1.5px] bg-retro-accent">
                   <div className="w-full h-full rounded-full bg-surface-canvas overflow-hidden flex items-center justify-center">
                     {activeGroup.pfpUrl ? (
                       <img src={activeGroup.pfpUrl} alt="" className="w-full h-full object-cover" />

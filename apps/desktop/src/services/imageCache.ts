@@ -112,7 +112,14 @@ export function devFetchable(url: string): string | null {
     if (u.hostname === 'imhentai.xxx' || u.hostname.endsWith('.imhentai.xxx')) {
       return `/px?u=${encodeURIComponent(url)}`
     }
-    if (u.hostname === 'realbooru.com' || u.hostname.endsWith('.booru.org') || u.hostname.includes('eporner.com')) {
+    if (u.hostname === 'video.twimg.com' || u.hostname === 'pbs.twimg.com') {
+      // X/Twitter direct media: raw cross-origin fetch dies on CORS in dev.
+      return `/px?u=${encodeURIComponent(url)}`
+    }
+    if (u.hostname === 'babesource.com' || u.hostname === 'media.babesource.com') {
+      return `/px?u=${encodeURIComponent(url)}`
+    }
+    if (u.hostname === 'realbooru.com' || u.hostname.endsWith('.booru.org')) {
       return `/px?u=${encodeURIComponent(url)}`
     }
     return null

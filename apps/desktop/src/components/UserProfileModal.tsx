@@ -7,8 +7,8 @@ import { X, Copy, Check, Star, Ban, Send, Grid, MessageCircle, Play, Swords, Fla
 import { playPress } from '../utils/sounds';
 import { resolveMediaUrl } from '../utils/media';
 import { ObjectImage } from './ObjectImage';
-import { InstagramPostModal } from './feed/InstagramPostModal';
-import type { FeedPost } from './feed/GMatchFeed';
+import { useProfilePostLightbox } from './feed/useProfilePostLightbox';
+import type { FeedPost, PostComment } from './feed/GMatchFeed';
 import { orbitFetch } from '../utils/api';
 
 interface UserProfileModalProps {
@@ -31,6 +31,16 @@ interface UserProfileModalProps {
   onInviteToGame?: (userId: string) => void;
   onOpenFollowers?: (tab: 'followers' | 'following') => void;
   onReportUser?: (userId: string, name: string) => void;
+  followingIds?: string[];
+  users?: Array<{ id: string; display_name?: string }>;
+  shareGroups?: { id: string; name: string; member_count: number }[];
+  onSendDm?: (peerId: string, text: string) => Promise<boolean>;
+  onPersistLike?: (postId: string, liked: boolean) => Promise<number | undefined>;
+  onPersistSave?: (postId: string, saved: boolean) => void;
+  onPersistComment?: (postId: string, text: string) => Promise<PostComment | null>;
+  onCopyLink?: (post: FeedPost) => void;
+  onReportPost?: (post: FeedPost) => void;
+  toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 }
 
 export function UserProfileModal({
@@ -53,13 +63,40 @@ export function UserProfileModal({
   onInviteToGame,
   onOpenFollowers,
   onReportUser,
+  followingIds = [],
+  users = [],
+  shareGroups = [],
+  onSendDm,
+  onPersistLike,
+  onPersistSave,
+  onPersistComment,
+  onCopyLink,
+  onReportPost,
+  toast,
 }: UserProfileModalProps) {
   const [showPic, setShowPic] = useState(false);
   const [copied, setCopied] = useState(false);
   const [selectedCardImage, setSelectedCardImage] = useState<string | null>(null);
-  const [selectedPost, setSelectedPost] = useState<FeedPost | null>(null);
   const [followersCount, setFollowersCount] = useState<number | null>(null);
   const [followingCount, setFollowingCount] = useState<number | null>(null);
+  // Fully-wired lightbox suite (like/save/comment/share/options/likers).
+  // z-90: this modal lives at z-system(80), so the lightbox + sub-modals
+  // must stack above it instead of the default z-modal(50).
+  const { openPost, modals: postLightboxModals } = useProfilePostLightbox({
+    identity: identity || null,
+    profilePics: profilePic ? { [user?.id || '']: profilePic } : {},
+    users,
+    followingIds,
+    shareGroups,
+    toast,
+    onPersistLike,
+    onPersistSave,
+    onPersistComment,
+    onSendDm,
+    onCopyLink,
+    onReportPost,
+    zIndexClass: 'z-[90]',
+  });
 
   // Fetch follower/following counts from API when viewing another user's profile
   useEffect(() => {
@@ -340,7 +377,10 @@ export function UserProfileModal({
                     <button
                       key={post.id}
                       type="button"
-                      onClick={() => setSelectedPost(post)}
+                      onClick={() => {
+                        playPress(700);
+                        openPost(post);
+                      }}
                       className="aspect-square bg-surface-interactive rounded-lg overflow-hidden border border-border-glass cursor-pointer group hover:opacity-90 transition-opacity"
                     >
                       <ObjectImage
@@ -434,15 +474,7 @@ export function UserProfileModal({
         </div>
       )}
 
-      {selectedPost && (
-        <InstagramPostModal
-          post={selectedPost}
-          isOpen
-          onClose={() => setSelectedPost(null)}
-          identity={identity}
-          profilePics={profilePic ? { [user.id]: profilePic } : {}}
-        />
-      )}
+      {postLightboxModals}
     </>
   );
 }

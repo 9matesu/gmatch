@@ -6,6 +6,7 @@ import { useIdle } from "./hooks/useIdle";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { getApiBaseUrl, orbitFetch, invalidateCache } from "./utils/api";
+import { countChatUnread } from "./utils/chatUnread";
 import { OrbitPeer, pollOffers } from "./utils/webrtc";
 import { saveObject, getAllObjects, deleteObject } from "./utils/storage";
 import type { SendPanelHandle } from "./components/SendPanel";
@@ -39,7 +40,8 @@ import { isOnboardingComplete, readOnboardingState } from "./firstRun/onboarding
 import { TourDock } from "./components/tour/TourDock";
 import { TourDeck } from "./components/tour/TourDeck";
 import { DEFAULT_FEED_SORT, isFeedSort, type FeedSort } from "./components/feed/feedSort";
-import { TOUR_STEPS, nextTourStep, readTourState, writeTourState, type TourState } from "./firstRun/tourState";
+import { TOUR_STEPS } from "./firstRun/tourState";
+import { useTourGuide } from "./components/tour/useTourGuide";
 import { GMatchFeed, type FeedPost } from "./components/feed/GMatchFeed";
 import { GMatchDMs } from "./components/chat/GMatchDMs";
 import type { GroupMember } from "./components/chat/GroupMembersPopover";
@@ -238,6 +240,19 @@ export default function Home() {
   const [roomSeen, setRoomSeen] = useState<Record<string, number>>(() => {
     try { return JSON.parse(localStorage.getItem('gmatch_room_seen_v1') || '{}') } catch { return {} }
   })
+  // Courier DM threads: per-peer last-opened stamp for the unread cue.
+  // (Server /api/pm unread endpoints are dead by directive — sealed local
+  // DMs can only be counted client-side, same as rooms above.)
+  const [dmSeen, setDmSeen] = useState<Record<string, number>>(() => {
+    try { return JSON.parse(localStorage.getItem('gmatch_dm_seen_v1') || '{}') } catch { return {} }
+  })
+  const stampDmSeen = useCallback((peerId: string) => {
+    setDmSeen((prev) => {
+      const next = { ...prev, [peerId]: Date.now() };
+      try { localStorage.setItem('gmatch_dm_seen_v1', JSON.stringify(next)) } catch { }
+      return next;
+    });
+  }, [])
   // UI-3: resizable messages sidebar (width persisted; smooth only when not dragging)
   const [notifOpen, setNotifOpen] = useState(false);
   const [gamesSubTab, setGamesSubTab] = useState<'duel' | 'babecock' | 'ranks' | 'idle'>(() => {
@@ -350,38 +365,20 @@ export default function Home() {
   }, [mainView]);
 
   // Guided tour: resumable per identity, skippable, teleports only on user click.
+  // Deck + dock share this hook so cards jump to their section in sync.
   const tourIdentityId = identity?.orbitId ?? null;
-  const [tourState, setTourState] = useState<TourState>(() => readTourState(tourIdentityId));
-
-  useEffect(() => {
-    setTourState(readTourState(tourIdentityId));
-  }, [tourIdentityId]);
-
-  useEffect(() => {
-    const onReset = () => setTourState(readTourState(tourIdentityId));
-    window.addEventListener('orbit_tour_reset', onReset);
-    return () => window.removeEventListener('orbit_tour_reset', onReset);
-  }, [tourIdentityId]);
-
-  const advanceTour = useCallback((dir: 1 | -1) => {
-    const step = TOUR_STEPS[tourState.index];
-    if (dir === 1 && step?.view) {
-      if (step.gamesTab === 'cards') { handleSetMainView('gallery'); }
-      else {
-        handleSetMainView(step.view);
-        if (step.gamesTab) setGamesSubTab(step.gamesTab);
-      }
-    }
-    const next = dir === 1 ? nextTourStep(tourState) : { ...tourState, index: Math.max(0, tourState.index - 1) };
-    writeTourState(tourIdentityId, next);
-    setTourState(next);
-  }, [handleSetMainView, tourIdentityId, tourState]);
-
-  const skipTour = useCallback(() => {
-    const next: TourState = { version: 1, index: tourState.index, status: 'skipped' };
-    writeTourState(tourIdentityId, next);
-    setTourState(next);
-  }, [tourIdentityId, tourState.index]);
+  const {
+    tourState,
+    advance: advanceTour,
+    goToStepId: goToTourStep,
+    skip: skipTour,
+  } = useTourGuide({
+    identityId: tourIdentityId,
+    navigateToView: handleSetMainView,
+    // 'cards' is a stale GamesNavTab value no step uses; the real subtabs
+    // are duel|babecock|ranks|idle.
+    setGamesTab: (tab) => { if (tab !== 'cards') setGamesSubTab(tab); },
+  });
 
   // Browser back/forward -> view. pushState entries surface via popstate;
   // manual hash edits via hashchange. Listen to both.
@@ -1268,6 +1265,14 @@ export default function Home() {
   }[]>([])
   const [pmUnreadCount, setPmUnreadCount] = useState(0)
 
+  // Arena badge: live players in queue + in match (presence — tracks live,
+  // never "clears"). Rides the existing lobby poll, no new fetching.
+  const gamesOnlineCount = useMemo(() => {
+    const waiting = lobby.state?.waiting_count ?? 0;
+    const inMatch = (lobby.liveMatches?.length ?? 0) * 2;
+    return waiting + inMatch;
+  }, [lobby.state?.waiting_count, lobby.liveMatches]);
+
   // Blind-courier DM path (plan P3.3): inert on full nodes (legacy inbox),
   // active only when the API 404s /api/pm (official SITE).
   useServerHeartbeat(identity ?? null);
@@ -1385,6 +1390,19 @@ export default function Home() {
     return !!last && last.ts > (roomSeen[roomId] || 0) && last.senderOrbitId !== identity?.orbitId
   }, [courier.roomMessages, roomSeen, identity?.orbitId, roomTick])
 
+  // Chat badge: total NEW inbound messages across courier DM threads and
+  // sealed rooms (both local-only lanes) plus the legacy server lane.
+  // Recomputes live as threads/rooms arrive via the existing courier state.
+  const chatUnreadCount = useMemo(() => countChatUnread({
+    threads: courier.threads,
+    dmSeen,
+    roomIds: courier.rooms.map((r) => r.id),
+    roomMessages: (id) => courier.roomMessages(id),
+    roomSeen,
+    selfId: identity?.orbitId,
+    serverUnread: pmUnreadCount,
+  }), [courier.threads, courier.rooms, courier.roomMessages, roomTick, dmSeen, roomSeen, pmUnreadCount, identity?.orbitId])
+
 
 
   const loadPmUnreadCount = useCallback(() => {
@@ -1398,12 +1416,45 @@ export default function Home() {
       .catch(() => { })
   }, [identity])
 
+  // Opening chat clears its badge: stamp all sealed rooms + all courier DM
+  // threads seen, plus best-effort per-thread legacy read, then reconcile
+  // the server count. Optimistically zero first so the badge clears
+  // instantly even if a call fails.
+  const markAllChatRead = useCallback(() => {
+    const now = Date.now();
+    setRoomSeen((prev) => {
+      const next = { ...prev };
+      for (const r of courier.rooms) next[r.id] = now;
+      try { localStorage.setItem('gmatch_room_seen_v1', JSON.stringify(next)); } catch { }
+      return next;
+    });
+    setDmSeen((prev) => {
+      const next = { ...prev };
+      for (const peerId of Object.keys(courier.threads)) next[peerId] = now;
+      try { localStorage.setItem('gmatch_dm_seen_v1', JSON.stringify(next)); } catch { }
+      return next;
+    });
+    if (identity) {
+      void Promise.allSettled(
+        pmThreads.map((t) =>
+          orbitFetch('/api/pm/read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ peer_id: t.peer_id }),
+          }, identity),
+        ),
+      ).finally(() => { loadPmUnreadCount(); });
+    }
+    setPmUnreadCount(0);
+  }, [courier, identity, pmThreads, loadPmUnreadCount])
+
   const loadPmMessages = useCallback((peerId: string) => {
     if (!identity) return Promise.resolve()
     // Courier mode: the thread lives in our local store; a "load" is a pull.
     if (courier.courierActive) {
       return (async () => {
         await courier.pull()
+        stampDmSeen(peerId)
         const msgs = (courier.threadFor(peerId) || []).map((m) => ({
           id: m.id,
           senderId: m.own ? identity.orbitId : peerId,
@@ -1455,7 +1506,7 @@ export default function Home() {
         }
       })
       .catch(() => { })
-  }, [identity, users, myProfile.displayName, loadPmUnreadCount, courierActive, courierPull, courierThreadFor])
+  }, [identity, users, myProfile.displayName, loadPmUnreadCount, courierActive, courierPull, courierThreadFor, stampDmSeen])
 
   const sendPm = useCallback(async (peerId: string, text: string, replyToId?: string, attachment?: { id: string; url: string }): Promise<boolean> => {
     if (!identity) return false
@@ -3204,7 +3255,8 @@ export default function Home() {
                   {/* gMatch Main Feed View */}
                   {mainView === 'feed' && identity && tourState.status === 'active' && tourState.index === 0 && isOnboardingComplete(readOnboardingState(identity.orbitId)) && (
                     <TourDeck
-                      onOpen={(step) => advanceTour(1)}
+                      steps={TOUR_STEPS}
+                      onOpen={(step) => goToTourStep(step.id)}
                       onDismiss={skipTour}
                     />
                   )}
@@ -3368,6 +3420,17 @@ export default function Home() {
                       setArchivedPostIds={setArchivedPostIds}
                       setDeletedPostIds={setDeletedPostIds}
                       deletePostOnServer={deletePostOnServer}
+                      users={users}
+                      onSendDm={sendPm}
+                      onPersistLike={persistLike}
+                      onPersistSave={persistSave}
+                      onPersistComment={persistComment}
+                      onSelectUser={(uId) => {
+                        const target = users.find((u) => u.id === uId || (u as any).orbitId === uId);
+                        if (target) setSelectedProfileUser(target);
+                      }}
+                      onOpenNetwork={(userId) => openUserNetwork(userId)}
+                      shareGroups={chatGroups.map((g) => ({ id: g.id, name: g.name, member_count: g.member_count }))}
                     />
                   )}
 
@@ -3790,6 +3853,14 @@ export default function Home() {
                       navigator.clipboard.writeText(id)
                       toast('Copied Orbit ID', 'info')
                     }}
+                    followingIds={followingIds}
+                    users={users}
+                    shareGroups={chatGroups.map((g) => ({ id: g.id, name: g.name, member_count: g.member_count }))}
+                    onSendDm={sendPm}
+                    onPersistLike={persistLike}
+                    onPersistSave={persistSave}
+                    onPersistComment={persistComment}
+                    toast={toast}
                   />
                 )}
               </div>
@@ -3862,7 +3933,7 @@ export default function Home() {
                     aria-label="Expand Direct Messages"
                     className="pointer-events-auto flex items-center gap-2.5 bg-black text-white pl-2 pr-4 py-2 rounded-full shadow-2xl border border-border-strong hover:bg-surface-canvas transition-colors cursor-pointer active:scale-95"
                   >
-                    <span className="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-500 via-teal-500 to-amber-500 p-[2px] shrink-0">
+                    <span className="w-8 h-8 rounded-full bg-glass-w20 p-[2px] shrink-0">
                       <span className="w-full h-full rounded-full bg-black overflow-hidden flex items-center justify-center text-xs font-bold text-white">
                         {pmPeer ? (
                           profilePics[pmPeer.id || (pmPeer as any).orbitId || ''] ? (
@@ -4010,7 +4081,7 @@ export default function Home() {
                           onClick={() => handleGroupPickerSelect(group.id)}
                           className="w-full p-3 hover:bg-glass-w5 transition-colors text-left border-b border-border-glass last:border-0 flex items-center gap-3"
                         >
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center text-white font-bold text-sm">
+                          <div className="w-10 h-10 rounded-full bg-glass-w20 flex items-center justify-center text-retro-fg font-bold text-sm">
                             {group.name.charAt(0).toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -4039,8 +4110,9 @@ export default function Home() {
               setMainView={handleSetMainView}
               balance={myUser?.balance ?? 0}
               wsConnected={isWsConnected}
-              unreadMessagesCount={pmUnreadCount}
+              unreadMessagesCount={chatUnreadCount}
               unreadNotificationsCount={lobby.unreadCount}
+              gamesOnlineCount={gamesOnlineCount}
               displayName={myProfile.displayName || myUser?.display_name || 'You'}
               profilePic={profilePics[identity?.orbitId || '']}
               isAdmin={myProfile.isAdmin}
@@ -4060,6 +4132,7 @@ export default function Home() {
                 playPress(860);
                 setChatOpen(false);
                 setDmMinimized(false);
+                if (mainView !== 'rooms') markAllChatRead();
                 handleSetMainView(mainView === 'rooms' ? 'feed' : 'rooms');
               }}
               messagesOpen={mainView === 'rooms' || mainView === 'messages'}

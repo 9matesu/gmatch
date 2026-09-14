@@ -252,7 +252,7 @@ export function LiveCameraModal({
               <button
                 type="button"
                 onClick={handleConfirmPhoto}
-                className="flex-1 py-3 bg-gradient-to-r from-cyan-500 via-teal-500 to-amber-500 hover:opacity-95 text-retro-fg rounded-xl text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md"
+                className="flex-1 py-3 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text rounded-xl text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md"
               >
                 <Check className="w-4 h-4" />
                 <span>Attach to Post</span>
@@ -274,7 +274,7 @@ export function LiveCameraModal({
                 type="button"
                 onClick={handleTakeSnapshot}
                 disabled={!!cameraError || isStarting}
-                className="w-16 h-16 rounded-full bg-gradient-to-tr from-cyan-500 via-teal-500 to-amber-500 p-1 cursor-pointer hover:scale-105 active:scale-95 transition-transform shadow-xl disabled:opacity-30"
+                className="w-16 h-16 rounded-full bg-retro-accent p-1 cursor-pointer hover:scale-105 active:scale-95 transition-transform shadow-xl disabled:opacity-30"
               >
                 <div className="w-full h-full rounded-full border-2 border-white bg-surface-raised flex items-center justify-center" />
               </button>

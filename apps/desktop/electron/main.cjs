@@ -14,16 +14,28 @@ const { dapiSource, booruOrgSource } = require('./booru-sources-core.cjs')
 // A portable exe can run twice from one double-click (and did: two sidecars
 // fight over :8790 and the second window never appeared). One install, one
 // process — the second launch just focuses the first window.
+// Log the silent quit: without this, every retry after a zombie leaves no
+// trace in main.log and looks like "double-click, nothing happens".
 if (!app.requestSingleInstanceLock()) {
+  try {
+    const { appendWithRotation: appendLock } = require('./mainlog-core.cjs')
+    appendLock(path.join(app.getPath('userData'), 'main.log'), 'second instance quit (single-instance lock held)')
+  } catch { /* userData unavailable — still quit silently rather than fight */ }
+  try {
+    const lockTmp = path.join(require('node:os').tmpdir(), 'gmatch-lock.log')
+    require('node:fs').appendFileSync(lockTmp, `[${new Date().toISOString()}] second instance quit\n`)
+  } catch { /* best effort */ }
   app.quit()
   app.exit(0)
 }
 
 // Never die silently: "app doesn't open" was unsolvable without this. Every
-// fatal lands in %APPDATA%/gMatch/main.log AND a native dialog. The log
+// fatal lands in the real userData main.log AND a native dialog. The log
 // rotates at ~1MB (keeps one .1 generation) so it can never starve the disk.
+// NOTE: with name "@gmatch/desktop" the real path is
+// %APPDATA%\@gmatch\desktop\main.log (not %APPDATA%\gMatch\main.log).
 const { appendWithRotation } = require('./mainlog-core.cjs')
-const LOG_HINT = 'Details were written to:\n%APPDATA%\\gMatch\\main.log'
+const LOG_HINT = 'Details were written to:\n%APPDATA%\\@gmatch\\desktop\\main.log'
 function mainLogPath() {
   return path.join(app.getPath('userData'), 'main.log')
 }
@@ -637,12 +649,16 @@ async function fetchImhentai(variant, n) {
     .filter((t) => t.length >= 2)
   if (hasBadTag(tags)) return []
 
-  // Direct results from search HTML (fast path, avoids gallery fetches)
+  // Direct results from search HTML (fast path, avoids gallery fetches).
+  // parseImhentaiSearchResults yields thumbs — rewrite thumb.jpg -> 1.jpg
+  // (full page 1) and NEVER serve the raw thumb as url.
   const directResults = parseImhentaiSearchResults(searchBody, n)
   if (directResults.length > 0) {
     const directPosts = []
     for (const { id, coverUrl } of directResults) {
-      directPosts.push({ id: `imh-${id}`, url: coverUrl, tags, rating: 'e', kind: 'image' })
+      const full = coverUrl.replace(/\/(?:thumb|t)\.([a-z0-9]+)(?:[?#]|$)/i, '/1.$1')
+      if (/\/(?:thumb|thumbs)(?:[?#/.]|$)/i.test(full)) continue
+      directPosts.push({ id: `imh-${id}`, url: full, preview: coverUrl, tags, rating: 'e', kind: 'image' })
       if (directPosts.length >= n) break
     }
     if (directPosts.length > 0) return directPosts
@@ -671,31 +687,151 @@ async function fetchImhentai(variant, n) {
   return posts
 }
 
-// --- eporner (real porn website API: HD thumbnails and tags) ------------------
-function parseEpornerJson(body) {
-  if (!body || typeof body !== 'string') return []
-  let data
-  try {
-    data = JSON.parse(body)
-  } catch {
-    return []
+// --- babesource (real porn photo galleries: full-res stills, never thumbs) --
+// Search: /search/<slug>/page<N>.html -> /galleries/<slug>-<id>.html (skip /video/)
+// Gallery: <a class="slideshowGalleryImage" href=FULL(babesource.com/media/...)>
+//          with thumb <img src>(media.babesource.com/.../thumbs/...).
+const BABESOURCE_ROOT = 'https://babesource.com'
+
+function babesourceSlug(query) {
+  return String(query || '')
+    .replace(/_/g, ' ')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+function babesourceThumbToFull(thumb) {
+  const m = /^https:\/\/media\.babesource\.com\/galleries\/([0-9a-f]+)\/thumbs\/(?:300x406\/)?(.+\.(?:jpe?g|png|webp|gif))$/i.exec(
+    String(thumb || '').trim(),
+  )
+  if (!m) return null
+  return `https://babesource.com/media/galleries/${m[1]}/${m[2]}`
+}
+
+function parseBabesourceSearch(html, limit) {
+  const out = []
+  if (!html || typeof html !== 'string') return out
+  const re = /href="(https:\/\/babesource\.com\/galleries\/[^"]+?-(\d+)\.html)"/gi
+  let m
+  while ((m = re.exec(html))) {
+    if (m[1].includes('/video/')) continue
+    if (!out.includes(m[1])) out.push(m[1])
+    if (out.length >= limit) break
   }
-  const list = Array.isArray(data.videos) ? data.videos : []
-  return list
-    .map((v) => {
-      const thumb = v.default_thumb?.src || v.thumbs?.[0]?.src || ''
-      const tags = (v.keywords || '').split(',').map((t) => t.trim().replace(/\s+/g, '_')).filter(Boolean)
-      return {
-        id: `ep-${v.id}`,
-        url: thumb,
-        tags,
-        rating: 'e',
-        kind: 'image',
-        width: Number(v.default_thumb?.width) || 640,
-        height: Number(v.default_thumb?.height) || 360,
+  return out
+}
+
+function parseBabesourceMaxPage(html) {
+  if (!html || typeof html !== 'string') return 1
+  let max = 1
+  const re = /href=["']page(\d+)\.html["']/gi
+  let m
+  while ((m = re.exec(html))) {
+    const n = Number(m[1])
+    if (Number.isFinite(n) && n > max) max = Math.min(n, 50)
+  }
+  return Math.max(1, max)
+}
+
+function parseBabesourceGallery(html, limit) {
+  const out = []
+  const seen = new Set()
+  if (!html || typeof html !== 'string') return out
+  const isFull = (u) => /^https:\/\/babesource\.com\/media\/galleries\/[0-9a-f]+\/.+\.(?:jpe?g|png|webp|gif)$/i.test(u)
+  const push = (url, preview) => {
+    if (!isFull(url) || seen.has(url)) return
+    seen.add(url)
+    out.push({ url, preview: /^https:\/\/media\.babesource\.com\/galleries\//i.test(preview) ? preview : url })
+  }
+  let m
+  const anchorRe = /<a[^>]*class="[^"]*slideshowGalleryImage"[^>]*href="([^"]+)"[^>]*>[\s\S]*?<img[^>]+src="([^"]+)"[^>]*>/gi
+  while ((m = anchorRe.exec(html))) {
+    push(m[1], m[2])
+    if (out.length >= limit) return out
+  }
+  if (out.length === 0) {
+    const thumbRe = /https:\/\/media\.babesource\.com\/galleries\/[0-9a-f]+\/thumbs\/(?:300x406\/)?[^"'\s]+\.(?:jpe?g|png|webp|gif)/gi
+    while ((m = thumbRe.exec(html))) {
+      const full = babesourceThumbToFull(m[0])
+      if (full) push(full, m[0])
+      if (out.length >= limit) return out
+    }
+  }
+  return out
+}
+
+function parseBabesourceTags(html, query) {
+  const tags = new Set(
+    String(query || '')
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length >= 2),
+  )
+  if (html && typeof html === 'string') {
+    const meta = /<meta\s+name="keywords"\s+content="([^"]*)"/i.exec(html)
+    if (meta) {
+      for (const part of meta[1].split(',')) {
+        const n = part.toLowerCase().replace(/[\s-]+/g, '_').replace(/[^a-z0-9_]/g, '')
+        if (n.length >= 2) tags.add(n)
       }
-    })
-    .filter((p) => p.id && p.url && !hasBadTag(p.tags))
+    }
+  }
+  return [...tags]
+}
+
+async function fetchBabesource(variant, n) {
+  const slug = babesourceSlug(variant)
+  if (!slug) return []
+  // Page-1 first; higher pages only when pagination advertises them.
+  // Single-page queries 404 on page2+ — normal, not a failure.
+  let searchBody
+  try {
+    searchBody = await httpGet(`${BABESOURCE_ROOT}/search/${encodeURIComponent(slug)}/page1.html`)
+  } catch (e) {
+    if (/HTTP 404/.test(String((e && e.message) || e))) return []
+    throw e
+  }
+  const seen = new Set()
+  const galleries = []
+  const collect = (html) => {
+    for (const u of parseBabesourceSearch(html, 3)) {
+      if (!seen.has(u)) {
+        seen.add(u)
+        galleries.push(u)
+      }
+    }
+  }
+  collect(searchBody)
+  const maxPage = Math.min(parseBabesourceMaxPage(searchBody), 5)
+  if (maxPage > 1 && galleries.length < 3) {
+    const page = 2 + Math.floor(Math.random() * (maxPage - 1))
+    try {
+      collect(await httpGet(`${BABESOURCE_ROOT}/search/${encodeURIComponent(slug)}/page${page}.html`))
+    } catch {
+      /* stale pagination link — page-1 results still stand */
+    }
+  }
+  const posts = []
+  for (const gUrl of galleries) {
+    if (posts.length >= n) break
+    try {
+      const gHtml = await httpGet(gUrl)
+      const tags = parseBabesourceTags(gHtml, variant)
+      if (hasBadTag(tags)) continue
+      const idMatch = /-(\d+)\.html?(?:[?#]|$)/.exec(gUrl)
+      const gid = idMatch ? idMatch[1] : 'x'
+      const images = parseBabesourceGallery(gHtml, n - posts.length)
+      images.forEach((img, i) => {
+        posts.push({ id: `bs-${gid}-${i}`, url: img.url, preview: img.preview, tags, rating: 'e', kind: 'image' })
+      })
+    } catch {
+      /* one dead gallery never kills the round */
+    }
+    if (posts.length >= 5) break
+  }
+  return posts
 }
 
 // Round-robin over sources with simple health tracking (SPEC §6).
@@ -766,17 +902,11 @@ const SOURCES = [
     },
   },
   {
-    // eporner: real porn website API (video thumbs/tags)
-    id: 'eporner',
+    // babesource: real porn photo galleries (full-res stills, eporner replacement).
+    // Stills-only — no long videos by construction.
+    id: 'babesource',
     category: 'real',
-    fetch: async (variant, n) => {
-      const page = 1 + Math.floor(Math.random() * 5)
-      const q = encodeURIComponent(variant.trim().replace(/\s+/g, '+'))
-      const json = await httpGet(
-        `https://www.eporner.com/api/v2/video/search/?query=${q}&per_page=${n}&page=${page}&thumbsize=big&format=json`
-      )
-      return parseEpornerJson(json)
-    },
+    fetch: (variant, n) => fetchBabesource(variant, n),
   },
   booruOrgSource('hgoon.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'hgoon', 'hentai'),
   booruOrgSource('blacked.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'blacked', 'real'),
@@ -845,10 +975,16 @@ function createWindow() {
   let bounds = { width: 1440, height: 900 }
   try {
     const { screen } = require('electron')
-    const saved = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'window-bounds.json'), 'utf8'))
+    const raw = fs.readFileSync(path.join(app.getPath('userData'), 'window-bounds.json'), 'utf8')
+    const saved = JSON.parse(raw)
     bounds = sanitizeBounds(saved, screen.getPrimaryDisplay().workArea) || bounds
-  } catch { /* first run */ }
-  const win = new BrowserWindow({
+    mainLog(`boot: window bounds ok ${JSON.stringify(bounds)}`)
+  } catch (err) {
+    mainLog(`boot: default window bounds (${err?.message || 'first run'})`)
+  }
+  let win = null
+  try {
+    win = new BrowserWindow({
     ...bounds,
     minWidth: 1000,
     // Frameless: NativeHeaderBar is the titlebar (drag strip + win controls).
@@ -893,15 +1029,28 @@ function createWindow() {
   // Only use the dev server when explicitly requested — never guess a port,
   // another app may be listening there.
   const devUrl = process.env.VITE_DEV_SERVER_URL
-  if (devUrl && !app.isPackaged) {
-    win.loadURL(devUrl).catch(() => win.loadFile(path.join(__dirname, '../dist/index.html')))
-  } else {
-    win.loadFile(path.join(__dirname, '../dist/index.html'))
+  mainLog(`boot: loading ${devUrl && !app.isPackaged ? devUrl : 'packaged dist/index.html'}`)
+  const loaded = (devUrl && !app.isPackaged)
+    ? win.loadURL(devUrl).catch(() => win.loadFile(path.join(__dirname, '../dist/index.html')))
+    : win.loadFile(path.join(__dirname, '../dist/index.html'))
+  loaded.catch((err) => {
+    mainLog(`window load failed: ${err?.stack || err}`)
+    try { dialog.showErrorBox('gMatch could not load its interface', `${String(err?.message || err)}\n\n${LOG_HINT}`) } catch { /* headless edge */ }
+  })
+  } catch (err) {
+    // createWindow must never throw into the boot chain (that was the 1.2.5
+    // "Task Mgr spin, no window" zombie: the outer .catch() never created one).
+    mainLog(`createWindow failed: ${err?.stack || err}`)
+    try { dialog.showErrorBox('gMatch could not open a window', `${String(err?.message || err)}\n\n${LOG_HINT}`) } catch { /* headless edge */ }
+    return
   }
+  return win
 }
 
 app.whenReady().then(async () => {
+  mainLog(`boot: whenReady (v${app.getVersion()}, packaged=${app.isPackaged})`)
   const secureAvailable = initSecureKV()
+  mainLog(`boot: secureKV ready (available=${secureAvailable})`)
   ipcMain.on('log:renderer', (_event, { scope, msg }) => mainLog(`[renderer:${scope}] ${msg}`))
   // Frameless window controls: NativeHeaderBar draws min/max/close and gates
   // them on the bridge exposing winMinimize/winToggleMaximize/winClose (browser
@@ -1057,6 +1206,10 @@ app.whenReady().then(async () => {
   // Topology: packaged builds default to CLIENT mode on the central node
   // (gmatch.fly.dev); host mode (the bundled server) is the opt-in in
   // Settings. Dev keeps the repo-local sidecar path unchanged.
+  // The window MUST exist before any sidecar wait: 1.2.5 blocked up to 30s
+  // on startApi() before createWindow(), so a slow/migrating bundled server
+  // looked like "Task Mgr spin, never opens" (and invited double-clicks
+  // that EADDRINUSE-crashed the sidecar).
   let sidecarRestartTried = false
   const onSidecarCrash = async (code) => {
     mainLog(`sidecar crashed code=${code}`)
@@ -1083,12 +1236,30 @@ app.whenReady().then(async () => {
     if (sidecarLogCount++ < 40) mainLog(`[sidecar] ${line}`)
   })
   apiSidecar.sidecarEvents.on('crashed', (code) => void onSidecarCrash(code))
-  if (app.isPackaged) {
-    packagedServer = serverMode.readServerMode()
-    if (packagedServer.mode === 'host') {
+  // Read topology early (sync, cheap) so the window gets the right --api-base.
+  try {
+    if (app.isPackaged) {
+      packagedServer = serverMode.readServerMode()
+      mainLog(`boot: server mode=${packagedServer.mode} url=${packagedServer.url}`)
+    }
+  } catch (err) {
+    mainLog(`boot: readServerMode failed, defaulting to client (${err?.message || err})`)
+    packagedServer = { mode: 'client', url: 'https://gmatch.fly.dev' }
+  }
+  // Window first — never gate first paint on the bundled server.
+  mainLog(`boot: creating window (v${app.getVersion()}, packaged=${app.isPackaged})`)
+  createWindow()
+  updater?.schedule()
+  // Start the bundled server in the background (host mode only). Failures
+  // surface as dialogs + log lines; they can never take the window with them.
+  const startSidecarBg = async () => {
+    if (app.isPackaged) {
+      if (packagedServer.mode !== 'host') return
       process.env.GMATCH_HOST_MODE = '1'
+      mainLog('boot: starting bundled server (host mode, background)')
       try {
         await apiSidecar.startApi()
+        mainLog('boot: bundled server ready')
       } catch (err) {
         mainLog(`bundled server start failed: ${err?.message || err}`)
         try {
@@ -1098,36 +1269,43 @@ app.whenReady().then(async () => {
           )
         } catch { /* headless edge */ }
       }
-    }
-  } else {
-    try {
-      await apiSidecar.startApi()
-    } catch (err) {
-      // Sidecar down (e.g. bun missing): the renderer still boots and shows
-      // offline states; Grid feed works via IPC booru.
-      console.error('[api] sidecar start failed:', err.message)
+    } else {
+      try {
+        await apiSidecar.startApi()
+      } catch (err) {
+        // Sidecar down (e.g. bun missing): the renderer still boots and shows
+        // offline states; Grid feed works via IPC booru.
+        console.error('[api] sidecar start failed:', err.message)
+      }
     }
   }
-  createWindow()
-  updater?.schedule()
+  void startSidecarBg()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
   .catch((err) => {
     // A fatal during boot used to leave a windowless zombie: no window, no
-    // error. Log it, show it, and let the process exit.
+    // error. Log it, show it, open a fallback window so the process is never
+    // a Task-Mgr-only ghost, then let the user decide.
     mainLog(`boot failed: ${err?.stack || err}`)
     try { dialog.showErrorBox('gMatch could not start', `${String(err?.message || err)}\n\n${LOG_HINT}`) } catch { /* headless edge */ }
+    try {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    } catch { /* last resort: process exits via window-all-closed */ }
   })
 
 // Portable double-launch (or a stale lock): focus the running window instead
-// of starting a second sidecar fight.
+// of starting a second sidecar fight. If the first instance somehow has no
+// window (crashed boot), open one so a retry never looks like a silent quit.
 app.on('second-instance', () => {
+  mainLog('second-instance: focusing existing window')
   const w = BrowserWindow.getAllWindows()[0]
   if (w) {
     if (w.isMinimized()) w.restore()
     w.focus()
+  } else {
+    try { createWindow() } catch { /* best effort */ }
   }
 })
 

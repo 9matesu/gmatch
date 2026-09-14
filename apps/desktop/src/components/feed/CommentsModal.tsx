@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { playPress, playMsgReceive } from '../../utils/sounds';
+import { resolveMediaUrl } from '../../utils/media';
 import {
   MessageCircle,
   X,
@@ -90,7 +91,7 @@ export function CommentsModal({
                 onClick={() => handleAvatarClick(post.author_id)}
               >
                 {profilePics[post.author_id] ? (
-                  <img src={profilePics[post.author_id]} alt="" className="w-full h-full object-cover" />
+                  <img src={resolveMediaUrl(profilePics[post.author_id])} alt="" className="w-full h-full object-cover" />
                 ) : (
                   <span className="w-full h-full flex items-center justify-center text-xs font-bold">{post.author_name.charAt(0)}</span>
                 )}
@@ -117,7 +118,7 @@ export function CommentsModal({
                   onClick={() => handleAvatarClick(c.author_id || post.author_id)}
                 >
                   {c.author_avatar ? (
-                    <img src={c.author_avatar} alt="" className="w-full h-full object-cover" />
+                    <img src={resolveMediaUrl(c.author_avatar)} alt="" className="w-full h-full object-cover" />
                   ) : (
                     c.author_name.charAt(0).toUpperCase()
                   )}

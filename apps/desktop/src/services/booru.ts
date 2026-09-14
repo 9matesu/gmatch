@@ -21,6 +21,16 @@ import {
   parseImhentaiSearchResults,
   toImhentaiPost,
 } from './imhentai'
+import {
+  BABESOURCE_ROOT,
+  babesourceSearchUrl,
+  babesourceSlug,
+  parseBabesourceGallery,
+  parseBabesourceMaxPage,
+  parseBabesourceSearch,
+  parseBabesourceTags,
+  toBabesourcePosts,
+} from './babesource'
 
 export interface BooruRequest {
   tags: string
@@ -308,7 +318,7 @@ export function parseRealbooruHtml(html: string): BooruPost[] {
     const ext = isVideo ? 'mp4' : isGif ? 'gif' : 'jpeg'
     const url = `https://realbooru.com/images/${dir1}/${dir2}/${hash}.${ext}`
     const preview = `https://realbooru.com/thumbnails/${dir1}/${dir2}/thumbnail_${hash}.jpg`
-    posts.push({ id: `rb-${postId}`, url, preview, tags, rating: 'e' })
+    posts.push({ id: `rb-${postId}`, url, preview, tags, rating: 'e', kind: isVideo ? 'video' : 'image' })
   }
   return posts
 }
@@ -385,8 +395,12 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
         // booru.org Cloudflare WAF challenges `tags=` queries with 403;
         // omitting `tags=` and paginating via random `pid` bypasses WAF (200 OK).
         // Each booru.org sub is already dedicated to its niche theme.
+        // Probes jitter across the first pages too: all 5 subdomains hitting
+        // pid=0 in lockstep trips the shared IP limiter (429 + 5min cooldown).
         kind = 'html'
-        const booruPid = isProbe ? 0 : Math.floor(Math.random() * 5) * 20
+        const booruPid = isProbe
+          ? Math.floor(Math.random() * 3) * 20
+          : Math.floor(Math.random() * 5) * 20
         url = `${src.proxy}/index.php?page=post&s=list&pid=${booruPid}`
       } else {
         url = `${src.proxy}/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
@@ -460,8 +474,10 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
       return { posts: fresh, source: src.id, ok: true }
     }
   }
-  // Redgifs (real/hardcore mp4s+gifs), then EPORNER, then imhentai (gallery scrape),
-  // before the paheal single-tag fallback.
+  // Redgifs (real/hardcore short mp4 loops + gifs), then Babesource (real
+  // stills galleries), then imhentai (hentai gallery scrape), before the
+  // paheal single-tag fallback. Long-form videos are dropped by postFilter
+  // (duration metadata only) — short mp4 loops always stay.
   if (allowReal && isHealthy('redgifs-direct')) {
     const rg = await redgifsDirect(req.tags, req.limit)
     if (rg) {
@@ -474,20 +490,20 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
       markUnhealthy('redgifs-direct')
     }
   }
-  if (allowReal && isHealthy('eporner-direct')) {
+  if (allowReal && isHealthy('babesource-direct')) {
     try {
-      const ep = await epornerDirect(req.tags, req.limit)
-      if (ep.length > 0) {
-        const fresh = remember(sanitize(ep, req.tags))
+      const bs = await babesourceDirect(req.tags, req.limit)
+      if (bs.length > 0) {
+        const fresh = remember(sanitize(bs, req.tags))
         if (fresh.length > 0) {
-          unhealthyUntil.delete('eporner-direct')
-          return { posts: fresh, source: 'eporner-direct', ok: true }
+          unhealthyUntil.delete('babesource-direct')
+          return { posts: fresh, source: 'babesource-direct', ok: true }
         }
-      } else {
-        markUnhealthy('eporner-direct')
       }
+      // Empty (rare query, single-page search, all repeats) is NOT a sick
+      // mirror — only hard failures (thrown below) cool the source down.
     } catch {
-      markUnhealthy('eporner-direct')
+      markUnhealthy('babesource-direct')
     }
   }
   if (allowHentai && isHealthy('imh-direct')) {
@@ -569,39 +585,69 @@ export async function redgifsDirect(query: string, limit: number, retried = fals
   }
 }
 
-/** EPORNER API for real porn images / previews */
-export async function epornerDirect(query: string, limit: number): Promise<BooruPost[]> {
-  try {
-    const page = 1 + Math.floor(Math.random() * 5)
-    const q = encodeURIComponent(query.trim().replace(/\s+/g, '+'))
-    const url = `/booru/eporner/api/v2/video/search/?query=${q}&per_page=${limit}&page=${page}&thumbsize=big&format=json`
-    const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) })
-    if (!res.ok) return []
-    const data = (await res.json()) as {
-      videos?: Array<{
-        id: string
-        keywords?: string
-        default_thumb?: { src?: string }
-        thumbs?: Array<{ src?: string }>
-      }>
+/** BABESOURCE gallery scraper for real porn stills (full-res, never thumbs).
+ *  Page-1 first; higher pages only when pagination advertises them (single-
+ *  page queries 404 on page2+, which is normal, not a sick mirror). Throws
+ *  only on hard failures (5xx/network) so the caller cools down correctly. */
+export async function babesourceDirect(query: string, limit: number): Promise<BooruPost[]> {
+  const slug = babesourceSlug(query)
+  if (!slug) return []
+  const fetchSearchPage = async (page: number): Promise<string | null> => {
+    const searchUrl = toProxy(
+      babesourceSearchUrl(query, page),
+      BABESOURCE_ROOT,
+      '/booru/babe',
+    )
+    let searchRes: Response
+    try {
+      searchRes = await fetch(searchUrl, { signal: AbortSignal.timeout(TIMEOUT_MS) })
+    } catch {
+      throw new Error('babesource search unreachable')
     }
-    const list = Array.isArray(data.videos) ? data.videos : []
-    return list
-      .map((v) => {
-        const thumb = v.default_thumb?.src || v.thumbs?.[0]?.src || ''
-        const tags = (v.keywords || '').split(',').map((t) => t.trim().replace(/\s+/g, '_')).filter(Boolean)
-        return {
-          id: `ep-${v.id}`,
-          url: thumb,
-          tags,
-          rating: 'e',
-          kind: 'image' as const,
-        }
-      })
-      .filter((p) => p.id && p.url)
-  } catch {
-    return []
+    if (searchRes.status === 404) return null
+    if (!searchRes.ok || typeof searchRes.text !== 'function') {
+      throw new Error(`babesource search HTTP ${searchRes.status}`)
+    }
+    return searchRes.text()
   }
+  const firstHtml = await fetchSearchPage(1)
+  if (firstHtml === null) return []
+  const seen = new Set<string>()
+  const galleryUrls: string[] = []
+  const collect = (html: string): void => {
+    for (const u of parseBabesourceSearch(html, 3)) {
+      if (!seen.has(u)) {
+        seen.add(u)
+        galleryUrls.push(u)
+      }
+    }
+  }
+  collect(firstHtml)
+  // Variety: one extra random page when pagination proves it exists.
+  const maxPage = Math.min(parseBabesourceMaxPage(firstHtml), 5)
+  if (maxPage > 1 && galleryUrls.length < 3) {
+    const page = 2 + Math.floor(Math.random() * (maxPage - 1))
+    const extraHtml = await fetchSearchPage(page)
+    if (extraHtml !== null) collect(extraHtml)
+  }
+  const posts: BooruPost[] = []
+  for (const gUrl of galleryUrls) {
+    if (posts.length >= limit) break
+    await new Promise((r) => setTimeout(r, 250))
+    try {
+      const gRes = await fetch(toProxy(gUrl, BABESOURCE_ROOT, '/booru/babe'), {
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      })
+      if (!gRes.ok || typeof gRes.text !== 'function') continue
+      const gHtml = await gRes.text()
+      const images = parseBabesourceGallery(gHtml, limit - posts.length)
+      if (images.length === 0) continue
+      posts.push(...toBabesourcePosts(gUrl, images, query, parseBabesourceTags(gHtml)))
+    } catch {
+      /* one dead gallery never kills the round */
+    }
+  }
+  return posts
 }
 
 /**
@@ -619,11 +665,15 @@ async function imhentaiDirect(query: string, limit: number): Promise<BooruPost[]
     // 1. First extract gallery covers directly from the search HTML in one pass.
     // The search page contains thumbnails; using them directly avoids secondary
     // /gallery/<id>/ requests that trigger Cloudflare 403 WAF challenges.
+    // toImhentaiPost rewrites thumb.jpg -> 1.jpg; drop any post where the
+    // rewrite failed (url still points at a thumb) — never serve thumbs.
     const directResults = parseImhentaiSearchResults(html, Math.max(limit, 3))
     if (directResults.length > 0) {
-      return directResults
+      const converted = directResults
         .slice(0, limit)
         .map((r) => toImhentaiPost(r.id, { url: r.coverUrl, width: 0, height: 0 }, query))
+        .filter((p) => !/\/(?:thumb|thumbs)(?:[?#/.]|$)/i.test(p.url))
+      if (converted.length > 0) return converted
     }
 
     // 2. Fallback to individual gallery fetches only when direct thumbnails were absent.

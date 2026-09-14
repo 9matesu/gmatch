@@ -3,7 +3,7 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { type OrbitObject, type User, type LeagueEntry } from '@orbit/shared'
 import type { OrbitIdentity } from '@orbit/crypto'
-import { currentMatch } from '../utils/lobby'
+import { currentMatch, parseServerTimestampMs } from '../utils/lobby'
 import type { useLobby } from '../hooks/useLobby'
 import { MatchRoundPanel } from './MatchRoundPanel'
 import { YourMatchTab } from './YourMatchTab'
@@ -307,7 +307,7 @@ const selfId = identity?.orbitId || ''
   const selfQueueRow = state?.players.find((p) => p.user_id === selfId)
   const queuedSinceRaw = selfQueueRow?.waiting_since || selfQueueRow?.joined_at
   const queuedSinceMs = queuedSinceRaw
-    ? Math.max(0, now - new Date(queuedSinceRaw).getTime())
+    ? Math.max(0, now - parseServerTimestampMs(queuedSinceRaw))
     : (autoQueueEnabled && queuedSinceFallback ? Math.max(0, now - queuedSinceFallback) : 0)
 
   // Let the page footer refetch users/score immediately after a match action

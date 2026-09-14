@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { playPress, playWin } from '../../utils/sounds';
-import { X, Camera, Globe, Lock } from 'lucide-react';
+import { X, Camera, Globe, Lock, Plus } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
-import { saveUserProfile } from '../../utils/profile';
+import { MAX_TAGS } from '@orbit/shared';
+import { saveUserProfile, addRemovedProfileTag, clearRemovedProfileTag } from '../../utils/profile';
 import { resolveMediaUrl } from '../../utils/media';
 import { ProfilePicModal } from './ProfilePicModal';
 
@@ -15,6 +16,7 @@ export function ProfileEditorModal({
   initialBio = '',
   initialWebsite = '',
   initialPfp = '',
+  initialTags = [],
   onClose,
   onProfileUpdated,
   toast,
@@ -24,14 +26,17 @@ export function ProfileEditorModal({
   initialBio?: string;
   initialWebsite?: string;
   initialPfp?: string;
+  initialTags?: string[];
   onClose: () => void;
-  onProfileUpdated?: (updated: { name: string; bio: string; website: string; pfpUrl?: string }) => void;
+  onProfileUpdated?: (updated: { name: string; bio: string; website: string; pfpUrl?: string; tags?: string[] }) => void;
   toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 }) {
   const [name, setName] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
   const [website, setWebsite] = useState(initialWebsite);
   const [pfpUrl, setPfpUrl] = useState(initialPfp);
+  const [tags, setTags] = useState<string[]>(() => [...initialTags]);
+  const [tagDraft, setTagDraft] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showPicModal, setShowPicModal] = useState(false);
@@ -47,6 +52,32 @@ export function ProfileEditorModal({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
+  const commitTagDraft = () => {
+    const norm = tagDraft
+      .trim()
+      .toLowerCase()
+      .replace(/^#/, '')
+      .replace(/[^a-z0-9_-]/g, '')
+      .slice(0, 20);
+    setTagDraft('');
+    if (!norm) return;
+    if (tags.includes(norm)) {
+      toast?.('Tag is already on your profile', 'info');
+      return;
+    }
+    if (tags.length >= MAX_TAGS) {
+      toast?.(`At most ${MAX_TAGS} tags`, 'warning');
+      return;
+    }
+    playPress(600);
+    setTags((prev) => [...prev, norm]);
+  };
+
+  const removeTag = (tag: string) => {
+    playPress(500);
+    setTags((prev) => prev.filter((t) => t !== tag));
+  };
+
   const handleSave = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!name.trim()) {
@@ -57,8 +88,7 @@ export function ProfileEditorModal({
     setSaving(true);
     playPress(850);
 
-    try {
-      let persistedPfp = pfpUrl.trim();
+    try {      let persistedPfp = pfpUrl.trim();
       if (persistedPfp.startsWith('blob:')) {
         const blob = await fetch(persistedPfp).then((res) => res.blob());
         persistedPfp = await new Promise<string>((resolve, reject) => {
@@ -76,9 +106,22 @@ export function ProfileEditorModal({
         if (bio !== undefined) patch.bio = bio.trim();
         if (website !== undefined) patch.website = website.trim();
         if (persistedPfp) patch.pfp_url = persistedPfp;
+        patch.tags = [...tags];
 
         const res = await saveUserProfile(identity, patch);
         if (!res.ok) throw new Error(res.error || `Profile save failed (${res.status})`);
+        // Adopt the server ref (avatar uploads rewrite data: → /api/objects/<id>).
+        if (typeof res.pfpUrl === 'string' && res.pfpUrl) persistedPfp = res.pfpUrl;
+
+        // Removal-sticks bookkeeping: deleted tags must not resurface via the
+        // post-tag auto-sync; re-added tags leave the removal list.
+        const before = new Set(initialTags);
+        const after = new Set(tags);
+        for (const t of before) if (!after.has(t)) addRemovedProfileTag(t);
+        for (const t of after) clearRemovedProfileTag(t);
+        try {
+          localStorage.setItem('orbit_tags', JSON.stringify([...tags]));
+        } catch { /* private mode */ }
       }
 
       playWin();
@@ -88,6 +131,7 @@ export function ProfileEditorModal({
         bio: bio.trim(),
         website: website.trim(),
         pfpUrl: persistedPfp || undefined,
+        tags: [...tags],
       });
       onClose();
     } catch (err: any) {
@@ -195,6 +239,58 @@ export function ProfileEditorModal({
                   placeholder="https://pmvhaven.com"
                   className="w-full bg-transparent focus:outline-none text-sm text-retro-fg placeholder:text-retro-muted"
                 />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-retro-body block mb-1.5">
+                Tags <span className="text-retro-muted font-normal">· {tags.length}/{MAX_TAGS} · drive your feed</span>
+              </label>
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {tags.map((t) => (
+                    <span
+                      key={t}
+                      className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-glass-w12 border border-border-glass text-xs font-semibold text-retro-fg"
+                    >
+                      #{t}
+                      <button
+                        type="button"
+                        onClick={() => removeTag(t)}
+                        aria-label={`Remove tag ${t}`}
+                        className="p-0.5 rounded-full text-retro-muted hover:text-rose-400 hover:bg-glass-w12 cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={tagDraft}
+                  onChange={(e) => setTagDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ',') {
+                      e.preventDefault();
+                      commitTagDraft();
+                    }
+                  }}
+                  placeholder={tags.length >= MAX_TAGS ? `Tag limit reached (${MAX_TAGS})` : 'Add a tag...'}
+                  disabled={tags.length >= MAX_TAGS}
+                  maxLength={20}
+                  className="flex-1 bg-surface-interactive border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent transition-colors disabled:opacity-40"
+                />
+                <button
+                  type="button"
+                  onClick={commitTagDraft}
+                  disabled={tags.length >= MAX_TAGS || !tagDraft.trim()}
+                  aria-label="Add tag"
+                  className="p-2 bg-surface-interactive hover:bg-glass-w12 border border-border-glass rounded-lg text-retro-muted hover:text-retro-fg transition-colors cursor-pointer shrink-0 disabled:opacity-40"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
               </div>
             </div>
 

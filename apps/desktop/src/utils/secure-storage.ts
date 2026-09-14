@@ -26,6 +26,11 @@ export const SECURE_KEYS = [
   'orbit_rooms_v1',
   'orbit_room_messages_v1',
   'goonmatch_pfps',
+  // The self pfp URL is read by myProfile init and written by every pfp
+  // save path — it must ride the same DPAPI mirror as goonmatch_pfps.
+  // Previously it stayed plaintext localStorage while profilePics went
+  // secure, so the two caches diverged after every restart ("pfp won't hold").
+  'orbit_pfp_url',
   'gmatch.server.join', // one-shot join password handoff (plan T5) — never plaintext
   'gmatch.server.host', // one-shot create-server claim (name + join password) — never plaintext
 ] as const

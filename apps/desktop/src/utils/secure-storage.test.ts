@@ -110,7 +110,19 @@ describe('secure-storage (Electron path)', () => {
     expect(SECURE_KEYS).toContain('orbit_admin_identity')
     expect(SECURE_KEYS).toContain('orbit_mail_threads_v1')
     expect(SECURE_KEYS).toContain('goonmatch_pfps')
+    // Self pfp URL must ride the same DPAPI mirror as goonmatch_pfps —
+    // otherwise myProfile and profilePics diverge after restart ("pfp won't hold").
+    expect(SECURE_KEYS).toContain('orbit_pfp_url')
     expect(SECURE_KEYS).toContain('gmatch.server.join')
+  })
+
+  it('migrates a legacy plaintext orbit_pfp_url into the secure KV', async () => {
+    localStorage.setItem('orbit_pfp_url', '/api/objects/11111111-1111-4111-8111-111111111111')
+    const { store } = mockBridge()
+    await initSecureStorage()
+    expect(store.get('orbit_pfp_url')).toBe('/api/objects/11111111-1111-4111-8111-111111111111')
+    expect(localStorage.getItem('orbit_pfp_url')).toBeNull()
+    expect(getSecureItem('orbit_pfp_url')).toBe('/api/objects/11111111-1111-4111-8111-111111111111')
   })
 
   it('removeAllScopedSecureItems wipes base AND scoped (base:<id>) variants', async () => {

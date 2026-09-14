@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { playPress, playWin, playMsgReceive } from '../../utils/sounds';
 import {
@@ -18,9 +18,9 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import type { FeedPost, PostComment } from './GMatchFeed';
 import { ObjectImage } from '../ObjectImage';
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
-import { isMediaVideo } from '../../utils/media';
+import { isMediaVideo, resolveMediaUrl } from '../../utils/media';
 
-export function InstagramPostModal({ post, isOpen, onClose, identity, profilePics = {}, isLiked = false, isSaved = false, likeCount = 0, comments = [], onToggleLike, onToggleSave, onAddComment, onToggleCommentLike, onOpenShare, onOptionsClick, onOpenLikers, onSelectUser, onAvatarClick, onOpenNetwork, toast }: {
+export function InstagramPostModal({ post, isOpen, onClose, identity, profilePics = {}, isLiked = false, isSaved = false, likeCount = 0, comments = [], onToggleLike, onToggleSave, onAddComment, onToggleCommentLike, onOpenShare, onOptionsClick, onOpenLikers, onSelectUser, onAvatarClick, onOpenNetwork, toast, zIndexClass = 'z-[var(--z-modal)]' }: {
   post: FeedPost | null;
   isOpen: boolean;
   onClose: () => void;
@@ -41,14 +41,45 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
   onAvatarClick?: (userId: string) => void;
   onOpenNetwork?: (userId: string) => void;
   toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
+  /** Stacking override for lightboxes nested in higher-z overlays. */
+  zIndexClass?: string;
 }) {
   const [commentInput, setCommentInput] = useState('');
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [doubleTapAnimation, setDoubleTapAnimation] = useState(false);
 
-  // If the post has multiple media urls or fallback array
-  const mediaList = post ? [(post as any).url, ...((post as any).mediaUrls || [])].filter(Boolean) : [];
+  // Reset carousel/zoom/draft whenever a different post is opened.
+  useEffect(() => {
+    setCommentInput('');
+    setZoomLevel(1);
+    setActiveMediaIndex(0);
+    setDoubleTapAnimation(false);
+  }, [post?.id, isOpen]);
+
+  interface ModalMediaItem {
+    url: string;
+    mime?: string;
+  }
+
+  // Media model mirrors the feed cards: post.media[] (per-item mime) first,
+  // then legacy mediaUrls, then the single url + mime_type. Keeps mime per
+  // item so extension-less object videos are detected as video.
+  const mediaItems: ModalMediaItem[] = post
+    ? (Array.isArray((post as any).media) && (post as any).media.length > 0
+      ? (post as any).media
+        .map((m: any) => ({ url: m?.url as string, mime: m?.mime_type as string | undefined }))
+        .filter((m: ModalMediaItem) => Boolean(m.url))
+      : [...((post as any).mediaUrls || [])].map((u: string) => ({ url: u }))
+    )
+    : [];
+  if (post && mediaItems.length === 0 && (post as any).url) {
+    mediaItems.push({ url: (post as any).url, mime: (post as any).mime_type });
+  }
+  const activeMedia = mediaItems[activeMediaIndex] || mediaItems[0] || null;
+
+  const isModalMediaVideo = (url?: string | null, mime?: string | null): boolean =>
+    Boolean(mime?.startsWith('video/')) || isMediaVideo(url);
 
   const handleDoubleTap = () => {
     playWin();
@@ -85,11 +116,12 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
   if (!isOpen || !post) return null;
 
   const authorAvatar = profilePics[post.author_id] || post.author_avatar;
+  const resolvedAuthorAvatar = authorAvatar ? resolveMediaUrl(authorAvatar) : '';
 
   return createPortal(
     (
       <div
-        className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 md:p-6 animate-orbit-fade-in select-none"
+        className={`fixed inset-0 ${zIndexClass} bg-black/70 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 md:p-6 animate-orbit-fade-in select-none`}
         onClick={onClose}
       >
         {/* Close button in top-right */}
@@ -111,10 +143,10 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
             className="relative flex-1 bg-black flex items-center justify-center overflow-hidden min-h-[340px] md:min-h-[580px] max-h-[50vh] md:max-h-none"
             onDoubleClick={handleDoubleTap}
           >
-            {isMediaVideo(mediaList[activeMediaIndex] || post.url) ? (
+            {activeMedia && isModalMediaVideo(activeMedia.url, activeMedia.mime) ? (
               <NativeVideoPlayer
-                key={mediaList[activeMediaIndex] || post.url}
-                src={mediaList[activeMediaIndex] || post.url}
+                key={activeMedia.url}
+                src={activeMedia.url}
                 className="w-full h-full max-h-[85vh] object-contain"
                 videoClassName="w-full h-full max-h-[85vh] object-contain"
                 autoPlay={true}
@@ -130,9 +162,10 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                 onClick={handleZoomToggle}
               >
                 <ObjectImage
-                  contentUrl={mediaList[activeMediaIndex] || post.url}
+                  contentUrl={activeMedia?.url || post.url}
                   objectId={null}
                   identity={identity}
+                  mimeType={activeMedia?.mime}
                   alt=""
                   className="w-full h-full object-contain max-h-[85vh]"
                   muted={false}
@@ -152,7 +185,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
             )}
 
             {/* Carousel Arrows if multiple images */}
-            {mediaList.length > 1 && (
+            {mediaItems.length > 1 && (
               <>
                 {activeMediaIndex > 0 && (
                   <button
@@ -167,13 +200,13 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                     <ChevronLeft className="w-5 h-5" />
                   </button>
                 )}
-                {activeMediaIndex < mediaList.length - 1 && (
+                {activeMediaIndex < mediaItems.length - 1 && (
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       playPress(700);
-                      setActiveMediaIndex((i) => Math.min(mediaList.length - 1, i + 1));
+                      setActiveMediaIndex((i) => Math.min(mediaItems.length - 1, i + 1));
                     }}
                     className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 text-white hover:bg-black/80 cursor-pointer"
                   >
@@ -183,7 +216,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
 
                 {/* Dots indicator */}
                 <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-10 bg-black/60 px-2 py-1 rounded-full">
-                  {mediaList.map((_, idx) => (
+                  {mediaItems.map((_, idx) => (
                     <span
                       key={idx}
                       className={`w-1.5 h-1.5 rounded-full transition-all ${idx === activeMediaIndex ? 'bg-white w-3' : 'bg-glass-w20'
@@ -218,7 +251,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                 <div className="w-8 h-8 rounded-full bg-glass-w12 border border-border-glass p-[1px] flex-shrink-0">
                   <div className="w-full h-full rounded-full bg-retro-panel overflow-hidden flex items-center justify-center text-xs font-semibold text-retro-fg">
                     {authorAvatar ? (
-                      <img src={authorAvatar} alt="" className="w-full h-full object-cover" />
+                      <img src={resolvedAuthorAvatar} alt="" className="w-full h-full object-cover" />
                     ) : (
                       post.author_name.charAt(0).toUpperCase()
                     )}
@@ -253,7 +286,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                     onClick={handleAuthorClick}
                   >
                     {authorAvatar ? (
-                      <img src={authorAvatar} alt="" className="w-full h-full object-cover" />
+                      <img src={resolvedAuthorAvatar} alt="" className="w-full h-full object-cover" />
                     ) : (
                       post.author_name.charAt(0).toUpperCase()
                     )}
@@ -286,7 +319,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                   <div className="flex items-start gap-2.5">
                     <div className="w-7 h-7 rounded-full bg-surface-interactive overflow-hidden shrink-0 flex items-center justify-center text-[10px] font-bold text-retro-fg">
                       {c.author_avatar ? (
-                        <img src={c.author_avatar} alt="" className="w-full h-full object-cover" />
+                        <img src={resolveMediaUrl(c.author_avatar)} alt="" className="w-full h-full object-cover" />
                       ) : (
                         c.author_name.charAt(0).toUpperCase()
                       )}
@@ -365,7 +398,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                     onOpenLikers?.(post.id);
                   }
                 }}
-                className="text-left px-3 pb-2 text-xs font-semibold text-retro-fg font-mono tracking-tight hover:underline cursor-pointer w-fit transition-colors"
+                className="text-left px-3 pb-2 text-xs font-semibold text-retro-fg tracking-tight hover:underline cursor-pointer w-fit transition-colors"
                 aria-label="View who liked this post"
               >
                 {likeCount.toLocaleString()} {likeCount === 1 ? 'like' : 'likes'}

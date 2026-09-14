@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { Camera, User, X, Plus, Tag } from 'lucide-react';
 import { normalizeTags, MAX_TAG_LENGTH } from '@orbit/shared';
 import { fileToThumbDataUrl, MAX_DISPLAY_NAME_LENGTH } from '../../utils/profile';
+import { resolveMediaUrl } from '../../utils/media';
 import { useCropper } from '../../hooks/useCropper';
 import { isCropableImage } from '../CropModal';
 import { playPress } from '../../utils/sounds';
@@ -87,7 +88,7 @@ export function ProfileSetupForm({
           <div className="w-20 h-20 rounded-full p-[2px] bg-retro-accent transition-transform">
             <div className="w-full h-full rounded-full bg-retro-bg overflow-hidden flex items-center justify-center border border-border-glass">
               {pfpUrl ? (
-                <img src={pfpUrl} alt="Avatar" className="w-full h-full object-cover" />
+                <img src={resolveMediaUrl(pfpUrl)} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
                 <Camera className="w-7 h-7 text-retro-muted group-hover:text-retro-accent transition-colors" />
               )}

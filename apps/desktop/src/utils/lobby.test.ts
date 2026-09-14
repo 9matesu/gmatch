@@ -7,6 +7,7 @@ import {
   countdownMs,
   formatCountdown,
   formatElapsed,
+  parseServerTimestampMs,
   matchWindowMs,
   displayName,
 } from './lobby'
@@ -95,6 +96,19 @@ describe('lobby helpers (1v1 match)', () => {
     expect(formatElapsed(0)).toBe('0:00')
     expect(formatElapsed(125_000)).toBe('2:05')
     expect(formatElapsed(-100)).toBe('0:00')
+  })
+
+  it('parses zone-less SQLite timestamps as UTC (queue timer fix)', () => {
+    // '2026-01-02 03:04:05' UTC must equal the same instant with Z designator,
+    // regardless of the client's local timezone (previously parsed as local,
+    // freezing the queue timer at 0:00 west of UTC).
+    expect(parseServerTimestampMs('2026-01-02 03:04:05')).toBe(Date.parse('2026-01-02T03:04:05Z'))
+    expect(parseServerTimestampMs('2026-01-02T03:04:05Z')).toBe(Date.parse('2026-01-02T03:04:05Z'))
+    expect(parseServerTimestampMs('2026-01-02T03:04:05+02:00')).toBe(Date.parse('2026-01-02T03:04:05+02:00'))
+    expect(parseServerTimestampMs(Date.parse('2026-01-02T03:04:05Z'))).toBe(Date.parse('2026-01-02T03:04:05Z'))
+    expect(parseServerTimestampMs('')).toBe(0)
+    expect(parseServerTimestampMs(null)).toBe(0)
+    expect(parseServerTimestampMs('not-a-date')).toBe(0)
   })
 
 it('displayName falls back to generated name from orbitId', () => {

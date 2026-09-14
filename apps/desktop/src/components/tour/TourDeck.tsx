@@ -1,19 +1,24 @@
 "use client";
 
-// One-time onboarding deck: four cards pinned above the timeline, shown on
-// the tour's first step (the TourDock covers the rest). Skipping marks the
+// Unified onboarding deck: one card per tour step, pinned above the
+// timeline on the tour's first step (the TourDock covers the walkthrough
+// from there). Cards jump straight to their section via the shared tour
+// hook — deck and dock stay in sync on the same state. Skipping marks the
 // tour skipped — same marker as the dock's skip, per identity.
 
-import { TOUR_STEPS, type TourStep } from '../../firstRun/tourState';
+import type { TourStep } from '../../firstRun/tourState';
 import { playPress } from '../../utils/sounds';
 import { X } from 'lucide-react';
 
-const DECK_IDS = ['create', 'idle', 'duel', 'messages'];
-const DECK: TourStep[] = DECK_IDS
-  .map((id) => TOUR_STEPS.find((s) => s.id === id))
-  .filter((s): s is TourStep => Boolean(s));
-
-export function TourDeck({ onOpen, onDismiss }: { onOpen: (step: TourStep) => void; onDismiss: () => void }) {
+export function TourDeck({
+  steps,
+  onOpen,
+  onDismiss,
+}: {
+  steps: TourStep[];
+  onOpen: (step: TourStep) => void;
+  onDismiss: () => void;
+}) {
   return (
     <div className="w-full max-w-[1400px] mx-auto px-2 sm:px-4 pt-3">
       <div className="flex items-start justify-between px-1 pb-1.5">
@@ -28,8 +33,8 @@ export function TourDeck({ onOpen, onDismiss }: { onOpen: (step: TourStep) => vo
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-        {DECK.map((step) => (
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+        {steps.map((step) => (
           <button
             key={step.id}
             type="button"

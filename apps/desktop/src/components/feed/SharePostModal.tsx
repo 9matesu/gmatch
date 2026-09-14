@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { playPress } from '../../utils/sounds';
+import { resolveMediaUrl } from '../../utils/media';
 import {
   Send,
   Search,
@@ -52,12 +53,23 @@ interface SharePostModalProps {
   onSendDm?: (peerId: string, text: string) => Promise<boolean>;
 }
 
-export function SharePostModal({ post, onClose, followingIds = [], profilePics = {}, userNames = {}, identity = null, toast, groups = [], onSendDm }: SharePostModalProps) {
+export function SharePostModal({ post, onClose, followingIds = [], profilePics = {}, userNames = {}, identity = null, toast, groups = [], onSendDm, zIndexClass = 'z-[var(--z-modal)]' }: SharePostModalProps & { zIndexClass?: string }) {
   const [shareSearch, setShareSearch] = useState('');
   const [shareMessage, setShareMessage] = useState('');
   const [sentTargets, setSentTargets] = useState<Record<string, boolean>>({});
-  const [sharing, setSharing] = useState(false);
+  // Per-target pending (not one global lock): sending to Alice must never
+  // block or silently swallow a send to Bob.
+  const [pendingTargets, setPendingTargets] = useState<Record<string, boolean>>({});
   const [recents] = useState<RecentEntry[]>(readRecents);
+
+  const requireIdentity = (): boolean => {
+    if (!identity) {
+      playPress(500);
+      toast?.('Log in to share posts with friends or groups', 'warning');
+      return false;
+    }
+    return true;
+  };
 
   // Resolvable permalink: GET /api/posts/:id serves the post (the desktop app
   // has no public web client in 1.0 — the API URL is the ONE honest target).
@@ -65,9 +77,9 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
 
   // Real DM send (P3.4): server-confirmed, never a fake success toast.
   const handleSendDirectShare = async (targetId: string, targetName: string) => {
-    if (!identity || sharing) return;
+    if (!requireIdentity() || pendingTargets[targetId] || sentTargets[targetId]) return;
     playPress(880);
-    setSharing(true);
+    setPendingTargets((prev) => ({ ...prev, [targetId]: true }));
     try {
       const text = shareMessage.trim()
         ? `${shareMessage.trim()}\n\n${permalink}`
@@ -96,14 +108,18 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
     } catch (e: unknown) {
       toast?.(`Couldn't share with ${targetName}: ${userFacingError(e, { fallback: 'network error' })}`, 'error');
     } finally {
-      setSharing(false);
+      setPendingTargets((prev) => {
+        const next = { ...prev };
+        delete next[targetId];
+        return next;
+      });
     }
   };
 
   const handleSendGroupShare = async (groupId: string, groupName: string) => {
-    if (!identity || sharing) return;
+    if (!requireIdentity() || pendingTargets[groupId] || sentTargets[groupId]) return;
     playPress(880);
-    setSharing(true);
+    setPendingTargets((prev) => ({ ...prev, [groupId]: true }));
     try {
       const text = shareMessage.trim()
         ? `${shareMessage.trim()}\n\n${permalink}`
@@ -123,7 +139,11 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
     } catch (e: unknown) {
       toast?.(`Couldn't share to ${groupName}: ${userFacingError(e, { fallback: 'network error' })}`, 'error');
     } finally {
-      setSharing(false);
+      setPendingTargets((prev) => {
+        const next = { ...prev };
+        delete next[groupId];
+        return next;
+      });
     }
   };
 
@@ -142,7 +162,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-orbit-fade-in"
+      className={`fixed inset-0 ${zIndexClass} bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-orbit-fade-in`}
       onClick={onClose}
     >
       <div
@@ -169,6 +189,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
           <ObjectImage
             contentUrl={post.url}
             identity={identity}
+            mimeType={post.mime_type}
             alt=""
             className="w-20 h-20 rounded-xl object-cover border border-border-glass shrink-0"
           />
@@ -197,11 +218,11 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                 key={r.id}
                 type="button"
                 onClick={() => (r.kind === 'user' ? void handleSendDirectShare(r.id, r.name) : void handleSendGroupShare(r.id, r.name))}
-                disabled={!!sentTargets[r.id]}
-                className="shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-full border border-border-glass text-xs text-retro-body hover:bg-glass-w5 cursor-pointer disabled:opacity-40"
+                disabled={!!sentTargets[r.id] || !!pendingTargets[r.id]}
+                className="shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-full border border-border-glass text-xs text-retro-body hover:bg-glass-w5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {profilePics[r.id] ? (
-                  <img src={profilePics[r.id]} alt="" className="w-4 h-4 rounded-full object-cover" />
+                  <img src={resolveMediaUrl(profilePics[r.id])} alt="" className="w-4 h-4 rounded-full object-cover" />
                 ) : (
                   <span className="w-4 h-4 rounded-full bg-glass-w10 flex items-center justify-center text-[10px]">{r.name.slice(0, 1).toUpperCase()}</span>
                 )}
@@ -230,6 +251,14 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
           {/* Fake preset groups removed (P3.5 dead-end sweep): they never
               existed server-side, so sharing to them was theater. Real groups
               live in the Messages view. */}
+          {followingIds.length === 0 && groups.length === 0 && (
+            <div className="py-8 text-center space-y-1.5">
+              <p className="text-xs font-semibold text-retro-fg">Nothing to send to yet</p>
+              <p className="text-[11px] text-retro-muted">
+                Follow friends or join a group first — or copy the link below.
+              </p>
+            </div>
+          )}
 
           {/* Friends Section */}
           <div className="space-y-1.5">
@@ -238,6 +267,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
               .filter((fId) => (userNames[fId] || fId).toLowerCase().includes(shareSearch.toLowerCase()))
               .map((fId) => {
               const isSent = !!sentTargets[fId];
+              const isPending = !!pendingTargets[fId];
               const name = userNames[fId] || `User ${fId.slice(0, 6)}`;
               return (
                 <div
@@ -247,7 +277,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-glass-w20 overflow-hidden border border-border-glass flex items-center justify-center text-xs font-bold">
                       {profilePics[fId] ? (
-                        <img src={profilePics[fId]} alt="" className="w-full h-full object-cover" />
+                        <img src={resolveMediaUrl(profilePics[fId])} alt="" className="w-full h-full object-cover" />
                       ) : (
                         fId.substring(0, 2).toUpperCase()
                       )}
@@ -261,14 +291,15 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                   <button
                     type="button"
                      onClick={() => void handleSendDirectShare(fId, name)}
-                    disabled={isSent}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
+                    disabled={isSent || isPending || !identity}
+                    title={!identity ? 'Log in to share' : undefined}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all disabled:cursor-not-allowed ${
                       isSent
                         ? 'bg-surface-interactive text-retro-muted border border-border-glass'
-                        : 'bg-black hover:bg-surface-elevated text-white'
+                        : 'bg-black hover:bg-surface-elevated text-white disabled:opacity-40'
                     }`}
                   >
-                    {isSent ? 'Sent' : 'Send'}
+                    {isSent ? 'Sent' : isPending ? 'Sending…' : 'Send'}
                   </button>
                 </div>
               );
@@ -282,6 +313,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                 .filter((g) => g.name.toLowerCase().includes(shareSearch.toLowerCase()))
                 .map((g) => {
                   const isSent = !!sentTargets[g.id];
+                  const isPending = !!pendingTargets[g.id];
                   return (
                     <div
                       key={g.id}
@@ -299,14 +331,15 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                       <button
                         type="button"
                         onClick={() => void handleSendGroupShare(g.id, g.name)}
-                        disabled={isSent}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
+                        disabled={isSent || isPending || !identity}
+                        title={!identity ? 'Log in to share' : undefined}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all disabled:cursor-not-allowed ${
                           isSent
                             ? 'bg-surface-interactive text-retro-muted border border-border-glass'
-                            : 'bg-black hover:bg-surface-elevated text-white'
+                            : 'bg-black hover:bg-surface-elevated text-white disabled:opacity-40'
                         }`}
                       >
-                        {isSent ? 'Sent' : 'Send'}
+                        {isSent ? 'Sent' : isPending ? 'Sending…' : 'Send'}
                       </button>
                     </div>
                   );

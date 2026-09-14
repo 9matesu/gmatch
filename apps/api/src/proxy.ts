@@ -132,6 +132,57 @@ async function resolveGiphy(url: URL): Promise<string | null> {
   return `https://media.giphy.com/media/${m[1]}/giphy.mp4`
 }
 
+function extractOgMedia(html: string): string | null {
+  const patterns = [
+    /<meta\s+property="og:video:secure_url"\s+content="([^"]+)"/i,
+    /<meta\s+content="([^"]+)"\s+property="og:video:secure_url"/i,
+    /<meta\s+property="og:video(?::url)?"\s+content="([^"]+)"/i,
+    /<meta\s+content="([^"]+)"\s+property="og:video(?::url)?"/i,
+    /<meta\s+property="og:image:secure_url"\s+content="([^"]+)"/i,
+    /<meta\s+content="([^"]+)"\s+property="og:image:secure_url"/i,
+    /<meta\s+property="og:image(?::url)?"\s+content="([^"]+)"/i,
+    /<meta\s+content="([^"]+)"\s+property="og:image(?::url)?"/i,
+  ]
+  for (const re of patterns) {
+    const m = html.match(re)
+    if (m?.[1]) return m[1].replace(/&amp;/g, '&')
+  }
+  return null
+}
+
+async function resolveRedgifs(url: URL): Promise<string | null> {
+  // redgifs.com/watch/<slug> and /ifr/<id> are JS-app pages, not media
+  // bytes — but they serve OG meta for embeds. No API token needed.
+  if (!url.hostname.toLowerCase().includes('redgifs.com')) return null
+  if (url.hostname.toLowerCase().startsWith('media.')) return url.toString()
+  if (!/\/(watch|ifr)\//i.test(url.pathname)) return null
+  try {
+    const res = await fetch(url.toString(), {
+      signal: AbortSignal.timeout(8000),
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36' },
+    })
+    if (!res.ok) return null
+    return extractOgMedia(await res.text())
+  } catch { return null }
+}
+
+async function resolveOpenGraph(url: URL): Promise<string | null> {
+  // Last-resort generic fallback for video/article pages we have no
+  // dedicated resolver for: og:video (player pages) beats og:image.
+  // Skips obvious direct files (the bytes path handles those, no extra GET).
+  if (/\.(jpe?g|png|gif|webp|avif|mp4|webm|mov|ogg|m4v)([?#]|$)/i.test(url.pathname)) return null
+  try {
+    const res = await fetch(url.toString(), {
+      signal: AbortSignal.timeout(8000),
+      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html,*/*;q=0.8' },
+    })
+    if (!res.ok) return null
+    const ct = res.headers.get('content-type') || ''
+    if (ct && !ct.includes('html')) return null
+    return extractOgMedia(await res.text())
+  } catch { return null }
+}
+
 /**
  * Run every per-source resolver and return the first direct playable URL.
  * If no resolver matches, returns the original URL (caller validates SSRF).
@@ -140,7 +191,7 @@ export async function classifyAndResolve(rawUrl: string): Promise<string | null>
   let parsed: URL
   try { parsed = new URL(rawUrl) } catch { return null }
   if (!['http:', 'https:'].includes(parsed.protocol) || rawUrl.length > 2048) return null
-  for (const r of [resolveTwitter, resolveDiscord, resolveReddit, resolveInstagram, resolveTenor, resolveGiphy]) {
+  for (const r of [resolveTwitter, resolveDiscord, resolveReddit, resolveInstagram, resolveTenor, resolveGiphy, resolveRedgifs, resolveOpenGraph]) {
     try {
       const out = await r(parsed)
       if (out) return out

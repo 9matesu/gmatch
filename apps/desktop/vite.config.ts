@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 // Hosts the dev /px byte-proxy may fetch (allowlist — no open proxy).
-const PX_ALLOW = /(^|\.)(imhentai\.xxx|paheal\.net|tbib\.org|xbooru\.com|redgifs\.com|konachan\.com|yande\.re|files\.yande\.re|realbooru\.com|booru\.org|eporner\.com|discordapp\.(com|net)|discord\.com|imgur\.com|redd\.it|twimg\.com|unsplash\.com|cloudinary\.com|postimg\.cc|imgbb\.com)$/
+const PX_ALLOW = /(^|\.)(imhentai\.xxx|babesource\.com|paheal\.net|tbib\.org|xbooru\.com|redgifs\.com|konachan\.com|yande\.re|files\.yande\.re|realbooru\.com|booru\.org|discordapp\.(com|net)|discord\.com|imgur\.com|redd\.it|twimg\.com|unsplash\.com|cloudinary\.com|postimg\.cc|imgbb\.com)$/
 
 const DEV_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36'
@@ -36,6 +36,8 @@ function devPxPlugin(): Plugin {
             headers['Referer'] = `https://${target.hostname}/`
           } else if (target.hostname.includes('imhentai.xxx')) {
             headers['Referer'] = 'https://imhentai.xxx/'
+          } else if (target.hostname === 'babesource.com' || target.hostname === 'media.babesource.com') {
+            headers['Referer'] = 'https://babesource.com/'
           }
 
           const urlsToTry: string[] = [target.toString()]
@@ -196,10 +198,18 @@ export default defineConfig({
       '^/booru/celeb': booruOrgProxy('https://celeb.booru.org', '/booru/celeb'),
       '^/booru/foot': booruOrgProxy('https://footfetishbooru.booru.org', '/booru/foot'),
       '^/booru/blacked': booruOrgProxy('https://blacked.booru.org', '/booru/blacked'),
-      '^/booru/eporner': {
-        target: 'https://www.eporner.com',
+      '^/booru/babe': {
+        target: 'https://babesource.com',
         changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/booru\/eporner/, ''),
+        rewrite: (p) => p.replace(/^\/booru\/babe/, ''),
+        headers: { Referer: 'https://babesource.com/' },
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.removeHeader('origin')
+            proxyReq.setHeader('referer', 'https://babesource.com/')
+            proxyReq.setHeader('user-agent', DEV_UA)
+          })
+        },
       },
     },
   },

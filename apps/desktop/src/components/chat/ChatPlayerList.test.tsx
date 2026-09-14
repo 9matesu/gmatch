@@ -40,7 +40,7 @@ describe('ChatPlayerList', () => {
   it('renders online and 24h offline users and excludes users inactive > 24h', () => {
     render(
       <ChatPlayerList
-        identity={{ orbitId: 'me', publicKeyHex: 'pk', secretKeyHex: 'sk', encryptionPubHex: 'ep', encryptionSecretHex: 'es' }}
+        identity={{ orbitId: 'me', publicKeyHex: 'pk', privateKeyHex: 'sk', encryptionPubHex: 'ep', encryptionPrivHex: 'es' }}
         users={mockUsers}
       />,
     )
@@ -57,7 +57,7 @@ describe('ChatPlayerList', () => {
   it('filters player list by search query', () => {
     render(
       <ChatPlayerList
-        identity={{ orbitId: 'me', publicKeyHex: 'pk', secretKeyHex: 'sk', encryptionPubHex: 'ep', encryptionSecretHex: 'es' }}
+        identity={{ orbitId: 'me', publicKeyHex: 'pk', privateKeyHex: 'sk', encryptionPubHex: 'ep', encryptionPrivHex: 'es' }}
         users={mockUsers}
       />,
     )
@@ -78,7 +78,7 @@ describe('ChatPlayerList', () => {
     const onOpenProfile = vi.fn()
     render(
       <ChatPlayerList
-        identity={{ orbitId: 'me', publicKeyHex: 'pk', secretKeyHex: 'sk', encryptionPubHex: 'ep', encryptionSecretHex: 'es' }}
+        identity={{ orbitId: 'me', publicKeyHex: 'pk', privateKeyHex: 'sk', encryptionPubHex: 'ep', encryptionPrivHex: 'es' }}
         users={mockUsers}
         onOpenProfile={onOpenProfile}
       />,

@@ -22,7 +22,7 @@ import type { OrbitObject as StoredCard } from '@orbit/shared';
 import type { FeedPost } from '../feed/GMatchFeed';
 import { ProfileEditorModal } from './ProfileEditorModal';
 import { ProfilePicModal } from './ProfilePicModal';
-import { InstagramPostModal } from '../feed/InstagramPostModal';
+import { useProfilePostLightbox } from '../feed/useProfilePostLightbox';
 import { ObjectImage } from '../ObjectImage';
 import { isMediaVideo, resolveMediaUrl } from '../../utils/media';
 import { saveUserProfile } from '../../utils/profile';
@@ -42,6 +42,20 @@ export function GMatchProfile({
   onOpenFollowers,
   onOpenCardViewer,
   onProfileUpdated,
+  followingIds = [],
+  users = [],
+  shareGroups = [],
+  onSendDm,
+  onPersistLike,
+  onPersistSave,
+  onPersistComment,
+  onSelectUser,
+  onOpenNetwork,
+  onCopyLink,
+  onReportPost,
+  onArchivePost,
+  onDeletePost,
+  profileTags = [],
   toast,
 }: {
   identity: OrbitIdentity | null;
@@ -57,14 +71,43 @@ export function GMatchProfile({
   onOpenSettings?: () => void;
   onOpenFollowers?: (tab: 'followers' | 'following') => void;
   onOpenCardViewer?: (card: any) => void;
-  onProfileUpdated?: (updated: { name: string; bio: string; website: string; pfpUrl?: string }) => void;
+  onProfileUpdated?: (updated: { name: string; bio: string; website: string; pfpUrl?: string; tags?: string[] }) => void;
   onArchivePost?: (postId: string) => void;
   onDeletePost?: (postId: string) => void;
+  followingIds?: string[];
+  users?: Array<{ id: string; display_name?: string }>;
+  shareGroups?: { id: string; name: string; member_count: number }[];
+  onSendDm?: (peerId: string, text: string) => Promise<boolean>;
+  onPersistLike?: (postId: string, liked: boolean) => Promise<number | undefined>;
+  onPersistSave?: (postId: string, saved: boolean) => void;
+  onPersistComment?: (postId: string, text: string) => Promise<any>;
+  onSelectUser?: (userId: string) => void;
+  onOpenNetwork?: (userId: string) => void;
+  onCopyLink?: (post: FeedPost) => void;
+  onReportPost?: (post: FeedPost) => void;
+  profileTags?: string[];
   toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 }) {
   const [profileTab, setProfileTab] = useState<'posts' | 'saved' | 'reposts' | 'cards'>('posts');
   const [showEditor, setShowEditor] = useState(false);
-  const [activeLightboxPost, setActiveLightboxPost] = useState<FeedPost | null>(null);
+  const { openPost, modals: postLightboxModals } = useProfilePostLightbox({
+    identity,
+    profilePics: profilePic ? { [identity?.orbitId || '']: profilePic } : {},
+    users,
+    followingIds,
+    shareGroups,
+    toast,
+    onPersistLike,
+    onPersistSave,
+    onPersistComment,
+    onSendDm,
+    onSelectUser,
+    onOpenNetwork,
+    onCopyLink,
+    onArchivePost,
+    onDeletePost,
+    onReportPost,
+  });
   const [bio, setBio] = useState(() => myUser?.bio || '');
   const [website, setWebsite] = useState(() => myUser?.website || '');
   const [displayName, setDisplayName] = useState(
@@ -118,6 +161,10 @@ export function GMatchProfile({
 
   const handleSavePfp = async (newPfp: string) => {
     setPfp(newPfp);
+    // The server ref (/api/objects/<id>) is what must stick everywhere.
+    // Propagating the local data:/blob: URL instead is why pfps looked set
+    // this session and vanished on restart (or 404'd for peers).
+    let serverPfp: string | null = null;
     if (identity) {
       try {
         let persisted = newPfp;
@@ -135,6 +182,10 @@ export function GMatchProfile({
           pfp_url: persisted,
         });
         if (!res.ok) throw new Error(`Profile save failed (${res.status})`);
+        if (typeof res.pfpUrl === 'string' && res.pfpUrl) {
+          serverPfp = res.pfpUrl;
+          setPfp(serverPfp);
+        }
       } catch {
         toast?.('Could not save profile photo', 'error');
       }
@@ -143,7 +194,7 @@ export function GMatchProfile({
       name: displayName,
       bio,
       website,
-      pfpUrl: newPfp,
+      pfpUrl: serverPfp || newPfp,
     });
   };
 
@@ -319,7 +370,8 @@ export function GMatchProfile({
               <div
                 key={post.id}
                 onClick={() => {
-                  setActiveLightboxPost(post);
+                  playPress(700);
+                  openPost(post);
                 }}
                 className="relative aspect-square bg-surface-canvas overflow-hidden cursor-pointer group"
               >
@@ -365,7 +417,8 @@ export function GMatchProfile({
               <div
                 key={post.id}
                 onClick={() => {
-                  setActiveLightboxPost(post);
+                  playPress(700);
+                  openPost(post);
                 }}
                 className="relative aspect-square bg-surface-canvas overflow-hidden cursor-pointer group"
               >
@@ -404,7 +457,8 @@ export function GMatchProfile({
               <div
                 key={post.id}
                 onClick={() => {
-                  setActiveLightboxPost(post);
+                  playPress(700);
+                  openPost(post);
                 }}
                 className="relative aspect-square bg-surface-canvas overflow-hidden cursor-pointer group"
               >
@@ -493,6 +547,7 @@ export function GMatchProfile({
           initialBio={bio}
           initialWebsite={website}
           initialPfp={pfp}
+          initialTags={profileTags}
           onClose={() => setShowEditor(false)}
           onProfileUpdated={(updated) => {
             setDisplayName(updated.name);
@@ -505,21 +560,8 @@ export function GMatchProfile({
         />
       )}
 
-      {/* Lightbox for clicked post */}
-      {activeLightboxPost && (
-        <InstagramPostModal
-          post={activeLightboxPost}
-          isOpen={Boolean(activeLightboxPost)}
-          onClose={() => setActiveLightboxPost(null)}
-          identity={identity}
-          profilePics={profilePic ? { [identity?.orbitId || '']: profilePic } : {}}
-          isLiked={activeLightboxPost.is_liked}
-          isSaved={activeLightboxPost.is_saved}
-          likeCount={activeLightboxPost.like_count}
-          comments={activeLightboxPost.comments}
-          toast={toast}
-        />
-      )}
+      {/* Lightbox for clicked post (fully wired: like/save/comment/share/options/likers) */}
+      {postLightboxModals}
     </div>
   );
 }

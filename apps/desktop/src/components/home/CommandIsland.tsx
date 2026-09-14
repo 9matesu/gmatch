@@ -21,6 +21,8 @@ import {
   Bell,
 } from '@phosphor-icons/react';
 import { playPress } from '../../utils/sounds';
+import { resolveMediaUrl } from '../../utils/media';
+import { CountBadge } from './CountBadge';
 export type MainViewType = 'feed' | 'games' | 'create' | 'messages' | 'profile' | 'game' | 'gallery' | 'store' | 'pc_domination' | 'grid' | 'rooms' | 'servers' | 'admin';
 
 export type GamesNavTab = 'duel' | 'cards' | 'babecock' | 'ranks' | 'idle';
@@ -52,6 +54,8 @@ export interface CommandIslandProps {
   wsConnected?: boolean;
   unreadMessagesCount?: number;
   unreadNotificationsCount?: number;
+  /** Live players in queue + in match (Arena badge). Hidden at 0. */
+  gamesOnlineCount?: number;
   displayName?: string;
   profilePic?: string;
   isAdmin?: boolean;
@@ -77,6 +81,7 @@ export function CommandIsland({
   wsConnected: _wsConnected = false,
   unreadMessagesCount = 0,
   unreadNotificationsCount = 0,
+  gamesOnlineCount = 0,
   displayName = 'You',
   profilePic,
   isAdmin = false,
@@ -134,7 +139,7 @@ export function CommandIsland({
       label: 'Arena',
       icon: Sword,
       active: mainView === 'games' || mainView === 'game',
-      badge: 0,
+      badge: gamesOnlineCount,
     },
     {
       id: 'gallery' as MainViewType,
@@ -243,6 +248,9 @@ export function CommandIsland({
                 <span className="text-xs font-medium hidden md:inline">
                   {item.label}
                 </span>
+                {item.badge > 0 && (
+                  <CountBadge count={item.badge} label={`${item.badge} players online`} />
+                )}
               </button>
             );
           })}
@@ -269,9 +277,7 @@ export function CommandIsland({
               weight={notificationsOpen ? 'fill' : 'regular'}
             />
             <span className="text-xs font-medium hidden md:inline">Alerts</span>
-            {unreadNotificationsCount > 0 && (
-              <span className="w-2 h-2 rounded-full bg-retro-error ring-2 ring-retro-panel" />
-            )}
+            <CountBadge count={unreadNotificationsCount} />
           </button>
 
           {/* Messages Drawer Toggle Button */}
@@ -297,9 +303,7 @@ export function CommandIsland({
               weight={messagesOpen || mainView === 'messages' || mainView === 'rooms' ? 'fill' : 'regular'}
             />
             <span className="text-xs font-medium hidden md:inline">Chat</span>
-            {unreadMessagesCount > 0 && (
-              <span className="w-2 h-2 rounded-full bg-retro-error ring-2 ring-retro-panel" />
-            )}
+            <CountBadge count={unreadMessagesCount} />
           </button>
 
           {/* User Profile Button directly on the Pill */}
@@ -321,7 +325,7 @@ export function CommandIsland({
           >
             <div className="w-5 h-5 rounded-full overflow-hidden border border-white/20 bg-black/40 flex items-center justify-center shrink-0">
               {profilePic ? (
-                <img src={profilePic} alt="" className="w-full h-full object-cover" />
+                <img src={resolveMediaUrl(profilePic)} alt="" className="w-full h-full object-cover" />
               ) : (
                 <User className="w-3.5 h-3.5" weight={mainView === 'profile' ? 'fill' : 'regular'} />
               )}

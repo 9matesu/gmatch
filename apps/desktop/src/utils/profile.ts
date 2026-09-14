@@ -88,16 +88,59 @@ export async function saveUserProfile(
  * stored profile tags. Post tags are the live source; the stored profile tags
  * seed the list until the user starts posting. Normalized + capped by the
  * shared rule (the same one the server enforces).
+ *
+ * Explicit removals (tags deleted in the profile editor) always win: they
+ * are filtered out of BOTH lists so auto-sync can never resurrect them.
  */
+const REMOVED_TAGS_KEY = 'orbit_tags_removed_v1';
+
+export function readRemovedProfileTags(): string[] {
+  try {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return [];
+    const raw = localStorage.getItem(REMOVED_TAGS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.map((t) => String(t)).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeRemovedProfileTags(removed: string[]): void {
+  try {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+    localStorage.setItem(REMOVED_TAGS_KEY, JSON.stringify(removed));
+  } catch {
+    /* private mode — removals last for this session via derive args */
+  }
+}
+
+export function addRemovedProfileTag(tag: string): void {
+  const t = String(tag || '').trim();
+  if (!t) return;
+  const next = readRemovedProfileTags();
+  if (!next.includes(t)) writeRemovedProfileTags([...next, t]);
+}
+
+export function clearRemovedProfileTag(tag: string): void {
+  const t = String(tag || '').trim();
+  if (!t) return;
+  writeRemovedProfileTags(readRemovedProfileTags().filter((x) => x !== t));
+}
+
 export function deriveProfileTags(
   ownPosts: Array<{ tags?: string[] | null }>,
   currentTags: string[] = [],
+  removed: string[] = readRemovedProfileTags(),
 ): string[] {
+  const blocked = new Set(removed);
   const postTags: string[] = [];
   for (const post of ownPosts) {
     if (Array.isArray(post?.tags)) postTags.push(...post.tags);
   }
-  return normalizeTags([...postTags, ...currentTags]);
+  return normalizeTags([
+    ...postTags.filter((t) => !blocked.has(String(t))),
+    ...currentTags.filter((t) => !blocked.has(String(t))),
+  ]);
 }
 
 /** A profile is only complete when non-default name, at least one tag and a picture exist. */

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { createMockEnv } from './test-utils'
-import { getBotConfig, saveBotConfig, buildApiRequestUrl } from './bot-image-api'
+import { getBotConfig, saveBotConfig, buildApiRequestUrl, extractImageUrlsFromJson } from './bot-image-api'
 
 describe('Bot Image API — Unit Tests', () => {
   let env: Awaited<ReturnType<typeof createMockEnv>>
@@ -111,5 +111,32 @@ describe('Bot Image API — Unit Tests', () => {
     const config = await getBotConfig(env.DB)
     expect(config.providers).toEqual([])
     expect(config.tags).toContain('-ai_generated')
+  })
+
+  it('extractImageUrlsFromJson prefers full-res over preview/thumbnail', () => {
+    const extracted = extractImageUrlsFromJson([
+      {
+        file_url: 'https://x.test/full.jpg',
+        preview_url: 'https://x.test/thumb.jpg',
+        thumbnail: 'https://x.test/thumb2.jpg',
+        tags: 'a b',
+      },
+    ])
+    expect(extracted).toHaveLength(1)
+    expect(extracted[0].url).toBe('https://x.test/full.jpg')
+  })
+
+  it('extractImageUrlsFromJson keeps short mp4 loops but drops long videos', () => {
+    const extracted = extractImageUrlsFromJson({
+      videos: [
+        { id: 'long', length_sec: 1500, default_thumb: { src: 'https://x.test/long_thumb.jpg' } },
+        { id: 'short', length_sec: 12, default_thumb: { src: 'https://x.test/short_thumb.jpg' } },
+        { id: 'clip', file_url: 'https://media.redgifs.com/clip.mp4', tags: 'a' },
+      ],
+    })
+    const urls = extracted.map((e) => e.url)
+    expect(urls).not.toContain('https://x.test/long_thumb.jpg')
+    expect(urls).toContain('https://x.test/short_thumb.jpg')
+    expect(urls).toContain('https://media.redgifs.com/clip.mp4')
   })
 })

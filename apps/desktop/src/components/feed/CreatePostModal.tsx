@@ -19,13 +19,19 @@ import {
 import type { OrbitIdentity } from '@orbit/crypto';
 import { orbitFetch } from '../../utils/api';
 import { mediaUrlToCachedFile } from '../../utils/cacheMedia';
-import { isMediaVideo } from '../../utils/media';
+import { isMediaVideo, isTwitterUrl, isVideoPageUrl, resolveTwitterMedia } from '../../utils/media';
 
 interface PostMediaItem {
   id: string;
   file?: File;
   previewUrl: string;
   isExternalUrl?: boolean;
+  /** Original page URL when previewUrl is a resolved direct-media URL. */
+  originalUrl?: string;
+  /** Watch/embed page (resolves server-side at share time). */
+  isVideoPage?: boolean;
+  /** Paste-time resolution failed (preview honest, share may still resolve). */
+  resolveNote?: string;
 }
 
 export function CreatePostModal({
@@ -49,6 +55,7 @@ export function CreatePostModal({
   const [mediaList, setMediaList] = useState<PostMediaItem[]>(() => initialMedia || []);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [urlInput, setUrlInput] = useState('');
+  const [resolvingUrl, setResolvingUrl] = useState(false);
   const [caption, setCaption] = useState(initialCaption || '');
   const [location, setLocation] = useState('');
   const [tags, setTags] = useState(initialTags || '');
@@ -154,12 +161,45 @@ export function CreatePostModal({
     playPress(800);
   };
 
-  const handleAddUrl = () => {
-    if (!urlInput.trim()) return;
+  const handleAddUrl = async () => {
+    const raw = urlInput.trim();
+    if (!raw) return;
+    if (!/^https?:\/\//i.test(raw)) {
+      toast?.('Paste a full https:// link', 'warning');
+      return;
+    }
+    // Page URLs (X posts, watch pages) are not media bytes: resolve to a
+    // direct file for an honest preview now; the server re-resolves at
+    // share time as a second chance.
+    if (isTwitterUrl(raw)) {
+      setResolvingUrl(true);
+      try {
+        const direct = await resolveTwitterMedia(raw);
+        if (direct) {
+          setMediaList((prev) => [
+            ...prev,
+            { id: 'url_' + Date.now(), previewUrl: direct, originalUrl: raw, isExternalUrl: true },
+          ]);
+          toast?.('Attached media from post link', 'success');
+        } else {
+          setMediaList((prev) => [
+            ...prev,
+            { id: 'url_' + Date.now(), previewUrl: raw, isExternalUrl: true, isVideoPage: true, resolveNote: 'Preview unavailable — will attach on share' },
+          ]);
+          toast?.('Kept the link — media attaches when you share', 'info');
+        }
+      } finally {
+        setResolvingUrl(false);
+      }
+      setUrlInput('');
+      playPress(840);
+      return;
+    }
     const newItem: PostMediaItem = {
       id: 'url_' + Date.now(),
-      previewUrl: urlInput.trim(),
+      previewUrl: raw,
       isExternalUrl: true,
+      isVideoPage: isVideoPageUrl(raw) || undefined,
     };
     setMediaList((prev) => [...prev, newItem]);
     setUrlInput('');
@@ -253,7 +293,12 @@ export function CreatePostModal({
         const res = await orbitFetch('/api/objects', { method: 'POST', body: formData }, identity);
         if (!res.ok) {
           const errData = await res.json().catch(() => null);
-          throw new Error(errData?.error || `Upload failed on item ${i + 1} of ${mediaList.length}`);
+          let host = '';
+          try { host = new URL(item.previewUrl).hostname; } catch { /* relative/data urls */ }
+          const hint = item.isVideoPage || (host && !/\.(jpe?g|png|gif|webp|mp4|webm)$/i.test(item.previewUrl.split('?')[0]))
+            ? ' — that link has no direct media; try a direct image/GIF/MP4 URL'
+            : '';
+          throw new Error(errData?.error || `Upload failed on item ${i + 1} of ${mediaList.length}${host ? ` (${host})` : ''}${hint}`);
         }
         const data = await res.json();
         if (data.id) {
@@ -415,15 +460,16 @@ export function CreatePostModal({
                 type="url"
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
-                placeholder="Paste direct image or GIF URL (e.g. https://...)"
+                placeholder="Paste image, GIF, MP4, post, or video page URL"
                 className="flex-1 px-3 py-2 bg-surface-raised border border-border-glass rounded-xl text-xs outline-none focus:border-retro-accent"
               />
               <button
                 type="button"
-                onClick={handleAddUrl}
-                className="px-4 py-2 chrome-accent text-black rounded-xl text-xs font-bold cursor-pointer transition-colors"
+                onClick={() => void handleAddUrl()}
+                disabled={resolvingUrl}
+                className="px-4 py-2 chrome-accent text-black rounded-xl text-xs font-bold cursor-pointer transition-colors disabled:opacity-40"
               >
-                Add
+                {resolvingUrl ? '…' : 'Add'}
               </button>
             </div>
           )}
@@ -432,20 +478,35 @@ export function CreatePostModal({
           {mediaList.length > 0 && currentMedia && (
             <div className="space-y-3">
               <div className="relative w-full rounded-xl overflow-hidden bg-black flex items-center justify-center border border-border-glass group">
-                {isMediaVideo(currentMedia.file?.type || currentMedia.previewUrl) ? (
-                  <video src={currentMedia.previewUrl} muted playsInline className={`w-full object-cover ${aspectRatio === 'square' ? 'aspect-square' : aspectRatio === 'portrait' ? 'aspect-[4/5]' : 'aspect-[16/9]'}`} />
-                ) : null}
-                {!isMediaVideo(currentMedia.file?.type || currentMedia.previewUrl) && (
-                <img
-                  src={currentMedia.previewUrl}
-                  alt=""
-                  className={`w-full object-cover transition-all ${aspectRatio === 'square'
-                    ? 'aspect-square'
-                    : aspectRatio === 'portrait'
-                      ? 'aspect-[4/5]'
-                      : 'aspect-[16/9]'
-                    }`}
-                />
+                {currentMedia.isVideoPage ? (
+                  <div className="w-full aspect-video flex flex-col items-center justify-center gap-2 p-4 text-center">
+                    <span className="w-10 h-10 rounded-full bg-glass-w12 border border-border-glass flex items-center justify-center text-retro-fg text-xs font-black">▶</span>
+                    <span className="text-xs font-semibold text-retro-fg">Video link attached</span>
+                    <span className="text-[10px] text-retro-muted break-all max-w-full">
+                      {(currentMedia.originalUrl || currentMedia.previewUrl).slice(0, 80)}
+                    </span>
+                    <span className="text-[10px] text-retro-muted">
+                      {currentMedia.resolveNote || 'Media attaches when you share'}
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    {isMediaVideo(currentMedia.file?.type || currentMedia.previewUrl) ? (
+                      <video src={currentMedia.previewUrl} muted playsInline className={`w-full object-cover ${aspectRatio === 'square' ? 'aspect-square' : aspectRatio === 'portrait' ? 'aspect-[4/5]' : 'aspect-[16/9]'}`} />
+                    ) : null}
+                    {!isMediaVideo(currentMedia.file?.type || currentMedia.previewUrl) && (
+                    <img
+                      src={currentMedia.previewUrl}
+                      alt=""
+                      className={`w-full object-cover transition-all ${aspectRatio === 'square'
+                        ? 'aspect-square'
+                        : aspectRatio === 'portrait'
+                          ? 'aspect-[4/5]'
+                          : 'aspect-[16/9]'
+                        }`}
+                    />
+                    )}
+                  </>
                 )}
 
                 {/* Aspect Ratio Switcher */}
@@ -506,7 +567,9 @@ export function CreatePostModal({
                       className={`relative w-14 h-14 rounded-md overflow-hidden shrink-0 border cursor-pointer transition-all duration-150 active:scale-[0.96] ${activeMediaIndex === idx ? 'border-white ring-1 ring-white' : 'border-border-glass opacity-60 hover:opacity-100'
                         }`}
                     >
-                      {isMediaVideo(m.file?.type || m.previewUrl) ? (
+                      {m.isVideoPage ? (
+                        <span className="w-full h-full flex items-center justify-center bg-glass-w12 text-retro-fg text-xs font-black">▶</span>
+                      ) : isMediaVideo(m.file?.type || m.previewUrl) ? (
                         <video src={m.previewUrl} muted className="w-full h-full object-cover" />
                       ) : (
                         <img src={m.previewUrl} alt="" className="w-full h-full object-cover" />

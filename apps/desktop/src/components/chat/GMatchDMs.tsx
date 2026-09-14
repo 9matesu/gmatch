@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { playPress } from '../../utils/sounds';
+import { resolveMediaUrl } from '../../utils/media';
 import { GroupMembersPopover, type GroupMember } from './GroupMembersPopover';
 import {
   Send,
@@ -685,7 +686,7 @@ export function GMatchDMs({
                       className="w-full p-2.5 rounded-md flex items-center gap-3 hover:bg-glass-w5 transition-colors text-left cursor-pointer"
                     >
                       <div className="w-9 h-9 rounded-full bg-surface-raised border border-border-glass text-retro-muted font-medium text-xs flex items-center justify-center overflow-hidden shrink-0">
-                        {pfp ? <img src={pfp} alt="" className="w-full h-full object-cover" /> : name.charAt(0).toUpperCase()}
+                        {pfp ? <img src={resolveMediaUrl(pfp)} alt="" className="w-full h-full object-cover" /> : name.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-medium text-retro-body truncate">{name}</div>
@@ -726,7 +727,7 @@ export function GMatchDMs({
                     className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-border-glass text-left cursor-pointer ${isSelected ? 'bg-glass-w8 border-border-glass' : ''}`}
                   >
                     <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center font-medium text-xs">
-                      {pfp ? <img src={pfp} alt="" className="w-full h-full object-cover" /> : name.charAt(0).toUpperCase()}
+                      {pfp ? <img src={resolveMediaUrl(pfp)} alt="" className="w-full h-full object-cover" /> : name.charAt(0).toUpperCase()}
                       {isUnread && <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-retro-accent" />}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -786,7 +787,7 @@ export function GMatchDMs({
                   ) : isQueueGroup ? (
                     <Gamepad2 className="w-4 h-4" />
                   ) : activePmPeer && profilePics[activePmPeer.orbitId] ? (
-                    <img src={profilePics[activePmPeer.orbitId]} alt="" className="w-full h-full object-cover" />
+                    <img src={resolveMediaUrl(profilePics[activePmPeer.orbitId])} alt="" className="w-full h-full object-cover" />
                   ) : (
                     headerTitle.charAt(0).toUpperCase()
                   )}
@@ -904,7 +905,7 @@ export function GMatchDMs({
                           onClick={() => onOpenProfile?.(first.senderId)}
                           title={senderName}
                         >
-                          {pfp ? <img src={pfp} alt="" className="w-full h-full object-cover" /> : senderName.charAt(0).toUpperCase()}
+                          {pfp ? <img src={resolveMediaUrl(pfp)} alt="" className="w-full h-full object-cover" /> : senderName.charAt(0).toUpperCase()}
                         </div>
                       )}
                       <div className={`flex flex-col max-w-[78%] sm:max-w-[70%] ${isOwn ? 'items-end' : 'items-start'}`}>

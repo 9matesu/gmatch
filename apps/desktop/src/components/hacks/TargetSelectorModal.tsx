@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { playPress } from '../../utils/sounds';
+import { resolveMediaUrl } from '../../utils/media';
 import { X, Search, ShieldAlert, Crosshair } from 'lucide-react';
 import type { StoreItem, User } from '@orbit/shared';
 
@@ -109,7 +110,7 @@ export function TargetSelectorModal({
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-surface-interactive overflow-hidden border border-border-glass flex items-center justify-center text-xs font-bold text-retro-fg">
                     {pfp ? (
-                      <img src={pfp} alt="" className="w-full h-full object-cover" />
+                      <img src={resolveMediaUrl(pfp)} alt="" className="w-full h-full object-cover" />
                     ) : (
                       peerName.charAt(0).toUpperCase()
                     )}

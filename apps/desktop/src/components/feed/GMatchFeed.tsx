@@ -34,7 +34,7 @@ import { ObjectImage } from '../ObjectImage';
 import CachedImg from '../../ui/CachedImg';
 import { LazyVideo } from '../LazyVideo';
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
-import { isMediaVideo } from '../../utils/media';
+import { isMediaVideo, resolveMediaUrl } from '../../utils/media';
 import { orbitFetch, postShareUrl } from '../../utils/api';
 import { GAME_AD_TEMPLATES } from '../../utils/gameAds';
 import { ExploreSearchModal } from './ExploreSearchModal';
@@ -710,7 +710,7 @@ export function GMatchFeed({
                     <div className={`w-8 h-8 rounded-full p-[1.5px] flex-shrink-0 ${authorHasStory ? 'bg-gradient-to-tr from-zinc-300 to-zinc-600' : 'bg-glass-w12 border border-border-glass'}`}>
                       <div className="w-full h-full rounded-full bg-retro-panel overflow-hidden flex items-center justify-center text-xs font-semibold text-retro-fg">
                         {profilePics[post.author_id] || post.author_avatar ? (
-                          <img src={profilePics[post.author_id] || post.author_avatar!} alt="" className="w-full h-full object-cover" />
+                          <img src={resolveMediaUrl(profilePics[post.author_id] || post.author_avatar!)} alt="" className="w-full h-full object-cover" />
                         ) : (
                           post.author_name.charAt(0).toUpperCase()
                         )}
@@ -1047,7 +1047,7 @@ export function GMatchFeed({
                       >
                         <span className="w-10 h-10 rounded-full overflow-hidden border border-border-glass flex items-center justify-center text-xs text-retro-fg bg-glass-w5">
                           {profilePics?.[s.id] ? (
-                            <img src={profilePics[s.id]} alt="" className="w-full h-full object-cover" />
+                            <img src={resolveMediaUrl(profilePics[s.id])} alt="" className="w-full h-full object-cover" />
                           ) : (
                             (s.display_name || s.id).slice(0, 2).toUpperCase()
                           )}

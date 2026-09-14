@@ -2,7 +2,7 @@
 // (apps/api/src/bot-image-api.ts) and the admin UI
 // (apps/web/src/components/admin/BotSetupPanel.tsx).
 
-export type ProviderType = 'rule34' | 'gelbooru' | 'danbooru' | 'waifu_im' | 'nekos_best' | 'safebooru' | 'e621' | 'generic';
+export type ProviderType = 'rule34' | 'gelbooru' | 'danbooru' | 'waifu_im' | 'nekos_best' | 'safebooru' | 'e621' | 'babesource' | 'generic';
 
 export type BotActivationRule = 'immediate' | 'fallback' | 'manual_only' | 'disabled';
 
@@ -159,5 +159,6 @@ export function detectProviderType(url: string): ProviderType {
   if (lower.includes('e621.net')) return 'e621';
   if (lower.includes('waifu.im')) return 'waifu_im';
   if (lower.includes('nekos.best')) return 'nekos_best';
+  if (lower.includes('babesource.com')) return 'babesource';
   return 'generic';
 }

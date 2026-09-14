@@ -198,7 +198,7 @@ export function SpectateModal({
       >
         <div
           onMouseDown={handleMouseDown}
-          className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-zinc-900 to-zinc-950 border-b border-border-glass cursor-grab active:cursor-grabbing"
+          className="flex items-center justify-between px-3 py-2 bg-surface-canvas border-b border-border-glass cursor-grab active:cursor-grabbing"
         >
           <div className="flex items-center gap-2 min-w-0">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
@@ -490,7 +490,7 @@ export function SpectateModal({
                           </button>
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-surface-canvas relative overflow-hidden text-retro-muted">
-                            <div className={`absolute inset-0 bg-gradient-to-br from-cyan-900/60 via-teal-900/40 to-cyan-900/50 blur-xl opacity-70 animate-pulse transition-all duration-300`} />
+                            <div className={`absolute inset-0 bg-glass-w5 transition-all duration-300`} />
                             <div className="relative z-10 flex flex-col items-center gap-2 text-center">
                               <div className="w-10 h-14 rounded-xl border border-border-strong bg-surface-raised/10 backdrop-blur-md flex items-center justify-center shadow-lg animate-bounce">
                                 <Sparkles className="w-4 h-4 text-cyan-300 animate-spin" />
@@ -550,7 +550,7 @@ export function SpectateModal({
                           </button>
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-surface-canvas relative overflow-hidden text-retro-muted">
-                            <div className={`absolute inset-0 bg-gradient-to-br from-amber-900/60 via-orange-900/40 to-rose-900/50 blur-xl opacity-70 animate-pulse transition-all duration-300`} />
+                            <div className={`absolute inset-0 bg-glass-w5 transition-all duration-300`} />
                             <div className="relative z-10 flex flex-col items-center gap-2 text-center">
                               <div className="w-10 h-14 rounded-xl border border-border-strong bg-surface-raised/10 backdrop-blur-md flex items-center justify-center shadow-lg animate-bounce">
                                 <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />

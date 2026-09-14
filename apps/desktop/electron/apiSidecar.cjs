@@ -68,7 +68,14 @@ async function startApi() {
   // packaged instances must own their server — never adopt a foreign one.
   if (adoptable) {
     try {
-      const r = await fetch(`${API_BASE}/api/health`)
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 5000)
+      let r
+      try {
+        r = await fetch(`${API_BASE}/api/health`, { signal: controller.signal })
+      } finally {
+        clearTimeout(timer)
+      }
       if (r.ok && (await r.json()).db_ready) {
         console.log(`[api] adopting existing sidecar at ${API_BASE}`)
         return true
@@ -78,7 +85,12 @@ async function startApi() {
     }
   }
   const apiDir = resourcesApi || path.join(__dirname, '..', '..', 'api')
-  proc = spawn(bundledBun || bunBin(), ['run', 'src/serve.ts'], {
+  const bunPath = bundledBun || bunBin()
+  try {
+    const { app: electronApp } = require('electron')
+    console.log(`[api] spawning ${bunPath} in ${apiDir} (packaged=${electronApp.isPackaged})`)
+  } catch { /* logging only */ }
+  proc = spawn(bunPath, ['run', 'src/serve.ts'], {
     cwd: apiDir,
     env: {
       ...process.env,
@@ -118,7 +130,17 @@ async function startApi() {
     // on the port must not masquerade as a healthy sidecar.
     if (!proc) throw new Error('API sidecar process is not running')
     try {
-      const r = await fetch(`${API_BASE}/api/health`)
+      // Each health poll gets its own timeout: without this, one hung
+      // connection (stale 1.2.4 sidecar holding :8790) stalls boot forever
+      // and the window never appears (1.2.5 "Task Mgr spin" zombie).
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 5000)
+      let r
+      try {
+        r = await fetch(`${API_BASE}/api/health`, { signal: controller.signal })
+      } finally {
+        clearTimeout(timer)
+      }
       if (r.ok) {
         const j = await r.json()
         if (j.db_ready) return true

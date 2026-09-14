@@ -451,6 +451,35 @@ describe('fetchPosts (SPEC §6/§8)', () => {
     expect(galleryCalls.length).toBe(0)
   })
 
+  it('babesource uses page1 only for single-page queries (no 404 page2+ probes)', async () => {
+    vi.stubGlobal('window', {})
+    const searchHtml =
+      '<a class="main-content__card-link" href="https://babesource.com/galleries/shrooms-q-swallowed-205844.html">' +
+      '<picture><img src="https://media.babesource.com/galleries/69bfc5acec79c/thumbs/187270_013.jpg"></picture></a>'
+    const galleryHtml =
+      '<meta name="keywords" content="swallowed, blonde">' +
+      '<a data-index="0" class="box-massage__card-link slideshowGalleryImage" href="https://babesource.com/media/galleries/69bfc5acec79c/187270_013.jpg">' +
+      '<picture><img src="https://media.babesource.com/galleries/69bfc5acec79c/thumbs/187270_013.jpg"></picture></a>'
+    const fetchMock = vi.fn(async (url: string) => {
+      const u = String(url)
+      if (u.startsWith('/booru/babe/search')) {
+        expect(u).toContain('page1.html')
+        return { ok: true, text: () => Promise.resolve(searchHtml) }
+      }
+      if (u.startsWith('/booru/babe/')) {
+        return { ok: true, text: () => Promise.resolve(galleryHtml) }
+      }
+      return { ok: false }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await fetchPosts({ tags: 'shrooms_q', limit: 5 })
+    expect(res.ok).toBe(true)
+    expect(res.source).toBe('babesource-direct')
+    expect(res.posts[0].url).toBe('https://babesource.com/media/galleries/69bfc5acec79c/187270_013.jpg')
+    const searchCalls = fetchMock.mock.calls.filter((c) => String(c[0]).startsWith('/booru/babe/search'))
+    expect(searchCalls.length).toBe(1)
+  })
+
   it('cools down all booru.org subdomains when any subdomain returns 429', async () => {
     vi.stubGlobal('window', {})
     const fetchMock = vi.fn(async (url: string) => {

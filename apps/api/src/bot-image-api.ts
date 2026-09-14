@@ -659,7 +659,26 @@ export function buildApiRequestUrl(
   }
 }
 
-/** Recursively extracts image URLs from diverse JSON schemas */
+/** Recursively extracts image URLs from diverse JSON schemas.
+ * Per-provider rules: full-res fields win over preview/thumbnail fields
+ * (never serve a thumb when a full exists); short mp4/webm loops stay,
+ * only long-form videos (duration metadata > LONG_VIDEO_SEC) are dropped. */
+export const LONG_VIDEO_SEC = 90
+
+function nodeDurationSec(node: any): number | null {
+  try {
+    for (const c of [node?.length_sec, node?.duration, node?.lengthSec, node?.durationSec]) {
+      const n = typeof c === 'string' ? Number(c) : typeof c === 'number' ? c : NaN
+      if (Number.isFinite(n) && n > 0) return n
+    }
+    if (typeof node?.length_min === 'string') {
+      const m = /^(\d+):(\d{1,2})$/.exec(node.length_min.trim())
+      if (m) return Number(m[1]) * 60 + Number(m[2])
+    }
+  } catch { /* ignore */ }
+  return null
+}
+
 export function extractImageUrlsFromJson(data: unknown): Array<{ url: string; caption?: string; tags?: string[] }> {
   const results: Array<{ url: string; caption?: string; tags?: string[] }> = []
 
@@ -670,9 +689,19 @@ export function extractImageUrlsFromJson(data: unknown): Array<{ url: string; ca
     if (clean.startsWith('//')) clean = 'https:' + clean
     if (!/^https?:\/\//i.test(clean)) return false
     const path = clean.split('?')[0].split('#')[0].toLowerCase()
-    if (/\.(jpg|jpeg|png|webp|gif|svg|avif|jfif|bmp|tiff?|heic|heif)$/i.test(path)) return true
+    // Stills + gif loops + short mp4/webm loops (redgifs gifs are mp4).
+    if (/\.(jpg|jpeg|png|webp|gif|mp4|webm|svg|avif|jfif|bmp|tiff?|heic|heif)$/i.test(path)) return true
     return !path.includes('.') && !path.endsWith('/')
   }
+
+  const FULL_KEYS = [
+    'file_url', 'large_file_url', 'sample_url', 'image_url', 'url', 'link',
+    'media_url', 'source', 'download_url', 'cdn_url', 'original', 'full',
+    'raw', 'display_url', 'view_url',
+  ] as const
+  const THUMB_KEYS = ['preview', 'preview_url', 'thumbnail'] as const
+
+  const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v : null)
 
   const visit = (node: any) => {
     if (!node) return
@@ -681,28 +710,36 @@ export function extractImageUrlsFromJson(data: unknown): Array<{ url: string; ca
       return
     }
     if (typeof node === 'object') {
-      let candidate =
-        node.file_url ||
-        node.url ||
-        node.large_file_url ||
-        node.sample_url ||
-        node.image_url ||
-        node.link ||
-        node.file?.url ||
-        node.media_url ||
-        node.source ||
-        node.preview ||
-        node.preview_url ||
-        node.thumbnail ||
-        node.download_url ||
-        node.cdn_url ||
-        node.original ||
-        node.full ||
-        node.raw ||
-        node.path ||
-        node.href ||
-        node.display_url ||
-        node.view_url
+      // Long-form video gate: duration metadata proves it (eporner
+      // length_sec, generic duration). Duration-less mp4 loops stay.
+      const secs = nodeDurationSec(node)
+      if (secs !== null && secs > LONG_VIDEO_SEC) return
+
+      let candidate: string | null = null
+      for (const k of FULL_KEYS) {
+        const v = str((node as Record<string, unknown>)[k])
+        if (v) { candidate = v; break }
+      }
+      if (!candidate && node.file && typeof node.file === 'object') {
+        candidate = str((node.file as Record<string, unknown>).url)
+      }
+      // Thumb tier: only when no full-res field exists on this node.
+      if (!candidate) {
+        for (const k of THUMB_KEYS) {
+          const v = str((node as Record<string, unknown>)[k])
+          if (v) { candidate = v; break }
+        }
+      }
+      // Eporner-style shape (default_thumb / thumbs[]) is thumb-tier too.
+      if (!candidate && node.default_thumb && typeof node.default_thumb === 'object') {
+        candidate = str((node.default_thumb as Record<string, unknown>).src)
+      }
+      if (!candidate && Array.isArray(node.thumbs) && node.thumbs.length > 0) {
+        candidate = str(node.thumbs[0]?.src)
+      }
+      if (!candidate && typeof node.image === 'string' && /^https?:\/\//i.test(node.image)) {
+        candidate = node.image
+      }
 
       if (!candidate && node.directory && node.image) {
         candidate = `https://safebooru.org/images/${node.directory}/${node.image}`
@@ -740,6 +777,9 @@ export function extractImageUrlsFromJson(data: unknown): Array<{ url: string; ca
   }
 
   visit(data)
+  // Stills + gif loops first, short mp4/webm loops as fallback (stable order otherwise).
+  const stillFirst = (u: string): number => (/\.(mp4|webm)(?:[?#]|$)/i.test(u) ? 1 : 0)
+  results.sort((a, b) => stillFirst(a.url) - stillFirst(b.url))
   return results
 }
 

@@ -63,3 +63,40 @@ describe('CommandIsland navigation coverage', () => {
     expect(notifButtons.length).toBe(1);
   });
 })
+
+describe('CommandIsland count badges', () => {
+  it('shows numbered circles for chat, notifications, and Arena players', async () => {
+    const setMainView = vi.fn();
+    render(
+      <CommandIsland
+        mainView="feed"
+        setMainView={setMainView}
+        unreadMessagesCount={3}
+        unreadNotificationsCount={5}
+        gamesOnlineCount={12}
+      />,
+    );
+    expect(screen.getByRole('status', { name: '3 unread' })).toHaveTextContent('3');
+    expect(screen.getByRole('status', { name: '5 unread' })).toHaveTextContent('5');
+    expect(screen.getByRole('status', { name: '12 players online' })).toHaveTextContent('12');
+  });
+
+  it('hides badges at zero and caps large numbers at 99+', async () => {
+    const setMainView = vi.fn();
+    const { rerender } = render(
+      <CommandIsland mainView="feed" setMainView={setMainView} />,
+    );
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    rerender(
+      <CommandIsland
+        mainView="feed"
+        setMainView={setMainView}
+        unreadMessagesCount={150}
+        gamesOnlineCount={250}
+      />,
+    );
+    const badges = screen.getAllByRole('status');
+    expect(badges).toHaveLength(2);
+    for (const b of badges) expect(b).toHaveTextContent('99+');
+  });
+})

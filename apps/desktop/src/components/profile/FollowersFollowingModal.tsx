@@ -275,7 +275,7 @@ export function FollowersFollowingModal({
                 >
                   <div
                     className={`w-11 h-11 rounded-full p-[2px] shrink-0 transition-transform group-hover:scale-105 ${hasStory
-                        ? 'bg-gradient-to-tr from-cyan-500 via-teal-500 to-amber-500 shadow-xs'
+                        ? 'bg-retro-accent shadow-xs'
                         : 'bg-glass-w20'
                       }`}
                   >
@@ -353,7 +353,7 @@ export function FollowersFollowingModal({
                       onClick={() => handleToggleFollow(user)}
                       className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1 ${isFollowing
                           ? 'bg-surface-interactive hover:bg-rose-50 text-retro-fg hover:text-rose-600 border border-border-glass'
-                          : 'bg-gradient-to-r from-cyan-500 via-teal-500 to-amber-500 hover:opacity-95 text-white shadow-xs'
+                          : 'bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text shadow-xs'
                         }`}
                     >
                       {isFollowing ? (

@@ -6,6 +6,7 @@ import { Heart, X, Loader2 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { orbitFetch } from '../../utils/api';
 import { playPress } from '../../utils/sounds';
+import { resolveMediaUrl } from '../../utils/media';
 
 export interface LikerUser {
   user_id: string;
@@ -21,6 +22,8 @@ interface PostLikersModalProps {
   profilePics?: Record<string, string>;
   onSelectUser?: (userId: string) => void;
   toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
+  /** Stacking override for likers opened above higher-z overlays. */
+  zIndexClass?: string;
 }
 
 export function PostLikersModal({
@@ -31,6 +34,7 @@ export function PostLikersModal({
   profilePics = {},
   onSelectUser,
   toast,
+  zIndexClass = 'z-[var(--z-modal)]',
 }: PostLikersModalProps) {
   const [likers, setLikers] = useState<LikerUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,7 +91,7 @@ export function PostLikersModal({
 
   const modalContent = (
     <div
-      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-orbit-fade-in"
+      className={`fixed inset-0 ${zIndexClass} bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-orbit-fade-in`}
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -156,7 +160,9 @@ export function PostLikersModal({
             </div>
           ) : (
             likers.map((liker) => {
-              const avatar = liker.pfp_url || profilePics[liker.user_id];
+              // Live cache first (post-upload server ref), server echo second:
+              // profilePics is synced from loadUsers on every boot + save.
+              const avatar = profilePics[liker.user_id] || liker.pfp_url;
               return (
                 <div
                   key={liker.user_id}
@@ -167,7 +173,7 @@ export function PostLikersModal({
                     <div className="w-9 h-9 rounded-full bg-glass-w20 border border-border-glass overflow-hidden shrink-0 flex items-center justify-center">
                       {avatar ? (
                         <img
-                          src={avatar}
+                          src={resolveMediaUrl(avatar)}
                           alt={liker.display_name}
                           className="w-full h-full object-cover"
                         />

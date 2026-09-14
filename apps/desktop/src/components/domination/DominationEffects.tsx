@@ -374,7 +374,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
       )}
 
       {messageEffect && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 max-w-md animate-orbit-slide-up" onClick={() => removeEffect(messageEffect.id)}>
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 max-w-md animate-domination-toast-up" onClick={() => removeEffect(messageEffect.id)}>
           <div className="glass-panel p-6 rounded-xl border border-border-glass text-center shadow-2xl">
             <p className="text-retro-fg text-lg">{messageEffect.data.text}</p>
             <p className="text-xs text-retro-muted mt-2">Click to dismiss</p>
@@ -449,16 +449,11 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
       )}
 
       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slideUp {
+        @keyframes domination-toast-up {
           from { opacity: 0; transform: translateX(-50%) translateY(20px); }
           to { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
-        .animate-orbit-slide-up { animation: slideUp 0.3s ease-out; }
-        .animate-orbit-fade-in { animation: fadeIn 0.2s ease-out; }
+        .animate-domination-toast-up { animation: domination-toast-up 0.3s ease-out; }
       `}</style>
     </>
   );

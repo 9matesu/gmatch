@@ -6,7 +6,7 @@ import { Search, X, MessageCircle, Users, Image as ImageIcon, Hash, Play, Video 
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { FeedPost } from './GMatchFeed';
 import { ObjectImage } from '../ObjectImage';
-import { isMediaVideo } from '../../utils/media';
+import { isMediaVideo, resolveMediaUrl } from '../../utils/media';
 
 interface PeerUser {
   id: string;
@@ -158,7 +158,7 @@ export function ExploreSearchModal({
                     >
                       <div className="w-10 h-10 rounded-full bg-glass-w20 overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold">
                         {pfp ? (
-                          <img src={pfp} alt="" className="w-full h-full object-cover" />
+                          <img src={resolveMediaUrl(pfp)} alt="" className="w-full h-full object-cover" />
                         ) : (
                           (u.display_name || id).charAt(0).toUpperCase()
                         )}

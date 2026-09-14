@@ -90,12 +90,12 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
                     <div
                       className={`max-w-[85%] px-3 py-1.5 rounded-xl text-xs shadow-xs select-text ${
                         mine
-                          ? 'bg-gradient-to-r from-cyan-600 to-amber-600 text-white rounded-br-xs'
-                          : 'bg-cyan-500/10 text-retro-fg border border-purple-100 rounded-bl-xs'
+                          ? 'bg-retro-accent text-retro-accent-text rounded-br-xs'
+                          : 'bg-surface-interactive text-retro-fg border border-border-glass rounded-bl-xs'
                       }`}
                     >
                       {!mine && (
-                        <div className="text-[10px] font-bold text-cyan-300 uppercase tracking-wider mb-0.5 select-none">
+                        <div className="text-[10px] font-bold text-retro-muted uppercase tracking-wider mb-0.5 select-none">
                           {m.sender_name?.trim() || 'Unknown User'}
                         </div>
                       )}
