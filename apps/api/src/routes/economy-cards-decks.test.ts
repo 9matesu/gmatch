@@ -89,6 +89,26 @@ describe('economy/cards/decks route wiring', () => {
 
     await expect(economy.getBalance(bob.orbitId)).resolves.toBe(900)
   })
+
+  it('POST /api/decks/:id/validate rejects a deck owned by another user', async () => {
+    const body = JSON.stringify({ name: 'Alice Deck', game_id: 'card-duel' })
+    const createRes = await app.request('/api/decks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(alice, 'POST', '/api/decks', body) },
+      body,
+    }, env)
+    expect(createRes.status).toBe(201)
+    const { deck } = await createRes.json() as any
+
+    const vPath = `/api/decks/${deck.id}/validate`
+    const vBody = JSON.stringify({})
+    const res = await app.request(vPath, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(bob, 'POST', vPath, vBody) },
+      body: vBody,
+    }, env)
+    expect(res.status).toBe(404)
+  })
 })
 
 describe('store purchase uses the g$ wallet', () => {

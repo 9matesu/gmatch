@@ -63,6 +63,9 @@ decks.delete('/:id/cards/:cardId', async (c) => {
 
 decks.post('/:id/validate', async (c) => {
   const service = new DeckService(c.env.DB)
+  // Ownership check: getDeck returns null for foreign decks (same filter as GET /:id).
+  const owned = await service.getDeck(c.req.param('id'), c.get('orbitId'))
+  if (!owned) return c.json({ error: 'Deck not found' }, 404)
   const result = await service.validateDeck(c.req.param('id'), DEFAULT_CARD_DUEL_RULES)
   return c.json(result)
 })
