@@ -2202,6 +2202,13 @@ export default function Home() {
       });
   }, [identity]);
 
+  // New admin grant -> refresh /api/users so myProfile.isAdmin (Admin button) updates now.
+  useEffect(() => {
+    const handler = () => { invalidateCache('/api/users'); loadUsers(); };
+    window.addEventListener('gmatch-admin-granted', handler);
+    return () => window.removeEventListener('gmatch-admin-granted', handler);
+  }, [loadUsers]);
+
   useEffect(() => {
     const onProfileUpdated = (e: Event) => {
       const detail = (e as CustomEvent).detail;
@@ -3497,7 +3504,7 @@ export default function Home() {
                   {/* Admin dashboard (vendored orbit admin app, PIN-gated) */}
                   {mainView === 'admin' && (
                     <div className="flex-1 min-h-0 w-full overflow-y-auto">
-                      <AdminApp />
+                      <AdminApp identity={identity} />
                     </div>
                   )}
 

@@ -1,7 +1,5 @@
 "use client";
 
-import { generateIdentity } from "@orbit/crypto";
-import { getSecureItem, setSecureItem, removeSecureItem } from '../utils/secure-storage'
 import { useEffect, useState, useCallback, useMemo } from "react";
 
 import { orbitFetch, getApiBaseUrl } from "../utils/api";
@@ -20,18 +18,11 @@ import { useAdminWebSocket } from "../hooks/useAdminWebSocket";
 import type { OrbitIdentity } from "@orbit/crypto";
 import type {  AdminState, TabId } from "../utils/adminTypes";
 
-export default function AdminPageClient() {
-  const [identity, setIdentity] = useState<OrbitIdentity | null>(() => {
-    if (typeof window === "undefined") return null;
-    try {
-      const raw = getSecureItem("orbit_admin_identity");
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      return parsed && parsed.orbitId && parsed.privateKeyHex ? parsed : null;
-    } catch {
-      return null;
-    }
-  });
+export default function AdminPageClient({ identity: appIdentity }: { identity?: OrbitIdentity | null }) {
+  // Sole-admin binding: the console signs with the APP's main identity —
+  // the central node gates ADMIN_ORBIT_ID against it, and the is_admin
+  // grant (Admin button visibility) is recorded for it.
+  const identity = appIdentity ?? null;
   const { toast } = useToast();
   const confirm = useConfirm();
 
@@ -139,15 +130,8 @@ export default function AdminPageClient() {
 
   const handleVerifyPin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pin.trim()) return;
-    let adminId = identity;
-    if (!adminId) {
-      adminId = generateIdentity();
-      if (typeof window !== "undefined") {
-        try { setSecureItem("orbit_admin_identity", JSON.stringify(adminId)); } catch {}
-      }
-      setIdentity(adminId);
-    }
+    if (!pin.trim() || !identity) return;
+    const adminId = identity;
     setVerifyingPin(true);
     try {
       const res = await orbitFetch(
@@ -162,6 +146,7 @@ export default function AdminPageClient() {
       if (res.ok) {
         setPinVerified(true);
         sessionStorage.setItem("orbit_admin_verified", "true");
+        window.dispatchEvent(new Event("gmatch-admin-granted"));
         toast("Admin passcode verified", "success");
       } else {
         const data = await res.json().catch(() => null);
@@ -177,9 +162,7 @@ export default function AdminPageClient() {
   const handleAuthError = useCallback((status?: number) => {
     if (typeof window !== "undefined") {
       sessionStorage.removeItem("orbit_admin_verified");
-      removeSecureItem("orbit_admin_identity");
     }
-    setIdentity(null);
     setPinVerified(false);
     toast(
       status === 403
@@ -441,7 +424,19 @@ export default function AdminPageClient() {
 
           <div className="text-[10px] text-retro-muted font-mono text-center pt-1 space-y-0.5">
             <div>Target: {getApiBaseUrl()}</div>
-            <div>Signed as: {identity?.orbitId ? `${identity.orbitId.slice(0, 12)}...` : "Anonymous"}</div>
+            <div className="flex items-center justify-center gap-1.5">
+              <span>Signed as: <span className="font-mono">{identity?.orbitId || "No identity — sign in first"}</span></span>
+              {identity?.orbitId && (
+                <button
+                  type="button"
+                  onClick={() => { void navigator.clipboard.writeText(identity.orbitId) }}
+                  className="text-retro-accent hover:text-white underline cursor-pointer"
+                  title="Copy your Orbit ID (needed for ADMIN_ORBIT_ID)"
+                >
+                  Copy
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

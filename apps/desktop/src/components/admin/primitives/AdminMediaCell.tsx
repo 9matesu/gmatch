@@ -37,7 +37,7 @@ export function AdminMediaCell({
     if (identity) return identity;
     if (typeof window === 'undefined') return null;
     try {
-      const raw = getSecureItem('orbit_admin_identity') || getSecureItem('orbit_identity');
+      const raw = getSecureItem('orbit_identity') || getSecureItem('orbit_admin_identity');
       return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
