@@ -33,17 +33,11 @@ describe('CommandIsland navigation coverage', () => {
     expect(setMainView).toHaveBeenCalledWith('pc_domination')
   })
 
-  it('Rooms entry appears only for active couriers', async () => {
+  it('Chat pill opens the unified rooms chat', async () => {
     const setMainView = vi.fn()
-    const { unmount } = render(<CommandIsland mainView="feed" setMainView={setMainView} />)
-    openMore()
-    expect(await screen.findByText('Domination')).toBeInTheDocument()
-    expect(screen.queryByText('Rooms')).not.toBeInTheDocument()
-    unmount()
-    render(<CommandIsland mainView="feed" setMainView={setMainView} showRooms />)
-    openMore()
-    fireEvent.click(await screen.findByText('Rooms'))
-    expect(setMainView).toHaveBeenCalledWith('rooms')
+    render(<CommandIsland mainView="feed" setMainView={setMainView} />)
+    fireEvent.click(screen.getByLabelText('Messages'))
+    expect(setMainView).toHaveBeenCalledWith('messages')
   })
 
   it('toggles satellite bar visibility when clicking More options', async () => {

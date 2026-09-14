@@ -45,7 +45,7 @@ import { GMatchDMs } from "./components/chat/GMatchDMs";
 import type { GroupMember } from "./components/chat/GroupMembersPopover";
 import { AttachmentUploadModal } from "./components/AttachmentUploadModal";
 import { ProfileView } from "./components/views/ProfileView";
-import { MessagesView, DmMinimizedView } from "./components/views/MessagesView";
+import { DmMinimizedView } from "./components/views/MessagesView";
 import { MessagesRail } from "./components/chat/MessagesRail";
 import { GameView } from "./components/views/GameView";
 import { AgeGateModal } from "./components/auth/AgeGateModal";
@@ -58,7 +58,7 @@ import { type MainViewType, type ActiveHackSession } from "./components/home/Com
 import { CommandIsland } from "./components/home/CommandIsland";
 import { ThemeDrawer } from "./components/theme/ThemeDrawer";
 import { NativeHeaderBar } from "./components/home/NativeHeaderBar";
-import { RoomsView } from "./components/rooms/RoomsView";
+import { RoomsPreview, buildPreviewRows } from "./components/chat/RoomsPreview";
 import { ServersView } from "./components/servers/ServersView";
 import { PCDominationView } from "./components/views/PCDominationView";
 import { DominationEffects } from "./components/domination/DominationEffects";
@@ -76,7 +76,6 @@ import GridWorkspace from "./components/grid/GridWorkspace";
 import AdminApp from "./admin/AdminApp";
 import { StoreView } from "./components/views/StoreView";
 import { NotificationsPanel } from "./components/NotificationsPanel";
-import { SocialPanel } from "./components/chat/SocialPanel";
 import { logger } from './utils/logger';
 import { useNotifications } from './hooks/useNotifications';
 import { useCourierDms } from './hooks/useCourierDms';
@@ -227,6 +226,12 @@ export default function Home() {
   }, [mainView]);
   const [dmMinimized, setDmMinimized] = useState(false);
   const [chatOpen, setChatOpen] = useState(() => desktopChatOnLoad());
+  // Unified rooms chat: the active sealed room (dock preview + full page both
+  // drive this), plus a per-room last-opened stamp for the unread cue.
+  const [activeRoomId, setActiveRoomId] = useState<string | null>(null)
+  const [roomSeen, setRoomSeen] = useState<Record<string, number>>(() => {
+    try { return JSON.parse(localStorage.getItem('gmatch_room_seen_v1') || '{}') } catch { return {} }
+  })
   // UI-3: resizable messages sidebar (width persisted; smooth only when not dragging)
   const [notifOpen, setNotifOpen] = useState(false);
   const [gamesSubTab, setGamesSubTab] = useState<'duel' | 'babecock' | 'ranks' | 'idle'>(() => {
@@ -1285,6 +1290,13 @@ export default function Home() {
       const name = usersRef.current.find((u) => u.id === msg.peerId)?.display_name || 'Someone'
       toast(`${name} sent you a message`, 'info')
     },
+    onRoomMessage: (msg, room) => {
+      setRoomTick((t) => t + 1)
+      if (msg.senderOrbitId === identity?.orbitId) return
+      if (settings.chatNotificationSfx) playMsgReceive()
+      const name = usersRef.current.find((u) => u.id === msg.senderOrbitId)?.display_name || 'Someone'
+      toast(`${name} → ${room.name}`, 'info')
+    },
   })
   // Keep the courier's TOFU key registry stocked from the user directory.
   // Destructured stable members: the hook returns a fresh object each render,
@@ -1336,6 +1348,41 @@ export default function Home() {
       })
       .catch(() => { })
   }, [identity])
+
+  // ─── Unified rooms chat (rooms ARE the chat system; dock shows a preview) ───
+  const chatRooms = useMemo(
+    () => courier.rooms.map((r) => ({ id: r.id, name: r.name, ownerId: r.ownerId, members: r.members, epoch: r.epoch, seenAt: roomSeen[r.id] })),
+    [courier.rooms, roomSeen]
+  )
+  // RoomMessage -> ChatMessage adapter so the existing thread renderer/blocks
+  // work untouched for sealed rooms.
+  const chatRoomMessages = useCallback((roomId: string): ChatMessage[] =>
+    courier.roomMessages(roomId).map((m) => ({
+      id: m.id,
+      senderId: m.senderOrbitId,
+      senderName: '',
+      text: m.text,
+      timestamp: m.ts,
+    })), [courier.roomMessages])
+  const openRoomChat = useCallback((roomId: string | null) => {
+    setActiveRoomId(roomId)
+    if (roomId) {
+      setRoomSeen((prev) => {
+        const next = { ...prev, [roomId]: Date.now() }
+        try { localStorage.setItem('gmatch_room_seen_v1', JSON.stringify(next)) } catch { }
+        return next
+      })
+    }
+  }, [])
+  // courier.roomMessages reads a mutable local store; bump this on every
+  // incoming room message so the preview/unread memos recompute.
+  const [roomTick, setRoomTick] = useState(0)
+  const roomUnread = useCallback((roomId: string): boolean => {
+    const last = courier.roomMessages(roomId).slice(-1)[0]
+    return !!last && last.ts > (roomSeen[roomId] || 0) && last.senderOrbitId !== identity?.orbitId
+  }, [courier.roomMessages, roomSeen, identity?.orbitId, roomTick])
+
+
 
   const loadPmUnreadCount = useCallback(() => {
     if (!identity) return Promise.resolve()
@@ -1717,6 +1764,27 @@ export default function Home() {
 
   // ─── Group chats ───
   const [chatGroups, setChatGroups] = useState<Array<{ id: string; name: string; owner_id: string; member_count: number; is_member: number }>>([])
+
+  // Dock preview rows: one line per chat surface (lobby, queue, rooms, groups,
+  // DM threads) — clicking a row opens the unified Rooms chat on it.
+  const previewRows = useMemo(() => {
+    const lobby = chatMessages.filter((m) => !m.channel || m.channel === 'global_lobby')
+    const queue = chatMessages.filter((m) => m.channel === 'card_queue')
+    let readIds = new Set<string>()
+    try { readIds = new Set(JSON.parse(localStorage.getItem('orbit_read_dms') || '[]')) } catch { /* fresh */ }
+    return buildPreviewRows({
+      rooms: chatRooms,
+      roomLast: (id) => chatRoomMessages(id).slice(-1)[0]?.text,
+      roomUnread,
+      groups: chatGroups,
+      groupLast: (id) => (groupMessagesByGroup[id] || []).slice(-1)[0]?.text,
+      threads: pmThreads,
+      myOrbitId: identity?.orbitId,
+      readIds,
+      lobbyLast: lobby.slice(-1)[0]?.text,
+      queueLast: queue.slice(-1)[0]?.text,
+    })
+  }, [chatMessages, chatRooms, chatRoomMessages, roomUnread, chatGroups, groupMessagesByGroup, pmThreads, identity?.orbitId, roomTick])
 
   const loadChatGroups = useCallback(() => {
     if (!identity) return Promise.resolve()
@@ -3225,45 +3293,9 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* gMatch Direct Messages View */}
-                  {mainView === 'messages' && !chatOpen && !dmMinimized && (
-                    <MessagesView
-                      identity={identity}
-                      chatMessages={chatMessages}
-                      pmPeer={pmPeer}
-                      pmMessagesByPeer={pmMessagesByPeer}
-                      users={users}
-                      pmThreads={pmThreads}
-                      profilePics={profilePics}
-                      myProfile={myProfile}
-                      chatGroups={chatGroups}
-                      groupMessagesByGroup={groupMessagesByGroup}
-                      activeGroupId={activeGroupId}
-                      setActiveGroupId={setActiveGroupId}
-                      sendChatMessage={sendChatMessage}
-                      sendPm={sendPm}
-                      sendGroupMessage={sendGroupMessage}
-                      openAttachmentModal={openAttachmentModal}
-                      loadPmMessages={loadPmMessages}
-                      loadPmThreads={loadPmThreads}
-                      loadPmHistory={loadPmHistory}
-                      reportPmMessage={reportPmMessage}
-                      reportPmUser={reportPmUser}
-                      deletePmMessage={deletePmMessage}
-                      deleteThread={deleteThread}
-                      createGroup={createGroup}
-                      leaveGroup={leaveGroup}
-                      loadGroupMessages={loadGroupMessages}
-                      loadGroupMembers={loadGroupMembers}
-                      addGroupMembers={addGroupMembers}
-                      setPmPeer={setPmPeer}
-                      setSelectedProfileUser={setSelectedProfileUser}
-                      setViewerMessage={setViewerMessage}
-                      setDmMinimized={setDmMinimized}
-                      pmUnreadCount={pmUnreadCount}
-                    />
-                  )}
-
+                  {/* gMatch Direct Messages View: the desktop inline page is
+                      the unified rooms chat (block above); the minimized
+                      bubble remains for the mobile drawer path. */}
                   {mainView === 'messages' && !chatOpen && dmMinimized && (
                     <DmMinimizedView pmPeer={pmPeer} profilePics={profilePics} />
                   )}
@@ -3346,18 +3378,66 @@ export default function Home() {
                     </div>
                   )}
 
-                  {mainView === 'rooms' && courierActive && (
-                    <RoomsView
-                      rooms={courier.rooms}
-                      roomMessages={courier.roomMessages}
-                      users={users}
-                      myOrbitId={identity?.orbitId || ''}
-                      onCreateRoom={courier.createRoom}
-                      onInvite={courier.inviteToRoom}
-                      onSay={courier.sayInRoom}
-                      onLeave={courier.leaveRoom}
-                      toast={toast}
+                  {/* Unified Rooms chat: sealed E2EE rooms + server groups +
+                      lobby/queue/DMs in ONE surface (courier rooms only show
+                      when courier mode is active). */}
+                  {(mainView === 'rooms' || (mainView === 'messages' && !chatOpen && !dmMinimized)) && (
+                    <div className="p-2 sm:p-4 h-full flex-1 flex flex-col min-h-0">
+                    <GMatchDMs
+                      identity={identity}
+                      chatMessages={chatMessages}
+                      pmMessages={pmPeer ? pmMessagesByPeer[pmPeer.id || (pmPeer as { orbitId?: string }).orbitId || ''] || [] : []}
+                      activePmPeer={pmPeer ? { orbitId: pmPeer.id || (pmPeer as { orbitId?: string }).orbitId || '', name: pmPeer.display_name || 'User' } : null}
+                      peers={users.map((u) => ({ orbitId: u.id || (u as { orbitId?: string }).orbitId || '', name: u.display_name || 'User' }))}
+                      threads={pmThreads}
+                      profilePics={profilePics}
+                      myDisplayName={myProfile.displayName || 'You'}
+                      groups={chatGroups}
+                      groupMessages={groupMessagesByGroup}
+                      activeGroupId={activeGroupId}
+                      rooms={chatRooms}
+                      activeRoomId={activeRoomId}
+                      onSelectRoom={openRoomChat}
+                      onCreateRoom={(name) => {
+                        const r = courier.createRoom(name)
+                        return r ? { id: r.id, name: r.name, ownerId: r.ownerId, members: r.members, epoch: r.epoch } : null
+                      }}
+                      onInviteRoom={courier.inviteToRoom}
+                      onSayRoom={(roomId, text) => { void courier.sayInRoom(roomId, text) }}
+                      onLeaveRoom={(roomId) => { courier.leaveRoom(roomId); if (activeRoomId === roomId) openRoomChat(null) }}
+                      getRoomMessages={chatRoomMessages}
+                      onSendMessage={sendChatMessage}
+                      onSendPm={(peerId, text, replyToId, attachment) => { void sendPm(peerId, text, replyToId, attachment) }}
+                      onSelectPeer={(p) => {
+                        if (p) {
+                          const found = users.find((u) => u.id === p.orbitId || (u as { orbitId?: string }).orbitId === p.orbitId)
+                          setPmPeer((found || { id: p.orbitId, display_name: p.name }) as never)
+                          if (p.orbitId !== 'global_lobby' && p.orbitId !== 'card_queue') loadPmMessages(p.orbitId)
+                        } else {
+                          setPmPeer(null)
+                        }
+                      }}
+                      onReportMessage={reportPmMessage}
+                      onReportUser={reportPmUser}
+                      onDeleteMessage={(messageId, peerId) => { if (peerId) void deletePmMessage(messageId, peerId) }}
+                      onCreateGroup={createGroup}
+                      onOpenAttachment={openAttachmentModal}
+                      onSendGroupMessage={(groupId, text, replyToId, attachment) => { void sendGroupMessage(groupId, text, replyToId, attachment) }}
+                      onLeaveGroup={leaveGroup}
+                      onLoadGroupMessages={loadGroupMessages}
+                      onLoadGroupMembers={loadGroupMembers}
+                      onAddGroupMembers={addGroupMembers}
+                      onSelectGroup={setActiveGroupId}
+                      onOpenProfile={(userId) => {
+                        const t = users.find((u) => u.id === userId || (u as { orbitId?: string }).orbitId === userId)
+                        if (t) setSelectedProfileUser(t)
+                      }}
+                      onOpenImage={(msg) => setViewerMessage(msg)}
+                      onDeleteThread={deleteThread}
+                      onBackToThreads={() => { setPmPeer(null); loadPmThreads() }}
+                      onLoadHistory={loadPmHistory}
                     />
+                    </div>
                   )}
                   {/* Babecock · Idle — gMatch workspace (plan D2/D5) */}
                   {mainView === 'grid' && (
@@ -3492,62 +3572,42 @@ export default function Home() {
 
                 {/* Desktop messages dock: right side panel sibling */}
                 <MessagesRail open={chatOpen}>
-                  <SocialPanel
-                    onClose={() => setChatOpen(false)}
-                    chatUnread={pmUnreadCount}
-                    dm={
-                      <GMatchDMs
-                        identity={identity}
-                        chatMessages={chatMessages}
-                        pmMessages={pmPeer ? pmMessagesByPeer[pmPeer.id || (pmPeer as any).orbitId || ''] || [] : []}
-                        activePmPeer={pmPeer ? { orbitId: pmPeer.id || (pmPeer as any).orbitId, name: pmPeer.display_name || (pmPeer as any).name || 'User' } : null}
-                        peers={users.map((u) => ({ orbitId: u.id || (u as any).orbitId, name: u.display_name || (u as any).name || 'User' }))}
-                        threads={pmThreads}
-                        profilePics={profilePics}
-                        myDisplayName={myProfile.displayName || 'You'}
-                        groups={chatGroups}
-                        groupMessages={groupMessagesByGroup}
-                        activeGroupId={activeGroupId}
-                        onSelectGroup={setActiveGroupId}
-                        onSendMessage={sendChatMessage}
-                        onSendPm={(peerId, text, replyToId, attachment) => {
-                          void sendPm(peerId, text, replyToId, attachment);
-                        }}
-                        onSelectPeer={(p) => {
-                          if (p) {
-                            const found = users.find((u) => u.id === p.orbitId || (u as any).orbitId === p.orbitId);
-                            setPmPeer(found || ({ id: p.orbitId, display_name: p.name } as any));
-                            if (p.orbitId !== 'global_lobby' && p.orbitId !== 'card_queue') {
-                              loadPmMessages(p.orbitId);
-                            }
-                          } else {
-                            setPmPeer(null);
-                          }
-                        }}
-                        onReportMessage={reportPmMessage}
-                        onReportUser={reportPmUser}
-                        onDeleteMessage={(messageId, peerId) => {
-                          if (peerId) void deletePmMessage(messageId, peerId);
-                        }}
-                        onCreateGroup={createGroup}
-                        onOpenAttachment={openAttachmentModal}
-                        onSendGroupMessage={(groupId, text, replyToId, attachment) => {
-                          void sendGroupMessage(groupId, text, replyToId, attachment);
-                        }}
-                        onLeaveGroup={leaveGroup}
-                        onLoadGroupMessages={loadGroupMessages}
-                        onLoadGroupMembers={loadGroupMembers}
-                        onAddGroupMembers={addGroupMembers}
-                        onOpenProfile={(userId) => {
-                          const t = users.find((u) => u.id === userId || (u as any).orbitId === userId);
-                          if (t) setSelectedProfileUser(t);
-                        }}
-                        onOpenImage={(msg) => setViewerMessage(msg)}
-                        onDeleteThread={deleteThread}
-                        onBackToThreads={() => { setPmPeer(null); loadPmThreads(); }}
-                        onLoadHistory={loadPmHistory}
-                      />
-                    }
+                  <RoomsPreview
+                    rows={previewRows}
+                    onOpenRow={(row) => {
+                      const open = () => {
+                        setChatOpen(false)
+                        setDmMinimized(false)
+                        setMainView('rooms')
+                        const want = hashForView('rooms')
+                        if (window.location.hash !== want) window.history.pushState(null, '', want)
+                      }
+                      if (row.kind === 'room') {
+                        setActiveGroupId(null); setPmPeer(null); openRoomChat(row.id); open(); return
+                      }
+                      if (row.kind === 'group') {
+                        openRoomChat(null); setActiveGroupId(row.id); setPmPeer(null); void loadGroupMessages(row.id); open(); return
+                      }
+                      openRoomChat(null)
+                      setActiveGroupId(null)
+                      if (row.kind === 'lobby' || row.kind === 'queue') {
+                        setPmPeer(row.kind === 'lobby'
+                          ? ({ id: 'global_lobby', display_name: 'Lobby Lounge (Everyone)' } as never)
+                          : ({ id: 'card_queue', display_name: 'Card Game Queue' } as never))
+                      } else {
+                        const found = users.find((u) => u.id === row.id || (u as { orbitId?: string }).orbitId === row.id)
+                        setPmPeer((found || { id: row.id, display_name: row.name }) as never)
+                        loadPmMessages(row.id)
+                      }
+                      open()
+                    }}
+                    onOpenAll={() => {
+                      setChatOpen(false)
+                      setDmMinimized(false)
+                      setMainView('rooms')
+                      const want = hashForView('rooms')
+                      if (window.location.hash !== want) window.history.pushState(null, '', want)
+                    }}
                   />
                 </MessagesRail>
 
@@ -3954,7 +4014,6 @@ export default function Home() {
               onLogout={() => { setChatOpen(false); setIdentityModalMode('logout'); }}
               onOpenProfile={() => handleSetMainView('profile')}
               onOpenCreateCard={() => { setChatOpen(false); setShowCreateCardModal(true); }}
-              showRooms={courierActive}
             />
           </ErrorBoundary>
         )}

@@ -92,6 +92,8 @@ test('journey 3: DM a peer and both sides see the message', async ({ page }) => 
   await expect(pageB.getByText(peerName).first()).toBeVisible({ timeout: 25_000 })
 
   await page.goto('/#/messages')
+  // Desktop: #/messages lands on the dock preview; open the unified chat.
+  await page.getByText('Open rooms →').click({ timeout: 20_000 })
   const search = page.getByPlaceholder('Search...')
   await expect(search).toBeVisible({ timeout: 20_000 })
   await search.fill(peerName)
@@ -105,6 +107,7 @@ test('journey 3: DM a peer and both sides see the message', async ({ page }) => 
   await expect(page.getByText(msg).first()).toBeVisible({ timeout: 15_000 })
 
   await pageB.goto('/#/messages')
+  await pageB.getByText('Open rooms →').click({ timeout: 20_000 })
   await expect(pageB.getByText(msg).first()).toBeVisible({ timeout: 25_000 })
   await ctxB.close()
 })
