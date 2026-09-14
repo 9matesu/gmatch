@@ -275,12 +275,12 @@ export class CardService {
     }
 
     const media = await this.db
-      .prepare('SELECT id, owner_id, is_public, is_story, is_chat, gacha_downloads_count FROM Objects WHERE id = ?')
+      .prepare('SELECT id, owner_id, is_public, is_story, is_chat, is_avatar, gacha_downloads_count FROM Objects WHERE id = ?')
       .bind(mediaObjectId)
-      .first<{ id: string; owner_id: string; is_public?: number; is_story?: number; is_chat?: number; gacha_downloads_count?: number | null }>()
+      .first<{ id: string; owner_id: string; is_public?: number; is_story?: number; is_chat?: number; is_avatar?: number; gacha_downloads_count?: number | null }>()
     if (!media) throw notFound('media object not found')
     if (media.owner_id !== creatorId) throw forbidden('you do not own this media')
-    if (media.is_public === 1 || media.is_story === 1 || media.is_chat === 1) throw badRequest('cannot create a card from a post, story, or chat attachment')
+    if (media.is_public === 1 || media.is_story === 1 || media.is_chat === 1 || media.is_avatar === 1) throw badRequest('cannot create a card from a post, story, chat attachment, or avatar')
 
     // Seed the canonical card's valuation from the media object's existing
     // reputation score and like count so card info shows the live g$ value

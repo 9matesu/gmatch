@@ -285,6 +285,31 @@ posts.delete('/:id/like', async (c) => {
   return c.json({ liked: false, like_count: Number(row?.like_count || 0) })
 })
 
+// List users who liked a post
+posts.get('/:id/likers', async (c) => {
+  const db = c.env.DB
+  const id = c.req.param('id')
+  const rows = await db
+    .prepare(
+      `SELECT PostLikes.user_id, Users.display_name, Users.pfp_url
+       FROM PostLikes
+       LEFT JOIN Users ON Users.id = PostLikes.user_id
+       WHERE PostLikes.object_id = ?
+       ORDER BY PostLikes.created_at DESC
+       LIMIT 100`
+    )
+    .bind(id)
+    .all<{ display_name: string | null; user_id: string; pfp_url?: string | null }>()
+
+  const likers = (rows.results || []).map(r => ({
+    user_id: r.user_id,
+    display_name: r.display_name?.trim() || generateFallbackName(r.user_id),
+    pfp_url: r.pfp_url || null,
+  }))
+
+  return c.json({ likers })
+})
+
 // Save (bookmark) a post
 posts.post('/:id/save', async (c) => {
   const db = c.env.DB

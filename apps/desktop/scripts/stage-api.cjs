@@ -20,6 +20,7 @@ function findBunExe() {
     return process.env.GMATCH_BUN_EXE
   }
   const candidates = [
+    join(ROOT, 'bun.exe'),
     join(process.env.APPDATA || '', 'npm', 'node_modules', 'bun', 'bin', 'bun.exe'),
     join(process.env.USERPROFILE || '', '.bun', 'bin', 'bun.exe'),
     // GitHub Actions windows-latest global npm prefix

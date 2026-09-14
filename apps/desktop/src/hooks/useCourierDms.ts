@@ -5,7 +5,7 @@ import { DmManager, DmStore, scopedKey, type DmMessage } from '../utils/mail-dm'
 import { rotateEpoch, type EpochState } from '../utils/handleRotation'
 import { getSecureItem, setSecureItem } from '../utils/secure-storage'
 import { RoomManager, type Room, type RoomMessage } from '../utils/rooms'
-import { detectMailMode, type MailMode } from '../utils/mail-mode'
+import { detectMailMode, cachedMailMode, isKnownSiteCourier, type MailMode } from '../utils/mail-mode'
 import { getApiBaseUrl } from '../utils/api'
 import { logger } from '../utils/logger'
 
@@ -28,7 +28,11 @@ export interface CourierDeps {
  * dependency array (a fresh literal each render would loop the effects).
  */
 export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps = {}) {
-  const [mode, setMode] = useState<MailMode>('legacy')
+  const [mode, setMode] = useState<MailMode>(() => {
+    const base = getApiBaseUrl()
+    if (isKnownSiteCourier(base)) return 'courier'
+    return cachedMailMode(base) || 'legacy'
+  })
   const [threads, setThreads] = useState<Record<string, DmMessage[]>>({})
   const [rooms, setRoomsState] = useState<Room[]>([])
   const clientRef = useRef<MailClient | null>(null)

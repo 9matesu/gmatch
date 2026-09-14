@@ -27,9 +27,11 @@ import {
   LogOut,
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
+import type { User } from '@orbit/shared';
 import type { ChatMessage } from '../../hooks/useP2P';
 import { orbitFetch } from '../../utils/api';
 import { ObjectImage } from '../ObjectImage';
+import { ChatPlayerList } from './ChatPlayerList';
 
 export interface PeerInfo {
   orbitId: string;
@@ -110,6 +112,7 @@ export function GMatchDMs({
   activeGroupId,
   onOpenImage,
   onLoadHistory,
+  users = [],
 }: {
   identity: OrbitIdentity | null;
   chatMessages?: ChatMessage[];
@@ -147,9 +150,10 @@ export function GMatchDMs({
   onLoadGroupMembers?: (groupId: string) => Promise<GroupMember[]>;
   onAddGroupMembers?: (groupId: string, ids: string[]) => Promise<boolean> | void;
   onSelectGroup?: (groupId: string | null) => void;
-  onOpenProfile?: (userId: string) => void;
+  onOpenProfile?: (userId: string, user?: User) => void;
   onOpenImage?: (message: ChatMessage) => void;
   onLoadHistory?: (peerId: string, beforeTimestamp: string) => Promise<boolean>;
+  users?: User[];
 }) {
   const [inputText, setInputText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -489,10 +493,9 @@ export function GMatchDMs({
   const canShowMembers = openTarget === 'group' && !!activeGroupId && !!onLoadGroupMembers;
 
   return (
-    <div className="flex-1 min-h-0 h-full w-full bg-transparent overflow-hidden flex flex-col md:flex-row-reverse font-sans text-retro-fg animate-orbit-fade-in">
-      {/* Thread list column — right side on desktop, coupled with the rail's
-          players/groups aside; chat panel owns the left. */}
-      <div className={`w-full md:w-60 lg:w-64 border-r md:border-r-0 md:border-l border-border-glass flex-col bg-glass-w5 shrink-0 min-h-0 select-none ${openTarget ? (sidebarOpen ? 'flex' : 'hidden') : 'flex'}`}>
+    <div className="flex-1 min-h-0 h-full w-full overflow-hidden flex flex-row font-sans text-retro-fg animate-orbit-fade-in bg-surface-raised/20">
+      {/* 1. Left Column: Channels, Rooms & DMs */}
+      <div className="w-60 lg:w-64 border-r border-border-glass flex flex-col bg-surface-raised/40 shrink-0 min-h-0 select-none">
         <div className="p-3 sm:p-4 border-b border-border-glass flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <h2 className="font-semibold text-sm text-retro-fg truncate">
@@ -508,15 +511,6 @@ export function GMatchDMs({
               className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => { playPress(700); setSidebarOpen(false); }}
-              title="Collapse sidebar"
-              aria-label="Collapse sidebar"
-              className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
-            >
-              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -768,11 +762,11 @@ export function GMatchDMs({
         </div>
       </div>
 
-      {/* Right Column */}
-      <div className={`flex-1 min-h-0 flex flex-col bg-transparent min-w-0 overflow-hidden ${openTarget ? 'flex' : 'hidden md:flex'}`}>
+      {/* 2. Center Column: Active Conversation */}
+      <div className="flex-1 min-h-0 flex flex-col bg-surface-canvas/50 min-w-0 overflow-hidden">
         {openTarget ? (
           <>
-            <div className="p-3 sm:p-3.5 px-4 border-b border-border-glass flex items-center justify-between shrink-0 select-none">
+            <div className="p-3 sm:p-3.5 px-4 border-b border-border-glass bg-surface-raised/70 flex items-center justify-between shrink-0 select-none">
               <div className="flex items-center gap-3 min-w-0">
                 <button
                   type="button"
@@ -873,7 +867,7 @@ export function GMatchDMs({
                </div>
              )}
 
-             <div ref={messageStreamRef} className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-3 styled-scrollbar select-text">
+              <div ref={messageStreamRef} className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-3 styled-scrollbar select-text bg-surface-canvas/40">
               {displayedMessages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-2 text-retro-muted my-auto select-none">
                   <MessageSquare className="w-6 h-6" />
@@ -1085,7 +1079,7 @@ export function GMatchDMs({
               </div>
             )}
 
-            <form onSubmit={handleSend} className="p-3 border-t border-border-glass flex items-center gap-2 shrink-0">
+            <form onSubmit={handleSend} className="p-3 border-t border-border-glass bg-surface-raised/70 flex items-center gap-2 shrink-0">
               {(activePmPeer && openTarget === 'peer') || openTarget === 'group' ? (
                 <button
                   type="button"
@@ -1139,6 +1133,16 @@ export function GMatchDMs({
             </div>
           </div>
         )}
+      </div>
+
+      {/* 3. Right Column: Expanded Player List */}
+      <div className="w-60 lg:w-64 border-l border-border-glass flex flex-col bg-surface-raised/40 shrink-0 min-h-0 select-none">
+        <ChatPlayerList
+          identity={identity}
+          users={users}
+          profilePics={profilePics}
+          onOpenProfile={onOpenProfile}
+        />
       </div>
     </div>
   );

@@ -78,6 +78,7 @@ import { StoreView } from "./components/views/StoreView";
 import { NotificationsPanel } from "./components/NotificationsPanel";
 import { logger } from './utils/logger';
 import { useNotifications } from './hooks/useNotifications';
+import { isKnownSiteCourier, cachedMailMode } from "./utils/mail-mode";
 import { useCourierDms } from './hooks/useCourierDms';
 import { useServerHeartbeat } from './hooks/useServerHeartbeat';
 import { usePendingJoinVerify } from './hooks/usePendingJoinVerify';
@@ -94,14 +95,7 @@ const isDesktopViewport = () =>
   typeof window.matchMedia === 'function' &&
   window.matchMedia('(min-width: 768px)').matches
 
-// Desktop has no inline messages view: #/messages (or a persisted 'messages'
-// main view) opens the bottom-right rail instead.
-const desktopChatOnLoad = () => {
-  if (!isDesktopViewport()) return false
-  const fromHash = viewFromHash(window.location.hash)
-  const saved = localStorage.getItem('orbit_main_view')
-  return fromHash === 'messages' || (!fromHash && saved === 'messages')
-}
+const desktopChatOnLoad = () => false;
 
 export default function Home() {
   useEffect(() => {
@@ -109,6 +103,17 @@ export default function Home() {
   }, []);
 
   const { identity, isLoaded, createIdentity, exportIdentity, loginWithExportedId, clearIdentity } = useIdentity();
+  const [myProfile, setMyProfile] = useState(() => {
+    if (typeof window === 'undefined') return { displayName: '', tags: [] as string[], isAdmin: false, pfpUrl: '' }
+    try {
+      const localName = localStorage.getItem('orbit_display_name') || ''
+      const localTags = JSON.parse(localStorage.getItem('orbit_tags') || '[]')
+      const localPfp = localStorage.getItem('orbit_pfp_url') || ''
+      return { displayName: localName, tags: Array.isArray(localTags) ? localTags : [], isAdmin: false, pfpUrl: localPfp }
+    } catch {
+      return { displayName: '', tags: [] as string[], isAdmin: false, pfpUrl: '' }
+    }
+  });
   // Idle game loop (merged from gmatch App): load save, tick economy, autosave.
   // Wall-clock dt so a throttled/hidden window accrues honestly in one catch-up
   // tick instead of silently losing seconds to Chromium timer clamping.
@@ -195,8 +200,7 @@ export default function Home() {
     const fromHash = viewFromHash(window.location.hash)
     const saved = localStorage.getItem('orbit_main_view') as MainViewType | null
     const resolved = fromHash || (saved && ROUTE_VIEWS.includes(saved as RoutedView) ? saved : 'servers')
-    // Desktop never renders the inline messages view (rail only).
-    return resolved === 'messages' && isDesktopViewport() ? 'servers' : resolved
+    return resolved === 'messages' ? 'rooms' : resolved
   });
   const [showCreatePostModal, setShowCreatePostModal] = useState(false);
   const [createPostInitialData, setCreatePostInitialData] = useState<{
@@ -328,23 +332,19 @@ export default function Home() {
   useEffect(() => { decisionMapRef.current = decisionMap }, [decisionMap])
 
   const handleSetMainView = useCallback((view: MainViewType) => {
-    const isDesktop = isDesktopViewport();
-    if (view === 'messages' && isDesktop) {
+    const targetView = view === 'messages' ? 'rooms' : view;
+    if (targetView === 'rooms') {
       setDmMinimized(false);
-      setChatOpen(true);
-      return;
+      setChatOpen(false);
     }
-    if (view === 'feed' && mainView === 'feed') {
-      mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+    if (targetView === 'feed' && mainView === 'feed') {
+      mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
     }
-    if (view === 'messages') {
-      setDmMinimized(false);
-    }
-    if (view === 'games') setGamesSubTab('duel');
-    setMainView(view);
+    if (targetView === 'games') setGamesSubTab('duel');
+    setMainView(targetView);
     // Keep the URL in sync (pushState so back/forward navigate views).
-    const want = hashForView(view)
-    if (window.location.hash !== want) window.history.pushState(null, '', want)
+    const want = hashForView(targetView);
+    if (window.location.hash !== want) window.history.pushState(null, '', want);
   }, [mainView]);
 
   // Guided tour: resumable per identity, skippable, teleports only on user click.
@@ -385,19 +385,23 @@ export default function Home() {
   // manual hash edits via hashchange. Listen to both.
   useEffect(() => {
     const onNav = () => {
-      const v = viewFromHash(window.location.hash)
-      if (v === 'messages' && isDesktopViewport()) { setChatOpen(true); return }
-      if (v && v !== mainView) {
-        setMainView(v)
-        if (v === 'games') setGamesSubTab('duel')
+      let v = viewFromHash(window.location.hash);
+      if (v === 'messages') v = 'rooms';
+      if (v === 'rooms') {
+        setChatOpen(false);
+        setDmMinimized(false);
       }
-    }
-    window.addEventListener('hashchange', onNav)
-    window.addEventListener('popstate', onNav)
+      if (v && v !== mainView) {
+        setMainView(v);
+        if (v === 'games') setGamesSubTab('duel');
+      }
+    };
+    window.addEventListener('hashchange', onNav);
+    window.addEventListener('popstate', onNav);
     return () => {
-      window.removeEventListener('hashchange', onNav)
-      window.removeEventListener('popstate', onNav)
-    }
+      window.removeEventListener('hashchange', onNav);
+      window.removeEventListener('popstate', onNav);
+    };
   }, [mainView]);
 
   const handleRespondBabecock = useCallback(async (id: string, accept: boolean) => {
@@ -451,7 +455,7 @@ export default function Home() {
 
   const myCards = useMemo(() => {
     if (!identity) return []
-    const allCards = mergeMyCards(items, canonicalCards, identity.orbitId)
+    const allCards = mergeMyCards(items, canonicalCards, identity.orbitId, myProfile?.pfpUrl)
     // If user has an active deck, filter duel cards to only cards in that deck
     if (activeDeckId && userDecks.length > 0) {
       const currentDeck = userDecks.find(d => d.id === activeDeckId)
@@ -461,7 +465,7 @@ export default function Home() {
       }
     }
     return allCards
-  }, [items, canonicalCards, identity, activeDeckId, userDecks])
+  }, [items, canonicalCards, identity, activeDeckId, userDecks, myProfile?.pfpUrl])
 
   // Queue gate: the server requires a registered deck of exactly
   // MIN_GAME_CARDS eligible cards (DeckService.getQueueEligibleDeck).
@@ -761,17 +765,6 @@ export default function Home() {
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [showPointsHelpModal, setShowPointsHelpModal] = useState(false);
   const [showFlashModal, setShowFlashModal] = useState(false);
-  const [myProfile, setMyProfile] = useState(() => {
-    if (typeof window === 'undefined') return { displayName: '', tags: [] as string[], isAdmin: false, pfpUrl: '' }
-    try {
-      const localName = localStorage.getItem('orbit_display_name') || ''
-      const localTags = JSON.parse(localStorage.getItem('orbit_tags') || '[]')
-      const localPfp = localStorage.getItem('orbit_pfp_url') || ''
-      return { displayName: localName, tags: Array.isArray(localTags) ? localTags : [], isAdmin: false, pfpUrl: localPfp }
-    } catch {
-      return { displayName: '', tags: [] as string[], isAdmin: false, pfpUrl: '' }
-    }
-  });
   const [,setAnnouncements] = useState<{ id: string; message: string; created_at: string; created_by_name: string | null }[]>([])
   const [showPasskeys,] = useState(false);
   const [identityModalMode, setIdentityModalMode] = useState<'export' | 'login' | 'logout' | null>(null);
@@ -1338,6 +1331,10 @@ export default function Home() {
 
   const loadPmThreads = useCallback(() => {
     if (!identity) return Promise.resolve()
+    const base = getApiBaseUrl()
+    if (courierActive || isKnownSiteCourier(base) || cachedMailMode(base) === 'courier') {
+      return Promise.resolve()
+    }
     return orbitFetch(`/api/pm/threads?_t=${Date.now()}`, {}, identity)
       .then(async (res) => {
         if (!res.ok) return
@@ -1347,7 +1344,7 @@ export default function Home() {
         }
       })
       .catch(() => { })
-  }, [identity])
+  }, [identity, courierActive])
 
   // ─── Unified rooms chat (rooms ARE the chat system; dock shows a preview) ───
   const chatRooms = useMemo(
@@ -1715,8 +1712,12 @@ export default function Home() {
 
   const deleteThread = useCallback(async (peerId: string) => {
     if (!identity) return
+    const base = getApiBaseUrl()
+    const isCourier = courierActive || isKnownSiteCourier(base) || cachedMailMode(base) === 'courier'
     try {
-      await orbitFetch(`/api/pm/threads/${peerId}`, { method: 'DELETE' }, identity)
+      if (!isCourier) {
+        await orbitFetch(`/api/pm/threads/${peerId}`, { method: 'DELETE' }, identity)
+      }
       setPmPeer(null)
       setPmMessagesByPeer(prev => {
         const next = { ...prev }
@@ -1726,7 +1727,7 @@ export default function Home() {
       loadPmThreads()
       loadPmUnreadCount()
     } catch { }
-  }, [identity, loadPmThreads, loadPmUnreadCount])
+  }, [identity, loadPmThreads, loadPmUnreadCount, courierActive])
 
   const loadPmHistory = useCallback(async (peerId: string, beforeTimestamp: string): Promise<boolean> => {
     if (!identity) return false
@@ -3382,61 +3383,64 @@ export default function Home() {
                       lobby/queue/DMs in ONE surface (courier rooms only show
                       when courier mode is active). */}
                   {(mainView === 'rooms' || (mainView === 'messages' && !chatOpen && !dmMinimized)) && (
-                    <div className="p-2 sm:p-4 h-full flex-1 flex flex-col min-h-0">
-                    <GMatchDMs
-                      identity={identity}
-                      chatMessages={chatMessages}
-                      pmMessages={pmPeer ? pmMessagesByPeer[pmPeer.id || (pmPeer as { orbitId?: string }).orbitId || ''] || [] : []}
-                      activePmPeer={pmPeer ? { orbitId: pmPeer.id || (pmPeer as { orbitId?: string }).orbitId || '', name: pmPeer.display_name || 'User' } : null}
-                      peers={users.map((u) => ({ orbitId: u.id || (u as { orbitId?: string }).orbitId || '', name: u.display_name || 'User' }))}
-                      threads={pmThreads}
-                      profilePics={profilePics}
-                      myDisplayName={myProfile.displayName || 'You'}
-                      groups={chatGroups}
-                      groupMessages={groupMessagesByGroup}
-                      activeGroupId={activeGroupId}
-                      rooms={chatRooms}
-                      activeRoomId={activeRoomId}
-                      onSelectRoom={openRoomChat}
-                      onCreateRoom={(name) => {
-                        const r = courier.createRoom(name)
-                        return r ? { id: r.id, name: r.name, ownerId: r.ownerId, members: r.members, epoch: r.epoch } : null
-                      }}
-                      onInviteRoom={courier.inviteToRoom}
-                      onSayRoom={(roomId, text) => { void courier.sayInRoom(roomId, text) }}
-                      onLeaveRoom={(roomId) => { courier.leaveRoom(roomId); if (activeRoomId === roomId) openRoomChat(null) }}
-                      getRoomMessages={chatRoomMessages}
-                      onSendMessage={sendChatMessage}
-                      onSendPm={(peerId, text, replyToId, attachment) => { void sendPm(peerId, text, replyToId, attachment) }}
-                      onSelectPeer={(p) => {
-                        if (p) {
-                          const found = users.find((u) => u.id === p.orbitId || (u as { orbitId?: string }).orbitId === p.orbitId)
-                          setPmPeer((found || { id: p.orbitId, display_name: p.name }) as never)
-                          if (p.orbitId !== 'global_lobby' && p.orbitId !== 'card_queue') loadPmMessages(p.orbitId)
-                        } else {
-                          setPmPeer(null)
-                        }
-                      }}
-                      onReportMessage={reportPmMessage}
-                      onReportUser={reportPmUser}
-                      onDeleteMessage={(messageId, peerId) => { if (peerId) void deletePmMessage(messageId, peerId) }}
-                      onCreateGroup={createGroup}
-                      onOpenAttachment={openAttachmentModal}
-                      onSendGroupMessage={(groupId, text, replyToId, attachment) => { void sendGroupMessage(groupId, text, replyToId, attachment) }}
-                      onLeaveGroup={leaveGroup}
-                      onLoadGroupMessages={loadGroupMessages}
-                      onLoadGroupMembers={loadGroupMembers}
-                      onAddGroupMembers={addGroupMembers}
-                      onSelectGroup={setActiveGroupId}
-                      onOpenProfile={(userId) => {
-                        const t = users.find((u) => u.id === userId || (u as { orbitId?: string }).orbitId === userId)
-                        if (t) setSelectedProfileUser(t)
-                      }}
-                      onOpenImage={(msg) => setViewerMessage(msg)}
-                      onDeleteThread={deleteThread}
-                      onBackToThreads={() => { setPmPeer(null); loadPmThreads() }}
-                      onLoadHistory={loadPmHistory}
-                    />
+                    <div className="p-2 sm:p-4 h-full flex-1 flex flex-col min-h-0 overflow-hidden">
+                      <div className="solid-panel flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col rounded-xl shadow-2xl">
+                        <GMatchDMs
+                          identity={identity}
+                          chatMessages={chatMessages}
+                          pmMessages={pmPeer ? pmMessagesByPeer[pmPeer.id || (pmPeer as { orbitId?: string }).orbitId || ''] || [] : []}
+                          activePmPeer={pmPeer ? { orbitId: pmPeer.id || (pmPeer as { orbitId?: string }).orbitId || '', name: pmPeer.display_name || 'User' } : null}
+                          peers={users.map((u) => ({ orbitId: u.id || (u as { orbitId?: string }).orbitId || '', name: u.display_name || 'User' }))}
+                          users={users}
+                          threads={pmThreads}
+                          profilePics={profilePics}
+                          myDisplayName={myProfile.displayName || 'You'}
+                          groups={chatGroups}
+                          groupMessages={groupMessagesByGroup}
+                          activeGroupId={activeGroupId}
+                          rooms={chatRooms}
+                          activeRoomId={activeRoomId}
+                          onSelectRoom={openRoomChat}
+                          onCreateRoom={(name) => {
+                            const r = courier.createRoom(name)
+                            return r ? { id: r.id, name: r.name, ownerId: r.ownerId, members: r.members, epoch: r.epoch } : null
+                          }}
+                          onInviteRoom={courier.inviteToRoom}
+                          onSayRoom={(roomId, text) => { void courier.sayInRoom(roomId, text) }}
+                          onLeaveRoom={(roomId) => { courier.leaveRoom(roomId); if (activeRoomId === roomId) openRoomChat(null) }}
+                          getRoomMessages={chatRoomMessages}
+                          onSendMessage={sendChatMessage}
+                          onSendPm={(peerId, text, replyToId, attachment) => { void sendPm(peerId, text, replyToId, attachment) }}
+                          onSelectPeer={(p) => {
+                            if (p) {
+                              const found = users.find((u) => u.id === p.orbitId || (u as { orbitId?: string }).orbitId === p.orbitId)
+                              setPmPeer((found || { id: p.orbitId, display_name: p.name }) as never)
+                              if (p.orbitId !== 'global_lobby' && p.orbitId !== 'card_queue') loadPmMessages(p.orbitId)
+                            } else {
+                              setPmPeer(null)
+                            }
+                          }}
+                          onReportMessage={reportPmMessage}
+                          onReportUser={reportPmUser}
+                          onDeleteMessage={(messageId, peerId) => { if (peerId) void deletePmMessage(messageId, peerId) }}
+                          onCreateGroup={createGroup}
+                          onOpenAttachment={openAttachmentModal}
+                          onSendGroupMessage={(groupId, text, replyToId, attachment) => { void sendGroupMessage(groupId, text, replyToId, attachment) }}
+                          onLeaveGroup={leaveGroup}
+                          onLoadGroupMessages={loadGroupMessages}
+                          onLoadGroupMembers={loadGroupMembers}
+                          onAddGroupMembers={addGroupMembers}
+                          onSelectGroup={setActiveGroupId}
+                          onOpenProfile={(userId, userObj) => {
+                            const t = users.find((u) => u.id === userId || (u as { orbitId?: string }).orbitId === userId)
+                            setSelectedProfileUser(t || userObj || ({ id: userId, display_name: 'User' } as User))
+                          }}
+                          onOpenImage={(msg) => setViewerMessage(msg)}
+                          onDeleteThread={deleteThread}
+                          onBackToThreads={() => { setPmPeer(null); loadPmThreads() }}
+                          onLoadHistory={loadPmHistory}
+                        />
+                      </div>
                     </div>
                   )}
                   {/* Babecock · Idle — gMatch workspace (plan D2/D5) */}
@@ -3999,13 +4003,11 @@ export default function Home() {
               notificationsOpen={notifOpen}
               onToggleMessages={() => {
                 playPress(860);
-                if (isDesktopViewport()) {
-                  setChatOpen((v) => !v);
-                } else {
-                  handleSetMainView(mainView === 'messages' ? 'feed' : 'messages');
-                }
+                setChatOpen(false);
+                setDmMinimized(false);
+                handleSetMainView(mainView === 'rooms' ? 'feed' : 'rooms');
               }}
-              messagesOpen={chatOpen}
+              messagesOpen={mainView === 'rooms' || mainView === 'messages'}
               onOpenWallpaper={() => {
                 playPress(760);
                 setShowThemeDrawer((v) => !v);

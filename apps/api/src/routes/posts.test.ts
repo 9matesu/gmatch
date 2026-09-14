@@ -347,3 +347,59 @@ it('names a nameless post author with the generated fallback, never "Unknown Use
   expect(post.author_name).not.toBe('Unknown User')
   expect(post.author_name).toMatch(/^User_/)
 })
+
+describe('Post Likers', () => {
+  it('records likes and returns list of likers via GET /api/posts/:id/likers', async () => {
+    const env = await createMockEnv()
+    await registerUser(env, alice)
+    await setDisplayName(env, alice, 'Alice In Wonderland')
+    await registerUser(env, bob)
+    await setDisplayName(env, bob, 'Bob The Builder')
+
+    const postId = await createPublicPost(env, alice, 'Likers test post')
+
+    // Alice likes it
+    const likeResAlice = await app.request(`/api/posts/${postId}/like`, {
+      method: 'POST',
+      headers: authHeaders(alice, 'POST', `/api/posts/${postId}/like`),
+    }, env)
+    expect(likeResAlice.status).toBe(200)
+
+    // Bob likes it
+    const likeResBob = await app.request(`/api/posts/${postId}/like`, {
+      method: 'POST',
+      headers: authHeaders(bob, 'POST', `/api/posts/${postId}/like`),
+    }, env)
+    expect(likeResBob.status).toBe(200)
+
+    // Query likers
+    const likersRes = await app.request(`/api/posts/${postId}/likers`, {
+      headers: authHeaders(bob, 'GET', `/api/posts/${postId}/likers`),
+    }, env)
+    expect(likersRes.status).toBe(200)
+    const likersJson: any = await likersRes.json()
+    expect(likersJson.likers).toHaveLength(2)
+    const bobLiker = likersJson.likers.find((l: any) => l.user_id === bob.orbitId)
+    const aliceLiker = likersJson.likers.find((l: any) => l.user_id === alice.orbitId)
+    expect(bobLiker).toBeDefined()
+    expect(bobLiker.display_name).toBe('Bob The Builder')
+    expect(aliceLiker).toBeDefined()
+    expect(aliceLiker.display_name).toBe('Alice In Wonderland')
+
+    // Bob unlikes
+    const unlikeRes = await app.request(`/api/posts/${postId}/like`, {
+      method: 'DELETE',
+      headers: authHeaders(bob, 'DELETE', `/api/posts/${postId}/like`),
+    }, env)
+    expect(unlikeRes.status).toBe(200)
+
+    // Query likers again
+    const likersResAfter = await app.request(`/api/posts/${postId}/likers`, {
+      headers: authHeaders(alice, 'GET', `/api/posts/${postId}/likers`),
+    }, env)
+    const likersJsonAfter: any = await likersResAfter.json()
+    expect(likersJsonAfter.likers).toHaveLength(1)
+    expect(likersJsonAfter.likers[0].user_id).toBe(alice.orbitId)
+  })
+})
+

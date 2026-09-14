@@ -116,12 +116,14 @@ CREATE TABLE IF NOT EXISTS Objects (
   sensitive_reason TEXT,
   post_group TEXT,
   is_chat INTEGER NOT NULL DEFAULT 0,
+  is_avatar INTEGER NOT NULL DEFAULT 0,
   is_archived INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_objects_owner_content_hash ON Objects (owner_id, content_hash);
 CREATE INDEX IF NOT EXISTS idx_objects_post_group ON Objects (post_group);
 CREATE INDEX IF NOT EXISTS idx_objects_is_chat ON Objects (is_chat);
+CREATE INDEX IF NOT EXISTS idx_objects_is_avatar ON Objects (is_avatar);
 
 CREATE TABLE IF NOT EXISTS Recipients (
   object_id TEXT NOT NULL,

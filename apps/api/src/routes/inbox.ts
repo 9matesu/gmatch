@@ -26,6 +26,7 @@ inbox.get('/', orbitAuth, async (c) => {
       WHERE (o.owner_id = ? OR r.recipient_id = ?)
         AND o.is_story = 0
         AND o.is_public = 0
+        AND (o.is_avatar = 0 OR o.is_avatar IS NULL)
         AND o.hidden_at IS NULL
         AND (o.expires_at IS NULL OR datetime(o.expires_at) > datetime('now'))
     `).bind(orbitId, orbitId).first<{ total: number }>()
@@ -55,6 +56,7 @@ inbox.get('/', orbitAuth, async (c) => {
       WHERE (o.owner_id = ? OR r.recipient_id = ?)
         AND o.is_story = 0
         AND o.is_public = 0
+        AND (o.is_avatar = 0 OR o.is_avatar IS NULL)
         AND o.hidden_at IS NULL
         AND (o.expires_at IS NULL OR datetime(o.expires_at) > datetime('now'))
       ORDER BY o.created_at DESC

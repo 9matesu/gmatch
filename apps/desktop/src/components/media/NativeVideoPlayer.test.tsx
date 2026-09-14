@@ -70,5 +70,40 @@ describe('NativeVideoPlayer', () => {
     const expandBtn = screen.getByTitle(/expand to fullscreen/i);
     await userEvent.click(expandBtn);
     expect(onExpand).toHaveBeenCalledTimes(1);
+
+    const bottomExpandBtn = screen.getByTitle(/expand to lightbox/i);
+    await userEvent.click(bottomExpandBtn);
+    expect(onExpand).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps control bar visible when alwaysShowControls is true even on mouse leave', () => {
+    const { container } = render(
+      <NativeVideoPlayer src="https://example.com/test.mp4" alwaysShowControls={true} />
+    );
+
+    const playerRoot = container.firstChild as HTMLElement;
+    fireEvent.mouseLeave(playerRoot);
+
+    const bottomControls = container.querySelector('.bg-gradient-to-t');
+    expect(bottomControls).toHaveClass('opacity-100');
+  });
+
+  it('toggles play when clicking video canvas directly', async () => {
+    const { container } = render(<NativeVideoPlayer src="https://example.com/test.mp4" />);
+    const video = container.querySelector('video')!;
+
+    await userEvent.click(video);
+    expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalled();
+  });
+
+  it('triggers onDoubleTapLike when double-clicking video canvas', async () => {
+    const onDoubleTap = vi.fn();
+    const { container } = render(
+      <NativeVideoPlayer src="https://example.com/test.mp4" onDoubleTapLike={onDoubleTap} />
+    );
+    const video = container.querySelector('video')!;
+
+    await userEvent.dblClick(video);
+    expect(onDoubleTap).toHaveBeenCalled();
   });
 });

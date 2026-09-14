@@ -114,16 +114,25 @@ function isChatAttachment(item: OrbitObject): boolean {
   return chat === 1 || chat === '1' || chat === true || chat === 'true';
 }
 
+function isAvatarObject(item: OrbitObject, pfpUrl?: string | null): boolean {
+  const av = (item as any).is_avatar;
+  if (av === 1 || av === '1' || av === true || av === 'true') return true;
+  if (!pfpUrl) return false;
+  if (pfpUrl.includes(item.id)) return true;
+  if (item.content_url && pfpUrl === item.content_url) return true;
+  return false;
+}
+
 /**
  * Card collection derivation: the set of cards the current identity owns.
  *
- * A "card" is a non-story, non-chat object the user uploaded themselves.
+ * A "card" is a non-story, non-chat, non-avatar object the user uploaded themselves.
  * P2P-imported entries (ids starting with `p2p-obj-`), public posts, chat attachments,
- * and stories are excluded.
+ * avatars/profile pictures, and stories are excluded.
  */
-export function deriveMyCards(items: readonly OrbitObject[], ownerId: string): OrbitObject[] {
+export function deriveMyCards(items: readonly OrbitObject[], ownerId: string, pfpUrl?: string | null): OrbitObject[] {
   const raw = items.filter(
-    (i) => !i.is_story && !isPublicPost(i) && !isChatAttachment(i) && !i.id.startsWith("p2p-obj-") && i.owner_id === ownerId
+    (i) => !i.is_story && !isPublicPost(i) && !isChatAttachment(i) && !isAvatarObject(i, pfpUrl) && !i.id.startsWith("p2p-obj-") && i.owner_id === ownerId
   );
   const seen = new Set<string>();
   const unique: OrbitObject[] = [];
@@ -142,12 +151,13 @@ export function deriveMyCards(items: readonly OrbitObject[], ownerId: string): O
  * playable: a canonical card's `id` is its media object id, which the match
  * routes already accept. Legacy objects that are the media of a canonical card
  * are de-duplicated (the canonical entry wins). Public posts, chat attachments,
- * and stories are excluded from the card collection.
+ * avatars, and stories are excluded from the card collection.
  */
 export function mergeMyCards(
   items: readonly OrbitObject[],
   canonicalCards: readonly CanonicalCard[],
-  ownerId: string
+  ownerId: string,
+  pfpUrl?: string | null
 ): MergedCard[] {
   const canonicalByMedia = new Map<string, CanonicalCard>();
   for (const c of canonicalCards) canonicalByMedia.set(c.mediaObjectId, c);
@@ -185,7 +195,7 @@ export function mergeMyCards(
   }
 
   for (const i of items) {
-    if (i.is_story || isPublicPost(i) || isChatAttachment(i) || i.id.startsWith("p2p-obj-") || i.owner_id !== ownerId) continue;
+    if (i.is_story || isPublicPost(i) || isChatAttachment(i) || isAvatarObject(i, pfpUrl) || i.id.startsWith("p2p-obj-") || i.owner_id !== ownerId) continue;
     if (canonicalByMedia.has(i.id) || seen.has(i.id)) continue;
     seen.add(i.id);
     result.push(i);

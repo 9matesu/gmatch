@@ -25,6 +25,7 @@ export interface NativeVideoPlayerProps {
   muted?: boolean;
   playsInline?: boolean;
   controls?: boolean;
+  alwaysShowControls?: boolean;
   className?: string;
   videoClassName?: string;
   style?: React.CSSProperties;
@@ -64,6 +65,7 @@ export function NativeVideoPlayer({
   muted = false,
   playsInline = true,
   controls = true,
+  alwaysShowControls = false,
   className = '',
   videoClassName = '',
   style,
@@ -126,12 +128,12 @@ export function NativeVideoPlayer({
     setShowControls(true);
     if (hideControlsTimerRef.current) clearTimeout(hideControlsTimerRef.current);
 
-    if (isPlaying && !isScrubbing) {
+    if (!alwaysShowControls && isPlaying && !isScrubbing) {
       hideControlsTimerRef.current = setTimeout(() => {
         setShowControls(false);
       }, 2500);
     }
-  }, [isPlaying, isScrubbing]);
+  }, [alwaysShowControls, isPlaying, isScrubbing]);
 
   useEffect(() => {
     resetHideControlsTimer();
@@ -139,6 +141,12 @@ export function NativeVideoPlayer({
       if (hideControlsTimerRef.current) clearTimeout(hideControlsTimerRef.current);
     };
   }, [isPlaying, isScrubbing, resetHideControlsTimer]);
+
+  useEffect(() => {
+    if (autoPlay && videoRef.current) {
+      videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+    }
+  }, [autoPlay, resolvedSrc]);
 
   const togglePlay = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -297,8 +305,10 @@ export function NativeVideoPlayer({
 
     if (diff < 300) {
       if (onDoubleTapLike) {
+        togglePlay();
         onDoubleTapLike();
       } else {
+        togglePlay();
         void toggleFullscreen();
       }
     } else {
@@ -368,7 +378,7 @@ export function NativeVideoPlayer({
       } catch {}
       setIsPlaying(false);
     }
-    if (isPlaying) {
+    if (isPlaying && !alwaysShowControls) {
       setShowControls(false);
     }
   };
@@ -487,7 +497,7 @@ export function NativeVideoPlayer({
       {controls && (
         <div
           className={`absolute top-0 inset-x-0 p-3 flex items-center justify-between z-20 pointer-events-none transition-opacity duration-300 bg-gradient-to-b from-black/80 via-black/30 to-transparent ${
-            showControls ? 'opacity-100' : 'opacity-0'
+            alwaysShowControls || showControls ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
           }`}
         >
           <div className="flex items-center gap-1.5 pointer-events-auto">
@@ -522,7 +532,7 @@ export function NativeVideoPlayer({
       {controls && !compact && (
         <div
           className={`absolute bottom-0 inset-x-0 z-20 flex flex-col justify-end pt-8 pb-2 px-3 bg-gradient-to-t from-black/95 via-black/60 to-transparent transition-opacity duration-300 ${
-            showControls || isScrubbing || !isPlaying ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+            alwaysShowControls || showControls || isScrubbing || !isPlaying ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
           }`}
           onClick={(e) => e.stopPropagation()}
         >
@@ -646,6 +656,21 @@ export function NativeVideoPlayer({
                   <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
                     <path d="M19 7h-8v6h8V7zm2-4H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16.01H3V4.99h18v14.02z" />
                   </svg>
+                </button>
+              )}
+
+              {onExpand && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onExpand();
+                  }}
+                  title="Expand to Lightbox"
+                  aria-label="Expand to Lightbox"
+                  className="p-1.5 rounded-md hover:bg-glass-w10 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+                >
+                  <Maximize2 className="w-4 h-4" />
                 </button>
               )}
 

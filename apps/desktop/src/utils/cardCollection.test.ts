@@ -84,4 +84,17 @@ describe('mergeMyCards', () => {
     const merged = mergeMyCards(items as OrbitObject[], [], 'me')
     expect(merged.map(m => m.id)).toEqual(['plain-obj'])
   })
+
+  it('excludes avatar objects and objects matching the user profile picture', () => {
+    const items = [
+      { ...base, id: 'plain-card', owner_id: 'me' },
+      { ...base, id: 'avatar-flagged', owner_id: 'me', is_avatar: 1 },
+      { ...base, id: 'avatar-url-match', owner_id: 'me', content_url: '/api/objects/avatar-url-match' },
+    ]
+    const derived = deriveMyCards(items as OrbitObject[], 'me', '/api/objects/avatar-url-match')
+    expect(derived.map(c => c.id)).toEqual(['plain-card'])
+
+    const merged = mergeMyCards(items as OrbitObject[], [], 'me', '/api/objects/avatar-url-match')
+    expect(merged.map(m => m.id)).toEqual(['plain-card'])
+  })
 })

@@ -28,8 +28,11 @@ export interface ObjectImageProps {
   autoPlay?: boolean
   loop?: boolean
   controls?: boolean
+  alwaysShowControls?: boolean
   playsInline?: boolean
   preload?: 'auto' | 'metadata' | 'none'
+  onExpand?: () => void
+  onDoubleTapLike?: () => void
   onError?: () => void
 }
 
@@ -82,8 +85,11 @@ export function ObjectImage({
   autoPlay = false,
   loop = false,
   controls = false,
+  alwaysShowControls = false,
   playsInline = true,
   preload = 'metadata',
+  onExpand,
+  onDoubleTapLike,
   onError,
 }: ObjectImageProps) {
   const signed = needsSignedFetch(contentUrl, objectId)
@@ -160,6 +166,9 @@ export function ObjectImage({
           autoPlay={autoPlay}
           loop={loop}
           playsInline={playsInline}
+          alwaysShowControls={alwaysShowControls}
+          onExpand={onExpand}
+          onDoubleTapLike={onDoubleTapLike}
           onError={(_e) => {
             onError?.()
             setHasError(true)

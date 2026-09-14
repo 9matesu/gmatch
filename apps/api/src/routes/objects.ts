@@ -106,6 +106,7 @@ objects.post('/', orbitAuth, async (c) => {
     const isStory = formData.get('is_story') === 'true' ? 1 : 0
     const isWallpaper = formData.get('is_wallpaper') === 'true' ? 1 : 0
     const isChat = (formData.get('is_chat') === 'true' || formData.get('is_chat') === '1') ? 1 : 0
+    const isAvatar = (formData.get('is_avatar') === 'true' || formData.get('is_avatar') === '1') ? 1 : 0
     const isPublic = (formData.get('is_public') === 'true' || formData.get('is_public') === '1') ? 1 : 0
     const postCaption = (formData.get('post_caption') as string | null)?.trim() || null
     const location = (formData.get('location') as string | null)?.trim() || null
@@ -215,12 +216,14 @@ objects.post('/', orbitAuth, async (c) => {
       // Handle byte-identical re-uploads: reuse existing object and attach any recipients
       if (contentHash && isStory === 0) {
         const dup = await c.env.DB.prepare(
-          `SELECT id FROM Objects WHERE owner_id = ? AND content_hash = ? AND is_story = 0 AND is_public = ? AND ${LIVE_OBJECT_FILTER} LIMIT 1`
-        ).bind(orbitId, contentHash, isPublic).first<{ id: string }>()
+          `SELECT id FROM Objects WHERE owner_id = ? AND content_hash = ? AND is_story = 0 AND is_public = ? AND is_avatar = ? AND ${LIVE_OBJECT_FILTER} LIMIT 1`
+        ).bind(orbitId, contentHash, isPublic, isAvatar).first<{ id: string }>()
         if (dup) {
           const recipientsRaw = formData.get('recipients') as string | null
           let recipientsCount = 1
-          if (recipientsRaw) {
+          if (isAvatar === 1) {
+            recipientsCount = 0
+          } else if (recipientsRaw) {
             const ids = recipientsRaw.split(',').map((s) => s.trim()).filter(Boolean)
             if (!ids.includes(orbitId)) ids.push(orbitId)
             recipientsCount = ids.length
@@ -235,6 +238,7 @@ objects.post('/', orbitAuth, async (c) => {
             reused: true,
             recipients: recipientsCount,
             is_story: 0,
+            is_avatar: isAvatar,
             points_awarded: 0,
           }, 200)
         }
@@ -254,8 +258,8 @@ objects.post('/', orbitAuth, async (c) => {
         ? `data:${mimeType === 'image/wallpaper' ? 'image/jpeg' : mimeType};base64,${Buffer.from(strippedBytes).toString('base64')}`
         : `/api/objects/${objectId}`
 
-      await c.env.DB.prepare('INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, caption, is_public, post_caption, location, post_tags, is_story, expires_at, content_hash, post_group, is_chat) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(
-        objectId, orbitId, strippedBytes.length, mimeType, contentUrl, caption, isPublic, postCaption, location, postTags, isStory, expiresAt, contentHash, postGroup, isChat
+      await c.env.DB.prepare('INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, caption, is_public, post_caption, location, post_tags, is_story, expires_at, content_hash, post_group, is_chat, is_avatar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(
+        objectId, orbitId, strippedBytes.length, mimeType, contentUrl, caption, isPublic, postCaption, location, postTags, isStory, expiresAt, contentHash, postGroup, isChat, isAvatar
       ).run()
     }
 
@@ -280,7 +284,9 @@ objects.post('/', orbitAuth, async (c) => {
 
     const recipientsRaw = formData.get('recipients') as string | null
     let recipientsCount = 1
-    if (recipientsRaw) {
+    if (isAvatar === 1) {
+      recipientsCount = 0
+    } else if (recipientsRaw) {
       const ids = recipientsRaw.split(',').map(s => s.trim()).filter(Boolean)
       if (!ids.includes(orbitId)) ids.push(orbitId)
       recipientsCount = ids.length
@@ -321,6 +327,7 @@ objects.post('/', orbitAuth, async (c) => {
       size: imageSize,
       recipients: recipientsCount,
       is_story: isStory,
+      is_avatar: isAvatar,
       points_awarded: bonusPoints
     }, 201)
   } catch (err: any) {

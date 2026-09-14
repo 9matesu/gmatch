@@ -17,6 +17,7 @@ async function uploadAvatarBytes(identity: OrbitIdentity, dataUrl: string): Prom
     const ext = (blob.type.split('/')[1] || 'jpeg').split('+')[0];
     const form = new FormData();
     form.append('image', new File([blob], `avatar.${ext}`, { type: blob.type || 'image/jpeg' }));
+    form.append('is_avatar', '1');
     const res = await orbitFetch('/api/objects', { method: 'POST', body: form }, identity);
     if (!res.ok) return null;
     const data = await res.json().catch(() => null);

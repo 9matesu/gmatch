@@ -532,10 +532,13 @@ users.on(['PATCH', 'PUT'], '/profile', async (c) => {
     // request header past the edge limit (403/431 on profile picture change).
     const objectRef = /^\/api\/objects\/[0-9a-fA-F-]{36}$/.exec(String(pfp_url ?? '').trim())
     if (objectRef) {
+      const objId = objectRef[0].split('/').pop() as string
       const obj = await c.env.DB.prepare(
         'SELECT id FROM Objects WHERE id = ? AND owner_id = ? AND hidden_at IS NULL',
-      ).bind(objectRef[0].split('/').pop() as string, orbitId).first<{ id: string }>()
+      ).bind(objId, orbitId).first<{ id: string }>()
       if (!obj) return c.json({ error: 'Avatar object not found' }, 404)
+      await c.env.DB.prepare('UPDATE Objects SET is_avatar = 1 WHERE id = ?').bind(objId).run().catch(() => {})
+      await c.env.DB.prepare('DELETE FROM Recipients WHERE object_id = ? AND recipient_id = ?').bind(objId, orbitId).run().catch(() => {})
       cleanPfp = objectRef[0]
     } else if (typeof pfp_url === 'string' && pfp_url.startsWith('data:image/')) {
       const comma = pfp_url.indexOf(',')

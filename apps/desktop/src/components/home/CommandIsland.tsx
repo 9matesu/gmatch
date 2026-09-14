@@ -287,14 +287,14 @@ export function CommandIsland({
             }}
             aria-label="Messages"
             className={`relative flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-              messagesOpen || mainView === 'messages'
+              messagesOpen || mainView === 'messages' || mainView === 'rooms'
                 ? 'bg-retro-accent text-retro-accent-text'
                 : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
             }`}
           >
             <ChatCircleText
               className="w-4 h-4"
-              weight={messagesOpen || mainView === 'messages' ? 'fill' : 'regular'}
+              weight={messagesOpen || mainView === 'messages' || mainView === 'rooms' ? 'fill' : 'regular'}
             />
             <span className="text-xs font-medium hidden md:inline">Chat</span>
             {unreadMessagesCount > 0 && (

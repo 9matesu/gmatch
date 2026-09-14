@@ -20,7 +20,7 @@ import { ObjectImage } from '../ObjectImage';
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
 import { isMediaVideo } from '../../utils/media';
 
-export function InstagramPostModal({ post, isOpen, onClose, identity, profilePics = {}, isLiked = false, isSaved = false, likeCount = 0, comments = [], onToggleLike, onToggleSave, onAddComment, onToggleCommentLike, onOpenShare, onOptionsClick, onSelectUser, onAvatarClick, onOpenNetwork }: {
+export function InstagramPostModal({ post, isOpen, onClose, identity, profilePics = {}, isLiked = false, isSaved = false, likeCount = 0, comments = [], onToggleLike, onToggleSave, onAddComment, onToggleCommentLike, onOpenShare, onOptionsClick, onOpenLikers, onSelectUser, onAvatarClick, onOpenNetwork, toast }: {
   post: FeedPost | null;
   isOpen: boolean;
   onClose: () => void;
@@ -36,6 +36,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
   onToggleCommentLike?: (postId: string, commentId: string) => void;
   onOpenShare?: (post: FeedPost) => void;
   onOptionsClick?: (post: FeedPost) => void;
+  onOpenLikers?: (postId: string) => void;
   onSelectUser?: (userId: string) => void;
   onAvatarClick?: (userId: string) => void;
   onOpenNetwork?: (userId: string) => void;
@@ -356,9 +357,19 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
               </div>
 
               {/* Likes Summary */}
-              <div className="px-3 pb-2 text-xs font-semibold text-retro-fg font-mono tracking-tight">
+              <button
+                type="button"
+                onClick={() => {
+                  if (post) {
+                    playPress(700);
+                    onOpenLikers?.(post.id);
+                  }
+                }}
+                className="text-left px-3 pb-2 text-xs font-semibold text-retro-fg font-mono tracking-tight hover:underline cursor-pointer w-fit transition-colors"
+                aria-label="View who liked this post"
+              >
                 {likeCount.toLocaleString()} {likeCount === 1 ? 'like' : 'likes'}
-              </div>
+              </button>
 
               {/* Comment Input */}
               <div className="p-3 border-t border-border-glass flex items-center gap-2">

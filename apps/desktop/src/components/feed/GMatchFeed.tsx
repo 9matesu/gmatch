@@ -44,6 +44,7 @@ import { CommentsModal } from './CommentsModal';
 import { PostOptionsModal } from './PostOptionsModal';
 import { ReportPostModal } from './ReportPostModal';
 import { PostCreatorModal } from './PostCreatorModal';
+import { PostLikersModal } from './PostLikersModal';
 import { FeedHeader } from './FeedHeader';
 
 export interface PostComment {
@@ -230,6 +231,7 @@ export function GMatchFeed({
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [showExploreSearch, setShowExploreSearch] = useState(false);
   const [activeLightboxPost, setActiveLightboxPost] = useState<FeedPost | null>(null);
+  const [likersModalPostId, setLikersModalPostId] = useState<string | null>(null);
   const [showCustomPostCreator, setShowCustomPostCreator] = useState(false);
 
   // Post Creator State (Multi-media + optional tags)
@@ -738,123 +740,154 @@ export function GMatchFeed({
                 </div>
 
                 {/* Post Media with Click to Lightbox & Double Tap Like */}
-                <div
-                  className="relative w-full bg-surface-canvas flex items-center justify-center overflow-hidden cursor-pointer rounded-none"
-                  onClick={() => {
-                    playPress(700);
-                    setActiveLightboxPost(post);
-                  }}
-                  onDoubleClick={(e) => {
-                    e.stopPropagation();
-                    handleDoubleTap(post);
-                  }}
-                >
-                  {multiMedia ? (() => {
-                    const item = multiMedia[currentIdx];
-                    const url = item.url;
-                    const mime = item.mime_type;
-                    const isObj = url.includes('/api/objects/') || !url;
-                    const isVid = isMediaVideo(mime || url);
-                    return (
-                      <>
-                        {isObj ? (
-                          <ObjectImage
-                            objectId={item.id}
-                            contentUrl={url}
-                            identity={identity}
-                            className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
-                            videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
-                          />
-                        ) : isVid ? (
-                          <NativeVideoPlayer
-                            src={url}
-                            videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
-                            controls
-                            muted={true}
-                            loop
-                            onExpand={() => setActiveLightboxPost(post)}
-                            onDoubleTapLike={() => handleDoubleTap(post)}
-                          />
-                        ) : (
-                          <CachedImg
-                            src={url}
-                            alt={post.caption || 'Post image'}
-                            className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
-                            loading="lazy"
-                          />
-                        )}
-                      </>
-                    );
-                  })() : isObjectMedia ? (
-                    <ObjectImage
-                      objectId={post.id}
-                      contentUrl={post.url}
-                      identity={identity}
-                      className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
-                      videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
-                    />
-                  ) : isVideo ? (
-                    <NativeVideoPlayer
-                      src={post.url}
-                      videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
-                      controls
-                      muted={true}
-                      loop
-                      onExpand={() => setActiveLightboxPost(post)}
-                      onDoubleTapLike={() => handleDoubleTap(post)}
-                    />
-                  ) : (
-                    <CachedImg
-                      src={post.url}
-                      alt={post.caption || 'Post image'}
-                      className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
-                      loading="lazy"
-                    />
-                  )}
+                {(() => {
+                  const activeItem = multiMedia ? multiMedia[currentIdx] : null;
+                  const activeUrl = activeItem ? activeItem.url : post.url;
+                  const activeMime = activeItem ? activeItem.mime_type : post.mime_type;
+                  const isCurrentVideo = isMediaVideo(activeMime || activeUrl);
 
-                  {/* Carousel controls + counter for multi-image posts */}
-                  {multiMedia && multiMedia.length > 1 && (
-                    <>
-                      <button
-                        type="button"
-                        aria-label="Previous image"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setMediaIdx((prev) => ({ ...prev, [post.id]: (currentIdx - 1 + multiMedia.length) % multiMedia.length }));
-                        }}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-black/45 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/70 transition-colors cursor-pointer"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="Next image"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setMediaIdx((prev) => ({ ...prev, [post.id]: (currentIdx + 1) % multiMedia.length }));
-                        }}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-black/45 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/70 transition-colors cursor-pointer"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                      <div className="absolute top-2 right-2 z-10 px-2 py-0.5 rounded-full bg-black/45 backdrop-blur-sm text-[10px] font-semibold text-white">
-                        {currentIdx + 1}/{multiMedia.length}
-                      </div>
-                    </>
-                  )}
+                  return (
+                    <div
+                      className={`relative w-full bg-surface-canvas flex items-center justify-center overflow-hidden rounded-none ${isCurrentVideo ? '' : 'cursor-pointer'}`}
+                      onClick={() => {
+                        if (!isCurrentVideo) {
+                          playPress(700);
+                          setActiveLightboxPost(post);
+                        }
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        handleDoubleTap(post);
+                      }}
+                    >
+                      {multiMedia ? (() => {
+                        const item = multiMedia[currentIdx];
+                        const url = item.url;
+                        const mime = item.mime_type;
+                        const isObj = url.includes('/api/objects/') || !url;
+                        const isVid = isMediaVideo(mime || url);
+                        return (
+                          <>
+                            {isObj ? (
+                              <ObjectImage
+                                objectId={item.id}
+                                contentUrl={url}
+                                identity={identity}
+                                mimeType={mime}
+                                className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
+                                videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
+                                controls={true}
+                                alwaysShowControls={true}
+                                autoPlay={true}
+                                muted={true}
+                                loop={true}
+                                onExpand={() => setActiveLightboxPost(post)}
+                                onDoubleTapLike={() => handleDoubleTap(post)}
+                              />
+                            ) : isVid ? (
+                              <NativeVideoPlayer
+                                src={url}
+                                videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
+                                controls={true}
+                                alwaysShowControls={true}
+                                autoPlay={true}
+                                muted={true}
+                                loop={true}
+                                onExpand={() => setActiveLightboxPost(post)}
+                                onDoubleTapLike={() => handleDoubleTap(post)}
+                              />
+                            ) : (
+                              <CachedImg
+                                src={url}
+                                alt={post.caption || 'Post image'}
+                                className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
+                                loading="lazy"
+                              />
+                            )}
+                          </>
+                        );
+                      })() : isObjectMedia ? (
+                        <ObjectImage
+                          objectId={post.id}
+                          contentUrl={post.url}
+                          identity={identity}
+                          mimeType={post.mime_type}
+                          className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
+                          videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
+                          controls={true}
+                          alwaysShowControls={true}
+                          autoPlay={true}
+                          muted={true}
+                          loop={true}
+                          onExpand={() => setActiveLightboxPost(post)}
+                          onDoubleTapLike={() => handleDoubleTap(post)}
+                        />
+                      ) : isVideo ? (
+                        <NativeVideoPlayer
+                          src={post.url}
+                          videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
+                          controls={true}
+                          alwaysShowControls={true}
+                          autoPlay={true}
+                          muted={true}
+                          loop={true}
+                          onExpand={() => setActiveLightboxPost(post)}
+                          onDoubleTapLike={() => handleDoubleTap(post)}
+                        />
+                      ) : (
+                        <CachedImg
+                          src={post.url}
+                          alt={post.caption || 'Post image'}
+                          className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
+                          loading="lazy"
+                        />
+                      )}
 
-                  {/* Double Tap Heart Pop Animation */}
-                  {doubleTapAnimationId === post.id && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 animate-orbit-pop">
-                      <Heart className="w-20 h-20 text-white fill-white opacity-90" />
+                      {/* Carousel controls + counter for multi-image posts */}
+                      {multiMedia && multiMedia.length > 1 && (
+                        <>
+                          <button
+                            type="button"
+                            aria-label="Previous image"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMediaIdx((prev) => ({ ...prev, [post.id]: (currentIdx - 1 + multiMedia.length) % multiMedia.length }));
+                            }}
+                            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-black/45 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/70 transition-colors cursor-pointer"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Next image"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMediaIdx((prev) => ({ ...prev, [post.id]: (currentIdx + 1) % multiMedia.length }));
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-black/45 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/70 transition-colors cursor-pointer"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                          <div className="absolute top-2.5 right-2.5 z-10 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-xs text-[10px] font-medium text-white/90">
+                            {currentIdx + 1}/{multiMedia.length}
+                          </div>
+                        </>
+                      )}
+
+                      {/* Double Tap Heart Pop Animation */}
+                      {doubleTapAnimationId === post.id && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 animate-orbit-pop">
+                          <Heart className="w-20 h-20 text-white fill-white opacity-90" />
+                        </div>
+                      )}
+                      {firstLikeId === post.id && (
+                        <span className="absolute left-2 top-2 z-20 text-[10px] font-bold text-retro-fg bg-retro-panel border border-border-glass rounded-md px-1.5 py-0.5 animate-orbit-pop">
+                          First like
+                        </span>
+                      )}
                     </div>
-                  )}
-                  {firstLikeId === post.id && (
-                    <span className="absolute left-2 top-2 z-20 text-[10px] font-bold text-retro-fg bg-retro-panel border border-border-glass rounded-md px-1.5 py-0.5 animate-orbit-pop">
-                      First like
-                    </span>
-                  )}
-                </div>
+                  );
+                })()}
 
                 {/* Action Bar (Like, Comment, Share, Save) */}
                 <div className="px-3 sm:px-4 py-3 flex flex-col gap-2">
@@ -908,11 +941,17 @@ export function GMatchFeed({
                   </div>
 
                   {/* Likes Count */}
-                  {currentLikes > 0 && (
-                    <div className="text-xs font-semibold text-retro-fg tracking-tight">
-                      {currentLikes.toLocaleString()} {currentLikes === 1 ? 'like' : 'likes'}
-                    </div>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playPress(700);
+                      setLikersModalPostId(post.id);
+                    }}
+                    className="text-left text-xs font-semibold text-retro-fg tracking-tight hover:underline cursor-pointer w-fit transition-colors"
+                    aria-label="View who liked this post"
+                  >
+                    {currentLikes.toLocaleString()} {currentLikes === 1 ? 'like' : 'likes'}
+                  </button>
 
                   {/* Caption & Tags */}
                   {post.caption && (
@@ -1122,6 +1161,7 @@ export function GMatchFeed({
           setActiveLightboxPost(null);
           setOptionsPost(p);
         }}
+        onOpenLikers={(postId) => setLikersModalPostId(postId)}
         onSelectUser={onSelectUser}
         onAvatarClick={(uId) => {
           setActiveLightboxPost(null);
@@ -1133,6 +1173,23 @@ export function GMatchFeed({
         }}
         toast={toast}
       />
+
+      {/* ─── MODAL 5b: Likers Modal ─── */}
+      {likersModalPostId && (
+        <PostLikersModal
+          postId={likersModalPostId}
+          isOpen={!!likersModalPostId}
+          onClose={() => setLikersModalPostId(null)}
+          identity={identity}
+          profilePics={profilePics}
+          onSelectUser={(userId) => {
+            setLikersModalPostId(null);
+            setActiveLightboxPost(null);
+            handleAvatarClick(userId);
+          }}
+          toast={toast}
+        />
+      )}
 
       {/* ─── MODAL 6: Live Camera Snapshot Modal (portaled) ─── */}
       {createPortal(

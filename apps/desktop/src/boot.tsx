@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import App from './App'
 import { ToastProvider } from './components/Toast'
 import { ConfirmProvider } from './components/ConfirmDialog'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 /** Render the app — called by main.tsx only after initSecureStorage() settled. */
 export function mount(): void {
@@ -19,7 +20,9 @@ export function mount(): void {
         <ConfirmProvider>
           <ToastProvider>
             <div className="flex-grow">
-              <App />
+              <ErrorBoundary>
+                <App />
+              </ErrorBoundary>
             </div>
           </ToastProvider>
         </ConfirmProvider>

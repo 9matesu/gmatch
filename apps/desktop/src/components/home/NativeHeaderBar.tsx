@@ -1,19 +1,23 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { SpeakerHigh, SpeakerSlash, Minus, Square, X } from '@phosphor-icons/react';
-import { isAudioMuted, setAudioMuted } from '../../utils/sounds';
+import { SpeakerHigh, SpeakerSlash, Minus, Square, X, CaretLeft, CaretRight } from '@phosphor-icons/react';
+import { isAudioMuted, setAudioMuted, playPress } from '../../utils/sounds';
 
 export interface NativeHeaderBarProps {
   wsConnected?: boolean;
   pingMs?: number;
   activeRoomName?: string;
+  onGoBack?: () => void;
+  onGoForward?: () => void;
 }
 
 export function NativeHeaderBar({
   wsConnected: _wsConnected = true,
   pingMs: _pingMs,
   activeRoomName: _activeRoomName,
+  onGoBack,
+  onGoForward,
 }: NativeHeaderBarProps = {}) {
   const [isMuted, setIsMuted] = useState(false);
 
@@ -32,12 +36,41 @@ export function NativeHeaderBar({
       className="w-full h-9 flex items-center justify-between px-3 select-none z-[var(--z-dropdown)] bg-transparent text-xs"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
-      {/* Left: Branding */}
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-2 font-bold tracking-tight">
-          <span className="w-2 h-2 rounded-sm bg-retro-info" />
-          <span className="text-[13px] font-bold tracking-wide text-retro-fg">gMatch</span>
+      {/* Left: Navigators & Branding */}
+      <div
+        className="flex items-center gap-1.5"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      >
+        <div className="flex items-center gap-0.5 text-retro-muted">
+          <button
+            type="button"
+            onClick={() => {
+              playPress(700);
+              if (onGoBack) onGoBack();
+              else window.history.back();
+            }}
+            title="Back"
+            aria-label="Back"
+            className="p-1 rounded-md hover:bg-glass-w10 hover:text-retro-fg transition-colors cursor-pointer"
+          >
+            <CaretLeft className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              playPress(700);
+              if (onGoForward) onGoForward();
+              else window.history.forward();
+            }}
+            title="Forward"
+            aria-label="Forward"
+            className="p-1 rounded-md hover:bg-glass-w10 hover:text-retro-fg transition-colors cursor-pointer"
+          >
+            <CaretRight className="w-3.5 h-3.5" />
+          </button>
         </div>
+
+        <span className="text-[13px] font-bold tracking-wide text-retro-fg select-none ml-1">gMatch</span>
       </div>
 
       {/* Right: mute + window controls (frameless: buttons render
