@@ -203,3 +203,14 @@ export function mergeMyCards(
 
   return result;
 }
+
+/** Duel pick-grid scope: when an active deck exists, only its members;
+ * falls back to the full owned list when the deck resolves to nothing. */
+export function filterToActiveDeck<T extends { id: string; card_id?: string | null }>(
+  allCards: readonly T[],
+  activeDeck?: { cards: string[] } | null,
+): T[] {
+  if (!activeDeck || activeDeck.cards.length === 0) return [...allCards]
+  const inDeck = allCards.filter((c) => activeDeck.cards.includes(c.card_id || c.id))
+  return inDeck.length > 0 ? inDeck : [...allCards]
+}

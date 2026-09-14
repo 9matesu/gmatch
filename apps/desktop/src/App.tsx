@@ -23,7 +23,7 @@ import { useP2P } from "./hooks/useP2P";
 import type { ChatMessage } from "./hooks/useP2P";
 import { useGame } from "./hooks/useGame";
 import { enqueueableItems, isP2pLocal, shouldEnqueue } from "./utils/game";
-import { mergeMyCards, type CanonicalCard } from "./utils/cardCollection";
+import { mergeMyCards, filterToActiveDeck, type CanonicalCard } from "./utils/cardCollection";
 import { collectConfigBundle, applyConfigBundle, applyStashFromBundle, parseConfigBundle, configDownloadFilename, bundleToString } from "./utils/configBackup";
 import { runMigrations } from "./utils/migration";
 import { useGame as useIdleGame } from "./game/store";
@@ -67,7 +67,7 @@ import { ChevronDown, ChevronRight, X, Bell } from "lucide-react";
 import { ChatCircleText } from "@phosphor-icons/react";
 import { WallpaperBackground } from "./components/WallpaperBackground";
 import { ContextOverlay, ReportModal, type ContextMenuState } from "./components/ContextOverlay";
-import { isMediaVideo } from "./utils/media";
+import { isMediaVideo, resolveMediaUrl } from "./utils/media";
 import { GlobalModals } from "./components/GlobalModals";
 import { GalleryTabView } from "./components/views/GalleryTabView";
 import { CreateCardModal } from "./components/CreateCardModal";
@@ -108,7 +108,9 @@ export default function Home() {
     try {
       const localName = localStorage.getItem('orbit_display_name') || ''
       const localTags = JSON.parse(localStorage.getItem('orbit_tags') || '[]')
-      const localPfp = localStorage.getItem('orbit_pfp_url') || ''
+      // Read through the secure mirror first (DPAPI mode), falling back to
+      // plaintext localStorage for pre-migration installs / browser dev.
+      const localPfp = getSecureItem('orbit_pfp_url') || localStorage.getItem('orbit_pfp_url') || ''
       return { displayName: localName, tags: Array.isArray(localTags) ? localTags : [], isAdmin: false, pfpUrl: localPfp }
     } catch {
       return { displayName: '', tags: [] as string[], isAdmin: false, pfpUrl: '' }
@@ -453,19 +455,16 @@ export default function Home() {
     return () => { active = false; };
   }, [identity, activeDeckId]);
 
+  const allOwnedCards = useMemo(
+    () => (identity ? mergeMyCards(items, canonicalCards, identity.orbitId, myProfile?.pfpUrl) : []),
+    [items, canonicalCards, identity, myProfile?.pfpUrl],
+  )
+  // Duel pick-grid scope: active deck members only (see filterToActiveDeck).
+  // DeckBuilder gets `allOwnedCards` directly — it must see cards NOT in the deck.
   const myCards = useMemo(() => {
     if (!identity) return []
-    const allCards = mergeMyCards(items, canonicalCards, identity.orbitId, myProfile?.pfpUrl)
-    // If user has an active deck, filter duel cards to only cards in that deck
-    if (activeDeckId && userDecks.length > 0) {
-      const currentDeck = userDecks.find(d => d.id === activeDeckId)
-      if (currentDeck && currentDeck.cards.length > 0) {
-        const deckCards = allCards.filter(c => currentDeck.cards.includes((c as any).card_id || c.id))
-        if (deckCards.length > 0) return deckCards
-      }
-    }
-    return allCards
-  }, [items, canonicalCards, identity, activeDeckId, userDecks, myProfile?.pfpUrl])
+    return filterToActiveDeck(allOwnedCards, userDecks.find((d) => d.id === activeDeckId) ?? null)
+  }, [allOwnedCards, identity, activeDeckId, userDecks])
 
   // Queue gate: the server requires a registered deck of exactly
   // MIN_GAME_CARDS eligible cards (DeckService.getQueueEligibleDeck).
@@ -2013,12 +2012,21 @@ export default function Home() {
       }
 
       // Reflect the server-side ref locally so peers see the same URL.
+      // This is the value that must stick: update BOTH caches (profilePics
+      // + myProfile/orbit_pfp_url) with the server ref, never the local
+      // data: thumbnail (which 404s for peers and bloats the secure store).
       setProfilePics((prev) => {
         if (typeof res.pfpUrl !== 'string') return prev
         const next = { ...prev, [identity.orbitId]: res.pfpUrl as string }
         try { setSecureItem('goonmatch_pfps', JSON.stringify(next)) } catch { }
         return next
       })
+      if (typeof res.pfpUrl === 'string' && res.pfpUrl) {
+        const serverPfp = res.pfpUrl as string
+        setMyProfile((prev) => (prev.pfpUrl === serverPfp ? prev : { ...prev, pfpUrl: serverPfp }))
+        try { setSecureItem('orbit_pfp_url', serverPfp) } catch { }
+        try { localStorage.setItem('orbit_pfp_url', serverPfp) } catch { }
+      }
 
       toast('Profile picture updated.', 'success')
       loadUsers()
@@ -2158,9 +2166,24 @@ export default function Home() {
             } catch { }
           }
           const isAdmin = Boolean((selfUser as { is_admin?: boolean } | null)?.is_admin);
+          // Server is truth for the avatar: adopt selfUser.pfp_url into
+          // myProfile (previously prev.pfpUrl was kept forever, so a pfp
+          // set on another device — or repaired server-side — never showed,
+          // and a locally-cached data: URL survived after the server moved on).
+          const serverPfp = typeof selfUser?.pfp_url === 'string' ? selfUser.pfp_url : '';
+          if (serverPfp) {
+            try {
+              const cached = getSecureItem('orbit_pfp_url') || (() => { try { return localStorage.getItem('orbit_pfp_url') || '' } catch { return '' } })();
+              if (cached !== serverPfp) {
+                try { setSecureItem('orbit_pfp_url', serverPfp) } catch { }
+                try { localStorage.setItem('orbit_pfp_url', serverPfp) } catch { }
+              }
+            } catch { /* best effort */ }
+          }
           setMyProfile(prev => {
-            if (prev.displayName === displayName && JSON.stringify(prev.tags) === JSON.stringify(tags) && prev.isAdmin === isAdmin) return prev;
-            return { displayName, tags, isAdmin, pfpUrl: prev.pfpUrl };
+            const nextPfp = serverPfp || prev.pfpUrl;
+            if (prev.displayName === displayName && JSON.stringify(prev.tags) === JSON.stringify(tags) && prev.isAdmin === isAdmin && prev.pfpUrl === nextPfp) return prev;
+            return { displayName, tags, isAdmin, pfpUrl: nextPfp };
           });
         }
       })
@@ -3065,7 +3088,12 @@ export default function Home() {
                   if (tags) localStorage.setItem('orbit_tags', JSON.stringify(tags.split(',').map(t => t.trim()).filter(Boolean)));
                   if (pfpUrl && res.identity?.orbitId) {
                     const targetId = res.identity.orbitId;
-                    setProfilePics((prev) => ({ ...prev, [targetId]: pfpUrl }));
+                    setProfilePics((prev) => {
+                      const next = { ...prev, [targetId]: pfpUrl };
+                      try { setSecureItem('goonmatch_pfps', JSON.stringify(next)) } catch { }
+                      return next;
+                    });
+                    try { setSecureItem('orbit_pfp_url', pfpUrl) } catch { }
                     try { localStorage.setItem('orbit_pfp_url', pfpUrl); } catch { }
                     // Also sync to server
                     await saveUserProfile(res.identity, { pfp_url: pfpUrl }).catch(() => { });
@@ -3082,9 +3110,13 @@ export default function Home() {
                   localStorage.setItem('orbit_display_name', name);
                   if (tags) localStorage.setItem('orbit_tags', JSON.stringify(tags.split(',').map(t => t.trim()).filter(Boolean)));
                   if (pfpUrl && newId?.orbitId) {
-                    const nextPfps = { [newId.orbitId]: pfpUrl };
-                    setProfilePics((prev) => ({ ...prev, ...nextPfps }));
-                    setSecureItem('goonmatch_pfps', JSON.stringify(nextPfps));
+                    const targetId = newId.orbitId;
+                    setProfilePics((prev) => {
+                      const next = { ...prev, [targetId]: pfpUrl };
+                      try { setSecureItem('goonmatch_pfps', JSON.stringify(next)) } catch { }
+                      return next;
+                    });
+                    try { setSecureItem('orbit_pfp_url', pfpUrl) } catch { }
                     try { localStorage.setItem('orbit_pfp_url', pfpUrl); } catch { }
                   }
                   setMyProfile({ displayName: name, tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [], isAdmin: false, pfpUrl: pfpUrl || '' });
@@ -3516,7 +3548,7 @@ export default function Home() {
                       toast={toast}
                       cardByMedia={cardByMedia}
                       onOpenOwnerProfile={openProfileById}
-                      myCards={myCards as any}
+                      myCards={allOwnedCards as any}
                       onEnterArena={() => { setGamesSubTab('duel'); setMainView('games'); }}
                       onRepostGalleryImage={(media) => openCreatePostWithMedia(media)}
                       onAddGalleryImageToStory={(media) => void shareMediaAs(media, 'story')}
@@ -3818,7 +3850,7 @@ export default function Home() {
                       <span className="w-full h-full rounded-full bg-black overflow-hidden flex items-center justify-center text-xs font-bold text-white">
                         {pmPeer ? (
                           profilePics[pmPeer.id || (pmPeer as any).orbitId || ''] ? (
-                            <img src={profilePics[pmPeer.id || (pmPeer as any).orbitId || '']} alt="" className="w-full h-full object-cover" />
+                            <img src={resolveMediaUrl(profilePics[pmPeer.id || (pmPeer as any).orbitId || ''])} alt="" className="w-full h-full object-cover" />
                           ) : (
                             (pmPeer.display_name || 'P').charAt(0).toUpperCase()
                           )
@@ -3917,7 +3949,14 @@ export default function Home() {
                   const result = loginWithExportedId(customKey);
                   if (!result.success) throw new Error(result.error || 'Invalid secret key');
                   if (pfpUrl && result.identity?.orbitId) {
-                    setProfilePics((prev) => ({ ...prev, [result.identity!.orbitId]: pfpUrl }));
+                    const targetId = result.identity.orbitId;
+                    setProfilePics((prev) => {
+                      const next = { ...prev, [targetId]: pfpUrl };
+                      try { setSecureItem('goonmatch_pfps', JSON.stringify(next)) } catch { }
+                      return next;
+                    });
+                    try { setSecureItem('orbit_pfp_url', pfpUrl) } catch { }
+                    try { localStorage.setItem('orbit_pfp_url', pfpUrl) } catch { }
                     await saveUserProfile(result.identity, { pfp_url: pfpUrl }).catch(() => { });
                   }
                 }}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { deriveMyCards, mergeMyCards, type CanonicalCard } from './cardCollection'
+import { deriveMyCards, mergeMyCards, filterToActiveDeck, type CanonicalCard } from './cardCollection'
 import type { OrbitObject } from '@orbit/shared'
 
 const base = {
@@ -96,5 +96,20 @@ describe('mergeMyCards', () => {
 
     const merged = mergeMyCards(items as OrbitObject[], [], 'me', '/api/objects/avatar-url-match')
     expect(merged.map(m => m.id)).toEqual(['plain-card'])
+  })
+})
+describe('filterToActiveDeck', () => {
+  const mk = (id: string, card_id?: string) => ({ id, ...(card_id ? { card_id } : {}) })
+  it('returns all cards when no active deck or empty deck', () => {
+    expect(filterToActiveDeck([mk('a')], undefined)).toHaveLength(1)
+    expect(filterToActiveDeck([mk('a')], { cards: [] } as any)).toHaveLength(1)
+  })
+  it('keeps only cards whose canonical id is in the deck', () => {
+    const cards = [mk('m1', 'c1'), mk('m2', 'c2')]
+    expect(filterToActiveDeck(cards, { cards: ['c1'] } as any)).toEqual([cards[0]])
+  })
+  it('falls back to all cards when deck members are not in the list', () => {
+    const cards = [mk('m1', 'c1')]
+    expect(filterToActiveDeck(cards, { cards: ['zz'] } as any)).toEqual(cards)
   })
 })
