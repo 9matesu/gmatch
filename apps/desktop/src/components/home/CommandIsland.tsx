@@ -17,7 +17,6 @@ import {
   SignOut,
   PaintBrush,
   Monitor,
-  Users,
   User,
   Bell,
 } from '@phosphor-icons/react';
@@ -68,7 +67,6 @@ export interface CommandIslandProps {
   onLogout?: () => void;
   onOpenProfile?: () => void;
   onOpenCreateCard?: () => void;
-  showRooms?: boolean;
   settingsOpen?: boolean;
 }
 
@@ -95,7 +93,6 @@ export function CommandIsland({
   onLogout,
   onOpenProfile,
   onOpenCreateCard,
-  showRooms = false,
 }: CommandIslandProps) {
   const [satelliteOpen, setSatelliteOpen] = useState<boolean>(readSatelliteOpen);
 
@@ -420,25 +417,6 @@ export function CommandIsland({
               <Monitor className="w-3.5 h-3.5 text-retro-info shrink-0" weight={mainView === 'pc_domination' ? 'fill' : 'regular'} />
               <span className="text-xs hidden sm:inline">Domination</span>
             </button>
-
-            {/* Rooms (conditional on courier active) */}
-            {showRooms && (
-              <button
-                type="button"
-                onClick={() => handleNavClick('rooms')}
-                aria-label="Rooms"
-                aria-current={mainView === 'rooms' ? 'page' : undefined}
-                title="Blind Courier Rooms"
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-                  mainView === 'rooms'
-                    ? 'bg-retro-accent text-retro-accent-text'
-                    : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
-                }`}
-              >
-                <Users className="w-3.5 h-3.5 text-retro-muted shrink-0" weight={mainView === 'rooms' ? 'fill' : 'regular'} />
-                <span className="text-xs hidden sm:inline">Rooms</span>
-              </button>
-            )}
 
             {/* Wallpaper */}
             <button

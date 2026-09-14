@@ -23,6 +23,8 @@ import {
   Edit2,
   CheckCheck,
   Trash,
+  Lock,
+  LogOut,
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { ChatMessage } from '../../hooks/useP2P';
@@ -56,7 +58,17 @@ export interface GroupInfo {
 
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
-type OpenTarget = 'group' | 'lobby' | 'queue' | 'peer' | null;
+type OpenTarget = 'group' | 'lobby' | 'queue' | 'peer' | 'room' | null;
+
+export interface RoomInfo {
+  id: string;
+  name: string;
+  ownerId: string;
+  members: string[];
+  epoch: number;
+  /** ms stamp of the last time the user opened this room (unread cue). */
+  seenAt?: number;
+}
 
 export function GMatchDMs({
   identity,
@@ -69,6 +81,15 @@ export function GMatchDMs({
   myDisplayName = 'You',
   groups = [],
   groupMessages = {},
+  showRooms = false,
+  rooms = [],
+  activeRoomId = null,
+  onSelectRoom,
+  onCreateRoom,
+  onInviteRoom,
+  onSayRoom,
+  onLeaveRoom,
+  getRoomMessages,
   onSendMessage,
   onSendPm,
   onSelectPeer,
@@ -101,6 +122,15 @@ export function GMatchDMs({
   groups?: GroupInfo[];
   groupMessages?: Record<string, ChatMessage[]>;
   activeGroupId?: string | null;
+  showRooms?: boolean;
+  rooms?: RoomInfo[];
+  activeRoomId?: string | null;
+  onSelectRoom?: (roomId: string | null) => void;
+  onCreateRoom?: (name: string) => RoomInfo | null;
+  onInviteRoom?: (roomId: string, peerId: string) => Promise<boolean>;
+  onSayRoom?: (roomId: string, text: string) => void;
+  onLeaveRoom?: (roomId: string) => void;
+  getRoomMessages?: (roomId: string) => ChatMessage[];
   onSendMessage?: (text: string, channel?: string) => void;
   onSendPm?: (peerId: string, text: string, replyToId?: string, attachment?: { id: string; url: string; isVideo?: boolean }) => void;
   onOpenAttachment?: (target: 'pm' | 'group', peerId?: string, groupId?: string, replyToId?: string) => void;
@@ -139,6 +169,9 @@ export function GMatchDMs({
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [actionFor, setActionFor] = useState<string | null>(null);
   const [showNewGroup, setShowNewGroup] = useState(false);
+  const [showNewRoom, setShowNewRoom] = useState(false);
+  const [newRoomName, setNewRoomName] = useState('');
+  const [roomInvitePeer, setRoomInvitePeer] = useState('');
   const [showMembers, setShowMembers] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupMembers, setNewGroupMembers] = useState<Set<string>>(new Set());
@@ -150,6 +183,8 @@ export function GMatchDMs({
   // The chat main page defaults to the public lobby when nothing is selected.
   const openTarget: OpenTarget = listMode
     ? null
+    : activeRoomId
+    ? 'room'
     : activeGroupId
     ? 'group'
     : activePmPeer
@@ -158,6 +193,16 @@ export function GMatchDMs({
 
   const isLobbyGroup = openTarget === 'lobby';
   const isQueueGroup = openTarget === 'queue';
+  const activeRoom = showRooms ? (rooms.find((r) => r.id === activeRoomId) || null) : null;
+  const roomUnread = (r: RoomInfo): boolean => {
+    const last = (getRoomMessages?.(r.id) || []).slice(-1)[0];
+    return !!last && last.senderId !== identity?.orbitId && last.timestamp > (r.seenAt || 0);
+  };
+  const roomMessages = useMemo<ChatMessage[]>(
+    () => (showRooms && activeRoomId && getRoomMessages ? getRoomMessages(activeRoomId) : []),
+    // getRoomMessages reads local courier state; recompute when it changes.
+    [showRooms, activeRoomId, getRoomMessages, rooms]
+  );
 
   // Mark current peer as read when opened
   useEffect(() => {
@@ -187,9 +232,14 @@ export function GMatchDMs({
     e?.preventDefault();
     const text = inputText.trim();
     if (!text && !pendingAttachment) return;
+    // Room messages ride the sealed group envelope: attachments/replies are a
+    // server-inbox feature; plain text only (the send button says so).
+    if (openTarget === 'room' && pendingAttachment) return;
 
     playPress(920);
-    if (openTarget === 'group' && activeGroupId) {
+    if (openTarget === 'room' && activeRoomId) {
+      onSayRoom?.(activeRoomId, text);
+    } else if (openTarget === 'group' && activeGroupId) {
       onSendGroupMessage?.(activeGroupId, text || ' ', replyingTo?.id, pendingAttachment ?? undefined);
     } else if (isLobbyGroup) {
       onSendMessage?.(text || ' ', 'global_lobby');
@@ -315,7 +365,9 @@ export function GMatchDMs({
   };
 
   const displayedMessages: ChatMessage[] =
-    openTarget === 'group'
+    openTarget === 'room'
+      ? roomMessages
+      : openTarget === 'group'
       ? (groupMessages[activeGroupId || ''] || [])
       : isLobbyGroup
       ? lobbyMessages
@@ -349,19 +401,51 @@ export function GMatchDMs({
     const stream = messageStreamRef.current;
     if (!stream) return;
     stream.scrollTop = stream.scrollHeight;
-  }, [activePmPeer?.orbitId, activeGroupId, displayedMessages.length]);
+  }, [activePmPeer?.orbitId, activeGroupId, activeRoomId, displayedMessages.length]);
 
   const lastLobbyMsg = lobbyMessages[lobbyMessages.length - 1]?.text || 'Active public discussion...';
   const lastQueueMsg = queueMessages[queueMessages.length - 1]?.text || 'Matchmaking chat & challenges';
+
+  const openRoom = (roomId: string) => {
+    playPress(800);
+    setListMode(false);
+    setSidebarOpen(false);
+    setShowMembers(false);
+    setReplyingTo(null);
+    onSelectGroup?.(null);
+    onSelectPeer(null);
+    onSelectRoom?.(roomId);
+  };
 
   const openGroup = (g: GroupInfo) => {
     playPress(800);
     setListMode(false);
     setSidebarOpen(false);
     setShowMembers(false);
+    onSelectRoom?.(null);
     onSelectGroup?.(g.id);
     setReplyingTo(null);
     onLoadGroupMessages?.(g.id);
+  };
+
+  const submitNewRoom = () => {
+    const name = newRoomName.trim();
+    if (!name || !onCreateRoom) return;
+    const room = onCreateRoom(name);
+    if (room) {
+      setShowNewRoom(false);
+      setNewRoomName('');
+      openRoom(room.id);
+    }
+  };
+
+  const inviteRoomPeer = async () => {
+    if (!activeRoom || !onInviteRoom) return;
+    const q = roomInvitePeer.trim().toLowerCase();
+    const target = peers.find((p) => p.orbitId === q || (p.name || '').toLowerCase() === q);
+    if (!target) return;
+    const ok = await onInviteRoom(activeRoom.id, target.orbitId);
+    if (ok) setRoomInvitePeer('');
   };
 
   const submitNewGroup = async () => {
@@ -379,7 +463,9 @@ export function GMatchDMs({
   };
 
   const headerTitle =
-    openTarget === 'group'
+    openTarget === 'room'
+      ? (activeRoom?.name || 'Room')
+      : openTarget === 'group'
       ? (groups.find((g) => g.id === activeGroupId)?.name || 'Group')
       : isLobbyGroup
       ? 'Lobby Lounge'
@@ -389,7 +475,9 @@ export function GMatchDMs({
       ? displayNameFor(activePmPeer.orbitId, activePmPeer.name)
       : 'User';
   const headerSubtitle =
-    openTarget === 'group'
+    openTarget === 'room'
+      ? `E2EE room · ${activeRoom?.members.length ?? 0} members · epoch ${activeRoom?.epoch ?? 1}`
+      : openTarget === 'group'
       ? 'Group chat'
       : isLobbyGroup
       ? 'Public lobby · clears every 12 hours'
@@ -481,7 +569,7 @@ export function GMatchDMs({
         <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar">
           <button
             type="button"
-            onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectPeer({ orbitId: 'global_lobby', name: 'Lobby Lounge (Everyone)' }); }}
+            onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectRoom?.(null); onSelectPeer({ orbitId: 'global_lobby', name: 'Lobby Lounge (Everyone)' }); }}
             className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-border-glass text-left cursor-pointer ${openTarget === 'lobby' ? 'bg-glass-w8 border-border-glass' : ''}`}
           >
             <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center">
@@ -498,7 +586,7 @@ export function GMatchDMs({
 
           <button
             type="button"
-            onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectPeer({ orbitId: 'card_queue', name: 'Card Game Queue' }); }}
+            onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectRoom?.(null); onSelectPeer({ orbitId: 'card_queue', name: 'Card Game Queue' }); }}
             className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-border-glass text-left cursor-pointer ${openTarget === 'queue' ? 'bg-glass-w8 border-border-glass' : ''}`}
           >
             <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center">
@@ -533,6 +621,58 @@ export function GMatchDMs({
             </>
           )}
 
+          {showRooms && (
+            <>
+              <div className="px-3 py-1.5 border-b border-border-glass text-xs text-retro-muted flex items-center justify-between gap-1.5">
+                <span className="flex items-center gap-1.5"><Lock className="w-3 h-3" /> Rooms</span>
+                <button
+                  type="button"
+                  onClick={() => { playPress(780); setShowNewRoom((v) => !v); }}
+                  title="New room"
+                  aria-label="New room"
+                  className="p-0.5 rounded text-retro-muted hover:text-retro-fg cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              {showNewRoom && (
+                <div className="p-2.5 border-b border-border-glass flex gap-1.5 shrink-0">
+                  <input
+                    value={newRoomName}
+                    onChange={(e) => setNewRoomName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') submitNewRoom(); }}
+                    placeholder="room name"
+                    aria-label="New room name"
+                    className="flex-1 min-w-0 bg-surface-raised border border-border-glass rounded-md px-2 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent/60"
+                  />
+                  <button type="button" onClick={submitNewRoom} className="px-2.5 py-1.5 bg-retro-accent text-black rounded-md text-xs font-bold cursor-pointer hover:bg-retro-accent-hover">Create</button>
+                </div>
+              )}
+              {rooms.map((r) => {
+                const last = (getRoomMessages?.(r.id) || []).slice(-1)[0];
+                const isRoomSelected = openTarget === 'room' && activeRoomId === r.id;
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => openRoom(r.id)}
+                    className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-border-glass text-left cursor-pointer ${isRoomSelected ? 'bg-glass-w8 border-border-glass' : ''}`}
+                  >
+                    <div className="w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center"><Lock className="w-4 h-4" /></div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-medium text-retro-body truncate block">{r.name}</span>
+                        <span className="text-[10px] text-retro-muted shrink-0 tabular-nums">{r.members.length}</span>
+                      </div>
+                      <p className="text-xs truncate mt-0.5 text-retro-muted">{last?.text || 'Sealed group chat'}</p>
+                      {roomUnread(r) && <span className="w-1.5 h-1.5 rounded-full bg-retro-accent shrink-0" aria-label="Unread" />}
+                    </div>
+                  </button>
+                );
+              })}
+            </>
+          )}
+
           <div className="px-3 py-1.5 border-b border-border-glass text-xs text-retro-muted"><span>Direct Messages</span></div>
 
           {isSearching ? (
@@ -547,7 +687,7 @@ export function GMatchDMs({
                     <button
                       key={p.orbitId}
                       type="button"
-                      onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectPeer(p); setSearchQuery(''); }}
+                      onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectRoom?.(null); onSelectPeer(p); setSearchQuery(''); }}
                       className="w-full p-2.5 rounded-md flex items-center gap-3 hover:bg-glass-w5 transition-colors text-left cursor-pointer"
                     >
                       <div className="w-9 h-9 rounded-full bg-surface-raised border border-border-glass text-retro-muted font-medium text-xs flex items-center justify-center overflow-hidden shrink-0">
@@ -588,7 +728,7 @@ export function GMatchDMs({
                 <div key={peerId} onContextMenu={handleThreadContextMenu}>
                   <button
                     type="button"
-                    onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectPeer({ orbitId: peerId, name, pfp }); setDeleteThreadPeerId(null); }}
+                    onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectRoom?.(null); onSelectPeer({ orbitId: peerId, name, pfp }); setDeleteThreadPeerId(null); }}
                     className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-border-glass text-left cursor-pointer ${isSelected ? 'bg-glass-w8 border-border-glass' : ''}`}
                   >
                     <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center font-medium text-xs">
@@ -643,7 +783,9 @@ export function GMatchDMs({
                 </button>
 
                 <div className="w-8 h-8 rounded-full bg-surface-raised border border-border-glass shrink-0 overflow-hidden flex items-center justify-center text-xs font-medium text-retro-muted">
-                  {openTarget === 'group' ? (
+                  {openTarget === 'room' ? (
+                    <Lock className="w-4 h-4" />
+                  ) : openTarget === 'group' ? (
                     <Users className="w-4 h-4" />
                   ) : isLobbyGroup ? (
                     <Globe className="w-4 h-4" />
@@ -663,6 +805,17 @@ export function GMatchDMs({
               </div>
 
               <div className="flex items-center gap-2 text-retro-muted shrink-0">
+                {openTarget === 'room' && activeRoom && identity && activeRoom.ownerId !== identity.orbitId && onLeaveRoom && (
+                  <button
+                    type="button"
+                    onClick={() => { playPress(520); onLeaveRoom(activeRoom.id); onSelectRoom?.(null); setListMode(true); }}
+                    title="Leave room"
+                    aria-label="Leave room"
+                    className="p-1.5 rounded-md text-retro-muted hover:text-rose-400 transition-colors cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                )}
                 {canShowMembers && (
                   <button
                     type="button"
@@ -839,6 +992,16 @@ export function GMatchDMs({
                               )}
                               {showActions && (() => {
                                 const ageMs = Date.now() - msg.timestamp;
+                                // Room messages live in the sealed local store:
+                                // edit/delete/report endpoints don't exist for
+                                // them; only Copy applies.
+                                if (openTarget === 'room') {
+                                  return (
+                                    <div className={`flex flex-wrap items-center gap-1 mt-1 ${isOwn ? 'justify-end' : ''}`}>
+                                      <button type="button" onClick={() => copyMessage(msg.text)} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Copy className="w-3 h-3" /> Copy</button>
+                                    </div>
+                                  );
+                                }
                                 const canEdit = isOwn && ageMs < 15 * 60 * 1000;
                                 const canDeleteEveryone = isOwn && ageMs < 10 * 60 * 1000;
                                 return (
@@ -885,6 +1048,26 @@ export function GMatchDMs({
               </>
               )}
             </div>
+
+            {openTarget === 'room' && activeRoom && (
+              <div className="px-3 pt-2 flex items-center gap-2 shrink-0 border-t border-border-glass">
+                <input
+                  value={roomInvitePeer}
+                  onChange={(e) => setRoomInvitePeer(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void inviteRoomPeer(); } }}
+                  placeholder="invite a contact by name…"
+                  aria-label="Invite contact to room"
+                  list="room-invite-peers"
+                  className="flex-1 min-w-0 bg-glass-w10 border border-border-glass rounded-md px-3 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent/50"
+                />
+                <datalist id="room-invite-peers">
+                  {peers.filter((p) => !activeRoom.members.includes(p.orbitId)).map((p) => (
+                    <option key={p.orbitId} value={p.name || p.orbitId} />
+                  ))}
+                </datalist>
+                <button type="button" onClick={() => void inviteRoomPeer()} className="px-2.5 py-1.5 rounded-md glass-action text-xs font-medium cursor-pointer">Invite</button>
+              </div>
+            )}
 
             {replyingTo && (
               <div className="px-3 pt-2 flex items-center gap-2 text-xs text-retro-muted shrink-0 border-t border-border-glass">
@@ -934,7 +1117,7 @@ export function GMatchDMs({
                       handleSend()
                     }
                   }}
-                  placeholder={openTarget === 'group' ? 'Message group...' : isLobbyGroup ? 'Message Lobby Lounge...' : isQueueGroup ? 'Message Card Queue...' : activePmPeer ? `Message ${displayNameFor(activePmPeer.orbitId, activePmPeer.name)}...` : 'Message...'}
+                  placeholder={openTarget === 'room' ? `Message ${activeRoom?.name || 'room'} (sealed)…` : openTarget === 'group' ? 'Message group...' : isLobbyGroup ? 'Message Lobby Lounge...' : isQueueGroup ? 'Message Card Queue...' : activePmPeer ? `Message ${displayNameFor(activePmPeer.orbitId, activePmPeer.name)}...` : 'Message...'}
                   className="w-full bg-transparent focus:outline-none placeholder:text-retro-muted text-retro-fg border-none"
                 />
               </div>
