@@ -45,6 +45,12 @@ export interface Deck {
   updatedAt: string;
 }
 
+/** Broadcast after any deck mutation so holders of deck state (App's queue
+ * gate) refetch — same pattern as orbit-active-deck-changed / orbit-cards-refresh. */
+export function notifyDecksChanged(): void {
+  window.dispatchEvent(new Event('orbit-decks-changed'))
+}
+
 interface DeckValidation {
   valid: boolean;
   issues: string[];
@@ -144,6 +150,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
           setStoredActiveDeckId(data.deck.id);
         }
         setNewDeckName('');
+        notifyDecksChanged();
         toast?.('Deck created! Now add 5 cards to finish.', 'success');
       } else {
         const data = await res.json();
@@ -174,6 +181,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
           setActiveDeckIdState(nextActive);
           setStoredActiveDeckId(nextActive);
         }
+        notifyDecksChanged();
         toast?.('Deck deleted', 'success');
       } else {
         const data = await res.json();
@@ -200,6 +208,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
       setSelectedDeck(data.deck)
       setDecks((current) => current.map((deck) => deck.id === data.deck.id ? data.deck : deck))
       setEditingName('')
+      notifyDecksChanged()
       toast?.('Deck renamed', 'success')
     } catch {
       toast?.('Failed to rename deck', 'error')
@@ -219,6 +228,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
         const data = await res.json();
         setSelectedDeck(data.deck);
         setDecks((current) => current.map(d => d.id === data.deck.id ? data.deck : d));
+        notifyDecksChanged();
         toast?.('Card added to deck', 'success');
       } else {
         const data = await res.json();
@@ -242,6 +252,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
         const data = await res.json();
         setSelectedDeck(data.deck);
         setDecks((current) => current.map(d => d.id === data.deck.id ? data.deck : d));
+        notifyDecksChanged();
         toast?.('Card removed from deck', 'success');
       } else {
         const data = await res.json();

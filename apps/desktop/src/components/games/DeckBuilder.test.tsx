@@ -50,4 +50,22 @@ describe('DeckBuilder', () => {
     await waitFor(() => expect(screen.getAllByTestId('card-tile').length).toBeGreaterThan(0))
     expect(cardTileProps[0].identity).toBe(identity)
   })
+
+  it('broadcasts orbit-decks-changed after adding a card so the queue gate refreshes', async () => {
+    const { userEvent } = await import('@testing-library/user-event')
+    const events: number[] = []
+    window.addEventListener('orbit-decks-changed', () => events.push(1))
+    orbitFetch.mockImplementation(async (endpoint: string, options?: any) => {
+      if (options?.method === 'POST' && /\/cards$/.test(endpoint)) {
+        return json({ deck: { ...deck, cards: ['c1', 'c2'] } })
+      }
+      return json({ decks: [deck] })
+    })
+    renderBuilder()
+    await waitFor(() => expect(screen.getAllByTestId('card-tile').length).toBeGreaterThan(0))
+    await userEvent.click(screen.getByRole('button', { name: /add cards/i }))
+    const addBtn = await screen.findByTitle(/^Add to deck/)
+    await userEvent.click(addBtn)
+    await waitFor(() => expect(events.length).toBeGreaterThan(0))
+  })
 })

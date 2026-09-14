@@ -5,7 +5,7 @@ import { useSettings } from "./hooks/useSettings";
 import { useIdle } from "./hooks/useIdle";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { getApiBaseUrl, orbitFetch } from "./utils/api";
+import { getApiBaseUrl, orbitFetch, invalidateCache } from "./utils/api";
 import { OrbitPeer, pollOffers } from "./utils/webrtc";
 import { saveObject, getAllObjects, deleteObject } from "./utils/storage";
 import type { SendPanelHandle } from "./components/SendPanel";
@@ -434,26 +434,31 @@ export default function Home() {
     return () => window.removeEventListener('orbit-active-deck-changed', handleDeckChange);
   }, []);
 
-  // Fetch decks on identity load or when deck changes
-  useEffect(() => {
+  // Fetch decks on identity load, deck change, or any deck mutation.
+  const loadUserDecks = useCallback(async () => {
     if (!identity) return;
-    let active = true;
-    orbitFetch('/api/decks', {}, identity)
-      .then(async (r) => {
-        if (r.ok && active) {
-          const data = await r.json();
-          setUserDecks((prev) => {
-            const list: Deck[] = data.decks || [];
-            if (prev.length === list.length && prev.every((d, i) => d.id === list[i].id && d.cards.length === list[i].cards.length && d.updatedAt === list[i].updatedAt)) {
-              return prev;
-            }
-            return list;
-          });
-        }
-      })
-      .catch(() => {});
-    return () => { active = false; };
-  }, [identity, activeDeckId]);
+    try {
+      const r = await orbitFetch('/api/decks', {}, identity);
+      if (!r.ok) return;
+      const data = await r.json();
+      const list: Deck[] = data.decks || [];
+      setUserDecks((prev) =>
+        prev.length === list.length &&
+        prev.every((d, i) => d.id === list[i].id && d.cards.length === list[i].cards.length && d.updatedAt === list[i].updatedAt)
+          ? prev
+          : list);
+    } catch { /* offline */ }
+  }, [identity]);
+
+  useEffect(() => { void loadUserDecks(); }, [identity, activeDeckId, loadUserDecks]);
+
+  // DeckBuilder mutations land in its own state; without this the queue gate
+  // (`hasActiveDeck`) keeps reading a stale `userDecks` forever.
+  useEffect(() => {
+    const handler = () => { invalidateCache('/api/decks'); void loadUserDecks(); };
+    window.addEventListener('orbit-decks-changed', handler);
+    return () => window.removeEventListener('orbit-decks-changed', handler);
+  }, [loadUserDecks]);
 
   const allOwnedCards = useMemo(
     () => (identity ? mergeMyCards(items, canonicalCards, identity.orbitId, myProfile?.pfpUrl) : []),
