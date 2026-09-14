@@ -423,6 +423,7 @@ export default function Home() {
 
   const [userDecks, setUserDecks] = useState<Deck[]>([]);
   const [activeDeckId, setActiveDeckId] = useState<string | null>(() => getStoredActiveDeckId());
+  const [gallerySubTab, setGallerySubTab] = useState<'cards' | 'deck'>('cards');
 
   // Listen to active deck changes across components
   useEffect(() => {
@@ -479,6 +480,7 @@ export default function Home() {
   )
 
   const navigateToDeckBuilder = useCallback(() => {
+    setGallerySubTab('deck');
     handleSetMainView('gallery');
     // mount-once handler: handleSetMainView identity is stable enough here
   }, [handleSetMainView]);
@@ -3553,7 +3555,9 @@ export default function Home() {
                       toast={toast}
                       cardByMedia={cardByMedia}
                       onOpenOwnerProfile={openProfileById}
-                      myCards={allOwnedCards as any}
+                      allOwnedCards={allOwnedCards as any}
+                      subTab={gallerySubTab}
+                      setSubTab={setGallerySubTab}
                       onEnterArena={() => { setGamesSubTab('duel'); setMainView('games'); }}
                       onRepostGalleryImage={(media) => openCreatePostWithMedia(media)}
                       onAddGalleryImageToStory={(media) => void shareMediaAs(media, 'story')}

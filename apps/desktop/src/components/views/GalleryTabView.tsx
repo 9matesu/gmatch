@@ -2,7 +2,6 @@
 
 // Extracted verbatim from App.tsx `mainView === 'gallery'` branch
 // (GalleryView + the DeckBuilder block that lives on the same page).
-import { useState } from 'react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject, User } from '@orbit/shared';
 import { GalleryView } from '../GalleryView';
@@ -12,6 +11,8 @@ import type { FeedPost } from '../feed/GMatchFeed';
 type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 
 export function GalleryTabView({
+  subTab,
+  setSubTab,
   filteredItems,
   itemsLoading,
   galleryFilter,
@@ -47,11 +48,13 @@ export function GalleryTabView({
   toast,
   cardByMedia,
   onOpenOwnerProfile,
-  myCards,
+  allOwnedCards,
   onEnterArena,
   onRepostGalleryImage,
   onAddGalleryImageToStory,
 }: {
+  subTab: 'cards' | 'deck';
+  setSubTab: (t: 'cards' | 'deck') => void;
   filteredItems: OrbitObject[];
   itemsLoading: boolean;
   galleryFilter: 'all' | 'received' | 'sent' | 'starred';
@@ -87,12 +90,11 @@ export function GalleryTabView({
   toast: ToastFn;
   cardByMedia: ReadonlyMap<string, string>;
   onOpenOwnerProfile: (ownerId: string) => void;
-  myCards: OrbitObject[];
+  allOwnedCards: OrbitObject[];
   onEnterArena: () => void;
   onRepostGalleryImage?: (media: { url: string; tags: string[]; name?: string }) => void;
   onAddGalleryImageToStory?: (media: { url: string; tags: string[]; name?: string }) => void;
 }) {
-  const [subTab, setSubTab] = useState<'cards' | 'deck'>('cards');
   const tab = (id: 'cards' | 'deck', label: string) => (
     <button
       type="button"
@@ -159,7 +161,7 @@ export function GalleryTabView({
         <div className="bg-surface-raised border border-border-glass rounded-xl p-4">
           <DeckBuilder
             identity={identity}
-            cards={myCards as any}
+            cards={allOwnedCards as any}
             onEnterArena={onEnterArena}
             toast={toast}
           />
