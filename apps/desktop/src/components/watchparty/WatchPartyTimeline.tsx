@@ -47,7 +47,7 @@ export function WatchPartyTimeline({ party, canLoad = false, onLoadVideo }: {
         type="button"
         aria-label={playing ? 'Pause party' : 'Play party'}
         onClick={() => controlPlayback(party.id, playing ? 'pause' : 'play', target)}
-        className={`${BTN} p-1.5 rounded-md`}
+        className={`${BTN} p-2 rounded-md`}
       >
         {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
       </button>

@@ -180,7 +180,7 @@ export function WatchPartySlot({
               v.muted = !v.muted
               setMuted(v.muted)
             }}
-            className="p-1.5 rounded-md bg-black/60 text-white/80 hover:text-white cursor-pointer"
+            className="p-2 rounded-md bg-black/60 text-white/90 hover:text-white cursor-pointer transition-colors duration-150"
           >
             {muted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
           </button>
@@ -193,7 +193,7 @@ export function WatchPartySlot({
               const v = wrapRef.current?.querySelector('video')
               if (v && party.frame) v.currentTime = computeTargetPosition(party.frame, serverNow())
             }}
-            className="p-1.5 rounded-md bg-black/60 text-white/80 hover:text-white cursor-pointer"
+            className="p-2 rounded-md bg-black/60 text-white/90 hover:text-white cursor-pointer transition-colors duration-150"
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
@@ -205,7 +205,7 @@ export function WatchPartySlot({
               if (document.fullscreenElement) void document.exitFullscreen()
               else void wrapRef.current?.requestFullscreen()
             }}
-            className="p-1.5 rounded-md bg-black/60 text-white/80 hover:text-white cursor-pointer"
+            className="p-2 rounded-md bg-black/60 text-white/90 hover:text-white cursor-pointer transition-colors duration-150"
           >
             <Maximize className="w-3.5 h-3.5" />
           </button>
