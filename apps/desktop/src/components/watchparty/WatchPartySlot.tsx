@@ -159,18 +159,18 @@ export function WatchPartySlot({
           </span>
         </div>
       )}
-      <span className="absolute top-1 left-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/90 pointer-events-none">
-        {party.name}
+      <span className="absolute top-2 left-3 rounded bg-black/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/90 pointer-events-none">
+        {party.mediaName || party.name}
       </span>
       {party.frame?.by && (
-        <span className="absolute bottom-1 left-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white/80 pointer-events-none truncate max-w-[60%]">
+        <span className="absolute bottom-2 left-3 rounded bg-black/60 px-2 py-0.5 text-[10px] text-white/80 pointer-events-none truncate max-w-[55%]">
           {party.frame.by} controls playback
         </span>
       )}
       {/* Local controls: never synced (volume/fullscreen belong to the room
           of one person's ears and monitor). */}
       {videoSrc && (
-        <div className="absolute top-1 right-1 flex gap-1">
+        <div className="absolute top-2 right-3 flex gap-1.5">
           <button
             type="button"
             aria-label={muted ? 'Unmute video' : 'Mute video'}

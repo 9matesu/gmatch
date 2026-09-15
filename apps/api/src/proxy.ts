@@ -176,30 +176,57 @@ async function resolveOpenGraph(url: URL): Promise<string | null> {
   if (/\.(jpe?g|png|gif|webp|avif|mp4|webm|mov|ogg|m4v)([?#]|$)/i.test(url.pathname)) return null
   try {
     const res = await fetch(url.toString(), {
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(15000),
       headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html,*/*;q=0.8' },
     })
     if (!res.ok) return null
     const ct = res.headers.get('content-type') || ''
     if (ct && !ct.includes('html')) return null
     const html = await res.text()
-    // An .mp4 embedded in the page is a stronger video signal than og:image
+    const title = extractPageTitle(html)
+    if (title) {
+      pageTitles.set(url.toString(), title)
+      if (pageTitles.size > 200) pageTitles.delete(pageTitles.keys().next().value as string)
+    }
+    // An embedded playable file is a stronger video signal than og:image
     // (pmvhaven ships only a thumbnail as og:image).
-    return extractEmbeddedMp4(html) || extractOgMedia(html)
+    return extractEmbeddedVideo(html) || extractOgMedia(html)
   } catch { return null }
 }
 
 /**
- * Site-agnostic module: find a direct .mp4 in page HTML, including
- * \u002F-escaped JSON payloads. m3u8 manifests are skipped (not playable in
- * <video> without hls.js; the .mp4 sibling is what sites ship for direct
- * playback). Longest match wins on ties-with-suffix pages.
+ * Site-agnostic module: find a direct playable file in page HTML
+ * (mp4/webm/m4v/mov, optional query), including \u002F-escaped JSON payloads
+ * and <video>/<source> tags. m3u8 stays out (not playable in <video>
+ * without hls.js; sites ship the direct file for playback anyway).
  */
-export function extractEmbeddedMp4(html: string): string | null {
+export function extractEmbeddedVideo(html: string): string | null {
   const unescaped = html.replace(/\\u002[fF]/g, '/')
-  const matches = unescaped.match(/https?:\/\/[^"'\\\s<>]+\.mp4/g)
-  if (!matches) return null
-  return matches.find((u) => !/\.m3u8/i.test(u)) || null
+  const m = unescaped.match(/https?:\/\/[^"'\\\s<>]+?\.(?:mp4|webm|m4v|mov)(?:\?[^"'\\\s<>]*)?/i)
+  if (m) return m[0]
+  const tag = unescaped.match(/<(?:video|source)[^>]*?src="([^"]+?\.(?:mp4|webm|m4v|mov)(?:\?[^"]*)?)"[^>]*>/i)
+  if (tag) return tag[1]
+  return null
+}
+
+/** Page title for parsed-media naming (og:title wins, then <title>). */
+export function extractPageTitle(html: string): string | null {
+  const og = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]{1,120})"/i)
+    || html.match(/<meta[^>]+content="([^"]{1,120})"[^>]+property="og:title"/i)
+  const t = html.match(/<title[^>]*>([^<]{1,120})<\/title>/i)
+  const raw = og?.[1] || t?.[1] || null
+  if (!raw) return null
+  return raw
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&#x27;/gi, "'")
+    .trim() || null
+}
+
+// page URL -> title captured during resolution; routes/watchparty consumes
+// it to name parsed videos. ponytail: capped in-memory map, per isolate.
+const pageTitles = new Map<string, string>()
+export function pageTitleFor(pageUrl: string): string | null {
+  return pageTitles.get(pageUrl) || null
 }
 
 /**

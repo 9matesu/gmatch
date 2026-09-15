@@ -45,10 +45,11 @@ export async function detectMailMode(
         return 'courier'
       }
 
-      // 2. Unsigned GET /api/pm: only OLD (pre-1.2.4) nodes still mount the
-      // inbox route (401 = route exists). Current full nodes 404 it, and
-      // courier (PUT /api/mail/:token, mounted everywhere) is the only mail.
-      const res = await fetchImpl(`${base}/api/pm`, { method: 'GET' }).catch(() => null)
+      // 2. Unsigned HEAD /api/pm: only OLD (pre-1.2.4) nodes still mount the
+      // inbox route (any mounted response = legacy exists). Current full
+      // nodes 404 it, and courier (PUT /api/mail/:token, mounted everywhere)
+      // is the only mail. HEAD so the probe itself never shows as a page 404.
+      const res = await fetchImpl(`${base}/api/pm`, { method: 'HEAD' }).catch(() => null)
       const mode: MailMode = res && res.status !== 404 ? 'legacy' : 'courier'
 
       cache.set(base, mode)

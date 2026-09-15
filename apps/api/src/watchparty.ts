@@ -417,14 +417,16 @@ function applyQueueMedia(party: Party, entry: QueueEntry, by: string, action: 'p
 }
 
 /** Persistence: rooms die with the process otherwise, so every deploy
- * 404s live rooms. Members/chat are NOT persisted: tabs lost their
- * sockets anyway; clients re-join by id (watch.join) and rebuild the
- * roster around the resurrected frame. Bans are session-scoped too. */
+ * 404s live rooms. Members/chat: the roster re-forms via watch.join (tabs
+ * lost their sockets anyway); chat persists WITH the room so the backlog
+ * lives for its whole lifespan. Bans stay session-scoped. */
 export function serializeParties(): string {
   return JSON.stringify([...parties.values()].map((p) => ({
     id: p.id, name: p.name, mediaUrl: p.mediaUrl, mediaName: p.mediaName,
     relay: p.relay, hostId: p.hostId, isPrivate: p.isPrivate, lockVideo: p.lockVideo,
     frame: p.frame, queue: p.queue, current: p.current,
+    // chat persists with the room (applyChat caps it at 80 entries)
+    chat: p.chat,
   })))
 }
 
@@ -464,6 +466,7 @@ export function restoreParties(json: string): number {
     p.frame = s.frame
     if (Array.isArray(s.queue)) p.queue = s.queue
     if (typeof s.current === 'string') p.current = s.current
+    if (Array.isArray(s.chat)) p.chat = s.chat.filter((m: any) => m && typeof m.text === 'string').slice(-80)
     // dropParty clears queue-entry capabilities; restore must re-mint ALL
     // of them, not just the current media, or queued private objects 404.
     for (const entry of p.queue) addPartyMedia(p, entry.url)

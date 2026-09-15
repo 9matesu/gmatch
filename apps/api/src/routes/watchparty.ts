@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { orbitAuth } from '../middleware/auth'
 import type { D1Turso } from '../db'
 import type { LocalBlobStore } from '../blob'
-import { proxyAndStoreExternal, classifyAndResolve, isPrivateTarget } from '../proxy'
+import { proxyAndStoreExternal, classifyAndResolve, isPrivateTarget, pageTitleFor } from '../proxy'
 import { broadcastToRoom } from '../ws-bus'
 import { createParty, getParty, listParties, setPartyMedia, queueOps, type Party } from '../watchparty'
 
@@ -89,6 +89,16 @@ function takeParseBudget(userId: string, n: number): boolean {
 }
 // ponytail: in-memory bucket dies with the isolate; fine for a 50-room app.
 
+function fallbackNameFromUrl(raw: string): string {
+  try {
+    const u = new URL(raw)
+    const base = u.pathname.split('/').filter(Boolean).pop() || u.hostname
+    return decodeURIComponent(base.replace(/\.(mp4|webm|m4v|mov)$/i, '').replace(/[-_]+/g, ' ')).trim().slice(0, 60)
+  } catch {
+    return ''
+  }
+}
+
 watchparty.post('/', orbitAuth, async (c) => {
   const orbitId = c.get('orbitId')
   if (!takeParseBudget(orbitId, 1)) return c.json({ error: 'Too many video parses. Wait a minute.' }, 429)
@@ -105,10 +115,14 @@ watchparty.post('/', orbitAuth, async (c) => {
   const media = await resolveMedia(c.env, orbitId, url)
   if (!media) return c.json({ error: PARSE_ERROR }, 422)
 
-  const party = createParty(name || 'Party', media.url, media.url, media.relay, orbitId)
+  // Room/media title: user name wins, then the page title captured during
+  // parsing, then a cleaned url basename. The video gets a name for free.
+  const parsedName = (pageTitleFor(url) || fallbackNameFromUrl(url)).slice(0, 60)
+  const party = createParty(name || parsedName || 'Party', media.url, media.url, media.relay, orbitId)
+  party.mediaName = parsedName || name
   if (media.relay) {
     setPartyMedia(party, `/api/watchparty/${party.id}/stream`)
-    party.queue.push({ id: crypto.randomUUID().slice(0, 8), name: party.name, url: party.mediaUrl, relay: media.relay })
+    party.queue.push({ id: crypto.randomUUID().slice(0, 8), name: party.mediaName, url: party.mediaUrl, relay: media.relay })
     party.current = party.queue[0].id
   }
   return c.json({ party: { id: party.id, name: party.name, url: party.mediaUrl } }, 201)
@@ -159,7 +173,7 @@ watchparty.post('/:id/video', orbitAuth, async (c) => {
     if (!media) { failed.push(u); continue }
     let entryUrl = media.url
     if (media.relay && !entryUrl) entryUrl = `/api/watchparty/${party.id}/stream`
-    const add = queueOps(orbitId, { party: party.id, op: 'add', name: title, url: entryUrl, relay: media.relay })
+    const add = queueOps(orbitId, { party: party.id, op: 'add', name: title || (pageTitleFor(u) || fallbackNameFromUrl(u)), url: entryUrl, relay: media.relay })
     if (!add) { failed.push(u); continue }
     added.push({ ...party.queue[party.queue.length - 1] })
   }
@@ -204,12 +218,19 @@ watchparty.get('/:id/stream', async (c) => {
   const headers: Record<string, string> = { 'User-Agent': 'Mozilla/5.0', Referer: party.relay.referer }
   const range = c.req.header('Range')
   if (range && /^bytes=[\d-]+$/.test(range)) headers.Range = range
+  // The timer guards ONLY the header phase: AbortSignal.timeout would keep
+  // owning the response body and kill every long stream 15 s in (the
+  // "randomly pauses mid-video" report). Release it once headers are here.
+  const ctl = new AbortController()
+  const headerTimer = setTimeout(() => ctl.abort(), 15_000)
   let up: Response
   try {
-    up = await fetch(party.relay.upstream, { headers, redirect: 'follow', signal: AbortSignal.timeout(15000) })
+    up = await fetch(party.relay.upstream, { headers, redirect: 'follow', signal: ctl.signal })
   } catch {
+    clearTimeout(headerTimer)
     return c.json({ error: 'Upstream unreachable' }, 502)
   }
+  clearTimeout(headerTimer)
   if (!up.ok) return c.json({ error: 'Upstream refused' }, 502)
   const out = new Headers()
   const ct = up.headers.get('content-type')
