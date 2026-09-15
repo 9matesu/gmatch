@@ -53,7 +53,11 @@ and playback stays frame-accurate within the drift deadband.
    the 8-hex code. `watch.join` subscribes the socket to room `watch:<id>`
    and the room receives a roster + "X joined" system line; the joiner
    receives ONE snapshot roster frame carrying `{host, members, frame, chat,
-   queue, current}` (position + backlog recovery for free).
+   queue, current}` (position + backlog recovery for free). Chat persists
+   WITH the room across restarts (80-entry window); bans and mutes stay
+   session-scoped. The theater stays mounted (hidden) off the Watch tab,
+   so an open room keeps playing in the background - the dock beside the
+   feed is a switcher, never a second player.
 3. Leave: explicit `watch.leave`, or the last socket of a user closing
    (`watchDisconnect` promotes the host to the oldest remaining member).
    Empty room = deleted.
@@ -84,10 +88,14 @@ and playback stays frame-accurate within the drift deadband.
    readable because `isPartyMediaObject()` authorizes the party-capability
    URL inside the objects route).
 2. If the file is above the 50MB store cap, `classifyAndResolve` extracts
-   the direct .mp4 and the room binds a RELAY: `GET /api/watchparty/:id/stream`
-   is a Range passthrough to that one upstream with the page referer
-   (probe: video/* content-type, <=500MB). The room id is the capability;
-   this is not an open proxy.
+    the direct playable file (mp4/webm/m4v/mov; `extractEmbeddedVideo`
+    scans raw + \u002F-escaped URLs and `<video>/<source>` tags; og:video >
+    embedded > og:image) and the room binds a RELAY:
+    `GET /api/watchparty/:id/stream` is a Range passthrough to that one
+    upstream with the page referer (probe: video/* content-type, <=500MB).
+    The relay's abort timer guards HEADERS only - long bodies stream past
+    15 s unmolested. The room id is the capability;
+    this is not an open proxy.
 3. Reconnect: after a WS reconnect the server-side socket holds no rooms;
    `auth_ack` fans `__ws_reconnected` and the store re-sends `watch.join`
    for every open party. The join snapshot restores frame/chat/queue.
