@@ -137,6 +137,9 @@ function serverNow(): number {
 
 function dropParty(party: Party): void {
   parties.delete(party.id)
+  // Audit A8: every queued URL registered a capability, not just the
+  // current one — clearing only mediaUrl left stale read grants forever.
+  for (const entry of party.queue) partyMedia.delete(entry.url)
   if (party.mediaUrl) partyMedia.delete(party.mediaUrl)
 }
 
@@ -145,11 +148,16 @@ function gcTick(): void {
   for (const [id, p] of parties) {
     if (now - p.lastSeen > IDLE_MS) dropParty(p)
   }
-  while (parties.size >= MAX_PARTIES) {
-    const oldest = parties.keys().next().value as string
-    const p = parties.get(oldest)
+  while (parties.size > MAX_PARTIES) {
+    // Audit A6: evict the least-recently-SEEN room, not the first created.
+    let victimId = ''
+    let victimSeen = Infinity
+    for (const [id, p] of parties) {
+      if (p.lastSeen < victimSeen) { victimSeen = p.lastSeen; victimId = id }
+    }
+    const p = parties.get(victimId)
     if (p) dropParty(p)
-    parties.delete(oldest)
+    parties.delete(victimId)
   }
 }
 
