@@ -1,14 +1,14 @@
 'use client'
 
 // Room playlist: resolved videos waiting to play. The current entry is
-// marked; the host can play any entry now or drop entries. Add runs the
-// server media pipeline (same parse as START PARTY) into the queue without
-// interrupting playback.
+// marked; the host can play any entry now or drop entries. Add accepts up
+// to 10 URLs (one per line) and runs the server media pipeline on them
+// without interrupting playback.
 
 import { useState } from 'react'
 import { ListVideo, Play, Plus, X } from 'lucide-react'
-import { BTN, MUTED } from '../../ui/styles'
-import { loadPartyVideo, queueOp, type PartyRuntime } from '../../hooks/watchPartyStore'
+import { BTN, BTN_PRIMARY, MUTED } from '../../ui/styles'
+import { loadPartyVideos, queueOp, type PartyRuntime } from '../../hooks/watchPartyStore'
 
 interface IdentityLike {
   orbitId: string
@@ -16,22 +16,38 @@ interface IdentityLike {
   privateKeyHex: string
 }
 
+function parseLines(text: string): string[] {
+  return text.split(/\n+/).map((l) => l.trim()).filter(Boolean).slice(0, 11)
+}
+
 export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; identity: IdentityLike }) {
   const [adding, setAdding] = useState(false)
-  const [url, setUrl] = useState('')
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const isHost = party.host === identity.orbitId
   const canAdd = isHost || !party.lockVideo
 
-  const submit = async () => {
-    if (!url.trim()) return
-    setError('')
-    const res = await loadPartyVideo(identity, party.id, url.trim(), '', true)
-    if (!res.ok) {
-      setError(res.error || 'Could not queue this video.')
+  const submit = async (queueOnly: boolean) => {
+    const urls = parseLines(text)
+    if (urls.length === 0 || busy) return
+    if (urls.length > 10) {
+      setError('Add up to 10 videos at a time.')
       return
     }
-    setUrl('')
+    setError('')
+    setBusy(true)
+    const res = await loadPartyVideos(identity, party.id, urls, queueOnly)
+    setBusy(false)
+    if (!res.ok) {
+      setError(res.error || 'Could not queue these videos.')
+      return
+    }
+    if (res.failed.length > 0) {
+      setError(`Added ${res.added}. Failed ${res.failed.length}: ${res.failed[0]}`)
+      return
+    }
+    setText('')
     setAdding(false)
   }
 
@@ -49,17 +65,33 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
         )}
       </div>
       {adding && (
-        <div className="px-3 pb-2 space-y-1">
-          <input
+        <div className="px-3 pb-2 space-y-1.5">
+          <textarea
             autoFocus
-            aria-label="Queue video URL"
-            value={url}
-            placeholder="Video URL or page link"
-            onChange={(e) => setUrl(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') void submit() }}
-            className="glass-inset w-full px-2.5 py-1.5 text-xs font-mono"
+            aria-label="Queue video URLs"
+            value={text}
+            rows={4}
+            placeholder="Video URLs, one per line"
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void submit(true)
+              if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault()
+                void submit(true)
+              }
+            }}
+            className="glass-inset w-full px-2.5 py-1.5 text-xs font-mono resize-y"
           />
+          <p className={`text-[10px] ${MUTED}`}>Up to 10 per add. Parsing runs server-side.</p>
           {error && <p className="text-[10px] text-retro-error">{error}</p>}
+          <div className="flex gap-2">
+            <button type="button" onClick={() => void submit(true)} disabled={busy} className={`${BTN} flex-1 py-1 text-[10px] uppercase tracking-wider disabled:opacity-40`}>
+              {busy ? 'Parsing...' : 'Add'}
+            </button>
+            <button type="button" onClick={() => void submit(false)} disabled={busy} className={`${BTN_PRIMARY} flex-1 py-1 text-[10px] uppercase tracking-wider disabled:opacity-40`}>
+              Add and play
+            </button>
+          </div>
         </div>
       )}
       {party.queue.length > 0 && (
