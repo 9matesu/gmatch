@@ -44,7 +44,7 @@ export function validateTicket(ticket: string): string | null {
 // Watch Party relay: tiny JSON control frames (never media bytes).
 import {
   applyWatch, joinWatch, watchPong, applyChat, deleteChat, leaveWatch,
-  kickWatch, banWatch, muteWatch, transferHost, settingsWatch, queueOps,
+  kickWatch, banWatch, muteWatch, transferHost, settingsWatch, queueOps, touchRooms,
 } from './watchparty'
 
 export function handleIncoming(conn: WsConn, data: string): void {
@@ -92,6 +92,7 @@ export function handleIncoming(conn: WsConn, data: string): void {
   // frames are re-stamped with the SERVER clock and relayed to the room so
   // every peer advances from the same instant.
   if (msg.type === 'watch.ping') {
+    touchRooms(conn.userId || '')
     conn.send(JSON.stringify(watchPong(msg.t0)))
     return
   }

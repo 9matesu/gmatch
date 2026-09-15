@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import {
   createParty, getParty, listParties, applyWatch, joinWatch, leaveWatch, leaveAll, applyChat,
   deleteChat, kickWatch, banWatch, muteWatch, transferHost, settingsWatch,
-  queueOps, setPartyMedia, __resetParties, partyRoom, type Party,
+  queueOps, setPartyMedia, __resetParties, partyRoom, IDLE_MS, MAX_QUEUE, type Party,
 } from './watchparty'
 import { handleIncoming, conns, createWsTicket, type WsConn } from './ws-bus'
 
@@ -199,13 +199,17 @@ describe('queue', () => {
     expect(queueOps('u1', { party: p.id, op: 'add', name: 'x', url: '/api/objects/x' })).not.toBeNull()
   })
 
-  it('queue caps at 20 dropping oldest non-current', () => {
+  it('queue caps at MAX_QUEUE dropping oldest non-current', () => {
     const p = makeParty()
-    for (let i = 0; i < 25; i++) {
+    for (let i = 0; i < MAX_QUEUE + 5; i++) {
       queueOps('u1', { party: p.id, op: 'add', name: `q${i}`, url: `/api/objects/${i}` })
     }
-    expect(p.queue.length).toBe(20)
-    expect(p.queue[19].name).toBe('q24')
+    expect(p.queue.length).toBe(MAX_QUEUE)
+    expect(p.queue[MAX_QUEUE - 1].name).toBe(`q${MAX_QUEUE + 4}`)
+  })
+
+  it('room idle window covers an overnight run', () => {
+    expect(IDLE_MS).toBeGreaterThanOrEqual(4 * 60 * 60_000)
   })
 
   it("'next' keeps the room playing when the previous frame was playing", () => {
@@ -275,6 +279,17 @@ describe('ws relay integration', () => {
     expect(pong.type).toBe('watch.pong')
     expect(pong.t0).toBe(123)
     expect(pong.t1).toBeGreaterThan(0)
+  })
+
+  it('watch.ping refreshes lastSeen of every room the user is in', () => {
+    const p = makeParty('u1')
+    joinWatch('u2', 'Bob', { party: p.id })
+    p.lastSeen = Date.now() - 60_000
+    const a = fakeConn()
+    conns.add(a)
+    authed(a, 'u2')
+    handleIncoming(a, JSON.stringify({ type: 'watch.ping', t0: 1 }))
+    expect(Date.now() - p.lastSeen).toBeLessThan(2000)
   })
 
   it('unauthenticated watch frames are dropped', () => {
