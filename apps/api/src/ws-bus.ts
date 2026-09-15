@@ -44,7 +44,7 @@ export function validateTicket(ticket: string): string | null {
 // Watch Party relay: tiny JSON control frames (never media bytes).
 import {
   applyWatch, joinWatch, watchPong, applyChat, deleteChat, leaveWatch,
-  kickWatch, banWatch, muteWatch, transferHost, settingsWatch, queueOps,
+  kickWatch, banWatch, muteWatch, transferHost, settingsWatch, queueOps, touchRooms,
 } from './watchparty'
 
 export function handleIncoming(conn: WsConn, data: string): void {
@@ -82,8 +82,13 @@ export function handleIncoming(conn: WsConn, data: string): void {
   }
 
   if (msg.type === 'subscribe') {
+    // Audit A1: room membership is minted server-side (watch.join, auth).
+    // A client may only ask for the two broadcast rooms; anything else —
+    // especially `watch:<id>`, whose ids ship in the public browse list —
+    // is a spoof.
+    const ALLOWED = new Set(['lobby', 'global'])
     if (Array.isArray(msg.rooms)) {
-      for (const r of msg.rooms) if (typeof r === 'string') conn.rooms.add(r)
+      for (const r of msg.rooms) if (typeof r === 'string' && ALLOWED.has(r)) conn.rooms.add(r)
     }
     return
   }
@@ -92,6 +97,7 @@ export function handleIncoming(conn: WsConn, data: string): void {
   // frames are re-stamped with the SERVER clock and relayed to the room so
   // every peer advances from the same instant.
   if (msg.type === 'watch.ping') {
+    touchRooms(conn.userId || '')
     conn.send(JSON.stringify(watchPong(msg.t0)))
     return
   }
@@ -161,21 +167,16 @@ export function handleIncoming(conn: WsConn, data: string): void {
     return
   }
 
-  if (msg.type === 'lobby') {
-    broadcastToRoom('lobby', msg)
-    return
-  }
-
-  const room = msg.room
-  const payload = JSON.stringify(msg)
-  if (room) {
-    for (const c of conns) {
-      if (c !== conn && c.authed && c.rooms.has(room)) c.send(payload)
-    }
-  } else {
-    for (const c of conns) {
-      if (c !== conn && c.authed && c.rooms.has('global')) c.send(data)
-    }
+  // Audit A2: the lobby room is server-published only (routes/lobby,
+  // babecock, posts), and no client flow needed the named-room pass-through
+  // either (it was the injection vector). The global swarm now carries ONLY
+  // the legacy P2P wire: opaque envelopes keyed `t`, or raw non-JSON. Any
+  // frame with a server-managed `type` key without a handler above is a
+  // forgery (feed/lobby/user_banned...) and is dropped.
+  // ponytail: add per-type relay allowlist if a client->client type returns.
+  if (typeof msg.type === 'string') return
+  for (const c of conns) {
+    if (c !== conn && c.authed && c.rooms.has('global')) c.send(data)
   }
 }
 

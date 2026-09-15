@@ -121,12 +121,13 @@ describe('handleIncoming: authenticated dispatch', () => {
     return c
   }
 
-  it('subscribe adds string rooms and ignores junk entries', () => {
+  it('subscribe adds allowlisted rooms and ignores junk or spoofed names', () => {
     const conn = authedConn()
-    handleIncoming(conn, JSON.stringify({ type: 'subscribe', rooms: ['lobby', 42, null, 'room-x'] }))
+    handleIncoming(conn, JSON.stringify({ type: 'subscribe', rooms: ['lobby', 42, null, 'room-x', 'watch:steal'] }))
     expect(conn.rooms.has('lobby')).toBe(true)
-    expect(conn.rooms.has('room-x')).toBe(true)
-    expect(conn.rooms.size).toBe(3) // global + lobby + room-x
+    expect(conn.rooms.has('room-x')).toBe(false)
+    expect(conn.rooms.has('watch:steal')).toBe(false)
+    expect(conn.rooms.size).toBe(2) // global + lobby
   })
 
   it('subscribe with a non-array rooms is a no-op', () => {
@@ -135,28 +136,29 @@ describe('handleIncoming: authenticated dispatch', () => {
     expect(conn.rooms.has('lobby')).toBe(false)
   })
 
-  it('lobby messages broadcast to the lobby room only', () => {
+  it('client lobby frames are dropped (server is the only lobby publisher)', () => {
     const sender = authedConn('sender')
     const lobbyPeer = authedConn('lobby-peer')
     lobbyPeer.rooms.add('lobby')
     const globalPeer = authedConn('global-peer')
 
     handleIncoming(sender, JSON.stringify({ type: 'lobby', action: 'ping' }))
-    expect(lobbyPeer.sent).toHaveLength(1)
-    expect(JSON.parse(lobbyPeer.sent[0])).toMatchObject({ type: 'lobby', action: 'ping' })
+    expect(lobbyPeer.sent).toHaveLength(0)
     expect(globalPeer.sent).toHaveLength(0)
-    expect(sender.sent).toHaveLength(0) // not echoed to self
+    expect(sender.sent).toHaveLength(0)
   })
 
-  it('named-room messages relay only to members of that room', () => {
+  it('named-room frames no longer fan out (audit A2: rooms are server-published)', () => {
     const sender = authedConn('s')
-    const member = authedConn('m')
-    member.rooms.add('arena')
-    const outsider = authedConn('o')
+    const lobbyMember = fakeConn()
+    lobbyMember.authed = true
+    lobbyMember.rooms.add('lobby')
+    conns.add(lobbyMember)
 
-    handleIncoming(sender, JSON.stringify({ room: 'arena', payload: 7 }))
-    expect(member.sent).toEqual([JSON.stringify({ room: 'arena', payload: 7 })])
-    expect(outsider.sent).toHaveLength(0)
+    handleIncoming(sender, JSON.stringify({ type: 'feed', room: 'lobby', action: 'new' }))
+    // A spoofed room selector must not deliver to lobby subscribers; the
+    // frame only rides the global swarm as legacy relay.
+    expect(lobbyMember.sent).toHaveLength(0)
   })
 
   it('roomless messages fan out to the global swarm', () => {

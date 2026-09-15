@@ -17,6 +17,7 @@ import {
   resetWatchParty,
   handleWatchMessage,
   createParty,
+  loadPartyVideos,
   joinParty,
   joinPartyById,
   sendPartyChat,
@@ -159,5 +160,25 @@ describe('watchPartyStore', () => {
     expect(watchPartyStore.getSnapshot().parties[0]?.url).toBe('/api/objects/z')
     vi.mocked(orbitFetch).mockResolvedValueOnce(new Response('{}', { status: 404 }))
     expect(await joinPartyById(identity, 'gone')).toBe(false)
+  })
+
+  it('loadPartyVideos posts urls and reports the failed list', async () => {
+    vi.mocked(orbitFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true, added: [{ id: 'q1', name: 'a', url: '/api/objects/a' }], failed: ['https://junk/2'] }), { status: 200 }),
+    )
+    const r = await loadPartyVideos(identity, 'p1', ['https://a', 'https://junk/2'], true)
+    const call = vi.mocked(orbitFetch).mock.calls.at(-1)!
+    expect(call[0]).toBe('/api/watchparty/p1/video')
+    expect(JSON.parse(String((call[1] as RequestInit).body))).toEqual({ urls: ['https://a', 'https://junk/2'], queueOnly: true })
+    expect(r).toEqual({ ok: true, added: 1, failed: ['https://junk/2'] })
+  })
+
+  it('loadPartyVideos surfaces server errors', async () => {
+    vi.mocked(orbitFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Add up to 10 videos at a time.' }), { status: 400 }),
+    )
+    const r = await loadPartyVideos(identity, 'p1', ['x'], false)
+    expect(r.ok).toBe(false)
+    expect(r.error).toContain('10 videos')
   })
 })

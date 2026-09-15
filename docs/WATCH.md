@@ -101,13 +101,21 @@ signature gets ONE new resolver function in the chain, plus a fixture in
 - Target position = `position + (serverNow - updatedAt)` while playing.
 - `driftCorrection`: paused/local-behind-seek on |drift| > 0.3s deadband,
   playing-ahead or >2s lag seeks, otherwise playback rides its own clock.
-- Video end: everyone parks paused; the host client sends `queue next`
-  once per media. No loop, no rate control (party is 1x).
+- Queue advance keeps the room PLAYING (autoplay continues overnight). An
+  ended video re-stamps the frame, so `next` wraps past the last entry and a
+  single-entry playlist loops it. The client guard keys on
+  `current:frame.updatedAt` so a wrap re-arms it.
+- Overnight survival: room GC is 4 h and every open tab's 30 s `watch.ping`
+  refreshes the life of all rooms that user is in. Queue cap 50; the video
+  route accepts `urls[]` (max 10/request, returns `{added, failed}`), which
+  the queue rail and the create modal feed with one multi-line paste.
+  No rate control (party is 1x).
 
 ## Trust boundaries
 
 - Every gate is server-side: membership, host-only ops, bans, mute, rate
-  limits, clamps (name 40, queue 20, chat 80 msgs / 80 chars, members 8).
+  limits, clamps (name 40, queue 50, chat 80 msgs / 80 chars, members 8,
+  bulk add 10/request).
 - The stream endpoint is unauthenticated BY DESIGN (raw `<video>` cannot
   sign): the unguessable room id + server-bound upstream are the controls.
 - Modified clients cannot desync others: frames re-stamp at the server,

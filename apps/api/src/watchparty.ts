@@ -53,11 +53,16 @@ export interface Party {
   lastSeen: number
   /** ponytail: last chat msg ts per user; global bucket if flood persists. */
   lastChat: Map<string, number>
+  lastControl: Map<string, number>
 }
 
 const parties = new Map<string, Party>()
 const MAX_PARTIES = 50
-const IDLE_MS = 30 * 60_000
+// Overnight rooms: an open tab pings every 30s (touchRooms), so 4h only
+// bounds abandoned rooms. 30 min GC'd a room during one long movie.
+export const IDLE_MS = 4 * 60 * 60_000
+// ponytail: fixed cap, per-room playlist size setting if someone hits 50.
+export const MAX_QUEUE = 50
 // media URL -> owning party id. Lets the objects route authorize reads for
 // private party media without making it feed-public.
 const partyMedia = new Map<string, string>()
@@ -87,6 +92,7 @@ export function createParty(
     chat: [],
     lastSeen: Date.now(),
     lastChat: new Map(),
+    lastControl: new Map(),
   }
   if (creatorId) party.members.set(creatorId, { name: '', muted: false })
   parties.set(party.id, party)
@@ -131,6 +137,9 @@ function serverNow(): number {
 
 function dropParty(party: Party): void {
   parties.delete(party.id)
+  // Audit A8: every queued URL registered a capability, not just the
+  // current one — clearing only mediaUrl left stale read grants forever.
+  for (const entry of party.queue) partyMedia.delete(entry.url)
   if (party.mediaUrl) partyMedia.delete(party.mediaUrl)
 }
 
@@ -139,11 +148,16 @@ function gcTick(): void {
   for (const [id, p] of parties) {
     if (now - p.lastSeen > IDLE_MS) dropParty(p)
   }
-  while (parties.size >= MAX_PARTIES) {
-    const oldest = parties.keys().next().value as string
-    const p = parties.get(oldest)
+  while (parties.size > MAX_PARTIES) {
+    // Audit A6: evict the least-recently-SEEN room, not the first created.
+    let victimId = ''
+    let victimSeen = Infinity
+    for (const [id, p] of parties) {
+      if (p.lastSeen < victimSeen) { victimSeen = p.lastSeen; victimId = id }
+    }
+    const p = parties.get(victimId)
     if (p) dropParty(p)
-    parties.delete(oldest)
+    parties.delete(victimId)
   }
 }
 
@@ -177,7 +191,12 @@ export function applyWatch(userId: string, msg: any): { room: string; payload: a
   // V1 lock: party speed is always 1x. A rate != 1 frame is a desync bug or
   // a modified client; drop it.
   if (msg.rate !== undefined && Number(msg.rate) !== 1) return null
-  party.lastSeen = Date.now()
+  // Audit A3: 200 ms/member transport throttle. Humans seek/play far less
+  // often; a bot hammering this frame used to amplify x-members broadcasts.
+  const now = Date.now()
+  if (now - (party.lastControl.get(userId) || 0) < 200) return null
+  party.lastControl.set(userId, now)
+  party.lastSeen = now
   party.frame = {
     url: party.mediaUrl,
     action: msg.action,
@@ -354,7 +373,7 @@ export function queueOps(userId: string, msg: any): { room: string; payload: any
       url,
       relay: msg.relay && typeof msg.relay.upstream === 'string' ? msg.relay : undefined,
     })
-    while (party.queue.length > 20) {
+    while (party.queue.length > MAX_QUEUE) {
       const dropIdx = party.queue.findIndex((q) => q.id !== party.current)
       party.queue.splice(dropIdx < 0 ? 0 : dropIdx, 1)
     }
@@ -362,11 +381,16 @@ export function queueOps(userId: string, msg: any): { room: string; payload: any
     party.queue = party.queue.filter((q) => q.id !== String(msg.id || ''))
   } else if (op === 'play') {
     const entry = party.queue.find((q) => q.id === String(msg.id || ''))
-    if (entry) applyQueueMedia(party, entry, member.name || userId.slice(0, 8))
+    if (entry) applyQueueMedia(party, entry, member.name || userId.slice(0, 8), 'play')
   } else if (op === 'next') {
     const idx = party.queue.findIndex((q) => q.id === party.current)
     const entry = party.queue[(idx + 1) % Math.max(party.queue.length, 1)]
-    if (entry && party.queue.length > 0) applyQueueMedia(party, entry, member.name || userId.slice(0, 8))
+    // Continuous playlist: a PLAYING room advances into a playing frame
+    // (video ended mid-run); a paused room advances paused.
+    if (entry && party.queue.length > 0) {
+      applyQueueMedia(party, entry, member.name || userId.slice(0, 8),
+        party.frame.action === 'play' ? 'play' : 'pause')
+    }
   } else {
     return null
   }
@@ -383,16 +407,25 @@ export function queueOps(userId: string, msg: any): { room: string; payload: any
   }
 }
 
-function applyQueueMedia(party: Party, entry: QueueEntry, by: string): void {
+function applyQueueMedia(party: Party, entry: QueueEntry, by: string, action: 'play' | 'pause' = 'pause'): void {
   party.current = entry.id
   party.mediaName = entry.name
   party.relay = entry.relay
   setPartyMedia(party, entry.url)
-  party.frame = { url: entry.url, action: 'pause', position: 0, rate: 1, updatedAt: serverNow(), by }
+  party.frame = { url: entry.url, action, position: 0, rate: 1, updatedAt: serverNow(), by }
 }
 
 export function watchPong(t0: unknown): { type: string; t0: number; t1: number } {
   return { type: 'watch.pong', t0: Number(t0) || 0, t1: serverNow() }
+}
+
+/** Keep-alive: an awake member's ping refreshes every room they belong to,
+ * so an idle-but-watching room never hits IDLE_MS. */
+export function touchRooms(userId: string): void {
+  if (!userId) return
+  for (const p of parties.values()) {
+    if (p.members.has(userId)) p.lastSeen = Date.now()
+  }
 }
 
 /** Test seam: wipe state between suites. */

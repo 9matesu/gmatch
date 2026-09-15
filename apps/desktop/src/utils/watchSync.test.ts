@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeTargetPosition, driftCorrection, ClockOffset, type SyncFrame } from './watchSync'
+import { computeTargetPosition, driftCorrection, ClockOffset, shouldFireQueueNext, type SyncFrame } from './watchSync'
 
 function frame(over: Partial<SyncFrame> = {}): SyncFrame {
   return { url: 'a.mp4', action: 'play', position: 10, rate: 1, updatedAt: 100, ...over }
@@ -54,5 +54,22 @@ describe('ClockOffset', () => {
     // a worse sample must not override the best one
     await c.sample(async () => ({ t0: 0, t1: 40, t3: 30 }))
     expect(Math.abs(c.now() - (Date.now() / 1000 - 101))).toBeLessThan(0.5)
+  })
+})
+
+describe('shouldFireQueueNext', () => {
+  const base = { isHost: true, queueLength: 2, action: 'play' as const, lastFiredKey: '' }
+  it('fires for host while playing with a queue', () => {
+    expect(shouldFireQueueNext({ ...base, endedKey: 'f1' })).toBe(true)
+  })
+  it('single-entry queue loops (one video all night)', () => {
+    expect(shouldFireQueueNext({ ...base, queueLength: 1, endedKey: 'f1' })).toBe(true)
+  })
+  it('never double-fires the same frame key (wrap re-keys the frame)', () => {
+    expect(shouldFireQueueNext({ ...base, endedKey: 'f1', lastFiredKey: 'f1' })).toBe(false)
+  })
+  it('non-host and paused rooms do not fire', () => {
+    expect(shouldFireQueueNext({ ...base, isHost: false, endedKey: 'f1' })).toBe(false)
+    expect(shouldFireQueueNext({ ...base, action: 'pause', endedKey: 'f1' })).toBe(false)
   })
 })

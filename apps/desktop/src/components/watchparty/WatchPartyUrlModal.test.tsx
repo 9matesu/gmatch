@@ -3,11 +3,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 vi.mock('../../hooks/watchPartyStore', () => ({
-  createParty: vi.fn(async () => ({ ok: true })),
+  createParty: vi.fn(async () => ({ ok: true, partyId: 'p9' })),
   joinPartyById: vi.fn(async () => true),
+  loadPartyVideo: vi.fn(async () => ({ ok: true })),
+  loadPartyVideos: vi.fn(async () => ({ ok: true, added: 0, failed: [] })),
 }))
 
-import { createParty } from '../../hooks/watchPartyStore'
+import { createParty, loadPartyVideos } from '../../hooks/watchPartyStore'
 import { WatchPartyUrlModal } from './WatchPartyUrlModal'
 
 const identity = { orbitId: 'me', publicKeyHex: 'p', privateKeyHex: 'k' } as never
@@ -44,5 +46,15 @@ describe('WatchPartyUrlModal', () => {
     fireEvent.change(screen.getByLabelText('Video URL'), { target: { value: 'https://bad' } })
     fireEvent.click(screen.getByRole('button', { name: /start party/i }))
     expect(await screen.findByText(/playable video/)).toBeTruthy()
+  })
+
+  it('multi-line create: first URL starts the party, the rest bulk-queue', async () => {
+    const onClose = vi.fn()
+    render(<WatchPartyUrlModal identity={identity} onClose={onClose} />)
+    fireEvent.change(screen.getByLabelText('Video URL'), { target: { value: 'https://one\nhttps://two\nhttps://three' } })
+    fireEvent.click(screen.getByRole('button', { name: /start party/i }))
+    await waitFor(() => expect(createParty).toHaveBeenCalledWith(identity, 'https://one', ''))
+    await waitFor(() => expect(loadPartyVideos).toHaveBeenCalledWith(identity, 'p9', ['https://two', 'https://three'], true))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
 })

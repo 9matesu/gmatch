@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import {
   createParty, getParty, listParties, applyWatch, joinWatch, leaveWatch, leaveAll, applyChat,
   deleteChat, kickWatch, banWatch, muteWatch, transferHost, settingsWatch,
-  queueOps, setPartyMedia, __resetParties, partyRoom, type Party,
+  queueOps, setPartyMedia, __resetParties, partyRoom, IDLE_MS, MAX_QUEUE, type Party,
 } from './watchparty'
 import { handleIncoming, conns, createWsTicket, type WsConn } from './ws-bus'
 
@@ -199,13 +199,51 @@ describe('queue', () => {
     expect(queueOps('u1', { party: p.id, op: 'add', name: 'x', url: '/api/objects/x' })).not.toBeNull()
   })
 
-  it('queue caps at 20 dropping oldest non-current', () => {
+  it('queue caps at MAX_QUEUE dropping oldest non-current', () => {
     const p = makeParty()
-    for (let i = 0; i < 25; i++) {
+    for (let i = 0; i < MAX_QUEUE + 5; i++) {
       queueOps('u1', { party: p.id, op: 'add', name: `q${i}`, url: `/api/objects/${i}` })
     }
-    expect(p.queue.length).toBe(20)
-    expect(p.queue[19].name).toBe('q24')
+    expect(p.queue.length).toBe(MAX_QUEUE)
+    expect(p.queue[MAX_QUEUE - 1].name).toBe(`q${MAX_QUEUE + 4}`)
+  })
+
+  it('room idle window covers an overnight run', () => {
+    expect(IDLE_MS).toBeGreaterThanOrEqual(4 * 60 * 60_000)
+  })
+
+  it("'next' keeps the room playing when the previous frame was playing", () => {
+    const p = makeParty()
+    queueOps('u1', { party: p.id, op: 'add', name: 'a', url: '/api/objects/a' })
+    queueOps('u1', { party: p.id, op: 'add', name: 'b', url: '/api/objects/b' })
+    queueOps('u1', { party: p.id, op: 'play', id: p.queue[0].id })
+    applyWatch('u1', { party: p.id, action: 'play', position: 60 })
+    const res = queueOps('u1', { party: p.id, op: 'next' })!
+    expect(res.payload.frame.action).toBe('play')
+    expect(res.payload.frame.position).toBe(0)
+  })
+
+  it("'next' on a paused room stays paused; manual 'play' starts playback", () => {
+    const p = makeParty()
+    queueOps('u1', { party: p.id, op: 'add', name: 'a', url: '/api/objects/a' })
+    queueOps('u1', { party: p.id, op: 'add', name: 'b', url: '/api/objects/b' })
+    const n = queueOps('u1', { party: p.id, op: 'next' })!
+    expect(n.payload.frame.action).toBe('pause')
+    queueOps('u1', { party: p.id, op: 'play', id: p.queue[1].id })
+    expect(p.frame.action).toBe('play')
+  })
+
+  it("'next' wraps past the last entry (loop), single entry replays itself", () => {
+    const p = makeParty()
+    queueOps('u1', { party: p.id, op: 'add', name: 'solo', url: '/api/objects/s' })
+    queueOps('u1', { party: p.id, op: 'play', id: p.queue[0].id })
+    applyWatch('u1', { party: p.id, action: 'play', position: 90 })
+    const before = p.frame
+    const res = queueOps('u1', { party: p.id, op: 'next' })!
+    expect(res.payload.current).toBe(p.queue[0].id)
+    expect(res.payload.frame.position).toBe(0)
+    expect(p.frame).not.toBe(before) // replay = a NEW stamped frame, so clients reseek
+    expect(p.frame.updatedAt).toBeGreaterThanOrEqual(before.updatedAt)
   })
 })
 
@@ -241,6 +279,29 @@ describe('ws relay integration', () => {
     expect(pong.type).toBe('watch.pong')
     expect(pong.t0).toBe(123)
     expect(pong.t1).toBeGreaterThan(0)
+  })
+
+  it('watch.ping refreshes lastSeen of every room the user is in', () => {
+    const p = makeParty('u1')
+    joinWatch('u2', 'Bob', { party: p.id })
+    p.lastSeen = Date.now() - 60_000
+    const a = fakeConn()
+    conns.add(a)
+    authed(a, 'u2')
+    handleIncoming(a, JSON.stringify({ type: 'watch.ping', t0: 1 }))
+    expect(Date.now() - p.lastSeen).toBeLessThan(2000)
+  })
+
+  it('transport frames are throttled per member (audit A3)', () => {
+    const p = makeParty('u1')
+    joinWatch('u1', 'Me', { party: p.id })
+    let relayed = 0
+    for (let i = 0; i < 30; i++) if (applyWatch('u1', { party: p.id, action: 'play', position: i })) relayed++
+    // 30 bursts, 1 every 200ms is 6s of human playback spam; a bot gets ~2.
+    expect(relayed).toBeLessThanOrEqual(3)
+    // And a legit next-frame after the window still passes.
+    p.lastControl.set('u1', Date.now() - 500)
+    expect(applyWatch('u1', { party: p.id, action: 'pause', position: 5 })).not.toBeNull()
   })
 
   it('unauthenticated watch frames are dropped', () => {
