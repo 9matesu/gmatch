@@ -70,7 +70,7 @@ const DEFAULTS: AppSettings = {
   feedCols: '1',
   hideDuplicates: false,
   soundEffects: true,
-  watchPartyEnabled: false,
+  watchPartyEnabled: true,
   autoRefresh: true,
   advancedMode: false,
   maximumGooner: false,
