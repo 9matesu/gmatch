@@ -15,8 +15,8 @@ export function WatchPartyEdgeTab({ side, onToggle }: { side: 'left' | 'right'; 
       onClick={onToggle}
       aria-label="Toggle watch party"
       aria-pressed={open}
-      className={`self-center shrink-0 h-fit py-3 px-1.5 bg-glass-w5 border border-border-glass text-retro-muted hover:bg-glass-w10 hover:text-retro-fg flex flex-col items-center gap-2 cursor-pointer transition-colors duration-150 ${
-        side === 'left' ? 'rounded-r-lg mr-0.5' : 'rounded-l-lg ml-0.5'
+      className={`self-center shrink-0 h-fit py-3 px-1.5 glass-toolbar text-retro-muted hover:text-retro-fg flex flex-col items-center gap-2 cursor-pointer transition-colors duration-150 ${
+        side === 'left' ? 'rounded-l-none mr-0.5' : 'rounded-r-none ml-0.5'
       }`}
     >
       <Clapperboard className="w-4 h-4" />
