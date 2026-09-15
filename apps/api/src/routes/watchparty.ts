@@ -3,7 +3,7 @@ import { orbitAuth } from '../middleware/auth'
 import type { D1Turso } from '../db'
 import type { LocalBlobStore } from '../blob'
 import { proxyAndStoreExternal } from '../proxy'
-import { createParty, getParty } from '../watchparty'
+import { createParty, getParty, listParties } from '../watchparty'
 
 type Bindings = {
   DB: D1Turso
