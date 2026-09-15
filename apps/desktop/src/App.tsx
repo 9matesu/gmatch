@@ -3704,9 +3704,15 @@ export default function Home() {
                     />
                   )}
 
-                  {/* Watch theater (synced video rooms) */}
-                  {mainView === 'watch' && identity && (
-                    <WatchPartyView identity={identity} profilePics={profilePics} />
+                  {/* Watch theater: ALWAYS mounted (hidden off-tab) so an
+                      opened room keeps playing in the background; unmounting
+                      destroyed the <video> on every tab switch. display:none
+                      does not pause HTML5 media; the sync tick keeps the
+                      drift lock and seeks back when the user returns. */}
+                  {settings.watchPartyEnabled && identity && (
+                    <div className={mainView === 'watch' ? 'flex-1 flex flex-row min-h-0 overflow-hidden' : 'hidden'}>
+                      <WatchPartyView identity={identity} profilePics={profilePics} />
+                    </div>
                   )}
 
                   {/* Game View (Matchmaking Lobby) */}
