@@ -42,7 +42,7 @@ export interface NativeVideoPlayerProps {
   onError?: (e: React.SyntheticEvent<HTMLVideoElement, Event>) => void;
 }
 
-function formatVideoTime(seconds: number): string {
+export function formatVideoTime(seconds: number): string {
   if (isNaN(seconds) || seconds < 0) return '0:00';
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);

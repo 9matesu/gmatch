@@ -1,5 +1,6 @@
 // Watch Party client store: module singleton + useSyncExternalStore.
 // Control frames only travel while a party is open; zero traffic otherwise.
+// Up to MAX_SLOTS parties can play side by side; each is its own WS room.
 import { useSyncExternalStore } from 'react'
 import { orbitFetch } from '../utils/api'
 import { subscribeOrbitWebSocket, sendOrbitWebSocket } from '../utils/orbitWebSocket'
@@ -18,31 +19,33 @@ export interface PartyInfo {
   url: string
 }
 
-export interface WatchPartyState {
-  open: boolean
-  party: PartyInfo | null
+export interface PartyRuntime extends PartyInfo {
   frame: SyncFrame | null
   members: Array<{ id: string; name: string }>
+}
+
+export interface WatchPartyState {
+  open: boolean
+  parties: PartyRuntime[]
   subscribed: boolean
 }
 
 export const MAX_SLOTS = 4
 
-const state: WatchPartyState = {
-  open: false,
-  party: null,
-  frame: null,
-  members: [],
-  subscribed: false,
-}
+const state: WatchPartyState = { open: false, parties: [], subscribed: false }
+
+// Immutable snapshot rebuilt on every mutation (getSnapshot must change
+// reference when data changes, or useSyncExternalStore never re-renders).
+let snapshot: WatchPartyState = { ...state, parties: [] }
 
 const listeners = new Set<() => void>()
 function emit() {
+  snapshot = { ...state, parties: state.parties.map((p) => ({ ...p })) }
   for (const l of listeners) l()
 }
 
 export const watchPartyStore = {
-  getSnapshot: () => state,
+  getSnapshot: () => snapshot,
   subscribe: (l: () => void) => {
     listeners.add(l)
     return () => listeners.delete(l)
@@ -59,27 +62,33 @@ export function serverNow(): number {
   return clock.now()
 }
 
+function upsertParty(info: PartyInfo): void {
+  const existing = state.parties.find((p) => p.id === info.id)
+  if (existing) Object.assign(existing, info)
+  else state.parties.push({ ...info, frame: null, members: [] })
+  if (state.parties.length > MAX_SLOTS) state.parties.shift()
+  watchPartyStore.set({})
+}
+
 export function resetWatchParty(): void {
   stopClockPing()
   unsubscribe?.()
   unsubscribe = null
-  watchPartyStore.set({ open: false, party: null, frame: null, members: [], subscribed: false })
+  watchPartyStore.set({ open: false, parties: [], subscribed: false })
 }
 
 export function handleWatchMessage(msg: any): void {
   if (!msg || typeof msg !== 'object') return
-  const party = watchPartyStore.getSnapshot().party
-  if (msg.type === 'watch.sync' && party && msg.party === party.id) {
-    watchPartyStore.set({ frame: msg.frame as SyncFrame })
-    return
-  }
-  if (msg.type === 'watch.roster' && party && msg.party === party.id) {
-    watchPartyStore.set({ members: Array.isArray(msg.members) ? msg.members : [] })
+  if (msg.type === 'watch.sync' || msg.type === 'watch.roster') {
+    const party = state.parties.find((p) => p.id === msg.party)
+    if (!party) return
+    if (msg.type === 'watch.sync') party.frame = msg.frame as SyncFrame
+    else party.members = Array.isArray(msg.members) ? msg.members : []
+    watchPartyStore.set({})
     return
   }
   if (msg.type === 'watch.pong') {
     pongResolve?.(msg)
-    return
   }
 }
 
@@ -91,7 +100,7 @@ function pingOnce(): Promise<{ t0: number; t1: number; t3: number }> {
     const t0 = Date.now() / 1000
     const done = (pong: any) => {
       const t3 = Date.now() / 1000
-      pongResolve = null
+      if (pongResolve === done) pongResolve = null
       resolve({ t0, t1: Number(pong?.t1) || t3, t3 })
     }
     pongResolve = done
@@ -123,6 +132,24 @@ function stopClockPing(): void {
   pongResolve = null
 }
 
+function ensureSubscribed(identity: IdentityLike): void {
+  if (!state.subscribed) {
+    unsubscribe?.()
+    unsubscribe = subscribeOrbitWebSocket(identity, handleWatchMessage)
+    watchPartyStore.set({ subscribed: true })
+    startClockPing()
+  }
+}
+
+function maybeUnsubscribe(): void {
+  if (state.parties.length === 0 && state.subscribed) {
+    stopClockPing()
+    unsubscribe?.()
+    unsubscribe = null
+    watchPartyStore.set({ subscribed: false })
+  }
+}
+
 export async function createParty(identity: IdentityLike, url: string, name: string): Promise<{ ok: boolean; error?: string }> {
   let res: Response
   try {
@@ -140,26 +167,34 @@ export async function createParty(identity: IdentityLike, url: string, name: str
   return { ok: true }
 }
 
-export function joinParty(identity: IdentityLike, party: PartyInfo): void {
-  unsubscribe?.()
-  unsubscribe = subscribeOrbitWebSocket(identity, handleWatchMessage)
-  watchPartyStore.set({ party, open: true, frame: null, members: [], subscribed: true })
-  sendOrbitWebSocket({ type: 'watch.join', party: party.id, name: identity.orbitId })
-  startClockPing()
+export async function joinPartyById(identity: IdentityLike, partyId: string): Promise<boolean> {
+  try {
+    const res = await orbitFetch(`/api/watchparty/${partyId}`, {}, identity)
+    if (!res.ok) return false
+    const snap = await res.json() as any
+    joinParty(identity, { id: snap.id, name: snap.name, url: snap.url })
+    return true
+  } catch {
+    return false
+  }
 }
 
-export function leaveParty(): void {
-  stopClockPing()
-  unsubscribe?.()
-  unsubscribe = null
-  watchPartyStore.set({ party: null, frame: null, members: [], subscribed: false })
+export function joinParty(identity: IdentityLike, party: PartyInfo): void {
+  ensureSubscribed(identity)
+  upsertParty(party)
+  watchPartyStore.set({ open: true })
+  sendOrbitWebSocket({ type: 'watch.join', party: party.id, name: identity.orbitId })
+}
+
+export function leaveParty(partyId: string): void {
+  state.parties = state.parties.filter((p) => p.id !== partyId)
+  watchPartyStore.set({})
+  maybeUnsubscribe()
 }
 
 /** Send a party transport command. The server re-stamps and relays it. */
-export function controlPlayback(action: 'play' | 'pause', position: number): void {
-  const { party } = watchPartyStore.getSnapshot()
-  if (!party) return
-  if (!sendOrbitWebSocket({ type: 'watch', party: party.id, action, position: Math.max(0, position) })) {
+export function controlPlayback(partyId: string, action: 'play' | 'pause', position: number): void {
+  if (!sendOrbitWebSocket({ type: 'watch', party: partyId, action, position: Math.max(0, position) })) {
     logger.warn('[watch] control frame dropped (socket offline)')
   }
 }

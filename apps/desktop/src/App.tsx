@@ -49,6 +49,9 @@ import { AttachmentUploadModal } from "./components/AttachmentUploadModal";
 import { ProfileView } from "./components/views/ProfileView";
 import { DmMinimizedView } from "./components/views/MessagesView";
 import { MessagesRail } from "./components/chat/MessagesRail";
+import { WatchPartyDock } from "./components/watchparty/WatchPartyDock";
+import { WatchPartyEdgeTab } from "./components/watchparty/WatchPartyEdgeTab";
+import { watchPartyStore, useWatchParty } from "./hooks/watchPartyStore";
 import { GameView } from "./components/views/GameView";
 import { AgeGateModal } from "./components/auth/AgeGateModal";
 import { LegalCenter, isLegalAccepted } from "./components/LegalCenter";
@@ -150,6 +153,7 @@ export default function Home() {
   }, []);
   const { peers, p2pItems, sendP2PItem, sendChatMessage, chatMessages, isWsConnected } = useP2P(identity);
   const { settings, update: updateSettings } = useSettings();
+  const watchParty = useWatchParty();
   const [users, setUsers] = useState<User[]>([]);
 
   // Panel opacity preference drives the glass chrome through a CSS variable.
@@ -2131,13 +2135,17 @@ export default function Home() {
           mergedMap.set(u.id, u);
         }
         if (currentPeers && currentPeers.length > 0) {
+          // Presence authority is the server: P2P sightings must never revive
+          // or freeze a peer's online flag (stale swarm entries used to pin
+          // leavers online forever). Swarm-only peers (heartbeat not yet
+          // processed server-side) are admitted only while their sighting is
+          // fresh, so they decay instead of lingering as ghosts.
+          const now = Date.now();
           for (const p of currentPeers) {
-            const existing = mergedMap.get(p.id);
-            if (existing) {
-              existing.online = p.online;
-              existing.last_seen = p.last_seen || existing.last_seen;
-            } else {
-              mergedMap.set(p.id, p);
+            if (mergedMap.has(p.id)) continue;
+            const seen = p.last_seen ? new Date(p.last_seen).getTime() : 0;
+            if (seen > 0 && now - seen < 90_000) {
+              mergedMap.set(p.id, { ...p, online: true });
             }
           }
         }
@@ -2781,6 +2789,10 @@ export default function Home() {
 
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
+        // Foreground burst: the heartbeat interval skips while hidden, so
+        // announce immediately instead of sitting ghost-offline. loadUsers
+        // follows to pick up who left/joined while away.
+        orbitFetch('/api/users/heartbeat', { method: 'POST' }, identity).catch(() => { })
         loadUsers()
         loadGallery()
         loadStories()
@@ -3230,9 +3242,16 @@ export default function Home() {
                       onClose={() => setNotifOpen(false)}
                     />
                   </div>
-                </MessagesRail>
+                  </MessagesRail>
 
-                <div ref={mainScrollRef} className="mobile-app-scroll flex-1 min-w-0 min-h-0 w-full flex flex-col relative z-10 overflow-y-auto styled-scrollbar pb-24">
+                  {settings.watchPartyEnabled && identity && (
+                    <WatchPartyEdgeTab
+                      side="left"
+                      onToggle={() => watchPartyStore.set({ open: !watchParty.open })}
+                    />
+                  )}
+
+                  <div ref={mainScrollRef} className="mobile-app-scroll flex-1 min-w-0 min-h-0 w-full flex flex-col relative z-10 overflow-y-auto styled-scrollbar pb-24">
 
                   {/* Modals & Config */}
                   {isIdle && settings.idleEnabled && (
@@ -3684,6 +3703,21 @@ export default function Home() {
 
                   {/* Decision Overlay deactivated — matching cards are shown directly inside the match tab */}
                 </div>
+
+                {/* Watch Party dock: same-layer flex sibling right of the feed */}
+                {settings.watchPartyEnabled && identity && watchParty.open && (
+                  <WatchPartyDock
+                    identity={identity}
+                    profilePics={profilePics}
+                    onClose={() => watchPartyStore.set({ open: false })}
+                  />
+                )}
+                {settings.watchPartyEnabled && identity && !watchParty.open && (
+                  <WatchPartyEdgeTab
+                    side="right"
+                    onToggle={() => watchPartyStore.set({ open: true })}
+                  />
+                )}
 
                 {/* Desktop messages dock: right side panel sibling */}
                 <MessagesRail open={chatOpen}>

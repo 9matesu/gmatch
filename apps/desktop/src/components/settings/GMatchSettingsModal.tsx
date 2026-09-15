@@ -459,6 +459,15 @@ export function GMatchSettingsModal({
                     <Switch checked={settings.animatedChrome} onChange={() => updateSettings('animatedChrome', !settings.animatedChrome)} />
                   </div>
 
+                  {/* Watch Party */}
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-xs font-medium text-retro-fg">Watch Party tab</div>
+                      <div className="text-xs text-retro-muted">Show the synced video party tabs on the feed edges.</div>
+                    </div>
+                    <Switch checked={settings.watchPartyEnabled} onChange={() => updateSettings('watchPartyEnabled', !settings.watchPartyEnabled)} />
+                  </div>
+
                   {/* Feed Columns */}
                   <div className="flex items-center justify-between gap-4">
                     <div>

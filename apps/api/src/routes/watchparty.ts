@@ -58,6 +58,10 @@ watchparty.post('/', async (c) => {
   return c.json({ party: { id: party.id, name: party.name, url: mediaUrl } }, 201)
 })
 
+watchparty.get('/', async (c) => {
+  return c.json({ parties: listParties() })
+})
+
 watchparty.get('/:id', async (c) => {
   const party = getParty(c.req.param('id') || '')
   if (!party) return c.json({ error: 'Party not found' }, 404)

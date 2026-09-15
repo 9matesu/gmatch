@@ -11,6 +11,7 @@ export interface AppSettings {
   feedCols: '1' | '2' | '3' | '4' | '5'
   hideDuplicates: boolean
   soundEffects: boolean
+  watchPartyEnabled: boolean
   autoRefresh: boolean
   advancedMode: boolean
   maximumGooner: boolean
@@ -64,6 +65,7 @@ const DEFAULTS: AppSettings = {
   feedCols: '1',
   hideDuplicates: false,
   soundEffects: true,
+  watchPartyEnabled: false,
   autoRefresh: true,
   advancedMode: false,
   maximumGooner: false,

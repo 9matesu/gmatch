@@ -53,6 +53,11 @@ export function getParty(id: string): Party | null {
   return parties.get(id) || null
 }
 
+/** Open parties for the join list: the tab is only visible to logged-in users. */
+export function listParties(): Array<{ id: string; name: string; members: number }> {
+  return [...parties.values()].map((p) => ({ id: p.id, name: p.name, members: p.members.size }))
+}
+
 export function partyRoom(id: string): string {
   return `watch:${id}`
 }
