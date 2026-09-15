@@ -8,6 +8,7 @@ import { redgifsPlayable } from '../../services/redgifs'
 import CachedImg from '../../ui/CachedImg'
 import MediaViewerModal from '../../ui/MediaViewerModal'
 import { EmptyState } from '../EmptyState'
+import { useVaultUrls, useVaultUrl } from '../../services/vault'
 import { SlideshowPlayer, type ResolvedItem } from '../slideshows/SlideshowPlayer'
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer'
 import {
@@ -198,6 +199,13 @@ export default function IdleGalleryView({
   const paginatedGallery = useMemo(() => {
     return sortedGallery.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE)
   }, [sortedGallery, safePage])
+
+  // Local vault (opt-in): render pinned bytes from disk instead of remote.
+  const vaultUrls = useVaultUrls(paginatedGallery.map((g) => g.url))
+  // Viewer may sit outside the current page; resolve its url separately.
+  const viewerVaultUrl = useVaultUrl(
+    (viewerId && sortedGallery.find((g) => g.id === viewerId)?.url) || null,
+  )
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -458,6 +466,7 @@ export default function IdleGalleryView({
               const isBackdrop = backgroundUrl === img.url
               const isMotion = img.kind === 'video'
               const isSelected = selectedIds.has(img.id)
+              const tileUrl = vaultUrls[img.url || ''] || img.url
 
               return (
                 <div
@@ -519,7 +528,7 @@ export default function IdleGalleryView({
                     {isMotion ? (
                       <video
                         className="block h-full w-full object-cover [content-visibility:auto]"
-                        src={img.url}
+                        src={tileUrl}
                         poster={img.preview || undefined}
                         muted
                         preload="metadata"
@@ -528,7 +537,7 @@ export default function IdleGalleryView({
                     ) : (
                       <CachedImg
                         className="block h-full w-full object-cover [content-visibility:auto]"
-                        src={img.url || offlineSvg(img.tags)}
+                        src={tileUrl || offlineSvg(img.tags)}
                         fallbackSrc={offlineSvg(img.tags)}
                         alt={img.tags.slice(0, 3).join(' ') || 'gallery image'}
                         referrerPolicy="no-referrer"
@@ -742,7 +751,7 @@ export default function IdleGalleryView({
             <div className="relative min-h-0 w-auto max-w-full">
               {viewer.kind === 'video' ? (
                 <NativeVideoPlayer
-                  src={viewer.url}
+                  src={viewerVaultUrl || viewer.url}
                   poster={viewer.preview || undefined}
                   className="max-h-[70vh] w-auto max-w-full rounded-lg"
                   videoClassName="max-h-[70vh] w-auto max-w-full rounded-lg object-contain"
@@ -754,7 +763,7 @@ export default function IdleGalleryView({
                 />
               ) : (
                 <img
-                  src={viewer.url || offlineSvg(viewer.tags)}
+                  src={viewerVaultUrl || viewer.url || offlineSvg(viewer.tags)}
                   alt={viewer.tags.slice(0, 3).join(' ') || 'keepsake'}
                   className="max-h-[70vh] w-auto max-w-full rounded-lg object-contain"
                   referrerPolicy="no-referrer"

@@ -28,6 +28,8 @@ import { mergeMyCards, filterToActiveDeck, type CanonicalCard } from "./utils/ca
 import { collectConfigBundle, applyConfigBundle, applyStashFromBundle, parseConfigBundle, configDownloadFilename, bundleToString } from "./utils/configBackup";
 import { runMigrations } from "./utils/migration";
 import { useGame as useIdleGame } from "./game/store";
+import { mapLimit } from "./services/booru";
+import { vaultPin } from "./services/vault";
 import { ROUTE_VIEWS, hashForView, viewFromHash, type RoutedView } from "./utils/routing";
 import { playChime, playPress, playMsgReceive } from "./utils/sounds";
 import { useLobby } from "./hooks/useLobby";
@@ -512,13 +514,40 @@ export default function Home() {
   const wallpaperBgRef = useRef('')
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsOpenTarget>('preferences')
 
-  const handleSetWallpaper = (url: string) => {
+  const handleSetWallpaper = (url: string, mime?: string) => {
     if (!url) return;
     setWallpaperBg(url);
     updateSettings('wallpaperUrl', url);
     updateSettings('wallpaperPreset', 'custom');
-    updateSettings('wallpaperMime', /\.(mp4|webm|ogv|mov)(\?|$)/i.test(url.split('?')[0]) ? 'video/mp4' : 'image/jpeg');
+    updateSettings('wallpaperMime', mime || (/\.(mp4|webm|ogv|mov)(\?|$)/i.test(url.split('?')[0]) ? 'video/mp4' : 'image/jpeg'));
     toast('Desktop wallpaper background updated', 'success');
+  }
+
+  // OS-level wallpaper (Windows desktop, not just in-app). Resolves the URL
+  // to bytes through the same ladder as the in-app background, then hands
+  // them to the Electron wallpaper bridge. Images only; no-op in browser.
+  const handleSetOsWallpaper = async (url: string) => {
+    if (!url) return;
+    try {
+      let blob: Blob | null = null;
+      if (/^https?:/i.test(url) || url.startsWith('gmcache://')) {
+        blob = await mediaUrlToCachedFile(url).catch(() => null);
+      } else {
+        const r = url.startsWith('data:') || url.startsWith('blob:')
+          ? await fetch(url)
+          : await orbitFetch(url, {}, identity);
+        if (r.ok) blob = await r.blob();
+      }
+      if (!blob || !blob.type.startsWith('image/')) {
+        toast('OS wallpaper needs an image file', 'warning');
+        return;
+      }
+      const out = await window.gmatch?.wallpaperSetData?.(await blob.arrayBuffer(), blob.type);
+      if (out?.ok) toast('OS wallpaper updated', 'success');
+      else toast('OS wallpaper is only available in the desktop app', 'warning');
+    } catch {
+      toast('Could not set OS wallpaper', 'error');
+    }
   }
 
   // Resolve a wallpaper source (remote API object / remote URL / blob / data)
@@ -526,7 +555,7 @@ export default function Home() {
   const resolveWallpaperUrl = useCallback((url: string): Promise<string> => {
     if (!url) return Promise.resolve('')
     if (url.startsWith('data:') || url.startsWith('blob:')) return Promise.resolve(url)
-    if (/^https?:/i.test(url)) {
+    if (/^https?:/i.test(url) || url.startsWith('gmcache://')) {
       // Remote booru bytes: no ACAO there, so orbitFetch's signed headers
       // would preflight-block it. cacheMedia's ladder (gmcache bridge →
       // dev proxy → direct fetch) is the byte path for exactly this.
@@ -650,13 +679,18 @@ export default function Home() {
         return;
       }
 
-      // 3. Image or video element
+      // 3. Image or video element (content only — avatars/icons opt out
+      // via data-no-wallpaper and never offer background actions)
       const mediaEl = target?.closest('img, video, [data-media-url], [data-media-src]') as HTMLElement | null;
       if (mediaEl) {
         const videoEl = mediaEl.tagName === 'VIDEO' ? (mediaEl as HTMLVideoElement) : mediaEl.querySelector('video');
         const imgEl = mediaEl.tagName === 'IMG' ? (mediaEl as HTMLImageElement) : mediaEl.querySelector('img');
         const isVideo = Boolean(videoEl) || (mediaEl.tagName === 'VIDEO') || isMediaVideo((mediaEl as any).src || (mediaEl as any).currentSrc || mediaEl.getAttribute('data-media-url'));
         const src = (videoEl as any)?.currentSrc || (videoEl as any)?.src || (imgEl as any)?.currentSrc || (imgEl as any)?.src || (mediaEl as any).currentSrc || (mediaEl as any).src || mediaEl.getAttribute('data-media-url') || mediaEl.getAttribute('data-media-src');
+        // Prefer the original content URL (data-media-url) over the rendered
+        // src: signed objects render as transient blob: URLs that die on
+        // reload, so persisting them would store a dead wallpaper.
+        const originalUrl = mediaEl.getAttribute('data-media-url') || mediaEl.getAttribute('data-media-src') || src;
         if (src) {
           setContextMenu({
             x,
@@ -664,7 +698,9 @@ export default function Home() {
             type: 'media',
             data: {
               src,
+              originalUrl,
               isVideo,
+              noWallpaper: mediaEl.closest('[data-no-wallpaper]') ? true : undefined,
               videoEl: videoEl || undefined,
             },
           });
@@ -2504,6 +2540,19 @@ export default function Home() {
     return () => window.removeEventListener('orbit-cards-refresh', onCardsRefresh);
   }, [loadCards, loadGallery]);
 
+  // Local vault backfill (opt-in): pin gallery keeps + card media to disk in
+  // the background whenever the vault is on. Session-idempotent — only new
+  // URLs hit the network; lookups never write.
+  const idleGallery = useIdleGame((s) => s.gallery);
+  useEffect(() => {
+    if (!settings.localVault) return;
+    const urls = new Set<string>();
+    for (const g of idleGallery) if (g.url) urls.add(g.url);
+    for (const c of myCards) if (c.content_url) urls.add(c.content_url);
+    if (urls.size === 0) return;
+    void mapLimit([...urls], 3, (u) => vaultPin(u).then(() => undefined));
+  }, [settings.localVault, idleGallery, myCards]);
+
 
   // Prune dead 404 content when notified
   useEffect(() => {
@@ -3946,6 +3995,10 @@ export default function Home() {
                 onRepostItem={(item) => void shareObjectAs(item, 'repost')}
                 onAddToStory={(item) => void shareObjectAs(item, 'story')}
                 onRepostImage={(url) => openCreatePostWithMedia({ url })}
+                onSetWallpaper={(url, target, mime) => {
+                  if (target === 'os') void handleSetOsWallpaper(url);
+                  else handleSetWallpaper(url, mime);
+                }}
               />
               <ReportModal
                 reportModal={reportModal}

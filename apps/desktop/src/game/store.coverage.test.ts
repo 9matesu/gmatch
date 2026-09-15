@@ -2,17 +2,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../services/booru', () => ({
   fetchPosts: vi.fn(async () => ({ posts: [], source: null, ok: false, offline: true })),
+  fetchPostsMulti: vi.fn(async () => ({ posts: [], source: null, ok: false, offline: true })),
 }))
 
 import { defaultSave, serialize, SAVE_KEY } from './save'
 import { setupTag } from './tags'
 import { getUserExcludes } from './tagFilter'
-import { fetchPosts } from '../services/booru'
+import { fetchPosts, fetchPostsMulti } from '../services/booru'
 import type { BooruResponse } from '../services/booru'
 import { MAX_USER_EXCLUDES, useGame, GRID_SIZE, __resetFeedRetryForTests } from './store'
 import type { BooruPost } from './types'
 
 const mocked = vi.mocked(fetchPosts)
+const mockedMulti = vi.mocked(fetchPostsMulti)
 const offline: BooruResponse = { posts: [], source: null, ok: false, offline: true }
 const foe = (id: string): BooruPost => ({ id, url: `https://x/${id}.jpg`, tags: ['gangbang'] })
 const post = (id: string) => ({ id, url: `https://x/${id}.jpg`, tags: ['gangbang'] })
@@ -39,6 +41,8 @@ beforeEach(() => {
   withLocalStorage()
   mocked.mockReset()
   mocked.mockResolvedValue(offline)
+  mockedMulti.mockReset()
+  mockedMulti.mockResolvedValue(offline)
   useGame.getState().resetGame()
 })
 
@@ -101,19 +105,19 @@ describe('progress side effects', () => {
 
 describe('setViewMode transitions', () => {
   it('single -> grid -> single with an empty queue asks the feed once', async () => {
-    mocked.mockClear()
+    mockedMulti.mockClear()
     useGame.setState({ viewMode: 'single', queue: [], grid: [], tags: [setupTag('aaa')] })
     useGame.getState().setViewMode('grid')
     await settle()
     // Queue empty -> grid can't fill -> fetchFeed fires (offline mock keeps it at 0).
-    expect(mocked).toHaveBeenCalled()
+    expect(mockedMulti).toHaveBeenCalled()
     expect(useGame.getState().viewMode).toBe('grid')
     useGame.getState().setViewMode('single')
     expect(useGame.getState().viewMode).toBe('single')
     // Re-setting the same mode is a no-op (no extra write, no fetch).
-    mocked.mockClear()
+    mockedMulti.mockClear()
     useGame.getState().setViewMode('single')
-    expect(mocked).not.toHaveBeenCalled()
+    expect(mockedMulti).not.toHaveBeenCalled()
   })
 
   it('grid -> grid with a full grid does not refetch', () => {
@@ -233,7 +237,7 @@ describe('fetchFeed guards + offline shapes', () => {
     useGame.setState({ tags: [setupTag('aaa')], queue: dozen(), grid: [] })
     useGame.getState().setViewMode('grid')
     const before = useGame.getState().grid
-    mocked.mockResolvedValue(offline)
+    mockedMulti.mockResolvedValue(offline)
     await useGame.getState().fetchFeed()
     const s = useGame.getState()
     expect(s.feedOffline).toBe(false)
@@ -251,7 +255,7 @@ describe('fetchFeed guards + offline shapes', () => {
       foeHp: 5,
       foeMaxHp: 5,
     })
-    mocked.mockResolvedValue(offline)
+    mockedMulti.mockResolvedValue(offline)
     await useGame.getState().fetchFeed()
     const s = useGame.getState()
     expect(s.current?.id).toBe('old')
@@ -259,41 +263,39 @@ describe('fetchFeed guards + offline shapes', () => {
     __resetFeedRetryForTests()
   })
 
-  it('retries once with the NEXT tag on a flaky round', async () => {
-    mocked.mockReset()
-    mocked
-      .mockResolvedValueOnce(offline)
-      .mockResolvedValueOnce({ posts: [post('retry')], source: 't', ok: true })
+  it('fans out to every selected tag in a single round (no per-tag retry)', async () => {
+    mockedMulti.mockReset()
+    mockedMulti.mockResolvedValue({ posts: [post('retry')], source: 't', ok: true })
     useGame.setState({
       tags: [setupTag('aaa'), setupTag('bbb')],
       feedCursor: 0,
     })
     await useGame.getState().fetchFeed()
-    const calls = mocked.mock.calls.map((c) => c[0].tags)
-    expect(calls).toEqual(['aaa', 'bbb'])
+    expect(mockedMulti.mock.calls).toHaveLength(1)
+    expect(mockedMulti.mock.calls[0][0].tags).toEqual(['aaa', 'bbb'])
     const s = useGame.getState()
     expect(s.current?.id).toBe('retry')
-    expect(s.feedCursor).toBe(2)
+    expect(s.feedCursor).toBe(1)
   })
 })
 
 describe('advanceFeed / goBack / featureImage edges', () => {
   it('advanceFeed with an empty queue pushes history and refetches', async () => {
     useGame.setState({ tags: [setupTag('aaa')], current: foe('a1'), queue: [], past: [] })
-    mocked.mockClear()
+    mockedMulti.mockClear()
     useGame.getState().advanceFeed()
     await settle()
     const s = useGame.getState()
     expect(s.past.map((p) => p.id)).toEqual(['a1'])
-    expect(mocked).toHaveBeenCalled()
+    expect(mockedMulti).toHaveBeenCalled()
   })
 
   it('advanceFeed with nothing at all just refetches', async () => {
     useGame.setState({ tags: [setupTag('aaa')], current: null, queue: [], past: [] })
-    mocked.mockClear()
+    mockedMulti.mockClear()
     useGame.getState().advanceFeed()
     await settle()
-    expect(mocked).toHaveBeenCalled()
+    expect(mockedMulti).toHaveBeenCalled()
     expect(useGame.getState().past).toEqual([])
   })
 
@@ -351,7 +353,7 @@ describe('clickCell / dropCell edges', () => {
   })
 
   it('KO with an empty queue refills via fetchFeed', async () => {
-    mocked.mockClear()
+    mockedMulti.mockClear()
     useGame.setState({
       tags: [setupTag('aaa')],
       grid: [{ post: foe('solo'), hp: 1, maxHp: 8, clicks: 0 }],
@@ -361,7 +363,7 @@ describe('clickCell / dropCell edges', () => {
     const r = useGame.getState().clickCell(0)
     expect(r.killed).toBe(true)
     await settle()
-    expect(mocked).toHaveBeenCalled()
+    expect(mockedMulti).toHaveBeenCalled()
   })
 
   it('dropCell on an empty square is a no-op', () => {
@@ -372,7 +374,7 @@ describe('clickCell / dropCell edges', () => {
   })
 
   it('dropCell with no refill asks the feed and recycles history', async () => {
-    mocked.mockClear()
+    mockedMulti.mockClear()
     useGame.setState({
       tags: [setupTag('aaa')],
       grid: [{ post: foe('broken'), hp: 5, maxHp: 8, clicks: 0 }],
@@ -384,7 +386,7 @@ describe('clickCell / dropCell edges', () => {
     await settle()
     const s = useGame.getState()
     expect(s.past.map((p) => p.id)).toEqual(['broken'])
-    expect(mocked).toHaveBeenCalled()
+    expect(mockedMulti).toHaveBeenCalled()
     __resetFeedRetryForTests()
   })
 })

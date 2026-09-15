@@ -28,6 +28,7 @@ export function Avatar({ id, size = 40, imageUrl, fill = false }: { id: string; 
           src={resolvedUrl}
           alt=""
           className="absolute inset-0 w-full h-full object-cover"
+          data-no-wallpaper
           onError={() => imageUrl && setFailedUrl(imageUrl)}
         />
       )
@@ -41,6 +42,7 @@ export function Avatar({ id, size = 40, imageUrl, fill = false }: { id: string; 
         height={size}
         className="flex-shrink-0 object-cover rounded-full"
         style={{ width: size, height: size }}
+        data-no-wallpaper
         onError={() => imageUrl && setFailedUrl(imageUrl)}
       />
     )

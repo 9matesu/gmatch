@@ -17,13 +17,14 @@ import {
   Search,
   Image as ImageIcon,
   Video as VideoIcon,
+  Monitor,
   Repeat,
   Play,
   Pause,
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { downloadMedia, copyImageToClipboard, resolveMediaUrl } from '../utils/media';
+import { downloadMedia, copyImageToClipboard, isMediaVideo, resolveMediaUrl } from '../utils/media';
 
 export type ContextMenuType = 'user' | 'item' | 'media' | 'input' | 'selection' | 'link' | 'general';
 
@@ -57,6 +58,7 @@ export interface ContextOverlayProps {
   onReportUser?: (id: string, name: string, objectId?: string) => void;
   onReportItem?: (ownerId: string, ownerName: string, objectId: string) => void;
   onRepostImage?: (url: string) => void;
+  onSetWallpaper?: (url: string, target: 'app' | 'os', mime?: string) => void;
   onSearchText?: (text: string) => void;
 }
 
@@ -83,6 +85,7 @@ export function ContextOverlay({
   onReportUser,
   onReportItem,
   onRepostImage,
+  onSetWallpaper,
   onSearchText,
 }: ContextOverlayProps) {
   useEffect(() => {
@@ -128,8 +131,10 @@ export function ContextOverlay({
       >
         {/* ─── MEDIA CONTEXT MENU (Images, Videos) ─── */}
         {contextMenu.type === 'media' && (() => {
-          const { src, isVideo, videoEl } = contextMenu.data;
+          const { src, originalUrl, isVideo, videoEl, noWallpaper } = contextMenu.data;
           const resolved = resolveMediaUrl(src);
+          const wallpaperUrl = originalUrl || src;
+          const wallpaperMime = isVideo ? 'video/mp4' : 'image/jpeg';
 
           return (
             <>
@@ -265,6 +270,39 @@ export function ContextOverlay({
                     <div className="flex items-center gap-2">
                       <Repeat className="w-3.5 h-3.5 text-retro-accent" />
                       <span>Repost to Feed</span>
+                    </div>
+                  </button>
+                </>
+              )}
+
+              {/* Wallpaper (content images only — avatars/icons opt out) */}
+              {onSetWallpaper && !noWallpaper && (
+                <>
+                  <div className="my-1 border-t border-border-glass/50" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSetWallpaper(wallpaperUrl, 'app', wallpaperMime);
+                      onDismiss();
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <ImageIcon className="w-3.5 h-3.5 text-retro-muted" />
+                      <span>Set as app background</span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSetWallpaper(wallpaperUrl, 'os', wallpaperMime);
+                      onDismiss();
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Monitor className="w-3.5 h-3.5 text-retro-muted" />
+                      <span>Set as OS wallpaper</span>
                     </div>
                   </button>
                 </>
@@ -711,6 +749,35 @@ export function ContextOverlay({
                 Copy Image Link
               </button>
             )}
+
+            {onSetWallpaper && (contextMenu.data.content_url || contextMenu.data.id) && (() => {
+              const itemUrl = contextMenu.data.content_url || `/api/objects/${contextMenu.data.id}`;
+              const itemMime = contextMenu.data.mime_type || (isMediaVideo(itemUrl) ? 'video/mp4' : 'image/jpeg');
+              return (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSetWallpaper(itemUrl, 'app', itemMime);
+                      onDismiss();
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Set as app background
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSetWallpaper(itemUrl, 'os', itemMime);
+                      onDismiss();
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Set as OS wallpaper
+                  </button>
+                </>
+              );
+            })()}
 
             {onToggleFavorite && (
               <button

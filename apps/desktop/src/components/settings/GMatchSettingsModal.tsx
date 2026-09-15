@@ -5,6 +5,25 @@ import React, { useState, useEffect } from 'react';
 import type { AppSettings } from '../../hooks/useSettings';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { playPress, playMsgReceive } from '../../utils/sounds';
+import { vaultStats, vaultClear, vaultBridge } from '../../services/vault';
+
+/** Vault disk usage line (desktop bridge only). */
+function VaultUsage() {
+  const [label, setLabel] = useState('…');
+  useEffect(() => {
+    let dead = false;
+    void vaultStats().then((s) => {
+      if (dead || !s) return;
+      const mb = (n: number) => (n / 1048576).toFixed(n >= 1073741824 ? 2 : 1);
+      const gb = s.quota >= 1073741824 ? `${(s.quota / 1073741824).toFixed(0)} GB` : `${mb(s.quota)} MB`;
+      setLabel(`${s.files} files · ${mb(s.bytes)} MB of ${gb}`);
+    });
+    return () => {
+      dead = true;
+    };
+  }, []);
+  return <span className="text-xs text-retro-muted">{label}</span>;
+}
 import { useGame, MAX_USER_EXCLUDES } from '../../game/store';
 import { FeedTuneStep } from '../../firstRun/FeedTuneStep';
 import { ServerTab } from './ServerTab';
@@ -724,6 +743,44 @@ export function GMatchSettingsModal({
                         </div>
                       )}
                     </div>
+                  )}
+                </div>
+
+                {/* Local media vault (opt-in): gallery keeps + card bytes on disk */}
+                <div className="p-4 bg-surface-interactive border border-border-glass rounded-lg space-y-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <h4 className="text-xs font-medium text-retro-fg">Local media vault</h4>
+                      <p className="text-xs text-retro-muted">
+                        Store kept gallery images and cards on this computer (3 GB cap, oldest unkept goes first).
+                        Off = memory only, nothing is written to disk.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.localVault}
+                      onChange={() => {
+                        playPress(750);
+                        const next = !settings.localVault;
+                        if (!next) void vaultClear().then(() => toast?.('Local vault wiped', 'info'));
+                        else toast?.('Local vault on — keeps and cards now save locally', 'success');
+                        updateSettings('localVault', next);
+                      }}
+                    />
+                  </div>
+                  {settings.localVault && (
+                    <div className="flex items-center justify-between gap-4 pt-1 border-t border-border-glass">
+                      <VaultUsage />
+                      <button
+                        type="button"
+                        onClick={() => { void vaultClear().then(() => toast?.('Local vault wiped', 'info')); }}
+                        className="text-[10px] text-red-500 font-bold hover:underline cursor-pointer shrink-0"
+                      >
+                        Wipe vault
+                      </button>
+                    </div>
+                  )}
+                  {!vaultBridge() && (
+                    <p className="text-[10px] text-retro-muted">Desktop app only — the browser build always streams.</p>
                   )}
                 </div>
               </div>

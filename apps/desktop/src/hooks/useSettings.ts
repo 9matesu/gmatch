@@ -58,6 +58,11 @@ export interface AppSettings {
   duelPacing: 'instant' | 'fast' | 'dramatic'
   accentColor: 'pink' | 'cyan' | 'gold' | 'emerald' | 'violet'
   theme: 'dark' | 'instagram-white'
+  /**
+   * Opt-in local media vault: gallery keeps + card bytes stored on disk
+   * (userData/media-vault, 3GB LRU). Off = memory-only, nothing hits disk.
+   */
+  localVault: boolean
 }
 
 const DEFAULTS: AppSettings = {
@@ -105,6 +110,7 @@ const DEFAULTS: AppSettings = {
   duelPacing: 'fast',
   accentColor: 'pink',
   theme: 'dark',
+  localVault: false,
 }
 
 function load(): AppSettings {

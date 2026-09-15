@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { isMediaVideo, resolveMediaUrl } from '../utils/media'
 import { useObjectImage } from '../hooks/useObjectImage'
 import { NativeVideoPlayer } from './media/NativeVideoPlayer'
+import { useVaultUrl } from '../services/vault'
 
 interface IdentityLike {
   orbitId: string
@@ -134,6 +135,10 @@ export function ObjectImage({
     isVideo = Boolean(mimeType && mimeType.startsWith('video/')) || isMediaVideo(contentUrl) || false
   }
 
+  // Local vault (opt-in): for direct http(s) content, prefer pinned bytes.
+  const vaultSrc = useVaultUrl(!signed && /^https?:/i.test(src) ? src : null)
+  if (vaultSrc) src = vaultSrc
+
   if (!src) {
     // While a signed image is deferred (off-screen) or still fetching, show a
     // blank placeholder instead of "No preview" to avoid a misleading flash.
@@ -177,22 +182,23 @@ export function ObjectImage({
       )
     }
 
-    return (
-      <video
-        src={src}
-        className={videoClassName || className}
-        muted={muted}
-        autoPlay={autoPlay}
-        loop={loop}
-        controls={false}
-        playsInline={playsInline}
-        preload={preload}
-        onError={(_e) => {
-          onError?.()
-          setHasError(true)
-        }}
-      />
-    )
+  return (
+    <video
+      src={src}
+      className={videoClassName || className}
+      muted={muted}
+      autoPlay={autoPlay}
+      loop={loop}
+      controls={false}
+      playsInline={playsInline}
+      preload={preload}
+      data-media-url={contentUrl || undefined}
+      onError={(_e) => {
+        onError?.()
+        setHasError(true)
+      }}
+    />
+  )
   }
 
   return (
@@ -202,6 +208,7 @@ export function ObjectImage({
       className={className}
       loading={loading}
       fetchPriority={fetchPriority}
+      data-media-url={contentUrl || undefined}
       onError={(_e) => {
         onError?.()
         setHasError(true)

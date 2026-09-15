@@ -49,8 +49,60 @@ describe('ContextOverlay Custom Context Menu', () => {
     expect(defaultProps.onDismiss).toHaveBeenCalled();
   });
 
-  it('renders input context menu with cut, copy, paste, select all', async () => {
-    const input = document.createElement('input');
+  it('offers app + OS wallpaper entries using the original URL, hidden for avatars', async () => {
+    const onSetWallpaper = vi.fn()
+    const { rerender } = render(
+      <ContextOverlay
+        {...defaultProps}
+        onSetWallpaper={onSetWallpaper}
+        contextMenu={{
+          x: 100,
+          y: 100,
+          type: 'media',
+          data: {
+            src: 'blob:https://app/transient',
+            originalUrl: '/api/objects/abc123',
+            isVideo: false,
+          },
+        }}
+      />
+    )
+    await userEvent.click(screen.getByText('Set as app background'))
+    expect(onSetWallpaper).toHaveBeenCalledWith('/api/objects/abc123', 'app', 'image/jpeg')
+    await userEvent.click(screen.getByText('Set as OS wallpaper'))
+    expect(onSetWallpaper).toHaveBeenCalledWith('/api/objects/abc123', 'os', 'image/jpeg')
+
+    // Avatars/icons opt out: no wallpaper entries at all.
+    rerender(
+      <ContextOverlay
+        {...defaultProps}
+        onSetWallpaper={onSetWallpaper}
+        contextMenu={{ x: 100, y: 100, type: 'media', data: { src: 'https://x/a.jpg', isVideo: false, noWallpaper: true } }}
+      />
+    )
+    expect(screen.queryByText('Set as app background')).toBeNull()
+    expect(screen.queryByText('Set as OS wallpaper')).toBeNull()
+  })
+
+  it('offers wallpaper entries on keepsake item menus', async () => {
+    const onSetWallpaper = vi.fn()
+    render(
+      <ContextOverlay
+        {...defaultProps}
+        onSetWallpaper={onSetWallpaper}
+        contextMenu={{
+          x: 100,
+          y: 100,
+          type: 'item',
+          data: { id: 'obj-9', content_url: '/api/objects/obj-9', mime_type: 'image/jpeg' },
+        }}
+      />
+    )
+    await userEvent.click(screen.getByText('Set as app background'))
+    expect(onSetWallpaper).toHaveBeenCalledWith('/api/objects/obj-9', 'app', 'image/jpeg')
+  })
+
+  it('renders input context menu with cut, copy, paste, select all', async () => {    const input = document.createElement('input');
     input.value = 'hello world';
 
     render(

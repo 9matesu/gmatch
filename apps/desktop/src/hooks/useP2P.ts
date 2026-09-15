@@ -227,15 +227,19 @@ export function useP2P(identity: OrbitIdentity | null) {
     channelRef.current = channel;
     const selfUser = selfUserRef.current;
 
-    // Load saved known peers from storage on mount
+    // Load saved known peers from storage on mount. Entries unseen for over
+    // 24h are dropped so ancient ghosts never resurrect; the rest hydrate as
+    // offline until the roster/swarm confirms them fresh.
     try {
       const savedPeers = localStorage.getItem('orbit_p2p_known_peers');
       if (savedPeers) {
         const parsed: User[] = JSON.parse(savedPeers);
+        const cutoff = Date.now() - 24 * 60 * 60 * 1000;
         for (const p of parsed) {
-          if (p.id !== selfUser.id) {
-            peerMapRef.current.set(p.id, { ...p, online: false });
-          }
+          if (!p || p.id === selfUser.id) continue;
+          const t = p.last_seen ? new Date(p.last_seen).getTime() : 0;
+          if (t > 0 && t < cutoff) continue;
+          peerMapRef.current.set(p.id, { ...p, online: false });
         }
       }
     } catch {}
@@ -499,13 +503,28 @@ export function useP2P(identity: OrbitIdentity | null) {
       orbitFetch('/api/users/online', {}, identity)
         .then((r) => (r.ok ? r.json() : { users: [] }))
         .then(({ users }: { users?: User[] }) => {
-          if (!Array.isArray(users) || users.length === 0) return
+          // NOTE: an empty roster is a valid signal (everyone left) — it
+          // still runs so leavers decay to offline instead of lingering.
+          if (!Array.isArray(users)) return
           if (mergeRoster(peerMapRef.current, users, selfUserRef.current.id)) updatePeersList()
         })
         .catch(() => {})
     }
     pullRoster()
     const rosterInterval = setInterval(pullRoster, 60_000)
+
+    // 4c. Foreground burst: timers are throttled while hidden and heartbeats
+    // are skipped, so on return immediately re-announce + re-pull instead of
+    // sitting ghost-offline until the next 60s tick.
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        sendHeartbeat()
+        pullRoster()
+      }
+    }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisible)
+    }
 
     // 5. Handle incoming local tab P2P swarm events
     channel.onmessage = (event: MessageEvent<P2PSwarmMessage>) => {
@@ -559,6 +578,9 @@ export function useP2P(identity: OrbitIdentity | null) {
       cancelled = true;
       clearInterval(interval);
       clearInterval(rosterInterval);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisible)
+      }
       channel.close();
       channelRef.current = null;
       if (wsRef.current) {

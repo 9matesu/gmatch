@@ -20,6 +20,13 @@ export interface GmatchBridge {
   cacheStats?: () => Promise<{ files: number; bytes: number }>
   clearCache?: () => Promise<{ files: number; bytes: number }>
   evictImage?: (url: string) => Promise<{ ok: boolean }>
+  vaultGet?: (url: string) => Promise<{ local: string | null }>
+  vaultPin?: (url: string) => Promise<{ local: string | null }>
+  vaultUnpin?: (url: string) => Promise<{ ok: boolean }>
+  vaultRemove?: (url: string) => Promise<{ ok: boolean }>
+  vaultStats?: () => Promise<{ files: number; bytes: number; quota: number; dir: boolean }>
+  vaultClear?: () => Promise<{ files: number; bytes: number; quota: number; dir: boolean }>
+  vaultPrune?: () => Promise<{ files: number; bytes: number; quota: number; dir: boolean }>
   customPickFolder?: () => Promise<{ ok: boolean; id?: string; path?: string; error?: string }>
   customListFolder?: (id: string) => Promise<{ ok: boolean; files?: { name: string; url: string }[]; error?: string }>
   customRemoveFolder?: (id: string) => Promise<{ ok: boolean }>

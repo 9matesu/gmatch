@@ -162,11 +162,11 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
 
   return (
     <div
-      className={`fixed inset-0 ${zIndexClass} bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-orbit-fade-in`}
+      className={`fixed inset-0 ${zIndexClass} bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 pb-[var(--island-clearance)] sm:p-4 animate-orbit-fade-in`}
       onClick={onClose}
     >
       <div
-        className="bg-glass backdrop-blur-2xl w-full max-w-lg rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col max-h-[88vh] animate-orbit-slide-up"
+        className="bg-glass backdrop-blur-2xl w-full max-w-lg rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col max-h-[calc(88vh-var(--island-clearance))] mb-[var(--island-clearance)] sm:mb-0 animate-orbit-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
