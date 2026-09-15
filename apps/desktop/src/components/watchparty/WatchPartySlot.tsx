@@ -134,6 +134,7 @@ export function WatchPartySlot({
         <NativeVideoPlayer
           key={videoSrc}
           src={videoSrc}
+          preload="auto"
           loop={false}
           autoPlay={false}
           controls={false}
