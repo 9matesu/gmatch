@@ -106,6 +106,10 @@ export function handleIncoming(conn: WsConn, data: string): void {
     if (res) {
       conn.rooms.add(res.room)
       broadcastToRoom(res.room, res.payload)
+    } else if (typeof msg.party === 'string') {
+      // Room died (GC/eviction pre-persistence, or a creator wipe): say so
+      // once, on the requester's socket, so no ghost room loops 404s.
+      conn.send(JSON.stringify({ type: 'watch.gone', party: msg.party }))
     }
     return
   }

@@ -282,6 +282,15 @@ describe('ws relay integration', () => {
     expect(pong.t1).toBeGreaterThan(0)
   })
 
+  it('watch.join for a dead party answers watch.gone on that socket only', () => {
+    const a = fakeConn()
+    conns.add(a)
+    authed(a, 'u1')
+    a.sent.length = 0
+    handleIncoming(a, JSON.stringify({ type: 'watch.join', party: 'zzzzzzzz' }))
+    expect(a.sent.map(JSON.parse).some((m) => m.type === 'watch.gone' && m.party === 'zzzzzzzz')).toBe(true)
+  })
+
   it('watch.ping refreshes lastSeen of every room the user is in', () => {
     const p = makeParty('u1')
     joinWatch('u2', 'Bob', { party: p.id })

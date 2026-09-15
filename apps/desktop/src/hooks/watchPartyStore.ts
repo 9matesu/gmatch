@@ -130,11 +130,15 @@ export function handleWatchMessage(msg: any): void {
     }
     return
   }
-  if (msg.type === 'watch.kicked') {
+  if (msg.type === 'watch.kicked' || msg.type === 'watch.gone') {
     const party = state.parties.find((p) => p.id === msg.party)
     if (party) {
       state.parties = state.parties.filter((p) => p.id !== msg.party)
-      watchPartyStore.set({ kickedNotice: `Removed from ${party.name}.` })
+      watchPartyStore.set({
+        kickedNotice: msg.type === 'watch.gone'
+          ? `"${party.name}" has closed.`
+          : `Removed from ${party.name}.`,
+      })
       maybeUnsubscribe()
     }
     return
