@@ -77,7 +77,68 @@ describe('POST /api/watchparty (relay fallback)', () => {
   })
 })
 
+describe('POST /api/watchparty/:id/video bulk', () => {
+  async function makeRoom(): Promise<string> {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(null, { status: 200, headers: { 'content-type': 'video/mp4', 'content-length': String(80 * 1024 * 1024) } }),
+    ))
+    __resetParties()
+    const body = JSON.stringify({ url: 'https://pmvhaven.com/video/show_abc', name: 'T' })
+    const res = await app.request('/api/watchparty', { method: 'POST', headers: auth('POST', '/api/watchparty', body), body }, env)
+    expect(res.status).toBe(201)
+    const json: any = await res.json()
+    vi.unstubAllGlobals()
+    return json.party.id
+  }
+
+  it('adds many urls at once, reporting failures', async () => {
+    const partyId = await makeRoom()
+    vi.stubGlobal('fetch', vi.fn(async (u: string) =>
+      String(u).includes('junk')
+        ? new Response('nope', { status: 404 })
+        : new Response('x', { status: 206, headers: { 'content-type': 'video/mp4', 'content-range': 'bytes 0-1/10' } }),
+    ))
+    const body = JSON.stringify({ queueOnly: true, urls: ['https://ok.com/1', 'https://junk.com/2', 'https://ok.com/3'] })
+    // resolveMedia probes the resolved URL; the mock resolver maps every
+    // non-junk input to example.com and junk input through unchanged, so
+    // only the fetch stub decides pass/fail per URL.
+    const res = await app.request(`/api/watchparty/${partyId}/video`, {
+      method: 'POST',
+      headers: auth('POST', `/api/watchparty/${partyId}/video`, body),
+      body,
+    }, env)
+    expect(res.status).toBe(200)
+    const json: any = await res.json()
+    expect(json.added.length).toBe(2)
+    expect(json.failed).toEqual(['https://junk.com/2'])
+  })
+
+  it('rejects more than 10 urls per request', async () => {
+    const partyId = await makeRoom()
+    const body = JSON.stringify({ queueOnly: true, urls: Array.from({ length: 11 }, (_, i) => `https://ok.com/${i}`) })
+    const res = await app.request(`/api/watchparty/${partyId}/video`, {
+      method: 'POST',
+      headers: auth('POST', `/api/watchparty/${partyId}/video`, body),
+      body,
+    }, env)
+    expect(res.status).toBe(400)
+  })
+
+  it('bulk with zero resolved videos is a 422', async () => {
+    const partyId = await makeRoom()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 404 })))
+    const body = JSON.stringify({ queueOnly: true, urls: ['https://ok.com/a', 'https://ok.com/b'] })
+    const res = await app.request(`/api/watchparty/${partyId}/video`, {
+      method: 'POST',
+      headers: auth('POST', `/api/watchparty/${partyId}/video`, body),
+      body,
+    }, env)
+    expect(res.status).toBe(422)
+  })
+})
+
 describe('GET /api/watchparty/:id/stream', () => {
+
   it('is reachable without auth headers (video tag cannot sign)', async () => {
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(null, { status: 200, headers: { 'content-type': 'video/mp4', 'content-length': String(80 * 1024 * 1024) } }),

@@ -119,16 +119,29 @@ watchparty.post('/:id/video', orbitAuth, async (c) => {
   const title = typeof body?.name === 'string' ? body.name.trim().slice(0, 60) : ''
   const queueOnly = body?.queueOnly === true
 
-  const media = await resolveMedia(c.env, orbitId, url)
-  if (!media) return c.json({ error: PARSE_ERROR }, 422)
-  let entryUrl = media.url
-  if (media.relay && !entryUrl) entryUrl = `/api/watchparty/${party.id}/stream`
+  // Bulk shape: urls[] (1..10) or the legacy single url.
+  const urlList: string[] = Array.isArray(body?.urls)
+    ? body.urls.map((u: unknown) => String(u).trim()).filter(Boolean).slice(0, 11)
+    : (url ? [url] : [])
+  if (urlList.length > 10) return c.json({ error: 'Add up to 10 videos at a time.' }, 400)
+  if (urlList.length === 0) return c.json({ error: PARSE_ERROR }, 422)
 
-  const add = queueOps(orbitId, { party: party.id, op: 'add', name: title, url: entryUrl, relay: media.relay })
-  if (!add) return c.json({ error: 'The room changed. Try again.' }, 409)
-  const entry = party.queue[party.queue.length - 1]
+  const added: Array<{ id: string; name: string; url: string }> = []
+  const failed: string[] = []
+  // Sequential on purpose: one burst of upstream fetches per click trips
+  // more hotlink WAFs than a short queue of requests.
+  for (const u of urlList) {
+    const media = await resolveMedia(c.env, orbitId, u)
+    if (!media) { failed.push(u); continue }
+    let entryUrl = media.url
+    if (media.relay && !entryUrl) entryUrl = `/api/watchparty/${party.id}/stream`
+    const add = queueOps(orbitId, { party: party.id, op: 'add', name: title, url: entryUrl, relay: media.relay })
+    if (!add) { failed.push(u); continue }
+    added.push({ ...party.queue[party.queue.length - 1] })
+  }
+  if (added.length === 0) return c.json({ error: PARSE_ERROR, failed }, 422)
   if (!queueOnly) {
-    queueOps(orbitId, { party: party.id, op: 'play', id: entry.id })
+    queueOps(orbitId, { party: party.id, op: 'play', id: added[0].id })
   }
   const payload = {
     type: 'watch.queue',
@@ -138,7 +151,7 @@ watchparty.post('/:id/video', orbitAuth, async (c) => {
     frame: party.frame,
   }
   broadcastToRoom(`watch:${party.id}`, payload)
-  return c.json({ ok: true, entry: { id: entry.id, name: entry.name, url: entry.url } })
+  return c.json({ ok: true, added, failed })
 })
 
 watchparty.get('/:id', orbitAuth, async (c) => {
