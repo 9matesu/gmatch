@@ -154,12 +154,12 @@ footer {
 <main>
 <section id="download">
 <h2>Download (Windows x64, single file)</h2>
-<p>Version <strong id="version">1.3.0</strong> · file <code>gMatch-1.3.0-portable.exe</code> · 113,125,380 bytes (107.9 MiB) · built <span id="build-date">2026-09-15T11:01:12.602Z</span> (UTC).</p>
-<p><a href="releases/gMatch-1.3.0-portable.exe" download>gMatch-1.3.0-portable.exe</a></p>
+<p>Version <strong id="version">1.3.1</strong> · file <code>gMatch-1.3.1-portable.exe</code> · 113,128,322 bytes (107.9 MiB) · built <span id="build-date">2026-09-15T16:44:08.048Z</span> (UTC).</p>
+<p><a href="releases/gMatch-1.3.1-portable.exe" download>gMatch-1.3.1-portable.exe</a></p>
 <p>Expected <strong>SHA-256</strong>. Copy the value below and check it against the next section before running anything:</p>
-<pre id="sha256">f599ce9c94e618ec0463f4a37e384f30280a85a35f1356eef22357c7412c952c</pre>
+<pre id="sha256">dd7a1824df54b4a79c9352cae90f91df114a5ab2172815ca699e2e6f346f18f2</pre>
 <p>Expected <strong>SHA-512</strong>, for extra paranoia (the file is 109 MB):</p>
-<pre id="sha512">ff973b0f0a21ae1e01001358bc68d5dedc027fec6212de4a8cb28b41adde8420665886c9b4a39bdc6ca9ea638d85789975b3709ecb516a73583b7561b0ab8713</pre>
+<pre id="sha512">066a8ec3b48c410727cf4bfccf2a53b35be17a2c706a075c2581146627547a2bb862cf1daba5d8979933d936c0f5ea3448cbf14324644f3519ff50b6d1b12ea9</pre>
 <p><em>(Both hashes, plus the build date and byte count above, are derived mechanically from the shipped file at publish time, never hand-typed. The same data lives at <code>release.json</code> on this server.)</em></p>
 <h3>Code signing: what we do and don't have</h3>
 <p>This binary is <strong>not Authenticode-signed</strong>. A commercial code-signing certificate costs hundreds of dollars a year, and we fund this project with donations rather than data sales. So instead we publish the cryptographic integrity you can verify yourself: SHA-256 and SHA-512 digests derived from the exact bytes served on this page. There is no macOS or Linux build yet.</p>
@@ -175,7 +175,7 @@ footer {
 <section id="verify">
 <h2>Verify the hash on Windows (20 seconds, nothing to install)</h2>
 <p>Open the Start menu, type <code>PowerShell</code>, and run (adjust the path if you saved elsewhere):</p>
-<pre>Get-FileHash "$env:USERPROFILE\Downloads\gMatch-1.3.0-portable.exe" -Algorithm SHA256</pre>
+<pre>Get-FileHash "$env:USERPROFILE\Downloads\gMatch-1.3.1-portable.exe" -Algorithm SHA256</pre>
 <p>Compare the <code>Hash</code> value with the one published above. If it differs by even ONE character, do NOT run the file: delete it and report it through the abuse page linked under Terms below.</p>
 <p>Same idea, any algorithm you prefer: <code>Get-FileHash ... -Algorithm SHA512</code> must match the SHA-512 block above.</p>
 </section>
