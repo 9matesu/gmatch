@@ -595,8 +595,13 @@ users.on(['PATCH', 'PUT'], '/profile', async (c) => {
     broadcastToRoom('lobby', { type: 'lobby', action: 'profile_updated', user: push.user })
   }
 
+  // Counts derived from the Followers table (same as GET /:id, /me, /api/users):
+  // the denormalized columns drift after cascade deletes and admin edits.
   const saved = await c.env.DB.prepare(
-    'SELECT id, display_name, tags, pfp_url, bio, website, followers_count, following_count, posts_count, is_private FROM Users WHERE id = ?'
+    `SELECT id, display_name, tags, pfp_url, bio, website, posts_count, is_private,
+            (SELECT COUNT(*) FROM Followers f WHERE f.followee_id = Users.id AND f.accepted = 1) as followers_count,
+            (SELECT COUNT(*) FROM Followers f WHERE f.follower_id = Users.id AND f.accepted = 1) as following_count
+     FROM Users WHERE id = ?`
   ).bind(orbitId).first<any>()
   let savedTags: string[] = []
   try { savedTags = saved?.tags ? JSON.parse(saved.tags) : [] } catch {}

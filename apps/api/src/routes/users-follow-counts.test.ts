@@ -51,4 +51,22 @@ describe('profile follow counts are derived', () => {
     expect(aliceRow?.followers_count).toBe(2)
     expect(aliceRow?.following_count).toBe(0)
   })
+
+  it('PATCH /profile response is derived too (ghost counter fix)', async () => {
+    const other = createTestIdentity()
+    await env.DB.prepare(`INSERT INTO Users (id, public_key, last_seen) VALUES (?, ?, datetime('now'))`)
+      .bind(other.orbitId, other.publicKeyHex).run()
+    await env.DB.prepare('INSERT INTO Followers (follower_id, followee_id, accepted) VALUES (?, ?, 1)')
+      .bind(other.orbitId, alice.orbitId).run()
+    const body = JSON.stringify({ bio: 'hi' })
+    const res = await app.request('/api/users/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...signRequestHeaders(alice, 'PATCH', '/api/users/profile', body) },
+      body,
+    }, env)
+    const json = (await res.json()) as any
+    expect(res.status).toBe(200)
+    expect(json.followers_count).toBe(3)
+    expect(json.following_count).toBe(0)
+  })
 })
