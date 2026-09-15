@@ -1,12 +1,12 @@
 'use client'
 
-// Watch Party join/create modal. One input, one list, no wizard.
+// Watch Party video modal. Create mode (URL + party name) when no room is
+// open; LOAD/QUEUE mode against the active room otherwise.
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Modal } from '../Modal'
 import { BTN, BTN_PRIMARY } from '../../ui/styles'
-import { orbitFetch } from '../../utils/api'
-import { createParty, joinPartyById } from '../../hooks/watchPartyStore'
+import { createParty, loadPartyVideo } from '../../hooks/watchPartyStore'
 
 interface IdentityLike {
   orbitId: string
@@ -17,30 +17,33 @@ interface IdentityLike {
 export function WatchPartyUrlModal({
   identity,
   onClose,
+  joinPartyId = null,
+  queueMode = false,
+  lockVideo = false,
 }: {
   identity: IdentityLike
   onClose: () => void
+  /** Room to load into; null = create a new party. */
+  joinPartyId?: string | null
+  /** Load into the queue without interrupting playback. */
+  queueMode?: boolean
+  lockVideo?: boolean
 }) {
   const [url, setUrl] = useState('')
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [parties, setParties] = useState<Array<{ id: string; name: string; members: number }>>([])
 
-  useEffect(() => {
-    let dead = false
-    void orbitFetch('/api/watchparty', {}, identity)
-      .then((r) => (r.ok ? r.json() : { parties: [] }))
-      .then((b: any) => { if (!dead && Array.isArray(b.parties)) setParties(b.parties) })
-      .catch(() => {})
-    return () => { dead = true }
-  }, [identity])
+  const inRoom = Boolean(joinPartyId)
+  const blocked = inRoom && lockVideo
 
   const submit = async () => {
-    if (!url.trim() || busy) return
+    if (!url.trim() || busy || blocked) return
     setBusy(true)
     setError(null)
-    const res = await createParty(identity, url.trim(), name.trim())
+    const res = inRoom
+      ? await loadPartyVideo(identity, joinPartyId as string, url.trim(), name.trim(), queueMode)
+      : await createParty(identity, url.trim(), name.trim())
     setBusy(false)
     if (!res.ok) {
       setError(res.error || 'Could not start the party.')
@@ -50,7 +53,7 @@ export function WatchPartyUrlModal({
   }
 
   return (
-    <Modal title="Watch Party" onClose={onClose}>
+    <Modal title={inRoom ? (queueMode ? 'Add to queue' : 'Load video') : 'Watch Party'} onClose={onClose}>
       <div className="space-y-3">
         <input
           autoFocus
@@ -64,47 +67,53 @@ export function WatchPartyUrlModal({
         <p className="text-[10px] text-retro-muted">
           Direct .mp4 links and video pages (pmvhaven, redgifs, X, Reddit) are parsed server-side.
         </p>
-        <input
-          aria-label="Party name"
-          value={name}
-          placeholder="Party name (optional)"
-          maxLength={40}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') void submit() }}
-          className="glass-field w-full px-3 py-2 text-xs"
-        />
-        {error && <p className="text-xs text-retro-error">{error}</p>}
-        <button
-          type="button"
-          onClick={() => void submit()}
-          disabled={!url.trim() || busy}
-          className={`${BTN_PRIMARY} w-full py-2 text-xs disabled:opacity-40`}
-        >
-          {busy ? 'Parsing...' : 'START PARTY'}
-        </button>
-
-        {parties.length > 0 && (
-          <div className="pt-1 border-t border-border-glass">
-            <p className="text-[10px] uppercase tracking-wider text-retro-muted mb-2">Open parties</p>
-            <ul className="space-y-1">
-              {parties.map((p) => (
-                <li key={p.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void joinPartyById(identity, p.id).then((ok) => ok && onClose())
-                    }}
-                    className={`${BTN} w-full px-3 py-2 text-xs text-left flex items-center justify-between`}
-                  >
-                    <span className="truncate">{p.name}</span>
-                    <span className="text-retro-muted">{p.members}/8</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+        {!inRoom && (
+          <input
+            aria-label="Party name"
+            value={name}
+            placeholder="Party name (optional)"
+            maxLength={40}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') void submit() }}
+            className="glass-field w-full px-3 py-2 text-xs"
+          />
         )}
+        {blocked && <p className="text-xs text-retro-muted">Only the host can load videos in this room.</p>}
+        {error && <p className="text-xs text-retro-error">{error}</p>}
+        <div className="flex gap-2">
+          {inRoom && queueMode && (
+            <button
+              type="button"
+              onClick={() => void loadIntoRoom()}
+              disabled={!url.trim() || busy || blocked}
+              className={`${BTN} flex-1 py-2 text-xs disabled:opacity-40`}
+            >
+              LOAD NOW
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={!url.trim() || busy || blocked}
+            className={`${BTN_PRIMARY} flex-1 py-2 text-xs disabled:opacity-40`}
+          >
+            {busy ? 'Parsing...' : inRoom ? (queueMode ? 'ADD TO QUEUE' : 'LOAD VIDEO') : 'START PARTY'}
+          </button>
+        </div>
       </div>
     </Modal>
   )
+
+  async function loadIntoRoom() {
+    if (!url.trim() || busy || blocked || !joinPartyId) return
+    setBusy(true)
+    setError(null)
+    const res = await loadPartyVideo(identity, joinPartyId, url.trim(), name.trim(), false)
+    setBusy(false)
+    if (!res.ok) {
+      setError(res.error || 'Could not load this video.')
+      return
+    }
+    onClose()
+  }
 }

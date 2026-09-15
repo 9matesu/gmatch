@@ -42,7 +42,10 @@ export function validateTicket(ticket: string): string | null {
 }
 
 // Watch Party relay: tiny JSON control frames (never media bytes).
-import { applyWatch, joinWatch, watchPong, applyChat } from './watchparty'
+import {
+  applyWatch, joinWatch, watchPong, applyChat, deleteChat, leaveWatch,
+  kickWatch, banWatch, muteWatch, transferHost, settingsWatch, queueOps,
+} from './watchparty'
 
 export function handleIncoming(conn: WsConn, data: string): void {
   let msg: any
@@ -85,9 +88,9 @@ export function handleIncoming(conn: WsConn, data: string): void {
     return
   }
 
-  // Watch Party frames. join subscribes the socket to the party room; play
-  // control frames are re-stamped with the SERVER clock and relayed to the
-  // room so every peer advances from the same instant.
+  // Watch Room frames. join subscribes the socket to the party room; control
+  // frames are re-stamped with the SERVER clock and relayed to the room so
+  // every peer advances from the same instant.
   if (msg.type === 'watch.ping') {
     conn.send(JSON.stringify(watchPong(msg.t0)))
     return
@@ -107,6 +110,53 @@ export function handleIncoming(conn: WsConn, data: string): void {
   }
   if (msg.type === 'watch.chat') {
     const res = applyChat(conn.userId || '', msg.name, msg)
+    if (res) broadcastToRoom(res.room, res.payload)
+    return
+  }
+  if (msg.type === 'watch.chat.del') {
+    const res = deleteChat(conn.userId || '', msg)
+    if (res) broadcastToRoom(res.room, res.payload)
+    return
+  }
+  if (msg.type === 'watch.leave') {
+    const res = leaveWatch(conn.userId || '', msg)
+    if (res) {
+      conn.rooms.delete(res.room)
+      broadcastToRoom(res.room, res.payload)
+    }
+    return
+  }
+  if (msg.type === 'watch.kick' || msg.type === 'watch.ban') {
+    const res = msg.type === 'watch.kick' ? kickWatch(conn.userId || '', msg) : banWatch(conn.userId || '', msg)
+    if (res) {
+      broadcastToRoom(res.room, res.payload)
+      // Tell the target directly + evict its room membership.
+      for (const c of conns) {
+        if (c.userId === res.kicked) {
+          c.rooms.delete(res.room)
+          c.send(JSON.stringify({ type: 'watch.kicked', party: msg.party }))
+        }
+      }
+    }
+    return
+  }
+  if (msg.type === 'watch.mute') {
+    const res = muteWatch(conn.userId || '', msg)
+    if (res) broadcastToRoom(res.room, res.payload)
+    return
+  }
+  if (msg.type === 'watch.host') {
+    const res = transferHost(conn.userId || '', msg)
+    if (res) broadcastToRoom(res.room, res.payload)
+    return
+  }
+  if (msg.type === 'watch.settings') {
+    const res = settingsWatch(conn.userId || '', msg)
+    if (res) broadcastToRoom(res.room, res.payload)
+    return
+  }
+  if (msg.type === 'watch.queue') {
+    const res = queueOps(conn.userId || '', msg)
     if (res) broadcastToRoom(res.room, res.payload)
     return
   }
@@ -130,9 +180,14 @@ export function handleIncoming(conn: WsConn, data: string): void {
 }
 
 export function broadcastToRoom(room: string, payload: unknown): void {
-  const payloadStr = JSON.stringify(payload)
-  for (const c of conns) {
-    if (c.rooms.has(room)) c.send(payloadStr)
+  // Array payloads fan out as individual messages (watch joins return a
+  // snapshot + system-note bundle; listeners switch on msg.type).
+  const list = Array.isArray(payload) ? payload : [payload]
+  for (const item of list) {
+    const payloadStr = JSON.stringify(item)
+    for (const c of conns) {
+      if (c.rooms.has(room)) c.send(payloadStr)
+    }
   }
 }
 

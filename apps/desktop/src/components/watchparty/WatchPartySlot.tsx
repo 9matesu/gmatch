@@ -5,10 +5,10 @@
 // player's own controls are hidden; mute stays local.
 
 import { useEffect, useRef, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Maximize, MicOff, Mic, Plus, RotateCcw } from 'lucide-react'
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer'
 import { useObjectImage } from '../../hooks/useObjectImage'
-import { controlPlayback, serverNow, type PartyRuntime } from '../../hooks/watchPartyStore'
+import { controlPlayback, serverNow, queueOp, type PartyRuntime } from '../../hooks/watchPartyStore'
 import { computeTargetPosition, driftCorrection } from '../../utils/watchSync'
 
 export function WatchPartySlot({
@@ -27,8 +27,11 @@ export function WatchPartySlot({
   onEmptyClick: () => void
 }) {
   const wrapRef = useRef<HTMLDivElement | null>(null)
-  const lastActionRef = useRef<string | null>(null)
+  const endedRef = useRef<string>('')
   const [videoSrc, setVideoSrc] = useState<string | null>(null)
+  // Default muted: Chrome blocks unmuted autoplay, and a silent room that
+  // starts playing beats a dead frame waiting for a click. Unmute is local.
+  const [muted, setMuted] = useState(true)
 
   const media = useObjectImage(party?.url || null, identity, { enabled: Boolean(party?.url) })
   const src = media.url
@@ -45,7 +48,22 @@ export function WatchPartySlot({
       if (document.hidden) return
       const v = wrapRef.current?.querySelector('video')
       if (!v || !party.frame || !videoSrc) return
-      applyPartyFrame(v, party.frame, lastActionRef)
+      const target = computeTargetPosition(party.frame, serverNow())
+      if (v.duration > 0 && target >= v.duration - 0.25 && party.frame.action === 'play') {
+        // Video ended: the host advances the queue (one shot per media);
+        // everyone else parks paused at the end (no loop in V1).
+        if (!v.paused) v.pause()
+        if (party.host === identity.orbitId && party.queue.length > 1 && endedRef.current !== party.current) {
+          endedRef.current = party.current
+          queueOp(party.id, 'next')
+        }
+        return
+      }
+      const localPlaying = !v.paused
+      const plan = driftCorrection(v.currentTime, target, localPlaying, party.frame.action)
+      if (plan.seekTo !== null) v.currentTime = plan.seekTo
+      if (plan.play && v.paused) void v.play().catch(() => {})
+      if (plan.pause && !v.paused) v.pause()
     }, 250)
     return () => clearInterval(timer)
   }, [party?.id, videoSrc, party?.frame])
@@ -98,33 +116,61 @@ export function WatchPartySlot({
           </span>
         </div>
       )}
-      <span className="absolute top-1 left-2 text-[10px] font-bold uppercase tracking-wider text-white/70 pointer-events-none drop-shadow">
+      <span className="absolute top-1 left-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/90 pointer-events-none">
         {party.name}
       </span>
+      {party.frame?.by && (
+        <span className="absolute bottom-1 left-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white/80 pointer-events-none truncate max-w-[60%]">
+          {party.frame.by} controls playback
+        </span>
+      )}
+      {/* Local controls: never synced (volume/fullscreen belong to the room
+          of one person's ears and monitor). */}
+      {videoSrc && (
+        <div className="absolute top-1 right-1 flex gap-1">
+          <button
+            type="button"
+            aria-label={muted ? 'Unmute video' : 'Mute video'}
+            onClick={(e) => {
+              e.stopPropagation()
+              const v = wrapRef.current?.querySelector('video')
+              if (!v) return
+              v.muted = !v.muted
+              setMuted(v.muted)
+            }}
+            className="p-1.5 rounded-md bg-black/60 text-white/80 hover:text-white cursor-pointer"
+          >
+            {muted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+          </button>
+          <button
+            type="button"
+            aria-label="Resync to the room"
+            title="Resync to the room"
+            onClick={(e) => {
+              e.stopPropagation()
+              const v = wrapRef.current?.querySelector('video')
+              if (v && party.frame) v.currentTime = computeTargetPosition(party.frame, serverNow())
+            }}
+            className="p-1.5 rounded-md bg-black/60 text-white/80 hover:text-white cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            aria-label="Fullscreen"
+            onClick={(e) => {
+              e.stopPropagation()
+              if (document.fullscreenElement) void document.exitFullscreen()
+              else void wrapRef.current?.requestFullscreen()
+            }}
+            className="p-1.5 rounded-md bg-black/60 text-white/80 hover:text-white cursor-pointer"
+          >
+            <Maximize className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   )
 }
 
-/** Apply the party frame to a local <video>: follow action, correct drift. */
-function applyPartyFrame(
-  v: HTMLVideoElement,
-  frame: { action: 'play' | 'pause'; position: number; rate: number; updatedAt: number },
-  lastActionRef: { current: string | null },
-): void {
-  const target = computeTargetPosition(frame as never, serverNow())
-  if (v.duration > 0 && target >= v.duration - 0.25 && frame.action === 'play') {
-    // party video ended: park paused at the end (no loop in V1)
-    if (!v.paused) v.pause()
-    return
-  }
-  const localPlaying = !v.paused
-  const plan = driftCorrection(v.currentTime, target, localPlaying, frame.action)
-  if (plan.seekTo !== null) v.currentTime = plan.seekTo
-  if (plan.play && v.paused) {
-    // Autoplay policy: a joined slot may not start until first interaction;
-    // a rejected play() just retries on the next tick.
-    void v.play().catch(() => {})
-  }
-  if (plan.pause && !v.paused) v.pause()
-  lastActionRef.current = frame.action
-}
+

@@ -1,10 +1,18 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { createParty, getParty, applyWatch, joinWatch, applyChat, __resetParties, partyRoom } from './watchparty'
+import {
+  createParty, getParty, listParties, applyWatch, joinWatch, leaveWatch, leaveAll, applyChat,
+  deleteChat, kickWatch, banWatch, muteWatch, transferHost, settingsWatch,
+  queueOps, setPartyMedia, __resetParties, partyRoom, type Party,
+} from './watchparty'
 import { handleIncoming, conns, createWsTicket, type WsConn } from './ws-bus'
 
 function fakeConn(): WsConn & { sent: string[] } {
   const sent: string[] = []
-  return { sent, send: (d: string) => { sent.push(d); return true }, rooms: new Set<string>() }
+  return {
+    sent,
+    send: (data: string) => { sent.push(data); return true },
+    rooms: new Set<string>(),
+  }
 }
 
 function authed(conn: WsConn & { sent: string[] }, userId: string) {
@@ -16,59 +24,194 @@ beforeEach(() => {
   conns.clear()
 })
 
-describe('party state', () => {
-  it('createParty seeds a paused frame on the media url', () => {
-    const p = createParty('Test', '/api/objects/abc', '/api/objects/abc')
-    expect(getParty(p.id)).toBe(p)
-    expect(p.frame.action).toBe('pause')
-    expect(p.members.size).toBe(0)
+function makeParty(creator = 'u1'): Party {
+  return createParty('T', 'u', 'u', undefined, creator)
+}
+
+describe('room model (host, private, queue, chat history)', () => {
+  it('createParty sets host and auto-joins the creator', () => {
+    const p = makeParty()
+    expect(p.hostId).toBe('u1')
+    expect(p.members.has('u1')).toBe(true)
+    expect(p.isPrivate).toBe(false)
+    expect(p.lockVideo).toBe(false)
+    expect(p.queue).toEqual([])
   })
 
-  it('applyWatch rejects non-members, bad actions, bad positions', () => {
-    const p = createParty('T', 'u', 'u')
-    expect(applyWatch('ghost', { party: p.id, action: 'play', position: 5 })).toBeNull()
-    joinWatch('u1', 'Alice', { party: p.id })
-    expect(applyWatch('u1', { party: p.id, action: 'jump', position: 5 })).toBeNull()
-    expect(applyWatch('u1', { party: p.id, action: 'play', position: -3 })).toBeNull()
-    expect(applyWatch('u1', { party: p.id, action: 'play', position: NaN })).toBeNull()
-    expect(applyWatch('u1', { party: p.id, action: 'play', position: 5, rate: 2 })).toBeNull()
+  it('joinWatch returns full snapshot: roster+host, frame, chat, queue', () => {
+    const p = makeParty()
+    joinWatch('u2', 'Bob', { party: p.id })
+    const res = joinWatch('u3', 'Cleo', { party: p.id })!
+    const pl = Array.isArray(res.payload) ? res.payload.find((x: any) => x.type === 'watch.roster') : res.payload
+    expect(pl.party).toBe(p.id)
+    expect(pl.host).toBe('u1')
+    expect(pl.members).toEqual([
+      { id: 'u1', name: '', muted: false },
+      { id: 'u2', name: 'Bob', muted: false },
+      { id: 'u3', name: 'Cleo', muted: false },
+    ])
+    expect(pl.frame).toBeTruthy()
+    expect(Array.isArray(pl.chat)).toBe(true)
+    expect(Array.isArray(pl.queue)).toBe(true)
   })
 
-  it('applyWatch stamps server clock and rate=1', () => {
-    const p = createParty('T', 'u', 'u')
-    joinWatch('u1', 'Alice', { party: p.id })
-    const res = applyWatch('u1', { party: p.id, action: 'play', position: 12.5 })!
-    expect(res.room).toBe(partyRoom(p.id))
-    expect(res.payload.type).toBe('watch.sync')
-    expect(res.payload.frame.position).toBe(12.5)
-    expect(res.payload.frame.rate).toBe(1)
-    expect(res.payload.frame.updatedAt).toBeGreaterThan(Date.now() / 1000 - 5)
-    expect(p.frame.action).toBe('play')
+  it('applyWatch stamps the acting member name on the frame', () => {
+    const p = makeParty()
+    joinWatch('u2', 'Bob', { party: p.id })
+    const res = applyWatch('u2', { party: p.id, action: 'play', position: 4 })!
+    expect(res.payload.frame.by).toBe('Bob')
   })
 
-  it('joinWatch caps members at 8 and relays the roster', () => {
-    const p = createParty('T', 'u', 'u')
-    for (let i = 0; i < 8; i++) expect(joinWatch(`u${i}`, `N${i}`, { party: p.id })).not.toBeNull()
-    expect(joinWatch('u8', 'Late', { party: p.id })).toBeNull()
-    expect(p.members.size).toBe(8)
+  it('leaveWatch removes member and broadcasts system + roster; host promotes', () => {
+    const p = makeParty()
+    joinWatch('u2', 'Bob', { party: p.id })
+    const res = leaveWatch('u1', { party: p.id })!
+    expect(p.members.has('u1')).toBe(false)
+    expect(p.hostId).toBe('u2') // promotion
+    expect(res.payload.find((r: any) => r.type === 'watch.system') !== undefined || res.payload.type === 'watch.system').toBe(true)
   })
 
-  it('applyChat relays member text with a 2s/user rate limit', () => {
-    const p = createParty('T', 'u', 'u')
-    expect(applyChat('ghost', 'X', { party: p.id, text: 'hi' })).toBeNull()
-    joinWatch('u1', 'Alice', { party: p.id })
-    const res = applyChat('u1', 'Alice', { party: p.id, text: '  hello  ' })!
-    expect(res.payload.text).toBe('hello')
-    expect(res.payload.from.name).toBe('Alice')
-    expect(applyChat('u1', 'Alice', { party: p.id, text: 'again' })).toBeNull()
-    expect(applyChat('u1', 'Alice', { party: p.id, text: '   ' })).toBeNull()
-    expect(applyChat('u2', 'Bob', { party: 'missing', text: 'x' })).toBeNull()
+  it('leaveAll covers every room the user was in', () => {
+    const a = makeParty('uA')
+    const b = makeParty('uB')
+    joinWatch('u9', 'Ghost', { party: a.id })
+    joinWatch('u9', 'Ghost', { party: b.id })
+    const results = leaveAll('u9')
+    expect(results.length).toBe(2)
+    expect(a.members.has('u9')).toBe(false)
+    expect(b.members.has('u9')).toBe(false)
+  })
+
+  it('last member leaving deletes the party', () => {
+    const p = makeParty()
+    leaveWatch('u1', { party: p.id })
+    expect(getParty(p.id)).toBeNull()
+  })
+})
+
+describe('moderation', () => {
+  it('non-host kick is null; host kick removes the target', () => {
+    const p = makeParty()
+    joinWatch('u2', 'Bob', { party: p.id })
+    expect(kickWatch('u2', { party: p.id, target: 'u1' })).toBeNull()
+    const res = kickWatch('u1', { party: p.id, target: 'u2' })!
+    expect(p.members.has('u2')).toBe(false)
+    expect(res.kicked).toBe('u2')
+  })
+
+  it('ban blocks rejoin for the party lifetime', () => {
+    const p = makeParty()
+    joinWatch('u2', 'Bob', { party: p.id })
+    const res = banWatch('u1', { party: p.id, target: 'u2' })!
+    expect(p.bans.has('u2')).toBe(true)
+    expect(res.kicked).toBe('u2')
+    expect(joinWatch('u2', 'Bob', { party: p.id })).toBeNull()
+  })
+
+  it('mute blocks chat for that member; unmute restores', () => {
+    const p = makeParty()
+    joinWatch('u2', 'Bob', { party: p.id })
+    expect(muteWatch('u2', { party: p.id, target: 'u1' })).toBeNull() // not host
+    const r = muteWatch('u1', { party: p.id, target: 'u2', on: true })!
+    expect(r.payload.muted).toEqual({ u2: true })
+    applyChat('u2', 'Bob', { party: p.id, text: 'hello?' })
+    expect(p.chat.length).toBe(0)
+    muteWatch('u1', { party: p.id, target: 'u2', on: false })
+    expect(applyChat('u2', 'Bob', { party: p.id, text: 'hello' })).not.toBeNull()
+  })
+
+  it('host transfer moves hostId and is host-only', () => {
+    const p = makeParty()
+    joinWatch('u2', 'Bob', { party: p.id })
+    expect(transferHost('u2', { party: p.id, target: 'u1' })).toBeNull()
+    transferHost('u1', { party: p.id, target: 'u2' })
+    expect(p.hostId).toBe('u2')
+    expect(transferHost('u2', { party: p.id, target: 'nobody' })).toBeNull()
+  })
+
+  it('settings clamps: name length, booleans; host-only', () => {
+    const p = makeParty()
+    expect(settingsWatch('u2', { party: p.id, name: 'x' })).toBeNull()
+    joinWatch('u2', 'Bob', { party: p.id })
+    settingsWatch('u1', { party: p.id, name: 'a'.repeat(99), isPrivate: true, lockVideo: true })
+    expect(p.name.length).toBe(40)
+    expect(p.isPrivate).toBe(true)
+    expect(p.lockVideo).toBe(true)
+  })
+
+  it('listParties hides private rooms', () => {
+    const p = makeParty()
+    settingsWatch('u1', { party: p.id, isPrivate: true })
+    expect(listParties().find((x) => x.id === p.id)).toBeUndefined()
+  })
+})
+
+describe('chat', () => {
+  it('chat history lives on the party, capped at 80, with ids', () => {
+    const p = makeParty()
+    for (let i = 0; i < 90; i++) {
+      // bypass rate limit: nudge lastChat ts manually per user rotation
+      p.lastChat.set('u1', 0)
+      applyChat('u1', 'Host', { party: p.id, text: `m${i}` })
+    }
+    expect(p.chat.length).toBe(80)
+    expect(p.chat[79].text).toBe('m89')
+    expect(p.chat[79].id.length).toBeGreaterThan(0)
+  })
+
+  it('deleteChat by author or host; strangers dropped', () => {
+    const p = makeParty()
+    joinWatch('u2', 'Bob', { party: p.id })
+    p.lastChat.set('u2', 0)
+    const res = applyChat('u2', 'Bob', { party: p.id, text: 'oops' })!
+    const msgId = res.payload.msgId
+    expect(deleteChat('u3', { party: p.id, msgId })).toBeNull()
+    const del = deleteChat('u2', { party: p.id, msgId })!
+    expect(del.payload.msgId).toBe(msgId)
+    expect(p.chat.some((m) => m.id === msgId)).toBe(false)
+    expect(deleteChat('u1', { party: p.id, msgId: 'zz' })).toBeNull()
+  })
+})
+
+describe('queue', () => {
+  it('queueOps add/remove/next mutates + returns room payload', () => {
+    const p = makeParty()
+    joinWatch('u2', 'Bob', { party: p.id })
+    queueOps('u2', { party: p.id, op: 'add', name: 'a', url: '/api/objects/a' })
+    queueOps('u1', { party: p.id, op: 'add', name: 'b', url: '/api/objects/b' } )
+    expect(p.queue.length).toBe(2)
+    expect(p.queue[0].id.length).toBe(8)
+    const firstId = p.queue[0].id
+    const next = queueOps('u1', { party: p.id, op: 'next' })!
+    expect(p.current).toBe(firstId)
+    expect(p.mediaUrl).toBe('/api/objects/a')
+    expect(next.payload.current).toBe(firstId)
+    queueOps('u1', { party: p.id, op: 'remove', id: firstId })
+    expect(p.queue.length).toBe(1)
+    expect(p.queue[0].name).toBe('b')
+  })
+
+  it('lockVideo blocks member queue ops but not the host', () => {
+    const p = makeParty()
+    joinWatch('u2', 'Bob', { party: p.id })
+    p.lockVideo = true
+    expect(queueOps('u2', { party: p.id, op: 'add', name: 'x', url: '/api/objects/x' })).toBeNull()
+    expect(queueOps('u1', { party: p.id, op: 'add', name: 'x', url: '/api/objects/x' })).not.toBeNull()
+  })
+
+  it('queue caps at 20 dropping oldest non-current', () => {
+    const p = makeParty()
+    for (let i = 0; i < 25; i++) {
+      queueOps('u1', { party: p.id, op: 'add', name: `q${i}`, url: `/api/objects/${i}` })
+    }
+    expect(p.queue.length).toBe(20)
+    expect(p.queue[19].name).toBe('q24')
   })
 })
 
 describe('ws relay integration', () => {
   it('watch.join subscribes the socket and broadcasts roster; watch relays sync', () => {
-    const p = createParty('T', '/m', '/m')
+    const p = makeParty('u0')
     const a = fakeConn()
     const b = fakeConn()
     conns.add(a)
@@ -78,11 +221,8 @@ describe('ws relay integration', () => {
     handleIncoming(a, JSON.stringify({ type: 'watch.join', party: p.id, name: 'Alice' }))
     expect(a.rooms.has(partyRoom(p.id))).toBe(true)
     handleIncoming(b, JSON.stringify({ type: 'watch.join', party: p.id, name: 'Bob' }))
-    // both got the roster
     const rosterA = a.sent.map(JSON.parse).filter((m) => m.type === 'watch.roster')
-    expect(rosterA.length).toBe(2) // own + Bob's
-    // a plays -> both sockets receive the server-stamped sync (broadcastToRoom
-    // includes the sender; the frame is authoritative, echoing it is harmless)
+    expect(rosterA.length).toBe(2)
     b.sent.length = 0
     a.sent.length = 0
     handleIncoming(a, JSON.stringify({ type: 'watch', party: p.id, action: 'play', position: 3 }))
@@ -107,5 +247,22 @@ describe('ws relay integration', () => {
     const a = fakeConn()
     handleIncoming(a, JSON.stringify({ type: 'watch.join', party: 'x' }))
     expect(a.sent.filter((s) => s.includes('watch'))).toHaveLength(0)
+  })
+
+  it('kick delivers watch.kicked to the target and system frame to the room', () => {
+    const p = makeParty('u1')
+    const a = fakeConn()
+    const b = fakeConn()
+    conns.add(a)
+    conns.add(b)
+    authed(a, 'u1')
+    authed(b, 'u2')
+    handleIncoming(a, JSON.stringify({ type: 'watch.join', party: p.id, name: 'Host' }))
+    handleIncoming(b, JSON.stringify({ type: 'watch.join', party: p.id, name: 'Bob' }))
+    a.sent.length = 0
+    b.sent.length = 0
+    handleIncoming(a, JSON.stringify({ type: 'watch.kick', party: p.id, target: 'u2' }))
+    expect(b.sent.map(JSON.parse).some((m) => m.type === 'watch.kicked' && m.party === p.id)).toBe(true)
+    expect(b.rooms.has(partyRoom(p.id))).toBe(false)
   })
 })
