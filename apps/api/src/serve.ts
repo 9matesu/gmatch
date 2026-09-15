@@ -334,18 +334,28 @@ Bun.serve({
       }
       const conn = wsToConn.get(ws)
       if (conn) {
+        const wasLobbyMember = conn.userId && conn.rooms.has('lobby')
         // WS6: Remove user from lobby queue on disconnect to prevent ghost entries
-        if (conn.userId && conn.rooms.has('lobby')) {
-          leaveLobby(db, conn.userId).catch((err) =>
+        if (wasLobbyMember) {
+          leaveLobby(db, conn.userId!).catch((err) =>
             console.warn('[WS] lobby leave on disconnect failed:', err?.message || err)
           )
-          // Mark the user offline immediately so the roster drops them on the
-          // next poll, and nudge connected clients to refresh right away.
-          db.prepare("UPDATE Users SET last_seen = datetime('now','-10 minutes') WHERE id = ?")
-            .bind(conn.userId)
-            .run()
-            .then(() => broadcastToRoom('lobby', { type: 'lobby', action: 'refresh' }))
-            .catch((err) => console.warn('[WS] mark offline on disconnect failed:', err?.message || err))
+        }
+        // Mark the user offline immediately so the roster drops them (and any
+        // ghost) on the next poll — for ANY authed socket, not only lobby
+        // members (watch/chat-only users used to linger until heartbeat decay).
+        // ponytail: linear scan over live conns, fine at this scale.
+        if (conn.userId) {
+          const stillConnected = [...conns].some((o) => o !== conn && o.userId === conn.userId)
+          if (!stillConnected) {
+            db.prepare("UPDATE Users SET last_seen = datetime('now','-10 minutes') WHERE id = ?")
+              .bind(conn.userId)
+              .run()
+              .then(() => {
+                if (wasLobbyMember) broadcastToRoom('lobby', { type: 'lobby', action: 'refresh' })
+              })
+              .catch((err) => console.warn('[WS] mark offline on disconnect failed:', err?.message || err))
+          }
         }
         conns.delete(conn)
         watchDisconnect(conn)
