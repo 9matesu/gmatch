@@ -290,6 +290,23 @@ export async function loadPartyVideo(identity: IdentityLike, partyId: string, ur
   }
 }
 
+export async function loadPartyVideos(
+  identity: IdentityLike, partyId: string, urls: string[], queueOnly = false,
+): Promise<{ ok: boolean; added: number; failed: string[]; error?: string }> {
+  try {
+    const res = await orbitFetch(`/api/watchparty/${partyId}/video`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urls, queueOnly }),
+    }, identity)
+    const body = await res.json().catch(() => ({})) as any
+    if (!res.ok) return { ok: false, added: 0, failed: [], error: body?.error || 'Could not load these videos.' }
+    return { ok: true, added: (body.added || []).length, failed: body.failed || [] }
+  } catch {
+    return { ok: false, added: 0, failed: [], error: 'Could not reach the server.' }
+  }
+}
+
 export async function joinPartyById(identity: IdentityLike, partyId: string): Promise<boolean> {
   try {
     const res = await orbitFetch(`/api/watchparty/${partyId}`, {}, identity)
