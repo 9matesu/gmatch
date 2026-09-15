@@ -160,7 +160,7 @@ export function WatchPartySlot({
         </div>
       )}
       <span className="absolute top-1 left-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/90 pointer-events-none">
-        {party.name}
+        {party.mediaName || party.name}
       </span>
       {party.frame?.by && (
         <span className="absolute bottom-1 left-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white/80 pointer-events-none truncate max-w-[60%]">

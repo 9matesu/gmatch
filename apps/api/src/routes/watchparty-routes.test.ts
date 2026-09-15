@@ -80,6 +80,16 @@ describe('POST /api/watchparty', () => {
     expect(res.status).toBe(422)
   })
 
+  it('names stored media from the page title or url basename', async () => {
+    __resetParties()
+    const body = JSON.stringify({ url: 'https://example.com/deep/holiday-mix.mp4' })
+    const res = await app.request('/api/watchparty', { method: 'POST', headers: auth('POST', '/api/watchparty', body), body }, env)
+    expect(res.status).toBe(201)
+    const json: any = await res.json()
+    expect(json.party.name).not.toBe('Party')
+    expect(json.party.name.toLowerCase()).toContain('holiday')
+  })
+
   it('audit A5: more than 30 party creates per minute is 429', async () => {
     __resetParties()
     const body = JSON.stringify({ url: 'https://example.com/v', name: '' })
