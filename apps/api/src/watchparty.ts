@@ -362,11 +362,16 @@ export function queueOps(userId: string, msg: any): { room: string; payload: any
     party.queue = party.queue.filter((q) => q.id !== String(msg.id || ''))
   } else if (op === 'play') {
     const entry = party.queue.find((q) => q.id === String(msg.id || ''))
-    if (entry) applyQueueMedia(party, entry, member.name || userId.slice(0, 8))
+    if (entry) applyQueueMedia(party, entry, member.name || userId.slice(0, 8), 'play')
   } else if (op === 'next') {
     const idx = party.queue.findIndex((q) => q.id === party.current)
     const entry = party.queue[(idx + 1) % Math.max(party.queue.length, 1)]
-    if (entry && party.queue.length > 0) applyQueueMedia(party, entry, member.name || userId.slice(0, 8))
+    // Continuous playlist: a PLAYING room advances into a playing frame
+    // (video ended mid-run); a paused room advances paused.
+    if (entry && party.queue.length > 0) {
+      applyQueueMedia(party, entry, member.name || userId.slice(0, 8),
+        party.frame.action === 'play' ? 'play' : 'pause')
+    }
   } else {
     return null
   }
@@ -383,12 +388,12 @@ export function queueOps(userId: string, msg: any): { room: string; payload: any
   }
 }
 
-function applyQueueMedia(party: Party, entry: QueueEntry, by: string): void {
+function applyQueueMedia(party: Party, entry: QueueEntry, by: string, action: 'play' | 'pause' = 'pause'): void {
   party.current = entry.id
   party.mediaName = entry.name
   party.relay = entry.relay
   setPartyMedia(party, entry.url)
-  party.frame = { url: entry.url, action: 'pause', position: 0, rate: 1, updatedAt: serverNow(), by }
+  party.frame = { url: entry.url, action, position: 0, rate: 1, updatedAt: serverNow(), by }
 }
 
 export function watchPong(t0: unknown): { type: string; t0: number; t1: number } {

@@ -207,6 +207,40 @@ describe('queue', () => {
     expect(p.queue.length).toBe(20)
     expect(p.queue[19].name).toBe('q24')
   })
+
+  it("'next' keeps the room playing when the previous frame was playing", () => {
+    const p = makeParty()
+    queueOps('u1', { party: p.id, op: 'add', name: 'a', url: '/api/objects/a' })
+    queueOps('u1', { party: p.id, op: 'add', name: 'b', url: '/api/objects/b' })
+    queueOps('u1', { party: p.id, op: 'play', id: p.queue[0].id })
+    applyWatch('u1', { party: p.id, action: 'play', position: 60 })
+    const res = queueOps('u1', { party: p.id, op: 'next' })!
+    expect(res.payload.frame.action).toBe('play')
+    expect(res.payload.frame.position).toBe(0)
+  })
+
+  it("'next' on a paused room stays paused; manual 'play' starts playback", () => {
+    const p = makeParty()
+    queueOps('u1', { party: p.id, op: 'add', name: 'a', url: '/api/objects/a' })
+    queueOps('u1', { party: p.id, op: 'add', name: 'b', url: '/api/objects/b' })
+    const n = queueOps('u1', { party: p.id, op: 'next' })!
+    expect(n.payload.frame.action).toBe('pause')
+    queueOps('u1', { party: p.id, op: 'play', id: p.queue[1].id })
+    expect(p.frame.action).toBe('play')
+  })
+
+  it("'next' wraps past the last entry (loop), single entry replays itself", () => {
+    const p = makeParty()
+    queueOps('u1', { party: p.id, op: 'add', name: 'solo', url: '/api/objects/s' })
+    queueOps('u1', { party: p.id, op: 'play', id: p.queue[0].id })
+    applyWatch('u1', { party: p.id, action: 'play', position: 90 })
+    const before = p.frame
+    const res = queueOps('u1', { party: p.id, op: 'next' })!
+    expect(res.payload.current).toBe(p.queue[0].id)
+    expect(res.payload.frame.position).toBe(0)
+    expect(p.frame).not.toBe(before) // replay = a NEW stamped frame, so clients reseek
+    expect(p.frame.updatedAt).toBeGreaterThanOrEqual(before.updatedAt)
+  })
 })
 
 describe('ws relay integration', () => {
