@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import { Modal } from '../Modal'
 import { BTN, BTN_PRIMARY } from '../../ui/styles'
-import { createParty, loadPartyVideo } from '../../hooks/watchPartyStore'
+import { createParty, loadPartyVideo, loadPartyVideos } from '../../hooks/watchPartyStore'
 
 interface IdentityLike {
   orbitId: string
@@ -41,28 +41,48 @@ export function WatchPartyUrlModal({
     if (!url.trim() || busy || blocked) return
     setBusy(true)
     setError(null)
-    const res = inRoom
-      ? await loadPartyVideo(identity, joinPartyId as string, url.trim(), name.trim(), queueMode)
-      : await createParty(identity, url.trim(), name.trim())
-    setBusy(false)
-    if (!res.ok) {
-      setError(res.error || 'Could not start the party.')
-      return
+    if (!inRoom) {
+      const lines = url.split(/\n+/).map((l) => l.trim()).filter(Boolean)
+      const res = await createParty(identity, lines[0], name.trim())
+      if (!res.ok) {
+        setBusy(false)
+        setError(res.error || 'Could not start the party.')
+        return
+      }
+      if (lines.length > 1) {
+        // The party exists; a failed tail is a warning, not a failure.
+        const partyId = res.partyId || ''
+        const bulk = partyId
+          ? await loadPartyVideos(identity, partyId, lines.slice(1, 11), true)
+          : { ok: false as const, added: 0, failed: lines.slice(1) }
+        if (!bulk.ok || bulk.failed.length > 0) {
+          setError(`Party started. ${bulk.failed.length} videos failed to queue.`)
+        }
+      }
+    } else {
+      const res = await loadPartyVideo(identity, joinPartyId as string, url.trim(), name.trim(), queueMode)
+      if (!res.ok) {
+        setBusy(false)
+        setError(res.error || 'Could not load this video.')
+        return
+      }
     }
+    setBusy(false)
     onClose()
   }
 
   return (
     <Modal title={inRoom ? (queueMode ? 'Add to queue' : 'Load video') : 'Watch Party'} onClose={onClose}>
       <div className="space-y-3">
-        <input
+        <textarea
           autoFocus
           aria-label="Video URL"
           value={url}
-          placeholder="Video URL or page link"
+          rows={inRoom ? 2 : 4}
+          placeholder={inRoom ? 'Video URL or page link' : 'Video URLs, one per line (first starts the party)'}
           onChange={(e) => setUrl(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') void submit() }}
-          className="glass-field w-full px-3 py-2 text-xs font-mono"
+          onKeyDown={(e) => { if (e.key === 'Enter' && (inRoom || e.ctrlKey || e.metaKey)) void submit() }}
+          className="glass-field w-full px-3 py-2 text-xs font-mono resize-y"
         />
         <p className="text-[10px] text-retro-muted">
           Direct .mp4 links and video pages (pmvhaven, redgifs, X, Reddit) are parsed server-side.

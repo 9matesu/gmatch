@@ -256,7 +256,7 @@ function maybeUnsubscribe(): void {
   }
 }
 
-export async function createParty(identity: IdentityLike, url: string, name: string): Promise<{ ok: boolean; error?: string }> {
+export async function createParty(identity: IdentityLike, url: string, name: string): Promise<{ ok: boolean; partyId?: string; error?: string }> {
   let res: Response
   try {
     res = await orbitFetch('/api/watchparty', {
@@ -270,7 +270,7 @@ export async function createParty(identity: IdentityLike, url: string, name: str
   const body = await res.json().catch(() => ({})) as any
   if (!res.ok) return { ok: false, error: body?.error || 'Could not find a playable video at that link.' }
   joinParty(identity, body.party)
-  return { ok: true }
+  return { ok: true, partyId: body.party?.id }
 }
 
 /** Resolve + queue/change a room's video over HTTP (the server runs the
