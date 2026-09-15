@@ -433,11 +433,13 @@ users.on(['PATCH', 'PUT'], '/profile', async (c) => {
   const orbitId = c.get('orbitId')
   const body = await c.req.json()
 
-  // Reject unexpected fields
+  // Unknown keys are IGNORED, not rejected: forward-compat with newer
+  // clients beats strictness here. A client shipping a new field must
+  // never brick profile saves against an older server (resilience rule).
   const allowedKeys = ['display_name', 'tags', 'pfp_url', 'bio', 'website']
   const unknownKeys = Object.keys(body).filter(k => !allowedKeys.includes(k))
   if (unknownKeys.length > 0) {
-    return c.json({ error: `Unexpected fields: ${unknownKeys.join(', ')}` }, 400)
+    console.warn('[users/profile] ignoring unknown fields:', unknownKeys.join(','))
   }
 
   const { display_name, tags, pfp_url } = body
@@ -486,7 +488,13 @@ users.on(['PATCH', 'PUT'], '/profile', async (c) => {
     }
     cleanName = trimmed
   }
-  if (!cleanName && !existing?.display_name?.trim()) {
+  // The name policy guards patches that TOUCH identity (name/tags):
+  // blanking the name on a nameless row stays illegal. An avatar/bio-only
+  // save must work even on an auth-provisioned row with no display_name
+  // yet - the old blanket 400 permanently locked such accounts out of
+  // ever fixing their profile (pfp 400 report, fix/resilience wave).
+  const patchCarriesIdentity = cleanName !== undefined || tags !== undefined
+  if (patchCarriesIdentity && !cleanName && !existing?.display_name?.trim()) {
     return c.json({ error: 'Display name is required' }, 400)
   }
   let cleanTags: string[] | undefined
