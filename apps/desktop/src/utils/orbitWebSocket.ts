@@ -76,6 +76,9 @@ async function connect(identity: OrbitIdentity, expectedGeneration: number): Pro
         }
         authenticated = true
         next.send(JSON.stringify({ type: 'subscribe', rooms: ['lobby', 'global'] }))
+        // Watch rooms live as server-side room memberships which a fresh
+        // socket does not have: tell listeners to re-send their joins.
+        for (const listener of listeners) listener({ type: '__ws_reconnected' })
         return
       }
       if (!authenticated) return

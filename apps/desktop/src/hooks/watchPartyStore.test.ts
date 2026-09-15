@@ -79,16 +79,50 @@ describe('watchPartyStore', () => {
 
   it('watch.chat appends text (clamped) to the right party only', () => {
     joinParty(identity, { id: 'p1', name: 'N', url: 'u' })
-    handleWatchMessage({ type: 'watch.chat', party: 'p1', from: { id: 'u2', name: 'Bob' }, text: 'yo', at: 5 })
-    handleWatchMessage({ type: 'watch.chat', party: 'p1', from: { id: 'u2', name: 'Bob' }, text: 'x'.repeat(100), at: 6 })
+    handleWatchMessage({ type: 'watch.chat', party: 'p1', msgId: 'm1', from: { id: 'u2', name: 'Bob' }, text: 'yo', at: 5 })
+    handleWatchMessage({ type: 'watch.chat', party: 'p1', msgId: 'm2', from: { id: 'u2', name: 'Bob' }, text: 'x'.repeat(100), at: 6 })
     const p = watchPartyStore.getSnapshot().parties[0]
     expect(p.chat).toEqual([
-      { id: 'u2', name: 'Bob', text: 'yo', at: 5 },
-      { id: 'u2', name: 'Bob', text: 'x'.repeat(80), at: 6 },
+      { id: 'm1', from: 'u2', name: 'Bob', text: 'yo', at: 5 },
+      { id: 'm2', from: 'u2', name: 'Bob', text: 'x'.repeat(80), at: 6 },
     ])
+    handleWatchMessage({ type: 'watch.chat_del', party: 'p1', msgId: 'm1' })
+    expect(watchPartyStore.getSnapshot().parties[0].chat.map((c) => c.id)).toEqual(['m2'])
     sendPartyChat('p1', ' hey ')
     expect(sendOrbitWebSocket).toHaveBeenLastCalledWith({ type: 'watch.chat', party: 'p1', text: 'hey' })
-    sendPartyChat('p1', '   ')
+  })
+
+  it('__ws_reconnected re-joins every open party', () => {
+    joinParty(identity, { id: 'a', name: 'A', url: 'u' })
+    joinParty(identity, { id: 'b', name: 'B', url: 'u' })
+    vi.mocked(sendOrbitWebSocket).mockClear()
+    handleWatchMessage({ type: '__ws_reconnected' })
+    expect(sendOrbitWebSocket).toHaveBeenCalledWith(expect.objectContaining({ type: 'watch.join', party: 'a' }))
+    expect(sendOrbitWebSocket).toHaveBeenCalledWith(expect.objectContaining({ type: 'watch.join', party: 'b' }))
+  })
+
+  it('watch.kicked drops the party and sets the notice', () => {
+    joinParty(identity, { id: 'a', name: 'Alone', url: 'u' })
+    handleWatchMessage({ type: 'watch.kicked', party: 'a' })
+    expect(watchPartyStore.getSnapshot().parties).toHaveLength(0)
+    expect(watchPartyStore.getSnapshot().kickedNotice).toContain('Alone')
+  })
+
+  it('roster join-snapshot restores frame, chat and queue', () => {
+    joinParty(identity, { id: 'a', name: 'A', url: 'u' })
+    handleWatchMessage({
+      type: 'watch.roster', party: 'a', host: 'me',
+      members: [{ id: 'me', name: 'Me' }],
+      frame: { url: 'u', action: 'play', position: 10, rate: 1, updatedAt: 100, by: 'Bob' },
+      chat: [{ id: 'c1', from: 'u2', name: 'Bob', text: 'hi', at: 1 }],
+      queue: [{ id: 'q1', name: 'vid', url: 'u' }], current: 'q1',
+    })
+    const p = watchPartyStore.getSnapshot().parties[0]
+    expect(p.frame?.position).toBe(10)
+    expect(p.host).toBe('me')
+    expect(p.queue).toEqual([{ id: 'q1', name: 'vid', url: 'u' }])
+    expect(p.current).toBe('q1')
+    expect(p.mediaName).toBe('vid')
   })
 
   it('caps slots at MAX_SLOTS, oldest evicted', () => {

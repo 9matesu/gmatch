@@ -1,6 +1,6 @@
-// Watch Party client store: module singleton + useSyncExternalStore.
-// Control frames only travel while a party is open; zero traffic otherwise.
-// Up to MAX_SLOTS parties can play side by side; each is its own WS room.
+// Watch Rooms client store: module singleton + useSyncExternalStore.
+// Control frames only travel while a room is open; zero traffic otherwise.
+// Up to MAX_SLOTS rooms can play side by side; each is its own WS room.
 import { useSyncExternalStore } from 'react'
 import { orbitFetch } from '../utils/api'
 import { subscribeOrbitWebSocket, sendOrbitWebSocket } from '../utils/orbitWebSocket'
@@ -19,21 +19,35 @@ export interface PartyInfo {
   url: string
 }
 
+export interface QueueEntry {
+  id: string
+  name: string
+  url: string
+}
+
 export interface PartyRuntime extends PartyInfo {
-  frame: SyncFrame | null
-  members: Array<{ id: string; name: string }>
-  chat: Array<{ id: string; name: string; text: string; at: number }>
+  frame: (SyncFrame & { by?: string }) | null
+  members: Array<{ id: string; name: string; muted?: boolean }>
+  chat: Array<{ id: string; from?: string; name: string; text: string; at: number; sys?: boolean }>
+  host: string
+  mutedIds: Record<string, boolean>
+  lockVideo: boolean
+  isPrivate: boolean
+  mediaName: string
+  queue: QueueEntry[]
+  current: string
 }
 
 export interface WatchPartyState {
   open: boolean
   parties: PartyRuntime[]
   subscribed: boolean
+  kickedNotice: string
 }
 
 export const MAX_SLOTS = 4
 
-const state: WatchPartyState = { open: false, parties: [], subscribed: false }
+const state: WatchPartyState = { open: false, parties: [], subscribed: false, kickedNotice: '' }
 
 // Immutable snapshot rebuilt on every mutation (getSnapshot must change
 // reference when data changes, or useSyncExternalStore never re-renders).
@@ -63,35 +77,116 @@ export function serverNow(): number {
   return clock.now()
 }
 
-// Display name for the party roster (App sets it after profile load).
+// Display name for the room roster (App sets it after profile load).
 let myDisplayName = ''
 export function setWatchDisplayName(name: string): void {
   myDisplayName = name.slice(0, 40)
 }
 
-function upsertParty(info: PartyInfo): void {
-  const existing = state.parties.find((p) => p.id === info.id)
-  if (existing) Object.assign(existing, info)
-  else state.parties.push({ ...info, frame: null, members: [], chat: [] })
+function blankParty(info: PartyInfo): PartyRuntime {
+  return {
+    ...info,
+    frame: null,
+    members: [],
+    chat: [],
+    host: '',
+    mutedIds: {},
+    lockVideo: false,
+    isPrivate: false,
+    mediaName: '',
+    queue: [],
+    current: '',
+  }
+}
+
+function upsertParty(info: PartyInfo): PartyRuntime {
+  let existing = state.parties.find((p) => p.id === info.id)
+  if (!existing) {
+    existing = blankParty(info)
+    state.parties.push(existing)
+  } else {
+    Object.assign(existing, info)
+  }
   if (state.parties.length > MAX_SLOTS) state.parties.shift()
-  watchPartyStore.set({})
+  return existing
 }
 
 export function resetWatchParty(): void {
   stopClockPing()
   unsubscribe?.()
   unsubscribe = null
-  watchPartyStore.set({ open: false, parties: [], subscribed: false })
+  subscribedIdentity = null
+  watchPartyStore.set({ open: false, parties: [], subscribed: false, kickedNotice: '' })
 }
 
 export function handleWatchMessage(msg: any): void {
   if (!msg || typeof msg !== 'object') return
-  if (msg.type === 'watch.sync' || msg.type === 'watch.roster' || msg.type === 'watch.chat') {
+  if (msg.type === '__ws_reconnected') {
+    // The server-side socket is brand new and holds no watch rooms: re-join
+    // everything we still have open. The join snapshot restores position.
+    if (!subscribedIdentity) return
+    for (const p of state.parties) {
+      sendOrbitWebSocket({ type: 'watch.join', party: p.id, name: myDisplayName || subscribedIdentity.orbitId })
+    }
+    return
+  }
+  if (msg.type === 'watch.kicked') {
+    const party = state.parties.find((p) => p.id === msg.party)
+    if (party) {
+      state.parties = state.parties.filter((p) => p.id !== msg.party)
+      watchPartyStore.set({ kickedNotice: `Removed from ${party.name}.` })
+      maybeUnsubscribe()
+    }
+    return
+  }
+  if (msg.type === 'watch.sync' || msg.type === 'watch.roster' || msg.type === 'watch.chat'
+      || msg.type === 'watch.chat_del' || msg.type === 'watch.system'
+      || msg.type === 'watch.settings' || msg.type === 'watch.queue') {
     const party = state.parties.find((p) => p.id === msg.party)
     if (!party) return
-    if (msg.type === 'watch.sync') party.frame = msg.frame as SyncFrame
-    else if (msg.type === 'watch.roster') party.members = Array.isArray(msg.members) ? msg.members : []
-    else party.chat = [...party.chat, { id: msg.from?.id || '', name: msg.from?.name || 'Unknown User', text: String(msg.text || '').slice(0, 80), at: Number(msg.at) || Date.now() }].slice(-80)
+    switch (msg.type) {
+      case 'watch.sync':
+        party.frame = msg.frame
+        break
+      case 'watch.roster':
+        party.members = Array.isArray(msg.members) ? msg.members : []
+        if (typeof msg.host === 'string' && msg.host) party.host = msg.host
+        for (const m of party.members) if (m.muted) party.mutedIds[m.id] = true
+        // join snapshots ride this frame: full state recovery in one message
+        if (msg.frame) party.frame = msg.frame
+        if (Array.isArray(msg.chat)) party.chat = msg.chat.map((c: any) => ({ id: String(c.id || ''), from: String(c.from || ''), name: String(c.name || ''), text: String(c.text || ''), at: Number(c.at) || 0 }))
+        if (Array.isArray(msg.queue)) party.queue = msg.queue.map((q: any) => ({ id: String(q.id), name: String(q.name), url: String(q.url) }))
+        if (typeof msg.current === 'string') {
+          party.current = msg.current
+          party.mediaName = party.queue.find((q) => q.id === party.current)?.name || party.mediaName
+        }
+        break
+      case 'watch.chat':
+        party.chat = [...party.chat, { id: String(msg.msgId || ''), from: String(msg.from?.id || ''), name: msg.from?.name || 'Unknown User', text: String(msg.text || '').slice(0, 80), at: Number(msg.at) || Date.now() }].slice(-80)
+        break
+      case 'watch.chat_del':
+        party.chat = party.chat.filter((c) => c.id !== String(msg.msgId))
+        break
+      case 'watch.system':
+        party.chat = [...party.chat, { id: `sys${Date.now()}`, name: '', text: String(msg.text || ''), at: Date.now(), sys: true }].slice(-80)
+        break
+      case 'watch.settings':
+        if (typeof msg.name === 'string') party.name = msg.name
+        if (typeof msg.isPrivate === 'boolean') party.isPrivate = msg.isPrivate
+        if (typeof msg.lockVideo === 'boolean') party.lockVideo = msg.lockVideo
+        if (msg.muted && typeof msg.muted === 'object') party.mutedIds = { ...party.mutedIds, ...msg.muted }
+        break
+      case 'watch.queue':
+        party.queue = Array.isArray(msg.queue) ? msg.queue : []
+        party.current = String(msg.current || '')
+        if (msg.frame) {
+          party.frame = msg.frame
+          party.url = String(msg.frame.url || party.url)
+          const entry = party.queue.find((q) => q.id === party.current)
+          party.mediaName = entry?.name || ''
+        }
+        break
+    }
     watchPartyStore.set({})
     return
   }
@@ -102,6 +197,7 @@ export function handleWatchMessage(msg: any): void {
 
 let unsubscribe: (() => void) | null = null
 let pongResolve: ((v: any) => void) | null = null
+let subscribedIdentity: IdentityLike | null = null
 
 function pingOnce(): Promise<{ t0: number; t1: number; t3: number }> {
   return new Promise((resolve) => {
@@ -144,6 +240,7 @@ function ensureSubscribed(identity: IdentityLike): void {
   if (!state.subscribed) {
     unsubscribe?.()
     unsubscribe = subscribeOrbitWebSocket(identity, handleWatchMessage)
+    subscribedIdentity = identity
     watchPartyStore.set({ subscribed: true })
     startClockPing()
   }
@@ -154,6 +251,7 @@ function maybeUnsubscribe(): void {
     stopClockPing()
     unsubscribe?.()
     unsubscribe = null
+    subscribedIdentity = null
     watchPartyStore.set({ subscribed: false })
   }
 }
@@ -175,6 +273,23 @@ export async function createParty(identity: IdentityLike, url: string, name: str
   return { ok: true }
 }
 
+/** Resolve + queue/change a room's video over HTTP (the server runs the
+ * media pipeline, then relays the queue frame). */
+export async function loadPartyVideo(identity: IdentityLike, partyId: string, url: string, name: string, queueOnly = false): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await orbitFetch(`/api/watchparty/${partyId}/video`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, name, queueOnly }),
+    }, identity)
+    const body = await res.json().catch(() => ({})) as any
+    if (!res.ok) return { ok: false, error: body?.error || 'Could not find a playable video at that link.' }
+    return { ok: true }
+  } catch {
+    return { ok: false, error: 'Could not reach the server.' }
+  }
+}
+
 export async function joinPartyById(identity: IdentityLike, partyId: string): Promise<boolean> {
   try {
     const res = await orbitFetch(`/api/watchparty/${partyId}`, {}, identity)
@@ -189,6 +304,7 @@ export async function joinPartyById(identity: IdentityLike, partyId: string): Pr
 
 export function joinParty(identity: IdentityLike, party: PartyInfo): void {
   ensureSubscribed(identity)
+  watchPartyStore.set({ kickedNotice: '' })
   upsertParty(party)
   watchPartyStore.set({ open: true })
   sendOrbitWebSocket({ type: 'watch.join', party: party.id, name: myDisplayName || identity.orbitId })
@@ -200,7 +316,37 @@ export function sendPartyChat(partyId: string, text: string): void {
   sendOrbitWebSocket({ type: 'watch.chat', party: partyId, text: trimmed })
 }
 
+export function deletePartyChat(partyId: string, msgId: string): void {
+  sendOrbitWebSocket({ type: 'watch.chat.del', party: partyId, msgId })
+}
+
+/** One-shot room command frames (kick/ban/mute/host/settings/queue ops). */
+export function sendRoomFrame(type: string, payload: Record<string, unknown>): void {
+  sendOrbitWebSocket({ type, ...payload })
+}
+
+/** Host-gated UI helpers ride one generic frame type; the server gates. */
+export function kickParty(partyId: string, target: string): void {
+  sendRoomFrame('watch.kick', { party: partyId, target })
+}
+export function banParty(partyId: string, target: string): void {
+  sendRoomFrame('watch.ban', { party: partyId, target })
+}
+export function muteParty(partyId: string, target: string, on: boolean): void {
+  sendRoomFrame('watch.mute', { party: partyId, target, on })
+}
+export function transferParty(partyId: string, target: string): void {
+  sendRoomFrame('watch.host', { party: partyId, target })
+}
+export function setPartySettings(partyId: string, patch: { name?: string; isPrivate?: boolean; lockVideo?: boolean }): void {
+  sendRoomFrame('watch.settings', { party: partyId, ...patch })
+}
+export function queueOp(partyId: string, op: 'remove' | 'play' | 'next', id = ''): void {
+  sendRoomFrame('watch.queue', { party: partyId, op, id })
+}
+
 export function leaveParty(partyId: string): void {
+  sendOrbitWebSocket({ type: 'watch.leave', party: partyId })
   state.parties = state.parties.filter((p) => p.id !== partyId)
   watchPartyStore.set({})
   maybeUnsubscribe()
