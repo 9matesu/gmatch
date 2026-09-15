@@ -75,6 +75,41 @@ export function WatchPartySlot({
     return () => clearInterval(timer)
   }, [party?.id, videoSrc, party?.frame])
 
+  // Stream hiccup recovery: a relay blip or upstream abort leaves a frozen
+  // frame forever otherwise. Reload the element; the 250 ms sync tick above
+  // re-joins the party position (driftCorrection seeks + plays). One shot
+  // per 5 s so a dead URL cannot spin the network.
+  useEffect(() => {
+    if (!videoSrc) return
+    let attached = false
+    let recover: (() => void) | null = null
+    const attach = () => {
+      const v = wrapRef.current?.querySelector('video')
+      if (!v || attached) return
+      attached = true
+      let last = 0
+      recover = () => {
+        const t = Date.now()
+        if (t - last < 5_000) return
+        last = t
+        v.load()
+      }
+      v.addEventListener('error', recover)
+      v.addEventListener('stalled', recover)
+    }
+    // The <video> mounts inside NativeVideoPlayer; give it a tick to exist.
+    const probe = setInterval(attach, 500)
+    attach()
+    return () => {
+      clearInterval(probe)
+      const v = wrapRef.current?.querySelector('video')
+      if (v && recover) {
+        v.removeEventListener('error', recover)
+        v.removeEventListener('stalled', recover)
+      }
+    }
+  }, [videoSrc])
+
   if (!party) {
     return (
       <button
