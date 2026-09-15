@@ -18,7 +18,6 @@ contextBridge.exposeInMainWorld('gmatch', {
   vaultRemove: (url) => ipcRenderer.invoke('vault:remove', url),
   vaultStats: () => ipcRenderer.invoke('vault:stats'),
   vaultClear: () => ipcRenderer.invoke('vault:clear'),
-  vaultPrune: () => ipcRenderer.invoke('vault:prune'),
   // Player-owned idle folders (dialog-picked, served over idle-file://).
   customPickFolder: () => ipcRenderer.invoke('custom:pick-folder'),
   customListFolder: (id) => ipcRenderer.invoke('custom:list-folder', id),

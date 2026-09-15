@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import {
   createParty, getParty, listParties, applyWatch, joinWatch, leaveWatch, leaveAll, applyChat,
   deleteChat, kickWatch, banWatch, muteWatch, transferHost, settingsWatch,
-  queueOps, setPartyMedia, __resetParties, partyRoom, IDLE_MS, MAX_QUEUE, type Party,
+  queueOps, setPartyMedia, __resetParties, partyRoom, IDLE_MS, MAX_QUEUE, isPartyMediaObject, type Party,
 } from './watchparty'
 import { handleIncoming, conns, createWsTicket, type WsConn } from './ws-bus'
 
@@ -325,5 +325,19 @@ describe('ws relay integration', () => {
     handleIncoming(a, JSON.stringify({ type: 'watch.kick', party: p.id, target: 'u2' }))
     expect(b.sent.map(JSON.parse).some((m) => m.type === 'watch.kicked' && m.party === p.id)).toBe(true)
     expect(b.rooms.has(partyRoom(p.id))).toBe(false)
+  })
+})
+
+describe('audit T9.1: capability key format is byte-exact across the seam', () => {
+  it('isPartyMediaObject only answers true for the /api/objects/<id> shape the route stores', () => {
+    const p = makeParty('u1')
+    setPartyMedia(p, '/api/objects/abc-123')
+    // objects.ts rebuilds the key as `/api/objects/${id}`; any drift
+    // (trailing slash, absolute URL, different prefix) silently breaks
+    // private-room streaming because it is a plain Map lookup.
+    expect(isPartyMediaObject('/api/objects/abc-123')).toBe(true)
+    expect(isPartyMediaObject('/api/objects/abc-123/')).toBe(false)
+    expect(isPartyMediaObject('https://x.dev/api/objects/abc-123')).toBe(false)
+    expect(isPartyMediaObject('/objects/abc-123')).toBe(false)
   })
 })

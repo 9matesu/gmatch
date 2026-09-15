@@ -203,12 +203,6 @@ function clear() {
   return stats()
 }
 
-function prune() {
-  makeRoom(0)
-  writeManifest()
-  return stats()
-}
-
 /**
  * protocol.handle('vault') — serves vault files by basename key.
  * Unknown/evicted key → 404 (renderer falls back to remote).
@@ -258,7 +252,6 @@ module.exports = {
   unpin,
   remove,
   clear,
-  prune,
   serveVault,
   // Test seam.
   _test: { keyFor, extOf, makeRoom: (need) => makeRoom(need), manifest: () => manifest, setFetcher: (fn) => { fetcher = fn } },

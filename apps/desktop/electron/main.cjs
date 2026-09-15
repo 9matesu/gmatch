@@ -1273,7 +1273,6 @@ app.whenReady().then(async () => {
   ipcMain.handle('vault:remove', (_event, url) => ({ ok: vault.remove(String(url ?? '')) }))
   ipcMain.handle('vault:stats', () => vault.stats())
   ipcMain.handle('vault:clear', () => vault.clear())
-  ipcMain.handle('vault:prune', () => vault.prune())
   // Update check (Settings): installed version + open the download in the OS browser.
   ipcMain.handle('app:version', () => app.getVersion())
   ipcMain.handle('app:open-log', () => shell.openPath(app.getPath('userData')))
