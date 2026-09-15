@@ -6,7 +6,7 @@ import { resolveStorageKey } from './storage-key'
 import { resolveNodeKey } from './node-key'
 import app from './index'
 import { join, dirname, extname } from 'node:path'
-import { handleIncoming, conns, WsConn, broadcastToRoom } from './ws-bus'
+import { handleIncoming, conns, broadcastToRoom, watchDisconnect, WsConn } from './ws-bus'
 import { mailWatchers, handleMailSocketMessage } from './routes/mail'
 import { isApiPath, parseSiteServices, siteAllows } from './site-services'
 import { leaveLobby, advanceLobby } from './lobby'
@@ -338,6 +338,7 @@ Bun.serve({
             .catch((err) => console.warn('[WS] mark offline on disconnect failed:', err?.message || err))
         }
         conns.delete(conn)
+        watchDisconnect(conn)
         wsToConn.delete(ws)
       }
     },

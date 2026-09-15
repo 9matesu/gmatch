@@ -9,19 +9,7 @@ interface WorkerWebSocket extends WebSocket {
   accept(): void
 }
 
-import { handleIncoming, conns, broadcastToRoom, WsConn } from '../ws-bus'
-import { leaveAll } from '../watchparty'
-
-// Presence: the last socket of a user closing means they left every watch
-// room (system note + roster, host promoted). Other tabs still open = stay.
-function watchDisconnect(conn: WsConn): void {
-  const userId = conn.userId
-  if (!userId) return
-  for (const c of conns) if (c.userId === userId) return
-  for (const res of leaveAll(userId)) {
-    if (conn.rooms.has(res.room)) broadcastToRoom(res.room, res.payload)
-  }
-}
+import { handleIncoming, conns, watchDisconnect, WsConn } from '../ws-bus'
 
 // Hard cap on concurrent sockets so anonymous squatting can't exhaust memory.
 const MAX_WS_CONNS = 500

@@ -6,6 +6,7 @@ import {
   createWsTicket,
   validateTicket,
   handleIncoming,
+  hasNoLiveSocket,
   broadcastToRoom,
   broadcastToUser,
   conns,
@@ -120,6 +121,19 @@ describe('handleIncoming: authenticated dispatch', () => {
     conns.add(c)
     return c
   }
+
+  it('hasNoLiveSocket ignores the closing socket, counts other authed ones', () => {
+    const a = authedConn('u1')
+    const b = authedConn('u2')
+    expect(hasNoLiveSocket('u1', a)).toBe(true)
+    expect(hasNoLiveSocket('u2', a)).toBe(false)
+    b.authed = false
+    expect(hasNoLiveSocket('u2', a)).toBe(true) // pending re-auth does not count
+    const unauthed = fakeConn()
+    unauthed.userId = 'u1'
+    conns.add(unauthed)
+    expect(hasNoLiveSocket('u1', a)).toBe(true) // junk socket doesn't keep presence
+  })
 
   it('subscribe adds allowlisted rooms and ignores junk or spoofed names', () => {
     const conn = authedConn()

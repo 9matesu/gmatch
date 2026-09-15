@@ -44,7 +44,7 @@ export function validateTicket(ticket: string): string | null {
 // Watch Party relay: tiny JSON control frames (never media bytes).
 import {
   applyWatch, joinWatch, watchPong, applyChat, deleteChat, leaveWatch,
-  kickWatch, banWatch, muteWatch, transferHost, settingsWatch, queueOps, touchRooms,
+  kickWatch, banWatch, muteWatch, transferHost, settingsWatch, queueOps, touchRooms, leaveAll,
 } from './watchparty'
 
 export function handleIncoming(conn: WsConn, data: string): void {
@@ -178,6 +178,31 @@ export function handleIncoming(conn: WsConn, data: string): void {
   for (const c of conns) {
     if (c !== conn && c.authed && c.rooms.has('global')) c.send(data)
   }
+}
+
+/** True when no OTHER authed socket still holds this user's presence.
+ * Exported seam for the leave-grace decision in watchDisconnect. */
+export function hasNoLiveSocket(userId: string, closing: WsConn): boolean {
+  for (const c of conns) if (c !== closing && c.userId === userId && c.authed) return false
+  return true
+}
+
+// Presence: the last socket of a user closing means they left every watch
+// room (system note + roster, host promoted). A network blip closes the old
+// socket seconds before the replacement authenticates, so the check runs on
+// a grace window instead of inline; other tabs still open = stay. Shared by
+// BOTH WS entry points (routes/ws.ts worker + serve.ts node) so rooms
+// behave identically on fly and CF.
+const LEAVE_GRACE_MS = 8_000
+export function watchDisconnect(conn: WsConn): void {
+  const userId = conn.userId
+  if (!userId) return
+  setTimeout(() => {
+    if (!hasNoLiveSocket(userId, conn)) return
+    for (const res of leaveAll(userId)) {
+      if (conn.rooms.has(res.room)) broadcastToRoom(res.room, res.payload)
+    }
+  }, LEAVE_GRACE_MS)
 }
 
 export function broadcastToRoom(room: string, payload: unknown): void {
