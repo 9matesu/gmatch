@@ -44,6 +44,8 @@ export interface BooruPost {
   preview?: string
   /** 'video' for mp4/webm/gif posts, else image. Inferred from URL when absent. */
   kind?: 'image' | 'video'
+  /** True when reshown from no-repeat memory after pool exhaustion. */
+  repeat?: boolean
 }
 
 /** Single/grid view for the feed stage (supports 1x1, 1x2, 2x2, 3x3). */

@@ -20,7 +20,7 @@ import {
   serialize,
 } from './save'
 import type { SaveData } from './save'
-import { fetchPosts } from '../services/booru'
+import { fetchPosts, clearMirrorCooldowns } from '../services/booru'
 import { evictImage } from '../services/imageCache'
 import { isCustomMediaUrl, sampleCustomSources } from '../services/customSources'
 import type { ActiveCap, BooruPost, CapId, CustomSource, GalleryImage, GridCell, KoDrop, OwnedTag, ViewMode } from './types'
@@ -83,6 +83,9 @@ export interface GameState {
   feedCursor: number
   priorityTag: string | null
   feedOffline: boolean
+  /** True when sources answer but everything was already seen (pool
+   *  exhausted) — distinct from network-offline for UI copy. */
+  feedEmptyFresh: boolean
   fetching: boolean
   /** True only while the CURRENT stage image is resolved + decoded. Clicks
    *  are dead until it flips — the game never runs on a missing/uncached
@@ -127,7 +130,9 @@ export interface GameState {
   allowReal: boolean
   allowHentai: boolean
   toggleFeedCategory: (cat: 'real' | 'hentai') => void
-  fetchFeed: () => Promise<void>
+  fetchFeed: (opts?: { manual?: boolean }) => Promise<void>
+  /** Manual retry: clears backoff + mirror cooldowns, then fetches. */
+  retryFeedManual: () => void
   advanceFeed: () => void
   goBack: () => boolean
   /** Grid mode: swap the whole board for a fresh one (session-only history). */
@@ -290,6 +295,7 @@ function freshData() {
     feedCursor: 0,
     priorityTag: null,
     feedOffline: false,
+    feedEmptyFresh: false,
     fetching: false,
     imageReady: false,
     allowReal: typeof localStorage !== 'undefined' ? localStorage.getItem('gmatch.feed.allowReal') !== '0' : true,
@@ -350,8 +356,9 @@ function clearFeedRetry() {
   feedRetryStep = 0
   lastFeedRetryMs = 0
 }
-function scheduleFeedRetry() {
+function scheduleFeedRetry(gentle = false) {
   if (feedRetryTimer) return
+  if (gentle) feedRetryStep = 0
   const delay = Math.min(60_000, 5_000 * 2 ** feedRetryStep)
   feedRetryStep += 1
   lastFeedRetryMs = delay
@@ -899,12 +906,21 @@ export const useGame = create<GameState>((set, get) => ({
     void get().fetchFeed()
   },
 
-  fetchFeed: async () => {
+  fetchFeed: async (opts?: { manual?: boolean }) => {
     const s = get()
     if (s.fetching) return
+    if (opts?.manual) {
+      // Manual retry starts clean: cancel pending auto-timer, reset backoff,
+      // lift mirror cooldowns. First click must work when sources are up.
+      clearFeedRetry()
+      clearMirrorCooldowns()
+    }
     set({ fetching: true })
     let cursor = s.feedCursor
     let posts: BooruPost[] | null = null
+    // Seen-exhausted (not broken): gentle path — no backoff escalation,
+    // distinct UI copy; auto-poll still recovers.
+    let emptyFreshRound = false
     // Player-owned sources first: custom URLs / local folders need no tags,
     // so they also feed fresh setups. Built-ins stay as the fallback.
     const customs = (s.customSources || []).filter((c) => c.enabled)
@@ -942,10 +958,18 @@ export const useGame = create<GameState>((set, get) => ({
       let res = await fetchPosts({ tags: first, limit: batchLimit, allowReal: s.allowReal, allowHentai: s.allowHentai })
       cursor = s.feedCursor + 1
       if (!res.ok || res.posts.length === 0) {
-        // Flaky round — retry once with the NEXT tag, never the same one.
+        // Flaky round — retry once with the NEXT tag, never the same one
+        // (single-tag pools have nothing new to try).
         const second = pool[cursor % pool.length]
-        res = await fetchPosts({ tags: second, limit: batchLimit, allowReal: s.allowReal, allowHentai: s.allowHentai })
-        cursor += 1
+        if (second !== first) {
+          res = await fetchPosts({ tags: second, limit: batchLimit, allowReal: s.allowReal, allowHentai: s.allowHentai })
+          cursor += 1
+        }
+      }
+      // Seen-exhausted (not broken): gentle path — no backoff escalation,
+      // distinct UI copy; auto-poll still recovers.
+      if (!res.ok && (res as { emptyFresh?: boolean }).emptyFresh === true) {
+        emptyFreshRound = true
       }
       if (res.ok && res.posts.length > 0) {
         // Random order every round — never push API sequence straight to the feed.
@@ -978,6 +1002,7 @@ export const useGame = create<GameState>((set, get) => ({
             grid: filled.grid,
             feedCursor: cursor,
             feedOffline: false,
+            feedEmptyFresh: false,
             fetching: false,
           })
           return
@@ -990,6 +1015,7 @@ export const useGame = create<GameState>((set, get) => ({
           foeClicks: 0,
           feedCursor: cursor,
           feedOffline: false,
+          feedEmptyFresh: false,
           fetching: false,
         })
       } else {
@@ -997,16 +1023,19 @@ export const useGame = create<GameState>((set, get) => ({
         set({ fetching: false })
       }
     } else {
-      // Sources unreachable: keep the game playable without EVER repeating past.
-      scheduleFeedRetry()
+      // Sources unreachable or pool exhausted: keep the game playable.
+      // Seen-exhausted polls gently (fixed 5s, no escalation, no cursor
+      // advance) since recovery just needs new tags, not backoff.
+      if (emptyFreshRound) scheduleFeedRetry(true)
+      else scheduleFeedRetry()
       if (isGridMode(get().viewMode)) {
         // Only use live, unseen queue posts — never recycle past.
         const target = gridSizeForMode(get().viewMode)
         const filled = fillGrid(get().grid, get().queue, get().defeated, target)
         set({
-          feedCursor: cursor,
           fetching: false,
           feedOffline: filled.grid.length === 0,
+          feedEmptyFresh: emptyFreshRound,
           grid: filled.grid,
           queue: filled.queue,
         })
@@ -1018,12 +1047,19 @@ export const useGame = create<GameState>((set, get) => ({
           foeHp: keep ? get().foeHp : 0,
           foeMaxHp: keep ? get().foeMaxHp : 0,
           foeClicks: keep ? get().foeClicks : 0,
-          feedCursor: cursor,
           feedOffline: !keep && get().queue.length === 0,
+          feedEmptyFresh: emptyFreshRound,
           fetching: false,
         })
       }
     }
+  },
+
+  /** Manual retry from any Retry button: clean slate, then fetch. */
+  retryFeedManual: () => {
+    clearFeedRetry()
+    clearMirrorCooldowns()
+    void get().fetchFeed({ manual: true })
   },
 
   advanceFeed: () => {

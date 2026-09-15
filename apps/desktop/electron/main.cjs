@@ -191,10 +191,9 @@ function getQueryNegatives() {
     .join(' ')
 }
 
-// Hard post-level floor (user spec: high quality always).
-const MIN_WIDTH = 700
-const MIN_HEIGHT = 700
-const MIN_PIXELS = 700 * 700
+// Post-level floor (user spec: high quality always; loosened from 700px to
+// 400px for localhost content-volume parity — small stills/gifs stay).
+const FLOOR_PX = 400
 
 function isQueryBlocked(query) {
   const q = String(query).toLowerCase()
@@ -219,6 +218,7 @@ async function httpGet(url, headers) {
       else if (url.includes('paheal')) ref = { Referer: 'https://rule34.paheal.net/' }
       else if (url.includes('realbooru.com')) ref = { Referer: 'https://realbooru.com/' }
       else if (url.includes('booru.org')) ref = { Referer: 'https://booru.org/' }
+      else if (url.includes('redgifs.com')) ref = { Referer: 'https://www.redgifs.com/' }
       else ref = { Referer: u.origin + '/' }
     } catch {
       /* ignore invalid url */
@@ -300,11 +300,14 @@ function parseDanbooruJson(body, baseUrl) {
     .filter((p) => p.id && p.url)
     .filter(
       (p) =>
-        /\.(jpe?g|png|webp)(?:[?#]|$)/i.test(p.url) &&
-        // DAPI spells it 'explicit'; e621-style sources use 'e'
-        (p.rating === 'explicit' || p.rating === 'e') &&
-        (p.width === 0 || p.width >= 500) &&
-        (p.height === 0 || p.height >= 500) &&
+        // Localhost parity: same media set as the renderer's allowOnly
+        // (stills + gifs + short mp4/webm loops). Floor is 400px, not 700px.
+        /\.(jpe?g|png|gif|webp|mp4|webm)(?:[?#]|$)/i.test(p.url) &&
+        // DAPI spells it 'explicit'; e621-style sources use 'e'. Missing
+        // ratings default to 'e' above, mirroring isRatingAllowed.
+        (p.rating === 'explicit' || p.rating === 'e' || p.rating === 'adult') &&
+        (p.width === 0 || p.width >= 400) &&
+        (p.height === 0 || p.height >= 400) &&
         !hasBadTag(p.tags),
     )
 }
@@ -336,9 +339,9 @@ function parsePahealXml(body) {
   }
   return posts.filter(
     (p) =>
-      (!p.fileName || /\.(jpe?g|png|webp)$/i.test(p.fileName) || /\.(jpe?g|png|webp)$/i.test(p.url)) &&
-      (p.width === 0 || p.width >= 500) &&
-      (p.height === 0 || p.height >= 500) &&
+      (!p.fileName || /\.(jpe?g|png|gif|webp)$/i.test(p.fileName) || /\.(jpe?g|png|gif|webp|mp4|webm)$/i.test(p.url)) &&
+      (p.width === 0 || p.width >= 400) &&
+      (p.height === 0 || p.height >= 400) &&
       !hasBadTag(p.tags),
   )
 }
@@ -374,11 +377,11 @@ function parseMoebooruJson(body, prefix) {
     .filter((p) => p.id !== `${prefix}-` && p.url)
     .filter(
       (p) =>
-        /\.(jpe?g|png)$/i.test(p.url) &&
-        (p.rating === 'explicit' || p.rating === 'e') &&
-        p.width >= MIN_WIDTH &&
-        p.height >= MIN_HEIGHT &&
-        p.width * p.height >= MIN_PIXELS &&
+        // Localhost parity: gifs/webp kept, floor 400px (not 700px).
+        /\.(jpe?g|png|gif|webp)$/i.test(p.url) &&
+        (p.rating === 'explicit' || p.rating === 'e' || p.rating === 'adult') &&
+        p.width >= 400 &&
+        p.height >= 400 &&
         !hasBadTag(p.tags),
     )
 }
@@ -443,11 +446,17 @@ function parseBooruOrgHtml(html, query) {
 }
 
 // --- redgifs (real/hardcore porn: pornstars, BBC, mp4s/gifs) ------------------
-// Public v2 API: temporary token (verified live) → gif search. Shape:
-// gifs[] with urls.hd (.mp4), urls.poster (.jpg), id, tags[], niches[].
+// Public v2 API: temporary token (verified live) → niche-targeted gif fetch
+// when the query matches a niche, else the generic trending feed (upstream
+// ignores search_text — every query returns the same global feed, so plain
+// search is query-blind). Shape: gifs[] with urls.hd (.mp4), urls.poster
+// (.jpg), id, tags[], niches[], width, height.
 const REDGIFS_API = 'https://api.redgifs.com'
 let redgifsToken = null
 let redgifsTokenExp = 0
+// Niche id per query (null = generic fallback), 1h TTL.
+const redgifsNicheCache = new Map()
+const REDGIFS_NICHE_CACHE_MS = 3600_000
 
 function redgifsWords(query) {
   return String(query).replace(/_/g, ' ').trim().replace(/\s+/g, ' ')
@@ -507,30 +516,148 @@ function parseRedgifsJson(body) {
         p.id &&
         p.url &&
         /\.(mp4|webm|gif|webp)(?:[?#]|$)/i.test(p.url) &&
-        p.width >= MIN_WIDTH &&
-        p.height >= MIN_HEIGHT &&
+        // Localhost parity: short loops are often small — floor 400px.
+        (p.width === 0 || p.width >= 400) &&
+        (p.height === 0 || p.height >= 400) &&
         !hasBadTag(p.tags),
     )
 }
 
 async function fetchRedgifs(variant, n) {
-  const page = 1 + Math.floor(Math.random() * 5)
-  const url =
-    `${REDGIFS_API}/v2/gifs/search?search_text=${encodeURIComponent(redgifsWords(variant))}` +
-    `&order=trending&count=${n}&page=${page}`
-  try {
-    const token = await redgifsAuth()
-    const body = await httpGet(url, { Authorization: `Bearer ${token}` })
-    return parseRedgifsJson(body)
-  } catch (e) {
-    if (!/401/.test(String((e && e.message) || e))) throw e
-    // ponytail: stale cached temp token; drop it and retry once.
-    redgifsToken = null
-    redgifsTokenExp = 0
-    const token = await redgifsAuth()
-    const body = await httpGet(url, { Authorization: `Bearer ${token}` })
-    return parseRedgifsJson(body)
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const token = await redgifsAuth()
+      // 1. Niche-targeted attempt (query-aware), tagged with query tokens.
+      try {
+        const niche = await redgifsNicheForQuery(variant, token)
+        if (niche) {
+          const page = 1 + Math.floor(Math.random() * 5)
+          const body = await httpGet(
+            `${REDGIFS_API}/v2/niches/${encodeURIComponent(niche.id)}/gifs?count=${n}&page=${page}`,
+            { Authorization: `Bearer ${token}` },
+          )
+          const posts = tagNichePosts(parseRedgifsJson(body), variant)
+          if (posts.length > 0) return posts
+        }
+      } catch (e) {
+        if (/401/.test(String((e && e.message) || e))) {
+          mainLog('redgifs niche fetch 401 — refreshing token and retrying once')
+          redgifsToken = null
+          redgifsTokenExp = 0
+          continue
+        }
+        /* niche lookup is best-effort — fall through to generic */
+      }
+      // 2. Generic trending fallback (query-blind upstream, untagged posts).
+      const page = 1 + Math.floor(Math.random() * 5)
+      const url =
+        `${REDGIFS_API}/v2/gifs/search?search_text=${encodeURIComponent(redgifsWords(variant))}` +
+        `&order=trending&count=${n}&page=${page}`
+      const body = await httpGet(url, { Authorization: `Bearer ${token}` })
+      return parseRedgifsJson(body)
+    } catch (e) {
+      if (!/401/.test(String((e && e.message) || e))) throw e
+      // Stale cached temp token; drop it and retry once fresh.
+      mainLog('redgifs search 401 — refreshing token and retrying once')
+      redgifsToken = null
+      redgifsTokenExp = 0
+    }
   }
+  // Both attempts 401'd (or niche+generic came back empty) — surface
+  // empty so the caller moves to the next source.
+  return []
+}
+
+function redgifsQueryTokens(query) {
+  const out = []
+  for (const part of redgifsWords(query).toLowerCase().split(/[^a-z0-9]+/)) {
+    const n = normRedgifsTag(part)
+    if (n && !out.includes(n)) out.push(n)
+  }
+  return out
+}
+
+function pickRedgifsNiche(query, niches) {
+  const tokens = redgifsQueryTokens(query).filter((t) => t.replace(/_/g, '').length >= 3)
+  if (tokens.length === 0 || !Array.isArray(niches) || niches.length === 0) return null
+  const hayFor = (n) => {
+    const hay = new Set()
+    const add = (s) => {
+      for (const part of String(s || '').toLowerCase().split(/[^a-z0-9]+/)) {
+        if (part.length >= 3) hay.add(part)
+      }
+    }
+    add(n.id)
+    add(n.name)
+    for (const t of n.tags || []) for (const part of String(t).split('_')) {
+      if (part.length >= 3) hay.add(part)
+    }
+    return hay
+  }
+  let best = null
+  let bestScore = 0
+  for (const n of niches) {
+    if (!n || typeof n.id !== 'string' || !n.id) continue
+    const hay = hayFor(n)
+    let score = 0
+    for (const tok of tokens) {
+      const flat = tok.replace(/_/g, '')
+      for (const h of hay) {
+        if (h === flat || h.includes(flat) || flat.includes(h)) {
+          score += 1
+          break
+        }
+      }
+    }
+    const subs = typeof n.subscribers === 'number' ? n.subscribers : 0
+    if (score > bestScore || (score === bestScore && score > 0 && subs > ((best && best.subscribers) || 0))) {
+      best = { id: n.id, subscribers: subs }
+      bestScore = score
+    }
+  }
+  return bestScore > 0 ? best : null
+}
+
+async function redgifsNicheForQuery(variant, token) {
+  const key = String(variant || '').trim().toLowerCase()
+  if (!key) return null
+  const cached = redgifsNicheCache.get(key)
+  if (cached && Date.now() < cached.exp) return cached.niche
+  const candidates = [redgifsWords(variant), ...redgifsQueryTokens(variant).map((t) => t.replace(/_/g, ' '))]
+  for (const q of [...new Set(candidates)]) {
+    if (!q) continue
+    try {
+      const body = await httpGet(
+        `${REDGIFS_API}/v2/niches/search?query=${encodeURIComponent(q)}`,
+        { Authorization: `Bearer ${token}` },
+      )
+      let niches = []
+      try {
+        const data = JSON.parse(body)
+        niches = Array.isArray(data.niches) ? data.niches : []
+      } catch {
+        continue
+      }
+      const niche = pickRedgifsNiche(variant, niches)
+      if (niche) {
+        redgifsNicheCache.set(key, { niche, exp: Date.now() + REDGIFS_NICHE_CACHE_MS })
+        return niche
+      }
+    } catch {
+      /* next candidate, then generic fallback */
+    }
+  }
+  redgifsNicheCache.set(key, { niche: null, exp: Date.now() + REDGIFS_NICHE_CACHE_MS })
+  return null
+}
+
+function tagNichePosts(posts, query) {
+  const tags = redgifsQueryTokens(query)
+  if (tags.length === 0) return posts
+  return posts.map((p) => ({
+    ...p,
+    tags: [...new Set([...(p.tags || []), ...tags])],
+  }))
 }
 
 // --- imhentai (hentai galleries: captions, hardcore doujins) ------------------
@@ -602,15 +729,21 @@ function parseImhentaiSearchResults(html, limit) {
   return out
 }
 
-function parseImhentaiCover(html) {
+// EVERY page image from a gallery page (the $.parseJSON ext map carries the
+// whole book) — one fetch yields all pages, zero extra requests.
+function parseImhentaiGalleryPages(html, limit) {
+  const max = Math.max(1, limit || 20)
+  if (!html || typeof html !== 'string') return []
   const srcTag = 'data-src="'
   const srcStart = html.indexOf(srcTag)
-  if (srcStart === -1) return null
+  if (srcStart === -1) return []
   const urlStart = srcStart + srcTag.length
   const urlEnd = html.indexOf('"', urlStart)
-  if (urlEnd === -1) return null
+  if (urlEnd === -1) return []
   const src = html.slice(urlStart, urlEnd)
-  if (!src) return null
+  if (!src) return []
+  const slash = src.lastIndexOf('/')
+  const root = slash === -1 ? '' : src.slice(0, slash + 1)
   const marker = 'parseJSON('
   const mStart = html.indexOf(marker)
   if (mStart !== -1) {
@@ -619,22 +752,28 @@ function parseImhentaiCover(html) {
     if (q1 !== -1 && q2 !== -1) {
       try {
         const raw = html.slice(q1 + 1, q2).split(String.fromCharCode(92)).join('')
-        const first = JSON.parse(raw)['1']
-        if (typeof first === 'string') {
-          const parts = first.split(',')
+        const data = JSON.parse(raw)
+        const pages = Object.keys(data)
+          .map(Number)
+          .filter((n) => Number.isInteger(n) && n >= 1)
+          .sort((a, b) => a - b)
+        const covers = []
+        for (const n of pages) {
+          if (covers.length >= max) break
+          const entry = data[String(n)]
+          if (typeof entry !== 'string') continue
+          const parts = entry.split(',')
           const suffix = IMH_EXTS[parts[0]]
-          if (suffix) {
-            const slash = src.lastIndexOf('/')
-            const root = slash === -1 ? '' : src.slice(0, slash + 1)
-            return { url: root + '1.' + suffix, width: Number(parts[1]) || 0, height: Number(parts[2]) || 0 }
-          }
+          if (!suffix) continue
+          covers.push({ url: root + n + '.' + suffix, width: Number(parts[1]) || 0, height: Number(parts[2]) || 0 })
         }
+        if (covers.length > 0) return covers
       } catch {
         /* fall through to raw data-src */
       }
     }
   }
-  return { url: src, width: 0, height: 0 }
+  return [{ url: src, width: 0, height: 0 }]
 }
 
 async function fetchImhentai(variant, n) {
@@ -664,21 +803,24 @@ async function fetchImhentai(variant, n) {
     if (directPosts.length > 0) return directPosts
   }
 
-  // Fallback to gallery inspection
+  // Fallback to gallery inspection — enter each gallery and take EVERY
+  // page image (the ext map carries the whole book), not just the cover.
   const ids = parseImhentaiSearch(searchBody, 3)
   const posts = []
   for (const id of ids) {
     if (posts.length >= n) break
     try {
       const galleryBody = await imhGet(`${IMHENTAI_ROOT}/gallery/${encodeURIComponent(id)}/`)
-      const cover = parseImhentaiCover(galleryBody)
-      if (!cover) continue
-      // Dims gate only when known — map-less covers skip it.
-      if (cover.width > 0 && cover.height > 0) {
-        if (cover.width < MIN_WIDTH || cover.height < MIN_HEIGHT) continue
-        if (cover.width * cover.height < MIN_PIXELS) continue
-      }
-      posts.push({ id: `imh-${id}`, url: cover.url, tags, rating: 'e', kind: 'image' })
+      const pages = parseImhentaiGalleryPages(galleryBody, n - posts.length)
+      const thumb = pages.length > 0 ? pages[0].url : ''
+      pages.forEach((cover, i) => {
+        // Dims gate only when known — map-less covers skip it. Floor 400px
+        // (localhost parity), not the old 700px starver.
+        if (cover.width > 0 && cover.height > 0) {
+          if (cover.width < FLOOR_PX || cover.height < FLOOR_PX) return
+        }
+        posts.push({ id: `imh-${id}-p${i + 1}`, url: cover.url, preview: thumb, tags, rating: 'e', kind: 'image' })
+      })
     } catch {
       /* one dead gallery never kills the round */
     }

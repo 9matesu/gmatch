@@ -168,9 +168,20 @@ export default defineConfig({
         },
       },
       '^/rg-auth': {
+        // RedGifs JSON API: same Origin-stripping as /rg-media — the API
+        // WAF 401s requests carrying a foreign localhost Origin even with a
+        // valid Bearer token. Authorization header passes through untouched.
         target: 'https://api.redgifs.com',
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/rg-auth/, ''),
+        headers: { Referer: 'https://www.redgifs.com/' },
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.removeHeader('origin')
+            proxyReq.setHeader('referer', 'https://www.redgifs.com/')
+            proxyReq.setHeader('user-agent', DEV_UA)
+          })
+        },
       },
       '^/booru/kona': {
         target: 'https://konachan.com',

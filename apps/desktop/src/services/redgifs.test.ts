@@ -2,10 +2,15 @@ import { describe, expect, it } from 'vitest'
 import {
   REDGIFS_MEDIA,
   parseRedgifs,
+  parseRedgifsNiches,
   parseRedgifsToken,
+  pickRedgifsNiche,
   redgifsAuthUrl,
+  redgifsNicheGifsUrl,
+  redgifsNicheSearchUrl,
   redgifsPlayable,
   redgifsQuery,
+  redgifsQueryTags,
   redgifsSearchUrl,
 } from './redgifs'
 
@@ -62,6 +67,45 @@ describe('redgifs adapter', () => {
     expect(url).toContain('search_text=skylar%20vox')
     expect(url).toContain('count=10')
     expect(url).toContain('page=2')
+  })
+
+  it('builds niche search + gif-list URLs (verified live)', () => {
+    expect(redgifsNicheSearchUrl('fair haired')).toBe(
+      'https://api.redgifs.com/v2/niches/search?query=fair%20haired',
+    )
+    expect(redgifsNicheGifsUrl('fair-haired', 15, 3)).toBe(
+      'https://api.redgifs.com/v2/niches/fair-haired/gifs?count=15&page=3',
+    )
+    expect(redgifsQueryTags('Skylar_Vox bbc')).toEqual(['skylar', 'vox', 'bbc'])
+  })
+})
+
+describe('redgifs niches (query-aware search)', () => {
+  const NICHES = parseRedgifsNiches({
+    niches: [
+      { id: 'fair-haired', name: 'Fair-Haired', tags: ['Blonde', 'Pale'], subscribers: 92705 },
+      { id: 'pornstars', name: 'Pornstars', tags: ['Pornstar', 'XXX'], subscribers: 136907 },
+      { id: 'sluty-milfs', name: 'Slutty MILFs', tags: ['MILF', 'Mom'], subscribers: 68409 },
+    ],
+  })
+
+  it('parses niche payloads', () => {
+    expect(NICHES).toHaveLength(3)
+    expect(NICHES[0]).toMatchObject({ id: 'fair-haired', subscribers: 92705 })
+    expect(NICHES[0].tags).toContain('blonde')
+    expect(parseRedgifsNiches(null)).toEqual([])
+    expect(parseRedgifsNiches({})).toEqual([])
+  })
+
+  it('picks the niche overlapping the query tokens', () => {
+    expect(pickRedgifsNiche('blonde', NICHES)?.id).toBe('fair-haired')
+    expect(pickRedgifsNiche('mom curves', NICHES)?.id).toBe('sluty-milfs')
+  })
+
+  it('returns null for pornstar names with no niche overlap (generic fallback)', () => {
+    expect(pickRedgifsNiche('skylar vox', NICHES)).toBeNull()
+    expect(pickRedgifsNiche('', NICHES)).toBeNull()
+    expect(pickRedgifsNiche('blonde', [])).toBeNull()
   })
 })
 

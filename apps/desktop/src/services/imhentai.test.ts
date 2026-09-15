@@ -3,8 +3,10 @@ import {
   imhentaiGalleryUrl,
   imhentaiSearchUrl,
   parseImhentaiCover,
+  parseImhentaiGalleryPages,
   parseImhentaiSearch,
   parseImhentaiSearchResults,
+  toImhentaiPagePosts,
   toImhentaiPost,
 } from './imhentai'
 
@@ -91,5 +93,31 @@ describe('imhentai adapter', () => {
     expect(parseImhentaiSearch('<div>no galleries</div>')).toEqual([])
     expect(parseImhentaiCover(null)).toBeNull()
     expect(parseImhentaiCover('<div>no image</div>')).toBeNull()
+    expect(parseImhentaiGalleryPages(null)).toEqual([])
+    expect(parseImhentaiGalleryPages('<div>no image</div>')).toEqual([])
+  })
+
+  it('extracts EVERY page image from the gallery ext map, not just the cover', () => {
+    const pages = parseImhentaiGalleryPages(GALLERY_HTML)
+    expect(pages).toEqual([
+      { url: 'https://m1.imhentai.xxx/abc/1.jpg', width: 1280, height: 1800 },
+      { url: 'https://m1.imhentai.xxx/abc/2.png', width: 1280, height: 1800 },
+    ])
+  })
+
+  it('caps gallery pages and skips unknown ext codes', () => {
+    const pages = parseImhentaiGalleryPages(GALLERY_HTML, 1)
+    expect(pages).toHaveLength(1)
+    expect(pages[0].url).toBe('https://m1.imhentai.xxx/abc/1.jpg')
+  })
+
+  it('maps gallery pages to per-page feed posts', () => {
+    const pages = parseImhentaiGalleryPages(GALLERY_HTML)
+    const posts = toImhentaiPagePosts('12345', pages, 'goon_caption')
+    expect(posts.map((p) => p.id)).toEqual(['imh-12345-p1', 'imh-12345-p2'])
+    expect(posts[0].url).toBe('https://m1.imhentai.xxx/abc/1.jpg')
+    expect(posts[1].url).toBe('https://m1.imhentai.xxx/abc/2.png')
+    expect(posts[0].kind).toBe('image')
+    expect(posts[0].tags).toContain('caption')
   })
 })

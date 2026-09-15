@@ -5,6 +5,8 @@ interface OfflineCardProps {
   fetching: boolean
   /** True when every source failed — dot pulses red. */
   feedOffline: boolean
+  /** True when sources answered but everything was already seen — amber dot, gentle copy. */
+  emptyFresh?: boolean
   onRetry: () => void
 }
 
@@ -20,14 +22,16 @@ const DOT_COLOR = {
  * One status dot, one line, one button — the dot is the visual feedback:
  * green spin = loading, red pulse = offline, amber = empty/idle.
  */
-export default function OfflineCard({ fetching, feedOffline, onRetry }: OfflineCardProps) {
+export default function OfflineCard({ fetching, feedOffline, emptyFresh = false, onRetry }: OfflineCardProps) {
   const state = fetching ? 'loading' : feedOffline ? 'offline' : 'empty'
   const label =
     state === 'loading'
       ? 'Loading feed…'
       : state === 'offline'
         ? 'Sources offline. Check your connection.'
-        : 'No image. Pull the feed'
+        : emptyFresh
+          ? 'Seen it all — add a tag for fresh posts.'
+          : 'No image. Pull the feed'
   return (
     <div
       className="pointer-events-auto absolute left-1/2 top-1/2 z-[4] flex -translate-x-1/2 -translate-y-1/2 items-center gap-2.5 rounded-xl border border-border-glass bg-glass-strong px-4 py-3"

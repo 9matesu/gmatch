@@ -70,6 +70,7 @@ function useReducedMotion(): boolean {
 export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNode }) {
   const current = useGame((s) => s.current)
   const feedOffline = useGame((s) => s.feedOffline)
+  const feedEmptyFresh = useGame((s) => s.feedEmptyFresh)
   const fetching = useGame((s) => s.fetching)
   const points = useGame((s) => s.points)
   const foeHp = useGame((s) => s.foeHp)
@@ -89,7 +90,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   const claimDropTag = useGame((s) => s.claimDropTag)
   const claimDropAntiTag = useGame((s) => s.claimDropAntiTag)
   const dismissDrop = useGame((s) => s.dismissDrop)
-  const fetchFeed = useGame((s) => s.fetchFeed)
+  const retryFeedManual = useGame((s) => s.retryFeedManual)
   const advanceFeed = useGame((s) => s.advanceFeed)
   const goBack = useGame((s) => s.goBack)
   const canGoBack = useGame((s) => s.past.length > 0)
@@ -468,7 +469,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             </Badge>
           )}
           {grid.length === 0 && (
-            <OfflineCard fetching={fetching} feedOffline={feedOffline} onRetry={() => void fetchFeed()} />
+            <OfflineCard fetching={fetching} feedOffline={feedOffline} emptyFresh={feedEmptyFresh} onRetry={() => retryFeedManual()} />
           )}
           {grid.length > 0 && (
             <>
@@ -563,7 +564,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             </span>
           )}
           {showOffline && (
-            <OfflineCard fetching={fetching} feedOffline={feedOffline} onRetry={() => void fetchFeed()} />
+            <OfflineCard fetching={fetching} feedOffline={feedOffline} emptyFresh={feedEmptyFresh} onRetry={() => retryFeedManual()} />
           )}
           <button
             type="button"
@@ -719,7 +720,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             className={`${BTN} ${BTN_SMALL} inline-flex items-center gap-1`}
             disabled={fetching}
             aria-label="Retry the feed"
-            onClick={() => void fetchFeed()}
+            onClick={() => retryFeedManual()}
             title="Retry the feed"
           >
             <ArrowClockwise size={12} weight="bold" className={fetching ? 'animate-spin' : ''} />

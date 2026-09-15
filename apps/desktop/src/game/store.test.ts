@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../services/booru', () => ({
   fetchPosts: vi.fn(async () => ({ posts: [], source: null, ok: false, offline: true })),
+  clearMirrorCooldowns: vi.fn(),
 }))
 
 const mem = new Map<string, string>()
@@ -127,6 +128,67 @@ describe('fetchFeed tag rotation', () => {
     expect(second).toBe('bbb')
     expect(first.split(/\s+/)).toHaveLength(1)
     expect(useGame.getState().current?.id).toBe('r2')
+  })
+
+  it('does not advance the cursor on total failure', async () => {
+    mocked.mockClear()
+    mocked.mockResolvedValue(offline)
+    useGame.setState({
+      tags: [{ name: 'aaa', level: 2, base: 10, income: 1, weight: 1 }],
+      feedCursor: 0,
+      current: null,
+      queue: [],
+    })
+    await useGame.getState().fetchFeed()
+    expect(useGame.getState().feedCursor).toBe(0)
+    expect(useGame.getState().feedOffline).toBe(true)
+  })
+
+  it('does not double-fetch a single-tag pool', async () => {
+    mocked.mockClear()
+    mocked.mockResolvedValue(offline)
+    useGame.setState({
+      tags: [{ name: 'aaa', level: 2, base: 10, income: 1, weight: 1 }],
+      feedCursor: 0,
+      current: null,
+      queue: [],
+    })
+    await useGame.getState().fetchFeed()
+    expect(mocked.mock.calls).toHaveLength(1)
+  })
+
+  it('marks seen-exhaustion gently without going offline when content remains', async () => {
+    mocked.mockClear()
+    const post = { id: 'k1', url: 'https://x/k1.jpg', tags: ['gangbang'] }
+    mocked.mockResolvedValue({ posts: [], source: null, ok: false, emptyFresh: true })
+    useGame.setState({
+      tags: [{ name: 'aaa', level: 2, base: 10, income: 1, weight: 1 }],
+      feedCursor: 0,
+      current: post,
+      queue: [],
+    })
+    await useGame.getState().fetchFeed()
+    // single-tag pool: first + no duplicate second fetch
+    expect(mocked.mock.calls).toHaveLength(1)
+    const s = useGame.getState()
+    expect(s.feedEmptyFresh).toBe(true)
+    expect(s.feedOffline).toBe(false)
+    expect(s.current?.id).toBe('k1')
+  })
+
+  it('retryFeedManual clears cooldowns and refetches', async () => {
+    const { clearMirrorCooldowns } = await import('../services/booru')
+    mocked.mockClear()
+    mocked.mockResolvedValue(offline)
+    useGame.setState({
+      tags: [{ name: 'aaa', level: 2, base: 10, income: 1, weight: 1 }],
+      feedCursor: 0,
+      current: null,
+      queue: [],
+    })
+    useGame.getState().retryFeedManual()
+    await vi.waitFor(() => expect(mocked.mock.calls.length).toBeGreaterThan(0))
+    expect(vi.mocked(clearMirrorCooldowns)).toHaveBeenCalled()
   })
 })
 

@@ -93,16 +93,29 @@ const IMH_EXTS: Record<string, string> = { j: 'jpg', p: 'png', g: 'gif', w: 'web
  * missing (gallery-dl's alternate strategy). Null when no image found.
  */
 export function parseImhentaiCover(html: unknown): ImhentaiCover | null {
+  const pages = parseImhentaiGalleryPages(html, 1)
+  return pages.length > 0 ? pages[0] : null
+}
+
+/**
+ * EVERY page image from a gallery page, not just the cover. The $.parseJSON
+ * ext map carries all pages ('1'..'N'); one gallery fetch yields the whole
+ * book with zero extra requests. Falls back to the single raw data-src URL
+ * when the map is missing. Never throws.
+ */
+export function parseImhentaiGalleryPages(html: unknown, limit = 20): ImhentaiCover[] {
   try {
-    if (typeof html !== 'string') return null
+    if (typeof html !== 'string') return []
     const srcTag = 'data-src="'
     const srcStart = html.indexOf(srcTag)
-    if (srcStart === -1) return null
+    if (srcStart === -1) return []
     const urlStart = srcStart + srcTag.length
     const urlEnd = html.indexOf('"', urlStart)
-    if (urlEnd === -1) return null
+    if (urlEnd === -1) return []
     const src = html.slice(urlStart, urlEnd)
-    if (!src) return null
+    if (!src) return []
+    const slash = src.lastIndexOf('/')
+    const root = slash === -1 ? '' : src.slice(0, slash + 1)
     // $.parseJSON('...') ext map — string-scan, no regex escapes needed.
     const marker = 'parseJSON('
     const mStart = html.indexOf(marker)
@@ -114,28 +127,33 @@ export function parseImhentaiCover(html: unknown): ImhentaiCover | null {
           // Pages embed the map in a JS string — drop stray backslashes first.
           const raw = html.slice(q1 + 1, q2).split(String.fromCharCode(92)).join('')
           const data = JSON.parse(raw) as Record<string, string>
-          const first = data['1']
-          if (typeof first === 'string') {
-            const parts = first.split(',')
+          const pages = Object.keys(data)
+            .map(Number)
+            .filter((n) => Number.isInteger(n) && n >= 1)
+            .sort((a, b) => a - b)
+          const covers: ImhentaiCover[] = []
+          for (const n of pages) {
+            if (covers.length >= Math.max(1, limit)) break
+            const entry = data[String(n)]
+            if (typeof entry !== 'string') continue
+            const parts = entry.split(',')
             const suffix = IMH_EXTS[parts[0]]
-            if (suffix) {
-              const slash = src.lastIndexOf('/')
-              const root = slash === -1 ? '' : src.slice(0, slash + 1)
-              return {
-                url: root + '1.' + suffix,
-                width: Number(parts[1]) || 0,
-                height: Number(parts[2]) || 0,
-              }
-            }
+            if (!suffix) continue
+            covers.push({
+              url: root + n + '.' + suffix,
+              width: Number(parts[1]) || 0,
+              height: Number(parts[2]) || 0,
+            })
           }
+          if (covers.length > 0) return covers
         } catch {
           /* fall through to raw data-src */
         }
       }
     }
-    return { url: src, width: 0, height: 0 }
+    return [{ url: src, width: 0, height: 0 }]
   } catch {
-    return null
+    return []
   }
 }
 
@@ -154,4 +172,28 @@ export function toImhentaiPost(galleryId: string, cover: ImhentaiCover, query: s
     rating: 'e',
     kind: 'image',
   }
+}
+
+/** Feed posts for EVERY page of a gallery (one fetch yields the whole book).
+ *  Page posts are id `imh-<id>-p<n>` with the gallery cover as preview. */
+export function toImhentaiPagePosts(
+  galleryId: string,
+  covers: ImhentaiCover[],
+  query: string,
+  limit = 20,
+): BooruPost[] {
+  const tags = query
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 2)
+  const thumb = covers.length > 0 ? covers[0].url : ''
+  return covers.slice(0, Math.max(1, limit)).map((cover, i) => ({
+    id: `imh-${galleryId}-p${i + 1}`,
+    url: cover.url,
+    preview: thumb,
+    tags,
+    rating: 'e',
+    kind: 'image' as const,
+  }))
 }

@@ -99,6 +99,12 @@ export function CardTile({
       .catch(() => {})
   }
 
+  const hasValuation =
+    item.card_id != null ||
+    item.value !== undefined ||
+    item.score !== undefined ||
+    item.gacha_downloads_count !== undefined ||
+    item.rarity != null
   const cardValue = Math.max(0, item.value ?? item.score ?? item.gacha_downloads_count ?? 0)
   const rarity = item.rarity && RARITY_TIERS[item.rarity as keyof typeof RARITY_TIERS]
     ? RARITY_TIERS[item.rarity as keyof typeof RARITY_TIERS]
@@ -232,9 +238,11 @@ export function CardTile({
             <div className="min-w-0 flex-1 text-xs font-semibold text-retro-fg truncate" title={cardTitle}>
               {cardTitle}
             </div>
-            <div className="shrink-0 text-[10px] font-mono font-bold tabular-nums tracking-tight" style={{ color: accent }}>
-              {formatGc(cardValue)}
-            </div>
+            {hasValuation && (
+              <div className="shrink-0 text-[10px] font-mono font-bold tabular-nums tracking-tight" style={{ color: accent }}>
+                {formatGc(cardValue)}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-retro-muted">

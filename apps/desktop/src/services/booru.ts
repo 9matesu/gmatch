@@ -8,17 +8,24 @@ import { allowOnly } from './postFilter'
 import {
   REDGIFS_API,
   parseRedgifs,
+  parseRedgifsNiches,
   parseRedgifsToken,
+  pickRedgifsNiche,
   redgifsAuthUrl,
+  redgifsNicheGifsUrl,
+  redgifsNicheSearchUrl,
+  redgifsQueryTags,
   redgifsSearchUrl,
+  type RedgifsNiche,
 } from './redgifs'
 import {
   IMHENTAI_ROOT,
   imhentaiGalleryUrl,
   imhentaiSearchUrl,
-  parseImhentaiCover,
+  parseImhentaiGalleryPages,
   parseImhentaiSearch,
   parseImhentaiSearchResults,
+  toImhentaiPagePosts,
   toImhentaiPost,
 } from './imhentai'
 import {
@@ -46,6 +53,8 @@ export interface BooruResponse {
   source: string | null
   ok: boolean
   offline?: boolean
+  /** True when sources answered but every post was already seen (not a network failure). */
+  emptyFresh?: boolean
   /** True when posts came from the 10-minute feed cache, not the network. */
   cached?: boolean
 }
@@ -89,6 +98,15 @@ function loadSeen(): void {
     const d = JSON.parse(raw) as { ids?: unknown; urls?: unknown }
     if (Array.isArray(d.ids)) for (const id of d.ids) seenIds.add(String(id))
     if (Array.isArray(d.urls)) for (const u of d.urls) seenUrls.add(String(u))
+    // Rebuild the reshow ledger from persisted order (ids/urls memoized in
+    // lockstep, so index pairing holds; worst case a mismatched pair still
+    // points at a real seen image).
+    if (Array.isArray(d.ids) && Array.isArray(d.urls)) {
+      const n = Math.min(d.ids.length, d.urls.length, SEEN_CAP)
+      for (let i = 0; i < n; i++) {
+        seenLedger.push({ id: String(d.ids[i]), url: String(d.urls[i]) })
+      }
+    }
   } catch {
     /* corrupt cache — start fresh */
   }
@@ -138,7 +156,15 @@ function isHealthy(id: string): boolean {
 }
 
 function markUnhealthy(id: string, durationMs = COOLDOWN_HARD_MS): void {
+  // Never extend an active cooldown: rapid manual retries must not
+  // perpetually push the outage further out.
+  if ((unhealthyUntil.get(id) ?? 0) > Date.now()) return
   unhealthyUntil.set(id, Date.now() + durationMs)
+}
+
+/** Manual retry: lift mirror cooldowns without wiping no-repeat memory. */
+export function clearMirrorCooldowns(): void {
+  unhealthyUntil.clear()
 }
 
 /** Test hook: reset mirror health + no-repeat memory. */
@@ -146,6 +172,9 @@ export function __resetFeedState(): void {
   unhealthyUntil.clear()
   seenIds.clear()
   seenUrls.clear()
+  seenLedger.length = 0
+  reshowCursor = 0
+  emptyStreak = 0
   seenLoaded = false
   if (seenTimer) {
     clearTimeout(seenTimer)
@@ -153,7 +182,18 @@ export function __resetFeedState(): void {
   }
   redgifsToken = null
   redgifsTokenExp = 0
+  redgifsNicheCache.clear()
 }
+
+// Insertion-ordered ledger of everything memoized, backing least-recent
+// reshow when the pool is truly exhausted (non-stop feed, last resort).
+// Entries carry no tags: recalled posts pass matchesQuery as untagged.
+const seenLedger: Array<{ id: string; url: string }> = []
+// Consecutive all-seen rounds (reset by any fresh hit). Reshow kicks in
+// only after the pool proves exhausted twice in a row, not on first contact.
+let emptyStreak = 0
+const RESHOW_AFTER_EMPTY = 2
+const RESHOW_BATCH = 10
 
 /** Filter out anything shown before (this session or past ones), memoize the rest. */
 function remember(posts: BooruPost[]): BooruPost[] {
@@ -163,6 +203,7 @@ function remember(posts: BooruPost[]): BooruPost[] {
     if (seenIds.has(p.id) || seenUrls.has(p.url)) continue
     seenIds.add(p.id)
     seenUrls.add(p.url)
+    seenLedger.push({ id: p.id, url: p.url })
     fresh.push(p)
   }
   // Cap the persistent sets (insertion-ordered, so oldest drops first).
@@ -174,7 +215,37 @@ function remember(posts: BooruPost[]): BooruPost[] {
     const oldest = seenUrls.values().next().value as string
     seenUrls.delete(oldest)
   }
+  while (seenLedger.length > SEEN_CAP) seenLedger.splice(0, seenLedger.length - SEEN_CAP)
   if (fresh.length > 0) persistSeen()
+  return fresh
+}
+
+/** Least-recently-seen posts for non-stop reshow (last resort only).
+ *  Returned posts carry no tags and `repeat: true`; they bypass remember
+ *  (already memoized) and match any query as untagged. Rotates through the
+ *  ledger so consecutive reshow rounds don't loop the same batch. */
+let reshowCursor = 0
+export function recallSeen(limit: number): BooruPost[] {
+  loadSeen()
+  const n = Math.min(Math.max(1, limit), seenLedger.length)
+  if (n === 0) return []
+  const out: BooruPost[] = []
+  for (let i = 0; i < n; i++) {
+    const s = seenLedger[(reshowCursor + i) % seenLedger.length]
+    out.push({ id: s.id, url: s.url, tags: [], rating: 'e', repeat: true as const })
+  }
+  reshowCursor = (reshowCursor + n) % seenLedger.length
+  return out
+}
+
+/** remember() variant that tallies pre/post counts for empty-vs-offline discrimination. */
+function rememberCounted(
+  posts: BooruPost[],
+  tally: { parsed: number; fresh: number },
+): BooruPost[] {
+  tally.parsed += posts.length
+  const fresh = remember(posts)
+  tally.fresh += fresh.length
   return fresh
 }
 
@@ -352,9 +423,28 @@ function parseBooruOrgHtml(html: string): BooruPost[] {
  * exist → fetch throws → caller reports offline. Tries tbib, then xbooru,
  * then paheal (single tag), each with the full→top2→single variant ladder.
  * Unhealthy mirrors sit out a cooldown; all-seen batches are skipped, never
- * shown twice.
+ * shown twice (until pool exhaustion triggers deepen + reshow below).
  */
 async function directFetch(req: BooruRequest): Promise<BooruResponse> {
+  const allowReal = req.allowReal !== false
+  const allowHentai = req.allowHentai !== false
+  // Round tally: distinguishes "mirrors answered but everything was seen"
+  // (emptyFresh — gentle path, no cooldown escalation) from true outages.
+  const tally = { parsed: 0, fresh: 0 }
+  const hit = await dapiPass(req, tally)
+  if (hit) return hit
+  return dapiFallbacks(req, tally, allowReal, allowHentai)
+}
+
+/**
+ * One pass over the DAPI/moebooru/HTML mirrors with the full→top2→single
+ * variant ladder. Page ids re-roll every pass, so a second (deep) pass
+ * probes different pages. Returns a fresh hit or null.
+ */
+async function dapiPass(
+  req: BooruRequest,
+  tally: { parsed: number; fresh: number },
+): Promise<BooruResponse | null> {
   const allowReal = req.allowReal !== false
   const allowHentai = req.allowHentai !== false
   const neg =
@@ -468,12 +558,26 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
         clean = sanitize(parsed, variant)
       }
       if (clean.length === 0) continue
-      const fresh = remember(clean)
+      const fresh = rememberCounted(clean, tally)
       if (fresh.length === 0) continue // all repeats — narrower pages may be new
       unhealthyUntil.delete(src.id)
       return { posts: fresh, source: src.id, ok: true }
     }
   }
+  return null
+}
+
+/**
+ * Redgifs → Babesource → imhentai → paheal fallback chain, then non-stop
+ * handling: one deep DAPI re-pass on seen-exhaustion, else an emptyFresh
+ * verdict (gentle) or an offline throw (true outage).
+ */
+async function dapiFallbacks(
+  req: BooruRequest,
+  tally: { parsed: number; fresh: number },
+  allowReal: boolean,
+  allowHentai: boolean,
+): Promise<BooruResponse> {
   // Redgifs (real/hardcore short mp4 loops + gifs), then Babesource (real
   // stills galleries), then imhentai (hentai gallery scrape), before the
   // paheal single-tag fallback. Long-form videos are dropped by postFilter
@@ -481,7 +585,7 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
   if (allowReal && isHealthy('redgifs-direct')) {
     const rg = await redgifsDirect(req.tags, req.limit)
     if (rg) {
-      const fresh = remember(sanitize(rg, req.tags))
+      const fresh = rememberCounted(sanitize(rg, req.tags), tally)
       if (fresh.length > 0) {
         unhealthyUntil.delete('redgifs-direct')
         return { posts: fresh, source: 'redgifs-direct', ok: true }
@@ -494,7 +598,7 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
     try {
       const bs = await babesourceDirect(req.tags, req.limit)
       if (bs.length > 0) {
-        const fresh = remember(sanitize(bs, req.tags))
+        const fresh = rememberCounted(sanitize(bs, req.tags), tally)
         if (fresh.length > 0) {
           unhealthyUntil.delete('babesource-direct')
           return { posts: fresh, source: 'babesource-direct', ok: true }
@@ -509,8 +613,9 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
   if (allowHentai && isHealthy('imh-direct')) {
     try {
       const scraped = await imhentaiDirect(req.tags, req.limit)
-      if (scraped.length === 0) markUnhealthy('imh-direct')
-      const fresh = remember(sanitize(scraped, req.tags))
+      // Empty gallery results are NOT a sick mirror (Cloudflare may simply
+      // have challenged this round) — only hard failures cool it down.
+      const fresh = rememberCounted(sanitize(scraped, req.tags), tally)
       if (fresh.length > 0) {
         unhealthyUntil.delete('imh-direct')
         return { posts: fresh, source: 'imh-direct', ok: true }
@@ -529,7 +634,7 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
         markUnhealthy('paheal-direct')
       } else {
         const clean = sanitize(parsePaheal(await res.text()), single)
-        const fresh = remember(clean)
+        const fresh = rememberCounted(clean, tally)
         if (fresh.length > 0) {
           unhealthyUntil.delete('paheal-direct')
           return { posts: fresh, source: 'paheal-direct', ok: true }
@@ -538,6 +643,17 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
     } catch {
       markUnhealthy('paheal-direct')
     }
+  }
+  // Deepen (non-stop feed, phase 1): mirrors answered but everything was
+  // already seen — one more DAPI pass with fresh random pages before
+  // declaring the pool exhausted.
+  if (tally.parsed > 0 && tally.fresh === 0) {
+    const deep = await dapiPass(req, tally)
+    if (deep) return deep
+  }
+  if (tally.parsed > 0 && tally.fresh === 0) {
+    // Seen-exhausted, not broken: gentle path, no cooldown escalation.
+    return { posts: [], source: null, ok: false, emptyFresh: true }
   }
   throw new Error('no direct source returned usable posts')
 }
@@ -551,38 +667,123 @@ function toProxy(url: string, origin: string, prefix: string): string {
 }
 
 /**
- * Real/hardcore porn via the Vite dev proxy: temp token → gif search.
+ * Real/hardcore porn via the Vite dev proxy: temp token → niche-targeted
+ * gif fetch when the query matches a niche, else the generic trending feed
+ * (upstream ignores search_text — every query returns the same global feed).
  * Null when unusable (caller moves to the next source). Never throws.
  */
-export async function redgifsDirect(query: string, limit: number, retried = false): Promise<BooruPost[] | null> {
+export async function redgifsDirect(query: string, limit: number): Promise<BooruPost[] | null> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const token = await ensureRedgifsToken()
+      if (!token) return null
+      // 1. Niche-targeted attempt (query-aware). Niche posts are tagged
+      // with the matched query tokens so matchesQuery actually matches.
+      try {
+        const niche = await redgifsNicheForQuery(query, token)
+        if (niche) {
+          const page = 1 + Math.floor(Math.random() * 5)
+          const res = await fetchRedgifsAuthed(
+            toProxy(redgifsNicheGifsUrl(niche.id, limit, page), REDGIFS_API, '/rg-auth'),
+            token,
+          )
+          if (res.ok) {
+            const posts = withRedgifsQueryTags(parseRedgifs(await res.json()), query)
+            if (posts.length > 0) return posts
+          }
+        }
+      } catch (e) {
+        if (e instanceof RedgifsAuthExpired) continue
+        /* niche lookup is best-effort — fall through to generic */
+      }
+      // 2. Generic trending fallback (query-blind upstream, untagged posts).
+      const page = 1 + Math.floor(Math.random() * 5)
+      const url = toProxy(redgifsSearchUrl(query, limit, page), REDGIFS_API, '/rg-auth')
+      const res = await fetchRedgifsAuthed(url, token)
+      if (!res.ok) return null
+      return parseRedgifs(await res.json())
+    } catch (e) {
+      if (e instanceof RedgifsAuthExpired) continue
+      return null
+    }
+  }
+  return null
+}
+
+/** Thrown to restart the redgifs flow once with a fresh token. */
+class RedgifsAuthExpired extends Error {}
+
+/** Cached temp token (server exp is 24h; we refresh at 20h). Null when unusable. */
+async function ensureRedgifsToken(): Promise<string | null> {
   try {
-    if (!redgifsToken || Date.now() >= redgifsTokenExp) {
-      redgifsToken = null
-      const authRes = await fetch(toProxy(redgifsAuthUrl(), REDGIFS_API, '/rg-auth'), {
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      })
-      if (!authRes.ok) return null
-      redgifsToken = parseRedgifsToken(await authRes.json())
-      if (!redgifsToken) return null
-      redgifsTokenExp = Date.now() + 20 * 3600 * 1000
-    }
-    const page = 1 + Math.floor(Math.random() * 20)
-    const url = toProxy(redgifsSearchUrl(query, limit, page), REDGIFS_API, '/rg-auth')
-    const res = await fetch(url, {
+    if (redgifsToken && Date.now() < redgifsTokenExp) return redgifsToken
+    redgifsToken = null
+    const authRes = await fetch(toProxy(redgifsAuthUrl(), REDGIFS_API, '/rg-auth'), {
       signal: AbortSignal.timeout(TIMEOUT_MS),
-      headers: { Authorization: `Bearer ${redgifsToken}` },
     })
-    if (res.status === 401 && !retried) {
-      // ponytail: temp tokens die before our 20h guess; drop cached one, retry once fresh.
-      redgifsToken = null
-      redgifsTokenExp = 0
-      return redgifsDirect(query, limit, true)
-    }
-    if (!res.ok) return null
-    return parseRedgifs(await res.json())
+    if (!authRes.ok) return null
+    redgifsToken = parseRedgifsToken(await authRes.json())
+    if (!redgifsToken) return null
+    redgifsTokenExp = Date.now() + 20 * 3600 * 1000
+    return redgifsToken
   } catch {
     return null
   }
+}
+
+async function fetchRedgifsAuthed(url: string, token: string): Promise<Response> {
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (res.status === 401) {
+    // Temp token died before our 20h guess — drop it; caller retries once fresh.
+    redgifsToken = null
+    redgifsTokenExp = 0
+    throw new RedgifsAuthExpired()
+  }
+  return res
+}
+
+// Niche id per query (null = generic fallback), cached 1h so the extra
+// lookup costs one request per query per hour, not per round.
+const redgifsNicheCache = new Map<string, { niche: RedgifsNiche | null; exp: number }>()
+const REDGIFS_NICHE_CACHE_MS = 3600_000
+
+async function redgifsNicheForQuery(query: string, token: string): Promise<RedgifsNiche | null> {
+  const key = query.trim().toLowerCase()
+  if (!key) return null
+  const cached = redgifsNicheCache.get(key)
+  if (cached && Date.now() < cached.exp) return cached.niche
+  const candidates = [key, ...redgifsQueryTags(query).map((t) => t.replace(/_/g, ' '))]
+  for (const q of [...new Set(candidates)]) {
+    try {
+      const res = await fetch(toProxy(redgifsNicheSearchUrl(q), REDGIFS_API, '/rg-auth'), {
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) continue
+      const niche = pickRedgifsNiche(query, parseRedgifsNiches(await res.json()))
+      if (niche) {
+        redgifsNicheCache.set(key, { niche, exp: Date.now() + REDGIFS_NICHE_CACHE_MS })
+        return niche
+      }
+    } catch {
+      /* next candidate, then generic fallback */
+    }
+  }
+  redgifsNicheCache.set(key, { niche: null, exp: Date.now() + REDGIFS_NICHE_CACHE_MS })
+  return null
+}
+
+/** Tag niche-sourced posts with the matched query tokens (niche items ship untagged). */
+function withRedgifsQueryTags(posts: BooruPost[], query: string): BooruPost[] {
+  const tags = redgifsQueryTags(query)
+  if (tags.length === 0) return posts
+  return posts.map((p) => ({
+    ...p,
+    tags: [...new Set([...(p.tags || []), ...tags])],
+  }))
 }
 
 /** BABESOURCE gallery scraper for real porn stills (full-res, never thumbs).
@@ -677,6 +878,8 @@ async function imhentaiDirect(query: string, limit: number): Promise<BooruPost[]
     }
 
     // 2. Fallback to individual gallery fetches only when direct thumbnails were absent.
+    // Each gallery page carries the whole book (ext map) — enter it and take
+    // every page image, not just the cover.
     const ids = parseImhentaiSearch(html, 3)
     const posts: BooruPost[] = []
     for (const id of ids) {
@@ -693,9 +896,7 @@ async function imhentaiDirect(query: string, limit: number): Promise<BooruPost[]
           break
         }
         if (!gRes.ok || typeof gRes.text !== 'function') continue
-        const cover = parseImhentaiCover(await gRes.text())
-        if (!cover) continue
-        posts.push(toImhentaiPost(id, cover, query))
+        posts.push(...toImhentaiPagePosts(id, parseImhentaiGalleryPages(await gRes.text(), limit - posts.length), query, limit - posts.length))
       } catch {
         /* one dead gallery never kills the round */
       }
@@ -730,7 +931,9 @@ function parsePaheal(xml: string): BooruPost[] {
 
 /**
  * Shared booru client. Electron → IPC bridge (main process does the HTTP).
- * Browser/dev → direct fetch. Any failure → offline:true, never throws.
+ * Browser/dev → direct fetch. True failures → offline:true, never throws.
+ * Seen-exhaustion → emptyFresh (+ least-recent reshow after proving
+ * exhausted twice in a row), so the feed stays non-stop.
  */
 export async function fetchPosts(req: BooruRequest): Promise<BooruResponse> {
   const offline: BooruResponse = { posts: [], source: null, ok: false, offline: true }
@@ -739,13 +942,44 @@ export async function fetchPosts(req: BooruRequest): Promise<BooruResponse> {
     if (typeof window !== 'undefined' && window.gmatch?.booruFetch) {
       const res = await window.gmatch.booruFetch(req)
       if (res.ok) {
-        const fresh = remember(sanitize(res.posts || [], req.tags))
-        return { ...res, posts: fresh }
+        const fetched = res.posts || []
+        const fresh = remember(sanitize(fetched, req.tags))
+        if (fresh.length > 0) {
+          emptyStreak = 0
+          return { ...res, posts: fresh }
+        }
+        return emptyRound(fetched.length, req.limit, res)
       }
       return { ...offline }
     }
-    return await directFetch(req)
+    const res = await directFetch(req)
+    if (res.ok && res.posts.length > 0) {
+      emptyStreak = 0
+      return res
+    }
+    if (res.emptyFresh) return emptyRound(1, req.limit, res)
+    return { ...offline }
   } catch {
     return { ...offline }
   }
+}
+
+/**
+ * Seen-exhausted round handler. First contact returns a gentle emptyFresh
+ * verdict (no backoff escalation); once the pool proves exhausted twice in
+ * a row, reshow least-recently-seen posts with repeat:true (non-stop feed,
+ * last resort). Skips/discards stay excluded — only passively-seen items
+ * can reshow (enforced by the caller paths, which never feed discards
+ * into remember()).
+ */
+function emptyRound(parsed: number, limit: number, res: BooruResponse): BooruResponse {
+  if (parsed <= 0) return { posts: [], source: null, ok: false, offline: true }
+  emptyStreak += 1
+  if (emptyStreak >= RESHOW_AFTER_EMPTY) {
+    const recalled = recallSeen(Math.min(Math.max(limit, 1), RESHOW_BATCH))
+    if (recalled.length > 0) {
+      return { posts: recalled, source: 'reshow', ok: true }
+    }
+  }
+  return { posts: [], source: res.source ?? null, ok: false, emptyFresh: true }
 }

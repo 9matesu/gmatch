@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { __resetFeedState, fetchPosts, markSeen, parseRealbooruHtml } from './booru'
+import { __resetFeedState, clearMirrorCooldowns, fetchPosts, markSeen, parseRealbooruHtml, recallSeen } from './booru'
 import { setCoRules, setFeedIntent, __resetCoRules } from '../game/tagCooccur'
 import { setUserExcludes } from '../game/tagFilter'
 
@@ -341,7 +341,48 @@ describe('fetchPosts (SPEC §6/§8)', () => {
     const res = await fetchPosts({ tags: 'goon_caption', limit: 5 })
     expect(res.ok).toBe(true)
     expect(res.source).toBe('imh-direct')
-    expect(res.posts[0].id).toBe('imh-999')
+    expect(res.posts[0].id).toBe('imh-999-p1')
+  })
+
+  it('browser mode enters imhentai galleries and takes every page image', async () => {
+    vi.stubGlobal('window', {})
+    const searchHtml =
+      '<div class="gallery"><a href="/gallery/555/"><img/></a></div>'
+    const DQ = String.fromCharCode(34)
+    const SQ = String.fromCharCode(39)
+    const map =
+      '{' + DQ + '1' + DQ + ':' + DQ + 'j,1000,1400' + DQ + ',' +
+      DQ + '2' + DQ + ':' + DQ + 'g,900,1200' + DQ + ',' +
+      DQ + '3' + DQ + ':' + DQ + 'p,1100,1500' + DQ + '}'
+    const galleryHtml =
+      '<img data-src="https://m2.imhentai.xxx/xyz/1.jpg" />' +
+      '<script>var x = $.parseJSON(' + SQ + map + SQ + ');</script>'
+    const fetchMock = vi.fn(async (url: string) => {
+      const u = String(url)
+      if (u.startsWith('/booru/imh/search')) {
+        return { ok: true, text: () => Promise.resolve(searchHtml) }
+      }
+      if (u.startsWith('/booru/imh/gallery')) {
+        return { ok: true, text: () => Promise.resolve(galleryHtml) }
+      }
+      if (u.startsWith('/booru/tbib/') || u.startsWith('/booru/xbooru/')) {
+        return { ok: true, json: () => Promise.resolve([]) }
+      }
+      return { ok: false }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await fetchPosts({ tags: 'goon_caption', limit: 5 })
+    expect(res.ok).toBe(true)
+    expect(res.source).toBe('imh-direct')
+    expect(res.posts.map((p) => p.id)).toEqual(['imh-555-p1', 'imh-555-p2', 'imh-555-p3'])
+    expect(res.posts.map((p) => p.url)).toEqual([
+      'https://m2.imhentai.xxx/xyz/1.jpg',
+      'https://m2.imhentai.xxx/xyz/2.gif',
+      'https://m2.imhentai.xxx/xyz/3.png',
+    ])
+    // one gallery fetch yields the whole book — no per-page requests
+    const galleryCalls = fetchMock.mock.calls.filter((c) => String(c[0]).startsWith('/booru/imh/gallery'))
+    expect(galleryCalls).toHaveLength(1)
   })
 
   it('all galleries 403 cools imh-direct down (no per-round retry spam)', async () => {
@@ -534,5 +575,45 @@ describe('realbooru parser', () => {
     expect(posts[0].url).toBe('https://realbooru.com/images/a8/9c/a89c.jpeg')
     expect(posts[1].url).toBe('https://realbooru.com/images/b1/22/b122.gif')
     expect(posts[2].url).toBe('https://realbooru.com/images/c3/44/c344.mp4')
+  })
+})
+
+describe('non-stop feed (exhaustion → reshow)', () => {
+  const mkPost = (id: string) => ({ id, url: `https://e.test/${id}.jpg`, tags: [], rating: 'e' })
+
+  it('recallSeen rotates least-recent posts flagged repeat:true', async () => {
+    const booruFetch = vi.fn().mockResolvedValue({ ok: true, posts: [mkPost('a'), mkPost('b'), mkPost('c')], source: 't' })
+    vi.stubGlobal('window', { gmatch: { booruFetch } })
+    await fetchPosts({ tags: 'skylar_vox', limit: 5 })
+    expect(recallSeen(2).map((p) => p.id)).toEqual(['a', 'b'])
+    expect(recallSeen(2).map((p) => p.id)).toEqual(['c', 'a'])
+    const r = recallSeen(2)
+    expect(r.every((p) => p.repeat === true)).toBe(true)
+    expect(r.every((p) => p.tags.length === 0)).toBe(true)
+  })
+
+  it('all-seen IPC round reports emptyFresh first, reshows on repeat contact', async () => {
+    const booruFetch = vi.fn().mockResolvedValue({ ok: true, posts: [mkPost('x1')], source: 't' })
+    vi.stubGlobal('window', { gmatch: { booruFetch } })
+    const first = await fetchPosts({ tags: 'skylar_vox', limit: 5 })
+    expect(first.posts.map((p) => p.id)).toEqual(['x1'])
+    const second = await fetchPosts({ tags: 'skylar_vox', limit: 5 })
+    expect(second.ok).toBe(false)
+    expect(second.emptyFresh).toBe(true)
+    expect(second.offline).toBeUndefined()
+    const third = await fetchPosts({ tags: 'skylar_vox', limit: 5 })
+    expect(third.ok).toBe(true)
+    expect(third.source).toBe('reshow')
+    expect(third.posts[0]).toMatchObject({ id: 'x1', repeat: true })
+  })
+
+  it('clearMirrorCooldowns keeps no-repeat memory intact', async () => {
+    const booruFetch = vi.fn().mockResolvedValue({ ok: true, posts: [mkPost('y1')], source: 't' })
+    vi.stubGlobal('window', { gmatch: { booruFetch } })
+    await fetchPosts({ tags: 'skylar_vox', limit: 5 })
+    clearMirrorCooldowns()
+    const res = await fetchPosts({ tags: 'skylar_vox', limit: 5 })
+    expect(res.posts).toEqual([])
+    expect(res.emptyFresh).toBe(true)
   })
 })

@@ -31,11 +31,10 @@ const HOVER_BTN =
 
 const RARITY_ORDER: Record<string, number> = {
   Common: 1,
-  Uncommon: 2,
-  Rare: 3,
-  Epic: 4,
-  Legendary: 5,
-  Mythic: 6,
+  Copper: 2,
+  Silver: 3,
+  Gold: 4,
+  Diamond: 5,
 }
 
 async function downloadMedia(url: string, filename: string) {
