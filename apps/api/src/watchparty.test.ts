@@ -3,7 +3,7 @@ import {
   createParty, getParty, listParties, applyWatch, joinWatch, leaveWatch, leaveAll, applyChat,
   deleteChat, kickWatch, banWatch, muteWatch, transferHost, settingsWatch,
   queueOps, setPartyMedia, __resetParties, partyRoom, IDLE_MS, MAX_QUEUE, isPartyMediaObject,
-  serializeParties, restoreParties, type Party,
+  serializeParties, restoreParties, liveMediaObjectIds, type Party,
 } from './watchparty'
 import { handleIncoming, conns, createWsTicket, type WsConn } from './ws-bus'
 
@@ -372,8 +372,20 @@ describe('room persistence', () => {
     expect(q.hostId).toBe('u1')
     // roster re-forms via watch.join
     expect(q.members.size).toBe(0)
-    // capability map is rebuilt: private media is readable again
+    // capability map is rebuilt: current AND queued media readable again
     expect(isPartyMediaObject(q.mediaUrl)).toBe(true)
+    expect(isPartyMediaObject('/api/objects/n')).toBe(true)
+  })
+
+  it('liveMediaObjectIds lists current + queued /api/objects ids', () => {
+    const p = makeParty('u1')
+    setPartyMedia(p, '/api/objects/aaa11111-1111-1111-1111-111111111111')
+    queueOps('u1', { party: p.id, op: 'add', name: 'b', url: '/api/objects/bbb22222-2222-2222-2222-222222222222' })
+    queueOps('u1', { party: p.id, op: 'add', name: 'r', url: '/api/watchparty/p/stream' })
+    const ids = liveMediaObjectIds()
+    expect(ids).toContain('aaa11111-1111-1111-1111-111111111111')
+    expect(ids).toContain('bbb22222-2222-2222-2222-222222222222')
+    expect(ids.length).toBe(2)
   })
   it('restore is idempotent and junk-safe', () => {
     expect(restoreParties('not json')).toBe(0)

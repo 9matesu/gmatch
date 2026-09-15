@@ -2107,7 +2107,7 @@ export default function Home() {
       const res = await saveUserProfile(identity, { pfp_url: thumbDataUrl })
 
       if (!res.ok) {
-        toast('Failed to save profile picture to server', 'error')
+        toast(res.error || 'Failed to save profile picture to server', 'error')
         return
       }
 

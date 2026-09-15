@@ -70,6 +70,20 @@ async function main() {
   // key shape: sha256 + preserved ext
   assert.match(vault._test.keyFor('https://x/a.jpg'), /^[0-9a-f]{64}\.jpg$/)
 
+  // parsed big video: >25MB (the IMAGE cap) pins under the VIDEO cap, and
+  // serveVault answers Range with 206 + Content-Range (seekable mp4).
+  const big = Buffer.alloc(26 * 1024 * 1024, 7)
+  vault._test.setFetcher(async () => ({ buf: big, mime: 'video/mp4' }))
+  const bigLocal = await vault.pin('https://x/big.mp4')
+  assert.ok(bigLocal, '26MB video must pin under the video cap')
+  const hit = await vault.serveVault(new Request(bigLocal, { headers: { Range: 'bytes=0-99' } }))
+  assert.strictEqual(hit.status, 206, 'Range serves 206')
+  assert.strictEqual(hit.headers.get('content-range'), `bytes 0-99/${big.length}`)
+  assert.strictEqual((await hit.arrayBuffer()).byteLength, 100)
+  const full = await vault.serveVault(new Request(bigLocal))
+  assert.strictEqual(full.headers.get('accept-ranges'), 'bytes')
+  assert.strictEqual(full.status, 200)
+
   fs.rmSync(tmp, { recursive: true, force: true })
   console.log('vault: all assertions passed')
 }

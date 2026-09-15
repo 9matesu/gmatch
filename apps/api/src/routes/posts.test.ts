@@ -22,10 +22,11 @@ async function setDisplayName(env: any, identity: ReturnType<typeof createTestId
   }, env)
 }
 
-it('rejects profile updates that leave an authenticated user nameless', async () => {
+it('rejects name-bearing profile updates on a nameless user; allows bio-only saves', async () => {
   const env = await createMockEnv()
   await registerUser(env, alice)
-  const body = JSON.stringify({ bio: 'No name yet' })
+  // An empty display_name on a nameless row stays illegal (onboarding gate).
+  const body = JSON.stringify({ display_name: '   ', bio: 'No name yet' })
   const response = await app.request('/api/users/profile', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...authHeaders(alice, 'PATCH', '/api/users/profile', body) },
@@ -33,7 +34,17 @@ it('rejects profile updates that leave an authenticated user nameless', async ()
   }, env)
 
   expect(response.status).toBe(400)
-  await expect(response.json()).resolves.toEqual({ error: 'Display name is required' })
+  await expect(response.json()).resolves.toEqual({ error: 'Display name cannot be empty or whitespace-only' })
+
+  // fix/resilience: a bio-only save (no identity fields) must work so an
+  // account with a provisioned-but-nameless row can still fix its profile.
+  const bioBody = JSON.stringify({ bio: 'hello' })
+  const ok = await app.request('/api/users/profile', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(alice, 'PATCH', '/api/users/profile', bioBody) },
+    body: bioBody,
+  }, env)
+  expect(ok.status).toBe(200)
 })
 
 function makePngBlob(): Blob {

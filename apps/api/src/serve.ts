@@ -99,7 +99,7 @@ setTimeout(() => {
 // /data volume as the DB snapshot. 30 s tick + SIGTERM flush; file is tiny
 // (<=50 rooms) so unconditional rewrite is fine. Workers mode has no FS and
 // skips this entirely (routes only run here).
-import { serializeParties, restoreParties } from './watchparty'
+import { serializeParties, restoreParties, liveMediaObjectIds } from './watchparty'
 const PARTIES_PATH = process.env.WATCH_PARTIES_PATH ||
   (process.env.SNAPSHOT_PATH ? join(dirname(process.env.SNAPSHOT_PATH), 'watchparties.json') : './watchparties.json')
 async function flushParties(): Promise<void> {
@@ -113,6 +113,16 @@ import('node:fs/promises').then(({ readFile }) =>
 ).catch(() => {})
 setInterval(() => {
   flushParties().catch((e) => console.warn('[WATCH] snapshot failed', (e as Error)?.message || e))
+  // Live rooms re-extend their media leases (Objects.expires_at, A4); a
+  // room that truly dies stops refreshing and expires +1 day after last
+  // use. Without this, an all-night room eventually served a purged
+  // object ("No preview") while touchRooms kept it alive.
+  const ids = liveMediaObjectIds()
+  if (ids.length && dbReady) {
+    const ph = ids.map(() => '?').join(',')
+    db.prepare(`UPDATE Objects SET expires_at = datetime('now', '+1 day') WHERE id IN (${ph})`)
+      .bind(...ids).run().catch((e: Error) => console.warn('[WATCH] media lease refresh failed', e?.message || e))
+  }
 }, 30_000)
 // On SIGTERM/SIGINT, persist a final snapshot before letting the process
 // exit. Bun's exit() is synchronous so we kick the snapshot synchronously

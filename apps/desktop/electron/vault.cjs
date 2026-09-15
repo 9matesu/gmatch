@@ -13,6 +13,10 @@ const imageCache = require('./imageCache.cjs')
 const SCHEME = 'vault'
 const QUOTA_BYTES = 3 * 1024 * 1024 * 1024
 const MAX_SINGLE_BYTES = 25 * 1024 * 1024
+// Videos get their own ceiling: parsed/proxied mp4s are routinely 80MB+
+// (pmvhaven), and silently refusing them is why "kept" videos never
+// persisted. Total stays bounded by QUOTA_BYTES (3GB) LRU eviction.
+const MAX_SINGLE_VIDEO_BYTES = 200 * 1024 * 1024
 
 let dir = null
 /** url -> { key, mime, bytes, atime, pins } */
@@ -147,7 +151,9 @@ async function pin(url) {
     }
     const fetch = fetcher || imageCache.fetchBinary
     const { buf, mime } = await fetch(String(url))
-    if (!buf || buf.length === 0 || buf.length > MAX_SINGLE_BYTES) return null
+    if (!buf || buf.length === 0) return null
+    const cap = String(mime || '').startsWith('video/') ? MAX_SINGLE_VIDEO_BYTES : MAX_SINGLE_BYTES
+    if (buf.length > cap) return null
     if (!makeRoom(buf.length)) return null
     const key = keyFor(url)
     try {
@@ -229,14 +235,29 @@ async function serveVault(request) {
     } catch {
       return new Response('miss', { status: 404 })
     }
-    return new Response(buf, {
-      headers: {
-        'Content-Type': entry.mime || 'application/octet-stream',
-        'Cache-Control': 'no-store',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-      },
-    })
+    // Range support: a 100MB+ mp4 must seek; answering the whole file with
+    // 200 forces the browser to re-download everything on every jump.
+    const base = {
+      'Content-Type': entry.mime || 'application/octet-stream',
+      'Cache-Control': 'no-store',
+      'Access-Control-Allow-Origin': '*',
+      'Accept-Ranges': 'bytes',
+    }
+    const range = /^bytes=(\d*)-(\d*)$/.exec(request.headers.get('range') || '')
+    if (range) {
+      const total = buf.length
+      let start = range[1] ? parseInt(range[1], 10) : 0
+      let end = range[2] ? Math.min(parseInt(range[2], 10), total - 1) : total - 1
+      if (!Number.isFinite(start) || start >= total || start > end) {
+        return new Response(null, { status: 416, headers: { ...base, 'Content-Range': `bytes */${buf.length}` } })
+      }
+      const slice = buf.subarray(start, end + 1)
+      return new Response(slice, {
+        status: 206,
+        headers: { ...base, 'Content-Length': String(slice.length), 'Content-Range': `bytes ${start}-${end}/${total}` },
+      })
+    }
+    return new Response(buf, { headers: { ...base, 'Content-Length': String(buf.length) } })
   } catch {
     return new Response('cache error', { status: 500 })
   }
