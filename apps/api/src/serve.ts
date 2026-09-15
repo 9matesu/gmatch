@@ -95,6 +95,25 @@ setInterval(() => {
 setTimeout(() => {
   if (dbReady) takeSnapshot()
 }, SNAPSHOT_INITIAL_DELAY_MS)
+// Watch rooms live in memory; keep them across restarts/deploys on the same
+// /data volume as the DB snapshot. 30 s tick + SIGTERM flush; file is tiny
+// (<=50 rooms) so unconditional rewrite is fine. Workers mode has no FS and
+// skips this entirely (routes only run here).
+import { serializeParties, restoreParties } from './watchparty'
+const PARTIES_PATH = process.env.WATCH_PARTIES_PATH ||
+  (process.env.SNAPSHOT_PATH ? join(dirname(process.env.SNAPSHOT_PATH), 'watchparties.json') : './watchparties.json')
+async function flushParties(): Promise<void> {
+  const { writeFile } = await import('node:fs/promises')
+  await writeFile(PARTIES_PATH, serializeParties(), { mode: 0o600 })
+}
+import('node:fs/promises').then(({ readFile }) =>
+  readFile(PARTIES_PATH, 'utf8')
+    .then((j) => { const n = restoreParties(j); if (n) console.log(`[WATCH] restored ${n} room(s)`) })
+    .catch(() => { /* first boot: no file yet */ }),
+).catch(() => {})
+setInterval(() => {
+  flushParties().catch((e) => console.warn('[WATCH] snapshot failed', (e as Error)?.message || e))
+}, 30_000)
 // On SIGTERM/SIGINT, persist a final snapshot before letting the process
 // exit. Bun's exit() is synchronous so we kick the snapshot synchronously
 // and rely on snapshotDb being awaitable. Fly.io's default stop_signal is
@@ -107,6 +126,7 @@ async function persistAndExit(code: number) {
   } catch (err) {
     console.warn('[DB] shutdown snapshot failed:', (err as Error)?.message || err)
   }
+  try { await flushParties() } catch { /* best effort */ }
   process.exit(code)
 }
 process.once('SIGTERM', () => { void persistAndExit(0) })
