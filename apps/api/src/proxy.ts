@@ -202,8 +202,18 @@ async function resolveOpenGraph(url: URL): Promise<string | null> {
  */
 export function extractEmbeddedVideo(html: string): string | null {
   const unescaped = html.replace(/\\u002[fF]/g, '/')
-  const m = unescaped.match(/https?:\/\/[^"'\\\s<>]+?\.(?:mp4|webm|m4v|mov)(?:\?[^"'\\\s<>]*)?/i)
-  if (m) return m[0]
+  // Skip 20s teaser files (goonchan ships preview.mp4 before the full
+  // micro.mp4 in its JSON — first match was a 24s clip posing as the video).
+  let teaser: string | null = null
+  for (const cand of unescaped.matchAll(/https?:\/\/[^"'\\\s<>]+?\.(?:mp4|webm|m4v|mov)(?:\?[^"'\\\s<>]*)?/gi)) {
+    const base = new URL(cand[0]).pathname.split('/').pop() || ''
+    if (/(^|[._-])(preview|trailer|teaser)([._-]|$)/i.test(base)) {
+      teaser = teaser || cand[0]
+      continue
+    }
+    return cand[0]
+  }
+  if (teaser) return teaser
   const tag = unescaped.match(/<(?:video|source)[^>]*?src="([^"]+?\.(?:mp4|webm|m4v|mov)(?:\?[^"]*)?)"[^>]*>/i)
   if (tag) return tag[1]
   return null
@@ -229,6 +239,13 @@ export function pageTitleFor(pageUrl: string): string | null {
   return pageTitles.get(pageUrl) || null
 }
 
+// goonchan's media.goonchan.org cert doesn't cover its own hostname (TLS
+// hard-fails in fetch AND browsers). test-media.goonchan.org is the same
+// nginx, same paths, valid cert (the site's own og:image uses it). Swap.
+function fixBrokenCdnHost(out: string): string {
+  return out.replace('https://media.goonchan.org/', 'https://test-media.goonchan.org/')
+}
+
 /**
  * Run every per-source resolver and return the first direct playable URL.
  * If no resolver matches, returns the original URL (caller validates SSRF).
@@ -240,11 +257,11 @@ export async function classifyAndResolve(rawUrl: string): Promise<string | null>
   for (const r of [resolveTwitter, resolveDiscord, resolveReddit, resolveInstagram, resolveTenor, resolveGiphy, resolveRedgifs, resolveOpenGraph]) {
     try {
       const out = await r(parsed)
-      if (out) return out
+      if (out) return fixBrokenCdnHost(out)
     } catch { /* try next */ }
   }
   // Direct image/video URL — let the proxy+SSRF step have it as-is.
-  return parsed.toString()
+  return fixBrokenCdnHost(parsed.toString())
 }
 
 // ---------------------------------------------------------------------------

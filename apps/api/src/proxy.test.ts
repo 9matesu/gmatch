@@ -15,6 +15,19 @@ describe('extractEmbeddedVideo (all playable formats)', () => {
     expect(extractEmbeddedVideo('<video><source src="https://c.t/x.m4v" type="video/mp4"></video>')).toBe('https://c.t/x.m4v')
     expect(extractEmbeddedVideo('nope <script>var a=".fake.mp4"</script>')).toBeNull()
   })
+  it('skips teaser files, returns the full one; falls back if only a teaser exists', () => {
+    expect(extractEmbeddedVideo('a.mp4 x https://cdn.t/v/preview.mp4 y https://cdn.t/v/micro.mp4 z'))
+      .toBe('https://cdn.t/v/micro.mp4')
+    expect(extractEmbeddedVideo('only https://cdn.t/v/preview.mp4 here'))
+      .toBe('https://cdn.t/v/preview.mp4')
+  })
+})
+
+describe('classifyAndResolve (goonchan broken CDN cert)', () => {
+  it('swaps media.goonchan.org for the valid test-media host', async () => {
+    const out = await classifyAndResolve('https://media.goonchan.org/videos/slug-abc123/micro.mp4')
+    expect(out).toBe('https://test-media.goonchan.org/videos/slug-abc123/micro.mp4')
+  })
 })
 
 describe('extractPageTitle', () => {
