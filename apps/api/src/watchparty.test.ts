@@ -292,6 +292,18 @@ describe('ws relay integration', () => {
     expect(Date.now() - p.lastSeen).toBeLessThan(2000)
   })
 
+  it('transport frames are throttled per member (audit A3)', () => {
+    const p = makeParty('u1')
+    joinWatch('u1', 'Me', { party: p.id })
+    let relayed = 0
+    for (let i = 0; i < 30; i++) if (applyWatch('u1', { party: p.id, action: 'play', position: i })) relayed++
+    // 30 bursts, 1 every 200ms is 6s of human playback spam; a bot gets ~2.
+    expect(relayed).toBeLessThanOrEqual(3)
+    // And a legit next-frame after the window still passes.
+    p.lastControl.set('u1', Date.now() - 500)
+    expect(applyWatch('u1', { party: p.id, action: 'pause', position: 5 })).not.toBeNull()
+  })
+
   it('unauthenticated watch frames are dropped', () => {
     const a = fakeConn()
     handleIncoming(a, JSON.stringify({ type: 'watch.join', party: 'x' }))

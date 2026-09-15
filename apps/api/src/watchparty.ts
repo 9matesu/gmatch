@@ -53,6 +53,7 @@ export interface Party {
   lastSeen: number
   /** ponytail: last chat msg ts per user; global bucket if flood persists. */
   lastChat: Map<string, number>
+  lastControl: Map<string, number>
 }
 
 const parties = new Map<string, Party>()
@@ -91,6 +92,7 @@ export function createParty(
     chat: [],
     lastSeen: Date.now(),
     lastChat: new Map(),
+    lastControl: new Map(),
   }
   if (creatorId) party.members.set(creatorId, { name: '', muted: false })
   parties.set(party.id, party)
@@ -181,7 +183,12 @@ export function applyWatch(userId: string, msg: any): { room: string; payload: a
   // V1 lock: party speed is always 1x. A rate != 1 frame is a desync bug or
   // a modified client; drop it.
   if (msg.rate !== undefined && Number(msg.rate) !== 1) return null
-  party.lastSeen = Date.now()
+  // Audit A3: 200 ms/member transport throttle. Humans seek/play far less
+  // often; a bot hammering this frame used to amplify x-members broadcasts.
+  const now = Date.now()
+  if (now - (party.lastControl.get(userId) || 0) < 200) return null
+  party.lastControl.set(userId, now)
+  party.lastSeen = now
   party.frame = {
     url: party.mediaUrl,
     action: msg.action,

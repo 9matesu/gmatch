@@ -36,8 +36,12 @@ async function resolveMedia(env: Bindings, orbitId: string, rawUrl: string): Pro
   const objectId = crypto.randomUUID()
   const proxied = await proxyAndStoreExternal(rawUrl, env.BUCKET, 'objects', objectId)
   if (proxied?.isVideo) {
+    // Audit A4: watch media is ephemeral (rooms die at 4h idle). Without an
+    // expiry the encrypted Object + blob stayed forever, contradicting the
+    // "nothing persists" promise. 24h covers any real overnight run; past
+    // that the room is gone anyway and the user re-adds.
     await env.DB.prepare(
-      'INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, is_public, is_proxied, proxied_mime) VALUES (?, ?, ?, ?, ?, 0, 1, ?)'
+      "INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, is_public, is_proxied, proxied_mime, expires_at) VALUES (?, ?, ?, ?, ?, 0, 1, ?, datetime('now', '+1 day'))"
     ).bind(objectId, orbitId, proxied.bytesStored, proxied.mimeType, proxied.storedUrl, proxied.proxiedMime).run()
     return { url: `/api/objects/${objectId}`, stored: true }
   }
@@ -67,8 +71,27 @@ async function resolveMedia(env: Bindings, orbitId: string, rawUrl: string): Pro
   return { url: '', relay: { upstream: up.toString(), referer: `${parsed.protocol}//${parsed.host}/` } }
 }
 
+// Audit A5: each resolveMedia costs an upstream fetch + up to 50MB of R2
+// storage. Per-user sliding budget: 30 parsed URLs/minute across create +
+// video routes (a human pastes a 10-line playlist once, not twice a minute).
+const parseBudget = new Map<string, { ts: number[] }>()
+function takeParseBudget(userId: string, n: number): boolean {
+  const now = Date.now()
+  const rec = parseBudget.get(userId) || { ts: [] }
+  rec.ts = rec.ts.filter((t) => now - t < 60_000)
+  if (rec.ts.length + n > 30) {
+    parseBudget.set(userId, rec)
+    return false
+  }
+  for (let i = 0; i < n; i++) rec.ts.push(now)
+  parseBudget.set(userId, rec)
+  return true
+}
+// ponytail: in-memory bucket dies with the isolate; fine for a 50-room app.
+
 watchparty.post('/', orbitAuth, async (c) => {
   const orbitId = c.get('orbitId')
+  if (!takeParseBudget(orbitId, 1)) return c.json({ error: 'Too many video parses. Wait a minute.' }, 429)
   let body: any
   try {
     body = await c.req.json()
@@ -125,6 +148,7 @@ watchparty.post('/:id/video', orbitAuth, async (c) => {
     : (url ? [url] : [])
   if (urlList.length > 10) return c.json({ error: 'Add up to 10 videos at a time.' }, 400)
   if (urlList.length === 0) return c.json({ error: PARSE_ERROR }, 422)
+  if (!takeParseBudget(orbitId, urlList.length)) return c.json({ error: 'Too many video parses. Wait a minute.' }, 429)
 
   const added: Array<{ id: string; name: string; url: string }> = []
   const failed: string[] = []

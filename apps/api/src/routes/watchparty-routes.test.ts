@@ -54,6 +54,11 @@ describe('POST /api/watchparty', () => {
     expect(json.party.id).toBeTruthy()
     expect(json.party.url.startsWith('/api/objects/')).toBe(true)
 
+    // Audit A4: the stored media row must carry an expiry (ephemeral rooms).
+    const objId = json.party.url.replace('/api/objects/', '')
+    const row: any = await env.DB.prepare('SELECT expires_at FROM Objects WHERE id = ?').bind(objId).first()
+    expect(row.expires_at).toBeTruthy()
+
     const get = await app.request(`/api/watchparty/${json.party.id}`, { headers: auth('GET', `/api/watchparty/${json.party.id}`) }, env)
     expect(get.status).toBe(200)
     const snap: any = await get.json()
@@ -73,5 +78,17 @@ describe('POST /api/watchparty', () => {
     const body = JSON.stringify({ url: 'javascript:alert(1)' })
     const res = await app.request('/api/watchparty', { method: 'POST', headers: auth('POST', '/api/watchparty', body), body }, env)
     expect(res.status).toBe(422)
+  })
+
+  it('audit A5: more than 30 party creates per minute is 429', async () => {
+    __resetParties()
+    const body = JSON.stringify({ url: 'https://example.com/v', name: '' })
+    let last = 0
+    for (let i = 0; i < 31; i++) {
+      const res = await app.request('/api/watchparty', { method: 'POST', headers: auth('POST', '/api/watchparty', body), body }, env)
+      last = res.status
+      expect([201, 429]).toContain(last)
+    }
+    expect(last).toBe(429)
   })
 })
