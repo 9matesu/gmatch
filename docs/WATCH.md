@@ -45,7 +45,10 @@ and playback stays frame-accurate within the drift deadband.
    longer kills live rooms. A room still dies on 4 h idle; clients then get
    one `watch.gone` frame ("has closed"), never a 404 loop. Socket close
    removes a member only after an 8 s grace, so a reconnect blip keeps the
-   seat (and a last-member blip keeps the room).
+   seat (and a last-member blip keeps the room). While a room is live, the
+   flush tick re-extends `expires_at` (+1 d) for every object it serves
+   (current + queue): overnight rooms never hand clients a purged media
+   ("No preview"); dead rooms stop refreshing and expire as promised.
 2. Others join from the room list, the invite link `#/watch?room=<id>`, or
    the 8-hex code. `watch.join` subscribes the socket to room `watch:<id>`
    and the room receives a roster + "X joined" system line; the joiner
