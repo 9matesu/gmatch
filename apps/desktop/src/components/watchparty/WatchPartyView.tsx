@@ -129,7 +129,7 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
       </aside>
 
       {inRoom && !railOpen && (
-        <button type="button" onClick={() => setRailOpen(true)} aria-label="Show side panel" className="absolute top-14 right-2 z-30 p-2 rounded-md glass-toolbar text-retro-muted hover:text-retro-fg cursor-pointer transition-colors duration-150">
+        <button type="button" onClick={() => setRailOpen(true)} aria-label="Show side panel" className="absolute bottom-16 right-2 z-30 p-2 rounded-md glass-toolbar text-retro-muted hover:text-retro-fg cursor-pointer transition-colors duration-150">
           <PanelRightOpen className="w-4 h-4" />
         </button>
       )}
