@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { __resetFeedState, clearMirrorCooldowns, fetchPosts, markSeen, parseRealbooruHtml, recallSeen } from './booru'
+import { __resetFeedState, clearMirrorCooldowns, fetchPosts, fetchPostsMulti, interleaveBatches, mapLimit, markSeen, parseRealbooruHtml, recallSeen, roundRobin } from './booru'
 import { setCoRules, setFeedIntent, __resetCoRules } from '../game/tagCooccur'
 import { setUserExcludes } from '../game/tagFilter'
 
@@ -405,11 +405,11 @@ describe('fetchPosts (SPEC §6/§8)', () => {
     const first = await fetchPosts({ tags: 'creampie', limit: 5 })
     expect(first.ok).toBe(false) // everything exhausted -> offline
     const galleryHits = fetchMock.mock.calls.filter((a) => String(a[0]).startsWith('/booru/imh/gallery')).length
-    expect(galleryHits).toBe(1) // fail-fast: first 403 cools imh-direct, no further galleries this round
+    expect(galleryHits).toBe(2) // bounded lanes attempt each gallery once (no per-gallery retries); 403s cool the source
     // Second round: imh-direct is cooling down — no gallery fetches at all.
     await fetchPosts({ tags: 'creampie', limit: 5 })
     const galleryHits2 = fetchMock.mock.calls.filter((a) => String(a[0]).startsWith('/booru/imh/gallery')).length
-    expect(galleryHits2).toBe(1)
+    expect(galleryHits2).toBe(2)
   })
 
   it('browser mode scrapes booru.org sub without tags query to dodge Cloudflare 403 WAF', async () => {
@@ -615,5 +615,140 @@ describe('non-stop feed (exhaustion → reshow)', () => {
     const res = await fetchPosts({ tags: 'skylar_vox', limit: 5 })
     expect(res.posts).toEqual([])
     expect(res.emptyFresh).toBe(true)
+  })
+})
+
+describe('roundRobin (every gallery contributes)', () => {
+  const p = (id: string) => ({ id, url: `https://e.test/${id}.jpg`, tags: [] as string[], rating: 'e' })
+  it('takes one per gallery per turn instead of first-fills-batch', () => {
+    const out = roundRobin(
+      [[p('g1a'), p('g1b'), p('g1c')], [p('g2a')], [p('g3a'), p('g3b')]],
+      5,
+    )
+    expect(out.map((x) => x.id)).toEqual(['g1a', 'g2a', 'g3a', 'g1b', 'g3b'])
+  })
+  it('caps at limit and skips empty sets', () => {
+    expect(roundRobin([[], [p('a')], []], 10).map((x) => x.id)).toEqual(['a'])
+    expect(roundRobin([[p('a'), p('b')]], 1).map((x) => x.id)).toEqual(['a'])
+  })
+})
+
+describe('interleaveBatches (recency-weighted tag mix)', () => {
+  const p = (id: string) => ({ id, url: `https://e.test/${id}.jpg`, tags: [] as string[], rating: 'e' })
+  it('gives the priority tag every other slot (~50%)', () => {
+    const out = interleaveBatches(
+      [
+        { tag: 'new', posts: [p('n1'), p('n2'), p('n3'), p('n4')] },
+        { tag: 'old', posts: [p('o1'), p('o2'), p('o3'), p('o4')] },
+      ],
+      'new',
+    )
+    expect(out.map((x) => x.id)).toEqual(['n1', 'o1', 'n2', 'o2', 'n3', 'o3', 'n4', 'o4'])
+  })
+  it('rotates the rest when several non-priority tags share the round', () => {
+    const out = interleaveBatches(
+      [
+        { tag: 'new', posts: [p('n1'), p('n2')] },
+        { tag: 'b', posts: [p('b1')] },
+        { tag: 'c', posts: [p('c1')] },
+      ],
+      'new',
+    )
+    expect(out.map((x) => x.id)).toEqual(['n1', 'b1', 'n2', 'c1'])
+  })
+  it('passes a single batch through untouched; no priority = plain round-robin', () => {
+    const solo = interleaveBatches([{ tag: 'a', posts: [p('a1'), p('a2')] }], 'a')
+    expect(solo.map((x) => x.id)).toEqual(['a1', 'a2'])
+    const rr = interleaveBatches(
+      [{ tag: 'a', posts: [p('a1')] }, { tag: 'b', posts: [p('b1'), p('b2')] }],
+      null,
+    )
+    expect(rr.map((x) => x.id)).toEqual(['a1', 'b1', 'b2'])
+  })
+})
+
+describe('mapLimit (bounded gallery lanes)', () => {
+  it('caps in-flight work and keeps input order', async () => {
+    let inFlight = 0
+    let maxInFlight = 0
+    const out = await mapLimit([1, 2, 3, 4, 5], 2, async (n) => {
+      inFlight++
+      maxInFlight = Math.max(maxInFlight, inFlight)
+      await new Promise((r) => setTimeout(r, 5))
+      inFlight--
+      return n * 10
+    })
+    expect(out).toEqual([10, 20, 30, 40, 50])
+    expect(maxInFlight).toBeLessThanOrEqual(2)
+  })
+  it('drops failures without killing the batch', async () => {
+    const out = await mapLimit([1, 2, 3], 3, async (n) => {
+      if (n === 2) throw new Error('dead gallery')
+      return n
+    })
+    expect(out).toEqual([1, 3])
+  })
+})
+
+describe('recallSeen tag preference (no cross-tag leftovers)', () => {
+  const mkPost = (id: string) => ({ id, url: `https://e.test/${id}.jpg`, tags: [], rating: 'e' })
+  it('serves same-tag history first even when it is not least-recent', async () => {
+    const booruFetch = vi.fn().mockResolvedValue({ ok: true, posts: [], source: 't' })
+    vi.stubGlobal('window', { gmatch: { booruFetch } })
+    // Ledger order: old-tag posts first, new-tag posts second.
+    booruFetch.mockResolvedValueOnce({ ok: true, posts: [mkPost('old1'), mkPost('old2')], source: 't' })
+    await fetchPosts({ tags: 'old_tag', limit: 5 })
+    booruFetch.mockResolvedValueOnce({ ok: true, posts: [mkPost('new1')], source: 't' })
+    await fetchPosts({ tags: 'new_tag', limit: 5 })
+    // Rotation starts at old1 — but the new tag must recall its own first.
+    expect(recallSeen(2, 'new_tag').map((p) => p.id)).toEqual(['new1', 'old1'])
+  })
+})
+
+describe('fetchPostsMulti (one round, every tag)', () => {
+  const mkPost = (id: string, tag: string) => ({ id, url: `https://e.test/${id}.jpg`, tags: [tag], rating: 'e' })
+  it('fans out concurrently and interleaves with priority weight', async () => {
+    const booruFetch = vi.fn(async (req: { tags: string }) => ({
+      ok: true,
+      source: 't',
+      posts: req.tags === 'gangbang' ? [mkPost('a1', 'gangbang'), mkPost('a2', 'gangbang')] : [mkPost('b1', 'skylar_vox'), mkPost('b2', 'skylar_vox')],
+    }))
+    vi.stubGlobal('window', { gmatch: { booruFetch } })
+    const res = await fetchPostsMulti({ tags: ['gangbang', 'skylar_vox'], limit: 4, priority: 'gangbang' })
+    expect(res.ok).toBe(true)
+    expect(booruFetch).toHaveBeenCalledTimes(2)
+    // priority every other slot: a1, b1, a2, b2
+    expect(res.posts.map((p) => p.id)).toEqual(['a1', 'b1', 'a2', 'b2'])
+  })
+  it('accounts exhaustion once per round, not once per tag', async () => {
+    // seen1 memoized by the first round; the two-tag round replays it on
+    // both lanes. Without single-round accounting the streak would hit 2
+    // and instantly reshow — expect one gentle emptyFresh instead.
+    const booruFetch = vi.fn().mockResolvedValue({ ok: true, posts: [mkPost('seen1', 'gangbang')], source: 't' })
+    vi.stubGlobal('window', { gmatch: { booruFetch } })
+    await fetchPostsMulti({ tags: ['gangbang'], limit: 5 })
+    const res = await fetchPostsMulti({ tags: ['gangbang', 'skylar_vox'], limit: 5 })
+    expect(res.ok).toBe(false)
+    expect(res.emptyFresh).toBe(true)
+  })
+  it('a new tag set resets exhaustion (no other-tag leftovers as fresh)', async () => {
+    const seen = mkPost('seen1', 'gangbang')
+    const booruFetch = vi.fn().mockResolvedValue({ ok: true, posts: [seen], source: 't' })
+    vi.stubGlobal('window', { gmatch: { booruFetch } })
+    await fetchPostsMulti({ tags: ['gangbang'], limit: 5 })
+    // Second dead round on gangbang...
+    await fetchPostsMulti({ tags: ['gangbang'], limit: 5 })
+    // ...must not leak a reshow of gangbang history into a fresh skylar_vox query.
+    const res = await fetchPostsMulti({ tags: ['skylar_vox'], limit: 5 })
+    expect(res.ok).toBe(false)
+    expect(res.emptyFresh).toBe(true)
+    expect(res.source).not.toBe('reshow')
+  })
+  it('total failure on every tag reports offline, never throws', async () => {
+    const booruFetch = vi.fn().mockResolvedValue({ posts: [], source: null, ok: false })
+    vi.stubGlobal('window', { gmatch: { booruFetch } })
+    const res = await fetchPostsMulti({ tags: ['aaa', 'bbb'], limit: 5 })
+    expect(res.ok).toBe(false)
+    expect(res.offline).toBe(true)
   })
 })

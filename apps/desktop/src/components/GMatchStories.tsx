@@ -58,6 +58,8 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
   const [openOrder, setOpenOrder] = useState<string[] | null>(null);
   const [activeStoryIndex, setActiveStoryIndex] = useState<number>(0);
   const [isPaused, setIsPaused] = useState(false);
+  // Avatar URLs that 404'd (e.g. deleted object refs) fall back to initials.
+  const [pfpFailed, setPfpFailed] = useState<Record<string, boolean>>({});
   const [progress, setProgress] = useState(0); // 0 to 100
   const [likedStories, setLikedStories] = useState<Set<string>>(new Set());
   const [floatingHearts, setFloatingHearts] = useState<{ id: number; x: number }[]>([]);
@@ -330,8 +332,13 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
             >
               <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-surface-raised p-[2px] overflow-hidden">
                 <div className="w-full h-full rounded-full bg-surface-interactive overflow-hidden flex items-center justify-center">
-                  {group.pfpUrl ? (
-                    <img src={group.pfpUrl} alt={group.displayName} className="w-full h-full object-cover" />
+                  {group.pfpUrl && !pfpFailed[group.userId] ? (
+                    <img
+                      src={resolveMediaUrl(group.pfpUrl)}
+                      alt={group.displayName}
+                      className="w-full h-full object-cover"
+                      onError={() => setPfpFailed((prev) => (prev[group.userId] ? prev : { ...prev, [group.userId]: true }))}
+                    />
                   ) : (
                     <span className="text-sm font-black text-retro-muted">
                       {group.displayName.charAt(0).toUpperCase()}
@@ -390,8 +397,13 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-full p-[1.5px] bg-retro-accent">
                   <div className="w-full h-full rounded-full bg-surface-canvas overflow-hidden flex items-center justify-center">
-                    {activeGroup.pfpUrl ? (
-                      <img src={activeGroup.pfpUrl} alt="" className="w-full h-full object-cover" />
+                    {activeGroup.pfpUrl && !pfpFailed[activeGroup.userId] ? (
+                      <img
+                        src={resolveMediaUrl(activeGroup.pfpUrl)}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        onError={() => setPfpFailed((prev) => (prev[activeGroup.userId] ? prev : { ...prev, [activeGroup.userId]: true }))}
+                      />
                     ) : (
                       <span className="text-[10px] font-bold">{activeGroup.displayName.substring(0, 1)}</span>
                     )}

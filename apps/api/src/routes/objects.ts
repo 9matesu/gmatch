@@ -9,6 +9,7 @@ import { PICTURE_TTL_SECONDS, STORY_TTL_SECONDS, checkBlacklistedTags } from '@o
 import { sha256 } from '@noble/hashes/sha256'
 import { bytesToHex } from '@noble/hashes/utils'
 import { proxyAndStoreExternal } from '../proxy'
+import { isPartyMediaObject } from '../watchparty'
 import { stripImageMetadata } from '../metadata-strip'
 
 type Bindings = {
@@ -482,7 +483,10 @@ objects.get('/:id', async (c, next) => {
   // admins, or duel match spectators (for revealed match cards) may read an object.
   // Public posts (is_public=1), stories (is_story=1), and active Cards are intentionally
   // readable by any viewer — stories are surfaced in the tray and public posts in the feed.
-  if (!isSignedToken && (!orbitId || row.owner_id !== orbitId) && row.is_public !== 1 && row.is_story !== 1) {
+  if (!isSignedToken && (!orbitId || row.owner_id !== orbitId) && row.is_public !== 1 && row.is_story !== 1
+      // Watch Party media: private object, readable by anyone holding the party
+      // URL (it only travels inside the authenticated party WS room).
+      && !isPartyMediaObject(`/api/objects/${id}`)) {
     const isMatchOrCard = await c.env.DB.prepare(`
       SELECT 1 FROM Cards WHERE media_object_id = ? AND moderation_state = 'active'
       UNION

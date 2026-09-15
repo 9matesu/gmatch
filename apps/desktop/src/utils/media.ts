@@ -19,11 +19,10 @@ export function resolveMediaUrl(url?: string | null): string {
     return '';
   }
   if (
-    trimmed.startsWith('data:') ||
-    trimmed.startsWith('blob:') ||
-    trimmed.startsWith('http://') ||
-    trimmed.startsWith('https://')
+    /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) || trimmed.startsWith('data:') || trimmed.startsWith('blob:')
   ) {
+    // http(s), data:, blob:, and the privileged local schemes
+    // (gmcache://, idle-file://, vault://) pass through untouched.
     return trimmed;
   }
   const base = getApiBaseUrl().replace(/\/+$/, '');

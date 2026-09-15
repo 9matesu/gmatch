@@ -6,6 +6,7 @@ const https = require('https')
 const fs = require('node:fs')
 const path = require('node:path')
 const imageCache = require('./imageCache.cjs')
+const vault = require('./vault.cjs')
 const customFolders = require('./customFolders.cjs')
 const wallpaperWin = require('./wallpaperWin.cjs')
 const { sanitizeBounds } = require('./window-bounds-core.cjs')
@@ -116,6 +117,11 @@ let packagedServer = null // { mode, url } when app.isPackaged
 protocol.registerSchemesAsPrivileged([
   {
     scheme: imageCache.SCHEME,
+    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true, bypassCSP: true },
+  },
+  {
+    // Opt-in local media vault: gallery keeps + card bytes on disk.
+    scheme: vault.SCHEME,
     privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true, bypassCSP: true },
   },
   {
@@ -776,6 +782,46 @@ function parseImhentaiGalleryPages(html, limit) {
   return [{ url: src, width: 0, height: 0 }]
 }
 
+// Galleries expanded per gallery-source round; lanes expanded in parallel.
+const GALLERY_CAP = 6
+const GALLERY_LANES = 3
+
+// Bounded-concurrency map: at most `n` lanes in flight; failures settle to
+// undefined and are dropped. Mirrors services/booru.ts (main.cjs can't
+// import TS).
+async function mapLimit(items, n, fn) {
+  const out = new Array(items.length)
+  let next = 0
+  const lanes = Math.min(Math.max(1, n), Math.max(items.length, 1))
+  const lane = async () => {
+    while (next < items.length) {
+      const i = next++
+      try {
+        out[i] = await fn(items[i], i)
+      } catch {
+        out[i] = undefined
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: lanes }, lane))
+  return out.filter((v) => v !== undefined)
+}
+
+// Round-robin merge across galleries: one post per gallery per turn so
+// every gallery contributes instead of the first filling the batch.
+function roundRobinPosts(lists, limit) {
+  const out = []
+  const queues = lists.map((l) => [...l])
+  while (out.length < limit && queues.some((q) => q.length > 0)) {
+    for (const q of queues) {
+      if (out.length >= limit) break
+      const p = q.shift()
+      if (p) out.push(p)
+    }
+  }
+  return out
+}
+
 async function fetchImhentai(variant, n) {
   const key = redgifsWords(variant)
   // Cloudflare challenges Node-TLS fetches (403 "Just a moment") — Electron's
@@ -792,41 +838,42 @@ async function fetchImhentai(variant, n) {
   // parseImhentaiSearchResults yields thumbs — rewrite thumb.jpg -> 1.jpg
   // (full page 1) and NEVER serve the raw thumb as url.
   const directResults = parseImhentaiSearchResults(searchBody, n)
-  if (directResults.length > 0) {
-    const directPosts = []
-    for (const { id, coverUrl } of directResults) {
-      const full = coverUrl.replace(/\/(?:thumb|t)\.([a-z0-9]+)(?:[?#]|$)/i, '/1.$1')
-      if (/\/(?:thumb|thumbs)(?:[?#/.]|$)/i.test(full)) continue
-      directPosts.push({ id: `imh-${id}`, url: full, preview: coverUrl, tags, rating: 'e', kind: 'image' })
-      if (directPosts.length >= n) break
-    }
-    if (directPosts.length > 0) return directPosts
+  const directPosts = []
+  const seenCoverIds = new Set()
+  for (const { id, coverUrl } of directResults) {
+    seenCoverIds.add(id)
+    const full = coverUrl.replace(/\/(?:thumb|t)\.([a-z0-9]+)(?:[?#]|$)/i, '/1.$1')
+    if (/\/(?:thumb|thumbs)(?:[?#/.]|$)/i.test(full)) continue
+    directPosts.push({ id: `imh-${id}`, url: full, preview: coverUrl, tags, rating: 'e', kind: 'image' })
+    if (directPosts.length >= n) break
   }
 
-  // Fallback to gallery inspection — enter each gallery and take EVERY
-  // page image (the ext map carries the whole book), not just the cover.
-  const ids = parseImhentaiSearch(searchBody, 3)
-  const posts = []
-  for (const id of ids) {
-    if (posts.length >= n) break
+  // Expand gallery books (whole book per page via the ext map) whenever
+  // covers leave the batch short — bounded lanes, round-robin merge.
+  const want = n - directPosts.length
+  const ids = want > 0 ? parseImhentaiSearch(searchBody, GALLERY_CAP).filter((id) => !seenCoverIds.has(id)) : []
+  if (ids.length === 0) return directPosts
+  const perGallery = Math.max(1, Math.ceil(want / ids.length))
+  const sets = await mapLimit(ids, GALLERY_LANES, async (id) => {
     try {
       const galleryBody = await imhGet(`${IMHENTAI_ROOT}/gallery/${encodeURIComponent(id)}/`)
-      const pages = parseImhentaiGalleryPages(galleryBody, n - posts.length)
+      const pages = parseImhentaiGalleryPages(galleryBody, perGallery)
       const thumb = pages.length > 0 ? pages[0].url : ''
+      const set = []
       pages.forEach((cover, i) => {
         // Dims gate only when known — map-less covers skip it. Floor 400px
         // (localhost parity), not the old 700px starver.
         if (cover.width > 0 && cover.height > 0) {
           if (cover.width < FLOOR_PX || cover.height < FLOOR_PX) return
         }
-        posts.push({ id: `imh-${id}-p${i + 1}`, url: cover.url, preview: thumb, tags, rating: 'e', kind: 'image' })
+        set.push({ id: `imh-${id}-p${i + 1}`, url: cover.url, preview: thumb, tags, rating: 'e', kind: 'image' })
       })
+      return set.length > 0 ? set : undefined
     } catch {
-      /* one dead gallery never kills the round */
+      return undefined /* one dead gallery never kills the round */
     }
-    if (posts.length >= 5) break
-  }
-  return posts
+  })
+  return [...directPosts, ...roundRobinPosts(sets, want)]
 }
 
 // --- babesource (real porn photo galleries: full-res stills, never thumbs) --
@@ -938,7 +985,7 @@ async function fetchBabesource(variant, n) {
   const seen = new Set()
   const galleries = []
   const collect = (html) => {
-    for (const u of parseBabesourceSearch(html, 3)) {
+    for (const u of parseBabesourceSearch(html, GALLERY_CAP)) {
       if (!seen.has(u)) {
         seen.add(u)
         galleries.push(u)
@@ -947,7 +994,7 @@ async function fetchBabesource(variant, n) {
   }
   collect(searchBody)
   const maxPage = Math.min(parseBabesourceMaxPage(searchBody), 5)
-  if (maxPage > 1 && galleries.length < 3) {
+  if (maxPage > 1 && galleries.length < GALLERY_CAP) {
     const page = 2 + Math.floor(Math.random() * (maxPage - 1))
     try {
       collect(await httpGet(`${BABESOURCE_ROOT}/search/${encodeURIComponent(slug)}/page${page}.html`))
@@ -955,25 +1002,25 @@ async function fetchBabesource(variant, n) {
       /* stale pagination link — page-1 results still stand */
     }
   }
-  const posts = []
-  for (const gUrl of galleries) {
-    if (posts.length >= n) break
+  if (galleries.length === 0) return []
+  // Every gallery contributes: bounded lanes expand in parallel, then images
+  // round-robin across galleries so one gallery can't fill the batch alone.
+  const perGallery = Math.max(1, Math.ceil(n / galleries.length))
+  const sets = await mapLimit(galleries, GALLERY_LANES, async (gUrl) => {
     try {
       const gHtml = await httpGet(gUrl)
       const tags = parseBabesourceTags(gHtml, variant)
-      if (hasBadTag(tags)) continue
+      if (hasBadTag(tags)) return undefined
       const idMatch = /-(\d+)\.html?(?:[?#]|$)/.exec(gUrl)
       const gid = idMatch ? idMatch[1] : 'x'
-      const images = parseBabesourceGallery(gHtml, n - posts.length)
-      images.forEach((img, i) => {
-        posts.push({ id: `bs-${gid}-${i}`, url: img.url, preview: img.preview, tags, rating: 'e', kind: 'image' })
-      })
+      const images = parseBabesourceGallery(gHtml, perGallery)
+      if (images.length === 0) return undefined
+      return images.map((img, i) => ({ id: `bs-${gid}-${i}`, url: img.url, preview: img.preview, tags, rating: 'e', kind: 'image' }))
     } catch {
-      /* one dead gallery never kills the round */
+      return undefined /* one dead gallery never kills the round */
     }
-    if (posts.length >= 5) break
-  }
-  return posts
+  })
+  return roundRobinPosts(sets, n)
 }
 
 // Round-robin over sources with simple health tracking (SPEC §6).
@@ -1206,7 +1253,9 @@ app.whenReady().then(async () => {
   })
   ipcMain.on('window:close', (e) => BrowserWindow.fromWebContents(e.sender)?.close())
   imageCache.init(app.getPath('userData'), UA)
+  vault.init(app.getPath('userData'))
   protocol.handle(imageCache.SCHEME, (request) => imageCache.serveImage(request))
+  protocol.handle(vault.SCHEME, (request) => vault.serveVault(request))
   customFolders.init(app.getPath('userData'), { ipcMain, BrowserWindow })
   ipcMain.handle('booru:fetch', (_event, payload) => fetchBooru(payload ?? {}))
   // Secure KV bridge (B.3): renderer proxies designated localStorage keys here.
@@ -1218,6 +1267,13 @@ app.whenReady().then(async () => {
   ipcMain.handle('cache:stats', () => imageCache.cacheStats())
   ipcMain.handle('cache:clear', () => imageCache.clearCache())
   ipcMain.handle('cache:evict', (_event, url) => ({ ok: imageCache.evict(String(url ?? '')) }))
+  ipcMain.handle('vault:get', (_event, url) => ({ local: vault.get(String(url ?? '')) }))
+  ipcMain.handle('vault:pin', (_event, url) => vault.pin(String(url ?? '')).then((local) => ({ local })))
+  ipcMain.handle('vault:unpin', (_event, url) => ({ ok: vault.unpin(String(url ?? '')) }))
+  ipcMain.handle('vault:remove', (_event, url) => ({ ok: vault.remove(String(url ?? '')) }))
+  ipcMain.handle('vault:stats', () => vault.stats())
+  ipcMain.handle('vault:clear', () => vault.clear())
+  ipcMain.handle('vault:prune', () => vault.prune())
   // Update check (Settings): installed version + open the download in the OS browser.
   ipcMain.handle('app:version', () => app.getVersion())
   ipcMain.handle('app:open-log', () => shell.openPath(app.getPath('userData')))

@@ -121,7 +121,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
   return createPortal(
     (
       <div
-        className={`fixed inset-0 ${zIndexClass} bg-black/70 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 md:p-6 animate-orbit-fade-in select-none`}
+        className={`fixed inset-0 ${zIndexClass} bg-black/70 backdrop-blur-sm flex items-center justify-center p-0 pb-[var(--island-clearance)] sm:p-4 md:p-6 md:pb-[calc(var(--island-clearance)+1.5rem)] animate-orbit-fade-in select-none`}
         onClick={onClose}
       >
         {/* Close button in top-right */}
@@ -135,7 +135,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
 
         {/* Main 2-Column Dialog */}
         <div
-          className="bg-retro-panel text-retro-fg w-full max-w-5xl h-full sm:h-auto sm:max-h-[90vh] rounded-none sm:rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col md:flex-row animate-orbit-slide-up"
+          className="bg-retro-panel text-retro-fg w-full max-w-5xl h-full sm:h-auto sm:max-h-[calc(90vh-var(--island-clearance))] mb-[var(--island-clearance)] sm:mb-0 rounded-none sm:rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col md:flex-row animate-orbit-slide-up"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Left Column: Media Viewer with Multi-Media Carousel & Zoom */}

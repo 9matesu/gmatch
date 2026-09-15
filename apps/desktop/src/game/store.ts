@@ -20,7 +20,8 @@ import {
   serialize,
 } from './save'
 import type { SaveData } from './save'
-import { fetchPosts, clearMirrorCooldowns } from '../services/booru'
+import { fetchPosts, fetchPostsMulti, clearMirrorCooldowns } from '../services/booru'
+import { vaultPin, vaultUnpin, vaultRemove } from '../services/vault'
 import { evictImage } from '../services/imageCache'
 import { isCustomMediaUrl, sampleCustomSources } from '../services/customSources'
 import type { ActiveCap, BooruPost, CapId, CustomSource, GalleryImage, GridCell, KoDrop, OwnedTag, ViewMode } from './types'
@@ -449,6 +450,9 @@ function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: 
   const pendingDrops = newDrop
     ? [newDrop, ...s.pendingDrops.filter((d) => d.id !== newDrop.id)].slice(0, 8)
     : s.pendingDrops
+  // Local vault (opt-in): pin the keep's bytes to disk in the background.
+  // Lookup-only reads never write, so this is the single write trigger.
+  if (img.url) void vaultPin(img.url)
   return {
     defeated,
     bonus,
@@ -945,27 +949,18 @@ export const useGame = create<GameState>((set, get) => ({
         })
         return
       }
-      // Stacked AND-queries truncate on the mirrors and repeat the same top
-      // posts — rotation keeps the feed fresh and online.
+      // Every selected tag is browsed every round: concurrent fetchPosts per
+      // tag, recency-weighted interleave (most-recent pick ~50%, rest
+      // rotating). No more one-tag-per-fetch rotation that starves tags.
       const pool = owned.slice(0, 4)
       setFeedIntent(pool)
       const priority = s.priorityTag && owned.includes(s.priorityTag) ? s.priorityTag : null
-      // A freshly added/picked tag steers the very next fetch (priority first),
-      // then hands back to rotation once its batch lands.
-      const first = priority ?? pool[s.feedCursor % pool.length]
+      // A freshly added/picked tag steers the round (priority weight), then
+      // decays back into the mix once its batch lands.
       // ponytail: in grid mode pull a larger batch (30) so queue stays ahead of the 3x3 grid
       const batchLimit = isGridMode(get().viewMode) ? 30 : 15
-      let res = await fetchPosts({ tags: first, limit: batchLimit, allowReal: s.allowReal, allowHentai: s.allowHentai })
+      const res = await fetchPostsMulti({ tags: pool, limit: batchLimit, priority, allowReal: s.allowReal, allowHentai: s.allowHentai })
       cursor = s.feedCursor + 1
-      if (!res.ok || res.posts.length === 0) {
-        // Flaky round — retry once with the NEXT tag, never the same one
-        // (single-tag pools have nothing new to try).
-        const second = pool[cursor % pool.length]
-        if (second !== first) {
-          res = await fetchPosts({ tags: second, limit: batchLimit, allowReal: s.allowReal, allowHentai: s.allowHentai })
-          cursor += 1
-        }
-      }
       // Seen-exhausted (not broken): gentle path — no backoff escalation,
       // distinct UI copy; auto-poll still recovers.
       if (!res.ok && (res as { emptyFresh?: boolean }).emptyFresh === true) {
@@ -1178,6 +1173,11 @@ export const useGame = create<GameState>((set, get) => ({
       gallery,
       backgroundUrl: s.backgroundUrl === img.url ? null : s.backgroundUrl,
     })
+    // Vault (opt-in): unpin + delete the bytes — gone means gone.
+    if (img.url) {
+      vaultUnpin(img.url)
+      vaultRemove(img.url)
+    }
     get().save()
     return true
   },

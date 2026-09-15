@@ -289,6 +289,13 @@ export function ServersView({
       }
     } catch { /* ignore */ }
     void refresh()
+    // Auto-refresh the dashboard/directory on the same 30s cadence as the
+    // chat player list so online counts track players joining/leaving.
+    const timer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      void refresh()
+    }, 30_000)
+    return () => clearInterval(timer)
   }, [refresh])
   useEffect(() => {
     window.gmatch?.serverState?.()
@@ -1023,10 +1030,6 @@ export function ServersView({
             {identity && (
               <section className="px-3.5 py-2.5 bg-surface-raised/90 border border-border-glass rounded-xl flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-2xs" aria-label="Server dashboard">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="relative flex items-center justify-center">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0" />
-                    <span className="absolute w-4 h-4 rounded-full bg-emerald-400/20 animate-ping" />
-                  </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <h2 className="truncate text-xs sm:text-sm font-bold text-retro-fg">{serverName || 'gmatch'}</h2>
@@ -1048,51 +1051,6 @@ export function ServersView({
                       {dash ? `${dash.members_total} members · ${dash.posts_24h} posts/24h` : (serverDescription || 'Connected')}
                     </p>
                   </div>
-                </div>
-
-                <div className="flex items-center gap-2 ml-auto">
-                  <div className="flex items-center gap-1 bg-surface-canvas p-0.5 rounded-lg border border-border-subtle">
-                    <button
-                      type="button"
-                      onClick={() => setUserTab('online')}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${
-                        userTab === 'online' ? 'bg-retro-accent text-retro-accent-text shadow-xs' : 'text-retro-muted hover:text-retro-fg'
-                      }`}
-                    >
-                      Online ({onlineUsers.length})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setUserTab('all24h')}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${
-                        userTab === 'all24h' ? 'bg-retro-accent text-retro-accent-text shadow-xs' : 'text-retro-muted hover:text-retro-fg'
-                      }`}
-                    >
-                      Last 24h ({allUsers.length})
-                    </button>
-                  </div>
-
-                  <div className="hidden md:flex items-center gap-1">
-                    {displayedUsers.slice(0, 4).map((u) => (
-                      <button
-                        key={u.id}
-                        type="button"
-                        onClick={() => handleUserClick(u)}
-                        className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-canvas hover:bg-surface-interactive border border-border-subtle text-[10px] text-retro-fg cursor-pointer transition-colors"
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full bg-retro-online" />
-                        <span className="truncate max-w-[80px]">{u.display_name || u.id}</span>
-                      </button>
-                    ))}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => { playPress(750); setActiveTab('hub'); }}
-                    className="px-2.5 py-1 rounded-lg text-xs font-semibold text-retro-muted hover:text-retro-fg hover:bg-glass-w8 transition-colors cursor-pointer"
-                  >
-                    Manage Hub &rarr;
-                  </button>
                 </div>
               </section>
             )}
@@ -1576,10 +1534,9 @@ export function ServersView({
 
                               <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-retro-muted font-mono pb-3 border-b border-border-subtle/50 mb-3">
                                 {(typeof s.online_count === 'number' || typeof s.user_count === 'number') ? (
-                                  <span className="inline-flex items-center gap-1 text-emerald-400">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                  <span>
                                     <span>{typeof s.online_count === 'number' ? `${s.online_count} online` : 'online n/a'}</span>
-                                    {typeof s.user_count === 'number' && (<span className="text-retro-muted">· {s.user_count} members</span>)}
+                                    {typeof s.user_count === 'number' && (<span> · {s.user_count} members</span>)}
                                   </span>
                                 ) : (
                                   <span className="text-retro-muted">no live counts</span>

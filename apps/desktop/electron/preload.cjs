@@ -11,6 +11,14 @@ contextBridge.exposeInMainWorld('gmatch', {
   cacheStats: () => ipcRenderer.invoke('cache:stats'),
   clearCache: () => ipcRenderer.invoke('cache:clear'),
   evictImage: (url) => ipcRenderer.invoke('cache:evict', url),
+  // Opt-in local media vault (gallery keeps + card bytes on disk).
+  vaultGet: (url) => ipcRenderer.invoke('vault:get', url),
+  vaultPin: (url) => ipcRenderer.invoke('vault:pin', url),
+  vaultUnpin: (url) => ipcRenderer.invoke('vault:unpin', url),
+  vaultRemove: (url) => ipcRenderer.invoke('vault:remove', url),
+  vaultStats: () => ipcRenderer.invoke('vault:stats'),
+  vaultClear: () => ipcRenderer.invoke('vault:clear'),
+  vaultPrune: () => ipcRenderer.invoke('vault:prune'),
   // Player-owned idle folders (dialog-picked, served over idle-file://).
   customPickFolder: () => ipcRenderer.invoke('custom:pick-folder'),
   customListFolder: (id) => ipcRenderer.invoke('custom:list-folder', id),

@@ -11,6 +11,7 @@ export interface AppSettings {
   feedCols: '1' | '2' | '3' | '4' | '5'
   hideDuplicates: boolean
   soundEffects: boolean
+  watchPartyEnabled: boolean
   autoRefresh: boolean
   advancedMode: boolean
   maximumGooner: boolean
@@ -57,6 +58,11 @@ export interface AppSettings {
   duelPacing: 'instant' | 'fast' | 'dramatic'
   accentColor: 'pink' | 'cyan' | 'gold' | 'emerald' | 'violet'
   theme: 'dark' | 'instagram-white'
+  /**
+   * Opt-in local media vault: gallery keeps + card bytes stored on disk
+   * (userData/media-vault, 3GB LRU). Off = memory-only, nothing hits disk.
+   */
+  localVault: boolean
 }
 
 const DEFAULTS: AppSettings = {
@@ -64,6 +70,7 @@ const DEFAULTS: AppSettings = {
   feedCols: '1',
   hideDuplicates: false,
   soundEffects: true,
+  watchPartyEnabled: false,
   autoRefresh: true,
   advancedMode: false,
   maximumGooner: false,
@@ -103,6 +110,7 @@ const DEFAULTS: AppSettings = {
   duelPacing: 'fast',
   accentColor: 'pink',
   theme: 'dark',
+  localVault: false,
 }
 
 function load(): AppSettings {

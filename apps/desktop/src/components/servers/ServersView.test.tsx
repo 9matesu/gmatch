@@ -51,7 +51,7 @@ afterEach(() => {
 })
 
 describe('ServersView', () => {
-  it('lists public servers with online dots and password lock marker', async () => {
+  it('lists public servers with plain counts and password lock marker', async () => {
     mockFetch(async (url) => {
       if (url.includes('/api/servers/dashboard')) return json({ name: 'central', users: [{ id: 'abcdef12', display_name: 'Alice', online: true }], posts_24h: 3, members_total: 9 })
       if (url.includes('/api/servers')) return json({ servers: [
@@ -69,7 +69,11 @@ describe('ServersView', () => {
     expect(screen.getByText('chill')).toBeInTheDocument()
     // password_required => visible lock marker
     expect(screen.getByLabelText('password required')).toBeInTheDocument()
-    // dashboard section present with the central node userlist
+    // browse view keeps no presence chrome: no Manage Hub, no Online pills.
+    expect(screen.queryByRole('button', { name: /manage hub/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /online \(/i })).toBeNull()
+    // dashboard userlist lives on the hub: open it to find Alice.
+    fireEvent.click(screen.getByRole('button', { name: /my server \/ hub/i }))
     expect(await screen.findByText('Alice')).toBeInTheDocument()
     // hero is ONE row: counts live under the name, not in a duplicate header
     expect(await screen.findByText('9 members · 3 posts/24h')).toBeInTheDocument()
@@ -295,6 +299,13 @@ describe('ServersView', () => {
     const onSelectUser = vi.fn()
     render(<ServersView identity={identity} toast={() => {}} onSelectUser={onSelectUser} />)
 
+    // Browse view keeps no presence chrome: no Manage Hub, no Online pills.
+    expect(await screen.findByText('Server browser (0)')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /manage hub/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /online \(/i })).toBeNull()
+
+    // Hub members section owns presence: switch to the hub tab first.
+    fireEvent.click(screen.getByRole('button', { name: /my server \/ hub/i }))
     // Online tab is default: BobOnline is visible, CarolRecent is hidden
     expect(await screen.findByText('BobOnline', {}, { timeout: 3000 })).toBeInTheDocument()
     expect(screen.queryByText('CarolRecent')).toBeNull()

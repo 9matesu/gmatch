@@ -320,6 +320,7 @@ async function serveImage(request) {
 module.exports = {
   SCHEME,
   init,
+  fetchBinary,
   cacheImage,
   cacheStats: stats,
   clearCache: clear,

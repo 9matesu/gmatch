@@ -28,6 +28,8 @@ import { mergeMyCards, filterToActiveDeck, type CanonicalCard } from "./utils/ca
 import { collectConfigBundle, applyConfigBundle, applyStashFromBundle, parseConfigBundle, configDownloadFilename, bundleToString } from "./utils/configBackup";
 import { runMigrations } from "./utils/migration";
 import { useGame as useIdleGame } from "./game/store";
+import { mapLimit } from "./services/booru";
+import { vaultPin } from "./services/vault";
 import { ROUTE_VIEWS, hashForView, viewFromHash, type RoutedView } from "./utils/routing";
 import { playChime, playPress, playMsgReceive } from "./utils/sounds";
 import { useLobby } from "./hooks/useLobby";
@@ -49,6 +51,9 @@ import { AttachmentUploadModal } from "./components/AttachmentUploadModal";
 import { ProfileView } from "./components/views/ProfileView";
 import { DmMinimizedView } from "./components/views/MessagesView";
 import { MessagesRail } from "./components/chat/MessagesRail";
+import { WatchPartyDock } from "./components/watchparty/WatchPartyDock";
+import { WatchPartyEdgeTab } from "./components/watchparty/WatchPartyEdgeTab";
+import { watchPartyStore, useWatchParty } from "./hooks/watchPartyStore";
 import { GameView } from "./components/views/GameView";
 import { AgeGateModal } from "./components/auth/AgeGateModal";
 import { LegalCenter, isLegalAccepted } from "./components/LegalCenter";
@@ -150,6 +155,7 @@ export default function Home() {
   }, []);
   const { peers, p2pItems, sendP2PItem, sendChatMessage, chatMessages, isWsConnected } = useP2P(identity);
   const { settings, update: updateSettings } = useSettings();
+  const watchParty = useWatchParty();
   const [users, setUsers] = useState<User[]>([]);
 
   // Panel opacity preference drives the glass chrome through a CSS variable.
@@ -508,13 +514,40 @@ export default function Home() {
   const wallpaperBgRef = useRef('')
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsOpenTarget>('preferences')
 
-  const handleSetWallpaper = (url: string) => {
+  const handleSetWallpaper = (url: string, mime?: string) => {
     if (!url) return;
     setWallpaperBg(url);
     updateSettings('wallpaperUrl', url);
     updateSettings('wallpaperPreset', 'custom');
-    updateSettings('wallpaperMime', /\.(mp4|webm|ogv|mov)(\?|$)/i.test(url.split('?')[0]) ? 'video/mp4' : 'image/jpeg');
+    updateSettings('wallpaperMime', mime || (/\.(mp4|webm|ogv|mov)(\?|$)/i.test(url.split('?')[0]) ? 'video/mp4' : 'image/jpeg'));
     toast('Desktop wallpaper background updated', 'success');
+  }
+
+  // OS-level wallpaper (Windows desktop, not just in-app). Resolves the URL
+  // to bytes through the same ladder as the in-app background, then hands
+  // them to the Electron wallpaper bridge. Images only; no-op in browser.
+  const handleSetOsWallpaper = async (url: string) => {
+    if (!url) return;
+    try {
+      let blob: Blob | null = null;
+      if (/^https?:/i.test(url) || url.startsWith('gmcache://')) {
+        blob = await mediaUrlToCachedFile(url).catch(() => null);
+      } else {
+        const r = url.startsWith('data:') || url.startsWith('blob:')
+          ? await fetch(url)
+          : await orbitFetch(url, {}, identity);
+        if (r.ok) blob = await r.blob();
+      }
+      if (!blob || !blob.type.startsWith('image/')) {
+        toast('OS wallpaper needs an image file', 'warning');
+        return;
+      }
+      const out = await window.gmatch?.wallpaperSetData?.(await blob.arrayBuffer(), blob.type);
+      if (out?.ok) toast('OS wallpaper updated', 'success');
+      else toast('OS wallpaper is only available in the desktop app', 'warning');
+    } catch {
+      toast('Could not set OS wallpaper', 'error');
+    }
   }
 
   // Resolve a wallpaper source (remote API object / remote URL / blob / data)
@@ -522,7 +555,7 @@ export default function Home() {
   const resolveWallpaperUrl = useCallback((url: string): Promise<string> => {
     if (!url) return Promise.resolve('')
     if (url.startsWith('data:') || url.startsWith('blob:')) return Promise.resolve(url)
-    if (/^https?:/i.test(url)) {
+    if (/^https?:/i.test(url) || url.startsWith('gmcache://')) {
       // Remote booru bytes: no ACAO there, so orbitFetch's signed headers
       // would preflight-block it. cacheMedia's ladder (gmcache bridge →
       // dev proxy → direct fetch) is the byte path for exactly this.
@@ -646,13 +679,18 @@ export default function Home() {
         return;
       }
 
-      // 3. Image or video element
+      // 3. Image or video element (content only — avatars/icons opt out
+      // via data-no-wallpaper and never offer background actions)
       const mediaEl = target?.closest('img, video, [data-media-url], [data-media-src]') as HTMLElement | null;
       if (mediaEl) {
         const videoEl = mediaEl.tagName === 'VIDEO' ? (mediaEl as HTMLVideoElement) : mediaEl.querySelector('video');
         const imgEl = mediaEl.tagName === 'IMG' ? (mediaEl as HTMLImageElement) : mediaEl.querySelector('img');
         const isVideo = Boolean(videoEl) || (mediaEl.tagName === 'VIDEO') || isMediaVideo((mediaEl as any).src || (mediaEl as any).currentSrc || mediaEl.getAttribute('data-media-url'));
         const src = (videoEl as any)?.currentSrc || (videoEl as any)?.src || (imgEl as any)?.currentSrc || (imgEl as any)?.src || (mediaEl as any).currentSrc || (mediaEl as any).src || mediaEl.getAttribute('data-media-url') || mediaEl.getAttribute('data-media-src');
+        // Prefer the original content URL (data-media-url) over the rendered
+        // src: signed objects render as transient blob: URLs that die on
+        // reload, so persisting them would store a dead wallpaper.
+        const originalUrl = mediaEl.getAttribute('data-media-url') || mediaEl.getAttribute('data-media-src') || src;
         if (src) {
           setContextMenu({
             x,
@@ -660,7 +698,9 @@ export default function Home() {
             type: 'media',
             data: {
               src,
+              originalUrl,
               isVideo,
+              noWallpaper: mediaEl.closest('[data-no-wallpaper]') ? true : undefined,
               videoEl: videoEl || undefined,
             },
           });
@@ -2131,13 +2171,17 @@ export default function Home() {
           mergedMap.set(u.id, u);
         }
         if (currentPeers && currentPeers.length > 0) {
+          // Presence authority is the server: P2P sightings must never revive
+          // or freeze a peer's online flag (stale swarm entries used to pin
+          // leavers online forever). Swarm-only peers (heartbeat not yet
+          // processed server-side) are admitted only while their sighting is
+          // fresh, so they decay instead of lingering as ghosts.
+          const now = Date.now();
           for (const p of currentPeers) {
-            const existing = mergedMap.get(p.id);
-            if (existing) {
-              existing.online = p.online;
-              existing.last_seen = p.last_seen || existing.last_seen;
-            } else {
-              mergedMap.set(p.id, p);
+            if (mergedMap.has(p.id)) continue;
+            const seen = p.last_seen ? new Date(p.last_seen).getTime() : 0;
+            if (seen > 0 && now - seen < 90_000) {
+              mergedMap.set(p.id, { ...p, online: true });
             }
           }
         }
@@ -2496,6 +2540,19 @@ export default function Home() {
     return () => window.removeEventListener('orbit-cards-refresh', onCardsRefresh);
   }, [loadCards, loadGallery]);
 
+  // Local vault backfill (opt-in): pin gallery keeps + card media to disk in
+  // the background whenever the vault is on. Session-idempotent — only new
+  // URLs hit the network; lookups never write.
+  const idleGallery = useIdleGame((s) => s.gallery);
+  useEffect(() => {
+    if (!settings.localVault) return;
+    const urls = new Set<string>();
+    for (const g of idleGallery) if (g.url) urls.add(g.url);
+    for (const c of myCards) if (c.content_url) urls.add(c.content_url);
+    if (urls.size === 0) return;
+    void mapLimit([...urls], 3, (u) => vaultPin(u).then(() => undefined));
+  }, [settings.localVault, idleGallery, myCards]);
+
 
   // Prune dead 404 content when notified
   useEffect(() => {
@@ -2781,6 +2838,10 @@ export default function Home() {
 
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
+        // Foreground burst: the heartbeat interval skips while hidden, so
+        // announce immediately instead of sitting ghost-offline. loadUsers
+        // follows to pick up who left/joined while away.
+        orbitFetch('/api/users/heartbeat', { method: 'POST' }, identity).catch(() => { })
         loadUsers()
         loadGallery()
         loadStories()
@@ -3230,9 +3291,16 @@ export default function Home() {
                       onClose={() => setNotifOpen(false)}
                     />
                   </div>
-                </MessagesRail>
+                  </MessagesRail>
 
-                <div ref={mainScrollRef} className="mobile-app-scroll flex-1 min-w-0 min-h-0 w-full flex flex-col relative z-10 overflow-y-auto styled-scrollbar pb-24">
+                  {settings.watchPartyEnabled && identity && (
+                    <WatchPartyEdgeTab
+                      side="left"
+                      onToggle={() => watchPartyStore.set({ open: !watchParty.open })}
+                    />
+                  )}
+
+                  <div ref={mainScrollRef} className="mobile-app-scroll flex-1 min-w-0 min-h-0 w-full flex flex-col relative z-10 overflow-y-auto styled-scrollbar pb-24">
 
                   {/* Modals & Config */}
                   {isIdle && settings.idleEnabled && (
@@ -3685,6 +3753,21 @@ export default function Home() {
                   {/* Decision Overlay deactivated — matching cards are shown directly inside the match tab */}
                 </div>
 
+                {/* Watch Party dock: same-layer flex sibling right of the feed */}
+                {settings.watchPartyEnabled && identity && watchParty.open && (
+                  <WatchPartyDock
+                    identity={identity}
+                    profilePics={profilePics}
+                    onClose={() => watchPartyStore.set({ open: false })}
+                  />
+                )}
+                {settings.watchPartyEnabled && identity && !watchParty.open && (
+                  <WatchPartyEdgeTab
+                    side="right"
+                    onToggle={() => watchPartyStore.set({ open: true })}
+                  />
+                )}
+
                 {/* Desktop messages dock: right side panel sibling */}
                 <MessagesRail open={chatOpen}>
                   <RoomsPreview
@@ -3912,6 +3995,10 @@ export default function Home() {
                 onRepostItem={(item) => void shareObjectAs(item, 'repost')}
                 onAddToStory={(item) => void shareObjectAs(item, 'story')}
                 onRepostImage={(url) => openCreatePostWithMedia({ url })}
+                onSetWallpaper={(url, target, mime) => {
+                  if (target === 'os') void handleSetOsWallpaper(url);
+                  else handleSetWallpaper(url, mime);
+                }}
               />
               <ReportModal
                 reportModal={reportModal}

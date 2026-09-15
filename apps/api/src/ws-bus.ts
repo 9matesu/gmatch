@@ -41,6 +41,9 @@ export function validateTicket(ticket: string): string | null {
   return entry.userId
 }
 
+// Watch Party relay: tiny JSON control frames (never media bytes).
+import { applyWatch, joinWatch, watchPong } from './watchparty'
+
 export function handleIncoming(conn: WsConn, data: string): void {
   let msg: any
   try {
@@ -79,6 +82,27 @@ export function handleIncoming(conn: WsConn, data: string): void {
     if (Array.isArray(msg.rooms)) {
       for (const r of msg.rooms) if (typeof r === 'string') conn.rooms.add(r)
     }
+    return
+  }
+
+  // Watch Party frames. join subscribes the socket to the party room; play
+  // control frames are re-stamped with the SERVER clock and relayed to the
+  // room so every peer advances from the same instant.
+  if (msg.type === 'watch.ping') {
+    conn.send(JSON.stringify(watchPong(msg.t0)))
+    return
+  }
+  if (msg.type === 'watch.join') {
+    const res = joinWatch(conn.userId || '', (msg.name || '').slice(0, 40), msg)
+    if (res) {
+      conn.rooms.add(res.room)
+      broadcastToRoom(res.room, res.payload)
+    }
+    return
+  }
+  if (msg.type === 'watch') {
+    const res = applyWatch(conn.userId || '', msg)
+    if (res) broadcastToRoom(res.room, res.payload)
     return
   }
 

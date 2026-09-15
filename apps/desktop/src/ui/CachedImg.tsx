@@ -13,13 +13,13 @@ interface CachedImgProps extends ImgHTMLAttributes<HTMLImageElement> {
  * in browser dev mode) and falls back to the remote URL otherwise.
  */
 export default function CachedImg({ src, fallbackSrc, onError, ...rest }: CachedImgProps) {
-  const isLocal = /^(gmcache|idle-file|blob|data):/i.test(src)
+  const isLocal = /^(gmcache|idle-file|vault|blob|data):/i.test(src)
   const [display, setDisplay] = useState<string>(src)
   const [resolved, setResolved] = useState<boolean>(isLocal)
 
   useEffect(() => {
     let live = true
-    if (/^(gmcache|idle-file|blob|data):/i.test(src)) {
+    if (/^(gmcache|idle-file|vault|blob|data):/i.test(src)) {
       setDisplay(src)
       setResolved(true)
       return

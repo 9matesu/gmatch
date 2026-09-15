@@ -183,12 +183,14 @@ export function __resetFeedState(): void {
   redgifsToken = null
   redgifsTokenExp = 0
   redgifsNicheCache.clear()
+  lastMultiKey = ''
 }
 
 // Insertion-ordered ledger of everything memoized, backing least-recent
 // reshow when the pool is truly exhausted (non-stop feed, last resort).
-// Entries carry no tags: recalled posts pass matchesQuery as untagged.
-const seenLedger: Array<{ id: string; url: string }> = []
+// Entries carry the retrieval query so recall prefers same-tag history;
+// pre-tag entries (persisted) recall as untagged.
+const seenLedger: Array<{ id: string; url: string; tag?: string }> = []
 // Consecutive all-seen rounds (reset by any fresh hit). Reshow kicks in
 // only after the pool proves exhausted twice in a row, not on first contact.
 let emptyStreak = 0
@@ -196,14 +198,14 @@ const RESHOW_AFTER_EMPTY = 2
 const RESHOW_BATCH = 10
 
 /** Filter out anything shown before (this session or past ones), memoize the rest. */
-function remember(posts: BooruPost[]): BooruPost[] {
+function remember(posts: BooruPost[], tag?: string): BooruPost[] {
   loadSeen()
   const fresh: BooruPost[] = []
   for (const p of posts) {
     if (seenIds.has(p.id) || seenUrls.has(p.url)) continue
     seenIds.add(p.id)
     seenUrls.add(p.url)
-    seenLedger.push({ id: p.id, url: p.url })
+    seenLedger.push({ id: p.id, url: p.url, tag })
     fresh.push(p)
   }
   // Cap the persistent sets (insertion-ordered, so oldest drops first).
@@ -221,20 +223,27 @@ function remember(posts: BooruPost[]): BooruPost[] {
 }
 
 /** Least-recently-seen posts for non-stop reshow (last resort only).
- *  Returned posts carry no tags and `repeat: true`; they bypass remember
- *  (already memoized) and match any query as untagged. Rotates through the
- *  ledger so consecutive reshow rounds don't loop the same batch. */
+ *  Same-tag history is served first so a fresh tag isn't answered with
+ *  another tag's leftovers; untagged (pre-tag) entries fill only when the
+ *  preferred tag's history runs out. Returned posts carry no tags and
+ *  `repeat: true`; they bypass remember (already memoized) and match any
+ *  query as untagged. Rotates through the ledger so consecutive reshow
+ *  rounds don't loop the same batch. */
 let reshowCursor = 0
-export function recallSeen(limit: number): BooruPost[] {
+export function recallSeen(limit: number, preferTag?: string): BooruPost[] {
   loadSeen()
+  if (seenLedger.length === 0) return []
   const n = Math.min(Math.max(1, limit), seenLedger.length)
-  if (n === 0) return []
+  // Rotation-ordered ledger so reshow walks least-recent first.
+  const ordered = seenLedger.map((_, i) => seenLedger[(reshowCursor + i) % seenLedger.length])
+  const same = preferTag ? ordered.filter((s) => s.tag === preferTag) : []
+  const rest = preferTag ? ordered.filter((s) => s.tag !== preferTag) : ordered
   const out: BooruPost[] = []
-  for (let i = 0; i < n; i++) {
-    const s = seenLedger[(reshowCursor + i) % seenLedger.length]
+  for (const s of [...same, ...rest]) {
+    if (out.length >= n) break
     out.push({ id: s.id, url: s.url, tags: [], rating: 'e', repeat: true as const })
   }
-  reshowCursor = (reshowCursor + n) % seenLedger.length
+  reshowCursor = (reshowCursor + out.length) % seenLedger.length
   return out
 }
 
@@ -242,9 +251,10 @@ export function recallSeen(limit: number): BooruPost[] {
 function rememberCounted(
   posts: BooruPost[],
   tally: { parsed: number; fresh: number },
+  tag?: string,
 ): BooruPost[] {
   tally.parsed += posts.length
-  const fresh = remember(posts)
+  const fresh = remember(posts, tag)
   tally.fresh += fresh.length
   return fresh
 }
@@ -329,6 +339,99 @@ export function queryVariants(query: string): string[] {
   if (parts.length > 2) variants.push(parts.slice(0, 2).join(' '))
   if (parts.length > 1) variants.push(parts[0])
   return [...new Set(variants)]
+}
+
+/**
+ * Bounded-concurrency map: at most `n` lanes in flight, one lane per item.
+ * Failures settle to undefined and are dropped — one dead gallery never
+ * kills the round. ponytail: stdlib only, no p-limit dep.
+ */
+export async function mapLimit<T, R>(
+  items: T[],
+  n: number,
+  fn: (item: T, i: number) => Promise<R | undefined>,
+): Promise<R[]> {
+  const out: Array<R | undefined> = new Array(items.length)
+  let next = 0
+  const lanes = Math.min(Math.max(1, n), Math.max(items.length, 1))
+  const lane = async (): Promise<void> => {
+    while (next < items.length) {
+      const i = next++
+      try {
+        out[i] = await fn(items[i], i)
+      } catch {
+        out[i] = undefined
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: lanes }, lane))
+  return out.filter((v): v is R => v !== undefined)
+}
+
+/**
+ * Round-robin merge across galleries/sets: one post per list per turn, up
+ * to `limit`. Every gallery contributes instead of the first filling the
+ * batch. Pure — unit-tested.
+ */
+export function roundRobin(lists: BooruPost[][], limit: number): BooruPost[] {
+  const out: BooruPost[] = []
+  const queues = lists.map((l) => [...l])
+  while (out.length < limit && queues.some((q) => q.length > 0)) {
+    for (const q of queues) {
+      if (out.length >= limit) break
+      const p = q.shift()
+      if (p) out.push(p)
+    }
+  }
+  return out
+}
+
+/**
+ * Recency-weighted interleave across tag batches: the priority (most
+ * recent) tag takes every other slot (~50%), the rest rotate through the
+ * remaining slots. No priority match → plain round-robin. Pure.
+ */
+export function interleaveBatches(
+  batches: Array<{ tag: string; posts: BooruPost[] }>,
+  priority?: string | null,
+): BooruPost[] {
+  const queues = new Map<string, BooruPost[]>()
+  for (const b of batches) {
+    if (b.posts.length === 0) continue
+    queues.set(b.tag, [...(queues.get(b.tag) ?? []), ...b.posts])
+  }
+  const fav = (priority && queues.get(priority)) || []
+  if (priority) queues.delete(priority)
+  const rest = [...queues.values()]
+  const out: BooruPost[] = []
+  let turn = 0
+  let ri = 0
+  while (fav.length > 0 || rest.some((q) => q.length > 0)) {
+    if (turn % 2 === 0 && fav.length > 0) {
+      const p = fav.shift()
+      if (p) out.push(p)
+    } else {
+      let took = false
+      for (let k = 0; k < rest.length; k++) {
+        const q = rest[(ri + k) % rest.length]
+        if (q.length > 0) {
+          const p = q.shift()
+          if (p) out.push(p)
+          ri = (ri + k + 1) % rest.length
+          took = true
+          break
+        }
+      }
+      if (!took) {
+        // Other tags dry: the favorite fills the rest (or we're done).
+        const p = fav.shift()
+        if (p) out.push(p)
+        else break
+      }
+    }
+    turn++
+  }
+  return out
 }
 
 function toPosts(
@@ -558,7 +661,7 @@ async function dapiPass(
         clean = sanitize(parsed, variant)
       }
       if (clean.length === 0) continue
-      const fresh = rememberCounted(clean, tally)
+      const fresh = rememberCounted(clean, tally, req.tags)
       if (fresh.length === 0) continue // all repeats — narrower pages may be new
       unhealthyUntil.delete(src.id)
       return { posts: fresh, source: src.id, ok: true }
@@ -585,7 +688,7 @@ async function dapiFallbacks(
   if (allowReal && isHealthy('redgifs-direct')) {
     const rg = await redgifsDirect(req.tags, req.limit)
     if (rg) {
-      const fresh = rememberCounted(sanitize(rg, req.tags), tally)
+      const fresh = rememberCounted(sanitize(rg, req.tags), tally, req.tags)
       if (fresh.length > 0) {
         unhealthyUntil.delete('redgifs-direct')
         return { posts: fresh, source: 'redgifs-direct', ok: true }
@@ -598,7 +701,7 @@ async function dapiFallbacks(
     try {
       const bs = await babesourceDirect(req.tags, req.limit)
       if (bs.length > 0) {
-        const fresh = rememberCounted(sanitize(bs, req.tags), tally)
+        const fresh = rememberCounted(sanitize(bs, req.tags), tally, req.tags)
         if (fresh.length > 0) {
           unhealthyUntil.delete('babesource-direct')
           return { posts: fresh, source: 'babesource-direct', ok: true }
@@ -615,7 +718,7 @@ async function dapiFallbacks(
       const scraped = await imhentaiDirect(req.tags, req.limit)
       // Empty gallery results are NOT a sick mirror (Cloudflare may simply
       // have challenged this round) — only hard failures cool it down.
-      const fresh = rememberCounted(sanitize(scraped, req.tags), tally)
+        const fresh = rememberCounted(sanitize(scraped, req.tags), tally, req.tags)
       if (fresh.length > 0) {
         unhealthyUntil.delete('imh-direct')
         return { posts: fresh, source: 'imh-direct', ok: true }
@@ -634,7 +737,7 @@ async function dapiFallbacks(
         markUnhealthy('paheal-direct')
       } else {
         const clean = sanitize(parsePaheal(await res.text()), single)
-        const fresh = rememberCounted(clean, tally)
+        const fresh = rememberCounted(clean, tally, single)
         if (fresh.length > 0) {
           unhealthyUntil.delete('paheal-direct')
           return { posts: fresh, source: 'paheal-direct', ok: true }
@@ -790,6 +893,9 @@ function withRedgifsQueryTags(posts: BooruPost[], query: string): BooruPost[] {
  *  Page-1 first; higher pages only when pagination advertises them (single-
  *  page queries 404 on page2+, which is normal, not a sick mirror). Throws
  *  only on hard failures (5xx/network) so the caller cools down correctly. */
+/** Galleries expanded per gallery-source round; lanes expanded in parallel. */
+const GALLERY_CAP = 6
+const GALLERY_LANES = 3
 export async function babesourceDirect(query: string, limit: number): Promise<BooruPost[]> {
   const slug = babesourceSlug(query)
   if (!slug) return []
@@ -816,7 +922,7 @@ export async function babesourceDirect(query: string, limit: number): Promise<Bo
   const seen = new Set<string>()
   const galleryUrls: string[] = []
   const collect = (html: string): void => {
-    for (const u of parseBabesourceSearch(html, 3)) {
+    for (const u of parseBabesourceSearch(html, GALLERY_CAP)) {
       if (!seen.has(u)) {
         seen.add(u)
         galleryUrls.push(u)
@@ -824,36 +930,38 @@ export async function babesourceDirect(query: string, limit: number): Promise<Bo
     }
   }
   collect(firstHtml)
-  // Variety: one extra random page when pagination proves it exists.
+  // Variety: extra random pages until the gallery set is full or pages run out.
   const maxPage = Math.min(parseBabesourceMaxPage(firstHtml), 5)
-  if (maxPage > 1 && galleryUrls.length < 3) {
+  if (maxPage > 1 && galleryUrls.length < GALLERY_CAP) {
     const page = 2 + Math.floor(Math.random() * (maxPage - 1))
     const extraHtml = await fetchSearchPage(page)
     if (extraHtml !== null) collect(extraHtml)
   }
-  const posts: BooruPost[] = []
-  for (const gUrl of galleryUrls) {
-    if (posts.length >= limit) break
-    await new Promise((r) => setTimeout(r, 250))
+  if (galleryUrls.length === 0) return []
+  // Every gallery contributes: bounded lanes expand in parallel, then images
+  // round-robin across galleries so one gallery can't fill the batch alone.
+  const perGallery = Math.max(1, Math.ceil(limit / galleryUrls.length))
+  const sets = await mapLimit(galleryUrls, GALLERY_LANES, async (gUrl) => {
     try {
       const gRes = await fetch(toProxy(gUrl, BABESOURCE_ROOT, '/booru/babe'), {
         signal: AbortSignal.timeout(TIMEOUT_MS),
       })
-      if (!gRes.ok || typeof gRes.text !== 'function') continue
+      if (!gRes.ok || typeof gRes.text !== 'function') return undefined
       const gHtml = await gRes.text()
-      const images = parseBabesourceGallery(gHtml, limit - posts.length)
-      if (images.length === 0) continue
-      posts.push(...toBabesourcePosts(gUrl, images, query, parseBabesourceTags(gHtml)))
+      const images = parseBabesourceGallery(gHtml, perGallery)
+      if (images.length === 0) return undefined
+      return toBabesourcePosts(gUrl, images, query, parseBabesourceTags(gHtml))
     } catch {
-      /* one dead gallery never kills the round */
+      return undefined /* one dead gallery never kills the round */
     }
-  }
-  return posts
+  })
+  return roundRobin(sets, limit)
 }
 
 /**
- * imhentai via the Vite dev proxy: search page → gallery IDs → up to 3
- * covers (gallery-dl shape). Never throws.
+ * imhentai via the Vite dev proxy: search page → gallery IDs → covers plus
+ * full-book expansion so one round returns several image sets, not one
+ * cover. Never throws.
  */
 async function imhentaiDirect(query: string, limit: number): Promise<BooruPost[]> {
   try {
@@ -863,45 +971,42 @@ async function imhentaiDirect(query: string, limit: number): Promise<BooruPost[]
     if (!searchRes.ok || typeof searchRes.text !== 'function') return []
     const html = await searchRes.text()
 
-    // 1. First extract gallery covers directly from the search HTML in one pass.
-    // The search page contains thumbnails; using them directly avoids secondary
-    // /gallery/<id>/ requests that trigger Cloudflare 403 WAF challenges.
-    // toImhentaiPost rewrites thumb.jpg -> 1.jpg; drop any post where the
-    // rewrite failed (url still points at a thumb) — never serve thumbs.
+    // 1. Gallery covers directly from the search HTML in one pass (avoids
+    // secondary requests that trigger Cloudflare 403s). toImhentaiPost
+    // rewrites thumb.jpg -> 1.jpg; drop posts where the rewrite failed.
     const directResults = parseImhentaiSearchResults(html, Math.max(limit, 3))
-    if (directResults.length > 0) {
-      const converted = directResults
-        .slice(0, limit)
-        .map((r) => toImhentaiPost(r.id, { url: r.coverUrl, width: 0, height: 0 }, query))
-        .filter((p) => !/\/(?:thumb|thumbs)(?:[?#/.]|$)/i.test(p.url))
-      if (converted.length > 0) return converted
-    }
+    const converted = directResults
+      .slice(0, limit)
+      .map((r) => toImhentaiPost(r.id, { url: r.coverUrl, width: 0, height: 0 }, query))
+      .filter((p) => !/\/(?:thumb|thumbs)(?:[?#/.]|$)/i.test(p.url))
+    const seenCoverIds = new Set(directResults.map((r) => r.id))
 
-    // 2. Fallback to individual gallery fetches only when direct thumbnails were absent.
-    // Each gallery page carries the whole book (ext map) — enter it and take
-    // every page image, not just the cover.
-    const ids = parseImhentaiSearch(html, 3)
-    const posts: BooruPost[] = []
-    for (const id of ids) {
-      if (posts.length >= limit) break
-      // Cloudflare trips on back-to-back gallery bursts — small gap per fetch.
-      // ponytail: fixed 250ms sleep, backoff only if 403s persist.
-      await new Promise((r) => setTimeout(r, 250))
+    // 2. Expand gallery books (whole book per page via the ext map) whenever
+    // covers alone leave the batch short — bounded lanes, round-robin merge
+    // so several galleries contribute instead of one.
+    const want = limit - converted.length
+    const ids = want > 0 ? parseImhentaiSearch(html, GALLERY_CAP).filter((id) => !seenCoverIds.has(id)) : []
+    if (ids.length === 0) return converted
+    const perGallery = Math.max(1, Math.ceil(want / ids.length))
+    const sets = await mapLimit(ids, GALLERY_LANES, async (id) => {
       try {
         const gRes = await fetch(toProxy(imhentaiGalleryUrl(id), IMHENTAI_ROOT, '/booru/imh'), {
           signal: AbortSignal.timeout(TIMEOUT_MS),
         })
+        // Cloudflare trips on gallery bursts — back the source off entirely.
         if (gRes.status === 403) {
           markUnhealthy('imh-direct')
-          break
+          return undefined
         }
-        if (!gRes.ok || typeof gRes.text !== 'function') continue
-        posts.push(...toImhentaiPagePosts(id, parseImhentaiGalleryPages(await gRes.text(), limit - posts.length), query, limit - posts.length))
+        if (!gRes.ok || typeof gRes.text !== 'function') return undefined
+        const pages = toImhentaiPagePosts(id, parseImhentaiGalleryPages(await gRes.text(), perGallery), query, perGallery)
+        return pages.length > 0 ? pages : undefined
       } catch {
-        /* one dead gallery never kills the round */
+        return undefined /* one dead gallery never kills the round */
       }
-    }
-    return posts
+    })
+    // A 403 mid-round cools the source; still serve whatever lanes finished.
+    return [...converted, ...roundRobin(sets, want)]
   } catch {
     return []
   }
@@ -943,12 +1048,12 @@ export async function fetchPosts(req: BooruRequest): Promise<BooruResponse> {
       const res = await window.gmatch.booruFetch(req)
       if (res.ok) {
         const fetched = res.posts || []
-        const fresh = remember(sanitize(fetched, req.tags))
+        const fresh = remember(sanitize(fetched, req.tags), req.tags)
         if (fresh.length > 0) {
           emptyStreak = 0
           return { ...res, posts: fresh }
         }
-        return emptyRound(fetched.length, req.limit, res)
+        return emptyRound(fetched.length, req.limit, res, req.tags)
       }
       return { ...offline }
     }
@@ -957,7 +1062,7 @@ export async function fetchPosts(req: BooruRequest): Promise<BooruResponse> {
       emptyStreak = 0
       return res
     }
-    if (res.emptyFresh) return emptyRound(1, req.limit, res)
+    if (res.emptyFresh) return emptyRound(1, req.limit, res, req.tags)
     return { ...offline }
   } catch {
     return { ...offline }
@@ -972,14 +1077,81 @@ export async function fetchPosts(req: BooruRequest): Promise<BooruResponse> {
  * can reshow (enforced by the caller paths, which never feed discards
  * into remember()).
  */
-function emptyRound(parsed: number, limit: number, res: BooruResponse): BooruResponse {
+function emptyRound(parsed: number, limit: number, res: BooruResponse, preferTag?: string): BooruResponse {
   if (parsed <= 0) return { posts: [], source: null, ok: false, offline: true }
   emptyStreak += 1
   if (emptyStreak >= RESHOW_AFTER_EMPTY) {
-    const recalled = recallSeen(Math.min(Math.max(limit, 1), RESHOW_BATCH))
+    const recalled = recallSeen(Math.min(Math.max(limit, 1), RESHOW_BATCH), preferTag)
     if (recalled.length > 0) {
       return { posts: recalled, source: 'reshow', ok: true }
     }
   }
   return { posts: [], source: res.source ?? null, ok: false, emptyFresh: true }
+}
+
+export interface BooruMultiRequest {
+  tags: string[]
+  limit: number
+  priority?: string | null
+  allowReal?: boolean
+  allowHentai?: boolean
+  page?: number
+  probe?: boolean
+}
+
+// New tag set = new round: yesterday's exhaustion must not answer today's
+// query with another tag's leftovers.
+let lastMultiKey = ''
+
+/**
+ * One ROUND across every selected tag: concurrent fetchPosts per tag, then a
+ * recency-weighted interleave (priority ~50%, rest rotating) so a tag switch
+ * lands new-tag posts immediately while keeping the mix. Exhaustion
+ * accounting runs ONCE for the combined round — per-call streak churn is
+ * rolled back first. Never throws (offline verdict on total failure).
+ */
+export async function fetchPostsMulti(req: BooruMultiRequest): Promise<BooruResponse> {
+  const tags = [...new Set(req.tags.map((t) => t.trim()).filter(Boolean))]
+  if (tags.length === 0) return { posts: [], source: null, ok: false, offline: true }
+  const key = [...tags].sort().join(' ')
+  if (key !== lastMultiKey) {
+    lastMultiKey = key
+    emptyStreak = 0
+  }
+  const streakBefore = emptyStreak
+  const settled = await Promise.all(
+    tags.map((t) =>
+      fetchPosts({
+        tags: t,
+        limit: Math.max(1, Math.ceil(req.limit / tags.length)),
+        allowReal: req.allowReal,
+        allowHentai: req.allowHentai,
+        page: req.page,
+        probe: req.probe,
+      }),
+    ),
+  )
+  // One verdict per round: roll back per-call streak churn first.
+  emptyStreak = streakBefore
+  const batches: Array<{ tag: string; posts: BooruPost[] }> = []
+  const sources: string[] = []
+  let answered = false
+  for (let i = 0; i < settled.length; i++) {
+    const r = settled[i]
+    if (r.source && !sources.includes(r.source)) sources.push(r.source)
+    if (r.ok || r.emptyFresh) answered = true
+    // Reshow posts are last-resort singles; drop them when any tag hit live.
+    const live = r.posts.filter((p) => !p.repeat)
+    if (r.ok && live.length > 0) batches.push({ tag: tags[i], posts: live })
+  }
+  if (batches.length > 0) {
+    emptyStreak = 0
+    return {
+      posts: interleaveBatches(batches, req.priority).slice(0, Math.max(req.limit, 1)),
+      source: sources.join('+') || null,
+      ok: true,
+    }
+  }
+  if (answered) return emptyRound(1, req.limit, { posts: [], source: sources.join('+') || null, ok: false }, req.priority ?? undefined)
+  return { posts: [], source: null, ok: false, offline: true }
 }

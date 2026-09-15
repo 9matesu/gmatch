@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../services/booru', () => ({
   fetchPosts: vi.fn(async () => ({ posts: [], source: null, ok: false, offline: true })),
+  fetchPostsMulti: vi.fn(async () => ({ posts: [], source: null, ok: false, offline: true })),
   clearMirrorCooldowns: vi.fn(),
 }))
 
@@ -19,7 +20,7 @@ vi.stubGlobal('localStorage', {
 import { defaultSave, serialize, SAVE_KEY } from './save'
 import { setupTag } from './tags'
 import { getUserExcludes } from './tagFilter'
-import { fetchPosts } from '../services/booru'
+import { fetchPosts, fetchPostsMulti } from '../services/booru'
 import type { BooruResponse } from '../services/booru'
 import { useGame, HISTORY_CAP, GRID_SIZE, gridSizeForMode, shufflePosts, __resetFeedRetryForTests, lastFeedRetryMs } from './store'
 
@@ -102,14 +103,14 @@ describe('refreshTagMarket', () => {
   })
 })
 
-describe('fetchFeed tag rotation', () => {
-  const mocked = vi.mocked(fetchPosts)
+describe('fetchFeed tag fan-out', () => {
+  const mocked = vi.mocked(fetchPostsMulti)
   const offline: BooruResponse = { posts: [], source: null, ok: false, offline: true }
 
-  it('fetches ONE tag at a time, rotating the pool instead of stacking', async () => {
+  it('browses every selected tag in one round (no one-tag rotation)', async () => {
     mocked.mockClear()
     const post = (id: string) => ({ id, url: `https://x/${id}.jpg`, tags: ['gangbang'] })
-    mocked.mockResolvedValue({ posts: [post('r1')], source: 't', ok: true })
+    mocked.mockResolvedValue({ posts: [post('r1'), post('r2')], source: 't', ok: true })
     useGame.setState({
       tags: [
         { name: 'aaa', level: 2, base: 10, income: 1, weight: 1 },
@@ -118,16 +119,28 @@ describe('fetchFeed tag rotation', () => {
       feedCursor: 0,
     })
     await useGame.getState().fetchFeed()
-    const first = mocked.mock.calls[0][0].tags
+    expect(mocked.mock.calls).toHaveLength(1)
+    expect(mocked.mock.calls[0][0].tags).toEqual(['aaa', 'bbb'])
+    // fetchFeed shuffles the batch — assert the set, not the order.
+    const ids = [useGame.getState().current?.id, ...useGame.getState().queue.map((p) => p.id)].sort()
+    expect(ids).toEqual(['r1', 'r2'])
+  })
+
+  it('steers the round with priorityTag, then clears it', async () => {
     mocked.mockClear()
-    mocked.mockResolvedValue({ posts: [post('r2')], source: 't', ok: true })
+    mocked.mockResolvedValue({ posts: [], source: null, ok: false, offline: true })
+    useGame.setState({
+      tags: [
+        { name: 'aaa', level: 2, base: 10, income: 1, weight: 1 },
+        { name: 'bbb', level: 1, base: 10, income: 1, weight: 1 },
+      ],
+      priorityTag: 'bbb',
+      feedCursor: 0,
+      current: null,
+      queue: [],
+    })
     await useGame.getState().fetchFeed()
-    const second = mocked.mock.calls[0][0].tags
-    mocked.mockResolvedValue(offline)
-    expect(first).toBe('aaa')
-    expect(second).toBe('bbb')
-    expect(first.split(/\s+/)).toHaveLength(1)
-    expect(useGame.getState().current?.id).toBe('r2')
+    expect(mocked.mock.calls[0][0].priority).toBe('bbb')
   })
 
   it('does not advance the cursor on total failure', async () => {
@@ -559,10 +572,11 @@ describe('addCustomTag', () => {
     await useGame.getState().addCustomTag('Gooner')
     expect(useGame.getState().priorityTag).toBe('gooner')
     // fetchFeed honors priorityTag first even with other owned tags in the pool
-    mocked.mockClear()
-    mocked.mockResolvedValue({ posts: [post], source: 'redgifs', ok: true })
+    const multi = vi.mocked(fetchPostsMulti)
+    multi.mockClear()
+    multi.mockResolvedValue({ posts: [post], source: 'redgifs', ok: true })
     await useGame.getState().fetchFeed()
-    expect(mocked).toHaveBeenCalledWith(expect.objectContaining({ tags: 'gooner' }))
+    expect(multi).toHaveBeenCalledWith(expect.objectContaining({ priority: 'gooner' }))
     expect(useGame.getState().priorityTag).toBeNull()
   })
 })
@@ -585,7 +599,7 @@ describe('shufflePosts (never sequential)', () => {
 })
 
 describe('3x3 grid mode', () => {
-  const mocked = vi.mocked(fetchPosts)
+  const mocked = vi.mocked(fetchPostsMulti)
   const offline: BooruResponse = { posts: [], source: null, ok: false, offline: true }
   const post = (id: string) => ({ id, url: `https://x/${id}.jpg`, tags: ['gangbang'] })
   const dozen = () => Array.from({ length: 12 }, (_, i) => post(`pts${i}`))
@@ -783,8 +797,8 @@ describe('setup + user excludes (no hardcoded tags)', () => {
 
 describe('silent feed retry (never offline)', () => {
   it('schedules backoff on failure without stacking timers', async () => {
-    const { fetchPosts } = await import('../services/booru')
-    const mocked = vi.mocked(fetchPosts)
+    const { fetchPostsMulti } = await import('../services/booru')
+    const mocked = vi.mocked(fetchPostsMulti)
     mocked.mockReset()
     mocked.mockResolvedValue({ posts: [], source: null, ok: false, offline: true })
     useGame.setState({
@@ -806,8 +820,8 @@ describe('silent feed retry (never offline)', () => {
   })
 
   it('never recycles past images into queue or grid on offline failure', async () => {
-    const { fetchPosts } = await import('../services/booru')
-    const mocked = vi.mocked(fetchPosts)
+    const { fetchPostsMulti } = await import('../services/booru')
+    const mocked = vi.mocked(fetchPostsMulti)
     mocked.mockReset()
     mocked.mockResolvedValue({ posts: [], source: null, ok: false, offline: true })
     const pastPost = { id: 'old-1', url: 'https://x/old-1.jpg', tags: ['aaa'] }
@@ -865,9 +879,9 @@ describe('toggleFeedCategory (REAL / HENTAI)', () => {
     expect(useGame.getState().allowHentai).toBe(true)
   })
 
-  it('passes allowReal and allowHentai to fetchPosts', async () => {
-    vi.mocked(fetchPosts).mockClear()
-    vi.mocked(fetchPosts).mockResolvedValue({ posts: [{ id: 'p1', url: 'https://x/p1.jpg', tags: ['aaa'] }], source: 't', ok: true })
+  it('passes allowReal and allowHentai to fetchPostsMulti', async () => {
+    vi.mocked(fetchPostsMulti).mockClear()
+    vi.mocked(fetchPostsMulti).mockResolvedValue({ posts: [{ id: 'p1', url: 'https://x/p1.jpg', tags: ['aaa'] }], source: 't', ok: true })
     useGame.setState({
       tags: [setupTag('aaa')],
       allowReal: false,
@@ -876,8 +890,8 @@ describe('toggleFeedCategory (REAL / HENTAI)', () => {
       queue: [],
     })
     await useGame.getState().fetchFeed()
-    expect(fetchPosts).toHaveBeenCalled()
-    const callArg = vi.mocked(fetchPosts).mock.calls[0][0]
+    expect(fetchPostsMulti).toHaveBeenCalled()
+    const callArg = vi.mocked(fetchPostsMulti).mock.calls[0][0]
     expect(callArg.allowReal).toBe(false)
     expect(callArg.allowHentai).toBe(true)
   })

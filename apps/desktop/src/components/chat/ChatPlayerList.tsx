@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Search, Users, X } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { User } from '@orbit/shared';
@@ -43,6 +43,14 @@ export function ChatPlayerList({
 }: ChatPlayerListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [dashboardUsers, setDashboardUsers] = useState<ChatPlayerItem[]>([]);
+  // Snapshot stamps: an `online:true` flag is only trustworthy while the
+  // snapshot that carried it is fresh. A stale flag with an old timestamp
+  // is a ghost — presence must decay, never stick.
+  const usersAtRef = useRef(0);
+  const dashboardAtRef = useRef(0);
+  useEffect(() => {
+    usersAtRef.current = Date.now();
+  }, [users]);
 
   const fetchDashboardUsers = useCallback(async () => {
     try {
@@ -50,6 +58,7 @@ export function ChatPlayerList({
       if (res.ok) {
         const data = (await res.json()) as { users?: ChatPlayerItem[] };
         if (Array.isArray(data?.users)) {
+          dashboardAtRef.current = Date.now();
           setDashboardUsers(data.users);
         }
       }
@@ -70,6 +79,24 @@ export function ChatPlayerList({
     const map = new Map<string, ChatPlayerItem>();
     const now = Date.now();
     const oneDayMs = 24 * 60 * 60 * 1000;
+    // Presence freshness: heartbeats land every <=30s and the server expires
+    // at 60s. A timestamp inside this window means online regardless of
+    // flags; a flag only counts while its own snapshot is fresh.
+    // Poll cadence: dashboard 30s, users prop 60-120s.
+    const SEEN_FRESH_MS = 90_000;
+    const USERS_FLAG_BUDGET_MS = 150_000;
+    const DASHBOARD_FLAG_BUDGET_MS = 75_000;
+    const seenMs = (v?: string | null) => {
+      if (!v) return 0;
+      const t = new Date(v).getTime();
+      return Number.isFinite(t) ? t : 0;
+    };
+    const usersAge = now - usersAtRef.current;
+    const dashboardAge = now - dashboardAtRef.current;
+    const usersFlagFresh = usersAge >= 0 && usersAge < USERS_FLAG_BUDGET_MS;
+    const dashboardFlagFresh = dashboardAge >= 0 && dashboardAge < DASHBOARD_FLAG_BUDGET_MS;
+    const isOnline = (lastSeen: number, flag: unknown, flagFresh: boolean) =>
+      (lastSeen > 0 && now - lastSeen < SEEN_FRESH_MS) || (flagFresh && Boolean(flag));
 
     // 1. Seed from dashboard 24h query
     for (const du of dashboardUsers) {
@@ -79,30 +106,32 @@ export function ChatPlayerList({
         display_name: du.display_name,
         pfp_url: du.pfp_url || profilePics[du.id],
         last_seen: du.last_seen,
-        online: Boolean(du.online),
+        online: isOnline(seenMs(du.last_seen), du.online, dashboardFlagFresh),
       });
     }
 
     // 2. Merge with props users (which may have fresher peer updates or profile pictures)
     for (const u of users) {
       if (!u.id) continue;
-      const lastSeenMs = u.last_seen ? new Date(u.last_seen).getTime() : 0;
-      const isOnline = Boolean(u.online) || (lastSeenMs > 0 && (now - lastSeenMs) < 60_000);
-      const isWithin24h = isOnline || (lastSeenMs > 0 && (now - lastSeenMs) <= oneDayMs);
+      const lastSeenMs = seenMs(u.last_seen);
+      const online = isOnline(lastSeenMs, u.online, usersFlagFresh);
+      const isWithin24h = online || (lastSeenMs > 0 && (now - lastSeenMs) <= oneDayMs);
 
       const existing = map.get(u.id);
       if (existing) {
         existing.display_name = u.display_name || existing.display_name;
         existing.pfp_url = u.pfp_url || profilePics[u.id] || existing.pfp_url;
-        existing.last_seen = u.last_seen || existing.last_seen;
-        existing.online = isOnline || existing.online;
+        // Keep the NEWEST sighting; a stale snapshot must not revive presence.
+        const existingSeenMs = seenMs(existing.last_seen);
+        if (lastSeenMs >= existingSeenMs) existing.last_seen = u.last_seen || existing.last_seen;
+        existing.online = isOnline(Math.max(lastSeenMs, existingSeenMs), online || existing.online, usersFlagFresh || dashboardFlagFresh);
       } else if (isWithin24h || (identity && u.id === identity.orbitId)) {
         map.set(u.id, {
           id: u.id,
           display_name: u.display_name,
           pfp_url: u.pfp_url || profilePics[u.id],
           last_seen: u.last_seen,
-          online: isOnline,
+          online,
         });
       }
     }
