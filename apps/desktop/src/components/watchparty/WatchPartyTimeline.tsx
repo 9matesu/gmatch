@@ -10,7 +10,11 @@ import { controlPlayback, serverNow, type PartyRuntime } from '../../hooks/watch
 import { computeTargetPosition } from '../../utils/watchSync'
 import { BTN } from '../../ui/styles'
 
-export function WatchPartyTimeline({ party }: { party: PartyRuntime | null }) {
+export function WatchPartyTimeline({ party, canLoad = false, onLoadVideo }: {
+  party: PartyRuntime | null
+  canLoad?: boolean
+  onLoadVideo?: () => void
+}) {
   const [, forceTick] = useState(0)
   const [duration, setDuration] = useState(0)
   const [scrubbing, setScrubbing] = useState(false)
@@ -72,6 +76,15 @@ export function WatchPartyTimeline({ party }: { party: PartyRuntime | null }) {
       <span className="text-[10px] font-mono tabular-nums text-retro-muted w-10">
         {duration > 0 ? formatVideoTime(duration) : '--:--'}
       </span>
+      {canLoad && onLoadVideo && (
+        <button
+          type="button"
+          onClick={onLoadVideo}
+          className={`${BTN} px-2 py-1 text-[10px] uppercase tracking-wider shrink-0`}
+        >
+          Video URL
+        </button>
+      )}
     </div>
   )
 }
