@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { Modal } from '../Modal'
 import { BTN, BTN_PRIMARY } from '../../ui/styles'
 import { orbitFetch } from '../../utils/api'
-import { createParty, joinParty } from '../../hooks/watchPartyStore'
+import { createParty, joinPartyById } from '../../hooks/watchPartyStore'
 
 interface IdentityLike {
   orbitId: string
@@ -92,15 +92,7 @@ export function WatchPartyUrlModal({
                   <button
                     type="button"
                     onClick={() => {
-                      void orbitFetch(`/api/watchparty/${p.id}`, {}, identity)
-                        .then((r) => (r.ok ? r.json() : null))
-                        .then((snap: any) => {
-                          if (snap) {
-                            joinParty(identity, { id: snap.id, name: snap.name, url: snap.url })
-                            onClose()
-                          }
-                        })
-                        .catch(() => {})
+                      void joinPartyById(identity, p.id).then((ok) => ok && onClose())
                     }}
                     className={`${BTN} w-full px-3 py-2 text-xs text-left flex items-center justify-between`}
                   >
