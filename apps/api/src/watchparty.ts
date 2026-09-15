@@ -428,6 +428,25 @@ export function serializeParties(): string {
   })))
 }
 
+/** Register an extra media grant (queue restore) without touching current. */
+export function addPartyMedia(party: Party, mediaUrl: string): void {
+  if (mediaUrl) partyMedia.set(mediaUrl, party.id)
+}
+
+/** Object ids of every media a LIVE room serves right now (current frame +
+ * queue). serve.ts re-extends their expires_at each flush: a room pinned
+ * alive by member pings must never serve a purged object ("No preview"). */
+export function liveMediaObjectIds(): string[] {
+  const out = new Set<string>()
+  for (const p of parties.values()) {
+    for (const u of [p.mediaUrl, ...p.queue.map((q) => q.url)]) {
+      const m = /^\/api\/objects\/([0-9a-fA-F-]{36})$/.exec(u)
+      if (m) out.add(m[1])
+    }
+  }
+  return [...out]
+}
+
 export function restoreParties(json: string): number {
   let rows: unknown
   try { rows = JSON.parse(json) } catch { return 0 }
@@ -445,6 +464,9 @@ export function restoreParties(json: string): number {
     p.frame = s.frame
     if (Array.isArray(s.queue)) p.queue = s.queue
     if (typeof s.current === 'string') p.current = s.current
+    // dropParty clears queue-entry capabilities; restore must re-mint ALL
+    // of them, not just the current media, or queued private objects 404.
+    for (const entry of p.queue) addPartyMedia(p, entry.url)
     n++
   }
   return n
