@@ -161,7 +161,10 @@ export async function orbitAuth(c: Context, next: Next) {
   // Auto-register user in DB if they don't exist and keep last_seen fresh
   try {
     const nowIso = new Date().toISOString()
-    await c.env.DB.prepare('INSERT INTO Users (id, public_key, last_seen) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET last_seen = excluded.last_seen').bind(orbitId, publicKeyHex, nowIso).run()
+    // Presence contract: last_seen is written ONLY by interactive activity
+    // (heartbeat, lobby, profile PATCH). A signed request from a backgrounded
+    // or forgotten client must not pin the user "online" (ghost roster bug).
+    await c.env.DB.prepare('INSERT INTO Users (id, public_key, last_seen) VALUES (?, ?, ?) ON CONFLICT(id) DO NOTHING').bind(orbitId, publicKeyHex, nowIso).run()
     if (encryptionPubKeyHex) {
       try {
         await c.env.DB.prepare('UPDATE Users SET encryption_pub_key = ? WHERE id = ?').bind(encryptionPubKeyHex, orbitId).run()

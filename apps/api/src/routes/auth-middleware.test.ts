@@ -288,6 +288,34 @@ describe('ban enforcement', () => {
   })
 })
 
+describe('presence contract: signed requests do not refresh last_seen', () => {
+  it('existing user keeps its old last_seen after an authenticated GET', async () => {
+    const ghost = createTestIdentity()
+    const old = new Date(Date.now() - 30 * 60 * 1000).toISOString()  // 30 min ago
+    await env.DB.prepare('INSERT INTO Users (id, public_key, last_seen) VALUES (?, ?, ?)')
+      .bind(ghost.orbitId, ghost.publicKeyHex, old).run()
+    const res = await app.request('/api/economy/balance', {
+      headers: signRequestHeaders(ghost, 'GET', '/api/economy/balance'),
+    }, env)
+    expect(res.status).toBe(200)
+    const row = await env.DB.prepare('SELECT last_seen FROM Users WHERE id = ?')
+      .bind(ghost.orbitId).first<{ last_seen: string }>()
+    expect(new Date(row!.last_seen).getTime()).toBeLessThan(Date.now() - 25 * 60 * 1000)
+  })
+
+  it('unknown user is still auto-registered with a fresh last_seen', async () => {
+    const newbie = createTestIdentity()
+    const res = await app.request('/api/economy/balance', {
+      headers: signRequestHeaders(newbie, 'GET', '/api/economy/balance'),
+    }, env)
+    expect(res.status).toBe(200)
+    const row = await env.DB.prepare('SELECT last_seen FROM Users WHERE id = ?')
+      .bind(newbie.orbitId).first<{ last_seen: string }>()
+    expect(row).toBeTruthy()
+    expect(Date.now() - new Date(row!.last_seen).getTime()).toBeLessThan(60_000)
+  })
+})
+
 describe('nonce cache maintenance under load', () => {
   it('cleanupNonces sweep runs once issued nonces exceed the threshold', async () => {
     // Issue >100 nonces so the next authenticated request triggers the
