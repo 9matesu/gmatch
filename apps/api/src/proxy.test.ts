@@ -1,11 +1,38 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { classifyAndResolve } from './proxy'
+import { classifyAndResolve, extractEmbeddedVideo, extractPageTitle, pageTitleFor } from './proxy'
 
 const html = (body: string, ct = 'text/html') =>
   ({ ok: true, headers: { get: (k: string) => (k === 'content-type' ? ct : null) }, text: async () => body }) as unknown as Response
 
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+
+
+describe('extractEmbeddedVideo (all playable formats)', () => {
+  it('finds webm/mov/m4v urls with query strings and <video>/<source> tags', () => {
+    expect(extractEmbeddedVideo('x https://cdn.t/a.webm?tok=1 y')).toContain('.webm')
+    expect(extractEmbeddedVideo('<video><source src="https://c.t/x.m4v" type="video/mp4"></video>')).toBe('https://c.t/x.m4v')
+    expect(extractEmbeddedVideo('nope <script>var a=".fake.mp4"</script>')).toBeNull()
+  })
+})
+
+describe('extractPageTitle', () => {
+  it('prefers og:title over <title>, decodes entities', () => {
+    expect(extractPageTitle('<meta property="og:title" content="OG Title"><title>Plain</title>')).toBe('OG Title')
+    expect(extractPageTitle('<title>Only &amp; This</title>')).toBe('Only & This')
+    expect(extractPageTitle('<html></html>')).toBeNull()
+  })
+})
+
+describe('pageTitleFor stash', () => {
+  it('captures the page title while resolving', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      html('<meta property="og:title" content="Chloe 19 YO"><p>https://cdn.t/a.mp4</p>')))
+    const out = await classifyAndResolve('https://pmvhaven.example/video/show_abc')
+    expect(out).toContain('.mp4')
+    expect(pageTitleFor('https://pmvhaven.example/video/show_abc')).toBe('Chloe 19 YO')
+  })
 })
 
 describe('classifyAndResolve (post-modal URL uploads)', () => {
