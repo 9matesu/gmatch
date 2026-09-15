@@ -172,7 +172,7 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
       if (onReportPost) {
         onReportPost(post);
       } else {
-        toast?.('Thanks — our team will review this post', 'info');
+        toast?.('Thanks. Our team will review this post.', 'info');
       }
       setOptionsPost(null);
     },

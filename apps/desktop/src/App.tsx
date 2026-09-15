@@ -53,7 +53,8 @@ import { DmMinimizedView } from "./components/views/MessagesView";
 import { MessagesRail } from "./components/chat/MessagesRail";
 import { WatchPartyDock } from "./components/watchparty/WatchPartyDock";
 import { WatchPartyEdgeTab } from "./components/watchparty/WatchPartyEdgeTab";
-import { watchPartyStore, useWatchParty } from "./hooks/watchPartyStore";
+import { WatchPartyView } from "./components/watchparty/WatchPartyView";
+import { watchPartyStore, setWatchDisplayName, useWatchParty } from "./hooks/watchPartyStore";
 import { GameView } from "./components/views/GameView";
 import { AgeGateModal } from "./components/auth/AgeGateModal";
 import { LegalCenter, isLegalAccepted } from "./components/LegalCenter";
@@ -156,6 +157,7 @@ export default function Home() {
   const { peers, p2pItems, sendP2PItem, sendChatMessage, chatMessages, isWsConnected } = useP2P(identity);
   const { settings, update: updateSettings } = useSettings();
   const watchParty = useWatchParty();
+  useEffect(() => { setWatchDisplayName(myProfile.displayName || '') }, [myProfile.displayName]);
   const [users, setUsers] = useState<User[]>([]);
 
   // Panel opacity preference drives the glass chrome through a CSS variable.
@@ -3293,7 +3295,7 @@ export default function Home() {
                   </div>
                   </MessagesRail>
 
-                  {settings.watchPartyEnabled && identity && (
+                  {settings.watchPartyEnabled && identity && mainView === 'feed' && (
                     <WatchPartyEdgeTab
                       side="left"
                       onToggle={() => watchPartyStore.set({ open: !watchParty.open })}
@@ -3702,6 +3704,11 @@ export default function Home() {
                     />
                   )}
 
+                  {/* Watch theater (synced video rooms) */}
+                  {mainView === 'watch' && identity && (
+                    <WatchPartyView identity={identity} profilePics={profilePics} />
+                  )}
+
                   {/* Game View (Matchmaking Lobby) */}
                   {mainView === 'game' && (
                     <GameView
@@ -3754,14 +3761,14 @@ export default function Home() {
                 </div>
 
                 {/* Watch Party dock: same-layer flex sibling right of the feed */}
-                {settings.watchPartyEnabled && identity && watchParty.open && (
+                {settings.watchPartyEnabled && identity && mainView === 'feed' && watchParty.open && (
                   <WatchPartyDock
                     identity={identity}
                     profilePics={profilePics}
                     onClose={() => watchPartyStore.set({ open: false })}
                   />
                 )}
-                {settings.watchPartyEnabled && identity && !watchParty.open && (
+                {settings.watchPartyEnabled && identity && mainView === 'feed' && !watchParty.open && (
                   <WatchPartyEdgeTab
                     side="right"
                     onToggle={() => watchPartyStore.set({ open: true })}

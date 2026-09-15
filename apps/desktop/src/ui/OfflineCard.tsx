@@ -30,7 +30,7 @@ export default function OfflineCard({ fetching, feedOffline, emptyFresh = false,
       : state === 'offline'
         ? 'Sources offline. Check your connection.'
         : emptyFresh
-          ? 'Seen it all — add a tag for fresh posts.'
+          ? 'Seen it all. Add a tag for fresh posts.'
           : 'No image. Pull the feed'
   return (
     <div

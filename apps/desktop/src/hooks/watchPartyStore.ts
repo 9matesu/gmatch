@@ -22,6 +22,7 @@ export interface PartyInfo {
 export interface PartyRuntime extends PartyInfo {
   frame: SyncFrame | null
   members: Array<{ id: string; name: string }>
+  chat: Array<{ id: string; name: string; text: string; at: number }>
 }
 
 export interface WatchPartyState {
@@ -62,10 +63,16 @@ export function serverNow(): number {
   return clock.now()
 }
 
+// Display name for the party roster (App sets it after profile load).
+let myDisplayName = ''
+export function setWatchDisplayName(name: string): void {
+  myDisplayName = name.slice(0, 40)
+}
+
 function upsertParty(info: PartyInfo): void {
   const existing = state.parties.find((p) => p.id === info.id)
   if (existing) Object.assign(existing, info)
-  else state.parties.push({ ...info, frame: null, members: [] })
+  else state.parties.push({ ...info, frame: null, members: [], chat: [] })
   if (state.parties.length > MAX_SLOTS) state.parties.shift()
   watchPartyStore.set({})
 }
@@ -79,11 +86,12 @@ export function resetWatchParty(): void {
 
 export function handleWatchMessage(msg: any): void {
   if (!msg || typeof msg !== 'object') return
-  if (msg.type === 'watch.sync' || msg.type === 'watch.roster') {
+  if (msg.type === 'watch.sync' || msg.type === 'watch.roster' || msg.type === 'watch.chat') {
     const party = state.parties.find((p) => p.id === msg.party)
     if (!party) return
     if (msg.type === 'watch.sync') party.frame = msg.frame as SyncFrame
-    else party.members = Array.isArray(msg.members) ? msg.members : []
+    else if (msg.type === 'watch.roster') party.members = Array.isArray(msg.members) ? msg.members : []
+    else party.chat = [...party.chat, { id: msg.from?.id || '', name: msg.from?.name || 'Unknown User', text: String(msg.text || '').slice(0, 80), at: Number(msg.at) || Date.now() }].slice(-80)
     watchPartyStore.set({})
     return
   }
@@ -183,7 +191,13 @@ export function joinParty(identity: IdentityLike, party: PartyInfo): void {
   ensureSubscribed(identity)
   upsertParty(party)
   watchPartyStore.set({ open: true })
-  sendOrbitWebSocket({ type: 'watch.join', party: party.id, name: identity.orbitId })
+  sendOrbitWebSocket({ type: 'watch.join', party: party.id, name: myDisplayName || identity.orbitId })
+}
+
+export function sendPartyChat(partyId: string, text: string): void {
+  const trimmed = text.trim().slice(0, 80)
+  if (!trimmed) return
+  sendOrbitWebSocket({ type: 'watch.chat', party: partyId, text: trimmed })
 }
 
 export function leaveParty(partyId: string): void {

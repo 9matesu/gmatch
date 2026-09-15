@@ -17,13 +17,14 @@ import {
   SignOut,
   PaintBrush,
   Monitor,
+  FilmSlate,
   User,
   Bell,
 } from '@phosphor-icons/react';
 import { playPress } from '../../utils/sounds';
 import { resolveMediaUrl } from '../../utils/media';
 import { CountBadge } from './CountBadge';
-export type MainViewType = 'feed' | 'games' | 'create' | 'messages' | 'profile' | 'game' | 'gallery' | 'store' | 'pc_domination' | 'grid' | 'rooms' | 'servers' | 'admin';
+export type MainViewType = 'feed' | 'games' | 'create' | 'messages' | 'profile' | 'game' | 'gallery' | 'store' | 'pc_domination' | 'grid' | 'rooms' | 'servers' | 'admin' | 'watch';
 
 export type GamesNavTab = 'duel' | 'cards' | 'babecock' | 'ranks' | 'idle';
 
@@ -146,6 +147,13 @@ export function CommandIsland({
       label: 'Vault',
       icon: Cards,
       active: mainView === 'gallery',
+      badge: 0,
+    },
+    {
+      id: 'watch' as MainViewType,
+      label: 'Watch',
+      icon: FilmSlate,
+      active: mainView === 'watch',
       badge: 0,
     },
   ];

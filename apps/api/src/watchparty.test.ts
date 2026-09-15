@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { createParty, getParty, applyWatch, joinWatch, __resetParties, partyRoom } from './watchparty'
+import { createParty, getParty, applyWatch, joinWatch, applyChat, __resetParties, partyRoom } from './watchparty'
 import { handleIncoming, conns, createWsTicket, type WsConn } from './ws-bus'
 
 function fakeConn(): WsConn & { sent: string[] } {
@@ -51,6 +51,18 @@ describe('party state', () => {
     for (let i = 0; i < 8; i++) expect(joinWatch(`u${i}`, `N${i}`, { party: p.id })).not.toBeNull()
     expect(joinWatch('u8', 'Late', { party: p.id })).toBeNull()
     expect(p.members.size).toBe(8)
+  })
+
+  it('applyChat relays member text with a 2s/user rate limit', () => {
+    const p = createParty('T', 'u', 'u')
+    expect(applyChat('ghost', 'X', { party: p.id, text: 'hi' })).toBeNull()
+    joinWatch('u1', 'Alice', { party: p.id })
+    const res = applyChat('u1', 'Alice', { party: p.id, text: '  hello  ' })!
+    expect(res.payload.text).toBe('hello')
+    expect(res.payload.from.name).toBe('Alice')
+    expect(applyChat('u1', 'Alice', { party: p.id, text: 'again' })).toBeNull()
+    expect(applyChat('u1', 'Alice', { party: p.id, text: '   ' })).toBeNull()
+    expect(applyChat('u2', 'Bob', { party: 'missing', text: 'x' })).toBeNull()
   })
 })
 

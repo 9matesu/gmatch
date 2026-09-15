@@ -42,7 +42,7 @@ export function validateTicket(ticket: string): string | null {
 }
 
 // Watch Party relay: tiny JSON control frames (never media bytes).
-import { applyWatch, joinWatch, watchPong } from './watchparty'
+import { applyWatch, joinWatch, watchPong, applyChat } from './watchparty'
 
 export function handleIncoming(conn: WsConn, data: string): void {
   let msg: any
@@ -102,6 +102,11 @@ export function handleIncoming(conn: WsConn, data: string): void {
   }
   if (msg.type === 'watch') {
     const res = applyWatch(conn.userId || '', msg)
+    if (res) broadcastToRoom(res.room, res.payload)
+    return
+  }
+  if (msg.type === 'watch.chat') {
+    const res = applyChat(conn.userId || '', msg.name, msg)
     if (res) broadcastToRoom(res.room, res.payload)
     return
   }

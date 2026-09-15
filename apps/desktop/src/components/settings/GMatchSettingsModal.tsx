@@ -762,7 +762,7 @@ export function GMatchSettingsModal({
                         playPress(750);
                         const next = !settings.localVault;
                         if (!next) void vaultClear().then(() => toast?.('Local vault wiped', 'info'));
-                        else toast?.('Local vault on — keeps and cards now save locally', 'success');
+                        else toast?.('Local vault on. Keeps and cards now save locally.', 'success');
                         updateSettings('localVault', next);
                       }}
                     />
@@ -780,7 +780,7 @@ export function GMatchSettingsModal({
                     </div>
                   )}
                   {!vaultBridge() && (
-                    <p className="text-[10px] text-retro-muted">Desktop app only — the browser build always streams.</p>
+                    <p className="text-[10px] text-retro-muted">Desktop app only. The browser build always streams.</p>
                   )}
                 </div>
               </div>

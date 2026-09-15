@@ -34,7 +34,7 @@ export function WatchPartyDock({
   const active = parties.find((p) => p.id === activeId) || parties[parties.length - 1] || null
 
   return (
-    <aside className="relative h-full w-[min(560px,38vw)] shrink-0 border-l border-border-glass flex flex-col min-h-0">
+    <aside className="relative h-full w-[min(560px,38vw)] shrink-0 border-l border-border-glass bg-glass-w5 flex flex-col min-h-0">
       <div className="flex items-center justify-between px-3 py-2 border-b border-border-glass">
         <h3 className="text-xs font-bold uppercase tracking-wider text-retro-fg">Watch Party</h3>
         <div className="flex items-center gap-2">

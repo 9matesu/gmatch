@@ -15,12 +15,14 @@ export function WatchPartySlot({
   party,
   identity,
   active,
+  fill = false,
   onSelect,
   onEmptyClick,
 }: {
   party: PartyRuntime | null
   identity: { orbitId: string; publicKeyHex: string; privateKeyHex: string }
   active: boolean
+  fill?: boolean
   onSelect: () => void
   onEmptyClick: () => void
 }) {
@@ -66,7 +68,7 @@ export function WatchPartySlot({
       ref={wrapRef}
       data-active={active ? 'true' : 'false'}
       onClick={onSelect}
-      className={`watch-party-slot relative aspect-video rounded-lg overflow-hidden bg-black cursor-pointer ${active ? 'ring-1 ring-retro-fg' : 'border border-border-glass'}`}
+      className={`watch-party-slot relative ${fill ? 'h-full' : 'aspect-video'} rounded-lg overflow-hidden bg-black cursor-pointer ${active ? 'ring-1 ring-retro-fg' : 'border border-border-glass'}`}
     >
       {videoSrc ? (
         <NativeVideoPlayer

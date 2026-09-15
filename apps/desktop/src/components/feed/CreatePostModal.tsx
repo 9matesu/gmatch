@@ -184,9 +184,9 @@ export function CreatePostModal({
         } else {
           setMediaList((prev) => [
             ...prev,
-            { id: 'url_' + Date.now(), previewUrl: raw, isExternalUrl: true, isVideoPage: true, resolveNote: 'Preview unavailable — will attach on share' },
+            { id: 'url_' + Date.now(), previewUrl: raw, isExternalUrl: true, isVideoPage: true, resolveNote: 'Preview not ready. It attaches on share.' },
           ]);
-          toast?.('Kept the link — media attaches when you share', 'info');
+          toast?.('Kept the link. Media attaches when you share.', 'info');
         }
       } finally {
         setResolvingUrl(false);
@@ -296,7 +296,7 @@ export function CreatePostModal({
           let host = '';
           try { host = new URL(item.previewUrl).hostname; } catch { /* relative/data urls */ }
           const hint = item.isVideoPage || (host && !/\.(jpe?g|png|gif|webp|mp4|webm)$/i.test(item.previewUrl.split('?')[0]))
-            ? ' — that link has no direct media; try a direct image/GIF/MP4 URL'
+            ? ', that link has no direct media. Try a direct image/GIF/MP4 URL'
             : '';
           throw new Error(errData?.error || `Upload failed on item ${i + 1} of ${mediaList.length}${host ? ` (${host})` : ''}${hint}`);
         }

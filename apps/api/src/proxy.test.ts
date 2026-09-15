@@ -29,6 +29,14 @@ describe('classifyAndResolve (post-modal URL uploads)', () => {
     )
   })
 
+  it('resolves pmvhaven video pages (escaped JSON, no og:video)', async () => {
+    const page = '<html><head><meta property="og:image" content="https://pmvhavencloud.s3.eu-west-par.io.cloud.ovh.net/thumbnails/abc/thumb_lg.webp" /></head><body>{"sources":[{"file":"https:\\u002F\\u002Fpmvhavencloud.s3.eu-west-par.io.cloud.ovh.net\\u002Fvideos\\u002Fshow_1b093l3k.mp4\\u002Fmaster.m3u8"},{"file":"https:\\u002F\\u002Fpmvhavencloud.s3.eu-west-par.io.cloud.ovh.net\\u002Fvideos\\u002Fshow_1b093l3k.mp4"}]}</body></html>'
+    vi.stubGlobal('fetch', vi.fn(async () => html(page)))
+    expect(await classifyAndResolve('https://pmvhaven.com/video/show_abc?from=home')).toBe(
+      'https://pmvhavencloud.s3.eu-west-par.io.cloud.ovh.net/videos/show_1b093l3k.mp4',
+    )
+  })
+
   it('passes direct file URLs through without fetching', async () => {
     const fetchMock = vi.fn(async () => { throw new Error('must not fetch') })
     vi.stubGlobal('fetch', fetchMock)

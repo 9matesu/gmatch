@@ -19,6 +19,7 @@ import {
   createParty,
   joinParty,
   joinPartyById,
+  sendPartyChat,
   leaveParty,
   controlPlayback,
   MAX_SLOTS,
@@ -74,6 +75,20 @@ describe('watchPartyStore', () => {
     expect(watchPartyStore.getSnapshot().parties.find((p) => p.id === 'p1')!.frame?.position).toBe(5)
     handleWatchMessage({ type: 'watch.roster', party: 'p1', members: [{ id: 'u2', name: 'Bob' }] })
     expect(watchPartyStore.getSnapshot().parties.find((p) => p.id === 'p1')!.members).toEqual([{ id: 'u2', name: 'Bob' }])
+  })
+
+  it('watch.chat appends text (clamped) to the right party only', () => {
+    joinParty(identity, { id: 'p1', name: 'N', url: 'u' })
+    handleWatchMessage({ type: 'watch.chat', party: 'p1', from: { id: 'u2', name: 'Bob' }, text: 'yo', at: 5 })
+    handleWatchMessage({ type: 'watch.chat', party: 'p1', from: { id: 'u2', name: 'Bob' }, text: 'x'.repeat(100), at: 6 })
+    const p = watchPartyStore.getSnapshot().parties[0]
+    expect(p.chat).toEqual([
+      { id: 'u2', name: 'Bob', text: 'yo', at: 5 },
+      { id: 'u2', name: 'Bob', text: 'x'.repeat(80), at: 6 },
+    ])
+    sendPartyChat('p1', ' hey ')
+    expect(sendOrbitWebSocket).toHaveBeenLastCalledWith({ type: 'watch.chat', party: 'p1', text: 'hey' })
+    sendPartyChat('p1', '   ')
   })
 
   it('caps slots at MAX_SLOTS, oldest evicted', () => {

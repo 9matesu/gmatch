@@ -425,7 +425,7 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
           <div className="text-[10px] text-retro-muted font-mono text-center pt-1 space-y-0.5">
             <div>Target: {getApiBaseUrl()}</div>
             <div className="flex items-center justify-center gap-1.5">
-              <span>Signed as: <span className="font-mono">{identity?.orbitId || "No identity — sign in first"}</span></span>
+              <span>Signed as: <span className="font-mono">{identity?.orbitId || "No identity. Sign in first."}</span></span>
               {identity?.orbitId && (
                 <button
                   type="button"

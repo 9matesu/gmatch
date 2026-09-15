@@ -168,8 +168,11 @@ async function resolveRedgifs(url: URL): Promise<string | null> {
 
 async function resolveOpenGraph(url: URL): Promise<string | null> {
   // Last-resort generic fallback for video/article pages we have no
-  // dedicated resolver for: og:video (player pages) beats og:image.
-  // Skips obvious direct files (the bytes path handles those, no extra GET).
+  // dedicated resolver for: og:video (player pages) beats og:image, which
+  // beats any .mp4 embedded in the page body (pmvhaven-style: video URL
+  // lives in escaped JSON, no og:video tag). Works for ANY site that ships
+  // the file URL in its HTML; hosts needing auth/signatures get a new
+  // dedicated resolver above this one.
   if (/\.(jpe?g|png|gif|webp|avif|mp4|webm|mov|ogg|m4v)([?#]|$)/i.test(url.pathname)) return null
   try {
     const res = await fetch(url.toString(), {
@@ -179,8 +182,24 @@ async function resolveOpenGraph(url: URL): Promise<string | null> {
     if (!res.ok) return null
     const ct = res.headers.get('content-type') || ''
     if (ct && !ct.includes('html')) return null
-    return extractOgMedia(await res.text())
+    const html = await res.text()
+    // An .mp4 embedded in the page is a stronger video signal than og:image
+    // (pmvhaven ships only a thumbnail as og:image).
+    return extractEmbeddedMp4(html) || extractOgMedia(html)
   } catch { return null }
+}
+
+/**
+ * Site-agnostic module: find a direct .mp4 in page HTML, including
+ * \u002F-escaped JSON payloads. m3u8 manifests are skipped (not playable in
+ * <video> without hls.js; the .mp4 sibling is what sites ship for direct
+ * playback). Longest match wins on ties-with-suffix pages.
+ */
+export function extractEmbeddedMp4(html: string): string | null {
+  const unescaped = html.replace(/\\u002[fF]/g, '/')
+  const matches = unescaped.match(/https?:\/\/[^"'\\\s<>]+\.mp4/g)
+  if (!matches) return null
+  return matches.find((u) => !/\.m3u8/i.test(u)) || null
 }
 
 /**

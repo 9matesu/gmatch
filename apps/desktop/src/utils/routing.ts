@@ -18,6 +18,7 @@ export const ROUTE_VIEWS = [
   'rooms',
   'servers',
   'admin',
+  'watch',
 ] as const
 
 export type RoutedView = (typeof ROUTE_VIEWS)[number]

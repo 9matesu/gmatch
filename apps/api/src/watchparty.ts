@@ -15,9 +15,13 @@ export interface Party {
   id: string
   name: string
   mediaUrl: string
+  /** Relay mode: videos over the 50MB store cap stream through the hub. */
+  relay?: { upstream: string; referer: string }
   frame: PartyFrame
   members: Map<string, string> // userId -> display name
   lastSeen: number
+  /** ponytail: last chat msg ts per user; global bucket if flood persists. */
+  lastChat: Map<string, number>
 }
 
 const parties = new Map<string, Party>()
@@ -27,19 +31,30 @@ const IDLE_MS = 30 * 60_000
 // private party media without making it feed-public.
 const partyMedia = new Map<string, string>()
 
-export function createParty(name: string, mediaUrl: string, seedUrl: string): Party {
+export function createParty(name: string, mediaUrl: string, seedUrl: string, relay?: { upstream: string; referer: string }): Party {
   gcTick()
   const party: Party = {
     id: randomUUID().slice(0, 8),
     name: name.slice(0, 40) || 'Party',
     mediaUrl,
+    relay,
     frame: { url: seedUrl, action: 'pause', position: 0, rate: 1, updatedAt: serverNow() },
     members: new Map(),
     lastSeen: Date.now(),
+    lastChat: new Map(),
   }
   parties.set(party.id, party)
-  partyMedia.set(mediaUrl, party.id)
+  if (mediaUrl) partyMedia.set(mediaUrl, party.id)
   return party
+}
+
+/** Set/replace a party's media URL after creation (relay needs the party id
+ * first, so the route creates then binds). Keeps partyMedia consistent. */
+export function setPartyMedia(party: Party, mediaUrl: string): void {
+  if (party.mediaUrl) partyMedia.delete(party.mediaUrl)
+  party.mediaUrl = mediaUrl
+  party.frame.url = mediaUrl
+  partyMedia.set(mediaUrl, party.id)
 }
 
 /** Media URL capability check for the objects route: party videos stay
@@ -117,6 +132,29 @@ export function joinWatch(userId: string, displayName: string, msg: any): { room
       type: 'watch.roster',
       party: party.id,
       members: [...party.members.entries()].map(([id, name]) => ({ id, name })),
+    },
+  }
+}
+
+/** Party chat: members only, 80 chars, 1 msg/2s per user. Text only. */
+export function applyChat(userId: string, displayName: string, msg: any): { room: string; payload: any } | null {
+  if (!msg || typeof msg !== 'object') return null
+  const party = parties.get(String(msg.party || ''))
+  if (!party || !party.members.has(userId)) return null
+  const text = typeof msg.text === 'string' ? msg.text.trim().slice(0, 80) : ''
+  if (!text) return null
+  const now = Date.now()
+  if (now - (party.lastChat.get(userId) || 0) < 2000) return null
+  party.lastChat.set(userId, now)
+  party.lastSeen = now
+  return {
+    room: partyRoom(party.id),
+    payload: {
+      type: 'watch.chat',
+      party: party.id,
+      from: { id: userId, name: party.members.get(userId) || String(displayName || '').slice(0, 40) },
+      text,
+      at: now,
     },
   }
 }
