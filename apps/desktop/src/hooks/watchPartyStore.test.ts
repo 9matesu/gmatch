@@ -109,6 +109,13 @@ describe('watchPartyStore', () => {
     expect(watchPartyStore.getSnapshot().kickedNotice).toContain('Alone')
   })
 
+  it('watch.gone drops the room with a closed notice (no ghost 404 loop)', () => {
+    joinParty(identity, { id: 'a', name: 'Ghost', url: 'u' })
+    handleWatchMessage({ type: 'watch.gone', party: 'a' })
+    expect(watchPartyStore.getSnapshot().parties).toHaveLength(0)
+    expect(watchPartyStore.getSnapshot().kickedNotice).toContain('closed')
+  })
+
   it('roster join-snapshot restores frame, chat and queue', () => {
     joinParty(identity, { id: 'a', name: 'A', url: 'u' })
     handleWatchMessage({

@@ -39,8 +39,13 @@ and playback stays frame-accurate within the drift deadband.
 ## Room lifecycle
 
 1. `POST /api/watchparty` {url,name} resolves the media (below) and creates
-   the room. The creator is HOST and auto-joins. Rooms are in-memory:
-   a cold node or 30 min idle deletes them; clients then see 404 and say so.
+   the room. The creator is HOST and auto-joins. Rooms live in memory but
+   are flushed to `WATCH_PARTIES_PATH` (default: beside the DB snapshot on
+   /data) every 30 s and on SIGTERM, and restored at boot: a deploy no
+   longer kills live rooms. A room still dies on 4 h idle; clients then get
+   one `watch.gone` frame ("has closed"), never a 404 loop. Socket close
+   removes a member only after an 8 s grace, so a reconnect blip keeps the
+   seat (and a last-member blip keeps the room).
 2. Others join from the room list, the invite link `#/watch?room=<id>`, or
    the 8-hex code. `watch.join` subscribes the socket to room `watch:<id>`
    and the room receives a roster + "X joined" system line; the joiner
@@ -110,9 +115,16 @@ signature gets ONE new resolver function in the chain, plus a fixture in
   route accepts `urls[]` (max 10/request, returns `{added, failed}`), which
   the queue rail and the create modal feed with one multi-line paste.
   No rate control (party is 1x).
+- Stream hiccup (relay 502, upstream abort): the slot's `error`/`stalled`
+  listeners reload the element (max once per 5 s) and the sync tick re-joins
+  the party position. Players use `preload="auto"`; the relay answers with
+  `private, max-age=60` so seek-back reads hit the browser cache.
 
 ## Trust boundaries
 
+- Single fly machine owns the room map; the JSON flush is that machine's
+  volume. Two machines would each restore their own copy -> rooms need a
+  Durable Object before scaling out.
 - Every gate is server-side: membership, host-only ops, bans, mute, rate
   limits, clamps (name 40, queue 50, chat 80 msgs / 80 chars, members 8,
   bulk add 10/request).

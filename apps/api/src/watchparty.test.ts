@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import {
   createParty, getParty, listParties, applyWatch, joinWatch, leaveWatch, leaveAll, applyChat,
   deleteChat, kickWatch, banWatch, muteWatch, transferHost, settingsWatch,
-  queueOps, setPartyMedia, __resetParties, partyRoom, IDLE_MS, MAX_QUEUE, type Party,
+  queueOps, setPartyMedia, __resetParties, partyRoom, IDLE_MS, MAX_QUEUE, isPartyMediaObject,
+  serializeParties, restoreParties, type Party,
 } from './watchparty'
 import { handleIncoming, conns, createWsTicket, type WsConn } from './ws-bus'
 
@@ -281,6 +282,15 @@ describe('ws relay integration', () => {
     expect(pong.t1).toBeGreaterThan(0)
   })
 
+  it('watch.join for a dead party answers watch.gone on that socket only', () => {
+    const a = fakeConn()
+    conns.add(a)
+    authed(a, 'u1')
+    a.sent.length = 0
+    handleIncoming(a, JSON.stringify({ type: 'watch.join', party: 'zzzzzzzz' }))
+    expect(a.sent.map(JSON.parse).some((m) => m.type === 'watch.gone' && m.party === 'zzzzzzzz')).toBe(true)
+  })
+
   it('watch.ping refreshes lastSeen of every room the user is in', () => {
     const p = makeParty('u1')
     joinWatch('u2', 'Bob', { party: p.id })
@@ -327,3 +337,50 @@ describe('ws relay integration', () => {
     expect(b.rooms.has(partyRoom(p.id))).toBe(false)
   })
 })
+
+describe('audit T9.1: capability key format is byte-exact across the seam', () => {
+  it('isPartyMediaObject only answers true for the /api/objects/<id> shape the route stores', () => {
+    const p = makeParty('u1')
+    setPartyMedia(p, '/api/objects/abc-123')
+    // objects.ts rebuilds the key as `/api/objects/${id}`; any drift
+    // (trailing slash, absolute URL, different prefix) silently breaks
+    // private-room streaming because it is a plain Map lookup.
+    expect(isPartyMediaObject('/api/objects/abc-123')).toBe(true)
+    expect(isPartyMediaObject('/api/objects/abc-123/')).toBe(false)
+    expect(isPartyMediaObject('https://x.dev/api/objects/abc-123')).toBe(false)
+    expect(isPartyMediaObject('/objects/abc-123')).toBe(false)
+  })
+})
+
+describe('room persistence', () => {
+  it('round-trips rooms through serialize/restore', () => {
+    const p = makeParty('u1')
+    joinWatch('u2', 'Bob', { party: p.id })
+    applyWatch('u2', { party: p.id, action: 'play', position: 42 })
+    queueOps('u1', { party: p.id, op: 'add', name: 'next', url: '/api/objects/n' })
+    const dump = serializeParties()
+    __resetParties()
+    expect(getParty(p.id)).toBeNull()
+    expect(restoreParties(dump)).toBe(1)
+    const q = getParty(p.id)!
+    expect(q.id).toBe(p.id)
+    expect(q.name).toBe(p.name)
+    expect(q.frame.position).toBe(42)
+    expect(q.frame.action).toBe('play')
+    expect(q.queue.length).toBe(1)
+    expect(q.current).toBe(p.current)
+    expect(q.hostId).toBe('u1')
+    // roster re-forms via watch.join
+    expect(q.members.size).toBe(0)
+    // capability map is rebuilt: private media is readable again
+    expect(isPartyMediaObject(q.mediaUrl)).toBe(true)
+  })
+  it('restore is idempotent and junk-safe', () => {
+    expect(restoreParties('not json')).toBe(0)
+    expect(restoreParties('{"nope":1}')).toBe(0)
+    makeParty('u1')
+    const dump = serializeParties()
+    expect(restoreParties(dump)).toBe(0)
+  })
+})
+

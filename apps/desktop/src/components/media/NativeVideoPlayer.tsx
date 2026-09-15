@@ -24,6 +24,8 @@ export interface NativeVideoPlayerProps {
   loop?: boolean;
   muted?: boolean;
   playsInline?: boolean;
+  /** Buffering hint: party players pass 'auto' to fetch past metadata before play. */
+  preload?: 'none' | 'metadata' | 'auto';
   controls?: boolean;
   alwaysShowControls?: boolean;
   className?: string;
@@ -64,6 +66,7 @@ export function NativeVideoPlayer({
   loop = true,
   muted = false,
   playsInline = true,
+  preload = 'metadata',
   controls = true,
   alwaysShowControls = false,
   className = '',
@@ -407,6 +410,7 @@ export function NativeVideoPlayer({
         loop={isLooping}
         muted={isMuted}
         playsInline={playsInline}
+        preload={preload}
         className={`w-full h-full object-contain pointer-events-auto cursor-pointer ${videoClassName}`}
         onClick={handleVideoCanvasClick}
         onTimeUpdate={() => {

@@ -218,7 +218,9 @@ watchparty.get('/:id/stream', async (c) => {
     const v = up.headers.get(h)
     if (v) out.set(h, v)
   }
-  out.set('Cache-Control', 'private, no-store')
+  // 60s private cache: seeking re-reads near-ranges locally without
+  // re-hitting upstream; the unguessable room id remains the capability.
+  out.set('Cache-Control', 'private, max-age=60')
   out.set('Access-Control-Allow-Origin', '*')
   return new Response(up.body, { status: up.status, headers: out })
 })

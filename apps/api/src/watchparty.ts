@@ -73,10 +73,11 @@ export function createParty(
   seedUrl: string,
   relay?: { upstream: string; referer: string },
   creatorId = '',
+  forcedId = '',
 ): Party {
   gcTick()
   const party: Party = {
-    id: randomUUID().slice(0, 8),
+    id: forcedId || randomUUID().slice(0, 8),
     name: name.slice(0, 40) || 'Party',
     mediaUrl,
     mediaName: '',
@@ -413,6 +414,40 @@ function applyQueueMedia(party: Party, entry: QueueEntry, by: string, action: 'p
   party.relay = entry.relay
   setPartyMedia(party, entry.url)
   party.frame = { url: entry.url, action, position: 0, rate: 1, updatedAt: serverNow(), by }
+}
+
+/** Persistence: rooms die with the process otherwise, so every deploy
+ * 404s live rooms. Members/chat are NOT persisted: tabs lost their
+ * sockets anyway; clients re-join by id (watch.join) and rebuild the
+ * roster around the resurrected frame. Bans are session-scoped too. */
+export function serializeParties(): string {
+  return JSON.stringify([...parties.values()].map((p) => ({
+    id: p.id, name: p.name, mediaUrl: p.mediaUrl, mediaName: p.mediaName,
+    relay: p.relay, hostId: p.hostId, isPrivate: p.isPrivate, lockVideo: p.lockVideo,
+    frame: p.frame, queue: p.queue, current: p.current,
+  })))
+}
+
+export function restoreParties(json: string): number {
+  let rows: unknown
+  try { rows = JSON.parse(json) } catch { return 0 }
+  if (!Array.isArray(rows)) return 0
+  let n = 0
+  for (const raw of rows) {
+    const s = raw as any
+    if (!s || typeof s.id !== 'string' || typeof s.mediaUrl !== 'string' || !s.frame) continue
+    if (parties.has(s.id)) continue
+    const p = createParty(String(s.name || 'Party'), s.mediaUrl, s.mediaUrl, s.relay, String(s.hostId || ''), s.id)
+    if (p.hostId) p.members.delete(p.hostId) // roster re-forms via watch.join
+    p.mediaName = String(s.mediaName || '')
+    p.isPrivate = Boolean(s.isPrivate)
+    p.lockVideo = Boolean(s.lockVideo)
+    p.frame = s.frame
+    if (Array.isArray(s.queue)) p.queue = s.queue
+    if (typeof s.current === 'string') p.current = s.current
+    n++
+  }
+  return n
 }
 
 export function watchPong(t0: unknown): { type: string; t0: number; t1: number } {
