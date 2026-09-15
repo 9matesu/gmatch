@@ -9,7 +9,7 @@ import { Maximize, MicOff, Mic, Plus, RotateCcw } from 'lucide-react'
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer'
 import { useObjectImage } from '../../hooks/useObjectImage'
 import { controlPlayback, serverNow, queueOp, type PartyRuntime } from '../../hooks/watchPartyStore'
-import { computeTargetPosition, driftCorrection } from '../../utils/watchSync'
+import { computeTargetPosition, driftCorrection, shouldFireQueueNext } from '../../utils/watchSync'
 
 export function WatchPartySlot({
   party,
@@ -50,11 +50,18 @@ export function WatchPartySlot({
       if (!v || !party.frame || !videoSrc) return
       const target = computeTargetPosition(party.frame, serverNow())
       if (v.duration > 0 && target >= v.duration - 0.25 && party.frame.action === 'play') {
-        // Video ended: the host advances the queue (one shot per media);
-        // everyone else parks paused at the end (no loop in V1).
+        // Video ended: the host advances the queue. Keyed by media+frame
+        // stamp so a wrap back to the same entry re-arms the guard.
         if (!v.paused) v.pause()
-        if (party.host === identity.orbitId && party.queue.length > 1 && endedRef.current !== party.current) {
-          endedRef.current = party.current
+        const endedKey = `${party.current}:${party.frame.updatedAt}`
+        if (shouldFireQueueNext({
+          isHost: party.host === identity.orbitId,
+          queueLength: party.queue.length,
+          action: party.frame.action,
+          endedKey,
+          lastFiredKey: endedRef.current,
+        })) {
+          endedRef.current = endedKey
           queueOp(party.id, 'next')
         }
         return

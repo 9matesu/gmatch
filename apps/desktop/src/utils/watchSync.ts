@@ -61,3 +61,18 @@ export class ClockOffset {
     return Date.now() / 1000 + this.offset
   }
 }
+
+/** Queue-advance guard: host only, playing room, queue present (a single
+ * entry loops it all night), and never twice for the same server frame.
+ * endedKey is `${current}:${frame.updatedAt}` — a wrap re-stamps updatedAt,
+ * so the guard re-arms itself without relying on the entry id changing. */
+export function shouldFireQueueNext(opts: {
+  isHost: boolean
+  queueLength: number
+  action: 'play' | 'pause'
+  endedKey: string
+  lastFiredKey: string
+}): boolean {
+  return opts.isHost && opts.action === 'play' && opts.queueLength >= 1 &&
+    opts.endedKey !== opts.lastFiredKey
+}
