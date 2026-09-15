@@ -19,6 +19,9 @@ try {
 
 const SCHEME = 'gmcache'
 const MAX_SINGLE_BYTES = 25 * 1024 * 1024
+// Same rule as vault.cjs: parsed videos (80MB+ mp4s) must not be rejected
+// at fetch time or the vault never sees them.
+const MAX_SINGLE_VIDEO_BYTES = 200 * 1024 * 1024
 // ponytail: 10min list TTL — a deduped query must refresh; the 24h "one call"
 // guarantee lives in the image-BYTES cache, not the feed list.
 const FEED_TTL_MS = 10 * 60 * 1000
@@ -124,7 +127,10 @@ async function fetchBinary(url, redirects = 3) {
       }
       const ab = await res.arrayBuffer()
       const buf = Buffer.from(ab)
-      if (buf.length > MAX_SINGLE_BYTES) {
+      // Videos get a bigger ceiling (vault pins parsed mp4s 80MB+); see
+      // vault.cjs MAX_SINGLE_VIDEO_BYTES for the same rule at store time.
+      const cap = /^video\//i.test(type) ? MAX_SINGLE_VIDEO_BYTES : MAX_SINGLE_BYTES
+      if (buf.length > cap) {
         throw new Error('file too large')
       }
       return { buf, mime: type || 'application/octet-stream' }
@@ -164,7 +170,8 @@ async function fetchBinary(url, redirects = 3) {
         let size = 0
         res.on('data', (c) => {
           size += c.length
-          if (size > MAX_SINGLE_BYTES) {
+          const cap = /^video\//i.test(String(type)) ? MAX_SINGLE_VIDEO_BYTES : MAX_SINGLE_BYTES
+          if (size > cap) {
             req.destroy(new Error('file too large'))
             return
           }
