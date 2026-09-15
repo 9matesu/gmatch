@@ -117,6 +117,7 @@ import { recommendations } from './routes/recommendations'
 import { likes } from './routes/likes'
 import { lobby, wsTicket } from './routes/lobby'
 import { rooms } from './routes/rooms'
+import { watchparty } from './routes/watchparty'
 import { flash } from './routes/flash'
 import { babecock } from './routes/babecock'
 import { stats } from './routes/stats'
@@ -166,6 +167,7 @@ app.route('/api/relationships', likes)
 app.route('/api/lobby', lobby)
 app.route('/api/ws-ticket', wsTicket)
 app.route('/api/rooms', rooms)
+app.route('/api/watchparty', watchparty)
 app.route('/api/flash', flash)
 app.route('/api/babecock', babecock)
 app.route('/api/stats', stats)
