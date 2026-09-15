@@ -204,12 +204,19 @@ watchparty.get('/:id/stream', async (c) => {
   const headers: Record<string, string> = { 'User-Agent': 'Mozilla/5.0', Referer: party.relay.referer }
   const range = c.req.header('Range')
   if (range && /^bytes=[\d-]+$/.test(range)) headers.Range = range
+  // The timer guards ONLY the header phase: AbortSignal.timeout would keep
+  // owning the response body and kill every long stream 15 s in (the
+  // "randomly pauses mid-video" report). Release it once headers are here.
+  const ctl = new AbortController()
+  const headerTimer = setTimeout(() => ctl.abort(), 15_000)
   let up: Response
   try {
-    up = await fetch(party.relay.upstream, { headers, redirect: 'follow', signal: AbortSignal.timeout(15000) })
+    up = await fetch(party.relay.upstream, { headers, redirect: 'follow', signal: ctl.signal })
   } catch {
+    clearTimeout(headerTimer)
     return c.json({ error: 'Upstream unreachable' }, 502)
   }
+  clearTimeout(headerTimer)
   if (!up.ok) return c.json({ error: 'Upstream refused' }, 502)
   const out = new Headers()
   const ct = up.headers.get('content-type')

@@ -159,6 +159,38 @@ describe('GET /api/watchparty/:id/stream', () => {
     expect(upOpts.headers.Referer).toBe('https://pmvhaven.com/')
   })
 
+
+describe('stream lifetime (no 15s body abort)', () => {
+  it('serves a stream that lasts longer than the header window', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(null, { status: 200, headers: { 'content-type': 'video/mp4', 'content-length': String(80 * 1024 * 1024) } }),
+    ))
+    const partyId = await createRelayParty()
+    // 21-chunk trickle (1 chunk/1.1s). The stub HONORS init.signal, so the
+    // old AbortSignal.timeout(15000) really kills the body at 15s (RED);
+    // the fix releases the timer at headers and the full stream lands.
+    const slowStream = (signal?: AbortSignal | null) => new ReadableStream({
+      start(c) {
+        c.enqueue(new Uint8Array([0]))
+        let n = 1
+        const t = setInterval(() => {
+          if (signal?.aborted) { clearInterval(t); c.error(new Error('aborted')); return }
+          if (n++ >= 20) { clearInterval(t); c.enqueue(new Uint8Array([n])); c.close() }
+          else c.enqueue(new Uint8Array([n]))
+        }, 1100)
+        signal?.addEventListener?.('abort', () => { clearInterval(t); c.error(new Error('aborted')) })
+      },
+    })
+    vi.stubGlobal('fetch', vi.fn(async (_u: string, init?: { signal?: AbortSignal | null }) => new Response(slowStream(init?.signal), {
+      status: 206, headers: { 'content-type': 'video/mp4', 'content-range': 'bytes 0-21/22' },
+    })))
+    const res = await app.request(`/api/watchparty/${partyId}/stream`, {}, env)
+    expect(res.status).toBe(206)
+    const out = new Uint8Array(await res.arrayBuffer())
+    expect(out.length).toBe(21)
+  }, 60_000)
+})
+
   it('404s for unknown or non-relay parties', async () => {
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(null, { status: 200, headers: { 'content-type': 'video/mp4', 'content-length': '1000' } }),
