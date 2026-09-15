@@ -358,6 +358,7 @@ describe('room persistence', () => {
     joinWatch('u2', 'Bob', { party: p.id })
     applyWatch('u2', { party: p.id, action: 'play', position: 42 })
     queueOps('u1', { party: p.id, op: 'add', name: 'next', url: '/api/objects/n' })
+    applyChat('u2', 'Bob', { party: p.id, text: 'gn everyone' })
     const dump = serializeParties()
     __resetParties()
     expect(getParty(p.id)).toBeNull()
@@ -375,6 +376,9 @@ describe('room persistence', () => {
     // capability map is rebuilt: current AND queued media readable again
     expect(isPartyMediaObject(q.mediaUrl)).toBe(true)
     expect(isPartyMediaObject('/api/objects/n')).toBe(true)
+    // chat lives as long as the room (feat/watch-bg-playback): the backlog
+    // survives a restart for everyone who (re-)joins.
+    expect(q.chat.some((m) => m.text === 'gn everyone')).toBe(true)
   })
 
   it('liveMediaObjectIds lists current + queued /api/objects ids', () => {
