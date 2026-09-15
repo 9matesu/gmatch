@@ -32,14 +32,20 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
   const active = parties.find((p) => p.id === activeId) || parties[parties.length - 1] || null
   const isHost = active?.host === identity.orbitId
 
-  // Invite deep link: #/watch?room=<id> joins once, then cleans the URL so a
-  // refresh does not re-join. The view only mounts with an identity, so the
-  // gated-app rule (no traffic before login/server pick) holds by placement.
+  // Invite deep link: #/watch?room=<id> joins, then cleans the URL so a
+  // refresh does not re-join. The theater is now ALWAYS mounted, so the
+  // link can arrive via a later hash change (dock click, pasted link):
+  // listen, don't just read once at mount.
   useEffect(() => {
-    const roomId = watchRoomFromHash(window.location.hash)
-    if (!roomId) return
-    window.history.replaceState(null, '', stripWatchRoom(window.location.hash))
-    void joinPartyById(identity, roomId)
+    const tryJoin = () => {
+      const roomId = watchRoomFromHash(window.location.hash)
+      if (!roomId) return
+      window.history.replaceState(null, '', stripWatchRoom(window.location.hash))
+      void joinPartyById(identity, roomId)
+    }
+    tryJoin()
+    window.addEventListener('hashchange', tryJoin)
+    return () => window.removeEventListener('hashchange', tryJoin)
   }, [identity])
 
   const inRoom = parties.length > 0

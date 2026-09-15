@@ -86,7 +86,7 @@ import { StoreView } from "./components/views/StoreView";
 import { NotificationsPanel } from "./components/NotificationsPanel";
 import { logger } from './utils/logger';
 import { useNotifications } from './hooks/useNotifications';
-import { isKnownSiteCourier, cachedMailMode } from "./utils/mail-mode";
+import { isKnownSiteCourier, cachedMailMode, detectMailMode } from "./utils/mail-mode";
 import { useCourierDms } from './hooks/useCourierDms';
 import { useServerHeartbeat } from './hooks/useServerHeartbeat';
 import { usePendingJoinVerify } from './hooks/usePendingJoinVerify';
@@ -1385,18 +1385,20 @@ export default function Home() {
   const loadPmThreads = useCallback(() => {
     if (!identity) return Promise.resolve()
     const base = getApiBaseUrl()
-    if (courierActive || isKnownSiteCourier(base) || cachedMailMode(base) === 'courier') {
-      return Promise.resolve()
-    }
-    return orbitFetch(`/api/pm/threads?_t=${Date.now()}`, {}, identity)
-      .then(async (res) => {
-        if (!res.ok) return
-        const data = await res.json()
-        if (Array.isArray(data)) {
-          setPmThreads(data)
-        }
-      })
-      .catch(() => { })
+    // Await the mode probe before deciding: firing the legacy fetch while
+    // the cache is still empty 404-spams the console on courier-only nodes.
+    return detectMailMode(base).then((mode) => {
+      if (courierActive || mode === 'courier') return
+      return orbitFetch(`/api/pm/threads?_t=${Date.now()}`, {}, identity)
+        .then(async (res) => {
+          if (!res.ok) return
+          const data = await res.json()
+          if (Array.isArray(data)) {
+            setPmThreads(data)
+          }
+        })
+        .catch(() => { })
+    })
   }, [identity, courierActive])
 
   // ─── Unified rooms chat (rooms ARE the chat system; dock shows a preview) ───
