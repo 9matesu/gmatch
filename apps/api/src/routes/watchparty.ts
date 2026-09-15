@@ -3,7 +3,8 @@ import { orbitAuth } from '../middleware/auth'
 import type { D1Turso } from '../db'
 import type { LocalBlobStore } from '../blob'
 import { proxyAndStoreExternal, classifyAndResolve, isPrivateTarget } from '../proxy'
-import { createParty, getParty, listParties, setPartyMedia } from '../watchparty'
+import { broadcastToRoom } from '../ws-bus'
+import { createParty, getParty, listParties, setPartyMedia, queueOps, type Party } from '../watchparty'
 
 type Bindings = {
   DB: D1Turso
@@ -17,9 +18,55 @@ const PARSE_ERROR = 'Could not find a playable video at that link.'
 // streaming through one bun process stays sane.
 const RELAY_MAX_BYTES = 500 * 1024 * 1024
 
-// Auth per-route: the stream endpoint is hit by a raw <video> src that
-// cannot carry X-Orbit-* headers. The party id (8 hex) is the capability —
-// it only ever travels inside the authenticated party WS room.
+/**
+ * The one media pipeline: try store-first (private Object, Range-streamed via
+ * the isPartyMediaObject door), fall back to a party-bound relay for files
+ * above the 50MB store cap. Returns the playable URL (+ relay binding) or
+ * null when nothing playable was found.
+ */
+async function resolveMedia(env: Bindings, orbitId: string, rawUrl: string): Promise<{ url: string; relay?: { upstream: string; referer: string }; stored?: boolean } | null> {
+  let parsed: URL
+  try {
+    parsed = new URL(rawUrl)
+  } catch {
+    return null
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol) || rawUrl.length > 2048) return null
+
+  const objectId = crypto.randomUUID()
+  const proxied = await proxyAndStoreExternal(rawUrl, env.BUCKET, 'objects', objectId)
+  if (proxied?.isVideo) {
+    await env.DB.prepare(
+      'INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, is_public, is_proxied, proxied_mime) VALUES (?, ?, ?, ?, ?, 0, 1, ?)'
+    ).bind(objectId, orbitId, proxied.bytesStored, proxied.mimeType, proxied.storedUrl, proxied.proxiedMime).run()
+    return { url: `/api/objects/${objectId}`, stored: true }
+  }
+
+  // Too big to store (pmvhaven ships 80MB+ mp4s): resolve + probe, the party
+  // binds THIS upstream and streams it through /stream. Not an open proxy:
+  // the URL can only enter via this authenticated create path.
+  const resolved = await classifyAndResolve(rawUrl)
+  if (!resolved) return null
+  let up: URL
+  try {
+    up = new URL(resolved)
+  } catch {
+    return null
+  }
+  if (await isPrivateTarget(up)) return null
+  try {
+    const probe = await fetch(up.toString(), { method: 'GET', headers: { Range: 'bytes=0-1', 'User-Agent': 'Mozilla/5.0', Referer: `${parsed.protocol}//${parsed.host}/` }, signal: AbortSignal.timeout(8000) })
+    const ct = probe.headers.get('content-type') || ''
+    const len = Number(probe.headers.get('content-length') || (probe.headers.get('content-range') || '').split('/')[1] || 0)
+    if (!probe.ok && probe.status !== 206) return null
+    if (!ct.startsWith('video/')) return null
+    if (len > RELAY_MAX_BYTES) return null
+  } catch {
+    return null
+  }
+  return { url: '', relay: { upstream: up.toString(), referer: `${parsed.protocol}//${parsed.host}/` } }
+}
+
 watchparty.post('/', orbitAuth, async (c) => {
   const orbitId = c.get('orbitId')
   let body: any
@@ -30,60 +77,68 @@ watchparty.post('/', orbitAuth, async (c) => {
   }
   const url = typeof body?.url === 'string' ? body.url.trim() : ''
   const name = typeof body?.name === 'string' ? body.name.trim().slice(0, 40) : ''
-  if (!url || url.length > 2048) return c.json({ error: PARSE_ERROR }, 422)
+  if (!url) return c.json({ error: PARSE_ERROR }, 422)
 
-  let parsed: URL
-  try {
-    parsed = new URL(url)
-  } catch {
-    return c.json({ error: PARSE_ERROR }, 422)
-  }
-  if (!['http:', 'https:'].includes(parsed.protocol)) return c.json({ error: PARSE_ERROR }, 422)
+  const media = await resolveMedia(c.env, orbitId, url)
+  if (!media) return c.json({ error: PARSE_ERROR }, 422)
 
-  // First choice: pull bytes ONCE into our own encrypted storage (SSRF guard
-  // + magic-byte validation inside proxyAndStoreExternal); peers then
-  // Range-stream the private Object via the isPartyMediaObject door.
-  const objectId = crypto.randomUUID()
-  const proxied = await proxyAndStoreExternal(url, c.env.BUCKET, 'objects', objectId)
-  if (proxied?.isVideo) {
-    await c.env.DB.prepare(
-      'INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, is_public, is_proxied, proxied_mime) VALUES (?, ?, ?, ?, ?, 0, 1, ?)'
-    ).bind(objectId, orbitId, proxied.bytesStored, proxied.mimeType, proxied.storedUrl, proxied.proxiedMime).run()
-    const mediaUrl = `/api/objects/${objectId}`
-    const party = createParty(name || 'Party', mediaUrl, mediaUrl)
-    return c.json({ party: { id: party.id, name: party.name, url: mediaUrl } }, 201)
+  const party = createParty(name || 'Party', media.url, media.url, media.relay, orbitId)
+  if (media.relay) {
+    setPartyMedia(party, `/api/watchparty/${party.id}/stream`)
+    party.queue.push({ id: crypto.randomUUID().slice(0, 8), name: party.name, url: party.mediaUrl, relay: media.relay })
+    party.current = party.queue[0].id
   }
-
-  // Fallback for videos above the store cap (pmvhaven ships 80MB+ mp4s):
-  // resolve the direct URL and bind a relay to the party. The hub then only
-  // ever proxies THIS upstream for THIS party — not an open proxy.
-  const resolved = await classifyAndResolve(url)
-  if (!resolved) return c.json({ error: PARSE_ERROR }, 422)
-  let up: URL
-  try {
-    up = new URL(resolved)
-  } catch {
-    return c.json({ error: PARSE_ERROR }, 422)
-  }
-  if (await isPrivateTarget(up)) return c.json({ error: PARSE_ERROR }, 422)
-  try {
-    const probe = await fetch(up.toString(), { method: 'GET', headers: { Range: 'bytes=0-1', 'User-Agent': 'Mozilla/5.0', Referer: `${parsed.protocol}//${parsed.host}/` }, signal: AbortSignal.timeout(8000) })
-    const ct = probe.headers.get('content-type') || ''
-    const len = Number(probe.headers.get('content-length') || (probe.headers.get('content-range') || '').split('/')[1] || 0)
-    if (!probe.ok && probe.status !== 206) return c.json({ error: PARSE_ERROR }, 422)
-    if (!ct.startsWith('video/')) return c.json({ error: PARSE_ERROR }, 422)
-    if (len > RELAY_MAX_BYTES) return c.json({ error: PARSE_ERROR }, 422)
-  } catch {
-    return c.json({ error: PARSE_ERROR }, 422)
-  }
-
-  const party = createParty(name || 'Party', '', '', { upstream: up.toString(), referer: `${parsed.protocol}//${parsed.host}/` })
-  setPartyMedia(party, `/api/watchparty/${party.id}/stream`)
   return c.json({ party: { id: party.id, name: party.name, url: party.mediaUrl } }, 201)
 })
 
 watchparty.get('/', orbitAuth, async (c) => {
   return c.json({ parties: listParties() })
+})
+
+/** Member check for the video endpoints mirrors the WS gates (the WS path
+ * itself re-validates per frame; this route needs it because queueOps'
+ * membership check reads party.members). */
+function memberParty(c: { get: (k: string) => string }, id: string): { party: Party | null; orbitId: string } {
+  const orbitId = c.get('orbitId')
+  return { party: getParty(id), orbitId }
+}
+
+// Queue add / video change over HTTP (runs the media pipeline, then relays
+// the queue frame to the room exactly like the WS ops would).
+watchparty.post('/:id/video', orbitAuth, async (c) => {
+  const { party, orbitId } = memberParty(c, c.req.param('id') || '')
+  if (!party || !party.members.has(orbitId)) return c.json({ error: 'Party not found' }, 404)
+  if (party.lockVideo && party.hostId !== orbitId) return c.json({ error: 'Only the host can load videos in this room.' }, 403)
+  let body: any
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400)
+  }
+  const url = typeof body?.url === 'string' ? body.url.trim() : ''
+  const title = typeof body?.name === 'string' ? body.name.trim().slice(0, 60) : ''
+  const queueOnly = body?.queueOnly === true
+
+  const media = await resolveMedia(c.env, orbitId, url)
+  if (!media) return c.json({ error: PARSE_ERROR }, 422)
+  let entryUrl = media.url
+  if (media.relay && !entryUrl) entryUrl = `/api/watchparty/${party.id}/stream`
+
+  const add = queueOps(orbitId, { party: party.id, op: 'add', name: title, url: entryUrl, relay: media.relay })
+  if (!add) return c.json({ error: 'The room changed. Try again.' }, 409)
+  const entry = party.queue[party.queue.length - 1]
+  if (!queueOnly) {
+    queueOps(orbitId, { party: party.id, op: 'play', id: entry.id })
+  }
+  const payload = {
+    type: 'watch.queue',
+    party: party.id,
+    queue: party.queue,
+    current: party.current,
+    frame: party.frame,
+  }
+  broadcastToRoom(`watch:${party.id}`, payload)
+  return c.json({ ok: true, entry: { id: entry.id, name: entry.name, url: entry.url } })
 })
 
 watchparty.get('/:id', orbitAuth, async (c) => {
@@ -94,7 +149,14 @@ watchparty.get('/:id', orbitAuth, async (c) => {
     name: party.name,
     url: party.mediaUrl,
     frame: party.frame,
-    members: [...party.members.entries()].map(([id, name]) => ({ id, name })),
+    host: party.hostId,
+    isPrivate: party.isPrivate,
+    lockVideo: party.lockVideo,
+    mediaName: party.mediaName,
+    queue: party.queue,
+    current: party.current,
+    chat: party.chat,
+    members: [...party.members.entries()].map(([id, m]) => ({ id, name: m.name, muted: m.muted })),
   })
 })
 
