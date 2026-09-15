@@ -38,4 +38,14 @@ G "spy hack reading DM bodies" \
 
 G "legacy /api/pm mount is dead"   "grep -n \"route('/api/pm\" apps/api/src/index.ts"
 
+# Audit rodada 5 standing locks (docs/AUDIT-2026-09-15.md)
+G "watch-room subscribe backdoor reintroduced" \
+  "grep -n 'ALLOWED = new Set' apps/api/src/ws-bus.ts | grep -v \"'lobby', 'global'\" | grep -v \"'global', 'lobby'\""
+G 'subscribe guard removed from ws-bus' \
+  "bash -c \"grep -q \\\"ALLOWED.has(r)\\\" apps/api/src/ws-bus.ts || echo missing\""
+G "party media INSERT lost its expires_at" \
+  "bash -c \"grep -q \\\"datetime('now', '+1 day')\\\" apps/api/src/routes/watchparty.ts || echo missing\""
+G "client sends type:lobby frames (server-only room)" \
+  "grep -rn \"type: 'lobby'\" apps/desktop/src --include='*.ts' --include='*.tsx' | grep -v test"
+
 if [ "$FAIL" -eq 0 ]; then echo "ALL GREPS CLEAN"; else exit 1; fi
