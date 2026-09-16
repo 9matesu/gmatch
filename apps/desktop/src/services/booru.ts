@@ -985,24 +985,19 @@ async function imhentaiDirect(query: string, limit: number): Promise<BooruPost[]
     if (!searchRes.ok || typeof searchRes.text !== 'function') return []
     const html = await searchRes.text()
 
-    // 1. Gallery covers directly from the search HTML in one pass (avoids
-    // secondary requests that trigger Cloudflare 403s). toImhentaiPost
-    // rewrites thumb.jpg -> 1.jpg; drop posts where the rewrite failed.
-    const directResults = parseImhentaiSearchResults(html, Math.max(limit, 3))
-    const converted = directResults
-      .slice(0, limit)
-      .map((r) => toImhentaiPost(r.id, { url: r.coverUrl, width: 0, height: 0 }, query))
-      .filter((p) => !/\/(?:thumb|thumbs)(?:[?#/.]|$)/i.test(p.url))
-    const seenCoverIds = new Set(directResults.map((r) => r.id))
-
-    // 2. Expand gallery books (whole book per page via the ext map) whenever
-    // covers alone leave the batch short — bounded lanes, round-robin merge
-    // so several galleries contribute instead of one.
-    const want = limit - converted.length
-    const ids = want > 0 ? parseImhentaiSearch(html, GALLERY_CAP).filter((id) => !seenCoverIds.has(id)) : []
-    if (ids.length === 0) return converted
-    const perGallery = Math.max(1, Math.ceil(want / ids.length))
-    const sets = await mapLimit(ids, GALLERY_LANES, async (id) => {
+    // 1. Gallery entries from the search page. Enter EACH gallery: the
+    // search cover is only a thumbnail — the real page extensions live in
+    // the gallery's ext map (a book may ship .webp while a blind
+    // thumb->1.jpg rewrite 404s). Covers stay as the fallback for galleries
+    // whose page fetch fails (CF burst/403) so the round still lands posts.
+    const results = parseImhentaiSearchResults(html, GALLERY_CAP)
+    // Links without an inline cover (sparse markup): still enter them.
+    const entries = results.length > 0
+      ? results
+      : parseImhentaiSearch(html, GALLERY_CAP).map((id) => ({ id, coverUrl: '' }))
+    if (entries.length === 0) return []
+    const perGallery = Math.max(1, Math.ceil(limit / Math.min(entries.length, GALLERY_LANES)))
+    const sets = await mapLimit(entries, GALLERY_LANES, async ({ id }) => {
       try {
         const gRes = await fetch(toProxy(imhentaiGalleryUrl(id), IMHENTAI_ROOT, '/booru/imh'), {
           signal: AbortSignal.timeout(TIMEOUT_MS),
@@ -1019,8 +1014,14 @@ async function imhentaiDirect(query: string, limit: number): Promise<BooruPost[]
         return undefined /* one dead gallery never kills the round */
       }
     })
-    // A 403 mid-round cools the source; still serve whatever lanes finished.
-    return [...converted, ...roundRobin(sets, want)]
+    const expanded = roundRobin(sets, limit)
+    if (expanded.length > 0) return expanded
+    // Every entry failed: fall back to the search-page covers (thumb -> 1.x
+    // rewrite; a wrong-extension cover is one broken image, not a dead feed).
+    return results
+      .slice(0, limit)
+      .map((r) => toImhentaiPost(r.id, { url: r.coverUrl, width: 0, height: 0 }, query))
+      .filter((p) => p.url && !/\/(?:thumb|thumbs)(?:[?#/.]|$)/i.test(p.url))
   } catch {
     return []
   }
