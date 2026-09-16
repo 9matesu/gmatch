@@ -52,6 +52,10 @@ process.on('unhandledRejection', (reason) => mainLog(`unhandledRejection: ${reas
 // Update handoff: once the swap script is spawned, quitting must not be
 // blocked by the renderer's save-your-keys unload gate.
 let updateHandoff = false
+// Explicit renderer reload (context menu, Ctrl+R): the key-save flush runs
+// synchronously in beforeunload itself, so the stay/leave gate is pure noise
+// here - let reloads through unasked. Close keeps the dialog.
+let reloadWanted = false
 
 // One-shot camera permission consumed by setPermissionRequestHandler.
 let cameraGrantOnce = false
@@ -1203,7 +1207,7 @@ function createWindow() {
   // unload just cancels the window close). Surface the page's message as a
   // real native dialog instead: Stay saves nothing, Leave closes.
   win.webContents.on('will-prevent-unload', (event) => {
-    if (updateHandoff) { event.preventDefault(); return }
+    if (updateHandoff || reloadWanted) { reloadWanted = false; event.preventDefault(); return }
     const choice = dialog.showMessageBoxSync(win, {
       type: 'warning',
       buttons: ['Stay', 'Leave anyway'],
@@ -1214,6 +1218,15 @@ function createWindow() {
       detail: 'Open Settings → Identity & Keys to copy or download it. If you already backed it up, you can close safely.',
     })
     if (choice === 1) event.preventDefault()
+  })
+  // Ctrl/Cmd+R = plain refresh (frameless window, no menu accelerators).
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown' && input.key.toLowerCase() === 'r' && (input.control || input.meta)) {
+      event.preventDefault()
+      reloadWanted = true
+      win.webContents.reload()
+      setTimeout(() => { reloadWanted = false }, 3000)
+    }
   })
   // Only use the dev server when explicitly requested — never guess a port,
   // another app may be listening there.
@@ -1252,6 +1265,16 @@ app.whenReady().then(async () => {
     if (w.isMaximized()) w.unmaximize(); else w.maximize()
   })
   ipcMain.on('window:close', (e) => BrowserWindow.fromWebContents(e.sender)?.close())
+  // Reload = refresh, never the stay/leave dialog: the beforeunload handlers
+  // (key save + idle save) run synchronously before the reload lands.
+  ipcMain.on('window:reload', (e) => {
+    const w = BrowserWindow.fromWebContents(e.sender)
+    if (!w) return
+    reloadWanted = true
+    w.webContents.reload()
+    // Safety: if no unload attempt materializes, don't leak the bypass.
+    setTimeout(() => { reloadWanted = false }, 3000)
+  })
   imageCache.init(app.getPath('userData'), UA)
   vault.init(app.getPath('userData'))
   protocol.handle(imageCache.SCHEME, (request) => imageCache.serveImage(request))

@@ -37,6 +37,7 @@ export interface GmatchBridge {
   winMinimize?: () => void
   winToggleMaximize?: () => void
   winClose?: () => void
+  winReload?: () => void
   appVersion?: () => Promise<string>
   openExternal?: (url: string) => Promise<void>
   serverSet?: (payload: { mode: 'host' | 'client'; url?: string }) => Promise<{ ok: boolean; error?: string }>
