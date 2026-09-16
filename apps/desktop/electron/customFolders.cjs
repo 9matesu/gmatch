@@ -109,6 +109,31 @@ function insideGrant(abs, root) {
   return normAbs === normRoot || normAbs.startsWith(normRoot + path.sep)
 }
 
+// Read the granted bytes for an idle-file:// URL, or null when the grant is
+// unknown / the path escapes / the file is missing. Used by the vault: its
+// byte fetcher only speaks http(s), so idle keeps could never persist there.
+// ponytail: resolution duplicated from serveIdleFile (which needs distinct
+// HTTP status codes); fold together if a third caller shows up.
+function readIdleFile(url) {
+  try {
+    const u = new URL(String(url))
+    if (u.protocol !== SCHEME + ':') return null
+    const grant = findGrant(u.host)
+    if (!grant) return null
+    const rel = decodeURIComponent(u.pathname.replace(/^\/+/, ''))
+    if (!rel || rel.includes('..') || path.isAbsolute(rel)) return null
+    const abs = path.join(grant.path, rel)
+    if (!insideGrant(abs, grant.path)) return null
+    const ext = path.extname(abs).slice(1).toLowerCase()
+    if (!MEDIA_EXTS.has(ext)) return null
+    const stat = fs.statSync(abs)
+    if (!stat.isFile() || stat.size > MAX_SINGLE_BYTES) return null
+    return { buf: fs.readFileSync(abs), mime: EXT_MIME[ext] || 'application/octet-stream' }
+  } catch {
+    return null
+  }
+}
+
 function serveIdleFile(request) {
   try {
     if (request.method === 'OPTIONS') {
@@ -172,4 +197,14 @@ function init(dataPath, { ipcMain, BrowserWindow }) {
   ipcMain.handle('custom:remove-folder', (_event, id) => removeFolder(id))
 }
 
-module.exports = { SCHEME, init, __test: { findGrant: (id) => findGrant(id), insideGrant } }
+module.exports = {
+  SCHEME,
+  init,
+  readIdleFile,
+  __test: {
+    findGrant: (id) => findGrant(id),
+    insideGrant,
+    // Test seam: register grants without the electron dialog.
+    setGrants: (list) => { grants = Array.isArray(list) ? list.map((g) => ({ id: String(g.id), path: String(g.path) })) : [] },
+  },
+}

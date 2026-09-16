@@ -73,7 +73,14 @@ async function main() {
   // parsed big video: >25MB (the IMAGE cap) pins under the VIDEO cap, and
   // serveVault answers Range with 206 + Content-Range (seekable mp4).
   const big = Buffer.alloc(26 * 1024 * 1024, 7)
-  vault._test.setFetcher(async () => ({ buf: big, mime: 'video/mp4' }))
+  vault._test.setFetcher(async (url) => {
+    // Mirror the real fetcher: http/https only. A non-http scheme throws
+    // 'bad protocol' there, which is exactly what kept idle-file:// keeps
+    // from ever reaching disk.
+    const u = new URL(String(url))
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Error('bad protocol')
+    return { buf: big, mime: 'video/mp4' }
+  })
   const bigLocal = await vault.pin('https://x/big.mp4')
   assert.ok(bigLocal, '26MB video must pin under the video cap')
   const hit = await vault.serveVault(new Request(bigLocal, { headers: { Range: 'bytes=0-99' } }))
@@ -83,6 +90,29 @@ async function main() {
   const full = await vault.serveVault(new Request(bigLocal))
   assert.strictEqual(full.headers.get('accept-ranges'), 'bytes')
   assert.strictEqual(full.status, 200)
+
+  // idle-file:// sources (player-owned idle folders) pin by reading the
+  // granted path directly: the byte fetcher only speaks http/https, so
+  // routing them through it threw 'bad protocol' and kepts never persisted.
+  const customFolders = require('./customFolders.cjs')
+  const picsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-pics-'))
+  fs.writeFileSync(path.join(picsDir, 'local.jpg'), Buffer.from('LOCALBYTES', 'utf8'))
+  customFolders.__test.setGrants([{ id: 'g1', path: picsDir }])
+  const idleUrl = 'idle-file://g1/local.jpg'
+
+  assert.strictEqual(vault.get(idleUrl), null, 'idle-file miss before pin')
+  const idleLocal = await vault.pin(idleUrl)
+  assert.ok(idleLocal && idleLocal.startsWith('vault://f/'), `idle-file pins, got ${idleLocal}`)
+  assert.strictEqual(vault.get(idleUrl), idleLocal, 'idle-file lookup hit after pin')
+  const idleServed = await vault.serveVault(new Request(idleLocal))
+  assert.strictEqual(idleServed.status, 200)
+  assert.strictEqual(await idleServed.text(), 'LOCALBYTES', 'granted bytes persisted')
+
+  // traversal out of the grant must never pin
+  assert.strictEqual(await vault.pin('idle-file://g1/..%2Fsecret.jpg'), null, 'traversal rejected')
+  // unknown grant id pins nothing
+  assert.strictEqual(await vault.pin('idle-file://nope/local.jpg'), null, 'unknown grant rejected')
+  fs.rmSync(picsDir, { recursive: true, force: true })
 
   fs.rmSync(tmp, { recursive: true, force: true })
   console.log('vault: all assertions passed')

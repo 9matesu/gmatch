@@ -149,8 +149,19 @@ async function pin(url) {
       writeManifest()
       return hit
     }
-    const fetch = fetcher || imageCache.fetchBinary
-    const { buf, mime } = await fetch(String(url))
+    // idle-file:// (player-owned idle folders) is not http(s) — the byte
+    // fetcher rejects any other scheme, so those keeps never reached disk
+    // and only reappeared while the clicker held the folder grant open.
+    // Read the granted path directly instead of routing through the fetcher.
+    let fetched
+    if (String(url).startsWith('idle-file://')) {
+      fetched = require('./customFolders.cjs').readIdleFile(url)
+      if (!fetched) return null
+    } else {
+      const fetch = fetcher || imageCache.fetchBinary
+      fetched = await fetch(String(url))
+    }
+    const { buf, mime } = fetched
     if (!buf || buf.length === 0) return null
     const cap = String(mime || '').startsWith('video/') ? MAX_SINGLE_VIDEO_BYTES : MAX_SINGLE_BYTES
     if (buf.length > cap) return null
