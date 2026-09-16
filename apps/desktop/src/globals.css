@@ -448,6 +448,18 @@
   border-color: rgba(255, 255, 255, 0.25);
 }
 
+/* Watch tab: the island recedes to a faint sliver; hover (or keyboard
+   focus inside it) brings it fully back. Nothing else hides it.
+   (opacity only — the pill is positioned with `translate`, and stacking a
+   `transform` here would double-shift it.) */
+.command-island.island-recessed {
+  opacity: 0.08;
+}
+.command-island.island-recessed:hover,
+.command-island.island-recessed:focus-within {
+  opacity: 1;
+}
+
 
 
 .module-glass {

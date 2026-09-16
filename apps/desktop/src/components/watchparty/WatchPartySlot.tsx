@@ -1,11 +1,10 @@
 'use client'
 
-// One watch-party slot: dashed "+" placeholder when empty, a sync-driven
-// NativeVideoPlayer when filled. Transport belongs to the party, so all the
-// player's own controls are hidden; mute stays local.
+// One watch-party slot: the video only. Transport lives in the timeline
+// overlay; room info lives in the rail. Empty slot = "+ Start playing".
 
 import { useEffect, useRef, useState } from 'react'
-import { Maximize, PictureInPicture2, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer'
 import { useObjectImage } from '../../hooks/useObjectImage'
 import { controlPlayback, serverNow, queueOp, type PartyRuntime } from '../../hooks/watchPartyStore'
@@ -29,9 +28,6 @@ export function WatchPartySlot({
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const endedRef = useRef<string>('')
   const [videoSrc, setVideoSrc] = useState<string | null>(null)
-  // Default muted: Chrome blocks unmuted autoplay, and a silent room that
-  // starts playing beats a dead frame waiting for a click. Unmute is local.
-  const [muted, setMuted] = useState(true)
 
   const media = useObjectImage(party?.url || null, identity, { enabled: Boolean(party?.url) })
   const src = media.url
@@ -40,7 +36,8 @@ export function WatchPartySlot({
     setVideoSrc(src)
   }, [src])
 
-  // The volume slider starts at 0 (autoplay-safe): make the element agree.
+  // Autoplay-safe start: Chrome only allows unattended play while muted; the
+  // timeline volume slider (at 0) is the source of truth.
   useEffect(() => {
     const v = wrapRef.current?.querySelector('video')
     if (v) v.muted = true
@@ -125,7 +122,7 @@ export function WatchPartySlot({
       <button
         type="button"
         onClick={onEmptyClick}
-        className="relative aspect-video rounded-lg border border-dashed border-border-glass bg-glass-w5 hover:bg-glass-w10 flex flex-col items-center justify-center gap-2 text-retro-muted transition-colors cursor-pointer"
+        className="relative aspect-video border border-dashed border-border-glass bg-glass-w5 hover:bg-glass-w10 flex flex-col items-center justify-center gap-2 text-retro-muted transition-colors cursor-pointer"
       >
         <Plus className="w-6 h-6" />
         <span className="text-[10px] font-bold uppercase tracking-wider">Start playing</span>
@@ -138,7 +135,7 @@ export function WatchPartySlot({
       ref={wrapRef}
       data-active={active ? 'true' : 'false'}
       onClick={onSelect}
-      className={`watch-party-slot relative ${fill ? 'w-[min(100cqw,calc(100cqh*16/9))]' : 'aspect-video'} aspect-video overflow-hidden bg-black cursor-pointer ${active ? 'ring-1 ring-retro-fg' : 'border border-border-glass'}`}
+      className={`watch-party-slot relative ${fill ? 'absolute inset-0' : 'aspect-video'} bg-black cursor-pointer ${active ? '' : 'border border-border-glass'}`}
     >
       {videoSrc ? (
         <NativeVideoPlayer
@@ -169,69 +166,6 @@ export function WatchPartySlot({
           </span>
         </div>
       )}
-      <span className="absolute top-2 left-3 rounded bg-black/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/90 pointer-events-none">
-        {party.mediaName || party.name}
-      </span>
-      {party.frame?.by && (
-        <span className="absolute bottom-2 left-3 rounded bg-black/60 px-2 py-0.5 text-[10px] text-white/80 pointer-events-none truncate max-w-[55%]">
-          {party.frame.by} controls playback
-        </span>
-      )}
-      {/* Local controls (never synced): volume, PiP detach, fullscreen —
-          one button, one function, identical casing. */}
-      {videoSrc && (
-        <div className="absolute top-2 right-3 flex items-center gap-1.5">
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={muted ? 0 : 1}
-            aria-label="Volume"
-            title="Volume"
-            onClick={(e) => e.stopPropagation()}
-            onInput={(e) => {
-              const v = wrapRef.current?.querySelector('video')
-              if (!v) return
-              const vol = Number((e.target as HTMLInputElement).value)
-              v.volume = vol
-              v.muted = vol === 0
-              setMuted(vol === 0)
-            }}
-            className="h-1 w-16 accent-retro-fg cursor-pointer"
-          />
-          <button
-            type="button"
-            aria-label="Detach to picture-in-picture"
-            title="Detach (picture-in-picture)"
-            onClick={(e) => {
-              e.stopPropagation()
-              const v = wrapRef.current?.querySelector('video')
-              if (!v) return
-              if (document.pictureInPictureElement) void document.exitPictureInPicture()
-              else void v.requestPictureInPicture().catch(() => {})
-            }}
-            className="p-2 bg-black/60 text-white/90 hover:text-white cursor-pointer transition-colors duration-150"
-          >
-            <PictureInPicture2 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            aria-label="Fullscreen"
-            title="Fullscreen"
-            onClick={(e) => {
-              e.stopPropagation()
-              if (document.fullscreenElement) void document.exitFullscreen()
-              else void wrapRef.current?.requestFullscreen()
-            }}
-            className="p-2 bg-black/60 text-white/90 hover:text-white cursor-pointer transition-colors duration-150"
-          >
-            <Maximize className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
     </div>
   )
 }
-
-

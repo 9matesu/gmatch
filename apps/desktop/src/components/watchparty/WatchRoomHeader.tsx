@@ -1,8 +1,7 @@
 'use client'
 
-// Room header: name (host-editable), host pill, invite copy, settings modal
-// (host-only), leave. Tokens straight from DESIGN.md: plate + raised buttons,
-// carved wells only for the inputs.
+// Room section at the top of the watch rail: name (host-editable), watching
+// count, host pill, invite, settings, leave. No bar on the video itself.
 
 import { useState } from 'react'
 import { Crown, Settings, Share, X } from 'lucide-react'
@@ -17,7 +16,7 @@ interface IdentityLike {
   privateKeyHex: string
 }
 
-export function WatchRoomHeader({ party, identity, profilePics }: { party: PartyRuntime; identity: IdentityLike; profilePics: Record<string, string> }) {
+export function WatchRoomHeader({ party, identity, profilePics: _profilePics }: { party: PartyRuntime; identity: IdentityLike; profilePics: Record<string, string> }) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [nameDraft, setNameDraft] = useState(party.name)
@@ -32,8 +31,8 @@ export function WatchRoomHeader({ party, identity, profilePics }: { party: Party
 
   return (
     <>
-      <div className="bg-surface-raised flex items-center justify-between px-4 py-2.5 border-b border-border-glass gap-2">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="px-3 py-2 border-b border-border-glass space-y-1.5">
+        <div className="flex items-center gap-1.5">
           {editing && isHost ? (
             <input
               autoFocus
@@ -43,24 +42,18 @@ export function WatchRoomHeader({ party, identity, profilePics }: { party: Party
               onChange={(e) => setNameDraft(e.target.value)}
               onBlur={() => { setEditing(false); if (nameDraft.trim() && nameDraft !== party.name) setPartySettings(party.id, { name: nameDraft }) }}
               onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-              className="glass-inset w-48 px-2 py-1 text-xs"
+              className="glass-inset flex-1 min-w-0 px-2 py-1 text-xs"
             />
           ) : (
             <button
               type="button"
               onClick={() => { if (isHost) { setNameDraft(party.name); setEditing(true) } }}
-              className={`text-xs font-bold uppercase tracking-wider text-retro-fg truncate ${isHost ? 'cursor-pointer hover:text-retro-muted' : 'cursor-default'}`}
+              className={`min-w-0 flex-1 text-left text-xs font-bold uppercase tracking-wider text-retro-fg truncate ${isHost ? 'cursor-pointer hover:text-retro-muted' : 'cursor-default'}`}
               title={isHost ? 'Rename room' : undefined}
             >
               {party.name}
             </button>
           )}
-          <span className="shrink-0 flex items-center gap-1 rounded-full bg-glass-w12 px-2 py-0.5 text-[10px] uppercase tracking-wider text-retro-fg">
-            <Crown className="w-3 h-3" />
-            Host
-          </span>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
           <button type="button" onClick={invite} aria-label="Copy invite link" title={copied ? 'Copied' : 'Invite'} className="relative p-1.5 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer">
             <Share className="w-4 h-4" />
             {copied && <span className="absolute -top-6 left-1/2 -translate-x-1/2 rounded-md bg-glass-w12 px-1.5 py-0.5 text-[10px] text-retro-fg">Copied</span>}
@@ -70,14 +63,15 @@ export function WatchRoomHeader({ party, identity, profilePics }: { party: Party
               <Settings className="w-4 h-4" />
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => leaveParty(party.id)}
-            className={`${BTN} px-2 py-1 text-[10px] uppercase tracking-wider`}
-          >
-            Leave
+          <button type="button" onClick={() => leaveParty(party.id)} aria-label="Leave room" title="Leave room" className="p-1.5 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer">
+            <X className="w-4 h-4" />
           </button>
         </div>
+        <p className={`flex items-center gap-1 ${MUTED}`}>
+          <Crown className="w-3 h-3" />
+          {party.members.length}/8 watching
+        </p>
+        {party.mediaName && <p className={`truncate ${MUTED}`}>{party.mediaName}</p>}
       </div>
 
       {settingsOpen && (

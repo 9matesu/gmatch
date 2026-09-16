@@ -3734,16 +3734,7 @@ export default function Home() {
                     />
                   )}
 
-                  {/* Watch theater: ALWAYS mounted (hidden off-tab) so an
-                      opened room keeps playing in the background; unmounting
-                      destroyed the <video> on every tab switch. display:none
-                      does not pause HTML5 media; the sync tick keeps the
-                      drift lock and seeks back when the user returns. */}
-                  {settings.watchPartyEnabled && identity && (
-                    <div className={mainView === 'watch' ? 'flex-1 flex flex-row min-h-0 overflow-hidden' : 'hidden'}>
-                      <WatchPartyView identity={identity} profilePics={profilePics} />
-                    </div>
-                  )}
+                  {/* Watch theater mounts as an app-shell overlay (below). */}
 
                   {/* Game View (Matchmaking Lobby) */}
                   {mainView === 'game' && (
@@ -4222,6 +4213,17 @@ export default function Home() {
               )}
             </div>
 
+            {/* Watch theater: ALWAYS mounted (hidden off-tab) so an opened
+                room keeps playing in the background. Mounted at app-shell
+                level (absolute, under the z-40 header + island) so in a room
+                the video bleeds full-frame behind the transparent header; the
+                island fades away on this tab (hover it to revive). */}
+            {settings.watchPartyEnabled && identity && (
+              <div className={mainView === 'watch' ? 'absolute inset-0 z-[5] flex flex-col min-h-0 overflow-hidden' : 'hidden'}>
+                <WatchPartyView identity={identity} profilePics={profilePics} />
+              </div>
+            )}
+
             {/* Centered Floating Dynamic Island Navigation HUD */}
             <CommandIsland
               mainView={mainView}
@@ -4233,6 +4235,7 @@ export default function Home() {
               gamesOnlineCount={gamesOnlineCount}
               watchWatchingCount={watchWatchingCount}
               feedNewPostsCount={feedNewPostsCount}
+              recessed={mainView === 'watch'}
               displayName={myProfile.displayName || myUser?.display_name || 'You'}
               profilePic={profilePics[identity?.orbitId || '']}
               isAdmin={myProfile.isAdmin}

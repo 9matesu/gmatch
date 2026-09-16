@@ -61,6 +61,9 @@ export interface CommandIslandProps {
   watchWatchingCount?: number;
   /** Posts newer than the last feed visit (Feed badge). Hidden while feed is open. */
   feedNewPostsCount?: number;
+  /** Watch tab: fade the island to a hairline so only the video shows;
+   * hovering the bottom edge brings it back (CSS .island-recessed). */
+  recessed?: boolean;
   displayName?: string;
   profilePic?: string;
   isAdmin?: boolean;
@@ -89,6 +92,7 @@ export function CommandIsland({
   gamesOnlineCount = 0,
   watchWatchingCount = 0,
   feedNewPostsCount = 0,
+  recessed = false,
   displayName = 'You',
   profilePic,
   isAdmin = false,
@@ -230,7 +234,7 @@ export function CommandIsland({
       {/* Primary Floating Command Island Dock */}
       <nav
         aria-label="Command Island"
-        className="command-island fixed bottom-5 left-1/2 -translate-x-1/2 z-[var(--z-dropdown)] flex max-w-[calc(100vw-1.5rem)] items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full select-none transition-all duration-300 overflow-x-auto styled-scrollbar"
+        className={`command-island fixed bottom-5 left-1/2 -translate-x-1/2 z-[var(--z-dropdown)] flex max-w-[calc(100vw-1.5rem)] items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full select-none transition-all duration-300 overflow-x-auto styled-scrollbar ${recessed ? 'island-recessed' : ''}`}
       >
         {/* Left Telemetry: $G Balance */}
         <div className="flex items-center px-2.5 py-1 rounded-full bg-glass-w5 border border-border-glass text-xs font-mono tabular-nums text-retro-body shrink-0">
