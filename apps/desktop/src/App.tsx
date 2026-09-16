@@ -52,7 +52,7 @@ import { ProfileView } from "./components/views/ProfileView";
 import { DmMinimizedView } from "./components/views/MessagesView";
 import { MessagesRail } from "./components/chat/MessagesRail";
 import { WatchPartyView } from "./components/watchparty/WatchPartyView";
-import { setWatchDisplayName } from "./hooks/watchPartyStore";
+import { setWatchDisplayName, useWatchParty } from "./hooks/watchPartyStore";
 import { GameView } from "./components/views/GameView";
 import { AgeGateModal } from "./components/auth/AgeGateModal";
 import { LegalCenter, isLegalAccepted } from "./components/LegalCenter";
@@ -155,6 +155,8 @@ export default function Home() {
   const { peers, p2pItems, sendP2PItem, sendChatMessage, chatMessages, isWsConnected } = useP2P(identity);
   const { settings, update: updateSettings } = useSettings();
   useEffect(() => { setWatchDisplayName(myProfile.displayName || '') }, [myProfile.displayName]);
+  // Watch tab: only a live ROOM gets the fullscreen treatment (see theater).
+  const watchRoomOpen = useWatchParty().parties.length > 0;
   const [users, setUsers] = useState<User[]>([]);
 
   // Panel opacity preference drives the glass chrome through a CSS variable.
@@ -4214,12 +4216,17 @@ export default function Home() {
             </div>
 
             {/* Watch theater: ALWAYS mounted (hidden off-tab) so an opened
-                room keeps playing in the background. Mounted at app-shell
-                level (absolute, under the z-40 header + island) so in a room
-                the video bleeds full-frame behind the transparent header; the
-                island fades away on this tab (hover it to revive). */}
+                room keeps playing in the background. In a ROOM it is the
+                whole shell (video bleeds behind the transparent header, the
+                island recedes to a hover sliver). BROWSING (no room open)
+                it stays a normal tab: content constrained between the
+                header and the pill bar, island fully visible. */}
             {settings.watchPartyEnabled && identity && (
-              <div className={mainView === 'watch' ? 'absolute inset-0 z-[5] flex flex-col min-h-0 overflow-hidden' : 'hidden'}>
+              <div className={mainView === 'watch'
+                ? (watchRoomOpen
+                    ? 'absolute inset-0 z-[5] flex flex-col min-h-0 overflow-hidden'
+                    : 'absolute inset-x-0 top-9 bottom-[var(--island-clearance)] z-[5] flex flex-col min-h-0 overflow-hidden')
+                : 'hidden'}>
                 <WatchPartyView identity={identity} profilePics={profilePics} />
               </div>
             )}
@@ -4235,7 +4242,7 @@ export default function Home() {
               gamesOnlineCount={gamesOnlineCount}
               watchWatchingCount={watchWatchingCount}
               feedNewPostsCount={feedNewPostsCount}
-              recessed={mainView === 'watch'}
+              recessed={mainView === 'watch' && watchRoomOpen}
               displayName={myProfile.displayName || myUser?.display_name || 'You'}
               profilePic={profilePics[identity?.orbitId || '']}
               isAdmin={myProfile.isAdmin}
