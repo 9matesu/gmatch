@@ -182,6 +182,9 @@ export async function resolveImage(url: string): Promise<string> {
   // Videos cache too (mp4 "isn't saved" report): the Electron RAM cache is
   // budget-guarded (oversize put() fails -> remote URL stands) and the
   // browser session path already accepts video blobs.
+  // ponytail: RAM-only video cache; disk write when seek-after-restart matters.
+  // The rest of this module is deliberately session-memory-only (security plan
+  // B.1/F1) — persisting video bytes to disk would break that contract.
   const b = bridge()
   if (b?.cacheImage) {
     try {
