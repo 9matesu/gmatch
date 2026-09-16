@@ -6,6 +6,7 @@ const https = require('https')
 const fs = require('node:fs')
 const path = require('node:path')
 const imageCache = require('./imageCache.cjs')
+const { createFetchBooru } = require('./booruSources.cjs')
 const vault = require('./vault.cjs')
 const customFolders = require('./customFolders.cjs')
 const wallpaperWin = require('./wallpaperWin.cjs')
@@ -1110,57 +1111,12 @@ const SOURCES = [
   booruOrgSource('footfetishbooru.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'footfetish', 'real'),
 ]
 
-// AND-combos of narrow pervert tags often return 0 on DAPI mirrors, so each
-// source tries the full query, then the top-2 tags, then the single leading
-// tag. Any result beats falling back to vanilla.
-function queryVariants(query) {
-  const parts = query.split(/\s+/).filter(Boolean)
-  const variants = [query]
-  if (parts.length > 2) variants.push(parts.slice(0, 2).join(' '))
-  if (parts.length > 1) variants.push(parts[0])
-  return [...new Set(variants)]
-}
-
-let rrIndex = 0
-
-async function fetchBooru({ tags, limit, allowReal, allowHentai }) {
-  const query = String(tags ?? '').trim()
-  const n = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100)
-  if (!query || isQueryBlocked(query)) {
-    return { posts: [], source: null, ok: false, error: 'blocked-or-empty query' }
-  }
-  const useReal = allowReal !== false
-  const useHentai = allowHentai !== false
-  const filtered = SOURCES.filter((s) => {
-    if (s.category === 'real' && !useReal) return false
-    if (s.category === 'hentai' && !useHentai) return false
-    return true
-  })
-  const pool = filtered.length > 0 ? filtered : SOURCES
-  // Never serve stale posts to the idle game: always ask the boorus for fresh
-  // images (the renderer filters seen ones itself). Feed cache survives only
-  // as a write-once store so the game never blocks on it.
-  const variants = queryVariants(query)
-  const ordered = pool.map((_, i) => pool[(rrIndex + i) % pool.length])
-  for (const source of ordered) {
-    for (const variant of variants) {
-      try {
-        const posts = source.fetch
-          ? await source.fetch(variant, n)
-          : source.parse(await httpGet(source.url(variant, n)))
-        if (posts.length > 0) {
-          rrIndex = (pool.indexOf(source) + 1) % pool.length
-          imageCache.setFeedCache(variant, posts)
-          return { posts, source: source.id, ok: true, query: variant }
-        }
-      } catch {
-        // try next variant / source
-      }
-    }
-  }
-  rrIndex = (rrIndex + 1) % pool.length
-  return { posts: [], source: null, ok: false }
-}
+const fetchBooru = createFetchBooru({
+  sources: SOURCES,
+  httpGet,
+  cache: imageCache,
+  blocked: isQueryBlocked,
+})
 
 function createWindow() {
   // Restore the last size/position when it is still usable; a 1440x900
