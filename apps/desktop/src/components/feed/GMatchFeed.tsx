@@ -623,13 +623,6 @@ export function GMatchFeed({
 
       {/* Feed Content Column (Posts) */}
       <div className="w-full max-w-[1400px] mx-auto flex flex-col px-2 sm:px-4 py-2 space-y-3">
-        {/* Density bar: post count only — the column picker lives in the header */}
-        <div className="flex items-center justify-end px-3 sm:px-6 py-1 border-b border-border-glass">
-          <span className="text-xs text-retro-muted">
-            {displayPosts.length} posts
-          </span>
-        </div>
-
         {/* Feed Posts List with Sharp Square Images */}
         <div className={`mt-3 ${feedCols === '1' ? 'space-y-3' : 'grid grid-cols-1 sm:grid-cols-2 gap-3' + (feedCols === '3' ? ' lg:grid-cols-3' : feedCols === '4' ? ' lg:grid-cols-3 xl:grid-cols-4' : feedCols === '5' ? ' lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5' : '')}`}>
           {displayPosts.map((post, _idx) => {
