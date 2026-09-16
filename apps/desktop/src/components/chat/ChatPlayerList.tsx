@@ -83,7 +83,7 @@ export function ChatPlayerList({
     // at 60s. A timestamp inside this window means online regardless of
     // flags; a flag only counts while its own snapshot is fresh.
     // Poll cadence: dashboard 30s, users prop 60-120s.
-    const SEEN_FRESH_MS = 90_000;
+    const SEEN_FRESH_MS = 60_000;
     const USERS_FLAG_BUDGET_MS = 150_000;
     const DASHBOARD_FLAG_BUDGET_MS = 75_000;
     const seenMs = (v?: string | null) => {

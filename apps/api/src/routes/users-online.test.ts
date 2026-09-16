@@ -54,3 +54,48 @@ describe('GET /api/users/online', () => {
     expect(res.status).toBe(401)
   })
 })
+
+// The followers/following lists used a 5-minute window while every other
+// presence surface used 60s: a user who left minutes ago read as online in
+// the network modal but offline in their profile. One window, all endpoints.
+describe('presence window is uniform across user endpoints', () => {
+  let env: any
+  let alice: any
+  let bob: any
+
+  beforeEach(async () => {
+    env = await createMockEnv()
+    alice = createTestIdentity()
+    bob = createTestIdentity()
+    const now = new Date().toISOString()
+    // 3 minutes: inside the old 5-minute window, outside the 60s truth.
+    const threeMinAgo = new Date(Date.now() - 3 * 60_000).toISOString()
+    await env.DB.prepare(
+      'INSERT INTO Users (id, public_key, display_name, last_seen) VALUES (?, ?, ?, ?)',
+    ).bind(alice.orbitId, alice.publicKeyHex, 'Alice', threeMinAgo).run()
+    await env.DB.prepare(
+      'INSERT INTO Users (id, public_key, display_name, last_seen) VALUES (?, ?, ?, ?)',
+    ).bind(bob.orbitId, bob.publicKeyHex, 'Bob', now).run()
+    await env.DB.prepare(
+      'INSERT INTO Followers (follower_id, followee_id, accepted) VALUES (?, ?, 1)',
+    ).bind(bob.orbitId, alice.orbitId).run()
+    await env.DB.prepare(
+      'INSERT INTO Followers (follower_id, followee_id, accepted) VALUES (?, ?, 1)',
+    ).bind(alice.orbitId, bob.orbitId).run()
+  })
+
+  it('reports a 3-minute-idle follower as offline (not 5-minute online)', async () => {
+    const url = `/api/users/${bob.orbitId}/followers`
+    const res = await app.fetch(
+      new Request(`http://localhost${url}`, {
+        headers: signRequestHeaders(bob, 'GET', url),
+      }),
+      env,
+    )
+    expect(res.status).toBe(200)
+    const rows = await res.json()
+    const aliceRow = (rows as any[]).find((r) => r.id === alice.orbitId)
+    expect(aliceRow).toBeTruthy()
+    expect(aliceRow.online).toBe(false)
+  })
+})

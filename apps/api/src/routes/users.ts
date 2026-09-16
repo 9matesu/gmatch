@@ -328,12 +328,19 @@ users.post('/heartbeat', async (c) => {
   return c.json({ ok: true })
 })
 
+// Single presence window for every endpoint that derives `online` from
+// last_seen. Heartbeats land every <=60s, so 60s is the truth. The followers/
+// following lists used 5 minutes, which read a user who left minutes ago as
+// still online — the "online in the list, offline when you open the profile"
+// ghost report. One constant, every caller.
+const PRESENCE_WINDOW_MS = 60_000
+
 // Discovery roster: who is online RIGHT NOW (last_seen within 60s, the same
 // window `GET /api/users` uses). A joining client seeds its peer map from
 // this instead of waiting passively for a swarm event.
 users.get('/online', async (c) => {
   const callerId = c.get('orbitId')
-  const since = new Date(Date.now() - 60_000).toISOString()
+  const since = new Date(Date.now() - PRESENCE_WINDOW_MS).toISOString()
   let rows: any[] = []
   try {
     const res = await c.env.DB.prepare(
@@ -687,7 +694,7 @@ users.get('/:id/followers', async (c) => {
     id: r.id,
     display_name: r.display_name?.trim() || generateFallbackName(r.id),
     pfp_url: r.pfp_url || null,
-    online: r.last_seen ? (Date.now() - new Date(r.last_seen).getTime() < 5 * 60 * 1000) : false,
+    online: r.last_seen ? (Date.now() - new Date(r.last_seen).getTime() < PRESENCE_WINDOW_MS) : false,
     is_following: Number(r.is_following || 0) > 0,
   })))
 })
@@ -710,7 +717,7 @@ users.get('/:id/following', async (c) => {
     id: r.id,
     display_name: r.display_name?.trim() || generateFallbackName(r.id),
     pfp_url: r.pfp_url || null,
-    online: r.last_seen ? (Date.now() - new Date(r.last_seen).getTime() < 5 * 60 * 1000) : false,
+    online: r.last_seen ? (Date.now() - new Date(r.last_seen).getTime() < PRESENCE_WINDOW_MS) : false,
     is_following: Number(r.is_following || 0) > 0,
   })))
 })

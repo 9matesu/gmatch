@@ -123,15 +123,14 @@ export function UserProfileModal({
   if (!user) return null;
 
   const displayName = user.display_name?.trim() || 'Unknown User';
-  // Presence: the server's `online` flag is authoritative (API sets it when
-  // last_seen is within 60s). The profile used to ignore it and re-derive from
-  // last_seen<90s, which made a user read "Online" in the Players list but
-  // "Offline" the moment you opened their profile. Honor the flag, then fall
-  // back to last_seen freshness when the flag is absent.
+  // Presence: last_seen < 60s is the ONE rule every server endpoint uses
+  // (roster, list, followers/following). The profile used to honor a raw
+  // `online` flag with no age gate — a stale snapshot then read "Online"
+  // forever — or re-derive with a different 90s window, which disagreed with
+  // the list. Same 60s window here; the flag is never trusted on its own.
   const isOnline = (() => {
-    if (user.online) return true;
     const seenMs = user.last_seen ? new Date(user.last_seen).getTime() : 0;
-    return seenMs > 0 && Date.now() - seenMs < 90_000;
+    return seenMs > 0 && Date.now() - seenMs < 60_000;
   })();
   const tags: string[] = parseTags(user.tags);
   const userStories = stories.filter((s) => s.owner_id === user.id || (s as any).user_id === user.id);
