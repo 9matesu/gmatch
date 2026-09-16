@@ -18,7 +18,7 @@ const PARSE_ERROR = 'Could not find a playable video at that link.'
 // in playlist order, capped at the parse budget. The authless
 // /api/playlists/<id> carries data.videos; the site's watched-video-ids
 // endpoint needs an API key we don't ask for.
-const PLAYLIST_MAX = 30
+const PLAYLIST_MAX = 50
 export async function expandPmvhavenPlaylists(urlList: string[]): Promise<string[]> {
   const out: string[] = []
   for (const u of urlList) {
@@ -102,14 +102,17 @@ async function resolveMedia(env: Bindings, orbitId: string, rawUrl: string): Pro
 }
 
 // Audit A5: each resolveMedia costs an upstream fetch + up to 50MB of R2
-// storage. Per-user sliding budget: 30 parsed URLs/minute across create +
-// video routes (a human pastes a 10-line playlist once, not twice a minute).
+// storage. Per-user sliding budget: 60 parsed URLs/minute across create +
+// video routes (raised to 60 so one full pmvhaven playlist — capped at the
+// 50-entry queue max — imports in a single add; a human doesn't do that
+// twice a minute).
+const PARSE_BUDGET_PER_MIN = 60
 const parseBudget = new Map<string, { ts: number[] }>()
 function takeParseBudget(userId: string, n: number): boolean {
   const now = Date.now()
   const rec = parseBudget.get(userId) || { ts: [] }
   rec.ts = rec.ts.filter((t) => now - t < 60_000)
-  if (rec.ts.length + n > 30) {
+  if (rec.ts.length + n > PARSE_BUDGET_PER_MIN) {
     parseBudget.set(userId, rec)
     return false
   }

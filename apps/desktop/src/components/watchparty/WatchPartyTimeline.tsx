@@ -6,9 +6,9 @@
 // DESIGN.md: 300ms enter/exit, bare icon controls, mono tabular time.
 
 import { useEffect, useState } from 'react'
-import { Maximize, Pause, PictureInPicture2, Play } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Maximize, Pause, PictureInPicture2, Play } from 'lucide-react'
 import { formatVideoTime } from '../media/NativeVideoPlayer'
-import { controlPlayback, serverNow, type PartyRuntime } from '../../hooks/watchPartyStore'
+import { controlPlayback, queueOp, serverNow, type PartyRuntime } from '../../hooks/watchPartyStore'
 import { computeTargetPosition } from '../../utils/watchSync'
 
 const BTN_BARE = 'p-1 text-white/90 hover:text-white cursor-pointer transition-colors duration-150'
@@ -54,11 +54,27 @@ export function WatchPartyTimeline({ party }: {
     >
       <button
         type="button"
+        aria-label="Previous video"
+        onClick={() => queueOp(party.id, 'prev')}
+        className={BTN_BARE}
+      >
+        <ChevronLeft className="w-4 h-4" />
+      </button>
+      <button
+        type="button"
         aria-label={playing ? 'Pause party' : 'Play party'}
         onClick={() => controlPlayback(party.id, playing ? 'pause' : 'play', target)}
         className={BTN_BARE}
       >
         {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+      </button>
+      <button
+        type="button"
+        aria-label="Next video"
+        onClick={() => queueOp(party.id, 'next')}
+        className={BTN_BARE}
+      >
+        <ChevronRight className="w-4 h-4" />
       </button>
       <span className="text-[10px] font-mono tabular-nums w-10 text-right">
         {formatVideoTime(target)}

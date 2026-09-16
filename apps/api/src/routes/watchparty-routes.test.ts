@@ -90,11 +90,11 @@ describe('POST /api/watchparty', () => {
     expect(json.party.name.toLowerCase()).toContain('holiday')
   })
 
-  it('audit A5: more than 30 party creates per minute is 429', async () => {
+  it('audit A5: more than 60 parses per minute is 429', async () => {
     __resetParties()
     const body = JSON.stringify({ url: 'https://example.com/v', name: '' })
     let last = 0
-    for (let i = 0; i < 31; i++) {
+    for (let i = 0; i < 61; i++) {
       const res = await app.request('/api/watchparty', { method: 'POST', headers: auth('POST', '/api/watchparty', body), body }, env)
       last = res.status
       expect([201, 429]).toContain(last)

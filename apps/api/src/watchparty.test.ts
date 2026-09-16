@@ -434,3 +434,30 @@ describe('room persistence', () => {
   })
 })
 
+
+describe('queue prev + playlist budget (autoplay wave)', () => {
+  it('op prev steps backward through the queue', () => {
+    const p = makeParty()
+    queueOps('u1', { party: p.id, op: 'add', name: 'a', url: '/api/objects/a' })
+    queueOps('u1', { party: p.id, op: 'add', name: 'b', url: '/api/objects/b' })
+    queueOps('u1', { party: p.id, op: 'add', name: 'c', url: '/api/objects/c' })
+    queueOps('u1', { party: p.id, op: 'play', id: p.queue[1].id })
+    expect(p.current).toBe(p.queue[1].id)
+    queueOps('u1', { party: p.id, op: 'prev' })
+    expect(p.current).toBe(p.queue[0].id)
+    // wrap: prev at the first entry lands on the last
+    queueOps('u1', { party: p.id, op: 'prev' })
+    expect(p.current).toBe(p.queue[2].id)
+  })
+
+  it('next from a playing room lands playing at 0 (autoplay continuity)', () => {
+    const p = makeParty()
+    queueOps('u1', { party: p.id, op: 'add', name: 'a', url: '/api/objects/a' })
+    queueOps('u1', { party: p.id, op: 'add', name: 'b', url: '/api/objects/b' })
+    queueOps('u1', { party: p.id, op: 'play', id: p.queue[0].id })
+    applyWatch('u1', { party: p.id, action: 'play', position: 10 })
+    queueOps('u1', { party: p.id, op: 'next' })
+    expect(p.frame.action).toBe('play')
+    expect(p.frame.position).toBe(0)
+  })
+})

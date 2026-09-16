@@ -407,14 +407,9 @@ export function queueOps(userId: string, msg: any): { room: string; payload: any
     const entry = party.queue.find((q) => q.id === String(msg.id || ''))
     if (entry) applyQueueMedia(party, entry, member.name || userId.slice(0, 8), 'play')
   } else if (op === 'next') {
-    const idx = party.queue.findIndex((q) => q.id === party.current)
-    const entry = party.queue[(idx + 1) % Math.max(party.queue.length, 1)]
-    // Continuous playlist: a PLAYING room advances into a playing frame
-    // (video ended mid-run); a paused room advances paused.
-    if (entry && party.queue.length > 0) {
-      applyQueueMedia(party, entry, member.name || userId.slice(0, 8),
-        party.frame.action === 'play' ? 'play' : 'pause')
-    }
+    stepQueue(party, userId, member.name, 1)
+  } else if (op === 'prev') {
+    stepQueue(party, userId, member.name, -1)
   } else {
     return null
   }
@@ -437,6 +432,18 @@ function applyQueueMedia(party: Party, entry: QueueEntry, by: string, action: 'p
   party.relay = entry.relay
   setPartyMedia(party, entry.url)
   party.frame = { url: entry.url, action, position: 0, rate: 1, updatedAt: serverNow(), by }
+}
+
+/** Step the playing entry +/-1 (wraps: prev at the first entry lands on the
+ * last). Continuous playlist: a PLAYING room moves into a playing frame
+ * (video ended mid-run); a paused room moves paused. */
+function stepQueue(party: Party, userId: string, name: string, dir: 1 | -1): void {
+  if (party.queue.length === 0) return
+  const idx = party.queue.findIndex((q) => q.id === party.current)
+  const nextIdx = (idx + dir + party.queue.length) % party.queue.length
+  const entry = idx < 0 ? party.queue[0] : party.queue[nextIdx]
+  if (entry) applyQueueMedia(party, entry, name || userId.slice(0, 8),
+    party.frame.action === 'play' ? 'play' : 'pause')
 }
 
 /** Persistence: rooms die with the process otherwise, so every deploy

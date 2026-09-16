@@ -27,6 +27,11 @@ export function WatchPartySlot({
 }) {
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const endedRef = useRef<string>('')
+  // Set when the slot's END handling pauses the element (sync tick) or the
+  // video ends natively. The resulting 'pause' must NOT echo to the room:
+  // arriving after the host's 'next' frame it would pause the room at the
+  // start of the next video (the "autoplay skips/holds" report).
+  const endPauseRef = useRef(0)
   const [videoSrc, setVideoSrc] = useState<string | null>(null)
 
   const media = useObjectImage(party?.url || null, identity, { enabled: Boolean(party?.url) })
@@ -55,7 +60,7 @@ export function WatchPartySlot({
       if (v.duration > 0 && target >= v.duration - 0.25 && party.frame.action === 'play') {
         // Video ended: the host advances the queue. Keyed by media+frame
         // stamp so a wrap back to the same entry re-arms the guard.
-        if (!v.paused) v.pause()
+        if (!v.paused) { endPauseRef.current = Date.now(); v.pause() }
         const endedKey = `${party.current}:${party.frame.updatedAt}`
         if (shouldFireQueueNext({
           isHost: party.host === identity.orbitId,
@@ -154,6 +159,9 @@ export function WatchPartySlot({
             controlPlayback(party.id, 'play', v ? v.currentTime : 0)
           }}
           onPause={() => {
+            // End-of-video pauses are local: echoing them races the host's
+            // 'next' frame and pauses the room at the next video's start.
+            if (Date.now() - endPauseRef.current < 2000) return
             const v = wrapRef.current?.querySelector('video')
             controlPlayback(party.id, 'pause', v ? v.currentTime : 0)
           }}

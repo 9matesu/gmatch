@@ -362,7 +362,7 @@ export function transferParty(partyId: string, target: string): void {
 export function setPartySettings(partyId: string, patch: { name?: string; isPrivate?: boolean; lockVideo?: boolean }): void {
   sendRoomFrame('watch.settings', { party: partyId, ...patch })
 }
-export function queueOp(partyId: string, op: 'remove' | 'play' | 'next', id = ''): void {
+export function queueOp(partyId: string, op: 'remove' | 'play' | 'next' | 'prev', id = ''): void {
   sendRoomFrame('watch.queue', { party: partyId, op, id })
 }
 export function moveQueueEntry(partyId: string, id: string, before: string): void {
