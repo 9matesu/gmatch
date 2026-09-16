@@ -381,10 +381,19 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
                 if (sIdx < activeStoryIndex) fillPercent = 100;
                 else if (sIdx === activeStoryIndex) fillPercent = progress;
 
+                // Instagram parity: white track, dimmer once the story was seen
+                // in an earlier run; the running segment fills solid white.
+                const wasSeen = seenStoryIds.has(s.id) && sIdx !== activeStoryIndex;
+
                 return (
-                  <div key={s.id || sIdx} className="flex-1 h-1 rounded-full bg-surface-raised/20 overflow-hidden backdrop-blur-xs">
+                  <div
+                    key={s.id || sIdx}
+                    data-testid={`seg-track-${sIdx}`}
+                    className={`flex-1 h-1 rounded-full overflow-hidden backdrop-blur-xs ${wasSeen ? 'bg-white/25' : 'bg-white/40'}`}
+                  >
                     <div
-                      className="h-full bg-surface-raised transition-all duration-150"
+                      data-testid={`seg-fill-${sIdx}`}
+                      className="h-full bg-retro-accent transition-all duration-150"
                       style={{ width: `${fillPercent}%` }}
                     />
                   </div>

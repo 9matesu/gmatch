@@ -1,9 +1,23 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { GMatchStories } from './GMatchStories'
 import { ToastProvider } from './Toast'
 import type { OrbitObject } from '@orbit/shared'
+
+// Node 22 ships an experimental localStorage global that is undefined unless
+// --localstorage-file is passed, and it shadows jsdom's own storage. Install a
+// real in-memory one so the seen-story persistence path is exercisable.
+const mem = new Map<string, string>()
+Object.defineProperty(globalThis, 'localStorage', {
+  configurable: true,
+  value: {
+    getItem: (k: string) => (mem.has(k) ? mem.get(k)! : null),
+    setItem: (k: string, v: string) => { mem.set(k, String(v)) },
+    removeItem: (k: string) => { mem.delete(k) },
+    clear: () => { mem.clear() },
+  },
+})
 
 // Pin the API base so relative avatar refs resolve to absolute URLs exactly
 // as they do in the packaged app (Electron preload __API_BASE__).
@@ -51,5 +65,24 @@ describe('GMatchStories avatars', () => {
     renderStories([story({ pfp_url: null })])
     expect(screen.queryByAltText('Story Gal')).toBeNull()
     expect(screen.getByText('S')).toBeDefined()
+  })
+});
+
+describe('GMatchStories segment bar (T-W3)', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('fills the running segment white, not the near-black surface token', () => {
+    renderStories([story({ id: 's1' })])
+    fireEvent.click(screen.getByAltText('Story Gal'))
+    const fill = screen.getByTestId('seg-fill-0')
+    expect(fill.className).toContain('bg-retro-accent')
+    expect(fill.className).not.toContain('bg-surface-raised')
+  })
+
+  it('dims the segment of a story that was already seen before this run', () => {
+    localStorage.setItem('orbit_seen_stories', JSON.stringify(['s2']))
+    renderStories([story({ id: 's1' }), story({ id: 's2' })])
+    fireEvent.click(screen.getByAltText('Story Gal'))
+    expect(screen.getByTestId('seg-track-1').className).toContain('bg-white/25')
   })
 });
