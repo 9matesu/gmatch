@@ -98,9 +98,11 @@ export function UserProfileModal({
     zIndexClass: 'z-[90]',
   });
 
-  // Fetch follower/following counts from API when viewing another user's profile
+  // Fetch follower/following counts for every profile INCLUDING your own:
+  // without this, the own-profile fallback rendered likes_received labeled
+  // "followers" (the wrong-count report).
   useEffect(() => {
-    if (!identity || !user || user.id === identity.orbitId) return;
+    if (!identity || !user) return;
     let cancelled = false;
     Promise.all([
       orbitFetch(`/api/users/${encodeURIComponent(user.id)}/followers`, {}, identity)
