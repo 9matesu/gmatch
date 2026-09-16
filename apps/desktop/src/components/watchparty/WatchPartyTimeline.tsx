@@ -42,7 +42,7 @@ export function WatchPartyTimeline({ party, canLoad = false, onLoadVideo }: {
   const playing = frame?.action === 'play'
 
   return (
-    <div className="flex items-center gap-2 px-4 py-2.5 border-t border-border-glass">
+    <div className="bg-surface-raised flex items-center gap-2 px-4 py-2.5 border-t border-border-glass">
       <button
         type="button"
         aria-label={playing ? 'Pause party' : 'Play party'}

@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react'
 import { Clapperboard, PanelRightClose, PanelRightOpen } from 'lucide-react'
 import { Avatar } from '../Avatar'
-import { BTN, MUTED, PLATE } from '../../ui/styles'
+import { MUTED } from '../../ui/styles'
 import { useWatchParty, joinPartyById, MAX_SLOTS } from '../../hooks/watchPartyStore'
 import { watchRoomFromHash, stripWatchRoom } from './invite'
 import { WatchPartySlot } from './WatchPartySlot'
@@ -53,12 +53,13 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
     <div className={inRoom
       ? 'relative h-full flex-1 flex min-h-0 overflow-hidden'
       : 'p-2 sm:p-4 h-full flex-1 flex flex-row gap-3 min-h-0 overflow-hidden'}>
-      {/* Stage: full-bleed in a room (video touches all edges), plate+pad in browse */}
-      <div className={`flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden ${inRoom ? '' : `rounded-xl ${PLATE}`}`}>
+      {/* Stage: full-bleed in a room (video touches all edges); in browse
+          it's a solid glass-card like every other tab (never see-through). */}
+      <div className={`flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden ${inRoom ? 'bg-surface-raised' : 'glass-card'}`}>
         {active ? (
           <WatchRoomHeader party={active} identity={identity} profilePics={profilePics} />
         ) : (
-          <div className="flex items-center justify-between px-3 py-2 border-b border-border-glass">
+          <div className="glass-header flex items-center justify-between px-4 py-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-retro-fg flex items-center gap-2">
               <Clapperboard className="w-4 h-4" />
               Watch
@@ -105,8 +106,8 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
 
       {/* Participants + queue + chat rail: in a room it floats OVER the
           full-bleed stage (video keeps full width); browse keeps the column */}
-      <aside className={`w-72 shrink-0 h-full flex-col min-h-0 overflow-hidden bg-glass backdrop-blur-md ${inRoom ? `absolute inset-y-0 right-0 z-20 border border-border-glass ${railOpen ? 'flex' : 'hidden'}` : `md:flex hidden rounded-xl ${PLATE}`}`}>
-        <div className="px-3 py-2 border-b border-border-glass flex items-start justify-between gap-2">
+      <aside className={`w-72 shrink-0 h-full flex-col min-h-0 overflow-hidden ${inRoom ? `absolute inset-y-0 right-0 z-20 glass-card ${railOpen ? 'flex' : 'hidden'}` : `md:flex hidden glass-card ${railOpen ? '' : 'hidden'}`}`}>
+        <div className="glass-header px-3 py-2 flex items-start justify-between gap-2">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-retro-fg">In this room</p>
             <p className={MUTED}>{active ? `${active.members.length}/8 watching` : 'No room open'}</p>
