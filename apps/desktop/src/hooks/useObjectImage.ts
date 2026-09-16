@@ -39,6 +39,15 @@ const CACHE_MAX = 24
 const objectCache = new Map<string, ImageState>()
 const cacheSource = new Map<string, string>()
 
+// A mounted consumer's entry must never be evicted-and-revoked out from under
+// it: the <img>/<video> keeps pointing at that blob URL and dies the moment it
+// is revoked ("Image unavailable" for photos, empty src -> "No preview" for
+// videos). Pin while mounted, unpin on unmount; eviction skips pinned keys.
+const pinned = new Set<string>()
+function pinKey(cardId: string, source: string): string {
+  return `${source}::${cardId}`
+}
+
 function cacheGet(cardId: string, source: string): ImageState | null {
   const hit = objectCache.get(cardId)
   if (!hit) return null
@@ -54,14 +63,20 @@ function cacheSet(cardId: string, source: string, img: ImageState): void {
   objectCache.delete(cardId)
   objectCache.set(cardId, img)
   // Evict oldest (front) entries beyond the cap, revoking their object URLs to
-  // hand memory back to the browser.
+  // hand memory back to the browser. Skip entries a mounted consumer still
+  // renders — revoking one blanks that element. If every entry is pinned we
+  // simply let the cache grow past CACHE_MAX; RAM beats a blank screen, and it
+  // self-corrects as consumers unmount.
+  // ponytail: soft cap while fully pinned; weak-ref map if pressure ever shows.
   while (objectCache.size > CACHE_MAX) {
-    const oldest = objectCache.keys().next().value as string | undefined
-    if (!oldest) break
-    const evicted = objectCache.get(oldest)
+    const victim = [...objectCache.keys()].find(
+      (k) => !pinned.has(pinKey(k, cacheSource.get(k) || '')),
+    )
+    if (!victim) break
+    const evicted = objectCache.get(victim)
     if (evicted?.url) URL.revokeObjectURL(evicted.url)
-    objectCache.delete(oldest)
-    cacheSource.delete(oldest)
+    objectCache.delete(victim)
+    cacheSource.delete(victim)
   }
 }
 
@@ -192,6 +207,15 @@ export function useObjectImage(
       if (freshUrl && !objectCache.has(cardId)) URL.revokeObjectURL(freshUrl)
     }
   }, [cardId, identity, enabled])
+
+  // Hold a pin for as long as this consumer is mounted, so the LRU can never
+  // revoke the URL we are currently rendering.
+  useEffect(() => {
+    if (!cardId || !identity) return
+    const k = pinKey(cardId, identity.orbitId)
+    pinned.add(k)
+    return () => { pinned.delete(k) }
+  }, [cardId, identity])
 
   if (!img || img.cardId !== cardId) {
     const cached = cardId && identity ? cacheGet(cardId, identity.orbitId) : null
