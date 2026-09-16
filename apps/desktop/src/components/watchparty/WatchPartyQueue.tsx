@@ -121,7 +121,7 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
             <li
               key={q.id}
               draggable={canAdd}
-              onDragStart={(e) => { dragId.current = q.id; e.dataTransfer.effectAllowed = 'move' }}
+              onDragStart={(e) => { dragId.current = q.id; if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move' }}
               onDragOver={(e) => { if (dragId.current && dragId.current !== q.id) e.preventDefault() }}
               onDrop={(e) => {
                 e.preventDefault()
