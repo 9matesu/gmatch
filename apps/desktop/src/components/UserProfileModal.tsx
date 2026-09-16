@@ -123,12 +123,13 @@ export function UserProfileModal({
   if (!user) return null;
 
   const displayName = user.display_name?.trim() || 'Unknown User';
-  // Presence decays: `user.online` is a snapshot from the last /api/users poll
-  // (60s+ cadence), so someone who left minutes ago still reads as "Online"
-  // when you open their profile. last_seen freshness is the authority here —
-  // same 90s rule ChatPlayerList already applies — and the stale flag is
-  // ignored so ghosts can never show as online.
+  // Presence: the server's `online` flag is authoritative (API sets it when
+  // last_seen is within 60s). The profile used to ignore it and re-derive from
+  // last_seen<90s, which made a user read "Online" in the Players list but
+  // "Offline" the moment you opened their profile. Honor the flag, then fall
+  // back to last_seen freshness when the flag is absent.
   const isOnline = (() => {
+    if (user.online) return true;
     const seenMs = user.last_seen ? new Date(user.last_seen).getTime() : 0;
     return seenMs > 0 && Date.now() - seenMs < 90_000;
   })();

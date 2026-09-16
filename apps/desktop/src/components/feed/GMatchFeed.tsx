@@ -641,7 +641,7 @@ export function GMatchFeed({
             return post.is_sponsored ? (
               <article
                 key={post.id}
-                className={`bg-retro-panel border border-border-glass rounded-lg overflow-hidden flex flex-col [content-visibility:auto] [contain-intrinsic-size:0_560px] shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
+                className={`bg-retro-panel border border-border-glass rounded-lg overflow-hidden flex flex-col shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
                 {/* Sponsored Banner */}
                 <div className="bg-retro-bg px-4 py-2 flex items-center gap-2 text-xs text-retro-muted border-b border-border-glass">
@@ -691,7 +691,7 @@ export function GMatchFeed({
               <article
                 key={post.id}
                 onContextMenu={(e) => { e.preventDefault(); setOptionsPost(post) }}
-                className={`bg-retro-panel border border-border-glass rounded-lg overflow-hidden flex flex-col [content-visibility:auto] [contain-intrinsic-size:0_560px] shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
+                className={`bg-retro-panel border border-border-glass rounded-lg overflow-hidden flex flex-col shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
                 {/* Repost Header Banner */}
                 {post.is_reposted && (
