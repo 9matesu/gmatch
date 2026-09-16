@@ -304,7 +304,7 @@ export async function loadPartyVideos(
       body: JSON.stringify({ urls, queueOnly }),
     }, identity)
     const body = await res.json().catch(() => ({})) as any
-    if (!res.ok) return { ok: false, added: 0, failed: [], error: body?.error || 'Could not load these videos.' }
+    if (!res.ok) return { ok: false, added: 0, failed: Array.isArray(body?.failed) ? body.failed.map(String) : [], error: body?.error || 'Could not load these videos.' }
     return { ok: true, added: (body.added || []).length, failed: body.failed || [] }
   } catch {
     return { ok: false, added: 0, failed: [], error: 'Could not reach the server.' }

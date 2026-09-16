@@ -40,7 +40,9 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
     const res = await loadPartyVideos(identity, party.id, urls, queueOnly)
     setBusy(false)
     if (!res.ok) {
-      setError(res.error || 'Could not queue these videos.')
+      setError(res.failed.length
+        ? `${res.error} Failed: ${res.failed.join(', ')}`
+        : (res.error || 'Could not queue these videos.'))
       return
     }
     if (res.failed.length > 0) {

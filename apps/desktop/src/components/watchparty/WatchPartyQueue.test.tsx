@@ -46,6 +46,15 @@ describe('WatchPartyQueue', () => {
     expect(await screen.findByText(/Failed 1: https:\/\/bad/)).toBeTruthy()
   })
 
+  it('full-reject 422 still names the failed urls', async () => {
+    vi.mocked(loadPartyVideos).mockResolvedValueOnce({ ok: false, added: 0, failed: ['https://bad'], error: 'Could not find a playable video at that link.' })
+    render(<WatchPartyQueue party={party} identity={identity} />)
+    fireEvent.click(screen.getByRole('button', { name: /add to queue/i }))
+    fireEvent.change(screen.getByLabelText('Queue video URLs'), { target: { value: 'https://bad' } })
+    fireEvent.click(screen.getByRole('button', { name: /add and play/i }))
+    expect(await screen.findByText(/Failed: https:\/\/bad/)).toBeTruthy()
+  })
+
   it('add and play sends queueOnly false', async () => {
     render(<WatchPartyQueue party={party} identity={identity} />)
     fireEvent.click(screen.getByRole('button', { name: /add to queue/i }))
