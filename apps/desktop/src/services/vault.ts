@@ -162,6 +162,17 @@ export function useVaultUrls(urls: Array<string | null | undefined>): Record<str
   return map
 }
 
+/** Browser-openable localhost URL for a stored URL, else null. */
+export async function vaultHttpUrl(url: string): Promise<string | null> {
+  if (!url || !enabled()) return null
+  try {
+    const res = await window.gmatch?.vaultHttpUrl?.(url)
+    return res?.local ?? null
+  } catch {
+    return null
+  }
+}
+
 /** Test seam: clear both session guards. */
 export function _resetSessionGuards(): void {
   sessionPinned.clear()

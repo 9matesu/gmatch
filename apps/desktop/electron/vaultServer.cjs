@@ -11,14 +11,13 @@
 // ponytail: no auth on the local origin; add a token in the URL if a hostile
 // local process becomes part of the threat model.
 const http = require('http')
-const { Readable } = require('stream')
 const vault = require('./vault.cjs')
 
 let server = null
-let origin = ''
+let serverOrigin = ''
 
 async function start(_vaultDir, { host = '127.0.0.1', port = 0 } = {}) {
-  if (server) return { origin }
+  if (server) return { origin: serverOrigin }
   server = http.createServer(async (req, res) => {
     try {
       const u = new URL(req.url, `http://${host}`)
@@ -43,24 +42,24 @@ async function start(_vaultDir, { host = '127.0.0.1', port = 0 } = {}) {
     server.once('error', reject)
     server.listen(port, host, resolve)
   })
-  origin = `http://${host}:${server.address().port}`
-  return { origin }
+  serverOrigin = `http://${host}:${server.address().port}`
+  return { origin: serverOrigin }
 }
 
-async function stop() {
+async function stopServer() {
   if (!server) return
   if (typeof server.closeAllConnections === 'function') {
     server.closeAllConnections()
   }
   await new Promise((resolve) => server.close(resolve))
   server = null
-  origin = ''
+  serverOrigin = ''
 }
 
 /** localhost URL for a stored vault:// URL, or null when it is not stored. */
 function httpUrl(vaultUrl) {
-  if (!origin || !vaultUrl || !String(vaultUrl).startsWith('vault://f/')) return null
-  return `${origin}/f/${String(vaultUrl).split('/').pop()}`
+  if (!serverOrigin || !vaultUrl || !String(vaultUrl).startsWith('vault://f/')) return null
+  return `${serverOrigin}/f/${String(vaultUrl).split('/').pop()}`
 }
 
-module.exports = { start, stop, httpUrl, origin: () => origin }
+module.exports = { start, stop: stopServer, httpUrl, origin: () => serverOrigin }

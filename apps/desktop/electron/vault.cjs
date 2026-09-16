@@ -12,11 +12,6 @@ const imageCache = require('./imageCache.cjs')
 
 const SCHEME = 'vault'
 const QUOTA_BYTES = 3 * 1024 * 1024 * 1024
-const MAX_SINGLE_BYTES = 25 * 1024 * 1024
-// Videos get their own ceiling: parsed/proxied mp4s are routinely 80MB+
-// (pmvhaven), and silently refusing them is why "kept" videos never
-// persisted. Total stays bounded by QUOTA_BYTES (3GB) LRU eviction.
-const MAX_SINGLE_VIDEO_BYTES = 200 * 1024 * 1024
 
 let dir = null
 /** url -> { key, mime, bytes, atime, pins } */

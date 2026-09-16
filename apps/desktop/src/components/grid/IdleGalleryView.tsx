@@ -8,7 +8,7 @@ import { redgifsPlayable } from '../../services/redgifs'
 import CachedImg from '../../ui/CachedImg'
 import MediaViewerModal from '../../ui/MediaViewerModal'
 import { EmptyState } from '../EmptyState'
-import { useVaultUrls, useVaultUrl } from '../../services/vault'
+import { useVaultUrls, useVaultUrl, vaultHttpUrl } from '../../services/vault'
 import { SlideshowPlayer, type ResolvedItem } from '../slideshows/SlideshowPlayer'
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer'
 import {
@@ -24,6 +24,7 @@ import {
   Sparkles,
   ImagePlus,
   MoreVertical,
+  ExternalLink,
 } from 'lucide-react'
 import { MUTED } from '../../ui/styles'
 
@@ -870,6 +871,18 @@ export default function IdleGalleryView({
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Download</span>
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const local = await vaultHttpUrl(viewer.url)
+                  if (local) void window.gmatch?.openExternal?.(local)
+                }}
+                className="glass-action px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer"
+                title="Open in browser"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Browser</span>
               </button>
               <button
                 type="button"
