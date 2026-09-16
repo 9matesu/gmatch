@@ -170,6 +170,7 @@ export function CommandIsland({
       icon: Sword,
       active: mainView === 'games' || mainView === 'game',
       badge: gamesOnlineCount,
+      badgeLabel: (n: number) => `${n} in lobby`,
     },
     {
       id: 'gallery' as MainViewType,

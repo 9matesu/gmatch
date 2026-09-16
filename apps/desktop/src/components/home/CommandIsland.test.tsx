@@ -108,7 +108,7 @@ describe('CommandIsland count badges', () => {
     );
     expect(screen.getByRole('status', { name: '3 unread' })).toHaveTextContent('3');
     expect(screen.getByRole('status', { name: '5 unread' })).toHaveTextContent('5');
-    expect(screen.getByRole('status', { name: '12 players online' })).toHaveTextContent('12');
+    expect(screen.getByRole('status', { name: '12 in lobby' })).toHaveTextContent('12');
   });
 
   it('Watch + Feed pills show their count badges', () => {
