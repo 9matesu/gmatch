@@ -560,7 +560,9 @@ export function ContextOverlay({
             <button
               type="button"
               onClick={() => {
-                window.location.reload();
+                const g = (window as unknown as { gmatch?: { winReload?: () => void } }).gmatch
+                if (g?.winReload) g.winReload()
+                else window.location.reload()
                 onDismiss();
               }}
               className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
