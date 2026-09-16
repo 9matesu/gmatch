@@ -4228,8 +4228,8 @@ export default function Home() {
             {settings.watchPartyEnabled && identity && (
               <div className={mainView === 'watch'
                 ? (watchRoomOpen
-                    ? 'absolute inset-0 z-[5] flex flex-col min-h-0 overflow-hidden'
-                    : 'absolute inset-x-0 top-9 bottom-[var(--island-clearance)] z-[5] flex flex-col min-h-0 overflow-hidden')
+                    ? 'absolute inset-0 z-20 flex flex-col min-h-0 overflow-hidden'
+                    : 'absolute inset-x-0 top-9 bottom-[var(--island-clearance)] z-20 flex flex-col min-h-0 overflow-hidden')
                 : 'hidden'}>
                 <WatchPartyView identity={identity} profilePics={profilePics} />
               </div>
