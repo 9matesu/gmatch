@@ -357,7 +357,7 @@ function parsePahealXml(body) {
 // ignores the rating filter, so rating is enforced client-side below.
 // Both paginate with ?page=N — random page per call keeps rounds fresh.
 function moebooruUrl(base, variant, n) {
-  const page = 1 + Math.floor(Math.random() * 5)
+  const page = 1 + Math.floor(Math.random() * 50)
   const tags = base.includes('konachan') ? `${variant} rating:explicit` : variant
   return `${base}/post.json?tags=${encodeURIComponent(tags)}&limit=${n}&page=${page}`
 }
@@ -1083,7 +1083,7 @@ const SOURCES = [
       // Preserve multi-word tags with underscores (e.g. skylar_vox),
       // don't drop the rest of the query with split(/\s+/)[0].
       const tagParam = variant.trim().replace(/\s+/g, '_')
-      const pid = Math.floor(Math.random() * 5)
+      const pid = Math.floor(Math.random() * 1000)
       const html = await httpGet(
         `https://realbooru.com/index.php?page=post&s=list&tags=${encodeURIComponent(tagParam)}&pid=${pid}`
       )

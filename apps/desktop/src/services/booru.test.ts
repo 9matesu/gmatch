@@ -752,3 +752,32 @@ describe('fetchPostsMulti (one round, every tag)', () => {
     expect(res.offline).toBe(true)
   })
 })
+
+describe('deep random sampling (repeat-fix 2026-09-15)', () => {
+  it('DAPI pid offset reaches the ~1000-post pool; probes stay shallow at 0', async () => {
+    vi.stubGlobal('window', {})
+    const urls: string[] = []
+    const fetchMock = vi.fn(async (url: string) => {
+      urls.push(String(url))
+      return { ok: true, json: () => Promise.resolve([]), text: () => Promise.resolve('') }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const realRandom = Math.random
+    Math.random = () => 0.999
+    try {
+      await fetchPosts({ tags: 'test_tag', limit: 15 })
+      const roundPids = urls.filter((u) => u.includes('page=dapi')).map((u) => new URL(u, 'http://x').searchParams.get('pid'))
+      // rand 0.999 * 1000 -> pid 999 (was rand*5 -> pid 4: the same ~20 newest
+      // posts per tag every round — the reported repeat).
+      expect(roundPids.length).toBeGreaterThan(0)
+      expect(roundPids).toContain('999')
+      urls.length = 0
+      await fetchPosts({ tags: 'test_tag', limit: 15, probe: true })
+      const probePids = urls.filter((u) => u.includes('page=dapi')).map((u) => new URL(u, 'http://x').searchParams.get('pid'))
+      expect(probePids.length).toBeGreaterThan(0)
+      expect(probePids.every((p) => p === '0')).toBe(true)
+    } finally {
+      Math.random = realRandom
+    }
+  })
+})

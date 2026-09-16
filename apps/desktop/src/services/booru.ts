@@ -553,7 +553,7 @@ async function dapiPass(
   const neg =
     '-ai_generated -ai-generated -furry -anthro -feral -scalie -monochrome -greyscale -sketch -comic -lowres -worst_quality -jpeg_artifacts -watermark -censored'
   const isProbe = req.probe || req.page === 0
-  const pid = req.page !== undefined ? req.page : isProbe ? 0 : Math.floor(Math.random() * 5)
+  const pid = req.page !== undefined ? req.page : isProbe ? 0 : Math.floor(Math.random() * 1000)
   const filteredSources = DIRECT_SOURCES.filter((s) => {
     if (s.category === 'real' && !allowReal) return false
     if (s.category === 'hentai' && !allowHentai) return false
@@ -574,7 +574,7 @@ async function dapiPass(
       let realPidNum = 0
       if (src.type === 'moebooru') {
         kind = 'moe'
-        pageNum = isProbe ? 1 : 1 + Math.floor(Math.random() * 5)
+        pageNum = isProbe ? 1 : 1 + Math.floor(Math.random() * 50)
         const tags = src.id === 'konachan-direct' ? `${variant} rating:explicit` : variant
         url = `${src.proxy}/post.json?tags=${encodeURIComponent(tags)}&limit=${req.limit}&page=${pageNum}`
       } else if (src.type === 'realhtml') {
@@ -582,7 +582,7 @@ async function dapiPass(
         // Preserve multi-word tags with underscores (e.g. skylar_vox),
         // don't drop the rest of the query with split(/\s+/)[0].
         const tagParam = variant.trim().replace(/\s+/g, '_')
-        realPidNum = isProbe ? 0 : Math.floor(Math.random() * 5)
+        realPidNum = isProbe ? 0 : Math.floor(Math.random() * 1000)
         url = `${src.proxy}/index.php?page=post&s=list&tags=${encodeURIComponent(tagParam)}&pid=${realPidNum}`
       } else if (src.type === 'booruorg') {
         // booru.org Cloudflare WAF challenges `tags=` queries with 403;
@@ -593,7 +593,7 @@ async function dapiPass(
         kind = 'html'
         const booruPid = isProbe
           ? Math.floor(Math.random() * 3) * 20
-          : Math.floor(Math.random() * 5) * 20
+          : Math.floor(Math.random() * 50) * 20
         url = `${src.proxy}/index.php?page=post&s=list&pid=${booruPid}`
       } else {
         url = `${src.proxy}/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
