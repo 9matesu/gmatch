@@ -163,7 +163,7 @@ async function pin(url) {
     }
     const { buf, mime } = fetched
     if (!buf || buf.length === 0) return null
-    const cap = String(mime || '').startsWith('video/') ? MAX_SINGLE_VIDEO_BYTES : MAX_SINGLE_BYTES
+    const cap = imageCache.capFor(mime, url)
     if (buf.length > cap) return null
     if (!makeRoom(buf.length)) return null
     const key = keyFor(url)

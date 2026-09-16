@@ -114,6 +114,15 @@ async function main() {
   assert.strictEqual(await vault.pin('idle-file://nope/local.jpg'), null, 'unknown grant rejected')
   fs.rmSync(picsDir, { recursive: true, force: true })
 
+  // A host serving an MP4 as application/octet-stream must still get the
+  // VIDEO cap, not the 25MB image cap: /^video\//i fails on octet-stream, the
+  // 40MB buffer then hit the image ceiling, pin() returned null and the clip
+  // was never written. Cap by MIME *or* URL extension.
+  vault._test.setFetcher(async () => ({ buf: Buffer.alloc(40 * 1024 * 1024, 9), mime: 'application/octet-stream' }))
+  const mislabeled = await vault.pin('https://x/mislabeled.mp4')
+  assert.ok(mislabeled, '40MB octet-stream mp4 must pin under the video cap')
+  assert.strictEqual(vault.get('https://x/mislabeled.mp4'), mislabeled)
+
   fs.rmSync(tmp, { recursive: true, force: true })
   console.log('vault: all assertions passed')
 }

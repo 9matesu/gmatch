@@ -92,6 +92,19 @@ function getReferer(url) {
   }
 }
 
+/**
+ * Byte ceiling for a fetched buffer. Videos get the big cap; everything else
+ * the small one. The response MIME is the primary signal, but hosts routinely
+ * serve mp4s as application/octet-stream — trusting only the MIME gave a 40MB
+ * clip the 25MB image cap, and it was dropped instead of stored.
+ */
+function capFor(mime, url) {
+  const isVideo =
+    /^video\//i.test(String(mime || '')) ||
+    /\.(mp4|webm|mov|mkv|gifv)(?:[?#]|$)/i.test(String(url || ''))
+  return isVideo ? MAX_SINGLE_VIDEO_BYTES : MAX_SINGLE_BYTES
+}
+
 async function fetchBinary(url, redirects = 3) {
   let u
   try {
@@ -129,7 +142,7 @@ async function fetchBinary(url, redirects = 3) {
       const buf = Buffer.from(ab)
       // Videos get a bigger ceiling (vault pins parsed mp4s 80MB+); see
       // vault.cjs MAX_SINGLE_VIDEO_BYTES for the same rule at store time.
-      const cap = /^video\//i.test(type) ? MAX_SINGLE_VIDEO_BYTES : MAX_SINGLE_BYTES
+      const cap = capFor(type, url)
       if (buf.length > cap) {
         throw new Error('file too large')
       }
@@ -170,7 +183,7 @@ async function fetchBinary(url, redirects = 3) {
         let size = 0
         res.on('data', (c) => {
           size += c.length
-          const cap = /^video\//i.test(String(type)) ? MAX_SINGLE_VIDEO_BYTES : MAX_SINGLE_BYTES
+          const cap = capFor(type, url)
           if (size > cap) {
             req.destroy(new Error('file too large'))
             return
@@ -358,6 +371,7 @@ module.exports = {
   getFeedCache,
   setFeedCache,
   serveImage,
+  capFor,
   // Test seam (pure-ish helpers; heavy IO stays in cacheImage/serveImage).
-  _test: { fnv1a, cacheFileName, normalizeQuery, destroyDiskCaches },
+  _test: { fnv1a, cacheFileName, normalizeQuery, destroyDiskCaches, capFor },
 }
