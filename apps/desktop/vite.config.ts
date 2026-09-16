@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 
 // Hosts the dev /px byte-proxy may fetch (allowlist — no open proxy).
 const PX_ALLOW = /(^|\.)(imhentai\.xxx|babesource\.com|paheal\.net|tbib\.org|xbooru\.com|redgifs\.com|konachan\.com|yande\.re|files\.yande\.re|realbooru\.com|booru\.org|discordapp\.(com|net)|discord\.com|imgur\.com|redd\.it|twimg\.com|unsplash\.com|cloudinary\.com|postimg\.cc|imgbb\.com)$/
@@ -89,6 +92,105 @@ function devPxPlugin(): Plugin {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Dev parity with the Electron shell. `npm run dev` in a browser used to
+// proxy /api straight to the production node (gmatch.fly.dev), so every
+// debug session read live data while the packaged app talked to a local
+// sidecar on 127.0.0.1:8790 — different code paths, different DB. Boot the
+// same local Bun sidecar (apps/api) and point the proxy at it.
+// Escape hatch: GMATCH_DEV_API=remote restores the central-node behaviour.
+// The renderer bridge (gmcache://, vault://, native dialogs) still only
+// exists in the real shell — use `npm run dev:electron` when you need those.
+const DEV_API_PORT = Number(process.env.GMATCH_API_PORT || 8790)
+const DEV_API_BASE = `http://127.0.0.1:${DEV_API_PORT}`
+const DEV_API_REMOTE = process.env.GMATCH_DEV_API === 'remote'
+
+/** True when a sidecar already answers /api/health on the dev port. */
+async function isSidecarHealthy(): Promise<boolean> {
+  try {
+    const r = await fetch(`${DEV_API_BASE}/api/health`, { signal: AbortSignal.timeout(1500) })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
+function devBunBin(): string {
+  const candidates = [
+    join(process.env.APPDATA || '', 'npm', 'node_modules', 'bun', 'bin', 'bun.exe'),
+    join(process.env.USERPROFILE || '', '.bun', 'bin', 'bun.exe'),
+  ]
+  for (const c of candidates) {
+    try {
+      if (c && existsSync(c)) return c
+    } catch {
+      /* keep looking */
+    }
+  }
+  return 'bun'
+}
+
+function devApiPlugin(): Plugin {
+  let proc: ReturnType<typeof spawn> | null = null
+  let killed = false
+  const stop = () => {
+    if (killed) return
+    killed = true
+    try {
+      proc?.kill()
+    } catch {
+      /* already dead */
+    }
+    proc = null
+  }
+  return {
+    name: 'gmatch-dev-api',
+    async configureServer(server) {
+      if (DEV_API_REMOTE) return
+      // Adopt a healthy sidecar before spawning: a second window, a leftover
+      // process, or `npm run dev:electron` may already own the port. A doomed
+      // duplicate would crash with EADDRINUSE while this plugin's health poll
+      // happily reported "ready" against the OTHER process (observed live).
+      if (await isSidecarHealthy()) {
+        console.log(`[dev-api] adopting existing sidecar at ${DEV_API_BASE}`)
+        return
+      }
+      const apiDir = fileURLToPath(new URL('../api', import.meta.url))
+      proc = spawn(devBunBin(), ['run', 'src/serve.ts'], {
+        cwd: apiDir,
+        env: { ...process.env, PORT: String(DEV_API_PORT) },
+        stdio: ['ignore', 'inherit', 'inherit'],
+      })
+      proc.on('error', (err) => {
+        console.warn(`[dev-api] could not spawn bun (${err.message}). Install bun or set GMATCH_DEV_API=remote.`)
+      })
+      // Dev DB/blob paths default to apps/api (serve.ts) — no electron
+      // userData here, and none needed for debugging.
+      server.httpServer?.once('close', stop)
+      process.once('exit', stop)
+      const started = Date.now()
+      const poll = setInterval(async () => {
+        // A child that already exited can never come up — never claim ready
+        // for a process we did not start.
+        if (!proc) {
+          clearInterval(poll)
+          console.warn('[dev-api] sidecar exited before becoming healthy')
+          return
+        }
+        if (await isSidecarHealthy()) {
+          clearInterval(poll)
+          console.log(`[dev-api] local sidecar ready at ${DEV_API_BASE}`)
+          return
+        }
+        if (Date.now() - started > 30_000) {
+          clearInterval(poll)
+          console.warn('[dev-api] sidecar did not report healthy within 30s')
+        }
+      }, 500)
+    },
+  }
+}
+
 function booruOrgProxy(target: string, prefix: string): ProxyOptions {
   return {
     target,
@@ -108,22 +210,21 @@ function booruOrgProxy(target: string, prefix: string): ProxyOptions {
 // base './' so Electron can load dist/index.html over file://
 export default defineConfig({
   base: './',
-  plugins: [react(), tailwindcss(), devPxPlugin()],
+  plugins: [react(), tailwindcss(), devPxPlugin(), devApiPlugin()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
   server: {
-    // Dev-only proxy: routes /api directly to central node at gmatch.fly.dev (no CORS issues).
+    // Dev proxy: /api goes to the LOCAL sidecar (devApiPlugin above) so the
+    // browser dev server debugs the same server the packaged app runs.
+    // GMATCH_DEV_API=remote keeps the old central-node target.
     // Also proxies Grid feed's booru mirrors for browser dev.
     proxy: {
-      '^/api': {
-        target: 'https://gmatch.fly.dev',
-        changeOrigin: true,
-        secure: true,
-        ws: true,
-      },
+      '^/api': DEV_API_REMOTE
+        ? { target: 'https://gmatch.fly.dev', changeOrigin: true, secure: true, ws: true }
+        : { target: DEV_API_BASE, changeOrigin: true, ws: true },
       '^/booru/tbib': {
         target: 'https://tbib.org',
         changeOrigin: true,
