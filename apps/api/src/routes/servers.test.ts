@@ -102,6 +102,12 @@ describe('Server directory API', () => {
     // client (same exposure as GET /api/users, which every member can call).
     expect(body.users.every((u) => typeof u.id === 'string' && u.id.length > 8)).toBe(true)
     expect(body.users.some((u) => u.id === owner.orbitId)).toBe(true)
+    const counts = body as unknown as { online_count: number; active_24h_count: number; members_total: number }
+    expect(typeof counts.online_count).toBe('number')
+    expect(typeof counts.active_24h_count).toBe('number')
+    expect(counts.online_count).toBe(body.users.filter((u) => u.online).length)
+    expect(counts.active_24h_count).toBe(body.users.length)
+    expect(counts.members_total).toBeGreaterThanOrEqual(counts.active_24h_count)
   })
 
   it('delete is owner-only; heartbeat refreshes last_seen', async () => {

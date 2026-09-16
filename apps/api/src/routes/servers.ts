@@ -31,11 +31,43 @@ const MAX_NAME = 60
 const MAX_DESC = 200
 const MAX_HINT = 120
 const MAX_PER_OWNER = 5
+const MAX_TAGS = 10
+const MAX_TAG_LEN = 24
 const STALE_MS = 24 * 60 * 60 * 1000
 
 const NODE_NAME_KEY = 'server_name'
 const NODE_DESC_KEY = 'server_description'
+const NODE_TAGS_KEY = 'server_tags'
 const NODE_DIRECTORY_KEY = 'server_directory_id'
+
+/**
+ * Host-authored display tags (browser chips + search). Plain slugs:
+ * lowercase alnum-dash, ≤24 chars, ≤10 per server. Returns null when the
+ * field is absent (preserve stored value); throws on a wrong type.
+ */
+export function parseServerTagsApi(value: unknown): string[] | null {
+  if (value === undefined) return null
+  if (!Array.isArray(value)) throw new Error('tags must be an array')
+  const seen = new Set<string>()
+  for (const raw of value) {
+    if (typeof raw !== 'string') continue
+    const tag = raw.trim().toLowerCase()
+    if (!new RegExp(`^[a-z0-9-]{1,${MAX_TAG_LEN}}$`).test(tag) || seen.has(tag)) continue
+    seen.add(tag)
+    if (seen.size >= MAX_TAGS) break
+  }
+  return [...seen]
+}
+
+function readStoredTags(raw: unknown): string[] {
+  if (typeof raw !== 'string' || !raw) return []
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.filter((t): t is string => typeof t === 'string') : []
+  } catch {
+    return []
+  }
+}
 
 async function getMeta(db: D1Turso, key: string): Promise<string | null> {
   const row = await db.prepare('SELECT value FROM SystemMeta WHERE key = ?').bind(key).first<{ value: string | null }>()
@@ -72,7 +104,7 @@ function validHint(hint: string): boolean {
 servers.get('/', softAuth, async (c) => {
   const viewer = c.get('orbitId') || ''
   const { results } = await c.env.DB.prepare(
-    `SELECT id, name, description, owner_id, password_required, endpoint_hint, user_count, online_count, is_private, created_at, last_seen
+    `SELECT id, name, description, owner_id, password_required, endpoint_hint, user_count, online_count, is_private, tags, created_at, last_seen
      FROM ServerDirectory
      WHERE last_seen >= datetime('now', ?)
        AND COALESCE(hidden, 0) = 0 AND COALESCE(blocked, 0) = 0
@@ -83,7 +115,12 @@ servers.get('/', softAuth, async (c) => {
   // anonymous directory browsers see name/description, never coordinates.
   // owner_name is NEVER listed — the browser shows the server, not the admin.
   const authed = !!c.get('orbitId')
-  return c.json({ servers: (results || []).map((r) => (authed ? r : { ...r, endpoint_hint: undefined })) })
+  return c.json({
+    servers: (results || []).map((r) => {
+      const row = { ...r, tags: readStoredTags(r.tags) }
+      return authed ? row : { ...row, endpoint_hint: undefined }
+    }),
+  })
 })
 
 servers.post('/', orbitAuth, async (c) => {
@@ -96,6 +133,10 @@ servers.post('/', orbitAuth, async (c) => {
   let userCount: number | null = null
   let onlineCount: number | null = null
   let ownerName = ''
+  let tags: string[] = []
+  // Absent tags (heartbeat replay) preserve the stored value — same class
+  // of bug as the private flag above.
+  let tagsProvided = false
   // Owner privacy: true/false sets it; absent (heartbeat replay) preserves the
   // stored value — an unflagged replay must never make a private server public.
   let priv: 0 | 1 | null = null
@@ -116,6 +157,12 @@ servers.post('/', orbitAuth, async (c) => {
     if (typeof body?.owner_name === 'string') ownerName = body.owner_name.trim().slice(0, 40)
     if (body?.private === true) priv = 1
     if (body?.private === false) priv = 0
+    try {
+      const parsed = parseServerTagsApi(body?.tags)
+      if (parsed !== null) { tags = parsed; tagsProvided = true }
+    } catch {
+      return c.json({ error: 'tags must be an array of slugs' }, 400)
+    }
   } catch {
     return c.json({ error: 'invalid json' }, 400)
   }
@@ -127,19 +174,22 @@ servers.post('/', orbitAuth, async (c) => {
   const mine = await c.env.DB.prepare('SELECT id FROM ServerDirectory WHERE id = ? AND owner_id = ?').bind(id, orbitId).first<{ id: string }>()
   if (!mine && (existing?.n ?? 0) >= MAX_PER_OWNER) return c.json({ error: `max ${MAX_PER_OWNER} servers per owner` }, 429)
 
+  const tagsJson = JSON.stringify(tags)
   await c.env.DB.prepare(`
-    INSERT INTO ServerDirectory (id, name, description, owner_id, owner_pubkey, owner_name, endpoint_hint, password_required, user_count, online_count, is_private, created_at, last_seen)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, 0), datetime('now'), datetime('now'))
+    INSERT INTO ServerDirectory (id, name, description, owner_id, owner_pubkey, owner_name, endpoint_hint, password_required, user_count, online_count, tags, is_private, created_at, last_seen)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, 0), datetime('now'), datetime('now'))
     ON CONFLICT(id) DO UPDATE SET description = excluded.description, endpoint_hint = excluded.endpoint_hint,
       password_required = excluded.password_required,
       owner_name = COALESCE(excluded.owner_name, ServerDirectory.owner_name),
       user_count = COALESCE(excluded.user_count, ServerDirectory.user_count),
       online_count = COALESCE(excluded.online_count, ServerDirectory.online_count),
+      tags = excluded.tags,
       is_private = COALESCE(?, ServerDirectory.is_private),
       last_seen = datetime('now')
-  `).bind(id, name, description, orbitId, ownerPub, ownerName || null, endpointHint, passwordRequired, userCount, onlineCount, priv, priv).run()
+  `).bind(id, name, description, orbitId, ownerPub, ownerName || null, endpointHint, passwordRequired, userCount, onlineCount, tagsJson, priv, priv).run()
 
-  const row = await c.env.DB.prepare('SELECT id, name, description, owner_id, owner_name, password_required, is_private, created_at FROM ServerDirectory WHERE id = ?').bind(id).first()
+  const raw = await c.env.DB.prepare('SELECT id, name, description, owner_id, owner_name, password_required, is_private, tags, created_at FROM ServerDirectory WHERE id = ?').bind(id).first<Record<string, unknown>>()
+  const row = raw ? { ...raw, tags: readStoredTags(raw.tags) } : raw
   return c.json({ server: row }, 201)
 })
 
@@ -248,8 +298,10 @@ servers.get('/dashboard', softAuth, async (c) => {
   const counts = await c.env.DB.prepare(
     `SELECT
        (SELECT COUNT(*) FROM Objects WHERE is_public = 1 AND created_at >= datetime('now', '-1 day')) as posts_24h,
-       (SELECT COUNT(*) FROM Users WHERE (is_admin = 0 OR is_admin IS NULL) AND id NOT LIKE 'bot_%') as members_total`, 
-  ).first<{ posts_24h: number; members_total: number }>()
+       (SELECT COUNT(*) FROM Users WHERE (is_admin = 0 OR is_admin IS NULL) AND id NOT LIKE 'bot_%') as members_total,
+       (SELECT COUNT(*) FROM Users WHERE (is_admin = 0 OR is_admin IS NULL) AND last_seen IS NOT NULL AND datetime(last_seen) >= datetime('now', '-60 seconds')) as online_count,
+       (SELECT COUNT(*) FROM Users WHERE (is_admin = 0 OR is_admin IS NULL) AND last_seen IS NOT NULL AND datetime(last_seen) >= datetime('now', '-24 hours')) as active_24h_count`,
+  ).first<{ posts_24h: number; members_total: number; online_count: number; active_24h_count: number }>()
   const authed = !!c.get('orbitId')
   const serverName = (await getMeta(c.env.DB, NODE_NAME_KEY)) || 'gmatch'
   return c.json({
@@ -266,6 +318,8 @@ servers.get('/dashboard', softAuth, async (c) => {
       : [],
     posts_24h: counts?.posts_24h ?? 0,
     members_total: counts?.members_total ?? 0,
+    online_count: counts?.online_count ?? 0,
+    active_24h_count: counts?.active_24h_count ?? 0,
   })
 })
 
