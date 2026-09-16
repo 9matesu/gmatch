@@ -26,6 +26,8 @@ export interface GmatchBridge {
   vaultRemove?: (url: string) => Promise<{ ok: boolean }>
   vaultStats?: () => Promise<{ files: number; bytes: number; quota: number; dir: boolean }>
   vaultClear?: () => Promise<{ files: number; bytes: number; quota: number; dir: boolean }>
+  /** localhost http URL for a stored vault:// URL (browser-openable), else null. */
+  vaultHttpUrl?: (url: string) => Promise<{ local: string | null }>
   customPickFolder?: () => Promise<{ ok: boolean; id?: string; path?: string; error?: string }>
   customListFolder?: (id: string) => Promise<{ ok: boolean; files?: { name: string; url: string }[]; error?: string }>
   customRemoveFolder?: (id: string) => Promise<{ ok: boolean }>

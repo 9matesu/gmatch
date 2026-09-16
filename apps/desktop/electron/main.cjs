@@ -8,6 +8,7 @@ const path = require('node:path')
 const imageCache = require('./imageCache.cjs')
 const { createFetchBooru } = require('./booruSources.cjs')
 const vault = require('./vault.cjs')
+const vaultServer = require('./vaultServer.cjs')
 const customFolders = require('./customFolders.cjs')
 const wallpaperWin = require('./wallpaperWin.cjs')
 const { sanitizeBounds } = require('./window-bounds-core.cjs')
@@ -1233,6 +1234,9 @@ app.whenReady().then(async () => {
   })
   imageCache.init(app.getPath('userData'), UA)
   vault.init(app.getPath('userData'))
+  vaultServer.start(app.getPath('userData')).catch(() => {
+    /* best effort */
+  })
   protocol.handle(imageCache.SCHEME, (request) => imageCache.serveImage(request))
   protocol.handle(vault.SCHEME, (request) => vault.serveVault(request))
   customFolders.init(app.getPath('userData'), { ipcMain, BrowserWindow })
@@ -1252,6 +1256,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('vault:remove', (_event, url) => ({ ok: vault.remove(String(url ?? '')) }))
   ipcMain.handle('vault:stats', () => vault.stats())
   ipcMain.handle('vault:clear', () => vault.clear())
+  ipcMain.handle('vault:http-url', (_event, url) => ({ local: vaultServer.httpUrl(String(url ?? '')) }))
   // Update check (Settings): installed version + open the download in the OS browser.
   ipcMain.handle('app:version', () => app.getVersion())
   ipcMain.handle('app:open-log', () => shell.openPath(app.getPath('userData')))
