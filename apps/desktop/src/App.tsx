@@ -1315,6 +1315,44 @@ export default function Home() {
     return waiting + inMatch;
   }, [lobby.state?.waiting_count, lobby.liveMatches]);
 
+  // Watch badge: people watching in public rooms (same list the room browser
+  // polls; 60s is plenty for a "N watching" pill count).
+  const [watchWatchingCount, setWatchWatchingCount] = useState(0);
+  useEffect(() => {
+    if (!identity || !settings.watchPartyEnabled) { setWatchWatchingCount(0); return }
+    let dead = false
+    const load = () => orbitFetch('/api/watchparty', {}, identity)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b: any) => {
+        if (!dead && Array.isArray(b?.parties))
+          setWatchWatchingCount(b.parties.reduce((s: number, p: any) => s + (Number(p.members) || 0), 0))
+      })
+      .catch(() => {})
+    load()
+    const t = setInterval(load, 60_000)
+    return () => { dead = true; clearInterval(t) }
+  }, [identity, settings.watchPartyEnabled])
+
+  // Feed badge: posts created after the last feed visit (sync poll already
+  // refreshes serverPosts off-tab). Baseline starts at the newest post of
+  // this session's first visit — a reload must not flag the whole backlog.
+  const [feedBaseline, setFeedBaseline] = useState<number | null>(null)
+  useEffect(() => {
+    if (mainView !== 'feed' && feedBaseline !== null) return
+    const newest = serverPosts.reduce((m, p) => {
+      const t = Date.parse(String((p as any).created_at || ''))
+      return Number.isFinite(t) && t > m ? t : m
+    }, feedBaseline ?? 0)
+    if (newest !== (feedBaseline ?? 0)) setFeedBaseline(newest)
+  }, [mainView, serverPosts, feedBaseline])
+  const feedNewPostsCount = useMemo(() => {
+    if (mainView === 'feed' || feedBaseline === null) return 0
+    return serverPosts.filter((p) => {
+      const t = Date.parse(String((p as any).created_at || ''))
+      return Number.isFinite(t) && t > feedBaseline
+    }).length
+  }, [mainView, serverPosts, feedBaseline])
+
   // Blind-courier DM path (plan P3.3): inert on full nodes (legacy inbox),
   // active only when the API 404s /api/pm (official SITE).
   useServerHeartbeat(identity ?? null);
@@ -4215,6 +4253,8 @@ export default function Home() {
               unreadMessagesCount={chatUnreadCount}
               unreadNotificationsCount={lobby.unreadCount}
               gamesOnlineCount={gamesOnlineCount}
+              watchWatchingCount={watchWatchingCount}
+              feedNewPostsCount={feedNewPostsCount}
               displayName={myProfile.displayName || myUser?.display_name || 'You'}
               profilePic={profilePics[identity?.orbitId || '']}
               isAdmin={myProfile.isAdmin}

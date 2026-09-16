@@ -81,6 +81,21 @@ describe('CommandIsland count badges', () => {
     expect(screen.getByRole('status', { name: '12 players online' })).toHaveTextContent('12');
   });
 
+  it('Watch + Feed pills show their count badges', () => {
+    render(
+      <CommandIsland
+        mainView="games"
+        setMainView={vi.fn()}
+        watchWatchingCount={7}
+        feedNewPostsCount={3}
+      />,
+    );
+    const watch = screen.getByRole('button', { name: /Watch/i })
+    expect(watch.querySelector('[role="status"]')).toHaveTextContent('7')
+    const feed = screen.getByRole('button', { name: /Feed/i })
+    expect(feed.querySelector('[role="status"]')).toHaveTextContent('3')
+  });
+
   it('hides badges at zero and caps large numbers at 99+', async () => {
     const setMainView = vi.fn();
     const { rerender } = render(

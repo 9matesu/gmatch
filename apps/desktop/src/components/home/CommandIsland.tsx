@@ -57,6 +57,10 @@ export interface CommandIslandProps {
   unreadNotificationsCount?: number;
   /** Live players in queue + in match (Arena badge). Hidden at 0. */
   gamesOnlineCount?: number;
+  /** People watching in public rooms (Watch badge). Hidden at 0. */
+  watchWatchingCount?: number;
+  /** Posts newer than the last feed visit (Feed badge). Hidden while feed is open. */
+  feedNewPostsCount?: number;
   displayName?: string;
   profilePic?: string;
   isAdmin?: boolean;
@@ -83,6 +87,8 @@ export function CommandIsland({
   unreadMessagesCount = 0,
   unreadNotificationsCount = 0,
   gamesOnlineCount = 0,
+  watchWatchingCount = 0,
+  feedNewPostsCount = 0,
   displayName = 'You',
   profilePic,
   isAdmin = false,
@@ -126,7 +132,8 @@ export function CommandIsland({
       label: 'Feed',
       icon: House,
       active: mainView === 'feed',
-      badge: 0,
+      badge: feedNewPostsCount,
+      badgeLabel: (n: number) => `${n} new posts`,
     },
     {
       id: 'grid' as MainViewType,
@@ -154,7 +161,8 @@ export function CommandIsland({
       label: 'Watch',
       icon: FilmSlate,
       active: mainView === 'watch',
-      badge: 0,
+      badge: watchWatchingCount,
+      badgeLabel: (n: number) => `${n} watching`,
     },
   ];
 
@@ -257,7 +265,7 @@ export function CommandIsland({
                   {item.label}
                 </span>
                 {item.badge > 0 && (
-                  <CountBadge count={item.badge} label={`${item.badge} players online`} />
+                  <CountBadge count={item.badge} label={item.badgeLabel ? item.badgeLabel(item.badge) : `${item.badge} players online`} />
                 )}
               </button>
             );
