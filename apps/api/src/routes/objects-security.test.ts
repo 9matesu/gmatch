@@ -188,5 +188,10 @@ describe('Objects API — Security & Access Control (GAPs A/B)', () => {
     });
     const strangerList = await asStranger.json() as any[];
     expect(strangerList.find((s) => s.id === storyId)?.viewed).toBe(0);
+
+    // view_count is the author's receipt: owner sees the number, everyone
+    // else gets NULL (never another author's analytics).
+    expect(viewerList.find((s) => s.id === storyId)?.view_count).toBe(1);
+    expect(strangerList.find((s) => s.id === storyId)?.view_count).toBeNull();
   });
 });

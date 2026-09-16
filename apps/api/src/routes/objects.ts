@@ -364,13 +364,14 @@ objects.get('/stories', orbitAuth, async (c) => {
 
     const { results } = await c.env.DB.prepare(`
       SELECT o.id, o.owner_id, o.size_bytes, o.mime_type, o.created_at, o.expires_at, o.caption, o.content_url, o.gacha_downloads_count, u.display_name, u.pfp_url, u.public_key as sender_pubkey, u.encryption_pub_key as sender_enc_pubkey,
-        EXISTS(SELECT 1 FROM StoryViews v WHERE v.object_id = o.id AND v.viewer_id = ?) AS viewed
+        EXISTS(SELECT 1 FROM StoryViews v WHERE v.object_id = o.id AND v.viewer_id = ?) AS viewed,
+        CASE WHEN o.owner_id = ? THEN (SELECT COUNT(*) FROM StoryViews v2 WHERE v2.object_id = o.id) END AS view_count
       FROM Objects o
       JOIN Users u ON o.owner_id = u.id
       WHERE o.is_story = 1 AND o.hidden_at IS NULL AND (o.expires_at IS NULL OR datetime(o.expires_at) > datetime('now'))
       ORDER BY o.created_at DESC
       LIMIT 50
-    `).bind(orbitId).all()
+    `).bind(orbitId, orbitId).all()
 
     return c.json(results || [])
   } catch  {

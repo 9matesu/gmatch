@@ -92,3 +92,25 @@ describe('GMatchStories segment bar (T-W3)', () => {
     expect(screen.getByTestId('seg-track-1').className).toContain('bg-white/25')
   })
 });
+
+describe('GMatchStories author view count (T-W3c)', () => {
+  beforeEach(() => localStorage.clear())
+
+  it("shows the view count on the author's own story", () => {
+    renderStories([story({ id: 's1', owner_id: 'me', view_count: 3 })])
+    fireEvent.click(screen.getByAltText('Story Gal'))
+    expect(screen.getByText('3 views')).toBeDefined()
+  })
+
+  it('uses the singular for exactly one view', () => {
+    renderStories([story({ id: 's1', owner_id: 'me', view_count: 1 })])
+    fireEvent.click(screen.getByAltText('Story Gal'))
+    expect(screen.getByText('1 view')).toBeDefined()
+  })
+
+  it("never shows a view count on someone else's story", () => {
+    renderStories([story({ id: 's1', owner_id: 'user-9', view_count: 3 })])
+    fireEvent.click(screen.getByAltText('Story Gal'))
+    expect(screen.queryByText('3 views')).toBeNull()
+  })
+});

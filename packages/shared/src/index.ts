@@ -253,6 +253,8 @@ export interface OrbitObject {
   expires_at?: string;
   /** 1 when the requesting viewer already watched this story (server truth). */
   viewed?: number;
+  /** View count, present ONLY on stories the requesting user owns. */
+  view_count?: number | null;
 }
 
 export interface Friend {

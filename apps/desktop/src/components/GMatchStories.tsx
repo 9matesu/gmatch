@@ -442,6 +442,12 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
                 <div>
                   <div className="text-xs font-bold leading-tight">{activeGroup.displayName}</div>
                   <div className="text-[10px] text-retro-body font-medium">{formatTimeAgo(currentStory.created_at)}</div>
+                  {/* The view count is the author's receipt: only their own story carries one. */}
+                  {currentStory.owner_id === currentUserId && typeof currentStory.view_count === 'number' && (
+                    <div className="text-[10px] text-retro-body font-medium">
+                      {currentStory.view_count} {currentStory.view_count === 1 ? 'view' : 'views'}
+                    </div>
+                  )}
                 </div>
               </div>
 
