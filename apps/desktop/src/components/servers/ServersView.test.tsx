@@ -65,7 +65,10 @@ describe('ServersView', () => {
     // or the admin's name.
     expect(screen.queryByText('by Alice')).not.toBeInTheDocument()
     expect(screen.queryByText(/192\.168/)).not.toBeInTheDocument()
+    // copy action lives behind the row overflow menu: open it first.
+    fireEvent.click(screen.getByRole('button', { name: /more actions for friend world/i }))
     expect(screen.getByTitle('Copy node code')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /more actions for friend world/i }))
     expect(screen.getByText('chill')).toBeInTheDocument()
     // password_required => visible lock marker
     expect(screen.getByLabelText('password required')).toBeInTheDocument()
@@ -73,7 +76,7 @@ describe('ServersView', () => {
     expect(screen.queryByRole('button', { name: /manage hub/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /online \(/i })).toBeNull()
     // dashboard userlist lives on the hub: open it to find Alice.
-    fireEvent.click(screen.getByRole('button', { name: /my server \/ hub/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^hub/i }))
     expect(await screen.findByText('Alice')).toBeInTheDocument()
     // hero is ONE row: counts live under the name, not in a duplicate header
     expect(await screen.findByText('9 members · 3 posts/24h')).toBeInTheDocument()
@@ -305,7 +308,7 @@ describe('ServersView', () => {
     expect(screen.queryByRole('button', { name: /online \(/i })).toBeNull()
 
     // Hub members section owns presence: switch to the hub tab first.
-    fireEvent.click(screen.getByRole('button', { name: /my server \/ hub/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^hub/i }))
     // Online tab is default: BobOnline is visible, CarolRecent is hidden
     expect(await screen.findByText('BobOnline', {}, { timeout: 3000 })).toBeInTheDocument()
     expect(screen.queryByText('CarolRecent')).toBeNull()
@@ -412,6 +415,7 @@ describe('ServersView', () => {
       return json({ servers: [{ id: 'bbb', name: 'My Realm', owner_id: ownId, password_required: 0, endpoint_hint: '10.0.0.1:8790' }] })
     })
     render(<ServersView identity={identity} toast={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: /more actions for my realm/i }))
     fireEvent.click(await screen.findByText('unregister'))
     await waitFor(() => expect(localStorage.getItem('gmatch.server.register')).toBeNull())
     expect(localStorage.getItem('gmatch.server.directoryId')).toBeNull()
@@ -425,9 +429,13 @@ describe('ServersView', () => {
       return json({ servers: [{ id: 'bbb', name: 'My Realm', owner_id: ownId, password_required: 0, is_private: 0, endpoint_hint: 'my.host:8790' }] })
     })
     render(<ServersView identity={identity} toast={() => {}} />)
+    // owner row stays compact: Switch inline, the rest behind the overflow menu.
+    expect(await screen.findByRole('button', { name: /switch/i })).toBeInTheDocument()
+    expect(within(screen.getByRole('listitem')).getAllByRole('button').length).toBeGreaterThanOrEqual(2)
+    fireEvent.click(screen.getByRole('button', { name: /more actions for my realm/i }))
     expect(await screen.findByText('Make private')).toBeInTheDocument()
-    // the button row per owner row: rename + switch sit next to share/unregister
-    expect(within(screen.getByRole('listitem')).getAllByRole('button').length).toBeGreaterThanOrEqual(4)
+    expect(screen.getByText('rename')).toBeInTheDocument()
+    expect(screen.getByText('unregister')).toBeInTheDocument()
   })
 
   it('shows the admin passcode once on first host login and never again after dismiss', async () => {
