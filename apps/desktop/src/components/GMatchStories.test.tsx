@@ -85,4 +85,10 @@ describe('GMatchStories segment bar (T-W3)', () => {
     fireEvent.click(screen.getByAltText('Story Gal'))
     expect(screen.getByTestId('seg-track-1').className).toContain('bg-white/25')
   })
+
+  it('treats a server-reported viewed=1 as already seen (cross-device)', () => {
+    renderStories([story({ id: 's1' }), story({ id: 's2', viewed: 1 })])
+    fireEvent.click(screen.getByAltText('Story Gal'))
+    expect(screen.getByTestId('seg-track-1').className).toContain('bg-white/25')
+  })
 });

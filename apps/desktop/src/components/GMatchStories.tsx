@@ -54,6 +54,23 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
     }
   });
 
+  // Server-side seen state (StoryViews) hydrates the localStorage mirror on
+  // load, so a story watched on another device starts dimmed here too.
+  useEffect(() => {
+    const viewedIds = stories.filter((s) => s.viewed).map((s) => s.id);
+    if (viewedIds.length === 0) return;
+    setSeenStoryIds((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const id of viewedIds) if (!next.has(id)) { next.add(id); changed = true; }
+      if (!changed) return prev;
+      try {
+        localStorage.setItem('orbit_seen_stories', JSON.stringify(Array.from(next)));
+      } catch {}
+      return next;
+    });
+  }, [stories]);
+
   const [openUserId, setOpenUserId] = useState<string | null>(null);
   const [openOrder, setOpenOrder] = useState<string[] | null>(null);
   const [activeStoryIndex, setActiveStoryIndex] = useState<number>(0);
@@ -137,6 +154,10 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
       } catch {}
       return next;
     });
+    // Fire-and-forget cross-device record; the endpoint is idempotent.
+    if (identity) {
+      void orbitFetch(`/api/objects/${id}/view`, { method: 'POST' }, identity).catch(() => {});
+    }
   };
 
   const closeStoryViewer = () => {

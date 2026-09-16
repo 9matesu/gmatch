@@ -141,4 +141,52 @@ describe('Objects API — Security & Access Control (GAPs A/B)', () => {
     const data = await res.json();
     expect(Array.isArray(data)).toBe(true);
   });
+
+  it('POST /:id/view records a StoryView and is idempotent', async () => {
+    const storyId = 'view-story-' + Date.now();
+    await env.DB.prepare(`
+      INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, is_story)
+      VALUES (?, ?, 100, 'image/jpeg', 'data:image/jpeg;base64,dGVzdA==', 1)
+    `).bind(storyId, owner.orbitId).run();
+
+    const path = `/api/objects/${storyId}/view`;
+    const headers = signRequestHeaders(stranger, 'POST', path);
+    expect((await app.request(path, { method: 'POST', headers })).status).toBe(200);
+    expect((await app.request(path, { method: 'POST', headers })).status).toBe(200);
+
+    const rows = await env.DB.prepare('SELECT COUNT(*) AS n FROM StoryViews WHERE object_id = ? AND viewer_id = ?')
+      .bind(storyId, stranger.orbitId).first<{ n: number }>();
+    expect(rows?.n).toBe(1);
+  });
+
+  it('POST /:id/view rejects a non-story object with 404', async () => {
+    const path = `/api/objects/${testObjectId}/view`;
+    const headers = signRequestHeaders(owner, 'POST', path);
+    expect((await app.request(path, { method: 'POST', headers })).status).toBe(404);
+  });
+
+  it('GET /stories flags viewed stories for the requesting viewer only', async () => {
+    const storyId = 'flag-story-' + Date.now();
+    await env.DB.prepare(`
+      INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, is_story)
+      VALUES (?, ?, 100, 'image/jpeg', 'data:image/jpeg;base64,dGVzdA==', 1)
+    `).bind(storyId, owner.orbitId).run();
+
+    await app.request(`/api/objects/${storyId}/view`, {
+      method: 'POST',
+      headers: signRequestHeaders(owner, 'POST', `/api/objects/${storyId}/view`),
+    });
+
+    const asViewer = await app.request('/api/objects/stories', {
+      headers: signRequestHeaders(owner, 'GET', '/api/objects/stories'),
+    });
+    const viewerList = await asViewer.json() as any[];
+    expect(viewerList.find((s) => s.id === storyId)?.viewed).toBe(1);
+
+    const asStranger = await app.request('/api/objects/stories', {
+      headers: signRequestHeaders(stranger, 'GET', '/api/objects/stories'),
+    });
+    const strangerList = await asStranger.json() as any[];
+    expect(strangerList.find((s) => s.id === storyId)?.viewed).toBe(0);
+  });
 });

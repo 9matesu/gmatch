@@ -251,6 +251,8 @@ export interface OrbitObject {
   display_name?: string;
   pfp_url?: string | null;
   expires_at?: string;
+  /** 1 when the requesting viewer already watched this story (server truth). */
+  viewed?: number;
 }
 
 export interface Friend {

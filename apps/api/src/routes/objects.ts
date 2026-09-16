@@ -357,18 +357,20 @@ async function purgeDeadObject(db: any, bucket: any, id: string) {
 }
 
 objects.get('/stories', orbitAuth, async (c) => {
+  const orbitId = c.get('orbitId')
   try {
     // Automatically purge expired stories and their associated blobs
     await deleteExpiredContent(c.env.DB, c.env.BUCKET).catch(() => { })
 
     const { results } = await c.env.DB.prepare(`
-      SELECT o.id, o.owner_id, o.size_bytes, o.mime_type, o.created_at, o.expires_at, o.caption, o.content_url, o.gacha_downloads_count, u.display_name, u.pfp_url, u.public_key as sender_pubkey, u.encryption_pub_key as sender_enc_pubkey
+      SELECT o.id, o.owner_id, o.size_bytes, o.mime_type, o.created_at, o.expires_at, o.caption, o.content_url, o.gacha_downloads_count, u.display_name, u.pfp_url, u.public_key as sender_pubkey, u.encryption_pub_key as sender_enc_pubkey,
+        EXISTS(SELECT 1 FROM StoryViews v WHERE v.object_id = o.id AND v.viewer_id = ?) AS viewed
       FROM Objects o
       JOIN Users u ON o.owner_id = u.id
       WHERE o.is_story = 1 AND o.hidden_at IS NULL AND (o.expires_at IS NULL OR datetime(o.expires_at) > datetime('now'))
       ORDER BY o.created_at DESC
       LIMIT 50
-    `).all()
+    `).bind(orbitId).all()
 
     return c.json(results || [])
   } catch  {
@@ -403,6 +405,17 @@ objects.post('/:id/claim-gacha', orbitAuth, async (c) => {
   } catch (err: any) {
     return c.json({ error: err?.message || 'Failed to claim story' }, 500)
   }
+})
+
+// Record that the caller watched a story. Idempotent (PK on object+viewer), so
+// the client can fire it on every story open without a dedupe round-trip.
+objects.post('/:id/view', orbitAuth, async (c) => {
+  const id = c.req.param('id')
+  const orbitId = c.get('orbitId')
+  const obj = await c.env.DB.prepare('SELECT id FROM Objects WHERE id = ? AND is_story = 1').bind(id).first()
+  if (!obj) return c.json({ error: 'Story not found' }, 404)
+  await c.env.DB.prepare('INSERT OR IGNORE INTO StoryViews (object_id, viewer_id) VALUES (?, ?)').bind(id, orbitId).run()
+  return c.json({ success: true })
 })
 
 objects.get('/:id/signed-url', orbitAuth, async (c) => {

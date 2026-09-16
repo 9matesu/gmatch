@@ -125,6 +125,18 @@ CREATE INDEX IF NOT EXISTS idx_objects_post_group ON Objects (post_group);
 CREATE INDEX IF NOT EXISTS idx_objects_is_chat ON Objects (is_chat);
 CREATE INDEX IF NOT EXISTS idx_objects_is_avatar ON Objects (is_avatar);
 
+-- Which stories a user has already watched. The client keeps a localStorage
+-- mirror for instant ring dimming; this table is the cross-device truth and
+-- the author's viewer count.
+CREATE TABLE IF NOT EXISTS StoryViews (
+  object_id TEXT NOT NULL,
+  viewer_id TEXT NOT NULL,
+  viewed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (object_id, viewer_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_story_views_viewer ON StoryViews (viewer_id);
+
 CREATE TABLE IF NOT EXISTS Recipients (
   object_id TEXT NOT NULL,
   recipient_id TEXT NOT NULL,
