@@ -13,6 +13,7 @@ import {
   Flag,
 } from 'lucide-react';
 import type { FeedPost, PostComment } from './GMatchFeed';
+import { Linkify } from '../Linkify';
 
 interface CommentsModalProps {
   post: FeedPost;
@@ -103,7 +104,7 @@ export function CommentsModal({
                 >
                   {post.author_name}
                 </span>
-                <span className="text-xs text-retro-body leading-relaxed">{post.caption}</span>
+                <Linkify text={post.caption} linkClassName="text-xs text-retro-body leading-relaxed underline break-all" />
                 <span className="text-[10px] text-retro-muted block mt-1">Author</span>
               </div>
             </div>
@@ -133,7 +134,7 @@ export function CommentsModal({
                     </span>
                     <span className="text-[10px] text-retro-muted">{c.created_at}</span>
                   </div>
-                  <p className="text-xs text-retro-body mt-0.5 leading-relaxed">{c.text}</p>
+                  <p className="text-xs text-retro-body mt-0.5 leading-relaxed"><Linkify text={c.text} linkClassName="underline break-all" /></p>
                 </div>
               </div>
 

@@ -19,6 +19,7 @@ import type { FeedPost, PostComment } from './GMatchFeed';
 import { ObjectImage } from '../ObjectImage';
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
 import { isMediaVideo, resolveMediaUrl } from '../../utils/media';
+import { Linkify } from '../Linkify';
 
 export function InstagramPostModal({ post, isOpen, onClose, identity, profilePics = {}, isLiked = false, isSaved = false, likeCount = 0, comments = [], onToggleLike, onToggleSave, onAddComment, onToggleCommentLike, onOpenShare, onOptionsClick, onOpenLikers, onSelectUser, onAvatarClick, onOpenNetwork, toast, zIndexClass = 'z-[var(--z-modal)]' }: {
   post: FeedPost | null;
@@ -293,7 +294,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                   </div>
                   <div className="flex-1 min-w-0">
                     <span className="text-xs font-extrabold text-retro-fg mr-1.5">{post.author_name}</span>
-                    <span className="text-xs text-retro-body leading-relaxed">{post.caption}</span>
+                    <Linkify text={post.caption} linkClassName="text-xs text-retro-body leading-relaxed underline break-all" />
 
                     {/* Clickable Tags */}
                     {post.tags && post.tags.length > 0 && (

@@ -46,6 +46,7 @@ import { ReportPostModal } from './ReportPostModal';
 import { PostCreatorModal } from './PostCreatorModal';
 import { PostLikersModal } from './PostLikersModal';
 import { FeedHeader } from './FeedHeader';
+import { Linkify } from '../Linkify';
 
 export interface PostComment {
   id: string;
@@ -963,7 +964,7 @@ export function GMatchFeed({
                       >
                         {post.author_name}
                       </span>
-                      <span>{post.caption}</span>
+                      <Linkify text={post.caption} />
                     </div>
                   )}
 
@@ -997,7 +998,7 @@ export function GMatchFeed({
                       <div className="text-xs text-retro-fg flex items-center justify-between">
                         <div className="truncate">
                           <strong className="font-semibold text-retro-fg mr-1.5">{postComments[postComments.length - 1].author_name}</strong>
-                          <span className="text-retro-muted">{postComments[postComments.length - 1].text}</span>
+                          <span className="text-retro-muted"><Linkify text={postComments[postComments.length - 1].text} /></span>
                         </div>
                       </div>
                     </div>

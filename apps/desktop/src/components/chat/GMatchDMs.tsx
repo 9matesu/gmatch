@@ -33,6 +33,7 @@ import type { ChatMessage } from '../../hooks/useP2P';
 import { orbitFetch } from '../../utils/api';
 import { ObjectImage } from '../ObjectImage';
 import { ChatPlayerList } from './ChatPlayerList';
+import { Linkify } from '../Linkify';
 
 export interface PeerInfo {
   orbitId: string;
@@ -980,7 +981,7 @@ export function GMatchDMs({
                                     <button type="button" onClick={() => setEditingMessage(null)} className="px-2 py-1 bg-glass-w8 border border-border-glass text-[10px] rounded cursor-pointer">Cancel</button>
                                   </div>
                                 ) : (
-                                  msg.text
+                                  <Linkify text={msg.text} />
                                 )}
                               </div>
                               {isLast && (
