@@ -554,22 +554,8 @@ export function GMatchFeed({
 
   return (
     <div className="w-full flex flex-col font-sans select-none pb-12 text-retro-fg">
-      {/* Stories Tray Carousel — topmost section of the feed */}
-      <div className="bg-transparent border-b border-border-glass py-3 px-1">
-        <GMatchStories
-          stories={stories}
-          loading={storiesLoading}
-          currentUserId={identity?.orbitId || ''}
-          identity={identity}
-          activeUserId={activeStoryUserId}
-          onCloseActiveUser={onActiveStoryClose || (() => {})}
-          onAddStory={onAddStory || (() => setShowCameraModal(true))}
-          profilePics={profilePics}
-          onStartPm={onStartPm}
-        />
-      </div>
-
-      {/* Feed Top Header — the only bar: brand, sort tabs, search, alerts */}
+      {/* Feed Top Header — the only bar: sort tabs, grid 1-5, search, alerts.
+          Sits ABOVE the stories tray so the tab leads with its controls. */}
       <FeedHeader
         unreadCount={unreadCount}
         onOpenSearch={() => setShowExploreSearch(true)}
@@ -594,34 +580,54 @@ export function GMatchFeed({
             ))}
           </div>
         }
+        colsControls={
+          <div
+            role="group"
+            aria-label="Feed columns"
+            className="flex items-center rounded-md bg-glass-w5 border border-border-glass p-0.5 text-xs"
+          >
+            {(['1', '2', '3', '4', '5'] as const).map((cols) => (
+              <button
+                key={cols}
+                type="button"
+                onClick={() => { playPress(720); onFeedColsChange?.(cols); }}
+                aria-pressed={feedCols === cols}
+                title={`${cols}-column feed`}
+                aria-label={`${cols}-column feed`}
+                className={`px-2 py-1 rounded transition-all duration-150 active:scale-[0.96] cursor-pointer font-medium ${feedCols === cols
+                    ? 'bg-retro-accent text-retro-accent-text font-semibold'
+                    : 'text-retro-muted hover:text-retro-fg'
+                  }`}
+              >
+                {cols}
+              </button>
+            ))}
+          </div>
+        }
       />
+
+      {/* Stories Tray Carousel — below the header */}
+      <div className="bg-transparent border-b border-border-glass py-3 px-1">
+        <GMatchStories
+          stories={stories}
+          loading={storiesLoading}
+          currentUserId={identity?.orbitId || ''}
+          identity={identity}
+          activeUserId={activeStoryUserId}
+          onCloseActiveUser={onActiveStoryClose || (() => {})}
+          onAddStory={onAddStory || (() => setShowCameraModal(true))}
+          profilePics={profilePics}
+          onStartPm={onStartPm}
+        />
+      </div>
 
       {/* Feed Content Column (Posts) */}
       <div className="w-full max-w-[1400px] mx-auto flex flex-col px-2 sm:px-4 py-2 space-y-3">
-        {/* Density bar: post count + column picker */}
-        <div className="flex items-center justify-end px-3 sm:px-6 py-1 gap-2 border-b border-border-glass">
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-retro-muted">
-              {displayPosts.length} posts
-            </span>
-            <div className="flex items-center bg-retro-panel border border-border-glass rounded-md p-0.5 text-xs">
-              {(['1', '2', '3', '4', '5'] as const).map((cols) => (
-                <button
-                  key={cols}
-                  type="button"
-                  onClick={() => { playPress(720); onFeedColsChange?.(cols); }}
-                  className={`px-2 py-1 rounded transition-all duration-150 active:scale-[0.96] cursor-pointer font-medium ${feedCols === cols
-                      ? 'bg-retro-accent text-retro-accent-text font-semibold'
-                      : 'text-retro-muted hover:text-retro-fg'
-                    }`}
-                  title={`${cols}-column feed`}
-                  aria-label={`${cols}-column feed`}
-                >
-                  {cols}
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* Density bar: post count only — the column picker lives in the header */}
+        <div className="flex items-center justify-end px-3 sm:px-6 py-1 border-b border-border-glass">
+          <span className="text-xs text-retro-muted">
+            {displayPosts.length} posts
+          </span>
         </div>
 
         {/* Feed Posts List with Sharp Square Images */}
