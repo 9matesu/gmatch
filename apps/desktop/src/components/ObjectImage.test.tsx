@@ -11,8 +11,15 @@ const hookState = {
   isLink: false,
   linkUrl: null as string | null,
 }
+// Records the cardId the component hands to the hook. The point of the
+// objectId-only and bare-uuid cases is whether the id REACHES the signed
+// fetch at all — the blank placeholder looks identical either way.
+const rec = { cardId: null as string | null }
 vi.mock('../hooks/useObjectImage', () => ({
-  useObjectImage: () => hookState,
+  useObjectImage: (cardId: string | null) => {
+    rec.cardId = cardId
+    return hookState
+  },
 }))
 vi.mock('../services/vault', () => ({
   useVaultUrl: () => null,
@@ -43,5 +50,22 @@ describe('ObjectImage placeholder (T-W3)', () => {
     hookState.url = 'blob:resolved'
     render(<ObjectImage contentUrl="/api/objects/abc" identity={identity} alt="shot" />)
     expect(screen.getByAltText('shot')).toHaveAttribute('src', 'blob:resolved')
+  })
+
+  it('feeds the objectId to the signed fetch when contentUrl is empty (T-W3b)', () => {
+    rec.cardId = null
+    render(<ObjectImage objectId="abc-123" identity={identity} />)
+    expect(rec.cardId).toBe('abc-123')
+  })
+
+  it('treats a bare uuid contentUrl as signed object media, never a raw img src (T-W3c)', () => {
+    const uuid = 'e66d0889-8c2a-4bd3-84d5-a7a29273db0f'
+    rec.cardId = null
+    hookState.url = null
+    hookState.failed = false
+    const { container } = render(<ObjectImage contentUrl={uuid} identity={identity} />)
+    // A raw <img> would carry the unauthenticated /api/objects/<uuid> url.
+    expect(container.querySelector('img')).toBeNull()
+    expect(rec.cardId).toBe(uuid)
   })
 })

@@ -39,10 +39,16 @@ export interface ObjectImageProps {
 
 const OBJECT_PATH = '/api/objects/'
 
+// A bare object id (uuid) is never a URL. resolveMediaUrl maps it to
+// /api/objects/<id> for <img>, but that request carries no auth headers and
+// 401s for anything not public. The signed fetch path must own it instead.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 function extractObjectId(contentUrl: string | null | undefined, objectId: string | null | undefined): string | null {
-  if (!contentUrl) return null
+  if (!contentUrl) return objectId || null
   const idx = contentUrl.indexOf(OBJECT_PATH)
   if (idx >= 0) return contentUrl.slice(idx + OBJECT_PATH.length).split(/[?#]/)[0] || null
+  if (UUID_RE.test(contentUrl.trim())) return contentUrl.trim()
   return objectId || null
 }
 
@@ -51,6 +57,9 @@ function needsSignedFetch(contentUrl: string | null | undefined, objectId: strin
     if (contentUrl.startsWith(OBJECT_PATH) || contentUrl.includes(OBJECT_PATH)) {
       const id = extractObjectId(contentUrl, objectId)
       return Boolean(id && !id.startsWith('p2p-'))
+    }
+    if (UUID_RE.test(contentUrl.trim())) {
+      return Boolean(objectId ? !objectId.startsWith('p2p-') : true)
     }
     if (contentUrl.startsWith('data:') || contentUrl.startsWith('http://') || contentUrl.startsWith('https://')) {
       return false
