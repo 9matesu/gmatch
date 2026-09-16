@@ -1181,7 +1181,7 @@ export function ServersView({
                       userTab === 'online' ? 'text-retro-fg' : 'text-retro-muted hover:text-retro-fg'
                     }`}
                   >
-                    Online ({onlineUsers.length})
+                    Online ({typeof dash?.online_count === 'number' ? dash.online_count : onlineUsers.length})
                   </button>
                   <button
                     type="button"
@@ -1191,7 +1191,7 @@ export function ServersView({
                       userTab === 'all24h' ? 'text-retro-fg' : 'text-retro-muted hover:text-retro-fg'
                     }`}
                   >
-                    Last 24h ({allUsers.length})
+                    Last 24h ({typeof dash?.active_24h_count === 'number' ? dash.active_24h_count : allUsers.length})
                   </button>
                 </div>
               </div>

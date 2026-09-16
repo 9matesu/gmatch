@@ -85,24 +85,15 @@ export function ChatPlayerList({
     const map = new Map<string, ChatPlayerItem>();
     const now = Date.now();
     const oneDayMs = 24 * 60 * 60 * 1000;
-    // Presence freshness: heartbeats land every <=30s and the server expires
-    // at 60s. A timestamp inside this window means online regardless of
-    // flags; a flag only counts while its own snapshot is fresh.
-    // Poll cadence: dashboard 30s, users prop 60-120s.
+    // Strict presence: last_seen is the sole authority for online presence.
+    // Must be sighted within the canonical 60-second window.
     const SEEN_FRESH_MS = 60_000;
-    const USERS_FLAG_BUDGET_MS = 150_000;
-    const DASHBOARD_FLAG_BUDGET_MS = 75_000;
     const seenMs = (v?: string | null) => {
       if (!v) return 0;
       const t = new Date(v).getTime();
       return Number.isFinite(t) ? t : 0;
     };
-    const usersAge = now - usersAtRef.current;
-    const dashboardAge = now - dashboardAtRef.current;
-    const usersFlagFresh = usersAge >= 0 && usersAge < USERS_FLAG_BUDGET_MS;
-    const dashboardFlagFresh = dashboardAge >= 0 && dashboardAge < DASHBOARD_FLAG_BUDGET_MS;
-    const isOnline = (lastSeen: number, flag: unknown, flagFresh: boolean) =>
-      (lastSeen > 0 && now - lastSeen < SEEN_FRESH_MS) || (flagFresh && Boolean(flag));
+    const isOnline = (lastSeen: number) => lastSeen > 0 && now - lastSeen < SEEN_FRESH_MS;
 
     // 1. Seed from dashboard 24h query
     for (const du of dashboardUsers) {
@@ -112,7 +103,7 @@ export function ChatPlayerList({
         display_name: du.display_name,
         pfp_url: du.pfp_url || profilePics[du.id],
         last_seen: du.last_seen,
-        online: isOnline(seenMs(du.last_seen), du.online, dashboardFlagFresh),
+        online: isOnline(seenMs(du.last_seen)),
       });
     }
 
@@ -120,7 +111,7 @@ export function ChatPlayerList({
     for (const u of users) {
       if (!u.id) continue;
       const lastSeenMs = seenMs(u.last_seen);
-      const online = isOnline(lastSeenMs, u.online, usersFlagFresh);
+      const online = isOnline(lastSeenMs);
       const isWithin24h = online || (lastSeenMs > 0 && (now - lastSeenMs) <= oneDayMs);
 
       const existing = map.get(u.id);
@@ -130,7 +121,7 @@ export function ChatPlayerList({
         // Keep the NEWEST sighting; a stale snapshot must not revive presence.
         const existingSeenMs = seenMs(existing.last_seen);
         if (lastSeenMs >= existingSeenMs) existing.last_seen = u.last_seen || existing.last_seen;
-        existing.online = isOnline(Math.max(lastSeenMs, existingSeenMs), online || existing.online, usersFlagFresh || dashboardFlagFresh);
+        existing.online = isOnline(Math.max(lastSeenMs, existingSeenMs));
       } else if (isWithin24h || (identity && u.id === identity.orbitId)) {
         map.set(u.id, {
           id: u.id,
