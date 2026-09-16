@@ -43,6 +43,7 @@ export function ChatPlayerList({
 }: ChatPlayerListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [dashboardUsers, setDashboardUsers] = useState<ChatPlayerItem[]>([]);
+  const [dashboardCounts, setDashboardCounts] = useState<{ online: number; active: number } | null>(null);
   // Snapshot stamps: an `online:true` flag is only trustworthy while the
   // snapshot that carried it is fresh. A stale flag with an old timestamp
   // is a ghost — presence must decay, never stick.
@@ -56,10 +57,15 @@ export function ChatPlayerList({
     try {
       const res = await orbitFetch('/api/servers/dashboard', { method: 'GET' }, identity);
       if (res.ok) {
-        const data = (await res.json()) as { users?: ChatPlayerItem[] };
+        const data = (await res.json()) as { users?: ChatPlayerItem[]; online_count?: number; active_24h_count?: number };
         if (Array.isArray(data?.users)) {
           dashboardAtRef.current = Date.now();
           setDashboardUsers(data.users);
+          if (typeof data.online_count === 'number' && typeof data.active_24h_count === 'number') {
+            setDashboardCounts({ online: data.online_count, active: data.active_24h_count });
+          } else {
+            setDashboardCounts(null);
+          }
         }
       }
     } catch {
@@ -191,7 +197,12 @@ export function ChatPlayerList({
     return list;
   }, [dashboardUsers, users, profilePics, identity]);
 
-  const onlineCount = useMemo(() => mergedPlayers.filter((p) => p.online).length, [mergedPlayers]);
+  const localOnlineCount = useMemo(() => mergedPlayers.filter((p) => p.online).length, [mergedPlayers]);
+  const isDashboardCountsFresh = Boolean(
+    dashboardCounts && (Date.now() - dashboardAtRef.current) < 75_000
+  );
+  const displayOnlineCount = isDashboardCountsFresh && dashboardCounts ? dashboardCounts.online : localOnlineCount;
+  const displayActiveCount = isDashboardCountsFresh && dashboardCounts ? dashboardCounts.active : mergedPlayers.length;
 
   const filteredPlayers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -231,11 +242,11 @@ export function ChatPlayerList({
         <div className="flex items-center gap-1.5 text-[11px] font-mono shrink-0">
           <span className="flex items-center gap-1 text-retro-online font-medium">
             <span className="w-2 h-2 rounded-full bg-retro-online inline-block" />
-            {onlineCount}
+            {displayOnlineCount}
           </span>
           <span className="text-retro-muted">/</span>
           <span className="text-retro-muted" title="Total active in the last 24 hours">
-            {mergedPlayers.length} 24h
+            {displayActiveCount} 24h
           </span>
         </div>
       </div>

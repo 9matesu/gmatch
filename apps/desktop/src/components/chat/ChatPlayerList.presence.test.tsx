@@ -2,6 +2,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import { ChatPlayerList } from './ChatPlayerList'
+import * as api from '../../utils/api'
 import type { User } from '@orbit/shared'
 
 const identity = {
@@ -70,5 +71,20 @@ describe('ChatPlayerList presence decay (no ghosts)', () => {
     )
     expect(row('Leaver').queryByText('Active now')).toBeNull()
     expect(row('Leaver').getByLabelText('Offline')).toBeDefined()
+  })
+
+  it('header shows server counts while the dashboard snapshot is fresh', async () => {
+    vi.spyOn(api, 'orbitFetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        users: [{ id: 'u1', display_name: 'U1', online: true, last_seen: fresh() }],
+        online_count: 5,
+        active_24h_count: 12,
+      }),
+    } as Response)
+    render(<ChatPlayerList identity={null} users={[]} />)
+    expect(await screen.findByText('5')).toBeDefined()
+    expect(await screen.findByText(/12 24h/)).toBeDefined()
   })
 });
