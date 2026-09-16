@@ -40,3 +40,8 @@ site/releases/*.exe
 .preview.log
 
 apps/desktop/.electron-dist/
+
+# dev scratch + local server state
+apps/api/probe-*.ts
+apps/api/watchparties.json
+release2/
