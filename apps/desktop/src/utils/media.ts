@@ -18,6 +18,12 @@ export function resolveMediaUrl(url?: string | null): string {
   if (/^(file|about|javascript|chrome|chrome-extension|moz-extension|safari-web-extension):/i.test(trimmed)) {
     return '';
   }
+  // A bare object id (UUID) is never a URL: treat it as the canonical
+  // /api/objects/<id> route, else the browser resolves it relative to the
+  // page (net::ERR_FILE_NOT_FOUND on a raw uuid in the packaged app).
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
+    return `${getApiBaseUrl().replace(/\/+$/, '')}/api/objects/${trimmed}`;
+  }
   if (
     /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) || trimmed.startsWith('data:') || trimmed.startsWith('blob:')
   ) {

@@ -14,7 +14,6 @@
  * the remote URL untouched.
  */
 
-import { isVideoUrl } from './postFilter'
 
 export interface ImageCacheStats {
   files: number
@@ -180,9 +179,9 @@ function queueBgFetch(url: string, task: () => Promise<void>): void {
 export async function resolveImage(url: string): Promise<string> {
   if (!url) return url
   destroyLegacyIdb()
-  // mp4/webm stream from source (often huge); only stills cache. Posters of
-  // videos cache as normal images.
-  if (isVideoUrl(url)) return url
+  // Videos cache too (mp4 "isn't saved" report): the Electron RAM cache is
+  // budget-guarded (oversize put() fails -> remote URL stands) and the
+  // browser session path already accepts video blobs.
   const b = bridge()
   if (b?.cacheImage) {
     try {

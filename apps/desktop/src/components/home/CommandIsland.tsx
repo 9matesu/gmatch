@@ -9,7 +9,8 @@ import {
   ChatCircleText,
   Plus,
   GameController,
-  DotsThree,
+  CaretLeft,
+  CaretRight,
   Gear,
   ShoppingBag,
   HardDrives,
@@ -379,7 +380,9 @@ export function CommandIsland({
               : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8'
           }`}
         >
-          <DotsThree className="w-4 h-4" weight="bold" />
+          {satelliteOpen
+            ? <CaretLeft className="w-4 h-4" />
+            : <CaretRight className="w-4 h-4" />}
         </button>
 
         {/* Expanded Right Section of the Pill Bar */}

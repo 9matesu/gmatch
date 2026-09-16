@@ -15,7 +15,7 @@ export function Modal({
 }) {
   return (
     <div
-      className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 bg-black/70 animate-orbit-fade-in"
+      className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 pb-[calc(1rem+var(--island-clearance))] bg-black/70 animate-orbit-fade-in"
       onClick={dismissable ? onClose : () => {}}
     >
       <div

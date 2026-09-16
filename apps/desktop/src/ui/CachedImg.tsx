@@ -1,5 +1,6 @@
 import { useEffect, useState, type ImgHTMLAttributes } from 'react'
 import { resolveImage } from '../services/imageCache'
+import { resolveMediaUrl } from '../utils/media'
 
 interface CachedImgProps extends ImgHTMLAttributes<HTMLImageElement> {
   src: string
@@ -12,7 +13,10 @@ interface CachedImgProps extends ImgHTMLAttributes<HTMLImageElement> {
  * (Electron main-process RAM cache — gmcache://, never disk; session Map
  * in browser dev mode) and falls back to the remote URL otherwise.
  */
-export default function CachedImg({ src, fallbackSrc, onError, ...rest }: CachedImgProps) {
+export default function CachedImg({ src: rawSrc, fallbackSrc, onError, ...rest }: CachedImgProps) {
+  // Normalize first: relative paths and bare object ids against the API base
+  // (a raw uuid would fire a file:// request -> ERR_FILE_NOT_FOUND).
+  const src = resolveMediaUrl(rawSrc)
   const isLocal = /^(gmcache|idle-file|vault|blob|data):/i.test(src)
   const [display, setDisplay] = useState<string>(src)
   const [resolved, setResolved] = useState<boolean>(isLocal)

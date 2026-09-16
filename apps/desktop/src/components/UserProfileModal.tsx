@@ -148,11 +148,11 @@ export function UserProfileModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-[var(--z-system)] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4 animate-orbit-fade-in select-none font-sans"
+        className="fixed inset-0 z-[var(--z-system)] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 pb-[var(--island-clearance)] sm:p-4 sm:pb-[calc(1rem+var(--island-clearance))] animate-orbit-fade-in select-none font-sans"
         onClick={onClose}
       >
         <div
-          className="bg-retro-panel border border-border-glass w-full max-w-lg overflow-hidden shadow-2xl rounded-t-2xl sm:rounded-xl animate-orbit-pop text-retro-fg max-h-[92dvh] sm:max-h-[90vh] flex flex-col"
+          className="bg-retro-panel border border-border-glass w-full max-w-lg overflow-hidden shadow-2xl rounded-t-2xl sm:rounded-xl animate-orbit-pop text-retro-fg max-h-[calc(100dvh-var(--island-clearance))] sm:max-h-[calc(100vh-var(--island-clearance)-2rem)] flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}

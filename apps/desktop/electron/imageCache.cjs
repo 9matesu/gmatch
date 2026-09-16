@@ -311,10 +311,33 @@ async function serveImage(request) {
     const buf = mem.get(key)
     if (!buf) return new Response('miss', { status: 404 })
     const mime = Object.values(meta).find((m) => m.key === key)?.mime || EXT_MIME[key.split('.').pop()] || 'application/octet-stream'
+    // Range support: <video> seeking re-requests with Range; answering 200
+    // every time makes a cached mp4 re-download the whole blob per seek.
+    const range = request.headers.get('range')
+    const m = range && /^bytes=(\d*)-(\d*)$/.exec(range)
+    if (m && (m[1] || m[2])) {
+      const total = buf.length
+      const start = m[1] ? Number(m[1]) : Math.max(0, total - Number(m[2]))
+      const end = m[1] && m[2] ? Math.min(Number(m[2]), total - 1) : total - 1
+      if (start <= end && end < total) {
+        return new Response(buf.slice(start, end + 1), {
+          status: 206,
+          headers: {
+            'Content-Type': mime,
+            'Content-Range': `bytes ${start}-${end}/${total}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': String(end - start + 1),
+            'Cache-Control': 'no-store',
+            'Access-Control-Allow-Origin': '*',
+          },
+        })
+      }
+    }
     return new Response(buf, {
       headers: {
         'Content-Type': mime,
         'Cache-Control': 'no-store',
+        'Accept-Ranges': 'bytes',
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
       },
