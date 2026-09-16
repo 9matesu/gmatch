@@ -111,6 +111,10 @@ export function NativeVideoPlayer({
   const [hoverPosition, setHoverPosition] = useState<number>(0);
 
   const resolvedSrc = resolveMediaUrl(src);
+  // Poster needs the same resolution as src: callers hand over bare object
+  // ids (/api/objects/<id> backed), and an unresolved uuid makes the browser
+  // request it relative to the page — net::ERR_FILE_NOT_FOUND in the console.
+  const resolvedPoster = resolveMediaUrl(poster) || undefined;
 
   useEffect(() => {
     setHasError(false);
@@ -405,7 +409,7 @@ export function NativeVideoPlayer({
       <video
         ref={videoRef}
         src={resolvedSrc}
-        poster={poster}
+        poster={resolvedPoster}
         autoPlay={autoPlay}
         loop={isLooping}
         muted={isMuted}

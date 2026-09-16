@@ -106,4 +106,21 @@ describe('NativeVideoPlayer', () => {
     await userEvent.dblClick(video);
     expect(onDoubleTap).toHaveBeenCalled();
   });
+
+  it('resolves a bare object id poster through resolveMediaUrl (not a raw uuid)', () => {
+    const uuid = 'e66d0889-8c2a-4bd3-84d5-a7a29273db0f';
+    const { container } = render(
+      <NativeVideoPlayer src="https://example.com/test.mp4" poster={uuid} />
+    );
+    const video = container.querySelector('video')!;
+    const poster = video.getAttribute('poster') || '';
+    expect(poster).not.toBe(uuid);
+    expect(poster).toContain(`/api/objects/${uuid}`);
+  });
+
+  it('omits the poster attribute when no poster is given', () => {
+    const { container } = render(<NativeVideoPlayer src="https://example.com/test.mp4" />);
+    const video = container.querySelector('video')!;
+    expect(video.hasAttribute('poster')).toBe(false);
+  });
 });
