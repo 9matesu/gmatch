@@ -31,6 +31,13 @@ function enabled(): boolean {
 // re-renders can't stack pins (which would leak bytes past eviction).
 const sessionPinned = new Set<string>()
 
+// Failed pins are remembered for the session too: the App backfill effect
+// re-runs on every feed update, and without this a URL the host refuses is
+// re-fetched on every pass. A transient failure therefore does not retry until
+// the next app launch — accepted, because the alternative is a fetch storm.
+// ponytail: session-scoped negative cache; add a TTL if a flaky host matters.
+const sessionFailed = new Set<string>()
+
 export async function vaultGet(url: string): Promise<string | null> {
   if (!url || !enabled()) return null
   try {
@@ -44,12 +51,15 @@ export async function vaultGet(url: string): Promise<string | null> {
 /** Get-or-fetch + pin. Fire-and-forget for keeps/cards; resolves vault:// or null. */
 export async function vaultPin(url: string): Promise<string | null> {
   if (!url || !enabled()) return null
+  if (sessionFailed.has(url)) return null
   try {
     if (sessionPinned.has(url)) return vaultGet(url)
     const res = await window.gmatch?.vaultPin?.(url)
     if (res?.local) sessionPinned.add(url)
+    else sessionFailed.add(url)
     return res?.local ?? null
   } catch {
+    sessionFailed.add(url)
     return null
   }
 }
@@ -150,4 +160,10 @@ export function useVaultUrls(urls: Array<string | null | undefined>): Record<str
     }
   }, [key])
   return map
+}
+
+/** Test seam: clear both session guards. */
+export function _resetSessionGuards(): void {
+  sessionPinned.clear()
+  sessionFailed.clear()
 }
