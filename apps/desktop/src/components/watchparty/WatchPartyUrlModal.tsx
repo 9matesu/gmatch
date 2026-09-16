@@ -5,7 +5,7 @@
 
 import { useState } from 'react'
 import { Modal } from '../Modal'
-import { BTN, BTN_PRIMARY } from '../../ui/styles'
+import { BTN_PRIMARY } from '../../ui/styles'
 import { createParty, loadPartyVideo, loadPartyVideos } from '../../hooks/watchPartyStore'
 
 interface IdentityLike {
@@ -101,16 +101,6 @@ export function WatchPartyUrlModal({
         {blocked && <p className="text-xs text-retro-muted">Only the host can load videos in this room.</p>}
         {error && <p className="text-xs text-retro-error">{error}</p>}
         <div className="flex gap-2">
-          {inRoom && queueMode && (
-            <button
-              type="button"
-              onClick={() => void loadIntoRoom()}
-              disabled={!url.trim() || busy || blocked}
-              className={`${BTN} flex-1 py-2 text-xs disabled:opacity-40`}
-            >
-              LOAD NOW
-            </button>
-          )}
           <button
             type="button"
             onClick={() => void submit()}
@@ -123,17 +113,4 @@ export function WatchPartyUrlModal({
       </div>
     </Modal>
   )
-
-  async function loadIntoRoom() {
-    if (!url.trim() || busy || blocked || !joinPartyId) return
-    setBusy(true)
-    setError(null)
-    const res = await loadPartyVideo(identity, joinPartyId, url.trim(), name.trim(), false)
-    setBusy(false)
-    if (!res.ok) {
-      setError(res.error || 'Could not load this video.')
-      return
-    }
-    onClose()
-  }
 }

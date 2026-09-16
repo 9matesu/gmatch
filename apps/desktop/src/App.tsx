@@ -51,10 +51,8 @@ import { AttachmentUploadModal } from "./components/AttachmentUploadModal";
 import { ProfileView } from "./components/views/ProfileView";
 import { DmMinimizedView } from "./components/views/MessagesView";
 import { MessagesRail } from "./components/chat/MessagesRail";
-import { WatchPartyDock } from "./components/watchparty/WatchPartyDock";
-import { WatchPartyEdgeTab } from "./components/watchparty/WatchPartyEdgeTab";
 import { WatchPartyView } from "./components/watchparty/WatchPartyView";
-import { watchPartyStore, setWatchDisplayName, useWatchParty } from "./hooks/watchPartyStore";
+import { setWatchDisplayName } from "./hooks/watchPartyStore";
 import { GameView } from "./components/views/GameView";
 import { AgeGateModal } from "./components/auth/AgeGateModal";
 import { LegalCenter, isLegalAccepted } from "./components/LegalCenter";
@@ -156,7 +154,6 @@ export default function Home() {
   }, []);
   const { peers, p2pItems, sendP2PItem, sendChatMessage, chatMessages, isWsConnected } = useP2P(identity);
   const { settings, update: updateSettings } = useSettings();
-  const watchParty = useWatchParty();
   useEffect(() => { setWatchDisplayName(myProfile.displayName || '') }, [myProfile.displayName]);
   const [users, setUsers] = useState<User[]>([]);
 
@@ -3335,13 +3332,6 @@ export default function Home() {
                   </div>
                   </MessagesRail>
 
-                  {settings.watchPartyEnabled && identity && mainView === 'feed' && (
-                    <WatchPartyEdgeTab
-                      side="left"
-                      onToggle={() => watchPartyStore.set({ open: !watchParty.open })}
-                    />
-                  )}
-
                   <div ref={mainScrollRef} className="mobile-app-scroll flex-1 min-w-0 min-h-0 w-full flex flex-col relative z-10 overflow-y-auto styled-scrollbar pb-24">
 
                   {/* Modals & Config */}
@@ -3806,20 +3796,8 @@ export default function Home() {
                   {/* Decision Overlay deactivated — matching cards are shown directly inside the match tab */}
                 </div>
 
-                {/* Watch Party dock: same-layer flex sibling right of the feed */}
-                {settings.watchPartyEnabled && identity && mainView === 'feed' && watchParty.open && (
-                  <WatchPartyDock
-                    identity={identity}
-                    profilePics={profilePics}
-                    onClose={() => watchPartyStore.set({ open: false })}
-                  />
-                )}
-                {settings.watchPartyEnabled && identity && mainView === 'feed' && !watchParty.open && (
-                  <WatchPartyEdgeTab
-                    side="right"
-                    onToggle={() => watchPartyStore.set({ open: true })}
-                  />
-                )}
+                {/* Watch Party lives on the Watch tab only (one entry point;
+                    the feed dock/edge tabs duplicated it). */}
 
                 {/* Desktop messages dock: right side panel sibling */}
                 <MessagesRail open={chatOpen}>

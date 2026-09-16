@@ -99,7 +99,7 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
                 </div>
               )}
             </div>
-            <WatchPartyTimeline party={active} onLoadVideo={() => setModalOpen(true)} canLoad={Boolean(active) && (isHost || !active?.lockVideo)} />
+            <WatchPartyTimeline party={active} />
           </>
         )}
       </div>

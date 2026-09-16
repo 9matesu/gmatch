@@ -6,12 +6,12 @@ import type { PartyRuntime } from '../../hooks/watchPartyStore'
 vi.mock('../../hooks/useObjectImage', () => ({
   useObjectImage: () => ({ url: '/api/watchparty/p1/stream' }),
 }))
-vi.mock('../../components/media/NativeVideoPlayer', () => ({
-  NativeVideoPlayer: () => {
-    const React = require('react')
-    return React.createElement('video', { 'data-testid': 'v' })
-  },
-}))
+vi.mock('../../components/media/NativeVideoPlayer', async () => {
+  const React = await import('react')
+  return {
+    NativeVideoPlayer: () => React.createElement('video', { 'data-testid': 'v' }),
+  }
+})
 vi.mock('../../hooks/watchPartyStore', async (io) => {
   const actual = await io<typeof import('../../hooks/watchPartyStore')>()
   return {

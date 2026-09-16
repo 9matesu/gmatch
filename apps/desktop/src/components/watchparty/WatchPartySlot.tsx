@@ -5,7 +5,7 @@
 // player's own controls are hidden; mute stays local.
 
 import { useEffect, useRef, useState } from 'react'
-import { Maximize, MicOff, Mic, Plus, RotateCcw } from 'lucide-react'
+import { Maximize, PictureInPicture2, Plus } from 'lucide-react'
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer'
 import { useObjectImage } from '../../hooks/useObjectImage'
 import { controlPlayback, serverNow, queueOp, type PartyRuntime } from '../../hooks/watchPartyStore'
@@ -40,6 +40,12 @@ export function WatchPartySlot({
     setVideoSrc(src)
   }, [src])
 
+  // The volume slider starts at 0 (autoplay-safe): make the element agree.
+  useEffect(() => {
+    const v = wrapRef.current?.querySelector('video')
+    if (v) v.muted = true
+  }, [videoSrc])
+
   // 250 ms sync tick, only while a party exists. The video element is read
   // imperatively from the DOM: NativeVideoPlayer keeps it in its own ref.
   useEffect(() => {
@@ -68,7 +74,11 @@ export function WatchPartySlot({
       }
       const localPlaying = !v.paused
       const plan = driftCorrection(v.currentTime, target, localPlaying, party.frame.action)
-      if (plan.seekTo !== null) v.currentTime = plan.seekTo
+      // Buffering must never move the needle: seeking into a stalled element
+      // just restarts the buffer (the lurching-playhead report). Transport
+      // (play/pause) still applies; the next data-rich tick re-seeks once.
+      const buffering = v.seeking || v.readyState < 3
+      if (plan.seekTo !== null && !buffering) v.currentTime = plan.seekTo
       if (plan.play && v.paused) void v.play().catch(() => {})
       if (plan.pause && !v.paused) v.pause()
     }, 250)
@@ -128,7 +138,7 @@ export function WatchPartySlot({
       ref={wrapRef}
       data-active={active ? 'true' : 'false'}
       onClick={onSelect}
-      className={`watch-party-slot relative ${fill ? 'h-full' : 'aspect-video'} rounded-lg overflow-hidden bg-black cursor-pointer ${active ? 'ring-1 ring-retro-fg' : 'border border-border-glass'}`}
+      className={`watch-party-slot relative ${fill ? 'h-full' : 'aspect-video'} overflow-hidden bg-black cursor-pointer ${active ? 'ring-1 ring-retro-fg' : 'border border-border-glass'}`}
     >
       {videoSrc ? (
         <NativeVideoPlayer
@@ -167,46 +177,54 @@ export function WatchPartySlot({
           {party.frame.by} controls playback
         </span>
       )}
-      {/* Local controls: never synced (volume/fullscreen belong to the room
-          of one person's ears and monitor). */}
+      {/* Local controls (never synced): volume, PiP detach, fullscreen —
+          one button, one function, identical casing. */}
       {videoSrc && (
-        <div className="absolute top-2 right-3 flex gap-1.5">
+        <div className="absolute top-2 right-3 flex items-center gap-1.5">
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={muted ? 0 : 1}
+            aria-label="Volume"
+            title="Volume"
+            onClick={(e) => e.stopPropagation()}
+            onInput={(e) => {
+              const v = wrapRef.current?.querySelector('video')
+              if (!v) return
+              const vol = Number((e.target as HTMLInputElement).value)
+              v.volume = vol
+              v.muted = vol === 0
+              setMuted(vol === 0)
+            }}
+            className="h-1 w-16 accent-retro-fg cursor-pointer"
+          />
           <button
             type="button"
-            aria-label={muted ? 'Unmute video' : 'Mute video'}
+            aria-label="Detach to picture-in-picture"
+            title="Detach (picture-in-picture)"
             onClick={(e) => {
               e.stopPropagation()
               const v = wrapRef.current?.querySelector('video')
               if (!v) return
-              v.muted = !v.muted
-              setMuted(v.muted)
+              if (document.pictureInPictureElement) void document.exitPictureInPicture()
+              else void v.requestPictureInPicture().catch(() => {})
             }}
-            className="p-2 rounded-md bg-black/60 text-white/90 hover:text-white cursor-pointer transition-colors duration-150"
+            className="p-2 bg-black/60 text-white/90 hover:text-white cursor-pointer transition-colors duration-150"
           >
-            {muted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-          </button>
-          <button
-            type="button"
-            aria-label="Resync to the room"
-            title="Resync to the room"
-            onClick={(e) => {
-              e.stopPropagation()
-              const v = wrapRef.current?.querySelector('video')
-              if (v && party.frame) v.currentTime = computeTargetPosition(party.frame, serverNow())
-            }}
-            className="p-2 rounded-md bg-black/60 text-white/90 hover:text-white cursor-pointer transition-colors duration-150"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
+            <PictureInPicture2 className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
             aria-label="Fullscreen"
+            title="Fullscreen"
             onClick={(e) => {
               e.stopPropagation()
               if (document.fullscreenElement) void document.exitFullscreen()
               else void wrapRef.current?.requestFullscreen()
             }}
-            className="p-2 rounded-md bg-black/60 text-white/90 hover:text-white cursor-pointer transition-colors duration-150"
+            className="p-2 bg-black/60 text-white/90 hover:text-white cursor-pointer transition-colors duration-150"
           >
             <Maximize className="w-3.5 h-3.5" />
           </button>
