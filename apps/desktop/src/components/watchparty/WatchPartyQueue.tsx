@@ -17,7 +17,14 @@ interface IdentityLike {
 }
 
 function parseLines(text: string): string[] {
-  return text.split(/\n+/).map((l) => l.trim()).filter(Boolean).slice(0, 11)
+  const lines = text.split(/\n+/).map((l) => l.trim()).filter(Boolean)
+  // 10 normal urls per add, or up to 30 pmvhaven playlists (each expands
+  // server-side to max 30 videos, hard-capped at 100 after expansion).
+  return lines.slice(0, lines.every(isPmvPlaylist) ? 30 : 10)
+}
+
+function isPmvPlaylist(u: string): boolean {
+  return /pmvhaven\.com\/playlists\//i.test(u)
 }
 
 export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; identity: IdentityLike }) {
@@ -32,12 +39,13 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
   const submit = async (queueOnly: boolean) => {
     const urls = parseLines(text)
     if (urls.length === 0 || busy) return
-    if (urls.length > 10) {
-      setError('Add up to 10 videos at a time.')
+    if (urls.length > 10 && !urls.every(isPmvPlaylist)) {
+      setError('Add up to 10 videos at a time. One pmvhaven playlist per add works too.')
       return
     }
     setError('')
     setBusy(true)
+    if (urls.some(isPmvPlaylist)) setError('Expanding playlists, parsing each video in order...')
     const res = await loadPartyVideos(identity, party.id, urls, queueOnly)
     setBusy(false)
     if (!res.ok) {
@@ -85,7 +93,7 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
             }}
             className="glass-inset w-full px-2.5 py-1.5 text-xs font-mono resize-y"
           />
-          <p className={`text-[10px] ${MUTED}`}>Up to 10 per add. Parsing runs server-side.</p>
+          <p className={`text-[10px] ${MUTED}`}>Up to 10 per add, or one pmvhaven playlist link per line. Parsing runs server-side.</p>
           {error && <p className="text-[10px] text-retro-error">{error}</p>}
           <div className="flex gap-2">
             <button type="button" onClick={() => void submit(true)} disabled={busy} className={`${BTN} flex-1 py-1 text-[10px] uppercase tracking-wider disabled:opacity-40`}>

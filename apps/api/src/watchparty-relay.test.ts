@@ -199,3 +199,58 @@ describe('stream lifetime (no 15s body abort)', () => {
     expect(res.status).toBe(404)
   })
 })
+
+describe('pmvhaven playlist expansion (alpha)', () => {
+  const PL = 'https://pmvhaven.com/playlists/6a815df3bc31b18d74b252f9?index=1'
+  const A = '68f85da04414feeb2eb3ea97'
+  const B = '68fa3323828ec8d0de64da03'
+
+  function stubPlaylistApi() {
+    vi.stubGlobal('fetch', vi.fn(async (u: string) => {
+      if (u.includes('/api/playlists/')) {
+        return new Response(JSON.stringify({ data: { videos: [A, { _id: B }] } }), { status: 200 })
+      }
+      return new Response(null, { status: 200, headers: { 'content-type': 'video/mp4', 'content-length': String(80 * 1024 * 1024) } })
+    }))
+  }
+
+  it('a playlist url expands in order through the video route', async () => {
+    stubPlaylistApi()
+    const partyId = await createRelayParty()
+    const body = JSON.stringify({ queueOnly: true, urls: [PL] })
+    const res = await app.request(`/api/watchparty/${partyId}/video`, {
+      method: 'POST',
+      headers: auth('POST', `/api/watchparty/${partyId}/video`, body),
+      body,
+    }, env)
+    expect(res.status).toBe(200)
+    const json: any = await res.json()
+    expect(json.added.length).toBe(2)
+    expect(json.failed).toEqual([])
+    // both entries resolved to distinct queue slots (playlist order preserved)
+    expect(json.added[0].id).not.toBe(json.added[1].id)
+    vi.unstubAllGlobals()
+  })
+
+  it('unreachable playlist API keeps the raw url (fails as one entry, not silent)', async () => {
+    stubPlaylistApi()
+    const partyId = await createRelayParty()
+    vi.mocked(fetch).mockImplementation(async (u: string) => {
+      if (String(u).includes('/api/playlists/')) return new Response('nope', { status: 500 })
+      return new Response(null, { status: 200, headers: { 'content-type': 'video/mp4', 'content-length': String(80 * 1024 * 1024) } })
+    })
+    const body = JSON.stringify({ queueOnly: true, urls: [PL] })
+    const res = await app.request(`/api/watchparty/${partyId}/video`, {
+      method: 'POST',
+      headers: auth('POST', `/api/watchparty/${partyId}/video`, body),
+      body,
+    }, env)
+    // Playlist API down -> expansion keeps the raw url, which the generic
+    // page resolver handles as ONE entry (not the 2-item expansion, not 0).
+    expect(res.status).toBe(200)
+    const json: any = await res.json()
+    expect(json.added.length).toBe(1)
+    expect(json.failed).toEqual([])
+    vi.unstubAllGlobals()
+  })
+})

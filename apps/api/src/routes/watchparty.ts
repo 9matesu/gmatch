@@ -14,6 +14,36 @@ type Bindings = {
 export const watchparty = new Hono<{ Bindings: Bindings, Variables: { orbitId: string, publicKeyHex: string } }>()
 
 const PARSE_ERROR = 'Could not find a playable video at that link.'
+// pmvhaven playlist (alpha): /playlists/<24hex> expands to its video pages,
+// in playlist order, capped at the parse budget. The authless
+// /api/playlists/<id> carries data.videos; the site's watched-video-ids
+// endpoint needs an API key we don't ask for.
+const PLAYLIST_MAX = 30
+export async function expandPmvhavenPlaylists(urlList: string[]): Promise<string[]> {
+  const out: string[] = []
+  for (const u of urlList) {
+    const m = u.match(/^https?:\/\/(?:www\.)?pmvhaven\.com\/playlists\/([0-9a-f]{24})(?:[?#]\S*)?$/i)
+    if (!m) { out.push(u); continue }
+    let ids: string[] = []
+    try {
+      const res = await fetch(`https://pmvhaven.com/api/playlists/${m[1]}`, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        signal: AbortSignal.timeout(10_000),
+      })
+      if (res.ok) {
+        const j: any = await res.json().catch(() => null)
+        const vids = Array.isArray(j?.data?.videos) ? j.data.videos : []
+        ids = vids
+          .map((v: unknown) => (typeof v === 'string' ? v : String((v as any)?._id || (v as any)?.id || '')))
+          .filter((s: string) => /^[0-9a-f]{24}$/.test(s))
+          .slice(0, PLAYLIST_MAX)
+      }
+    } catch { /* fall through: keep the raw url (fails downstream as one 422 entry) */ }
+    if (ids.length === 0) out.push(u)
+    else for (const id of ids) out.push(`https://pmvhaven.com/video/${id}`)
+  }
+  return out
+}
 // Relay cap: bigger than the store cap, small enough that a party of 8
 // streaming through one bun process stays sane.
 const RELAY_MAX_BYTES = 500 * 1024 * 1024
@@ -156,19 +186,22 @@ watchparty.post('/:id/video', orbitAuth, async (c) => {
   const title = typeof body?.name === 'string' ? body.name.trim().slice(0, 60) : ''
   const queueOnly = body?.queueOnly === true
 
-  // Bulk shape: urls[] (1..10) or the legacy single url.
+  // Bulk shape: urls[] (1..10, or up to 30 pmvhaven playlists) or the legacy single url.
   const urlList: string[] = Array.isArray(body?.urls)
-    ? body.urls.map((u: unknown) => String(u).trim()).filter(Boolean).slice(0, 11)
+    ? body.urls.map((u: unknown) => String(u).trim()).filter(Boolean)
     : (url ? [url] : [])
-  if (urlList.length > 10) return c.json({ error: 'Add up to 10 videos at a time.' }, 400)
+  const isPl = (u: string) => /pmvhaven\.com\/playlists\//i.test(u)
+  if (urlList.length > 30 || (urlList.length > 10 && !urlList.every(isPl))) return c.json({ error: 'Add up to 10 videos at a time (pmvhaven playlists: up to 30).' }, 400)
   if (urlList.length === 0) return c.json({ error: PARSE_ERROR }, 422)
-  if (!takeParseBudget(orbitId, urlList.length)) return c.json({ error: 'Too many video parses. Wait a minute.' }, 429)
+  const expanded = await expandPmvhavenPlaylists(urlList)
+  if (expanded.length > 100) return c.json({ error: 'That playlist is too big. Add 100 videos at a time.' }, 400)
+  if (!takeParseBudget(orbitId, expanded.length)) return c.json({ error: 'Too many video parses. Wait a minute.' }, 429)
 
   const added: Array<{ id: string; name: string; url: string }> = []
   const failed: string[] = []
   // Sequential on purpose: one burst of upstream fetches per click trips
   // more hotlink WAFs than a short queue of requests.
-  for (const u of urlList) {
+  for (const u of expanded) {
     const media = await resolveMedia(c.env, orbitId, u)
     if (!media) { failed.push(u); continue }
     let entryUrl = media.url
