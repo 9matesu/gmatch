@@ -374,4 +374,32 @@ describe('Likes & Relationships API', () => {
     )
     expect(notFound.status).toBe(404)
   })
+
+  it('notifies the post owner on a new like, once (T-W3)', async () => {
+    const objId = 'obj-a-notif'
+    await env.DB.prepare('INSERT INTO Objects (id, owner_id, size_bytes, mime_type) VALUES (?, ?, 1024, ?)').bind(objId, userA.orbitId, 'image/png').run()
+    await env.DB.prepare('INSERT INTO Recipients (object_id, recipient_id) VALUES (?, ?)').bind(objId, userB.orbitId).run()
+
+    const like = (decision: string) => app.fetch(new Request(`http://localhost/api/likes/${objId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...signRequestHeaders(userB, 'POST', `/api/likes/${objId}`, JSON.stringify({ decision })) },
+      body: JSON.stringify({ decision }),
+    }), env)
+
+    const count = async () => {
+      const row = await env.DB.prepare("SELECT COUNT(*) as cnt FROM Notifications WHERE user_id = ? AND type = 'like'").bind(userA.orbitId).first<{ cnt: number }>()
+      return Number(row?.cnt || 0)
+    }
+
+    expect((await like('like')).status).toBe(200)
+    expect(await count()).toBe(1)
+
+    // Re-liking the same object is not a new positive transition: no duplicate.
+    expect((await like('like')).status).toBe(200)
+    expect(await count()).toBe(1)
+
+    // A reject on a previously-liked object is not a new like either.
+    expect((await like('reject')).status).toBe(200)
+    expect(await count()).toBe(1)
+  })
 })

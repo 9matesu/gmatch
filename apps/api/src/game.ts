@@ -227,6 +227,26 @@ export async function applyLikeDecision(
       db.prepare('UPDATE Users SET likes_received = COALESCE(likes_received, 0) + 1 WHERE id = ?').bind(obj.owner_id),
       db.prepare("UPDATE Cards SET like_count = like_count + 1, updated_at = ? WHERE media_object_id = ?").bind(new Date().toISOString(), objectId),
     ])
+
+    // Wave 3: the bell needs the like, not just the counters. Fires ONLY on the
+    // not-yet-positive -> positive transition, so re-liking or rejecting a
+    // previously-liked object can't spam the owner. Best-effort: a bell failure
+    // must never roll back a like that already landed (counters are committed).
+    try {
+      const { createNotification } = await import('./notifications')
+      const liker = await db
+        .prepare('SELECT display_name FROM Users WHERE id = ?')
+        .bind(userId)
+        .first<{ display_name: string | null }>()
+      await createNotification(
+        db,
+        obj.owner_id,
+        'like',
+        `${liker?.display_name?.trim() || 'Someone'} liked your post`,
+        null,
+        { object_id: objectId, liker_id: userId },
+      )
+    } catch { /* bell is best-effort */ }
   } else if (!isPositive && wasPositive) {
     await db.batch([
       db.prepare('UPDATE Users SET likes_given = MAX(0, COALESCE(likes_given, 0) - 1) WHERE id = ?').bind(userId),
