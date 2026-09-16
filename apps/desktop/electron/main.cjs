@@ -838,31 +838,22 @@ async function fetchImhentai(variant, n) {
     .filter((t) => t.length >= 2)
   if (hasBadTag(tags)) return []
 
-  // Direct results from search HTML (fast path, avoids gallery fetches).
-  // parseImhentaiSearchResults yields thumbs — rewrite thumb.jpg -> 1.jpg
-  // (full page 1) and NEVER serve the raw thumb as url.
-  const directResults = parseImhentaiSearchResults(searchBody, n)
-  const directPosts = []
-  const seenCoverIds = new Set()
-  for (const { id, coverUrl } of directResults) {
-    seenCoverIds.add(id)
-    const full = coverUrl.replace(/\/(?:thumb|t)\.([a-z0-9]+)(?:[?#]|$)/i, '/1.$1')
-    if (/\/(?:thumb|thumbs)(?:[?#/.]|$)/i.test(full)) continue
-    directPosts.push({ id: `imh-${id}`, url: full, preview: coverUrl, tags, rating: 'e', kind: 'image' })
-    if (directPosts.length >= n) break
-  }
-
-  // Expand gallery books (whole book per page via the ext map) whenever
-  // covers leave the batch short — bounded lanes, round-robin merge.
-  const want = n - directPosts.length
-  const ids = want > 0 ? parseImhentaiSearch(searchBody, GALLERY_CAP).filter((id) => !seenCoverIds.has(id)) : []
-  if (ids.length === 0) return directPosts
-  const perGallery = Math.max(1, Math.ceil(want / ids.length))
-  const sets = await mapLimit(ids, GALLERY_LANES, async (id) => {
+  // Direct results from search HTML give gallery ids + cover thumbs. Enter EVERY gallery from the search page: covers are only thumbs and
+  // the blind thumb->1.jpg rewrite 404s on books that ship .webp/.png —
+  // the ext map in the gallery page carries the real extensions. Cover
+  // posts remain the fallback when all entries fail. parseImhentaiSearch
+  // covers galleries whose markup hides the thumbnail from the direct parse.
+  const results = parseImhentaiSearchResults(searchBody, GALLERY_CAP)
+  const entries = results.length > 0
+    ? results
+    : parseImhentaiSearch(searchBody, GALLERY_CAP).map((id) => ({ id, coverUrl: '' }))
+  if (entries.length === 0) return []
+  const perGallery = Math.max(1, Math.ceil(n / Math.min(entries.length, GALLERY_LANES)))
+  const sets = await mapLimit(entries, GALLERY_LANES, async ({ id, coverUrl }) => {
     try {
       const galleryBody = await imhGet(`${IMHENTAI_ROOT}/gallery/${encodeURIComponent(id)}/`)
       const pages = parseImhentaiGalleryPages(galleryBody, perGallery)
-      const thumb = pages.length > 0 ? pages[0].url : ''
+      const thumb = pages.length > 0 ? pages[0].url : coverUrl
       const set = []
       pages.forEach((cover, i) => {
         // Dims gate only when known — map-less covers skip it. Floor 400px
@@ -877,7 +868,16 @@ async function fetchImhentai(variant, n) {
       return undefined /* one dead gallery never kills the round */
     }
   })
-  return [...directPosts, ...roundRobinPosts(sets, want)]
+  const expanded = roundRobinPosts(sets, n)
+  if (expanded.length > 0) return expanded
+  const directPosts = []
+  for (const { id, coverUrl } of results) {
+    const full = coverUrl.replace(/\/(?:thumb|t)\.([a-z0-9]+)(?:[?#]|$)/i, '/1.$1')
+    if (!full || /\/(?:thumb|thumbs)(?:[?#/.]|$)/i.test(full)) continue
+    directPosts.push({ id: `imh-${id}`, url: full, preview: coverUrl, tags, rating: 'e', kind: 'image' })
+    if (directPosts.length >= n) break
+  }
+  return directPosts
 }
 
 // --- babesource (real porn photo galleries: full-res stills, never thumbs) --

@@ -149,6 +149,17 @@ export default defineConfig({
             proxyReq.removeHeader('origin')
             proxyReq.setHeader('referer', 'https://imhentai.xxx/')
             proxyReq.setHeader('user-agent', DEV_UA)
+            // imhentai's Cloudflare 403-challenges /gallery/* when the
+            // request looks like a script (UA+Referer only). A full browser
+            // header set passes; this is what Electron's Chromium stack was
+            // implicitly sending, so dev now matches the packaged app.
+            proxyReq.setHeader('accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8')
+            proxyReq.setHeader('accept-language', 'en-US,en;q=0.9')
+            proxyReq.setHeader('sec-fetch-dest', 'document')
+            proxyReq.setHeader('sec-fetch-mode', 'navigate')
+            proxyReq.setHeader('sec-fetch-site', 'same-origin')
+            proxyReq.setHeader('sec-fetch-user', '?1')
+            proxyReq.setHeader('upgrade-insecure-requests', '1')
           })
         },
       },

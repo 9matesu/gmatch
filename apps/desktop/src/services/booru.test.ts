@@ -321,7 +321,7 @@ describe('fetchPosts (SPEC §6/§8)', () => {
   it('browser mode scrapes imhentai covers through the proxy', async () => {
     vi.stubGlobal('window', {})
     const searchHtml =
-      '<div class="gallery"><a href="/gallery/999/"><img/></a></div>'
+      '<div class="thumb"><a href="/gallery/999/"><img class="lazy" data-src="https://m1.imhentai.xxx/cov/thumb.jpg" /></a></div>'
     const galleryHtml =
       '<h1>caption doujin</h1><img data-src="https://m1.imhentai.xxx/cov/1.jpg" />'
     const fetchMock = vi.fn(async (url: string) => {
@@ -467,7 +467,7 @@ describe('fetchPosts (SPEC §6/§8)', () => {
     expect(res.ok).toBe(false)
   })
 
-  it('extracts imhentai covers directly from search HTML without requesting /gallery/<id>', async () => {
+  it('extracts imhentai covers from search HTML as the FALLBACK and prefers real gallery pages', async () => {
     vi.stubGlobal('window', {})
     const searchHtml =
       '<div class="thumb"><div class="inner_thumb"><a href="/gallery/777/"><img class="lazy" data-src="https://m1.imhentai.xxx/001/a/thumb.jpg" /></a></div></div>'
@@ -477,7 +477,8 @@ describe('fetchPosts (SPEC §6/§8)', () => {
         return { ok: true, text: () => Promise.resolve(searchHtml) }
       }
       if (u.startsWith('/booru/imh/gallery')) {
-        throw new Error('should not fetch individual gallery when thumbnails are in search')
+        // No ext map + no parseJSON: parser falls back to the data-src list.
+        return { ok: true, text: () => Promise.resolve('<img data-src="https://m1.imhentai.xxx/001/a/1.png" /><img data-src="https://m1.imhentai.xxx/001/a/2.png" />') }
       }
       return { ok: false }
     })
@@ -485,11 +486,26 @@ describe('fetchPosts (SPEC §6/§8)', () => {
     const res = await fetchPosts({ tags: 'doujin_caption', limit: 5 })
     expect(res.ok).toBe(true)
     expect(res.source).toBe('imh-direct')
-    expect(res.posts[0].id).toBe('imh-777')
-    expect(res.posts[0].url).toBe('https://m1.imhentai.xxx/001/a/1.jpg')
-    expect(res.posts[0].preview).toBe('https://m1.imhentai.xxx/001/a/thumb.jpg')
+    // The gallery page was ENTERED (its real extensions beat the thumb->1.jpg guess)
     const galleryCalls = fetchMock.mock.calls.filter((c) => String(c[0]).startsWith('/booru/imh/gallery'))
-    expect(galleryCalls.length).toBe(0)
+    expect(galleryCalls.length).toBe(1)
+    expect(res.posts.map((p) => p.url)).toContain('https://m1.imhentai.xxx/001/a/1.png')
+  })
+
+  it('imhentai cover fallback survives when every gallery page 403s', async () => {
+    vi.stubGlobal('window', {})
+    const searchHtml =
+      '<div class="thumb"><div class="inner_thumb"><a href="/gallery/777/"><img class="lazy" data-src="https://m1.imhentai.xxx/001/a/thumb.jpg" /></a></div></div>'
+    const fetchMock = vi.fn(async (url: string) => {
+      const u = String(url)
+      if (u.startsWith('/booru/imh/search')) return { ok: true, text: () => Promise.resolve(searchHtml) }
+      if (u.startsWith('/booru/imh/gallery')) return { ok: false, status: 403 }
+      return { ok: false }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await fetchPosts({ tags: 'doujin_caption', limit: 5 })
+    expect(res.source).toBe('imh-direct')
+    expect(res.posts[0].url).toBe('https://m1.imhentai.xxx/001/a/1.jpg')
   })
 
   it('babesource uses page1 only for single-page queries (no 404 page2+ probes)', async () => {
