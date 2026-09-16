@@ -3390,20 +3390,19 @@ export default function Home() {
                         <div className="w-full max-w-5xl mx-auto px-3 sm:px-4 pt-3 sm:pt-4 flex flex-col gap-4 pb-24 lg:pb-16">
                           {/* ── Feed ── */}
                           <section className="module module-primary module-glass glass-surface overflow-visible order-1">
-                            <div className="module-header flex items-center justify-between sticky top-0 z-20">
-                              <div className="flex items-center gap-2">
+                            {collapsedModules.feed && (
+                              <div className="module-header flex items-center justify-between sticky top-0 z-20">
                                 <span className="module-title">Timeline</span>
-                                <span className="module-subtitle">Latest &amp; Trending</span>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleModule('feed')}
+                                  aria-label="Expand Timeline"
+                                  className="p-1.5 rounded-lg text-retro-muted hover:text-retro-fg hover:bg-surface-interactive transition-colors cursor-pointer"
+                                >
+                                  <ChevronRight className="w-4 h-4" />
+                                </button>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => toggleModule('feed')}
-                                aria-label={collapsedModules.feed ? 'Expand Timeline' : 'Collapse Timeline'}
-                                className="p-1.5 rounded-lg text-retro-muted hover:text-retro-fg hover:bg-surface-interactive transition-colors cursor-pointer"
-                              >
-                                {collapsedModules.feed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                              </button>
-                            </div>
+                            )}
                             {!collapsedModules.feed && (
                               <GMatchFeed
                                 identity={identity}
