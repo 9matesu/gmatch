@@ -2589,6 +2589,9 @@ export default function Home() {
   // the background whenever the vault is on. Session-idempotent — only new
   // URLs hit the network; lookups never write.
   const idleGallery = useIdleGame((s) => s.gallery);
+  // Clicker layout pill lives on the bar (was a toolbar row in GoonPanel).
+  const idleViewMode = useIdleGame((s) => s.viewMode);
+  const setIdleViewMode = useIdleGame((s) => s.setViewMode);
   useEffect(() => {
     if (!settings.localVault) return;
     const urls = new Set<string>();
@@ -4282,6 +4285,8 @@ export default function Home() {
               onLogout={() => { setChatOpen(false); setIdentityModalMode('logout'); }}
               onOpenProfile={() => handleSetMainView('profile')}
               onOpenCreateCard={() => { setChatOpen(false); setShowCreateCardModal(true); }}
+              gridSize={idleViewMode}
+              onGridSizeChange={(m) => setIdleViewMode(m)}
             />
           </ErrorBoundary>
         )}

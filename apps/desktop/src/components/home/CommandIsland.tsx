@@ -25,7 +25,19 @@ import {
 import { playPress } from '../../utils/sounds';
 import { resolveMediaUrl } from '../../utils/media';
 import { CountBadge } from './CountBadge';
+import type { ViewMode } from '../../game/types';
 export type MainViewType = 'feed' | 'games' | 'create' | 'messages' | 'profile' | 'game' | 'gallery' | 'store' | 'pc_domination' | 'grid' | 'rooms' | 'servers' | 'admin' | 'watch';
+
+/** Layout pill on the bar: 1x1 / 1x2 / 2x2 / 3x3. */
+const GRID_SIZES: ViewMode[] = ['1x1', '1x2', '2x2', '3x3'];
+/** Legacy aliases read as their canonical layout ('single'→1x1, 'grid'→3x3). */
+function gridSizeMatches(mode: ViewMode, active?: ViewMode): boolean {
+  if (!active) return false
+  if (mode === active) return true
+  if (mode === '1x1' && active === 'single') return true
+  if (mode === '3x3' && active === 'grid') return true
+  return false
+}
 
 export type GamesNavTab = 'duel' | 'cards' | 'babecock' | 'ranks' | 'idle';
 
@@ -81,6 +93,9 @@ export interface CommandIslandProps {
   onOpenProfile?: () => void;
   onOpenCreateCard?: () => void;
   settingsOpen?: boolean;
+  /** Active Clicker layout; the pill only renders when this prop pair is given. */
+  gridSize?: ViewMode;
+  onGridSizeChange?: (mode: ViewMode) => void;
 }
 
 export function CommandIsland({
@@ -110,6 +125,8 @@ export function CommandIsland({
   onLogout,
   onOpenProfile,
   onOpenCreateCard,
+  gridSize,
+  onGridSizeChange,
 }: CommandIslandProps) {
   const [satelliteOpen, setSatelliteOpen] = useState<boolean>(readSatelliteOpen);
 
@@ -224,6 +241,36 @@ export function CommandIsland({
           <GameController className="w-3.5 h-3.5" weight="fill" />
           <span className="hidden sm:inline">Play</span>
         </button>
+      );
+    }
+
+    // Clicker layout: the size control lives on the bar (was a row above the
+    // grid). Renders only when App passes the prop pair.
+    if (mainView === 'grid' && onGridSizeChange) {
+      return (
+        <div
+          role="group"
+          aria-label="Grid size"
+          className="inline-flex items-center gap-0.5 rounded-full bg-glass-w5 border border-border-glass p-0.5"
+        >
+          {GRID_SIZES.map((mode) => {
+            const active = gridSizeMatches(mode, gridSize)
+            return (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={active}
+                onClick={() => { playPress(760); onGridSizeChange(mode) }}
+                title={mode === '1x1' ? 'Single foe' : `${mode} grid`}
+                className={`px-2 py-0.5 rounded-full text-xs font-mono transition-all cursor-pointer ${
+                  active ? 'bg-retro-accent text-retro-accent-text font-bold' : 'text-retro-muted hover:text-retro-fg'
+                }`}
+              >
+                {mode}
+              </button>
+            )
+          })}
+        </div>
       );
     }
 

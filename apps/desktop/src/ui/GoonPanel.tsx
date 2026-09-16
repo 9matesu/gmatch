@@ -3,7 +3,7 @@ import { useGame } from '../game/store'
 import { gridSizeForMode, isGridMode } from '../game/store'
 import { CAPS, capEffectLabel, capStacks } from '../game/caps'
 import { HEAT_WINDOW_MS, heatMultiplier } from '../game/economy'
-import type { CapId, ViewMode } from '../game/types'
+import type { CapId } from '../game/types'
 import { offlineSvg } from '../services/offlineSvg'
 import { prefetchImages, resolveImage } from '../services/imageCache'
 import { isVideoUrl } from '../services/postFilter'
@@ -319,44 +319,13 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
       // the click target jump under the cursor every advance.
       className={`${PLATE} ${PANEL} flex min-h-0 flex-1 flex-col gap-2 overflow-hidden`}
     >
-      {/* Integrated panel toolbar: gallery + sources + fullscreen live here, never floating */}
-      <div className="flex flex-none items-center justify-between gap-2 px-1 pt-0.5">
-        <div
-          className="inline-flex flex-none items-center bg-glass-w8 border border-border-glass rounded-lg p-0.5 gap-0.5 shadow-inner"
-          role="group"
-          aria-label="Feed layout"
-        >
-          {(['1x1', '1x2', '2x2', '3x3'] as ViewMode[]).map((mode) => {
-            const active = viewMode === mode
-              || (mode === '1x1' && viewMode === 'single')
-              || (mode === '3x3' && viewMode === 'grid')
-            return (
-            <button
-              key={mode}
-              type="button"
-              className={`${MONO} cursor-pointer rounded-md border-0 px-2.5 py-0.5 text-xs transition-all duration-150 ${active
-                ? 'bg-glass-w10 text-white shadow-sm font-bold'
-                : 'text-white/45 hover:text-retro-body hover:bg-glass-w5 font-medium'
-                }`}
-              aria-pressed={active}
-              onClick={() => setViewMode(mode)}
-              title={
-                mode === '1x1'
-                  ? 'Single foe view'
-                  : mode === '1x2'
-                    ? 'Split. Two foes side by side'
-                    : mode === '2x2'
-                      ? 'Four foes at once'
-                      : '3×3 grid. Nine foes at once'
-              }
-            >
-              {mode === '1x1' ? '1×1' : mode === '1x2' ? '1×2' : mode === '2x2' ? '2×2' : '3×3'}
-            </button>
-            )
-          })}
+      {/* The layout pill moved onto the gMatch bar (CommandIsland) — only the
+          caller-supplied header action stays here. */}
+      {headerRight && (
+        <div className="flex flex-none items-center justify-end gap-2 px-1 pt-0.5">
+          {headerRight}
         </div>
-        {headerRight}
-      </div>
+      )}
       {isGrid ? (
         <div
           className={`${STAGE_FRAME} relative min-h-0 flex-1 grid auto-rows-fr ${gridCols} gap-2 p-2`}
