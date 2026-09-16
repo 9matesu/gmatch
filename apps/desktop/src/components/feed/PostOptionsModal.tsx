@@ -43,7 +43,7 @@ export function PostOptionsModal({
 
   return (
     <div
-      className={`fixed inset-0 ${zIndexClass} bg-black/70 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 animate-orbit-fade-in select-none`}
+      className={`fixed inset-0 ${zIndexClass} bg-black/70 backdrop-blur-sm flex items-center justify-center p-0 pb-[var(--island-clearance)] sm:p-4 sm:pb-[calc(1rem+var(--island-clearance))] animate-orbit-fade-in select-none`}
       onClick={onClose}
     >
       <div

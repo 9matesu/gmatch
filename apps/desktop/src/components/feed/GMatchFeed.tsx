@@ -689,6 +689,7 @@ export function GMatchFeed({
             ) : (
               <article
                 key={post.id}
+                onContextMenu={(e) => { e.preventDefault(); setOptionsPost(post) }}
                 className={`bg-retro-panel border border-border-glass rounded-lg overflow-hidden flex flex-col [content-visibility:auto] [contain-intrinsic-size:0_560px] shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
                 {/* Repost Header Banner */}
