@@ -455,4 +455,27 @@ describe('ServersView', () => {
     spy.mockRestore()
     delete (window as unknown as { gmatch?: unknown }).gmatch
   })
+
+  it('collapses the search/filter band and remembers it across a reload', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 's1', name: 'Alpha Node', description: '', owner_id: 'o1', password_required: 0, endpoint_hint: '' },
+      ] })
+      return json({})
+    })
+    const { unmount } = render(<ServersView identity={identity} toast={() => {}} />)
+    await screen.findByText('Alpha Node')
+    // band starts open: the search field is on screen
+    expect(screen.getByLabelText('Search servers')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /hide filters/i }))
+    expect(screen.queryByLabelText('Search servers')).toBeNull()
+    // hiding the band never hides the directory itself
+    expect(screen.getByText(/server browser \(1\)/i)).toBeInTheDocument()
+    unmount()
+    // the choice survives a reload
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await screen.findByText(/server browser \(1\)/i)
+    expect(screen.queryByLabelText('Search servers')).toBeNull()
+  })
 })

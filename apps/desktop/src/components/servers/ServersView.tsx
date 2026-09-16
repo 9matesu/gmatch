@@ -149,6 +149,19 @@ export function ServersView({
   const [deleteError, setDeleteError] = useState('')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [showCentralPopover, setShowCentralPopover] = useState(false)
+  // Collapsible filter band (the chatroom idiom): the search/sort row eats a
+  // full strip above the list and is only needed while narrowing. Persisted so
+  // the choice survives a reload.
+  const [filtersCollapsed, setFiltersCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem('gmatch.servers.filters_collapsed_v1') === '1' } catch { return false }
+  })
+  const toggleFilters = () => {
+    setFiltersCollapsed((v) => {
+      const next = !v
+      try { localStorage.setItem('gmatch.servers.filters_collapsed_v1', next ? '1' : '0') } catch { /* private mode */ }
+      return next
+    })
+  }
 
   useEffect(() => {
     if (!openMenuId && !showCentralPopover) return
@@ -1064,6 +1077,15 @@ export function ServersView({
               <div>
                 <div className="flex items-center gap-2.5">
                   <h1 className="text-sm sm:text-base font-bold text-retro-fg uppercase tracking-wider">Server browser ({visibleServers.length})</h1>
+                  <button
+                    type="button"
+                    onClick={() => { playPress(720); toggleFilters() }}
+                    aria-expanded={!filtersCollapsed}
+                    aria-label={filtersCollapsed ? 'Show filters' : 'Hide filters'}
+                    className="text-[10px] font-bold text-retro-muted hover:text-retro-fg cursor-pointer transition-colors px-1.5 py-0.5 rounded hover:bg-glass-w8"
+                  >
+                    {filtersCollapsed ? '⌃ filters' : '⌄ filters'}
+                  </button>
                 </div>
                 <div className="relative mt-1">
                   <button
@@ -1303,7 +1325,9 @@ export function ServersView({
               </div>
             ) : (
               <>
-                {/* Search, Filter & Sort Toolbar */}
+                {/* Search, Filter & Sort Toolbar — collapsible; hidden band saves
+                    a full strip of vertical space while browsing. */}
+                {!filtersCollapsed && (
                 <div className="glass-toolbar flex flex-wrap items-center gap-2.5 p-2 shrink-0">
                   <div className="glass-field min-w-[160px] flex-1 flex items-center gap-1.5 px-2.5 py-1.5 text-xs">
                     <Search className="w-3.5 h-3.5 text-retro-muted shrink-0" />
@@ -1345,6 +1369,7 @@ export function ServersView({
                     <RefreshCw className="w-3 h-3" /> Refresh
                   </button>
                 </div>
+                )}
 
                 {/* Directory Content List */}
                 <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar pr-0.5">
