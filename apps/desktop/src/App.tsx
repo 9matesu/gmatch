@@ -2597,9 +2597,19 @@ export default function Home() {
     const urls = new Set<string>();
     for (const g of idleGallery) if (g.url) urls.add(g.url);
     for (const c of myCards) if (c.content_url) urls.add(c.content_url);
+    // Feed media too: the backfill used to cover only gallery keeps + cards,
+    // so feed posts (and their videos) were never pinned and stayed missing
+    // from the vault. vaultPin is session-idempotent, so re-running on feed
+    // updates costs nothing.
+    for (const p of feedPosts) {
+      if (/^https?:/i.test(p.url || '')) urls.add(p.url);
+      for (const m of p.media || []) {
+        if (/^https?:/i.test(m.url || '')) urls.add(m.url);
+      }
+    }
     if (urls.size === 0) return;
     void mapLimit([...urls], 3, (u) => vaultPin(u).then(() => undefined));
-  }, [settings.localVault, idleGallery, myCards]);
+  }, [settings.localVault, idleGallery, myCards, feedPosts]);
 
 
   // Prune dead 404 content when notified

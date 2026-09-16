@@ -542,7 +542,12 @@ objects.get('/:id', async (c, next) => {
     })
   }
 
-  const mimeType = row.mime_type && row.mime_type !== 'application/octet-stream' ? row.mime_type : 'image/jpeg'
+  // Encrypted-at-rest uploads store mime_type='application/octet-stream', so
+  // blanket-defaulting to image/jpeg served a VIDEO as image/jpeg: the client
+  // then rendered <img> over video bytes and the feed showed no preview. Keep
+  // the row value when it is real, otherwise detect from the actual bytes.
+  const rowMime = row.mime_type && row.mime_type !== 'application/octet-stream' ? row.mime_type : null
+  const mimeType = rowMime || 'image/jpeg'
 
   // Decode base64 data URL if content_url is stored inline
   if (row.content_url && row.content_url.startsWith('data:')) {
@@ -554,7 +559,7 @@ objects.get('/:id', async (c, next) => {
         bytes[i] = binaryStr.charCodeAt(i)
       }
       const headers = new Headers()
-      headers.set('Content-Type', mimeType)
+      headers.set('Content-Type', rowMime || detectMediaMime(bytes))
       headers.set('Content-Length', String(bytes.length))
       headers.set('Accept-Ranges', 'bytes')
       headers.set('Cache-Control', 'no-store')
@@ -665,7 +670,7 @@ objects.get('/:id', async (c, next) => {
   }
 
   const headers = new Headers()
-  headers.set('Content-Type', mimeType)
+  headers.set('Content-Type', rowMime || detectMediaMime(plaintext))
   headers.set('Content-Length', String(plaintext.length))
   headers.set('etag', `"${id}"`)
   // CORS headers for cross-origin image loading

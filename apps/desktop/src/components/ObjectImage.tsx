@@ -120,7 +120,16 @@ export function ObjectImage({
       { rootMargin: '300px 0px' }
     )
     observer.observe(el)
-    return () => observer.disconnect()
+    // Fallback: feed cards carry [content-visibility:auto], which can suppress
+    // the observer callback for skipped subtrees — lazy media then stays blank
+    // until some later layout pass (the "images only load after opening the
+    // idle clicker" report). Flip inView on a short grace period so deferred
+    // media always resolves.
+    const fallback = window.setTimeout(() => setInView(true), 1500)
+    return () => {
+      observer.disconnect()
+      window.clearTimeout(fallback)
+    }
   }, [shouldDefer, inView])
 
   const img = useObjectImage(signed ? effObjectId : null, identity, { enabled: signed ? inView : true })

@@ -123,6 +123,15 @@ export function UserProfileModal({
   if (!user) return null;
 
   const displayName = user.display_name?.trim() || 'Unknown User';
+  // Presence decays: `user.online` is a snapshot from the last /api/users poll
+  // (60s+ cadence), so someone who left minutes ago still reads as "Online"
+  // when you open their profile. last_seen freshness is the authority here —
+  // same 90s rule ChatPlayerList already applies — and the stale flag is
+  // ignored so ghosts can never show as online.
+  const isOnline = (() => {
+    const seenMs = user.last_seen ? new Date(user.last_seen).getTime() : 0;
+    return seenMs > 0 && Date.now() - seenMs < 90_000;
+  })();
   const tags: string[] = parseTags(user.tags);
   const userStories = stories.filter((s) => s.owner_id === user.id || (s as any).user_id === user.id);
   const hasStories = userStories.length > 0;
@@ -160,9 +169,9 @@ export function UserProfileModal({
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass shrink-0">
             <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${user.online ? 'bg-emerald-500' : 'bg-glass-w20'}`} />
+              <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-glass-w20'}`} />
               <span className="text-xs font-medium text-retro-muted">
-                {user.online ? 'Online' : 'Offline'}
+                {isOnline ? 'Online' : 'Offline'}
               </span>
             </div>
 
