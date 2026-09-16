@@ -365,6 +365,13 @@ export function setPartySettings(partyId: string, patch: { name?: string; isPriv
 export function queueOp(partyId: string, op: 'remove' | 'play' | 'next', id = ''): void {
   sendRoomFrame('watch.queue', { party: partyId, op, id })
 }
+export function moveQueueEntry(partyId: string, id: string, before: string): void {
+  sendRoomFrame('watch.queue', { party: partyId, op: 'move', id, before })
+}
+/** Host closes the room for everyone (server answers watch.gone to all). */
+export function disbandParty(partyId: string): void {
+  sendRoomFrame('watch.disband', { party: partyId })
+}
 
 export function leaveParty(partyId: string): void {
   sendOrbitWebSocket({ type: 'watch.leave', party: partyId })

@@ -337,6 +337,17 @@ export function transferHost(userId: string, msg: any): { room: string; payload:
   return { room: partyRoom(party.id), payload: rosterPayload(party) }
 }
 
+/** Host closes the room for everyone: drop it and tell each member socket
+ * watch.gone (their client removes the room + shows the notice). */
+export function disbandWatch(userId: string, msg: any): { room: string; partyId: string } | null {
+  const party = parties.get(String(msg?.party || ''))
+  if (!party || party.hostId !== userId) return null
+  const room = partyRoom(party.id)
+  const partyId = party.id
+  dropParty(party)
+  return { room, partyId }
+}
+
 export function settingsWatch(userId: string, msg: any): { room: string; payload: any } | null {
   const party = parties.get(String(msg?.party || ''))
   if (!party || party.hostId !== userId) return null
@@ -380,6 +391,18 @@ export function queueOps(userId: string, msg: any): { room: string; payload: any
     }
   } else if (op === 'remove') {
     party.queue = party.queue.filter((q) => q.id !== String(msg.id || ''))
+  } else if (op === 'move') {
+    const from = party.queue.findIndex((q) => q.id === String(msg.id || ''))
+    if (from < 0) return null
+    const beforeRaw = String(msg.before || '')
+    const entry = party.queue.splice(from, 1)[0]
+    if (!beforeRaw) {
+      party.queue.push(entry)
+    } else {
+      const to = party.queue.findIndex((q) => q.id === beforeRaw)
+      if (to < 0) { party.queue.splice(from, 0, entry); return null }
+      party.queue.splice(to, 0, entry)
+    }
   } else if (op === 'play') {
     const entry = party.queue.find((q) => q.id === String(msg.id || ''))
     if (entry) applyQueueMedia(party, entry, member.name || userId.slice(0, 8), 'play')

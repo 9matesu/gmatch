@@ -5,6 +5,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 vi.mock('../../hooks/watchPartyStore', () => ({
   loadPartyVideos: vi.fn(async () => ({ ok: true, added: 3, failed: [] })),
   queueOp: vi.fn(),
+  moveQueueEntry: vi.fn(),
 }))
 
 import { loadPartyVideos } from '../../hooks/watchPartyStore'
@@ -17,7 +18,7 @@ const identity = { orbitId: 'me', publicKeyHex: 'p', privateKeyHex: 'k' } as nev
 const party = {
   id: 'p1', name: 'N', url: 'u', frame: null, members: [], chat: [],
   host: 'me', mutedIds: {}, lockVideo: false, isPrivate: false,
-  mediaName: '', queue: [{ id: 'q1', name: 'a', url: '/api/objects/a' }], current: 'q1',
+  mediaName: '', queue: [{ id: 'q1', name: 'a', url: '/api/objects/a' }, { id: 'q2', name: 'b', url: '/api/objects/b' }], current: 'q1',
 } as PartyRuntime
 
 beforeEach(() => {
@@ -53,6 +54,18 @@ describe('WatchPartyQueue', () => {
     fireEvent.change(screen.getByLabelText('Queue video URLs'), { target: { value: 'https://bad' } })
     fireEvent.click(screen.getByRole('button', { name: /add and play/i }))
     expect(await screen.findByText(/Failed: https:\/\/bad/)).toBeTruthy()
+  })
+
+  it('drag-drop reorder sends move with the drop-target id', async () => {
+    const { moveQueueEntry } = await import('../../hooks/watchPartyStore')
+    render(<WatchPartyQueue party={party} identity={identity} />)
+    const rows = screen.getAllByText(/^(a|b)$/)
+    const rowA = rows.find((el) => el.textContent === 'a')!.closest('li')!
+    const rowB = rows.find((el) => el.textContent === 'b')!.closest('li')!
+    fireEvent.dragStart(rowA)
+    fireEvent.dragOver(rowB)
+    fireEvent.drop(rowB)
+    expect(vi.mocked(moveQueueEntry)).toHaveBeenCalledWith('p1', 'q1', 'q2')
   })
 
   it('add and play sends queueOnly false', async () => {

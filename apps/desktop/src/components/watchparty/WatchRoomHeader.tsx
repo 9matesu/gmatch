@@ -9,7 +9,7 @@ import { Crown, Settings, Share, X } from 'lucide-react'
 import { BTN, BTN_PRIMARY, MUTED } from '../../ui/styles'
 import { Modal } from '../Modal'
 import { Switch } from '../../ui/Switch'
-import { kickParty, banParty, muteParty, transferParty, setPartySettings, leaveParty, type PartyRuntime } from '../../hooks/watchPartyStore'
+import { kickParty, banParty, muteParty, transferParty, setPartySettings, leaveParty, disbandParty, type PartyRuntime } from '../../hooks/watchPartyStore'
 
 interface IdentityLike {
   orbitId: string
@@ -115,6 +115,9 @@ export function WatchRoomHeader({ party, identity, profilePics }: { party: Party
                 </li>
               ))}
             </ul>
+            <button type="button" onClick={() => { disbandParty(party.id); setSettingsOpen(false) }} className={`${BTN} w-full py-2 text-xs text-retro-error hover:bg-retro-error/10`}>
+              Delete room
+            </button>
             <button type="button" onClick={() => setSettingsOpen(false)} className={`${BTN_PRIMARY} w-full py-2 text-xs flex items-center justify-center gap-2`}>
               <X className="w-3.5 h-3.5" />
               Done

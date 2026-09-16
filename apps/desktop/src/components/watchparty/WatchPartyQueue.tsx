@@ -5,10 +5,10 @@
 // to 10 URLs (one per line) and runs the server media pipeline on them
 // without interrupting playback.
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ListVideo, Play, Plus, X } from 'lucide-react'
 import { BTN, BTN_PRIMARY, MUTED } from '../../ui/styles'
-import { loadPartyVideos, queueOp, type PartyRuntime } from '../../hooks/watchPartyStore'
+import { loadPartyVideos, moveQueueEntry, queueOp, type PartyRuntime } from '../../hooks/watchPartyStore'
 
 interface IdentityLike {
   orbitId: string
@@ -27,6 +27,7 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
   const [error, setError] = useState('')
   const isHost = party.host === identity.orbitId
   const canAdd = isHost || !party.lockVideo
+  const dragId = useRef<string | null>(null)
 
   const submit = async (queueOnly: boolean) => {
     const urls = parseLines(text)
@@ -97,9 +98,34 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
         </div>
       )}
       {party.queue.length > 0 && (
-        <ul className="px-3 pb-2 max-h-28 overflow-y-auto space-y-0.5 styled-scrollbar">
+        <ul
+          className="px-3 pb-2 max-h-28 overflow-y-auto space-y-0.5 styled-scrollbar"
+          onDragOver={(e) => { if (dragId.current) e.preventDefault() }}
+          onDrop={(e) => {
+            // Dropped past the last row: append to the end (no `before`).
+            e.preventDefault()
+            const src = dragId.current
+            dragId.current = null
+            if (src) moveQueueEntry(party.id, src, '')
+          }}
+        >
           {party.queue.map((q, i) => (
-            <li key={q.id} className="flex items-center gap-2 text-xs">
+            <li
+              key={q.id}
+              draggable={canAdd}
+              onDragStart={(e) => { dragId.current = q.id; e.dataTransfer.effectAllowed = 'move' }}
+              onDragOver={(e) => { if (dragId.current && dragId.current !== q.id) e.preventDefault() }}
+              onDrop={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                const src = dragId.current
+                dragId.current = null
+                // Insert before the row you drop on (moving to the very
+                // last slot: drop the tail entry onto its own successor).
+                if (src && src !== q.id) moveQueueEntry(party.id, src, q.id)
+              }}
+              className={`flex items-center gap-2 text-xs ${canAdd ? 'cursor-grab active:cursor-grabbing' : ''}`}
+            >
               <span className={MUTED}>{i + 1}</span>
               <span className={`truncate flex-1 ${q.id === party.current ? 'text-retro-fg font-semibold' : 'text-retro-muted'}`}>
                 {q.name || q.url}

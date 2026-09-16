@@ -192,6 +192,40 @@ describe('queue', () => {
     expect(p.queue[0].name).toBe('b')
   })
 
+  it('queueOps move reorders by id (drag-and-drop queue)', () => {
+    const p = makeParty()
+    queueOps('u1', { party: p.id, op: 'add', name: 'a', url: '/api/objects/a' })
+    queueOps('u1', { party: p.id, op: 'add', name: 'b', url: '/api/objects/b' })
+    queueOps('u1', { party: p.id, op: 'add', name: 'c', url: '/api/objects/c' })
+    const [a, b, c] = p.queue.map((q) => q.id)
+    const res = queueOps('u1', { party: p.id, op: 'move', id: a, before: c })!
+    expect(p.queue.map((q) => q.name)).toEqual(['b', 'a', 'c'])
+    expect(res.payload.queue.map((q: any) => q.name)).toEqual(['b', 'a', 'c'])
+    // unknown ids drop the frame
+    expect(queueOps('u1', { party: p.id, op: 'move', id: 'zzzzzzzz', before: a })).toBeNull()
+    expect(queueOps('u1', { party: p.id, op: 'move', id: a, before: 'zzzzzzzz' })).toBeNull()
+    // missing 'before' appends to the end
+    queueOps('u1', { party: p.id, op: 'move', id: b })
+    expect(p.queue.map((q) => q.name)).toEqual(['a', 'c', 'b'])
+  })
+
+  it('disband closes the room host-only; members get watch.gone', () => {
+    const p = makeParty()
+    joinWatch('u2', 'Bob', { party: p.id })
+    const hostSock = fakeConn(); authed(hostSock, 'u1'); conns.add(hostSock)
+    hostSock.rooms.add(partyRoom(p.id))
+    const memberSock = fakeConn(); authed(memberSock, 'u2'); conns.add(memberSock)
+    memberSock.rooms.add(partyRoom(p.id))
+    // non-host cannot disband
+    handleIncoming(memberSock, JSON.stringify({ type: 'watch.disband', party: p.id }))
+    expect(getParty(p.id)).toBeTruthy()
+    handleIncoming(hostSock, JSON.stringify({ type: 'watch.disband', party: p.id }))
+    expect(getParty(p.id)).toBeFalsy()
+    expect(memberSock.sent.some((s) => s.includes('"watch.gone"') && s.includes(p.id))).toBe(true)
+    // the host's own socket also learns the room is gone
+    expect(hostSock.sent.some((s) => s.includes('"watch.gone"'))).toBe(true)
+  })
+
   it('lockVideo blocks member queue ops but not the host', () => {
     const p = makeParty()
     joinWatch('u2', 'Bob', { party: p.id })

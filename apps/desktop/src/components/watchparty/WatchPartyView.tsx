@@ -71,7 +71,7 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
           <WatchPartyRoomList identity={identity} onNewParty={() => setModalOpen(true)} kickedNotice={kickedNotice} />
         ) : (
           <>
-            <div className={`flex-1 min-h-0 ${inRoom ? '' : 'p-2'}`}>
+            <div className={`flex-1 min-h-0 flex items-center justify-center [container-type:size] ${inRoom ? '' : 'p-2'}`}>
               {parties.length === 1 ? (
                 <WatchPartySlot
                   party={parties[0]}

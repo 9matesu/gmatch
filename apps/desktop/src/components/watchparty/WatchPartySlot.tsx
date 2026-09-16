@@ -138,7 +138,7 @@ export function WatchPartySlot({
       ref={wrapRef}
       data-active={active ? 'true' : 'false'}
       onClick={onSelect}
-      className={`watch-party-slot relative ${fill ? 'h-full' : 'aspect-video'} overflow-hidden bg-black cursor-pointer ${active ? 'ring-1 ring-retro-fg' : 'border border-border-glass'}`}
+      className={`watch-party-slot relative ${fill ? 'w-[min(100cqw,calc(100cqh*16/9))]' : 'aspect-video'} aspect-video overflow-hidden bg-black cursor-pointer ${active ? 'ring-1 ring-retro-fg' : 'border border-border-glass'}`}
     >
       {videoSrc ? (
         <NativeVideoPlayer

@@ -44,7 +44,7 @@ export function validateTicket(ticket: string): string | null {
 // Watch Party relay: tiny JSON control frames (never media bytes).
 import {
   applyWatch, joinWatch, watchPong, applyChat, deleteChat, leaveWatch,
-  kickWatch, banWatch, muteWatch, transferHost, settingsWatch, queueOps, touchRooms, leaveAll,
+  kickWatch, banWatch, muteWatch, transferHost, settingsWatch, queueOps, touchRooms, leaveAll, disbandWatch,
 } from './watchparty'
 
 export function handleIncoming(conn: WsConn, data: string): void {
@@ -168,6 +168,19 @@ export function handleIncoming(conn: WsConn, data: string): void {
   if (msg.type === 'watch.queue') {
     const res = queueOps(conn.userId || '', msg)
     if (res) broadcastToRoom(res.room, res.payload)
+    return
+  }
+  if (msg.type === 'watch.disband') {
+    const res = disbandWatch(conn.userId || '', msg)
+    if (res) {
+      // Everyone in the room (host included) gets gone + leaves the room.
+      for (const c of conns) {
+        if (c.rooms.has(res.room)) {
+          c.rooms.delete(res.room)
+          c.send(JSON.stringify({ type: 'watch.gone', party: res.partyId }))
+        }
+      }
+    }
     return
   }
 
