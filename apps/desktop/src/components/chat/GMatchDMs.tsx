@@ -110,6 +110,7 @@ export function GMatchDMs({
   onAddGroupMembers,
   onSelectGroup,
   onOpenProfile,
+  onUserContext,
   activeGroupId,
   onOpenImage,
   onLoadHistory,
@@ -152,6 +153,8 @@ export function GMatchDMs({
   onAddGroupMembers?: (groupId: string, ids: string[]) => Promise<boolean> | void;
   onSelectGroup?: (groupId: string | null) => void;
   onOpenProfile?: (userId: string, user?: User) => void;
+  /** Wave 3: route the thread right-click to the shared user context menu. */
+  onUserContext?: (e: React.MouseEvent, userId: string, displayName: string) => void;
   onOpenImage?: (message: ChatMessage) => void;
   onLoadHistory?: (peerId: string, beforeTimestamp: string) => Promise<boolean>;
   users?: User[];
@@ -712,6 +715,14 @@ export function GMatchDMs({
 
               const handleThreadContextMenu = (e: React.MouseEvent) => {
                 e.preventDefault();
+                // Wave 3: same menu as right-clicking a name anywhere else
+                // (DM / Follow / Block / profile) instead of the lone inline
+                // "Delete Conversation" popover.
+                if (onUserContext) {
+                  onUserContext(e, peerId, name);
+                  setDeleteThreadPeerId(null);
+                  return;
+                }
                 if (deleteThreadPeerId === peerId) {
                   setDeleteThreadPeerId(null);
                 } else {

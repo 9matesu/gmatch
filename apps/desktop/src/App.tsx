@@ -3651,6 +3651,10 @@ export default function Home() {
                             setSelectedProfileUser(t || userObj || ({ id: userId, display_name: 'User' } as User))
                           }}
                           onOpenImage={(msg) => setViewerMessage(msg)}
+                          onUserContext={(e, peerId, name) => {
+                            const u = users.find((x) => x.id === peerId || (x as { orbitId?: string }).orbitId === peerId)
+                            openContextMenu('user', u || { id: peerId, display_name: name })(e)
+                          }}
                           onDeleteThread={deleteThread}
                           onBackToThreads={() => { setPmPeer(null); loadPmThreads() }}
                           onLoadHistory={loadPmHistory}
