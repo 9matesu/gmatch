@@ -49,8 +49,10 @@ export function useServerHeartbeat(identity: Parameters<typeof orbitFetch>[2] | 
         const d = await orbitFetch('/api/servers/dashboard', { method: 'GET' }, identity)
         if (d.ok) {
           const dj = await d.json()
-          if (typeof dj?.members_total === 'number') body.user_count = dj.members_total
-          if (Array.isArray(dj?.users)) body.online_count = dj.users.filter((u: { online?: boolean }) => u?.online).length
+          if (typeof dj?.active_24h_count === 'number') body.user_count = dj.active_24h_count
+          else if (typeof dj?.members_total === 'number') body.user_count = dj.members_total
+          if (typeof dj?.online_count === 'number') body.online_count = dj.online_count
+          else if (Array.isArray(dj?.users)) body.online_count = dj.users.filter((u: { online?: boolean }) => u?.online).length
         }
       } catch { /* counts optional */ }
       try {

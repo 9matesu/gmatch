@@ -6,7 +6,7 @@
 // Right = public directory browser (search, join, create).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Lock, Globe, UserPlus, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, Share2, ArrowLeft, MessageSquare, Plus, Trash2, MoreVertical } from 'lucide-react'
+import { Lock, Globe, UserPlus, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, Share2, ArrowLeft, Plus, Trash2, MoreVertical, ClipboardPaste, ChevronDown } from 'lucide-react'
 import { generateIdentity } from '@orbit/crypto'
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
 import { orbitFetch, getApiBaseUrl } from '../../utils/api'
@@ -32,6 +32,7 @@ export interface DirectoryServer {
   password_required: number
   endpoint_hint?: string
   is_private?: number
+  tags?: string[]
   user_count?: number | null
   online_count?: number | null
   last_seen?: string
@@ -50,19 +51,16 @@ export interface Dashboard {
   users: DashboardUser[]
   posts_24h: number
   members_total: number
+  online_count?: number
+  active_24h_count?: number
 }
 
 export interface ServerNode {
   name: string
   description: string
   directoryId?: string | null
+  tags?: string[]
   isAdmin: boolean
-}
-
-export interface ServerRoomPreview {
-  id: string
-  name: string
-  membersCount?: number
 }
 
 type Toast = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void
@@ -81,6 +79,18 @@ function localDisplayName(): string {
   try { return (localStorage.getItem('orbit_display_name') || '').trim().slice(0, 40) } catch { return '' }
 }
 
+/** Comma-separated tag input → clamped lowercase slug list (≤10 × 24 chars). */
+export function parseServerTags(input: string): string[] {
+  const seen = new Set<string>()
+  for (const raw of input.split(',')) {
+    const tag = raw.trim().toLowerCase()
+    if (!/^[a-z0-9-]{1,24}$/.test(tag) || seen.has(tag)) continue
+    seen.add(tag)
+    if (seen.size >= 10) break
+  }
+  return [...seen]
+}
+
 function formatRelativeTime(iso?: string | null): string {
   if (!iso) return 'recently'
   const ms = Date.now() - new Date(iso).getTime()
@@ -96,22 +106,14 @@ function formatRelativeTime(iso?: string | null): string {
 export function ServersView({
   identity,
   toast,
-  showRooms = false,
-  onOpenRooms,
   onSelectUser,
   profilePics = {},
-  rooms = [],
-  onOpenRoom,
   onServerJoined,
 }: {
   identity: Parameters<typeof orbitFetch>[2] | null
   toast: Toast
-  showRooms?: boolean
-  onOpenRooms?: () => void
   onSelectUser?: (user: User) => void
   profilePics?: Record<string, string>
-  rooms?: ServerRoomPreview[]
-  onOpenRoom?: (roomId: string) => void
   onServerJoined?: (server: DirectoryServer) => void
 }) {
   const [central, setCentral] = useState(() => getCentralApiUrl())
@@ -136,6 +138,10 @@ export function ServersView({
   const [editingServer, setEditingServer] = useState(false)
   const [serverName, setServerName] = useState('gmatch')
   const [serverDescription, setServerDescription] = useState('')
+  const [hubPrivate, setHubPrivate] = useState(false)
+  const [hubNewPassword, setHubNewPassword] = useState('')
+  const [hubRemovePassword, setHubRemovePassword] = useState(false)
+  const [hubTags, setHubTags] = useState('')
   const [renaming, setRenaming] = useState(false)
   const [serverMode, setServerMode] = useState<'host' | 'client' | null>(null)
   type ServerBridgeState = { packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[]; adminPin?: string }
@@ -198,10 +204,16 @@ export function ServersView({
     endpoint_hint: central,
     password_required: 0,
     is_private: 0,
-    user_count: dash?.members_total ?? null,
-    online_count: dash?.users ? dash.users.filter((u) => u.online).length : null,
+    user_count: dash?.active_24h_count ?? dash?.members_total ?? null,
+    online_count: dash?.online_count ?? (dash?.users ? dash.users.filter((u) => u.online).length : null),
     last_seen: new Date().toISOString(),
   }), [central, dash])
+
+  // The pinned Official row renders outside the directory list, but it is a
+  // visible row — counts share this so tab/sub-bar totals stay honest.
+  const showOfficial = Boolean(
+    central && !passwordOnly && (!query || `${centralServer.name} ${centralServer.description}`.toLowerCase().includes(query.toLowerCase())),
+  )
 
   const refresh = useCallback(async () => {
     // Anonymous browser: public directory only — never touch node routes
@@ -357,8 +369,28 @@ export function ServersView({
       })
   }, [servers, query, sort, passwordOnly, central])
 
+  // Total visible rows = directory rows + the pinned Official row (when shown).
+  const visibleRowCount = visibleServers.length + (showOfficial ? 1 : 0)
+
   const closeCreateForm = () => {
     setShowCreate(false); setName(''); setDescription(''); setHint(''); setNeedsPassword(false); setIsPrivate(false); setServerPassword('')
+  }
+
+  // Snapshot the connected node's current settings into the Hub editor.
+  // Only the connected node is node-editable; other owned rows are
+  // directory-editable (privacy/unregister) until you switch to them.
+  const openEditor = () => {
+    playPress(780)
+    const ownRow = servers.find((s) => mine(s) && isCurrent(s))
+    setHubPrivate(Boolean(ownRow?.is_private))
+    try {
+      const raw = localStorage.getItem(REG_KEY)
+      if (raw && typeof JSON.parse(raw)?.private === 'boolean') setHubPrivate(Boolean(JSON.parse(raw).private))
+    } catch { /* session-only */ }
+    setHubTags((node && Array.isArray(node.tags) ? node.tags : []).join(', '))
+    setHubNewPassword('')
+    setHubRemovePassword(false)
+    setEditingServer(true)
   }
 
   // Best-effort: list the (public) registration on the central directory.
@@ -466,25 +498,48 @@ export function ServersView({
     else toast(res.error || 'Could not switch servers', 'error')
   }
 
-  const renameServer = async () => {
+  // One settings save for the connected node (host admin): name, description,
+  // tags, privacy and join password. Node PATCH owns name/description/tags,
+  // the node password route owns the secret, the central directory mirrors
+  // the public mirrors (name/description/private/password_required/tags).
+  const saveServerSettings = async () => {
     if (!identity) return
     const trimmed = serverName.trim()
+    const desc = serverDescription.trim()
+    const tags = parseServerTags(hubTags)
     if (!trimmed || renaming) return
     setRenaming(true)
     try {
       const res = await orbitFetch('/api/servers/node', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: trimmed, description: serverDescription.trim() }),
+        body: JSON.stringify({ name: trimmed, description: desc, tags }),
       }, identity)
       const body = (await res.json().catch(() => ({}))) as { error?: string; server?: ServerNode }
-      if (!res.ok) { toast(body.error || 'Could not rename this server', 'error'); return }
+      if (!res.ok) { toast(body.error || 'Could not save these settings', 'error'); return }
       if (body.server) {
         setNode(body.server)
         setServerName(body.server.name)
         setServerDescription(body.server.description || '')
       }
       setEditingServer(false)
+
+      // Join password: untouched when the field is empty; a value sets it,
+      // the checkbox clears it. The directory only mirrors the flag.
+      let passwordRequired: boolean | null = null
+      const newPw = hubNewPassword.trim()
+      if (newPw) {
+        if (newPw.length < 4) { toast('Pick a join password of at least 4 characters (or leave it empty)', 'warning'); return }
+        const pwRes = await orbitFetch('/api/server/password', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: newPw }),
+        }, identity)
+        if (!pwRes.ok) { toast('Password was not updated.', 'warning') } else passwordRequired = true
+      } else if (hubRemovePassword) {
+        const pwRes = await orbitFetch('/api/server/password', { method: 'POST' }, identity)
+        if (!pwRes.ok) { toast('Password was not removed.', 'warning') } else passwordRequired = false
+      }
+      setHubNewPassword('')
+      setHubRemovePassword(false)
 
       let directoryId = body.server?.directoryId || node?.directoryId || ''
       try { directoryId ||= localStorage.getItem(DIRECTORY_ID_KEY) || '' } catch { /* session-only */ }
@@ -495,19 +550,33 @@ export function ServersView({
         }
         if (directoryId) {
           try {
+            const dirPatch: Record<string, unknown> = {
+              name: trimmed, description: desc, private: hubPrivate, tags,
+            }
+            if (passwordRequired !== null) dirPatch.password_required = passwordRequired
             const dirRes = await orbitFetch(`${central}/api/servers/${directoryId}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name: trimmed, description: serverDescription.trim() }),
+              body: JSON.stringify(dirPatch),
             }, identity)
-            if (dirRes.ok) localStorage.setItem(DIRECTORY_ID_KEY, directoryId)
-            else toast('Server renamed here, but the directory didn\'t update.', 'warning')
+            if (dirRes.ok) {
+              localStorage.setItem(DIRECTORY_ID_KEY, directoryId)
+              try {
+                const raw = localStorage.getItem(REG_KEY)
+                if (raw) localStorage.setItem(REG_KEY, JSON.stringify({ ...JSON.parse(raw), private: hubPrivate }))
+              } catch { /* session-only */ }
+              // Name change shows in the browser immediately, no refetch wait.
+              setServers((prev) => prev.map((s) => (s.id === directoryId
+                ? { ...s, name: trimmed, description: desc, is_private: hubPrivate ? 1 : 0, tags,
+                    ...(passwordRequired !== null ? { password_required: passwordRequired ? 1 : 0 } : {}) }
+                : s)))
+            } else toast('Settings saved here, but the directory didn\'t update.', 'warning')
           } catch {
-            toast('Server renamed here. The directory is offline.', 'warning')
+            toast('Settings saved here. The directory is offline.', 'warning')
           }
         }
       }
-      toast('Server renamed', 'success')
+      toast('Server settings saved', 'success')
       void refresh()
     } catch {
       toast('Couldn\'t reach the server.', 'error')
@@ -765,49 +834,39 @@ export function ServersView({
       {/* Unified dashboard — Discord-style framed container, narrow column */}
       <div className="glass-card flex flex-col h-full min-h-0 flex-1 w-full max-w-[680px] overflow-hidden rounded-lg border border-border-glass bg-surface-canvas">
         {/* Discord-style Unified Top Bar */}
-        <div className="h-9 px-2 border-b border-border-glass bg-surface-raised flex items-center justify-between gap-2 shrink-0">
-          <div className="flex items-center gap-1.5 min-w-0">
+        <div className="glass-toolbar border-0 border-b border-border-glass rounded-none h-12 px-4 flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
             {identity && (
-              <div className="flex items-center gap-0.5 bg-surface-canvas p-0.5 rounded-md border border-border-glass shrink-0">
+              <div className="flex items-center gap-5 shrink-0">
                 <button
                   type="button"
                   onClick={() => { playPress(750); setActiveTab('browse'); }}
-                  className={`px-2 py-0.5 rounded text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`flex items-center gap-2 text-sm font-bold transition-colors cursor-pointer ${
                     activeTab === 'browse'
-                      ? 'bg-retro-accent text-retro-accent-text'
-                      : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8'
+                      ? 'text-retro-fg'
+                      : 'text-retro-muted hover:text-retro-fg'
                   }`}
                 >
-                  Browse ({visibleServers.length})
+                  Browse ({visibleRowCount})
                 </button>
                 <button
                   type="button"
                   onClick={() => { playPress(750); setActiveTab('hub'); }}
-                  className={`px-2 py-0.5 rounded text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1 ${
+                  aria-label={`Hub: ${serverName || 'your server'}`}
+                  className={`flex items-center gap-2 text-sm font-bold transition-colors cursor-pointer max-w-[220px] ${
                     activeTab === 'hub'
-                      ? 'bg-retro-accent text-retro-accent-text'
-                      : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8'
+                      ? 'text-retro-fg'
+                      : 'text-retro-muted hover:text-retro-fg'
                   }`}
                 >
-                  <span>Hub</span>
-                  {dash ? <span className="text-[10px] font-mono opacity-80">({dash.members_total})</span> : null}
+                  <span className="truncate">{serverName || 'Hub'}</span>
+                  {dash ? <span className="text-[10px] font-mono font-normal opacity-80 shrink-0">({dash.members_total})</span> : null}
                 </button>
-              </div>
-            )}
-
-            {identity && (
-              <div
-                className="hidden lg:flex items-center gap-1 px-1.5 py-px rounded-md bg-surface-interactive border border-border-subtle text-[10px] font-mono text-retro-muted truncate"
-                title={dash ? `${dash.members_total} members · ${dash.posts_24h} posts/24h` : (serverDescription || 'Connected')}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-retro-online shrink-0" />
-                <span className="text-retro-fg font-semibold truncate max-w-[100px]">{serverName || 'gmatch'}</span>
-                {node?.isAdmin && <span className="text-amber-300 font-bold text-[10px]">ADMIN</span>}
               </div>
             )}
           </div>
 
-          <div className="flex items-center gap-1 shrink-0 ml-auto">
+          <div className="flex items-center gap-2 shrink-0 ml-auto">
             {/* Central Directory Selector */}
             <div className="relative">
               <button
@@ -815,10 +874,10 @@ export function ServersView({
                 data-menu-trigger
                 onClick={() => setShowCentralPopover((v) => !v)}
                 aria-label="Change central node address"
-                className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w8 transition-colors cursor-pointer"
+                className="p-2 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w8 transition-colors cursor-pointer"
                 title={central ? `Directory: ${central.replace(/^https?:\/\//, '')} (change)` : 'Change central node address'}
               >
-                <Globe className="w-3.5 h-3.5" />
+                <Globe className="w-4 h-4" />
               </button>
 
               {/* Central Node Popover */}
@@ -904,11 +963,11 @@ export function ServersView({
                 type="button"
                 onClick={() => { playPress(760); setShowAdmin((v) => !v) }}
                 aria-expanded={showAdmin}
-                aria-label="Central admin"
-                title="Central admin"
-                className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w8 cursor-pointer transition-colors active:scale-[0.98]"
+                aria-label="Central admin panel"
+                title="Central admin panel"
+                className="p-2 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w8 cursor-pointer transition-colors active:scale-[0.98]"
               >
-                <ShieldCheck className="w-3.5 h-3.5" />
+                <ShieldCheck className="w-4 h-4" />
               </button>
             )}
             <button
@@ -916,9 +975,9 @@ export function ServersView({
               onClick={() => { playPress(700); setCodeAskOpen(true) }}
               aria-label="Paste node code"
               title="Paste node code"
-              className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w8 cursor-pointer transition-colors active:scale-[0.98]"
+              className="p-2 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w8 cursor-pointer transition-colors active:scale-[0.98]"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <ClipboardPaste className="w-4 h-4" />
             </button>
             {identity && (
               <button
@@ -927,7 +986,7 @@ export function ServersView({
                 aria-expanded={showCreate}
                 aria-label="Create server"
                 title="Create server"
-                className="h-6 px-2 rounded-md bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text text-xs font-bold cursor-pointer flex items-center gap-1 transition-colors active:scale-[0.98]"
+                className="flex items-center gap-1 px-1.5 py-1 rounded-md text-xs font-bold text-retro-fg hover:bg-glass-w8 transition-colors cursor-pointer"
               >
                 <Plus className="w-3 h-3" /> Create
               </button>
@@ -949,10 +1008,10 @@ export function ServersView({
               {central && (
                 <button
                   type="button"
-                  onClick={() => { playPress(760); setShowAdmin((v) => !v); }}
-                  className="glass-action px-2.5 py-1 rounded-lg text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer"
+                  onClick={() => { playPress(760); setShowAdmin((v) => !v) }}
+                  className="px-1.5 py-1 rounded-md text-xs font-semibold text-retro-muted hover:text-retro-fg hover:bg-glass-w8 transition-colors cursor-pointer"
                 >
-                  Central Admin
+                  Central Panel
                 </button>
               )}
             </div>
@@ -984,14 +1043,14 @@ export function ServersView({
                   </div>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="flex shrink-0 items-center gap-1">
                   {serverMode === 'client' && (
                     <button
                       type="button"
                       onClick={() => { playPress(620); void leave(); }}
-                      className="glass-action glass-action-danger h-8 px-3 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1"
+                      className="flex items-center gap-1 px-1.5 py-1 rounded-md text-xs font-semibold text-retro-error/80 hover:text-retro-error hover:bg-retro-error/10 transition-colors cursor-pointer"
                     >
-                      <ArrowLeft className="w-3.5 h-3.5" /> Leave
+                      <ArrowLeft className="w-3 h-3" /> Leave
                     </button>
                   )}
                   {serverMode === 'host' && (
@@ -1003,20 +1062,22 @@ export function ServersView({
                           .then((st) => void shareServer(st?.lanUrls?.[0] || '', serverName))
                           .catch(() => void shareServer('', serverName));
                       }}
-                      className="glass-action h-8 px-3 rounded-lg text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1"
+                      className="flex items-center gap-1 px-1.5 py-1 rounded-md text-xs font-semibold text-retro-muted hover:text-retro-fg hover:bg-glass-w8 transition-colors cursor-pointer"
                     >
-                      <Share2 className="w-3.5 h-3.5" /> Share
+                      <Share2 className="w-3 h-3" /> Share
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => { playPress(780); setServerName(serverName); setEditingServer((v) => !v); }}
-                    aria-expanded={editingServer}
-                    title="Rename server"
-                    className="glass-action h-8 px-3 rounded-lg text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1"
-                  >
-                    <Pencil className="w-3.5 h-3.5" /> Rename
-                  </button>
+                  {node?.isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => openEditor()}
+                      aria-expanded={editingServer}
+                      title="Server settings"
+                      className="flex items-center gap-1 px-1.5 py-1 rounded-md text-xs font-semibold text-retro-muted hover:text-retro-fg hover:bg-glass-w8 transition-colors cursor-pointer"
+                    >
+                      <Pencil className="w-3 h-3" /> Settings
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1043,18 +1104,62 @@ export function ServersView({
                       className="glass-field mt-1 w-full px-2.5 py-1.5 text-xs"
                     />
                   </label>
+                  <label className="block text-xs text-retro-muted">
+                    Tags (comma-separated, shown in the browser)
+                    <input
+                      aria-label="Current server tags"
+                      value={hubTags}
+                      onChange={(e) => setHubTags(e.target.value)}
+                      maxLength={260}
+                      placeholder="chill, movies, late-night"
+                      className="glass-field mt-1 w-full px-2.5 py-1.5 text-xs"
+                    />
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-retro-muted cursor-pointer">
+                    <input type="checkbox" checked={hubPrivate} onChange={(e) => setHubPrivate(e.target.checked)} />
+                    Private. Hide from the public browser (friends join with your code)
+                  </label>
+                  <label className="block text-xs text-retro-muted">
+                    New join password (empty keeps the current one)
+                    <input
+                      type="password"
+                      aria-label="New server join password"
+                      value={hubNewPassword}
+                      onChange={(e) => { setHubNewPassword(e.target.value); if (e.target.value) setHubRemovePassword(false) }}
+                      placeholder="At least 4 characters"
+                      maxLength={64}
+                      className="glass-field mt-1 w-full px-2.5 py-1.5 text-xs"
+                    />
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-retro-muted cursor-pointer">
+                    <input
+                      type="checkbox"
+                      aria-label="Remove join password"
+                      checked={hubRemovePassword}
+                      disabled={hubNewPassword.trim().length > 0}
+                      onChange={(e) => setHubRemovePassword(e.target.checked)}
+                    />
+                    Remove the join password
+                  </label>
                   <div className="flex gap-2 pt-1">
                     <button
                       type="button"
                       disabled={!serverName.trim() || renaming}
-                      onClick={() => void renameServer()}
+                      onClick={() => void saveServerSettings()}
                       className="glass-action glass-action-primary h-8 px-3 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1"
                     >
                       <Check className="w-3.5 h-3.5" /> Save
                     </button>
                     <button
                       type="button"
-                      onClick={() => { setEditingServer(false); setServerName(node?.name || dash?.name || 'gmatch'); setServerDescription(node?.description || ''); }}
+                      onClick={() => {
+                        setEditingServer(false)
+                        setServerName(node?.name || dash?.name || 'gmatch')
+                        setServerDescription(node?.description || '')
+                        setHubNewPassword('')
+                        setHubRemovePassword(false)
+                        setHubTags((node && Array.isArray(node.tags) ? node.tags : []).join(', '))
+                      }}
                       className="glass-action h-8 px-2.5 rounded-lg text-xs text-retro-muted cursor-pointer flex items-center gap-1"
                     >
                       <X className="w-3.5 h-3.5" /> Cancel
@@ -1064,55 +1169,16 @@ export function ServersView({
               )}
             </section>
 
-            {/* Connected Chat Rooms Preview */}
-            {showRooms && (
-             <section className="glass-inset p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-retro-fg flex items-center gap-1.5">
-                    <MessageSquare className="w-3.5 h-3.5 text-retro-accent" /> Active Rooms
-                  </span>
-                  {onOpenRooms && (
-                    <button
-                      type="button"
-                      onClick={() => { playPress(720); onOpenRooms(); }}
-                      className="text-[10px] text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
-                    >
-                      View all ({rooms.length}) →
-                    </button>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {rooms.length === 0 ? (
-                    <span className="text-xs text-retro-muted py-1">No group rooms open yet.</span>
-                  ) : (
-                    rooms.slice(0, 8).map((r) => (
-                      <button
-                        key={r.id}
-                        type="button"
-                        onClick={() => {
-                          playPress(720);
-                          if (onOpenRoom) onOpenRoom(r.id);
-                          else if (onOpenRooms) onOpenRooms();
-                        }}
-                        className="bg-surface-interactive/60 border border-border-subtle hover:border-border-strong px-2.5 py-1 rounded-lg text-xs font-medium text-retro-fg cursor-pointer transition-colors flex items-center gap-1"
-                      >
-                        <span>#{r.name}</span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </section>
-            )}
-
             {/* Active Members & 24h Activity List */}
            <section className="glass-inset p-4 space-y-3" aria-label="Server members">
               <div className="flex items-center justify-between pb-2 border-b border-border-glass">
-                <div className="flex items-center gap-1 bg-surface-interactive/60 border border-border-subtle p-0.5 rounded-lg">
+                <div className="flex items-center gap-4">
                   <button
                     type="button"
                     onClick={() => setUserTab('online')}
-                    className={`px-2.5 py-1 rounded-md text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5 ${
-                      userTab === 'online' ? 'bg-retro-accent text-retro-accent-text shadow-xs' : 'text-retro-muted hover:text-retro-fg'
+                    aria-pressed={userTab === 'online'}
+                    className={`text-xs font-bold cursor-pointer transition-colors ${
+                      userTab === 'online' ? 'text-retro-fg' : 'text-retro-muted hover:text-retro-fg'
                     }`}
                   >
                     Online ({onlineUsers.length})
@@ -1120,8 +1186,9 @@ export function ServersView({
                   <button
                     type="button"
                     onClick={() => setUserTab('all24h')}
-                    className={`px-2.5 py-1 rounded-md text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5 ${
-                      userTab === 'all24h' ? 'bg-retro-accent text-retro-accent-text shadow-xs' : 'text-retro-muted hover:text-retro-fg'
+                    aria-pressed={userTab === 'all24h'}
+                    className={`text-xs font-bold cursor-pointer transition-colors ${
+                      userTab === 'all24h' ? 'text-retro-fg' : 'text-retro-muted hover:text-retro-fg'
                     }`}
                   >
                     Last 24h ({allUsers.length})
@@ -1186,10 +1253,10 @@ export function ServersView({
             )}
 
             {/* Sub-Bar: Title & Filter Controls */}
-            <div className="h-8 px-2 border-b border-border-subtle bg-surface-canvas flex items-center justify-between gap-2 shrink-0">
+            <div className="glass-header h-8 px-3 flex items-center justify-between gap-2 shrink-0">
               <div className="flex items-center gap-1.5 shrink-0">
                 <h1 className="text-xs font-bold text-retro-fg uppercase tracking-wider whitespace-nowrap">
-                  Server browser ({visibleServers.length})
+                  Server browser ({visibleRowCount})
                 </h1>
                 <button
                   type="button"
@@ -1251,7 +1318,7 @@ export function ServersView({
             </div>
 
             {/* Scrollable Directory Content */}
-            <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar px-2 py-2 space-y-1.5">
+            <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar px-3 py-2 space-y-1.5">
               {/* Create-server drawer */}
               {showCreate && (
                 <div className="glass-panel p-3.5 space-y-2 shrink-0 rounded-lg border border-border-glass">
@@ -1386,12 +1453,12 @@ export function ServersView({
                   ) : (
                     <div className="space-y-1.5">
                       {/* Pinned Official Node Row */}
-                      {central && !passwordOnly && (!query || `${centralServer.name} ${centralServer.description}`.toLowerCase().includes(query.toLowerCase())) && (
+                      {showOfficial && (
                         <div
                           key="central-node"
-                          className="group relative flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg border border-border-glass bg-glass-w5 hover:border-border-strong transition-colors duration-150"
+                          className="group relative flex items-center justify-between gap-2.5 px-3 py-2 rounded-lg border border-border-glass bg-glass-w5 hover:border-border-strong transition-colors duration-150"
                         >
-                          <div className="flex min-w-0 items-center gap-2">
+                          <div className="flex min-w-0 items-center gap-2.5">
                             <div className="w-6 h-6 rounded-md bg-surface-interactive border border-border-subtle text-retro-fg flex items-center justify-center shrink-0">
                               <Globe className="w-3.5 h-3.5" />
                             </div>
@@ -1436,7 +1503,7 @@ export function ServersView({
                         </div>
                       )}
 
-                      <ul className="divide-y divide-border-subtle rounded-lg border border-border-glass bg-surface-canvas overflow-hidden">
+                      <ul className="divide-y divide-border-subtle rounded-lg border border-border-glass bg-surface-canvas/80 overflow-hidden">
                         {visibleServers.length === 0 && (
                           <li className="p-6 text-xs text-retro-muted text-center flex flex-col items-center justify-center gap-1.5">
                             <Globe className="w-5 h-5 text-retro-muted/40" />
@@ -1468,9 +1535,9 @@ export function ServersView({
                           return (
                             <li
                               key={s.id}
-                              className="group relative flex items-center justify-between gap-2 px-2 py-1.5 hover:bg-glass-w5 transition-colors duration-150"
+                              className="group relative flex items-center justify-between gap-2.5 px-3 py-2 hover:bg-glass-w5 transition-colors duration-150"
                             >
-                              <div className="flex min-w-0 items-center gap-2 flex-1">
+                              <div className="flex min-w-0 items-center gap-2.5 flex-1">
                                 <div className="w-6 h-6 rounded-md bg-surface-interactive border border-border-subtle text-retro-fg flex items-center justify-center text-[10px] font-mono font-bold shrink-0">
                                   {s.name.slice(0, 2).toUpperCase()}
                                 </div>
@@ -1567,14 +1634,16 @@ export function ServersView({
                                       >
                                         {isMyServer && (
                                           <>
-                                            <button
-                                              type="button"
-                                              onClick={() => { playPress(780); setServerName(s.name); setEditingServer(true); setOpenMenuId(null); }}
-                                              title="Rename this server"
-                                              className="w-full px-3 py-1.5 text-xs text-left text-retro-fg hover:bg-glass-w8 flex items-center gap-2 cursor-pointer"
-                                            >
-                                              <Pencil className="w-3.5 h-3.5 text-retro-muted" /> rename
-                                            </button>
+                                            {isCurrentServer && (
+                                              <button
+                                                type="button"
+                                                onClick={() => { openEditor(); setOpenMenuId(null); }}
+                                                title="Server settings"
+                                                className="w-full px-3 py-1.5 text-xs text-left text-retro-fg hover:bg-glass-w8 flex items-center gap-2 cursor-pointer"
+                                              >
+                                                <Pencil className="w-3.5 h-3.5 text-retro-muted" /> Server settings
+                                              </button>
+                                            )}
                                             <button
                                               type="button"
                                               onClick={() => { playPress(740); void setPrivate(s, !s.is_private); setOpenMenuId(null); }}
