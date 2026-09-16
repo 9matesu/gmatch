@@ -1488,13 +1488,17 @@ export default function Home() {
 
   const loadPmUnreadCount = useCallback(() => {
     if (!identity) return Promise.resolve()
-    return orbitFetch(`/api/pm/unread-count?_t=${Date.now()}`, {}, identity)
-      .then(async (res) => {
-        if (!res.ok) return
-        const data = await res.json()
-        setPmUnreadCount(Math.max(0, Number(data?.count || 0)))
-      })
-      .catch(() => { })
+    // Same courier gate as loadPmThreads: the legacy route is 404 on official
+    // nodes; probing it every poll is the console-spam report.
+    return detectMailMode(getApiBaseUrl()).then((mode) => {
+      if (mode === 'courier') { setPmUnreadCount(0); return }
+      return orbitFetch(`/api/pm/unread-count?_t=${Date.now()}`, {}, identity)
+        .then(async (res) => {
+          if (!res.ok) return
+          const data = await res.json()
+          setPmUnreadCount(Math.max(0, Number(data?.count || 0)))
+        })
+    }).catch(() => { })
   }, [identity])
 
   // Opening chat clears its badge: stamp all sealed rooms + all courier DM
