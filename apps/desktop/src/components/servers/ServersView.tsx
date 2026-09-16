@@ -793,8 +793,8 @@ export function ServersView({
         </div>
       )}
 
-      {/* Unified dashboard */}
-      <div className="glass-surface flex flex-col h-full min-h-0 flex-1 overflow-hidden rounded-xl">
+      {/* Unified dashboard — one named glass card, not a hand-rolled surface. */}
+      <div className="glass-card flex flex-col h-full min-h-0 flex-1 overflow-hidden">
         {activeTab === 'hub' && identity ? (
           <aside className="flex flex-col min-h-0 h-full overflow-y-auto styled-scrollbar p-4 sm:p-6 space-y-4 max-w-4xl w-full mx-auto" aria-label="Current server hub">
             {/* Top Navigation */}
@@ -818,7 +818,7 @@ export function ServersView({
             </div>
 
             {/* Current Node Hero */}
-            <section className="p-4 sm:p-5 bg-surface-raised/80 border border-border-glass rounded-xl shadow-sm space-y-3" aria-label="Server dashboard">
+           <section className="glass-inset p-4 sm:p-5 space-y-3" aria-label="Server dashboard">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="min-w-0">
@@ -926,7 +926,7 @@ export function ServersView({
 
             {/* Connected Chat Rooms Preview */}
             {showRooms && (
-              <section className="p-4 bg-surface-raised/80 border border-border-glass rounded-xl shadow-sm space-y-2">
+             <section className="glass-inset p-4 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-retro-fg flex items-center gap-1.5">
                     <MessageSquare className="w-3.5 h-3.5 text-retro-accent" /> Active Rooms
@@ -965,7 +965,7 @@ export function ServersView({
             )}
 
             {/* Active Members & 24h Activity List */}
-            <section className="p-4 bg-surface-raised/80 border border-border-glass rounded-xl shadow-sm space-y-3" aria-label="Server members">
+           <section className="glass-inset p-4 space-y-3" aria-label="Server members">
               <div className="flex items-center justify-between pb-2 border-b border-border-glass">
                 <div className="flex items-center gap-1 bg-surface-interactive/60 border border-border-subtle p-0.5 rounded-lg">
                   <button
@@ -1041,7 +1041,7 @@ export function ServersView({
           <main className="flex flex-col min-h-0 h-full gap-3 overflow-hidden p-3 sm:p-5" aria-label="Server directory">
             {/* Connected Server Strip */}
             {identity && (
-              <section className="px-3.5 py-2.5 bg-surface-raised/90 border border-border-glass rounded-xl flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-2xs" aria-label="Server dashboard">
+              <section className="glass-inset px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0" aria-label="Server dashboard">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -1286,7 +1286,7 @@ export function ServersView({
 
             {/* Directory Setup / Not configured notice */}
             {!central || setupUrl ? (
-              <div className="bg-surface-raised/80 border border-border-glass p-4 space-y-2 rounded-xl">
+             <div className="glass-inset p-4 space-y-2">
                 <p className="text-xs text-retro-muted">
                   No central node is configured, so there is no public server
                   network to discover or list yours on. Creating a server still
@@ -1374,7 +1374,7 @@ export function ServersView({
                 {/* Directory Content List */}
                 <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar pr-0.5">
                   {dirError ? (
-                    <div className="bg-surface-raised/80 border border-border-glass p-3 text-xs text-retro-muted space-y-2 rounded-xl">
+                   <div className="glass-inset p-3 text-xs text-retro-muted space-y-2">
                       <p>
                         Could not reach the central directory at <span className="font-mono">{central}</span>.
                         It may be offline, or the address is wrong.
@@ -1393,7 +1393,7 @@ export function ServersView({
                       {central && !passwordOnly && (!query || `${centralServer.name} ${centralServer.description}`.toLowerCase().includes(query.toLowerCase())) && (
                         <div
                           key="central-node"
-                          className="group relative flex flex-col justify-between bg-surface-raised/90 border border-cyan-500/30 hover:border-cyan-400/50 rounded-xl p-4 transition-all duration-150 shadow-xs hover:shadow-md"
+                         className="group relative flex flex-col justify-between glass-inset border-cyan-500/30 hover:border-cyan-400/50 p-4 transition-all duration-150"
                         >
                           <div>
                             <div className="flex items-start justify-between gap-2">
@@ -1451,7 +1451,7 @@ export function ServersView({
                       )}
 
                       {visibleServers.length === 0 && (
-                        <li className="col-span-full bg-surface-raised/60 border border-border-glass p-8 sm:p-12 text-xs text-retro-muted text-center rounded-xl flex flex-col items-center justify-center gap-2">
+                      <li className="col-span-full glass-inset p-8 sm:p-12 text-xs text-retro-muted text-center flex flex-col items-center justify-center gap-2">
                           <Globe className="w-8 h-8 text-retro-muted/40" />
                           <p className="max-w-sm leading-relaxed">
                             {servers.length === 0
@@ -1469,7 +1469,7 @@ export function ServersView({
                         return (
                           <li
                             key={s.id}
-                            className="group relative flex flex-col justify-between bg-surface-raised/80 hover:bg-surface-elevated border border-border-glass hover:border-retro-muted/40 rounded-xl p-4 transition-all duration-150 shadow-xs hover:shadow-md"
+                          className="group relative flex flex-col justify-between glass-inset border-border-glass hover:border-retro-muted/40 p-4 transition-all duration-150"
                           >
                             <div>
                               <div className="flex items-start justify-between gap-2">
