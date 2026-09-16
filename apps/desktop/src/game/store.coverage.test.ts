@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('../services/booru', () => ({
   fetchPosts: vi.fn(async () => ({ posts: [], source: null, ok: false, offline: true })),
   fetchPostsMulti: vi.fn(async () => ({ posts: [], source: null, ok: false, offline: true })),
+  clearMirrorCooldowns: vi.fn(),
+  clearSeenMemory: vi.fn(),
 }))
 
 import { defaultSave, serialize, SAVE_KEY } from './save'

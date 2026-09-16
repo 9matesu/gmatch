@@ -4,7 +4,10 @@ vi.mock('../services/booru', () => ({
   fetchPosts: vi.fn(async () => ({ posts: [], source: null, ok: false, offline: true })),
   fetchPostsMulti: vi.fn(async () => ({ posts: [], source: null, ok: false, offline: true })),
   clearMirrorCooldowns: vi.fn(),
+  clearSeenMemory: vi.fn(),
 }))
+
+import { clearSeenMemory } from '../services/booru'
 
 const mem = new Map<string, string>()
 vi.stubGlobal('localStorage', {
@@ -894,5 +897,13 @@ describe('toggleFeedCategory (REAL / HENTAI)', () => {
     const callArg = vi.mocked(fetchPostsMulti).mock.calls[0][0]
     expect(callArg.allowReal).toBe(false)
     expect(callArg.allowHentai).toBe(true)
+  })
+})
+
+describe('resetGame fresh start', () => {
+  it('wipes the never-repeat memory (fresh start = fresh pool)', () => {
+    vi.mocked(clearSeenMemory).mockClear()
+    useGame.getState().resetGame()
+    expect(clearSeenMemory).toHaveBeenCalled()
   })
 })

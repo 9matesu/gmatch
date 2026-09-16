@@ -167,6 +167,20 @@ export function clearMirrorCooldowns(): void {
   unhealthyUntil.clear()
 }
 
+/** Fresh game: forget every image ever seen (global never-repeat ledger) so a
+ * reset start draws from the full pool again. Keeps mirror cooldowns intact. */
+export function clearSeenMemory(): void {
+  seenIds.clear()
+  seenUrls.clear()
+  seenLedger.length = 0
+  reshowCursor = 0
+  emptyStreak = 0
+  seenLoaded = true
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(SEEN_KEY)
+  } catch { /* private mode */ }
+}
+
 /** Test hook: reset mirror health + no-repeat memory. */
 export function __resetFeedState(): void {
   unhealthyUntil.clear()

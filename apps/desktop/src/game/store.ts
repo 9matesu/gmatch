@@ -20,7 +20,7 @@ import {
   serialize,
 } from './save'
 import type { SaveData } from './save'
-import { fetchPosts, fetchPostsMulti, clearMirrorCooldowns } from '../services/booru'
+import { fetchPosts, fetchPostsMulti, clearMirrorCooldowns, clearSeenMemory } from '../services/booru'
 import { vaultPin, vaultUnpin, vaultRemove } from '../services/vault'
 import { evictImage } from '../services/imageCache'
 import { isCustomMediaUrl, sampleCustomSources } from '../services/customSources'
@@ -1525,6 +1525,7 @@ export const useGame = create<GameState>((set, get) => ({
 
   resetGame: () => {
     setUserExcludes([])
+    clearSeenMemory()
     set({ ...freshData() })
   },
 }))
