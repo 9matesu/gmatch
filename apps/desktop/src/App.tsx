@@ -2601,10 +2601,18 @@ export default function Home() {
     // so feed posts (and their videos) were never pinned and stayed missing
     // from the vault. vaultPin is session-idempotent, so re-running on feed
     // updates costs nothing.
+    // Resolve FIRST: feed media arrives as a relative /api/objects/<id>
+    // (and lobby endpoints), so the old /^https?:/ test silently dropped
+    // every server-hosted post — images and videos never reached the vault.
+    // resolveMediaUrl turns those into absolute URLs; public objects
+    // (is_public=1) are readable anonymously, which is what the vault
+    // fetcher does. Direct http(s) URLs pass through unchanged.
     for (const p of feedPosts) {
-      if (/^https?:/i.test(p.url || '')) urls.add(p.url);
+      const u = resolveMediaUrl(p.url);
+      if (/^https?:/i.test(u)) urls.add(u);
       for (const m of p.media || []) {
-        if (/^https?:/i.test(m.url || '')) urls.add(m.url);
+        const mu = resolveMediaUrl(m.url);
+        if (/^https?:/i.test(mu)) urls.add(mu);
       }
     }
     if (urls.size === 0) return;
