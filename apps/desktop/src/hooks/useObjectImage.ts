@@ -35,7 +35,8 @@ function isProtectedObjectUrl(value: string): boolean {
 // Bounded LRU cache of previously fetched objects keyed by cardId. Prevents
 // repeat downloads/decrypts on every round change (the same card is re-requested
 // as my-card, opponent-card and reveal card across rounds), keeping memory bounded.
-const CACHE_MAX = 24
+// Cap 96 slots avoids aggressive early revocation during feed and gallery scrolling.
+const CACHE_MAX = 96
 const objectCache = new Map<string, ImageState>()
 const cacheSource = new Map<string, string>()
 
@@ -45,10 +46,20 @@ const cacheSource = new Map<string, string>()
 // videos). Pin while mounted, unpin on unmount; eviction skips pinned keys.
 const pinned = new Set<string>()
 function pinKey(cardId: string, source: string): string {
-  return `${source}::${cardId}`
+  // Normalize /api/objects/<id> and bare <id> to the same key so lookups,
+  // saves, and pins always agree (split callers otherwise unpin/evict
+  // entries each other still display).
+  return `${source}::${normalizeCardId(cardId)}`
 }
 
-function cacheGet(cardId: string, source: string): ImageState | null {
+export function normalizeCardId(cardId: string): string {
+  if (!cardId) return cardId
+  if (cardId.startsWith('/api/objects/')) return cardId.slice('/api/objects/'.length).split(/[?#]/)[0]
+  return cardId
+}
+
+function cacheGet(rawCardId: string, source: string): ImageState | null {
+  const cardId = normalizeCardId(rawCardId)
   const hit = objectCache.get(cardId)
   if (!hit) return null
   if (cacheSource.get(cardId) !== source) return null
@@ -58,10 +69,11 @@ function cacheGet(cardId: string, source: string): ImageState | null {
   return hit
 }
 
-function cacheSet(cardId: string, source: string, img: ImageState): void {
+function cacheSet(rawCardId: string, source: string, img: ImageState): void {
+  const cardId = normalizeCardId(rawCardId)
   cacheSource.set(cardId, source)
   objectCache.delete(cardId)
-  objectCache.set(cardId, img)
+  objectCache.set(cardId, { ...img, cardId })
   // Evict oldest (front) entries beyond the cap, revoking their object URLs to
   // hand memory back to the browser. Skip entries a mounted consumer still
   // renders — revoking one blanks that element. If every entry is pinned we
@@ -141,8 +153,8 @@ export function useObjectImage(
     // near the viewport, at which point this effect re-runs and fetches.
     if (!enabled) return
 
-    // Clean any accidental /api/objects/ prefix
-    const cleanId = cardId.startsWith('/api/objects/') ? cardId.slice('/api/objects/'.length).split(/[?#]/)[0] : cardId
+    // Clean any accidental /api/objects/ prefix (normalized key story below)
+    const cleanId = normalizeCardId(cardId)
 
     // Adopt a cached entry immediately if present
     if (cacheGet(cleanId, identity.orbitId)) return
@@ -153,11 +165,16 @@ export function useObjectImage(
       .then(async (res) => {
         if (cancelled) return
         if (!res.ok) {
-          const failedState: ImageState = { cardId, url: '', failed: true, isVideo: false, isLink: false, linkUrl: null }
-          cacheSet(cardId, identity?.orbitId || '', failedState)
+          // Transient upstream 502/503 (Vite dev proxy -> cold Fly.io node):
+          // never cache as a permanent failure. Leave the slot empty so the
+          // next mount/scroll retries instead of locking in "Image
+          // unavailable" forever.
+          if (res.status === 502 || res.status === 503 || res.status === 504) return
+          const failedState: ImageState = { cardId: cleanId, url: '', failed: true, isVideo: false, isLink: false, linkUrl: null }
+          cacheSet(cleanId, identity?.orbitId || '', failedState)
           setImg(failedState)
           if (res.status === 404 && typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('orbit-object-404', { detail: { cardId } }))
+            window.dispatchEvent(new CustomEvent('orbit-object-404', { detail: { cardId: cleanId } }))
           }
           return
         }
@@ -169,14 +186,14 @@ export function useObjectImage(
           const data = await res.json().catch(() => null)
           if (cancelled) return
           const linkState: ImageState = {
-            cardId,
+            cardId: cleanId,
             url: '',
             failed: false,
             isVideo: false,
             isLink: true,
             linkUrl: typeof data?.url === 'string' ? data.url : null,
           }
-          cacheSet(cardId, identity?.orbitId || '', linkState)
+          cacheSet(cleanId, identity?.orbitId || '', linkState)
           setImg(linkState)
           return
         }
@@ -185,26 +202,26 @@ export function useObjectImage(
         if (cancelled) return
         freshUrl = URL.createObjectURL(blob)
         const loaded: ImageState = {
-          cardId,
+          cardId: cleanId,
           url: freshUrl,
           failed: false,
           isVideo: contentType.startsWith('video/'),
           isLink: false,
           linkUrl: null,
         }
-        cacheSet(cardId, identity?.orbitId || '', loaded)
+        cacheSet(cleanId, identity?.orbitId || '', loaded)
         setImg(loaded)
       })
       .catch(() => {
         if (!cancelled) {
-          const failedState: ImageState = { cardId, url: '', failed: true, isVideo: false, isLink: false, linkUrl: null }
-          cacheSet(cardId, identity?.orbitId || '', failedState)
+          const failedState: ImageState = { cardId: cleanId, url: '', failed: true, isVideo: false, isLink: false, linkUrl: null }
+          cacheSet(cleanId, identity?.orbitId || '', failedState)
           setImg(failedState)
         }
       })
     return () => {
       cancelled = true
-      if (freshUrl && !objectCache.has(cardId)) URL.revokeObjectURL(freshUrl)
+      if (freshUrl && !objectCache.has(cleanId)) URL.revokeObjectURL(freshUrl)
     }
   }, [cardId, identity, enabled])
 
@@ -217,13 +234,14 @@ export function useObjectImage(
     return () => { pinned.delete(k) }
   }, [cardId, identity])
 
-  if (!img || img.cardId !== cardId) {
-    const cached = cardId && identity ? cacheGet(cardId, identity.orbitId) : null
+  const normalized = normalizeCardId(cardId || '')
+  if (!img || img.cardId !== normalized) {
+    const cached = cardId && identity ? cacheGet(normalized, identity.orbitId) : null
     return cached || EMPTY
   }
   // Keep the displayed card fresh in the LRU so eviction never reclaims it
   // while it is on screen.
-  if (cardId && identity) cacheGet(cardId, identity.orbitId)
+  if (cardId && identity) cacheGet(normalized, identity.orbitId)
   return {
     url: img.url || null,
     failed: img.failed,

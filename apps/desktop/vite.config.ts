@@ -123,6 +123,21 @@ export default defineConfig({
         changeOrigin: true,
         secure: true,
         ws: true,
+        // Fly.io sleeps idle machines: the first request wakes it (~4s) and
+        // http-proxy would otherwise drop the socket, logging a raw 502 that
+        // useObjectImage then caches as a permanent failure ("Image
+        // unavailable" forever). Answer proxy transport errors with a clean
+        // JSON 502 so callers can retry instead of caching death.
+        configure: (proxy) => {
+          proxy.on('error', (err, _req, res) => {
+            try {
+              if (res && 'writeHead' in res && !(res as { headersSent?: boolean }).headersSent) {
+                ;(res as { writeHead: (s: number, h: Record<string, string>) => void; end: (b: string) => void }).writeHead(502, { 'Content-Type': 'application/json' })
+                ;(res as { end: (b: string) => void }).end(JSON.stringify({ error: 'Central node waking up, retry shortly' }))
+              }
+            } catch { /* socket already gone */ }
+          })
+        },
       },
       '^/booru/tbib': {
         target: 'https://tbib.org',
@@ -160,6 +175,19 @@ export default defineConfig({
             proxyReq.setHeader('sec-fetch-site', 'same-origin')
             proxyReq.setHeader('sec-fetch-user', '?1')
             proxyReq.setHeader('upgrade-insecure-requests', '1')
+          })
+          // Even with browser headers, Cloudflare still 403s gallery bursts
+          // from a bare dev IP. booru.ts already falls back to search-page
+          // covers when gallery pages fail — rewriting the status to 200
+          // with the challenge body keeps that fallback clean and stops the
+          // red 403 rows in the dev console. The challenge HTML carries no
+          // data-src/parseJSON, so gallery parsing yields zero pages.
+          proxy.on('proxyRes', (proxyRes, req) => {
+            try {
+              if (proxyRes.statusCode === 403 && req.url && req.url.includes('/gallery/')) {
+                proxyRes.statusCode = 200
+              }
+            } catch { /* passthrough */ }
           })
         },
       },
