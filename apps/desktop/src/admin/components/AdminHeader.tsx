@@ -3,6 +3,7 @@
 import { cn } from "../../lib/utils";
 import { Menu, Search, RefreshCw,  User, LogOut, ChevronDown, Settings } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { resolveMediaUrl } from "../../utils/media";
 
 interface AdminHeaderProps {
   isMobile: boolean;
@@ -123,7 +124,7 @@ export function AdminHeader({
           >
             <div className="w-7 h-7 rounded-full bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
               {user?.avatar ? (
-                <img src={user.avatar} alt="" className="w-full h-full rounded-full object-cover" />
+                <img src={resolveMediaUrl(user.avatar)} alt="" className="w-full h-full rounded-full object-cover" />
               ) : (
                 <User className="w-4 h-4 text-cyan-300" />
               )}

@@ -14,6 +14,7 @@ import { CardBack } from './CardBack'
 import { CreateCardModal } from './CreateCardModal'
 import { LazyVideo } from './LazyVideo'
 import { ObjectImage } from './ObjectImage'
+import { resolveMediaUrl } from '../utils/media'
 import { ZoomIn, Heart, X, Sparkles } from 'lucide-react'
 import type { OrbitIdentity } from '@orbit/crypto'
 
@@ -156,9 +157,9 @@ export function YourMatchTab({
         ) : img?.url ? (
           <>
             {img.url.split('?')[0].toLowerCase().match(/\.(mp4|webm|mov|ogg)$/) || img.url.includes('video/') ? (
-              <LazyVideo src={img.url} videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150" />
+              <LazyVideo src={resolveMediaUrl(img.url)} videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150" />
             ) : (
-              <img src={img.url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150" />
+              <img src={resolveMediaUrl(img.url)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150" />
             )}
             <button
               type="button"

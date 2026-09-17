@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { groupNotifications, groupTitle, type NotifItem } from "../utils/groupNotifications";
 import { playPress } from "../utils/sounds";
+import { resolveMediaUrl } from "../utils/media";
 
 export interface NotificationItem {
   id: string;
@@ -150,7 +151,7 @@ export function NotificationsPanel({
                   <div className="w-9 h-9 rounded-full overflow-hidden glass-field flex items-center justify-center text-xs font-medium shrink-0">
                     {inv.inviter_pfp_url ? (
                       <img
-                        src={inv.inviter_pfp_url}
+                        src={resolveMediaUrl(inv.inviter_pfp_url)}
                         alt=""
                         className="w-full h-full object-cover"
                       />

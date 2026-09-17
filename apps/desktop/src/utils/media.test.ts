@@ -37,6 +37,16 @@ describe('resolveMediaUrl', () => {
     expect(resolveMediaUrl(null)).toBe('');
     expect(resolveMediaUrl(undefined)).toBe('');
   });
+
+  it('maps a bare object id to the /api/objects route, never a bare uuid', () => {
+    // A raw uuid in an <img src> fires net::ERR_FILE_NOT_FOUND; the resolver
+    // must always expand it to the canonical route (relative in browser dev
+    // so the Vite proxy owns it, absolute elsewhere).
+    const uuid = 'c9f4ace9-fe25-4c6c-a0fc-cfbc26b02119';
+    const out = resolveMediaUrl(uuid);
+    expect(out).toContain(`/api/objects/${uuid}`);
+    expect(out).not.toBe(uuid);
+  });
 });
 
 describe('isMediaVideo', () => {

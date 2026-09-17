@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useObjectImage } from '../../hooks/useObjectImage';
-import { isMediaVideo } from '../../utils/media';
+import { isMediaVideo, resolveMediaUrl } from '../../utils/media';
 import { ChevronLeft, ChevronRight, X, Play } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 
@@ -106,9 +106,9 @@ export function SlideshowPlayer({
       <div className="max-w-[90vw] max-h-[90vh] flex flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
         {image.url ? (
           isVideo ? (
-            <video src={image.url} autoPlay loop muted playsInline className="max-w-[90vw] max-h-[80vh] rounded-xl shadow-2xl" />
+            <video src={resolveMediaUrl(image.url)} autoPlay loop muted playsInline className="max-w-[90vw] max-h-[80vh] rounded-xl shadow-2xl" />
           ) : (
-            <img src={image.url} alt={current?.caption || ''} className="max-w-[90vw] max-h-[80vh] rounded-xl shadow-2xl object-contain" />
+            <img src={resolveMediaUrl(image.url)} alt={current?.caption || ''} className="max-w-[90vw] max-h-[80vh] rounded-xl shadow-2xl object-contain" />
           )
         ) : (
           <div className="w-[70vw] h-[50vh] flex items-center justify-center bg-glass-w5 rounded-xl">

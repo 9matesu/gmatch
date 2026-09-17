@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { AdminMediaThumbnail } from "../AdminMediaThumbnail";
+import { resolveMediaUrl } from "../../../utils/media";
 import type { AdminUser, AdminCard, TableParams, OrbitIdentity } from "../../../utils/adminTypes";
 
 interface UsersTabProps {
@@ -329,7 +330,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                   cell: (_, row) => (
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-full bg-surface-canvas border border-border-glass flex items-center justify-center text-xs font-bold text-retro-fg uppercase overflow-hidden shrink-0">
-                        {row.pfp_url ? <img src={row.pfp_url} alt="" className="w-full h-full object-cover" /> : (row.display_name?.[0] || "?")}
+                        {row.pfp_url ? <img src={resolveMediaUrl(row.pfp_url)} alt="" className="w-full h-full object-cover" /> : (row.display_name?.[0] || "?")}
                       </div>
                       <div className="min-w-0">
                         <div className="text-xs font-bold text-retro-fg truncate">{row.display_name || "Anonymous"}</div>

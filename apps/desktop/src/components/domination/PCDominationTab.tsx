@@ -26,6 +26,7 @@ import type { User } from '@orbit/shared';
 import { isDefaultPeerName } from '@orbit/shared';
 import { ActionModal } from './ActionModal';
 import { HacksPanel } from './HacksPanel';
+import { resolveMediaUrl } from '../../utils/media';
 import type { ActiveHackSession } from '../home/CommandIsland';
 
 type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
@@ -573,7 +574,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     }`}
                   >
                     {t.pfpUrl ? (
-                      <img src={t.pfpUrl} alt="" className="w-7 h-7 rounded-md object-cover border border-border-glass" />
+                      <img src={resolveMediaUrl(t.pfpUrl)} alt="" className="w-7 h-7 rounded-md object-cover border border-border-glass" />
                     ) : (
                       <div className="w-7 h-7 rounded-md glass-inset flex items-center justify-center text-xs font-semibold text-retro-fg">
                         {t.displayName.charAt(0).toUpperCase()}

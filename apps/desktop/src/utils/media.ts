@@ -20,9 +20,12 @@ export function resolveMediaUrl(url?: string | null): string {
   }
   // A bare object id (UUID) is never a URL: treat it as the canonical
   // /api/objects/<id> route, else the browser resolves it relative to the
-  // page (net::ERR_FILE_NOT_FOUND on a raw uuid in the packaged app).
+  // page (net::ERR_FILE_NOT_FOUND on a raw uuid in dev and packaged builds).
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
-    return `${getApiBaseUrl().replace(/\/+$/, '')}/api/objects/${trimmed}`;
+    const base = getApiBaseUrl().replace(/\/+$/, '');
+    // Browser dev (base '') stays relative so the Vite /api proxy owns it;
+    // packaged/electron builds resolve to the absolute API host.
+    return base ? `${base}/api/objects/${trimmed}` : `/api/objects/${trimmed}`;
   }
   if (
     /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) || trimmed.startsWith('data:') || trimmed.startsWith('blob:')
