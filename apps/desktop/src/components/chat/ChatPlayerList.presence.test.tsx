@@ -43,6 +43,20 @@ describe('ChatPlayerList presence decay (no ghosts)', () => {
     expect(row('Ghost').getByText(/Seen /)).toBeDefined()
   })
 
+  it('treats space-separated SQLite timestamps as UTC, not local time', () => {
+    // SQLite CURRENT_TIMESTAMP format: "YYYY-MM-DD HH:MM:SS" (UTC, no Z).
+    // In UTC-3 or any negative offset, raw `new Date()` treats this as local time (+3h in future).
+    const sqliteStale = new Date(Date.now() - 2 * 3600_000).toISOString().replace('T', ' ').replace('Z', '').slice(0, 19)
+    render(
+      <ChatPlayerList
+        identity={identity}
+        users={[baseUser('stale-sql', { display_name: 'StaleSql', online: true, last_seen: sqliteStale })]}
+      />,
+    )
+    expect(row('StaleSql').queryByText('Active now')).toBeNull()
+    expect(row('StaleSql').getByLabelText('Offline')).toBeDefined()
+  })
+
   it('keeps a fresh sighting online even when the flag lags', () => {
     render(
       <ChatPlayerList

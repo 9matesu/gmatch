@@ -80,12 +80,12 @@ export function isBotUser(userId: string | null | undefined): boolean {
 export async function ensureBotReady(db: D1Turso, bot: { id: string; name: string; tags: string[]; col?: string; pfp_url?: string | null }): Promise<void> {
   await db.prepare(`
     INSERT INTO Users (id, public_key, display_name, tags, pfp_url, last_seen, is_admin)
-    VALUES (?, ?, ?, ?, ?, datetime('now'), 0)
+    VALUES (?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 0)
     ON CONFLICT(id) DO UPDATE SET
       display_name = excluded.display_name,
       tags = excluded.tags,
       pfp_url = COALESCE(excluded.pfp_url, Users.pfp_url),
-      last_seen = datetime('now')
+      last_seen = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
   `).bind(bot.id, bot.id, bot.name, JSON.stringify(bot.tags), bot.pfp_url || null).run().catch(() => { })
 
   // Purge any legacy bot placeholder cards from Objects table (so they never pollute storage or admin panel)
@@ -123,7 +123,7 @@ export async function resolveCardUrl(db: D1Turso, id: string | null | undefined)
 }
 
 export async function joinLobby(db: D1Turso, userId: string, autoQueue: number = 1): Promise<void> {
-  await db.prepare('UPDATE Users SET last_seen = CURRENT_TIMESTAMP WHERE id = ?').bind(userId).run().catch(() => { })
+  await db.prepare("UPDATE Users SET last_seen = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?").bind(userId).run().catch(() => { })
   await db
     .prepare(`
       INSERT INTO LobbyPlayers (user_id, status, auto_queue, joined_at, waiting_since)
@@ -152,7 +152,7 @@ export async function setAutoQueue(db: D1Turso, userId: string, enabled: boolean
   if (!enabled) {
     await db.prepare("UPDATE LobbyPlayers SET auto_queue = 0, status = 'idle', waiting_since = NULL WHERE user_id = ?").bind(userId).run()
   } else {
-    await db.prepare('UPDATE Users SET last_seen = CURRENT_TIMESTAMP WHERE id = ?').bind(userId).run().catch(() => { })
+    await db.prepare("UPDATE Users SET last_seen = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?").bind(userId).run().catch(() => { })
     await db
       .prepare(`
         INSERT INTO LobbyPlayers (user_id, status, auto_queue, joined_at, waiting_since)
@@ -1495,7 +1495,7 @@ export async function getLobbyState(
   shouldAdvance: boolean = true
 ): Promise<LobbySnapshot> {
   if (userId) {
-    await db.prepare('UPDATE Users SET last_seen = CURRENT_TIMESTAMP WHERE id = ?').bind(userId).run().catch(() => { })
+    await db.prepare("UPDATE Users SET last_seen = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?").bind(userId).run().catch(() => { })
   }
 
   if (shouldAdvance) await advanceLobby(db, now)

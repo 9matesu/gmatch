@@ -25,8 +25,14 @@ export interface ChatPlayerListProps {
 
 function formatRelativeTime(iso?: string | null): string {
   if (!iso) return 'recently';
-  const ms = Date.now() - new Date(iso).getTime();
-  if (isNaN(ms) || ms < 0) return 'just now';
+  const s = typeof iso === 'string' && !iso.endsWith('Z') && !iso.includes('+')
+    ? (iso.includes('T') ? `${iso}Z` : `${iso.replace(' ', 'T')}Z`)
+    : iso;
+  const t = new Date(s).getTime();
+  if (isNaN(t) || t <= 0) return 'recently';
+  const ms = Date.now() - t;
+  if (ms < 0 && ms >= -15_000) return 'just now';
+  if (ms < 0) return 'recently';
   const mins = Math.floor(ms / 60000);
   if (mins < 1) return 'just now';
   if (mins < 60) return `${mins}m ago`;
@@ -90,10 +96,17 @@ export function ChatPlayerList({
     const SEEN_FRESH_MS = 60_000;
     const seenMs = (v?: string | null) => {
       if (!v) return 0;
-      const t = new Date(v).getTime();
+      const s = typeof v === 'string' && !v.endsWith('Z') && !v.includes('+')
+        ? (v.includes('T') ? `${v}Z` : `${v.replace(' ', 'T')}Z`)
+        : v;
+      const t = new Date(s).getTime();
       return Number.isFinite(t) ? t : 0;
     };
-    const isOnline = (lastSeen: number) => lastSeen > 0 && now - lastSeen < SEEN_FRESH_MS;
+    const isOnline = (lastSeen: number) => {
+      if (lastSeen <= 0) return false;
+      const delta = now - lastSeen;
+      return delta >= -15_000 && delta < SEEN_FRESH_MS;
+    };
 
     // 1. Seed from dashboard 24h query
     for (const du of dashboardUsers) {
@@ -161,12 +174,11 @@ export function ChatPlayerList({
     // 4. Filter for only active in last 24h or online
     const list: ChatPlayerItem[] = [];
     for (const p of map.values()) {
-      const lastSeenMs = p.last_seen ? new Date(p.last_seen).getTime() : 0;
-      const isOnline = p.online || (lastSeenMs > 0 && (now - lastSeenMs) < 60_000);
-      const is24h = isOnline || (lastSeenMs > 0 && (now - lastSeenMs) <= oneDayMs);
+      const lastSeenMs = seenMs(p.last_seen);
+      const is24h = p.online || (lastSeenMs > 0 && (now - lastSeenMs) <= oneDayMs);
 
       if (is24h || (identity && p.id === identity.orbitId)) {
-        list.push({ ...p, online: isOnline });
+        list.push(p);
       }
     }
 
@@ -180,8 +192,8 @@ export function ChatPlayerList({
         const nameB = (b.display_name || b.id).toLowerCase();
         return nameA.localeCompare(nameB);
       }
-      const timeA = a.last_seen ? new Date(a.last_seen).getTime() : 0;
-      const timeB = b.last_seen ? new Date(b.last_seen).getTime() : 0;
+      const timeA = seenMs(a.last_seen);
+      const timeB = seenMs(b.last_seen);
       return timeB - timeA;
     });
 

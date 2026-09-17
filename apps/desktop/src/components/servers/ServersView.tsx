@@ -93,8 +93,14 @@ export function parseServerTags(input: string): string[] {
 
 function formatRelativeTime(iso?: string | null): string {
   if (!iso) return 'recently'
-  const ms = Date.now() - new Date(iso).getTime()
-  if (isNaN(ms) || ms < 0) return 'just now'
+  const s = typeof iso === 'string' && !iso.endsWith('Z') && !iso.includes('+')
+    ? (iso.includes('T') ? `${iso}Z` : `${iso.replace(' ', 'T')}Z`)
+    : iso
+  const t = new Date(s).getTime()
+  if (isNaN(t) || t <= 0) return 'recently'
+  const ms = Date.now() - t
+  if (ms < 0 && ms >= -15_000) return 'just now'
+  if (ms < 0) return 'recently'
   const mins = Math.floor(ms / 60000)
   if (mins < 1) return 'just now'
   if (mins < 60) return `${mins}m ago`
