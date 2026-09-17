@@ -160,6 +160,7 @@ export function ServersView({
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [expandedServerId, setExpandedServerId] = useState<string | null>(null)
   const [showCentralPopover, setShowCentralPopover] = useState(false)
   // Collapsible filter band (the chatroom idiom): the search/sort row eats a
   // full strip above the list and is only needed while narrowing. Persisted so
@@ -367,7 +368,7 @@ export function ServersView({
         return true
       })
       .filter((s) => !passwordOnly || s.password_required)
-      .filter((s) => !q || `${s.name} ${s.description ?? ''} ${s.endpoint_hint ?? ''}`.toLowerCase().includes(q))
+      .filter((s) => !q || `${s.name} ${s.description ?? ''} ${s.endpoint_hint ?? ''} ${(s.tags ?? []).join(' ')}`.toLowerCase().includes(q))
       .sort((a, b) => {
         if (sort === 'name') return a.name.localeCompare(b.name)
         if (sort === 'online') return (b.online_count ?? -1) - (a.online_count ?? -1)
@@ -1537,81 +1538,94 @@ export function ServersView({
                           const isMenuOpen = openMenuId === s.id
                           const isMyServer = mine(s)
                           const isCurrentServer = isCurrent(s)
+                          const isExpanded = expandedServerId === s.id
+                          const code = s.endpoint_hint ? buildNodeCode(s.endpoint_hint, s.name) : ''
 
                           return (
                             <li
                               key={s.id}
-                              className="group relative flex items-center justify-between gap-2.5 px-3 py-2 hover:bg-glass-w5 transition-colors duration-150"
+                              className="group flex flex-col hover:bg-glass-w5 transition-colors duration-150"
                             >
-                              <div className="flex min-w-0 items-center gap-2.5 flex-1">
-                                <div className="w-6 h-6 rounded-md bg-surface-interactive border border-border-subtle text-retro-fg flex items-center justify-center text-[10px] font-mono font-bold shrink-0">
-                                  {s.name.slice(0, 2).toUpperCase()}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-1 min-w-0">
-                                    <h3 className="text-xs font-bold text-retro-fg truncate">{s.name}</h3>
-                                    {!!s.password_required && (
-                                      <span className="p-0.5 rounded bg-surface-interactive text-amber-300 border border-border-glass shrink-0" title="Password required">
-                                        <Lock className="w-3 h-3" aria-label="password required" />
-                                      </span>
-                                    )}
-                                    {isMyServer && (
-                                      <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider bg-glass-w10 text-retro-fg border border-border-glass shrink-0">
-                                        Yours
-                                      </span>
-                                    )}
-                                    {!!s.is_private && (
-                                      <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider text-retro-muted border border-border-subtle bg-surface-interactive shrink-0">
-                                        Private
-                                      </span>
-                                    )}
-                                    <span className="hidden sm:inline text-[10px] text-retro-muted font-mono truncate">
-                                      {formatRelativeTime(s.last_seen)}
-                                    </span>
+                              <div className="flex items-center justify-between gap-2.5 px-3 py-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedServerId(isExpanded ? null : s.id)}
+                                  aria-expanded={isExpanded}
+                                  aria-label={`${isExpanded ? 'Hide' : 'Show'} details for ${s.name}`}
+                                  className="p-1 -ml-1 text-retro-muted hover:text-retro-fg cursor-pointer transition-colors"
+                                >
+                                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${isExpanded ? 'rotate-180 text-retro-fg' : ''}`} />
+                                </button>
+
+                                <div className="flex min-w-0 items-center gap-2.5 flex-1">
+                                  <div className="w-6 h-6 rounded-md bg-surface-interactive border border-border-subtle text-retro-fg flex items-center justify-center text-[10px] font-mono font-bold shrink-0">
+                                    {s.name.slice(0, 2).toUpperCase()}
                                   </div>
-                                  <p className="text-[10px] text-retro-muted truncate max-w-[320px]">
-                                    {s.description || 'No description.'}
-                                  </p>
-                                </div>
-                              </div>
-
-                              <div className="flex shrink-0 items-center justify-end gap-2">
-                                <div className="hidden sm:flex items-center font-mono text-[10px] text-retro-muted tabular-nums">
-                                  {(typeof s.online_count === 'number' || typeof s.user_count === 'number') ? (
-                                    <span className="inline-flex items-center gap-1">
-                                      {typeof s.online_count === 'number' && (
-                                        <>
-                                          <span className={`w-1.5 h-1.5 rounded-full ${s.online_count > 0 ? 'bg-retro-online' : 'bg-retro-muted'}`} />
-                                          <span>{s.online_count}</span>
-                                        </>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1 min-w-0">
+                                      <h3 className="text-xs font-bold text-retro-fg truncate">{s.name}</h3>
+                                      {!!s.password_required && (
+                                        <span className="p-0.5 rounded bg-surface-interactive text-amber-300 border border-border-glass shrink-0" title="Password required">
+                                          <Lock className="w-3 h-3" aria-label="password required" />
+                                        </span>
                                       )}
-                                      {typeof s.user_count === 'number' && (
-                                        <span>· {s.user_count}</span>
+                                      {isMyServer && (
+                                        <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider bg-glass-w10 text-retro-fg border border-border-glass shrink-0">
+                                          Yours
+                                        </span>
                                       )}
-                                    </span>
-                                  ) : null}
+                                      {!!s.is_private && (
+                                        <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider text-retro-muted border border-border-subtle bg-surface-interactive shrink-0">
+                                          Private
+                                        </span>
+                                      )}
+                                      <span className="hidden sm:inline text-[10px] text-retro-muted font-mono truncate">
+                                        {formatRelativeTime(s.last_seen)}
+                                      </span>
+                                    </div>
+                                    <p className="text-[10px] text-retro-muted truncate max-w-[320px]">
+                                      {s.description || 'No description.'}
+                                    </p>
+                                  </div>
                                 </div>
 
-                                <div className="flex items-center gap-1">
-                                  {isMyServer ? (
-                                    !isCurrentServer ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => { playPress(620); void switchTo(s); }}
-                                        className="flex items-center gap-1 px-1 py-0.5 rounded text-xs font-semibold text-retro-muted hover:text-retro-fg hover:bg-glass-w8 transition-colors duration-150 cursor-pointer"
-                                      >
-                                        <ArrowLeft className="w-3 h-3" /> Switch
-                                      </button>
-                                    ) : (
-                                      <span className="h-6 px-2 rounded-md text-xs font-medium text-retro-muted bg-surface-canvas border border-border-subtle flex items-center justify-center cursor-default">
+                                <div className="flex shrink-0 items-center justify-end gap-2">
+                                  <div className="hidden sm:flex items-center font-mono text-[10px] text-retro-muted tabular-nums">
+                                    {(typeof s.online_count === 'number' || typeof s.user_count === 'number') ? (
+                                      <span className="inline-flex items-center gap-1">
+                                        {typeof s.online_count === 'number' && (
+                                          <>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${s.online_count > 0 ? 'bg-retro-online' : 'bg-retro-muted'}`} />
+                                            <span>{s.online_count}</span>
+                                          </>
+                                        )}
+                                        {typeof s.user_count === 'number' && (
+                                          <span>· {s.user_count}</span>
+                                        )}
+                                      </span>
+                                    ) : null}
+                                  </div>
+
+                                  <div className="flex items-center gap-1">
+                                    {isMyServer ? (
+                                      !isCurrentServer ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => { playPress(620); void switchTo(s); }}
+                                          className="flex items-center gap-1 px-1 py-0.5 rounded text-xs font-semibold text-retro-muted hover:text-retro-fg hover:bg-glass-w8 transition-colors duration-150 cursor-pointer"
+                                        >
+                                          <ArrowLeft className="w-3 h-3" /> Switch
+                                        </button>
+                                      ) : (
+                                        <span className="h-6 px-2 rounded-md text-xs font-medium text-retro-muted bg-surface-canvas border border-border-subtle flex items-center justify-center cursor-default">
+                                          Connected
+                                        </span>
+                                      )
+                                    ) : isCurrentServer && identity ? (
+                                      <span className="h-6 px-2 rounded-md text-xs font-semibold text-retro-muted bg-surface-canvas border border-border-subtle flex items-center justify-center cursor-default">
                                         Connected
                                       </span>
-                                    )
-                                  ) : isCurrentServer && identity ? (
-                                    <span className="h-6 px-2 rounded-md text-xs font-semibold text-retro-muted bg-surface-canvas border border-border-subtle flex items-center justify-center cursor-default">
-                                      Connected
-                                    </span>
-                                  ) : (
+                                    ) : (
                                       <button
                                         type="button"
                                         onClick={() => void join(s)}
@@ -1619,87 +1633,138 @@ export function ServersView({
                                       >
                                         <UserPlus className="w-3 h-3" /> {!identity ? 'Enter' : 'Join'}
                                       </button>
-                                  )}
+                                    )}
 
-                                  <div className="relative">
-                                    <button
-                                      type="button"
-                                      data-menu-trigger
-                                      onClick={() => setOpenMenuId((cur) => (cur === s.id ? null : s.id))}
-                                      aria-label={`More actions for ${s.name}`}
-                                      className="h-6 w-6 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w8 flex items-center justify-center cursor-pointer transition-colors duration-150"
-                                      title="More actions"
-                                    >
-                                      <MoreVertical className="w-3.5 h-3.5" />
-                                    </button>
-
-                                    {isMenuOpen && (
-                                      <div
-                                        data-menu-content
-                                        className="absolute right-0 top-full mt-1 w-44 bg-surface-raised border border-border-glass rounded-lg py-1 shadow-lg z-20 space-y-0.5 animate-orbit-fade-in"
+                                    <div className="relative">
+                                      <button
+                                        type="button"
+                                        data-menu-trigger
+                                        onClick={() => setOpenMenuId((cur) => (cur === s.id ? null : s.id))}
+                                        aria-label={`More actions for ${s.name}`}
+                                        className="h-6 w-6 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w8 flex items-center justify-center cursor-pointer transition-colors duration-150"
+                                        title="More actions"
                                       >
-                                        {isMyServer && (
-                                          <>
-                                            {isCurrentServer && (
+                                        <MoreVertical className="w-3.5 h-3.5" />
+                                      </button>
+
+                                      {isMenuOpen && (
+                                        <div
+                                          data-menu-content
+                                          className="absolute right-0 top-full mt-1 w-44 bg-surface-raised border border-border-glass rounded-lg py-1 shadow-lg z-20 space-y-0.5 animate-orbit-fade-in"
+                                        >
+                                          {isMyServer && (
+                                            <>
+                                              {isCurrentServer && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => { openEditor(); setOpenMenuId(null); }}
+                                                  title="Server settings"
+                                                  className="w-full px-3 py-1.5 text-xs text-left text-retro-fg hover:bg-glass-w8 flex items-center gap-2 cursor-pointer"
+                                                >
+                                                  <Pencil className="w-3.5 h-3.5 text-retro-muted" /> Server settings
+                                                </button>
+                                              )}
                                               <button
                                                 type="button"
-                                                onClick={() => { openEditor(); setOpenMenuId(null); }}
-                                                title="Server settings"
+                                                onClick={() => { playPress(740); void setPrivate(s, !s.is_private); setOpenMenuId(null); }}
                                                 className="w-full px-3 py-1.5 text-xs text-left text-retro-fg hover:bg-glass-w8 flex items-center gap-2 cursor-pointer"
                                               >
-                                                <Pencil className="w-3.5 h-3.5 text-retro-muted" /> Server settings
+                                                <Lock className="w-3.5 h-3.5 text-retro-muted" /> {s.is_private ? 'Make public' : 'Make private'}
                                               </button>
-                                            )}
+                                              <button
+                                                type="button"
+                                                onClick={() => { void unregister(s); setOpenMenuId(null); }}
+                                                className="w-full px-3 py-1.5 text-xs text-left text-retro-fg hover:bg-glass-w8 flex items-center gap-2 cursor-pointer"
+                                              >
+                                                unregister
+                                              </button>
+                                            </>
+                                          )}
+                                          {s.endpoint_hint && (
                                             <button
                                               type="button"
-                                              onClick={() => { playPress(740); void setPrivate(s, !s.is_private); setOpenMenuId(null); }}
+                                              onClick={() => {
+                                                playPress(820);
+                                                void shareServer(s.endpoint_hint || '', s.name);
+                                                setOpenMenuId(null);
+                                              }}
+                                              title="Copy node code"
+                                              aria-label={`Copy code for ${s.name}`}
                                               className="w-full px-3 py-1.5 text-xs text-left text-retro-fg hover:bg-glass-w8 flex items-center gap-2 cursor-pointer"
                                             >
-                                              <Lock className="w-3.5 h-3.5 text-retro-muted" /> {s.is_private ? 'Make public' : 'Make private'}
+                                              <Share2 className="w-3.5 h-3.5 text-retro-muted" /> Copy Server Code
                                             </button>
+                                          )}
+                                          {s.id !== 'central-node' && (
                                             <button
                                               type="button"
-                                              onClick={() => { void unregister(s); setOpenMenuId(null); }}
-                                              className="w-full px-3 py-1.5 text-xs text-left text-retro-fg hover:bg-glass-w8 flex items-center gap-2 cursor-pointer"
+                                              onClick={() => {
+                                                setDeleteTarget(s);
+                                                setDeleteError('');
+                                                setDeletePasscode('');
+                                                setOpenMenuId(null);
+                                              }}
+                                              className="w-full px-3 py-1.5 text-xs text-left text-rose-400 hover:bg-rose-500/10 flex items-center gap-2 cursor-pointer border-t border-border-subtle mt-0.5"
                                             >
-                                              unregister
+                                              <Trash2 className="w-3.5 h-3.5 text-rose-400" /> Delete / Forget
                                             </button>
-                                          </>
-                                        )}
-                                        {s.endpoint_hint && (
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              playPress(820);
-                                              void shareServer(s.endpoint_hint || '', s.name);
-                                              setOpenMenuId(null);
-                                            }}
-                                            title="Copy node code"
-                                            aria-label={`Copy code for ${s.name}`}
-                                            className="w-full px-3 py-1.5 text-xs text-left text-retro-fg hover:bg-glass-w8 flex items-center gap-2 cursor-pointer"
-                                          >
-                                            <Share2 className="w-3.5 h-3.5 text-retro-muted" /> Copy Server Code
-                                          </button>
-                                        )}
-                                        {s.id !== 'central-node' && (
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setDeleteTarget(s);
-                                              setDeleteError('');
-                                              setDeletePasscode('');
-                                              setOpenMenuId(null);
-                                            }}
-                                            className="w-full px-3 py-1.5 text-xs text-left text-rose-400 hover:bg-rose-500/10 flex items-center gap-2 cursor-pointer border-t border-border-subtle mt-0.5"
-                                          >
-                                            <Trash2 className="w-3.5 h-3.5 text-rose-400" /> Delete / Forget
-                                          </button>
-                                        )}
-                                      </div>
-                                    )}
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
+
+                              {/* Expandable server info drawer */}
+                              {isExpanded && (
+                                <div
+                                  data-testid={`server-details-${s.id}`}
+                                  className="px-4 py-3 bg-surface-interactive/30 border-t border-border-subtle text-xs space-y-2.5 animate-orbit-fade-in"
+                                >
+                                  {s.description && (
+                                    <p className="text-retro-fg leading-relaxed whitespace-pre-wrap">{s.description}</p>
+                                  )}
+
+                                  {Array.isArray(s.tags) && s.tags.length > 0 && (
+                                    <div className="flex flex-wrap items-center gap-1">
+                                      <span className="text-[10px] text-retro-muted font-mono uppercase tracking-wider mr-1">Tags:</span>
+                                      {s.tags.map((tag) => (
+                                        <button
+                                          key={tag}
+                                          type="button"
+                                          onClick={() => setQuery(tag)}
+                                          className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-surface-interactive hover:bg-surface-elevated text-retro-fg border border-border-subtle cursor-pointer transition-colors"
+                                          title={`Filter by tag "${tag}"`}
+                                        >
+                                          #{tag}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  <div className="flex flex-wrap items-center gap-4 text-[10px] text-retro-muted font-mono pt-1 border-t border-border-subtle/50">
+                                    <span>last seen: {formatRelativeTime(s.last_seen)}</span>
+                                    {typeof s.online_count === 'number' && <span>online: {s.online_count}</span>}
+                                    {typeof s.user_count === 'number' && <span>members: {s.user_count}</span>}
+                                    {s.password_required ? <span className="text-amber-300">password protected</span> : <span>public access</span>}
+                                    {code && (
+                                      <span className="flex items-center gap-1.5 ml-auto">
+                                        <span className="truncate max-w-[120px]">{code.slice(0, 20)}…</span>
+                                        <button
+                                          type="button"
+                                          title="Copy node code"
+                                          aria-label={`Copy code for ${s.name}`}
+                                          onClick={() => { playPress(820); void shareServer(s.endpoint_hint || '', s.name); }}
+                                          className="text-retro-fg hover:text-retro-accent cursor-pointer underline"
+                                        >
+                                          copy
+                                        </button>
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
                             </li>
                           )
                         })}
