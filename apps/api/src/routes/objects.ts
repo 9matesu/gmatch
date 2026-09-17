@@ -93,6 +93,65 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
 /** Any object still alive (profile pics never expire, everything else has a future expires_at). */
 const LIVE_OBJECT_FILTER = "(expires_at IS NULL OR datetime(expires_at) > datetime('now'))"
 
+objects.post('/register', orbitAuth, async (c) => {
+  try {
+    const orbitId = c.get('orbitId')
+    const body = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object') {
+      return c.json({ error: 'Invalid JSON body' }, 400)
+    }
+
+    const objectId = (typeof body.id === 'string' && body.id.trim()) ? body.id.trim() : crypto.randomUUID()
+    const contentHash = (typeof body.content_hash === 'string' && body.content_hash.trim().toLowerCase()) || null
+    const magnetUri = (typeof body.magnet_uri === 'string' && body.magnet_uri.trim()) || null
+    const sizeBytes = Number(body.size_bytes) || 0
+    const mimeType = (typeof body.mime_type === 'string' && body.mime_type.trim()) || 'application/octet-stream'
+    const caption = (typeof body.caption === 'string' && body.caption.trim()) || null
+    const postCaption = (typeof body.post_caption === 'string' && body.post_caption.trim()) || null
+    const location = (typeof body.location === 'string' && body.location.trim()) || null
+    const postTags = (typeof body.tags === 'string' && body.tags.trim()) || null
+    const isPublic = (body.is_public === 1 || body.is_public === true) ? 1 : 0
+    const isStory = (body.is_story === 1 || body.is_story === true) ? 1 : 0
+    const isAvatar = (body.is_avatar === 1 || body.is_avatar === true) ? 1 : 0
+    const isChat = (body.is_chat === 1 || body.is_chat === true) ? 1 : 0
+    const postGroup = (typeof body.post_group === 'string' && body.post_group.trim()) || null
+
+    if (postTags) {
+      const { hasBlacklisted, blockedTags } = checkBlacklistedTags(postTags.split(','))
+      if (hasBlacklisted) {
+        return c.json({ error: `The following tags are prohibited: ${blockedTags.join(', ')}` }, 400)
+      }
+    }
+
+    const expiresAt = isStory ? new Date(Date.now() + 24 * 3600 * 1000).toISOString() : null
+    const contentUrl = magnetUri || (contentHash ? `urn:sha256:${contentHash}` : `/api/objects/${objectId}`)
+
+    await c.env.DB.prepare(
+      'INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, caption, is_public, post_caption, location, post_tags, is_story, expires_at, content_hash, post_group, is_chat, is_avatar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).bind(
+      objectId, orbitId, sizeBytes, mimeType, contentUrl, caption, isPublic, postCaption, location, postTags, isStory, expiresAt, contentHash, postGroup, isChat, isAvatar
+    ).run()
+
+    if (isPublic === 1) {
+      await c.env.DB.prepare('UPDATE Users SET posts_count = COALESCE(posts_count, 0) + 1 WHERE id = ?').bind(orbitId).run().catch(() => {})
+    }
+
+    return c.json({
+      id: objectId,
+      content_hash: contentHash,
+      magnet_uri: magnetUri,
+      content_url: contentUrl,
+      size_bytes: sizeBytes,
+      mime_type: mimeType,
+      is_public: isPublic,
+      is_avatar: isAvatar,
+    }, 200)
+  } catch (err) {
+    console.error('Failed to register object metadata:', err)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
 objects.post('/', orbitAuth, async (c) => {
   try {
     const orbitId = c.get('orbitId')
@@ -194,6 +253,10 @@ objects.post('/', orbitAuth, async (c) => {
 
       if (bytes.length > 50 * 1024 * 1024) {
         return c.json({ error: 'File exceeds 50MB limit' }, 400)
+      }
+
+      if (bytes.length > 128 * 1024) {
+        return c.json({ error: 'Central server does not store media files. Register content metadata and seed via P2P.' }, 422)
       }
 
       if (!isValidMediaMagicBytes(bytes)) {
