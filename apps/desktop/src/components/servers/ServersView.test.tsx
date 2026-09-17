@@ -537,4 +537,48 @@ describe('ServersView', () => {
     expect(screen.getByText(/server browser \(2\)/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /browse \(2\)/i })).toBeInTheDocument()
   })
+
+  it('expandable browser row shows tags and server info', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 's1', name: 'Chill Zone', description: 'a cool place to hang', owner_id: 'o1', password_required: 1, tags: ['chill', 'movies'], endpoint_hint: '', online_count: 3, user_count: 10, last_seen: new Date().toISOString() },
+        { id: 's2', name: 'No Tags', description: '', owner_id: 'o2', password_required: 0, endpoint_hint: '' },
+      ] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await screen.findByText('Chill Zone')
+    expect(screen.queryByTestId('server-details-s1')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /show details for chill zone/i }))
+    await waitFor(() => expect(screen.getByTestId('server-details-s1')).toBeInTheDocument())
+
+    const details = screen.getByTestId('server-details-s1')
+    expect(details.textContent).toMatch(/a cool place to hang/)
+    expect(details.textContent).toMatch(/password protected/)
+    expect(details.textContent).toMatch(/online: 3/)
+    expect(details.textContent).toMatch(/members: 10/)
+    expect(within(details).getByRole('button', { name: '#chill' })).toBeInTheDocument()
+
+    // Clicking a tag sets it as the search filter
+    fireEvent.click(within(details).getByRole('button', { name: '#chill' }))
+    expect(screen.getByLabelText('Search servers')).toHaveValue('chill')
+  })
+
+  it('search query matches server tags', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 's1', name: 'Chill Zone', description: '', owner_id: 'o1', password_required: 0, tags: ['chill', 'movies'], endpoint_hint: '' },
+        { id: 's2', name: 'Other Realm', description: '', owner_id: 'o2', password_required: 0, tags: ['gaming'], endpoint_hint: '' },
+      ] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await screen.findByText('Chill Zone')
+    fireEvent.change(screen.getByLabelText('Search servers'), { target: { value: 'chill' } })
+    expect(await screen.findByText('Chill Zone')).toBeInTheDocument()
+    expect(screen.queryByText('Other Realm')).toBeNull()
+  })
 })
