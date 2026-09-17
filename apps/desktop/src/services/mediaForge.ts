@@ -1,5 +1,6 @@
 import { OrbitIdentity } from '@orbit/crypto'
 import { orbitFetch } from '../utils/api'
+import { buildMagnetUri } from '../utils/magnet'
 
 export interface ForgedMedia {
   id: string
@@ -31,7 +32,7 @@ export async function forgeMediaLocally(
 ): Promise<ForgedMedia> {
   const contentHash = await hashFileSha256(file)
   const objectId = crypto.randomUUID()
-  const magnetUri = `magnet:?xt=urn:btih:${contentHash.slice(0, 40)}`
+  const magnetUri = buildMagnetUri(contentHash.slice(0, 40), options.caption || file.name)
 
   // 1. Keep local reference (local blob URL or electron vault pin)
   let localUrl = ''

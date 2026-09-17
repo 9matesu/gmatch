@@ -54,7 +54,8 @@ mkdirSync(join(STAGE, 'packages'), { recursive: true })
 // Stage-root marker package.json: stops npm's walk-up to the real workspace
 // root (which would make it reconcile this subdir against the monorepo's
 // lockfile and crash arborist on rewritten file: deps).
-writeFileSync(join(STAGE, 'package.json'), JSON.stringify({ name: 'gmatch-api-stage', private: true }, null, 2) + '\n')
+// Declares the staged workspaces so `bun install` links file: deps correctly.
+writeFileSync(join(STAGE, 'package.json'), JSON.stringify({ name: 'gmatch-api-stage', private: true, workspaces: ['apps/api', 'packages/*'] }, null, 2) + '\n')
 
 cpSync(join(ROOT, 'packages', 'crypto'), join(STAGE, 'packages', 'crypto'), { recursive: true, filter: (s) => !s.includes('node_modules') })
 cpSync(join(ROOT, 'packages', 'shared'), join(STAGE, 'packages', 'shared'), { recursive: true, filter: (s) => !s.includes('node_modules') })
@@ -102,22 +103,32 @@ for (const junk of ['orbit.snapshot.sqlite', 'orbit.snapshot.sqlite.tmp', 'blobs
 }
 
 console.log('[stage-api] installing production deps (this can take a minute)...')
-// npm <=10 (CI windows runners) walks up from the cwd, finds the monorepo
-// ROOT package-lock.json and crashes reconciling the rewritten file: deps
-// against it ("Cannot read properties of null (reading 'edgesOut')").
-// --no-package-lock only stops writing. Hide the root lock for the install.
+// Prefer the staged bun: npm's arborist crashes on the rewritten file: links
+// ("Cannot read properties of null (reading 'edgesOut')" on npm 10+), while
+// `bun install --production` from the stage root links the staged workspaces
+// in seconds. Fall back to npm only when no bun binary is present.
 const { renameSync } = require('node:fs')
 const rootLock = join(ROOT, 'package-lock.json')
 const lockBak = rootLock + '.stage-bak'
 let lockHidden = false
+const bunBin = join(STAGE, 'bun.exe')
 try {
   if (existsSync(rootLock)) { renameSync(rootLock, lockBak); lockHidden = true }
-  execFileSync('npm', ['install', '--omit=dev', '--no-audit', '--no-fund', '--ignore-scripts=false', '--no-package-lock'], {
-    cwd: join(STAGE, 'apps', 'api'),
-    stdio: 'inherit',
-    shell: true, // npm is a .cmd shim on Windows
-    env: { ...process.env, NODE_ENV: 'development' },
-  })
+  let installed = false
+  if (existsSync(bunBin)) {
+    try {
+      execFileSync(bunBin, ['install', '--production'], { cwd: STAGE, stdio: 'inherit' })
+      installed = true
+    } catch { /* fall through to npm below */ }
+  }
+  if (!installed) {
+    execFileSync('npm', ['install', '--omit=dev', '--no-audit', '--no-fund', '--ignore-scripts=false', '--no-package-lock'], {
+      cwd: join(STAGE, 'apps', 'api'),
+      stdio: 'inherit',
+      shell: true, // npm is a .cmd shim on Windows
+      env: { ...process.env, NODE_ENV: 'development' },
+    })
+  }
 } finally {
   if (lockHidden) { try { renameSync(lockBak, rootLock) } catch { /* restore manually */ } }
 }
