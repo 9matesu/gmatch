@@ -48,141 +48,44 @@ function findBunExe() {
 }
 
 rmSync(STAGE, { recursive: true, force: true })
-mkdirSync(join(STAGE, 'apps'), { recursive: true })
-mkdirSync(join(STAGE, 'packages'), { recursive: true })
+mkdirSync(join(STAGE, 'apps', 'api'), { recursive: true })
+mkdirSync(join(STAGE, 'shared'), { recursive: true })
 
-// Stage-root marker package.json: stops npm's walk-up to the real workspace
-// root (which would make it reconcile this subdir against the monorepo's
-// lockfile and crash arborist on rewritten file: deps).
-// Declares the staged workspaces so `bun install` links file: deps correctly.
-writeFileSync(join(STAGE, 'package.json'), JSON.stringify({ name: 'gmatch-api-stage', private: true, workspaces: ['apps/api', 'packages/*'] }, null, 2) + '\n')
+const bunExe = findBunExe()
+cpSync(bunExe, join(STAGE, 'bun.exe'))
 
-cpSync(join(ROOT, 'packages', 'crypto'), join(STAGE, 'packages', 'crypto'), { recursive: true, filter: (s) => !s.includes('node_modules') })
-cpSync(join(ROOT, 'packages', 'shared'), join(STAGE, 'packages', 'shared'), { recursive: true, filter: (s) => !s.includes('node_modules') })
-cpSync(join(ROOT, 'packages', 'protocol'), join(STAGE, 'packages', 'protocol'), { recursive: true, filter: (s) => !s.includes('node_modules') })
-// packages/shared/src/index.ts imports ../../../shared/blocklist.json (single
-// source of truth, 84f4d68) — the stage is only complete with the root file.
-cpSync(join(ROOT, 'shared'), join(STAGE, 'shared'), { recursive: true, filter: (s) => !s.includes('node_modules') })
-cpSync(join(ROOT, 'apps', 'api'), join(STAGE, 'apps', 'api'), {
-  recursive: true,
-  filter: (s) => !s.includes('node_modules') && !s.includes('test-blobs-') && !s.includes('coverage') && !s.endsWith('.sqlite') && !s.endsWith('.sqlite.tmp'),
-})
-
-// Deps -> file: links (bun resolves these without a workspace root).
-// NOTE: npm's arborist silently DROPS the transitive deps of a file:-linked
-// package that lives outside the project root (@orbit/crypto's
-// @noble/ciphers/@noble/curves were never installed in the stage, so the
-// bundled server crashed on boot with "Cannot find module
-// '@noble/curves/ed25519'" and every upload/PM failed). Pin them as direct
-// deps of the staged API so the install is deterministic either way.
-const apiPkgPath = join(STAGE, 'apps', 'api', 'package.json')
-const apiPkg = JSON.parse(readFileSync(apiPkgPath, 'utf8'))
-for (const name of Object.keys(apiPkg.dependencies || {})) {
-  if (name.startsWith('@orbit/')) {
-    apiPkg.dependencies[name] = `file:../../packages/${name.split('/')[1]}`
-  }
+// Copy schema, migrations, and shared blocklist
+cpSync(join(ROOT, 'apps', 'api', 'schema.sql'), join(STAGE, 'apps', 'api', 'schema.sql'))
+if (existsSync(join(ROOT, 'apps', 'api', 'migrations'))) {
+  cpSync(join(ROOT, 'apps', 'api', 'migrations'), join(STAGE, 'apps', 'api', 'migrations'), { recursive: true })
 }
-apiPkg.dependencies = {
-  ...apiPkg.dependencies,
-  '@noble/ciphers': '^2.2.0',
-  '@noble/curves': '^1.3.0',
-  '@noble/hashes': '^1.3.3',
-}
-writeFileSync(apiPkgPath, JSON.stringify(apiPkg, null, 2) + '\n')
-// The monorepo lockfile does not know about these rewritten file: links —
-// keeping it in the stage is what crashes npm 10 (arborist edgesOut).
-rmSync(join(STAGE, 'apps', 'api', 'package-lock.json'), { force: true })
+cpSync(join(ROOT, 'shared', 'blocklist.json'), join(STAGE, 'shared', 'blocklist.json'))
 
-cpSync(findBunExe(), join(STAGE, 'bun.exe'))
+// Minimal package.json so Bun treats apps/api as an ES module project
+writeFileSync(
+  join(STAGE, 'apps', 'api', 'package.json'),
+  JSON.stringify({ name: '@orbit/api', type: 'module' }, null, 2) + '\n'
+)
 
-// Purge any runtime data (from a previous staged-server test run) — a release
-// bundle must boot with an EMPTY world. The copy filter above already skips
-// *.sqlite in the source; this covers files created inside STAGE itself.
-for (const junk of ['orbit.snapshot.sqlite', 'orbit.snapshot.sqlite.tmp', 'blobs']) {
-  rmSync(join(STAGE, 'apps', 'api', junk), { recursive: true, force: true })
-}
-
-console.log('[stage-api] installing production deps (this can take a minute)...')
-// Prefer the staged bun: npm's arborist crashes on the rewritten file: links
-// ("Cannot read properties of null (reading 'edgesOut')" on npm 10+), while
-// `bun install --production` from the stage root links the staged workspaces
-// in seconds. Fall back to npm only when no bun binary is present.
-const { renameSync } = require('node:fs')
-const rootLock = join(ROOT, 'package-lock.json')
-const lockBak = rootLock + '.stage-bak'
-let lockHidden = false
-const bunBin = join(STAGE, 'bun.exe')
+console.log('[stage-api] bundling standalone API server (zero node_modules)...')
+// Bundle the entire API server and all @orbit / @noble dependencies into one
+// self-contained serve.js file. This eliminates node_modules, circular symlinks,
+// and NSIS 7zip path errors completely.
+const serveJs = join(STAGE, 'apps', 'api', 'serve.js')
 try {
-  if (existsSync(rootLock)) { renameSync(rootLock, lockBak); lockHidden = true }
-  let installed = false
-  if (existsSync(bunBin)) {
-    try {
-      execFileSync(bunBin, ['install', '--production', '--backend=copyfile', '--linker=hoisted'], { cwd: STAGE, stdio: 'inherit' })
-      installed = true
-    } catch { /* fall through to npm below */ }
-  }
-  if (!installed) {
-    execFileSync('npm', ['install', '--omit=dev', '--no-audit', '--no-fund', '--ignore-scripts=false', '--no-package-lock'], {
-      cwd: join(STAGE, 'apps', 'api'),
-      stdio: 'inherit',
-      shell: true, // npm is a .cmd shim on Windows
-      env: { ...process.env, NODE_ENV: 'development' },
-    })
-  }
-} finally {
-  if (lockHidden) { try { renameSync(lockBak, rootLock) } catch { /* restore manually */ } }
-}
-
-// Ensure the bundle has zero junctions or symlinks: on Windows runners,
-// NSIS 7zip fails with "The system cannot find the path specified" when
-// walking junction loops. Replace any @orbit workspace links with physical copies.
-for (const pkg of ['crypto', 'shared', 'protocol', 'api']) {
-  const target = join(STAGE, 'node_modules', '@orbit', pkg)
-  if (existsSync(target)) {
-    try {
-      rmSync(target, { recursive: true, force: true })
-      cpSync(pkg === 'api' ? join(STAGE, 'apps', 'api') : join(STAGE, 'packages', pkg), target, {
-        recursive: true,
-        filter: (s) => !s.includes('node_modules'),
-      })
-    } catch { /* best effort */ }
-  }
-}
-
-// packages/shared/src/index.ts imports ../../../shared/blocklist.json, which
-// only resolves when @orbit/shared stays a symlink (dev, smoke). npm's file:
-// install PHYSICALLY COPIES it into node_modules, so inside the packaged
-// bundle ../../../shared lands on node_modules/shared. Mirror it there.
-if (existsSync(join(STAGE, 'apps', 'api', 'node_modules', '@orbit', 'shared'))) {
-  cpSync(join(STAGE, 'shared'), join(STAGE, 'apps', 'api', 'node_modules', 'shared'), { recursive: true })
-}
-if (existsSync(join(STAGE, 'node_modules', '@orbit', 'shared'))) {
-  cpSync(join(STAGE, 'shared'), join(STAGE, 'node_modules', 'shared'), { recursive: true })
-}
-
-// Remove any nested node_modules inside packages/* and apps/api/node_modules
-// that might contain lingering links.
-for (const pkg of ['crypto', 'shared', 'protocol']) {
-  rmSync(join(STAGE, 'packages', pkg, 'node_modules'), { recursive: true, force: true })
-}
-
-// Smoke check: the staged server's module graph must fully resolve. bun build
-// imports nothing at runtime — it only walks the dependency graph — so the
-// noble-drop regression ("Cannot find module '@noble/curves/ed25519'", which
-// only surfaced at first upload/PM) fails the BUILD instead.
-console.log('[stage-api] verifying staged server modules resolve...')
-const smokeOut = join(STAGE, 'apps', 'api', '.stage-smoke.js')
-try {
-  execFileSync(join(STAGE, 'bun.exe'), ['build', 'src/serve.ts', '--target=bun', '--outfile', '.stage-smoke.js'], {
-    cwd: join(STAGE, 'apps', 'api'),
+  execFileSync(bunExe, ['build', join(ROOT, 'apps', 'api', 'src', 'serve.ts'), '--target=bun', '--outfile', serveJs], {
+    cwd: ROOT,
     stdio: 'inherit',
     timeout: 120_000,
   })
-} catch {
-  console.error('[stage-api] staged server has unresolved modules — refusing to package a dead bundle')
+} catch (err) {
+  console.error('[stage-api] failed to bundle API server:', err)
   process.exit(1)
-} finally {
-  rmSync(smokeOut, { force: true })
+}
+
+if (!existsSync(serveJs)) {
+  console.error('[stage-api] bundled serve.js missing')
+  process.exit(1)
 }
 
 console.log('[stage-api] done →', STAGE)

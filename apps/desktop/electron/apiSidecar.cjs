@@ -90,7 +90,8 @@ async function startApi() {
     const { app: electronApp } = require('electron')
     console.log(`[api] spawning ${bunPath} in ${apiDir} (packaged=${electronApp.isPackaged})`)
   } catch { /* logging only */ }
-  proc = spawn(bunPath, ['run', 'src/serve.ts'], {
+  const entry = fs.existsSync(path.join(apiDir, 'serve.js')) ? 'serve.js' : 'src/serve.ts'
+  proc = spawn(bunPath, ['run', entry], {
     cwd: apiDir,
     env: {
       ...process.env,
