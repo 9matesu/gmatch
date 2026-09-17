@@ -117,7 +117,7 @@ try {
   let installed = false
   if (existsSync(bunBin)) {
     try {
-      execFileSync(bunBin, ['install', '--production'], { cwd: STAGE, stdio: 'inherit' })
+      execFileSync(bunBin, ['install', '--production', '--backend=copyfile', '--linker=hoisted'], { cwd: STAGE, stdio: 'inherit' })
       installed = true
     } catch { /* fall through to npm below */ }
   }
@@ -133,6 +133,22 @@ try {
   if (lockHidden) { try { renameSync(lockBak, rootLock) } catch { /* restore manually */ } }
 }
 
+// Ensure the bundle has zero junctions or symlinks: on Windows runners,
+// NSIS 7zip fails with "The system cannot find the path specified" when
+// walking junction loops. Replace any @orbit workspace links with physical copies.
+for (const pkg of ['crypto', 'shared', 'protocol', 'api']) {
+  const target = join(STAGE, 'node_modules', '@orbit', pkg)
+  if (existsSync(target)) {
+    try {
+      rmSync(target, { recursive: true, force: true })
+      cpSync(pkg === 'api' ? join(STAGE, 'apps', 'api') : join(STAGE, 'packages', pkg), target, {
+        recursive: true,
+        filter: (s) => !s.includes('node_modules'),
+      })
+    } catch { /* best effort */ }
+  }
+}
+
 // packages/shared/src/index.ts imports ../../../shared/blocklist.json, which
 // only resolves when @orbit/shared stays a symlink (dev, smoke). npm's file:
 // install PHYSICALLY COPIES it into node_modules, so inside the packaged
@@ -140,11 +156,12 @@ try {
 if (existsSync(join(STAGE, 'apps', 'api', 'node_modules', '@orbit', 'shared'))) {
   cpSync(join(STAGE, 'shared'), join(STAGE, 'apps', 'api', 'node_modules', 'shared'), { recursive: true })
 }
+if (existsSync(join(STAGE, 'node_modules', '@orbit', 'shared'))) {
+  cpSync(join(STAGE, 'shared'), join(STAGE, 'node_modules', 'shared'), { recursive: true })
+}
 
-// Remove any nested node_modules inside packages/* (created by bun's
-// workspace linking) — they contain circular symlinks/junctions between
-// @orbit/* packages that cause NSIS 7zip on Windows runners to crash with
-// "The system cannot find the path specified."
+// Remove any nested node_modules inside packages/* and apps/api/node_modules
+// that might contain lingering links.
 for (const pkg of ['crypto', 'shared', 'protocol']) {
   rmSync(join(STAGE, 'packages', pkg, 'node_modules'), { recursive: true, force: true })
 }
