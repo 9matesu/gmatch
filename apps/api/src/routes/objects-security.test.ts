@@ -60,6 +60,17 @@ describe('Objects API — Security & Access Control (GAPs A/B)', () => {
     expect(res.status).toBe(200);
   });
 
+  it('allows unauthenticated requests to GET /api/objects/:id when is_avatar = 1', async () => {
+    const avatarId = 'avatar-test-uuid-' + Date.now();
+    await env.DB.prepare(`
+      INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, is_avatar, is_public, is_story)
+      VALUES (?, ?, 100, 'image/jpeg', 'data:image/jpeg;base64,dGVzdA==', 1, 0, 0)
+    `).bind(avatarId, owner.orbitId).run();
+
+    const res = await app.request(`/api/objects/${avatarId}`, { method: 'GET' });
+    expect(res.status).toBe(200);
+  });
+
   it('allows reading active Cards without auth headers', async () => {
     const cardObjectId = 'card-obj-' + Date.now();
     await env.DB.prepare(`

@@ -478,10 +478,10 @@ objects.get('/:id', async (c, next) => {
     return c.json({ error: 'P2P object is stored client-side in browser IndexedDB' }, 404)
   }
 
-  let row: { id: string; owner_id: string; size_bytes: number; mime_type: string; content_url: string | null; created_at: string; is_story: number; is_public: number; hidden_at: string | null } | null = null
+  let row: { id: string; owner_id: string; size_bytes: number; mime_type: string; content_url: string | null; created_at: string; is_story: number; is_public: number; is_avatar: number; hidden_at: string | null } | null = null
   try {
     row = await c.env.DB.prepare(
-      'SELECT o.id, o.owner_id, o.size_bytes, o.mime_type, o.content_url, o.created_at, o.is_story, o.is_public, o.hidden_at FROM Objects o WHERE o.id = ?'
+      'SELECT o.id, o.owner_id, o.size_bytes, o.mime_type, o.content_url, o.created_at, o.is_story, o.is_public, o.is_avatar, o.hidden_at FROM Objects o WHERE o.id = ?'
     ).bind(id).first()
   } catch (err) {
     console.error(`Failed to load object ${id}:`, err)
@@ -493,11 +493,12 @@ objects.get('/:id', async (c, next) => {
   // Reported content is hidden for everyone until an admin resolves the report.
   if (row.hidden_at) return c.json({ error: 'Object not found' }, 404)
 
-  // Authorization: only the owner, explicit recipients, valid signed tokens,
+  // Authorization: only *** owner, explicit recipients, valid signed tokens,
   // admins, or duel match spectators (for revealed match cards) may read an object.
-  // Public posts (is_public=1), stories (is_story=1), and active Cards are intentionally
-  // readable by any viewer — stories are surfaced in the tray and public posts in the feed.
-  if (!isSignedToken && (!orbitId || row.owner_id !== orbitId) && row.is_public !== 1 && row.is_story !== 1
+  // Public posts (is_public=1), stories (is_story=1), active Cards, and avatars (is_avatar=1)
+  // are intentionally readable by any viewer — stories are surfaced in the tray,
+  // public posts in the feed, and avatars across arena, chat, and profiles.
+  if (!isSignedToken && (!orbitId || row.owner_id !== orbitId) && row.is_public !== 1 && row.is_story !== 1 && row.is_avatar !== 1
       // Watch Party media: private object, readable by anyone holding the party
       // URL (it only travels inside the authenticated party WS room).
       && !isPartyMediaObject(`/api/objects/${id}`)) {
@@ -517,9 +518,9 @@ objects.get('/:id', async (c, next) => {
     if (!isMatchOrCard) {
       // Avatars are public: an object referenced by some user's pfp_url is
       // renderable by anyone (the same exposure a data: avatar always had).
-      const isAvatar = await c.env.DB.prepare(
-        "SELECT 1 FROM Users WHERE pfp_url = ? AND hidden_at IS NULL LIMIT 1",
-      ).bind(`/api/objects/${id}`).first().catch(() => null)
+      const isAvatar = row.is_avatar === 1 || await c.env.DB.prepare(
+        "SELECT 1 FROM Users WHERE (pfp_url = ? OR pfp_url LIKE '%/api/objects/' || ?) AND hidden_at IS NULL LIMIT 1",
+      ).bind(`/api/objects/${id}`, id).first().catch(() => null)
       if (!isAvatar) {
         if (!orbitId) {
           return c.json({ error: 'Object not found' }, 404)
