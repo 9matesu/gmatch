@@ -183,10 +183,10 @@ servers.post('/', orbitAuth, async (c) => {
       owner_name = COALESCE(excluded.owner_name, ServerDirectory.owner_name),
       user_count = COALESCE(excluded.user_count, ServerDirectory.user_count),
       online_count = COALESCE(excluded.online_count, ServerDirectory.online_count),
-      tags = excluded.tags,
+      tags = CASE WHEN ? = 1 THEN excluded.tags ELSE ServerDirectory.tags END,
       is_private = COALESCE(?, ServerDirectory.is_private),
       last_seen = datetime('now')
-  `).bind(id, name, description, orbitId, ownerPub, ownerName || null, endpointHint, passwordRequired, userCount, onlineCount, tagsJson, priv, priv).run()
+  `).bind(id, name, description, orbitId, ownerPub, ownerName || null, endpointHint, passwordRequired, userCount, onlineCount, tagsJson, priv, tagsProvided ? 1 : 0, priv).run()
 
   const raw = await c.env.DB.prepare('SELECT id, name, description, owner_id, owner_name, password_required, is_private, tags, created_at FROM ServerDirectory WHERE id = ?').bind(id).first<Record<string, unknown>>()
   const row = raw ? { ...raw, tags: readStoredTags(raw.tags) } : raw
@@ -201,10 +201,12 @@ servers.get('/node', orbitAuth, async (c) => {
   const name = (await getMeta(c.env.DB, NODE_NAME_KEY)) || 'gmatch'
   const description = (await getMeta(c.env.DB, NODE_DESC_KEY)) || ''
   const directoryId = await getMeta(c.env.DB, NODE_DIRECTORY_KEY)
+  const tagsRaw = await getMeta(c.env.DB, NODE_TAGS_KEY)
   return c.json({
     name,
     description,
     directoryId,
+    tags: readStoredTags(tagsRaw),
     isAdmin: await isNodeAdmin(c.env.DB, orbitId),
   })
 })
@@ -222,6 +224,12 @@ servers.patch('/node', orbitAuth, async (c) => {
   if (typeof body.description === 'string') {
     await setMeta(c.env.DB, NODE_DESC_KEY, body.description.trim().slice(0, MAX_DESC))
   }
+  try {
+    const parsed = parseServerTagsApi(body.tags)
+    if (parsed !== null) await setMeta(c.env.DB, NODE_TAGS_KEY, JSON.stringify(parsed))
+  } catch {
+    return c.json({ error: 'tags must be an array of slugs' }, 400)
+  }
   // Directory row this node is listed as (set by the create-server flow so
   // /node can report the linkage without leaning on the owner's localStorage).
   if (typeof body.directory_id === 'string') {
@@ -232,7 +240,8 @@ servers.patch('/node', orbitAuth, async (c) => {
   const name = (await getMeta(c.env.DB, NODE_NAME_KEY)) || 'gmatch'
   const description = (await getMeta(c.env.DB, NODE_DESC_KEY)) || ''
   const directoryId = await getMeta(c.env.DB, NODE_DIRECTORY_KEY)
-  return c.json({ server: { name, description, directoryId, isAdmin: true } })
+  const tagsRaw = await getMeta(c.env.DB, NODE_TAGS_KEY)
+  return c.json({ server: { name, description, directoryId, tags: readStoredTags(tagsRaw), isAdmin: true } })
 })
 
 servers.post('/:id/ping', orbitAuth, async (c) => {
@@ -255,6 +264,16 @@ servers.patch('/:id', orbitAuth, async (c) => {
   let body: Record<string, unknown> = {}
   try { body = (await c.req.json()) as Record<string, unknown> } catch { return c.json({ error: 'invalid json' }, 400) }
 
+  let tagsJson: string | null = null
+  if (body.tags !== undefined) {
+    try {
+      const parsed = parseServerTagsApi(body.tags)
+      if (parsed !== null) tagsJson = JSON.stringify(parsed)
+    } catch {
+      return c.json({ error: 'tags must be an array of slugs' }, 400)
+    }
+  }
+
   const current = await c.env.DB.prepare(
     'SELECT name, description, endpoint_hint, password_required, is_private FROM ServerDirectory WHERE id = ?',
   ).bind(id).first<{ name: string; description: string; endpoint_hint: string; password_required: number; is_private: number }>()
@@ -270,13 +289,16 @@ servers.patch('/:id', orbitAuth, async (c) => {
 
   await c.env.DB.prepare(`
     UPDATE ServerDirectory
-    SET name = ?, description = ?, endpoint_hint = ?, password_required = ?, is_private = ?, updated_at = datetime('now'), last_seen = datetime('now')
+    SET name = ?, description = ?, endpoint_hint = ?, password_required = ?, is_private = ?,
+        tags = COALESCE(?, tags),
+        updated_at = datetime('now'), last_seen = datetime('now')
     WHERE id = ? AND owner_id = ?
-  `).bind(name, description, endpointHint, passwordRequired, isPrivate, id, orbitId).run()
+  `).bind(name, description, endpointHint, passwordRequired, isPrivate, tagsJson, id, orbitId).run()
 
-  const updated = await c.env.DB.prepare(
-    'SELECT id, name, description, owner_id, password_required, is_private, endpoint_hint, created_at, last_seen, updated_at FROM ServerDirectory WHERE id = ?',
-  ).bind(id).first()
+  const updatedRaw = await c.env.DB.prepare(
+    'SELECT id, name, description, owner_id, password_required, is_private, endpoint_hint, tags, created_at, last_seen, updated_at FROM ServerDirectory WHERE id = ?',
+  ).bind(id).first<Record<string, unknown>>()
+  const updated = updatedRaw ? { ...updatedRaw, tags: readStoredTags(updatedRaw.tags) } : updatedRaw
   return c.json({ server: updated })
 })
 

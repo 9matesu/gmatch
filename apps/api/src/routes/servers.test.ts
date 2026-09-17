@@ -322,4 +322,48 @@ describe('Server node API', () => {
     }, env)
     expect(res.status).toBe(400)
   })
+
+  it('server tags: register + PATCH /:id + PATCH /node roundtrip, clamp, sanitize', async () => {
+    // 1. Register with tags (slugified, clamped ≤10)
+    const tags = ['CHILL', 'movies', 'late-night', 'invalid tag with spaces', 'chill']
+    const created = await register(env, owner, { name: 'Tagged Realm', tags })
+    expect(created.status).toBe(201)
+    const row = (await created.json()) as { server: { id: string; tags: string[] } }
+    // uppercase lowercased, duplicate dropped, space dropped
+    expect(row.server.tags).toEqual(['chill', 'movies', 'late-night'])
+
+    // Directory GET lists tags
+    const list = (await (await app.request('/api/servers', {}, env)).json()) as { servers: Array<{ id: string; tags: string[] }> }
+    const entry = list.servers.find((s) => s.id === row.server.id)
+    expect(entry?.tags).toEqual(['chill', 'movies', 'late-night'])
+
+    // 2. Owner updates tags via PATCH /:id
+    const updated = await app.request(`/api/servers/${row.server.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...headers(owner, 'PATCH', `/api/servers/${row.server.id}`, JSON.stringify({ tags: ['gaming', 'voice'] })) },
+      body: JSON.stringify({ tags: ['gaming', 'voice'] }),
+    }, env)
+    expect(updated.status).toBe(200)
+    expect(((await updated.json()) as any).server.tags).toEqual(['gaming', 'voice'])
+
+    // Reject invalid tags type
+    const bad = await app.request(`/api/servers/${row.server.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...headers(owner, 'PATCH', `/api/servers/${row.server.id}`, JSON.stringify({ tags: 'not-an-array' })) },
+      body: JSON.stringify({ tags: 'not-an-array' }),
+    }, env)
+    expect(bad.status).toBe(400)
+
+    // 3. Node PATCH writes tags, GET /node serves them
+    const nodePatch = await app.request('/api/servers/node', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...headers(host, 'PATCH', '/api/servers/node', JSON.stringify({ tags: ['cozy', 'idle'] })) },
+      body: JSON.stringify({ tags: ['cozy', 'idle'] }),
+    }, env)
+    expect(nodePatch.status).toBe(200)
+    expect(((await nodePatch.json()) as any).server.tags).toEqual(['cozy', 'idle'])
+
+    const nodeGet = await app.request('/api/servers/node', { headers: headers(host, 'GET', '/api/servers/node') }, env)
+    expect(((await nodeGet.json()) as any).tags).toEqual(['cozy', 'idle'])
+  })
 })
