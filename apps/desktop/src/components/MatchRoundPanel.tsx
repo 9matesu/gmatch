@@ -15,7 +15,7 @@ import {
 import type { LobbyDecisionResult, LobbyDecisionFailure } from '../hooks/useLobby'
 import { CardZoomModal } from './CardZoomModal'
 import { computeCardRarity, formatGc, matchEconomy } from '@orbit/shared'
-import { isMediaVideo, resolveMediaUrl } from '../utils/media'
+import { isMediaVideo } from '../utils/media'
 import { MediaBadge } from './MediaBadge'
 import { CardBack } from './CardBack'
 import { ObjectImage } from './ObjectImage'
