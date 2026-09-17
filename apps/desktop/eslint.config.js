@@ -3,7 +3,7 @@ import tseslint from 'typescript-eslint'
 import globals from 'globals'
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'release/**', '../../api-stage/**', 'node_modules/**', 'public/**', 'tools/**'] },
+  { ignores: ['dist/**', 'release/**', 'release*/**', '../../api-stage/**', 'node_modules/**', 'public/**', 'tools/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

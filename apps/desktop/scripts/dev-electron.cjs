@@ -4,7 +4,6 @@
 // native dialogs, imageCache IPC - so "works in dev" == "works in the exe".
 // Usage: npm run dev:electron (Ctrl+C kills both).
 const { spawn } = require('child_process')
-const path = require('path')
 
 const PORT = 5274
 const url = `http://localhost:${PORT}`
