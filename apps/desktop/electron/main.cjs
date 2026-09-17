@@ -447,10 +447,11 @@ function parseBooruOrgHtml(html, query) {
       if (!ok) continue
     }
     const url = `https://img.booru.org/${bSub}//images/${dir}/${hash}.${ext}`
+    const preview = `https://thumbs.booru.org/${bSub}/thumbnails//${dir}/thumbnail_${hash}.${ext}`
     const id = `${bSub}-${hash.slice(0, 10)}`
     if (rating === 'explicit' || rating === 'e' || rating === 'questionable') {
       if (!hasBadTag(tags)) {
-        posts.push({ id, url, tags, rating: 'e', width: 1200, height: 1200 })
+        posts.push({ id, url, preview, tags, rating: 'e', width: 1200, height: 1200 })
       }
     }
   }

@@ -55,8 +55,14 @@ export async function vaultPin(url: string): Promise<string | null> {
   try {
     if (sessionPinned.has(url)) return vaultGet(url)
     const res = await window.gmatch?.vaultPin?.(url)
-    if (res?.local) sessionPinned.add(url)
-    else sessionFailed.add(url)
+    if (res?.local) {
+      sessionPinned.add(url)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('orbit-vault-updated', { detail: { url, local: res.local } }))
+      }
+    } else {
+      sessionFailed.add(url)
+    }
     return res?.local ?? null
   } catch {
     sessionFailed.add(url)
@@ -153,10 +159,20 @@ export function useVaultUrls(urls: Array<string | null | undefined>): Record<str
       })
     }
     resolve()
+    const onVaultUpdate = (e: Event) => {
+      const custom = e as CustomEvent<{ url?: string; local?: string }>
+      if (custom.detail?.url && custom.detail?.local && key.includes(custom.detail.url)) {
+        setMap((prev) => ({ ...prev, [custom.detail!.url!]: custom.detail!.local! }))
+      } else {
+        resolve()
+      }
+    }
     window.addEventListener('orbit-settings-updated', resolve)
+    window.addEventListener('orbit-vault-updated', onVaultUpdate)
     return () => {
       dead = true
       window.removeEventListener('orbit-settings-updated', resolve)
+      window.removeEventListener('orbit-vault-updated', onVaultUpdate)
     }
   }, [key])
   return map

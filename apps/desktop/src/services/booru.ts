@@ -526,9 +526,10 @@ function parseBooruOrgHtml(html: string): BooruPost[] {
       .trim()
     const tags = tagsPart.split(/\s+/).filter(Boolean)
     const url = `https://img.booru.org/${bSub}//images/${dir}/${hash}.${ext}`
+    const preview = `https://thumbs.booru.org/${bSub}/thumbnails//${dir}/thumbnail_${hash}.${ext}`
     const id = `${bSub}-${hash.slice(0, 10)}`
     if (rating === 'explicit' || rating === 'e' || rating === 'questionable') {
-      posts.push({ id, url, tags, rating: 'e' })
+      posts.push({ id, url, preview, tags, rating: 'e' })
     }
   }
   return posts

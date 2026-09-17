@@ -2,7 +2,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import IdleGalleryView from './IdleGalleryView'
+import IdleGalleryView, { resolveGalleryTileUrl } from './IdleGalleryView'
 import { useGame } from '../../game/store'
 import type { GalleryImage } from '../../game/types'
 
@@ -216,5 +216,37 @@ describe('IdleGalleryView', () => {
     // Close slideshow
     await userEvent.click(closeBtn)
     expect(screen.queryByLabelText(/Close slideshow/i)).not.toBeInTheDocument()
+  })
+
+  it('resolveGalleryTileUrl prefers vault SSD url, then preview, then inferred thumbnail', () => {
+    const baseImg: GalleryImage = {
+      id: 'test-1',
+      url: 'https://img.booru.org/blacked//images/105/abcdef123456.png',
+      tags: ['test'],
+      rarityBase: 1,
+      clicks: 0,
+      rarity: 'Common',
+    }
+
+    // 1. Vault URL takes precedence when stored locally
+    expect(resolveGalleryTileUrl(baseImg, 'vault://f/stored.png')).toBe('vault://f/stored.png')
+
+    // 2. Pre-computed preview thumbnail is preferred over full remote URL
+    const withPreview = { ...baseImg, preview: 'https://preview.com/thumb.jpg' }
+    expect(resolveGalleryTileUrl(withPreview)).toBe('https://preview.com/thumb.jpg')
+
+    // 3. booru.org full URLs infer the 18KB thumbnail to prevent multi-MB stalls
+    expect(resolveGalleryTileUrl(baseImg)).toBe(
+      'https://thumbs.booru.org/blacked/thumbnails//105/thumbnail_abcdef123456.png',
+    )
+
+    // 4. realbooru URLs infer the thumbnail
+    const rbImg: GalleryImage = {
+      ...baseImg,
+      url: 'https://realbooru.com/images/38/f9/38f9dd17899412d912bc38fbe6916d35.jpeg',
+    }
+    expect(resolveGalleryTileUrl(rbImg)).toBe(
+      'https://realbooru.com/thumbnails/38/f9/thumbnail_38f9dd17899412d912bc38fbe6916d35.jpg',
+    )
   })
 })

@@ -2595,7 +2595,11 @@ export default function Home() {
   useEffect(() => {
     if (!settings.localVault) return;
     const urls = new Set<string>();
-    for (const g of idleGallery) if (g.url) urls.add(g.url);
+    // Prioritize newest keepsakes first so recently collected images pin immediately
+    for (let i = idleGallery.length - 1; i >= 0; i--) {
+      const g = idleGallery[i];
+      if (g.url) urls.add(g.url);
+    }
     for (const c of myCards) if (c.content_url) urls.add(c.content_url);
     // Feed media too: the backfill used to cover only gallery keeps + cards,
     // so feed posts (and their videos) were never pinned and stayed missing
@@ -3598,15 +3602,11 @@ export default function Home() {
                         <ServersView
                           identity={identity as never}
                           toast={toast}
-                          showRooms={courierActive}
-                          onOpenRooms={() => handleSetMainView('rooms')}
                           onSelectUser={(u) => {
                             const full = users.find((existing) => existing.id === u.id || (existing as any).orbitId === u.id)
                             setSelectedProfileUser(full || u)
                           }}
                           profilePics={profilePics}
-                          rooms={courier.rooms.map((r) => ({ id: r.id, name: r.name, membersCount: r.members.length }))}
-                          onOpenRoom={(_roomId) => handleSetMainView('rooms')}
                         />
                       ) : (
                         <div className="p-6 text-xs text-retro-muted">Sign in to browse servers.</div>

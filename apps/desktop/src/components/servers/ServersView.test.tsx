@@ -94,7 +94,8 @@ describe('ServersView', () => {
     })
     render(<ServersView identity={identity} toast={() => {}} />)
     await waitFor(() => expect(screen.getByText('Alpha Node')).toBeInTheDocument())
-    expect(screen.getByText(/server browser \(2\)/i)).toBeInTheDocument()
+    // count includes the pinned Official row on top of the 2 directory rows
+    expect(screen.getByText(/server browser \(3\)/i)).toBeInTheDocument()
     expect(screen.getAllByRole('listitem').length).toBe(2)
   })
 
@@ -303,7 +304,8 @@ describe('ServersView', () => {
     render(<ServersView identity={identity} toast={() => {}} onSelectUser={onSelectUser} />)
 
     // Browse view keeps no presence chrome: no Manage Hub, no Online pills.
-    expect(await screen.findByText('Server browser (0)')).toBeInTheDocument()
+    // Count is 1: no directory rows, but the pinned Official row shows.
+    expect(await screen.findByText('Server browser (1)')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /manage hub/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /online \(/i })).toBeNull()
 
@@ -331,7 +333,7 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('Server browser (0)')
+    await screen.findByText('Server browser (1)')
     // The button no longer pre-gates on node.isAdmin: the user's .exe is the
     // central admin. CentralAdminPanel itself refuses until the PIN unlocks.
     expect(screen.getByRole('button', { name: /central admin/i })).toBeInTheDocument()
@@ -347,7 +349,8 @@ describe('ServersView', () => {
     })
     render(<ServersView identity={null as never} toast={() => {}} />)
     await screen.findByText('Alpha Node')
-    expect(screen.getByText(/server browser \(1\)/i)).toBeInTheDocument()
+    // anonymous browser still pins the Official row: 1 directory + 1 official
+    expect(screen.getByText(/server browser \(2\)/i)).toBeInTheDocument()
     expect(calls.some((c) => c.url.includes('/api/servers/dashboard'))).toBe(false)
     expect(calls.some((c) => c.url.includes('/api/servers/node'))).toBe(false)
   })
@@ -434,8 +437,41 @@ describe('ServersView', () => {
     expect(within(screen.getByRole('listitem')).getAllByRole('button').length).toBeGreaterThanOrEqual(2)
     fireEvent.click(screen.getByRole('button', { name: /more actions for my realm/i }))
     expect(await screen.findByText('Make private')).toBeInTheDocument()
-    expect(screen.getByText('rename')).toBeInTheDocument()
     expect(screen.getByText('unregister')).toBeInTheDocument()
+    // node-level settings live in the Hub editor of the connected server,
+    // so a non-connected row offers no rename item.
+    expect(screen.queryByText('Server settings')).not.toBeInTheDocument()
+  })
+
+  it('hub settings editor saves name and description to node + directory', async () => {
+    const did = 'd'.repeat(64)
+    mockFetch(async (url, init) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'My Realm', users: [], posts_24h: 0, members_total: 1 })
+      if (url.includes('/api/servers/node')) {
+        if (init?.method === 'PATCH') {
+          const b = JSON.parse(String(init?.body))
+          return json({ server: { name: b.name, description: b.description, directoryId: did, isAdmin: true } })
+        }
+        return json({ name: 'My Realm', description: 'old', isAdmin: true })
+      }
+      if (init?.method === 'PATCH' && url.includes(`/api/servers/${did}`)) return json({ server: {} })
+      return json({ servers: [] })
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: /^hub:/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /settings/i }))
+    expect(screen.getByLabelText('Current server tags')).toBeInTheDocument()
+    expect(screen.getByLabelText('New server join password')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Current server name'), { target: { value: 'Renamed Realm' } })
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+    await waitFor(() => {
+      const nodePatch = calls.find((c) => c.url.includes('/api/servers/node') && c.init?.method === 'PATCH')
+      expect(nodePatch).toBeTruthy()
+      expect(JSON.parse(String(nodePatch?.init?.body))).toMatchObject({ name: 'Renamed Realm' })
+      const dirPatch = calls.find((c) => c.url.includes(`/api/servers/${did}`) && c.init?.method === 'PATCH')
+      expect(dirPatch).toBeTruthy()
+      expect(JSON.parse(String(dirPatch?.init?.body))).toMatchObject({ name: 'Renamed Realm' })
+    })
   })
 
   it('shows the admin passcode once on first host login and never again after dismiss', async () => {
@@ -458,7 +494,7 @@ describe('ServersView', () => {
     expect(screen.queryByTestId('admin-pin-banner')).toBeNull()
     unmount()
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('Server browser (0)')
+    await screen.findByText('Server browser (1)')
     expect(screen.queryByTestId('admin-pin-banner')).toBeNull()
     spy.mockRestore()
     delete (window as unknown as { gmatch?: unknown }).gmatch
@@ -479,11 +515,26 @@ describe('ServersView', () => {
     fireEvent.click(screen.getByRole('button', { name: /hide filters/i }))
     expect(screen.queryByLabelText('Search servers')).toBeNull()
     // hiding the band never hides the directory itself
-    expect(screen.getByText(/server browser \(1\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/server browser \(2\)/i)).toBeInTheDocument()
     unmount()
     // the choice survives a reload
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText(/server browser \(1\)/i)
+    await screen.findByText(/server browser \(2\)/i)
     expect(screen.queryByLabelText('Search servers')).toBeNull()
+  })
+
+  it('browse count includes the pinned Official row', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 's1', name: 'Alpha Node', description: '', owner_id: 'o1', password_required: 0, endpoint_hint: '' },
+      ] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await screen.findByText('Alpha Node')
+    // 1 directory row + 1 pinned Official row = 2 visible rows
+    expect(screen.getByText(/server browser \(2\)/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /browse \(2\)/i })).toBeInTheDocument()
   })
 })

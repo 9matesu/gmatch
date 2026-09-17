@@ -76,6 +76,34 @@ function toResolvedItems(images: GalleryImage[]): ResolvedItem[] {
   }))
 }
 
+/**
+ * Fast thumbnail resolution for gallery grid tiles:
+ * 1. Pinned local vault SSD URL if ready (vault://)
+ * 2. Pre-computed preview thumbnail if available
+ * 3. Inferred thumbnail for known hosts (booru.org, realbooru) to avoid multi-MB full PNG/JPEG stalls
+ * 4. Full image URL fallback
+ */
+export function resolveGalleryTileUrl(img: GalleryImage, vaultUrl?: string): string {
+  if (vaultUrl) return vaultUrl
+  if (img.preview) return img.preview
+  const u = String(img.url || '')
+  if (u.includes('img.booru.org')) {
+    const match = u.match(/https:\/\/img\.booru\.org\/([^/]+)\/\/images\/([^/]+)\/([^."]+)\.([^?#]+)/i)
+    if (match) {
+      const [, bSub, dir, hash, ext] = match
+      return `https://thumbs.booru.org/${bSub}/thumbnails//${dir}/thumbnail_${hash}.${ext}`
+    }
+  }
+  if (u.includes('realbooru.com/images/')) {
+    const match = u.match(/https:\/\/realbooru\.com\/images\/([^/]+)\/([^/]+)\/([^.]+)\./i)
+    if (match) {
+      const [, d1, d2, h] = match
+      return `https://realbooru.com/thumbnails/${d1}/${d2}/thumbnail_${h}.jpg`
+    }
+  }
+  return u
+}
+
 export interface IdleGalleryViewProps {
   onCreateCard?: (media: { url: string; tags: string[]; name: string }) => void
   onSetWallpaper?: (url: string) => void
@@ -467,7 +495,7 @@ export default function IdleGalleryView({
               const isBackdrop = backgroundUrl === img.url
               const isMotion = img.kind === 'video'
               const isSelected = selectedIds.has(img.id)
-              const tileUrl = vaultUrls[img.url || ''] || img.url
+              const tileUrl = resolveGalleryTileUrl(img, vaultUrls[img.url || ''])
 
               return (
                 <div
@@ -528,7 +556,7 @@ export default function IdleGalleryView({
                   >
                     {isMotion ? (
                       <video
-                        className="block h-full w-full object-cover [content-visibility:auto]"
+                        className="block h-full w-full object-cover"
                         src={tileUrl}
                         poster={img.preview || undefined}
                         muted
@@ -537,7 +565,7 @@ export default function IdleGalleryView({
                       />
                     ) : (
                       <CachedImg
-                        className="block h-full w-full object-cover [content-visibility:auto]"
+                        className="block h-full w-full object-cover"
                         src={tileUrl || offlineSvg(img.tags)}
                         fallbackSrc={offlineSvg(img.tags)}
                         alt={img.tags.slice(0, 3).join(' ') || 'gallery image'}
