@@ -553,12 +553,9 @@ objects.get('/:id', async (c, next) => {
   // Decode base64 data URL if content_url is stored inline
   if (row.content_url && row.content_url.startsWith('data:')) {
     try {
-      const base64Data = row.content_url.split(',')[1] || row.content_url
-      const binaryStr = atob(base64Data)
-      const bytes = new Uint8Array(binaryStr.length)
-      for (let i = 0; i < binaryStr.length; i++) {
-        bytes[i] = binaryStr.charCodeAt(i)
-      }
+      const commaIdx = row.content_url.indexOf(',')
+      const base64Str = commaIdx >= 0 ? row.content_url.slice(commaIdx + 1) : row.content_url
+      const bytes = Buffer.from(base64Str, 'base64')
       const headers = new Headers()
       headers.set('Content-Type', rowMime || detectMediaMime(bytes))
       headers.set('Content-Length', String(bytes.length))
