@@ -141,6 +141,14 @@ if (existsSync(join(STAGE, 'apps', 'api', 'node_modules', '@orbit', 'shared'))) 
   cpSync(join(STAGE, 'shared'), join(STAGE, 'apps', 'api', 'node_modules', 'shared'), { recursive: true })
 }
 
+// Remove any nested node_modules inside packages/* (created by bun's
+// workspace linking) — they contain circular symlinks/junctions between
+// @orbit/* packages that cause NSIS 7zip on Windows runners to crash with
+// "The system cannot find the path specified."
+for (const pkg of ['crypto', 'shared', 'protocol']) {
+  rmSync(join(STAGE, 'packages', pkg, 'node_modules'), { recursive: true, force: true })
+}
+
 // Smoke check: the staged server's module graph must fully resolve. bun build
 // imports nothing at runtime — it only walks the dependency graph — so the
 // noble-drop regression ("Cannot find module '@noble/curves/ed25519'", which
