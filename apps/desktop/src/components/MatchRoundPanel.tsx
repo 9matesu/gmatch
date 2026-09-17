@@ -15,10 +15,11 @@ import {
 import type { LobbyDecisionResult, LobbyDecisionFailure } from '../hooks/useLobby'
 import { CardZoomModal } from './CardZoomModal'
 import { computeCardRarity, formatGc, matchEconomy } from '@orbit/shared'
-import { isMediaVideo } from '../utils/media'
+import { isMediaVideo, resolveMediaUrl } from '../utils/media'
 import { MediaBadge } from './MediaBadge'
 import { CardBack } from './CardBack'
 import { ObjectImage } from './ObjectImage'
+import { Avatar } from './Avatar'
 import { ValuationSummary } from './game/ValuationSummary'
 import { ZoomIn, Check, X, Sparkles, Heart, Zap, Link as LinkIcon,   LayoutGrid } from 'lucide-react'
 
@@ -234,13 +235,7 @@ export function MatchRoundPanel({
     <section className="module module-primary">
       <div className="module-header allow-wrap flex items-center gap-2">
         <span className="module-title flex items-center gap-2 min-w-0">
-          {match.opponent.pfp_url ? (
-            <img
-              src={match.opponent.pfp_url}
-              alt=""
-              className="w-5 h-5 rounded-full border border-border-glass object-cover flex-shrink-0"
-            />
-          ) : null}
+          <Avatar id={match.opponent.id} imageUrl={match.opponent.pfp_url || opponentUser?.pfp_url || undefined} size={20} />
           <span className="truncate text-sm">
             vs{' '}
             <button
