@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { orbitFetch } from '../utils/api'
+import { getLocalObject } from '../utils/p2pSwarm'
 
 interface IdentityLike {
   orbitId: string
@@ -161,6 +162,23 @@ export function useObjectImage(
 
     let cancelled = false
     let freshUrl: string | null = null
+
+    // P2P Swarm & local vault hit: if object is already local, resolve with zero network
+    getLocalObject(cleanId).then((localBlob) => {
+      if (cancelled || !localBlob) return
+      freshUrl = URL.createObjectURL(localBlob)
+      const loaded: ImageState = {
+        cardId: cleanId,
+        url: freshUrl,
+        failed: false,
+        isVideo: localBlob.type.startsWith('video/'),
+        isLink: false,
+        linkUrl: null,
+      }
+      cacheSet(cleanId, identity.orbitId, loaded)
+      setImg(loaded)
+    }).catch(() => {})
+
     orbitFetch(`/api/objects/${cleanId}`, { method: 'GET' }, identity)
       .then(async (res) => {
         if (cancelled) return
