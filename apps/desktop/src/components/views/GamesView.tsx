@@ -22,6 +22,7 @@ export function GamesView({
   myCards,
   hasActiveDeck,
   users,
+  profilePics,
   lobby,
   toggleAutoQueue,
   sendInvite,
@@ -49,6 +50,7 @@ export function GamesView({
   myCards: OrbitObject[];
   hasActiveDeck: boolean;
   users: User[];
+  profilePics?: Record<string, string>;
   lobby: ReturnType<typeof useLobby>;
   toggleAutoQueue: (enabled: boolean) => Promise<{ ok: boolean; error?: string }>;
   sendInvite: (userId: string) => Promise<{ ok: boolean; error?: string }>;
@@ -108,6 +110,7 @@ export function GamesView({
             setExpandedItemId(initialId);
           }}
           users={users}
+          profilePics={profilePics}
         />
       )}
       onOpenSources={() => setShowSources(true)}

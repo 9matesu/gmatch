@@ -3573,6 +3573,7 @@ export default function Home() {
                       myCards={myCards}
                       hasActiveDeck={hasActiveDeck}
                       users={users}
+                      profilePics={profilePics}
                       lobby={lobby}
                       toggleAutoQueue={toggleAutoQueue}
                       sendInvite={sendInvite}
@@ -3777,6 +3778,7 @@ export default function Home() {
                       hasActiveDeck={hasActiveDeck}
                       soundEnabled={settings.soundEffects}
                       users={users}
+                      profilePics={profilePics}
                       spinTarget={spinTarget}
                       selectedIds={selectedIds}
                       setSelectedIds={setSelectedIds}

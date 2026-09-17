@@ -35,6 +35,7 @@ interface Props {
   onOpenHelp?: () => void
   onOpenProfile?: (user: User) => void
   users?: User[]
+  profilePics?: Record<string, string>
   onOpenSpectateItem?: (items: OrbitObject[], initialId: string) => void
   onOpenCardChat?: () => void
   onOpenCreateCard?: () => void
@@ -44,7 +45,7 @@ interface Props {
   sendInvite?: (userId: string) => Promise<{ ok: boolean; error?: string }>
 }
 
-export function LobbyPanel({ lobby, identity, myCards, hasActiveDeck, soundEnabled, onExpandItem, onOpenProfile, users, onOpenSpectateItem, onOpenCardChat, onOpenCreateCard, onOpenDeckBuilder, toggleAutoQueue }: Props) {
+export function LobbyPanel({ lobby, identity, myCards, hasActiveDeck, soundEnabled, onExpandItem, onOpenProfile, users, profilePics, onOpenSpectateItem, onOpenCardChat, onOpenCreateCard, onOpenDeckBuilder, toggleAutoQueue }: Props) {
 const { state, joined, autoQueueEnabled, loading, toggleAutoQueue: lobbyToggleAutoQueue, spectateMatch, closeSpectate, spectatingMatchId, spectatingSnapshot, liveMatches, pickCard, decide, quitMatch, activeSpecials, submitSpecialCard, endSpecialMatch, decideSpecialMatch, onlineUsers } = lobby
 
   // Use passed-in override functions if provided, otherwise fall back to lobby functions
@@ -171,7 +172,16 @@ const selfId = identity?.orbitId || ''
 
     const resolvePfp = (id: string, directPfp?: string | null): string | null => {
       if (directPfp) return directPfp
-      return usersMap.get(id)?.pfp_url || null
+      const fromUsers = usersMap.get(id)?.pfp_url
+      if (fromUsers) return fromUsers
+      if (profilePics?.[id]) return profilePics[id]
+      if (id === selfId && typeof window !== 'undefined') {
+        try {
+          const local = localStorage.getItem('orbit_pfp_url')
+          if (local && local.trim()) return local
+        } catch { }
+      }
+      return null
     }
 
     const findMatch = (userId: string) => {
@@ -511,6 +521,7 @@ const selfId = identity?.orbitId || ''
                   selfId={selfId}
                   spectateRequesting={spectateRequesting}
                   users={users}
+                  profilePics={profilePics}
                   onOpenProfile={onOpenProfile}
                   onSpectate={handleSpectate}
                   loading={loading}

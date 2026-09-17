@@ -20,6 +20,7 @@ export function GameView({
   hasActiveDeck,
   soundEnabled,
   users,
+  profilePics,
   spinTarget,
   selectedIds,
   setSelectedIds,
@@ -47,6 +48,7 @@ export function GameView({
   hasActiveDeck: boolean;
   soundEnabled: boolean;
   users: User[];
+  profilePics?: Record<string, string>;
   spinTarget: User | null;
   selectedIds: Set<string>;
   setSelectedIds: React.Dispatch<React.SetStateAction<Set<string>>>;
@@ -87,6 +89,7 @@ export function GameView({
           setExpandedItemId(initialId)
         }}
         users={users}
+        profilePics={profilePics}
       />
 
       {(spinTarget || selectedIds.size > 0) && (

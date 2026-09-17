@@ -18,11 +18,12 @@ type Segment =
   | { kind: 'pair'; matchId: string; players: PlayerInfo[] }
   | { kind: 'solo'; player: PlayerInfo }
 
-interface PlayerRosterProps {
+export interface PlayerRosterProps {
   players: PlayerInfo[]
   selfId: string
   spectateRequesting: string | null
   users?: User[]
+  profilePics?: Record<string, string>
   onOpenProfile?: (user: User) => void
   onSpectate?: (matchId: string) => void
   loading?: boolean
@@ -33,25 +34,35 @@ function PlayerTile({
   player,
   selfId,
   users,
+  profilePics,
   onOpenProfile,
 }: {
   player: PlayerInfo
   selfId: string
   users?: User[]
+  profilePics?: Record<string, string>
   onOpenProfile?: (user: User) => void
 }) {
   const isPlaying = player.queueStatus === 'in_match'
 
+  const base = users?.find(u => u.id === player.id)
+  let localSelfPfp = ''
+  if (player.id === selfId && typeof window !== 'undefined') {
+    try {
+      localSelfPfp = localStorage.getItem('orbit_pfp_url') || ''
+    } catch { }
+  }
+  const effectivePfp = player.pfp_url || base?.pfp_url || profilePics?.[player.id] || localSelfPfp || undefined
+
   const handleClick = () => {
-    const base = users?.find(u => u.id === player.id)
     const userObj: User = base
       ? {
           ...base,
           display_name: (player.display_name && player.display_name.trim()) ? player.display_name : base.display_name,
-          pfp_url: player.pfp_url || base.pfp_url,
+          pfp_url: effectivePfp || base.pfp_url,
           tags: (player.tags && player.tags.length > 0 ? player.tags : base.tags) as string[],
         }
-      : { id: player.id, display_name: player.display_name, pfp_url: player.pfp_url, tags: player.tags } as User
+      : { id: player.id, display_name: player.display_name, pfp_url: effectivePfp, tags: player.tags } as User
     onOpenProfile?.(userObj)
   }
 
@@ -69,7 +80,7 @@ function PlayerTile({
           : 'border-border-glass'
       } hover:border-retro-accent/60`}
     >
-      <Avatar id={player.id} imageUrl={player.pfp_url || undefined} fill />
+      <Avatar id={player.id} imageUrl={effectivePfp} fill />
 
       <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
 
@@ -134,6 +145,7 @@ function DuelPair({
   selfId,
   spectateRequesting,
   users,
+  profilePics,
   onOpenProfile,
   onSpectate,
 }: {
@@ -142,6 +154,7 @@ function DuelPair({
   selfId: string
   spectateRequesting: string | null
   users?: User[]
+  profilePics?: Record<string, string>
   onOpenProfile?: (user: User) => void
   onSpectate?: (matchId: string) => void
 }) {
@@ -181,6 +194,7 @@ function DuelPair({
             player={p}
             selfId={selfId}
             users={users}
+            profilePics={profilePics}
             onOpenProfile={onOpenProfile}
           />
         ))}
@@ -202,6 +216,7 @@ export function PlayerRoster({
   selfId,
   spectateRequesting,
   users,
+  profilePics,
   onOpenProfile,
   onSpectate,
   loading,
@@ -260,6 +275,7 @@ export function PlayerRoster({
               selfId={selfId}
               spectateRequesting={spectateRequesting}
               users={users}
+              profilePics={profilePics}
               onOpenProfile={onOpenProfile}
               onSpectate={onSpectate}
             />
@@ -271,6 +287,7 @@ export function PlayerRoster({
             player={seg.player}
             selfId={selfId}
             users={users}
+            profilePics={profilePics}
             onOpenProfile={onOpenProfile}
           />
         )
