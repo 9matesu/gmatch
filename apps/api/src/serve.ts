@@ -1,6 +1,6 @@
 import { createClient } from '@libsql/client'
 import { D1Turso, ensureSchema } from './db'
-import { restoreDb, snapshotDb } from './persistence'
+import { existsSync } from 'node:fs'
 import { LocalBlobStore } from './blob'
 import { resolveStorageKey } from './storage-key'
 import { resolveNodeKey } from './node-key'
@@ -15,62 +15,44 @@ import { runPeriodicMaintenance } from './cleanup'
 
 declare const Bun: any
 
-// Single embedded in-memory SQLite engine. Row persistence (to gitignored
-// orbit.snapshot.sqlite) is handled by snapshotDb/restoreDb instead of an
-// external Turso instance.
-const client = createClient({ url: ':memory:' })
+// Single file-backed SQLite engine: the DB file (the same artifact the old
+// snapshot cycle produced via VACUUM INTO) is the live database — rows land
+// on disk per transaction instead of living in RAM behind 30 s snapshots.
+const DB_PATH = process.env.SNAPSHOT_PATH || join(process.cwd(), 'orbit.sqlite')
+const SNAPSHOT_PATH = DB_PATH
+const dbFilePresentAtBoot = existsSync(DB_PATH)
+const client = createClient({ url: `file:${DB_PATH}` })
 const db = new D1Turso(client)
-
-const SNAPSHOT_PATH = process.env.SNAPSHOT_PATH || join(process.cwd(), 'orbit.snapshot.sqlite')
 // crypto.ts hard-requires a non-zero 64-hex STORAGE_ENCRYPTION_KEY; the server
 // can also be started bare (`bun run serve:api`, packaged api-stage). Resolve
 // env → persisted keyfile → fresh generated key so uploads/PMs never 500 on a
 // missing key.
 process.env.STORAGE_ENCRYPTION_KEY = resolveStorageKey(SNAPSHOT_PATH, process.env)
 const BLOB_STORE_DIR = process.env.BLOB_STORE_DIR || (process.env.SNAPSHOT_PATH ? join(dirname(process.env.SNAPSHOT_PATH), 'blobs') : './blobs')
-const SNAPSHOT_INTERVAL_MS = Math.max(
-  30000,
-  parseInt(process.env.SNAPSHOT_INTERVAL_MS || '30000', 10) || 30000,
-)
-const SNAPSHOT_INITIAL_DELAY_MS = Math.max(
-  10000,
-  parseInt(process.env.SNAPSHOT_INITIAL_DELAY_MS || '10000', 10) || 10000,
-)
-let snapshotInFlight = false
-
-async function takeSnapshot() {
-  if (snapshotInFlight) return
-  snapshotInFlight = true
-  try {
-    await snapshotDb(client, SNAPSHOT_PATH)
-    console.log(`[DB] snapshot written → ${SNAPSHOT_PATH}`)
-  } catch (err) {
-    console.warn('[DB] Snapshot failed:', (err as Error)?.message || err)
-  } finally {
-    snapshotInFlight = false
-  }
-}
-
 let dbReady = false
 let dbInitError: string | null = null
 const dbReadyPromise = (async () => {
   try {
-    await ensureSchema(client)
-    // Boot-time durability diagnostics: log whether the snapshot file + blob
-    // store vimpy exist on disk before we try to load, so a deploy that lost
-    // the mounted volume (the most common root cause of "cards reset on
-    // update") is visible in logs immediately rather than discovered when
-    // a user later reports missing data.
-    const { access } = await import('node:fs/promises')
-    let snapshotExists = false
-    try {
-      await access(SNAPSHOT_PATH)
-      snapshotExists = true
-    } catch {
-      console.warn(`[DB] no snapshot found at ${SNAPSHOT_PATH} — first boot or missing volume mount`)
+    // Boot-time durability diagnostics: a deploy that lost the mounted
+    // volume (the most common root cause of "cards reset on update") must
+    // be visible in logs immediately rather than discovered when a user
+    // later reports missing data.
+    if (!dbFilePresentAtBoot) {
+      console.warn(`[DB] no DB file found at ${SNAPSHOT_PATH} — first boot or missing volume mount`)
     }
-    const restored = await restoreDb(client, SNAPSHOT_PATH)
-    console.log(`[DB] restore summary: file_present=${snapshotExists} rows_restored=${restored}`)
+    await ensureSchema(client)
+    // Compaction + durability: WAL for crash-safe per-transaction persistence
+    // without a snapshot dance; FULL auto_vacuum reclaims space. On a
+    // pre-existing DB file auto_vacuum only takes effect after one VACUUM —
+    // the guard makes that happen exactly once per DB lifetime.
+    await client.execute('PRAGMA journal_mode = WAL')
+    const av = await client.execute('PRAGMA auto_vacuum')
+    const avValue = Number(Object.values((av.rows[0] ?? {}) as Record<string, unknown>)[0] ?? 0)
+    if (!avValue) {
+      await client.execute('PRAGMA auto_vacuum = FULL')
+      await client.execute('VACUUM')
+    }
+    console.log(`[DB] file DB ready at ${SNAPSHOT_PATH} (WAL, auto_vacuum=FULL)`)
     // Blob store sanity check — count objects recovered on disk.
     let blobCount = -1
     try {
@@ -89,12 +71,6 @@ const dbReadyPromise = (async () => {
   }
 })()
 
-setInterval(() => {
-  if (dbReady) takeSnapshot()
-}, SNAPSHOT_INTERVAL_MS)
-setTimeout(() => {
-  if (dbReady) takeSnapshot()
-}, SNAPSHOT_INITIAL_DELAY_MS)
 // Watch rooms live in memory; keep them across restarts/deploys on the same
 // /data volume as the DB snapshot. 30 s tick + SIGTERM flush; file is tiny
 // (<=50 rooms) so unconditional rewrite is fine. Workers mode has no FS and
@@ -124,18 +100,9 @@ setInterval(() => {
       .bind(...ids).run().catch((e: Error) => console.warn('[WATCH] media lease refresh failed', e?.message || e))
   }
 }, 30_000)
-// On SIGTERM/SIGINT, persist a final snapshot before letting the process
-// exit. Bun's exit() is synchronous so we kick the snapshot synchronously
-// and rely on snapshotDb being awaitable. Fly.io's default stop_signal is
-// SIGTERM with a kill_timeout; verify fly.toml has kill_timeout >= 60s so
-// the VACUUM INTO completes.
+// On SIGTERM/SIGINT, flush watch parties and exit. The file-backed DB needs
+// no shutdown snapshot — rows are on disk per transaction.
 async function persistAndExit(code: number) {
-  try {
-    if (dbReady) await takeSnapshot()
-    console.log('[DB] shutdown snapshot complete')
-  } catch (err) {
-    console.warn('[DB] shutdown snapshot failed:', (err as Error)?.message || err)
-  }
   try { await flushParties() } catch { /* best effort */ }
   process.exit(code)
 }

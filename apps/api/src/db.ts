@@ -119,8 +119,8 @@ export class D1Turso {
 
   // Atomic batch: executes all statements in a single write transaction on the
   // shared connection (all-or-nothing). Unlike libsql's interactive
-  // `transaction()`, this does not swap out the in-memory connection, so it is
-  // safe for the embedded `:memory:` engine used in production and tests.
+  // `transaction()`, this does not swap the connection, so it is safe for the
+  // single embedded engine used in production and tests.
   //
   // Statements run synchronously under the hood (no interleaving awaits), which
   // gives genuine atomicity in the single-process event loop. Errors surface as
