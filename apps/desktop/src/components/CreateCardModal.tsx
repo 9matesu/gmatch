@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { ImagePlus, Loader2, Plus, Sparkles, Tag, X } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { DropZone, DND_KEEPSAKE } from './DropZone';
-import { uploadWithProgress } from '../utils/api';
 import { mediaUrlToCachedFile } from '../utils/cacheMedia';
+import { forgeMediaLocally } from '../services/mediaForge';
 import { createCardFromMedia, type CanonicalCard, type CardCreationMetadata } from '../utils/cardCollection';
 import { useCropper } from '../hooks/useCropper';
 import { isCropableImage } from './CropModal';
@@ -181,19 +181,15 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
         // and cards are cache, never a live URL).
         payloadFile = await mediaUrlToCachedFile(url.trim());
       }
-      const form = new FormData();
-      form.append('is_story', 'false');
-      form.append('image', payloadFile);
+      setProgress(30);
+      const forged = await forgeMediaLocally(payloadFile, identity, {
+        caption: name,
+        isPublic: true,
+      });
 
-      const upload = await uploadWithProgress('/api/objects', form, identity, setProgress);
-
-      if (!upload.ok || !upload.id) {
-        throw new Error(upload.error || 'Media upload failed');
-      }
-
-      setProgress(92);
-      const card = await createCardFromMedia(identity, upload.id, name, metadata);
-      if (!card) throw new Error('The media uploaded, but card creation failed');
+      setProgress(80);
+      const card = await createCardFromMedia(identity, forged.id, name, metadata);
+      if (!card) throw new Error('Card creation failed');
       setProgress(100);
       onCreated?.(card);
       onClose();
