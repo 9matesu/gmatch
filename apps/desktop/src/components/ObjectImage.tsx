@@ -132,9 +132,10 @@ export function ObjectImage({
     // Fallback: feed cards carry [content-visibility:auto], which can suppress
     // the observer callback for skipped subtrees — lazy media then stays blank
     // until some later layout pass (the "images only load after opening the
-    // idle clicker" report). Flip inView on a short grace period so deferred
-    // media always resolves.
-    const fallback = window.setTimeout(() => setInView(true), 1500)
+    // idle clicker" report). Stagger fallback so decode doesn't spike GPU all
+    // at once.
+    const jitter = 500 + Math.random() * 2500
+    const fallback = window.setTimeout(() => setInView(true), jitter)
     return () => {
       observer.disconnect()
       window.clearTimeout(fallback)
@@ -225,6 +226,7 @@ export function ObjectImage({
       alt={alt}
       className={className}
       loading={loading}
+      decoding="async"
       fetchPriority={fetchPriority}
       data-media-url={contentUrl || undefined}
       onError={(_e) => {

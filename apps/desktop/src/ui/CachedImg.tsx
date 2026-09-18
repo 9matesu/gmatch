@@ -49,6 +49,7 @@ export default function CachedImg({ src: rawSrc, fallbackSrc, onError, ...rest }
   return (
     <img
       src={display || undefined}
+      decoding="async"
       {...rest}
       onError={(e) => {
         if (!resolved) return

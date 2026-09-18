@@ -36,8 +36,8 @@ function isProtectedObjectUrl(value: string): boolean {
 // Bounded LRU cache of previously fetched objects keyed by cardId. Prevents
 // repeat downloads/decrypts on every round change (the same card is re-requested
 // as my-card, opponent-card and reveal card across rounds), keeping memory bounded.
-// Cap 96 slots avoids aggressive early revocation during feed and gallery scrolling.
-const CACHE_MAX = 96
+// Cap 24 slots keeps GPU texture memory and RAM low on long timelines.
+const CACHE_MAX = 24
 const objectCache = new Map<string, ImageState>()
 const cacheSource = new Map<string, string>()
 

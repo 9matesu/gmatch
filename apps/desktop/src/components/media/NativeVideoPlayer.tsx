@@ -131,6 +131,28 @@ export function NativeVideoPlayer({
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  // Pause playback when scrolled out of viewport to free GPU decoder.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const v = videoRef.current;
+          if (!v) return;
+          if (!entry.isIntersecting && !v.paused) {
+            v.pause();
+          } else if (entry.isIntersecting && autoPlay && v.paused) {
+            v.play().catch(() => {});
+          }
+        });
+      },
+      { rootMargin: '100px 0px' }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [autoPlay]);
+
   const resetHideControlsTimer = useCallback(() => {
     setShowControls(true);
     if (hideControlsTimerRef.current) clearTimeout(hideControlsTimerRef.current);
