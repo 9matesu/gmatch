@@ -1,4 +1,6 @@
-import { unlink, writeFile, readFile, mkdir, readdir } from 'node:fs/promises'
+import { unlink, writeFile, mkdir, readdir, stat } from 'node:fs/promises'
+import { createReadStream } from 'node:fs'
+import { Readable } from 'node:stream'
 
 import { join, dirname } from 'node:path'
 
@@ -25,28 +27,21 @@ export class LocalBlobStore {
     writeHttpMetadata: (headers: Headers) => void
   } | null> {
     const filePath = this.resolve(key)
+    // Stream the file — never buffer the whole blob in RAM (multi-MB media
+    // used to be readFile'd whole, keeping every served image resident).
+    let size = 0
     try {
-      const data = await readFile(filePath)
-      let bodyUsed = false
-      return {
-        get body() {
-          if (bodyUsed) return null
-          bodyUsed = true
-          return new ReadableStream({
-            start(controller) {
-              controller.enqueue(new Uint8Array(data))
-              controller.close()
-            },
-          })
-        },
-        httpEtag: `orbit-blob-${key}`,
-        writeHttpMetadata(headers: Headers) {
-          headers.set('Content-Type', 'application/octet-stream')
-          headers.set('Content-Length', String(data.length))
-        },
-      }
+      size = (await stat(filePath)).size
     } catch {
       return null
+    }
+    return {
+      body: Readable.toWeb(createReadStream(filePath)) as ReadableStream,
+      httpEtag: `orbit-blob-${key}`,
+      writeHttpMetadata(headers: Headers) {
+        headers.set('Content-Type', 'application/octet-stream')
+        headers.set('Content-Length', String(size))
+      },
     }
   }
 
