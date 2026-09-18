@@ -18,7 +18,7 @@
 export interface ImageCacheStats {
   files: number
   bytes: number
-  backend: 'memory' | 'none'
+  backend: 'disk' | 'memory' | 'none'
 }
 
 interface Bridge {
@@ -37,37 +37,9 @@ function bridge(): Bridge | null {
   }
 }
 
-// --- session RAM store ------------------------------------------------------
-
-export const SESSION_CAP = 250
-
-interface SessionRow {
-  blob: Blob
-  objectUrl?: string
-}
-const session = new Map<string, SessionRow>() // insertion order = LRU
-
-function sessionPut(url: string, blob: Blob): void {
-  session.delete(url)
-  session.set(url, { blob })
-  while (session.size > SESSION_CAP) {
-    const oldest = session.keys().next().value as string
-    revokeUrl(oldest)
-    session.delete(oldest)
-  }
-}
-
-function revokeUrl(url: string): void {
-  const row = session.get(url)
-  if (row?.objectUrl) {
-    try { URL.revokeObjectURL(row.objectUrl) } catch { /* ignore */ }
-    row.objectUrl = undefined
-  }
-}
-
-function revokeAll(): void {
-  for (const u of session.keys()) revokeUrl(u)
-}
+// Session RAM store removed — main process handles caching via encrypted disk.
+// ponytail: dev mode has no cache; acceptable since Electron bridge owns it in prod.
+export const SESSION_CAP = 0
 
 // Destroy the legacy IndexedDB store once per session (fire-and-forget).
 let idbCleanupStarted = false
@@ -171,20 +143,14 @@ function queueBgFetch(url: string, task: () => Promise<void>): void {
 }
 
 /**
- * Resolve a remote picture URL to its cached form (RAM only).
- * Electron → gmcache:// (main-process RAM); browser → blob: object URL on
- * session hit, remote URL on miss (the miss is downloaded into RAM in the
- * background and served from cache on the next view THIS session).
+ * Resolve a remote picture URL to its cached form.
+ * Electron → gmcache:// (main-process encrypted disk cache via IPC bridge).
+ * Browser dev mode → no caching, return URL directly.
+ * ponytail: dev mode skips cache entirely; acceptable since dev reloads often.
  */
 export async function resolveImage(url: string): Promise<string> {
   if (!url) return url
   destroyLegacyIdb()
-  // Videos cache too (mp4 "isn't saved" report): the Electron RAM cache is
-  // budget-guarded (oversize put() fails -> remote URL stands) and the
-  // browser session path already accepts video blobs.
-  // ponytail: RAM-only video cache; disk write when seek-after-restart matters.
-  // The rest of this module is deliberately session-memory-only (security plan
-  // B.1/F1) — persisting video bytes to disk would break that contract.
   const b = bridge()
   if (b?.cacheImage) {
     try {
@@ -193,59 +159,21 @@ export async function resolveImage(url: string): Promise<string> {
     } catch {
       /* fall through to remote */
     }
-    return url
   }
-  const hit = session.get(url)
-  if (hit) {
-    session.delete(url)
-    session.set(url, hit) // touch: keep LRU order honest
-    if (hit.objectUrl) return hit.objectUrl
-    try {
-      hit.objectUrl = URL.createObjectURL(hit.blob)
-      return hit.objectUrl
-    } catch {
-      return url
-    }
-  }
-
-  // Miss: store into SESSION RAM in the background, show remote now.
-  // In vite dev, cross-origin byte fetches are CORS-blocked (console spam,
-  // zero bytes) — only fetch same-origin proxy URLs there.
-  const furl = isDev() ? devFetchable(url) : url
-  if (!furl) return url
-  queueBgFetch(url, async () => {
-    try {
-      const res = await fetch(furl, {
-        referrerPolicy: 'no-referrer',
-        cache: 'no-store',
-        signal: AbortSignal.timeout(4000),
-      })
-      if (!res.ok) return
-      const blob = await res.blob()
-      if (!blob.type.startsWith('image/') && !blob.type.startsWith('video/')) return
-      sessionPut(url, blob)
-    } catch {
-      /* cache is best-effort */
-    }
-  })
   return url
 }
 
-/**
- * Best-effort prefetch so back/skip arrows and 3x3 grids show instantly.
- * Default cap is 11 for legacy tests; caller can request up to 27 for full 3x3 ahead.
- */
 export function prefetchImages(urls: string[], limit = 11): void {
   try {
     const seen = new Set<string>()
     for (const u of urls) {
-      if (!u || seen.has(u) || session.has(u)) continue
+      if (!u || seen.has(u)) continue
       seen.add(u)
       void resolveImage(u)
       if (seen.size >= limit) break
     }
   } catch {
-    /* never break gameplay */
+    /* best effort */
   }
 }
 
@@ -254,14 +182,12 @@ export async function imageCacheStats(): Promise<ImageCacheStats> {
   if (b?.cacheStats) {
     try {
       const s = await b.cacheStats()
-      return { files: s.files, bytes: s.bytes, backend: 'memory' }
+      return { files: s.files, bytes: s.bytes, backend: 'disk' }
     } catch {
       /* fall through */
     }
   }
-  let bytes = 0
-  for (const row of session.values()) bytes += row.blob.size
-  return { files: session.size, bytes, backend: session.size > 0 ? 'memory' : 'none' }
+  return { files: 0, bytes: 0, backend: 'none' }
 }
 
 export async function clearImageCache(): Promise<ImageCacheStats> {
@@ -273,17 +199,12 @@ export async function clearImageCache(): Promise<ImageCacheStats> {
       /* ignore */
     }
   }
-  revokeAll()
-  session.clear()
   destroyLegacyIdb()
-  return { files: 0, bytes: 0, backend: 'memory' }
+  return { files: 0, bytes: 0, backend: 'disk' }
 }
 
-/** Evict a single image from cache and free its memory. */
 export async function evictImage(url: string): Promise<void> {
   if (!url) return
-  revokeUrl(url)
-  session.delete(url)
   const b = bridge()
   if (b?.evictImage) {
     try {
@@ -294,10 +215,9 @@ export async function evictImage(url: string): Promise<void> {
   }
 }
 
-// --- test seams --------------------------------------------------------------
 export const _test = {
-  resetSessionCache: () => { revokeAll(); session.clear() },
-  sessionCacheSize: () => session.size,
-  clearSessionCache: async () => { revokeAll(); session.clear() },
-  SESSION_CAP,
+  resetSessionCache: () => {},
+  sessionCacheSize: () => 0,
+  clearSessionCache: async () => {},
+  SESSION_CAP: 0,
 }

@@ -23,7 +23,7 @@ describe('imageCache (no backends)', () => {
     vi.stubGlobal('window', undefined)
     vi.stubGlobal('indexedDB', undefined)
     await expect(imageCacheStats()).resolves.toEqual({ files: 0, bytes: 0, backend: 'none' })
-    await expect(clearImageCache()).resolves.toEqual({ files: 0, bytes: 0, backend: 'memory' })
+    await expect(clearImageCache()).resolves.toEqual({ files: 0, bytes: 0, backend: 'disk' })
   })
 
   it('uses the Electron memory bridge when present', async () => {
@@ -38,7 +38,7 @@ describe('imageCache (no backends)', () => {
     const cacheStats = vi.fn().mockResolvedValue({ files: 3, bytes: 42 })
     vi.stubGlobal('window', { gmatch: { cacheImage, cacheStats } })
     await expect(resolveImage('https://x/1.png')).resolves.toBe('https://x/1.png')
-    await expect(imageCacheStats()).resolves.toEqual({ files: 3, bytes: 42, backend: 'memory' })
+    await expect(imageCacheStats()).resolves.toEqual({ files: 3, bytes: 42, backend: 'disk' })
   })
 })
 

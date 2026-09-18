@@ -163,30 +163,33 @@ export function useObjectImage(
     let cancelled = false
     let freshUrl: string | null = null
 
-    // P2P Swarm & local vault hit: if object is already local, resolve with zero network
-    getLocalObject(cleanId).then((localBlob) => {
-      if (cancelled || !localBlob) return
-      freshUrl = URL.createObjectURL(localBlob)
-      const loaded: ImageState = {
-        cardId: cleanId,
-        url: freshUrl,
-        failed: false,
-        isVideo: localBlob.type.startsWith('video/'),
-        isLink: false,
-        linkUrl: null,
+// P2P first, then network only if P2P misses. Concurrent fetches race
+    // and the loser's blob URL gets orphaned into leaked RAM.
+    getLocalObject(cleanId).then(async (localBlob) => {
+      if (cancelled) return
+      if (localBlob) {
+        freshUrl = URL.createObjectURL(localBlob)
+        const loaded: ImageState = {
+          cardId: cleanId,
+          url: freshUrl,
+          failed: false,
+          isVideo: localBlob.type.startsWith('video/'),
+          isLink: false,
+          linkUrl: null,
+        }
+        cacheSet(cleanId, identity.orbitId, loaded)
+        setImg(loaded)
+        return // P2P hit: skip network entirely
       }
-      cacheSet(cleanId, identity.orbitId, loaded)
-      setImg(loaded)
-    }).catch(() => {})
+      await fetchFromNetwork()
+    }).catch(() => { fetchFromNetwork() })
 
-    orbitFetch(`/api/objects/${cleanId}`, { method: 'GET' }, identity)
-      .then(async (res) => {
+    async function fetchFromNetwork() {
+      if (cancelled) return
+      try {
+        const res = await orbitFetch(`/api/objects/${cleanId}`, { method: 'GET' }, identity)
         if (cancelled) return
         if (!res.ok) {
-          // Transient upstream 502/503 (Vite dev proxy -> cold Fly.io node):
-          // never cache as a permanent failure. Leave the slot empty so the
-          // next mount/scroll retries instead of locking in "Image
-          // unavailable" forever.
           if (res.status === 502 || res.status === 503 || res.status === 504) return
           const failedState: ImageState = { cardId: cleanId, url: '', failed: true, isVideo: false, isLink: false, linkUrl: null }
           cacheSet(cleanId, identity?.orbitId || '', failedState)
@@ -199,7 +202,6 @@ export function useObjectImage(
 
         const contentType = (res.headers.get('Content-Type') || '').toLowerCase()
 
-        // Link-type objects return JSON { type: 'link', url }
         if (contentType.includes('json')) {
           const data = await res.json().catch(() => null)
           if (cancelled) return
@@ -229,14 +231,14 @@ export function useObjectImage(
         }
         cacheSet(cleanId, identity?.orbitId || '', loaded)
         setImg(loaded)
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) {
           const failedState: ImageState = { cardId: cleanId, url: '', failed: true, isVideo: false, isLink: false, linkUrl: null }
           cacheSet(cleanId, identity?.orbitId || '', failedState)
           setImg(failedState)
         }
-      })
+      }
+    }
     return () => {
       cancelled = true
       if (freshUrl && !objectCache.has(cleanId)) URL.revokeObjectURL(freshUrl)

@@ -1,15 +1,14 @@
-// gMatch image + feed-response cache (main process) — MEMORY ONLY (F1 fix).
-// Security plan B.1: content must never cross a session on disk. Images are
-// held in an LRU byte-budget Map (apps/desktop/electron/imageCacheMemory.cjs)
-// and served over the same privileged gmcache:// scheme; feed query
-// responses are cached in RAM with the same 10-minute TTL.
+// gMatch image + feed-response cache (main process) — encrypted disk cache.
+// Images stored AES-256-GCM encrypted in userData/imgcache/*.enc using the
+// same storage.key as the API sidecar. Served over gmcache:// scheme.
+// Feed query responses still cached in RAM with 10-minute TTL.
 // init() destroys the legacy on-disk caches left by pre-1.1 installs
 // (image-cache/ + meta.json + feed-cache.json) — one-time, force, silent.
 const fs = require('fs')
 const path = require('path')
 const http = require('http')
 const https = require('https')
-const mem = require('./imageCacheMemory.cjs')
+const mem = require('./diskImageCache.cjs')
 let electronNet = null
 try {
   electronNet = require('electron').net
@@ -67,9 +66,10 @@ function destroyDiskCaches(userDataPath) {
   try { fs.rmSync(path.join(userDataPath, 'feed-cache.json'), { force: true }) } catch { /* already clean */ }
 }
 
-function init(userDataPath, userAgent) {
+function init(userDataPath, userAgent, storageKeyHex) {
   if (userAgent) UA = userAgent
   destroyDiskCaches(userDataPath)
+  mem.init(userDataPath, storageKeyHex)
   meta = {}
   feed = {}
 }

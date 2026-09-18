@@ -1233,7 +1233,10 @@ app.whenReady().then(async () => {
     // Safety: if no unload attempt materializes, don't leak the bypass.
     setTimeout(() => { reloadWanted = false }, 3000)
   })
-  imageCache.init(app.getPath('userData'), UA)
+  const storageKeyPath = path.join(app.getPath('userData'), 'storage.key')
+  let diskKey = null
+  try { diskKey = fs.readFileSync(storageKeyPath, 'utf8').trim() } catch {}
+  imageCache.init(app.getPath('userData'), UA, diskKey)
   vault.init(app.getPath('userData'))
   vaultServer.start(app.getPath('userData')).catch(() => {
     /* best effort */
