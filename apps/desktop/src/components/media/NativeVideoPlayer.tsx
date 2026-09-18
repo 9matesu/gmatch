@@ -104,6 +104,7 @@ export function NativeVideoPlayer({
   const [isBuffering, setIsBuffering] = useState<boolean>(false);
   const [hasError, setHasError] = useState<boolean>(false);
   const [actionPulse, setActionPulse] = useState<'play' | 'pause' | null>(null);
+  const [inView, setInView] = useState<boolean>(() => typeof IntersectionObserver === 'undefined');
 
   // Scrubber hover state
   const [isScrubbing, setIsScrubbing] = useState<boolean>(false);
@@ -131,7 +132,8 @@ export function NativeVideoPlayer({
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  // Pause playback when scrolled out of viewport to free GPU decoder.
+  // Viewport gating: keep preload='none' and pause when scrolled out of
+  // viewport so off-screen players allocate ZERO GPU hardware video decoders.
   useEffect(() => {
     const el = containerRef.current;
     if (!el || typeof IntersectionObserver === 'undefined') return;
@@ -139,15 +141,19 @@ export function NativeVideoPlayer({
       (entries) => {
         entries.forEach((entry) => {
           const v = videoRef.current;
-          if (!v) return;
-          if (!entry.isIntersecting && !v.paused) {
-            v.pause();
-          } else if (entry.isIntersecting && autoPlay && v.paused) {
-            v.play().catch(() => {});
+          if (entry.isIntersecting) {
+            setInView(true);
+            if (autoPlay && v && v.paused) {
+              v.play().catch(() => {});
+            }
+          } else {
+            if (v && !v.paused) {
+              v.pause();
+            }
           }
         });
       },
-      { rootMargin: '100px 0px' }
+      { rootMargin: '300px 0px' }
     );
     obs.observe(el);
     return () => obs.disconnect();
@@ -432,11 +438,11 @@ export function NativeVideoPlayer({
         ref={videoRef}
         src={resolvedSrc}
         poster={resolvedPoster}
-        autoPlay={autoPlay}
+        autoPlay={inView ? autoPlay : false}
         loop={isLooping}
         muted={isMuted}
         playsInline={playsInline}
-        preload={preload}
+        preload={inView ? preload : 'none'}
         className={`w-full h-full object-contain pointer-events-auto cursor-pointer ${videoClassName}`}
         onClick={handleVideoCanvasClick}
         onTimeUpdate={() => {

@@ -3401,7 +3401,7 @@ export default function Home() {
                       <div className={isVisionJammed ? "blur-md select-none pointer-events-none transition-all duration-300" : ""}>
                         <div className="w-full max-w-5xl mx-auto px-3 sm:px-4 pt-3 sm:pt-4 flex flex-col gap-4 pb-24 lg:pb-16">
                           {/* ── Feed ── */}
-                          <section className="module module-primary module-glass glass-surface overflow-visible order-1">
+                          <section className="module module-primary module-glass overflow-visible order-1">
                             {collapsedModules.feed && (
                               <div className="module-header flex items-center justify-between sticky top-0 z-20">
                                 <span className="module-title">Timeline</span>

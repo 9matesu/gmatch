@@ -126,19 +126,11 @@ export function ObjectImage({
           observer.disconnect()
         }
       },
-      { rootMargin: '300px 0px' }
+      { rootMargin: '400px 0px' }
     )
     observer.observe(el)
-    // Fallback: feed cards carry [content-visibility:auto], which can suppress
-    // the observer callback for skipped subtrees — lazy media then stays blank
-    // until some later layout pass (the "images only load after opening the
-    // idle clicker" report). Stagger fallback so decode doesn't spike GPU all
-    // at once.
-    const jitter = 500 + Math.random() * 2500
-    const fallback = window.setTimeout(() => setInView(true), jitter)
     return () => {
       observer.disconnect()
-      window.clearTimeout(fallback)
     }
   }, [shouldDefer, inView])
 
