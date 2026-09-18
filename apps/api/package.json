@@ -5,6 +5,7 @@
   "scripts": {
     "serve": "bun run src/serve.ts",
     "migrate": "bun run src/migrate-cli.ts",
+    "migrate:dataurls": "bun run src/migrate-dataurls-cli.ts",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
