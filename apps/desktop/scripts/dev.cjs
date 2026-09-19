@@ -65,9 +65,17 @@ async function main() {
     }
   }
 
+  // Spawn vite directly through node: npm .cmd shims can't be exec'd by
+  // child_process.spawn on current Node (EINVAL on win32 without shell).
+  const viteBinCandidates = [
+    path.join(__dirname, '..', '..', '..', 'node_modules', 'vite', 'bin', 'vite.js'),
+    path.join(__dirname, '..', 'node_modules', 'vite', 'bin', 'vite.js'),
+  ]
+  const viteBin = viteBinCandidates.find((c) => { try { return fs.existsSync(c) } catch { return false } })
+  if (!viteBin) throw new Error('vite binary not found (run npm install from the repo root)')
   const vite = spawn(
-    process.platform === 'win32' ? 'npx.cmd' : 'npx',
-    ['vite'],
+    process.execPath,
+    [viteBin],
     {
       stdio: 'inherit',
       cwd: path.join(__dirname, '..'),

@@ -68,6 +68,9 @@ export interface FeedPost {
   mime_type?: string;
   mediaUrls?: string[];
   media?: { id: string; url: string; mime_type: string }[];
+  /** Session-only blob: URL for an own fresh post. Renders instantly without
+   *  any fetch; never persisted, replaced by server reconciliation. */
+  localPreviewUrl?: string | null;
   caption?: string;
   location?: string;
   tags?: string[];
@@ -807,7 +810,30 @@ export function GMatchFeed({
                             )}
                           </>
                         );
-                      })() : isObjectMedia ? (
+                      })() : post.localPreviewUrl ? (
+                        // Own fresh post: session blob URL renders instantly
+                        // with zero fetch while server/swarm catch up.
+                        isVideo ? (
+                          <NativeVideoPlayer
+                            src={post.localPreviewUrl}
+                            videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
+                            controls={true}
+                            alwaysShowControls={true}
+                            autoPlay={true}
+                            muted={true}
+                            loop={true}
+                            onExpand={() => setActiveLightboxPost(post)}
+                            onDoubleTapLike={() => handleDoubleTap(post)}
+                          />
+                        ) : (
+                          <img
+                            src={post.localPreviewUrl}
+                            alt={post.caption || 'Post image'}
+                            className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
+                            draggable={false}
+                          />
+                        )
+                      ) : isObjectMedia ? (
                         <ObjectImage
                           objectId={post.id}
                           contentUrl={post.url}

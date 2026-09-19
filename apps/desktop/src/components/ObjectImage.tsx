@@ -158,10 +158,13 @@ export function ObjectImage({
   if (!src) {
     // While a signed image is deferred (off-screen) or still fetching, show a
     // blank placeholder instead of "No preview" to avoid a misleading flash.
+    // A P2P-only row with no live seeder says so honestly and retries when a
+    // peer comes online (see useObjectImage PEER_ONLINE_EVENT).
     const waiting = signed && !img.failed
+    const seeding = signed && img.awaitingSeeder
     return (
       <div ref={placeholderRef} className={className || 'w-full aspect-[4/3] bg-retro-bg flex items-center justify-center text-[10px] text-retro-muted'}>
-        {waiting ? '' : 'No preview'}
+        {seeding ? 'Waiting for poster…' : waiting ? '' : 'No preview'}
       </div>
     )
   }

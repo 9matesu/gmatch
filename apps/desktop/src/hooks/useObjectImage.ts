@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { orbitFetch } from '../utils/api'
-import { getLocalObject, requestSwarmObject } from '../utils/p2pSwarm'
+import { getLocalObject, requestSwarmObject, PEER_ONLINE_EVENT } from '../utils/p2pSwarm'
 
 interface IdentityLike {
   orbitId: string
@@ -16,6 +16,10 @@ export interface ObjectImageResult {
   isVideo: boolean
   isLink: boolean
   linkUrl: string | null
+  /** True when the server confirmed a P2P-only row but no seeder answered.
+   *  The tile should read "waiting for poster", not "unavailable" — a peer
+   *  coming online (PEER_ONLINE_EVENT) triggers an automatic retry. */
+  awaitingSeeder: boolean
 }
 
 interface ImageState {
@@ -27,7 +31,7 @@ interface ImageState {
   linkUrl: string | null
 }
 
-const EMPTY: ObjectImageResult = { url: null, failed: false, isVideo: false, isLink: false, linkUrl: null }
+const EMPTY: ObjectImageResult = { url: null, failed: false, isVideo: false, isLink: false, linkUrl: null, awaitingSeeder: false }
 
 function isProtectedObjectUrl(value: string): boolean {
   return value.startsWith('/api/objects/') || value.includes('/api/objects/')
@@ -132,8 +136,26 @@ export function useObjectImage(
     return cacheGet(cardId, identity?.orbitId || '')
   })
 
+  // Retry wave for offline seeders: a failed P2P tile re-resolves when any
+  // peer comes online (PEER_ONLINE_EVENT from useP2P). Stale closures are
+  // avoided via imgRef — the listener only bumps the nonce while failed.
+  const [retryNonce, setRetryNonce] = useState(0)
+  const imgRef = useRef(img)
+  imgRef.current = img
+  const awaitingSeederRef = useRef(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const onPeerOnline = () => {
+      const cur = imgRef.current
+      if (cur && cur.failed) setRetryNonce((n) => n + 1)
+    }
+    window.addEventListener(PEER_ONLINE_EVENT, onPeerOnline)
+    return () => window.removeEventListener(PEER_ONLINE_EVENT, onPeerOnline)
+  }, [])
+
   useEffect(() => {
     if (!cardId) return
+    awaitingSeederRef.current = false
 
     if (isDirectUrl) {
       setImg({
@@ -156,6 +178,13 @@ export function useObjectImage(
 
     // Clean any accidental /api/objects/ prefix (normalized key story below)
     const cleanId = normalizeCardId(cardId)
+
+    // A seeder retry must not adopt a poisoned failure entry cached by an
+    // earlier attempt — evict so this wave fetches honestly.
+    if (retryNonce > 0) {
+      objectCache.delete(cleanId)
+      cacheSource.delete(cleanId)
+    }
 
     // Adopt a cached entry immediately if present
     if (cacheGet(cleanId, identity.orbitId)) return
@@ -268,6 +297,9 @@ export function useObjectImage(
               // Seeder offline (or still hydrating): fail WITHOUT caching so
               // a later remount/scroll retries once the seeder is back. A
               // cached failure would blank the image until LRU eviction.
+              // Mark awaitingSeeder so the tile reads "waiting for poster"
+              // and the PEER_ONLINE_EVENT listener retries automatically.
+              awaitingSeederRef.current = true
               setImg({ cardId: cleanId, url: '', failed: true, isVideo: false, isLink: false, linkUrl: null })
             }
             return
@@ -310,7 +342,7 @@ export function useObjectImage(
       cancelled = true
       if (freshUrl && !objectCache.has(cleanId)) URL.revokeObjectURL(freshUrl)
     }
-  }, [cardId, identity, enabled])
+  }, [cardId, identity, enabled, retryNonce])
 
   // Hold a pin for as long as this consumer is mounted, so the LRU can never
   // revoke the URL we are currently rendering.
@@ -324,7 +356,8 @@ export function useObjectImage(
   const normalized = normalizeCardId(cardId || '')
   if (!img || img.cardId !== normalized) {
     const cached = cardId && identity ? cacheGet(normalized, identity.orbitId) : null
-    return cached || EMPTY
+    if (!cached) return EMPTY
+    return { ...cached, url: cached.url || null, awaitingSeeder: false }
   }
   // Keep the displayed card fresh in the LRU so eviction never reclaims it
   // while it is on screen.
@@ -335,5 +368,6 @@ export function useObjectImage(
     isVideo: img.isVideo,
     isLink: img.isLink,
     linkUrl: img.linkUrl,
+    awaitingSeeder: awaitingSeederRef.current && img.failed,
   }
 }

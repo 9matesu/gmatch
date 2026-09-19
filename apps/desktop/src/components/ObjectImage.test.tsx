@@ -10,6 +10,7 @@ const hookState = {
   isVideo: false,
   isLink: false,
   linkUrl: null as string | null,
+  awaitingSeeder: false,
 }
 // Records the cardId the component hands to the hook. The point of the
 // objectId-only and bare-uuid cases is whether the id REACHES the signed
@@ -32,6 +33,7 @@ const identity = { orbitId: 'me', publicKeyHex: 'p', privateKeyHex: 'k' }
 beforeEach(() => {
   hookState.url = null
   hookState.failed = false
+  hookState.awaitingSeeder = false
 })
 
 describe('ObjectImage placeholder (T-W3)', () => {
@@ -44,6 +46,14 @@ describe('ObjectImage placeholder (T-W3)', () => {
     hookState.failed = true
     render(<ObjectImage contentUrl="/api/objects/abc" identity={identity} />)
     expect(screen.getByText('No preview')).toBeInTheDocument()
+  })
+
+  it('says "Waiting for poster…" (not "No preview") when no seeder answered', () => {
+    hookState.failed = true
+    hookState.awaitingSeeder = true
+    render(<ObjectImage contentUrl="/api/objects/abc" identity={identity} />)
+    expect(screen.getByText('Waiting for poster…')).toBeInTheDocument()
+    expect(screen.queryByText('No preview')).toBeNull()
   })
 
   it('renders the fetched blob once the signed image resolves', () => {

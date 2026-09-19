@@ -1255,6 +1255,7 @@ export default function Home() {
       const postGroup = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `pg_${Date.now()}_${Math.random().toString(36).slice(2)}`
       const mediaUrls: string[] = []
       const mediaMimes: string[] = []
+      let localPreviewUrl: string | null = null
       for (const dataUrl of mediaDataUrls) {
         const blob = dataUrlToBlob(dataUrl)
         const mime = blob.type || 'image/jpeg'
@@ -1281,6 +1282,9 @@ export default function Home() {
           uploadedAny = true
           mediaUrls.push(`/api/objects/${forged.id}`)
           mediaMimes.push(mime)
+          // Instant tile: the blob URL renders with zero fetch while the
+          // server row + swarm catch up. Session-local only.
+          if (!localPreviewUrl && forged.localUrl) localPreviewUrl = forged.localUrl
         }
       }
       if (uploadedAny) {
@@ -1293,6 +1297,7 @@ export default function Home() {
           url: primaryUrl,
           mime_type: mediaMimes[0] || 'image/jpeg',
           mediaUrls: mediaUrls.length > 1 ? mediaUrls : undefined,
+          localPreviewUrl,
           caption: caption.trim() || undefined,
           tags: tags.map((t) => t.replace(/^#/, '').toLowerCase()).filter(Boolean),
           created_at: new Date().toISOString(),

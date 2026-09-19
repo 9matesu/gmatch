@@ -246,6 +246,7 @@ export function CreatePostModal({
       const postGroup = crypto.randomUUID();
       const ids: string[] = [];
       let primaryId = '';
+      let primaryLocalUrl: string | null = null;
       for (let i = 0; i < mediaList.length; i++) {
         const item = mediaList[i];
         const formData = new FormData();
@@ -296,6 +297,8 @@ export function CreatePostModal({
           });
           ids.push(forged.id);
           if (!primaryId) primaryId = forged.id;
+          // Instant tile: render the session blob URL with zero fetch.
+          if (!primaryLocalUrl && forged.localUrl) primaryLocalUrl = forged.localUrl;
         } else {
           formData.append('url', item.previewUrl);
           formData.append('is_public', '1');
@@ -334,6 +337,7 @@ export function CreatePostModal({
         author_avatar: null,
         url: primaryId ? `/api/objects/${primaryId}` : mediaList[0].previewUrl,
         mediaUrls: ids.map((id) => `/api/objects/${id}`),
+        localPreviewUrl: primaryLocalUrl,
         caption: caption.trim(),
         location: location.trim(),
         tags: tags.split(/[\s,#]+/).map((t) => t.trim()).filter(Boolean),

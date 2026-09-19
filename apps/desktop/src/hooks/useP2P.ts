@@ -8,7 +8,7 @@ import { getApiWebSocketUrl, orbitFetch } from '../utils/api';
 import { mergeRoster } from '../utils/peerRoster';
 import { CHAT_WIPE_SECONDS } from '@orbit/shared';
 import { logger } from '../utils/logger';
-import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, type SwarmMessage } from '../utils/p2pSwarm';
+import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, announcePeerOnline, type SwarmMessage } from '../utils/p2pSwarm';
 
 const CHAT_WIPE_MS = CHAT_WIPE_SECONDS * 1000;
 const DIRECT_WEBRTC_FANOUT_LIMIT = 3;
@@ -275,12 +275,15 @@ export function useP2P(identity: OrbitIdentity | null) {
 
       logger.log('[ORBIT Network Swarm] Discovered remote peer:', data.user.display_name || data.user.id, 'Type:', data.type);
 
+      const prevSeen = peerMapRef.current.get(data.user.id);
       peerMapRef.current.set(data.user.id, {
         ...data.user,
         online: true,
         last_seen: new Date().toISOString(),
       });
       updatePeersList();
+      // Offline seeder coming back: wake failed P2P tiles so they retry.
+      if (!prevSeen || !prevSeen.online) announcePeerOnline(data.user.id);
 
       if (data.type === 'PRESENCE') {
         logger.log('[ORBIT Network Swarm] Remote peer online presence confirmed:', data.user.display_name || data.user.id);
@@ -542,7 +545,19 @@ export function useP2P(identity: OrbitIdentity | null) {
           // NOTE: an empty roster is a valid signal (everyone left) — it
           // still runs so leavers decay to offline instead of lingering.
           if (!Array.isArray(users)) return
+          const wasOnline = new Set(
+            [...peerMapRef.current.entries()]
+              .filter(([, p]) => p?.online)
+              .map(([id]) => id),
+          )
           if (mergeRoster(peerMapRef.current, users, selfUserRef.current.id)) updatePeersList()
+          // Freshly-online roster members may be seeders for failed P2P
+          // tiles — wake them to retry.
+          for (const u of users) {
+            if (u?.id && u.id !== selfUserRef.current.id && !wasOnline.has(u.id)) {
+              announcePeerOnline(u.id)
+            }
+          }
         })
         .catch(() => {})
     }
@@ -572,12 +587,14 @@ export function useP2P(identity: OrbitIdentity | null) {
       const data = event.data as P2PSwarmMessage;
       if (!data || !data.user) return;
 
+      const prevLocal = peerMapRef.current.get(data.user.id);
       peerMapRef.current.set(data.user.id, {
         ...data.user,
         online: true,
         last_seen: new Date().toISOString(),
       });
       updatePeersList();
+      if (!prevLocal || !prevLocal.online) announcePeerOnline(data.user.id);
 
       if (data.type === 'PRESENCE') {
         // Do not echo every tab's presence back into BroadcastChannel and the

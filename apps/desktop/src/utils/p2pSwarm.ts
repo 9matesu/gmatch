@@ -20,6 +20,21 @@ export type SwarmMessage =
 const localObjects = new Map<string, Blob>()
 const CHUNK_SIZE = 64 * 1024 // 64KB per WebRTC DataChannel chunk
 
+/** Broadcast by useP2P whenever a peer transitions to online (swarm or
+ *  roster). Failed P2P tiles listen for it to retry an offline seeder. */
+export const PEER_ONLINE_EVENT = 'orbit-peer-online'
+
+/** Emit PEER_ONLINE_EVENT (no-op outside a browser window). */
+export function announcePeerOnline(peerId: string): void {
+  try {
+    if (typeof window !== 'undefined' && peerId) {
+      window.dispatchEvent(new CustomEvent(PEER_ONLINE_EVENT, { detail: { peerId } }))
+    }
+  } catch {
+    /* event bus unavailable (tests/SSR) */
+  }
+}
+
 function persistToDisk(id: string, blob: Blob): void {
   // Fire-and-forget: IndexedDB write so seeded bytes survive reload in the
   // packaged app (Chromium storage lives under userData). Must await the
