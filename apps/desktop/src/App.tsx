@@ -1248,18 +1248,18 @@ export default function Home() {
           if (mime.includes('image/webp')) return 'webp'
           return 'jpg'
         })()
-        const formData = new FormData()
-        formData.append('image', blob, `post_${Date.now()}.${ext}`)
-        formData.append('is_public', '1')
-        formData.append('post_caption', caption.trim())
-        formData.append('tags', tags.join(','))
-        formData.append('post_group', postGroup)
-        const res = await orbitFetch('/api/objects', { method: 'POST', body: formData }, identity)
-        if (res.ok) {
+        const file = new File([blob], `post_${Date.now()}.${ext}`, { type: mime })
+        const { forgeMediaLocally } = await import('./services/mediaForge')
+        const forged = await forgeMediaLocally(file, identity, {
+          caption: caption.trim() || undefined,
+          postCaption: caption.trim() || undefined,
+          tags: tags.join(','),
+          isPublic: true,
+          postGroup,
+        })
+        if (forged?.id) {
           uploadedAny = true
-          const data = await res.json().catch(() => null)
-          const objectId = data?.id || `local_${Date.now()}_${mediaUrls.length}`
-          mediaUrls.push(data?.type === 'link' ? dataUrl : `/api/objects/${objectId}`)
+          mediaUrls.push(`/api/objects/${forged.id}`)
           mediaMimes.push(mime)
         }
       }
@@ -2663,15 +2663,13 @@ export default function Home() {
 
   const handleAddStory = async (file: File) => {
     try {
-      const formData = new FormData()
-      formData.append('image', file)
-      formData.append('is_story', 'true')
-      formData.append('duration_hours', '8')
-      const res = await orbitFetch('/api/objects', { method: 'POST', body: formData }, identity!)
-      if (!res.ok) {
-        const data = await res.json().catch(() => null)
-        const msg = data?.error || (res.status === 409 ? 'You already uploaded this image as a story.' : `Story upload failed (${res.status})`)
-        toast(msg, 'error')
+      const { forgeMediaLocally } = await import('./services/mediaForge')
+      const forged = await forgeMediaLocally(file, identity!, {
+        isPublic: false,
+        isStory: true,
+      })
+      if (!forged?.id) {
+        toast('Story upload failed. Try again.', 'error')
         return
       }
       loadStories()

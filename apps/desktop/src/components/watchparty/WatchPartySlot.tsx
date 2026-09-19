@@ -1,10 +1,10 @@
 'use client'
 
-// One watch-party slot: the video only. Transport lives in the timeline
-// overlay; room info lives in the rail. Empty slot = "+ Start playing".
+// One watch-party slot: the video player viewport. Transport lives in the
+// timeline overlay; room info lives in the rail. Empty slot = "+ Start playing".
 
-import { useEffect, useRef, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Play, Plus } from 'lucide-react'
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer'
 import { useObjectImage } from '../../hooks/useObjectImage'
 import { controlPlayback, serverNow, queueOp, type PartyRuntime } from '../../hooks/watchPartyStore'
@@ -34,7 +34,27 @@ export function WatchPartySlot({
   const endPauseRef = useRef(0)
   const [videoSrc, setVideoSrc] = useState<string | null>(null)
 
-  const media = useObjectImage(party?.url || null, identity, { enabled: Boolean(party?.url) })
+  // Determine current playing item's URL from queue or fallback to party.url
+  const currentItem = party?.queue.find((q) => q.id === party?.current)
+  const currentUrl = currentItem?.url || party?.url || null
+
+  // Ensure stream URLs always include the item ID so:
+  // 1. Each queue item has a distinct URL, preventing browser Range caching of previous videos
+  // 2. Switching videos triggers videoSrc change and cleanly remounts NativeVideoPlayer
+  // 3. Both local and remote Fly API endpoints know which video item is requested
+  const targetMediaUrl = useMemo(() => {
+    if (!currentUrl) return null
+    if (currentUrl.includes('/stream')) {
+      const itemId = party?.current || currentItem?.id
+      if (itemId && !currentUrl.includes('item=')) {
+        const sep = currentUrl.includes('?') ? '&' : '?'
+        return `${currentUrl}${sep}item=${encodeURIComponent(itemId)}`
+      }
+    }
+    return currentUrl
+  }, [currentUrl, party?.current, currentItem?.id])
+
+  const media = useObjectImage(targetMediaUrl, identity, { enabled: Boolean(targetMediaUrl) })
   const src = media.url
 
   useEffect(() => {
@@ -85,7 +105,7 @@ export function WatchPartySlot({
       if (plan.pause && !v.paused) v.pause()
     }, 250)
     return () => clearInterval(timer)
-  }, [party?.id, videoSrc, party?.frame])
+  }, [party?.id, videoSrc, party?.frame, party?.current, party?.host, party?.queue.length, identity.orbitId])
 
   // Stream hiccup recovery: a relay blip or upstream abort leaves a frozen
   // frame forever otherwise. Reload the element; the 250 ms sync tick above
@@ -135,38 +155,69 @@ export function WatchPartySlot({
     )
   }
 
+  const isPlaying = party.frame?.action === 'play'
+
+  const togglePlayback = () => {
+    const v = wrapRef.current?.querySelector('video')
+    const pos = v ? v.currentTime : 0
+    controlPlayback(party.id, isPlaying ? 'pause' : 'play', pos)
+  }
+
   return (
     <div
       ref={wrapRef}
       data-active={active ? 'true' : 'false'}
       onClick={onSelect}
-      className={`watch-party-slot relative ${fill ? 'absolute inset-0' : 'aspect-video'} bg-black cursor-pointer ${active ? '' : 'border border-border-glass'}`}
+      className={`watch-party-slot relative ${fill ? 'w-full h-full' : 'aspect-video'} bg-black cursor-pointer overflow-hidden flex items-center justify-center ${
+        active ? '' : 'border border-border-glass'
+      }`}
     >
       {videoSrc ? (
-        <NativeVideoPlayer
-          key={videoSrc}
-          src={videoSrc}
-          preload="auto"
-          loop={false}
-          autoPlay={false}
-          controls={false}
-          showFullscreenButton={false}
-          showPipButton={false}
-          showSpeedButton={false}
-          showLoopButton={false}
-          onPlay={() => {
-            const v = wrapRef.current?.querySelector('video')
-            controlPlayback(party.id, 'play', v ? v.currentTime : 0)
-          }}
-          onPause={() => {
-            // End-of-video pauses are local: echoing them races the host's
-            // 'next' frame and pauses the room at the next video's start.
-            if (Date.now() - endPauseRef.current < 2000) return
-            const v = wrapRef.current?.querySelector('video')
-            controlPlayback(party.id, 'pause', v ? v.currentTime : 0)
-          }}
-          className="w-full h-full"
-        />
+        <>
+          <NativeVideoPlayer
+            key={`${videoSrc}:${party?.current || ''}`}
+            src={videoSrc}
+            preload="auto"
+            loop={false}
+            autoPlay={false}
+            controls={false}
+            showFullscreenButton={false}
+            showPipButton={false}
+            showSpeedButton={false}
+            showLoopButton={false}
+            onPlay={() => {
+              const v = wrapRef.current?.querySelector('video')
+              controlPlayback(party.id, 'play', v ? v.currentTime : 0)
+            }}
+            onPause={() => {
+              // End-of-video pauses are local: echoing them races the host's
+              // 'next' frame and pauses the room at the next video's start.
+              if (Date.now() - endPauseRef.current < 2000) return
+              const v = wrapRef.current?.querySelector('video')
+              controlPlayback(party.id, 'pause', v ? v.currentTime : 0)
+            }}
+            className="w-full h-full object-contain"
+          />
+
+          {/* Big Center Play Button when paused */}
+          {!isPlaying && (
+            <div
+              className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 transition-opacity duration-300"
+            >
+              <button
+                type="button"
+                aria-label="Play party"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  togglePlayback()
+                }}
+                className="pointer-events-auto w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-black/60 hover:bg-black/80 border border-border-glass text-white flex items-center justify-center shadow-lg transition-transform duration-150 active:scale-95 cursor-pointer"
+              >
+                <Play className="w-7 h-7 sm:w-8 sm:h-8 fill-white text-white translate-x-0.5" />
+              </button>
+            </div>
+          )}
+        </>
       ) : (
         <div className="absolute inset-0 flex items-center justify-center">
           <span className="text-[10px] uppercase tracking-wider text-retro-muted">

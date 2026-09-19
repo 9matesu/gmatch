@@ -1245,6 +1245,16 @@ app.whenReady().then(async () => {
   protocol.handle(vault.SCHEME, (request) => vault.serveVault(request))
   customFolders.init(app.getPath('userData'), { ipcMain, BrowserWindow })
   ipcMain.handle('booru:fetch', (_event, payload) => fetchBooru(payload ?? {}))
+  ipcMain.handle('pmv:playlist', async (_event, id) => {
+    const rawId = String(id || '').trim()
+    if (!/^(?:[0-9a-fA-F]{24}|[a-zA-Z0-9_-]{12,32})$/.test(rawId)) return null
+    try {
+      const text = await httpGet(`https://pmvhaven.com/api/playlists/${rawId}`, { Referer: 'https://pmvhaven.com/' })
+      return JSON.parse(text)
+    } catch {
+      return null
+    }
+  })
   // Secure KV bridge (B.3): renderer proxies designated localStorage keys here.
   ipcMain.handle('secure:available', () => secureAvailable)
   ipcMain.handle('secure:get', (_event, key) => secureKV.get(String(key)))

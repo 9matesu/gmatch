@@ -7,8 +7,8 @@ import { DropZone } from './DropZone'
 import type { OrbitIdentity } from '@orbit/crypto'
 import type { User, OrbitObject } from '@orbit/shared'
 import { LazyVideo } from './LazyVideo'
-import { contentHash } from '../utils/media'
 import { logger } from '../utils/logger';
+import { forgeMediaLocally } from '../services/mediaForge'
 
 function compressImageForP2P(file: File, maxDim = 1200, quality = 0.8): Promise<string> {
   return new Promise((resolve) => {
@@ -328,37 +328,32 @@ export const SendPanel = forwardRef<SendPanelHandle, {
             is_story: isStory ? 1 : 0,
           };
 
-          const formData = new FormData()
-          formData.append('image', payloadToUpload)
-          formData.append('encrypted', isEncrypted.toString())
-          formData.append('is_story', isStory.toString())
-          formData.append('is_wallpaper', isWallpaper.toString())
-          formData.append('content_hash', await contentHash(file))
-          if (timebombHours > 0) formData.append('duration_hours', timebombHours.toString())
-          if (autoForward) formData.append('auto_forward', 'true')
-          if (isWallpaper) formData.append('mime_type', 'image/wallpaper')
-          if (caption.trim()) formData.append('caption', caption.trim())
-          if (otherRecipients.length > 0) {
-            formData.append('recipients', otherRecipients.join(','))
-          }
+          // Zero-media P2P path: seed the payload into the swarm and register
+          // metadata with the server. Never sends raw >128KB binary (422).
+          const payloadFile = payloadToUpload instanceof File
+            ? payloadToUpload
+            : new File([payloadToUpload], file.name || `media-${Date.now()}`, { type: (payloadToUpload as Blob).type || file.type })
+          const forged = await (async () => {
+            try {
+              return await forgeMediaLocally(payloadFile, identity, {
+                caption: caption.trim() || undefined,
+                isPublic: false,
+                isStory,
+                isChat: !isStory,
+                recipients: otherRecipients.length > 0 ? otherRecipients.join(',') : undefined,
+              })
+            } catch (err) {
+              let friendly = err instanceof Error ? err.message : 'Upload failed'
+              if (friendly.includes('already')) friendly = 'You already uploaded this image. Choose a different one.'
+              throw new Error(friendly)
+            }
+          })()
+          if (forged?.id) onObjectUploaded?.(forged.id)
 
           successCount++
           if (onSendP2PItem) {
-            onSendP2PItem(p2pItem)
+            onSendP2PItem({ ...p2pItem, id: forged.id })
           }
-
-          const uploadRes = await orbitFetch('/api/objects', { method: 'POST', body: formData }, identity)
-          if (!uploadRes.ok) {
-            let friendly = await uploadRes.text()
-            try {
-              const body = JSON.parse(friendly)
-              if (body?.error) friendly = body.error
-            } catch {}
-            if (uploadRes.status === 409) friendly = 'You already uploaded this image. Choose a different one.'
-            throw new Error(friendly)
-          }
-          const uploaded = await uploadRes.json().catch(() => null) as { id?: string } | null
-          if (uploaded?.id) onObjectUploaded?.(uploaded.id)
 
           const MAX_CONCURRENT_PEERS = 3
           const webrtcResults: Promise<void>[] = []

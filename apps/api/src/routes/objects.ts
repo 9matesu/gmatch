@@ -125,12 +125,23 @@ objects.post('/register', orbitAuth, async (c) => {
 
     const expiresAt = isStory ? new Date(Date.now() + 24 * 3600 * 1000).toISOString() : null
     const contentUrl = magnetUri || (contentHash ? `urn:sha256:${contentHash}` : `/api/objects/${objectId}`)
+    const recipientsRaw = typeof body.recipients === 'string' ? body.recipients : null
 
     await c.env.DB.prepare(
       'INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, caption, is_public, post_caption, location, post_tags, is_story, expires_at, content_hash, post_group, is_chat, is_avatar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(
       objectId, orbitId, sizeBytes, mimeType, contentUrl, caption, isPublic, postCaption, location, postTags, isStory, expiresAt, contentHash, postGroup, isChat, isAvatar
     ).run()
+
+    if (recipientsRaw) {
+      const ids = recipientsRaw.split(',').map((s: string) => s.trim()).filter(Boolean)
+      if (!ids.includes(orbitId)) ids.push(orbitId)
+      for (const id of ids) {
+        await c.env.DB.prepare('INSERT OR IGNORE INTO Recipients (object_id, recipient_id) VALUES (?, ?)').bind(objectId, id).run().catch(() => { })
+      }
+    } else if (isPublic !== 1) {
+      await c.env.DB.prepare('INSERT OR IGNORE INTO Recipients (object_id, recipient_id) VALUES (?, ?)').bind(objectId, orbitId).run().catch(() => { })
+    }
 
     if (isPublic === 1) {
       await c.env.DB.prepare('UPDATE Users SET posts_count = COALESCE(posts_count, 0) + 1 WHERE id = ?').bind(orbitId).run().catch(() => {})
@@ -541,10 +552,10 @@ objects.get('/:id', async (c, next) => {
     return c.json({ error: 'P2P object is stored client-side in browser IndexedDB' }, 404)
   }
 
-  let row: { id: string; owner_id: string; size_bytes: number; mime_type: string; content_url: string | null; created_at: string; is_story: number; is_public: number; is_avatar: number; hidden_at: string | null } | null = null
+  let row: { id: string; owner_id: string; size_bytes: number; mime_type: string; content_url: string | null; created_at: string; is_story: number; is_public: number; is_avatar: number; hidden_at: string | null; content_hash: string | null } | null = null
   try {
     row = await c.env.DB.prepare(
-      'SELECT o.id, o.owner_id, o.size_bytes, o.mime_type, o.content_url, o.created_at, o.is_story, o.is_public, o.is_avatar, o.hidden_at FROM Objects o WHERE o.id = ?'
+      'SELECT o.id, o.owner_id, o.size_bytes, o.mime_type, o.content_url, o.created_at, o.is_story, o.is_public, o.is_avatar, o.hidden_at, o.content_hash FROM Objects o WHERE o.id = ?'
     ).bind(id).first()
   } catch (err) {
     console.error(`Failed to load object ${id}:`, err)
@@ -601,6 +612,25 @@ objects.get('/:id', async (c, next) => {
   // Link-type objects return JSON
   if (row.mime_type === 'text/url') {
     return c.json({ type: 'link', id: row.id, url: row.content_url, created_at: row.created_at }, 200, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Credentials': 'true',
+    })
+  }
+
+  // Zero-media (register-only) rows: bytes live on the P2P swarm, never on the
+  // server. Return a descriptor the client resolves from its local store /
+  // swarm peers. NEVER fall through to BUCKET purge — there is no blob to
+  // miss, and deleting the metadata row would destroy the only record.
+  if (row.content_url && (row.content_url.startsWith('magnet:') || row.content_url.startsWith('urn:sha256:'))) {
+    return c.json({
+      type: 'p2p',
+      id: row.id,
+      content_url: row.content_url,
+      content_hash: row.content_hash,
+      mime_type: row.mime_type,
+      size_bytes: row.size_bytes,
+      created_at: row.created_at,
+    }, 200, {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Credentials': 'true',
     })

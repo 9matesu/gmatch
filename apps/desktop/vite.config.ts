@@ -119,9 +119,9 @@ export default defineConfig({
     // Also proxies Grid feed's booru mirrors for browser dev.
     proxy: {
       '^/api': {
-        target: 'https://gmatch.fly.dev',
+        target: process.env.VITE_API_URL || 'https://gmatch.fly.dev',
         changeOrigin: true,
-        secure: true,
+        secure: (process.env.VITE_API_URL || 'https://gmatch.fly.dev').startsWith('https:'),
         ws: true,
         // Fly.io sleeps idle machines: the first request wakes it (~4s) and
         // http-proxy would otherwise drop the socket, logging a raw 502 that
@@ -129,7 +129,12 @@ export default defineConfig({
         // unavailable" forever). Answer proxy transport errors with a clean
         // JSON 502 so callers can retry instead of caching death.
         configure: (proxy) => {
-          proxy.on('error', (err, _req, res) => {
+          proxy.on('error', (err: unknown, _req, res) => {
+            const code = (err as { code?: string })?.code
+            // Ignore client socket aborts/resets (normal during video seeks and queue changes)
+            if (code === 'ECONNRESET' || code === 'EPIPE' || code === 'ERR_STREAM_PREMATURE_CLOSE') {
+              return
+            }
             try {
               if (res && 'writeHead' in res && !(res as { headersSent?: boolean }).headersSent) {
                 ;(res as { writeHead: (s: number, h: Record<string, string>) => void; end: (b: string) => void }).writeHead(502, { 'Content-Type': 'application/json' })
@@ -138,6 +143,12 @@ export default defineConfig({
             } catch { /* socket already gone */ }
           })
         },
+      },
+      '^/pmv-api': {
+        target: 'https://pmvhaven.com',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/pmv-api/, '/api'),
+        headers: { Referer: 'https://pmvhaven.com/', 'User-Agent': DEV_UA },
       },
       '^/booru/tbib': {
         target: 'https://tbib.org',

@@ -75,4 +75,13 @@ describe('WatchPartyQueue', () => {
     fireEvent.click(screen.getByRole('button', { name: /add and play/i }))
     await waitFor(() => expect(loadPartyVideos).toHaveBeenCalledWith(identity, 'p1', ['https://x'], false))
   })
+
+  it('truncation displays queue limit notice and clears input', async () => {
+    vi.mocked(loadPartyVideos).mockResolvedValueOnce({ ok: true, added: 2, failed: [], truncated: true })
+    render(<WatchPartyQueue party={party} identity={identity} />)
+    fireEvent.click(screen.getByRole('button', { name: /add to queue/i }))
+    fireEvent.change(screen.getByLabelText('Queue video URLs'), { target: { value: 'https://a\nhttps://b\nhttps://c' } })
+    fireEvent.click(screen.getByRole('button', { name: /^add$/i }))
+    expect(await screen.findByText(/Queue limit \(50\) reached/)).toBeTruthy()
+  })
 })

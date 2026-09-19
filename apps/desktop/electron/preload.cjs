@@ -56,6 +56,7 @@ contextBridge.exposeInMainWorld('gmatch', {
   blocklistGet: () => ipcRenderer.invoke('blocklist:get'),
   blocklistSet: (data) => ipcRenderer.invoke('blocklist:set', data),
   blocklistReset: () => ipcRenderer.invoke('blocklist:reset'),
+  pmvPlaylist: (id) => ipcRenderer.invoke('pmv:playlist', id),
   logError: (scope, msg) => { try { ipcRenderer.send('log:renderer', { scope: String(scope || ''), msg: String(msg || '') }) } catch { /* never log-loop */ } },
   openLogFolder: () => ipcRenderer.invoke('app:open-log'),
 })

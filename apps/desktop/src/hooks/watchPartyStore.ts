@@ -260,7 +260,93 @@ function maybeUnsubscribe(): void {
   }
 }
 
-export async function createParty(identity: IdentityLike, url: string, name: string): Promise<{ ok: boolean; partyId?: string; error?: string }> {
+export interface ExpandPlaylistResult {
+  ok: boolean
+  isPlaylist: boolean
+  count: number
+  playlistTitle?: string
+  items: Array<{ url: string; title?: string; playlistTitle?: string }>
+  error?: string
+}
+
+export async function expandPlaylist(identity: IdentityLike, url: string): Promise<ExpandPlaylistResult> {
+  // 1. Try server-side expansion first
+  try {
+    const res = await orbitFetch('/api/watchparty/expand', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    }, identity)
+    if (res.ok) {
+      const body = await res.json().catch(() => ({})) as any
+      const items = Array.isArray(body.items) ? body.items : []
+      if (body.isPlaylist && items.length > 0) {
+        return {
+          ok: true,
+          isPlaylist: true,
+          count: Number(body.count) || items.length,
+          playlistTitle: body.playlistTitle,
+          items,
+        }
+      }
+    }
+  } catch {
+    /* Fall through to client-side expander */
+  }
+
+  // 2. Client-side fallback: handles pmvhaven playlists even if central node is an older deploy
+  const m = url.match(/(?:https?:\/\/)?(?:www\.)?pmvhaven\.com\/playlists?\/([0-9a-fA-F]{24}|[a-zA-Z0-9_-]{12,32})/i)
+  if (m) {
+    const playlistId = m[1]
+    try {
+      let data: any = null
+      if (typeof window !== 'undefined' && (window as any).gmatch?.pmvPlaylist) {
+        data = await (window as any).gmatch.pmvPlaylist(playlistId)
+      } else {
+        const reqUrl = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+          ? `/pmv-api/playlists/${playlistId}`
+          : `https://pmvhaven.com/api/playlists/${playlistId}`
+        const res = await fetch(reqUrl, {
+          signal: AbortSignal.timeout(10_000),
+        })
+        if (res.ok) data = await res.json().catch(() => null)
+      }
+
+      if (data?.data) {
+        const playlistName = typeof data.data.name === 'string' ? data.data.name.trim().slice(0, 60) : undefined
+        const vids = Array.isArray(data.data.videos) ? data.data.videos : []
+        const items = vids
+          .map((v: unknown) => {
+            if (typeof v === 'string') {
+              return /^[0-9a-f]{24}$/.test(v) ? { url: `https://pmvhaven.com/video/${v}`, playlistTitle: playlistName } : null
+            }
+            const id = String((v as any)?._id || (v as any)?.id || '')
+            const rawTitle = typeof (v as any)?.title === 'string' ? (v as any).title : (typeof (v as any)?.name === 'string' ? (v as any).name : '')
+            const title = rawTitle ? rawTitle.trim().slice(0, 60) : undefined
+            return /^[0-9a-f]{24}$/.test(id) ? { url: `https://pmvhaven.com/video/${id}`, title, playlistTitle: playlistName } : null
+          })
+          .filter((it: any): it is { url: string; title?: string; playlistTitle?: string } => Boolean(it))
+          .slice(0, 50)
+
+        if (items.length > 0) {
+          return {
+            ok: true,
+            isPlaylist: true,
+            count: items.length,
+            playlistTitle: playlistName,
+            items,
+          }
+        }
+      }
+    } catch {
+      /* ignore and return single item below */
+    }
+  }
+
+  return { ok: true, isPlaylist: false, count: 1, items: [{ url }] }
+}
+
+export async function createParty(identity: IdentityLike, url: string, name: string): Promise<{ ok: boolean; partyId?: string; error?: string; truncated?: boolean }> {
   let res: Response
   try {
     res = await orbitFetch('/api/watchparty', {
@@ -274,12 +360,12 @@ export async function createParty(identity: IdentityLike, url: string, name: str
   const body = await res.json().catch(() => ({})) as any
   if (!res.ok) return { ok: false, error: body?.error || 'Could not find a playable video at that link.' }
   joinParty(identity, body.party)
-  return { ok: true, partyId: body.party?.id }
+  return { ok: true, partyId: body.party?.id, truncated: Boolean(body?.truncated) }
 }
 
 /** Resolve + queue/change a room's video over HTTP (the server runs the
  * media pipeline, then relays the queue frame). */
-export async function loadPartyVideo(identity: IdentityLike, partyId: string, url: string, name: string, queueOnly = false): Promise<{ ok: boolean; error?: string }> {
+export async function loadPartyVideo(identity: IdentityLike, partyId: string, url: string, name: string, queueOnly = false): Promise<{ ok: boolean; error?: string; added?: number; failed?: string[]; truncated?: boolean }> {
   try {
     const res = await orbitFetch(`/api/watchparty/${partyId}/video`, {
       method: 'POST',
@@ -288,7 +374,7 @@ export async function loadPartyVideo(identity: IdentityLike, partyId: string, ur
     }, identity)
     const body = await res.json().catch(() => ({})) as any
     if (!res.ok) return { ok: false, error: body?.error || 'Could not find a playable video at that link.' }
-    return { ok: true }
+    return { ok: true, added: (body.added || []).length, failed: body.failed || [], truncated: Boolean(body?.truncated) }
   } catch {
     return { ok: false, error: 'Could not reach the server.' }
   }
@@ -296,7 +382,7 @@ export async function loadPartyVideo(identity: IdentityLike, partyId: string, ur
 
 export async function loadPartyVideos(
   identity: IdentityLike, partyId: string, urls: string[], queueOnly = false,
-): Promise<{ ok: boolean; added: number; failed: string[]; error?: string }> {
+): Promise<{ ok: boolean; added: number; failed: string[]; truncated?: boolean; error?: string }> {
   try {
     const res = await orbitFetch(`/api/watchparty/${partyId}/video`, {
       method: 'POST',
@@ -305,7 +391,7 @@ export async function loadPartyVideos(
     }, identity)
     const body = await res.json().catch(() => ({})) as any
     if (!res.ok) return { ok: false, added: 0, failed: Array.isArray(body?.failed) ? body.failed.map(String) : [], error: body?.error || 'Could not load these videos.' }
-    return { ok: true, added: (body.added || []).length, failed: body.failed || [] }
+    return { ok: true, added: (body.added || []).length, failed: body.failed || [], truncated: Boolean(body?.truncated) }
   } catch {
     return { ok: false, added: 0, failed: [], error: 'Could not reach the server.' }
   }

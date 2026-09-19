@@ -42,5 +42,11 @@ describe('mediaForge (Zero-Fly Local Seeding)', () => {
     const parsedBody = JSON.parse(callInit.body)
     expect(parsedBody.content_hash).toBe(result.contentHash)
     expect(parsedBody.size_bytes).toBe(file.size)
+
+    // Verify local swarm registration occurred
+    const { getLocalObject } = await import('../utils/p2pSwarm')
+    const stored = await getLocalObject(result.id)
+    expect(stored).not.toBeNull()
+    expect(stored?.size).toBe(file.size)
   })
 })

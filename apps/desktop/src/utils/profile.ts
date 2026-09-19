@@ -8,20 +8,17 @@ export const MAX_DISPLAY_NAME_LENGTH = 50;
 export const MAX_BIO_LENGTH = 150;
 export const MAX_WEBSITE_LENGTH = 200;
 
-/** Upload a data: image as multipart bytes to /api/objects; returns the
+/** Forge an avatar via the zero-media P2P path; returns the
  * private object ref the profile row stores ('/api/objects/<id>'). */
 async function uploadAvatarBytes(identity: OrbitIdentity, dataUrl: string): Promise<string | null> {
   try {
     const blob = await fetch(dataUrl).then((r) => r.blob());
     if (!blob.size) return null;
     const ext = (blob.type.split('/')[1] || 'jpeg').split('+')[0];
-    const form = new FormData();
-    form.append('image', new File([blob], `avatar.${ext}`, { type: blob.type || 'image/jpeg' }));
-    form.append('is_avatar', '1');
-    const res = await orbitFetch('/api/objects', { method: 'POST', body: form }, identity);
-    if (!res.ok) return null;
-    const data = await res.json().catch(() => null);
-    return data?.id ? `/api/objects/${data.id}` : null;
+    const file = new File([blob], `avatar.${ext}`, { type: blob.type || 'image/jpeg' });
+    const { forgeMediaLocally } = await import('../services/mediaForge');
+    const forged = await forgeMediaLocally(file, identity, { isPublic: false, isAvatar: true });
+    return forged?.id ? `/api/objects/${forged.id}` : null;
   } catch {
     return null;
   }

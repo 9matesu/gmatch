@@ -151,12 +151,14 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
       const isPublicRequested = payload.isPublic !== undefined ? Boolean(payload.isPublic) : true;
       const makePublic = isPublicConsent && isPublicRequested;
 
-      const formData = new FormData();
-      formData.append('image', dataUrl);
-      formData.append('caption', `Photo sent to ${from}`);
-      formData.append('is_public', makePublic ? '1' : '0');
-      if (!makePublic) formData.append('recipients', from);
-      await orbitFetch('/api/objects', { method: 'POST', body: formData }, identity);
+      const blob = await fetch(dataUrl).then((r) => r.blob());
+      const file = new File([blob], `domination-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      const { forgeMediaLocally } = await import('../../services/mediaForge');
+      await forgeMediaLocally(file, identity, {
+        caption: `Photo sent to ${from}`,
+        isPublic: makePublic,
+        recipients: !makePublic ? from : undefined,
+      });
       // A delivered photo IS the receipt for a camera action.
       if (payload.actionId) {
         void orbitFetch(`/api/domination/ack/${payload.actionId}`, { method: 'POST' }, identity).catch(() => { });

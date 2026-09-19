@@ -12,7 +12,9 @@ vi.mock('./proxy', async (importOriginal) => {
     // >50MB path: store attempt fails, resolver finds the mp4.
     proxyAndStoreExternal: vi.fn(async () => null),
     classifyAndResolve: vi.fn(async (url: string) =>
-      url.includes('junk') ? url : 'https://example.com/show.mp4'),
+      url.includes('junk')
+        ? url
+        : (url.includes('show_abc') ? 'https://example.com/show.mp4' : `https://example.com/${url.split('/').pop() || 'show'}.mp4`)),
   }
 })
 
@@ -44,7 +46,7 @@ async function createRelayParty(): Promise<string> {
   }, env)
   expect(res.status).toBe(201)
   const json: any = await res.json()
-  expect(json.party.url).toBe(`/api/watchparty/${json.party.id}/stream`)
+  expect(json.party.url).toBe(`/api/watchparty/${json.party.id}/stream?item=${json.party.queue[0].id}`)
   return json.party.id
 }
 
@@ -251,6 +253,102 @@ describe('pmvhaven playlist expansion (alpha)', () => {
     const json: any = await res.json()
     expect(json.added.length).toBe(1)
     expect(json.failed).toEqual([])
+    vi.unstubAllGlobals()
+  })
+
+  it('POST /api/watchparty/expand inspects playlist link and returns playlist metadata', async () => {
+    stubPlaylistApi()
+    const body = JSON.stringify({ url: PL })
+    const res = await app.request('/api/watchparty/expand', {
+      method: 'POST',
+      headers: auth('POST', '/api/watchparty/expand', body),
+      body,
+    }, env)
+    expect(res.status).toBe(200)
+    const json: any = await res.json()
+    expect(json.ok).toBe(true)
+    expect(json.isPlaylist).toBe(true)
+    expect(json.count).toBe(2)
+    expect(json.items[0].url).toContain(A)
+    expect(json.items[1].url).toContain(B)
+    vi.unstubAllGlobals()
+  })
+
+  it('streams item-specific upstream when ?item= query parameter is provided', async () => {
+    stubPlaylistApi()
+    const partyId = await createRelayParty()
+    const body = JSON.stringify({ queueOnly: true, urls: [PL] })
+    const res = await app.request(`/api/watchparty/${partyId}/video`, {
+      method: 'POST',
+      headers: auth('POST', `/api/watchparty/${partyId}/video`, body),
+      body,
+    }, env)
+    expect(res.status).toBe(200)
+    const json: any = await res.json()
+    expect(json.added.length).toBe(2)
+
+    const itemB = json.added[1]
+    const streamMock = vi.fn(async () => new Response('video-data', {
+      status: 206,
+      headers: { 'content-type': 'video/mp4', 'content-range': 'bytes 0-9/10' },
+    }))
+    vi.stubGlobal('fetch', streamMock)
+
+    const streamRes = await app.request(`/api/watchparty/${partyId}/stream?item=${itemB.id}`, {}, env)
+    expect(streamRes.status).toBe(206)
+    const [upUrl] = streamMock.mock.calls[0] as unknown as [string, any]
+    expect(upUrl).toBe(`https://example.com/${B}.mp4`)
+    vi.unstubAllGlobals()
+  })
+
+  it('POST /api/watchparty expands playlist on creation, starts 1st video, and queues remaining', async () => {
+    stubPlaylistApi()
+    __resetParties()
+    const body = JSON.stringify({ url: PL, name: 'Party with Playlist' })
+    const res = await app.request('/api/watchparty', {
+      method: 'POST',
+      headers: auth('POST', '/api/watchparty', body),
+      body,
+    }, env)
+    expect(res.status).toBe(201)
+    const json: any = await res.json()
+    expect(json.party.name).toBe('Party with Playlist')
+    expect(json.party.url).toMatch(new RegExp(`^/api/watchparty/${json.party.id}/stream\\?item=`))
+    expect(json.party.queue.length).toBeGreaterThanOrEqual(1)
+
+    // Wait briefly for background resolution of remaining playlist items
+    await new Promise((r) => setTimeout(r, 100))
+    const partySnap = await app.request(`/api/watchparty/${json.party.id}`, {
+      headers: auth('GET', `/api/watchparty/${json.party.id}`),
+    }, env)
+    const snapJson: any = await partySnap.json()
+    expect(snapJson.queue.length).toBe(2)
+    expect(snapJson.queue[0].id).not.toBe(snapJson.queue[1].id)
+    vi.unstubAllGlobals()
+  })
+
+  it('reports truncation when adding more items than capacity', async () => {
+    stubPlaylistApi()
+    const partyId = await createRelayParty()
+    const { getParty } = await import('./watchparty')
+    const liveParty = getParty(partyId)!
+    for (let i = 0; i < 48; i++) {
+      liveParty.queue.push({ id: `q${i}`, name: `Video ${i}`, url: `https://example.com/v${i}.mp4` })
+    }
+    expect(liveParty.queue.length).toBe(49)
+
+    // Add playlist with 2 items; capacity is 1 (50 - 49 = 1)
+    const body = JSON.stringify({ queueOnly: true, urls: [PL] })
+    const res = await app.request(`/api/watchparty/${partyId}/video`, {
+      method: 'POST',
+      headers: auth('POST', `/api/watchparty/${partyId}/video`, body),
+      body,
+    }, env)
+    expect(res.status).toBe(200)
+    const json: any = await res.json()
+    expect(json.added.length).toBe(1)
+    expect(json.truncated).toBe(true)
+    expect(liveParty.queue.length).toBe(50)
     vi.unstubAllGlobals()
   })
 })

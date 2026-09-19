@@ -631,7 +631,7 @@ export function GMatchFeed({
             const currentLikes = likeCounts[post.id] ?? post.like_count ?? 0;
             const postComments = commentsMap[post.id] || [];
             const authorHasStory = storyOwners.has(post.author_id);
-           const isObjectMedia = post.url.includes('/api/objects/') || !post.url;
+            const isObjectMedia = post.url.includes('/api/objects/') || !post.url || post.url.startsWith('magnet:') || post.url.startsWith('urn:sha256:') || post.url.startsWith('p2p-');
            const isVideo = isMediaVideo(post.mime_type || post.url);
            const isNewPost = animatedPostIds.has(post.id);
            const multiMedia = Array.isArray(post.media) && post.media.length > 1 ? post.media : null;
@@ -765,7 +765,7 @@ export function GMatchFeed({
                         const item = multiMedia[currentIdx];
                         const url = item.url;
                         const mime = item.mime_type;
-                        const isObj = url.includes('/api/objects/') || !url;
+                        const isObj = url.includes('/api/objects/') || !url || url.startsWith('magnet:') || url.startsWith('urn:sha256:') || url.startsWith('p2p-');
                         const isVid = isMediaVideo(mime || url);
                         return (
                           <>

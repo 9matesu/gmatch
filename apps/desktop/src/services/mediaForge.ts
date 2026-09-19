@@ -1,6 +1,7 @@
 import { OrbitIdentity } from '@orbit/crypto'
 import { orbitFetch } from '../utils/api'
 import { buildMagnetUri } from '../utils/magnet'
+import { registerLocalObject } from '../utils/p2pSwarm'
 
 export interface ForgedMedia {
   id: string
@@ -24,17 +25,26 @@ export async function forgeMediaLocally(
   identity: OrbitIdentity,
   options: {
     caption?: string
+    postCaption?: string
+    location?: string
     isPublic?: boolean
     isStory?: boolean
     isAvatar?: boolean
+    isChat?: boolean
+    postGroup?: string
     tags?: string
+    recipients?: string
   } = {}
 ): Promise<ForgedMedia> {
   const contentHash = await hashFileSha256(file)
   const objectId = crypto.randomUUID()
   const magnetUri = buildMagnetUri(contentHash.slice(0, 40), options.caption || file.name)
 
-  // 1. Keep local reference (local blob URL or electron vault pin)
+  // 1. Seed into the swarm store immediately (both by objectId and contentHash)
+  registerLocalObject(objectId, file)
+  registerLocalObject(contentHash, file)
+
+  // 2. Keep local reference (local blob URL or electron vault pin)
   let localUrl = ''
   try {
     if (typeof window !== 'undefined' && window.gmatch?.vaultPin) {
@@ -48,7 +58,7 @@ export async function forgeMediaLocally(
     localUrl = URL.createObjectURL(file)
   }
 
-  // 2. Register metadata ONLY with the backend — ZERO BINARY BYTES SENT TO FLY.IO
+  // 3. Register metadata ONLY with the backend — ZERO BINARY BYTES SENT TO FLY.IO
   const payload = {
     id: objectId,
     content_hash: contentHash,
@@ -56,10 +66,15 @@ export async function forgeMediaLocally(
     mime_type: file.type || 'application/octet-stream',
     magnet_uri: magnetUri,
     caption: options.caption || null,
+    post_caption: options.postCaption || options.caption || null,
+    location: options.location || null,
     is_public: options.isPublic ?? true,
     is_story: options.isStory ?? false,
     is_avatar: options.isAvatar ?? false,
+    is_chat: options.isChat ?? false,
+    post_group: options.postGroup || null,
     tags: options.tags || null,
+    recipients: options.recipients || null,
   }
 
   const res = await orbitFetch('/api/objects/register', {

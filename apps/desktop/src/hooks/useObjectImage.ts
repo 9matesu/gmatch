@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { orbitFetch } from '../utils/api'
-import { getLocalObject } from '../utils/p2pSwarm'
+import { getLocalObject, requestSwarmObject } from '../utils/p2pSwarm'
 
 interface IdentityLike {
   orbitId: string
@@ -205,6 +205,72 @@ export function useObjectImage(
         if (contentType.includes('json')) {
           const data = await res.json().catch(() => null)
           if (cancelled) return
+          if (data && data.type === 'p2p') {
+            // Zero-media register-only row: bytes live on the swarm, not the server.
+            // Resolve order: local store (also keyed by content_hash) -> swarm peers.
+            const hash: string | null = typeof data.content_hash === 'string' ? data.content_hash : null
+            const mime: string = typeof data.mime_type === 'string' ? data.mime_type : 'application/octet-stream'
+            const local =
+              (await getLocalObject(cleanId)) ||
+              (hash ? await getLocalObject(hash) : null)
+            if (local) {
+              if (cancelled) return
+              freshUrl = URL.createObjectURL(local)
+              const loaded: ImageState = {
+                cardId: cleanId,
+                url: freshUrl,
+                failed: false,
+                isVideo: mime.startsWith('video/'),
+                isLink: false,
+                linkUrl: null,
+              }
+              cacheSet(cleanId, identity?.orbitId || '', loaded)
+              setImg(loaded)
+              return
+            }
+            // Ask the swarm by object id, then by content_hash alias — a
+            // restarted seeder may only hold the hash-keyed copy.
+            let blob: Blob | null = null
+            try {
+              blob = await requestSwarmObject(cleanId)
+            } catch {
+              if (hash) {
+                try {
+                  blob = await requestSwarmObject(hash)
+                } catch {
+                  blob = null
+                }
+              }
+            }
+            if (blob) {
+              if (hash) {
+                try {
+                  const { registerLocalObject } = await import('../utils/p2pSwarm')
+                  registerLocalObject(cleanId, blob)
+                } catch {
+                  /* cache alias best-effort */
+                }
+              }
+              if (cancelled) return
+              freshUrl = URL.createObjectURL(blob)
+              const loaded: ImageState = {
+                cardId: cleanId,
+                url: freshUrl,
+                failed: false,
+                isVideo: (blob.type || mime).startsWith('video/'),
+                isLink: false,
+                linkUrl: null,
+              }
+              cacheSet(cleanId, identity?.orbitId || '', loaded)
+              setImg(loaded)
+            } else {
+              if (cancelled) return
+              const failedState: ImageState = { cardId: cleanId, url: '', failed: true, isVideo: false, isLink: false, linkUrl: null }
+              cacheSet(cleanId, identity?.orbitId || '', failedState)
+              setImg(failedState)
+            }
+            return
+          }
           const linkState: ImageState = {
             cardId: cleanId,
             url: '',

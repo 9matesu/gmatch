@@ -55,7 +55,14 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
       return
     }
     if (res.failed.length > 0) {
-      setError(`Added ${res.added}. Failed ${res.failed.length}: ${res.failed[0]}`)
+      const truncNote = res.truncated ? ' (Queue reached 50 limit)' : ''
+      setError(`Added ${res.added}. Failed ${res.failed.length}: ${res.failed[0]}${truncNote}`)
+      if (res.added > 0) setText('')
+      return
+    }
+    if (res.truncated) {
+      setError(`Queue limit (50) reached. Added ${res.added} videos; remaining were omitted.`)
+      setText('')
       return
     }
     setText('')

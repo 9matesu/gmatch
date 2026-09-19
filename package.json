@@ -1,6 +1,6 @@
 {
   "name": "gmatch",
-  "version": "1.2.8",
+  "version": "1.4.0",
   "private": true,
   "type": "module",
   "workspaces": [

@@ -182,9 +182,11 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
         payloadFile = await mediaUrlToCachedFile(url.trim());
       }
       setProgress(30);
+      // Cards are private media (isPublic false): the canonical card route
+      // rejects posts/stories/chat/avatars as card sources.
       const forged = await forgeMediaLocally(payloadFile, identity, {
         caption: name,
-        isPublic: true,
+        isPublic: false,
       });
 
       setProgress(80);

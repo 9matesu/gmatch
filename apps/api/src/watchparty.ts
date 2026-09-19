@@ -379,12 +379,14 @@ export function queueOps(userId: string, msg: any): { room: string; payload: any
   if (op === 'add') {
     const url = typeof msg.url === 'string' ? msg.url : ''
     if (!url) return null
+    const entryId = (typeof msg.id === 'string' && msg.id.trim()) ? msg.id.trim().slice(0, 8) : randomUUID().slice(0, 8)
     party.queue.push({
-      id: randomUUID().slice(0, 8),
+      id: entryId,
       name: (typeof msg.name === 'string' ? msg.name : '').slice(0, 60) || 'Untitled',
       url,
       relay: msg.relay && typeof msg.relay.upstream === 'string' ? msg.relay : undefined,
     })
+    addPartyMedia(party, url)
     while (party.queue.length > MAX_QUEUE) {
       const dropIdx = party.queue.findIndex((q) => q.id !== party.current)
       party.queue.splice(dropIdx < 0 ? 0 : dropIdx, 1)

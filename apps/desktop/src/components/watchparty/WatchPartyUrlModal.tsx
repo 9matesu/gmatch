@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import { Modal } from '../Modal'
 import { BTN_PRIMARY } from '../../ui/styles'
-import { createParty, loadPartyVideo, loadPartyVideos } from '../../hooks/watchPartyStore'
+import { createParty, expandPlaylist, loadPartyVideo, loadPartyVideos } from '../../hooks/watchPartyStore'
 
 interface IdentityLike {
   orbitId: string
@@ -33,6 +33,7 @@ export function WatchPartyUrlModal({
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [statusText, setStatusText] = useState<string | null>(null)
 
   const inRoom = Boolean(joinPartyId)
   const blocked = inRoom && lockVideo
@@ -41,33 +42,130 @@ export function WatchPartyUrlModal({
     if (!url.trim() || busy || blocked) return
     setBusy(true)
     setError(null)
+    setStatusText(null)
+
+    const trimmedUrl = url.trim()
+    const lines = trimmedUrl.split(/\n+/).map((l) => l.trim()).filter(Boolean)
+
+    // Inspect / expand link if it might be a playlist
+    setStatusText('Checking link...')
+    const expandRes = await expandPlaylist(identity, trimmedUrl)
+
+    const isPlaylist = Boolean(expandRes.ok && expandRes.isPlaylist && (expandRes.items?.length ?? 0) > 1)
+    const expandedUrls = isPlaylist && expandRes.items ? expandRes.items.map((it) => it.url) : lines
+
     if (!inRoom) {
-      const lines = url.split(/\n+/).map((l) => l.trim()).filter(Boolean)
-      const res = await createParty(identity, lines[0], name.trim())
-      if (!res.ok) {
-        setBusy(false)
-        setError(res.error || 'Could not start the party.')
-        return
-      }
-      if (lines.length > 1) {
-        // The party exists; a failed tail is a warning, not a failure.
+      if (isPlaylist) {
+        setStatusText(`Detected playlist: ${expandedUrls.length} videos found. Starting party with video 1...`)
+        const partyName = name.trim() || expandRes.playlistTitle || 'Party'
+        const res = await createParty(identity, expandedUrls[0], partyName)
+        if (!res.ok) {
+          setBusy(false)
+          setStatusText(null)
+          setError(res.error || 'Could not start the party.')
+          return
+        }
         const partyId = res.partyId || ''
-        const bulk = partyId
-          ? await loadPartyVideos(identity, partyId, lines.slice(1, 11), true)
-          : { ok: false as const, added: 0, failed: lines.slice(1) }
-        if (!bulk.ok || bulk.failed.length > 0) {
-          setError(`Party started. ${bulk.failed.length} videos failed to queue.`)
+        const remainingUrls = expandedUrls.slice(1)
+        if (remainingUrls.length > 0 && partyId) {
+          let totalAdded = 0
+          for (let i = 0; i < remainingUrls.length; i += 10) {
+            const batch = remainingUrls.slice(i, i + 10)
+            const end = Math.min(i + 10, remainingUrls.length)
+            setStatusText(`Party created! Queuing videos ${i + 1}-${end} of ${remainingUrls.length}...`)
+            const bulk = await loadPartyVideos(identity, partyId, batch, true)
+            if (!bulk.ok || bulk.failed.length === batch.length) {
+              setError(`Party started. ${bulk.failed.length} videos failed to queue.`)
+              setBusy(false)
+              setStatusText(null)
+              return
+            }
+            totalAdded += bulk.added
+          }
+          setStatusText(`All ${totalAdded || remainingUrls.length} videos added to queue! Entering room...`)
+        }
+      } else if (lines.length > 1) {
+        setStatusText(`Starting party with video 1 of ${lines.length}...`)
+        const res = await createParty(identity, lines[0], name.trim())
+        if (!res.ok) {
+          setBusy(false)
+          setStatusText(null)
+          setError(res.error || 'Could not start the party.')
+          return
+        }
+        const partyId = res.partyId || ''
+        const remainingUrls = lines.slice(1)
+        if (partyId && remainingUrls.length > 0) {
+          let totalAdded = 0
+          for (let i = 0; i < remainingUrls.length; i += 10) {
+            const batch = remainingUrls.slice(i, i + 10)
+            const end = Math.min(i + 10, remainingUrls.length)
+            setStatusText(`Party created! Queuing videos ${i + 1}-${end} of ${remainingUrls.length}...`)
+            const bulk = await loadPartyVideos(identity, partyId, batch, true)
+            if (!bulk.ok || bulk.failed.length === batch.length) {
+              setError(`Party started. ${bulk.failed.length} videos failed to queue.`)
+              setBusy(false)
+              setStatusText(null)
+              return
+            }
+            totalAdded += bulk.added
+          }
+          setStatusText(`All ${totalAdded || remainingUrls.length} videos added to queue! Entering room...`)
+        }
+      } else {
+        setStatusText('Starting party...')
+        const res = await createParty(identity, lines[0], name.trim())
+        if (!res.ok) {
+          setBusy(false)
+          setStatusText(null)
+          setError(res.error || 'Could not start the party.')
+          return
         }
       }
     } else {
-      const res = await loadPartyVideo(identity, joinPartyId as string, url.trim(), name.trim(), queueMode)
-      if (!res.ok) {
-        setBusy(false)
-        setError(res.error || 'Could not load this video.')
-        return
+      const targetPartyId = joinPartyId as string
+      if (isPlaylist || lines.length > 1) {
+        const toQueue = isPlaylist ? expandedUrls : lines
+        let totalAdded = 0
+        for (let i = 0; i < toQueue.length; i += 10) {
+          const batch = toQueue.slice(i, i + 10)
+          const end = Math.min(i + 10, toQueue.length)
+          setStatusText(`Adding videos ${i + 1}-${end} of ${toQueue.length} to queue...`)
+          const res = await loadPartyVideos(identity, targetPartyId, batch, queueMode)
+          if (!res.ok) {
+            setBusy(false)
+            setStatusText(null)
+            setError(res.error || 'Could not load these videos.')
+            return
+          }
+          if (res.failed.length === batch.length) {
+            setError(`Failed to queue: ${res.failed[0]}`)
+            setBusy(false)
+            setStatusText(null)
+            return
+          }
+          totalAdded += res.added
+        }
+        setStatusText(`Added ${totalAdded} videos to queue!`)
+      } else {
+        setStatusText('Loading video...')
+        const res = await loadPartyVideo(identity, targetPartyId, trimmedUrl, name.trim(), queueMode)
+        if (!res.ok) {
+          setBusy(false)
+          setStatusText(null)
+          setError(res.error || 'Could not load this video.')
+          return
+        }
+        if (res.failed && res.failed.length > 0) {
+          setError(`Failed to load: ${res.failed[0]}`)
+          setBusy(false)
+          setStatusText(null)
+          return
+        }
       }
     }
     setBusy(false)
+    setStatusText(null)
     onClose()
   }
 
@@ -79,13 +177,23 @@ export function WatchPartyUrlModal({
           aria-label="Video URL"
           value={url}
           rows={inRoom ? 2 : 4}
-          placeholder={inRoom ? 'Video URL or page link' : 'Video URLs, one per line (first starts the party)'}
+          placeholder={inRoom ? 'Video or playlist URLs, one per line' : 'Video or playlist URLs, one per line (first starts the party)'}
           onChange={(e) => setUrl(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && (inRoom || e.ctrlKey || e.metaKey)) void submit() }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              if (inRoom && !e.shiftKey && !url.includes('\n')) {
+                e.preventDefault()
+                void submit()
+              } else if (e.ctrlKey || e.metaKey) {
+                e.preventDefault()
+                void submit()
+              }
+            }
+          }}
           className="glass-field w-full px-3 py-2 text-xs font-mono resize-y"
         />
         <p className="text-[10px] text-retro-muted">
-          Direct .mp4 links and video pages (pmvhaven, redgifs, X, Reddit) are parsed server-side.
+          Direct .mp4 links, playlists, and video pages (pmvhaven, redgifs, X, Reddit) are parsed server-side.
         </p>
         {!inRoom && (
           <input
@@ -99,6 +207,12 @@ export function WatchPartyUrlModal({
           />
         )}
         {blocked && <p className="text-xs text-retro-muted">Only the host can load videos in this room.</p>}
+        {statusText && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded bg-glass-w5 border border-border-glass text-xs font-mono text-retro-fg animate-orbit-fade-in">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+            <span className="truncate">{statusText}</span>
+          </div>
+        )}
         {error && <p className="text-xs text-retro-error">{error}</p>}
         <div className="flex gap-2">
           <button
@@ -107,7 +221,7 @@ export function WatchPartyUrlModal({
             disabled={!url.trim() || busy || blocked}
             className={`${BTN_PRIMARY} flex-1 py-2 text-xs disabled:opacity-40`}
           >
-            {busy ? 'Parsing...' : inRoom ? (queueMode ? 'ADD TO QUEUE' : 'LOAD VIDEO') : 'START PARTY'}
+            {busy ? (statusText || 'Parsing...') : inRoom ? (queueMode ? 'ADD TO QUEUE' : 'LOAD VIDEO') : 'START PARTY'}
           </button>
         </div>
       </div>

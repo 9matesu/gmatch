@@ -17,6 +17,7 @@ import {
   resetWatchParty,
   handleWatchMessage,
   createParty,
+  expandPlaylist,
   loadPartyVideos,
   joinParty,
   joinPartyById,
@@ -177,7 +178,7 @@ describe('watchPartyStore', () => {
     const call = vi.mocked(orbitFetch).mock.calls.at(-1)!
     expect(call[0]).toBe('/api/watchparty/p1/video')
     expect(JSON.parse(String((call[1] as RequestInit).body))).toEqual({ urls: ['https://a', 'https://junk/2'], queueOnly: true })
-    expect(r).toEqual({ ok: true, added: 1, failed: ['https://junk/2'] })
+    expect(r).toEqual({ ok: true, added: 1, failed: ['https://junk/2'], truncated: false })
   })
 
   it('loadPartyVideos surfaces server errors', async () => {
@@ -187,5 +188,39 @@ describe('watchPartyStore', () => {
     const r = await loadPartyVideos(identity, 'p1', ['x'], false)
     expect(r.ok).toBe(false)
     expect(r.error).toContain('10 videos')
+  })
+
+  it('expandPlaylist uses server expansion when endpoint returns ok', async () => {
+    vi.mocked(orbitFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({
+        ok: true,
+        isPlaylist: true,
+        count: 2,
+        playlistTitle: 'Server PL',
+        items: [{ url: 'https://v1' }, { url: 'https://v2' }],
+      }), { status: 200 }),
+    )
+    const res = await expandPlaylist(identity, 'https://pmvhaven.com/playlists/6a815df3bc31b18d74b252f9')
+    expect(res.isPlaylist).toBe(true)
+    expect(res.count).toBe(2)
+    expect(res.playlistTitle).toBe('Server PL')
+  })
+
+  it('expandPlaylist falls back to client pmvhaven manifest when server returns 404', async () => {
+    vi.mocked(orbitFetch).mockResolvedValueOnce(new Response('404', { status: 404 }))
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({
+        data: {
+          name: 'Client PL',
+          videos: ['65b4c16b43134d3e15acafbc', '6824710fba516ce0d0e63f71'],
+        },
+      }), { status: 200 }),
+    ))
+    const res = await expandPlaylist(identity, 'https://pmvhaven.com/playlists/6a815df3bc31b18d74b252f9')
+    expect(res.isPlaylist).toBe(true)
+    expect(res.count).toBe(2)
+    expect(res.playlistTitle).toBe('Client PL')
+    expect(res.items[0].url).toBe('https://pmvhaven.com/video/65b4c16b43134d3e15acafbc')
+    expect(res.items[1].url).toBe('https://pmvhaven.com/video/6824710fba516ce0d0e63f71')
   })
 })

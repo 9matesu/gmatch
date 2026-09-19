@@ -20,9 +20,31 @@ export type SwarmMessage =
 const localObjects = new Map<string, Blob>()
 const CHUNK_SIZE = 64 * 1024 // 64KB per WebRTC DataChannel chunk
 
+function persistToDisk(id: string, blob: Blob): void {
+  // Fire-and-forget: IndexedDB write so seeded bytes survive reload.
+  try {
+    void import('./storage').then(({ saveObject }) =>
+      saveObject({
+        id,
+        name: id,
+        mime_type: blob.type || 'application/octet-stream',
+        size_bytes: blob.size,
+        owner_id: '',
+        sender_pubkey: '',
+        sender_enc_pubkey: '',
+        created_at: new Date().toISOString(),
+        data: blob.arrayBuffer(),
+      } as never).then((r) => r).catch(() => {}),
+    ).catch(() => {})
+  } catch {
+    /* storage unavailable (tests/SSR) */
+  }
+}
+
 export function registerLocalObject(id: string, blob: Blob): void {
   if (!id || !blob) return
   localObjects.set(id, blob)
+  persistToDisk(id, blob)
 }
 
 export function hasLocalObject(id: string): boolean {
@@ -30,6 +52,7 @@ export function hasLocalObject(id: string): boolean {
 }
 
 export async function getLocalObject(id: string): Promise<Blob | null> {
+  if (!id) return null
   if (localObjects.has(id)) return localObjects.get(id)!
 
   // Fallback: check Electron vault if available
@@ -49,7 +72,128 @@ export async function getLocalObject(id: string): Promise<Blob | null> {
     }
   }
 
+  // Fallback: IndexedDB (survives reload)
+  try {
+    const { getObject } = await import('./storage')
+    const stored = await getObject(id)
+    const data = stored?.data as ArrayBuffer | undefined
+    if (stored && data && data.byteLength > 0) {
+      const blob = new Blob([data], { type: stored.mime_type || 'application/octet-stream' })
+      localObjects.set(id, blob)
+      return blob
+    }
+  } catch {
+    /* storage unavailable */
+  }
+
   return null
+}
+
+// ---- Swarm transport: module-level WANT/CHUNK request/response ------------
+// The P2P hook (useP2P) wires every available pipe (BroadcastChannel, WS
+// relay, PeerJS direct) into one send fan-out; serving peers answer WANTs
+// from their local store. This keeps bytes moving peer-to-peer with zero
+// server storage.
+
+type SwarmSend = (msg: SwarmMessage) => void
+let swarmSend: SwarmSend | null = null
+
+export function setSwarmTransport(send: SwarmSend | null): void {
+  swarmSend = send
+}
+
+interface PendingFetch {
+  resolve: (blob: Blob) => void
+  reject: (err: Error) => void
+  timer: ReturnType<typeof setTimeout>
+  chunks: Map<number, Uint8Array>
+  total: number
+  mimeType: string
+}
+const pendingFetches = new Map<string, PendingFetch>()
+
+function decodeChunk(dataBase64: string): Uint8Array {
+  const binaryStr = atob(dataBase64)
+  const bytes = new Uint8Array(binaryStr.length)
+  for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i)
+  return bytes
+}
+
+function finishFetch(id: string, req: PendingFetch): void {
+  clearTimeout(req.timer)
+  pendingFetches.delete(id)
+  const parts: Uint8Array[] = []
+  for (let i = 0; i < req.total; i++) {
+    const chunk = req.chunks.get(i)
+    if (chunk) parts.push(chunk)
+  }
+  const assembled = new Blob(parts as BlobPart[], { type: req.mimeType || 'application/octet-stream' })
+  registerLocalObject(id, assembled)
+  req.resolve(assembled)
+}
+
+/** Route an inbound swarm message. Returns true when consumed. */
+export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
+  if (!msg || typeof msg !== 'object') return false
+  if (msg.type === 'SWARM_WANT') {
+    const blob = localObjects.get(msg.id) || (await getLocalObject(msg.id))
+    if (!blob || !swarmSend) return true
+    try {
+      const buffer = await blob.arrayBuffer()
+      const totalChunks = Math.ceil(buffer.byteLength / CHUNK_SIZE) || 1
+      const mimeType = blob.type || 'application/octet-stream'
+      for (let i = 0; i < totalChunks; i++) {
+        const slice = new Uint8Array(buffer.slice(i * CHUNK_SIZE, Math.min((i + 1) * CHUNK_SIZE, buffer.byteLength)))
+        let binaryStr = ''
+        for (let j = 0; j < slice.length; j++) binaryStr += String.fromCharCode(slice[j])
+        swarmSend({ type: 'SWARM_CHUNK', id: msg.id, index: i, total: totalChunks, mimeType, dataBase64: btoa(binaryStr) })
+      }
+    } catch {
+      /* read failed */
+    }
+    return true
+  }
+  if (msg.type === 'SWARM_CHUNK') {
+    const req = pendingFetches.get(msg.id)
+    if (!req) return false
+    req.chunks.set(msg.index, decodeChunk(msg.dataBase64))
+    req.total = msg.total
+    req.mimeType = msg.mimeType
+    if (req.chunks.size === req.total) finishFetch(msg.id, req)
+    return true
+  }
+  if (msg.type === 'SWARM_HAVE') return true
+  return false
+}
+
+/** Ask the swarm for an object by id (or content_hash alias). */
+export function requestSwarmObject(id: string, timeoutMs = 15000): Promise<Blob> {
+  const cached = localObjects.get(id)
+  if (cached) return Promise.resolve(cached)
+  if (!swarmSend) return Promise.reject(new Error('swarm transport unavailable'))
+  const existing = pendingFetches.get(id)
+  if (existing) {
+    return new Promise<Blob>((resolve, reject) => {
+      const prevResolve = existing.resolve
+      const prevReject = existing.reject
+      existing.resolve = (b) => { prevResolve(b); resolve(b) }
+      existing.reject = (e) => { prevReject(e); reject(e) }
+    })
+  }
+  return new Promise<Blob>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pendingFetches.delete(id)
+      reject(new Error(`Timed out waiting for swarm object ${id}`))
+    }, timeoutMs)
+    pendingFetches.set(id, { resolve, reject, timer, chunks: new Map(), total: 0, mimeType: '' })
+    try {
+      swarmSend!({ type: 'SWARM_WANT', id })
+    } catch (err) {
+      clearTimeout(timer)
+      pendingFetches.delete(id)
+      reject(err instanceof Error ? err : new Error('swarm send failed'))
+    }
+  })
 }
 
 export interface SwarmSessionOptions {

@@ -7,6 +7,7 @@ import { DropZone } from './DropZone'
 import { contentHash } from '../utils/media'
 import { useCropper } from '../hooks/useCropper'
 import { isCropableImage } from './CropModal'
+import { forgeMediaLocally } from '../services/mediaForge'
 import { UploadCloud, Camera, Link as LinkIcon, X, Check, Loader2, ImagePlus } from 'lucide-react'
 
 interface IdentityLike {
@@ -118,6 +119,36 @@ export function AttachmentUploadModal({
     setUploading(true)
     setError(null)
     try {
+      const recipientList = recipients || (recipientId ? [recipientId] : [])
+      const recipientStr = recipientList.length > 0 ? recipientList.join(',') : undefined
+
+      if (file || (preview && preview.startsWith('data:'))) {
+        let payloadFile = file
+        if (!payloadFile && preview && preview.startsWith('data:')) {
+          const [meta, b64] = preview.split(',')
+          const mime = (meta.match(/data:([^;]+)/) || [])[1] || 'image/jpeg'
+          const bin = atob(b64)
+          const bytes = new Uint8Array(bin.length)
+          for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i)
+          payloadFile = new File([bytes], `attachment-${Date.now()}.jpg`, { type: mime })
+        }
+        if (payloadFile) {
+          // Zero-media P2P path: seed into swarm + register metadata (no 422).
+          const forged = await forgeMediaLocally(payloadFile, identity, {
+            isPublic: false,
+            isChat: true,
+            recipients: recipientStr,
+          })
+          onSuccess({
+            id: forged.id,
+            url: `/api/objects/${forged.id}`,
+            isVideo: payloadFile.type.startsWith('video/') || link?.includes('.mp4') || link?.includes('.webm') || false
+          })
+          onClose()
+          return
+        }
+      }
+
       const form = new FormData()
       if (file) {
         form.append('image', file, file.name || `attachment-${Date.now()}.jpg`)
@@ -137,7 +168,6 @@ export function AttachmentUploadModal({
       form.append('is_story', 'false')
       form.append('is_chat', 'true')
 
-      const recipientList = recipients || (recipientId ? [recipientId] : [])
       if (recipientList.length > 0) {
         form.append('recipients', recipientList.join(','))
       }

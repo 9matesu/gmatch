@@ -20,6 +20,7 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import { orbitFetch } from '../../utils/api';
 import { mediaUrlToCachedFile } from '../../utils/cacheMedia';
 import { isMediaVideo, isTwitterUrl, isVideoPageUrl, resolveTwitterMedia } from '../../utils/media';
+import { forgeMediaLocally } from '../../services/mediaForge';
 
 interface PostMediaItem {
   id: string;
@@ -281,29 +282,44 @@ export function CreatePostModal({
             /* fall back to url */
           }
         }
-        if (uploadFile) formData.append('image', uploadFile);
-        else formData.append('url', item.previewUrl);
-        formData.append('is_public', '1');
-        formData.append('post_group', postGroup);
-        if (i === 0) {
-          formData.append('post_caption', caption.trim());
-          formData.append('location', location.trim());
-          formData.append('tags', tags.trim());
-        }
-        const res = await orbitFetch('/api/objects', { method: 'POST', body: formData }, identity);
-        if (!res.ok) {
-          const errData = await res.json().catch(() => null);
-          let host = '';
-          try { host = new URL(item.previewUrl).hostname; } catch { /* relative/data urls */ }
-          const hint = item.isVideoPage || (host && !/\.(jpe?g|png|gif|webp|mp4|webm)$/i.test(item.previewUrl.split('?')[0]))
-            ? ', that link has no direct media. Try a direct image/GIF/MP4 URL'
-            : '';
-          throw new Error(errData?.error || `Upload failed on item ${i + 1} of ${mediaList.length}${host ? ` (${host})` : ''}${hint}`);
-        }
-        const data = await res.json();
-        if (data.id) {
-          ids.push(data.id);
-          if (!primaryId) primaryId = data.id;
+
+        if (uploadFile) {
+          // Zero-media P2P path: seed locally into swarm and register metadata
+          // with central server. Never sends raw binary bytes (which 422).
+          const forged = await forgeMediaLocally(uploadFile, identity, {
+            caption: i === 0 ? caption.trim() : undefined,
+            postCaption: i === 0 ? caption.trim() : undefined,
+            location: i === 0 ? location.trim() : undefined,
+            tags: i === 0 ? tags.trim() : undefined,
+            isPublic: true,
+            postGroup,
+          });
+          ids.push(forged.id);
+          if (!primaryId) primaryId = forged.id;
+        } else {
+          formData.append('url', item.previewUrl);
+          formData.append('is_public', '1');
+          formData.append('post_group', postGroup);
+          if (i === 0) {
+            formData.append('post_caption', caption.trim());
+            formData.append('location', location.trim());
+            formData.append('tags', tags.trim());
+          }
+          const res = await orbitFetch('/api/objects', { method: 'POST', body: formData }, identity);
+          if (!res.ok) {
+            const errData = await res.json().catch(() => null);
+            let host = '';
+            try { host = new URL(item.previewUrl).hostname; } catch { /* relative/data urls */ }
+            const hint = item.isVideoPage || (host && !/\.(jpe?g|png|gif|webp|mp4|webm)$/i.test(item.previewUrl.split('?')[0]))
+              ? ', that link has no direct media. Try a direct image/GIF/MP4 URL'
+              : '';
+            throw new Error(errData?.error || `Upload failed on item ${i + 1} of ${mediaList.length}${host ? ` (${host})` : ''}${hint}`);
+          }
+          const data = await res.json();
+          if (data.id) {
+            ids.push(data.id);
+            if (!primaryId) primaryId = data.id;
+          }
         }
       }
       const objectId = primaryId || 'post_' + Math.random().toString(36).substring(2, 9);

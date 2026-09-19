@@ -4,11 +4,12 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { type BabecockRound, type BabecockEntry, type BabecockInvite, type User } from '@orbit/shared'
 import { orbitFetch } from '../utils/api'
 import { ObjectImage } from './ObjectImage'
-import { resolveMediaUrl, contentHash } from '../utils/media'
+import { resolveMediaUrl } from '../utils/media'
 import { useToast } from './Toast'
 import { userFacingError } from '../utils/userError'
 import { DropZone } from './DropZone'
 import { CameraCapture } from './CameraCapture'
+import { forgeMediaLocally } from '../services/mediaForge'
 import {
   Flame, Camera, UploadCloud, Link as LinkIcon, Clock,
   Sparkles, Check, X, Grid, Move,   Mail,
@@ -399,17 +400,16 @@ export function BabecockPanel({
         return
       }
       const file = new File([blob], `babecock-${round.id.slice(0, 8)}.jpg`, { type: 'image/jpeg' })
-      const form = new FormData()
-      form.append('image', file, file.name)
-      form.append('is_public', '1')
-      form.append('post_caption', `Babecock grid by ${round.host_name || 'Anonymous'}`)
-      form.append('tags', 'babecock')
-      const res = await orbitFetch('/api/objects', { method: 'POST', body: form }, identity)
-      if (res.ok) {
+      // Zero-media P2P path: seed + register (never raw binary, which 422s).
+      const forged = await forgeMediaLocally(file, identity, {
+        caption: `Babecock grid by ${round.host_name || 'Anonymous'}`,
+        tags: 'babecock',
+        isPublic: true,
+      })
+      if (forged?.id) {
         toast('Posted to your feed.', 'success')
       } else {
-        const data = await res.json().catch(() => null)
-        toast(data?.error || 'Failed to post to feed', 'error')
+        toast('Failed to post to feed', 'error')
       }
     } catch {
       toast('Failed to post to feed', 'error')
@@ -444,24 +444,21 @@ export function BabecockPanel({
         toast('Could not load the image', 'error')
         return
       }
-      const form = new FormData()
-      form.append('image', file, file.name)
-      form.append('content_hash', await contentHash(file))
-      form.append('is_story', 'false')
-      const res = await orbitFetch('/api/objects', { method: 'POST', body: form }, identity)
-      if (res.ok) {
-        const data = await res.json().catch(() => null)
-        if (data?.id) {
-          // Open attachment modal for group chat
-          // We need to trigger this from parent - emit custom event
-          window.dispatchEvent(new CustomEvent('babecock-share-to-group', {
-            detail: { attachment: { id: data.id, url: `/api/objects/${data.id}`, isVideo: entry.mime_type.startsWith('video') } }
-          }))
-          toast('Ready to share. Pick a group chat.', 'success')
-        }
+      // Zero-media P2P path: seed + register (never raw binary, which 422s).
+      const forged = await forgeMediaLocally(file, identity, {
+        caption: entry.id,
+        isPublic: false,
+        isChat: true,
+      })
+      if (forged?.id) {
+        // Open attachment modal for group chat
+        // We need to trigger this from parent - emit custom event
+        window.dispatchEvent(new CustomEvent('babecock-share-to-group', {
+          detail: { attachment: { id: forged.id, url: `/api/objects/${forged.id}`, isVideo: entry.mime_type.startsWith('video') } }
+        }))
+        toast('Ready to share. Pick a group chat.', 'success')
       } else {
-        const data = await res.json().catch(() => null)
-        toast(data?.error || 'Failed to prepare image', 'error')
+        toast('Failed to prepare image', 'error')
       }
     } catch {
       toast('Failed to prepare image', 'error')

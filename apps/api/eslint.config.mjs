@@ -2,7 +2,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["**/*.test.ts", "src/test-utils.ts", "scripts/**"],
+    ignores: ["dist/**", "**/*.test.ts", "src/test-utils.ts", "scripts/**"],
   },
   ...tseslint.configs.recommended,
   {

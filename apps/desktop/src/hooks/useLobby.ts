@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { LobbyState, LobbyImage, LobbyComment, SpecialMatchesResponse, TierMatch, MatchSnapshot, MatchEvent, ChatMessage, FlashEvent } from '@orbit/shared'
-import { orbitFetch, uploadWithProgress } from '../utils/api'
-import { contentHash } from '../utils/media'
+import { orbitFetch } from '../utils/api'
 import { createCardFromMedia } from '../utils/cardCollection'
 import { subscribeOrbitWebSocket } from '../utils/orbitWebSocket'
 import { logger } from '../utils/logger';
@@ -794,25 +793,21 @@ export function useLobby({
   const uploadMatchCard = useCallback(
     async (match: TierMatch, file: File, name: string | null, onProgress?: (pct: number) => void): Promise<{ ok: boolean; cardId: string | null; name?: string | null; value?: number; error?: string }> => {
       if (!identity) return { ok: false, cardId: null, error: 'Not signed in' }
-      const form = new FormData()
-      form.append('image', file)
-      form.append('is_story', 'false')
       const opponentId = match.user_a === identity.orbitId ? match.user_b : match.user_a
-      form.append('recipients', opponentId)
       try {
-        form.append('content_hash', await contentHash(file))
-        const res = await uploadWithProgress('/api/objects', form, identity, onProgress)
-        if (!res.ok) {
-          if (res.id) {
-            // Reused existing card successfully
-            const card = await createCardFromMedia(identity, res.id, name)
-            return { ok: true, cardId: res.id, name: card?.name ?? name, value: card?.value ?? 0 }
-          }
-          return { ok: false, cardId: null, error: res.error || (res.status === 409 ? 'You already uploaded this image. Choose a different one.' : 'Upload failed') }
-        }
-        if (!res.id) return { ok: false, cardId: null, error: 'Upload failed' }
-        const card = await createCardFromMedia(identity, res.id, name)
-        return { ok: true, cardId: res.id, name: card?.name ?? name, value: card?.value ?? 0 }
+        onProgress?.(10)
+        // Zero-media P2P path: seed + register (never raw binary, which 422s).
+        const { forgeMediaLocally } = await import('../services/mediaForge')
+        const forged = await forgeMediaLocally(file, identity, {
+          caption: name || undefined,
+          isPublic: false,
+          recipients: opponentId,
+        })
+        onProgress?.(80)
+        if (!forged?.id) return { ok: false, cardId: null, error: 'Upload failed' }
+        const card = await createCardFromMedia(identity, forged.id, name)
+        onProgress?.(100)
+        return { ok: true, cardId: forged.id, name: card?.name ?? name, value: card?.value ?? 0 }
       } catch (err: any) {
         return { ok: false, cardId: null, error: err?.message || 'Upload failed' }
       }

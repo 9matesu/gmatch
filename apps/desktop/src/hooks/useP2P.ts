@@ -8,6 +8,7 @@ import { getApiBaseUrl, getApiWebSocketUrl, orbitFetch } from '../utils/api';
 import { mergeRoster } from '../utils/peerRoster';
 import { CHAT_WIPE_SECONDS } from '@orbit/shared';
 import { logger } from '../utils/logger';
+import { handleSwarmMessage, setSwarmTransport, type SwarmMessage } from '../utils/p2pSwarm';
 
 const CHAT_WIPE_MS = CHAT_WIPE_SECONDS * 1000;
 const DIRECT_WEBRTC_FANOUT_LIMIT = 3;
@@ -227,6 +228,16 @@ export function useP2P(identity: OrbitIdentity | null) {
     channelRef.current = channel;
     const selfUser = selfUserRef.current;
 
+    // Swarm transport wire: allow requestSwarmObject / handleSwarmMessage to
+    // fan out WANT and CHUNK frames over both the BroadcastChannel (same-device
+    // tabs) and the WebSocket relay (network peers).
+    setSwarmTransport((msg: SwarmMessage) => {
+      try { channel.postMessage({ type: 'SWARM_FRAME', swarm: msg }); } catch {}
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: 'SWARM_FRAME', swarm: msg }));
+      }
+    });
+
     // Load saved known peers from storage on mount. Entries unseen for over
     // 24h are dropped so ancient ghosts never resurrect; the rest hydrate as
     // offline until the roster/swarm confirms them fresh.
@@ -370,6 +381,11 @@ export function useP2P(identity: OrbitIdentity | null) {
           try {
             const rawData = JSON.parse(event.data);
             if (!rawData) return;
+
+            if (rawData.type === 'SWARM_FRAME' && rawData.swarm) {
+              void handleSwarmMessage(rawData.swarm);
+              return;
+            }
 
             if (rawData.type === 'PROFILE' && rawData.user && rawData.user.id) {
               const profile = rawData.user;
@@ -527,8 +543,13 @@ export function useP2P(identity: OrbitIdentity | null) {
     }
 
     // 5. Handle incoming local tab P2P swarm events
-    channel.onmessage = (event: MessageEvent<P2PSwarmMessage>) => {
-      const data = event.data;
+    channel.onmessage = (event: MessageEvent<P2PSwarmMessage & { swarm?: SwarmMessage; type: string }>) => {
+      const raw = event.data as unknown as { swarm?: SwarmMessage; type?: string };
+      if (raw && raw.swarm && typeof raw.swarm === 'object') {
+        void handleSwarmMessage(raw.swarm);
+        return;
+      }
+      const data = event.data as P2PSwarmMessage;
       if (!data || !data.user) return;
 
       peerMapRef.current.set(data.user.id, {
@@ -583,6 +604,7 @@ export function useP2P(identity: OrbitIdentity | null) {
       }
       channel.close();
       channelRef.current = null;
+      setSwarmTransport(null);
       if (wsRef.current) {
         wsRef.current.close();
       }

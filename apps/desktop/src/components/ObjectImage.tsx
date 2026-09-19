@@ -54,6 +54,11 @@ function extractObjectId(contentUrl: string | null | undefined, objectId: string
 
 function needsSignedFetch(contentUrl: string | null | undefined, objectId: string | null | undefined): boolean {
   if (contentUrl) {
+    const trimmed = contentUrl.trim()
+    // Zero-media register rows: bytes live on the swarm. Resolve them through
+    // the signed fetch path (which handles the p2p JSON descriptor) instead
+    // of handing a magnet:/urn: URL to <img>.
+    if (trimmed.startsWith('magnet:') || trimmed.startsWith('urn:sha256:')) return true
     if (contentUrl.startsWith(OBJECT_PATH) || contentUrl.includes(OBJECT_PATH)) {
       const id = extractObjectId(contentUrl, objectId)
       return Boolean(id && !id.startsWith('p2p-'))
