@@ -1,5 +1,4 @@
-import { OrbitIdentity } from '@orbit/crypto'
-import { orbitFetch } from '../utils/api'
+import { orbitFetch, type OrbitIdentityLike } from '../utils/api'
 import { buildMagnetUri } from '../utils/magnet'
 import { registerLocalObject } from '../utils/p2pSwarm'
 
@@ -22,7 +21,10 @@ export async function hashFileSha256(file: File | Blob): Promise<string> {
 
 export async function forgeMediaLocally(
   file: File,
-  identity: OrbitIdentity,
+  // Loose like-type: callers hold local IdentityLike shapes (encryption keys
+  // optional); identity passes straight through to orbitFetch, which already
+  // accepts this contract and skips sealing without encryption keys.
+  identity: OrbitIdentityLike,
   options: {
     caption?: string
     postCaption?: string

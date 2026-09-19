@@ -140,7 +140,8 @@ function resolveEndpoint(endpoint: string): string {
   return `${API_BASE}${endpoint}`
 }
 
-type OrbitIdentityLike = { orbitId: string; publicKeyHex: string; privateKeyHex: string; encryptionPubHex?: string; encryptionPrivHex?: string }
+/** Minimal identity shape `orbitFetch` accepts (encryption keys optional — the sealed path is skipped without them). */
+export interface OrbitIdentityLike { orbitId: string; publicKeyHex: string; privateKeyHex: string; encryptionPubHex?: string; encryptionPrivHex?: string }
 
 // ---- sealed-request support (security plan T2) -----------------------------
 /** Node X25519 transport pubkey, cached per API base (TTL 1h). */
