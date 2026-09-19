@@ -94,6 +94,37 @@ export function setApiBaseUrl(url: string): void {
   } catch { /* session-only */ }
 }
 
+/** True for a loopback API base (packaged host-mode sidecar address). */
+export function isLoopbackApiUrl(url: string | null | undefined): boolean {
+  if (!url) return false
+  try {
+    const u = new URL(url, 'http://localhost')
+    return u.hostname === '127.0.0.1' || u.hostname === 'localhost' || u.hostname === '[::1]'
+  } catch {
+    return /127\.0\.0\.1|localhost/.test(url)
+  }
+}
+
+/**
+ * Packaged-exe install fix: a stale `gmatch.api.url=http://127.0.0.1:8790`
+ * (left by an old host-mode install or server-join debug) makes a fresh
+ * client-default install hammer a dead sidecar forever — the "loops pinging
+ * 127.0.0.1" report. Call once on boot when the main process says we are a
+ * packaged client: the stale key is dropped so API_BASE falls through to
+ * the central node. Returns true when a stale key was cleared.
+ */
+export function clearStaleLoopbackApiBase(): boolean {
+  try {
+    if (typeof localStorage === 'undefined') return false
+    const manual = localStorage.getItem('gmatch.api.url')
+    if (manual?.trim() && isLoopbackApiUrl(manual.trim())) {
+      localStorage.removeItem('gmatch.api.url')
+      return true
+    }
+  } catch { /* private mode */ }
+  return false
+}
+
 function toHex(bytes: Uint8Array): string {
   return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
 }

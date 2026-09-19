@@ -4,11 +4,11 @@ import { OrbitP2PNode } from '@orbit/protocol';
 import { User, OrbitObject } from '@orbit/shared';
 import { saveObject } from '../utils/storage';
 import { OrbitPeerRelay } from '../utils/peer-relay';
-import { getApiBaseUrl, getApiWebSocketUrl, orbitFetch } from '../utils/api';
+import { getApiWebSocketUrl, orbitFetch } from '../utils/api';
 import { mergeRoster } from '../utils/peerRoster';
 import { CHAT_WIPE_SECONDS } from '@orbit/shared';
 import { logger } from '../utils/logger';
-import { handleSwarmMessage, setSwarmTransport, type SwarmMessage } from '../utils/p2pSwarm';
+import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, type SwarmMessage } from '../utils/p2pSwarm';
 
 const CHAT_WIPE_MS = CHAT_WIPE_SECONDS * 1000;
 const DIRECT_WEBRTC_FANOUT_LIMIT = 3;
@@ -237,6 +237,9 @@ export function useP2P(identity: OrbitIdentity | null) {
         wsRef.current.send(JSON.stringify({ type: 'SWARM_FRAME', swarm: msg }));
       }
     });
+    // Local-first seeding: reload persisted bytes into RAM so this client
+    // keeps retransmitting its own posts after a restart (packaged exe).
+    void hydrateLocalObjects().catch(() => {});
 
     // Load saved known peers from storage on mount. Entries unseen for over
     // 24h are dropped so ancient ghosts never resurrect; the rest hydrate as
@@ -358,6 +361,25 @@ export function useP2P(identity: OrbitIdentity | null) {
 
     let wsReconnectDelay = 1000;
     const MAX_WS_DELAY = 30000;
+    // Install-loop guard: a stale loopback base (dead 127.0.0.1:8790) must
+    // not reconnect forever. After 8 straight failures on loopback, park
+    // the socket (5min) instead of hammering the port.
+    let wsFailCount = 0;
+    let wsParked = false;
+    const isLoopbackWs = /127\.0\.0\.1|localhost|::1/.test(API_WS);
+    const scheduleReconnect = () => {
+      if (cancelled) return;
+      if (isLoopbackWs && wsFailCount >= 8) {
+        if (!wsParked) {
+          wsParked = true;
+          logger.warn('[ORBIT Network Swarm] Loopback relay unreachable — parking reconnects (stale host-mode override?).');
+        }
+        setTimeout(() => { if (!cancelled) { wsFailCount = 0; wsParked = false; connectWebSocket(); } }, 5 * 60 * 1000);
+        return;
+      }
+      setTimeout(connectWebSocket, wsReconnectDelay);
+      wsReconnectDelay = Math.min(wsReconnectDelay * 2, MAX_WS_DELAY);
+    };
 
     const connectWebSocket = () => {
       if (cancelled) return;
@@ -373,6 +395,8 @@ export function useP2P(identity: OrbitIdentity | null) {
         socket.onopen = () => {
           logger.log('[ORBIT Network Swarm] WebSocket swarm relay connected via:', API_WS);
           wsReconnectDelay = 1000;
+          wsFailCount = 0;
+          wsParked = false;
           setIsWsConnected(true);
           void authenticateWs();
         };
@@ -468,19 +492,15 @@ export function useP2P(identity: OrbitIdentity | null) {
         };
 
         socket.onclose = () => {
+          wsFailCount += 1;
           logger.log(`[ORBIT Network Swarm] WebSocket connection closed, reconnecting in ${wsReconnectDelay}ms...`);
           setIsWsConnected(false);
-          if (!cancelled) {
-            setTimeout(connectWebSocket, wsReconnectDelay);
-            wsReconnectDelay = Math.min(wsReconnectDelay * 2, MAX_WS_DELAY);
-          }
+          scheduleReconnect();
         };
       } catch (e) {
+        wsFailCount += 1;
         logger.warn('[ORBIT Network Swarm] WebSocket init error:', e);
-        if (!cancelled) {
-          setTimeout(connectWebSocket, wsReconnectDelay);
-          wsReconnectDelay = Math.min(wsReconnectDelay * 2, MAX_WS_DELAY);
-        }
+        scheduleReconnect();
       }
     };
 

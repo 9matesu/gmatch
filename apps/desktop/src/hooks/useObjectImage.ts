@@ -229,27 +229,27 @@ export function useObjectImage(
               return
             }
             // Ask the swarm by object id, then by content_hash alias — a
-            // restarted seeder may only hold the hash-keyed copy.
+            // restarted seeder may only hold the hash-keyed copy. 30s each:
+            // chunked WS-relay retransmit of multi-MB photos needs headroom.
             let blob: Blob | null = null
             try {
-              blob = await requestSwarmObject(cleanId)
+              blob = await requestSwarmObject(cleanId, 30000)
             } catch {
               if (hash) {
                 try {
-                  blob = await requestSwarmObject(hash)
+                  blob = await requestSwarmObject(hash, 30000)
                 } catch {
                   blob = null
                 }
               }
             }
             if (blob) {
-              if (hash) {
-                try {
-                  const { registerLocalObject } = await import('../utils/p2pSwarm')
-                  registerLocalObject(cleanId, blob)
-                } catch {
-                  /* cache alias best-effort */
-                }
+              try {
+                const { registerLocalObject } = await import('../utils/p2pSwarm')
+                registerLocalObject(cleanId, blob)
+                if (hash && hash !== cleanId) registerLocalObject(hash, blob)
+              } catch {
+                /* cache alias best-effort */
               }
               if (cancelled) return
               freshUrl = URL.createObjectURL(blob)
@@ -265,9 +265,10 @@ export function useObjectImage(
               setImg(loaded)
             } else {
               if (cancelled) return
-              const failedState: ImageState = { cardId: cleanId, url: '', failed: true, isVideo: false, isLink: false, linkUrl: null }
-              cacheSet(cleanId, identity?.orbitId || '', failedState)
-              setImg(failedState)
+              // Seeder offline (or still hydrating): fail WITHOUT caching so
+              // a later remount/scroll retries once the seeder is back. A
+              // cached failure would blank the image until LRU eviction.
+              setImg({ cardId: cleanId, url: '', failed: true, isVideo: false, isLink: false, linkUrl: null })
             }
             return
           }

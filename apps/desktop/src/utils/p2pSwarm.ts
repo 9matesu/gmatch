@@ -21,23 +21,56 @@ const localObjects = new Map<string, Blob>()
 const CHUNK_SIZE = 64 * 1024 // 64KB per WebRTC DataChannel chunk
 
 function persistToDisk(id: string, blob: Blob): void {
-  // Fire-and-forget: IndexedDB write so seeded bytes survive reload.
+  // Fire-and-forget: IndexedDB write so seeded bytes survive reload in the
+  // packaged app (Chromium storage lives under userData). Must await the
+  // ArrayBuffer — storing the Promise itself silently breaks reload reads.
   try {
-    void import('./storage').then(({ saveObject }) =>
-      saveObject({
-        id,
-        name: id,
-        mime_type: blob.type || 'application/octet-stream',
-        size_bytes: blob.size,
-        owner_id: '',
-        sender_pubkey: '',
-        sender_enc_pubkey: '',
-        created_at: new Date().toISOString(),
-        data: blob.arrayBuffer(),
-      } as never).then((r) => r).catch(() => {}),
-    ).catch(() => {})
+    void (async () => {
+      try {
+        const buf = await blob.arrayBuffer()
+        if (!buf || buf.byteLength === 0) return
+        const { saveObject } = await import('./storage')
+        await saveObject({
+          id,
+          name: id,
+          mime_type: blob.type || 'application/octet-stream',
+          size_bytes: buf.byteLength,
+          owner_id: '',
+          sender_pubkey: '',
+          sender_enc_pubkey: '',
+          created_at: new Date().toISOString(),
+          data: buf,
+        }).catch(() => {})
+      } catch {
+        /* storage unavailable (tests/SSR/quota) */
+      }
+    })()
   } catch {
     /* storage unavailable (tests/SSR) */
+  }
+}
+
+/** Preload persisted swarm bytes into RAM so a restarted seeder can answer
+ *  WANTs without first re-viewing each image. Best-effort, capped. */
+export async function hydrateLocalObjects(maxBytes = 256 * 1024 * 1024): Promise<number> {
+  try {
+    const { getAllObjects } = await import('./storage')
+    const all = await getAllObjects()
+    let used = 0
+    let count = 0
+    for (const o of all) {
+      const data = o?.data as ArrayBuffer | undefined
+      if (!o?.id || !data || !(data instanceof ArrayBuffer) || data.byteLength === 0) continue
+      if (used + data.byteLength > maxBytes) break
+      if (!localObjects.has(o.id)) {
+        localObjects.set(o.id, new Blob([data], { type: o.mime_type || 'application/octet-stream' }))
+        used += data.byteLength
+        count += 1
+      }
+    }
+    return count
+  } catch {
+    return 0
   }
 }
 

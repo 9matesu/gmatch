@@ -40,21 +40,18 @@ export async function forgeMediaLocally(
   const objectId = crypto.randomUUID()
   const magnetUri = buildMagnetUri(contentHash.slice(0, 40), options.caption || file.name)
 
-  // 1. Seed into the swarm store immediately (both by objectId and contentHash)
+  // 1. Seed into the swarm store immediately (both by objectId and contentHash).
+  // registerLocalObject persists to IndexedDB, so the bytes stay on this
+  // machine's disk (packaged app) and this client keeps retransmitting them
+  // to peers on SWARM_WANT after restarts.
   registerLocalObject(objectId, file)
   registerLocalObject(contentHash, file)
 
-  // 2. Keep local reference (local blob URL or electron vault pin)
+  // 2. Keep a local reference for instant render (session object URL).
+  // NOTE: the Electron vault is URL-keyed for http(s) fetches only — it
+  // cannot pin a local:// blob, so don't call it here.
   let localUrl = ''
-  try {
-    if (typeof window !== 'undefined' && window.gmatch?.vaultPin) {
-      const pinned = await window.gmatch.vaultPin(`local://${contentHash}`)
-      if (pinned?.local) localUrl = pinned.local
-    }
-  } catch {
-    /* fallback below */
-  }
-  if (!localUrl && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+  if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
     localUrl = URL.createObjectURL(file)
   }
 

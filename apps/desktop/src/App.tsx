@@ -108,6 +108,26 @@ export default function Home() {
     runMigrations();
   }, []);
 
+  // Packaged-exe install fix: drop a stale loopback API override when the
+  // main process says we are a client (no bundled server). Otherwise every
+  // poll + WS reconnect hammers dead 127.0.0.1:8790 forever. API_BASE is
+  // computed at import time, so clear + reload once when stale.
+  useEffect(() => {
+    let dead = false;
+    void (async () => {
+      try {
+        const st = await window.gmatch?.serverState?.().catch(() => null);
+        if (dead || !st?.packaged || st.mode !== 'client') return;
+        const { clearStaleLoopbackApiBase, getApiBaseUrl } = await import('./utils/api');
+        const base = getApiBaseUrl();
+        if (/127\.0\.0\.1|localhost/.test(base)) {
+          if (clearStaleLoopbackApiBase()) window.location.reload();
+        }
+      } catch { /* browser dev: no bridge */ }
+    })();
+    return () => { dead = true; };
+  }, []);
+
   const { identity, isLoaded, createIdentity, exportIdentity, loginWithExportedId, clearIdentity } = useIdentity();
   const [myProfile, setMyProfile] = useState(() => {
     if (typeof window === 'undefined') return { displayName: '', tags: [] as string[], isAdmin: false, pfpUrl: '' }

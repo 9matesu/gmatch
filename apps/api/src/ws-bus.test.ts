@@ -175,6 +175,31 @@ describe('handleIncoming: authenticated dispatch', () => {
     expect(lobbyMember.sent).toHaveLength(0)
   })
 
+  it('relays SWARM_FRAME want/chunk to global peers (local-first retransmit)', () => {
+    const sender = authedConn('s')
+    const peer = authedConn('p')
+    const outsider = fakeConn()
+    outsider.authed = true
+    outsider.rooms.add('lobby')
+    conns.add(outsider)
+
+    handleIncoming(sender, JSON.stringify({ type: 'SWARM_FRAME', swarm: { type: 'SWARM_WANT', id: 'obj-1' } }))
+    expect(peer.sent).toHaveLength(1)
+    expect(outsider.sent).toHaveLength(0)
+
+    handleIncoming(sender, JSON.stringify({ type: 'SWARM_FRAME', swarm: { type: 'SWARM_CHUNK', id: 'obj-1', index: 0, total: 1, mimeType: 'image/jpeg', dataBase64: 'aGk=' } }))
+    expect(peer.sent).toHaveLength(2)
+  })
+
+  it('drops malformed SWARM_FRAME shapes fail-closed', () => {
+    const sender = authedConn('s')
+    const peer = authedConn('p')
+    handleIncoming(sender, JSON.stringify({ type: 'SWARM_FRAME', swarm: { type: 'SWARM_EVIL' } }))
+    handleIncoming(sender, JSON.stringify({ type: 'SWARM_FRAME', swarm: { type: 'SWARM_CHUNK', id: 'x', dataBase64: 'z'.repeat(200 * 1024) } }))
+    handleIncoming(sender, JSON.stringify({ type: 'SWARM_FRAME' }))
+    expect(peer.sent).toHaveLength(0)
+  })
+
   it('roomless messages fan out to the global swarm', () => {
     const sender = authedConn('s')
     const peer = authedConn('p')

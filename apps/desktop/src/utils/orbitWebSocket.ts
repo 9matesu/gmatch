@@ -16,7 +16,17 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let generation = 0
 let reconnectDelay = 1000
 let closeTimer: ReturnType<typeof setTimeout> | null = null
+let loopbackFailCount = 0
 const listeners = new Set<Listener>()
+
+function isLoopbackBase(): boolean {
+  try {
+    const base = getApiBaseUrl()
+    return /127\.0\.0\.1|localhost|::1/.test(base)
+  } catch {
+    return false
+  }
+}
 
 function clearReconnect() {
   if (reconnectTimer) clearTimeout(reconnectTimer)
@@ -64,6 +74,7 @@ async function connect(identity: OrbitIdentity, expectedGeneration: number): Pro
       }
       next.send(JSON.stringify({ type: 'auth', ticket: body.ticket }))
       reconnectDelay = 1000
+      loopbackFailCount = 0
       finish()
     }
     next.onmessage = (event) => {
@@ -90,6 +101,19 @@ async function connect(identity: OrbitIdentity, expectedGeneration: number): Pro
       if (socket !== next || expectedGeneration !== generation || listeners.size === 0) return
       socket = null
       clearReconnect()
+      // Install-loop guard: park loopback reconnects after repeated failures
+      // instead of hammering dead 127.0.0.1:8790 forever.
+      if (isLoopbackBase()) {
+        loopbackFailCount += 1
+        if (loopbackFailCount >= 8) {
+          reconnectTimer = setTimeout(() => {
+            reconnectTimer = null
+            loopbackFailCount = 0
+            void ensureConnected(identity, expectedGeneration)
+          }, 5 * 60 * 1000)
+          return
+        }
+      }
       reconnectTimer = setTimeout(() => {
         reconnectTimer = null
         connectPromise = connect(identity, expectedGeneration).catch(() => {

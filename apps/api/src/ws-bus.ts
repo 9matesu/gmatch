@@ -184,12 +184,34 @@ export function handleIncoming(conn: WsConn, data: string): void {
     return
   }
 
+  // Local-first timeline media: bytes stay on the poster's disk
+  // (IndexedDB in the packaged app) and are retransmitted peer-to-peer on
+  // demand. The WS relay is the guaranteed fallback when direct WebRTC is
+  // unavailable, so SWARM_FRAME envelopes ride the global room. Only the
+  // three swarm shapes relay; anything else with a `type` key stays dropped
+  // (audit A2: feed/lobby/user_banned... forgery guard).
+  if (msg.type === 'SWARM_FRAME' && msg.swarm && typeof msg.swarm === 'object') {
+    const inner = msg.swarm as { type?: unknown; dataBase64?: unknown }
+    if (inner.type === 'SWARM_WANT' || inner.type === 'SWARM_HAVE') {
+      for (const c of conns) {
+        if (c !== conn && c.authed && c.rooms.has('global')) c.send(data)
+      }
+      return
+    }
+    if (inner.type === 'SWARM_CHUNK' && typeof inner.dataBase64 === 'string' && inner.dataBase64.length <= 128 * 1024) {
+      for (const c of conns) {
+        if (c !== conn && c.authed && c.rooms.has('global')) c.send(data)
+      }
+      return
+    }
+    return
+  }
   // Audit A2: the lobby room is server-published only (routes/lobby,
   // babecock, posts), and no client flow needed the named-room pass-through
   // either (it was the injection vector). The global swarm now carries ONLY
-  // the legacy P2P wire: opaque envelopes keyed `t`, or raw non-JSON. Any
-  // frame with a server-managed `type` key without a handler above is a
-  // forgery (feed/lobby/user_banned...) and is dropped.
+  // the legacy P2P wire: opaque envelopes keyed `t`, SWARM_FRAME above, or
+  // raw non-JSON. Any other frame with a server-managed `type` key without
+  // a handler above is a forgery (feed/lobby/user_banned...) and is dropped.
   // ponytail: add per-type relay allowlist if a client->client type returns.
   if (typeof msg.type === 'string') return
   for (const c of conns) {
