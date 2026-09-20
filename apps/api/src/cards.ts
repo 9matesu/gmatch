@@ -275,9 +275,9 @@ export class CardService {
     }
 
     const media = await this.db
-      .prepare('SELECT id, owner_id, is_public, is_story, is_chat, is_avatar, gacha_downloads_count FROM Objects WHERE id = ?')
+      .prepare('SELECT id, owner_id, content_hash, is_public, is_story, is_chat, is_avatar, gacha_downloads_count FROM Objects WHERE id = ?')
       .bind(mediaObjectId)
-      .first<{ id: string; owner_id: string; is_public?: number; is_story?: number; is_chat?: number; is_avatar?: number; gacha_downloads_count?: number | null }>()
+      .first<{ id: string; owner_id: string; content_hash?: string | null; is_public?: number; is_story?: number; is_chat?: number; is_avatar?: number; gacha_downloads_count?: number | null }>()
     if (!media) throw notFound('media object not found')
     if (media.owner_id !== creatorId) throw forbidden('you do not own this media')
     if (media.is_public === 1 || media.is_story === 1 || media.is_chat === 1 || media.is_avatar === 1) throw badRequest('cannot create a card from a post, story, chat attachment, or avatar')
@@ -292,14 +292,26 @@ export class CardService {
       .first<{ c: number }>())?.c ?? 0
     const rarity = requestedRarity ?? computeCardRarity(score).rarity
 
-    // Idempotent creation: a media object maps to at most one canonical card.
-    // Re-uploading the same media (or re-submitting the create intent) returns
-    // the existing card and refreshes its name when the creator re-names it,
-    // instead of minting a duplicate canonical card.
-    const existing = await this.db
-      .prepare('SELECT id, name FROM Cards WHERE media_object_id = ?')
-      .bind(mediaObjectId)
-      .first<{ id: string; name: string | null }>()
+    const contentHash = media.content_hash ? media.content_hash.trim().toLowerCase() : null
+
+    // Idempotent creation: a media object (and unique picture content_hash)
+    // maps to at most one canonical card. Re-uploading the same picture returns
+    // the existing card and refreshes its name when the creator re-names it.
+    const existing = contentHash
+      ? await this.db
+          .prepare(
+            `SELECT c.id, c.name FROM Cards c
+             JOIN Objects o ON c.media_object_id = o.id
+             WHERE (c.media_object_id = ? OR (o.content_hash IS NOT NULL AND LOWER(o.content_hash) = ?))
+               AND c.moderation_state != 'burned'
+             LIMIT 1`
+          )
+          .bind(mediaObjectId, contentHash)
+          .first<{ id: string; name: string | null }>()
+      : await this.db
+          .prepare("SELECT id, name FROM Cards WHERE media_object_id = ? AND moderation_state != 'burned'")
+          .bind(mediaObjectId)
+          .first<{ id: string; name: string | null }>()
     if (existing) {
       if (name && name !== existing.name) {
         await this.db
@@ -316,8 +328,16 @@ export class CardService {
 
     const res = await this.db.atomicBatch([
       {
-        sql: "INSERT INTO Cards (id, creator_id, media_object_id, name, rarity, value, like_count, market_status, moderation_state, tags, description, frame, accent_color, created_at, updated_at) SELECT ?, ?, ?, ?, ?, ?, ?, 'none', 'active', ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM Objects WHERE id = ? AND owner_id = ?) AND NOT EXISTS (SELECT 1 FROM Cards WHERE media_object_id = ?)",
-        args: [cardId, creatorId, mediaObjectId, name, rarity, score, likeCount, JSON.stringify(tags), description, frame, accentColor, nowIso, nowIso, mediaObjectId, creatorId, mediaObjectId],
+        sql: `INSERT INTO Cards (id, creator_id, media_object_id, name, rarity, value, like_count, market_status, moderation_state, tags, description, frame, accent_color, created_at, updated_at)
+              SELECT ?, ?, ?, ?, ?, ?, ?, 'none', 'active', ?, ?, ?, ?, ?, ?
+              WHERE EXISTS (SELECT 1 FROM Objects WHERE id = ? AND owner_id = ?)
+                AND NOT EXISTS (
+                  SELECT 1 FROM Cards c2
+                  JOIN Objects o2 ON c2.media_object_id = o2.id
+                  WHERE (c2.media_object_id = ? OR (? IS NOT NULL AND o2.content_hash IS NOT NULL AND LOWER(o2.content_hash) = ?))
+                    AND c2.moderation_state != 'burned'
+                )`,
+        args: [cardId, creatorId, mediaObjectId, name, rarity, score, likeCount, JSON.stringify(tags), description, frame, accentColor, nowIso, nowIso, mediaObjectId, creatorId, mediaObjectId, contentHash, contentHash],
       },
       { sql: 'INSERT INTO CardOwnership (card_id, owner_id, acquired_at) SELECT ?, ?, ? WHERE changes() = 1', args: [cardId, creatorId, nowIso] },
       { sql: "INSERT INTO CardHistory (id, card_id, event, from_user, to_user, meta, created_at) SELECT ?, ?, 'created', NULL, ?, ?, ? WHERE changes() = 1", args: [historyId, cardId, creatorId, JSON.stringify({ mediaObjectId }), nowIso] },
@@ -326,10 +346,21 @@ export class CardService {
     if (res[0].rowsAffected === 0) {
       // Either the media changed ownership or a concurrent create won — return
       // the existing card for this media (idempotent) or surface the conflict.
-      const winner = await this.db
-        .prepare('SELECT id FROM Cards WHERE media_object_id = ?')
-        .bind(mediaObjectId)
-        .first<{ id: string }>()
+      const winner = contentHash
+        ? await this.db
+            .prepare(
+              `SELECT c.id FROM Cards c
+               JOIN Objects o ON c.media_object_id = o.id
+               WHERE (c.media_object_id = ? OR (o.content_hash IS NOT NULL AND LOWER(o.content_hash) = ?))
+                 AND c.moderation_state != 'burned'
+               LIMIT 1`
+            )
+            .bind(mediaObjectId, contentHash)
+            .first<{ id: string }>()
+        : await this.db
+            .prepare("SELECT id FROM Cards WHERE media_object_id = ? AND moderation_state != 'burned'")
+            .bind(mediaObjectId)
+            .first<{ id: string }>()
       if (winner) {
         if (name) {
           await this.db

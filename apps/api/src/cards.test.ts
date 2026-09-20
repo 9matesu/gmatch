@@ -69,6 +69,25 @@ describe('CardService', () => {
     expect(rows?.c).toBe(1)
   })
 
+  it('mints only once per unique picture (content_hash), returning existing card for identical image bytes', async () => {
+    const hash = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+    await db
+      .prepare('INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_hash) VALUES (?, ?, 1000, ?, ?)')
+      .bind('media-hash-1', CREATOR, 'image/jpeg', hash)
+      .run()
+    await db
+      .prepare('INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_hash) VALUES (?, ?, 1000, ?, ?)')
+      .bind('media-hash-2', CREATOR, 'image/jpeg', hash)
+      .run()
+
+    const first = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-hash-1', name: 'First Mint' })
+    const second = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-hash-2', name: 'Second Mint Attempt' })
+
+    expect(second.id).toBe(first.id)
+    const count = await db.prepare('SELECT COUNT(*) AS c FROM Cards WHERE id = ?').bind(first.id).first<{ c: number }>()
+    expect(count?.c).toBe(1)
+  })
+
   it('persists bounded creator metadata on card creation', async () => {
     await seedMedia(db, 'media-meta-1', CREATOR)
     const card = await cards.createCard({
