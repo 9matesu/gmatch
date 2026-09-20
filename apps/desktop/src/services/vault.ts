@@ -163,7 +163,7 @@ export function useVaultUrl(url?: string | null): string {
   const [local, setLocal] = useState<string | null>(null)
   useEffect(() => {
     setLocal(null)
-    if (!url || !vaultOptIn() || !vaultBridge()) return
+    if (!url || !vaultOptIn()) return
     let dead = false
     const resolve = () => {
       void vaultGet(url).then((l) => {
@@ -191,7 +191,7 @@ export function useVaultUrls(urls: Array<string | null | undefined>): Record<str
   const [map, setMap] = useState<Record<string, string>>({})
   const key = urls.filter(Boolean).join('|')
   useEffect(() => {
-    if (!key || !vaultOptIn() || !vaultBridge()) return
+    if (!key || !vaultOptIn()) return
     let dead = false
     const resolve = () => {
       void Promise.all(
@@ -229,12 +229,17 @@ export function useVaultUrls(urls: Array<string | null | undefined>): Record<str
 /** Browser-openable localhost URL for a stored URL, else null. */
 export async function vaultHttpUrl(url: string): Promise<string | null> {
   if (!url || !enabled()) return null
-  try {
-    const res = await window.gmatch?.vaultHttpUrl?.(url)
-    return res?.local ?? null
-  } catch {
-    return null
+  if (vaultBridge()) {
+    try {
+      const res = await window.gmatch?.vaultHttpUrl?.(url)
+      if (res?.local) return res.local
+    } catch {
+      /* fallback */
+    }
   }
+  const stored = getStoredVault()
+  if (stored[url] && !stored[url].startsWith('vault://')) return stored[url]
+  return null
 }
 
 /** Test seam: clear both session guards. */

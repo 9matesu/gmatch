@@ -12,7 +12,7 @@ function hashToInt(hex: string, index: number, max: number): number {
 
 import { useState, useEffect } from 'react'
 import { resolveMediaUrl } from '../utils/media'
-import { resolveImage } from '../services/imageCache'
+import { resolveImage, devFetchable } from '../services/imageCache'
 
 export function Avatar({ id, size = 40, imageUrl, fill = false }: { id: string; size?: number; imageUrl?: string | null; fill?: boolean }) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
@@ -29,6 +29,11 @@ export function Avatar({ id, size = 40, imageUrl, fill = false }: { id: string; 
     const resolved = resolveMediaUrl(imageUrl)
     if (/^(gmcache|idle-file|vault|blob|data):/i.test(resolved)) {
       setCachedUrl(resolved)
+      return
+    }
+    const proxied = devFetchable(resolved)
+    if (proxied) {
+      setCachedUrl(proxied)
       return
     }
     let live = true

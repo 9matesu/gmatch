@@ -77,7 +77,6 @@ export default function CachedImg({ src: rawSrc, fallbackSrc, onError, ...rest }
       decoding="async"
       {...rest}
       onError={(e) => {
-        if (!resolved) return
         if (fallbackSrc && e.currentTarget.src !== fallbackSrc) {
           e.currentTarget.src = fallbackSrc
           return

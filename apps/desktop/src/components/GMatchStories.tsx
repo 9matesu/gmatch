@@ -42,7 +42,7 @@ interface GroupedUserStories {
   lastCreatedAt: string;
 }
 
-export function GMatchStories({ stories, loading = false, currentUserId, identity, profilePics = {}, activeUserId, onCloseActiveUser, onAddStory, onStartPm }: GMatchStoriesProps) {
+export function GMatchStories({ stories = [], loading = false, currentUserId, identity, profilePics = {}, activeUserId, onCloseActiveUser, onAddStory, onStartPm }: GMatchStoriesProps) {
   const { toast } = useToast();
   const [seenStoryIds, setSeenStoryIds] = useState<Set<string>>(() => {
     if (typeof window === 'undefined') return new Set();
@@ -89,7 +89,7 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
     // Dedupe by story ID so reused media URLs do not hide separate stories.
     const cleanStories: OrbitObject[] = [];
     const seenIds = new Set<string>();
-    for (const story of stories) {
+    for (const story of (stories || [])) {
       if (!story) continue;
       const hasUrl = typeof story.content_url === 'string' && story.content_url.trim().length > 0;
       const hasId = typeof story.id === 'string' && story.id.trim().length > 0;

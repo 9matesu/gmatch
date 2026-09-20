@@ -29,7 +29,8 @@ import { collectConfigBundle, applyConfigBundle, applyStashFromBundle, parseConf
 import { runMigrations } from "./utils/migration";
 import { useGame as useIdleGame } from "./game/store";
 import { mapLimit } from "./services/booru";
-import { vaultPin } from "./services/vault";
+import { vaultPin, vaultHttpUrl } from "./services/vault";
+import { devFetchable } from "./services/imageCache";
 import { ROUTE_VIEWS, hashForView, viewFromHash, type RoutedView } from "./utils/routing";
 import { playChime, playPress, playMsgReceive } from "./utils/sounds";
 import { useLobby } from "./hooks/useLobby";
@@ -579,10 +580,11 @@ export default function Home() {
     if (url.startsWith('data:') || url.startsWith('blob:')) return Promise.resolve(url)
     const isVideo = /\.(mp4|webm|ogv|mov)(\?|$)/i.test(url.split('?')[0]) || url.includes('/rg-media')
     if (isVideo) {
-      if (isDev() && /^https?:/i.test(url)) {
-        const proxied = devFetchable(url)
-        if (proxied) return Promise.resolve(proxied)
+      if (url.startsWith('vault://')) {
+        return vaultHttpUrl(url).then(http => http || url)
       }
+      const proxied = devFetchable(url)
+      if (proxied) return Promise.resolve(proxied)
       return Promise.resolve(url)
     }
     if (/^https?:/i.test(url) || url.startsWith('gmcache://') || url.startsWith('vault://')) {

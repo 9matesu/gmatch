@@ -32,10 +32,12 @@ import { GMatchStories } from '../GMatchStories';
 import { InstagramPostModal } from './InstagramPostModal';
 import { LiveCameraModal } from '../camera/LiveCameraModal';
 import { ObjectImage } from '../ObjectImage';
+import { Avatar } from '../Avatar';
 import CachedImg from '../../ui/CachedImg';
 import { LazyVideo } from '../LazyVideo';
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
 import { isMediaVideo, resolveMediaUrl } from '../../utils/media';
+import { isUserOnline } from '../../utils/presence';
 import { orbitFetch, postShareUrl } from '../../utils/api';
 import { GAME_AD_TEMPLATES } from '../../utils/gameAds';
 import { ExploreSearchModal } from './ExploreSearchModal';
@@ -219,7 +221,7 @@ export function GMatchFeed({
 
   // Endless scroll observer
   useEffect(() => {
-    if (!sentinelRef.current) return;
+    if (!sentinelRef.current || typeof IntersectionObserver === 'undefined') return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && !internalLoadingMore && !isLoadingMore && hasMore !== false) {
@@ -366,11 +368,45 @@ export function GMatchFeed({
     }
   }, [posts]);
 
+  // Track posts whose media failed to load or are unavailable
+  const [failedPostIds, setFailedPostIds] = useState<Set<string>>(() => new Set());
+  const markPostUnavailable = useCallback((id: string) => {
+    setFailedPostIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+
+  const onlineUserIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const u of users || []) {
+      if (isUserOnline(u)) {
+        if (u.id) s.add(u.id);
+        if (u.orbitId) s.add(u.orbitId);
+      }
+    }
+    if (identity?.orbitId) s.add(identity.orbitId);
+    return s;
+  }, [users, identity]);
+
   // Algorithmic Sorting. Latest is strictly chronological; Trending is a
   // deterministic engagement + tag-affinity score with recency decay, matching
   // the server's scoring intent (see /api/posts).
   const displayPosts = useMemo(() => {
-    const active = posts.filter((p) => !p.is_archived);
+    const active = posts.filter((p) => {
+      if (p.is_archived) return false;
+      if (failedPostIds.has(p.id)) return false;
+      if (!p.is_sponsored && !p.url && (!p.media || p.media.length === 0)) return false;
+      const isObj = Boolean(p.url && (p.url.startsWith('p2p-') || p.url.includes('/api/objects/')));
+      if (isObj && p.author_id && !onlineUserIds.has(p.author_id) && p.author_id !== identity?.orbitId) {
+        if (!p.localPreviewUrl && !p.url?.startsWith('data:') && !p.url?.startsWith('blob:')) {
+          return false;
+        }
+      }
+      return true;
+    });
 
     if (feedSort === 'latest') {
       return [...active].sort(
@@ -401,7 +437,7 @@ export function GMatchFeed({
       if (scoreA !== scoreB) return scoreB - scoreA;
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
-  }, [posts, likeCounts, commentsMap, tagAffinities, now, feedSort]);
+  }, [posts, likeCounts, commentsMap, tagAffinities, now, feedSort, failedPostIds, onlineUserIds, identity?.orbitId]);
 
   const followSuggestions = useMemo(
     () => displayPosts.length === 0
@@ -720,12 +756,8 @@ export function GMatchFeed({
                     title={authorHasStory ? 'Watch story' : 'View profile'}
                   >
                     <div className={`w-8 h-8 rounded-full p-[1.5px] flex-shrink-0 ${authorHasStory ? 'bg-gradient-to-tr from-zinc-300 to-zinc-600' : 'bg-glass-w12 border border-border-glass'}`}>
-                      <div className="w-full h-full rounded-full bg-retro-panel overflow-hidden flex items-center justify-center text-xs font-semibold text-retro-fg">
-                        {profilePics[post.author_id] || post.author_avatar ? (
-                          <img src={resolveMediaUrl(profilePics[post.author_id] || post.author_avatar!)} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          post.author_name.charAt(0).toUpperCase()
-                        )}
+                      <div className="w-full h-full rounded-full bg-retro-panel overflow-hidden flex items-center justify-center text-xs font-semibold text-retro-fg">
+                        <Avatar id={post.author_id} size={32} imageUrl={profilePics[post.author_id] || post.author_avatar} fill={true} />
                       </div>
                     </div>
                     <div>
@@ -793,6 +825,8 @@ export function GMatchFeed({
                                 autoPlay={true}
                                 muted={true}
                                 loop={true}
+                                hideUnavailable={true}
+                                onMediaUnavailable={() => markPostUnavailable(post.id)}
                                 onExpand={() => setActiveLightboxPost(post)}
                                 onDoubleTapLike={() => handleDoubleTap(post)}
                               />
@@ -805,6 +839,7 @@ export function GMatchFeed({
                                 autoPlay={true}
                                 muted={true}
                                 loop={true}
+                                onError={() => markPostUnavailable(post.id)}
                                 onExpand={() => setActiveLightboxPost(post)}
                                 onDoubleTapLike={() => handleDoubleTap(post)}
                               />
@@ -814,6 +849,7 @@ export function GMatchFeed({
                                 alt={post.caption || 'Post image'}
                                 className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
                                 loading="lazy"
+                                onError={() => markPostUnavailable(post.id)}
                               />
                             )}
                           </>
@@ -854,6 +890,8 @@ export function GMatchFeed({
                           autoPlay={true}
                           muted={true}
                           loop={true}
+                          hideUnavailable={true}
+                          onMediaUnavailable={() => markPostUnavailable(post.id)}
                           onExpand={() => setActiveLightboxPost(post)}
                           onDoubleTapLike={() => handleDoubleTap(post)}
                         />
@@ -866,6 +904,7 @@ export function GMatchFeed({
                           autoPlay={true}
                           muted={true}
                           loop={true}
+                          onError={() => markPostUnavailable(post.id)}
                           onExpand={() => setActiveLightboxPost(post)}
                           onDoubleTapLike={() => handleDoubleTap(post)}
                         />
@@ -875,6 +914,7 @@ export function GMatchFeed({
                           alt={post.caption || 'Post image'}
                           className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
                           loading="lazy"
+                          onError={() => markPostUnavailable(post.id)}
                         />
                       )}
 
@@ -1094,11 +1134,7 @@ export function GMatchFeed({
                         aria-label={`Follow ${s.display_name || s.id}`}
                       >
                         <span className="w-10 h-10 rounded-full overflow-hidden border border-border-glass flex items-center justify-center text-xs text-retro-fg bg-glass-w5">
-                          {profilePics?.[s.id] ? (
-                            <img src={resolveMediaUrl(profilePics[s.id])} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            (s.display_name || s.id).slice(0, 2).toUpperCase()
-                          )}
+                          <Avatar id={s.id} size={40} imageUrl={profilePics?.[s.id]} fill={true} />
                         </span>
                         <span className="text-[10px] text-retro-muted truncate max-w-[72px] group-hover:text-retro-fg">{s.display_name}</span>
                         <span className="text-[10px] text-retro-fg border border-border-glass rounded-md px-1.5 py-0.5 group-hover:bg-glass-w10">Follow</span>

@@ -5,7 +5,7 @@ import { isMediaVideo, resolveMediaUrl } from '../utils/media'
 import { useObjectImage } from '../hooks/useObjectImage'
 import { NativeVideoPlayer } from './media/NativeVideoPlayer'
 import { useVaultUrl } from '../services/vault'
-import { resolveImage } from '../services/imageCache'
+import { resolveImage, devFetchable } from '../services/imageCache'
 
 interface IdentityLike {
   orbitId: string
@@ -36,6 +36,8 @@ export interface ObjectImageProps {
   onExpand?: () => void
   onDoubleTapLike?: () => void
   onError?: () => void
+  /** Invoked when media cannot be loaded / is unavailable */
+  onMediaUnavailable?: () => void
   /** When true, hides the element cleanly on missing/failed media instead of placeholder box */
   hideUnavailable?: boolean
 }
@@ -109,6 +111,7 @@ export function ObjectImage({
   onExpand,
   onDoubleTapLike,
   onError,
+  onMediaUnavailable,
   hideUnavailable = false,
 }: ObjectImageProps) {
   const signed = needsSignedFetch(contentUrl, objectId)
@@ -149,8 +152,8 @@ export function ObjectImage({
   let baseSrc: string
   let isVideo: boolean
   if (signed) {
-    baseSrc = img.url || ''
-    isVideo = img.isVideo || Boolean(mimeType && mimeType.startsWith('video/'))
+    baseSrc = img.url || (img.isLink && img.linkUrl ? img.linkUrl : '')
+    isVideo = img.isVideo || Boolean(mimeType && mimeType.startsWith('video/')) || isMediaVideo(baseSrc)
   } else {
     baseSrc = resolveMediaUrl(contentUrl)
     isVideo = Boolean(mimeType && mimeType.startsWith('video/')) || isMediaVideo(contentUrl) || false
@@ -174,7 +177,14 @@ export function ObjectImage({
     return () => { live = false }
   }, [baseSrc, signed])
 
-  const src = vaultSrc || cachedDirectUrl || baseSrc
+  const proxied = devFetchable(baseSrc)
+  const src = vaultSrc || cachedDirectUrl || proxied || baseSrc
+
+  useEffect(() => {
+    if ((signed && img.failed) || hasError) {
+      onMediaUnavailable?.()
+    }
+  }, [signed, img.failed, hasError, onMediaUnavailable])
 
   if (!src) {
     if (hideUnavailable) return null

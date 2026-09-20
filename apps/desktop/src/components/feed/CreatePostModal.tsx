@@ -21,6 +21,7 @@ import { orbitFetch } from '../../utils/api';
 import { mediaUrlToCachedFile } from '../../utils/cacheMedia';
 import { isMediaVideo, isTwitterUrl, isVideoPageUrl, resolveTwitterMedia } from '../../utils/media';
 import { forgeMediaLocally } from '../../services/mediaForge';
+import { devFetchable } from '../../services/imageCache';
 
 interface PostMediaItem {
   id: string;
@@ -554,11 +555,11 @@ export function CreatePostModal({
                 ) : (
                   <>
                     {isMediaVideo(currentMedia.file?.type || currentMedia.previewUrl) ? (
-                      <video src={currentMedia.previewUrl} muted playsInline className={`w-full object-cover ${aspectRatio === 'square' ? 'aspect-square' : aspectRatio === 'portrait' ? 'aspect-[4/5]' : 'aspect-[16/9]'}`} />
+                      <video src={devFetchable(currentMedia.previewUrl) || currentMedia.previewUrl} muted playsInline className={`w-full object-cover ${aspectRatio === 'square' ? 'aspect-square' : aspectRatio === 'portrait' ? 'aspect-[4/5]' : 'aspect-[16/9]'}`} />
                     ) : null}
                     {!isMediaVideo(currentMedia.file?.type || currentMedia.previewUrl) && (
                     <img
-                      src={currentMedia.previewUrl}
+                      src={devFetchable(currentMedia.previewUrl) || currentMedia.previewUrl}
                       alt=""
                       className={`w-full object-cover transition-all ${aspectRatio === 'square'
                         ? 'aspect-square'

@@ -7,6 +7,9 @@ vi.mock('../services/imageCache', () => ({
   resolveImage: vi.fn(async (url: string) =>
     url.includes('cached') ? 'gmcache://disk-hash' : url
   ),
+  devFetchable: vi.fn((url: string) =>
+    url.includes('dev-proxy') ? '/px?u=' + encodeURIComponent(url) : null
+  ),
 }));
 
 describe('Avatar offline cache and fallback', () => {
@@ -26,6 +29,14 @@ describe('Avatar offline cache and fallback', () => {
     await waitFor(() => {
       expect(container.querySelector('img')).toBeNull();
       expect(container.querySelector('svg')).toBeInTheDocument();
+    });
+  });
+
+  it('proxies external booru/CDN avatar URLs through /px in dev', async () => {
+    const { container } = render(<Avatar id="user-3" imageUrl="https://cdn.example.com/dev-proxy-avatar.jpg" />);
+    await waitFor(() => {
+      const img = container.querySelector('img');
+      expect(img).toHaveAttribute('src', '/px?u=https%3A%2F%2Fcdn.example.com%2Fdev-proxy-avatar.jpg');
     });
   });
 });
