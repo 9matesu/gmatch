@@ -60,7 +60,13 @@ export async function vaultGet(url: string): Promise<string | null> {
   if (vaultBridge()) {
     try {
       const res = await window.gmatch?.vaultGet?.(url)
-      if (res?.local) return res.local
+      if (res?.local) {
+        if (/\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(url) || /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(res.local)) {
+          const http = await vaultHttpUrl(res.local)
+          if (http) return http
+        }
+        return res.local
+      }
     } catch {
       /* fallback to local storage */
     }

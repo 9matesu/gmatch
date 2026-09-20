@@ -116,12 +116,24 @@ function stats() {
 function get(url) {
   try {
     if (!url || !dir) return null
-    const e = manifest[String(url)]
+    const str = String(url)
+    if (str.startsWith(`${SCHEME}://f/`)) {
+      const k = str.split('/').pop()
+      if (k) {
+        try {
+          fs.accessSync(fileFor(k), fs.constants.R_OK)
+          return str
+        } catch {
+          return null
+        }
+      }
+    }
+    const e = manifest[str]
     if (!e) return null
     try {
       fs.accessSync(fileFor(e.key), fs.constants.R_OK)
     } catch {
-      delete manifest[String(url)]
+      delete manifest[str]
       return null
     }
     e.atime = Date.now()
@@ -138,36 +150,74 @@ function get(url) {
 async function pin(url) {
   try {
     if (!url || !dir) return null
-    const hit = get(url)
+    const str = String(url)
+    if (str.startsWith(`${SCHEME}://f/`)) {
+      const hit = get(str)
+      if (hit) return hit
+    }
+    const hit = get(str)
     if (hit) {
-      manifest[String(url)].pins += 1
-      writeManifest()
+      if (manifest[str]) {
+        manifest[str].pins = (manifest[str].pins || 0) + 1
+        writeManifest()
+      }
       return hit
     }
     // idle-file:// (player-owned idle folders) is not http(s) — the byte
     // fetcher rejects any other scheme, so those keeps never reached disk
     // and only reappeared while the clicker held the folder grant open.
     // Read the granted path directly instead of routing through the fetcher.
-    let fetched
-    if (String(url).startsWith('idle-file://')) {
-      fetched = require('./customFolders.cjs').readIdleFile(url)
+    let fetched = null
+    if (str.startsWith('idle-file://')) {
+      fetched = require('./customFolders.cjs').readIdleFile(str)
+      if (!fetched) return null
+    } else if (str.startsWith('gmcache://')) {
+      const cacheKey = str.replace('gmcache://', '')
+      const cached = require('./diskImageCache.cjs').get(cacheKey)
+      if (cached) {
+        const buf = Buffer.isBuffer(cached) ? cached : cached.buf
+        if (buf && buf.length > 0) {
+          fetched = { buf, mime: cached.mime || 'image/jpeg' }
+        }
+      }
+      if (!fetched) {
+        try {
+          const m = imageCache.readCache ? imageCache.readCache(str) : null
+          if (m && m.buf) fetched = m
+        } catch {}
+      }
       if (!fetched) return null
     } else {
       const fetch = fetcher || imageCache.fetchBinary
-      fetched = await fetch(String(url))
+      try {
+        fetched = await fetch(str)
+      } catch (err) {
+        // Fallback for boorus: try alternate extensions
+        if (/\.(jpe?g|png|gif|webp)$/i.test(str)) {
+          const exts = ['jpg', 'png', 'gif', 'jpeg']
+          for (const ext of exts) {
+            const alt = str.replace(/\.(jpe?g|png|gif|webp)$/i, `.${ext}`)
+            if (alt === str) continue
+            try {
+              fetched = await fetch(alt)
+              if (fetched && fetched.buf) break
+            } catch {}
+          }
+        }
+      }
     }
+    if (!fetched || !fetched.buf || fetched.buf.length === 0) return null
     const { buf, mime } = fetched
-    if (!buf || buf.length === 0) return null
-    const cap = imageCache.capFor(mime, url)
+    const cap = imageCache.capFor(mime, str)
     if (buf.length > cap) return null
     if (!makeRoom(buf.length)) return null
-    const key = keyFor(url)
+    const key = keyFor(str)
     try {
       fs.writeFileSync(fileFor(key), buf)
     } catch {
       return null
     }
-    manifest[String(url)] = { key, mime: String(mime || ''), bytes: buf.length, atime: Date.now(), pins: 1 }
+    manifest[str] = { key, mime: String(mime || ''), bytes: buf.length, atime: Date.now(), pins: 1 }
     writeManifest()
     return `${SCHEME}://f/${key}`
   } catch {
