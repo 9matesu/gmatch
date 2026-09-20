@@ -51,6 +51,8 @@ export interface Party {
   /** Session chat log (server-authoritative; joiners get the backlog). */
   chat: ChatEntry[]
   lastSeen: number
+  /** Grace timestamp when the room emptied, giving peers 15m to reconnect */
+  emptySince?: number
   /** ponytail: last chat msg ts per user; global bucket if flood persists. */
   lastChat: Map<string, number>
   lastControl: Map<string, number>
@@ -147,7 +149,11 @@ function dropParty(party: Party): void {
 function gcTick(): void {
   const now = Date.now()
   for (const [id, p] of parties) {
-    if (now - p.lastSeen > IDLE_MS) dropParty(p)
+    if (p.emptySince && now - p.emptySince > 15 * 60 * 1000) {
+      dropParty(p)
+    } else if (!p.emptySince && now - p.lastSeen > IDLE_MS) {
+      dropParty(p)
+    }
   }
   while (parties.size > MAX_PARTIES) {
     // Audit A6: evict the least-recently-SEEN room, not the first created.
@@ -210,15 +216,24 @@ export function applyWatch(userId: string, msg: any): { room: string; payload: a
 }
 
 /** Handle watch.join: add member, return the snapshot payload for the room. */
-export function joinWatch(userId: string, displayName: string, msg: any): { room: string; payload: any } | null {
+export function joinWatch(userId: string, displayName: string, msg: any): { room: string; payload: any; snapshot: any; broadcastPayload: any } | null {
   const party = parties.get(String(msg?.party || ''))
   if (!party || party.bans.has(userId)) return null
-  if (party.members.size >= 8 && !party.members.has(userId)) return null
+  // # ponytail: limitless watch party entry (removed artificial 8-peer ceiling)
   party.members.set(userId, { name: String(displayName || '').slice(0, 40), muted: party.members.get(userId)?.muted || false })
   party.lastSeen = Date.now()
+  party.emptySince = undefined
   const room = partyRoom(party.id)
   const who = String(displayName || '').slice(0, 40) || userId.slice(0, 8)
-  return { room, payload: [snapshotPayload(party), pushSystem(party, `${who} joined`)] }
+  const snap = snapshotPayload(party)
+  const sys = pushSystem(party, `${who} joined`)
+  const rost = rosterPayload(party)
+  return {
+    room,
+    payload: [snap, sys],
+    snapshot: snap,
+    broadcastPayload: [sys, rost],
+  }
 }
 
 /** Explicit watch.leave (tab close uses leaveAll via the socket close hook). */
@@ -246,13 +261,18 @@ function removeMember(party: Party, userId: string, forceClose: boolean): { room
   party.members.delete(userId)
   const room = partyRoom(party.id)
   if (party.members.size === 0) {
+    if (forceClose) {
+      // # ponytail: socket disconnects / reloads get a 15m grace period so the party isn't destroyed mid-stream
+      party.emptySince = Date.now()
+      return { room, payload: [pushSystem(party, `${who} left`)] }
+    }
     dropParty(party)
     return { room, payload: [pushSystem(party, `${who} left`)] }
   }
+  party.emptySince = undefined
   if (party.hostId === userId) {
     party.hostId = party.members.keys().next().value || ''
   }
-  void forceClose
   const payloads: any[] = [pushSystem(party, `${who} left`), rosterPayload(party)]
   return { room, payload: payloads }
 }

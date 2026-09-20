@@ -33,11 +33,21 @@ export async function mediaUrlToCachedFile(url: string): Promise<File> {
     const res = await fetch(source, { referrerPolicy: 'no-referrer' })
     if (!res.ok) throw new Error(`source responded ${res.status}`)
     const blob = await res.blob()
-    if (blob.size === 0 || (!blob.type.startsWith('image/') && !blob.type.startsWith('video/'))) {
+    let mime = blob.type || ''
+    if (!mime || mime === 'application/octet-stream') {
+      const extMatch = source.match(/\.(jpe?g|png|gif|webp|avif|bmp|mp4|webm)(\?|#|$)/i)
+      if (extMatch) {
+        const ext = extMatch[1].toLowerCase()
+        mime = ext === 'mp4' || ext === 'webm' ? `video/${ext}` : `image/${ext === 'jpg' ? 'jpeg' : ext}`
+      } else {
+        mime = 'image/jpeg'
+      }
+    }
+    if (blob.size === 0 || (!mime.startsWith('image/') && !mime.startsWith('video/'))) {
       throw new Error('not cacheable media')
     }
-    const ext = (blob.type.split('/')[1] || 'jpg').split('+')[0]
-    return new File([blob], `media-${Date.now()}.${ext}`, { type: blob.type })
+    const ext = (mime.split('/')[1] || 'jpg').split('+')[0]
+    return new File([blob], `media-${Date.now()}.${ext}`, { type: mime })
   } catch {
     throw new Error('Could not cache this URL — the source refused the transfer')
   }

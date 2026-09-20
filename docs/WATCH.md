@@ -69,7 +69,7 @@ and playback stays frame-accurate within the drift deadband.
 | Frame | Payload | Server rule |
 |---|---|---|
 | `watch` | `{party, action: play\|pause, position}` | members only; position finite >=0; rate locked 1; re-stamped `updatedAt` = server clock + `by` = member name; relayed as `watch.sync` |
-| `watch.join` | `{party, name}` | member (not banned, cap 8); relays `watch.roster` (with snapshot) + `watch.system` |
+| `watch.join` | `{party, name}` | member (not banned; limitless entry); replies with `watch.roster` (snapshot) to joiner + relays `watch.system` + roster to room |
 | `watch.leave` | `{party}` | member; relays `watch.system` + `watch.roster` |
 | `watch.chat` | `{party, text}` | member, not muted; 80 chars; 1 msg/2s per user; stored + relayed as `watch.chat` with `msgId` |
 | `watch.chat.del` | `{party, msgId}` | author or host; relays `watch.chat_del` |
@@ -137,7 +137,7 @@ signature gets ONE new resolver function in the chain, plus a fixture in
   volume. Two machines would each restore their own copy -> rooms need a
   Durable Object before scaling out.
 - Every gate is server-side: membership, host-only ops, bans, mute, rate
-  limits, clamps (name 40, queue 50, chat 80 msgs / 80 chars, members 8,
+  limits, clamps (name 40, queue 50, chat 80 msgs / 80 chars, limitless members,
   bulk add 10/request).
 - The stream endpoint is unauthenticated BY DESIGN (raw `<video>` cannot
   sign): the unguessable room id + server-bound upstream are the controls.

@@ -21,7 +21,7 @@ const { dapiSource, booruOrgSource } = require('./booru-sources-core.cjs')
   Math.random = () => 0.99
   const posts = await src.fetch('solo_tag', 10)
   assert.equal(posts.length, 1, 'retry served posts')
-  assert.ok(urls[0].includes('pid=7'), `first pid high: ${urls[0]}`)
+  assert.ok(urls[0].includes('pid=79'), `first pid high: ${urls[0]}`)
   assert.ok(urls[1].includes('pid=0'), 'fallback retried pid=0')
   assert.ok(decodeURIComponent(urls[0]).includes('solo_tag rating:explicit -bad'), 'negatives in query')
   assert.equal(src.id, 'tbib')

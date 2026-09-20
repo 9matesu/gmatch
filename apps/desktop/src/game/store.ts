@@ -959,7 +959,7 @@ export const useGame = create<GameState>((set, get) => ({
       // decays back into the mix once its batch lands.
       // ponytail: in grid mode pull a larger batch (30) so queue stays ahead of the 3x3 grid
       const batchLimit = isGridMode(get().viewMode) ? 30 : 15
-      const res = await fetchPostsMulti({ tags: pool, limit: batchLimit, priority, allowReal: s.allowReal, allowHentai: s.allowHentai })
+      const res = await fetchPostsMulti({ tags: pool, limit: batchLimit, priority, allowReal: s.allowReal, allowHentai: s.allowHentai, fresh: true })
       cursor = s.feedCursor + 1
       // Seen-exhausted (not broken): gentle path — no backoff escalation,
       // distinct UI copy; auto-poll still recovers.
@@ -985,7 +985,8 @@ export const useGame = create<GameState>((set, get) => ({
         ...(get().current ? [get().current!.url] : []),
       ])
       const freshPosts = posts.filter((p) => !existingUrls.has(p.url))
-      const usablePosts = freshPosts.length > 0 ? freshPosts : posts
+      // # ponytail: skip seen posts completely; never repeat into usablePosts
+      const usablePosts = freshPosts
       if (usablePosts.length > 0) {
         if (isGridMode(get().viewMode)) {
           // Grid consumes the whole batch: append to the queue, top up squares.

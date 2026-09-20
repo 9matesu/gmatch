@@ -259,14 +259,49 @@ export function CreatePostModal({
             /* fall back to url */
           }
         }
-        if (!uploadFile && item.previewUrl.includes('/api/objects/')) {
-          // Server-side repost (gallery/feed item): bytes need the signed
-          // headers; a raw `url` reference would 400 at the URL validator.
+        if (!uploadFile && (/^(gmcache|idle-file|vault):/i.test(item.previewUrl) || item.previewUrl.startsWith('/booru/'))) {
           try {
-            const res = await orbitFetch(item.previewUrl, {}, identity);
-            if (res.ok) {
-              const blob = await res.blob();
-              if (blob.size > 0) uploadFile = new File([blob], `media_${i}.bin`, { type: blob.type || 'image/jpeg' });
+            uploadFile = await mediaUrlToCachedFile(item.previewUrl);
+          } catch {
+            /* fall back to url */
+          }
+        }
+        if (!uploadFile && item.previewUrl.includes('/api/objects/')) {
+          // Server-side repost (gallery/feed item): check local swarm/indexedDB first
+          try {
+            const cleanId = item.previewUrl.split('/api/objects/')[1]?.split(/[?#]/)[0] || '';
+            const { getLocalObject, requestSwarmObject } = await import('../../utils/p2pSwarm');
+            let blob: Blob | null = cleanId ? await getLocalObject(cleanId) : null;
+            if (!blob && cleanId) {
+              try {
+                blob = await requestSwarmObject(cleanId, 3000);
+              } catch {
+                /* fallback to orbitFetch */
+              }
+            }
+            if (!blob) {
+              const res = await orbitFetch(item.previewUrl, {}, identity);
+              if (res.ok) {
+                const ctype = (res.headers.get('Content-Type') || '').toLowerCase();
+                if (ctype.includes('json')) {
+                  const data = await res.json().catch(() => null);
+                  if (data?.content_hash) {
+                    blob = (await getLocalObject(data.content_hash)) || null;
+                    if (!blob) {
+                      try {
+                        blob = await requestSwarmObject(data.content_hash, 3000);
+                      } catch {
+                        /* fallback */
+                      }
+                    }
+                  }
+                } else {
+                  blob = await res.blob();
+                }
+              }
+            }
+            if (blob && blob.size > 0 && !blob.type.includes('json')) {
+              uploadFile = new File([blob], `card_${i}.jpg`, { type: blob.type || 'image/jpeg' });
             }
           } catch {
             /* fall back to url */
@@ -300,6 +335,9 @@ export function CreatePostModal({
           // Instant tile: render the session blob URL with zero fetch.
           if (!primaryLocalUrl && forged.localUrl) primaryLocalUrl = forged.localUrl;
         } else {
+          if (/^(gmcache|idle-file|vault):/i.test(item.previewUrl) || item.previewUrl.includes('/api/objects/')) {
+            throw new Error('Failed to resolve image bytes for P2P distribution');
+          }
           formData.append('url', item.previewUrl);
           formData.append('is_public', '1');
           formData.append('post_group', postGroup);

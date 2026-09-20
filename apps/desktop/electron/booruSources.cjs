@@ -11,17 +11,16 @@ function queryVariants(query) {
 
 function createFetchBooru({ sources, httpGet, cache, blocked = () => false }) {
   let rrIndex = 0
-  return async function fetchBooru({ tags, limit, allowReal, allowHentai }) {
+  return async function fetchBooru({ tags, limit, allowReal, allowHentai, fresh }) {
     const query = String(tags ?? '').trim()
     const n = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100)
     if (!query || blocked(query)) {
       return { posts: [], source: null, ok: false, error: 'blocked-or-empty query' }
     }
 
-    // READ the memo fetchBooru already writes. Without this the store is
-    // write-only: every round re-queries the providers for a query whose posts
-    // are already in hand. Cached posts skip the network entirely.
-    const memo = cache?.getFeedCache?.(query)
+    // READ the memo fetchBooru already writes if fresh isn't requested.
+    // # ponytail: fresh=true bypasses 10-minute memo so idle loop gets new images
+    const memo = !fresh ? cache?.getFeedCache?.(query) : null
     if (memo && memo.length > 0) {
       return { posts: memo, source: 'cache', ok: true, query, cached: true }
     }
@@ -53,6 +52,13 @@ function createFetchBooru({ sources, httpGet, cache, blocked = () => false }) {
       }
     }
     rrIndex = (rrIndex + 1) % pool.length
+
+    // Fallback to cache if providers all failed offline
+    const fallback = cache?.getFeedCache?.(query)
+    if (fallback && fallback.length > 0) {
+      return { posts: fallback, source: 'cache', ok: true, query, cached: true }
+    }
+
     return { posts: [], source: null, ok: false }
   }
 }

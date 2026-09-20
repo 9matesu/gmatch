@@ -28,4 +28,11 @@ describe('mediaUrlToCachedFile', () => {
     globalThis.fetch = mockFetch({ 'blocked.example': { ok: true, type: 'text/html' } })
     await expect(mediaUrlToCachedFile('https://blocked.example/x')).rejects.toThrow(/cache/i)
   })
+
+  it('accepts gmcache:// and recovers image mime from octet-stream', async () => {
+    globalThis.fetch = mockFetch({ 'gmcache://f/sample.jpg': { ok: true, type: 'application/octet-stream' } })
+    const f = await mediaUrlToCachedFile('gmcache://f/sample.jpg')
+    expect(f).toBeInstanceOf(File)
+    expect(f.type).toBe('image/jpeg')
+  })
 })

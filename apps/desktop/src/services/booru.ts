@@ -46,6 +46,7 @@ export interface BooruRequest {
   allowHentai?: boolean
   page?: number
   probe?: boolean
+  fresh?: boolean
 }
 
 export interface BooruResponse {
@@ -1113,6 +1114,7 @@ export interface BooruMultiRequest {
   allowHentai?: boolean
   page?: number
   probe?: boolean
+  fresh?: boolean
 }
 
 // New tag set = new round: yesterday's exhaustion must not answer today's
@@ -1144,6 +1146,7 @@ export async function fetchPostsMulti(req: BooruMultiRequest): Promise<BooruResp
         allowHentai: req.allowHentai,
         page: req.page,
         probe: req.probe,
+        fresh: req.fresh,
       }),
     ),
   )

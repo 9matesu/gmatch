@@ -460,4 +460,22 @@ describe('queue prev + playlist budget (autoplay wave)', () => {
     expect(p.frame.action).toBe('play')
     expect(p.frame.position).toBe(0)
   })
+
+  it('allows limitless party members (past 8) and holds 15m reconnect grace on socket disconnect', () => {
+    const p = makeParty('u1')
+    for (let i = 2; i <= 25; i++) {
+      const res = joinWatch(`user-${i}`, `User ${i}`, { party: p.id })
+      expect(res).not.toBeNull()
+    }
+    expect(p.members.size).toBe(25)
+
+    // Disconnect sockets via leaveAll (forceClose)
+    for (let i = 2; i <= 25; i++) {
+      leaveAll(`user-${i}`)
+    }
+    leaveAll('u1')
+    expect(p.members.size).toBe(0)
+    expect(p.emptySince).toBeGreaterThan(0)
+    expect(getParty(p.id)).toBeDefined()
+  })
 })

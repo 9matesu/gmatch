@@ -105,7 +105,13 @@ export function handleIncoming(conn: WsConn, data: string): void {
     const res = joinWatch(conn.userId || '', (msg.name || '').slice(0, 40), msg)
     if (res) {
       conn.rooms.add(res.room)
-      broadcastToRoom(res.room, res.payload)
+      // Send full state snapshot ONLY to the joiner socket
+      conn.send(JSON.stringify(res.snapshot || (Array.isArray(res.payload) ? res.payload[0] : res.payload)))
+      // Broadcast system join notice + lightweight roster to other members in the room
+      const othersPayload = res.broadcastPayload || (Array.isArray(res.payload) ? res.payload.slice(1) : [])
+      if (othersPayload && (!Array.isArray(othersPayload) || othersPayload.length > 0)) {
+        broadcastToRoomExcept(res.room, conn, othersPayload)
+      }
     } else if (typeof msg.party === 'string') {
       // Room died (GC/eviction pre-persistence, or a creator wipe): say so
       // once, on the requester's socket, so no ghost room loops 404s.
@@ -252,6 +258,16 @@ export function broadcastToRoom(room: string, payload: unknown): void {
     const payloadStr = JSON.stringify(item)
     for (const c of conns) {
       if (c.rooms.has(room)) c.send(payloadStr)
+    }
+  }
+}
+
+export function broadcastToRoomExcept(room: string, exclude: WsConn, payload: unknown): void {
+  const list = Array.isArray(payload) ? payload : [payload]
+  for (const item of list) {
+    const payloadStr = JSON.stringify(item)
+    for (const c of conns) {
+      if (c !== exclude && c.rooms.has(room)) c.send(payloadStr)
     }
   }
 }

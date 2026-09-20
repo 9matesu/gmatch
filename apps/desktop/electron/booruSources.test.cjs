@@ -40,6 +40,10 @@ async function main() {
   assert.ok(second.posts.length === 1, 'cached posts returned')
   assert.strictEqual(second.cached, true, 'cached verdict is flagged')
 
+  const thirdFresh = await fetchBooru({ tags: 'alpha', limit: 10, fresh: true })
+  assert.strictEqual(providerCalls, 2, 'fresh=true must bypass cache and re-hit provider')
+  assert.ok(!thirdFresh.cached, 'fresh call not flagged cached')
+
   fs_cleanup()
   console.log('booruSources: all assertions passed')
 }
