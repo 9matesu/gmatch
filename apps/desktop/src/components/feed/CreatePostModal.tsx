@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { playPress, playWin } from '../../utils/sounds';
+import { playPress } from '../../utils/sounds';
 import { useCropper } from '../../hooks/useCropper';
 import { isCropableImage } from '../CropModal';
 import {
@@ -369,8 +369,8 @@ export function CreatePostModal({
         }
       }
       const objectId = primaryId || 'post_' + Math.random().toString(36).substring(2, 9);
-
-      playWin();
+ 
+      playPress(800);
       toast?.('Post shared.', 'success');
 
       onPostCreated?.({

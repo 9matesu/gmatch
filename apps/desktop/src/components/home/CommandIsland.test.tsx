@@ -65,30 +65,7 @@ describe('CommandIsland navigation coverage', () => {
 })
 
 describe('CommandIsland grid size control (T-W3)', () => {
-  it('shows the layout control only on the Clicker view', () => {
-    const { rerender } = render(
-      <CommandIsland mainView="feed" setMainView={vi.fn()} gridSize="3x3" onGridSizeChange={vi.fn()} />,
-    )
-    expect(screen.queryByRole('group', { name: 'Grid size' })).not.toBeInTheDocument()
-    rerender(
-      <CommandIsland mainView="grid" setMainView={vi.fn()} gridSize="3x3" onGridSizeChange={vi.fn()} />,
-    )
-    expect(screen.getByRole('group', { name: 'Grid size' })).toBeInTheDocument()
-  })
-
-  it('maps legacy aliases and reports the picked layout', () => {
-    const onGridSizeChange = vi.fn()
-    render(
-      <CommandIsland mainView="grid" setMainView={vi.fn()} gridSize="grid" onGridSizeChange={onGridSizeChange} />,
-    )
-    // legacy 'grid' reads as the 3x3 layout being active
-    expect(screen.getByRole('button', { name: '3x3' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: '1x1' })).toHaveAttribute('aria-pressed', 'false')
-    fireEvent.click(screen.getByRole('button', { name: '2x2' }))
-    expect(onGridSizeChange).toHaveBeenCalledWith('2x2')
-  })
-
-  it('renders nothing when the props are not passed', () => {
+  it('does not render layout control on pill bar (moved to game header)', () => {
     render(<CommandIsland mainView="grid" setMainView={vi.fn()} />)
     expect(screen.queryByRole('group', { name: 'Grid size' })).not.toBeInTheDocument()
   })

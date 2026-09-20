@@ -245,36 +245,6 @@ export function CommandIsland({
       );
     }
 
-    // Clicker layout: the size control lives on the bar (was a row above the
-    // grid). Renders only when App passes the prop pair.
-    if (mainView === 'grid' && onGridSizeChange) {
-      return (
-        <div
-          role="group"
-          aria-label="Grid size"
-          className="inline-flex items-center gap-0.5 rounded-full bg-glass-w5 border border-border-glass p-0.5"
-        >
-          {GRID_SIZES.map((mode) => {
-            const active = gridSizeMatches(mode, gridSize)
-            return (
-              <button
-                key={mode}
-                type="button"
-                aria-pressed={active}
-                onClick={() => { playPress(760); onGridSizeChange(mode) }}
-                title={mode === '1x1' ? 'Single foe' : `${mode} grid`}
-                className={`px-2 py-0.5 rounded-full text-xs font-mono transition-all cursor-pointer ${
-                  active ? 'bg-retro-accent text-retro-accent-text font-bold' : 'text-retro-muted hover:text-retro-fg'
-                }`}
-              >
-                {mode}
-              </button>
-            )
-          })}
-        </div>
-      );
-    }
-
     return null;
   };
 

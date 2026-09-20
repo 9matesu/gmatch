@@ -500,8 +500,7 @@ users.on(['PATCH', 'PUT'], '/profile', async (c) => {
   // save must work even on an auth-provisioned row with no display_name
   // yet - the old blanket 400 permanently locked such accounts out of
   // ever fixing their profile (pfp 400 report, fix/resilience wave).
-  const patchCarriesIdentity = cleanName !== undefined || tags !== undefined
-  if (patchCarriesIdentity && !cleanName && !existing?.display_name?.trim()) {
+  if (cleanName !== undefined && !cleanName && !existing?.display_name?.trim()) {
     return c.json({ error: 'Display name is required' }, 400)
   }
   let cleanTags: string[] | undefined

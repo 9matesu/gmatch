@@ -19,18 +19,21 @@ describe('GMatchFeed author and name click behavior', () => {
     author_avatar: 'https://example.com/alice.jpg',
     url: 'https://example.com/media.jpg',
     created_at: new Date().toISOString(),
+    like_count: 0,
+    comment_count: 0,
   };
 
   const dummyStories = [
     { id: 'story-1', owner_id: 'user-alice', content_url: 'https://example.com/story.jpg', created_at: new Date().toISOString() } as any,
   ];
 
-  it('clicking author name does NOT call onOpenStory even if author has active stories', () => {
+  it('clicking author name calls onSelectUser directly without opening story or picture lightbox', () => {
     const onOpenStory = vi.fn();
     const onSelectUser = vi.fn();
 
     render(
       <GMatchFeed
+        identity={null}
         posts={[dummyPost]}
         stories={dummyStories}
         onOpenStory={onOpenStory}
@@ -41,9 +44,10 @@ describe('GMatchFeed author and name click behavior', () => {
     const nameEl = screen.getByText('Alice Wonder');
     fireEvent.click(nameEl);
 
-    // Clicking name MUST NOT trigger story
+    // Clicking name opens user profile directly
     expect(onOpenStory).not.toHaveBeenCalled();
-    expect(screen.getByRole('dialog', { name: /profile picture/i })).toBeDefined();
+    expect(onSelectUser).toHaveBeenCalledWith('user-alice');
+    expect(screen.queryByRole('dialog', { name: /profile picture/i })).toBeNull();
   });
 
   it('clicking avatar ring calls onOpenStory when author has active stories', () => {
@@ -51,6 +55,7 @@ describe('GMatchFeed author and name click behavior', () => {
 
     render(
       <GMatchFeed
+        identity={null}
         posts={[dummyPost]}
         stories={dummyStories}
         onOpenStory={onOpenStory}

@@ -47,6 +47,21 @@ export function WatchPartyUrlModal({
     const trimmedUrl = url.trim()
     const lines = trimmedUrl.split(/\n+/).map((l) => l.trim()).filter(Boolean)
 
+    const isValidUrl = (val: string): boolean => {
+      try {
+        const u = new URL(val)
+        return u.protocol === 'http:' || u.protocol === 'https:' || u.protocol === 'ipfs:'
+      } catch {
+        return false
+      }
+    }
+
+    if (lines.length === 0 || !lines.some(isValidUrl)) {
+      setBusy(false)
+      setError('Please enter a valid HTTP, HTTPS, or media URL.')
+      return
+    }
+
     // Inspect / expand link if it might be a playlist
     setStatusText('Checking link...')
     const expandRes = await expandPlaylist(identity, trimmedUrl)

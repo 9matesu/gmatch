@@ -289,7 +289,6 @@ export function GMatchFeed({
   // Post Options Modal State
   const [optionsPost, setOptionsPost] = useState<FeedPost | null>(null);
   const [reportingPost, setReportingPost] = useState<FeedPost | null>(null);
-  const [viewingProfilePic, setViewingProfilePic] = useState<{ url: string; name: string; userId: string } | null>(null);
 
   const handleAvatarClick = (userId: string) => {
     playPress(750);
@@ -301,14 +300,9 @@ export function GMatchFeed({
     }
   };
 
-  const handleNameClick = (userId: string, name: string, avatarUrl?: string | null) => {
+  const handleNameClick = (userId: string) => {
     playPress(750);
-    const pfp = profilePics[userId] || avatarUrl;
-    if (pfp) {
-      setViewingProfilePic({ url: pfp, name, userId });
-    } else {
-      onSelectUser?.(userId);
-    }
+    onSelectUser?.(userId);
   };
 
   // Initialize likes/saves and comments state (without fake mock comments)
@@ -777,13 +771,13 @@ export function GMatchFeed({
                         <Avatar id={post.author_id} size={32} imageUrl={profilePics[post.author_id] || post.author_avatar} fill={true} />
                       </div>
                     </div>
-                    <div>
+                    <div className="flex flex-col justify-center min-w-0 leading-snug">
                       <div className="flex items-center gap-1.5">
                         <span
                           role="button"
                           tabIndex={0}
-                          onClick={() => handleNameClick(post.author_id, post.author_name, post.author_avatar)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleNameClick(post.author_id, post.author_name, post.author_avatar)}
+                          onClick={() => handleNameClick(post.author_id)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleNameClick(post.author_id)}
                           className="text-xs font-semibold text-retro-fg hover:underline cursor-pointer"
                         >
                           {post.author_name}
@@ -1355,53 +1349,6 @@ export function GMatchFeed({
         toast={toast}
       />,
       document.body,
-      )}
-      {/* ─── Profile Picture Lightbox ─── */}
-      {viewingProfilePic && createPortal(
-        <div
-          role="dialog"
-          aria-label="Profile picture"
-          className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/80 p-4 cursor-pointer"
-          onClick={() => setViewingProfilePic(null)}
-        >
-          <div
-            className="relative max-w-sm w-full bg-retro-panel rounded-xl border border-border-glass shadow-2xl overflow-hidden p-4 flex flex-col items-center gap-3 cursor-default"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-full flex items-center justify-between">
-              <span className="text-sm font-semibold text-retro-fg truncate">{viewingProfilePic.name}</span>
-              <button
-                type="button"
-                onClick={() => setViewingProfilePic(null)}
-                className="text-retro-muted hover:text-retro-fg p-1 rounded hover:bg-glass-w12 transition-colors"
-                aria-label="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="w-48 h-48 sm:w-64 sm:h-64 rounded-lg overflow-hidden bg-black flex items-center justify-center border border-border-glass">
-              <img
-                src={resolveMediaUrl(viewingProfilePic.url)}
-                alt={viewingProfilePic.name}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            {onSelectUser && (
-              <button
-                type="button"
-                onClick={() => {
-                  const uid = viewingProfilePic.userId;
-                  setViewingProfilePic(null);
-                  onSelectUser(uid);
-                }}
-                className="w-full py-1.5 px-3 rounded-lg text-xs font-semibold bg-retro-fg text-retro-bg hover:opacity-90 transition-opacity"
-              >
-                View Profile
-              </button>
-            )}
-          </div>
-        </div>,
-        document.body
       )}
       {cameraCropper && createPortal(cameraCropper, document.body)}
     </div>

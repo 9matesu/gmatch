@@ -930,7 +930,7 @@ export const useGame = create<GameState>((set, get) => ({
     const customs = (s.customSources || []).filter((c) => c.enabled)
     if (customs.length > 0) {
       const customPosts = await sampleCustomSources(customs, 10)
-      if (customPosts.length > 0) posts = customPosts
+      if (customPosts.length > 0) posts = shufflePosts(customPosts)
     }
     if (!posts) {
       const owned = feedQuery(s.tags)

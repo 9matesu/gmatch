@@ -1588,19 +1588,8 @@ export default function Home() {
       try { localStorage.setItem('gmatch_dm_seen_v1', JSON.stringify(next)); } catch { }
       return next;
     });
-    if (identity) {
-      void Promise.allSettled(
-        pmThreads.map((t) =>
-          orbitFetch('/api/pm/read', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ peer_id: t.peer_id }),
-          }, identity),
-        ),
-      ).finally(() => { loadPmUnreadCount(); });
-    }
     setPmUnreadCount(0);
-  }, [courier, identity, pmThreads, loadPmUnreadCount])
+  }, [courier])
 
   const loadPmMessages = useCallback((peerId: string) => {
     if (!identity) return Promise.resolve()
@@ -1624,11 +1613,8 @@ export default function Home() {
       })()
     }
     if (peerId !== 'global_lobby' && peerId !== 'card_queue') {
-      orbitFetch('/api/pm/read', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ peer_id: peerId }),
-      }, identity).then(() => loadPmUnreadCount()).catch(() => { })
+      // Server /api/pm/read is retired; unread state tracked locally
+      loadPmUnreadCount();
     }
     return orbitFetch(`/api/pm?peer=${encodeURIComponent(peerId)}&_t=${Date.now()}`, {}, identity)
       .then(async (res) => {
@@ -2448,7 +2434,10 @@ export default function Home() {
     syncedTagsRef.current = derived;
     if (JSON.stringify(derived) === JSON.stringify(myProfile.tags)) return;
     setMyProfile(prev => (JSON.stringify(prev.tags) === JSON.stringify(derived) ? prev : { ...prev, tags: derived }));
-    saveUserProfile(identity, { tags: derived }).catch(() => { });
+    saveUserProfile(identity, {
+      display_name: myProfile?.displayName || identity.orbitId.slice(0, 8),
+      tags: derived,
+    }).catch(() => { });
   }, [serverPosts, identity, myProfile.tags]);
 
   useEffect(() => {
@@ -2521,6 +2510,10 @@ export default function Home() {
 
       // 2. Add IndexedDB objects (blob URLs recovered from the raw bytes)
       for (const dbObj of dbObjects) {
+        if (dbObj.id.startsWith('p2p-obj-') && !canonicalCards.some(c => c.mediaObjectId === dbObj.id)) {
+          void deleteObject(dbObj.id);
+          continue;
+        }
         const contentUrl = localObjectBlobUrl(dbObj.id, dbObj.data, dbObj.mime_type)
         itemMap.set(dbObj.id, {
           id: dbObj.id,
@@ -3116,6 +3109,8 @@ export default function Home() {
       if (item.is_story || (item as any).is_public === 1 || (item as any).is_public) return false
       if (isP2pLocal(item.id)) return false
       if (blockedIds.includes(item.owner_id)) return false
+      // Posts as posts, cards as cards: reject unminted p2p objects or Unknown User objects with no canonical card
+      if ((item.id.startsWith('p2p-obj-') || item.display_name === 'Unknown User') && !canonicalCards.some(c => c.mediaObjectId === item.id)) return false
       if (galleryFilter === 'received') return item.owner_id !== identity?.orbitId
       if (galleryFilter === 'sent') return item.owner_id === identity?.orbitId
       if (galleryFilter === 'starred') return Boolean(item.is_favorited)
@@ -3316,15 +3311,16 @@ export default function Home() {
     })) return
     if (!identity) return
     try {
-      const res = await orbitFetch(`/api/objects/${item.id}`, { method: 'DELETE' }, identity)
-      if (!res.ok) throw new Error(await res.text())
+      await deleteObject(item.id).catch(() => {});
+      await orbitFetch(`/api/objects/${item.id}`, { method: 'DELETE' }, identity).catch(() => null);
       setItems(prev => prev.filter(i => i.id !== item.id))
-      toast('Payload deleted', 'success')
+      toast('Card deleted', 'success')
+      loadGallery()
     } catch (err) {
       logger.error('Delete failed', err)
-      toast('Failed to delete payload', 'error')
+      toast('Failed to delete card', 'error')
     }
-  }, [identity, toast])
+  }, [identity, toast, loadGallery])
 
   if (!isLoaded) return <PageSkeleton />;
 
@@ -4105,58 +4101,6 @@ export default function Home() {
                 )}
               </div>
 
-              <ContextOverlay
-                contextMenu={contextMenu}
-                onDismiss={() => setContextMenu(null)}
-                identity={identity}
-                friendsIds={friendsIds}
-                toast={toast}
-                onViewProfile={(user) => setSelectedProfileUser(user)}
-                onToggleContact={toggleFriend}
-                onSendCard={(userId) => setSelectedIds(new Set([userId]))}
-                onCopyId={(id) => {
-                  navigator.clipboard.writeText(id)
-                  toast('GMatch ID copied', 'info')
-                }}
-                onSendPm={(user) => setPmPeer(user)}
-                onBlockUser={blockUser}
-                onOpenLightbox={(id) => setExpandedItemId(id)}
-                onDownloadItem={async (item) => {
-                  try {
-                    const res = await orbitFetch(`/api/objects/${item.id}`, {}, identity)
-                    if (!res.ok) return
-                    const blob = await res.blob()
-                    const a = document.createElement('a')
-                    a.href = URL.createObjectURL(blob)
-                    a.download = `${item.id.substring(0, 8)}.jpg`
-                    a.click()
-                    URL.revokeObjectURL(a.href)
-                  } catch { }
-                }}
-                onCopyImageLink={(id) => {
-                  // Public share page for this object — openable anywhere.
-                  navigator.clipboard.writeText(`${getApiBaseUrl()}/p/${encodeURIComponent(id)}`)
-                  toast('Image link copied', 'info')
-                }}
-                onToggleFavorite={toggleFavorite}
-                onDeleteItem={handleDelete}
-                onRemoveFromInbox={async (item) => {
-                  try {
-                    await orbitFetch(`/api/inbox/${item.id}/remove`, { method: 'POST' }, identity!)
-                    toast('Removed from inbox', 'success')
-                    loadGallery()
-                  } catch { }
-                }}
-                onReportUser={(id, name) => openReportModal(id, name)}
-                onReportItem={(ownerId, ownerName, objectId) => openReportModal(ownerId, ownerName, objectId)}
-                onRepostItem={(item) => void shareObjectAs(item, 'repost')}
-                onAddToStory={(item) => void shareObjectAs(item, 'story')}
-                onRepostImage={(url) => openCreatePostWithMedia({ url })}
-                onSetWallpaper={(url, target, mime) => {
-                  if (target === 'os') void handleSetOsWallpaper(url);
-                  else handleSetWallpaper(url, mime);
-                }}
-              />
               <ReportModal
                 reportModal={reportModal}
                 onClose={() => setReportModal(null)}
@@ -4357,8 +4301,8 @@ export default function Home() {
             {settings.watchPartyEnabled && identity && (
               <div className={mainView === 'watch'
                 ? (watchRoomOpen
-                    ? 'absolute inset-0 z-20 flex flex-col min-h-0 overflow-hidden'
-                    : 'absolute inset-x-0 top-9 bottom-[var(--island-clearance)] z-20 flex flex-col min-h-0 overflow-hidden')
+                    ? `absolute inset-0 ${notifOpen ? 'md:left-[min(420px,32vw)]' : 'left-0'} ${chatOpen ? 'md:right-[min(720px,40vw)]' : 'right-0'} z-20 flex flex-col min-h-0 overflow-hidden`
+                    : `absolute top-9 bottom-[var(--island-clearance)] ${notifOpen ? 'md:left-[min(420px,32vw)]' : 'left-0'} ${chatOpen ? 'md:right-[min(720px,40vw)]' : 'right-0'} z-20 flex flex-col min-h-0 overflow-hidden`)
                 : 'hidden'}>
                 <WatchPartyView identity={identity} profilePics={profilePics} />
               </div>
@@ -4469,6 +4413,59 @@ export default function Home() {
           onAccept={() => setLegalAccepted(true)}
         />
       )}
+
+      <ContextOverlay
+        contextMenu={contextMenu}
+        onDismiss={() => setContextMenu(null)}
+        identity={identity}
+        friendsIds={friendsIds}
+        toast={toast}
+        onViewProfile={(user) => setSelectedProfileUser(user)}
+        onToggleContact={toggleFriend}
+        onSendCard={(userId) => setSelectedIds(new Set([userId]))}
+        onCopyId={(id) => {
+          navigator.clipboard.writeText(id)
+          toast('GMatch ID copied', 'info')
+        }}
+        onSendPm={(user) => setPmPeer(user)}
+        onBlockUser={blockUser}
+        onOpenLightbox={(id) => setExpandedItemId(id)}
+        onDownloadItem={async (item) => {
+          try {
+            const res = await orbitFetch(`/api/objects/${item.id}`, {}, identity)
+            if (!res.ok) return
+            const blob = await res.blob()
+            const a = document.createElement('a')
+            a.href = URL.createObjectURL(blob)
+            a.download = `${item.id.substring(0, 8)}.jpg`
+            a.click()
+            URL.revokeObjectURL(a.href)
+          } catch { }
+        }}
+        onCopyImageLink={(id) => {
+          // Public share page for this object — openable anywhere.
+          navigator.clipboard.writeText(`${getApiBaseUrl()}/p/${encodeURIComponent(id)}`)
+          toast('Image link copied', 'info')
+        }}
+        onToggleFavorite={toggleFavorite}
+        onDeleteItem={handleDelete}
+        onRemoveFromInbox={async (item) => {
+          try {
+            await orbitFetch(`/api/inbox/${item.id}/remove`, { method: 'POST' }, identity!)
+            toast('Removed from inbox', 'success')
+            loadGallery()
+          } catch { }
+        }}
+        onReportUser={(id, name) => openReportModal(id, name)}
+        onReportItem={(ownerId, ownerName, objectId) => openReportModal(ownerId, ownerName, objectId)}
+        onRepostItem={(item) => void shareObjectAs(item, 'repost')}
+        onAddToStory={(item) => void shareObjectAs(item, 'story')}
+        onRepostImage={(url) => openCreatePostWithMedia({ url })}
+        onSetWallpaper={(url, target, mime) => {
+          if (target === 'os') void handleSetOsWallpaper(url);
+          else handleSetWallpaper(url, mime);
+        }}
+      />
     </main>
   );
 }

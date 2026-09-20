@@ -117,7 +117,7 @@ export function ContextOverlay({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-modal)] bg-black/10 select-none"
+      className="fixed inset-0 z-[var(--z-system)] bg-black/10 select-none"
       onClick={onDismiss}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -125,7 +125,7 @@ export function ContextOverlay({
       }}
     >
       <div
-        className="fixed bg-retro-panel/95 backdrop-blur-md border border-border-glass rounded-xl shadow-2xl p-1.5 w-56 text-xs z-[var(--z-modal)] space-y-0.5 animate-orbit-fade-in text-retro-fg"
+        className="fixed bg-retro-panel/95 backdrop-blur-md border border-border-glass rounded-xl shadow-2xl p-1.5 w-56 text-xs z-[var(--z-system)] space-y-0.5 animate-orbit-fade-in text-retro-fg"
         style={{ top, left }}
         onClick={(e) => e.stopPropagation()}
       >
