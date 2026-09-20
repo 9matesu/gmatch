@@ -455,10 +455,10 @@ objects.get('/stories', orbitAuth, async (c) => {
         EXISTS(SELECT 1 FROM StoryViews v WHERE v.object_id = o.id AND v.viewer_id = ?) AS viewed,
         CASE WHEN o.owner_id = ? THEN (SELECT COUNT(*) FROM StoryViews v2 WHERE v2.object_id = o.id) END AS view_count
       FROM Objects o
-      JOIN Users u ON o.owner_id = u.id
+      LEFT JOIN Users u ON o.owner_id = u.id
       WHERE o.is_story = 1 AND o.hidden_at IS NULL AND (o.expires_at IS NULL OR datetime(o.expires_at) > datetime('now'))
       ORDER BY o.created_at DESC
-      LIMIT 50
+      LIMIT 200
     `).bind(orbitId, orbitId).all()
 
     return c.json(results || [])

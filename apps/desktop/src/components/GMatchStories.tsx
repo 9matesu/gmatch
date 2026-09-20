@@ -488,43 +488,15 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
 
             {/* Center Media Presentation — fills canvas, image letterboxed dead-center */}
             <div className="absolute inset-0 z-0 flex items-center justify-center bg-black overflow-hidden">
-              {identity && (!currentStory.content_url || (currentStory.content_url || '').includes('/api/objects/')) ? (
-                <ObjectImage
-                  objectId={currentStory.id}
-                  contentUrl={currentStory.content_url}
-                  identity={identity}
-                  hideUnavailable
-                  className="w-full h-full object-contain"
-                  videoClassName="w-full h-full object-contain"
-                />
-              ) : isMediaVideo(currentStory.mime_type || '') ? (
-                <LazyVideo
-                  src={currentStory.content_url || ''}
-                  className="w-full h-full"
-                  videoClassName="w-full h-full object-contain"
-                  autoPlay
-                  loop
-                  playsInline
-                />
-              ) : currentStory.content_url ? (
-                <ObjectImage
-                  contentUrl={currentStory.content_url}
-                  objectId={currentStory.id}
-                  identity={identity ?? null}
-                  mimeType={currentStory.mime_type}
-                  hideUnavailable
-                  alt="Story content"
-                  className="w-full h-full object-contain select-none"
-                />
-              ) : (
-                <ObjectImage
-                  objectId={currentStory.id}
-                  contentUrl={currentStory.content_url}
-                  identity={identity || null}
-                  hideUnavailable
-                  className="w-full h-full object-contain"
-                />
-              )}
+              <ObjectImage
+                objectId={currentStory.id}
+                contentUrl={currentStory.content_url}
+                identity={identity ?? null}
+                mimeType={currentStory.mime_type}
+                alt={currentStory.caption || "Story content"}
+                className="w-full h-full object-contain select-none"
+                videoClassName="w-full h-full object-contain"
+              />
 
               {/* Floating Animated Hearts */}
               {floatingHearts.map((heart) => (
