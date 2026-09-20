@@ -49,7 +49,7 @@ describe('CardService', () => {
     await db.prepare("INSERT INTO Likes (id, user_id, object_id, decision) VALUES (?, ?, ?, 'like')").bind('like-1', OTHER, 'media-valued').run()
     await db.prepare("INSERT INTO Likes (id, user_id, object_id, decision) VALUES (?, ?, ?, 'like')").bind('like-2', 'third-user-1', 'media-valued').run()
 
-    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-valued' })
+    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-valued', name: 'Valued Card' })
 
     expect(card.value).toBe(200)
     expect(card.likeCount).toBe(2)
@@ -129,38 +129,46 @@ describe('CardService', () => {
     await expect(cards.createCard({
       creatorId: CREATOR,
       mediaObjectId: 'media-meta-3',
+      name: 'Test Card',
       description: 'x'.repeat(300),
     })).rejects.toMatchObject({ code: 'BAD_REQUEST' })
     await expect(cards.createCard({
       creatorId: CREATOR,
       mediaObjectId: 'media-meta-3',
+      name: 'Test Card',
       tags: ['x'.repeat(40)],
     })).rejects.toMatchObject({ code: 'BAD_REQUEST' })
   })
 
+  it('rejects card creation when name is missing', async () => {
+    await seedMedia(db, 'media-noname', CREATOR)
+    await expect(cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-noname' })).rejects.toMatchObject({ code: 'BAD_REQUEST' })
+    await expect(cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-noname', name: '   ' })).rejects.toMatchObject({ code: 'BAD_REQUEST' })
+  })
+
   it('rejects card creation for media the creator does not own', async () => {
     await seedMedia(db, 'media-0002', OTHER)
-    await expect(cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0002' })).rejects.toMatchObject({ code: 'FORBIDDEN' })
+    await expect(cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0002', name: 'Test Card' })).rejects.toMatchObject({ code: 'FORBIDDEN' })
   })
 
   it('rejects card creation for media that is a public post or story', async () => {
     await db.prepare('INSERT INTO Objects (id, owner_id, size_bytes, mime_type, is_public) VALUES (?, ?, 100, ?, 1)').bind('media-post', CREATOR, 'image/jpeg').run()
     await db.prepare('INSERT INTO Objects (id, owner_id, size_bytes, mime_type, is_story) VALUES (?, ?, 100, ?, 1)').bind('media-story', CREATOR, 'image/jpeg').run()
 
-    await expect(cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-post' })).rejects.toMatchObject({ code: 'BAD_REQUEST' })
-    await expect(cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-story' })).rejects.toMatchObject({ code: 'BAD_REQUEST' })
+    await expect(cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-post', name: 'Test Card' })).rejects.toMatchObject({ code: 'BAD_REQUEST' })
+    await expect(cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-story', name: 'Test Card' })).rejects.toMatchObject({ code: 'BAD_REQUEST' })
   })
 
   it('lists owned cards in the collection', async () => {
     await seedMedia(db, 'media-0003', CREATOR)
-    await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0003' })
+    await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0003', name: 'Test Card' })
     const collection = await cards.getCollection(CREATOR)
     expect(collection).toHaveLength(1)
   })
 
   it('sells a listed card atomically and moves funds', async () => {
     await seedMedia(db, 'media-0004', CREATOR)
-    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0004' })
+    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0004', name: 'Test Card' })
     await cards.listForSale(CREATOR, card.id, 250)
     await economy.credit(BUYER, 1000, { idempotencyKey: 'seed-buyer-funds', kind: 'grant' })
 
@@ -182,7 +190,7 @@ describe('CardService', () => {
 
   it('rejects a purchase with insufficient funds and changes nothing', async () => {
     await seedMedia(db, 'media-0005', CREATOR)
-    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0005' })
+    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0005', name: 'Test Card' })
     await cards.listForSale(CREATOR, card.id, 500)
 
     await expect(cards.buyCard(BUYER, card.id, 'purchase-key-0002')).rejects.toMatchObject({ code: 'INSUFFICIENT_FUNDS' })
@@ -195,7 +203,7 @@ describe('CardService', () => {
 
   it('is idempotent on repeated purchase with the same key', async () => {
     await seedMedia(db, 'media-0006', CREATOR)
-    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0006' })
+    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0006', name: 'Test Card' })
     await cards.listForSale(CREATOR, card.id, 100)
     await economy.credit(BUYER, 1000, { idempotencyKey: 'seed-buyer-2', kind: 'grant' })
 
@@ -208,14 +216,14 @@ describe('CardService', () => {
 
   it('forbids buying your own listed card', async () => {
     await seedMedia(db, 'media-0007', CREATOR)
-    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0007' })
+    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0007', name: 'Test Card' })
     await cards.listForSale(CREATOR, card.id, 100)
     await expect(cards.buyCard(CREATOR, card.id, 'purchase-key-0004')).rejects.toMatchObject({ code: 'FORBIDDEN' })
   })
 
   it('cancels a listing only by the seller', async () => {
     await seedMedia(db, 'media-0008', CREATOR)
-    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0008' })
+    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0008', name: 'Test Card' })
     await cards.listForSale(CREATOR, card.id, 100)
     await cards.cancelListing(CREATOR, card.id)
 
@@ -228,7 +236,7 @@ describe('CardService', () => {
 
   it('transfers ownership only from the current owner', async () => {
     await seedMedia(db, 'media-0009', CREATOR)
-    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0009' })
+    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0009', name: 'Test Card' })
 
     await expect(cards.transferOwnership(OTHER, BUYER, card.id)).rejects.toMatchObject({ code: 'FORBIDDEN' })
 
@@ -238,7 +246,7 @@ describe('CardService', () => {
 
   it('rejects purchase key reuse by a different buyer', async () => {
     await seedMedia(db, 'media-0010', CREATOR)
-    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0010' })
+    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0010', name: 'Test Card' })
     await cards.listForSale(CREATOR, card.id, 100)
     await economy.credit(BUYER, 1000, { idempotencyKey: 'seed-buyer-3', kind: 'grant' })
 
@@ -250,7 +258,7 @@ describe('CardService', () => {
 
   it('rejects listing a card the caller no longer owns (atomic check)', async () => {
     await seedMedia(db, 'media-0011', CREATOR)
-    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0011' })
+    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0011', name: 'Test Card' })
     await cards.transferOwnership(CREATOR, BUYER, card.id)
 
     await expect(cards.listForSale(CREATOR, card.id, 100)).rejects.toMatchObject({ code: 'FORBIDDEN' })
@@ -272,8 +280,8 @@ describe('CardService', () => {
   it('browses open marketplace listings and excludes non-active cards', async () => {
     await seedMedia(db, 'media-0013', CREATOR)
     await seedMedia(db, 'media-0014', CREATOR)
-    const a = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0013' })
-    const b = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0014' })
+    const a = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0013', name: 'Test Card A' })
+    const b = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0014', name: 'Test Card B' })
     await cards.listForSale(CREATOR, a.id, 300)
     await cards.listForSale(CREATOR, b.id, 150)
     await db.prepare("UPDATE Cards SET moderation_state = 'hidden' WHERE id = ?").bind(b.id).run()
@@ -285,32 +293,9 @@ describe('CardService', () => {
     expect(listings[0].sellerId).toBe(CREATOR)
   })
 
-  it('backfills canonical cards from eligible self-uploaded media, idempotently', async () => {
-    await db.prepare('INSERT INTO Objects (id, owner_id, size_bytes, mime_type, caption, gacha_downloads_count, is_story, is_public) VALUES (?, ?, ?, ?, ?, ?, 0, 0)').bind('media-bf-1', CREATOR, 100, 'image/jpeg', 'Backfill Me', 42).run()
-    await db.prepare('INSERT INTO Objects (id, owner_id, size_bytes, mime_type, is_story, is_public) VALUES (?, ?, ?, ?, 1, 0)').bind('media-bf-2', CREATOR, 100, 'image/jpeg').run()
-    await db.prepare('INSERT INTO Objects (id, owner_id, size_bytes, mime_type, is_story, is_public) VALUES (?, ?, ?, ?, 0, 1)').bind('media-bf-post', CREATOR, 100, 'image/jpeg').run()
-    await db.prepare('INSERT INTO Objects (id, owner_id, size_bytes, mime_type) VALUES (?, ?, ?, ?)').bind('p2p-obj-bf', CREATOR, 100, 'image/jpeg').run()
-    await db.prepare('INSERT INTO Objects (id, owner_id, sender_id, size_bytes, mime_type) VALUES (?, ?, ?, ?, ?)').bind('media-bf-3', CREATOR, OTHER, 100, 'image/jpeg').run()
-
-    const first = await cards.backfillFromObjects()
-    expect(first.created).toBe(1)
-
-    const backfilled = await cards.getCollection(CREATOR)
-    const card = backfilled.find((c) => c.mediaObjectId === 'media-bf-1')
-    expect(card).toBeDefined()
-    expect(card!.name).toBe('Backfill Me')
-    expect(card!.value).toBe(42)
-
-    const postCard = backfilled.find((c) => c.mediaObjectId === 'media-bf-post')
-    expect(postCard).toBeUndefined()
-
-    const second = await cards.backfillFromObjects()
-    expect(second.created).toBe(0)
-  })
-
   it('cashes out a card for g$ and burns it from the collection', async () => {
     await seedMedia(db, 'media-cash-1', CREATOR)
-    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-cash-1' })
+    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-cash-1', name: 'Cash Card' })
     await db.prepare('UPDATE Cards SET value = 1000 WHERE id = ?').bind(card.id).run()
 
     const result = await cards.cashOutCard(CREATOR, card.id, 'cashout-key-0001')
@@ -336,7 +321,7 @@ describe('CardService', () => {
 
   it('rejects cashing out a listed card', async () => {
     await seedMedia(db, 'media-cash-2', CREATOR)
-    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-cash-2' })
+    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-cash-2', name: 'Cash Card' })
     await cards.listForSale(CREATOR, card.id, 100)
 
     await expect(cards.cashOutCard(CREATOR, card.id, 'cashout-key-0002')).rejects.toMatchObject({ code: 'CONFLICT' })
@@ -344,7 +329,7 @@ describe('CardService', () => {
 
   it('rejects a second cashout of the same card', async () => {
     await seedMedia(db, 'media-cash-3', CREATOR)
-    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-cash-3' })
+    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-cash-3', name: 'Cash Card' })
     await cards.cashOutCard(CREATOR, card.id, 'cashout-key-0003')
 
     await expect(cards.cashOutCard(CREATOR, card.id, 'cashout-key-0003b')).rejects.toMatchObject({ code: 'CONFLICT' })
@@ -352,7 +337,7 @@ describe('CardService', () => {
 
   it('is idempotent on repeated cashout with the same key', async () => {
     await seedMedia(db, 'media-cash-4', CREATOR)
-    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-cash-4' })
+    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-cash-4', name: 'Cash Card' })
     await db.prepare('UPDATE Cards SET value = 500 WHERE id = ?').bind(card.id).run()
 
     await cards.cashOutCard(CREATOR, card.id, 'cashout-key-0004')
@@ -367,7 +352,7 @@ describe('CardService', () => {
     await expect(getCashoutRateBps(db)).resolves.toBe(20000)
 
     await seedMedia(db, 'media-cash-5', CREATOR)
-    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-cash-5' })
+    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-cash-5', name: 'Cash Card' })
     await db.prepare('UPDATE Cards SET value = 1000 WHERE id = ?').bind(card.id).run()
 
     const result = await cards.cashOutCard(CREATOR, card.id, 'cashout-key-0005')
@@ -378,7 +363,7 @@ describe('CardService', () => {
   it('removes the card from every deck on cash-out', async () => {
     const decks = new DeckService(db)
     await seedMedia(db, 'media-cash-deck', CREATOR)
-    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-cash-deck' })
+    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-cash-deck', name: 'Deck Card' })
 
     const deck = await decks.createDeck(CREATOR, 'Deck For Burn')
     await decks.addCard(CREATOR, deck.id, card.id)

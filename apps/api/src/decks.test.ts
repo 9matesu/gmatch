@@ -35,7 +35,7 @@ describe('DeckService', () => {
 
   it('adds an owned, active card to a deck', async () => {
     await seedMedia(db, 'media-0001', OWNER)
-    const card = await cards.createCard({ creatorId: OWNER, mediaObjectId: 'media-0001' })
+    const card = await cards.createCard({ creatorId: OWNER, mediaObjectId: 'media-0001', name: 'Test Card' })
     const deck = await decks.createDeck(OWNER, 'Deck A')
 
     const updated = await decks.addCard(OWNER, deck.id, card.id)
@@ -44,7 +44,7 @@ describe('DeckService', () => {
 
   it('rejects adding a card the caller does not own', async () => {
     await seedMedia(db, 'media-0002', OTHER)
-    const card = await cards.createCard({ creatorId: OTHER, mediaObjectId: 'media-0002' })
+    const card = await cards.createCard({ creatorId: OTHER, mediaObjectId: 'media-0002', name: 'Test Card' })
     const deck = await decks.createDeck(OWNER, 'Deck B')
 
     await expect(decks.addCard(OWNER, deck.id, card.id)).rejects.toMatchObject({ code: 'FORBIDDEN' })
@@ -52,7 +52,7 @@ describe('DeckService', () => {
 
   it('rejects duplicate cards in a deck', async () => {
     await seedMedia(db, 'media-0003', OWNER)
-    const card = await cards.createCard({ creatorId: OWNER, mediaObjectId: 'media-0003' })
+    const card = await cards.createCard({ creatorId: OWNER, mediaObjectId: 'media-0003', name: 'Test Card' })
     const deck = await decks.createDeck(OWNER, 'Deck C')
 
     await decks.addCard(OWNER, deck.id, card.id)
@@ -61,7 +61,7 @@ describe('DeckService', () => {
 
   it('rejects a moderated card from a deck', async () => {
     await seedMedia(db, 'media-0004', OWNER)
-    const card = await cards.createCard({ creatorId: OWNER, mediaObjectId: 'media-0004' })
+    const card = await cards.createCard({ creatorId: OWNER, mediaObjectId: 'media-0004', name: 'Test Card' })
     await db.prepare("UPDATE Cards SET moderation_state = 'banned' WHERE id = ?").bind(card.id).run()
     const deck = await decks.createDeck(OWNER, 'Deck D')
 
@@ -75,7 +75,7 @@ describe('DeckService', () => {
     for (let i = 1; i <= 3; i++) {
       const media = `media-${String(i).padStart(4, '0')}`
       await seedMedia(db, media, OWNER)
-      const c = await cards.createCard({ creatorId: OWNER, mediaObjectId: media })
+      const c = await cards.createCard({ creatorId: OWNER, mediaObjectId: media, name: `Deck Card ${i}` })
       cardIds.push(c.id)
     }
 
@@ -86,7 +86,7 @@ describe('DeckService', () => {
 
   it('validates a deck against size rules', async () => {
     await seedMedia(db, 'media-0005', OWNER)
-    const card = await cards.createCard({ creatorId: OWNER, mediaObjectId: 'media-0005' })
+    const card = await cards.createCard({ creatorId: OWNER, mediaObjectId: 'media-0005', name: 'Test Card' })
     const deck = await decks.createDeck(OWNER, 'Deck F')
 
     const empty = await decks.validateDeck(deck.id, DEFAULT_CARD_DUEL_RULES)
@@ -100,7 +100,7 @@ describe('DeckService', () => {
 
   it('removes a card from a deck', async () => {
     await seedMedia(db, 'media-0006', OWNER)
-    const card = await cards.createCard({ creatorId: OWNER, mediaObjectId: 'media-0006' })
+    const card = await cards.createCard({ creatorId: OWNER, mediaObjectId: 'media-0006', name: 'Test Card' })
     const deck = await decks.createDeck(OWNER, 'Deck G')
     await decks.addCard(OWNER, deck.id, card.id)
 
@@ -118,7 +118,7 @@ describe('DeckService', () => {
       for (let i = 0; i < 5; i++) {
         const mid = `media-q${tag}-${i}`
         await seedMedia(db, mid, OWNER)
-        const card = await cards.createCard({ creatorId: OWNER, mediaObjectId: mid })
+        const card = await cards.createCard({ creatorId: OWNER, mediaObjectId: mid, name: 'Deck Card ' + i })
         await decks.addCard(OWNER, deck.id, card.id)
       }
       return deck

@@ -99,11 +99,6 @@ export interface MarketListingRecord {
   card: CardRecord
 }
 
-export interface BackfillResult {
-  created: number
-  skipped: number
-}
-
 interface CardRow {
   id: string
   creator_id: string
@@ -262,7 +257,9 @@ export class CardService {
   }): Promise<CardRecord> {
     const creatorId = requireId(input.creatorId, 'creatorId')
     const mediaObjectId = requireId(input.mediaObjectId, 'mediaObjectId')
-    const name = input.name ? requireString(input.name, 'name', { max: 80 }) : null
+    const rawName = input.name?.trim() || null
+    if (!rawName) throw badRequest('name is required to create a card')
+    const name = requireString(rawName, 'name', { max: 80 })
     const rawTags = Array.isArray(input.tags) ? input.tags : []
     const tags = [...new Set(rawTags.filter((tag): tag is string => typeof tag === 'string').map((tag) => tag.trim().toLowerCase()).filter(Boolean))].slice(0, 8)
     if (tags.some((tag) => tag.length > 24)) throw badRequest('tags must be 24 characters or fewer')
@@ -483,51 +480,6 @@ export class CardService {
     }))
   }
 
-  // Non-canonical -> canonical migration: mint canonical Cards for a user's own
-  // shared media objects (non-story, self-uploaded, not already carded). Each
-  // mint re-verifies "not already carded" inside its own write transaction, so
-  // concurrent/rerepeated runs never double-mint. Returns mint/skip counts.
-  async backfillFromObjects(): Promise<BackfillResult> {
-    const rows = await this.db
-      .prepare(
-        `SELECT o.id, o.owner_id, o.caption, o.gacha_downloads_count, o.mime_type
-         FROM Objects o
-         WHERE o.is_story = 0
-           AND o.is_public = 0
-           AND o.id NOT LIKE 'p2p-obj-%'
-           AND o.sender_id IS NULL
-           AND o.owner_id IS NOT NULL
-           AND (o.content_url IS NOT NULL OR o.mime_type IS NOT NULL)
-           AND NOT EXISTS (SELECT 1 FROM Cards c WHERE c.media_object_id = o.id)`,
-      )
-      .bind()
-      .all<{ id: string; owner_id: string; caption: string | null; gacha_downloads_count: number | null; mime_type: string }>()
-
-    let created = 0
-    let skipped = 0
-
-    for (const o of rows.results) {
-      const cardId = crypto.randomUUID()
-      const historyId = crypto.randomUUID()
-      const nowIso = new Date().toISOString()
-      const value = Math.max(0, Number(o.gacha_downloads_count ?? 0))
-      const name = o.caption ? o.caption.slice(0, 80) : null
-
-      const res = await this.db.atomicBatch([
-        {
-          sql: "INSERT INTO Cards (id, creator_id, media_object_id, name, rarity, value, like_count, market_status, moderation_state, created_at, updated_at) SELECT ?, ?, ?, ?, 'common', ?, 0, 'none', 'active', ?, ? WHERE NOT EXISTS (SELECT 1 FROM Cards WHERE media_object_id = ?)",
-          args: [cardId, o.owner_id, o.id, name, value, nowIso, nowIso, o.id],
-        },
-        { sql: 'INSERT INTO CardOwnership (card_id, owner_id, acquired_at) SELECT ?, ?, ? WHERE changes() = 1', args: [cardId, o.owner_id, nowIso] },
-        { sql: "INSERT INTO CardHistory (id, card_id, event, from_user, to_user, meta, created_at) SELECT ?, ?, 'backfilled', NULL, ?, ?, ? WHERE changes() = 1", args: [historyId, cardId, o.owner_id, JSON.stringify({ source: 'backfill_v1', mediaObjectId: o.id }), nowIso] },
-      ])
-
-      if (res[0].rowsAffected > 0) created++
-      else skipped++
-    }
-
-    return { created, skipped }
-  }
 
   // List a card for sale. Only the current owner may list, and only if the card
   // is not already listed. The listing insert re-verifies ownership atomically.

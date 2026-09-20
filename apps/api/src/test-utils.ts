@@ -72,7 +72,7 @@ export async function seedActiveDeck(env: { DB: D1Turso }, ownerId: string, size
     const mid = `media-sd-${deck.id.slice(0, 8)}-${i}`
     await env.DB.prepare('INSERT INTO Objects (id, owner_id, size_bytes, mime_type) VALUES (?, ?, ?, ?)')
       .bind(mid, ownerId, 1000, 'image/jpeg').run()
-    const card = await cards.createCard({ creatorId: ownerId, mediaObjectId: mid })
+    const card = await cards.createCard({ creatorId: ownerId, mediaObjectId: mid, name: 'Seed Card ' + i })
     await decks.addCard(ownerId, deck.id, card.id)
   }
   return deck.id
