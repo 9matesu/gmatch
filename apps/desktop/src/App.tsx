@@ -35,6 +35,7 @@ import { ROUTE_VIEWS, hashForView, viewFromHash, type RoutedView } from "./utils
 import { playChime, playPress, playMsgReceive } from "./utils/sounds";
 import { useLobby } from "./hooks/useLobby";
 import { UserProfileModal } from "./components/UserProfileModal";
+import { SendCardModal } from "./components/cards/SendCardModal";
 import { MIN_GAME_CARDS, generateFallbackName, type User, type OrbitObject } from "@orbit/shared";
 import { applyCanonicalCard } from "./game/galleryMapping";
 import { areItemsStructurallyEqual, areUsersStructurallyEqual, areAnnouncementsStructurallyEqual } from "./utils/compare";
@@ -225,6 +226,7 @@ export default function Home() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [items, setItems] = useState<OrbitObject[]>([]);
   const [canonicalCards, setCanonicalCards] = useState<CanonicalCard[]>([]);
+  const [sendCardTarget, setSendCardTarget] = useState<{ id: string; name: string } | null>(null);
   const [itemsLoading, setItemsLoading] = useState(true);
   const [mainView, setMainView] = useState<MainViewType>(() => {
     if (typeof window === 'undefined') return 'servers'
@@ -4050,8 +4052,8 @@ export default function Home() {
                       setStoryViewerUserId(userId);
                     }}
                     onSendCard={selectedProfileUser.id === identity?.orbitId ? undefined : (userId) => {
-                      setSelectedIds(new Set([userId]))
-                      setMainView('game')
+                      const target = selectedProfileUser;
+                      setSendCardTarget({ id: userId, name: target?.display_name || 'User' });
                     }}
                     onStartPm={selectedProfileUser.id === identity?.orbitId ? undefined : (u) => {
                       const targetUser = users.find((usr) => usr.id === u.id) || ({ id: u.id, display_name: u.display_name } as User);
@@ -4085,6 +4087,19 @@ export default function Home() {
                     onPersistLike={persistLike}
                     onPersistSave={persistSave}
                     onPersistComment={persistComment}
+                    toast={toast}
+                  />
+                )}
+
+                {/* Gift / Send Card Modal */}
+                {sendCardTarget && (
+                  <SendCardModal
+                    isOpen={true}
+                    onClose={() => setSendCardTarget(null)}
+                    recipientId={sendCardTarget.id}
+                    recipientName={sendCardTarget.name}
+                    identity={identity}
+                    cards={canonicalCards}
                     toast={toast}
                   />
                 )}

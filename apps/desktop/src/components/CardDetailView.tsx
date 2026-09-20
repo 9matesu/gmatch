@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Heart, Tag, TrendingUp, Coins } from 'lucide-react';
+import { X, Heart, Tag, TrendingUp, Coins, Gift } from 'lucide-react';
 import { orbitFetch } from '../utils/api';
 import { userFacingError } from '../utils/userError';
 import type { OrbitIdentity } from '@orbit/crypto';
@@ -36,6 +36,7 @@ interface CardDetailViewProps {
   onClose: () => void;
   toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
   onOpenProfile?: (userId: string) => void;
+  onGiftCard?: (card: CardRecord) => void;
 }
 
 /**
@@ -44,7 +45,7 @@ interface CardDetailViewProps {
  * buy it. Media renders through ObjectImage (signed fetch) so private
  * objects actually show up.
  */
-export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile }: CardDetailViewProps) {
+export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile, onGiftCard }: CardDetailViewProps) {
   const [card, setCard] = useState<CardRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -312,14 +313,27 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
             <div className="space-y-3 pt-3 border-t border-border-glass">
               <div className="flex gap-3">
                 {card.marketStatus === 'none' && (
-                  <button
-                    type="button"
-                    disabled={marketBusy || !/^\d+$/.test(listPrice) || Number(listPrice) <= 0}
-                    onClick={() => { void mutateCard('list', { price: Number(listPrice) }, `Listed for ${formatGc(Number(listPrice))} g$`) }}
-                    className="glass-action glass-action-primary flex-1 py-2 px-4 rounded-lg font-semibold cursor-pointer disabled:opacity-40"
-                  >
-                    List for Sale
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      disabled={marketBusy || !/^\d+$/.test(listPrice) || Number(listPrice) <= 0}
+                      onClick={() => { void mutateCard('list', { price: Number(listPrice) }, `Listed for ${formatGc(Number(listPrice))} g$`) }}
+                      className="glass-action glass-action-primary flex-1 py-2 px-4 rounded-lg font-semibold cursor-pointer disabled:opacity-40"
+                    >
+                      List for Sale
+                    </button>
+                    {onGiftCard && (
+                      <button
+                        type="button"
+                        disabled={marketBusy}
+                        onClick={() => onGiftCard(card)}
+                        className="glass-action flex-1 py-2 px-4 rounded-lg font-semibold cursor-pointer disabled:opacity-40 flex items-center justify-center gap-1.5"
+                      >
+                        <Gift className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Gift Card</span>
+                      </button>
+                    )}
+                  </>
                 )}
                 {card.marketStatus === 'listed' && (
                   <>

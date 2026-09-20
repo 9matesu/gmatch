@@ -104,6 +104,34 @@ export async function createCardFromMedia(
   }
 }
 
+export async function transferCard(
+  identity: CardCreationIdentity | null,
+  cardId: string,
+  toUserId: string,
+): Promise<CanonicalCard | null> {
+  if (!identity || !cardId || !toUserId) return null;
+  try {
+    const res = await orbitFetch(
+      `/api/cards/${cardId}/transfer`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to_user_id: toUserId }),
+      },
+      identity
+    );
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    const card = data?.card ?? null;
+    if (card && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("orbit-cards-refresh"));
+    }
+    return card;
+  } catch {
+    return null;
+  }
+}
+
 function isPublicPost(item: OrbitObject): boolean {
   const pub = (item as any).is_public;
   return pub === 1 || pub === '1' || pub === true || pub === 'true';

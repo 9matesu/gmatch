@@ -106,8 +106,33 @@ cards.post('/:id/buy', async (c) => {
 cards.post('/:id/transfer', async (c) => {
   const body = await c.req.json().catch(() => ({}))
   const toUserId = String(body?.to_user_id || '').trim()
+  const fromUserId = c.get('orbitId')
   const service = new CardService(c.env.DB)
-  const card = await service.transferOwnership(c.get('orbitId'), toUserId, c.req.param('id'))
+  const card = await service.transferOwnership(fromUserId, toUserId, c.req.param('id'))
+  try {
+    const sender = await c.env.DB
+      .prepare('SELECT display_name FROM Users WHERE id = ?')
+      .bind(fromUserId)
+      .first<{ display_name: string | null }>()
+    const senderName = sender?.display_name?.trim() || fromUserId
+    const { createNotification } = await import('../notifications')
+    const { broadcastToUser } = await import('../ws-bus')
+    const notif = await createNotification(
+      c.env.DB,
+      toUserId,
+      'card_received',
+      `${senderName} gifted you a card: ${card.name || 'Untitled'}`,
+      `Card "${card.name || 'Untitled'}" (${card.rarity}) was gifted to your collection.`,
+      { card_id: card.id, sender_id: fromUserId, sender_name: senderName, card_name: card.name, rarity: card.rarity, tags: card.tags }
+    )
+    if (notif) {
+      broadcastToUser(toUserId, { type: 'notification', action: 'new', notification: notif })
+    }
+    broadcastToUser(toUserId, { type: 'card_received', card, fromUserId, senderName })
+    broadcastToUser(fromUserId, { type: 'card_transferred', cardId: card.id, toUserId })
+  } catch {
+    /* notification is best-effort */
+  }
   return c.json({ card })
 })
 

@@ -90,6 +90,38 @@ describe('economy/cards/decks route wiring', () => {
     await expect(economy.getBalance(bob.orbitId)).resolves.toBe(900)
   })
 
+  it('cards: transfer/gift card moves ownership and creates card_received notification for recipient', async () => {
+    await env.DB.prepare("UPDATE Users SET display_name = 'Alice' WHERE id = ?").bind(alice.orbitId).run()
+    await seedMedia(env.DB, 'media-gift-1', alice.orbitId)
+    const createBody = JSON.stringify({ media_object_id: 'media-gift-1', name: 'Gift Card', tags: ['gift', 'rare'] })
+    const createRes = await app.request('/api/cards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(alice, 'POST', '/api/cards', createBody) },
+      body: createBody,
+    }, env)
+    expect(createRes.status).toBe(201)
+    const created: any = await createRes.json()
+    const cardId = created.card.id
+
+    const transferBody = JSON.stringify({ to_user_id: bob.orbitId })
+    const transferRes = await app.request(`/api/cards/${cardId}/transfer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(alice, 'POST', `/api/cards/${cardId}/transfer`, transferBody) },
+      body: transferBody,
+    }, env)
+    expect(transferRes.status).toBe(200)
+    const transferData: any = await transferRes.json()
+    expect(transferData.card.ownerId).toBe(bob.orbitId)
+    expect(transferData.card.name).toBe('Gift Card')
+    expect(transferData.card.tags).toEqual(['gift', 'rare'])
+
+    // Recipient receives 'card_received' notification
+    const giftNotifs = await env.DB.prepare("SELECT type, user_id, title FROM Notifications WHERE type = 'card_received'").all<any>()
+    expect(giftNotifs.results.length).toBe(1)
+    expect(giftNotifs.results[0].user_id).toBe(bob.orbitId)
+    expect(giftNotifs.results[0].title).toContain('Alice')
+  })
+
   it('POST /api/decks/:id/validate rejects a deck owned by another user', async () => {
     const body = JSON.stringify({ name: 'Alice Deck', game_id: 'card-duel' })
     const createRes = await app.request('/api/decks', {
