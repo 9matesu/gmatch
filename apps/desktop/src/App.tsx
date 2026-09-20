@@ -1297,6 +1297,7 @@ export default function Home() {
           tags: tags.join(','),
           isPublic: true,
           postGroup,
+          authorName: myProfile.displayName || undefined,
         })
         if (forged?.id) {
           uploadedAny = true

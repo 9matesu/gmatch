@@ -898,3 +898,26 @@ CREATE TABLE IF NOT EXISTS ServerDirectory (
 );
 CREATE INDEX IF NOT EXISTS idx_server_dir_owner ON ServerDirectory(owner_id);
 CREATE INDEX IF NOT EXISTS idx_server_dir_seen ON ServerDirectory(last_seen);
+
+-- GossipEnvelopes (plan G1, self-hosting relay): SIGNED public-post
+-- envelopes replicated node-to-node. The relay validates SHAPE + SIGNATURE
+-- only (routes/gossip.ts) — media bytes stay local-first on the poster's
+-- disk (P2P swarm) and only post metadata travels. Durable (unlike the
+-- in-memory blind mail store) so offline hosts catch up via GET /since.
+-- Envelope id = origin Objects row id: retries and multi-path delivery
+-- dedupe via INSERT OR IGNORE. Rows expire (default 30d TTL).
+CREATE TABLE IF NOT EXISTS GossipEnvelopes (
+  id TEXT PRIMARY KEY,
+  author_id TEXT NOT NULL,
+  author_pubkey TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'post',
+  payload TEXT NOT NULL,
+  sig TEXT NOT NULL,
+  origin_node TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  received_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  expires_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_gossip_received ON GossipEnvelopes(received_at, id);
+CREATE INDEX IF NOT EXISTS idx_gossip_expires ON GossipEnvelopes(expires_at);
+

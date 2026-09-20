@@ -107,6 +107,13 @@ async function startApi() {
           ? path.join(process.resourcesPath, 'shared', 'blocklist.json')
           : path.join(__dirname, '..', '..', '..', 'shared', 'blocklist.json')
       })(),
+      // Gossip pull (plan G1): packaged hosts replicate public posts from
+      // central into their own db. Dev sidecars stay islanded unless opted
+      // in; 'off' disables everywhere.
+      ...(process.env.GMATCH_GOSSIP_UPSTREAM === 'off' ? {} : {
+        GOSSIP_UPSTREAM: process.env.GMATCH_GOSSIP_UPSTREAM
+          || (app.isPackaged ? 'https://gmatch.fly.dev' : ''),
+      }),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })

@@ -20,6 +20,7 @@ const EXEMPT_PATHS = new Set([
   'POST:/api/users/heartbeat',
   'POST:/api/users/profile',
   'POST:/api/objects',
+  'POST:/api/gossip/envelopes',
   'POST:/api/lobby/images',
   'POST:/api/lobby/join',
   'POST:/api/lobby/leave',

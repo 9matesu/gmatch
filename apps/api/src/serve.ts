@@ -148,6 +148,28 @@ setInterval(() => {
   if (dbReady) advanceBabecock(db).catch((err) => console.warn('[BABECOCK] advance tick failed:', err?.message || err))
 }, 1000)
 
+// Gossip pull (plan G1 — every user a self-hosting db): host nodes
+// periodically pull signed public-post envelopes from the upstream relay
+// (central by default) into their own db. Offline hosts catch up on next
+// pull via the durable SystemMeta cursor. Central itself sets no upstream
+// and skips; dev sidecars opt in via GMATCH_GOSSIP_UPSTREAM (apiSidecar).
+const GOSSIP_UPSTREAM = (process.env.GOSSIP_UPSTREAM || '').replace(/\/+$/, '')
+let gossipPullRunning = false
+if (GOSSIP_UPSTREAM) {
+  setInterval(() => {
+    if (!dbReady || gossipPullRunning) return
+    gossipPullRunning = true
+    import('./gossip-pull').then(({ pullGossipUpstream }) => pullGossipUpstream(db, GOSSIP_UPSTREAM))
+      .then((r) => {
+        if (r.applied > 0 || r.rejected > 0) {
+          console.log(`[GOSSIP] pull: applied=${r.applied} duplicates=${r.duplicates} rejected=${r.rejected}`)
+        }
+      })
+      .catch((err) => console.warn('[GOSSIP] pull failed:', (err as Error)?.message || err))
+      .finally(() => { gossipPullRunning = false })
+  }, 60_000)
+}
+
 const MIME: Record<string, string> = {
   '.html': 'text/html',
   '.css': 'text/css',

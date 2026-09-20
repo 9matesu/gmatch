@@ -36,6 +36,8 @@ export async function forgeMediaLocally(
     postGroup?: string
     tags?: string
     recipients?: string
+    /** Display-name snapshot for the gossip envelope (falls back to storage). */
+    authorName?: string
   } = {}
 ): Promise<ForgedMedia> {
   const contentHash = await hashFileSha256(file)
@@ -85,6 +87,30 @@ export async function forgeMediaLocally(
   if (!res.ok) {
     const err = await res.json().catch(() => null)
     throw new Error(err?.error || 'Failed to register media metadata with central node')
+  }
+
+  // 4. Self-hosting relay (plan G1): gossip PUBLIC posts so other nodes can
+  // pull them into their own dbs. Stories/avatars/chats/DMs never gossip —
+  // same flags as the register payload above. Fire-and-forget: the post is
+  // already live locally; relay failure must not fail the share.
+  if ((options.isPublic ?? true) && !options.isStory && !options.isAvatar && !options.isChat) {
+    try {
+      const { gossipOwnPost } = await import('./gossip')
+      void gossipOwnPost(identity, {
+        id: objectId,
+        contentHash,
+        mimeType: file.type || 'application/octet-stream',
+        sizeBytes: file.size,
+        magnetUri,
+        caption: options.postCaption || options.caption,
+        location: options.location || undefined,
+        tags: options.tags || undefined,
+        postGroup: options.postGroup || null,
+        authorName: options.authorName,
+      }).catch(() => { })
+    } catch {
+      /* gossip unavailable (tests/SSR) */
+    }
   }
 
   return {

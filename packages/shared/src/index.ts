@@ -407,6 +407,7 @@ export interface BabecockInvite {
 export * from './lobby';
 export * from './card-valuation';
 export * from './booru';
+export * from './gossip';
 
 /** PC Domination action log entry */
 export interface DominationAction {
