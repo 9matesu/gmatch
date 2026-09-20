@@ -8,22 +8,6 @@ export const MAX_DISPLAY_NAME_LENGTH = 50;
 export const MAX_BIO_LENGTH = 150;
 export const MAX_WEBSITE_LENGTH = 200;
 
-/** Forge an avatar via the zero-media P2P path; returns the
- * private object ref the profile row stores ('/api/objects/<id>'). */
-async function uploadAvatarBytes(identity: OrbitIdentity, dataUrl: string): Promise<string | null> {
-  try {
-    const blob = await fetch(dataUrl).then((r) => r.blob());
-    if (!blob.size) return null;
-    const ext = (blob.type.split('/')[1] || 'jpeg').split('+')[0];
-    const file = new File([blob], `avatar.${ext}`, { type: blob.type || 'image/jpeg' });
-    const { forgeMediaLocally } = await import('../services/mediaForge');
-    const forged = await forgeMediaLocally(file, identity, { isPublic: false, isAvatar: true });
-    return forged?.id ? `/api/objects/${forged.id}` : null;
-  } catch {
-    return null;
-  }
-}
-
 /** The single shape the web client persists via /api/users/profile. */
 export interface ProfilePatch {
   display_name?: string;
@@ -45,15 +29,7 @@ export async function saveUserProfile(
 ): Promise<{ ok: boolean; status: number; error?: string; pfpUrl?: string }> {
   const body: ProfilePatch = { ...patch };
   if (body.tags !== undefined) body.tags = normalizeTags(body.tags as (string | null | undefined)[]);
-  // Avatars above ~3KB of base64 ride a multipart BYTES upload first (the
-  // signed-headers stream posts use), then the PATCH carries only the tiny
-  // /api/objects/ ref. JSON bodies with data: URLs inflate the sealed request
-  // header ~20x and the edge rejects them (403/431 on profile picture change).
-  if (typeof body.pfp_url === 'string' && body.pfp_url.startsWith('data:image/') && body.pfp_url.length > 3072) {
-    const uploaded = await uploadAvatarBytes(identity, body.pfp_url);
-    if (!uploaded) return { ok: false, status: 0, error: 'Could not upload the profile picture' };
-    body.pfp_url = uploaded;
-  }
+  // ponytail: base64 data URL up to ~256px JPEG stored directly in DB; migrate to S3/R2 signed upload if concurrent active users exceed 500
   const res = await orbitFetch('/api/users/profile', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -70,8 +46,6 @@ export async function saveUserProfile(
       error = `Profile save failed (HTTP ${res.status})`;
     }
   }
-  // pfpUrl: the ref the server actually stored (an object upload rewrites
-  // the data: URL to /api/objects/<id>; on failure it stays undefined).
   let pfpUrl: string | undefined
   if (res.ok && body.pfp_url !== undefined) {
     try { pfpUrl = ((await res.json()) as { pfp_url?: string })?.pfp_url ?? undefined } catch { /* keep optimistic */ }

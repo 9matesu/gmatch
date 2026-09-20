@@ -26,7 +26,9 @@ export function Avatar({ id, size = 40, imageUrl, fill = false }: { id: string; 
       setCachedUrl(null)
       return
     }
-    const resolved = resolveMediaUrl(imageUrl)
+    // ponytail: fallback legacy P2P metadata object refs to user /pfp binary endpoint
+    const target = (imageUrl.includes('/api/objects/') && id) ? `/api/users/${id}/pfp` : imageUrl
+    const resolved = resolveMediaUrl(target)
     if (/^(gmcache|idle-file|vault|blob|data):/i.test(resolved)) {
       setCachedUrl(resolved)
       return
@@ -44,7 +46,8 @@ export function Avatar({ id, size = 40, imageUrl, fill = false }: { id: string; 
   }, [imageUrl])
 
   if (imageUrl && !failed) {
-    const resolvedUrl = cachedUrl || resolveMediaUrl(imageUrl)
+    const target = (imageUrl.includes('/api/objects/') && id) ? `/api/users/${id}/pfp` : imageUrl
+    const resolvedUrl = cachedUrl || resolveMediaUrl(target)
 
     if (fill) {
       return (

@@ -771,24 +771,27 @@ export function GMatchFeed({
                         <Avatar id={post.author_id} size={32} imageUrl={profilePics[post.author_id] || post.author_avatar} fill={true} />
                       </div>
                     </div>
-                    <div className="flex flex-col justify-center min-w-0 leading-snug">
+                    <div className="h-8 flex flex-col justify-center min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span
                           role="button"
                           tabIndex={0}
                           onClick={() => handleNameClick(post.author_id)}
                           onKeyDown={(e) => e.key === 'Enter' && handleNameClick(post.author_id)}
-                          className="text-xs font-semibold text-retro-fg hover:underline cursor-pointer"
+                          className="text-xs font-semibold text-retro-fg hover:underline cursor-pointer truncate leading-tight block"
                         >
                           {post.author_name}
                         </span>
-                        <time className="text-xs text-retro-muted" dateTime={post.created_at}>
-                          {new Date(post.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                        </time>
                       </div>
-                      {post.location && (
-                        <span className="text-xs text-retro-muted block">{post.location}</span>
-                      )}
+                      <div className="flex items-center gap-1 text-[11px] text-retro-muted leading-tight mt-0.5 truncate">
+                        {post.location ? (
+                          <span className="truncate">{post.location}</span>
+                        ) : (
+                          <time dateTime={post.created_at}>
+                            {new Date(post.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                          </time>
+                        )}
+                      </div>
                     </div>
                   </div>
 

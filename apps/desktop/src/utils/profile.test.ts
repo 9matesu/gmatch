@@ -77,4 +77,20 @@ describe('saveUserProfile', () => {
     expect(res.ok).toBe(false);
     expect(res.status).toBe(409);
   });
+
+  it('preserves data URL avatars exceeding 3KB without rewriting', async () => {
+    const largeDataUrl = 'data:image/jpeg;base64,' + 'A'.repeat(5000);
+    apiMock.orbitFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ pfp_url: largeDataUrl }),
+    });
+    const res = await saveUserProfile(identity, {
+      display_name: 'Test User',
+      pfp_url: largeDataUrl,
+    });
+    expect(res.ok).toBe(true);
+    const [, init] = apiMock.orbitFetch.mock.calls[0];
+    expect(JSON.parse(init.body).pfp_url).toBe(largeDataUrl);
+  });
 });

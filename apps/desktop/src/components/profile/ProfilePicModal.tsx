@@ -8,7 +8,7 @@ import { DropZone } from '../DropZone';
 import { useCropper } from '../../hooks/useCropper';
 import { isCropableImage } from '../CropModal';
 import { fileToThumbDataUrl } from '../../utils/profile';
-import { playPress, playWin } from '../../utils/sounds';
+import { playPress } from '../../utils/sounds';
 
 interface ProfilePicModalProps {
   isOpen: boolean;
@@ -122,7 +122,7 @@ export function ProfilePicModal({
         /* keep the original when conversion fails */
       }
     }
-    playWin();
+    playPress(800);
     onSave(finalUrl);
     toast?.('Profile photo updated', 'success');
     onClose();

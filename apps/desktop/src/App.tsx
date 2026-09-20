@@ -1129,6 +1129,17 @@ export default function Home() {
         if (Array.isArray(data?.posts)) {
           setServerPosts(data.posts as FeedPost[])
           setHasMoreFeed(data.posts.length >= 50)
+          setProfilePics((prev) => {
+            let changed = false
+            const next = { ...prev }
+            for (const p of data.posts as FeedPost[]) {
+              if (p.author_id && p.author_avatar && next[p.author_id] !== p.author_avatar) {
+                next[p.author_id] = p.author_avatar
+                changed = true
+              }
+            }
+            return changed ? next : prev
+          })
         }
       })
       .catch(() => { })
@@ -2200,9 +2211,11 @@ export default function Home() {
         return next
       })
 
-      // 3. Persist via the shared profile path: bytes go up as multipart
-      // (the sealed-JSON route 403s past ~4KB), the row stores the object ref.
-      const res = await saveUserProfile(identity, { pfp_url: thumbDataUrl })
+      // 3. Persist via the shared profile path: data URL persists directly.
+      const res = await saveUserProfile(identity, {
+        display_name: myProfile?.displayName || identity.orbitId.slice(0, 8),
+        pfp_url: thumbDataUrl,
+      })
 
       if (!res.ok) {
         toast(res.error || 'Failed to save profile picture to server', 'error')

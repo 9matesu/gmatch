@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { playPress, playWin } from '../../utils/sounds';
+import { playPress } from '../../utils/sounds';
 import { X, Camera, Globe, Lock, Plus } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { MAX_TAGS } from '@orbit/shared';
@@ -124,7 +124,7 @@ export function ProfileEditorModal({
         } catch { /* private mode */ }
       }
 
-      playWin();
+      playPress(800);
       toast?.('Profile updated', 'success');
       onProfileUpdated?.({
         name: name.trim(),

@@ -106,6 +106,11 @@ users.get('/:id/pfp', async (c) => {
   }
 })
 
+users.get('/:id/avatar', async (c) => {
+  const userId = c.req.param('id')
+  return c.redirect(`/api/users/${userId}/pfp`, 307)
+})
+
 users.use('*', orbitAuth)
 
 users.get('/me', async (c) => {
