@@ -142,12 +142,21 @@ export function UserProfileModal({
   };
 
   const handleAvatarClick = () => {
+    if (profilePic) {
+      setShowPic(true);
+    } else if (hasStories && onOpenStories) {
+      playPress(800);
+      onClose();
+      onOpenStories(user.id);
+    }
+  };
+
+  const handleStoryBadgeClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (hasStories && onOpenStories) {
       playPress(800);
       onClose();
       onOpenStories(user.id);
-    } else if (profilePic) {
-      setShowPic(true);
     }
   };
 
@@ -205,7 +214,7 @@ export function UserProfileModal({
 
                 {hasStories && (
                   <div
-                    onClick={handleAvatarClick}
+                    onClick={handleStoryBadgeClick}
                     className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-white text-retro-bg text-[10px] font-semibold flex items-center gap-0.5 cursor-pointer shadow-xs"
                   >
                     <Play className="w-2 h-2 fill-current" />
