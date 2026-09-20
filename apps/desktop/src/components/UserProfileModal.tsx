@@ -10,6 +10,7 @@ import { ObjectImage } from './ObjectImage';
 import { useProfilePostLightbox } from './feed/useProfilePostLightbox';
 import type { FeedPost, PostComment } from './feed/GMatchFeed';
 import { orbitFetch } from '../utils/api';
+import { isUserOnline } from '../utils/presence';
 
 interface UserProfileModalProps {
   user: User | null;
@@ -123,15 +124,9 @@ export function UserProfileModal({
   if (!user) return null;
 
   const displayName = user.display_name?.trim() || 'Unknown User';
-  // Presence: last_seen < 60s is the ONE rule every server endpoint uses
-  // (roster, list, followers/following). The profile used to honor a raw
-  // `online` flag with no age gate — a stale snapshot then read "Online"
-  // forever — or re-derive with a different 90s window, which disagreed with
-  // the list. Same 60s window here; the flag is never trusted on its own.
-  const isOnline = (() => {
-    const seenMs = user.last_seen ? new Date(user.last_seen).getTime() : 0;
-    return seenMs > 0 && Date.now() - seenMs < 60_000;
-  })();
+  // ponytail: canonical presence via shared isUserOnline; sync with props.users if fresher
+  const liveUser = (users?.find((u) => u.id === user.id) as User) || user;
+  const isOnline = isUserOnline(liveUser);
   const tags: string[] = parseTags(user.tags);
   const userStories = stories.filter((s) => s.owner_id === user.id || (s as any).user_id === user.id);
   const hasStories = userStories.length > 0;

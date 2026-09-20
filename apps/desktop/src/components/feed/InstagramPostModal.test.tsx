@@ -75,6 +75,28 @@ describe('InstagramPostModal media', () => {
     expect(document.body.querySelector('.lucide-chevron-right')).not.toBeInTheDocument();
     expect(document.body.querySelector('.lucide-chevron-left')).not.toBeInTheDocument();
   });
+
+  it('renders immediate localPreviewUrl for freshly created posts', async () => {
+    const freshPost = {
+      id: 'p-fresh',
+      author_id: 'a-1',
+      author_name: 'A',
+      url: '/api/objects/pending-id',
+      localPreviewUrl: 'blob:fresh-preview-url',
+      caption: 'fresh post',
+      created_at: new Date().toISOString(),
+      like_count: 0,
+      comment_count: 0,
+    } as unknown as FeedPost;
+
+    await act(async () => {
+      render(<InstagramPostModal post={freshPost} isOpen onClose={() => {}} identity={identity} />);
+    });
+
+    const img = document.body.querySelector('img');
+    expect(img).toBeInTheDocument();
+    expect(img).toHaveAttribute('src', 'blob:fresh-preview-url');
+  });
 });
 
 describe('InstagramPostModal actions + font', () => {

@@ -78,4 +78,20 @@ describe('ObjectImage placeholder (T-W3)', () => {
     expect(container.querySelector('img')).toBeNull()
     expect(rec.cardId).toBe(uuid)
   })
+
+  it('does not apply crossOrigin="anonymous" on direct external images', () => {
+    const { container } = render(<ObjectImage contentUrl="https://cdn.example.com/art.jpg" identity={identity} alt="art" />)
+    const img = container.querySelector('img')
+    expect(img).toBeInTheDocument()
+    expect(img).not.toHaveAttribute('crossorigin')
+  })
+
+  it('hides component cleanly when hideUnavailable is true and image failed', () => {
+    hookState.failed = true
+    const { container } = render(
+      <ObjectImage contentUrl="/api/objects/missing" identity={identity} hideUnavailable />
+    )
+    expect(screen.queryByText('No preview')).toBeNull()
+    expect(container.firstChild).toBeNull()
+  })
 })

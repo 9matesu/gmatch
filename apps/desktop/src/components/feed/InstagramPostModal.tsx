@@ -59,6 +59,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
   }, [post?.id, isOpen]);
 
   interface ModalMediaItem {
+    id?: string;
     url: string;
     mime?: string;
   }
@@ -69,13 +70,16 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
   const mediaItems: ModalMediaItem[] = post
     ? (Array.isArray((post as any).media) && (post as any).media.length > 0
       ? (post as any).media
-        .map((m: any) => ({ url: m?.url as string, mime: m?.mime_type as string | undefined }))
+        .map((m: any) => ({ id: m?.id as string | undefined, url: m?.url as string, mime: m?.mime_type as string | undefined }))
         .filter((m: ModalMediaItem) => Boolean(m.url))
       : [...((post as any).mediaUrls || [])].map((u: string) => ({ url: u }))
     )
     : [];
-  if (post && mediaItems.length === 0 && (post as any).url) {
-    mediaItems.push({ url: (post as any).url, mime: (post as any).mime_type });
+  if (post && mediaItems.length === 0) {
+    const fallbackUrl = post.localPreviewUrl || (post as any).url;
+    if (fallbackUrl) {
+      mediaItems.push({ id: post.id, url: fallbackUrl, mime: (post as any).mime_type });
+    }
   }
   const activeMedia = mediaItems[activeMediaIndex] || mediaItems[0] || null;
 
@@ -144,7 +148,34 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
             className="relative flex-1 bg-black flex items-center justify-center overflow-hidden min-h-[340px] md:min-h-[580px] max-h-[50vh] md:max-h-none"
             onDoubleClick={handleDoubleTap}
           >
-            {activeMedia && isModalMediaVideo(activeMedia.url, activeMedia.mime) ? (
+            {post.localPreviewUrl ? (
+              isModalMediaVideo(post.localPreviewUrl, post.mime_type) ? (
+                <NativeVideoPlayer
+                  key={post.localPreviewUrl}
+                  src={post.localPreviewUrl}
+                  className="w-full h-full max-h-[85vh] object-contain"
+                  videoClassName="w-full h-full max-h-[85vh] object-contain"
+                  autoPlay={true}
+                  controls={true}
+                  loop={true}
+                  muted={true}
+                  onDoubleTapLike={handleDoubleTap}
+                />
+              ) : (
+                <div
+                  className="w-full h-full flex items-center justify-center transition-transform duration-300 ease-out cursor-zoom-in"
+                  style={{ transform: `scale(${zoomLevel})` }}
+                  onClick={handleZoomToggle}
+                >
+                  <img
+                    src={post.localPreviewUrl}
+                    alt={post.caption || ''}
+                    className="w-full h-full object-contain max-h-[85vh]"
+                    draggable={false}
+                  />
+                </div>
+              )
+            ) : activeMedia && isModalMediaVideo(activeMedia.url, activeMedia.mime) ? (
               <NativeVideoPlayer
                 key={activeMedia.url}
                 src={activeMedia.url}
@@ -163,10 +194,10 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                 onClick={handleZoomToggle}
               >
                 <ObjectImage
-                  contentUrl={activeMedia?.url || post.url}
-                  objectId={null}
+                  contentUrl={post.localPreviewUrl || activeMedia?.url || post.url}
+                  objectId={activeMedia?.id || post.id}
                   identity={identity}
-                  mimeType={activeMedia?.mime}
+                  mimeType={activeMedia?.mime || post.mime_type}
                   alt=""
                   className="w-full h-full object-contain max-h-[85vh]"
                   muted={false}

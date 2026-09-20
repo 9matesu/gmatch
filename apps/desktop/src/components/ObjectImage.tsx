@@ -5,6 +5,7 @@ import { isMediaVideo, resolveMediaUrl } from '../utils/media'
 import { useObjectImage } from '../hooks/useObjectImage'
 import { NativeVideoPlayer } from './media/NativeVideoPlayer'
 import { useVaultUrl } from '../services/vault'
+import { resolveImage } from '../services/imageCache'
 
 interface IdentityLike {
   orbitId: string
@@ -35,6 +36,8 @@ export interface ObjectImageProps {
   onExpand?: () => void
   onDoubleTapLike?: () => void
   onError?: () => void
+  /** When true, hides the element cleanly on missing/failed media instead of placeholder box */
+  hideUnavailable?: boolean
 }
 
 const OBJECT_PATH = '/api/objects/'
@@ -106,6 +109,7 @@ export function ObjectImage({
   onExpand,
   onDoubleTapLike,
   onError,
+  hideUnavailable = false,
 }: ObjectImageProps) {
   const signed = needsSignedFetch(contentUrl, objectId)
   const effObjectId = extractObjectId(contentUrl, objectId)
@@ -115,6 +119,7 @@ export function ObjectImage({
   const shouldDefer = signed && loading === 'lazy'
   const [inView, setInView] = useState(!shouldDefer)
   const [hasError, setHasError] = useState(false)
+  const [cachedDirectUrl, setCachedDirectUrl] = useState<string | null>(null)
   const placeholderRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -141,21 +146,38 @@ export function ObjectImage({
 
   const img = useObjectImage(signed ? effObjectId : null, identity, { enabled: signed ? inView : true })
 
-  let src: string
+  let baseSrc: string
   let isVideo: boolean
   if (signed) {
-    src = img.url || ''
+    baseSrc = img.url || ''
     isVideo = img.isVideo || Boolean(mimeType && mimeType.startsWith('video/'))
   } else {
-    src = resolveMediaUrl(contentUrl)
+    baseSrc = resolveMediaUrl(contentUrl)
     isVideo = Boolean(mimeType && mimeType.startsWith('video/')) || isMediaVideo(contentUrl) || false
   }
 
   // Local vault (opt-in): for direct http(s) content, prefer pinned bytes.
-  const vaultSrc = useVaultUrl(!signed && /^https?:/i.test(src) ? src : null)
-  if (vaultSrc) src = vaultSrc
+  const vaultSrc = useVaultUrl(!signed && /^https?:/i.test(baseSrc) ? baseSrc : null)
+
+  // Resolve direct remote images through disk cache (gmcache://) when offline/available
+  useEffect(() => {
+    if (signed || !baseSrc || /^(gmcache|idle-file|vault|blob|data):/i.test(baseSrc)) {
+      setCachedDirectUrl(null)
+      return
+    }
+    let live = true
+    resolveImage(baseSrc)
+      .then((local) => {
+        if (live && local && local !== baseSrc) setCachedDirectUrl(local)
+      })
+      .catch(() => {})
+    return () => { live = false }
+  }, [baseSrc, signed])
+
+  const src = vaultSrc || cachedDirectUrl || baseSrc
 
   if (!src) {
+    if (hideUnavailable) return null
     // While a signed image is deferred (off-screen) or still fetching, show a
     // blank placeholder instead of "No preview" to avoid a misleading flash.
     // A P2P-only row with no live seeder says so honestly and retries when a
@@ -172,6 +194,7 @@ export function ObjectImage({
   // Fallback placeholder for failed loads
 
   if (hasError) {
+    if (hideUnavailable) return null
     return (
       <div ref={placeholderRef} className={className || 'w-full aspect-[4/3] bg-retro-bg flex items-center justify-center text-[10px] text-retro-muted'}>
         Image unavailable
@@ -234,7 +257,6 @@ export function ObjectImage({
         setHasError(true)
       }}
       draggable={false}
-      crossOrigin={signed ? 'use-credentials' : 'anonymous'}
     />
   )
 }

@@ -963,7 +963,14 @@ export default function Home() {
   const [gallerySort, setGallerySort] = useState<'newest' | 'oldest' | 'likes' | 'score'>('newest');
   const [batchDownloading, setBatchDownloading] = useState(false);
   const [transferProgress, setTransferProgress] = useState<string | null>(null);
-  const [stories, setStories] = useState<OrbitObject[]>([])
+  const [stories, setStories] = useState<OrbitObject[]>(() => {
+    try {
+      const saved = localStorage.getItem('orbit_cached_stories');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  })
   const [storiesLoading, setStoriesLoading] = useState(true)
   const storiesRequestRef = useRef(0)
   const [showStoryModal, setShowStoryModal] = useState(false)
@@ -2601,7 +2608,11 @@ export default function Home() {
       })
       .then((data: OrbitObject[]) => {
         if (requestId !== storiesRequestRef.current || requestIdentity !== identity.orbitId) return
-        setStories(Array.isArray(data) ? data : [])
+        const list = Array.isArray(data) ? data : []
+        setStories(list)
+        try {
+          localStorage.setItem('orbit_cached_stories', JSON.stringify(list.slice(0, 50)))
+        } catch {}
       })
       .catch(err => {
         logger.error(err)
@@ -2668,9 +2679,26 @@ export default function Home() {
         if (/^https?:/i.test(mu)) urls.add(mu);
       }
     }
+    // Stories & profile avatars too: ensure offline access
+    for (const s of stories) {
+      if (s.content_url) {
+        const su = resolveMediaUrl(s.content_url);
+        if (/^https?:/i.test(su)) urls.add(su);
+      }
+      if (s.pfp_url) {
+        const pu = resolveMediaUrl(s.pfp_url);
+        if (/^https?:/i.test(pu)) urls.add(pu);
+      }
+    }
+    for (const u of users) {
+      if (u.pfp_url) {
+        const pu = resolveMediaUrl(u.pfp_url);
+        if (/^https?:/i.test(pu)) urls.add(pu);
+      }
+    }
     if (urls.size === 0) return;
     void mapLimit([...urls], 3, (u) => vaultPin(u).then(() => undefined));
-  }, [settings.localVault, idleGallery, myCards, feedPosts]);
+  }, [settings.localVault, idleGallery, myCards, feedPosts, stories, users]);
 
 
   // Prune dead 404 content when notified

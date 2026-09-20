@@ -90,7 +90,10 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
     const cleanStories: OrbitObject[] = [];
     const seenIds = new Set<string>();
     for (const story of stories) {
-      if (!story.content_url && !story.id) continue;
+      if (!story) continue;
+      const hasUrl = typeof story.content_url === 'string' && story.content_url.trim().length > 0;
+      const hasId = typeof story.id === 'string' && story.id.trim().length > 0;
+      if (!hasUrl && !hasId) continue;
       if (seenIds.has(story.id)) continue;
       seenIds.add(story.id);
       cleanStories.push(story);
@@ -490,6 +493,7 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
                   objectId={currentStory.id}
                   contentUrl={currentStory.content_url}
                   identity={identity}
+                  hideUnavailable
                   className="w-full h-full object-contain"
                   videoClassName="w-full h-full object-contain"
                 />
@@ -508,6 +512,7 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
                   objectId={currentStory.id}
                   identity={identity ?? null}
                   mimeType={currentStory.mime_type}
+                  hideUnavailable
                   alt="Story content"
                   className="w-full h-full object-contain select-none"
                 />
@@ -516,6 +521,7 @@ export function GMatchStories({ stories, loading = false, currentUserId, identit
                   objectId={currentStory.id}
                   contentUrl={currentStory.content_url}
                   identity={identity || null}
+                  hideUnavailable
                   className="w-full h-full object-contain"
                 />
               )}

@@ -10,17 +10,36 @@ function hashToInt(hex: string, index: number, max: number): number {
   return isNaN(val) ? 0 : val % max
 }
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { resolveMediaUrl } from '../utils/media'
+import { resolveImage } from '../services/imageCache'
 
 export function Avatar({ id, size = 40, imageUrl, fill = false }: { id: string; size?: number; imageUrl?: string | null; fill?: boolean }) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
+  const [cachedUrl, setCachedUrl] = useState<string | null>(null)
 
   // Track the URL that failed to load. When the profile pic changes (e.g. just
   const failed = imageUrl ? failedUrl === imageUrl : false
 
+  useEffect(() => {
+    if (!imageUrl) {
+      setCachedUrl(null)
+      return
+    }
+    const resolved = resolveMediaUrl(imageUrl)
+    if (/^(gmcache|idle-file|vault|blob|data):/i.test(resolved)) {
+      setCachedUrl(resolved)
+      return
+    }
+    let live = true
+    resolveImage(resolved).then((local) => {
+      if (live && local && local !== resolved) setCachedUrl(local)
+    }).catch(() => {})
+    return () => { live = false }
+  }, [imageUrl])
+
   if (imageUrl && !failed) {
-    const resolvedUrl = resolveMediaUrl(imageUrl)
+    const resolvedUrl = cachedUrl || resolveMediaUrl(imageUrl)
 
     if (fill) {
       return (
