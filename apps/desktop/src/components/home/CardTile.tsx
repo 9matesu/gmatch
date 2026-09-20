@@ -81,7 +81,7 @@ export function CardTile({
   const ownerLabel = (
     item.owner_name?.trim() || item.uploader_name?.trim() ||
     users?.find(u => u.id === item.owner_id)?.display_name?.trim() ||
-    'Unknown User'
+    ''
   )
 
   const cardTitle = item.name?.trim() || item.caption?.trim() || ownerLabel || 'Untitled Card'
@@ -246,24 +246,26 @@ export function CardTile({
           </div>
 
           <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-retro-muted">
-            <span className="truncate">
-              by{' '}
-              {onOpenOwnerProfile ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onOpenOwnerProfile(item.owner_id)
-                  }}
-                  className="inline font-medium cursor-pointer hover:underline hover:text-retro-fg transition-colors"
-                  title={`View ${ownerLabel}`}
-                >
-                  {ownerLabel}
-                </button>
-              ) : (
-                <span className="font-medium text-retro-fg">{ownerLabel}</span>
-              )}
-            </span>
+            {ownerLabel && (
+              <span className="truncate">
+                by{' '}
+                {onOpenOwnerProfile ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onOpenOwnerProfile(item.owner_id)
+                    }}
+                    className="inline font-medium cursor-pointer hover:underline hover:text-retro-fg transition-colors"
+                    title={`View ${ownerLabel}`}
+                  >
+                    {ownerLabel}
+                  </button>
+                ) : (
+                  <span className="font-medium text-retro-fg">{ownerLabel}</span>
+                )}
+              </span>
+            )}
             <span className="shrink-0 flex items-center gap-1 font-bold text-retro-fg">
               <Heart className="w-2.5 h-2.5 fill-rose-500 text-rose-400" />
               <span>{likes}</span>

@@ -492,7 +492,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
                 objectId={currentStory.id}
                 contentUrl={currentStory.content_url}
                 identity={identity ?? null}
-                mimeType={currentStory.mime_type}
+                mimeType={currentStory.mime_type || (/\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(currentStory.content_url || '') ? 'video/mp4' : undefined)}
                 alt={currentStory.caption || "Story content"}
                 className="w-full h-full object-contain select-none"
                 videoClassName="w-full h-full object-contain"

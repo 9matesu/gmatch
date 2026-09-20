@@ -3122,8 +3122,8 @@ export default function Home() {
       if (item.is_story || (item as any).is_public === 1 || (item as any).is_public) return false
       if (isP2pLocal(item.id)) return false
       if (blockedIds.includes(item.owner_id)) return false
-      // Posts as posts, cards as cards: reject unminted p2p objects or Unknown User objects with no canonical card
-      if ((item.id.startsWith('p2p-obj-') || item.display_name === 'Unknown User') && !canonicalCards.some(c => c.mediaObjectId === item.id)) return false
+      // Posts as posts, cards as cards: reject unminted p2p objects or cards with no resolvable owner
+      if ((item.id.startsWith('p2p-obj-') || !item.display_name?.trim()) && !canonicalCards.some(c => c.mediaObjectId === item.id)) return false
       if (galleryFilter === 'received') return item.owner_id !== identity?.orbitId
       if (galleryFilter === 'sent') return item.owner_id === identity?.orbitId
       if (galleryFilter === 'starred') return Boolean(item.is_favorited)

@@ -771,14 +771,14 @@ export function GMatchFeed({
                         <Avatar id={post.author_id} size={32} imageUrl={profilePics[post.author_id] || post.author_avatar} fill={true} />
                       </div>
                     </div>
-                    <div className="flex flex-col justify-center min-w-0 leading-snug">
+                    <div className="flex flex-col justify-center min-w-0 self-center">
                       <div className="flex items-center gap-1.5">
                         <span
                           role="button"
                           tabIndex={0}
                           onClick={() => handleNameClick(post.author_id)}
                           onKeyDown={(e) => e.key === 'Enter' && handleNameClick(post.author_id)}
-                          className="text-xs font-semibold text-retro-fg hover:underline cursor-pointer"
+                          className="text-xs font-semibold text-retro-fg hover:underline cursor-pointer leading-none"
                         >
                           {post.author_name}
                         </span>
