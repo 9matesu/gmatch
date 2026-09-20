@@ -1114,6 +1114,26 @@ export default function Home() {
       .catch(() => { })
   }, [identity, feedSort])
 
+  // Retrieve-by-force: drop cached/inflight feed responses, then reload. A
+  // plain reload inside the 3s GET cache (or a stuck inflight request) would
+  // otherwise keep serving the stale snapshot that hides fresh posts.
+  const forceRefreshFeed = useCallback(() => {
+    invalidateCache('/api/posts')
+    return loadServerFeed()
+  }, [loadServerFeed])
+
+  // Which node this feed reads — surfaced in the empty state so a pin to the
+  // wrong (e.g. fresh/empty local) node is visible instead of mysterious.
+  const apiNodeLabel = useMemo(() => {
+    try {
+      const base = getApiBaseUrl()
+      if (!base) return 'central relay'
+      return new URL(base, 'http://localhost').hostname || base
+    } catch {
+      return 'this node'
+    }
+  }, [])
+
   const loadMoreFeedPosts = useCallback(async () => {
     if (isLoadingMoreFeed) return
     setIsLoadingMoreFeed(true)
@@ -1311,6 +1331,9 @@ export default function Home() {
           const fresh = newPost.id && !seen.has(newPost.id) ? [newPost] : []
           return [...fresh, ...prev]
         })
+        // Bust the feed cache so reconciliation fetches the committed row
+        // instead of re-serving the pre-publish snapshot over our prepend.
+        invalidateCache('/api/posts')
         loadServerFeed()
         window.dispatchEvent(new CustomEvent('orbit-score-refresh'))
       }
@@ -3485,6 +3508,8 @@ export default function Home() {
                                 onPersistReport={persistReport}
                                 onReportComment={(commentId) => reportTarget('post_comment', commentId)}
                                 onPublishPost={publishPost}
+                                onForceRefresh={forceRefreshFeed}
+                                apiNodeLabel={apiNodeLabel}
                                 onDeletePostApi={deletePostOnServer}
                                 unreadCount={lobby.unreadCount}
                                 onRefreshNotifications={() => lobby.refreshNotifications()}

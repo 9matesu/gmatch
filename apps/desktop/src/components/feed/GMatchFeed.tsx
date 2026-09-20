@@ -24,6 +24,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Zap,
+  RefreshCw,
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject as StoryItem } from '@orbit/shared';
@@ -147,6 +148,8 @@ export function GMatchFeed({
   onOpenNotifications,
   onOpenNetwork,
   onUserContext,
+  onForceRefresh,
+  apiNodeLabel,
 }: {
   identity: OrbitIdentity | null;
   posts: FeedPost[];
@@ -192,6 +195,10 @@ export function GMatchFeed({
   onOpenNotifications?: () => void;
   onOpenNetwork?: (userId: string) => void;
   onUserContext?: (e: React.MouseEvent, userId: string, displayName: string) => void;
+  /** Retrieve-by-force: drops cached/inflight feed responses, then reloads. */
+  onForceRefresh?: () => void;
+  /** Human label for the node this feed reads (e.g. central host or LAN IP). */
+  apiNodeLabel?: string;
 }) {
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [savedPosts, setSavedPosts] = useState<Record<string, boolean>>({});
@@ -561,6 +568,7 @@ export function GMatchFeed({
           Sits ABOVE the stories tray so the tab leads with its controls. */}
       <FeedHeader
         unreadCount={unreadCount}
+        onRefresh={onForceRefresh ? () => { onForceRefresh(); } : undefined}
         onOpenSearch={() => setShowExploreSearch(true)}
         onOpenNotifications={() => {
           if (onOpenNotifications) onOpenNotifications();
@@ -1048,7 +1056,20 @@ export function GMatchFeed({
                 <p className="text-xs text-retro-muted mt-1 leading-relaxed">
                   One upload, three tags. Posts are what grow followers.
                 </p>
+                <p className="text-[10px] font-mono text-retro-muted mt-1">
+                  Reading from {apiNodeLabel || 'this node'} · {displayPosts.length} posts
+                </p>
               </div>
+              {onForceRefresh && (
+                <button
+                  type="button"
+                  onClick={() => { playPress(800); onForceRefresh(); }}
+                  className="px-4 py-2 text-xs font-semibold rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer inline-flex items-center gap-1.5 border border-border-glass text-retro-body hover:text-retro-fg hover:bg-glass-w10"
+                >
+                  <RefreshCw className="w-4 h-4 stroke-[2]" />
+                  <span>Reload feed</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {

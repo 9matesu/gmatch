@@ -150,6 +150,13 @@ posts.get('/', async (c) => {
        ) DESC, o.created_at DESC`
     : 'ORDER BY o.created_at DESC'
 
+  // Coalesce multi-image posts in SQL: only the earliest row of each
+  // post_group is selected, so LIMIT/OFFSET count coalesced primaries and a
+  // group can never straddle (or vanish across) page boundaries. Previously
+  // the collapse happened after pagination, so the client's count-based
+  // offset skipped rows whenever a group collapsed a page.
+  where.push('(o.post_group IS NULL OR o.rowid = (SELECT MIN(o2.rowid) FROM Objects o2 WHERE o2.post_group = o.post_group))')
+
   const rows = await db.prepare(`
     SELECT o.id, o.owner_id, o.size_bytes, o.mime_type, o.created_at, o.content_url,
            COALESCE(o.post_caption, o.caption) as caption, o.location, o.post_tags,
@@ -165,18 +172,9 @@ posts.get('/', async (c) => {
     LIMIT ? OFFSET ?
   `).bind(...args, limit, offset).all<any>()
 
-  // Coalesce multi-image posts: rows sharing a post_group become one post whose
-  // `media` array carries every image in the group. The first-seen row in the
-  // page is the primary (drives likes/comments/id); later group members are
-  // skipped so they don't produce duplicate feed entries.
-  const primaries: any[] = []
-  const seenGroups = new Set<string>()
-  for (const row of rows.results || []) {
-    const group = row.post_group || null
-    if (group && seenGroups.has(group)) continue
-    if (group) seenGroups.add(group)
-    primaries.push(row)
-  }
+  // Every selected row is already a coalesced primary (see above); the loop
+  // below only attaches each group's full `media` array.
+  const primaries: any[] = rows.results || []
 
   for (const row of primaries) {
     if (!row.post_group) continue

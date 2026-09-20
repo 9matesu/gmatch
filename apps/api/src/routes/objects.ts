@@ -145,6 +145,20 @@ objects.post('/register', orbitAuth, async (c) => {
 
     if (isPublic === 1) {
       await c.env.DB.prepare('UPDATE Users SET posts_count = COALESCE(posts_count, 0) + 1 WHERE id = ?').bind(orbitId).run().catch(() => {})
+      // Real-time push so connected clients prepend the new post to the feed.
+      // Mirrors the multipart path: only the first-inserted row of a
+      // post_group broadcasts (the feed groups the rest into its media).
+      // Non-public rows (stories) match no broadcast row and stay silent.
+      let isGroupPrimary = true
+      if (postGroup) {
+        const min = await c.env.DB.prepare('SELECT MIN(rowid) as first_row FROM Objects WHERE post_group = ?').bind(postGroup).first<{ first_row?: number | null }>().catch(() => null)
+        const self = await c.env.DB.prepare('SELECT rowid FROM Objects WHERE id = ?').bind(objectId).first<{ rowid?: number | null }>().catch(() => null)
+        isGroupPrimary = Boolean(min?.first_row && self?.rowid && min.first_row === self.rowid)
+      }
+      if (isGroupPrimary) {
+        const { broadcastNewPost } = await import('./posts')
+        await broadcastNewPost(c.env.DB, objectId).catch(() => { })
+      }
     }
 
     return c.json({
