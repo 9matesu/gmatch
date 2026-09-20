@@ -51,7 +51,7 @@ export function Avatar({ id, size = 40, imageUrl, fill = false }: { id: string; 
         <img
           src={resolvedUrl}
           alt=""
-          className="absolute inset-0 w-full h-full object-cover"
+          className="w-full h-full object-cover"
           data-no-wallpaper
           onError={() => imageUrl && setFailedUrl(imageUrl)}
         />
@@ -89,7 +89,7 @@ export function Avatar({ id, size = 40, imageUrl, fill = false }: { id: string; 
         height="100%"
         viewBox={`0 0 ${size} ${size}`}
         preserveAspectRatio="xMidYMid slice"
-        className="absolute inset-0 w-full h-full"
+        className="w-full h-full"
         aria-hidden="true"
       >
         <rect width="100%" height="100%" fill={bgColor} />

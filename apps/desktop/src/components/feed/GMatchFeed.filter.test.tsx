@@ -65,6 +65,7 @@ describe('GMatchFeed timeline filtering and resilience', () => {
       <GMatchFeed
         identity={mockIdentity}
         posts={posts}
+        stories={[]}
         users={mockUsers}
         feedSort="latest"
       />
@@ -102,6 +103,7 @@ describe('GMatchFeed timeline filtering and resilience', () => {
       <GMatchFeed
         identity={mockIdentity}
         posts={posts}
+        stories={[]}
         users={mockUsers}
         feedSort="latest"
       />
@@ -129,6 +131,7 @@ describe('GMatchFeed timeline filtering and resilience', () => {
       <GMatchFeed
         identity={mockIdentity}
         posts={posts}
+        stories={[]}
         users={mockUsers}
         feedSort="latest"
       />
@@ -143,6 +146,42 @@ describe('GMatchFeed timeline filtering and resilience', () => {
 
     await waitFor(() => {
       expect(screen.queryByText('Broken image post to hide')).toBeNull();
+    });
+  });
+
+  it('opens post lightbox on media click without triggering user profile navigation', async () => {
+    const onSelectUser = vi.fn();
+    const posts: any[] = [
+      {
+        id: 'post-click-1',
+        author_id: 'online-author',
+        author_name: 'Online User',
+        created_at: new Date().toISOString(),
+        caption: 'Clickable media post',
+        url: 'https://example.com/photo.jpg',
+        like_count: 5,
+        comment_count: 2,
+      },
+    ];
+
+    const { container } = render(
+      <GMatchFeed
+        identity={mockIdentity}
+        posts={posts}
+        stories={[]}
+        users={mockUsers}
+        feedSort="latest"
+        onSelectUser={onSelectUser}
+      />
+    );
+
+    const mediaContainer = container.querySelector('img[src="https://example.com/photo.jpg"]')?.closest('.cursor-pointer');
+    expect(mediaContainer).toBeTruthy();
+    fireEvent.click(mediaContainer!);
+
+    expect(onSelectUser).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(document.body.textContent).toContain('Online User');
     });
   });
 });

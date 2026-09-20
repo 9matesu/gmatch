@@ -737,7 +737,7 @@ export function GMatchFeed({
               <article
                 key={post.id}
                 onContextMenu={(e) => { e.preventDefault(); setOptionsPost(post) }}
-                className={`bg-retro-panel border border-border-glass rounded-lg overflow-hidden flex flex-col shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
+                className={`relative bg-retro-panel border border-border-glass rounded-lg overflow-hidden flex flex-col shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
                 {/* Repost Header Banner */}
                 {post.is_reposted && (
@@ -755,8 +755,8 @@ export function GMatchFeed({
                     onContextMenu={(e) => onUserContext?.(e, post.author_id, post.author_name)}
                     title={authorHasStory ? 'Watch story' : 'View profile'}
                   >
-                    <div className={`w-8 h-8 rounded-full p-[1.5px] flex-shrink-0 ${authorHasStory ? 'bg-gradient-to-tr from-zinc-300 to-zinc-600' : 'bg-glass-w12 border border-border-glass'}`}>
-                      <div className="w-full h-full rounded-full bg-retro-panel overflow-hidden flex items-center justify-center text-xs font-semibold text-retro-fg">
+                    <div className={`relative w-8 h-8 rounded-full p-[1.5px] flex-shrink-0 ${authorHasStory ? 'bg-gradient-to-tr from-zinc-300 to-zinc-600' : 'bg-glass-w12 border border-border-glass'}`}>
+                      <div className="relative w-full h-full rounded-full bg-retro-panel overflow-hidden flex items-center justify-center text-xs font-semibold text-retro-fg">
                         <Avatar id={post.author_id} size={32} imageUrl={profilePics[post.author_id] || post.author_avatar} fill={true} />
                       </div>
                     </div>
@@ -1133,7 +1133,7 @@ export function GMatchFeed({
                         className="flex flex-col items-center gap-1 cursor-pointer group"
                         aria-label={`Follow ${s.display_name || s.id}`}
                       >
-                        <span className="w-10 h-10 rounded-full overflow-hidden border border-border-glass flex items-center justify-center text-xs text-retro-fg bg-glass-w5">
+                        <span className="relative w-10 h-10 rounded-full overflow-hidden border border-border-glass flex items-center justify-center text-xs text-retro-fg bg-glass-w5">
                           <Avatar id={s.id} size={40} imageUrl={profilePics?.[s.id]} fill={true} />
                         </span>
                         <span className="text-[10px] text-retro-muted truncate max-w-[72px] group-hover:text-retro-fg">{s.display_name}</span>

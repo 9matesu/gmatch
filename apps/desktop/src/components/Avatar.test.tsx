@@ -39,4 +39,31 @@ describe('Avatar offline cache and fallback', () => {
       expect(img).toHaveAttribute('src', '/px?u=https%3A%2F%2Fcdn.example.com%2Fdev-proxy-avatar.jpg');
     });
   });
+
+  it('renders fill={true} as in-flow w-full h-full without unconstrained absolute inset-0', async () => {
+    const { container } = render(
+      <div className="w-8 h-8">
+        <Avatar id="user-fill-1" imageUrl="https://cdn.example.com/cached-pfp.jpg" fill={true} />
+      </div>
+    );
+    await waitFor(() => {
+      const img = container.querySelector('img');
+      expect(img).toBeTruthy();
+      expect(img?.className).toContain('w-full h-full object-cover');
+      expect(img?.className).not.toContain('absolute');
+      expect(img?.className).not.toContain('inset-0');
+    });
+  });
+
+  it('renders fallback SVG with fill={true} without absolute positioning', () => {
+    const { container } = render(
+      <div className="w-8 h-8">
+        <Avatar id="user-fill-svg" imageUrl={null} fill={true} />
+      </div>
+    );
+    const svg = container.querySelector('svg');
+    expect(svg).toBeTruthy();
+    expect(svg?.className.baseVal || svg?.getAttribute('class')).toContain('w-full h-full');
+    expect(svg?.className.baseVal || svg?.getAttribute('class')).not.toContain('absolute');
+  });
 });
