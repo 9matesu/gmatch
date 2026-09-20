@@ -46,6 +46,9 @@ describe('devFetchable (vite-dev same-origin bytes)', () => {
   it('maps known image hosts to local proxies', () => {
     expect(devFetchable('https://tbib.org/images/1/a.jpg')).toBe('/booru/tbib/images/1/a.jpg')
     expect(devFetchable('https://xbooru.com/images/2/b.png')).toBe('/booru/xbooru/images/2/b.png')
+    expect(devFetchable('https://img.xbooru.com/images/235/f58df51bba880e6f880c14ec46c87401.jpeg')).toBe(
+      '/px?u=https%3A%2F%2Fimg.xbooru.com%2Fimages%2F235%2Ff58df51bba880e6f880c14ec46c87401.jpeg'
+    )
     expect(devFetchable('https://media.redgifs.com/Foo.mp4')).toBe('/rg-media/Foo.mp4')
     expect(devFetchable('https://m11.imhentai.xxx/1728478/1.jpg')).toBe(
       '/px?u=https%3A%2F%2Fm11.imhentai.xxx%2F1728478%2F1.jpg',

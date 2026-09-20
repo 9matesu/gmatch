@@ -305,7 +305,10 @@ export async function proxyAndStoreExternal(
       'imhentai.xxx': 'https://imhentai.xxx/',
     }
     const host = parsed.hostname.replace(/^www\./, '')
-    const referer = REFERERS[host] || (host.endsWith('.booru.org') ? `https://${parsed.hostname}/` : undefined)
+    const referer = REFERERS[host] ||
+      (host.endsWith('.xbooru.com') ? 'https://xbooru.com/' : undefined) ||
+      (host.endsWith('.redgifs.com') ? 'https://www.redgifs.com/' : undefined) ||
+      (host.endsWith('.booru.org') ? `https://${parsed.hostname}/` : undefined)
     res = await fetch(parsed.toString(), {
       signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
       redirect: 'follow',

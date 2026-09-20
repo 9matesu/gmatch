@@ -107,10 +107,7 @@ export function useP2P(identity: OrbitIdentity | null) {
     if (typeof window === 'undefined') return [];
     try {
       const stored = localStorage.getItem('orbit_chat_messages');
-      const parsed: ChatMessage[] = stored ? JSON.parse(stored) : [];
-      // Chat is wiped every 12h — drop anything older than that on load.
-      const fresh = parsed.filter((m) => !m.timestamp || Date.now() - m.timestamp < CHAT_WIPE_MS);
-      return fresh;
+      return stored ? JSON.parse(stored) : [];
     } catch {
       return [];
     }
@@ -824,15 +821,6 @@ export function useP2P(identity: OrbitIdentity | null) {
       } catch {}
     }
   }, [chatMessages]);
-
-  // Chat is ephemeral — erase the whole log every 12h.
-  useEffect(() => {
-    const id = setInterval(() => {
-      setChatMessages([]);
-      try { localStorage.removeItem('orbit_chat_messages'); } catch {}
-    }, CHAT_WIPE_MS);
-    return () => clearInterval(id);
-  }, []);
 
   return {
     peers,

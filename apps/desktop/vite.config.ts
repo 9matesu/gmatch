@@ -38,6 +38,10 @@ function devPxPlugin(): Plugin {
             headers['Referer'] = 'https://imhentai.xxx/'
           } else if (target.hostname === 'babesource.com' || target.hostname === 'media.babesource.com') {
             headers['Referer'] = 'https://babesource.com/'
+          } else if (target.hostname.endsWith('xbooru.com')) {
+            headers['Referer'] = 'https://xbooru.com/'
+          } else if (target.hostname.endsWith('redgifs.com')) {
+            headers['Referer'] = 'https://www.redgifs.com/'
           }
 
           const urlsToTry: string[] = [target.toString()]

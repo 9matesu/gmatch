@@ -32,4 +32,22 @@ describe('vaultPin negative cache', () => {
     await vaultPin('https://x/dead.jpg')
     expect(bridge.vaultPin).toHaveBeenCalledTimes(1)
   })
+
+  it('defaults to opt-in when localVault setting is missing', async () => {
+    delete storage['goonmatch-settings']
+    const { vaultOptIn } = await import('./vault')
+    expect(vaultOptIn()).toBe(true)
+  })
+
+  it('saves MP4s and media to localStorage by default when bridge is absent', async () => {
+    delete (window as any).gmatch
+    delete storage['goonmatch-settings']
+    const { vaultPin, vaultGet } = await import('./vault')
+    const mp4Url = 'https://example.com/clips/video.mp4'
+    const pinned = await vaultPin(mp4Url)
+    expect(pinned).toBe(mp4Url)
+    const stored = await vaultGet(mp4Url)
+    expect(stored).toBe(mp4Url)
+    expect(storage['gmatch_vault_v1']).toContain(mp4Url)
+  })
 })

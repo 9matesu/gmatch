@@ -3,28 +3,45 @@
 import { useEffect, useState } from 'react'
 
 const SETTINGS_KEY = 'goonmatch-settings'
+const VAULT_STORAGE_KEY = 'gmatch_vault_v1'
+
+function getStoredVault(): Record<string, string> {
+  try {
+    if (typeof localStorage === 'undefined') return {}
+    const raw = localStorage.getItem(VAULT_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveStoredVault(map: Record<string, string>): void {
+  try {
+    if (typeof localStorage === 'undefined') return
+    localStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(map))
+  } catch {}
+}
 
 /** Renderer side of the opt-in local media vault (electron/vault.cjs).
- *  Without the Electron bridge every call degrades to remote URLs — the web
- *  build simply never stores bytes. Lookup-only reads: mere rendering can
- *  never fill the disk; only explicit pins (keeps, cards) write. */
+ *  When the Electron bridge is absent, degrades to localStorage storage. */
 export function vaultBridge(): boolean {
   return typeof window !== 'undefined' && typeof window.gmatch?.vaultGet === 'function'
 }
 
 export function vaultOptIn(): boolean {
   try {
-    if (typeof localStorage === 'undefined') return false
+    if (typeof localStorage === 'undefined') return true
     const raw = localStorage.getItem(SETTINGS_KEY)
-    if (!raw) return false
-    return (JSON.parse(raw) as { localVault?: unknown }).localVault === true
+    if (!raw) return true
+    const parsed = JSON.parse(raw) as { localVault?: unknown }
+    return parsed.localVault !== false
   } catch {
-    return false
+    return true
   }
 }
 
 function enabled(): boolean {
-  return vaultOptIn() && vaultBridge()
+  return vaultOptIn()
 }
 
 // Session guard: pin() is idempotent per URL per session so backfills and
@@ -40,30 +57,43 @@ const sessionFailed = new Set<string>()
 
 export async function vaultGet(url: string): Promise<string | null> {
   if (!url || !enabled()) return null
-  try {
-    const res = await window.gmatch?.vaultGet?.(url)
-    return res?.local ?? null
-  } catch {
-    return null
+  if (vaultBridge()) {
+    try {
+      const res = await window.gmatch?.vaultGet?.(url)
+      if (res?.local) return res.local
+    } catch {
+      /* fallback to local storage */
+    }
   }
+  const stored = getStoredVault()
+  return stored[url] ?? null
 }
 
-/** Get-or-fetch + pin. Fire-and-forget for keeps/cards; resolves vault:// or null. */
+/** Get-or-fetch + pin. Fire-and-forget for keeps/cards; resolves vault:// or cached url. */
 export async function vaultPin(url: string): Promise<string | null> {
   if (!url || !enabled()) return null
   if (sessionFailed.has(url)) return null
   try {
     if (sessionPinned.has(url)) return vaultGet(url)
-    const res = await window.gmatch?.vaultPin?.(url)
-    if (res?.local) {
-      sessionPinned.add(url)
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('orbit-vault-updated', { detail: { url, local: res.local } }))
+    if (vaultBridge()) {
+      const res = await window.gmatch?.vaultPin?.(url)
+      if (res?.local) {
+        sessionPinned.add(url)
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('orbit-vault-updated', { detail: { url, local: res.local } }))
+        }
+        return res.local
       }
-    } else {
-      sessionFailed.add(url)
     }
-    return res?.local ?? null
+    // Browser fallback / localStorage: persist pinned URL directly
+    const stored = getStoredVault()
+    stored[url] = url
+    saveStoredVault(stored)
+    sessionPinned.add(url)
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('orbit-vault-updated', { detail: { url, local: url } }))
+    }
+    return url
   } catch {
     sessionFailed.add(url)
     return null
@@ -73,30 +103,48 @@ export async function vaultPin(url: string): Promise<string | null> {
 export function vaultUnpin(url: string): void {
   if (!url || !enabled()) return
   sessionPinned.delete(url)
-  try {
-    void window.gmatch?.vaultUnpin?.(url)
-  } catch {
-    /* best effort */
+  if (vaultBridge()) {
+    try {
+      void window.gmatch?.vaultUnpin?.(url)
+    } catch {
+      /* best effort */
+    }
+  }
+  const stored = getStoredVault()
+  if (stored[url]) {
+    delete stored[url]
+    saveStoredVault(stored)
   }
 }
 
 export function vaultRemove(url: string): void {
   if (!url || !enabled()) return
   sessionPinned.delete(url)
-  try {
-    void window.gmatch?.vaultRemove?.(url)
-  } catch {
-    /* best effort */
+  if (vaultBridge()) {
+    try {
+      void window.gmatch?.vaultRemove?.(url)
+    } catch {
+      /* best effort */
+    }
+  }
+  const stored = getStoredVault()
+  if (stored[url]) {
+    delete stored[url]
+    saveStoredVault(stored)
   }
 }
 
 export async function vaultStats(): Promise<{ files: number; bytes: number; quota: number } | null> {
   if (!enabled()) return null
-  try {
-    return (await window.gmatch?.vaultStats?.()) ?? null
-  } catch {
-    return null
+  if (vaultBridge()) {
+    try {
+      return (await window.gmatch?.vaultStats?.()) ?? null
+    } catch {
+      /* fallback */
+    }
   }
+  const stored = getStoredVault()
+  return { files: Object.keys(stored).length, bytes: 0, quota: 3 * 1024 * 1024 * 1024 }
 }
 
 export async function vaultClear(): Promise<void> {

@@ -86,6 +86,8 @@ function getReferer(url) {
     if (url.includes('paheal')) return 'https://rule34.paheal.net/'
     if (url.includes('realbooru.com')) return 'https://realbooru.com/'
     if (url.includes('booru.org')) return 'https://booru.org/'
+    if (url.includes('xbooru.com')) return 'https://xbooru.com/'
+    if (url.includes('redgifs.com')) return 'https://www.redgifs.com/'
     return u.origin + '/'
   } catch {
     return undefined

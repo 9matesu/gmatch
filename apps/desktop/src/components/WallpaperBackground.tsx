@@ -11,7 +11,7 @@ interface WallpaperBackgroundProps {
 export function WallpaperBackground({ wallpaperBg, wallpaperFit = 'cover', wallpaperMime = '', hideUiForWallpaper, onRestore }: WallpaperBackgroundProps) {
   if (!wallpaperBg) return null;
 
-  const isVideo = wallpaperMime.startsWith('video/') || /\.(mp4|webm|ogv|mov)$/i.test(wallpaperBg.split('?')[0]);
+  const isVideo = wallpaperMime.startsWith('video/') || /\.(mp4|webm|ogv|mov)(\?|$)/i.test(wallpaperBg.split('?')[0]) || wallpaperBg.includes('/rg-media');
 
   const imgStyle = {
     backgroundImage: `url(${wallpaperBg})`,

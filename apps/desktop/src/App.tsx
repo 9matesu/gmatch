@@ -540,7 +540,8 @@ export default function Home() {
     setWallpaperBg(url);
     updateSettings('wallpaperUrl', url);
     updateSettings('wallpaperPreset', 'custom');
-    updateSettings('wallpaperMime', mime || (/\.(mp4|webm|ogv|mov)(\?|$)/i.test(url.split('?')[0]) ? 'video/mp4' : 'image/jpeg'));
+    const isVideo = mime?.startsWith('video/') || /\.(mp4|webm|ogv|mov)(\?|$)/i.test(url.split('?')[0]) || url.includes('/rg-media');
+    updateSettings('wallpaperMime', isVideo ? 'video/mp4' : 'image/jpeg');
     toast('Desktop wallpaper background updated', 'success');
   }
 
@@ -576,7 +577,15 @@ export default function Home() {
   const resolveWallpaperUrl = useCallback((url: string): Promise<string> => {
     if (!url) return Promise.resolve('')
     if (url.startsWith('data:') || url.startsWith('blob:')) return Promise.resolve(url)
-    if (/^https?:/i.test(url) || url.startsWith('gmcache://')) {
+    const isVideo = /\.(mp4|webm|ogv|mov)(\?|$)/i.test(url.split('?')[0]) || url.includes('/rg-media')
+    if (isVideo) {
+      if (isDev() && /^https?:/i.test(url)) {
+        const proxied = devFetchable(url)
+        if (proxied) return Promise.resolve(proxied)
+      }
+      return Promise.resolve(url)
+    }
+    if (/^https?:/i.test(url) || url.startsWith('gmcache://') || url.startsWith('vault://')) {
       // Remote booru bytes: no ACAO there, so orbitFetch's signed headers
       // would preflight-block it. cacheMedia's ladder (gmcache bridge →
       // dev proxy → direct fetch) is the byte path for exactly this.

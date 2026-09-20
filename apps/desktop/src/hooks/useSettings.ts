@@ -110,7 +110,7 @@ const DEFAULTS: AppSettings = {
   duelPacing: 'fast',
   accentColor: 'pink',
   theme: 'dark',
-  localVault: false,
+  localVault: true,
 }
 
 function load(): AppSettings {

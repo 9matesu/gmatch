@@ -10,6 +10,7 @@
  * Anything else (same-origin /api/objects, data:, blob:) is fetched directly.
  */
 import { devFetchable } from '../services/imageCache'
+import { vaultHttpUrl, vaultGet } from '../services/vault'
 
 interface CacheBridge { cacheImage?: (url: string) => Promise<{ local?: string } | null> }
 const bridge = (): CacheBridge | null =>
@@ -17,6 +18,19 @@ const bridge = (): CacheBridge | null =>
 
 export async function mediaUrlToCachedFile(url: string): Promise<File> {
   let source = url.trim()
+  if (source.startsWith('vault://')) {
+    try {
+      const http = await vaultHttpUrl(source)
+      if (http) {
+        source = http
+      } else {
+        const stored = await vaultGet(source)
+        if (stored && !stored.startsWith('vault://')) source = stored
+      }
+    } catch {
+      /* fall through */
+    }
+  }
   const b = bridge()
   if (b?.cacheImage && /^https?:/i.test(source)) {
     try {

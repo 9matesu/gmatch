@@ -341,6 +341,10 @@ export function CreatePostModal({
           formData.append('url', item.previewUrl);
           formData.append('is_public', '1');
           formData.append('post_group', postGroup);
+          const isVid = item.isVideo || /\.(mp4|webm|mov)(\?|$)/i.test(item.previewUrl);
+          if (isVid) {
+            formData.append('mime_type', 'video/mp4');
+          }
           if (i === 0) {
             formData.append('post_caption', caption.trim());
             formData.append('location', location.trim());

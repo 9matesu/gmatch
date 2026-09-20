@@ -72,6 +72,9 @@ export function devFetchable(url: string): string | null {
     if (u.hostname === 'media.redgifs.com') return `/rg-media${path}`
     if (u.hostname === 'tbib.org') return `/booru/tbib${path}`
     if (u.hostname === 'xbooru.com') return `/booru/xbooru${path}`
+    if (u.hostname === 'img.xbooru.com' || u.hostname.endsWith('.xbooru.com')) {
+      return `/px?u=${encodeURIComponent(url)}`
+    }
     if (u.hostname === 'rule34.paheal.net') return `/booru/paheal${path}`
     if (u.hostname === 'konachan.com') return `/booru/kona${path}`
     if (u.hostname === 'yande.re' || u.hostname === 'files.yande.re') {

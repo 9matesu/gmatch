@@ -126,11 +126,8 @@ export async function deleteExpiredContent(
     .catch(() => {})
   stats.expiredSessions = sessionRes?.meta?.changes || 0
 
-  // 3b. Lobby chat is capped at 12 hours — older rows are dropped so the replay
-  // history never grows unbounded. Users are told "clears every 12 hours".
-  await db.prepare("DELETE FROM LobbyChat WHERE datetime(created_at) < datetime(?, '-12 hours')").bind(nowIso).run().catch(() => {})
-
-  // 3c. Match invites are transient: stale (expired / older than a day) rows
+  // 3b. Lobby chat 24h wipe removed: message history is preserved.
+  // Match invites are transient: stale (expired / older than a day) rows
   // are swept so the table doesn't accumulate.
   await db
     .prepare("DELETE FROM MatchInvites WHERE datetime(expires_at) < datetime(?) OR datetime(updated_at) < datetime(?, '-1 day')")

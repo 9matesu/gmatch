@@ -489,7 +489,7 @@ export function GMatchDMs({
       : openTarget === 'group'
       ? 'Group chat'
       : isLobbyGroup
-      ? 'Public lobby · clears every 12 hours'
+      ? 'Public lobby'
       : isQueueGroup
       ? 'Queue chat'
       : 'Direct message';

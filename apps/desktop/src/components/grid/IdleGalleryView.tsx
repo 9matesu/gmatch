@@ -106,7 +106,7 @@ export function resolveGalleryTileUrl(img: GalleryImage, vaultUrl?: string): str
 
 export interface IdleGalleryViewProps {
   onCreateCard?: (media: { url: string; tags: string[]; name: string }) => void
-  onSetWallpaper?: (url: string) => void
+  onSetWallpaper?: (url: string, mime?: string) => void
   onRepostImage?: (media: { url: string; tags: string[]; name?: string }) => void
   onAddToStory?: (media: { url: string; tags: string[]; name?: string }) => void
 }
@@ -684,7 +684,7 @@ export default function IdleGalleryView({
                           onClick={() => {
                             setOpenMenuId(null)
                             setBackground(img.url)
-                            onSetWallpaper?.(img.url)
+                            onSetWallpaper?.(img.url, isMotion ? 'video/mp4' : undefined)
                           }}
                         >
                           <IconWallpaper size={13} className="text-cyan-400" />
@@ -916,7 +916,7 @@ export default function IdleGalleryView({
                 type="button"
                 onClick={() => {
                   setBackground(viewer.url)
-                  onSetWallpaper?.(viewer.url)
+                  onSetWallpaper?.(viewer.url, viewer.kind === 'video' ? 'video/mp4' : undefined)
                 }}
                 className="glass-action px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer"
                 title="Set as app backdrop"
