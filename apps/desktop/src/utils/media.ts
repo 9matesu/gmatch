@@ -154,14 +154,48 @@ export function resolveVideoMime(opts: {
   return null
 }
 
-/** Reads the first bytes of a File/Blob for magic-byte MIME sniffing. */
+/** Reads the first bytes of a File/Blob for magic-byte MIME sniffing. Uses
+ * arrayBuffer when available, FileReader otherwise (older webviews/jsdom). */
 export async function sniffFileHead(file: Blob, n = 16): Promise<Uint8Array | null> {
   try {
-    const buf = await file.slice(0, n).arrayBuffer()
-    return new Uint8Array(buf)
+    const sliced = file.slice(0, n)
+    const anyBlob = sliced as Blob & { arrayBuffer?: () => Promise<ArrayBuffer> }
+    if (typeof anyBlob.arrayBuffer === 'function') {
+      return new Uint8Array(await anyBlob.arrayBuffer())
+    }
+    const buf = await new Promise<ArrayBuffer | null>((resolve) => {
+      try {
+        const reader = new FileReader()
+        reader.onload = () => resolve((reader.result as ArrayBuffer) || null)
+        reader.onerror = () => resolve(null)
+        reader.readAsArrayBuffer(sliced)
+      } catch {
+        resolve(null)
+      }
+    })
+    return buf ? new Uint8Array(buf) : null
   } catch {
     return null
   }
+}
+
+/**
+ * Render-time video check (never persisted): true for explicit video MIME or
+ * video-ish URLs, and — when the MIME is missing/generic (pre-1.4.7 rows
+ * registered as application/octet-stream) — for opaque URLs with any sibling
+ * video MIME in the same post group. A concrete non-video MIME still wins.
+ */
+export function isVideoPost(
+  mime?: string | null,
+  url?: string | null,
+  siblingMimes: Array<string | null | undefined> = [],
+): boolean {
+  const m = (mime || '').toLowerCase().split(';')[0].trim()
+  if (m.startsWith('video/')) return true
+  if (isMediaVideo(m || url)) return true
+  if (m && m !== 'application/octet-stream' && m !== 'binary/octet-stream') return false
+  if (isMediaVideo(url)) return true
+  return siblingMimes.some((s) => (s || '').toLowerCase().startsWith('video/'))
 }
 
 /**

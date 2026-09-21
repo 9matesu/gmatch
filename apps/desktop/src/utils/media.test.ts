@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveMediaUrl, isMediaVideo, isVideoPageUrl, redgifsIdFromUrl, resolveVideoMime } from './media';
+import { resolveMediaUrl, isMediaVideo, isVideoPageUrl, isVideoPost, redgifsIdFromUrl, resolveVideoMime } from './media';
 
 describe('resolveMediaUrl', () => {
   it('keeps data:, blob:, http: and https: URLs untouched', () => {
@@ -101,6 +101,22 @@ describe('resolveVideoMime', () => {
   });
 });
 
+describe('isVideoPost', () => {
+  it('trusts explicit video mime and video urls', () => {
+    expect(isVideoPost('video/mp4', '/api/objects/abc')).toBe(true);
+    expect(isVideoPost(null, 'https://x.com/a.mp4')).toBe(true);
+  });
+
+  it('treats empty/generic mime as unknown and uses url + siblings', () => {
+    expect(isVideoPost('application/octet-stream', 'magnet:?xt=abc', ['video/mp4'])).toBe(true);
+    expect(isVideoPost('', 'urn:sha256:abc', [])).toBe(false);
+    expect(isVideoPost(null, 'blob:xyz', ['image/jpeg'])).toBe(false);
+  });
+
+  it('lets concrete non-video mime win over hints', () => {
+    expect(isVideoPost('image/jpeg', 'blob:xyz', ['video/mp4'])).toBe(false);
+  });
+});
 describe('isVideoPageUrl / redgifsIdFromUrl', () => {
   it('flags watch pages but not direct files', () => {
     expect(isVideoPageUrl('https://www.redgifs.com/watch/abc123')).toBe(true);

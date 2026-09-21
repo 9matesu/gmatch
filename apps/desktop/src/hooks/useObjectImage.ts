@@ -3,6 +3,20 @@
 import { useState, useEffect, useRef } from 'react'
 import { orbitFetch } from '../utils/api'
 import { getLocalObject, requestSwarmObject, PEER_ONLINE_EVENT } from '../utils/p2pSwarm'
+import { resolveVideoMime, sniffFileHead } from '../utils/media'
+
+/**
+ * Video detection for bytes in hand: trusts a concrete blob/stored MIME, but
+ * when both are empty or generic (pre-1.4.7 rows registered as
+ * application/octet-stream, typeless swarm blobs) sniffs the magic bytes so
+ * video isn't rendered as a broken image.
+ */
+async function isVideoBlob(blob: Blob, storedMime: string): Promise<boolean> {
+  const t = ((blob as Blob).type || storedMime || '').toLowerCase().split(';')[0].trim()
+  if (t.startsWith('video/')) return true
+  if (t && t !== 'application/octet-stream' && t !== 'binary/octet-stream') return false
+  return resolveVideoMime({ type: t, bytes: await sniffFileHead(blob) }) !== null
+}
 
 interface IdentityLike {
   orbitId: string
@@ -50,7 +64,14 @@ const cacheSource = new Map<string, string>()
 // is revoked ("Image unavailable" for photos, empty src -> "No preview" for
 // videos). Pin while mounted, unpin on unmount; eviction skips pinned keys.
 const pinned = new Set<string>()
-function pinKey(cardId: string, source: string): string {
+
+/** Test-only: clear the module-level media cache + pins so suites that share
+ * the module don't pollute each other with stale blob URLs. */
+export function __resetObjectImageCacheForTests(): void {
+  objectCache.clear()
+  cacheSource.clear()
+  pinned.clear()
+}function pinKey(cardId: string, source: string): string {
   // Normalize /api/objects/<id> and bare <id> to the same key so lookups,
   // saves, and pins always agree (split callers otherwise unpin/evict
   // entries each other still display).
@@ -202,7 +223,7 @@ export function useObjectImage(
           cardId: cleanId,
           url: freshUrl,
           failed: false,
-          isVideo: localBlob.type.startsWith('video/'),
+          isVideo: await isVideoBlob(localBlob, ''),
           isLink: false,
           linkUrl: null,
         }
@@ -249,7 +270,7 @@ export function useObjectImage(
                 cardId: cleanId,
                 url: freshUrl,
                 failed: false,
-                isVideo: mime.startsWith('video/'),
+                isVideo: await isVideoBlob(local, mime),
                 isLink: false,
                 linkUrl: null,
               }
@@ -286,7 +307,7 @@ export function useObjectImage(
                 cardId: cleanId,
                 url: freshUrl,
                 failed: false,
-                isVideo: (blob.type || mime).startsWith('video/'),
+                isVideo: await isVideoBlob(blob, mime),
                 isLink: false,
                 linkUrl: null,
               }
@@ -324,7 +345,7 @@ export function useObjectImage(
           cardId: cleanId,
           url: freshUrl,
           failed: false,
-          isVideo: contentType.startsWith('video/'),
+          isVideo: await isVideoBlob(blob, contentType),
           isLink: false,
           linkUrl: null,
         }

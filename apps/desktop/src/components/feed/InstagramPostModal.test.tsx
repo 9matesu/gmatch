@@ -7,6 +7,20 @@ import type { FeedPost } from './GMatchFeed';
 
 vi.mock('../../utils/sounds', () => ({ playPress: vi.fn(), playWin: vi.fn(), playMsgReceive: vi.fn() }));
 
+vi.mock('../../utils/api', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('../../utils/api')>();
+  const mp4 = new Uint8Array([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x6d, 0x70, 0x34, 0x32]);
+  return {
+    ...mod,
+    orbitFetch: vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'Content-Type': 'video/mp4' }),
+      blob: async () => new Blob([mp4], { type: 'video/mp4' }),
+    })),
+  };
+});
+
 beforeEachSetup();
 
 function beforeEachSetup() {
@@ -16,6 +30,10 @@ function beforeEachSetup() {
   window.HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined) as never;
   window.HTMLMediaElement.prototype.pause = vi.fn() as never;
   window.HTMLMediaElement.prototype.load = vi.fn() as never;
+  // jsdom has no createObjectURL: the signed-fetch leg needs it to mint URLs.
+  let seq = 0;
+  (URL as unknown as { createObjectURL: unknown }).createObjectURL = vi.fn(() => `blob:obj-${++seq}`);
+  (URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL = vi.fn();
 }
 
 const identity = { orbitId: 'me-1' } as never;
@@ -41,11 +59,19 @@ function videoPost(): FeedPost {
 
 describe('InstagramPostModal media', () => {
   it('plays extension-less object video from post.media[] instead of a broken image', async () => {
+    const { waitFor } = await import('@testing-library/react');
     await act(async () => {
       render(<InstagramPostModal post={videoPost()} isOpen onClose={() => {}} identity={identity} />);
     });
-    const video = document.body.querySelector('video');
-    expect(video).toBeInTheDocument();
+    // Signed fetch resolves async: the dual-leg ObjectImage fetches the
+    // object bytes (mocked mp4) and renders a real <video>, never a raw
+    // <video src="/api/objects/..."> without auth.
+    await waitFor(() => {
+      const video = document.body.querySelector('video');
+      expect(video).toBeInTheDocument();
+    });
+    const rawSrc = document.body.querySelector('video')?.getAttribute('src') || '';
+    expect(rawSrc.startsWith('/api/objects/')).toBe(false);
     // No image fallback rendered for the video item
     expect(document.body.querySelector('.cursor-zoom-in')).not.toBeInTheDocument();
   });

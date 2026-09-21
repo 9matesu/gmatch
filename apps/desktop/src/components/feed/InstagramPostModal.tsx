@@ -18,7 +18,7 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import type { FeedPost, PostComment } from './GMatchFeed';
 import { ObjectImage } from '../ObjectImage';
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
-import { isMediaVideo, resolveMediaUrl } from '../../utils/media';
+import { isMediaVideo, isVideoPost, resolveMediaUrl } from '../../utils/media';
 import { Linkify } from '../Linkify';
 
 export function InstagramPostModal({ post, isOpen, onClose, identity, profilePics = {}, isLiked = false, isSaved = false, likeCount = 0, comments = [], onToggleLike, onToggleSave, onAddComment, onToggleCommentLike, onOpenShare, onOptionsClick, onOpenLikers, onSelectUser, onAvatarClick, onOpenNetwork, toast, zIndexClass = 'z-[var(--z-modal)]' }: {
@@ -84,7 +84,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
   const activeMedia = mediaItems[activeMediaIndex] || mediaItems[0] || null;
 
   const isModalMediaVideo = (url?: string | null, mime?: string | null): boolean =>
-    Boolean(mime?.startsWith('video/')) || isMediaVideo(url);
+    isVideoPost(mime, url, mediaItems.map((m) => m.mime));
 
   const handleDoubleTap = () => {
     playWin();
@@ -176,13 +176,18 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                 </div>
               )
             ) : activeMedia && isModalMediaVideo(activeMedia.url, activeMedia.mime) ? (
-              <NativeVideoPlayer
+              <ObjectImage
                 key={activeMedia.url}
-                src={activeMedia.url}
+                contentUrl={activeMedia.url}
+                objectId={activeMedia.id || post.id}
+                identity={identity}
+                mimeType={activeMedia.mime || post.mime_type}
+                loading="eager"
                 className="w-full h-full max-h-[85vh] object-contain"
                 videoClassName="w-full h-full max-h-[85vh] object-contain"
                 autoPlay={true}
                 controls={true}
+                alwaysShowControls={true}
                 loop={true}
                 muted={true}
                 onDoubleTapLike={handleDoubleTap}

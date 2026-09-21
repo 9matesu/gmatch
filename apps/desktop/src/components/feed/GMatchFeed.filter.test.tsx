@@ -75,14 +75,14 @@ describe('GMatchFeed timeline filtering and resilience', () => {
     expect(screen.queryByText('Ghost empty post')).toBeNull();
   });
 
-  it('hides peer-to-peer object posts if the author is offline and no local copy exists', () => {
+  it('renders peer-to-peer object posts try-first even when the author is offline', () => {
     const posts: any[] = [
       {
         id: 'offline-p2p-post',
         author_id: 'offline-author',
         author_name: 'Offline User',
         created_at: new Date().toISOString(),
-        caption: 'Unavailable P2P post',
+        caption: 'Offline P2P post still attempted',
         url: '/api/objects/obj-123',
         like_count: 0,
         comment_count: 0,
@@ -110,7 +110,9 @@ describe('GMatchFeed timeline filtering and resilience', () => {
     );
 
     expect(screen.getByText('Available online P2P post')).toBeInTheDocument();
-    expect(screen.queryByText('Unavailable P2P post')).toBeNull();
+    // Try-first: the offline author's tile renders and attempts the fetch
+    // instead of being pre-filtered.
+    expect(screen.getByText('Offline P2P post still attempted')).toBeInTheDocument();
   });
 
   it('hides a post from the timeline when its image media fails to load', async () => {
@@ -146,6 +148,44 @@ describe('GMatchFeed timeline filtering and resilience', () => {
 
     await waitFor(() => {
       expect(screen.queryByText('Broken image post to hide')).toBeNull();
+    });
+  });
+
+  it('silently retries hidden posts when a peer comes online', async () => {
+    const posts: any[] = [
+      {
+        id: 'flaky-img-post',
+        author_id: 'online-author',
+        author_name: 'Online User',
+        created_at: new Date().toISOString(),
+        caption: 'Flaky post retried on peer online',
+        url: 'https://example.com/flaky.jpg',
+        like_count: 0,
+        comment_count: 0,
+      },
+    ];
+
+    const { container } = render(
+      <GMatchFeed
+        identity={mockIdentity}
+        posts={posts}
+        stories={[]}
+        users={mockUsers}
+        feedSort="latest"
+      />
+    );
+
+    const img = container.querySelector('img[src="https://example.com/flaky.jpg"]');
+    if (img) {
+      fireEvent.error(img);
+    }
+    await waitFor(() => {
+      expect(screen.queryByText('Flaky post retried on peer online')).toBeNull();
+    });
+
+    window.dispatchEvent(new Event('orbit-peer-online'));
+    await waitFor(() => {
+      expect(screen.getByText('Flaky post retried on peer online')).toBeInTheDocument();
     });
   });
 

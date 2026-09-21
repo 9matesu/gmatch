@@ -110,6 +110,18 @@ process.once('SIGTERM', () => { void persistAndExit(0) })
 process.once('SIGINT', () => { void persistAndExit(0) })
 
 const bucket = new LocalBlobStore(BLOB_STORE_DIR)
+// One-shot video MIME backfill (1.4.7): repairs pre-fix mislabeled rows
+// (octet-stream/image-jpeg video bytes, loopback content_urls). SystemMeta-
+// gated inside repairVideoMime — runs once per DB, best-effort per row,
+// never fails boot.
+dbReadyPromise.then(() => {
+  import('./migrate-video-mime').then(({ repairVideoMime }) =>
+    repairVideoMime(db, bucket).then(
+      (s) => { if (s.sniffed || s.loopbackRewritten) console.log(`[DB] video MIME repair: ${s.sniffed} re-sniffed, ${s.loopbackRewritten} loopback URLs rewritten`) },
+      (err) => console.warn('[DB] video MIME repair skipped:', (err as Error)?.message || err),
+    ),
+  ).catch((err) => console.warn('[DB] video MIME repair skipped:', (err as Error)?.message || err))
+})
 // ADMIN_PIN / ADMIN_PIN_HASH must reach routes via c.env — pre-B.4 neither was
 // wired here, so verify-pin silently ran on the hardcoded fallback forever.
 const nodeKey = resolveNodeKey(SNAPSHOT_PATH)

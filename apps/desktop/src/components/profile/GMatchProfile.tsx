@@ -24,7 +24,7 @@ import { ProfileEditorModal } from './ProfileEditorModal';
 import { ProfilePicModal } from './ProfilePicModal';
 import { useProfilePostLightbox } from '../feed/useProfilePostLightbox';
 import { ObjectImage } from '../ObjectImage';
-import { isMediaVideo, resolveMediaUrl } from '../../utils/media';
+import { isMediaVideo, isVideoPost, resolveMediaUrl } from '../../utils/media';
 import { saveUserProfile } from '../../utils/profile';
 import { profileShareUrl } from '../../utils/api';
 
@@ -387,7 +387,7 @@ export function GMatchProfile({
                   autoPlay={false}
                   playsInline
                 />
-                {(post.mime_type?.startsWith('video/') || isMediaVideo(post.url)) && (
+                {(isVideoPost(post.mime_type, post.url, post.media?.map((mm) => mm.mime_type) ?? [])) && (
                   <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
@@ -435,7 +435,7 @@ export function GMatchProfile({
                   autoPlay={false}
                   playsInline
                 />
-                {(post.mime_type?.startsWith('video/') || isMediaVideo(post.url)) && (
+                {(isVideoPost(post.mime_type, post.url, post.media?.map((mm) => mm.mime_type) ?? [])) && (
                   <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
@@ -476,7 +476,7 @@ export function GMatchProfile({
                   autoPlay={false}
                   playsInline
                 />
-                {(post.mime_type?.startsWith('video/') || isMediaVideo(post.url)) && (
+                {(isVideoPost(post.mime_type, post.url, post.media?.map((mm) => mm.mime_type) ?? [])) && (
                   <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
@@ -514,7 +514,7 @@ export function GMatchProfile({
                   autoPlay={false}
                   playsInline
                 />
-                {(card.mime_type?.startsWith('video/') || isMediaVideo(card.content_url || (card as any).url)) && (
+                {(isVideoPost(card.mime_type, card.content_url || (card as any).url)) && (
                   <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>

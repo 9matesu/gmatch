@@ -37,8 +37,13 @@ import { Avatar } from '../Avatar';
 import CachedImg from '../../ui/CachedImg';
 import { LazyVideo } from '../LazyVideo';
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
-import { isMediaVideo, resolveMediaUrl } from '../../utils/media';
-import { isUserOnline } from '../../utils/presence';
+import { isMediaVideo, isVideoPost, resolveMediaUrl } from '../../utils/media';
+
+/** Sibling item MIME types for render-time video detection (see isVideoPost). */
+function siblingMimesFor(post: FeedPost): string[] {
+  return Array.isArray(post.media) ? post.media.map((m) => m.mime_type) : [];
+}
+import { PEER_ONLINE_EVENT } from '../../utils/p2pSwarm';
 import { orbitFetch, postShareUrl } from '../../utils/api';
 import { GAME_AD_TEMPLATES } from '../../utils/gameAds';
 import { ExploreSearchModal } from './ExploreSearchModal';
@@ -374,7 +379,9 @@ export function GMatchFeed({
     }
   }, [posts]);
 
-  // Track posts whose media failed to load or are unavailable
+  // Track posts whose media failed to load or are unavailable.
+  // Failures are retryable, never permanent: a peer coming online clears the
+  // set so tiles silently re-attempt instead of staying hidden until reload.
   const [failedPostIds, setFailedPostIds] = useState<Set<string>>(() => new Set());
   const markPostUnavailable = useCallback((id: string) => {
     setFailedPostIds((prev) => {
@@ -384,18 +391,11 @@ export function GMatchFeed({
       return next;
     });
   }, []);
-
-  const onlineUserIds = useMemo(() => {
-    const s = new Set<string>();
-    for (const u of users || []) {
-      if (isUserOnline(u)) {
-        if (u.id) s.add(u.id);
-        if (u.orbitId) s.add(u.orbitId);
-      }
-    }
-    if (identity?.orbitId) s.add(identity.orbitId);
-    return s;
-  }, [users, identity]);
+  useEffect(() => {
+    const retryFailed = () => setFailedPostIds((prev) => (prev.size > 0 ? new Set() : prev));
+    window.addEventListener(PEER_ONLINE_EVENT, retryFailed);
+    return () => window.removeEventListener(PEER_ONLINE_EVENT, retryFailed);
+  }, []);
 
   // Algorithmic Sorting. Latest is strictly chronological; Trending is a
   // deterministic engagement + tag-affinity score with recency decay, matching
@@ -405,12 +405,9 @@ export function GMatchFeed({
       if (p.is_archived) return false;
       if (failedPostIds.has(p.id)) return false;
       if (!p.is_sponsored && !p.url && (!p.media || p.media.length === 0)) return false;
-      const isObj = Boolean(p.url && (p.url.startsWith('p2p-') || p.url.includes('/api/objects/')));
-      if (isObj && p.author_id && !onlineUserIds.has(p.author_id) && p.author_id !== identity?.orbitId) {
-        if (!p.localPreviewUrl && !p.url?.startsWith('data:') && !p.url?.startsWith('blob:')) {
-          return false;
-        }
-      }
+      // Try-first: object posts render even when the author looks offline —
+      // the tile attempts the swarm fetch and only hides on real failure
+      // (markPostUnavailable), which auto-retries when peers come online.
       return true;
     });
 
@@ -443,7 +440,7 @@ export function GMatchFeed({
       if (scoreA !== scoreB) return scoreB - scoreA;
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
-  }, [posts, likeCounts, commentsMap, tagAffinities, now, feedSort, failedPostIds, onlineUserIds, identity?.orbitId]);
+  }, [posts, likeCounts, commentsMap, tagAffinities, now, feedSort, failedPostIds]);
 
   const followSuggestions = useMemo(
     () => displayPosts.length === 0
@@ -685,7 +682,7 @@ export function GMatchFeed({
             const postComments = commentsMap[post.id] || [];
             const authorHasStory = storyOwners.has(post.author_id);
             const isObjectMedia = post.url.includes('/api/objects/') || !post.url || post.url.startsWith('magnet:') || post.url.startsWith('urn:sha256:') || post.url.startsWith('p2p-');
-           const isVideo = isMediaVideo(post.mime_type || post.url);
+            const isVideo = isVideoPost(post.mime_type, post.url, siblingMimesFor(post));
            const isNewPost = animatedPostIds.has(post.id);
            const multiMedia = Array.isArray(post.media) && post.media.length > 1 ? post.media : null;
            const currentIdx = multiMedia ? Math.min(Math.max(0, mediaIdx[post.id] || 0), multiMedia.length - 1) : 0;
@@ -807,7 +804,7 @@ export function GMatchFeed({
                   const activeItem = multiMedia ? multiMedia[currentIdx] : null;
                   const activeUrl = activeItem ? activeItem.url : post.url;
                   const activeMime = activeItem ? activeItem.mime_type : post.mime_type;
-                  const isCurrentVideo = isMediaVideo(activeMime || activeUrl);
+                  const isCurrentVideo = isVideoPost(activeMime, activeUrl, siblingMimesFor(post));
 
                   return (
                     <div
@@ -828,7 +825,7 @@ export function GMatchFeed({
                         const url = item.url;
                         const mime = item.mime_type;
                         const isObj = url.includes('/api/objects/') || !url || url.startsWith('magnet:') || url.startsWith('urn:sha256:') || url.startsWith('p2p-');
-                        const isVid = isMediaVideo(mime || url);
+                        const isVid = isVideoPost(mime, url, siblingMimesFor(post));
                         return (
                           <>
                             {isObj ? (

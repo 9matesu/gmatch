@@ -19,7 +19,7 @@ import {
 import type { OrbitIdentity } from '@orbit/crypto';
 import { orbitFetch } from '../../utils/api';
 import { mediaUrlToCachedFile } from '../../utils/cacheMedia';
-import { isMediaVideo, isTwitterUrl, isVideoPageUrl, resolveTwitterMedia, resolveVideoMime, sniffFileHead } from '../../utils/media';
+import { isMediaVideo, isTwitterUrl, isVideoPageUrl, isVideoPost, resolveTwitterMedia, resolveVideoMime, sniffFileHead } from '../../utils/media';
 import { forgeMediaLocally } from '../../services/mediaForge';
 import { devFetchable } from '../../services/imageCache';
 
@@ -143,6 +143,13 @@ export function CreatePostModal({
   };
 
   const MAX_MEDIA = 10;
+
+/** Preview-time video check: carried kind/mime first, recovered file type, then URL. */
+function itemLooksVideo(m: PostMediaItem): boolean {
+  if (m.kind === 'video') return true;
+  if (m.kind === 'image') return isMediaVideo(m.mimeType || m.file?.type || m.previewUrl);
+  return isVideoPost(m.mimeType || m.file?.type, m.previewUrl);
+}
 
 /** Filename extension matching a MIME type (cosmetic: names never drive type detection). */
 function extForMime(mime: string): string {
@@ -596,10 +603,10 @@ function extForMime(mime: string): string {
                   </div>
                 ) : (
                   <>
-                    {isMediaVideo(currentMedia.file?.type || currentMedia.previewUrl) ? (
+                    {itemLooksVideo(currentMedia) ? (
                       <video src={devFetchable(currentMedia.previewUrl) || currentMedia.previewUrl} muted playsInline className={`w-full object-cover ${aspectRatio === 'square' ? 'aspect-square' : aspectRatio === 'portrait' ? 'aspect-[4/5]' : 'aspect-[16/9]'}`} />
                     ) : null}
-                    {!isMediaVideo(currentMedia.file?.type || currentMedia.previewUrl) && (
+                    {!itemLooksVideo(currentMedia) && (
                     <img
                       src={devFetchable(currentMedia.previewUrl) || currentMedia.previewUrl}
                       alt=""
@@ -674,7 +681,7 @@ function extForMime(mime: string): string {
                     >
                       {m.isVideoPage ? (
                         <span className="w-full h-full flex items-center justify-center bg-glass-w12 text-retro-fg text-xs font-black">▶</span>
-                      ) : isMediaVideo(m.file?.type || m.previewUrl) ? (
+                      ) : itemLooksVideo(m) ? (
                         <video src={m.previewUrl} muted className="w-full h-full object-cover" />
                       ) : (
                         <img src={m.previewUrl} alt="" className="w-full h-full object-cover" />
