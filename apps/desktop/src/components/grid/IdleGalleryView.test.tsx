@@ -199,6 +199,32 @@ describe('IdleGalleryView', () => {
     expect(onCreateCard).toHaveBeenCalledTimes(1)
   })
 
+  it('carries video kind + mime when reposting a video keepsake', async () => {
+    // jsdom has no media playback: stub play() so the viewer video mounts.
+    const playStub = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(window.HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      writable: true,
+      value: playStub,
+    });
+    const images = makeGalleryImages(5) // img-4 is video
+    useGame.setState({ gallery: images })
+
+    const onRepost = vi.fn()
+    render(<IdleGalleryView onRepostImage={onRepost} />)
+
+    // Open the viewer on the video tile (img-4 renders 2nd in desc order) and hit Repost there.
+    const tileBtns = screen.getAllByRole('button', { name: /^View /i })
+    await userEvent.click(tileBtns[1])
+    const modalRepostBtn = screen.getByRole('button', { name: /^Repost$/i })
+    await userEvent.click(modalRepostBtn)
+
+    expect(onRepost).toHaveBeenCalledTimes(1)
+    expect(onRepost).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'video', mimeType: 'video/mp4' })
+    )
+  })
+
   it('opens slideshow from header and batch action bar', async () => {
     const images = makeGalleryImages(5)
     useGame.setState({ gallery: images })

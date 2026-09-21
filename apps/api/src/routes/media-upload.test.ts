@@ -40,6 +40,18 @@ describe('Media Magic Bytes & Video Uploads', () => {
     expect(detectMediaMime(oggBytes)).toBe('video/ogg')
   })
 
+  it('detects free-box MP4 magic bytes as video/mp4 (not image/jpeg)', () => {
+    // 00 00 00 08 'free' ... — accepted by isValidMediaMagicBytes, so the
+    // MIME mapper must agree it is video.
+    const freeBytes = new Uint8Array([
+      0x00, 0x00, 0x00, 0x08,
+      0x66, 0x72, 0x65, 0x65,
+      0x00, 0x00, 0x00, 0x00,
+    ])
+    expect(isValidMediaMagicBytes(freeBytes)).toBe(true)
+    expect(detectMediaMime(freeBytes)).toBe('video/mp4')
+  })
+
   it('rejects random non-media bytes', () => {
     const junkBytes = new Uint8Array([0x00, 0x01, 0x02, 0x03])
     expect(isValidMediaMagicBytes(junkBytes)).toBe(false)

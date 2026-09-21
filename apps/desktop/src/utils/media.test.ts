@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveMediaUrl, isMediaVideo, isVideoPageUrl, redgifsIdFromUrl } from './media';
+import { resolveMediaUrl, isMediaVideo, isVideoPageUrl, redgifsIdFromUrl, resolveVideoMime } from './media';
 
 describe('resolveMediaUrl', () => {
   it('keeps data:, blob:, http: and https: URLs untouched', () => {
@@ -69,6 +69,35 @@ describe('isMediaVideo', () => {
     expect(isMediaVideo('https://redgifs.com/ifr/abc123')).toBe(true);
     // Direct CDN bytes are files, still video via extension
     expect(isMediaVideo('https://media.redgifs.com/abc123.mp4')).toBe(true);
+  });
+});
+
+describe('resolveVideoMime', () => {
+  it('trusts an explicit video type first', () => {
+    expect(resolveVideoMime({ type: 'video/mp4', name: 'clip.jpg' })).toBe('video/mp4');
+    expect(resolveVideoMime({ type: 'video/webm;codecs=vp9', name: 'clip' })).toBe('video/webm');
+  });
+
+  it('falls back to filename extension when type is empty (Windows/Electron MP4s)', () => {
+    expect(resolveVideoMime({ type: '', name: 'clip.mp4' })).toBe('video/mp4');
+    expect(resolveVideoMime({ type: null, name: 'clip.MOV' })).toBe('video/quicktime');
+    expect(resolveVideoMime({ type: 'application/octet-stream', name: 'clip.webm' })).toBe('video/webm');
+    expect(resolveVideoMime({ type: '', name: 'clip.mkv' })).toBe('video/x-matroska');
+  });
+
+  it('sniffs magic bytes for extension-less blobs', () => {
+    const ftyp = new Uint8Array([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x6d, 0x70, 0x34, 0x32]);
+    expect(resolveVideoMime({ type: '', name: 'blob', bytes: ftyp })).toBe('video/mp4');
+    const free = new Uint8Array([0, 0, 0, 8, 0x66, 0x72, 0x65, 0x65, 0, 0, 0, 0]);
+    expect(resolveVideoMime({ type: '', name: 'blob', bytes: free })).toBe('video/mp4');
+    const webm = new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0, 0, 0, 0]);
+    expect(resolveVideoMime({ type: '', name: 'blob', bytes: webm })).toBe('video/webm');
+  });
+
+  it('returns null when nothing indicates video', () => {
+    expect(resolveVideoMime({ type: '', name: 'photo.jpg' })).toBeNull();
+    expect(resolveVideoMime({ type: 'image/jpeg', name: 'photo.mp4' })).toBeNull();
+    expect(resolveVideoMime({})).toBeNull();
   });
 });
 

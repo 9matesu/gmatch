@@ -19,7 +19,7 @@ import {
 import type { OrbitIdentity } from '@orbit/crypto';
 import { orbitFetch } from '../../utils/api';
 import { mediaUrlToCachedFile } from '../../utils/cacheMedia';
-import { isMediaVideo, isTwitterUrl, isVideoPageUrl, resolveTwitterMedia } from '../../utils/media';
+import { isMediaVideo, isTwitterUrl, isVideoPageUrl, resolveTwitterMedia, resolveVideoMime, sniffFileHead } from '../../utils/media';
 import { forgeMediaLocally } from '../../services/mediaForge';
 import { devFetchable } from '../../services/imageCache';
 
@@ -32,6 +32,11 @@ interface PostMediaItem {
   originalUrl?: string;
   /** Watch/embed page (resolves server-side at share time). */
   isVideoPage?: boolean;
+  /** Known media kind, carried from gallery/vault reposts so video detection
+   * never depends on extension-sniffing opaque local URLs. */
+  kind?: 'video' | 'image';
+  /** Known MIME type, carried alongside kind when the source knows it. */
+  mimeType?: string;
   /** Paste-time resolution failed (preview honest, share may still resolve). */
   resolveNote?: string;
 }
@@ -139,6 +144,20 @@ export function CreatePostModal({
 
   const MAX_MEDIA = 10;
 
+/** Filename extension matching a MIME type (cosmetic: names never drive type detection). */
+function extForMime(mime: string): string {
+  const t = (mime || '').toLowerCase().split(';')[0].trim();
+  if (t === 'video/mp4' || t === 'video/m4v') return 'mp4';
+  if (t === 'video/webm') return 'webm';
+  if (t === 'video/quicktime') return 'mov';
+  if (t === 'video/x-matroska') return 'mkv';
+  if (t === 'video/ogg') return 'ogv';
+  if (t === 'image/png') return 'png';
+  if (t === 'image/gif') return 'gif';
+  if (t === 'image/webp') return 'webp';
+  return 'jpg';
+}
+
   const handleFilesSelected = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const room = MAX_MEDIA - mediaList.length;
@@ -156,6 +175,18 @@ export function CreatePostModal({
         if (!res) continue;
         if (res.file) file = res.file;
         previewUrl = res.dataUrl;
+      }
+      // Windows/Electron often reports MP4s with an empty File.type — recover
+      // the video MIME now (extension, then magic bytes) so the forge,
+      // register, and render paths all treat it as video.
+      if (!file.type || file.type === 'application/octet-stream') {
+        const head = await sniffFileHead(file).catch(() => null);
+        const recovered = resolveVideoMime({ type: file.type, name: file.name, bytes: head });
+        if (recovered) {
+          file = new File([file], file.name, { type: recovered });
+          try { URL.revokeObjectURL(previewUrl); } catch { /* ignore */ }
+          previewUrl = URL.createObjectURL(file);
+        }
       }
       const newItem: PostMediaItem = { id: 'file_' + Date.now() + '_' + i, file, previewUrl };
       setMediaList((prev) => [...prev, newItem]);
@@ -248,6 +279,7 @@ export function CreatePostModal({
       const ids: string[] = [];
       let primaryId = '';
       let primaryLocalUrl: string | null = null;
+      let primaryMime: string | null = null;
       for (let i = 0; i < mediaList.length; i++) {
         const item = mediaList[i];
         const formData = new FormData();
@@ -255,7 +287,7 @@ export function CreatePostModal({
         if (!uploadFile && (item.previewUrl.startsWith('data:') || item.previewUrl.startsWith('blob:'))) {
           try {
             const blob = await fetch(item.previewUrl).then((r) => r.blob());
-            uploadFile = new File([blob], `media_${i}.jpg`, { type: blob.type || 'image/jpeg' });
+            uploadFile = new File([blob], `media_${i}.${extForMime(blob.type)}`, { type: blob.type || 'image/jpeg' });
           } catch {
             /* fall back to url */
           }
@@ -302,7 +334,7 @@ export function CreatePostModal({
               }
             }
             if (blob && blob.size > 0 && !blob.type.includes('json')) {
-              uploadFile = new File([blob], `card_${i}.jpg`, { type: blob.type || 'image/jpeg' });
+              uploadFile = new File([blob], `media_${i}.${extForMime(blob.type)}`, { type: blob.type || 'image/jpeg' });
             }
           } catch {
             /* fall back to url */
@@ -335,14 +367,23 @@ export function CreatePostModal({
           if (!primaryId) primaryId = forged.id;
           // Instant tile: render the session blob URL with zero fetch.
           if (!primaryLocalUrl && forged.localUrl) primaryLocalUrl = forged.localUrl;
+          // Optimistic mime so the feed renders <video> immediately (the
+          // forge already recovered empty File.types via resolveVideoMime).
+          if (!primaryMime && forged.mimeType) primaryMime = forged.mimeType;
         } else {
-          if (/^(gmcache|idle-file|vault):/i.test(item.previewUrl) || item.previewUrl.includes('/api/objects/')) {
-            throw new Error('Failed to resolve image bytes for P2P distribution');
+          // Local-only URLs (vault/gmcache/loopback) can never render off
+          // this machine: they must resolve to bytes + forge above. Posting
+          // the URL string would store an unrenderable row for everyone.
+          if (/^(gmcache|idle-file|vault):/i.test(item.previewUrl) || item.previewUrl.includes('/api/objects/') || /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//i.test(item.previewUrl)) {
+            throw new Error('Could not read those local bytes for sharing — try again or pick the file directly');
           }
           formData.append('url', item.previewUrl);
           formData.append('is_public', '1');
           formData.append('post_group', postGroup);
-          const isVid = (item as any).isVideo || Boolean(item.file && item.file.type.startsWith('video/')) || /\.(mp4|webm|mov)(\?|$)/i.test(item.previewUrl);
+          const isVid = (item as any).isVideo || item.kind === 'video'
+            || Boolean(item.file && item.file.type.startsWith('video/'))
+            || /\.(mp4|m4v|webm|mov|mkv|ogv|ogg|gifv)(\?|$)/i.test(item.previewUrl);
+          if (!primaryMime) primaryMime = item.mimeType || (isVid ? 'video/mp4' : null);
           if (isVid) {
             formData.append('mime_type', 'video/mp4');
           }
@@ -381,6 +422,7 @@ export function CreatePostModal({
         url: primaryId ? `/api/objects/${primaryId}` : mediaList[0].previewUrl,
         mediaUrls: ids.map((id) => `/api/objects/${id}`),
         localPreviewUrl: primaryLocalUrl,
+        mime_type: primaryMime || undefined,
         caption: caption.trim(),
         location: location.trim(),
         tags: tags.split(/[\s,#]+/).map((t) => t.trim()).filter(Boolean),

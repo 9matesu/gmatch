@@ -239,17 +239,19 @@ export default function Home() {
   });
   const [showCreatePostModal, setShowCreatePostModal] = useState(false);
   const [createPostInitialData, setCreatePostInitialData] = useState<{
-    mediaList?: Array<{ id: string; previewUrl: string; isExternalUrl?: boolean; file?: File }>;
+    mediaList?: Array<{ id: string; previewUrl: string; isExternalUrl?: boolean; file?: File; kind?: 'video' | 'image'; mimeType?: string }>;
     tags?: string;
     caption?: string;
   } | null>(null);
 
-  const openCreatePostWithMedia = useCallback((media: { url: string; tags?: string[]; name?: string }) => {
+  const openCreatePostWithMedia = useCallback((media: { url: string; tags?: string[]; name?: string; kind?: 'video' | 'image'; mimeType?: string }) => {
     setCreatePostInitialData({
       mediaList: [{
         id: 'repost_' + Math.random().toString(36).substring(2, 9),
         previewUrl: media.url,
         isExternalUrl: /^https?:\/\//i.test(media.url),
+        kind: media.kind,
+        mimeType: media.mimeType,
       }],
       tags: Array.isArray(media.tags) ? media.tags.slice(0, 5).join(' ') : '',
       caption: media.name ? `Repost: ${media.name}` : '',

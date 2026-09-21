@@ -31,8 +31,8 @@ export function GamesHub({
   renderDuelContent: () => React.ReactNode;
   /** Open the custom image-sources manager (idle clicker). */
   onOpenSources?: () => void;
-  onRepostImage?: (media: { url: string; tags: string[]; name?: string }) => void;
-  onAddToStory?: (media: { url: string; tags: string[]; name?: string }) => void;
+  onRepostImage?: (media: { url: string; tags: string[]; name?: string; kind?: 'video' | 'image'; mimeType?: string }) => void;
+  onAddToStory?: (media: { url: string; tags: string[]; name?: string; kind?: 'video' | 'image'; mimeType?: string }) => void;
   onCreateCard?: (media: { url: string; tags: string[]; name: string }) => void;
   onSetWallpaper?: (url: string) => void;
 }) {

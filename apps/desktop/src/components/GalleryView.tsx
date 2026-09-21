@@ -52,8 +52,8 @@ export interface GalleryViewProps {
   /** Right-click on a collection card → shared context menu. */
   onItemContextMenu?: (e: React.MouseEvent, item: OrbitObject) => void;
   onSetWallpaper?: (url: string) => void;
-  onRepostGalleryImage?: (media: { url: string; tags: string[]; name?: string }) => void;
-  onAddGalleryImageToStory?: (media: { url: string; tags: string[]; name?: string }) => void;
+  onRepostGalleryImage?: (media: { url: string; tags: string[]; name?: string; kind?: 'video' | 'image'; mimeType?: string }) => void;
+  onAddGalleryImageToStory?: (media: { url: string; tags: string[]; name?: string; kind?: 'video' | 'image'; mimeType?: string }) => void;
 }
 
 export function GalleryView({

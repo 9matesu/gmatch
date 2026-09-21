@@ -107,8 +107,8 @@ export function resolveGalleryTileUrl(img: GalleryImage, vaultUrl?: string): str
 export interface IdleGalleryViewProps {
   onCreateCard?: (media: { url: string; tags: string[]; name: string }) => void
   onSetWallpaper?: (url: string, mime?: string) => void
-  onRepostImage?: (media: { url: string; tags: string[]; name?: string }) => void
-  onAddToStory?: (media: { url: string; tags: string[]; name?: string }) => void
+  onRepostImage?: (media: { url: string; tags: string[]; name?: string; kind?: 'video' | 'image'; mimeType?: string }) => void
+  onAddToStory?: (media: { url: string; tags: string[]; name?: string; kind?: 'video' | 'image'; mimeType?: string }) => void
 }
 
 /**
@@ -609,6 +609,8 @@ export default function IdleGalleryView({
                                 url: vaultUrls[img.url] || img.url,
                                 tags: img.tags,
                                 name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
+                                kind: img.kind,
+                                mimeType: img.kind === 'video' ? 'video/mp4' : undefined,
                               })
                             }}
                           >
@@ -629,6 +631,8 @@ export default function IdleGalleryView({
                                 url: vaultUrls[img.url] || img.url,
                                 tags: img.tags,
                                 name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
+                                kind: img.kind,
+                                mimeType: img.kind === 'video' ? 'video/mp4' : undefined,
                               })
                             }}
                           >
@@ -842,6 +846,8 @@ export default function IdleGalleryView({
                       url: viewerVaultUrl || viewer.url,
                       tags: viewer.tags,
                       name: viewer.tags.slice(0, 3).join(' ') || 'Keepsake',
+                      kind: viewer.kind,
+                      mimeType: viewer.kind === 'video' ? 'video/mp4' : undefined,
                     })
                   }
                   className="glass-action px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer"
@@ -859,6 +865,8 @@ export default function IdleGalleryView({
                       url: viewerVaultUrl || viewer.url,
                       tags: viewer.tags,
                       name: viewer.tags.slice(0, 3).join(' ') || 'Keepsake',
+                      kind: viewer.kind,
+                      mimeType: viewer.kind === 'video' ? 'video/mp4' : undefined,
                     })
                   }
                   className="glass-action px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer"

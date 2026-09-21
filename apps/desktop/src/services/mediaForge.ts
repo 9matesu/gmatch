@@ -1,6 +1,7 @@
 import { orbitFetch, type OrbitIdentityLike } from '../utils/api'
 import { buildMagnetUri } from '../utils/magnet'
 import { registerLocalObject } from '../utils/p2pSwarm'
+import { resolveVideoMime, sniffFileHead } from '../utils/media'
 
 export interface ForgedMedia {
   id: string
@@ -44,6 +45,19 @@ export async function forgeMediaLocally(
   const objectId = crypto.randomUUID()
   const magnetUri = buildMagnetUri(contentHash.slice(0, 40), options.caption || file.name)
 
+  // Recover a lost video MIME (empty File.type on Windows/Electron MP4s):
+  // without this the row registers as application/octet-stream and every
+  // render gate treats video bytes as an image.
+  let mimeType = file.type || 'application/octet-stream'
+  if (!file.type || file.type === 'application/octet-stream') {
+    const recovered = resolveVideoMime({
+      type: file.type,
+      name: file.name,
+      bytes: await sniffFileHead(file).catch(() => null),
+    })
+    if (recovered) mimeType = recovered
+  }
+
   // 1. Seed into the swarm store immediately (both by objectId and contentHash).
   // registerLocalObject persists to IndexedDB, so the bytes stay on this
   // machine's disk (packaged app) and this client keeps retransmitting them
@@ -71,7 +85,7 @@ export async function forgeMediaLocally(
     id: objectId,
     content_hash: contentHash,
     size_bytes: file.size,
-    mime_type: file.type || 'application/octet-stream',
+    mime_type: mimeType,
     magnet_uri: magnetUri,
     caption: options.caption || null,
     post_caption: options.postCaption || options.caption || null,
@@ -106,7 +120,7 @@ export async function forgeMediaLocally(
       void gossipOwnPost(identity, {
         id: objectId,
         contentHash,
-        mimeType: file.type || 'application/octet-stream',
+        mimeType,
         sizeBytes: file.size,
         magnetUri,
         caption: options.postCaption || options.caption,
@@ -123,7 +137,7 @@ export async function forgeMediaLocally(
   return {
     id: objectId,
     contentHash,
-    mimeType: file.type || 'application/octet-stream',
+    mimeType,
     sizeBytes: file.size,
     localUrl,
     magnetUri,

@@ -47,8 +47,8 @@ export default function GridWorkspace({
   idleFullscreen?: boolean
   onToggleFullscreen?: () => void
   onOpenSources?: () => void
-  onRepostImage?: (media: { url: string; tags: string[]; name?: string }) => void
-  onAddToStory?: (media: { url: string; tags: string[]; name?: string }) => void
+  onRepostImage?: (media: { url: string; tags: string[]; name?: string; kind?: 'video' | 'image'; mimeType?: string }) => void
+  onAddToStory?: (media: { url: string; tags: string[]; name?: string; kind?: 'video' | 'image'; mimeType?: string }) => void
   onCreateCard?: (media: { url: string; tags: string[]; name: string }) => void
   onSetWallpaper?: (url: string) => void
 }) {

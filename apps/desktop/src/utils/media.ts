@@ -110,6 +110,61 @@ export function redgifsIdFromUrl(url?: string | null): string | null {
 }
 
 /**
+ * Recovers a video MIME type when `File.type` is empty or unhelpful (MP4s on
+ * Windows/Electron routinely report `''`). Trusts an explicit video type
+ * first, then the filename extension, then caller-supplied magic bytes.
+ * Returns null when nothing indicates video — callers keep prior behavior.
+ */
+const VIDEO_EXT_MIME: Record<string, string> = {
+  mp4: 'video/mp4',
+  m4v: 'video/mp4',
+  webm: 'video/webm',
+  mov: 'video/quicktime',
+  mkv: 'video/x-matroska',
+  ogv: 'video/ogg',
+  ogg: 'video/ogg',
+}
+
+export function resolveVideoMime(opts: {
+  type?: string | null
+  name?: string | null
+  bytes?: Uint8Array | ArrayBuffer | null
+}): string | null {
+  const t = (opts.type || '').toLowerCase().split(';')[0].trim()
+  if (t.startsWith('video/')) return t
+  // A concrete non-video type (e.g. image/jpeg) wins over extension guesses;
+  // only empty/generic types fall through to extension + magic bytes.
+  if (t && t !== 'application/octet-stream' && t !== 'binary/octet-stream') return null
+  const bareName = (opts.name || '').split('?')[0].split('#')[0]
+  const ext = bareName.includes('.') ? bareName.split('.').pop()!.toLowerCase() : ''
+  if (ext && VIDEO_EXT_MIME[ext]) return VIDEO_EXT_MIME[ext]
+  const raw = opts.bytes instanceof ArrayBuffer ? new Uint8Array(opts.bytes) : opts.bytes
+  if (raw && raw.length >= 8) {
+    const tag = String.fromCharCode(raw[4], raw[5], raw[6], raw[7])
+    if (tag === 'ftyp' || tag === 'moov' || tag === 'mdat' || tag === 'wide' || tag === 'free') {
+      if (tag === 'ftyp' && raw.length >= 12) {
+        const sub = String.fromCharCode(raw[8], raw[9], raw[10], raw[11]).toLowerCase()
+        if (sub.includes('qt')) return 'video/quicktime'
+      }
+      return 'video/mp4'
+    }
+    if (raw.length >= 4 && raw[0] === 0x1a && raw[1] === 0x45 && raw[2] === 0xdf && raw[3] === 0xa3) return 'video/webm'
+    if (raw.length >= 4 && raw[0] === 0x4f && raw[1] === 0x67 && raw[2] === 0x67 && raw[3] === 0x53) return 'video/ogg'
+  }
+  return null
+}
+
+/** Reads the first bytes of a File/Blob for magic-byte MIME sniffing. */
+export async function sniffFileHead(file: Blob, n = 16): Promise<Uint8Array | null> {
+  try {
+    const buf = await file.slice(0, n).arrayBuffer()
+    return new Uint8Array(buf)
+  } catch {
+    return null
+  }
+}
+
+/**
  * Checks if a string is a Twitter/X status link.
  */
 export function isTwitterUrl(url: string): boolean {

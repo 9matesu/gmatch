@@ -11,6 +11,7 @@
  */
 import { devFetchable } from '../services/imageCache'
 import { vaultHttpUrl, vaultGet } from '../services/vault'
+import { resolveVideoMime, sniffFileHead } from './media'
 
 interface CacheBridge { cacheImage?: (url: string) => Promise<{ local?: string } | null> }
 const bridge = (): CacheBridge | null =>
@@ -49,12 +50,17 @@ export async function mediaUrlToCachedFile(url: string): Promise<File> {
     const blob = await res.blob()
     let mime = blob.type || ''
     if (!mime || mime === 'application/octet-stream') {
-      const extMatch = source.match(/\.(jpe?g|png|gif|webp|avif|bmp|mp4|webm)(\?|#|$)/i)
+      // Extension sniff covers the common cases; magic bytes catch
+      // extension-less vault keys (e.g. <hash>.img holding MP4 bytes) so
+      // video is never mislabeled image/jpeg.
+      const extMatch = source.match(/\.(jpe?g|png|gif|webp|avif|bmp|mp4|m4v|webm|mov|mkv|ogv|ogg)(\?|#|$)/i)
       if (extMatch) {
         const ext = extMatch[1].toLowerCase()
-        mime = ext === 'mp4' || ext === 'webm' ? `video/${ext}` : `image/${ext === 'jpg' ? 'jpeg' : ext}`
+        mime = resolveVideoMime({ type: mime, name: `x.${ext}` })
+          || (ext === 'jpg' ? 'image/jpeg' : ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`)
       } else {
-        mime = 'image/jpeg'
+        mime = resolveVideoMime({ type: mime, name: source, bytes: await sniffFileHead(blob).catch(() => null) })
+          || 'image/jpeg'
       }
     }
     if (blob.size === 0 || (!mime.startsWith('image/') && !mime.startsWith('video/'))) {

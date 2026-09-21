@@ -66,7 +66,7 @@ export function detectMediaMime(bytes: Uint8Array, fallbackHint?: string | null)
       if (sub.includes('qt')) return 'video/quicktime'
       return 'video/mp4'
     }
-    if (tag === 'moov' || tag === 'mdat' || tag === 'wide') return 'video/mp4'
+    if (tag === 'moov' || tag === 'mdat' || tag === 'wide' || tag === 'free') return 'video/mp4'
   }
   if (bytes.length >= 2 && bytes[0] === 0x42 && bytes[1] === 0x4D) return 'image/bmp'
   if (fallbackHint) {
@@ -184,6 +184,11 @@ objects.post('/', orbitAuth, async (c) => {
     const formData = await c.req.formData()
     const imageFile = formData.get('image') as File | null
     const linkUrl = (formData.get('url') as string | null)?.trim() || null
+    // Client-declared MIME (the share flow sends video/mp4 for video items).
+    // Used only as a fallback hint for magic-byte detection — never trusted
+    // over the actual bytes.
+    const clientMimeRaw = (formData.get('mime_type') as string | null)?.trim().toLowerCase() || null
+    const clientMimeHint = clientMimeRaw && /^[a-z]+\/[a-z0-9.+-]+$/.test(clientMimeRaw) ? clientMimeRaw : null
     const encrypted = formData.get('encrypted') === 'true'
     const caption = (formData.get('caption') as string | null)?.trim() || null
     const clientContentHash = (formData.get('content_hash') as string | null)?.trim().toLowerCase() || null
@@ -288,7 +293,7 @@ objects.post('/', orbitAuth, async (c) => {
         return c.json({ error: 'Invalid media format (magic bytes check failed)' }, 400)
       }
 
-      const detectedMime = detectMediaMime(bytes, imageFile?.type || imageFile?.name)
+      const detectedMime = detectMediaMime(bytes, clientMimeHint || imageFile?.type || imageFile?.name)
       // Wave 2 / F20: strip every metadata container (EXIF/GPS, XMP, ICC,
       // comments) BEFORE hashing/storing — tags live in the DB, never in the
       // file. Stripping before the hash keeps dedup on canonical bytes.

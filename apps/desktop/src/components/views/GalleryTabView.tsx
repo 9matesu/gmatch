@@ -92,8 +92,8 @@ export function GalleryTabView({
   onOpenOwnerProfile: (ownerId: string) => void;
   allOwnedCards: OrbitObject[];
   onEnterArena: () => void;
-  onRepostGalleryImage?: (media: { url: string; tags: string[]; name?: string }) => void;
-  onAddGalleryImageToStory?: (media: { url: string; tags: string[]; name?: string }) => void;
+  onRepostGalleryImage?: (media: { url: string; tags: string[]; name?: string; kind?: 'video' | 'image'; mimeType?: string }) => void;
+  onAddGalleryImageToStory?: (media: { url: string; tags: string[]; name?: string; kind?: 'video' | 'image'; mimeType?: string }) => void;
 }) {
   const tab = (id: 'cards' | 'deck', label: string) => (
     <button
