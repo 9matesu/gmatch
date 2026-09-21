@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { isMediaVideo, resolveMediaUrl } from '../utils/media'
 import { useObjectImage } from '../hooks/useObjectImage'
 import { NativeVideoPlayer } from './media/NativeVideoPlayer'
-import { useVaultUrl } from '../services/vault'
+import { useVaultUrl, useVaultHttpUrls } from '../services/vault'
 import { resolveImage, devFetchable } from '../services/imageCache'
 
 interface IdentityLike {
@@ -60,6 +60,11 @@ function extractObjectId(contentUrl: string | null | undefined, objectId: string
 function needsSignedFetch(contentUrl: string | null | undefined, objectId: string | null | undefined): boolean {
   if (contentUrl) {
     const trimmed = contentUrl.trim()
+    // Privileged local schemes render directly — never route them through the
+    // signed /api/objects fetch, even when an objectId/postId is also set
+    // (legacy vault:// repost rows carry both; signing them 404s and blanks
+    // every surface). vault:// is resolved to localhost http below.
+    if (/^(vault|gmcache|idle-file):/i.test(trimmed)) return false
     // Zero-media register rows: bytes live on the swarm. Resolve them through
     // the signed fetch path (which handles the p2p JSON descriptor) instead
     // of handing a magnet:/urn: URL to <img>.
@@ -149,13 +154,19 @@ export function ObjectImage({
 
   const img = useObjectImage(signed ? effObjectId : null, identity, { enabled: signed ? inView : true })
 
+  // vault:// has no in-browser form: prefer the localhost http URL (Range
+  // capable, so <video> seeks) and fall back to the raw scheme URL the
+  // Electron handler may still serve.
+  const vaultHttpMap = useVaultHttpUrls([contentUrl])
+  const vaultHttp = contentUrl && vaultHttpMap[contentUrl] ? vaultHttpMap[contentUrl] : null
+
   let baseSrc: string
   let isVideo: boolean
   if (signed) {
     baseSrc = img.url || (img.isLink && img.linkUrl ? img.linkUrl : '')
     isVideo = img.isVideo || Boolean(mimeType && mimeType.startsWith('video/')) || isMediaVideo(baseSrc)
   } else {
-    baseSrc = resolveMediaUrl(contentUrl)
+    baseSrc = vaultHttp || resolveMediaUrl(contentUrl)
     isVideo = Boolean(mimeType && mimeType.startsWith('video/')) || isMediaVideo(contentUrl) || false
   }
 

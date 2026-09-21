@@ -102,8 +102,7 @@ describe('InstagramPostModal media', () => {
     expect(document.body.querySelector('.lucide-chevron-left')).not.toBeInTheDocument();
   });
 
-  it('renders immediate localPreviewUrl for freshly created posts', async () => {
-    const freshPost = {
+  it('renders immediate localPreviewUrl for freshly created posts', async () => {    const freshPost = {
       id: 'p-fresh',
       author_id: 'a-1',
       author_name: 'A',
@@ -122,6 +121,33 @@ describe('InstagramPostModal media', () => {
     const img = document.body.querySelector('img');
     expect(img).toBeInTheDocument();
     expect(img).toHaveAttribute('src', 'blob:fresh-preview-url');
+  });
+
+  it('plays a legacy vault:// repost (mediaUrls only, post-level video mime) through the video branch', async () => {
+    (window as unknown as { gmatch: unknown }).gmatch = {
+      vaultGet: vi.fn(async () => ({ local: null })),
+      vaultHttpUrl: vi.fn(async (url: string) => ({
+        local: url.startsWith('vault://') ? `http://127.0.0.1:9/v/${encodeURIComponent(url)}` : null,
+      })),
+    };
+    const { waitFor } = await import('@testing-library/react');
+    const legacy = {
+      id: 'p-vault-legacy', author_id: 'a-1', author_name: 'A',
+      url: 'vault://f/clip123',
+      mime_type: 'video/mp4',
+      mediaUrls: ['vault://f/clip123'],
+      caption: 'vault repost', created_at: new Date().toISOString(),
+      like_count: 0, comment_count: 0,
+    } as unknown as FeedPost;
+    await act(async () => {
+      render(<InstagramPostModal post={legacy} isOpen onClose={() => {}} identity={identity} />);
+    });
+    await waitFor(() => {
+      expect(document.body.querySelector('video')).toBeInTheDocument();
+    });
+    // Video branch (controls leg), not the image zoom wrapper
+    expect(document.body.querySelector('.cursor-zoom-in')).not.toBeInTheDocument();
+    expect(document.body.querySelector('video')?.getAttribute('src')).toContain('http://127.0.0.1');
   });
 });
 

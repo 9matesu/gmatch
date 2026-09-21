@@ -129,4 +129,46 @@ describe('GMatchFeed video player on timeline', () => {
     // Lightbox modal is opened showing the post caption and comment input
     expect(screen.getByPlaceholderText(/add a comment\.\.\./i)).toBeInTheDocument();
   });
+
+  it('routes a legacy vault:// video repost through ObjectImage (localhost http), never raw vault:// or signed post-id fetch', async () => {
+    (window as unknown as { gmatch: unknown }).gmatch = {
+      vaultGet: vi.fn(async () => ({ local: null })),
+      vaultHttpUrl: vi.fn(async (url: string) => ({
+        local: url.startsWith('vault://') ? `http://127.0.0.1:9/v/${encodeURIComponent(url)}` : null,
+      })),
+    };
+    const fetchSpy = vi.mocked(globalThis.fetch);
+    const vaultPost = {
+      id: 'vid-vault-1',
+      author_id: 'author-1',
+      author_name: 'Gooner',
+      url: 'vault://f/clip123',
+      mime_type: 'video/mp4',
+      caption: 'Vault repost',
+      tags: [],
+      created_at: new Date().toISOString(),
+      like_count: 0,
+      comment_count: 0,
+    };
+
+    let container: HTMLElement;
+    await act(async () => {
+      const res = render(
+        <GMatchFeed
+          identity={mockIdentity as never}
+          posts={[vaultPost as never]}
+          stories={[]}
+          users={[]}
+        />
+      );
+      container = res.container;
+    });
+
+    const video = container!.querySelector('video');
+    expect(video).toBeInTheDocument();
+    expect(video).toHaveAttribute('src', expect.stringContaining('http://127.0.0.1'));
+    const calls = fetchSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls.some((u) => u.includes('/api/objects/vid-vault-1'))).toBe(false);
+    expect(video!.getAttribute('src')).not.toMatch(/^vault:/);
+  });
 });

@@ -66,13 +66,19 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
 
   // Media model mirrors the feed cards: post.media[] (per-item mime) first,
   // then legacy mediaUrls, then the single url + mime_type. Keeps mime per
-  // item so extension-less object videos are detected as video.
+  // item so extension-less object videos are detected as video. Legacy
+  // mediaUrls rows carry no per-item mime — fall back to the matching
+  // post.media[] entry, then the post-level mime_type (legacy vault://
+  // reposts only store the mime on the post).
   const mediaItems: ModalMediaItem[] = post
     ? (Array.isArray((post as any).media) && (post as any).media.length > 0
       ? (post as any).media
         .map((m: any) => ({ id: m?.id as string | undefined, url: m?.url as string, mime: m?.mime_type as string | undefined }))
         .filter((m: ModalMediaItem) => Boolean(m.url))
-      : [...((post as any).mediaUrls || [])].map((u: string) => ({ url: u }))
+      : [...((post as any).mediaUrls || [])].map((u: string) => ({
+        url: u,
+        mime: ((post as any).media?.find?.((m: any) => m?.url === u)?.mime_type ?? (post as any).mime_type) as string | undefined,
+      }))
     )
     : [];
   if (post && mediaItems.length === 0) {

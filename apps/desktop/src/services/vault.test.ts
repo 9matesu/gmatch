@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { renderHook, waitFor } from '@testing-library/react'
 
 describe('vaultPin negative cache', () => {
   const bridge = { vaultGet: vi.fn(async () => ({ local: null })), vaultPin: vi.fn(async () => ({ local: null })) }
@@ -49,5 +50,43 @@ describe('vaultPin negative cache', () => {
     const stored = await vaultGet(mp4Url)
     expect(stored).toBe(mp4Url)
     expect(storage['gmatch_vault_v1']).toContain(mp4Url)
+  })
+})
+
+describe('useVaultHttpUrls', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('maps vault:// URLs to localhost http URLs and ignores anything else', async () => {
+    ;(window as unknown as { gmatch: unknown }).gmatch = {
+      vaultGet: vi.fn(async () => ({ local: null })),
+      vaultHttpUrl: vi.fn(async (url: string) => ({
+        local: url.startsWith('vault://') ? `http://127.0.0.1:9/v/${encodeURIComponent(url)}` : null,
+      })),
+    }
+    const { useVaultHttpUrls } = await import('./vault')
+    const { result } = renderHook(() =>
+      useVaultHttpUrls(['vault://f/abc123', 'https://x/y.jpg', '/api/objects/abc', null, undefined]),
+    )
+    await waitFor(() =>
+      expect(result.current['vault://f/abc123']).toMatch(/^http:\/\/127\.0\.0\.1/),
+    )
+    expect(result.current['https://x/y.jpg']).toBeUndefined()
+    expect(result.current['/api/objects/abc']).toBeUndefined()
+  })
+
+  it('leaves vault:// URLs unmapped when the bridge has no bytes for them', async () => {
+    ;(window as unknown as { gmatch: unknown }).gmatch = {
+      vaultGet: vi.fn(async () => ({ local: null })),
+      vaultHttpUrl: vi.fn(async () => ({ local: null })),
+    }
+    const { useVaultHttpUrls } = await import('./vault')
+    const { result } = renderHook(() => useVaultHttpUrls(['vault://f/missing']))
+    // Settles without a mapping (callers fall back to the raw vault:// URL).
+    await waitFor(() =>
+      expect((window as any).gmatch.vaultHttpUrl).toHaveBeenCalled(),
+    )
+    expect(result.current['vault://f/missing']).toBeUndefined()
   })
 })

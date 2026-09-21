@@ -199,6 +199,29 @@ export function isVideoPost(
 }
 
 /**
+ * Server mime for URL-fallback (non-forged) post items: an explicit video
+ * mime wins verbatim (webm stays webm), video-ish items without one get
+ * video/mp4, images get null so the server default applies. Without this a
+ * vault video repost that falls back to URL storage registers as a generic
+ * row and no surface renders it as video.
+ */
+export function urlFallbackMime(item: {
+  kind?: string | null
+  mimeType?: string | null
+  file?: { type?: string | null } | null
+  isVideo?: boolean
+  previewUrl?: string | null
+}): string | null {
+  const explicit = (item.mimeType || '').toLowerCase().split(';')[0].trim()
+  if (explicit.startsWith('video/')) return explicit
+  const isVid = item.isVideo === true
+    || item.kind === 'video'
+    || Boolean(item.file?.type && item.file.type.startsWith('video/'))
+    || isMediaVideo(item.previewUrl)
+  return isVid ? 'video/mp4' : null
+}
+
+/**
  * Checks if a string is a Twitter/X status link.
  */
 export function isTwitterUrl(url: string): boolean {
