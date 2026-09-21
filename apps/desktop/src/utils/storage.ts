@@ -12,6 +12,13 @@ export interface StoredObject {
   sender_enc_pubkey: string
   created_at: string
   data: ArrayBuffer
+  /** Media-kind flags when known at write time (forge/receive). Absent for
+   * legacy rows; gallery rebuilds must treat absent flags as unknown, never
+   * as "private card-eligible". */
+  is_public?: number | null
+  is_story?: number | null
+  is_chat?: number | null
+  is_avatar?: number | null
 }
 
 export interface EncryptedChunk {

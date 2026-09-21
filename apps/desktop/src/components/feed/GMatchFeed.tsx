@@ -771,23 +771,23 @@ export function GMatchFeed({
                         <Avatar id={post.author_id} size={32} imageUrl={profilePics[post.author_id] || post.author_avatar} fill={true} />
                       </div>
                     </div>
-                    <div className="flex flex-col justify-center min-w-0 self-center">
-                      <div className="flex items-center gap-1.5">
+                    <div className="flex flex-col justify-center min-w-0 self-center leading-tight">
+                      <div className="flex items-baseline gap-1.5 min-w-0">
                         <span
                           role="button"
                           tabIndex={0}
                           onClick={() => handleNameClick(post.author_id)}
                           onKeyDown={(e) => e.key === 'Enter' && handleNameClick(post.author_id)}
-                          className="text-xs font-semibold text-retro-fg hover:underline cursor-pointer leading-none"
+                          className="text-xs font-semibold text-retro-fg hover:underline cursor-pointer leading-tight truncate min-w-0"
                         >
                           {post.author_name}
                         </span>
-                        <time className="text-xs text-retro-muted" dateTime={post.created_at}>
+                        <time className="text-xs text-retro-muted leading-tight shrink-0" dateTime={post.created_at}>
                           {new Date(post.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                         </time>
                       </div>
                       {post.location && (
-                        <span className="text-xs text-retro-muted block">{post.location}</span>
+                        <span className="text-xs text-retro-muted leading-tight block truncate">{post.location}</span>
                       )}
                     </div>
                   </div>

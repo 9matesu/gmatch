@@ -25,6 +25,7 @@ import type { ChatMessage } from "./hooks/useP2P";
 import { useGame } from "./hooks/useGame";
 import { enqueueableItems, isP2pLocal, shouldEnqueue } from "./utils/game";
 import { mergeMyCards, filterToActiveDeck, type CanonicalCard } from "./utils/cardCollection";
+import { buildMirrorRow } from "./utils/galleryMirror";
 import { collectConfigBundle, applyConfigBundle, applyStashFromBundle, parseConfigBundle, configDownloadFilename, bundleToString } from "./utils/configBackup";
 import { runMigrations } from "./utils/migration";
 import { useGame as useIdleGame } from "./game/store";
@@ -2521,26 +2522,22 @@ export default function Home() {
         itemMap.set(item.id, item);
       }
 
-      // 2. Add IndexedDB objects (blob URLs recovered from the raw bytes)
+      // 2. Add IndexedDB objects (blob URLs recovered from the raw bytes).
+      // Flag discipline: mirror rows may predate flag storage, so rebuild via
+      // buildMirrorRow — server (inbox) flags win, explicit mirror flags apply,
+      // and unknown rows stay flag-less so card surfaces exclude them instead
+      // of phantom-minting uploads into cards.
       for (const dbObj of dbObjects) {
         if (dbObj.id.startsWith('p2p-obj-') && !canonicalCards.some(c => c.mediaObjectId === dbObj.id)) {
           void deleteObject(dbObj.id);
           continue;
         }
         const contentUrl = localObjectBlobUrl(dbObj.id, dbObj.data, dbObj.mime_type)
-        itemMap.set(dbObj.id, {
-          id: dbObj.id,
-          owner_id: dbObj.owner_id,
-          size_bytes: dbObj.size_bytes,
-          mime_type: dbObj.mime_type,
-          created_at: dbObj.created_at,
-          content_url: contentUrl,
-          display_name: dbObj.owner_id === identity.orbitId
+        const prev = itemMap.get(dbObj.id)
+        itemMap.set(dbObj.id, buildMirrorRow(dbObj, prev, contentUrl,
+          dbObj.owner_id === identity.orbitId
             ? (myProfile.displayName || 'You')
-            : (usersRef.current.find((u) => u.id === dbObj.owner_id)?.display_name?.trim() || generateFallbackName(dbObj.owner_id)),
-          sender_pubkey: dbObj.sender_pubkey,
-          sender_enc_pubkey: dbObj.sender_enc_pubkey,
-        })
+            : (prev?.display_name || usersRef.current.find((u) => u.id === dbObj.owner_id)?.display_name?.trim() || generateFallbackName(dbObj.owner_id))))
       }
 
       // 3. Add p2pItems from memory safely
@@ -2945,6 +2942,9 @@ export default function Home() {
                 sender_enc_pubkey: meta.sender_enc_pubkey,
                 created_at: newItem.created_at,
                 data: buffer,
+                is_public: 0,
+                is_story: 0,
+                is_chat: 0,
               }).catch(() => {
                 toast('Failed to save to local storage', 'error')
               })
@@ -3127,7 +3127,9 @@ export default function Home() {
       if (galleryFilter === 'received') return item.owner_id !== identity?.orbitId
       if (galleryFilter === 'sent') return item.owner_id === identity?.orbitId
       if (galleryFilter === 'starred') return Boolean(item.is_favorited)
-      return true
+      // Default collection view is mine-only: foreign inbox objects and
+      // unattributed local mirror rows (owner_id '') never render as my cards.
+      return item.owner_id === identity?.orbitId
     })
 
     const q = cardSearch.trim().toLowerCase()

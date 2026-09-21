@@ -74,6 +74,10 @@ export interface RoundHistoryItem {
   card_b_url?: string | null;
   decision_a?: LobbyDecision | null;
   decision_b?: LobbyDecision | null;
+  /** True when the decision was synthesized by the decide-phase timer (AFK),
+   * never cast by the player. Auto decisions never move card value. */
+  auto_a?: boolean;
+  auto_b?: boolean;
   matched: boolean;
   result?: string | null;
 }
@@ -120,12 +124,17 @@ export interface MatchSnapshot {
   played_cards: string[];
   phase_deadline: number;
   my_card: string | null;
+  /** Resolved display URL for the current-round card (server-side, handles
+   * match-local bot cards). Render with contentUrl + objectId dual legs. */
+  my_card_url?: string | null;
   my_decided: boolean;
   my_decision?: LobbyDecision | null;
   boosts_remaining?: number;
   valuation_summary?: MatchValuationSummary | null;
   opponent: { id: OrbitId; display_name?: string | null; pfp_url?: string | null };
   opponent_card: string | null;
+  /** Resolved display URL for the opponent's current-round card. */
+  opponent_card_url?: string | null;
   opponent_played: boolean;
   opponent_decided: boolean;
   opponent_decision?: LobbyDecision | null;
@@ -134,8 +143,8 @@ export interface MatchSnapshot {
   forfeit_user?: string | null;
   quit_user_id?: string | null;
   is_spectating?: boolean;
-  user_a_info?: { id: OrbitId; display_name?: string | null; pfp_url?: string | null; card?: string | null; decided?: boolean; decision?: LobbyDecision | null; score?: number };
-  user_b_info?: { id: OrbitId; display_name?: string | null; pfp_url?: string | null; card?: string | null; decided?: boolean; decision?: LobbyDecision | null; score?: number };
+  user_a_info?: { id: OrbitId; display_name?: string | null; pfp_url?: string | null; card?: string | null; card_id?: string | null; decided?: boolean; decision?: LobbyDecision | null; score?: number };
+  user_b_info?: { id: OrbitId; display_name?: string | null; pfp_url?: string | null; card?: string | null; card_id?: string | null; decided?: boolean; decision?: LobbyDecision | null; score?: number };
 }
 
 export interface LiveMatchSummary {

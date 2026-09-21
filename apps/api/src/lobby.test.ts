@@ -394,6 +394,21 @@ describe('lobby core: rejects, timeouts and quit', () => {
     m = await matchFor(ids[0])
     expect(m!.phase).toBe('round_result')
     expect(m!.matched).toBe(false)
+
+    // Timeout synthesis is marked auto in history …
+    const hist = Array.isArray(m!.rounds_history) ? m!.rounds_history : JSON.parse((m as any).rounds_history_json || '[]')
+    expect(hist).toHaveLength(1)
+    expect(hist[0].decision_a).toBe('like')
+    expect(hist[0].decision_b).toBe('reject')
+    expect(hist[0].auto_a).toBeFalsy()
+    expect(hist[0].auto_b).toBe(true)
+
+    // … and the auto-reject writes no value: live like moved cardB (+10),
+    // the auto side left cardA untouched.
+    const scoreA = await env._client.execute('SELECT gacha_downloads_count FROM Objects WHERE id = ?', [cardA])
+    const scoreB = await env._client.execute('SELECT gacha_downloads_count FROM Objects WHERE id = ?', [cardB])
+    expect(Number(scoreA.rows[0]?.gacha_downloads_count ?? 0)).toBe(0)
+    expect(Number(scoreB.rows[0]?.gacha_downloads_count ?? 0)).toBe(10)
   })
 
   it('quit ends the match and re-queues only the staying player', async () => {

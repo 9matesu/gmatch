@@ -122,6 +122,18 @@ export function SpectateModal({
   const pATags = players?.find((p) => p.user_id === pA.id)?.tags || []
   const pBTags = players?.find((p) => p.user_id === pB.id)?.tags || []
 
+  // Dual-leg card resolution: the server ships both the raw card id and the
+  // resolved display URL. The id drives the signed object stream (bucket
+  // cards, swarm descriptors); the URL covers direct/bot-card media.
+  const objectIdFromUrl = (url: string | null | undefined): string | null => {
+    if (!url) return null
+    const idx = url.indexOf('/api/objects/')
+    if (idx >= 0) return url.slice(idx + '/api/objects/'.length).split(/[?#]/)[0] || null
+    return null
+  }
+  const pACardId = (pA as { card_id?: string | null }).card_id ?? objectIdFromUrl(pA.card)
+  const pBCardId = (pB as { card_id?: string | null }).card_id ?? objectIdFromUrl(pB.card)
+
   const phase = match.phase
   const isRevealed = ['reveal', 'decide', 'round_result', 'result'].includes(phase)
   const msLeft = Math.max(0, countdownMs(match.phase_deadline, now))
@@ -134,10 +146,12 @@ export function SpectateModal({
 
   const buildViewerItems = (): OrbitObject[] => {
     const map = new Map<string, OrbitObject>()
-    const add = (url: string | null | undefined, ownerId: string, label: string) => {
-      if (!url || map.has(url)) return
-      map.set(url, {
-        id: url,
+    const add = (id: string | null | undefined, url: string | null | undefined, ownerId: string, label: string) => {
+      if (!url) return
+      const key = id || url
+      if (map.has(key)) return
+      map.set(key, {
+        id: key,
         owner_id: ownerId as OrbitId,
         size_bytes: 0,
         mime_type: isMediaVideo(url) ? 'video/mp4' : 'image/jpeg',
@@ -146,18 +160,18 @@ export function SpectateModal({
         display_name: label,
       })
     }
-    add(pA.card, pA.id, `${pA.display_name || 'Player 1'}'s Card`)
-    add(pB.card, pB.id, `${pB.display_name || 'Player 2'}'s Card`)
+    add(pACardId, pA.card, pA.id, `${pA.display_name || 'Player 1'}'s Card`)
+    add(pBCardId, pB.card, pB.id, `${pB.display_name || 'Player 2'}'s Card`)
     for (const h of history) {
-      add(h.card_a_url, pA.id, `R${h.round} · ${pA.display_name || 'Player 1'}'s Card`)
-      add(h.card_b_url, pB.id, `R${h.round} · ${pB.display_name || 'Player 2'}'s Card`)
+      add(h.card_a, h.card_a_url, pA.id, `R${h.round} · ${pA.display_name || 'Player 1'}'s Card`)
+      add(h.card_b, h.card_b_url, pB.id, `R${h.round} · ${pB.display_name || 'Player 2'}'s Card`)
     }
     return Array.from(map.values())
   }
 
-  const openInBoard = (url: string) => {
+  const openInBoard = (id: string, url: string) => {
     playPress(780)
-    if (onOpenItem) onOpenItem(buildViewerItems(), url)
+    if (onOpenItem) onOpenItem(buildViewerItems(), id)
     else
       setZoomModal({
         isOpen: true,
@@ -242,6 +256,7 @@ export function SpectateModal({
                     <div className="relative w-full flex-1 min-h-0 bg-surface-canvas overflow-hidden">
                       <ObjectImage
                         contentUrl={cardAUrl}
+                        objectId={pACardId}
                         identity={identity}
                         className="w-full h-full object-cover"
                         videoClassName="w-full h-full object-cover"
@@ -277,6 +292,7 @@ export function SpectateModal({
                     <div className="relative w-full flex-1 min-h-0 bg-surface-canvas overflow-hidden">
                       <ObjectImage
                         contentUrl={cardBUrl}
+                        objectId={pBCardId}
                         identity={identity}
                         className="w-full h-full object-cover"
                         videoClassName="w-full h-full object-cover"
@@ -460,7 +476,7 @@ export function SpectateModal({
                         {isRevealed && cardAUrl ? (
                           <button
                             type="button"
-                            onClick={() => openInBoard(cardAUrl)}
+                            onClick={() => openInBoard(pACardId ?? cardAUrl, cardAUrl)}
                             className="w-full h-full cursor-zoom-in relative flex flex-col"
                           >
                             <div className="absolute top-2 left-2 z-20 flex items-center gap-1">
@@ -471,6 +487,7 @@ export function SpectateModal({
                             <div className="relative w-full flex-1 min-h-0 bg-surface-canvas overflow-hidden">
                               <ObjectImage
                                 contentUrl={cardAUrl}
+                                objectId={pACardId}
                                 identity={identity}
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                 videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -520,7 +537,7 @@ export function SpectateModal({
                         {isRevealed && cardBUrl ? (
                           <button
                             type="button"
-                            onClick={() => openInBoard(cardBUrl)}
+                            onClick={() => openInBoard(pBCardId ?? cardBUrl, cardBUrl)}
                             className="w-full h-full cursor-zoom-in relative flex flex-col"
                           >
                             <div className="absolute top-2 left-2 z-20 flex items-center gap-1">
@@ -531,6 +548,7 @@ export function SpectateModal({
                             <div className="relative w-full flex-1 min-h-0 bg-surface-canvas overflow-hidden">
                               <ObjectImage
                                 contentUrl={cardBUrl}
+                                objectId={pBCardId}
                                 identity={identity}
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                 videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -580,7 +598,7 @@ export function SpectateModal({
 
                   <div className="space-y-2 flex-1 min-h-0 overflow-y-auto styled-scrollbar pr-1 max-h-80 lg:max-h-none">
                     {history.map((h) => {
-                      const mediaThumb = (url: string | null | undefined) => {
+                      const mediaThumb = (id: string | null | undefined, url: string | null | undefined) => {
                         if (!url) {
                           return (
                             <span className="w-14 h-14 shrink-0 flex items-center justify-center text-[10px] text-retro-muted bg-surface-interactive border border-border-glass rounded-xl">
@@ -591,11 +609,12 @@ export function SpectateModal({
                         return (
                           <button
                             type="button"
-                            onClick={() => openInBoard(url)}
+                            onClick={() => openInBoard(id ?? url, url)}
                             className="w-14 h-14 shrink-0 overflow-hidden border border-border-glass bg-black group relative cursor-zoom-in rounded-xl shadow-xs"
                           >
                             <ObjectImage
                               contentUrl={url}
+                              objectId={id}
                               identity={identity}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                               videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform"
@@ -615,9 +634,9 @@ export function SpectateModal({
                         >
                           <span className="font-mono font-bold text-retro-muted text-xs shrink-0">R{h.round}</span>
                           <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                            {mediaThumb(h.card_a_url)}
+                            {mediaThumb(h.card_a, h.card_a_url)}
                             <span className="text-[10px] text-retro-muted font-bold shrink-0">VS</span>
-                            {mediaThumb(h.card_b_url)}
+                            {mediaThumb(h.card_b, h.card_b_url)}
                           </div>
                           <span
                             className={`font-bold px-2 py-0.5 text-[10px] rounded-lg shrink-0 border ${h.matched

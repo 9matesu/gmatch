@@ -188,6 +188,9 @@ export interface CardEvaluationDelta {
   pointDelta: number;
   previousScore: number;
   newScore: number;
+  /** True when the vote was a timer-synthesized auto decision: displayed for
+   * honesty, but the delta is always 0 (no value was written). */
+  auto?: boolean;
   promoted?: boolean;
   newRarity?: CardRarity;
 }

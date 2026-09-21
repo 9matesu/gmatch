@@ -16,7 +16,6 @@ import type { LobbyDecisionResult, LobbyDecisionFailure } from '../hooks/useLobb
 import { CardZoomModal } from './CardZoomModal'
 import { computeCardRarity, formatGc, matchEconomy } from '@orbit/shared'
 import { isMediaVideo } from '../utils/media'
-import { MediaBadge } from './MediaBadge'
 import { CardBack } from './CardBack'
 import { ObjectImage } from './ObjectImage'
 import { Avatar } from './Avatar'
@@ -150,6 +149,18 @@ export function MatchRoundPanel({
   const myPlayedCardId = myCardId(match)
   const opponentImg = useObjectImage(oppCardId, identity)
   const myPlayedImg = useObjectImage(myPlayedCardId, identity)
+  // Dual-leg display URLs: server-resolved snapshot URL first (handles
+  // match-local bot cards + bucket-backed objects), local card row second,
+  // signed-fetch blob last. Either leg alone left images blank.
+  const myPlayed = myCards.find((c) => c.id === myPlayedCardId)
+  const myPlayedUrl = match?.my_card_url ?? myPlayed?.content_url ?? myPlayedImg.url ?? null
+  const oppUrl = match?.opponent_card_url ?? opponentImg.url ?? null
+  // Real opponent value: the result-phase valuation summary. Before that the
+  // value is unknown — never fabricate one (the old pointDelta || 100 fiction).
+  const oppKnownValue = (() => {
+    const d = match?.valuation_summary?.opponentCardDeltas?.find((x) => x.cardId === oppCardId)
+    return typeof d?.newScore === 'number' ? Math.max(0, d.newScore) : null
+  })()
 
   if (!phase || !match) return null
 
@@ -380,11 +391,12 @@ export function MatchRoundPanel({
                               Locked in
                             </span>
                             <div className="relative w-full flex-1 min-h-0 bg-surface-canvas overflow-hidden">
-                              {myPlayedImg?.url || c?.content_url ? (
+                              {myPlayedUrl || myPlayedCardId ? (
                                 <ObjectImage
-                                  contentUrl={c?.content_url}
-                                  objectId={c?.id}
+                                  contentUrl={myPlayedUrl}
+                                  objectId={myPlayedCardId}
                                   identity={identity}
+                                  mimeType={myPlayed?.mime_type}
                                   className="w-full h-full object-cover"
                                   videoClassName="pointer-events-none w-full h-full object-cover"
                                 />
@@ -473,11 +485,12 @@ export function MatchRoundPanel({
                                   : 'hover:border-retro-muted'
                               }`}
                           >
-                            {card.content_url ? (
+                            {card.content_url || card.id ? (
                               <ObjectImage
                                 contentUrl={card.content_url}
                                 objectId={card.id}
                                 identity={identity}
+                                mimeType={card.mime_type}
                                 className="w-full h-full object-cover"
                                 videoClassName="pointer-events-none w-full h-full object-cover"
                               />
@@ -601,15 +614,19 @@ export function MatchRoundPanel({
 
                       {/* Image container */}
                       <div className="relative w-full flex-1 min-h-0 bg-surface-canvas overflow-hidden">
-                        {myPlayedImg.url ? (
-                          myPlayedImg.isVideo ? (
-                            <>
-                              <video src={myPlayedImg.url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
-                              <MediaBadge className="absolute bottom-1.5 right-1.5" />
-                            </>
-                          ) : (
-                            <img src={myPlayedImg.url} alt="Your card" className="w-full h-full object-cover" />
-                          )
+                        {myPlayedUrl || myPlayedCardId ? (
+                          <ObjectImage
+                            contentUrl={myPlayedUrl}
+                            objectId={myPlayedCardId}
+                            identity={identity}
+                            mimeType={myPlayed?.mime_type}
+                            className="w-full h-full object-cover"
+                            videoClassName="w-full h-full object-cover"
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                          />
                         ) : myPlayedImg.isLink ? (
                           <a
                             href={myPlayedImg.linkUrl || '#'}
@@ -652,10 +669,7 @@ export function MatchRoundPanel({
 
             {/* Opponent's card */}
             {(() => {
-              const oppVal = match.valuation_summary?.cardOfTheMatch?.ownerId === opponentUser?.id
-                ? (match.valuation_summary.cardOfTheMatch.pointDelta || 100)
-                : 100
-              const oppRarity = computeCardRarity(oppVal)
+              const oppRarity = computeCardRarity(oppKnownValue ?? 0)
               const oppTitle = `${opponentName}'s Card`
 
               return (
@@ -663,13 +677,14 @@ export function MatchRoundPanel({
                   <div
                     className={`metallic-card-border w-full aspect-[3/4.2] mx-auto select-none transition-all ${
                       isRoundResult && match.matched ? 'ring-2 ring-emerald-400 shadow-2xl' : ''
-                    } ${opponentImg.url ? 'cursor-pointer hover:opacity-80' : ''}`}
+                    } ${oppUrl || oppCardId ? 'cursor-pointer hover:opacity-80' : ''}`}
                     data-rarity={oppRarity.rarity}
                     onClick={() => {
-                      if (opponentImg.url) {
+                      const zoomUrl = oppUrl || opponentImg.url
+                      if (zoomUrl) {
                         setZoomModal({
                           isOpen: true,
-                          imageUrl: opponentImg.url,
+                          imageUrl: zoomUrl,
                           isVideo: opponentImg.isVideo,
                           title: oppTitle,
                           subtitle: `Round ${currentRound}`,
@@ -679,14 +694,16 @@ export function MatchRoundPanel({
                   >
                     <div className="metallic-card flex flex-col h-full">
                       {/* Top Badges */}
-                      {opponentImg.url && (
+                      {(oppUrl || oppCardId) && (
                         <div className="absolute top-2 left-2 z-20 flex items-center gap-1">
                           <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-md ${oppRarity.badgeClass}`}>
                             {oppRarity.label}
                           </span>
-                          <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-amber-300 border border-amber-400/40 shadow-md backdrop-blur-xs">
-                            {formatGc(oppVal)}
-                          </span>
+                          {oppKnownValue !== null && (
+                            <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-amber-300 border border-amber-400/40 shadow-md backdrop-blur-xs">
+                              {formatGc(oppKnownValue)}
+                            </span>
+                          )}
                         </div>
                       )}
 
@@ -699,15 +716,18 @@ export function MatchRoundPanel({
 
                       {/* Image container */}
                       <div className="relative w-full flex-1 min-h-0 bg-surface-canvas overflow-hidden">
-                        {opponentImg.url ? (
-                          opponentImg.isVideo ? (
-                            <>
-                              <video src={opponentImg.url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
-                              <MediaBadge className="absolute bottom-1.5 right-1.5" />
-                            </>
-                          ) : (
-                            <img src={opponentImg.url} alt="Opponent card" className="w-full h-full object-cover" />
-                          )
+                        {oppUrl || oppCardId ? (
+                          <ObjectImage
+                            contentUrl={oppUrl}
+                            objectId={oppCardId}
+                            identity={identity}
+                            className="w-full h-full object-cover"
+                            videoClassName="w-full h-full object-cover"
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                          />
                         ) : opponentImg.isLink ? (
                           <a
                             href={opponentImg.linkUrl || '#'}

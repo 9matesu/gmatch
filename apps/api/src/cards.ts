@@ -292,22 +292,26 @@ export class CardService {
     const contentHash = media.content_hash ? media.content_hash.trim().toLowerCase() : null
 
     // Idempotent creation: a media object (and unique picture content_hash)
-    // maps to at most one canonical card. Re-uploading the same picture returns
-    // the existing card and refreshes its name when the creator re-names it.
+    // maps to at most one canonical card PER CREATOR. Re-uploading the same
+    // picture returns the existing card and refreshes its name when the
+    // creator re-names it. Cross-owner matches are ignored: each owner mints
+    // their own card from their own media, and nobody renames another
+    // owner's card.
     const existing = contentHash
       ? await this.db
           .prepare(
             `SELECT c.id, c.name FROM Cards c
              JOIN Objects o ON c.media_object_id = o.id
              WHERE (c.media_object_id = ? OR (o.content_hash IS NOT NULL AND LOWER(o.content_hash) = ?))
+               AND c.creator_id = ?
                AND c.moderation_state != 'burned'
              LIMIT 1`
           )
-          .bind(mediaObjectId, contentHash)
+          .bind(mediaObjectId, contentHash, creatorId)
           .first<{ id: string; name: string | null }>()
       : await this.db
-          .prepare("SELECT id, name FROM Cards WHERE media_object_id = ? AND moderation_state != 'burned'")
-          .bind(mediaObjectId)
+          .prepare("SELECT id, name FROM Cards WHERE media_object_id = ? AND creator_id = ? AND moderation_state != 'burned'")
+          .bind(mediaObjectId, creatorId)
           .first<{ id: string; name: string | null }>()
     if (existing) {
       if (name && name !== existing.name) {
@@ -332,9 +336,10 @@ export class CardService {
                   SELECT 1 FROM Cards c2
                   JOIN Objects o2 ON c2.media_object_id = o2.id
                   WHERE (c2.media_object_id = ? OR (? IS NOT NULL AND o2.content_hash IS NOT NULL AND LOWER(o2.content_hash) = ?))
+                    AND c2.creator_id = ?
                     AND c2.moderation_state != 'burned'
                 )`,
-        args: [cardId, creatorId, mediaObjectId, name, rarity, score, likeCount, JSON.stringify(tags), description, frame, accentColor, nowIso, nowIso, mediaObjectId, creatorId, mediaObjectId, contentHash, contentHash],
+        args: [cardId, creatorId, mediaObjectId, name, rarity, score, likeCount, JSON.stringify(tags), description, frame, accentColor, nowIso, nowIso, mediaObjectId, creatorId, mediaObjectId, contentHash, contentHash, creatorId],
       },
       { sql: 'INSERT INTO CardOwnership (card_id, owner_id, acquired_at) SELECT ?, ?, ? WHERE changes() = 1', args: [cardId, creatorId, nowIso] },
       { sql: "INSERT INTO CardHistory (id, card_id, event, from_user, to_user, meta, created_at) SELECT ?, ?, 'created', NULL, ?, ?, ? WHERE changes() = 1", args: [historyId, cardId, creatorId, JSON.stringify({ mediaObjectId }), nowIso] },
@@ -349,14 +354,15 @@ export class CardService {
               `SELECT c.id FROM Cards c
                JOIN Objects o ON c.media_object_id = o.id
                WHERE (c.media_object_id = ? OR (o.content_hash IS NOT NULL AND LOWER(o.content_hash) = ?))
+                 AND c.creator_id = ?
                  AND c.moderation_state != 'burned'
                LIMIT 1`
             )
-            .bind(mediaObjectId, contentHash)
+            .bind(mediaObjectId, contentHash, creatorId)
             .first<{ id: string }>()
         : await this.db
-            .prepare("SELECT id FROM Cards WHERE media_object_id = ? AND moderation_state != 'burned'")
-            .bind(mediaObjectId)
+            .prepare("SELECT id FROM Cards WHERE media_object_id = ? AND creator_id = ? AND moderation_state != 'burned'")
+            .bind(mediaObjectId, creatorId)
             .first<{ id: string }>()
       if (winner) {
         if (name) {

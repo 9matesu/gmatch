@@ -174,12 +174,13 @@ export function deriveMyCards(items: readonly OrbitObject[], ownerId: string, pf
 }
 
 /**
- * Merge canonical cards (from `/api/cards`) with the object gallery so the
- * collection UI shows canonical ownership/rarity/value while remaining
- * playable: a canonical card's `id` is its media object id, which the match
- * routes already accept. Legacy objects that are the media of a canonical card
- * are de-duplicated (the canonical entry wins). Public posts, chat attachments,
- * avatars, and stories are excluded from the card collection.
+ * Merge canonical cards (from `/api/cards`) for the collection UI.
+ *
+ * ONLY explicitly minted cards appear here: every entry carries a real
+ * `card_id`. Plain uploads (posts, stories, chats, unminted media) are NOT
+ * cards and never render as one — that phantom-mint path is removed.
+ * Canonical rows from other owners are ignored (defense in depth; the API
+ * already scopes `/api/cards` to the caller).
  */
 export function mergeMyCards(
   items: readonly OrbitObject[],
@@ -187,14 +188,14 @@ export function mergeMyCards(
   ownerId: string,
   pfpUrl?: string | null
 ): MergedCard[] {
-  const canonicalByMedia = new Map<string, CanonicalCard>();
-  for (const c of canonicalCards) canonicalByMedia.set(c.mediaObjectId, c);
-
+  void items;
+  void pfpUrl;
   const result: MergedCard[] = [];
   const seen = new Set<string>();
 
   for (const c of canonicalCards) {
-    if (seen.has(c.mediaObjectId)) continue;
+    if ((c.ownerId || ownerId) !== ownerId) continue;
+    if (!c.mediaObjectId || seen.has(c.mediaObjectId)) continue;
     seen.add(c.mediaObjectId);
     const parsedCardTags = Array.isArray(c.tags) ? c.tags : parseTags(c.tags);
     result.push({
@@ -220,13 +221,6 @@ export function mergeMyCards(
       frame: c.frame,
       accent_color: c.accentColor,
     });
-  }
-
-  for (const i of items) {
-    if (i.is_story || isPublicPost(i) || isChatAttachment(i) || isAvatarObject(i, pfpUrl) || i.id.startsWith("p2p-obj-") || i.owner_id !== ownerId) continue;
-    if (canonicalByMedia.has(i.id) || seen.has(i.id)) continue;
-    seen.add(i.id);
-    result.push(i);
   }
 
   return result;

@@ -136,6 +136,10 @@ const selfId = identity?.orbitId || ''
       } else if (result === 'quit' && state?.match?.forfeit_user && state.match.forfeit_user !== 'both' && state.match.forfeit_user !== selfId) {
         toast('Opponent forfeited. You win.', 'success')
       }
+      // Live votes wrote card value server-side during the match: refetch the
+      // canonical collection so the new values show without a reload.
+      refreshScore()
+      try { window.dispatchEvent(new CustomEvent('orbit-cards-refresh')) } catch { }
     }
     prevResultRef.current = result
   }, [state?.match?.result, state?.match?.score_mine, state?.match?.score_opponent, state?.match?.forfeit_user, selfId, toast])

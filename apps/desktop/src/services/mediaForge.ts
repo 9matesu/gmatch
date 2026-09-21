@@ -47,8 +47,15 @@ export async function forgeMediaLocally(
   // 1. Seed into the swarm store immediately (both by objectId and contentHash).
   // registerLocalObject persists to IndexedDB, so the bytes stay on this
   // machine's disk (packaged app) and this client keeps retransmitting them
-  // to peers on SWARM_WANT after restarts.
-  registerLocalObject(objectId, file)
+  // to peers on SWARM_WANT after restarts. Owner/kind flags travel with the
+  // bytes so gallery rebuilds never mistake a post/story/chat for a card.
+  registerLocalObject(objectId, file, {
+    ownerId: identity.orbitId,
+    isPublic: options.isPublic ?? true,
+    isStory: options.isStory ?? false,
+    isAvatar: options.isAvatar ?? false,
+    isChat: options.isChat ?? false,
+  })
   registerLocalObject(contentHash, file)
 
   // 2. Keep a local reference for instant render (session object URL).

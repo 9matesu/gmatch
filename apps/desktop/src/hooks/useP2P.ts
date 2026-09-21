@@ -302,6 +302,8 @@ export function useP2P(identity: OrbitIdentity | null) {
 
         if (newItem.content_url) {
           const enc = new TextEncoder()
+          const flagOf = (v: unknown): number | null =>
+            v === 1 || v === true || v === '1' || v === 'true' ? 1 : (v === 0 || v === false || v === '0' ? 0 : null)
           saveObject({
             id: newItem.id,
             name: newItem.id,
@@ -312,6 +314,10 @@ export function useP2P(identity: OrbitIdentity | null) {
             sender_enc_pubkey: newItem.sender_enc_pubkey || '',
             created_at: newItem.created_at || new Date().toISOString(),
             data: enc.encode(newItem.content_url).buffer as ArrayBuffer,
+            is_public: flagOf((newItem as any).is_public),
+            is_story: flagOf((newItem as any).is_story ?? newItem.is_story),
+            is_chat: flagOf((newItem as any).is_chat),
+            is_avatar: flagOf((newItem as any).is_avatar),
           }).catch(() => {})
         }
 
@@ -718,6 +724,10 @@ export function useP2P(identity: OrbitIdentity | null) {
             sender_enc_pubkey: identity.encryptionPubHex || '',
             created_at: item.created_at || new Date().toISOString(),
             data: enc.encode(item.content_url).buffer,
+            is_public: (item as any).is_public === 1 || (item as any).is_public === true ? 1 : null,
+            is_story: item.is_story === 1 || (item as any).is_story === true ? 1 : null,
+            is_chat: (item as any).is_chat === 1 || (item as any).is_chat === true ? 1 : null,
+            is_avatar: (item as any).is_avatar === 1 || (item as any).is_avatar === true ? 1 : null,
           }).catch(() => {});
         } catch {}
       }

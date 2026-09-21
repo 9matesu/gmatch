@@ -59,22 +59,30 @@ describe('card collection derivation', () => {
 })
 
 describe('mergeMyCards', () => {
-  it('puts canonical cards first with metadata and de-dupes their media object', () => {
+  it('returns only canonical cards, ignoring unminted objects (uploads are not cards)', () => {
     const items = [
       { ...base, id: 'obj-1', owner_id: 'me' },
       { ...base, id: 'legacy-1', owner_id: 'me' },
     ]
     const merged = mergeMyCards(items as OrbitObject[], [cardBase], 'me')
-    expect(merged).toHaveLength(2)
+    expect(merged).toHaveLength(1)
     expect(merged[0].id).toBe('obj-1')
     expect(merged[0].card_id).toBe('card-1')
     expect(merged[0].rarity).toBe('common')
     expect(merged[0].gacha_downloads_count).toBe(100)
-    expect(merged[1].id).toBe('legacy-1')
-    expect(merged[1].card_id).toBeUndefined()
   })
 
-  it('keeps legacy objects that are not canonical media, excluding stories, public posts, and chat attachments', () => {
+  it('excludes canonical cards owned by someone else', () => {
+    const foreign: CanonicalCard = { ...cardBase, id: 'card-x', mediaObjectId: 'obj-x', ownerId: 'them' }
+    const merged = mergeMyCards(
+      [{ ...base, id: 'obj-x', owner_id: 'them' }] as OrbitObject[],
+      [cardBase, foreign],
+      'me'
+    )
+    expect(merged.map((m) => m.card_id)).toEqual(['card-1'])
+  })
+
+  it('returns empty when there are no canonical cards, even with stories, posts, and chat attachments', () => {
     const items = [
       { ...base, id: 'plain-obj', owner_id: 'me' },
       { ...base, id: 'story', owner_id: 'me', is_story: 1 },
@@ -82,7 +90,7 @@ describe('mergeMyCards', () => {
       { ...base, id: 'chat-pic', owner_id: 'me', is_chat: 1 },
     ]
     const merged = mergeMyCards(items as OrbitObject[], [], 'me')
-    expect(merged.map(m => m.id)).toEqual(['plain-obj'])
+    expect(merged).toEqual([])
   })
 
   it('excludes avatar objects and objects matching the user profile picture', () => {
@@ -95,7 +103,7 @@ describe('mergeMyCards', () => {
     expect(derived.map(c => c.id)).toEqual(['plain-card'])
 
     const merged = mergeMyCards(items as OrbitObject[], [], 'me', '/api/objects/avatar-url-match')
-    expect(merged.map(m => m.id)).toEqual(['plain-card'])
+    expect(merged).toEqual([])
   })
 })
 describe('filterToActiveDeck', () => {

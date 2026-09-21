@@ -35,10 +35,20 @@ export function announcePeerOnline(peerId: string): void {
   }
 }
 
-function persistToDisk(id: string, blob: Blob): void {
+export interface LocalObjectMeta {
+  ownerId?: string
+  isPublic?: boolean
+  isStory?: boolean
+  isChat?: boolean
+  isAvatar?: boolean
+}
+
+function persistToDisk(id: string, blob: Blob, meta: LocalObjectMeta = {}): void {
   // Fire-and-forget: IndexedDB write so seeded bytes survive reload in the
   // packaged app (Chromium storage lives under userData). Must await the
   // ArrayBuffer — storing the Promise itself silently breaks reload reads.
+  // Owner/kind flags are stamped when known so gallery rebuilds can tell a
+  // post/story/chat from card-eligible media (absent = unknown, excluded).
   try {
     void (async () => {
       try {
@@ -50,11 +60,15 @@ function persistToDisk(id: string, blob: Blob): void {
           name: id,
           mime_type: blob.type || 'application/octet-stream',
           size_bytes: buf.byteLength,
-          owner_id: '',
+          owner_id: meta.ownerId || '',
           sender_pubkey: '',
           sender_enc_pubkey: '',
           created_at: new Date().toISOString(),
           data: buf,
+          is_public: typeof meta.isPublic === 'boolean' ? (meta.isPublic ? 1 : 0) : null,
+          is_story: typeof meta.isStory === 'boolean' ? (meta.isStory ? 1 : 0) : null,
+          is_chat: typeof meta.isChat === 'boolean' ? (meta.isChat ? 1 : 0) : null,
+          is_avatar: typeof meta.isAvatar === 'boolean' ? (meta.isAvatar ? 1 : 0) : null,
         }).catch(() => {})
       } catch {
         /* storage unavailable (tests/SSR/quota) */
@@ -89,10 +103,10 @@ export async function hydrateLocalObjects(maxBytes = 256 * 1024 * 1024): Promise
   }
 }
 
-export function registerLocalObject(id: string, blob: Blob): void {
+export function registerLocalObject(id: string, blob: Blob, meta: LocalObjectMeta = {}): void {
   if (!id || !blob) return
   localObjects.set(id, blob)
-  persistToDisk(id, blob)
+  persistToDisk(id, blob, meta)
 }
 
 export function hasLocalObject(id: string): boolean {

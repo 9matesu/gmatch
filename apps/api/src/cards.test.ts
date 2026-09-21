@@ -88,6 +88,27 @@ describe('CardService', () => {
     expect(count?.c).toBe(1)
   })
 
+  it('mints a separate card per owner for identical image bytes and never renames across owners', async () => {
+    const hash = 'f3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b856'
+    await db
+      .prepare('INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_hash) VALUES (?, ?, 1000, ?, ?)')
+      .bind('media-xowner-1', CREATOR, 'image/jpeg', hash)
+      .run()
+    await db
+      .prepare('INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_hash) VALUES (?, ?, 1000, ?, ?)')
+      .bind('media-xowner-2', OTHER, 'image/jpeg', hash)
+      .run()
+
+    const mine = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-xowner-1', name: 'Mine' })
+    const theirs = await cards.createCard({ creatorId: OTHER, mediaObjectId: 'media-xowner-2', name: 'Theirs' })
+
+    expect(theirs.id).not.toBe(mine.id)
+    expect(theirs.ownerId).toBe(OTHER)
+    expect(theirs.name).toBe('Theirs')
+    const fresh = await db.prepare('SELECT name FROM Cards WHERE id = ?').bind(mine.id).first<{ name: string }>()
+    expect(fresh?.name).toBe('Mine')
+  })
+
   it('persists bounded creator metadata on card creation', async () => {
     await seedMedia(db, 'media-meta-1', CREATOR)
     const card = await cards.createCard({

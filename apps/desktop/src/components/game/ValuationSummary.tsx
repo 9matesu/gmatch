@@ -33,6 +33,7 @@ interface MyCardDelta {
   delta: number;
   prevScore: number;
   newScore: number;
+  auto?: boolean;
 }
 
 interface OppCardDelta {
@@ -41,6 +42,7 @@ interface OppCardDelta {
   cardUrl?: string | null;
   vote?: string | null;
   delta: number;
+  auto?: boolean;
 }
 
 interface SummaryResult {
@@ -87,6 +89,7 @@ export function ValuationSummary({
         delta: d.pointDelta,
         prevScore: d.previousScore,
         newScore: d.newScore,
+        auto: d.auto,
       }))
       const oppCardDeltas: OppCardDelta[] = vs.opponentCardDeltas.map((d) => ({
         round: rounds.findIndex((r) => r.card_a === d.cardId || r.card_b === d.cardId) + 1 || 1,
@@ -94,6 +97,7 @@ export function ValuationSummary({
         cardUrl: d.cardUrl,
         vote: d.vote,
         delta: d.pointDelta,
+        auto: d.auto,
       }))
       const promotions: PromotionItem[] = (vs.promotions || []).map((p) => ({
         id: p.cardId,
@@ -119,10 +123,14 @@ export function ValuationSummary({
     const myCardDeltas: MyCardDelta[] = rounds.map((r) => {
       const cardId = r.card_a === match.my_card || match.played_cards.includes(r.card_a || '') ? (r.card_a || '') : (r.card_b || '');
       const theirVote = r.card_a === cardId ? r.decision_b : r.decision_a;
+      // Timer-synthesized votes never moved value server-side: show +0/auto.
+      const theirAuto = r.card_a === cardId ? r.auto_b === true : r.auto_a === true;
       let delta = 0;
-      if (theirVote === 'boost') delta = 25;
-      else if (theirVote === 'like') delta = 10;
-      else if (theirVote === 'reject') delta = -5;
+      if (!theirAuto) {
+        if (theirVote === 'boost') delta = 25;
+        else if (theirVote === 'like') delta = 10;
+        else if (theirVote === 'reject') delta = -5;
+      }
 
       // Check promotion
       const cardObj = myCards.find((c) => c.id === cardId);
@@ -145,6 +153,7 @@ export function ValuationSummary({
         delta,
         prevScore,
         newScore,
+        auto: theirAuto || undefined,
       };
     });
     const myDelta = myCardDeltas.reduce((acc, c) => acc + c.delta, 0);
@@ -158,10 +167,13 @@ export function ValuationSummary({
     const oppCardDeltas: OppCardDelta[] = rounds.map((r) => {
       const cardId = r.card_a === match.my_card || match.played_cards.includes(r.card_a || '') ? (r.card_b || '') : (r.card_a || '');
       const myVote = r.card_a === match.my_card ? r.decision_a : r.decision_b;
+      const myAuto = (r.card_a === match.my_card ? r.auto_a : r.auto_b) === true;
       let delta = 0;
-      if (myVote === 'boost') delta = 25;
-      else if (myVote === 'like') delta = 10;
-      else if (myVote === 'reject') delta = -5;
+      if (!myAuto) {
+        if (myVote === 'boost') delta = 25;
+        else if (myVote === 'like') delta = 10;
+        else if (myVote === 'reject') delta = -5;
+      }
 
       return {
         round: r.round,
@@ -169,6 +181,7 @@ export function ValuationSummary({
         cardUrl: r.card_a === match.my_card ? r.card_b_url : r.card_a_url,
         vote: myVote,
         delta,
+        auto: myAuto || undefined,
       };
     });
     const oppDelta = oppCardDeltas.reduce((acc, c) => acc + c.delta, 0);
@@ -275,6 +288,7 @@ export function ValuationSummary({
                     <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold uppercase tracking-wider ${rarity.badgeClass}`}>{rarity.label}</span>
                     <span className="text-retro-muted text-xs flex items-center gap-1">
                       {c.vote === 'boost' ? <><Zap className="w-3 h-3 text-amber-400" /> Boosted</> : c.vote === 'like' ? <><Heart className="w-3 h-3 text-amber-400 fill-rose-400" /> Liked</> : <><X className="w-3 h-3 text-retro-muted" /> Rejected</>}
+                      {c.auto && <span className="text-[10px] font-mono text-retro-muted border border-border-glass rounded px-1">auto · +0</span>}
                     </span>
                   </div>
                   <span className={`font-mono font-bold text-xs ${c.delta >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -296,6 +310,7 @@ export function ValuationSummary({
                   <span className="font-mono text-retro-muted text-xs">R{c.round}:</span>
                   <span className="text-retro-muted text-xs flex items-center gap-1">
                     {c.vote === 'boost' ? <><Zap className="w-3 h-3 text-amber-400" /> You Boosted</> : c.vote === 'like' ? <><Heart className="w-3 h-3 text-amber-400 fill-rose-400" /> You Liked</> : <><X className="w-3 h-3 text-retro-muted" /> You Rejected</>}
+                    {c.auto && <span className="text-[10px] font-mono text-retro-muted border border-border-glass rounded px-1">auto · +0</span>}
                   </span>
                 </div>
                 <span className={`font-mono font-bold text-xs ${c.delta >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>

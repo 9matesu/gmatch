@@ -67,4 +67,22 @@ describe('GMatchFeed author and name click behavior', () => {
 
     expect(onOpenStory).toHaveBeenCalledWith('user-alice');
   });
+
+  it('username and timestamp share the same leading so baselines align', () => {
+    render(
+      <GMatchFeed
+        identity={null}
+        posts={[dummyPost]}
+        stories={dummyStories}
+      />
+    );
+
+    const nameEl = screen.getByText('Alice Wonder');
+    const row = nameEl.closest('div.flex');
+    expect(row?.className).toMatch('items-baseline');
+    expect(nameEl.className).toMatch('leading-tight');
+    const timeEl = row?.querySelector('time');
+    expect(timeEl?.className).toMatch('leading-tight');
+    expect(timeEl?.className).toMatch('shrink-0');
+  });
 });

@@ -379,6 +379,7 @@ export function GMatchProfile({
                   objectId={post.id}
                   contentUrl={post.url}
                   identity={identity}
+                  mimeType={post.mime_type}
                   alt=""
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
                   videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
@@ -386,7 +387,7 @@ export function GMatchProfile({
                   autoPlay={false}
                   playsInline
                 />
-                {isMediaVideo(post.url) && (
+                {(post.mime_type?.startsWith('video/') || isMediaVideo(post.url)) && (
                   <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
@@ -426,6 +427,7 @@ export function GMatchProfile({
                   objectId={post.id}
                   contentUrl={post.url}
                   identity={identity}
+                  mimeType={post.mime_type}
                   alt=""
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
                   videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
@@ -433,7 +435,7 @@ export function GMatchProfile({
                   autoPlay={false}
                   playsInline
                 />
-                {isMediaVideo(post.url) && (
+                {(post.mime_type?.startsWith('video/') || isMediaVideo(post.url)) && (
                   <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
@@ -466,6 +468,7 @@ export function GMatchProfile({
                   contentUrl={post.url}
                   objectId={post.id}
                   identity={identity}
+                  mimeType={post.mime_type}
                   alt=""
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
                   videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
@@ -473,7 +476,7 @@ export function GMatchProfile({
                   autoPlay={false}
                   playsInline
                 />
-                {isMediaVideo(post.url) && (
+                {(post.mime_type?.startsWith('video/') || isMediaVideo(post.url)) && (
                   <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
@@ -503,6 +506,7 @@ export function GMatchProfile({
                   contentUrl={card.content_url || (card as any).data || (card as any).url || `/api/objects/${card.id}`}
                   objectId={card.id}
                   identity={identity}
+                  mimeType={card.mime_type}
                   alt=""
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
                   videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
@@ -510,7 +514,7 @@ export function GMatchProfile({
                   autoPlay={false}
                   playsInline
                 />
-                {isMediaVideo(card.content_url || (card as any).url) && (
+                {(card.mime_type?.startsWith('video/') || isMediaVideo(card.content_url || (card as any).url)) && (
                   <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>

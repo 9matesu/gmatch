@@ -27,11 +27,11 @@ async function userVersion(client: Awaited<ReturnType<typeof createClient>>): Pr
 }
 
 describe('gMatch Phase 1 migrations', () => {
-  it('migrates a fresh in-memory DB to user_version 55 with all new tables/columns', async () => {
+  it('migrates a fresh in-memory DB to user_version 56 with all new tables/columns', async () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)
 
-    expect(await userVersion(client)).toBe(55)
+    expect(await userVersion(client)).toBe(56)
 
     // Gossip relay envelopes (migration 055, plan G1)
     expect(await tableExists(client, 'GossipEnvelopes')).toBe(true)
@@ -160,27 +160,85 @@ describe('gMatch Phase 1 migrations', () => {
     const object = await client.execute("SELECT gacha_downloads_count FROM Objects WHERE id = 'legacy-object'")
     expect(Number(object.rows[0]?.gacha_downloads_count)).toBe(30)
 
+    // 035 auto-mints, then 056 purges the auto-mint (backfilled, never
+    // user-created): auto-mint is retired, only explicit cards survive.
     const card = await client.execute("SELECT id, value, like_count FROM Cards WHERE media_object_id = 'legacy-object'")
-    expect(card.rows).toHaveLength(1)
-    expect(Number(card.rows[0]?.value)).toBe(30)
-    expect(Number(card.rows[0]?.like_count)).toBe(1)
+    expect(card.rows).toHaveLength(0)
 
-    const ownership = await client.execute("SELECT COUNT(*) AS count FROM CardOwnership WHERE card_id = ?", [card.rows[0]?.id])
-    expect(Number(ownership.rows[0]?.count)).toBe(1)
+    const ownership = await client.execute("SELECT COUNT(*) AS count FROM CardOwnership WHERE card_id NOT IN (SELECT id FROM Cards)")
+    expect(Number(ownership.rows[0]?.count)).toBe(0)
 
-    const history = await client.execute("SELECT COUNT(*) AS count FROM CardHistory WHERE card_id = ? AND event = 'backfilled'", [card.rows[0]?.id])
-    expect(Number(history.rows[0]?.count)).toBe(1)
+    const history = await client.execute("SELECT COUNT(*) AS count FROM CardHistory WHERE card_id NOT IN (SELECT id FROM Cards)")
+    expect(Number(history.rows[0]?.count)).toBe(0)
 
     const publicCard = await client.execute("SELECT COUNT(*) AS count FROM Cards WHERE media_object_id = 'legacy-post'")
     expect(Number(publicCard.rows[0]?.count)).toBe(0)
 
-    // Reapplying 035 does not duplicate cards, ownership, or history.
+    // Reapplying does not resurrect cards, ownership, or history.
     await client.execute('PRAGMA user_version = 34')
     await migrate(client)
     const cardCount = await client.execute("SELECT COUNT(*) AS count FROM Cards WHERE media_object_id = 'legacy-object'")
-    const historyCount = await client.execute("SELECT COUNT(*) AS count FROM CardHistory WHERE card_id = ? AND event = 'backfilled'", [card.rows[0]?.id])
-    expect(Number(cardCount.rows[0]?.count)).toBe(1)
-    expect(Number(historyCount.rows[0]?.count)).toBe(1)
+    expect(Number(cardCount.rows[0]?.count)).toBe(0)
+  })
+
+  it('purges bug-generated cards (056) while keeping user-minted and adopted cards', async () => {
+    const client = createClient({ url: ':memory:' })
+    await migrate(client)
+
+    await client.execute("INSERT INTO Users (id, public_key, display_name) VALUES ('purge-owner', 'purge-owner-key', 'Purge Owner')")
+    // Media kinds: private (keeper), post, story, chat, avatar.
+    await client.execute("INSERT INTO Objects (id, owner_id, size_bytes, mime_type, is_public, is_story, is_chat, is_avatar) VALUES ('m-private', 'purge-owner', 1, 'image/jpeg', 0, 0, 0, 0)")
+    await client.execute("INSERT INTO Objects (id, owner_id, size_bytes, mime_type, is_public, is_story, is_chat, is_avatar) VALUES ('m-post', 'purge-owner', 1, 'image/jpeg', 1, 0, 0, 0)")
+    await client.execute("INSERT INTO Objects (id, owner_id, size_bytes, mime_type, is_public, is_story, is_chat, is_avatar) VALUES ('m-story', 'purge-owner', 1, 'image/jpeg', 0, 1, 0, 0)")
+    await client.execute("INSERT INTO Objects (id, owner_id, size_bytes, mime_type, is_public, is_story, is_chat, is_avatar) VALUES ('m-chat', 'purge-owner', 1, 'image/jpeg', 0, 0, 1, 0)")
+    await client.execute("INSERT INTO Objects (id, owner_id, size_bytes, mime_type, is_public, is_story, is_chat, is_avatar) VALUES ('m-avatar', 'purge-owner', 1, 'image/jpeg', 0, 0, 0, 1)")
+    // Cards: user-minted keeper, flag-backed bogus, nameless, backfilled-only,
+    // backfilled-then-adopted (purchased), backfilled-then-listed.
+    await client.execute("INSERT INTO Cards (id, creator_id, media_object_id, name, rarity, value, market_status, moderation_state) VALUES ('keep', 'purge-owner', 'm-private', 'Keeper', 'common', 10, 'none', 'active')")
+    await client.execute("INSERT INTO CardHistory (id, card_id, event, to_user) VALUES ('h-keep', 'keep', 'created', 'purge-owner')")
+    await client.execute("INSERT INTO CardOwnership (card_id, owner_id) VALUES ('keep', 'purge-owner')")
+    for (const [cid, mid] of [['bogus-post', 'm-post'], ['bogus-story', 'm-story'], ['bogus-chat', 'm-chat'], ['bogus-avatar', 'm-avatar']] as Array<[string, string]>) {
+      await client.execute("INSERT INTO Cards (id, creator_id, media_object_id, name, rarity, value, market_status, moderation_state) VALUES (?, 'purge-owner', ?, 'Bogus', 'common', 0, 'none', 'active')", [cid, mid])
+      await client.execute("INSERT INTO CardHistory (id, card_id, event, to_user) VALUES (?, ?, 'backfilled', 'purge-owner')", [`h-${cid}`, cid])
+      await client.execute("INSERT INTO CardOwnership (card_id, owner_id) VALUES (?, 'purge-owner')", [cid])
+    }
+    await client.execute("INSERT INTO Cards (id, creator_id, media_object_id, name, rarity, value, market_status, moderation_state) VALUES ('nameless', 'purge-owner', 'm-private', NULL, 'common', 0, 'none', 'active')")
+    await client.execute("INSERT INTO CardOwnership (card_id, owner_id) VALUES ('nameless', 'purge-owner')")
+    await client.execute("INSERT INTO Cards (id, creator_id, media_object_id, name, rarity, value, market_status, moderation_state) VALUES ('auto-only', 'purge-owner', 'm-private', 'Auto', 'common', 0, 'none', 'active')")
+    await client.execute("INSERT INTO CardHistory (id, card_id, event, to_user) VALUES ('h-auto', 'auto-only', 'backfilled', 'purge-owner')")
+    await client.execute("INSERT INTO CardOwnership (card_id, owner_id) VALUES ('auto-only', 'purge-owner')")
+    await client.execute("INSERT INTO Cards (id, creator_id, media_object_id, name, rarity, value, market_status, moderation_state) VALUES ('adopted', 'purge-owner', 'm-private', 'Adopted', 'common', 0, 'none', 'active')")
+    await client.execute("INSERT INTO CardHistory (id, card_id, event, to_user) VALUES ('h-adopted-b', 'adopted', 'backfilled', 'purge-owner')")
+    await client.execute("INSERT INTO CardHistory (id, card_id, event, from_user, to_user) VALUES ('h-adopted-p', 'adopted', 'purchased', 'purge-owner', 'other-user')")
+    await client.execute("INSERT INTO CardOwnership (card_id, owner_id) VALUES ('adopted', 'other-user')")
+    await client.execute("INSERT INTO Cards (id, creator_id, media_object_id, name, rarity, value, market_status, moderation_state) VALUES ('listed-auto', 'purge-owner', 'm-private', 'Listed', 'common', 0, 'open', 'active')")
+    await client.execute("INSERT INTO CardHistory (id, card_id, event, to_user) VALUES ('h-listed-b', 'listed-auto', 'backfilled', 'purge-owner')")
+    await client.execute("INSERT INTO CardHistory (id, card_id, event, to_user) VALUES ('h-listed-l', 'listed-auto', 'listed', 'purge-owner')")
+    await client.execute("INSERT INTO CardOwnership (card_id, owner_id) VALUES ('listed-auto', 'purge-owner')")
+    await client.execute("INSERT INTO MarketListings (id, card_id, seller_id, price, status) VALUES ('listing-1', 'listed-auto', 'purge-owner', 50, 'open')")
+    await client.execute("INSERT INTO Decks (id, owner_id, name) VALUES ('deck-1', 'purge-owner', 'D1')")
+    await client.execute("INSERT INTO DeckCards (deck_id, card_id, position) VALUES ('deck-1', 'bogus-chat', 0)")
+    await client.execute("INSERT INTO DeckCards (deck_id, card_id, position) VALUES ('deck-1', 'keep', 1)")
+
+    // Only migration 056 should run.
+    await client.execute('PRAGMA user_version = 55')
+    await migrate(client)
+
+    const remaining = await client.execute("SELECT id FROM Cards ORDER BY id")
+    expect(remaining.rows.map((r: any) => r.id).sort()).toEqual(['adopted', 'keep', 'listed-auto'])
+    // Cascades leave no dangling references.
+    for (const table of ['CardOwnership', 'CardHistory', 'MarketListings', 'DeckCards']) {
+      const dangling = await client.execute(`SELECT COUNT(*) AS count FROM ${table} WHERE card_id NOT IN (SELECT id FROM Cards)`)
+      expect(Number(dangling.rows[0]?.count)).toBe(0)
+    }
+    // Backing media untouched.
+    const media = await client.execute("SELECT COUNT(*) AS count FROM Objects WHERE id IN ('m-private','m-post','m-story','m-chat','m-avatar')")
+    expect(Number(media.rows[0]?.count)).toBe(5)
+    // Rerunnable: second pass changes nothing.
+    await client.execute('PRAGMA user_version = 55')
+    await migrate(client)
+    const again = await client.execute("SELECT COUNT(*) AS count FROM Cards")
+    expect(Number(again.rows[0]?.count)).toBe(3)
   })
 
   it('backfills legacy players into the economy (040): XP, wallets, and card valuation', async () => {
@@ -231,7 +289,7 @@ describe('gMatch Phase 1 migrations', () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)
     const versionAfterFirst = await userVersion(client)
-    expect(versionAfterFirst).toBe(55)
+    expect(versionAfterFirst).toBe(56)
     expect(await columnExists(client, 'ServerDirectory', 'tags')).toBe(true)
 
     // Running migrate() again is a no-op
@@ -243,10 +301,10 @@ describe('gMatch Phase 1 migrations', () => {
     expect(await columnExists(client, 'Users', 'is_moderator')).toBe(true)
   })
 
-  it('upgrades a pre-gMatch snapshot (user_version 13) by applying 014-055', async () => {
+  it('upgrades a pre-gMatch snapshot (user_version 13) by applying 014-056', async () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)
-    expect(await userVersion(client)).toBe(55)
+    expect(await userVersion(client)).toBe(56)
 
     // Tear down gMatch additions so we're effectively at pre-014 state.
     await client.execute('DROP TABLE IF EXISTS Saves')
@@ -269,10 +327,10 @@ describe('gMatch Phase 1 migrations', () => {
     // Pretend we're still on the pre-gMatch migration version.
     await client.execute('PRAGMA user_version = 13')
 
-    // Re-run migrate — it should detect user_version=13 and apply 014-055 in order
+    // Re-run migrate — it should detect user_version=13 and apply 014-056 in order
     await migrate(client)
 
-    expect(await userVersion(client)).toBe(55)
+    expect(await userVersion(client)).toBe(56)
     expect(await tableExists(client, 'Followers')).toBe(true)
     expect(await tableExists(client, 'Comments')).toBe(true)
     expect(await tableExists(client, 'CommentLikes')).toBe(true)

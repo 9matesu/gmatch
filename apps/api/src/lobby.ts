@@ -115,7 +115,13 @@ export async function resolveCardUrl(db: D1Turso, id: string | null | undefined)
   if (mc && mc.content_url) return mc.content_url
   const obj = await db.prepare('SELECT id, content_url FROM Objects WHERE id = ?').bind(id).first<{ id: string; content_url: string | null }>()
   if (obj) {
-    if (obj.content_url && obj.content_url.trim()) return obj.content_url
+    if (obj.content_url && obj.content_url.trim()) {
+      const stored = obj.content_url.trim()
+      // Client-renderable schemes pass through; only unknown values fall back
+      // to the object stream (which 404s for non-object ids).
+      if (/^(data:|blob:|https?:\/\/|\/api\/|gmcache:\/\/|vault:\/\/|idle-file:\/\/|magnet:|urn:sha256:)/i.test(stored)) return stored
+      return `/api/objects/${obj.id}`
+    }
     return `/api/objects/${obj.id}`
   }
   if (id.startsWith('data:') || id.startsWith('http://') || id.startsWith('https://') || id.startsWith('/api/')) return id
@@ -332,11 +338,13 @@ async function snapshotForUser(db: D1Turso, match: GameMatch, userId: string): P
     played_cards: myPlayedCards,
     phase_deadline: match.phase_deadline,
     my_card: rawMine ?? null,
+    my_card_url: await resolveCardUrl(db, rawMine),
     my_decided: myDecided,
     my_decision: myDecision ?? null,
     boosts_remaining: boostsRemaining,
     opponent: { id: opponentId, display_name: opp.display_name, pfp_url: opp.pfp_url },
     opponent_card: revealed ? (rawTheirs ?? null) : null,
+    opponent_card_url: revealed ? await resolveCardUrl(db, rawTheirs) : null,
     opponent_played: Boolean(rawTheirs),
     opponent_decided: theirDecided,
     opponent_decision: showTheirDecision ? (theirDecision ?? null) : null,
@@ -393,13 +401,17 @@ async function buildValuationSummary(
 
   for (const r of rounds) {
     // I vote on my opponent's card; my opponent votes on mine.
+    // Timer-synthesized (auto) votes resolve the round but never move value,
+    // so their delta is forced to 0 — the summary must match what was written.
     const myVote: 'like' | 'reject' | 'boost' | null = (me === 'a' ? r.decision_a : r.decision_b) as any || null
     const theirVote: 'like' | 'reject' | 'boost' | null = (me === 'a' ? r.decision_b : r.decision_a) as any || null
+    const myAuto = me === 'a' ? r.auto_a === true : r.auto_b === true
+    const theirAuto = me === 'a' ? r.auto_b === true : r.auto_a === true
     const myCardId = me === 'a' ? r.card_a : r.card_b
     const oppCardId = me === 'a' ? r.card_b : r.card_a
 
-    const myDelta = theirVote ? VOTE_POINTS[theirVote] : 0
-    const oppDelta = myVote ? VOTE_POINTS[myVote] : 0
+    const myDelta = theirAuto ? 0 : (theirVote ? VOTE_POINTS[theirVote] : 0)
+    const oppDelta = myAuto ? 0 : (myVote ? VOTE_POINTS[myVote] : 0)
 
     cumulativeDelta.set(myCardId || '', (cumulativeDelta.get(myCardId || '') || 0) + myDelta)
     cumulativeDelta.set(oppCardId || '', (cumulativeDelta.get(oppCardId || '') || 0) + oppDelta)
@@ -418,6 +430,7 @@ async function buildValuationSummary(
         pointDelta: myDelta,
         previousScore: prev,
         newScore: next,
+        auto: theirAuto || undefined,
         promoted: promo.promoted,
         newRarity: promo.newRarity,
       })
@@ -433,6 +446,7 @@ async function buildValuationSummary(
         pointDelta: oppDelta,
         previousScore: prev,
         newScore: Math.max(0, prev + oppDelta),
+        auto: myAuto || undefined,
       })
     }
   }
@@ -445,10 +459,13 @@ async function buildValuationSummary(
   const oppDeckBefore = opponentCardDeltas.reduce((acc, d) => acc + d.previousScore, 0)
   const oppDeckAfter = oppDeckBefore + oppDeltaTotal
 
-  const myVotes = rounds.map((r) => ((me === 'a' ? r.decision_a : r.decision_b) as 'like' | 'reject' | 'boost') || null)
+  const myVotes = rounds.map((r) => ({
+    vote: ((me === 'a' ? r.decision_a : r.decision_b) as 'like' | 'reject' | 'boost') || null,
+    auto: (me === 'a' ? r.auto_a : r.auto_b) === true,
+  }))
   const discoveryInfluenceEarned = myVotes.reduce((acc, v) => {
-    if (!v) return acc
-    return acc + calculateDiscoveryReward(VOTE_POINTS[v], v)
+    if (!v.vote || v.auto) return acc
+    return acc + calculateDiscoveryReward(VOTE_POINTS[v.vote], v.vote)
   }, 0)
 
   // Card of the match: highest positive delta across both decks.
@@ -520,11 +537,13 @@ export async function getSpectatorSnapshot(db: D1Turso, matchId: string): Promis
     rounds_history: resolvedHistory,
     played_cards: [],
     phase_deadline: match.phase_deadline,
-    my_card: cardAUrl,
+    my_card: revealed ? (match.card_a ?? null) : null,
+    my_card_url: cardAUrl,
     my_decided: Boolean(match.decision_a),
     my_decision: match.decision_a ?? null,
     opponent: { id: match.user_b, display_name: oppB.display_name, pfp_url: oppB.pfp_url },
-    opponent_card: cardBUrl,
+    opponent_card: revealed ? (match.card_b ?? null) : null,
+    opponent_card_url: cardBUrl,
     opponent_played: Boolean(match.card_b),
     opponent_decided: Boolean(match.decision_b),
     opponent_decision: match.decision_b ?? null,
@@ -537,6 +556,7 @@ export async function getSpectatorSnapshot(db: D1Turso, matchId: string): Promis
       display_name: oppA.display_name,
       pfp_url: oppA.pfp_url,
       card: cardAUrl,
+      card_id: revealed ? (match.card_a ?? null) : null,
       decided: Boolean(match.decision_a),
       decision: match.decision_a ?? null,
       score: match.score_a || 0,
@@ -546,6 +566,7 @@ export async function getSpectatorSnapshot(db: D1Turso, matchId: string): Promis
       display_name: oppB.display_name,
       pfp_url: oppB.pfp_url,
       card: cardBUrl,
+      card_id: revealed ? (match.card_b ?? null) : null,
       decided: Boolean(match.decision_b),
       decision: match.decision_b ?? null,
       score: match.score_b || 0,
@@ -1033,8 +1054,13 @@ async function advanceMatches(db: D1Turso, now: number): Promise<void> {
     }
 
     if (match.phase === 'decide') {
-      if (!match.decision_a) match.decision_a = 'reject'
-      if (!match.decision_b) match.decision_b = 'reject'
+      // Timer-synthesized rejects are marked auto: they resolve the round but
+      // never move card value (no applyLikeDecision write). Live votes that
+      // arrived before the deadline keep auto=false.
+      const autoA = !match.decision_a
+      const autoB = !match.decision_b
+      if (autoA) match.decision_a = 'reject'
+      if (autoB) match.decision_b = 'reject'
       const roundMatched = ['like', 'boost'].includes(match.decision_a || '') && ['like', 'boost'].includes(match.decision_b || '')
       match.matched = roundMatched ? 1 : 0
       if (roundMatched) {
@@ -1049,6 +1075,8 @@ async function advanceMatches(db: D1Turso, now: number): Promise<void> {
         card_b: match.card_b,
         decision_a: match.decision_a,
         decision_b: match.decision_b,
+        auto_a: autoA || undefined,
+        auto_b: autoB || undefined,
         matched: roundMatched,
         result: roundMatched ? 'match' : 'no_match',
       })

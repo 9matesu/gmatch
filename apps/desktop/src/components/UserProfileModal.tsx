@@ -402,6 +402,7 @@ export function UserProfileModal({
                         contentUrl={post.url}
                         objectId={post.id}
                         identity={identity}
+                        mimeType={(post as any).mime_type}
                         alt={post.caption || ''}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                       />
@@ -431,7 +432,8 @@ export function UserProfileModal({
                       <ObjectImage
                         contentUrl={card.content_url || (card as any).data || (card as any).url || `/api/objects/${card.id}`}
                         objectId={card.id}
-                        identity={null}
+                        identity={identity}
+                        mimeType={(card as any).mime_type}
                         alt=""
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                       />
