@@ -606,7 +606,7 @@ export default function IdleGalleryView({
                             onClick={() => {
                               setOpenMenuId(null)
                               onRepostImage({
-                                url: img.url,
+                                url: vaultUrls[img.url] || img.url,
                                 tags: img.tags,
                                 name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
                               })
@@ -626,7 +626,7 @@ export default function IdleGalleryView({
                             onClick={() => {
                               setOpenMenuId(null)
                               onAddToStory({
-                                url: img.url,
+                                url: vaultUrls[img.url] || img.url,
                                 tags: img.tags,
                                 name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
                               })
@@ -839,7 +839,7 @@ export default function IdleGalleryView({
                   type="button"
                   onClick={() =>
                     onRepostImage({
-                      url: viewer.url,
+                      url: viewerVaultUrl || viewer.url,
                       tags: viewer.tags,
                       name: viewer.tags.slice(0, 3).join(' ') || 'Keepsake',
                     })
@@ -856,7 +856,7 @@ export default function IdleGalleryView({
                   type="button"
                   onClick={() =>
                     onAddToStory({
-                      url: viewer.url,
+                      url: viewerVaultUrl || viewer.url,
                       tags: viewer.tags,
                       name: viewer.tags.slice(0, 3).join(' ') || 'Keepsake',
                     })
