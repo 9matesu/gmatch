@@ -1067,13 +1067,18 @@ export default function Home() {
     const seenServerIds = new Set(serverVisible.map((p) => p.id));
     const myLocalPublicPosts: FeedPost[] = items
       .filter((obj) => (obj as any).is_public === 1 && obj.owner_id === identity?.orbitId && !deletedPostIds.has(obj.id) && !seenServerIds.has(obj.id))
-      .map((obj) => ({
+      .map((obj) => {
+        // Blind image/jpeg defaults mislabel video rows (cover-all has no
+        // extension to sniff): keep image default, but let video-ish URLs
+        // stay video so tiles pick the player, not a broken image.
+        const localUrl = obj.content_url || (obj as any).data || (obj as any).url || `/api/objects/${obj.id}`
+        return ({
         id: obj.id,
         author_id: identity?.orbitId || 'peer',
         author_name: myProfile.displayName || 'You',
         author_avatar: profilePics[identity?.orbitId || ''] || null,
-        url: obj.content_url || (obj as any).data || (obj as any).url || `/api/objects/${obj.id}`,
-        mime_type: obj.mime_type || 'image/jpeg',
+        url: localUrl,
+        mime_type: obj.mime_type || (isMediaVideo(localUrl) ? 'video/mp4' : 'image/jpeg'),
         caption: obj.caption || (obj as any).post_caption || '',
         location: (obj as any).location || '',
         tags: Array.isArray((obj as any).tags) ? (obj as any).tags : [],
@@ -1083,7 +1088,8 @@ export default function Home() {
         is_liked: false,
         is_saved: false,
         is_archived: archivedPostIds.has(obj.id),
-      }));
+        })
+      })
 
     return [...serverVisible, ...repostedPosts, ...myLocalPublicPosts];
   }, [items, profilePics, identity, myProfile, repostedPosts, archivedPostIds, deletedPostIds, serverPosts, normalizeFeedPost]);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveMediaUrl, isMediaVideo, isVideoPageUrl, isVideoPost, redgifsIdFromUrl, resolveVideoMime } from './media';
+import { resolveMediaUrl, isMediaVideo, isVideoPageUrl, isVideoPost, redgifsIdFromUrl, resolveVideoMime, urlFallbackMime } from './media';
 
 describe('resolveMediaUrl', () => {
   it('keeps data:, blob:, http: and https: URLs untouched', () => {
@@ -133,5 +133,22 @@ describe('isVideoPageUrl / redgifsIdFromUrl', () => {
     expect(redgifsIdFromUrl('https://redgifs.com/ifr/XYZ789')).toBe('xyz789');
     expect(redgifsIdFromUrl('https://www.redgifs.com/tags/blonde')).toBeNull();
     expect(redgifsIdFromUrl('not a url')).toBeNull();
+  });
+});
+
+describe('urlFallbackMime', () => {
+  it('keeps an explicit video mime (webm stays webm, not mp4)', () => {
+    expect(urlFallbackMime({ kind: 'video', mimeType: 'video/webm', previewUrl: 'https://x/v.webm' })).toBe('video/webm');
+  });
+
+  it('falls back to video/mp4 for video-ish items without an explicit mime', () => {
+    expect(urlFallbackMime({ kind: 'video', previewUrl: 'vault://f/clip' })).toBe('video/mp4');
+    expect(urlFallbackMime({ previewUrl: 'https://x/clip.mp4' })).toBe('video/mp4');
+    expect(urlFallbackMime({ isVideo: true, previewUrl: 'https://x/watch/abc' })).toBe('video/mp4');
+  });
+
+  it('returns null for images so the server default applies', () => {
+    expect(urlFallbackMime({ kind: 'image', mimeType: 'image/png', previewUrl: 'https://x/a.png' })).toBeNull();
+    expect(urlFallbackMime({ previewUrl: 'https://x/a.jpg' })).toBeNull();
   });
 });

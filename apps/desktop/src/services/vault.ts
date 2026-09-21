@@ -232,9 +232,58 @@ export function useVaultUrls(urls: Array<string | null | undefined>): Record<str
   return map
 }
 
+/**
+ * Batch lookup for renderers: vault:// URL -> browser-playable localhost
+ * http URL (the Electron vault server speaks Range, so <video> seeks work;
+ * raw vault:// depends on the custom-scheme handler and never works in a
+ * browser tab). Non-vault URLs are never included — callers fall back to the
+ * original URL when there is no mapping. Re-resolves on vault updates so a
+ * tile recovers if its bytes arrive after first paint.
+ */
+export function useVaultHttpUrls(urls: Array<string | null | undefined>): Record<string, string> {
+  const key = urls.filter((u): u is string => !!u && u.startsWith('vault://')).join('|')
+  const [map, setMap] = useState<Record<string, string>>({})
+  useEffect(() => {
+    if (!key || !enabled()) return
+    let dead = false
+    const resolve = () => {
+      void Promise.all(
+        key.split('|').map(async (u) => [u, await vaultHttpUrl(u)] as const),
+      ).then((pairs) => {
+        if (!dead) {
+          setMap((prev) => {
+            const next = { ...prev }
+            for (const [u, l] of pairs) if (l) next[u] = l
+            return next
+          })
+        }
+      })
+    }
+    resolve()
+    const onVaultUpdate = (e: Event) => {
+      const custom = e as CustomEvent<{ url?: string; local?: string }>
+      if (custom.detail?.url && key.includes(custom.detail.url)) {
+        setMap((prev) => {
+          const next = { ...prev }
+          delete next[custom.detail!.url!]
+          return next
+        })
+      }
+      resolve()
+    }
+    window.addEventListener('orbit-settings-updated', resolve)
+    window.addEventListener('orbit-vault-updated', onVaultUpdate)
+    return () => {
+      dead = true
+      window.removeEventListener('orbit-settings-updated', resolve)
+      window.removeEventListener('orbit-vault-updated', onVaultUpdate)
+    }
+  }, [key])
+  return map
+}
+
 /** Browser-openable localhost URL for a stored URL, else null. */
-export async function vaultHttpUrl(url: string): Promise<string | null> {
-  if (!url || !enabled()) return null
+export async function vaultHttpUrl(url: string): Promise<string | null> {  if (!url || !enabled()) return null
   if (vaultBridge()) {
     try {
       const res = await window.gmatch?.vaultHttpUrl?.(url)

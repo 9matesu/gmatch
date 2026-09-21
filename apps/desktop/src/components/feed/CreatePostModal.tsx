@@ -19,7 +19,7 @@ import {
 import type { OrbitIdentity } from '@orbit/crypto';
 import { orbitFetch } from '../../utils/api';
 import { mediaUrlToCachedFile } from '../../utils/cacheMedia';
-import { isMediaVideo, isTwitterUrl, isVideoPageUrl, isVideoPost, resolveTwitterMedia, resolveVideoMime, sniffFileHead } from '../../utils/media';
+import { isMediaVideo, isTwitterUrl, isVideoPageUrl, isVideoPost, resolveTwitterMedia, resolveVideoMime, sniffFileHead, urlFallbackMime } from '../../utils/media';
 import { forgeMediaLocally } from '../../services/mediaForge';
 import { devFetchable } from '../../services/imageCache';
 
@@ -387,12 +387,10 @@ function extForMime(mime: string): string {
           formData.append('url', item.previewUrl);
           formData.append('is_public', '1');
           formData.append('post_group', postGroup);
-          const isVid = (item as any).isVideo || item.kind === 'video'
-            || Boolean(item.file && item.file.type.startsWith('video/'))
-            || /\.(mp4|m4v|webm|mov|mkv|ogv|ogg|gifv)(\?|$)/i.test(item.previewUrl);
-          if (!primaryMime) primaryMime = item.mimeType || (isVid ? 'video/mp4' : null);
-          if (isVid) {
-            formData.append('mime_type', 'video/mp4');
+          const fallbackMime = urlFallbackMime(item as any);
+          if (!primaryMime) primaryMime = item.mimeType || fallbackMime;
+          if (fallbackMime) {
+            formData.append('mime_type', fallbackMime);
           }
           if (i === 0) {
             formData.append('post_caption', caption.trim());
