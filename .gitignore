@@ -46,3 +46,6 @@ apps/desktop/.electron-dist/
 apps/api/probe-*.ts
 apps/api/watchparties.json
 release2/
+
+# local storage signing key (never commit)
+storage.key
