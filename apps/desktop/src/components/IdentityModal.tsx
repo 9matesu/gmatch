@@ -181,7 +181,6 @@ export function IdentityModal({
   return (
     <div
       className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 select-none font-sans"
-      onClick={onClose}
     >
       <div
         className="bg-surface-raised border border-border-glass w-full max-w-lg rounded-lg shadow-xl overflow-hidden animate-orbit-pop flex flex-col"

@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('gmatch', {
   cacheImage: (url) => ipcRenderer.invoke('cache:image', url),
   cacheStats: () => ipcRenderer.invoke('cache:stats'),
   clearCache: () => ipcRenderer.invoke('cache:clear'),
+  clearFeedCache: () => ipcRenderer.invoke('cache:clear-feed'),
   evictImage: (url) => ipcRenderer.invoke('cache:evict', url),
   // Opt-in local media vault (gallery keeps + card bytes on disk).
   vaultGet: (url) => ipcRenderer.invoke('vault:get', url),

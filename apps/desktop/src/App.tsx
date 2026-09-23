@@ -111,20 +111,20 @@ export default function Home() {
     runMigrations();
   }, []);
 
-  // Packaged-exe install fix: drop a stale loopback API override when the
-  // main process says we are a client (no bundled server). Otherwise every
-  // poll + WS reconnect hammers dead 127.0.0.1:8790 forever. API_BASE is
-  // computed at import time, so clear + reload once when stale.
+  // Stale-API fix (all surfaces): drop a loopback API override pointing at a
+  // DEAD sidecar — a stale `gmatch.api.url` would otherwise hammer dead
+  // 127.0.0.1:8790 forever in the browser tab and Electron alike (the anon
+  // tab, with no persisted key, was the only surface that still worked).
+  // API_BASE is computed at import time, so clear + reload once when stale.
+  // A healthy opt-in local sidecar (GMATCH_LOCAL_API=1) keeps its override.
   useEffect(() => {
     let dead = false;
     void (async () => {
       try {
-        const st = await window.gmatch?.serverState?.().catch(() => null);
-        if (dead || !st?.packaged || st.mode !== 'client') return;
-        const { clearStaleLoopbackApiBase, getApiBaseUrl } = await import('./utils/api');
-        const base = getApiBaseUrl();
-        if (/127\.0\.0\.1|localhost/.test(base)) {
-          if (clearStaleLoopbackApiBase()) window.location.reload();
+        const { clearDeadLoopbackApiBase, getApiBaseUrl } = await import('./utils/api');
+        if (dead) return;
+        if (await clearDeadLoopbackApiBase()) {
+          if (!dead && /127\.0\.0\.1|localhost/.test(getApiBaseUrl())) window.location.reload();
         }
       } catch { /* browser dev: no bridge */ }
     })();

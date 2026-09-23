@@ -61,7 +61,6 @@ export function CommentsModal({
   return (
     <div
       className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-orbit-fade-in"
-      onClick={onClose}
     >
       <div
         className="bg-surface-raised w-full max-w-md rounded-t-3xl sm:rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col h-[75vh] max-h-[600px] animate-orbit-slide-up"

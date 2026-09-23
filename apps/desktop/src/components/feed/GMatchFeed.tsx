@@ -1347,7 +1347,7 @@ export function GMatchFeed({
       />,
       document.body,
       )}
-      {cameraCropper && createPortal(cameraCropper, document.body)}
+      {cameraCropper}
     </div>
   );
 }

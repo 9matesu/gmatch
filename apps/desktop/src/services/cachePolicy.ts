@@ -71,7 +71,9 @@ export function isFeedCacheFresh(
   return cachedAt > 0 && now - cachedAt < ttlMs
 }
 
-/** Normalize a feed query so identical tags share one cache slot. */
+/** Normalize a feed query so identical tags share one cache slot.
+ * Underscores and spaces name the same tag (skylar_vox == skylar vox) —
+ * mirrors electron/imageCache.cjs normalizeQuery, keep in sync. */
 export function normalizeFeedQuery(query: string): string {
-  return query.trim().replace(/\s+/g, ' ').toLowerCase()
+  return query.trim().replace(/_/g, ' ').replace(/\s+/g, ' ').toLowerCase()
 }

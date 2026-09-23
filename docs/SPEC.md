@@ -174,7 +174,16 @@ text overlays kept for caption hunts, §6).
   Gallery tab: text box filters keepsakes by tag substring.
   Config tab: starter picks recap + extra excludes (add/remove, 100 max).
 
-## 8. Hard blocklist (reject tag if ANY substring matches; case-insensitive)
+## 8. Blocklist — client-side only (reject tag if ANY substring matches; case-insensitive)
+
+The server NEVER hard-blocks a tag: write paths (objects, gossip, slideshows,
+users) store tags verbatim and gossip replicates them as-is. Filtering happens
+exclusively in the desktop client (feed queries, post tags, market discovery),
+driven by a single source of truth:
+
+`shared/blocklist.json` (factory default) + the user's edited copy at
+`userData/blocklist.json` (takes precedence, written only through Settings →
+Blocklist; Settings never touches the repo file).
 
 Player excludes (setup screen + Config tab, 100 max, persisted) extend this
 list at runtime: queries, post tags, and market discovery all respect them.

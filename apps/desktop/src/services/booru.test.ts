@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { __resetFeedState, clearMirrorCooldowns, fetchPosts, fetchPostsMulti, interleaveBatches, mapLimit, markSeen, parseRealbooruHtml, recallSeen, roundRobin } from './booru'
+import { __resetFeedState, clearMirrorCooldowns, drawFreshPage, drawFreshPid, expandPostViews, fetchPosts, fetchPostsMulti, interleaveBatches, isSeen, mapLimit, markSeen, parseBooruOrgEntries, parseBooruOrgPost, parseRealbooruEntries, parseRealbooruHtml, parseRealbooruPost, recallSeen, roundRobin } from './booru'
 import { setCoRules, setFeedIntent, __resetCoRules } from '../game/tagCooccur'
 import { setUserExcludes } from '../game/tagFilter'
 
@@ -597,12 +597,21 @@ describe('realbooru parser', () => {
 describe('non-stop feed (exhaustion → reshow)', () => {
   const mkPost = (id: string) => ({ id, url: `https://e.test/${id}.jpg`, tags: [], rating: 'e' })
 
-  it('recallSeen rotates least-recent posts flagged repeat:true', async () => {
-    const booruFetch = vi.fn().mockResolvedValue({ ok: true, posts: [mkPost('a'), mkPost('b'), mkPost('c')], source: 't' })
+  it('recallSeen rotates least-recent posts flagged repeat:true (order varies)', async () => {
+    const booruFetch = vi.fn().mockResolvedValue({ ok: true, posts: [mkPost('a'), mkPost('b'), mkPost('c'), mkPost('d')], source: 't' })
     vi.stubGlobal('window', { gmatch: { booruFetch } })
     await fetchPosts({ tags: 'skylar_vox', limit: 5 })
-    expect(recallSeen(2).map((p) => p.id)).toEqual(['a', 'b'])
-    expect(recallSeen(2).map((p) => p.id)).toEqual(['c', 'a'])
+    // Deterministic RNG: Fisher-Yates with j=0 always. Call 1 (cursor 0):
+    // [a,b,c,d] -> [b,c,d,a], out [b,c]. Call 2 (cursor 2): [c,d,a,b] ->
+    // [d,a,b,c], out [d,a]. Same pool, never byte-identical.
+    const realRandom = Math.random
+    Math.random = () => 0
+    try {
+      expect(recallSeen(2).map((p) => p.id)).toEqual(['b', 'c'])
+      expect(recallSeen(2).map((p) => p.id)).toEqual(['d', 'a'])
+    } finally {
+      Math.random = realRandom
+    }
     const r = recallSeen(2)
     expect(r.every((p) => p.repeat === true)).toBe(true)
     expect(r.every((p) => p.tags.length === 0)).toBe(true)
@@ -717,7 +726,10 @@ describe('recallSeen tag preference (no cross-tag leftovers)', () => {
     booruFetch.mockResolvedValueOnce({ ok: true, posts: [mkPost('new1')], source: 't' })
     await fetchPosts({ tags: 'new_tag', limit: 5 })
     // Rotation starts at old1 — but the new tag must recall its own first.
-    expect(recallSeen(2, 'new_tag').map((p) => p.id)).toEqual(['new1', 'old1'])
+    // (Single-element groups are shuffle-proof; the filler may be either leftover.)
+    const out = recallSeen(2, 'new_tag').map((p) => p.id)
+    expect(out[0]).toBe('new1')
+    expect(['old1', 'old2']).toContain(out[1])
   })
 })
 
@@ -795,5 +807,221 @@ describe('deep random sampling (repeat-fix 2026-09-15)', () => {
     } finally {
       Math.random = realRandom
     }
+  })
+})
+
+describe('silent validation (probe/market never poison the pool)', () => {
+  const p = (id: string) => ({ id, url: `https://e.test/${id}.jpg`, tags: ['skylar_vox'], rating: 'e' })
+  it('checks servability without memoizing: ledger, seen-set untouched', async () => {
+    const booruFetch = vi.fn().mockResolvedValue({ ok: true, posts: [p('s1'), p('s2')], source: 't' })
+    vi.stubGlobal('window', { gmatch: { booruFetch } })
+    const res = await fetchPosts({ tags: 'skylar_vox', limit: 5, silent: true })
+    expect(res.ok).toBe(true)
+    expect(res.posts.map((x) => x.id)).toEqual(['s1', 's2'])
+    // Nothing memoized: the same pictures are still "new" afterwards.
+    expect(isSeen('s1', 'https://e.test/s1.jpg')).toBe(false)
+    expect(recallSeen(5, 'skylar_vox')).toEqual([])
+    const res2 = await fetchPosts({ tags: 'skylar_vox', limit: 5 })
+    expect(res2.posts.map((x) => x.id)).toEqual(['s1', 's2'])
+  })
+})
+
+describe('drawFreshPid/drawFreshPage (sampling without replacement)', () => {
+  it('covers every page before repeating while alternatives exist', () => {
+    const seq = [0.1, 0.3, 0.5, 0.7, 0.9]
+    let i = 0
+    const rand = () => seq[i++ % seq.length]
+    const draws = Array.from({ length: 5 }, () => drawFreshPid('cov', 5, rand))
+    expect([...draws].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4])
+  })
+  it('accepts a repeat for tiny pools instead of hanging', () => {
+    expect(drawFreshPid('tiny', 1, () => 0.5)).toBe(0)
+    expect(drawFreshPid('tiny', 1, () => 0.5)).toBe(0)
+  })
+  it('drawFreshPage stays 1-based within bounds', () => {
+    for (let i = 0; i < 20; i++) {
+      const p = drawFreshPage('bnd', 5)
+      expect(p).toBeGreaterThanOrEqual(1)
+      expect(p).toBeLessThanOrEqual(5)
+    }
+  })
+})
+
+describe('post-view expansion (exact file URLs, live-verified markup)', () => {
+  const RB_LIST =
+    '<div class="col thumb" id="s1000087"><a id="p1000087" href="https://realbooru.com/index.php?page=post&s=view&id=1000087">' +
+    '<img src="https://realbooru.com/thumbnails/e5/9e/thumbnail_e59e2458228685aa29c9e661d0da1ff7.jpg" title="1boy, skylar vox, tattoo" alt="Image: 1000087" style=""/></a></div>' +
+    '<div class="col thumb" id="s1000088"><img src="https://realbooru.com/thumbnails/e5/9e/thumbnail_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg" title="1girl, solo" alt="Image: 1000088"/></div>'
+  const RB_VIEW_VIDEO =
+    '<video style="width: 100%;" controls loop id="gelcomVideoPlayer">' +
+    '<source src="https://realbooru.com//images/fc/14/fc14a7833ef171023deb3d10b841ee7e.mp4" type="video/mp4" />' +
+    '<source src="https://realbooru.com//images/fc/14/fc14a7833ef171023deb3d10b841ee7e.webm" type="video/webm" /></video>'
+  const RB_VIEW_STILL =
+    '<img style="max-width: 100%;" alt="1girl skylar vox" src="https://realbooru.com//images/ba/c3/bac3a43e967d7a5f5201127198858d03.jpeg" id="image" onclick="javascript:; return false;"/>'
+  const BO_LIST =
+    '<span class="thumb"><a id="p119629" href="index.php?page=post&s=view&id=119629">' +
+    '<img src="https://thumbs.booru.org/blacked/thumbnails//105/thumbnail_13e95013be4d2c3693717879294adbfa6ec94218.png" alt="post" border="0" title=" ass bbc score:2 rating:Explicit"/></a>'
+  const BO_VIEW =
+    '<div id="note-container"><img alt="img" src="https://img.booru.org/blacked//images/105/13e95013be4d2c3693717879294adbfa6ec94218.png" id="image" onclick="Note.toggle();" style="margin-right: 70px;"/>'
+
+  it('parseRealbooruEntries captures view ids, keeps guessed urls', () => {
+    const entries = parseRealbooruEntries(RB_LIST)
+    expect(entries).toHaveLength(2)
+    expect(entries[0].postId).toBe('1000087')
+    expect(entries[0].tags).toContain('skylar_vox')
+    expect(entries[0].url).toContain('/images/e5/9e/')
+    expect(entries[1].postId).toBe('1000088')
+  })
+
+  it('parseRealbooruPost prefers the mp4 source on video pages', () => {
+    expect(parseRealbooruPost(RB_VIEW_VIDEO)).toEqual({
+      url: 'https://realbooru.com//images/fc/14/fc14a7833ef171023deb3d10b841ee7e.mp4',
+      kind: 'video',
+    })
+  })
+
+  it('parseRealbooruPost takes the id=image still regardless of attribute order', () => {
+    expect(parseRealbooruPost(RB_VIEW_STILL)).toEqual({
+      url: 'https://realbooru.com//images/ba/c3/bac3a43e967d7a5f5201127198858d03.jpeg',
+      kind: 'image',
+    })
+  })
+
+  it('parseRealbooruPost falls back to the Original link, null on garbage', () => {
+    expect(
+      parseRealbooruPost('<a style="color: #fff;" href="https://realbooru.com//images/x/y.webm">Original</a>'),
+    ).toEqual({ url: 'https://realbooru.com//images/x/y.webm', kind: 'video' })
+    expect(parseRealbooruPost('<div>no file here</div>')).toBeNull()
+    expect(parseRealbooruPost(null)).toBeNull()
+  })
+
+  it('parseBooruOrgEntries captures relative view links', () => {
+    const entries = parseBooruOrgEntries(BO_LIST)
+    expect(entries).toHaveLength(1)
+    expect(entries[0].postId).toBe('119629')
+    expect(entries[0].url).toBe('https://img.booru.org/blacked//images/105/13e95013be4d2c3693717879294adbfa6ec94218.png')
+    expect(entries[0].tags).toContain('bbc')
+  })
+
+  it('parseBooruOrgPost takes the id=image file url', () => {
+    expect(parseBooruOrgPost(BO_VIEW)).toEqual({
+      url: 'https://img.booru.org/blacked//images/105/13e95013be4d2c3693717879294adbfa6ec94218.png',
+      kind: 'image',
+    })
+    expect(parseBooruOrgPost('<div>no file</div>')).toBeNull()
+  })
+
+  it('expandPostViews swaps exact urls, falls back to guessed on failure', async () => {
+    vi.stubGlobal('window', {})
+    const fetchMock = vi.fn(async (url: string) => {
+      const u = String(url)
+      if (u.includes('id=1000087')) return { ok: true, text: () => Promise.resolve(RB_VIEW_STILL) }
+      return { ok: false, status: 404 }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const out = await expandPostViews(parseRealbooruEntries(RB_LIST), '/booru/real', parseRealbooruPost)
+    expect(out).toHaveLength(2)
+    // Expanded: exact view-page file.
+    expect(out[0].url).toBe('https://realbooru.com//images/ba/c3/bac3a43e967d7a5f5201127198858d03.jpeg')
+    expect(out[0].kind).toBe('image')
+    // Failed view fetch: guessed url kept, round survives.
+    expect(out[1].url).toContain('/images/e5/9e/')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('realbooru list omits pid (nonzero pid blanks small pools), expands s=view ids', async () => {
+    // Live: skylar_vox base list carries 42 thumbs while pid=500 returns a
+    // blank page — so the list URL must not page via pid at all.
+    vi.stubGlobal('window', {})
+    const listUrls: string[] = []
+    const fetchMock = vi.fn(async (url: string) => {
+      const u = String(url)
+      if (u.startsWith('/booru/real')) {
+        if (u.includes('s=view')) return { ok: true, text: () => Promise.resolve(RB_VIEW_STILL) }
+        listUrls.push(u)
+        return { ok: true, text: () => Promise.resolve(RB_LIST) }
+      }
+      return { ok: true, json: () => Promise.resolve([]), text: () => Promise.resolve('') }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await fetchPosts({ tags: 'skylar_vox', limit: 5 })
+    expect(listUrls).toHaveLength(1)
+    expect(listUrls[0]).toContain('s=list')
+    expect(listUrls[0]).toContain('tags=skylar_vox')
+    expect(listUrls[0]).not.toContain('pid=')
+    expect(res.ok).toBe(true)
+    expect(res.posts[0].url).toBe('https://realbooru.com//images/ba/c3/bac3a43e967d7a5f5201127198858d03.jpeg')
+  })
+
+  it('redgifs refuses a fragment-only niche: foreign posts ship unstamped and die in sanitize', async () => {
+    // Fresh query (no 1h niche-cache poisoning from other tests): `sky-high`
+    // shares only the `sky` fragment with the query — electing it used to
+    // stamp foreign posts with the query tags (wrong-tag rounds).
+    vi.stubGlobal('window', {})
+    const gif = {
+      id: 'foreignabc',
+      width: 1080,
+      height: 1920,
+      tags: ['Amateur', 'BBC'],
+      niches: [],
+      urls: {
+        hd: 'https://media.redgifs.com/Foreignabc.mp4',
+        poster: 'https://media.redgifs.com/Foreignabc-poster.jpg',
+      },
+    }
+    const seen: string[] = []
+    const fetchMock = vi.fn(async (url: string) => {
+      const u = String(url)
+      seen.push(u)
+      if (u.startsWith('/booru/tbib/') || u.startsWith('/booru/xbooru/')) {
+        return { ok: true, json: () => Promise.resolve([]) }
+      }
+      if (u.includes('/auth/temporary')) {
+        return { ok: true, json: () => Promise.resolve({ token: 'tok' }) }
+      }
+      if (u.includes('/v2/niches/search')) {
+        return {
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              niches: [{ id: 'sky-high', name: 'Sky High', tags: ['Sky'], subscribers: 999999 }],
+            }),
+        }
+      }
+      if (u.includes('/v2/niches/sky-high/gifs') || u.includes('/v2/gifs/search')) {
+        return { ok: true, json: () => Promise.resolve({ gifs: [gif] }) }
+      }
+      return { ok: false }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await fetchPosts({ tags: 'skylar_vox_mistag', limit: 10 })
+    // Fragment niche refused: generic fallback used, native tags kept, and
+    // sanitize drops the foreign post instead of serving it as the query.
+    expect(seen.some((u) => u.includes('/v2/gifs/search'))).toBe(true)
+    expect(seen.some((u) => u.includes('/niches/sky-high/'))).toBe(false)
+    expect(res.ok).toBe(false)
+    expect(res.posts).toHaveLength(0)
+  })
+
+  it('matchesQuery refuses short-tag fragments (sky is not skylar_vox)', async () => {
+    vi.stubGlobal('window', {})
+    const skyPost = {
+      id: 1,
+      directory: 1,
+      image: 'a.jpg',
+      width: 100,
+      height: 100,
+      rating: 'explicit',
+      tags: 'sky clouds landscape',
+    }
+    const fetchMock = vi.fn(async (url: string) => {
+      const u = String(url)
+      if (u.startsWith('/booru/tbib/')) return { ok: true, json: () => Promise.resolve([skyPost]) }
+      return { ok: false }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await fetchPosts({ tags: 'skylar_vox', limit: 10 })
+    expect(res.ok).toBe(false)
+    expect(res.posts).toHaveLength(0)
   })
 })

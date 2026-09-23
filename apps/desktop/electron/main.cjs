@@ -193,6 +193,9 @@ const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
 const TIMEOUT_MS = 3_500
+// Budget for full HTML documents (babesource searches run ~500KB,
+// galleries ~300KB). JSON APIs stay on the tight TIMEOUT_MS.
+const HTML_TIMEOUT_MS = 8_000
 
 // Build negative query terms directly from the active blocklist (single source of truth).
 function getQueryNegatives() {
@@ -221,7 +224,7 @@ function hasBadTag(tags) {
   })
 }
 
-async function httpGet(url, headers) {
+async function httpGet(url, headers, timeoutMs) {
   let ref = {}
   if (typeof url === 'string') {
     try {
@@ -268,7 +271,7 @@ async function httpGet(url, headers) {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           res.resume()
           const next = new URL(res.headers.location, url).toString()
-          httpGet(next, headers).then(resolve, reject)
+          httpGet(next, headers, timeoutMs).then(resolve, reject)
           return
         }
         if (res.statusCode >= 400) {
@@ -282,7 +285,7 @@ async function httpGet(url, headers) {
         res.on('end', () => resolve(body))
       },
     )
-    req.setTimeout(TIMEOUT_MS, () => req.destroy(new Error('quality-gate timeout')))
+    req.setTimeout(timeoutMs || TIMEOUT_MS, () => req.destroy(new Error('quality-gate timeout')))
     req.on('error', reject)
   })
 }
@@ -362,8 +365,8 @@ function parsePahealXml(body) {
 // Verified live: konachan.com answers rating:explicit server-side; yandere
 // ignores the rating filter, so rating is enforced client-side below.
 // Both paginate with ?page=N — random page per call keeps rounds fresh.
-function moebooruUrl(base, variant, n) {
-  const page = 1 + Math.floor(Math.random() * 50)
+function moebooruUrl(base, variant, n, deterministic) {
+  const page = deterministic ? 1 : 1 + Math.floor(Math.random() * 50)
   const tags = base.includes('konachan') ? `${variant} rating:explicit` : variant
   return `${base}/post.json?tags=${encodeURIComponent(tags)}&limit=${n}&page=${page}`
 }
@@ -399,63 +402,174 @@ function parseMoebooruJson(body, prefix) {
 }
 
 // --- realbooru (HTML scraper: images/videos with Referer) --------------------
-function parseRealbooruHtml(html) {
-  const posts = []
-  const imgRegex =
-    /<img\s+[^>]*src="https:\/\/realbooru\.com\/thumbnails\/([^/]+)\/([^/]+)\/thumbnail_([^."]+)\.jpg"[^>]*title="([^"]*)"[^>]*alt="Image:\s*(\d+)"/gi
-  let m
-  while ((m = imgRegex.exec(html)) !== null) {
-    const [, dir1, dir2, hash, rawTitle, postId] = m
-    const tags = rawTitle
-      .split(/,\s*/)
-      .map((t) => t.trim().replace(/\s+/g, '_'))
-      .filter(Boolean)
-    const isVideo = tags.includes('video') || tags.includes('mp4') || tags.includes('webm')
-    const isGif = tags.includes('gif')
-    // realbooru stores stills as .jpeg on the full-image path (.jpg 404s).
-    const ext = isVideo ? 'mp4' : isGif ? 'gif' : 'jpeg'
-    const url = `https://realbooru.com/images/${dir1}/${dir2}/${hash}.${ext}`
-    const preview = `https://realbooru.com/thumbnails/${dir1}/${dir2}/thumbnail_${hash}.jpg`
-    if (!hasBadTag(tags)) {
-      posts.push({ id: `rb-${postId}`, url, preview, tags, rating: 'e', width: 1200, height: 1200 })
-    }
+function realbooruPostFromThumb(thumbSrc, rawTitle, postId) {
+  const t = /realbooru\.com\/thumbnails\/([^/]+)\/([^/]+)\/thumbnail_([^."]+)\.jpg/i.exec(thumbSrc || '')
+  if (!t) return null
+  const dir1 = t[1]
+  const dir2 = t[2]
+  const hash = t[3]
+  const tags = String(rawTitle || '')
+    .split(/,\s*/)
+    .map((x) => x.trim().replace(/\s+/g, '_'))
+    .filter(Boolean)
+  const isVideo = tags.includes('video') || tags.includes('mp4') || tags.includes('webm')
+  const isGif = tags.includes('gif')
+  // realbooru stores stills as .jpeg on the full-image path (.jpg 404s).
+  const ext = isVideo ? 'mp4' : isGif ? 'gif' : 'jpeg'
+  const url = `https://realbooru.com/images/${dir1}/${dir2}/${hash}.${ext}`
+  const preview = `https://realbooru.com/thumbnails/${dir1}/${dir2}/thumbnail_${hash}.jpg`
+  const altId = postId || ''
+  if (!altId) return null
+  if (hasBadTag(tags)) return null
+  return { id: `rb-${altId}`, url, preview, tags, rating: 'e', kind: isVideo ? 'video' : 'image', width: 1200, height: 1200, postId }
+}
+
+function parseRealbooruEntries(html) {
+  const out = []
+  if (!html || typeof html !== 'string') return out
+  const seen = new Set()
+  const push = (e) => {
+    if (!e || !e.id || e.id === 'rb-' || seen.has(e.id)) return
+    seen.add(e.id)
+    out.push(e)
   }
-  return posts
+  let m
+  const anchorRe = /<a\b[^>]*href="[^"]*?page=post&(?:amp;)?s=view&(?:amp;)?id=(\d+)"[^>]*>\s*<img\b([^>]*)>/gi
+  while ((m = anchorRe.exec(html)) !== null) {
+    const attrs = m[2]
+    const src = /src="([^"]+)"/i.exec(attrs)
+    const title = /title="([^"]*)"/i.exec(attrs)
+    push(realbooruPostFromThumb(src ? src[1] : '', title ? title[1] : '', m[1]))
+  }
+  const imgRe = /<img\s+[^>]*src="(https:\/\/realbooru\.com\/thumbnails\/([^/]+)\/([^/]+)\/thumbnail_([^."]+)\.jpg)"[^>]*title="([^"]*)"[^>]*alt="Image:\s*(\d+)"/gi
+  while ((m = imgRe.exec(html)) !== null) {
+    push(realbooruPostFromThumb(m[1], m[5], m[6]))
+  }
+  return out
+}
+
+function kindForFileUrl(url) {
+  return /\.(mp4|webm|mov)(?:[?#]|$)/i.test(url) ? 'video' : 'image'
+}
+
+// Exact file URL from a realbooru post-view page (verified live):
+// <video><source mp4> first, then <img id="image">, then the Original
+// link. Mirrors services/booru.ts parseRealbooruPost.
+function parseRealbooruPost(html) {
+  try {
+    if (!html || typeof html !== 'string') return null
+    const video = /<video\b[^>]*>([\s\S]*?)<\/video>/i.exec(html)
+    if (video) {
+      const srcs = [...video[1].matchAll(/<source\b[^>]*\bsrc="([^"]+)"/gi)].map((s) => s[1])
+      const mp4 = srcs.find((u) => /\.mp4(?:[?#]|$)/i.test(u))
+      const any = mp4 || srcs.find((u) => /\.(mp4|webm|mov)(?:[?#]|$)/i.test(u))
+      if (any) return { url: any, kind: 'video' }
+    }
+    const img = /<img\b(?=[^>]*\bid="image")[^>]*\bsrc="([^"]+)"/i.exec(html)
+    if (img) {
+      const url = img[1].startsWith('//') ? `https:${img[1]}` : img[1]
+      return { url, kind: kindForFileUrl(url) }
+    }
+    const orig = /<a\b[^>]*\bhref="([^"]+)"[^>]*>\s*Original\s*<\/a>/i.exec(html)
+    if (orig) {
+      const url = orig[1].startsWith('//') ? `https:${orig[1]}` : orig[1]
+      return { url, kind: kindForFileUrl(url) }
+    }
+    return null
+  } catch {
+    return null
+  }
 }
 
 // --- booru.org subdomains (hgoon, blacked, allgirl, rule34) ------------------
-function parseBooruOrgHtml(html, query) {
-  const posts = []
-  const imgRegex =
-    /<img\s+[^>]*src="https:\/\/thumbs\.booru\.org\/([^/]+)\/thumbnails\/\/([^/]+)\/thumbnail_([^."]+)\.([^"]+)"[^>]*title="([^"]*)"/gi
+function booruOrgPostFromFields(bSub, dir, hash, ext, rawTitle) {
+  const ratingMatch = /rating:([a-z]+)/i.exec(rawTitle)
+  const rating = ratingMatch ? ratingMatch[1].toLowerCase() : 'e'
+  const tagsPart = rawTitle
+    .replace(/score:\d+/i, '')
+    .replace(/rating:[a-z]+/i, '')
+    .trim()
+  const tags = tagsPart.split(/\s+/).filter(Boolean)
+  const url = `https://img.booru.org/${bSub}/images/${dir}/${hash}.${ext}`
+  const preview = `https://thumbs.booru.org/${bSub}/thumbnails/${dir}/thumbnail_${hash}.${ext}`
+  const id = `${bSub}-${hash.slice(0, 10)}`
+  if (rating === 'explicit' || rating === 'e' || rating === 'questionable') {
+    if (!hasBadTag(tags)) {
+      return { id, url, preview, tags, rating: 'e', width: 1200, height: 1200 }
+    }
+  }
+  return null
+}
+
+function parseBooruOrgEntries(html, query) {
+  const out = []
+  if (!html || typeof html !== 'string') return out
+  const seen = new Set()
+  const push = (e, postId) => {
+    if (!e || seen.has(e.id)) return
+    seen.add(e.id)
+    out.push({ ...e, postId: postId || null })
+  }
   // WAF forces tagless browsing; enforce the query locally so the feed still
   // shows what the player asked for (mirror of matchesQuery in booru.ts).
   const tokens = String(query || '').toLowerCase().split(/\s+/).filter(Boolean)
-  let m
-  while ((m = imgRegex.exec(html)) !== null) {
-    const [, bSub, dir, hash, ext, rawTitle] = m
-    const ratingMatch = /rating:([a-z]+)/i.exec(rawTitle)
-    const rating = ratingMatch ? ratingMatch[1].toLowerCase() : 'e'
-    const tagsPart = rawTitle
-      .replace(/score:\d+/i, '')
-      .replace(/rating:[a-z]+/i, '')
-      .trim()
-    const tags = tagsPart.split(/\s+/).filter(Boolean)
-    if (tokens.length) {
-      const tagSet = tags.map((t) => t.toLowerCase().replace(/[\s-]+/g, '_'))
-      const ok = tokens.some((tok) => tagSet.some((t) => t === tok || t.includes(tok) || tok.includes(t)))
-      if (!ok) continue
-    }
-    const url = `https://img.booru.org/${bSub}/images/${dir}/${hash}.${ext}`
-    const preview = `https://thumbs.booru.org/${bSub}/thumbnails/${dir}/thumbnail_${hash}.${ext}`
-    const id = `${bSub}-${hash.slice(0, 10)}`
-    if (rating === 'explicit' || rating === 'e' || rating === 'questionable') {
-      if (!hasBadTag(tags)) {
-        posts.push({ id, url, preview, tags, rating: 'e', width: 1200, height: 1200 })
-      }
-    }
+  const gated = (e) => {
+    if (!e || !tokens.length) return e
+    const tagSet = e.tags.map((t) => t.toLowerCase().replace(/[\s-]+/g, '_'))
+    const ok = tokens.some((tok) =>
+      tagSet.some(
+        (t) => t === tok || t.includes(tok) || (t.length >= 4 && tok.includes(t)),
+      ),
+    )
+    return ok ? e : null
   }
-  return posts
+  let m
+  const anchorRe = /<a\b[^>]*\bid="p(\d+)"[^>]*href="[^"]*?s=view&(?:amp;)?id=(\d+)"[^>]*>\s*<img\b([^>]*)>/gi
+  while ((m = anchorRe.exec(html)) !== null) {
+    const attrs = m[3]
+    const fields =
+      /src="https:\/\/thumbs\.booru\.org\/([^/]+)\/thumbnails\/\/([^/]+)\/thumbnail_([^."]+)\.([^"]+)"[^>]*title="([^"]*)"/i.exec(
+        attrs,
+      )
+    if (!fields) continue
+    push(gated(booruOrgPostFromFields(fields[1], fields[2], fields[3], fields[4], fields[5])), m[2])
+  }
+  const imgRe =
+    /<img\s+[^>]*src="https:\/\/thumbs\.booru\.org\/([^/]+)\/thumbnails\/\/([^/]+)\/thumbnail_([^."]+)\.([^"]+)"[^>]*title="([^"]*)"/gi
+  while ((m = imgRe.exec(html)) !== null) {
+    push(gated(booruOrgPostFromFields(m[1], m[2], m[3], m[4], m[5])), null)
+  }
+  return out
+}
+
+function parseBooruOrgHtml(html, query) {
+  return parseBooruOrgEntries(html, query).map((e) => {
+    const out = { ...e }
+    delete out.postId
+    return out
+  })
+}
+
+// Exact file URL from a booru.org post-view page (verified live on blacked:
+// `<img … id="image" src="https://img.booru.org/…">`). Falls back to an
+// original-file link. Mirrors services/booru.ts parseBooruOrgPost.
+function parseBooruOrgPost(html) {
+  try {
+    if (!html || typeof html !== 'string') return null
+    const img = /<img\b(?=[^>]*\bid="image")[^>]*\bsrc="([^"]+)"/i.exec(html)
+    if (img) {
+      const url = img[1].startsWith('//') ? `https:${img[1]}` : img[1]
+      return { url, kind: kindForFileUrl(url) }
+    }
+    const orig = /<a\b[^>]*\bhref="([^"]*\/\/images\/[^"]+)"[^>]*>/i.exec(html)
+    if (orig) {
+      const url = orig[1].startsWith('//') ? `https:${orig[1]}` : orig[1]
+      return { url, kind: kindForFileUrl(url) }
+    }
+    return null
+  } catch {
+    return null
+  }
 }
 
 // --- redgifs (real/hardcore porn: pornstars, BBC, mp4s/gifs) ------------------
@@ -549,7 +663,7 @@ async function fetchRedgifs(variant, n) {
             `${REDGIFS_API}/v2/niches/${encodeURIComponent(niche.id)}/gifs?count=${n}&page=${page}`,
             { Authorization: `Bearer ${token}` },
           )
-          const posts = tagNichePosts(parseRedgifsJson(body), variant)
+          const posts = tagNichePosts(parseRedgifsJson(body), variant, niche)
           if (posts.length > 0) return posts
         }
       } catch (e) {
@@ -615,16 +729,16 @@ function pickRedgifsNiche(query, niches) {
     let score = 0
     for (const tok of tokens) {
       const flat = tok.replace(/_/g, '')
-      for (const h of hay) {
-        if (h === flat || h.includes(flat) || flat.includes(h)) {
-          score += 1
-          break
-        }
+      // Full-token equality only: a shared fragment (e.g. `sky` inside
+      // `skylar_vox`) must never elect a foreign niche whose posts get
+      // stamped with the query tags (wrong-tag rounds).
+      if (hay.has(flat)) {
+        score += 1
       }
     }
     const subs = typeof n.subscribers === 'number' ? n.subscribers : 0
     if (score > bestScore || (score === bestScore && score > 0 && subs > ((best && best.subscribers) || 0))) {
-      best = { id: n.id, subscribers: subs }
+      best = { id: n.id, name: typeof n.name === 'string' ? n.name : n.id, subscribers: subs }
       bestScore = score
     }
   }
@@ -664,13 +778,33 @@ async function redgifsNicheForQuery(variant, token) {
   return null
 }
 
-function tagNichePosts(posts, query) {
+function tagNichePosts(posts, query, niche) {
+  // Stamp query tags ONLY on full-token niche↔query agreement (a
+  // stale-cached fragment-elected niche must not launder foreign posts
+  // through the query match) — otherwise native tags face the filter alone.
+  if (!redgifsNicheAgrees(niche, query)) return posts
   const tags = redgifsQueryTokens(query)
   if (tags.length === 0) return posts
   return posts.map((p) => ({
     ...p,
     tags: [...new Set([...(p.tags || []), ...tags])],
   }))
+}
+
+/** Full-token niche↔query agreement (mirrors the renderer guard). */
+function redgifsNicheAgrees(niche, query) {
+  if (!niche || typeof niche.id !== 'string') return false
+  const tokens = redgifsQueryTokens(query)
+    .map((t) => t.replace(/_/g, ''))
+    .filter((t) => t.length >= 3)
+  if (tokens.length === 0) return false
+  const parts = new Set()
+  for (const s of [niche.id, niche.name || '']) {
+    for (const part of String(s || '').toLowerCase().split(/[^a-z0-9]+/)) {
+      if (part.length >= 3) parts.add(part)
+    }
+  }
+  return tokens.some((t) => parts.has(t))
 }
 
 // --- imhentai (hentai galleries: captions, hardcore doujins) ------------------
@@ -792,6 +926,8 @@ function parseImhentaiGalleryPages(html, limit) {
 // Galleries expanded per gallery-source round; lanes expanded in parallel.
 const GALLERY_CAP = 6
 const GALLERY_LANES = 3
+// Post-view (exact file URL) expansion bounds, mirroring services/booru.ts.
+const VIEW_POST_CAP = 6
 
 // Bounded-concurrency map: at most `n` lanes in flight; failures settle to
 // undefined and are dropped. Mirrors services/booru.ts (main.cjs can't
@@ -827,6 +963,35 @@ function roundRobinPosts(lists, limit) {
     }
   }
   return out
+}
+
+// Post-view expansion: swap guessed file URLs for exact ones from the
+// post-view page. Bounded lanes; per-post failures fall back to the guessed
+// entry so expansion never kills a round. List order preserved.
+function stripViewPostId(e) {
+  const out = { ...e }
+  delete out.postId
+  return out
+}
+
+async function expandPostViews(entries, viewBase, parseView) {
+  const withId = entries.filter((e) => e.postId).slice(0, VIEW_POST_CAP)
+  if (withId.length === 0) return entries.map(stripViewPostId)
+  const expanded = await mapLimit(withId, GALLERY_LANES, async (entry) => {
+    try {
+      const view = await httpGet(`${viewBase}/index.php?page=post&s=view&id=${entry.postId}`, undefined, HTML_TIMEOUT_MS)
+      const hit = parseView(view)
+      if (!hit || !hit.url) return undefined
+      const post = stripViewPostId(entry)
+      post.url = hit.url
+      post.kind = hit.kind || post.kind
+      return post
+    } catch {
+      return undefined // guessed-url entry below keeps the round alive
+    }
+  })
+  const byId = new Map(expanded.map((p) => [p.id, p]))
+  return entries.map((e) => byId.get(e.id) || stripViewPostId(e))
 }
 
 async function fetchImhentai(variant, n) {
@@ -984,7 +1149,7 @@ async function fetchBabesource(variant, n) {
   // Single-page queries 404 on page2+ — normal, not a failure.
   let searchBody
   try {
-    searchBody = await httpGet(`${BABESOURCE_ROOT}/search/${encodeURIComponent(slug)}/page1.html`)
+    searchBody = await httpGet(`${BABESOURCE_ROOT}/search/${encodeURIComponent(slug)}/page1.html`, undefined, HTML_TIMEOUT_MS)
   } catch (e) {
     if (/HTTP 404/.test(String((e && e.message) || e))) return []
     throw e
@@ -1000,13 +1165,23 @@ async function fetchBabesource(variant, n) {
     }
   }
   collect(searchBody)
+  const searchBodies = [searchBody]
   const maxPage = Math.min(parseBabesourceMaxPage(searchBody), 5)
   if (maxPage > 1 && galleries.length < GALLERY_CAP) {
-    const page = 2 + Math.floor(Math.random() * (maxPage - 1))
-    try {
-      collect(await httpGet(`${BABESOURCE_ROOT}/search/${encodeURIComponent(slug)}/page${page}.html`))
-    } catch {
-      /* stale pagination link — page-1 results still stand */
+    // Up to two extra distinct random pages — page 1 alone re-serves the
+    // same galleries every round. Mirrors services/booru.ts.
+    const extra = new Set()
+    for (let i = 0; i < 6 && extra.size < 2; i++) {
+      extra.add(Math.max(2, 1 + Math.floor(Math.random() * maxPage)))
+    }
+    for (const page of [...extra].sort((a, b) => a - b)) {
+      try {
+        const body = await httpGet(`${BABESOURCE_ROOT}/search/${encodeURIComponent(slug)}/page${page}.html`, undefined, HTML_TIMEOUT_MS)
+        searchBodies.push(body)
+        collect(body)
+      } catch {
+        /* stale pagination link — page-1 results still stand */
+      }
     }
   }
   if (galleries.length === 0) return []
@@ -1015,7 +1190,7 @@ async function fetchBabesource(variant, n) {
   const perGallery = Math.max(1, Math.ceil(n / galleries.length))
   const sets = await mapLimit(galleries, GALLERY_LANES, async (gUrl) => {
     try {
-      const gHtml = await httpGet(gUrl)
+      const gHtml = await httpGet(gUrl, undefined, HTML_TIMEOUT_MS)
       const tags = parseBabesourceTags(gHtml, variant)
       if (hasBadTag(tags)) return undefined
       const idMatch = /-(\d+)\.html?(?:[?#]|$)/.exec(gUrl)
@@ -1027,7 +1202,34 @@ async function fetchBabesource(variant, n) {
       return undefined /* one dead gallery never kills the round */
     }
   })
-  return roundRobinPosts(sets, n)
+  const expanded = roundRobinPosts(sets, n)
+  if (expanded.length > 0) return expanded
+  // Gallery expansion died but search HTML arrived: fall back to
+  // search-page covers rewritten to exact fulls (never thumbs-as-url).
+  // Mirrors services/booru.ts.
+  const seenCover = new Set()
+  const covers = []
+  const coverRe = /https:\/\/media\.babesource\.com\/galleries\/[0-9a-f]+\/thumbs\/(?:300x406\/)?[^"']+?\.(?:jpe?g|png|webp|gif)/gi
+  for (const body of searchBodies) {
+    let m
+    while ((m = coverRe.exec(body))) {
+      const full = babesourceThumbToFull(m[0])
+      if (!full || seenCover.has(full)) continue
+      seenCover.add(full)
+      const h = /\/galleries\/([0-9a-f]+)\//i.exec(m[0])
+      covers.push({
+        id: `bs-c-${h ? h[1] : 'x'}-${covers.length}`,
+        url: full,
+        preview: m[0],
+        tags: parseBabesourceTags(null, variant),
+        rating: 'e',
+        kind: 'image',
+      })
+      if (covers.length >= n) break
+    }
+    if (covers.length >= n) break
+  }
+  return covers
 }
 
 // Round-robin over sources with simple health tracking (SPEC §6).
@@ -1045,9 +1247,9 @@ const SOURCES = [
     // paheal combos return 0 results — query a single tag only.
     id: 'paheal',
     category: 'hentai',
-    fetch: async (variant, n) => {
+    fetch: async (variant, n, opts) => {
       const tag = variant.split(/\s+/)[0]
-      const page = 1 + Math.floor(Math.random() * 5)
+      const page = opts && opts.deterministic ? 1 : 1 + Math.floor(Math.random() * 5)
       let xml = await httpGet(
         `https://rule34.paheal.net/api/danbooru/find_posts?tags=${encodeURIComponent(tag)}&limit=${n}&page=${page}`
       )
@@ -1072,14 +1274,14 @@ const SOURCES = [
     // archive of the bunch. Serves uncensored per yandere/konachan probes.
     id: 'konachan',
     category: 'hentai',
-    fetch: async (variant, n) =>
-      parseMoebooruJson(await httpGet(moebooruUrl('https://konachan.com', variant, n)), 'kona'),
+    fetch: async (variant, n, opts) =>
+      parseMoebooruJson(await httpGet(moebooruUrl('https://konachan.com', variant, n, opts && opts.deterministic)), 'kona'),
   },
   {
     id: 'yandere',
     category: 'hentai',
-    fetch: async (variant, n) =>
-      parseMoebooruJson(await httpGet(moebooruUrl('https://yande.re', variant, n)), 'yand'),
+    fetch: async (variant, n, opts) =>
+      parseMoebooruJson(await httpGet(moebooruUrl('https://yande.re', variant, n, opts && opts.deterministic)), 'yand'),
   },
   {
     // realbooru: real/hardcore porn (jav uncensored, pov, homemade).
@@ -1089,12 +1291,17 @@ const SOURCES = [
     fetch: async (variant, n) => {
       // Preserve multi-word tags with underscores (e.g. skylar_vox),
       // don't drop the rest of the query with split(/\s+/)[0].
+      // No `pid`: it is a result offset and any nonzero value over-pages
+      // small pools (live: skylar_vox pid=500 returns a blank page while
+      // the base list carries 42 thumbs). Variety comes from shuffling
+      // expanded view results + seen-memory.
       const tagParam = variant.trim().replace(/\s+/g, '_')
-      const pid = Math.floor(Math.random() * 1000)
       const html = await httpGet(
-        `https://realbooru.com/index.php?page=post&s=list&tags=${encodeURIComponent(tagParam)}&pid=${pid}`
+        `https://realbooru.com/index.php?page=post&s=list&tags=${encodeURIComponent(tagParam)}`
       )
-      return parseRealbooruHtml(html).slice(0, n)
+      // Exact file URLs via post-view expansion (guessed-url fallback).
+      const expanded = await expandPostViews(parseRealbooruEntries(html), 'https://realbooru.com', parseRealbooruPost)
+      return expanded.slice(0, n)
     },
   },
   {
@@ -1104,13 +1311,13 @@ const SOURCES = [
     category: 'real',
     fetch: (variant, n) => fetchBabesource(variant, n),
   },
-  booruOrgSource('hgoon.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'hgoon', 'hentai'),
-  booruOrgSource('blacked.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'blacked', 'real'),
-  booruOrgSource('allgirl.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'allgirl', 'real'),
-  booruOrgSource('rule34.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'rule34-org', 'hentai'),
-  booruOrgSource('qoh.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'qoh', 'hentai'),
-  booruOrgSource('celeb.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'celeb', 'real'),
-  booruOrgSource('footfetishbooru.booru.org', { httpGet, parse: parseBooruOrgHtml }, 'footfetish', 'real'),
+  booruOrgSource('hgoon.booru.org', { httpGet, parse: parseBooruOrgHtml, parseEntries: parseBooruOrgEntries, parsePost: parseBooruOrgPost }, 'hgoon', 'hentai'),
+  booruOrgSource('blacked.booru.org', { httpGet, parse: parseBooruOrgHtml, parseEntries: parseBooruOrgEntries, parsePost: parseBooruOrgPost }, 'blacked', 'real'),
+  booruOrgSource('allgirl.booru.org', { httpGet, parse: parseBooruOrgHtml, parseEntries: parseBooruOrgEntries, parsePost: parseBooruOrgPost }, 'allgirl', 'real'),
+  booruOrgSource('rule34.booru.org', { httpGet, parse: parseBooruOrgHtml, parseEntries: parseBooruOrgEntries, parsePost: parseBooruOrgPost }, 'rule34-org', 'hentai'),
+  booruOrgSource('qoh.booru.org', { httpGet, parse: parseBooruOrgHtml, parseEntries: parseBooruOrgEntries, parsePost: parseBooruOrgPost }, 'qoh', 'hentai'),
+  booruOrgSource('celeb.booru.org', { httpGet, parse: parseBooruOrgHtml, parseEntries: parseBooruOrgEntries, parsePost: parseBooruOrgPost }, 'celeb', 'real'),
+  booruOrgSource('footfetishbooru.booru.org', { httpGet, parse: parseBooruOrgHtml, parseEntries: parseBooruOrgEntries, parsePost: parseBooruOrgPost }, 'footfetish', 'real'),
 ]
 
 const fetchBooru = createFetchBooru({
@@ -1263,6 +1470,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('cache:image', (_event, url) => imageCache.cacheImage(url).then((local) => ({ local })))
   ipcMain.handle('cache:stats', () => imageCache.cacheStats())
   ipcMain.handle('cache:clear', () => imageCache.clearCache())
+  ipcMain.handle('cache:clear-feed', () => imageCache.clearFeedCache())
   ipcMain.handle('cache:evict', (_event, url) => ({ ok: imageCache.evict(String(url ?? '')) }))
   ipcMain.handle('vault:get', (_event, url) => ({ local: vault.get(String(url ?? '')) }))
   ipcMain.handle('vault:pin', (_event, url) => vault.pin(String(url ?? '')).then((local) => ({ local })))
@@ -1297,17 +1505,13 @@ app.whenReady().then(async () => {
       if (!Array.isArray(data.blocklist)) {
         return { ok: false, error: 'Payload must contain a "blocklist" array' }
       }
+      // Single source of truth: shared/blocklist.json is the factory
+      // default (read-only); Settings edits land ONLY in the userData copy,
+      // which takes precedence on load.
       const userPath = userBlocklistPath()
       if (userPath) {
         fs.mkdirSync(path.dirname(userPath), { recursive: true })
         fs.writeFileSync(userPath, JSON.stringify(data, null, 2), 'utf8')
-      }
-      if (!app.isPackaged && fs.existsSync(blocklistPath)) {
-        try {
-          fs.writeFileSync(blocklistPath, JSON.stringify(data, null, 2), 'utf8')
-        } catch {
-          /* best effort in dev */
-        }
       }
       currentBlocklistData = data
       currentBlocklist = data.blocklist

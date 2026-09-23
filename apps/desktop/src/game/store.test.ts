@@ -5,6 +5,13 @@ vi.mock('../services/booru', () => ({
   fetchPostsMulti: vi.fn(async () => ({ posts: [], source: null, ok: false, offline: true })),
   clearMirrorCooldowns: vi.fn(),
   clearSeenMemory: vi.fn(),
+  // Faithful mirror of the real token matcher (single/multi-token intents).
+  matchesQuery: (post: { tags: string[] }, query?: string) => {
+    if (!query || post.tags.length === 0) return true
+    const toks = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    const tags = post.tags.map((t) => t.toLowerCase())
+    return toks.some((tok) => tags.some((t) => t === tok || t.includes(tok) || tok.includes(t)))
+  },
 }))
 
 import { clearSeenMemory } from '../services/booru'
@@ -110,7 +117,7 @@ describe('fetchFeed tag fan-out', () => {
   const mocked = vi.mocked(fetchPostsMulti)
   const offline: BooruResponse = { posts: [], source: null, ok: false, offline: true }
 
-  it('browses every selected tag in one round (no one-tag rotation)', async () => {
+  it('queries a random single-pill subset each round (rotation, never full fan-out)', async () => {
     mocked.mockClear()
     const post = (id: string) => ({ id, url: `https://x/${id}.jpg`, tags: ['gangbang'] })
     mocked.mockResolvedValue({ posts: [post('r1'), post('r2')], source: 't', ok: true })
@@ -118,15 +125,46 @@ describe('fetchFeed tag fan-out', () => {
       tags: [
         { name: 'aaa', level: 2, base: 10, income: 1, weight: 1 },
         { name: 'bbb', level: 1, base: 10, income: 1, weight: 1 },
+        { name: 'ccc', level: 1, base: 10, income: 1, weight: 1 },
+        { name: 'ddd', level: 1, base: 10, income: 1, weight: 1 },
       ],
       feedCursor: 0,
+      recentQueryKeys: [],
     })
     await useGame.getState().fetchFeed()
     expect(mocked.mock.calls).toHaveLength(1)
-    expect(mocked.mock.calls[0][0].tags).toEqual(['aaa', 'bbb'])
+    const arg = mocked.mock.calls[0][0]
+    // One pill per query, at most PILLS_PER_ROUND pills, all from the pool.
+    expect(arg.tags.length).toBeLessThanOrEqual(2)
+    for (const t of arg.tags) expect(['aaa', 'bbb', 'ccc', 'ddd']).toContain(t)
+    for (const t of arg.tags) expect(t).not.toContain(' ')
     // fetchFeed shuffles the batch — assert the set, not the order.
     const ids = [useGame.getState().current?.id, ...useGame.getState().queue.map((p) => p.id)].sort()
     expect(ids).toEqual(['r1', 'r2'])
+  })
+
+  it('never repeats the previous round key while alternatives exist', async () => {
+    mocked.mockClear()
+    mocked.mockResolvedValue(offline)
+    // 5 pills → 10 possible pairs: history can never cover every
+    // alternative, so each round must differ from the previous one.
+    const names = ['w1', 'w2', 'w3', 'w4', 'w5']
+    useGame.setState({
+      tags: names.map((name, i) => ({ name, level: i + 1, base: 10, income: 1, weight: 1 })),
+      feedCursor: 0,
+      current: null,
+      queue: [],
+      recentQueryKeys: [],
+    })
+    const keys: string[] = []
+    for (let i = 0; i < 6; i++) {
+      await useGame.getState().fetchFeed()
+      keys.push([...mocked.mock.calls[i][0].tags].sort().join(' '))
+    }
+    for (let i = 1; i < keys.length; i++) {
+      expect(keys[i]).not.toBe(keys[i - 1])
+    }
+    expect(useGame.getState().recentQueryKeys.length).toBeGreaterThan(0)
   })
 
   it('steers the round with priorityTag, then clears it', async () => {
@@ -905,5 +943,64 @@ describe('resetGame fresh start', () => {
     vi.mocked(clearSeenMemory).mockClear()
     useGame.getState().resetGame()
     expect(clearSeenMemory).toHaveBeenCalled()
+  })
+})
+
+describe('tag-intent cache flush (solo/remove = no old-tag images)', () => {
+  const other = { id: 'o1', url: 'https://x/o1.jpg', tags: ['bbb'] }
+  const mine = { id: 's1', url: 'https://x/s1.jpg', tags: ['aaa'] }
+  const untagged = { id: 'u1', url: 'https://x/u1.jpg', tags: [] }
+  const owned = () => [
+    { name: 'aaa', level: 2, base: 10, income: 1, weight: 1, selected: true },
+    { name: 'bbb', level: 1, base: 10, income: 1, weight: 1, selected: true },
+  ]
+
+  it('soloTag flushes other-tag unseen posts and refills from the solo tag', async () => {
+    const mocked = vi.mocked(fetchPostsMulti)
+    mocked.mockClear()
+    mocked.mockResolvedValue({ posts: [], source: null, ok: false, offline: true })
+    useGame.setState({
+      tags: owned(),
+      queue: [other, mine, untagged],
+      current: other,
+      grid: [],
+      priorityTag: null,
+      recentQueryKeys: [],
+      fetching: false,
+    })
+    expect(useGame.getState().soloTag('aaa')).toBe(true)
+    const s = useGame.getState()
+    expect(s.queue.map((p) => p.id).sort()).toEqual(['s1', 'u1'])
+    expect(s.current).toBeNull()
+    expect(s.priorityTag).toBe('aaa')
+    // Solo refills immediately, steered by the solo tag.
+    expect(mocked).toHaveBeenCalled()
+    const arg = mocked.mock.calls[0][0]
+    expect(arg.tags).toContain('aaa')
+    expect(arg.priority).toBe('aaa')
+  })
+
+  it('deleteTag drops the removed tag unseen posts, keeps the rest', () => {
+    useGame.setState({
+      tags: owned(),
+      queue: [other, mine, untagged],
+      current: other,
+      grid: [],
+    })
+    expect(useGame.getState().deleteTag('bbb')).toBe(true)
+    const s = useGame.getState()
+    expect(s.queue.map((p) => p.id).sort()).toEqual(['s1', 'u1'])
+    expect(s.current).toBeNull()
+  })
+
+  it('deselecting a tag drops its unseen posts; reselecting keeps them', () => {
+    useGame.setState({
+      tags: owned(),
+      queue: [other, mine],
+      current: null,
+      grid: [],
+    })
+    expect(useGame.getState().toggleTag('bbb')).toBe(true)
+    expect(useGame.getState().queue.map((p) => p.id)).toEqual(['s1'])
   })
 })

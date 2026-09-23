@@ -99,11 +99,11 @@ describe('Gossip relay (self-hosting posts)', () => {
     conns.clear()
   })
 
-  it('rejects blocklisted tags like the object path does', async () => {
+  it('accepts any tags verbatim (filtering is client-side only)', async () => {
     const id = createTestIdentity()
     const envelope = signEnvelope(id, payloadFor(id, { post_tags: 'art, loli' }))
     const res = await postEnvelopeOn(env, id, envelope)
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(200)
     conns.clear()
   })
 

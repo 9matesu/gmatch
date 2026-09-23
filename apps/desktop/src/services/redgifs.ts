@@ -134,9 +134,13 @@ export function parseRedgifsNiches(data: unknown): RedgifsNiche[] {
 }
 
 /**
- * Best niche for a query by token overlap with the niche id, name and tags.
- * Null when nothing overlaps (e.g. pornstar names) — caller falls back to
- * the generic trending feed. Ties break toward more subscribers.
+ * Best niche for a query by FULL-TOKEN equality with the niche id, name and
+ * tags. Substring/fragment matching is deliberately refused: a shared
+ * 3-letter fragment (e.g. `sky` inside `skylar_vox`) used to elect a foreign
+ * niche whose posts were then stamped with the query tags and served as the
+ * query (wrong-tag rounds). Null when nothing matches on a full token
+ * (e.g. pornstar names) — caller falls back to the generic trending feed.
+ * Ties break toward more subscribers.
  */
 export function pickRedgifsNiche(query: string, niches: RedgifsNiche[]): RedgifsNiche | null {
   const tokens = redgifsQueryTags(query).filter((t) => t.replace(/_/g, '').length >= 3)
@@ -162,11 +166,10 @@ export function pickRedgifsNiche(query: string, niches: RedgifsNiche[]): Redgifs
     let score = 0
     for (const tok of tokens) {
       const flat = tok.replace(/_/g, '')
-      for (const h of hay) {
-        if (h === flat || h.includes(flat) || flat.includes(h)) {
-          score += 1
-          break
-        }
+      // Full-token equality only (see doc comment): `sky` must never elect
+      // a niche for query `skylar_vox`.
+      if (hay.has(flat)) {
+        score += 1
       }
     }
     if (score > bestScore || (score === bestScore && score > 0 && n.subscribers > (best?.subscribers ?? 0))) {
@@ -175,6 +178,29 @@ export function pickRedgifsNiche(query: string, niches: RedgifsNiche[]): Redgifs
     }
   }
   return bestScore > 0 ? best : null
+}
+
+/**
+ * Full-token niche↔query agreement (same tokenization as pickRedgifsNiche):
+ * true when a flattened query token (len ≥ 3) equals a niche id/name/tag
+ * part. Guards the query-tag stamping in booru.ts so a stale-cached or
+ * loosely-elected niche can never launder foreign posts through matchesQuery.
+ */
+export function redgifsNicheMatchesQuery(niche: RedgifsNiche, query: string): boolean {
+  const tokens = redgifsQueryTags(query)
+    .map((t) => t.replace(/_/g, ''))
+    .filter((t) => t.length >= 3)
+  if (tokens.length === 0) return false
+  const parts = new Set<string>()
+  const add = (s: string): void => {
+    for (const part of s.toLowerCase().split(/[^a-z0-9]+/)) {
+      if (part.length >= 3) parts.add(part)
+    }
+  }
+  add(niche.id)
+  add(niche.name)
+  for (const t of niche.tags) add(t.replace(/_/g, ' '))
+  return tokens.some((t) => parts.has(t))
 }
 
 /** Parse a /v2/gifs/search payload into feed posts. Never throws. */

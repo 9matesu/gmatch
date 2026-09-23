@@ -44,6 +44,13 @@ async function main() {
   assert.strictEqual(providerCalls, 2, 'fresh=true must bypass cache and re-hit provider')
   assert.ok(!thirdFresh.cached, 'fresh call not flagged cached')
 
+  // A fresh (random-page) round must NOT poison the tag slot: the next
+  // normal read still serves the original memo without re-hitting.
+  const fourth = await fetchBooru({ tags: 'alpha', limit: 10 })
+  assert.strictEqual(providerCalls, 2, 'fresh round must not rewrite the memo')
+  assert.ok(fourth.posts.length === 1, 'original memo still served')
+  assert.strictEqual(fourth.cached, true, 'memo verdict flagged')
+
   fs_cleanup()
   console.log('booruSources: all assertions passed')
 }

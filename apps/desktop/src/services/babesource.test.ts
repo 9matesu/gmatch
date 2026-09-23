@@ -3,10 +3,12 @@ import {
   babesourceSearchUrl,
   babesourceSlug,
   babesourceThumbToFull,
+  parseBabesourceCovers,
   parseBabesourceGallery,
   parseBabesourceMaxPage,
   parseBabesourceSearch,
   parseBabesourceTags,
+  toBabesourceCoverPosts,
   toBabesourcePosts,
 } from './babesource'
 
@@ -87,5 +89,34 @@ describe('babesource adapter', () => {
     expect(parseBabesourceGallery(null)).toEqual([])
     expect(parseBabesourceGallery('<div>no pics</div>')).toEqual([])
     expect(parseBabesourceTags(null)).toEqual([])
+    expect(parseBabesourceCovers(null)).toEqual([])
+  })
+
+  it('rewrites search-page covers to exact fulls (live markup, incl. spaced names)', () => {
+    const html =
+      '<img alt="" loading="lazy" src="https://media.babesource.com/galleries/6a7594d0172fe/thumbs/300x406/189434_005.jpg">' +
+      '<img src="https://media.babesource.com/galleries/61cae4b698fe1/thumbs/4037 lhb_0137.jpg">'
+    const covers = parseBabesourceCovers(html, 5)
+    expect(covers).toHaveLength(2)
+    expect(covers[0].url).toBe('https://babesource.com/media/galleries/6a7594d0172fe/189434_005.jpg')
+    expect(covers[0].preview).toContain('/thumbs/300x406/')
+    expect(covers[1].url).toBe('https://babesource.com/media/galleries/61cae4b698fe1/4037 lhb_0137.jpg')
+    expect(covers.every((c) => !/\/thumbs\//i.test(c.url))).toBe(true)
+  })
+
+  it('maps covers to image-kind posts with stable ids and query tags', () => {
+    const posts = toBabesourceCoverPosts(
+      [
+        {
+          url: 'https://babesource.com/media/galleries/6a7594d0172fe/189434_005.jpg',
+          preview: 'https://media.babesource.com/galleries/6a7594d0172fe/thumbs/300x406/189434_005.jpg',
+        },
+      ],
+      'skylar_vox',
+    )
+    expect(posts).toHaveLength(1)
+    expect(posts[0].id).toBe('bs-c-6a7594d0172fe-0')
+    expect(posts[0].kind).toBe('image')
+    expect(posts[0].tags).toEqual(expect.arrayContaining(['skylar', 'vox']))
   })
 })

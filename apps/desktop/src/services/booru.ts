@@ -13,6 +13,7 @@ import {
   pickRedgifsNiche,
   redgifsAuthUrl,
   redgifsNicheGifsUrl,
+  redgifsNicheMatchesQuery,
   redgifsNicheSearchUrl,
   redgifsQueryTags,
   redgifsSearchUrl,
@@ -32,11 +33,14 @@ import {
   BABESOURCE_ROOT,
   babesourceSearchUrl,
   babesourceSlug,
+  parseBabesourceCovers,
   parseBabesourceGallery,
   parseBabesourceMaxPage,
   parseBabesourceSearch,
   parseBabesourceTags,
+  toBabesourceCoverPosts,
   toBabesourcePosts,
+  type BabesourceImage,
 } from './babesource'
 
 export interface BooruRequest {
@@ -47,6 +51,12 @@ export interface BooruRequest {
   page?: number
   probe?: boolean
   fresh?: boolean
+  /**
+   * Validation-only fetch (tag probe, market discovery): posts are checked
+   * but NEVER memoized into the seen-set, so probing a tag can't hide its
+   * own pool from the feed or stuff the reshow ledger with unseen pictures.
+   */
+  silent?: boolean
 }
 
 export interface BooruResponse {
@@ -64,6 +74,17 @@ export interface BooruResponse {
 // declared once, centrally, in src/types/gmatch-bridge.ts.
 
 const TIMEOUT_MS = 3_500
+
+/**
+ * Budget for full HTML documents (list/search/gallery/post-view pages:
+ * realbooru lists run ~56KB, babesource searches ~500KB, galleries ~300KB).
+ * JSON APIs stay on the tight TIMEOUT_MS; scraping gets room to land.
+ */
+const HTML_TIMEOUT_MS = 8_000
+
+/** View-page (gallery) expansion bounds: capped lanes, exact file URLs. */
+export const VIEW_POST_CAP = 6
+export const VIEW_POST_LANES = 3
 
 // No-repeat memory: ids + file URLs seen this session AND in past sessions
 // (localStorage), capped so it can't grow forever. Same file under a
@@ -191,6 +212,7 @@ export function __resetFeedState(): void {
   reshowCursor = 0
   emptyStreak = 0
   seenLoaded = false
+  recentPages.clear()
   if (seenTimer) {
     clearTimeout(seenTimer)
     seenTimer = null
@@ -245,7 +267,7 @@ function remember(posts: BooruPost[], tag?: string): BooruPost[] {
  *  query as untagged. Rotates through the ledger so consecutive reshow
  *  rounds don't loop the same batch. */
 let reshowCursor = 0
-export function recallSeen(limit: number, preferTag?: string): BooruPost[] {
+export function recallSeen(limit: number, preferTag?: string, rand: () => number = Math.random): BooruPost[] {
   loadSeen()
   if (seenLedger.length === 0) return []
   const n = Math.min(Math.max(1, limit), seenLedger.length)
@@ -253,8 +275,21 @@ export function recallSeen(limit: number, preferTag?: string): BooruPost[] {
   const ordered = seenLedger.map((_, i) => seenLedger[(reshowCursor + i) % seenLedger.length])
   const same = preferTag ? ordered.filter((s) => s.tag === preferTag) : []
   const rest = preferTag ? ordered.filter((s) => s.tag !== preferTag) : ordered
+  // Shuffle WITHIN each group (never across): the same-tag preference is
+  // preserved, but consecutive reshow rounds can never come back
+  // byte-identical — the "same 10 pictures in the same order" loop.
+  const shuffle = <T>(arr: T[]): T[] => {
+    const a = [...arr]
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1))
+      const t = a[i]
+      a[i] = a[j]
+      a[j] = t
+    }
+    return a
+  }
   const out: BooruPost[] = []
-  for (const s of [...same, ...rest]) {
+  for (const s of [...shuffle(same), ...shuffle(rest)]) {
     if (out.length >= n) break
     out.push({ id: s.id, url: s.url, tags: [], rating: 'e', repeat: true as const })
   }
@@ -262,16 +297,58 @@ export function recallSeen(limit: number, preferTag?: string): BooruPost[] {
   return out
 }
 
-/** remember() variant that tallies pre/post counts for empty-vs-offline discrimination. */
+/** remember() variant that tallies pre/post counts for empty-vs-offline discrimination.
+ * Silent (probe/market) calls only count — they never memoize, so validation
+ * fetches can't poison the no-repeat memory or the reshow ledger. */
 function rememberCounted(
   posts: BooruPost[],
   tally: { parsed: number; fresh: number },
   tag?: string,
+  silent = false,
 ): BooruPost[] {
   tally.parsed += posts.length
-  const fresh = remember(posts, tag)
+  const fresh = silent ? posts : remember(posts, tag)
   tally.fresh += fresh.length
   return fresh
+}
+
+// Page memory: recently-drawn pages per source+query, so rounds sample
+// WITHOUT replacement instead of re-rolling seen windows (the "same
+// pictures" machine for small pools). Session-only, capped; deterministic
+// (probe/page-explicit) draws are never recorded.
+const PAGE_MEMORY_DEPTH = 20
+const recentPages = new Map<string, number[]>()
+/** Test hook: clear page memory (also run by __resetFeedState). */
+export function __resetPageMemoryForTests(): void {
+  recentPages.clear()
+}
+
+function recordPage(key: string, page: number): void {
+  recentPages.set(key, [...(recentPages.get(key) ?? []), page].slice(-PAGE_MEMORY_DEPTH))
+}
+
+/**
+ * Draw a 0-based pid in [0, window) avoiding recently drawn ones (re-roll
+ * up to 6 times, then accept a repeat — tiny pools can't avoid it).
+ * Exported for tests.
+ */
+export function drawFreshPid(key: string, window: number, rand: () => number = Math.random): number {
+  const w = Math.max(1, Math.floor(window) || 1)
+  const seen = recentPages.get(key) ?? []
+  let pid = Math.floor(rand() * w)
+  for (let i = 0; i < 6 && seen.includes(pid); i++) {
+    pid = Math.floor(rand() * w)
+  }
+  recordPage(key, pid)
+  return pid
+}
+
+/**
+ * Draw a 1-based page in [1, maxPage] with the same no-repeat rule.
+ * Exported for tests.
+ */
+export function drawFreshPage(key: string, maxPage: number, rand: () => number = Math.random): number {
+  return drawFreshPid(key, Math.max(1, Math.floor(maxPage) || 1), rand) + 1
 }
 
 // Co-occurrence rules blocked by the player's current feed intent (T4).
@@ -280,7 +357,7 @@ function feedTagsSafe(tags: string[]): Set<string> {
   return new Set(tags.filter(isFeedIntent))
 }
 
-function matchesQuery(post: BooruPost, query?: string): boolean {
+export function matchesQuery(post: BooruPost, query?: string): boolean {
   // Untagged posts come from tag-targeted searches (redgifs/imhentai/paheal):
   // nothing to check against, trust the search.
   if (!query || post.tags.length === 0) return true
@@ -302,7 +379,14 @@ function matchesQuery(post: BooruPost, query?: string): boolean {
   }
   const tags = post.tags.map((t) => t.toLowerCase().replace(/[\s-]+/g, '_'))
   return Array.from(tokens).some((tok) =>
-    tags.some((t) => t === tok || t.includes(tok) || tok.includes(t)),
+    tags.some(
+      (t) =>
+        t === tok ||
+        t.includes(tok) ||
+        // Reversed clause (query ⊃ tag) needs a meaningful tag: without a
+        // floor, a 3-letter tag like `sky` passes as `skylar_vox`.
+        (t.length >= 4 && tok.includes(t)),
+    ),
   )
 }
 
@@ -490,50 +574,244 @@ function toMoePosts(data: unknown, _origin: string): BooruPost[] {
 }
 
 export function parseRealbooruHtml(html: string): BooruPost[] {
-  const posts: BooruPost[] = []
-  const imgRegex =
-    /<img\s+[^>]*src="https:\/\/realbooru\.com\/thumbnails\/([^/]+)\/([^/]+)\/thumbnail_([^."]+)\.jpg"[^>]*title="([^"]*)"[^>]*alt="Image:\s*(\d+)"/gi
-  let m: RegExpExecArray | null
-  while ((m = imgRegex.exec(html)) !== null) {
-    const [, dir1, dir2, hash, rawTitle, postId] = m
-    const tags = rawTitle
-      .split(/,\s*/)
-      .map((t) => t.trim().replace(/\s+/g, '_'))
-      .filter(Boolean)
-    const isVideo = tags.includes('video') || tags.includes('mp4') || tags.includes('webm')
-    const isGif = tags.includes('gif')
-    // realbooru stores stills as .jpeg on the full-image path (.jpg 404s;
-    // verified live via HEAD). Thumbnails stay .jpg.
-    const ext = isVideo ? 'mp4' : isGif ? 'gif' : 'jpeg'
-    const url = `https://realbooru.com/images/${dir1}/${dir2}/${hash}.${ext}`
-    const preview = `https://realbooru.com/thumbnails/${dir1}/${dir2}/thumbnail_${hash}.jpg`
-    posts.push({ id: `rb-${postId}`, url, preview, tags, rating: 'e', kind: isVideo ? 'video' : 'image' })
-  }
-  return posts
+  return parseRealbooruEntries(html).map(stripAnyEntryPostId)
 }
 
-function parseBooruOrgHtml(html: string): BooruPost[] {
-  const posts: BooruPost[] = []
-  const imgRegex =
-    /<img\s+[^>]*src="https:\/\/thumbs\.booru\.org\/([^/]+)\/thumbnails\/\/([^/]+)\/thumbnail_([^."]+)\.([^"]+)"[^>]*title="([^"]*)"/gi
-  let m: RegExpExecArray | null
-  while ((m = imgRegex.exec(html)) !== null) {
-    const [, bSub, dir, hash, ext, rawTitle] = m
-    const ratingMatch = /rating:([a-z]+)/i.exec(rawTitle)
-    const rating = ratingMatch ? ratingMatch[1].toLowerCase() : 'e'
-    const tagsPart = rawTitle
-      .replace(/score:\d+/i, '')
-      .replace(/rating:[a-z]+/i, '')
-      .trim()
-    const tags = tagsPart.split(/\s+/).filter(Boolean)
-    const url = `https://img.booru.org/${bSub}//images/${dir}/${hash}.${ext}`
-    const preview = `https://thumbs.booru.org/${bSub}/thumbnails//${dir}/thumbnail_${hash}.${ext}`
-    const id = `${bSub}-${hash.slice(0, 10)}`
-    if (rating === 'explicit' || rating === 'e' || rating === 'questionable') {
-      posts.push({ id, url, preview, tags, rating: 'e' })
-    }
+/** A list-parsed post plus its post-view id (null when the thumb has no
+ * view link). The feed expands view pages for exact file URLs. */
+export interface RealbooruEntry extends BooruPost {
+  postId: string | null
+}
+
+function stripAnyEntryPostId(e: RealbooruEntry | BooruOrgEntry): BooruPost {
+  const { postId: _ignored, ...post } = e
+  void _ignored
+  return post
+}
+
+function realbooruPostFromThumb(
+  thumbSrc: string,
+  rawTitle: string,
+  postId: string | null,
+): RealbooruEntry | null {
+  const t = /realbooru\.com\/thumbnails\/([^/]+)\/([^/]+)\/thumbnail_([^."]+)\.jpg/i.exec(thumbSrc)
+  if (!t) return null
+  const [, dir1, dir2, hash] = t
+  const tags = rawTitle
+    .split(/,\s*/)
+    .map((x) => x.trim().replace(/\s+/g, '_'))
+    .filter(Boolean)
+  const isVideo = tags.includes('video') || tags.includes('mp4') || tags.includes('webm')
+  const isGif = tags.includes('gif')
+  // realbooru stores stills as .jpeg on the full-image path (.jpg 404s;
+  // verified live via HEAD). Thumbnails stay .jpg. Guessed — the view
+  // page carries the authoritative URL (see parseRealbooruPost).
+  const ext = isVideo ? 'mp4' : isGif ? 'gif' : 'jpeg'
+  const url = `https://realbooru.com/images/${dir1}/${dir2}/${hash}.${ext}`
+  const preview = `https://realbooru.com/thumbnails/${dir1}/${dir2}/thumbnail_${hash}.jpg`
+  const altId = postId ?? ''
+  return {
+    id: `rb-${altId}`,
+    url,
+    preview,
+    tags,
+    rating: 'e',
+    kind: isVideo ? 'video' : 'image',
+    postId,
   }
-  return posts
+}
+
+/**
+ * List entries with post-view ids. Primary pass: thumb anchors
+ * (`<a href="...s=view&id=NNN"><img …>`) — the id feeds view-page
+ * expansion. Second pass: lone thumbs (old shape) keep guessed-url
+ * coverage. Never throws.
+ */
+export function parseRealbooruEntries(html: string): RealbooruEntry[] {
+  const out: RealbooruEntry[] = []
+  if (typeof html !== 'string') return out
+  const seen = new Set<string>()
+  const push = (e: RealbooruEntry | null): void => {
+    if (!e || !e.id || e.id === 'rb-' || seen.has(e.id)) return
+    seen.add(e.id)
+    out.push(e)
+  }
+  let m: RegExpExecArray | null
+  const anchorRe = /<a\b[^>]*href="[^"]*?page=post&(?:amp;)?s=view&(?:amp;)?id=(\d+)"[^>]*>\s*<img\b([^>]*)>/gi
+  while ((m = anchorRe.exec(html)) !== null) {
+    const attrs = m[2]
+    const src = /src="([^"]+)"/i.exec(attrs)?.[1] ?? ''
+    const title = /title="([^"]*)"/i.exec(attrs)?.[1] ?? ''
+    push(realbooruPostFromThumb(src, title, m[1]))
+  }
+  const imgRe =
+    /<img\s+[^>]*src="(https:\/\/realbooru\.com\/thumbnails\/([^/]+)\/([^/]+)\/thumbnail_([^."]+)\.jpg)"[^>]*title="([^"]*)"[^>]*alt="Image:\s*(\d+)"/gi
+  while ((m = imgRe.exec(html)) !== null) {
+    const [, src, , , , rawTitle, altId] = m
+    push(realbooruPostFromThumb(src, rawTitle, altId))
+  }
+  return out
+}
+
+/** Kind from a file URL: mp4/webm/mov play, everything else shows. */
+function kindForFileUrl(url: string): 'image' | 'video' {
+  return /\.(mp4|webm|mov)(?:[?#]|$)/i.test(url) ? 'video' : 'image'
+}
+
+/**
+ * Exact file URL from a realbooru post-view page (verified live):
+ *  1. `<video><source src="….mp4">` (mp4 preferred) → video,
+ *  2. `<img id="image" src="…">` (attribute order varies) → by extension,
+ *  3. the `Original` download link → by extension.
+ * Null when the page carries no file (challenge/removed). Never throws.
+ */
+export function parseRealbooruPost(html: unknown): { url: string; kind: 'image' | 'video' } | null {
+  try {
+    if (typeof html !== 'string') return null
+    const video = /<video\b[^>]*>([\s\S]*?)<\/video>/i.exec(html)
+    if (video) {
+      const srcs = [...video[1].matchAll(/<source\b[^>]*\bsrc="([^"]+)"/gi)].map((s) => s[1])
+      const mp4 = srcs.find((u) => /\.mp4(?:[?#]|$)/i.test(u))
+      const any = mp4 ?? srcs.find((u) => /\.(mp4|webm|mov)(?:[?#]|$)/i.test(u))
+      if (any) return { url: any, kind: 'video' }
+    }
+    const img = /<img\b(?=[^>]*\bid="image")[^>]*\bsrc="([^"]+)"/i.exec(html)
+    if (img) {
+      const url = img[1].startsWith('//') ? `https:${img[1]}` : img[1]
+      return { url, kind: kindForFileUrl(url) }
+    }
+    const orig = /<a\b[^>]*\bhref="([^"]+)"[^>]*>\s*Original\s*<\/a>/i.exec(html)
+    if (orig) {
+      const url = orig[1].startsWith('//') ? `https:${orig[1]}` : orig[1]
+      return { url, kind: kindForFileUrl(url) }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+function booruOrgPostFromFields(
+  bSub: string,
+  dir: string,
+  hash: string,
+  ext: string,
+  rawTitle: string,
+): BooruPost | null {
+  const ratingMatch = /rating:([a-z]+)/i.exec(rawTitle)
+  const rating = ratingMatch ? ratingMatch[1].toLowerCase() : 'e'
+  const tagsPart = rawTitle
+    .replace(/score:\d+/i, '')
+    .replace(/rating:[a-z]+/i, '')
+    .trim()
+  const tags = tagsPart.split(/\s+/).filter(Boolean)
+  const url = `https://img.booru.org/${bSub}//images/${dir}/${hash}.${ext}`
+  const preview = `https://thumbs.booru.org/${bSub}/thumbnails//${dir}/thumbnail_${hash}.${ext}`
+  const id = `${bSub}-${hash.slice(0, 10)}`
+  if (rating === 'explicit' || rating === 'e' || rating === 'questionable') {
+    return { id, url, preview, tags, rating: 'e' }
+  }
+  return null
+}
+
+/** A list-parsed post plus its post-view id (null when the thumb has no
+ * view link). The feed expands view pages for exact file URLs. */
+export interface BooruOrgEntry extends BooruPost {
+  postId: string | null
+}
+
+/**
+ * Post-view expansion: swap guessed file URLs for exact ones from the
+ * post-view page (`s=view&id=`). Bounded lanes (VIEW_POST_CAP/LANES);
+ * per-post failures fall back to the guessed entry, so expansion can
+ * never kill a round. List order preserved. Never throws. Exported for tests.
+ */
+export async function expandPostViews(
+  entries: Array<RealbooruEntry | BooruOrgEntry>,
+  viewBase: string,
+  parseView: (html: string) => { url: string; kind: 'image' | 'video' } | null,
+): Promise<BooruPost[]> {
+  const withId = entries.filter((e) => e.postId).slice(0, VIEW_POST_CAP)
+  if (withId.length === 0) return entries.map(stripAnyEntryPostId)
+  const expanded = await mapLimit(withId, VIEW_POST_LANES, async (entry) => {
+    try {
+      const res = await fetch(`${viewBase}/index.php?page=post&s=view&id=${entry.postId}`, {
+        signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
+      })
+      if (!res.ok || typeof res.text !== 'function') return undefined
+      const hit = parseView(await res.text())
+      if (!hit) return undefined
+      const { postId: _drop, ...post } = entry
+      void _drop
+      return { ...post, url: hit.url, kind: hit.kind }
+    } catch {
+      return undefined // guessed-url entry below keeps the round alive
+    }
+  })
+  const byId = new Map(expanded.map((p) => [p.id, p]))
+  return entries.map((e) => byId.get(e.id) ?? stripAnyEntryPostId(e))
+}
+
+/**
+ * List entries with post-view ids. Primary pass: thumb anchors
+ * (`<a id="pNNN" href="…s=view&id=NNN"><img …>`) — the id feeds view-page
+ * expansion. Second pass: lone thumbs (old shape) keep guessed-url
+ * coverage. Never throws.
+ */
+export function parseBooruOrgEntries(html: string): BooruOrgEntry[] {
+  const out: BooruOrgEntry[] = []
+  if (typeof html !== 'string') return out
+  const seen = new Set<string>()
+  const push = (e: (BooruPost | null), postId: string | null): void => {
+    if (!e || seen.has(e.id)) return
+    seen.add(e.id)
+    out.push({ ...e, postId })
+  }
+  let m: RegExpExecArray | null
+  const anchorRe =
+    /<a\b[^>]*\bid="p(\d+)"[^>]*href="[^"]*?s=view&(?:amp;)?id=(\d+)"[^>]*>\s*<img\b([^>]*)>/gi
+  while ((m = anchorRe.exec(html)) !== null) {
+    const attrs = m[3]
+    const fields =
+      /src="https:\/\/thumbs\.booru\.org\/([^/]+)\/thumbnails\/\/([^/]+)\/thumbnail_([^."]+)\.([^"]+)"[^>]*title="([^"]*)"/i.exec(
+        attrs,
+      )
+    if (!fields) continue
+    push(booruOrgPostFromFields(fields[1], fields[2], fields[3], fields[4], fields[5]), m[2])
+  }
+  const imgRe =
+    /<img\s+[^>]*src="https:\/\/thumbs\.booru\.org\/([^/]+)\/thumbnails\/\/([^/]+)\/thumbnail_([^."]+)\.([^"]+)"[^>]*title="([^"]*)"/gi
+  while ((m = imgRe.exec(html)) !== null) {
+    const [, bSub, dir, hash, ext, rawTitle] = m
+    push(booruOrgPostFromFields(bSub, dir, hash, ext, rawTitle), null)
+  }
+  return out
+}
+
+/**
+ * Exact file URL from a booru.org post-view page (verified live on
+ * blacked: `<img … id="image" src="https://img.booru.org/…">`):
+ *  1. `<img id="image" src="…">` (attribute order varies) → by extension,
+ *  2. an original-file link (`//images/` href) → by extension.
+ * Null when the page carries no file. Never throws.
+ */
+export function parseBooruOrgPost(html: unknown): { url: string; kind: 'image' | 'video' } | null {
+  try {
+    if (typeof html !== 'string') return null
+    const img = /<img\b(?=[^>]*\bid="image")[^>]*\bsrc="([^"]+)"/i.exec(html)
+    if (img) {
+      const url = img[1].startsWith('//') ? `https:${img[1]}` : img[1]
+      return { url, kind: kindForFileUrl(url) }
+    }
+    const orig = /<a\b[^>]*\bhref="([^"]*\/\/images\/[^"]+)"[^>]*>/i.exec(html)
+    if (orig) {
+      const url = orig[1].startsWith('//') ? `https:${orig[1]}` : orig[1]
+      return { url, kind: kindForFileUrl(url) }
+    }
+    return null
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -587,19 +865,21 @@ async function dapiPass(
       let url: string
       let kind: 'dapi' | 'moe' | 'html' = 'dapi'
       let pageNum = 1
-      let realPidNum = 0
       if (src.type === 'moebooru') {
         kind = 'moe'
-        pageNum = isProbe ? 1 : 1 + Math.floor(Math.random() * 50)
+        pageNum = isProbe ? 1 : drawFreshPage(`moe::${src.id}::${variant}`, 50)
         const tags = src.id === 'konachan-direct' ? `${variant} rating:explicit` : variant
         url = `${src.proxy}/post.json?tags=${encodeURIComponent(tags)}&limit=${req.limit}&page=${pageNum}`
       } else if (src.type === 'realhtml') {
         kind = 'html'
+        // Realbooru `pid` is a result offset: any nonzero pid over-pages
+        // small pools (live: skylar_vox base list carries 42 thumbs while
+        // pid=500 returns a blank page). Always fetch the base list;
+        // variety comes from shuffling expanded view results + seen-memory.
         // Preserve multi-word tags with underscores (e.g. skylar_vox),
         // don't drop the rest of the query with split(/\s+/)[0].
         const tagParam = variant.trim().replace(/\s+/g, '_')
-        realPidNum = isProbe ? 0 : Math.floor(Math.random() * 1000)
-        url = `${src.proxy}/index.php?page=post&s=list&tags=${encodeURIComponent(tagParam)}&pid=${realPidNum}`
+        url = `${src.proxy}/index.php?page=post&s=list&tags=${encodeURIComponent(tagParam)}`
       } else if (src.type === 'booruorg') {
         // booru.org Cloudflare WAF challenges `tags=` queries with 403;
         // omitting `tags=` and paginating via random `pid` bypasses WAF (200 OK).
@@ -609,12 +889,15 @@ async function dapiPass(
         kind = 'html'
         const booruPid = isProbe
           ? Math.floor(Math.random() * 3) * 20
-          : Math.floor(Math.random() * 50) * 20
+          : drawFreshPid(`boorg::${src.sub}::${variant}`, 50) * 20
         url = `${src.proxy}/index.php?page=post&s=list&pid=${booruPid}`
       } else {
+        // Explicit page/probe pins the pid; rounds sample without replacement
+        // per source+query so the same window is never re-rolled twice.
+        const usePid = isProbe || req.page !== undefined ? pid : drawFreshPid(`dapi::${src.id}::${variant}`, 1000)
         url = `${src.proxy}/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
           `${variant} rating:explicit ${neg}`,
-        )}&limit=${req.limit}&json=1&pid=${pid}`
+        )}&limit=${req.limit}&json=1&pid=${usePid}`
       }
       let res: Response
       try {
@@ -653,8 +936,14 @@ async function dapiPass(
         }
         parsed =
           src.type === 'realhtml'
-            ? parseRealbooruHtml(html).slice(0, req.limit)
-            : parseBooruOrgHtml(html).slice(0, req.limit)
+            ? (await expandPostViews(parseRealbooruEntries(html), src.proxy, parseRealbooruPost)).slice(
+                0,
+                req.limit,
+              )
+            : (await expandPostViews(parseBooruOrgEntries(html), src.proxy, parseBooruOrgPost)).slice(
+                0,
+                req.limit,
+              )
       } else {
         let data: unknown
         try {
@@ -677,7 +966,7 @@ async function dapiPass(
         clean = sanitize(parsed, variant)
       }
       if (clean.length === 0) continue
-      const fresh = rememberCounted(clean, tally, req.tags)
+      const fresh = rememberCounted(clean, tally, req.tags, req.silent)
       if (fresh.length === 0) continue // all repeats — narrower pages may be new
       unhealthyUntil.delete(src.id)
       return { posts: fresh, source: src.id, ok: true }
@@ -704,7 +993,7 @@ async function dapiFallbacks(
   if (allowReal && isHealthy('redgifs-direct')) {
     const rg = await redgifsDirect(req.tags, req.limit)
     if (rg) {
-      const fresh = rememberCounted(sanitize(rg, req.tags), tally, req.tags)
+      const fresh = rememberCounted(sanitize(rg, req.tags), tally, req.tags, req.silent)
       if (fresh.length > 0) {
         unhealthyUntil.delete('redgifs-direct')
         return { posts: fresh, source: 'redgifs-direct', ok: true }
@@ -717,7 +1006,7 @@ async function dapiFallbacks(
     try {
       const bs = await babesourceDirect(req.tags, req.limit)
       if (bs.length > 0) {
-        const fresh = rememberCounted(sanitize(bs, req.tags), tally, req.tags)
+        const fresh = rememberCounted(sanitize(bs, req.tags), tally, req.tags, req.silent)
         if (fresh.length > 0) {
           unhealthyUntil.delete('babesource-direct')
           return { posts: fresh, source: 'babesource-direct', ok: true }
@@ -734,7 +1023,7 @@ async function dapiFallbacks(
       const scraped = await imhentaiDirect(req.tags, req.limit)
       // Empty gallery results are NOT a sick mirror (Cloudflare may simply
       // have challenged this round) — only hard failures cool it down.
-        const fresh = rememberCounted(sanitize(scraped, req.tags), tally, req.tags)
+        const fresh = rememberCounted(sanitize(scraped, req.tags), tally, req.tags, req.silent)
       if (fresh.length > 0) {
         unhealthyUntil.delete('imh-direct')
         return { posts: fresh, source: 'imh-direct', ok: true }
@@ -743,17 +1032,18 @@ async function dapiFallbacks(
       markUnhealthy('imh-direct')
     }
   }
-  // paheal only answers single tags — use the leading one.
+  // paheal only answers single tags — use the leading one. Pages rotate
+  // without replacement (unpainted page param = same newest posts forever).
   const single = req.tags.split(/\s+/).filter(Boolean)[0]
   if (allowHentai && single && isHealthy('paheal-direct')) {
     try {
-      const url = `/booru/paheal/api/danbooru/find_posts?tags=${encodeURIComponent(single)}&limit=${req.limit}`
+      const url = `/booru/paheal/api/danbooru/find_posts?tags=${encodeURIComponent(single)}&limit=${req.limit}&page=${drawFreshPage(`paheal::${single}`, 5)}`
       const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) })
       if (!res.ok) {
         markUnhealthy('paheal-direct')
       } else {
         const clean = sanitize(parsePaheal(await res.text()), single)
-        const fresh = rememberCounted(clean, tally, single)
+        const fresh = rememberCounted(clean, tally, single, req.silent)
         if (fresh.length > 0) {
           unhealthyUntil.delete('paheal-direct')
           return { posts: fresh, source: 'paheal-direct', ok: true }
@@ -764,9 +1054,10 @@ async function dapiFallbacks(
     }
   }
   // Deepen (non-stop feed, phase 1): mirrors answered but everything was
-  // already seen — one more DAPI pass with fresh random pages before
-  // declaring the pool exhausted.
-  if (tally.parsed > 0 && tally.fresh === 0) {
+  // already seen — up to two more full DAPI passes over fresh pages (page
+  // memory keeps every pass on unseen windows) before declaring exhaustion.
+  // parsed === 0 means true outage: never deepen dead mirrors.
+  for (let i = 0; i < 2 && tally.parsed > 0 && tally.fresh === 0; i++) {
     const deep = await dapiPass(req, tally)
     if (deep) return deep
   }
@@ -801,14 +1092,21 @@ export async function redgifsDirect(query: string, limit: number): Promise<Booru
       try {
         const niche = await redgifsNicheForQuery(query, token)
         if (niche) {
-          const page = 1 + Math.floor(Math.random() * 5)
+          const page = drawFreshPage(`rg::${query}`, 5)
           const res = await fetchRedgifsAuthed(
             toProxy(redgifsNicheGifsUrl(niche.id, limit, page), REDGIFS_API, '/rg-auth'),
             token,
           )
           if (res.ok) {
-            const posts = withRedgifsQueryTags(parseRedgifs(await res.json()), query)
-            if (posts.length > 0) return posts
+            const posts = parseRedgifs(await res.json())
+            // Stamp query tags ONLY on full-token niche↔query agreement (a
+            // stale-cached fragment-elected niche must not launder foreign
+            // posts through matchesQuery) — otherwise native tags face
+            // sanitize alone.
+            const tagged = redgifsNicheMatchesQuery(niche, query)
+              ? withRedgifsQueryTags(posts, query)
+              : posts
+            if (tagged.length > 0) return tagged
           }
         }
       } catch (e) {
@@ -816,7 +1114,7 @@ export async function redgifsDirect(query: string, limit: number): Promise<Booru
         /* niche lookup is best-effort — fall through to generic */
       }
       // 2. Generic trending fallback (query-blind upstream, untagged posts).
-      const page = 1 + Math.floor(Math.random() * 5)
+      const page = drawFreshPage(`rg::${query}`, 5)
       const url = toProxy(redgifsSearchUrl(query, limit, page), REDGIFS_API, '/rg-auth')
       const res = await fetchRedgifsAuthed(url, token)
       if (!res.ok) return null
@@ -923,7 +1221,7 @@ export async function babesourceDirect(query: string, limit: number): Promise<Bo
     )
     let searchRes: Response
     try {
-      searchRes = await fetch(searchUrl, { signal: AbortSignal.timeout(TIMEOUT_MS) })
+      searchRes = await fetch(searchUrl, { signal: AbortSignal.timeout(HTML_TIMEOUT_MS) })
     } catch {
       throw new Error('babesource search unreachable')
     }
@@ -935,6 +1233,7 @@ export async function babesourceDirect(query: string, limit: number): Promise<Bo
   }
   const firstHtml = await fetchSearchPage(1)
   if (firstHtml === null) return []
+  const searchHtmls: string[] = [firstHtml]
   const seen = new Set<string>()
   const galleryUrls: string[] = []
   const collect = (html: string): void => {
@@ -946,12 +1245,22 @@ export async function babesourceDirect(query: string, limit: number): Promise<Bo
     }
   }
   collect(firstHtml)
-  // Variety: extra random pages until the gallery set is full or pages run out.
+  // Variety: extra random search pages until the gallery set is full or
+  // pages run out. Up to two extra DISTINCT pages (page memory keeps rounds
+  // off already-crawled pages) — page 1 alone re-serves the same galleries.
   const maxPage = Math.min(parseBabesourceMaxPage(firstHtml), 5)
   if (maxPage > 1 && galleryUrls.length < GALLERY_CAP) {
-    const page = 2 + Math.floor(Math.random() * (maxPage - 1))
-    const extraHtml = await fetchSearchPage(page)
-    if (extraHtml !== null) collect(extraHtml)
+    const extra = new Set<number>()
+    for (let i = 0; i < 6 && extra.size < 2; i++) {
+      extra.add(Math.max(2, drawFreshPage(`babe::${slug}`, maxPage)))
+    }
+    const more = await mapLimit([...extra].sort((a, b) => a - b), GALLERY_LANES, fetchSearchPage)
+    for (const html of more) {
+      if (html !== null) {
+        searchHtmls.push(html)
+        collect(html)
+      }
+    }
   }
   if (galleryUrls.length === 0) return []
   // Every gallery contributes: bounded lanes expand in parallel, then images
@@ -960,7 +1269,7 @@ export async function babesourceDirect(query: string, limit: number): Promise<Bo
   const sets = await mapLimit(galleryUrls, GALLERY_LANES, async (gUrl) => {
     try {
       const gRes = await fetch(toProxy(gUrl, BABESOURCE_ROOT, '/booru/babe'), {
-        signal: AbortSignal.timeout(TIMEOUT_MS),
+        signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
       })
       if (!gRes.ok || typeof gRes.text !== 'function') return undefined
       const gHtml = await gRes.text()
@@ -971,7 +1280,23 @@ export async function babesourceDirect(query: string, limit: number): Promise<Bo
       return undefined /* one dead gallery never kills the round */
     }
   })
-  return roundRobin(sets, limit)
+  const expanded = roundRobin(sets, limit)
+  if (expanded.length > 0) return expanded
+  // Gallery expansion died (slow/blocked gallery pages) but search HTML
+  // arrived: fall back to search-page covers rewritten to exact fulls —
+  // real image files, never thumbs-as-url.
+  const seenCover = new Set<string>()
+  const coverImages: BabesourceImage[] = []
+  for (const html of searchHtmls) {
+    for (const img of parseBabesourceCovers(html, limit)) {
+      if (coverImages.length >= limit) break
+      if (seenCover.has(img.url)) continue
+      seenCover.add(img.url)
+      coverImages.push(img)
+    }
+    if (coverImages.length >= limit) break
+  }
+  return toBabesourceCoverPosts(coverImages, query)
 }
 
 /**
@@ -982,7 +1307,7 @@ export async function babesourceDirect(query: string, limit: number): Promise<Bo
 async function imhentaiDirect(query: string, limit: number): Promise<BooruPost[]> {
   try {
     const searchRes = await fetch(toProxy(imhentaiSearchUrl(query), IMHENTAI_ROOT, '/booru/imh'), {
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
     })
     if (!searchRes.ok || typeof searchRes.text !== 'function') return []
     const html = await searchRes.text()
@@ -1002,7 +1327,7 @@ async function imhentaiDirect(query: string, limit: number): Promise<BooruPost[]
     const sets = await mapLimit(entries, GALLERY_LANES, async ({ id }) => {
       try {
         const gRes = await fetch(toProxy(imhentaiGalleryUrl(id), IMHENTAI_ROOT, '/booru/imh'), {
-          signal: AbortSignal.timeout(TIMEOUT_MS),
+          signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
         })
         // Cloudflare trips on gallery bursts — back the source off entirely.
         if (gRes.status === 403) {
@@ -1065,6 +1390,11 @@ export async function fetchPosts(req: BooruRequest): Promise<BooruResponse> {
       const res = await window.gmatch.booruFetch(req)
       if (res.ok) {
         const fetched = res.posts || []
+        if (req.silent) {
+          // Validation-only: checked, never memoized (see BooruRequest.silent).
+          const clean = sanitize(fetched, req.tags)
+          return clean.length > 0 ? { ...res, posts: clean } : { ...offline }
+        }
         const fresh = remember(sanitize(fetched, req.tags), req.tags)
         if (fresh.length > 0) {
           emptyStreak = 0

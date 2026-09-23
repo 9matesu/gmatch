@@ -54,8 +54,11 @@ function cacheFileName(url) {
 }
 
 function normalizeQuery(q) {
+  // Underscores and spaces name the same tag (skylar_vox == skylar vox):
+  // canonicalize so both spellings share one memo slot.
   return String(q ?? '')
     .trim()
+    .replace(/_/g, ' ')
     .replace(/\s+/g, ' ')
     .toLowerCase()
 }
@@ -88,6 +91,7 @@ function getReferer(url) {
     if (url.includes('booru.org')) return 'https://booru.org/'
     if (url.includes('xbooru.com')) return 'https://xbooru.com/'
     if (url.includes('redgifs.com')) return 'https://www.redgifs.com/'
+    if (url.includes('twimg.com')) return 'https://twitter.com/'
     return u.origin + '/'
   } catch {
     return undefined
@@ -254,6 +258,14 @@ function clear() {
   return stats()
 }
 
+/** Drop all memoized feed lists (bytes untouched): tag intent changed
+ * (solo/remove/deselect) so old-tag query slots must not serve again. */
+function clearFeedCache() {
+  const n = Object.keys(feed).length
+  feed = {}
+  return { cleared: n }
+}
+
 /** Evict a single image from cache and free its memory. Also prunes any cached feed lists. */
 function evict(url) {
   try {
@@ -369,6 +381,7 @@ module.exports = {
   cacheImage,
   cacheStats: stats,
   clearCache: clear,
+  clearFeedCache,
   evict,
   getFeedCache,
   setFeedCache,

@@ -104,7 +104,6 @@ export function PostCreatorModal({
   return (
     <div
       className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 select-none animate-orbit-fade-in"
-      onClick={onClose}
     >
       <div
         className="bg-glass backdrop-blur-2xl text-retro-fg w-full max-w-lg rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-orbit-slide-up"

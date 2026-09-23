@@ -94,3 +94,82 @@ describe('classifyAndResolve (post-modal URL uploads)', () => {
     )
   })
 })
+
+// ---------------------------------------------------------------------------
+// Twitter/X resolvers
+// ---------------------------------------------------------------------------
+import { resolveTwitterAll } from './proxy'
+
+const vxResp = (media: object[]) =>
+  ({ ok: true, json: async () => ({ media_extended: media, mediaURLs: media.map((m: any) => m.url) }) }) as unknown as Response
+
+describe('classifyAndResolve — Twitter CDN direct URLs', () => {
+  it('passes pbs.twimg.com URLs through without calling vxtwitter', async () => {
+    const fetchMock = vi.fn(async () => { throw new Error('must not call vx') })
+    vi.stubGlobal('fetch', fetchMock)
+    const out = await classifyAndResolve('https://pbs.twimg.com/media/ABC?format=jpg&name=large')
+    expect(out).toBe('https://pbs.twimg.com/media/ABC?format=jpg&name=large')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('passes video.twimg.com URLs through without calling vxtwitter', async () => {
+    const fetchMock = vi.fn(async () => { throw new Error('must not call vx') })
+    vi.stubGlobal('fetch', fetchMock)
+    const out = await classifyAndResolve('https://video.twimg.com/ext_tw_video/123/pu/vid/1280x720/video.mp4')
+    expect(out).toBe('https://video.twimg.com/ext_tw_video/123/pu/vid/1280x720/video.mp4')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('classifyAndResolve — Twitter photo-only tweet', () => {
+  it('resolves a tweet with only a photo to the image URL', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      vxResp([{ type: 'photo', url: 'https://pbs.twimg.com/media/XYZ.jpg' }]),
+    ))
+    expect(await classifyAndResolve('https://x.com/user/status/123')).toBe(
+      'https://pbs.twimg.com/media/XYZ.jpg',
+    )
+  })
+})
+
+describe('resolveTwitterAll', () => {
+  it('returns all photo URLs from a multi-image tweet', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      vxResp([
+        { type: 'photo', url: 'https://pbs.twimg.com/media/A.jpg' },
+        { type: 'photo', url: 'https://pbs.twimg.com/media/B.jpg' },
+        { type: 'photo', url: 'https://pbs.twimg.com/media/C.jpg' },
+      ]),
+    ))
+    const out = await resolveTwitterAll('https://x.com/user/status/456')
+    expect(out).toEqual([
+      'https://pbs.twimg.com/media/A.jpg',
+      'https://pbs.twimg.com/media/B.jpg',
+      'https://pbs.twimg.com/media/C.jpg',
+    ])
+  })
+
+  it('picks highest-bitrate mp4 variant for video items', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        media_extended: [{
+          type: 'video',
+          url: 'https://video.twimg.com/fallback.mp4',
+          variants: [
+            { content_type: 'video/mp4', bitrate: 832000, url: 'https://video.twimg.com/low.mp4' },
+            { content_type: 'video/mp4', bitrate: 2176000, url: 'https://video.twimg.com/high.mp4' },
+            { content_type: 'application/x-mpegURL', url: 'https://video.twimg.com/playlist.m3u8' },
+          ],
+        }],
+      }),
+    }) as unknown as Response))
+    const out = await resolveTwitterAll('https://twitter.com/user/status/789')
+    expect(out).toEqual(['https://video.twimg.com/high.mp4'])
+  })
+
+  it('returns null for non-twitter URLs', async () => {
+    expect(await resolveTwitterAll('https://example.com/page')).toBeNull()
+  })
+})
+

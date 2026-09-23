@@ -125,6 +125,32 @@ export function clearStaleLoopbackApiBase(): boolean {
   return false
 }
 
+/**
+ * Boot-time fix (all surfaces — browser tab, dev, Electron): a stale
+ * `gmatch.api.url` pointing at a dead loopback sidecar (left by an old
+ * host-mode install or dev session) makes every surface hammer dead
+ * 127.0.0.1:8790 forever. Probe the sidecar health; when it is unreachable
+ * the stale key is dropped so API_BASE falls through to the central node /
+ * dev proxy. A HEALTHY sidecar (opt-in local dev, GMATCH_LOCAL_API=1) keeps
+ * its override. Returns true when a stale key was cleared.
+ */
+export async function clearDeadLoopbackApiBase(): Promise<boolean> {
+  try {
+    if (typeof localStorage === 'undefined') return false
+    const manual = localStorage.getItem('gmatch.api.url')
+    if (!manual?.trim() || !isLoopbackApiUrl(manual.trim())) return false
+    const base = manual.trim().replace(/\/+$/, '')
+    try {
+      const res = await fetch(`${base}/api/health`, { signal: AbortSignal.timeout(1200) })
+      if (res.ok) return false // sidecar alive: the override is legitimate
+    } catch { /* dead: clear below */ }
+    localStorage.removeItem('gmatch.api.url')
+    return true
+  } catch {
+    return false
+  }
+}
+
 function toHex(bytes: Uint8Array): string {
   return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
 }

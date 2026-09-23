@@ -7,6 +7,7 @@ import {
   pickRedgifsNiche,
   redgifsAuthUrl,
   redgifsNicheGifsUrl,
+  redgifsNicheMatchesQuery,
   redgifsNicheSearchUrl,
   redgifsPlayable,
   redgifsQuery,
@@ -100,6 +101,32 @@ describe('redgifs niches (query-aware search)', () => {
   it('picks the niche overlapping the query tokens', () => {
     expect(pickRedgifsNiche('blonde', NICHES)?.id).toBe('fair-haired')
     expect(pickRedgifsNiche('mom curves', NICHES)?.id).toBe('sluty-milfs')
+  })
+
+  it('refuses fragment-only niche matches (wrong-tag rounds)', () => {
+    // `sky` shares a fragment with `skylar_vox` but no full token: electing
+    // it used to stamp foreign posts with the query tags (mistag pipeline).
+    const frag = parseRedgifsNiches({
+      niches: [{ id: 'sky-high', name: 'Sky High', tags: ['Sky'], subscribers: 999999 }],
+    })
+    expect(pickRedgifsNiche('skylar_vox', frag)).toBeNull()
+    // A full-token niche still elects.
+    const exact = parseRedgifsNiches({
+      niches: [{ id: 'skylar-vox', name: 'Skylar Vox', tags: [], subscribers: 10 }],
+    })
+    expect(pickRedgifsNiche('skylar_vox', exact)?.id).toBe('skylar-vox')
+  })
+
+  it('gates query-tag stamping on full-token niche agreement', () => {
+    const frag = parseRedgifsNiches({
+      niches: [{ id: 'sky-high', name: 'Sky High', tags: ['Sky'], subscribers: 1 }],
+    })[0]
+    const exact = parseRedgifsNiches({
+      niches: [{ id: 'skylar-vox', name: 'Skylar Vox', tags: [], subscribers: 1 }],
+    })[0]
+    expect(redgifsNicheMatchesQuery(exact, 'skylar_vox')).toBe(true)
+    expect(redgifsNicheMatchesQuery(frag, 'skylar_vox')).toBe(false)
+    expect(redgifsNicheMatchesQuery(frag, '')).toBe(false)
   })
 
   it('returns null for pornstar names with no niche overlap (generic fallback)', () => {

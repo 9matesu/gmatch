@@ -60,15 +60,61 @@ export async function isPrivateTarget(url: URL): Promise<boolean> {
 
 async function resolveTwitter(url: URL): Promise<string | null> {
   const host = url.hostname.toLowerCase()
+  // pbs.twimg.com is the direct media CDN — return as-is so the proxy
+  // fetches it with the correct Referer (added in REFERERS map below).
+  if (host === 'pbs.twimg.com' || host === 'video.twimg.com') return url.toString()
   if (!['twitter.com', 'www.twitter.com', 'x.com', 'www.x.com', 'vxtwitter.com', 'fxtwitter.com', 'fixupx.com'].includes(host)) return null
   try {
     const vxUrl = `https://api.vxtwitter.com${url.pathname}`
     const res = await fetch(vxUrl, { signal: AbortSignal.timeout(6000), headers: { 'User-Agent': 'Mozilla/5.0' } })
     if (!res.ok) return null
     const data = await res.json() as any
-    const vid = data.media_extended?.find((m: any) => m.type === 'video' || m.type === 'gif')
-    if (vid?.url) return vid.url
+    // Prefer video/gif over photos (highest-quality media first), but also
+    // accept photos — previously only video/gif were picked, so static-image
+    // tweets silently fell through and picked up the wrong mediaURLs[0].
+    const media = data.media_extended
+    if (Array.isArray(media) && media.length > 0) {
+      const vid = media.find((m: any) => m.type === 'video' || m.type === 'gif')
+      if (vid?.url) return vid.url
+      const photo = media.find((m: any) => m.type === 'photo' && m.url)
+      if (photo?.url) return photo.url
+    }
     if (Array.isArray(data.mediaURLs) && data.mediaURLs.length > 0) return data.mediaURLs[0]
+  } catch {}
+  return null
+}
+
+/**
+ * Like resolveTwitter but returns ALL media items from the tweet — used when
+ * the caller wants to add every image/gif/video as separate post items.
+ * Returns null when the URL is not a Twitter page or resolution fails.
+ */
+export async function resolveTwitterAll(rawUrl: string): Promise<string[] | null> {
+  let url: URL
+  try { url = new URL(rawUrl) } catch { return null }
+  const host = url.hostname.toLowerCase()
+  if (!['twitter.com', 'www.twitter.com', 'x.com', 'www.x.com', 'vxtwitter.com', 'fxtwitter.com', 'fixupx.com'].includes(host)) return null
+  try {
+    const vxUrl = `https://api.vxtwitter.com${url.pathname}`
+    const res = await fetch(vxUrl, { signal: AbortSignal.timeout(6000), headers: { 'User-Agent': 'Mozilla/5.0' } })
+    if (!res.ok) return null
+    const data = await res.json() as any
+    const media = data.media_extended
+    if (Array.isArray(media) && media.length > 0) {
+      const urls = media
+        .map((m: any) => {
+          // For video/gif prefer the highest-quality mp4 variant when available.
+          if ((m.type === 'video' || m.type === 'gif') && Array.isArray(m.variants)) {
+            const best = m.variants.filter((v: any) => v.content_type === 'video/mp4')
+              .sort((a: any, b: any) => (b.bitrate ?? 0) - (a.bitrate ?? 0))[0]
+            return best?.url || m.url
+          }
+          return m.url
+        })
+        .filter(Boolean) as string[]
+      if (urls.length > 0) return urls
+    }
+    if (Array.isArray(data.mediaURLs) && data.mediaURLs.length > 0) return data.mediaURLs as string[]
   } catch {}
   return null
 }
@@ -303,6 +349,8 @@ export async function proxyAndStoreExternal(
       'rule34.paheal.net': 'https://rule34.paheal.net/',
       'media.redgifs.com': 'https://www.redgifs.com/',
       'imhentai.xxx': 'https://imhentai.xxx/',
+      'pbs.twimg.com': 'https://twitter.com/',
+      'video.twimg.com': 'https://twitter.com/',
     }
     const host = parsed.hostname.replace(/^www\./, '')
     const referer = REFERERS[host] ||

@@ -5,9 +5,10 @@ Inspired by the `babecock` module and game-registry patterns of the ORBIT/gMatch
 platform (see docs/reference/). This repo is standalone — ORBIT is NOT a dependency.
 
 > **18+ / SAFETY (non-negotiable):** the app gates on an age confirmation screen at
-> first launch. The booru client MUST apply a hard blocklist (see docs/SPEC.md §8)
+> first launch. The desktop client MUST apply the blocklist (see docs/SPEC.md §8)
 > that rejects any tag suggesting minors or prohibited content, and must only
-> request `rating:explicit`/adult pools. No telemetry, no uploads — images are
+> request `rating:explicit`/adult pools. Enforcement is client-side only — the
+> API stores tags verbatim and never hard-blocks them. No telemetry, no uploads — images are
 > fetched read-only from public booru APIs.
 
 ## Stack

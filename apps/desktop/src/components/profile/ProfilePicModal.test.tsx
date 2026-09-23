@@ -47,7 +47,7 @@ describe('ProfilePicModal', () => {
     expect(backdrop).toBeInTheDocument();
   });
 
-  it('closes on backdrop click', async () => {
+  it('does NOT close on backdrop click (staged photo/URL is preserved)', async () => {
     const onClose = vi.fn();
     render(
       <ProfilePicModal isOpen={true} onClose={onClose} onSave={vi.fn()} />
@@ -56,7 +56,7 @@ describe('ProfilePicModal', () => {
     expect(backdrop).toBeInTheDocument();
     if (backdrop) {
       await userEvent.click(backdrop);
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
     }
   });
 

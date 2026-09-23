@@ -7,7 +7,7 @@ import type { GossipEnvelope } from '@orbit/shared'
  *
  * A host node periodically pulls SIGNED public-post envelopes from an
  * upstream relay (central by default) and applies them to its own db via
- * applyGossipEnvelope (re-validates shape + signature + blocklist, upserts
+  * applyGossipEnvelope (re-validates shape + signature, upserts
  * a Users stub + the public Objects row, idempotent). Offline hosts catch
  * up on next pull thanks to the durable cursor in SystemMeta.
  *

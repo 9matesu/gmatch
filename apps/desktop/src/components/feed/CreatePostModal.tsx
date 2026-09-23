@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { playPress } from '../../utils/sounds';
 import { useCropper } from '../../hooks/useCropper';
 import { isCropableImage } from '../CropModal';
@@ -19,7 +18,7 @@ import {
 import type { OrbitIdentity } from '@orbit/crypto';
 import { orbitFetch } from '../../utils/api';
 import { mediaUrlToCachedFile } from '../../utils/cacheMedia';
-import { isMediaVideo, isTwitterUrl, isVideoPageUrl, isVideoPost, resolveTwitterMedia, resolveVideoMime, sniffFileHead, urlFallbackMime } from '../../utils/media';
+import { isMediaVideo, isTwitterUrl, isVideoPageUrl, isVideoPost, resolveTwitterMediaAll, resolveVideoMime, sniffFileHead, urlFallbackMime } from '../../utils/media';
 import { forgeMediaLocally } from '../../services/mediaForge';
 import { devFetchable } from '../../services/imageCache';
 
@@ -214,13 +213,19 @@ function extForMime(mime: string): string {
     if (isTwitterUrl(raw)) {
       setResolvingUrl(true);
       try {
-        const direct = await resolveTwitterMedia(raw);
-        if (direct) {
+        const directs = await resolveTwitterMediaAll(raw);
+        if (directs && directs.length > 0) {
+          const ts = Date.now();
           setMediaList((prev) => [
             ...prev,
-            { id: 'url_' + Date.now(), previewUrl: direct, originalUrl: raw, isExternalUrl: true },
+            ...directs.map((url, idx) => ({
+              id: `url_${ts}_${idx}`,
+              previewUrl: url,
+              originalUrl: raw,
+              isExternalUrl: true,
+            })),
           ]);
-          toast?.('Attached media from post link', 'success');
+          toast?.(directs.length > 1 ? `Attached ${directs.length} items from post link` : 'Attached media from post link', 'success');
         } else {
           setMediaList((prev) => [
             ...prev,
@@ -451,7 +456,6 @@ function extForMime(mime: string): string {
   return (
     <div
       className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 pb-[calc(0.75rem+var(--island-clearance))] sm:p-4 sm:pb-[calc(1rem+var(--island-clearance))] font-sans select-none animate-orbit-fade-in"
-      onClick={onClose}
     >
       <div
         className="w-full max-w-3xl bg-retro-panel border border-border-glass rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[calc(100dvh-var(--island-clearance)-2rem)] text-retro-fg animate-orbit-pop"
@@ -756,7 +760,7 @@ function extForMime(mime: string): string {
           )}
         </div>
       </div>
-      {cropper && createPortal(cropper, document.body)}
+      {cropper}
     </div>
   );
 }

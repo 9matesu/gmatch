@@ -1,10 +1,16 @@
 import { useCallback, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CropModal, type CropAspect, type CropResult } from '../components/CropModal';
 
 /**
  * Local cropper instance: `crop(source)` opens the crop dialog and
  * resolves with { dataUrl, file } — or null when the user cancels.
  * Render `cropper` inside the host component's JSX.
+ *
+ * The dialog is portaled to document.body so its backdrop events never
+ * bubble through a host modal's React tree (a nested crop inside e.g.
+ * CreateCardModal used to trigger the host's backdrop-dismiss and wipe
+ * the whole form).
  */
 export function useCropper() {
   const [pending, setPending] = useState<{ src: string; aspect: CropAspect; title: string } | null>(null);
@@ -36,7 +42,12 @@ export function useCropper() {
   }, []);
 
   const cropper = pending ? (
-    <CropModal src={pending.src} defaultAspect={pending.aspect} title={pending.title} onCancel={() => settle(null)} onDone={(r) => settle(r)} />
+    typeof document !== 'undefined' ? (
+      createPortal(
+        <CropModal src={pending.src} defaultAspect={pending.aspect} title={pending.title} onCancel={() => settle(null)} onDone={(r) => settle(r)} />,
+        document.body,
+      )
+    ) : null
   ) : null;
 
   return { crop, cropper };

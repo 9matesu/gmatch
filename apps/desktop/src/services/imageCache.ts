@@ -25,6 +25,7 @@ interface Bridge {
   cacheImage?: (url: string) => Promise<{ local: string | null }>
   cacheStats?: () => Promise<{ files: number; bytes: number }>
   clearCache?: () => Promise<{ files: number; bytes: number }>
+  clearFeedCache?: () => Promise<void>
   evictImage?: (url: string) => Promise<{ ok: boolean }>
 }
 
@@ -212,6 +213,20 @@ export async function evictImage(url: string): Promise<void> {
   if (b?.evictImage) {
     try {
       await b.evictImage(url)
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/** Drop memoized feed lists after a tag-intent change (solo/remove/
+ * deselect). Bytes untouched — the gallery keeps serving gmcache:// URLs.
+ * No bridge (browser dev) = no memo = no-op. */
+export async function clearFeedCache(): Promise<void> {
+  const b = bridge()
+  if (b?.clearFeedCache) {
+    try {
+      await b.clearFeedCache()
     } catch {
       /* ignore */
     }

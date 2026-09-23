@@ -74,7 +74,7 @@ export function FlashModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[var(--z-toast)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-orbit-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[var(--z-toast)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-orbit-fade-in">
       <div
         className="bg-retro-panel border-2 border-yellow-500 rounded-xl max-w-md w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}

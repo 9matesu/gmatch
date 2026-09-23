@@ -19,6 +19,8 @@ export interface GmatchBridge {
   cacheImage?: (url: string) => Promise<{ local: string | null }>
   cacheStats?: () => Promise<{ files: number; bytes: number }>
   clearCache?: () => Promise<{ files: number; bytes: number }>
+  /** Drops memoized feed lists after tag-intent changes (bytes untouched). */
+  clearFeedCache?: () => Promise<{ cleared: number }>
   evictImage?: (url: string) => Promise<{ ok: boolean }>
   vaultGet?: (url: string) => Promise<{ local: string | null }>
   vaultPin?: (url: string) => Promise<{ local: string | null }>

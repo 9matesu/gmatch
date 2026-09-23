@@ -227,3 +227,57 @@ function hashCode(s: string): number {
   }
   return h
 }
+
+/**
+ * Search-page covers rewritten to fulls — fallback when gallery expansion
+ * fails (search HTML arrived but gallery pages timed out): the round still
+ * lands real image files, never thumbs-as-url. Thumb filenames match full
+ * filenames (same file, thumbs/ path), so the rewrite is exact. The
+ * character class admits spaces: live thumbs ship names like
+ * `4037 lhb_0137.jpg`. Never throws.
+ */
+export function parseBabesourceCovers(html: unknown, limit = 20): BabesourceImage[] {
+  try {
+    if (typeof html !== 'string') return []
+    const out: BabesourceImage[] = []
+    const seen = new Set<string>()
+    const re =
+      /https:\/\/media\.babesource\.com\/galleries\/[0-9a-f]+\/thumbs\/(?:300x406\/)?[^"']+?\.(?:jpe?g|png|webp|gif)/gi
+    let m: RegExpExecArray | null
+    while ((m = re.exec(html))) {
+      const full = babesourceThumbToFull(m[0])
+      if (!full || seen.has(full)) continue
+      seen.add(full)
+      out.push({ url: full, preview: m[0] })
+      if (out.length >= Math.max(1, limit)) break
+    }
+    return out
+  } catch {
+    return []
+  }
+}
+
+/** Feed posts for search-page covers (no gallery context): stable ids from
+ * the image hash dir, tags from the query tokens. Pure. */
+export function toBabesourceCoverPosts(images: BabesourceImage[], query: string): BooruPost[] {
+  const tags = [
+    ...new Set(
+      query
+        .replace(/_/g, ' ')
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter((t) => t.length >= 2),
+    ),
+  ]
+  return images.map((img, i) => {
+    const h = /\/galleries\/([0-9a-f]+)\//i.exec(img.preview)?.[1] ?? `c${i}`
+    return {
+      id: `bs-c-${h}-${i}`,
+      url: img.url,
+      preview: img.preview,
+      tags,
+      rating: 'e',
+      kind: 'image' as const,
+    }
+  })
+}

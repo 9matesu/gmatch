@@ -3,7 +3,7 @@ import { orbitAuth } from '../middleware/auth'
 import type { D1Turso } from '../db'
 import type { LocalBlobStore } from '../blob'
 import { getSlideshowImagesByTags } from '../bot-image-api'
-import { checkBlacklistedTags, normalizeTags } from '@orbit/shared'
+import { normalizeTagShape } from '@orbit/shared'
 
 type Bindings = {
   DB: D1Turso
@@ -157,9 +157,8 @@ slideshows.post('/', async (c) => {
 
   if (source === 'api') {
     const rawTags = Array.isArray(body.tags) ? body.tags : (typeof body.tags === 'string' ? body.tags.split(/[\n,]+/) : [])
-    const { hasBlacklisted } = checkBlacklistedTags(rawTags.map((t: unknown) => String(t ?? '')))
-    if (hasBlacklisted) return c.json({ error: 'Tags contain prohibited terms' }, 400)
-    const tags = normalizeTags(rawTags.map((t: unknown) => String(t ?? '')))
+    // Client-side filtering only: store tags verbatim (shared/blocklist.json).
+    const tags = normalizeTagShape(rawTags.map((t: unknown) => String(t ?? '')))
     await c.env.DB
       .prepare('INSERT INTO Slideshows (id, owner_id, title, source, tags, interval_ms) VALUES (?, ?, ?, ?, ?, ?)')
       .bind(id, orbitId, title, source, JSON.stringify(tags), interval)

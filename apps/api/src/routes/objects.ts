@@ -5,7 +5,7 @@ import type { D1Turso } from '../db'
 import type { LocalBlobStore } from '../blob'
 import { purgeObjectLikes, addPoints } from '../game'
 import { deleteExpiredContent } from '../cleanup'
-import { PICTURE_TTL_SECONDS, STORY_TTL_SECONDS, checkBlacklistedTags } from '@orbit/shared'
+import { PICTURE_TTL_SECONDS, STORY_TTL_SECONDS } from '@orbit/shared'
 import { sha256 } from '@noble/hashes/sha256'
 import { bytesToHex } from '@noble/hashes/utils'
 import { proxyAndStoreExternal } from '../proxy'
@@ -116,13 +116,9 @@ objects.post('/register', orbitAuth, async (c) => {
     const isChat = (body.is_chat === 1 || body.is_chat === true) ? 1 : 0
     const postGroup = (typeof body.post_group === 'string' && body.post_group.trim()) || null
 
-    if (postTags) {
-      const { hasBlacklisted, blockedTags } = checkBlacklistedTags(postTags.split(','))
-      if (hasBlacklisted) {
-        return c.json({ error: `The following tags are prohibited: ${blockedTags.join(', ')}` }, 400)
-      }
-    }
-
+    // Client-side filtering only: the server stores tags verbatim, never
+    // hard-blocks them (single source of truth: shared/blocklist.json,
+    // editable through desktop Settings).
     const expiresAt = isStory ? new Date(Date.now() + 24 * 3600 * 1000).toISOString() : null
     const contentUrl = magnetUri || (contentHash ? `urn:sha256:${contentHash}` : `/api/objects/${objectId}`)
     const recipientsRaw = typeof body.recipients === 'string' ? body.recipients : null
@@ -205,12 +201,7 @@ objects.post('/', orbitAuth, async (c) => {
     if (postGroup && (postGroup.length > 80 || !/^[A-Za-z0-9_-]+$/.test(postGroup))) {
       return c.json({ error: 'Invalid post group' }, 400)
     }
-    if (postTags) {
-      const { hasBlacklisted, blockedTags } = checkBlacklistedTags(postTags.split(','))
-      if (hasBlacklisted) {
-        return c.json({ error: `The following tags are prohibited: ${blockedTags.join(', ')}` }, 400)
-      }
-    }
+    // Client-side filtering only (see JSON path above): store verbatim.
     const durationHoursRaw = formData.get('duration_hours') as string | null
     const durationMinutesRaw = formData.get('duration_minutes') as string | null
     let durationHours = durationHoursRaw ? Math.min(Math.max(1, parseInt(durationHoursRaw, 10)), 24) : 0

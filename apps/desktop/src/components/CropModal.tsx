@@ -152,8 +152,8 @@ export function CropModal({
   };
 
   const modalContent = (
-    <div className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg" onClick={onCancel}>
-      <div className="w-full max-w-sm bg-retro-bg border border-border-glass rounded-xl p-4 space-y-3 animate-orbit-pop" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg" style={{ zIndex: 'calc(var(--z-system) + 10)' }} onClick={onCancel} onMouseDown={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-sm bg-retro-bg border border-border-glass rounded-xl p-4 space-y-3 animate-orbit-pop" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold">{title}</h3>
           <button type="button" onClick={onCancel} aria-label="Cancel crop" className="p-1.5 rounded-lg text-retro-muted hover:text-white hover:bg-retro-panel cursor-pointer transition-colors">

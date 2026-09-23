@@ -112,14 +112,17 @@ describe('Slideshows API', () => {
     expect(Array.isArray((await itemsRes.json()).items)).toBe(true)
   })
 
-  it('rejects prohibited tags and invalid sources', async () => {
-    const badTags = JSON.stringify({ source: 'api', tags: ['loli'] })
+  it('stores tags verbatim and still rejects invalid sources', async () => {
+    // Client-side filtering only: the server accepts any tags (blocking
+    // happens in the desktop client via shared/blocklist.json).
+    const anyTags = JSON.stringify({ source: 'api', tags: ['loli'] })
     const res = await app.request('/api/slideshows', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders(alice, 'POST', '/api/slideshows', badTags) },
-      body: badTags,
+      headers: { 'Content-Type': 'application/json', ...authHeaders(alice, 'POST', '/api/slideshows', anyTags) },
+      body: anyTags,
     }, env)
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(200)
+    expect((await res.json()).slideshow.tags).toContain('loli')
 
     const badSource = JSON.stringify({ source: 'nope', items: [{ object_id: cardId }] })
     const res2 = await app.request('/api/slideshows', {

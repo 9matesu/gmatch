@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { orbitAuth } from '../middleware/auth'
 import type { D1Turso, AtomicStatement } from '../db'
 import type { LocalBlobStore } from '../blob'
-import { normalizeTags, checkBlacklistedTags, STORE_ITEMS, computeCardRarity, generateFallbackName, isDefaultPeerName } from '@orbit/shared'
+import { normalizeTagShape, STORE_ITEMS, computeCardRarity, generateFallbackName, isDefaultPeerName } from '@orbit/shared'
 import { parseLootboxTags, normalizeDrawConfig } from '../lootboxes/service'
 import { recomputeUserCounters } from '../game'
 import { maybeResetDailyScores } from '../cleanup'
@@ -521,12 +521,9 @@ users.on(['PATCH', 'PUT'], '/profile', async (c) => {
         return c.json({ error: 'Tags cannot contain < > & " or \'' }, 400)
       }
     }
-    const { hasBlacklisted, blockedTags } = checkBlacklistedTags(tags)
-    if (hasBlacklisted) {
-      return c.json({ error: `The following tags are prohibited: ${blockedTags.join(', ')}. Please choose different tags.` }, 400)
-    }
+    // Client-side filtering only (shared/blocklist.json): store verbatim.
     // Single normalization source of truth shared with the web client.
-    cleanTags = normalizeTags(tags)
+    cleanTags = normalizeTagShape(tags)
   }
 
   const updates: string[] = []

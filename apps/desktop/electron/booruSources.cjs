@@ -11,12 +11,16 @@ function queryVariants(query) {
 
 function createFetchBooru({ sources, httpGet, cache, blocked = () => false }) {
   let rrIndex = 0
-  return async function fetchBooru({ tags, limit, allowReal, allowHentai, fresh }) {
+  return async function fetchBooru({ tags, limit, allowReal, allowHentai, fresh, probe, page }) {
     const query = String(tags ?? '').trim()
     const n = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100)
     if (!query || blocked(query)) {
       return { posts: [], source: null, ok: false, error: 'blocked-or-empty query' }
     }
+    // Probes (tag validation, page 0) need deterministic first pages, not a
+    // random draw — mirrors the renderer's isProbe handling in dapiPass.
+    const deterministic = probe === true || page === 0
+    const fetchOpts = deterministic ? { deterministic: true } : undefined
 
     // READ the memo fetchBooru already writes if fresh isn't requested.
     // # ponytail: fresh=true bypasses 10-minute memo so idle loop gets new images
@@ -39,11 +43,14 @@ function createFetchBooru({ sources, httpGet, cache, blocked = () => false }) {
       for (const variant of variants) {
         try {
           const posts = source.fetch
-            ? await source.fetch(variant, n)
+            ? await source.fetch(variant, n, fetchOpts)
             : source.parse(await httpGet(source.url(variant, n)))
           if (posts && posts.length > 0) {
             rrIndex = (pool.indexOf(source) + 1) % pool.length
-            cache?.setFeedCache?.(variant, posts)
+            // Random round pages must NOT poison the tag slot: a memoized
+            // random page would repeat for 10 minutes on probe/market reads.
+            // Only deterministic (probe/page-0) results are memoized.
+            if (!fresh) cache?.setFeedCache?.(variant, posts)
             return { posts, source: source.id, ok: true, query: variant }
           }
         } catch {

@@ -3,6 +3,7 @@ import { getSecureItem } from '../utils/secure-storage'
 import { clickGain, clickPower, heatMultiplier, heatStreakAfter, isCrit, passiveGps } from './economy'
 import type { EconomyInput } from './economy'
 import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, mergeTags as mergeTagList, normalizeCustomTag, removeTag as removeTagList, setupTag, soloTag as soloTagList, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
+import { buildRoundQueries, roundQueryKey, PILLS_PER_ROUND, RECENT_QUERY_DEPTH } from './queryBuilder'
 import { getUserExcludes, isNoise, isQueryBlocked, rankTags, setUserExcludes } from './tagFilter'
 import { learnPurge, setCoRules, setFeedIntent } from './tagCooccur'
 import { KILL_XP, foeMaxHp, killBonusPoints } from './battle'
@@ -20,9 +21,9 @@ import {
   serialize,
 } from './save'
 import type { SaveData } from './save'
-import { fetchPosts, fetchPostsMulti, clearMirrorCooldowns, clearSeenMemory } from '../services/booru'
+import { fetchPosts, fetchPostsMulti, matchesQuery, clearMirrorCooldowns, clearSeenMemory } from '../services/booru'
 import { vaultPin, vaultUnpin, vaultRemove } from '../services/vault'
-import { evictImage } from '../services/imageCache'
+import { evictImage, clearFeedCache } from '../services/imageCache'
 import { isCustomMediaUrl, sampleCustomSources } from '../services/customSources'
 import type { ActiveCap, BooruPost, CapId, CustomSource, GalleryImage, GridCell, KoDrop, OwnedTag, ViewMode } from './types'
 
@@ -83,6 +84,9 @@ export interface GameState {
   /** Round-robin cursor over the tag pool — one tag per fetch, never stacked. */
   feedCursor: number
   priorityTag: string | null
+  /** Recent round query keys (order-independent pill sets): consecutive
+   * rounds never repeat the same queries (session-only, not saved). */
+  recentQueryKeys: string[]
   feedOffline: boolean
   /** True when sources answer but everything was already seen (pool
    *  exhausted) — distinct from network-offline for UI copy. */
@@ -295,6 +299,7 @@ function freshData() {
     defeated: 0,
     feedCursor: 0,
     priorityTag: null,
+    recentQueryKeys: [] as string[],
     feedOffline: false,
     feedEmptyFresh: false,
     fetching: false,
@@ -337,6 +342,17 @@ export function shufflePosts<T>(posts: readonly T[]): T[] {
 function pushPast(past: BooruPost[], post: BooruPost | null): BooruPost[] {
   if (!post) return past
   return [...past, post].slice(-HISTORY_CAP)
+}
+
+/**
+ * Keep rule for unseen posts after a tag-intent change (solo/remove/
+ * deselect): untagged posts can't be attributed to any tag (they come from
+ * tag-targeted searches), so they stay; tagged posts stay only when they
+ * match the new intent. Gallery/past history is never touched.
+ */
+function postMatchesIntent(post: BooruPost, intent: string): boolean {
+  if (post.tags.length === 0) return true
+  return matchesQuery(post, intent)
 }
 
 /** Silent feed retry: sources are never allowed to kill the game.
@@ -778,14 +794,40 @@ export const useGame = create<GameState>((set, get) => ({
     if (!next) return false
     const tags = [...s.tags]
     tags[idx] = next
-    set({ tags })
+    // Intent changed: old-tag memo slots must not serve again.
+    void clearFeedCache()
+    if (next.selected === false) {
+      // Deselected: drop its unseen tagged posts now (untagged posts can't
+      // be attributed; gallery/past kept).
+      const drop = (p: BooruPost) => postMatchesIntent(p, name) && p.tags.length > 0
+      set({
+        tags,
+        queue: s.queue.filter((p) => !drop(p)),
+        grid: s.grid.filter((c) => !drop(c.post)),
+        current: s.current && drop(s.current) ? null : s.current,
+      })
+    } else {
+      set({ tags })
+    }
     return true
   },
 
   soloTag: (name) => {
     const next = soloTagList(get().tags, name)
     if (!next) return false
-    set({ tags: next, priorityTag: name })
+    // Intent narrowed to one tag: drop the old-tag memo, flush unseen
+    // posts from every other tag, then refill from the solo tag at once.
+    void clearFeedCache()
+    const s = get()
+    const keep = (p: BooruPost) => postMatchesIntent(p, name)
+    set({
+      tags: next,
+      priorityTag: name,
+      queue: s.queue.filter(keep),
+      grid: s.grid.filter((c) => keep(c.post)),
+      current: s.current && keep(s.current) ? s.current : null,
+    })
+    void get().fetchFeed()
     return true
   },
 
@@ -793,7 +835,17 @@ export const useGame = create<GameState>((set, get) => ({
     const s = get()
     const next = removeTagList(s.tags, name)
     if (!next) return false
-    set({ tags: next, toasts: pushToast(s, `Tag ${name} removed.`) })
+    // Removal of a tag means removal of its cache: drop the memo and its
+    // unseen posts now (gallery/past history and bytes kept).
+    void clearFeedCache()
+    const drop = (p: BooruPost) => postMatchesIntent(p, name) && p.tags.length > 0
+    set({
+      tags: next,
+      toasts: pushToast(s, `Tag ${name} removed.`),
+      queue: s.queue.filter((p) => !drop(p)),
+      grid: s.grid.filter((c) => !drop(c.post)),
+      current: s.current && drop(s.current) ? null : s.current,
+    })
     return true
   },
 
@@ -801,6 +853,9 @@ export const useGame = create<GameState>((set, get) => ({
     const s = get()
     const next = mergeTagList(s.tags, a, b)
     if (!next) return false
+    // Consumed pills are gone as queries: drop the memo (queued posts stay,
+    // they still match the merged pair's content).
+    void clearFeedCache()
     const name = `${a} ${b}`
     set({ tags: next, priorityTag: name, toasts: pushToast(s, `Merged into ${name} — combined search, best level kept.`) })
     return true
@@ -829,7 +884,9 @@ export const useGame = create<GameState>((set, get) => ({
     set({ fetching: true })
     let probe: { ok: boolean; posts: { length: number } }
     try {
-      probe = await fetchPosts({ tags: verdict.name, limit: 20, page: 0, probe: true })
+      // Silent validation: proving the tag serves must not mark its pool
+      // seen (that would hide those pictures from the very feed being built).
+      probe = await fetchPosts({ tags: verdict.name, limit: 20, page: 0, probe: true, silent: true })
     } finally {
       set({ fetching: false })
     }
@@ -861,8 +918,14 @@ export const useGame = create<GameState>((set, get) => ({
       set({ fetching: false })
       return
     }
-    const q = owned.slice(0, 3)
-    const res = await fetchPosts({ tags: q.join(' '), limit: 60 })
+    const q = buildRoundQueries({ pills: owned, count: 1 })
+    if (q.length === 0) {
+      set({ fetching: false })
+      return
+    }
+    // Silent: market discovery must not mark the pool seen — those pictures
+    // still belong to future feed rounds.
+    const res = await fetchPosts({ tags: q[0], limit: 60, silent: true })
     const prev = new Map(s.tags.map((t) => [t.name, t]))
     let offers: OwnedTag[]
     if (res.ok && res.posts.length > 0) {
@@ -949,17 +1012,30 @@ export const useGame = create<GameState>((set, get) => ({
         })
         return
       }
-      // Every selected tag is browsed every round: concurrent fetchPosts per
-      // tag, recency-weighted interleave (most-recent pick ~50%, rest
-      // rotating). No more one-tag-per-fetch rotation that starves tags.
-      const pool = owned.slice(0, 4)
-      setFeedIntent(pool)
-      const priority = s.priorityTag && owned.includes(s.priorityTag) ? s.priorityTag : null
-      // A freshly added/picked tag steers the round (priority weight), then
-      // decays back into the mix once its batch lands.
+      // Smart rotation: a random single-pill subset every round (merged
+      // pills stay intact — combos exist ONLY via merge). Recent round keys
+      // are refused, so consecutive rounds never repeat queries. A fresh
+      // pick/solo (priorityTag) force-steers its round, then decays back
+      // into the mix once its batch lands.
+      const force = s.priorityTag && owned.includes(s.priorityTag) ? s.priorityTag : null
+      const picks = buildRoundQueries({
+        pills: owned,
+        count: Math.min(PILLS_PER_ROUND, owned.length),
+        forceInclude: force,
+        recentKeys: s.recentQueryKeys,
+      })
+      setFeedIntent(picks)
+      set({ recentQueryKeys: [...s.recentQueryKeys, roundQueryKey(picks)].slice(-RECENT_QUERY_DEPTH) })
+      const priority = force
       // ponytail: in grid mode pull a larger batch (30) so queue stays ahead of the 3x3 grid
       const batchLimit = isGridMode(get().viewMode) ? 30 : 15
-      const res = await fetchPostsMulti({ tags: pool, limit: batchLimit, priority, allowReal: s.allowReal, allowHentai: s.allowHentai, fresh: true })
+      const res = await fetchPostsMulti({ tags: picks, limit: batchLimit, priority, allowReal: s.allowReal, allowHentai: s.allowHentai, fresh: true })
+      // Dev-only round trace: which query won which source (wrong-tag
+      // reports become a one-line answer). Stripped from prod builds and
+      // silent under vitest.
+      if (import.meta.env.DEV && import.meta.env.MODE !== 'test') {
+        console.debug(`[feed] picks=${picks.join('+')} source=${res.source} posts=${res.posts.length} ok=${res.ok}`)
+      }
       cursor = s.feedCursor + 1
       // Seen-exhausted (not broken): gentle path — no backoff escalation,
       // distinct UI copy; auto-poll still recovers.

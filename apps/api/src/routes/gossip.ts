@@ -9,7 +9,6 @@ import {
   type GossipEnvelope,
   type GossipPostPayload,
 } from '@orbit/shared'
-import { checkBlacklistedTags } from '@orbit/shared'
 
 /**
  * Gossip relay (plan G1 — every user a self-hosting db).
@@ -25,10 +24,12 @@ import { checkBlacklistedTags } from '@orbit/shared'
  * - GET  /api/gossip/since?cursor=&limit= (PUBLIC — hosts pull without an
  *   identity bootstrap; envelopes are public posts) → ordered envelopes.
  *
- * Write path also enforces the shared tag blocklist and a per-author daily
- * cap, mirroring POST /api/objects policy. Unlike the in-memory blind mail
- * store, envelopes are DURABLE so offline hosts catch up on next pull.
- */
+  * Write path enforces a per-author daily cap, mirroring POST /api/objects
+  * policy. Tag filtering happens client-side only (shared/blocklist.json):
+  * the relay stores envelopes verbatim, never hard-blocks a tag. Unlike
+  * the in-memory blind mail store, envelopes are DURABLE so offline hosts
+  * catch up on next pull.
+  */
 
 type Bindings = {
   DB: D1Turso
@@ -77,10 +78,7 @@ export async function applyGossipEnvelope(
   if (malformed) return 'rejected'
   if (!verifyEnvelopeSig(e)) return 'rejected'
   const p: GossipPostPayload = e.payload
-  if (p.post_tags) {
-    const { hasBlacklisted } = checkBlacklistedTags(p.post_tags.split(','))
-    if (hasBlacklisted) return 'rejected'
-  }
+  // Client-side filtering only: envelopes apply verbatim (see module doc).
   // Known-author binding: never let an envelope rewrite a local user's key.
   const known = await db.prepare('SELECT public_key FROM Users WHERE id = ?').bind(p.owner_id)
     .first<{ public_key: string }>().catch(() => null)
@@ -125,12 +123,7 @@ gossip.post('/envelopes', orbitAuth, async (c) => {
   if (local && local.public_key.toLowerCase() !== body.payload.author_pubkey.toLowerCase()) {
     return c.json({ error: 'author_pubkey does not match local user' }, 403)
   }
-  if (body.payload.post_tags) {
-    const { hasBlacklisted, blockedTags } = checkBlacklistedTags(body.payload.post_tags.split(','))
-    if (hasBlacklisted) {
-      return c.json({ error: `The following tags are prohibited: ${blockedTags.join(', ')}` }, 400)
-    }
-  }
+  // Client-side filtering only: store the envelope verbatim (see module doc).
   const dayCount = await c.env.DB.prepare(
     "SELECT COUNT(*) as n FROM GossipEnvelopes WHERE author_id = ? AND received_at > datetime('now', '-1 day')",
   ).bind(orbitId).first<{ n: number }>().catch(() => ({ n: 0 }))

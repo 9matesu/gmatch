@@ -5,6 +5,13 @@ vi.mock('../services/booru', () => ({
   fetchPostsMulti: vi.fn(async () => ({ posts: [], source: null, ok: false, offline: true })),
   clearMirrorCooldowns: vi.fn(),
   clearSeenMemory: vi.fn(),
+  // Faithful mirror of the real token matcher (single/multi-token intents).
+  matchesQuery: (post: { tags: string[] }, query?: string) => {
+    if (!query || post.tags.length === 0) return true
+    const toks = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    const tags = post.tags.map((t) => t.toLowerCase())
+    return toks.some((tok) => tags.some((t) => t === tok || t.includes(tok) || tok.includes(t)))
+  },
 }))
 
 import { defaultSave, serialize, SAVE_KEY } from './save'
@@ -265,16 +272,19 @@ describe('fetchFeed guards + offline shapes', () => {
     __resetFeedRetryForTests()
   })
 
-  it('fans out to every selected tag in a single round (no per-tag retry)', async () => {
+  it('queries rotated single-pill subsets (one call per round, no full fan-out)', async () => {
     mockedMulti.mockReset()
     mockedMulti.mockResolvedValue({ posts: [post('retry')], source: 't', ok: true })
     useGame.setState({
       tags: [setupTag('aaa'), setupTag('bbb')],
       feedCursor: 0,
+      recentQueryKeys: [],
     })
     await useGame.getState().fetchFeed()
     expect(mockedMulti.mock.calls).toHaveLength(1)
-    expect(mockedMulti.mock.calls[0][0].tags).toEqual(['aaa', 'bbb'])
+    const arg = mockedMulti.mock.calls[0][0]
+    expect(arg.tags.length).toBeLessThanOrEqual(2)
+    for (const t of arg.tags) expect(['aaa', 'bbb']).toContain(t)
     const s = useGame.getState()
     expect(s.current?.id).toBe('retry')
     expect(s.feedCursor).toBe(1)

@@ -66,6 +66,34 @@ export function checkBlacklistedTags(raw: (string | null | undefined)[]): { hasB
 }
 
 /**
+ * Shape-only tag normalization for SERVER write paths: trims, lowercases,
+ * strips anything outside [a-z0-9_-], splits comma lists, drops empties,
+ * dedupes, then caps at MAX_TAGS tags of at most MAX_TAG_LENGTH characters.
+ * Deliberately NO blacklist strip — the server stores tags verbatim;
+ * blocklist filtering happens client-side only (single source of truth:
+ * shared/blocklist.json, editable through desktop Settings).
+ */
+export function normalizeTagShape(raw: (string | null | undefined)[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const entry of raw) {
+    if (!entry) continue;
+    const parts = entry
+      .split(',')
+      .map(p => p.trim().toLowerCase().replace(/^#/, '').replace(/[^a-z0-9_-]/g, ''))
+      .filter(Boolean);
+    for (const part of parts) {
+      const t = part.slice(0, MAX_TAG_LENGTH);
+      if (t && !seen.has(t) && out.length < MAX_TAGS) {
+        seen.add(t);
+        out.push(t);
+      }
+    }
+  }
+  return out;
+}
+
+/**
  * Single normalization rule for tags shared by the web client and the API.
  * Trims, lowercases, strips anything outside [a-z0-9_-], splits comma lists,
  * drops empties, dedupes, then caps at MAX_TAGS tags of at most

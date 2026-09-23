@@ -34,7 +34,6 @@ export function PromptDialog({
   return (
     <div
       className="fixed inset-0 z-[var(--z-modal)] bg-black/70 flex items-center justify-center p-4"
-      onClick={onCancel}
     >
       <div
         className="glass-panel w-full max-w-sm rounded-xl p-4 space-y-3"

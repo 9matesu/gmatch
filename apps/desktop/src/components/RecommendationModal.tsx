@@ -45,7 +45,7 @@ export function RecommendationModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 select-none font-sans" onClick={onClose}>
+    <div className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 select-none font-sans">
       <div className="bg-surface-canvas border border-border-glass rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl backdrop-blur-md" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-border-glass pb-3">
           <div className="flex items-center gap-2">

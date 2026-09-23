@@ -245,15 +245,14 @@ export function isTwitterUrl(url: string): boolean {
 }
 
 /**
- * Resolves a Twitter/X URL to a playable direct video MP4 URL or image URL.
+ * Resolves a Twitter/X URL to ALL playable media URLs in the tweet.
+ * Returns null when the URL is not a Twitter status page or resolution fails.
  */
-export async function resolveTwitterMedia(url: string): Promise<string | null> {
+export async function resolveTwitterMediaAll(url: string): Promise<string[] | null> {
   try {
-    const parsed = new URL(url);
     if (!isTwitterUrl(url)) return null;
-
-    const pathname = parsed.pathname;
-    const vxApiUrl = `https://api.vxtwitter.com${pathname}`;
+    const parsed = new URL(url);
+    const vxApiUrl = `https://api.vxtwitter.com${parsed.pathname}`;
 
     const res = await fetch(vxApiUrl, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
@@ -263,17 +262,28 @@ export async function resolveTwitterMedia(url: string): Promise<string | null> {
     if (!res.ok) return null;
     const data = await res.json();
 
-    // 1. Direct video from media_extended
-    const video = data.media_extended?.find(
-      (m: { type: string; url?: string }) => m.type === 'video' || m.type === 'gif'
-    );
-    if (video?.url) {
-      return video.url;
+    const media: Array<{ type: string; url?: string; variants?: Array<{ content_type: string; bitrate?: number; url: string }> }> =
+      data.media_extended ?? [];
+
+    if (media.length > 0) {
+      const urls = media
+        .map((m) => {
+          // For video/gif pick the best-bitrate mp4 variant when available.
+          if ((m.type === 'video' || m.type === 'gif') && Array.isArray(m.variants)) {
+            const best = m.variants
+              .filter((v) => v.content_type === 'video/mp4')
+              .sort((a, b) => (b.bitrate ?? 0) - (a.bitrate ?? 0))[0];
+            return best?.url || m.url;
+          }
+          // photo type — include it
+          return m.url;
+        })
+        .filter(Boolean) as string[];
+      if (urls.length > 0) return urls;
     }
 
-    // 2. First media from mediaURLs
     if (Array.isArray(data.mediaURLs) && data.mediaURLs.length > 0) {
-      return data.mediaURLs[0];
+      return data.mediaURLs as string[];
     }
 
     return null;
@@ -282,6 +292,16 @@ export async function resolveTwitterMedia(url: string): Promise<string | null> {
     return null;
   }
 }
+
+/**
+ * Resolves a Twitter/X URL to a single playable direct video MP4 URL or image URL.
+ * @deprecated Prefer resolveTwitterMediaAll — returns only the first item.
+ */
+export async function resolveTwitterMedia(url: string): Promise<string | null> {
+  const all = await resolveTwitterMediaAll(url);
+  return all?.[0] ?? null;
+}
+
 
 /**
  * Computes a SHA-256 hex digest of a Blob/File's bytes. Used as a content
