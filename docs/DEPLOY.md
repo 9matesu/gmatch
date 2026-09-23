@@ -1,6 +1,6 @@
 # Deploy notes (security-relevant ops)
 
-## Central node (gmatch.fly.dev)
+## Central node (gmatch-wcz1.onrender.com)
 
 - Secrets live in fly (`fly secrets list -a gmatch`); never in the repo.
 - Admin suite on the official node: `ADMIN_PIN_HASH` (sha256 hex of the PIN)
@@ -11,7 +11,7 @@
   the fly origin only sees CF egress IPs — the app layer already never
   stores/echoes/logs client IPs (`scripts/security-greps.sh` gate); this
   closes the network-edge view. Verify once fronted:
-  `curl -sI https://gmatch.fly.dev/api/health | grep -i server` shows cloudflare.
+  `curl -sI https://gmatch-wcz1.onrender.com/api/health | grep -i server` shows cloudflare.
 
 ## API_SEALED_ONLY flip (wave 2 B2)
 

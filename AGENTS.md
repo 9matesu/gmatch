@@ -1,7 +1,7 @@
-# gMatch — Babecock Idle
+# gmatch — Babecock Idle
 
 Adults-only (18+) desktop idle-clicker game. Electron + Vite + React + TypeScript.
-Inspired by the `babecock` module and game-registry patterns of the ORBIT/gMatch
+Inspired by the `babecock` module and game-registry patterns of the ORBIT/gmatch
 platform (see docs/reference/). This repo is standalone — ORBIT is NOT a dependency.
 
 > **18+ / SAFETY (non-negotiable):** the app gates on an age confirmation screen at

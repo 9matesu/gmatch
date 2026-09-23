@@ -10,12 +10,12 @@ describe('sortDirectoryServers', () => {
   it('pins the central row first under both sorts', () => {
     const rows = [
       s({ name: 'ZZZ', endpoint_hint: 'https://a.example', online_count: 99 }),
-      s({ name: 'Central', endpoint_hint: 'https://gmatch.fly.dev' }),
+      s({ name: 'Central', endpoint_hint: 'https://gmatch-wcz1.onrender.com' }),
       s({ name: 'AAA', endpoint_hint: 'https://b.example', online_count: 1 }),
     ]
-    expect(sortDirectoryServers(rows, 'https://gmatch.fly.dev', 'name').map((r) => r.name))
+    expect(sortDirectoryServers(rows, 'https://gmatch-wcz1.onrender.com', 'name').map((r) => r.name))
       .toEqual(['Central', 'AAA', 'ZZZ'])
-    expect(sortDirectoryServers(rows, 'https://gmatch.fly.dev', 'players').map((r) => r.name))
+    expect(sortDirectoryServers(rows, 'https://gmatch-wcz1.onrender.com', 'players').map((r) => r.name))
       .toEqual(['Central', 'ZZZ', 'AAA'])
   })
 
@@ -44,9 +44,9 @@ describe('sortDirectoryServers', () => {
   it('matches host for host:port hints (central reachable via bare address)', () => {
     const rows = [
       s({ name: 'other', endpoint_hint: 'https://b.example', online_count: 50 }),
-      s({ name: 'cen', endpoint_hint: 'gmatch.fly.dev:443' }),
+      s({ name: 'cen', endpoint_hint: 'gmatch-wcz1.onrender.com:443' }),
     ]
-    expect(sortDirectoryServers(rows, 'https://gmatch.fly.dev', 'players').map((r) => r.name))
+    expect(sortDirectoryServers(rows, 'https://gmatch-wcz1.onrender.com', 'players').map((r) => r.name))
       .toEqual(['cen', 'other'])
   })
 })

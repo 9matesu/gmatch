@@ -80,7 +80,7 @@ describe('updater-core (portable self-update)', () => {
     const meta = { file: 'gMatch-1.2.0-portable.exe', version: '1.2.0', sha256: 'ef'.repeat(32) }
     const plan = planCheck(meta, '1.1.3')
     expect(plan.action).toBe('download')
-    expect(plan).toMatchObject({ version: '1.2.0', url: 'https://gmatch.fly.dev/releases/gMatch-1.2.0-portable.exe', digest: 'ef'.repeat(32) })
+    expect(plan).toMatchObject({ version: '1.2.0', url: 'https://gmatch-wcz1.onrender.com/releases/gMatch-1.2.0-portable.exe', digest: 'ef'.repeat(32) })
     expect(planCheck({ ...meta, downloadUrl: 'https://example.test/a/gMatch-1.2.0-portable.exe' }, '1.1.3')).toMatchObject({ url: 'https://example.test/a/gMatch-1.2.0-portable.exe' })
     expect(planCheck(meta, '1.2.0').action).toBe('current')
     expect(planCheck({ file: 'evil.zip', version: '9.9.9' }, '1.1.3').action).toBe('error')

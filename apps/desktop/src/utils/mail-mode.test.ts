@@ -46,9 +46,9 @@ describe('courier-mode detection', () => {
     expect(slowFn).toHaveBeenCalledTimes(1)
   })
 
-  it('identifies official gmatch.fly.dev and goonmatch.fly.dev without probing', async () => {
+  it('identifies official gmatch-wcz1.onrender.com and goonmatch.fly.dev without probing', async () => {
     const fetchFn = vi.fn() as unknown as typeof fetch
-    expect(await detectMailMode('https://gmatch.fly.dev', fetchFn)).toBe('courier')
+    expect(await detectMailMode('https://gmatch-wcz1.onrender.com', fetchFn)).toBe('courier')
     expect(await detectMailMode('https://goonmatch.fly.dev/', fetchFn)).toBe('courier')
     expect(fetchFn).not.toHaveBeenCalled()
   })

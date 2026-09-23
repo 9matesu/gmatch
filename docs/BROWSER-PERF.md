@@ -149,5 +149,5 @@ Verified live this sweep: `POST /api/admin/verify-pin` → 200 with the PIN,
 system/user env var `ADMIN_PIN` reaches the bundled server on next launch.
 PIN for this machine: 318b98f8 (LOCAL DEV ONLY — plaintext PIN is a dev
 convenience; central keeps the hash). Wrong PIN → 401;
-5 tries/15 min → 429 lockout. Central node (gmatch.fly.dev) keeps
+5 tries/15 min → 429 lockout. Central node (gmatch-wcz1.onrender.com) keeps
 `ADMIN_PIN_HASH` — untouched.

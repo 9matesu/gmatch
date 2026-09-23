@@ -72,7 +72,7 @@ Copy was audited separately today (see the humanize sweep commits); not re-litig
 - `transition-all` x110 → property-scoped. Only when one measurably repaints.
 - `bg-surface-raised` vs `bg-retro-panel` dual-name convergence (58 files) —
   one-way sed wave when the tree is quiet.
-- Monospace usage: DESIGN.md says numbers MONO; "(gmatch.fly.dev)", "online now",
+- Monospace usage: DESIGN.md says numbers MONO; "(gmatch-wcz1.onrender.com)", "online now",
   server-id hex also wear mono (ServersView) — narrow the rule to numerals only,
   decide case-by-case.
 - Touch-target floor at 375px (header icon row ~24px glyphs, mob-feed.png):

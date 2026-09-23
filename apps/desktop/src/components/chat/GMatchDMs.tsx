@@ -32,6 +32,7 @@ import type { User } from '@orbit/shared';
 import type { ChatMessage } from '../../hooks/useP2P';
 import { orbitFetch } from '../../utils/api';
 import { ObjectImage } from '../ObjectImage';
+import { DropZone } from '../DropZone';
 import { ChatPlayerList } from './ChatPlayerList';
 import { Linkify } from '../Linkify';
 
@@ -188,6 +189,7 @@ export function GMatchDMs({
   const [deleteThreadPeerId, setDeleteThreadPeerId] = useState<string | null>(null);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [showUnavailable, setShowUnavailable] = useState(false);
 
   // The chat main page defaults to the public lobby when nothing is selected.
   const openTarget: OpenTarget = listMode
@@ -373,7 +375,7 @@ export function GMatchDMs({
     return 'User';
   };
 
-  const displayedMessages: ChatMessage[] =
+  const rawDisplayedMessages: ChatMessage[] =
     openTarget === 'room'
       ? roomMessages
       : openTarget === 'group'
@@ -383,6 +385,9 @@ export function GMatchDMs({
       : isQueueGroup
       ? queueMessages
       : pmMessages;
+  const onlineIds = useMemo(() => new Set(peers.filter((p) => p.is_online !== false).map((p) => p.orbitId)), [peers]);
+  const hiddenUnavailableCount = rawDisplayedMessages.filter((msg) => msg.senderId !== identity?.orbitId && !onlineIds.has(msg.senderId)).length;
+  const displayedMessages = showUnavailable ? rawDisplayedMessages : rawDisplayedMessages.filter((msg) => msg.senderId === identity?.orbitId || onlineIds.has(msg.senderId));
 
   const messageBlocks = useMemo(() => {
     const blocks: ChatMessage[][] = [];
@@ -408,9 +413,21 @@ export function GMatchDMs({
 
   useEffect(() => {
     const stream = messageStreamRef.current;
-    if (!stream) return;
-    stream.scrollTop = stream.scrollHeight;
+    if (stream) stream.scrollTop = stream.scrollHeight;
   }, [activePmPeer?.orbitId, activeGroupId, activeRoomId, displayedMessages.length]);
+
+  useEffect(() => {
+    if (!activeGroupId || !onLoadGroupMessages) return;
+    const refresh = () => {
+      if (document.visibilityState === 'visible') onLoadGroupMessages(activeGroupId);
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [activeGroupId, onLoadGroupMessages]);
 
   const lastLobbyMsg = lobbyMessages[lobbyMessages.length - 1]?.text || 'Active public discussion...';
   const lastQueueMsg = queueMessages[queueMessages.length - 1]?.text || 'Matchmaking chat & challenges';
@@ -880,8 +897,24 @@ export function GMatchDMs({
                </div>
              )}
 
-              <div ref={messageStreamRef} className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-3 styled-scrollbar select-text bg-surface-canvas">
-              {displayedMessages.length === 0 ? (
+               <DropZone
+                 onFiles={() => {
+                   if (openTarget === 'group' && activeGroupId) onOpenAttachment?.('group', undefined, activeGroupId, replyingTo?.id);
+                   else if (openTarget === 'peer' && activePmPeer) onOpenAttachment?.('pm', activePmPeer.orbitId, undefined, replyingTo?.id);
+                 }}
+                 disabled={openTarget === 'room' || (!activePmPeer && openTarget !== 'group')}
+                 clickToBrowse={false}
+                 bare
+                 className="flex-1 min-h-0 flex flex-col"
+               >
+               <div ref={messageStreamRef} className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-3 styled-scrollbar select-text bg-surface-canvas">
+               {hiddenUnavailableCount > 0 && (
+                 <div className="text-center text-[10px] text-retro-muted/70 py-2 select-none">
+                   {hiddenUnavailableCount} messages unavailable
+                   <button type="button" className="ml-2 underline hover:text-retro-muted" onClick={() => setShowUnavailable((v) => !v)}>{showUnavailable ? 'hide' : 'show'}</button>
+                 </div>
+               )}
+               {displayedMessages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-2 text-retro-muted my-auto select-none">
                   <MessageSquare className="w-6 h-6" />
                   <p className="text-xs text-retro-body">{headerTitle}</p>
@@ -1054,9 +1087,10 @@ export function GMatchDMs({
                 })}
               </>
               )}
-            </div>
+             </div>
+               </DropZone>
 
-            {openTarget === 'room' && activeRoom && (
+             {openTarget === 'room' && activeRoom && (
               <div className="px-3 pt-2 flex items-center gap-2 shrink-0 border-t border-border-glass">
                 <input
                   value={roomInvitePeer}

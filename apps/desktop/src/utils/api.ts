@@ -19,7 +19,7 @@ function computeApiBase(): string {
   if (envUrl) return envUrl.replace(/\/+$/, '')
 
   // In browser dev mode (e.g. http://localhost:5173 without Electron bridge), use relative ''
-  // so requests hit the Vite dev proxy to https://gmatch.fly.dev, eliminating CORS blocks.
+  // so requests hit the Vite dev proxy to https://gmatch-wcz1.onrender.com, eliminating CORS blocks.
   if (
     typeof window !== 'undefined' &&
     !(window as unknown as { gmatch?: unknown }).gmatch &&
@@ -30,14 +30,14 @@ function computeApiBase(): string {
 
   // Dev (electron) and packaged builds both default to the gmatch central node;
   // the local sidecar is opt-in via VITE_API_URL / __API_BASE__ / server-mode.
-  return 'https://gmatch.fly.dev'
+  return 'https://gmatch-wcz1.onrender.com'
 }
 
 export const API_BASE = computeApiBase();
 
 /** Openable share links (P3.5): public HTML pages served by the API host. */
-export const postShareUrl = (id: string) => `${API_BASE || 'https://gmatch.fly.dev'}/p/${encodeURIComponent(id)}`
-export const profileShareUrl = (id: string) => `${API_BASE || 'https://gmatch.fly.dev'}/u/${encodeURIComponent(id)}`
+export const postShareUrl = (id: string) => `${API_BASE || 'https://gmatch-wcz1.onrender.com'}/p/${encodeURIComponent(id)}`
+export const profileShareUrl = (id: string) => `${API_BASE || 'https://gmatch-wcz1.onrender.com'}/u/${encodeURIComponent(id)}`
 
 const inflightRequests = new Map<string, Promise<Response>>()
 const responseCache = new Map<string, { data: Response; expiry: number }>()
@@ -80,7 +80,7 @@ export function getApiBaseUrl(): string {
 }
 
 export function getApiWebSocketUrl(path = '/api/ws'): string {
-  const base = (API_BASE || 'https://gmatch.fly.dev').replace(/\/+$/, '')
+  const base = (API_BASE || 'https://gmatch-wcz1.onrender.com').replace(/\/+$/, '')
   const scheme = base.startsWith('https') ? 'wss' : 'ws'
   const hostAndPath = base.includes('://') ? base.slice(base.indexOf('://') + 3) : base.replace(/^\/+/, '')
   const cleanPath = path.startsWith('/') ? path : `/${path}`

@@ -112,7 +112,7 @@ async function startApi() {
       // in; 'off' disables everywhere.
       ...(process.env.GMATCH_GOSSIP_UPSTREAM === 'off' ? {} : {
         GOSSIP_UPSTREAM: process.env.GMATCH_GOSSIP_UPSTREAM
-          || (app.isPackaged ? 'https://gmatch.fly.dev' : ''),
+          || (app.isPackaged ? 'https://gmatch-wcz1.onrender.com' : ''),
       }),
     },
     stdio: ['ignore', 'pipe', 'pipe'],

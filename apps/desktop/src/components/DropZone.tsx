@@ -11,8 +11,11 @@ export function DropZone({
   onPayloadDrop,
   accept = 'image/jpeg, image/png, image/webp, image/avif, image/gif, video/mp4, video/webm, video/quicktime, video/ogg, video/*',
   multiple = true,
-  disabled = false,
-  compact = false,
+   disabled = false,
+   compact = false,
+  clickToBrowse = true,
+  bare = false,
+  className,
   children,
 }: {
   onFiles: (files: FileList | File[]) => void
@@ -21,9 +24,12 @@ export function DropZone({
   onPayloadDrop?: (type: string, payload: Record<string, unknown>) => void
   accept?: string
   multiple?: boolean
-  disabled?: boolean
-  compact?: boolean
-  children?: React.ReactNode
+   disabled?: boolean
+   compact?: boolean
+   clickToBrowse?: boolean
+   bare?: boolean
+   className?: string
+   children?: React.ReactNode
 }) {
   const [dragOver, setDragOver] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -95,16 +101,17 @@ export function DropZone({
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
       onPaste={handlePasteEvent}
-      onClick={() => !disabled && inputRef.current?.click()}
-      className={`relative border-2 border-dashed text-center transition-all cursor-pointer outline-none focus:border-retro-accent ${
-        compact ? 'p-3' : 'p-6'
-      } ${
-        disabled
-          ? 'border-border-glass/30 opacity-40 cursor-not-allowed'
-          : dragOver
-          ? 'border-retro-accent bg-retro-bg'
-          : 'border-border-glass hover:border-retro-muted hover:bg-retro-panel'
-      }`}
+       onClick={() => clickToBrowse && !disabled && inputRef.current?.click()}
+
+        className={bare ? `${className || ''} relative outline-none ${dragOver ? 'bg-retro-accent/5 ring-1 ring-inset ring-retro-accent/50' : ''}` : `${className || ''} relative border-2 border-dashed text-center transition-all cursor-pointer outline-none focus:border-retro-accent ${
+         compact ? 'p-3' : 'p-6'
+       } ${
+         disabled
+           ? 'border-border-glass/30 opacity-40 cursor-not-allowed'
+           : dragOver
+           ? 'border-retro-accent bg-retro-bg'
+           : 'border-border-glass hover:border-retro-muted hover:bg-retro-panel'
+       }`}
     >
       <input
         ref={inputRef}
@@ -119,7 +126,9 @@ export function DropZone({
         }}
         className="hidden"
       />
-      {children || (
+       {bare && dragOver && <div className="pointer-events-none absolute inset-3 z-10 flex items-center justify-center rounded-lg border border-dashed border-retro-accent/60 bg-surface-canvas/80 text-xs text-retro-muted">Drop media here</div>}
+       {children || (
+
         <div className="space-y-2">
           <svg
             width={compact ? 20 : 28} height={compact ? 20 : 28} viewBox="0 0 24 24" fill="none"

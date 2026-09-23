@@ -75,7 +75,7 @@ describe('GMatchFeed timeline filtering and resilience', () => {
     expect(screen.queryByText('Ghost empty post')).toBeNull();
   });
 
-  it('renders peer-to-peer object posts try-first even when the author is offline', () => {
+  it('hides offline-author posts and reports the hidden count', () => {
     const posts: any[] = [
       {
         id: 'offline-p2p-post',
@@ -110,9 +110,8 @@ describe('GMatchFeed timeline filtering and resilience', () => {
     );
 
     expect(screen.getByText('Available online P2P post')).toBeInTheDocument();
-    // Try-first: the offline author's tile renders and attempts the fetch
-    // instead of being pre-filtered.
-    expect(screen.getByText('Offline P2P post still attempted')).toBeInTheDocument();
+    expect(screen.queryByText('Offline P2P post still attempted')).toBeNull();
+    expect(screen.getByText('1 posts hidden. Wait for them to get online.')).toBeInTheDocument();
   });
 
   it('hides a post from the timeline when its image media fails to load', async () => {

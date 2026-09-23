@@ -911,7 +911,7 @@ export function ServersView({
                       aria-label="Central node URL"
                       value={setupUrl || (central || '')}
                       onChange={(e) => setSetupUrl(e.target.value)}
-                      placeholder="https://gmatch.fly.dev"
+                      placeholder="https://gmatch-wcz1.onrender.com"
                       className="w-full px-2.5 py-1 text-xs font-mono bg-surface-canvas border border-border-glass rounded-md text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-retro-accent"
                     />
                     <button
@@ -945,13 +945,13 @@ export function ServersView({
                         <button
                           type="button"
                           onClick={() => {
-                            setCentralApiUrl('https://gmatch.fly.dev')
-                            setCentral('https://gmatch.fly.dev')
+                            setCentralApiUrl('https://gmatch-wcz1.onrender.com')
+                            setCentral('https://gmatch-wcz1.onrender.com')
                             toast('Switched to fly.dev', 'info')
                             void refresh()
                           }}
                           className={`px-1.5 py-0.5 rounded text-[10px] font-mono cursor-pointer ${
-                            central === 'https://gmatch.fly.dev'
+                            central === 'https://gmatch-wcz1.onrender.com'
                               ? 'bg-retro-accent text-white font-bold'
                               : 'bg-glass-w10 text-retro-muted hover:text-retro-fg'
                           }`}

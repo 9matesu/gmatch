@@ -119,13 +119,13 @@ export default defineConfig({
     },
   },
   server: {
-    // Dev-only proxy: routes /api directly to central node at gmatch.fly.dev (no CORS issues).
+    // Dev-only proxy: routes /api directly to central node at gmatch-wcz1.onrender.com (no CORS issues).
     // Also proxies Grid feed's booru mirrors for browser dev.
     proxy: {
       '^/api': {
-        target: process.env.VITE_API_URL || 'https://gmatch.fly.dev',
+        target: process.env.VITE_API_URL || 'https://gmatch-wcz1.onrender.com',
         changeOrigin: true,
-        secure: (process.env.VITE_API_URL || 'https://gmatch.fly.dev').startsWith('https:'),
+        secure: (process.env.VITE_API_URL || 'https://gmatch-wcz1.onrender.com').startsWith('https:'),
         ws: true,
         // Fly.io sleeps idle machines: the first request wakes it (~4s) and
         // http-proxy would otherwise drop the socket, logging a raw 502 that

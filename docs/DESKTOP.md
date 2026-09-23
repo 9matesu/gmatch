@@ -1,4 +1,4 @@
-# gMatch Desktop (.exe) — architecture, storage, failure paths
+# gmatch Desktop (.exe) — architecture, storage, failure paths
 
 Audience: whoever has to debug a user's install. Everything here is derived
 from the code in `apps/desktop/electron/` and `apps/desktop/src/`; when a
@@ -15,7 +15,7 @@ spawning a second bundled server.
 Two topologies, chosen once per launch in Settings → Server
 (`electron/server-mode.cjs`, persisted in `userData/server-mode.json`):
 
-- **client (default):** talks to the central node `https://gmatch.fly.dev`
+- **client (default):** talks to the central node `https://gmatch-wcz1.onrender.com`
   (a blind courier: relays encrypted envelopes it cannot open). No local server.
 - **host:** spawns the bundled server (bun sidecar on `:8790`,
   `electron/apiSidecar.cjs`); one world per host, LAN addresses shown for
@@ -26,7 +26,7 @@ Two topologies, chosen once per launch in Settings → Server
 1. `requestSingleInstanceLock` — duplicate launches exit after focusing.
 2. `migrateUserData()` — one-shot move from the legacy `@goongrid` profile.
 3. `mainLog()` + `uncaughtException`/`unhandledRejection` handlers — a fatal
-   shows a native dialog AND writes `%APPDATA%\gMatch\main.log`.
+   shows a native dialog AND writes `%APPDATA%\gmatch\main.log`.
 4. Blocklist load — `userData/blocklist.json` (user-edited, Settings →
    Blocklist) overrides the packaged `shared/blocklist.json` (SPEC §8).
 5. `initSecureKV()` (DPAPI) + `log:renderer` IPC — renderer `logger.error`
@@ -39,14 +39,14 @@ Two topologies, chosen once per launch in Settings → Server
 
 ## Where things live
 
-All under `%APPDATA%\gMatch\` (`app.getPath('userData')`; also reachable via
+All under `%APPDATA%\gmatch\` (`app.getPath('userData')`; also reachable via
 Help → Troubleshooting → Open log folder):
 
 | File | What | Notes |
 |---|---|---|
 | `main.log` (+`.1`) | main + renderer errors | rotates at ~1MB, one generation |
 | `window-bounds.json` | last size/position | rejected if off-screen |
-| `server-mode.json` | host/client + friend URL | env `GMATCH_SERVER_URL` overrides |
+| `server-mode.json` | host/client + friend URL | env `gmatch_SERVER_URL` overrides |
 | `blocklist.json` | user blocklist | overrides packaged default |
 | `admin-pin.txt` | host-mode admin PIN | 8 hex, minted per install |
 | `storage.key` | 64-hex blob/PM encryption key | losing it = losing the local world |
@@ -74,7 +74,7 @@ never hit disk, nothing sensitive survives a shutdown.
 
 ## Self-update (`electron/updater.cjs`, `updater-core.cjs`)
 
-Feed: `https://gmatch.fly.dev/release.json` (GitHub Releases is a mirror).
+Feed: `https://gmatch-wcz1.onrender.com/release.json` (GitHub Releases is a mirror).
 Check on boot + every 24h. Auto-downloads the new portable exe with a
 progress percent, **verifies SHA-256 against the published digest** (an
 unpublished digest is shown honestly as unverified), then Settings → Update's
@@ -94,7 +94,7 @@ dark by design.
 
 | Symptom | Check |
 |---|---|
-| Double-click does nothing | `%APPDATA%\gMatch\main.log` (migration/boot failure) |
+| Double-click does nothing | `%APPDATA%\gmatch\main.log` (migration/boot failure) |
 | Feed images dead / OFFLINE badge | idle grid shows source health; sources are public boorus, outages are normal |
 | Friends cannot join | host mode + same LAN/VPN; Settings → Server shows the shareable addresses |
 | Switched server, nothing changed | Settings → Server → Restart now |
@@ -110,7 +110,7 @@ dark by design.
 3. `node electron/*.test.cjs` battery (admin-pin, customFolders, imageCache,
    imageCacheMemory, secureStore, mainlog, window-bounds, booru-sources,
    server-mode, updater).
-4. `cd apps/desktop && npm run dist` → `release/gMatch-<version>-portable.exe`.
+4. `cd apps/desktop && npm run dist` → `release/gmatch-<version>-portable.exe`.
 5. Smoke the artifact: single-instance, log writes, server switch panel,
    window bounds restore, update check.
 6. Publish hashes/version where the site's release block expects them

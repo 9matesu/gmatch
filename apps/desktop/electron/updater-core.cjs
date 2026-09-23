@@ -66,7 +66,7 @@ function shaFromReleaseJson(meta, version) {
  * site (which mirrors the GitHub Release artifact) is the canonical release
  * feed for installed apps.
  */
-function parseSiteRelease(meta, base = 'https://gmatch.fly.dev') {
+function parseSiteRelease(meta, base = 'https://gmatch-wcz1.onrender.com') {
   if (!meta || typeof meta !== 'object') return null
   const urlHint = String(meta.downloadUrl || '')
   const name = String(meta.file || '') || decodeURIComponent(urlHint.split('/').pop() || '')

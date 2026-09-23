@@ -16,7 +16,7 @@ const core = require('./updater-core.cjs')
 // The repo is PRIVATE, so the canonical public release feed for installed
 // apps is the site's release.json (fly mirrors the GitHub Release artifact;
 // it carries the exact sha256 we verify). GitHub API shape also supported.
-const RELEASE_URL = 'https://gmatch.fly.dev/release.json'
+const RELEASE_URL = 'https://gmatch-wcz1.onrender.com/release.json'
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
 const FIRST_CHECK_DELAY_MS = 12 * 1000
 

@@ -70,7 +70,7 @@ export function UpdateSection({ toast }: {
     try {
       const cur = await bridge.appVersion!();
       setInstalled(cur);
-      const base = getApiBaseUrl() || (typeof window !== 'undefined' ? window.location.origin : 'https://gmatch.fly.dev');
+      const base = getApiBaseUrl() || (typeof window !== 'undefined' ? window.location.origin : 'https://gmatch-wcz1.onrender.com');
       const res = await fetch(`${base.replace(/\/+$/, '')}/release.json`, { cache: 'no-store' });
       if (!res.ok) { toast?.('Update server has no release.json yet', 'warning'); return; }
       const meta = (await res.json()) as ReleaseMeta;
@@ -139,7 +139,7 @@ export function UpdateSection({ toast }: {
               type="button"
               onClick={() => {
                 playPress(820);
-                const base = getApiBaseUrl() || (typeof window !== 'undefined' ? window.location.origin : 'https://gmatch.fly.dev');
+                const base = getApiBaseUrl() || (typeof window !== 'undefined' ? window.location.origin : 'https://gmatch-wcz1.onrender.com');
                 void bridge.openExternal!(new URL(`/releases/${latest.file}`, base).href);
               }}
               className="px-3 py-1.5 rounded-lg bg-retro-accent text-black text-xs font-bold cursor-pointer flex items-center gap-1.5"

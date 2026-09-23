@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: gmatch-courier
+    runtime: docker
+    plan: free
+    region: singapore
+    branch: main
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "8080"
+      - key: SITE_SERVICES
+        value: mail,turn
+      - key: SNAPSHOT_PATH
+        value: /tmp/orbit.sqlite
+      - key: BLOB_STORE_DIR
+        value: /tmp/blobs
+    autoDeploy: true

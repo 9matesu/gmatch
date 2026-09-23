@@ -9,7 +9,7 @@ describe('ipMask', () => {
     expect(out).toContain('8790')
   })
   it('leaves hostnames and localhost alone', () => {
-    expect(maskedServerUrl('https://gmatch.fly.dev')).toBe('https://gmatch.fly.dev')
+    expect(maskedServerUrl('https://gmatch-wcz1.onrender.com')).toBe('https://gmatch-wcz1.onrender.com')
     expect(maskedServerUrl('http://localhost:8790')).toBe('http://localhost:8790')
   })
   it('masks bare ips in arbitrary text', () => {

@@ -654,41 +654,41 @@ export function useP2P(identity: OrbitIdentity | null) {
     };
   }, [identity]);
 
-  // Replay the last 12 hours of server-persisted lobby chat on mount (or
-  // identity change) so a fresh tab shows recent history instead of an empty
-  // room. Merge
-  // with any P2P/local messages already present, dedup by id.
-  useEffect(() => {
+  const loadLobbyHistory = useCallback(async () => {
     if (!identity) return
-    let cancelled = false
-    historyLoadedRef.current = false
-    const load = async () => {
-      try {
-        const res = await orbitFetch('/api/lobby/chat', { method: 'GET' }, identity)
-        if (cancelled || !res.ok) return
-        const data = await res.json() as { messages?: Array<{ id: string; sender_id: string; sender_name: string | null; body: string; created_at: string; channel?: string }> }
-        if (cancelled || !Array.isArray(data.messages)) return
-        const mapped: ChatMessage[] = data.messages
-          .filter((m) => m && m.id && m.body)
-          .map((m) => ({
-            id: m.id,
-            senderId: m.sender_id,
-             senderName: m.sender_name?.trim() || 'Unknown User',
-            text: m.body,
-            timestamp: Date.parse(m.created_at) || Date.now(),
-            channel: m.channel || 'global_lobby',
-          }))
-        if (cancelled) return
-        setChatMessages((prev) => {
-          const seen = new Set(prev.map((m) => m.id))
-          const fresh = mapped.filter((m) => !seen.has(m.id))
-          return [...prev, ...fresh].sort((a, b) => a.timestamp - b.timestamp)
-        })
-      } catch {}
-    }
-    void load()
-    return () => { cancelled = true }
+    try {
+      const res = await orbitFetch('/api/lobby/chat', { method: 'GET' }, identity)
+      if (!res.ok) return
+      const data = await res.json() as { messages?: Array<{ id: string; sender_id: string; sender_name: string | null; body: string; created_at: string; channel?: string }> }
+      if (!Array.isArray(data.messages)) return
+      const mapped: ChatMessage[] = data.messages
+        .filter((m) => m && m.id && m.body)
+        .map((m) => ({
+          id: m.id,
+          senderId: m.sender_id,
+          senderName: m.sender_name?.trim() || 'Unknown User',
+          text: m.body,
+          timestamp: Date.parse(m.created_at) || Date.now(),
+          channel: m.channel || 'global_lobby',
+        }))
+      setChatMessages((prev) => {
+        const byId = new Map(prev.map((m) => [m.id, m]))
+        for (const message of mapped) byId.set(message.id, message)
+        return Array.from(byId.values()).sort((a, b) => a.timestamp - b.timestamp).slice(-100)
+      })
+    } catch {}
   }, [identity])
+
+  useEffect(() => {
+    void loadLobbyHistory()
+    const onVisible = () => { if (document.visibilityState === 'visible') void loadLobbyHistory() }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [loadLobbyHistory])
 
   const queuedMessagesRef = useRef<P2PSwarmMessage[]>([]);
 

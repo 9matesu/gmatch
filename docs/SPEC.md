@@ -1,6 +1,6 @@
-# gMatch — Product Spec
+# gmatch — Product Spec
 
-One Electron desktop app, one multiplayer game. The **gMatch shell** (feed,
+One Electron desktop app, one multiplayer game. The **gmatch shell** (feed,
 card duels, chat, P2P, hacks, moderation, admin — vendored from the orbit repo
 in the 2026-09 merge) wraps the **Babecock · Idle** game (ex-GoonGrid): click
 pictures to earn **pts**, buy **tags** (parsed live from booru sources) that
@@ -260,11 +260,11 @@ offline earnings). Each +5% click power. Persist across prestige.
   deps + `bun.exe`) at `api-stage/`; electron-builder ships it as
   `resources/api` (`extraResources`). Nothing must be installed on the machine.
 - Packaged startup (`electron/main.cjs` + `electron/server-mode.cjs`):
-  - **client** (default): the central node `https://gmatch.fly.dev` — a blind
+  - **client** (default): the central node `https://gmatch-wcz1.onrender.com` — a blind
     courier (mail + TURN only; content routes 404 at the edge). A persisted
     `userData/server-mode.json` may point at any friend's node instead
     (validated `http(s)://host[:port]`, applied on relaunch).
-    `GMATCH_SERVER_URL` env overrides both.
+    `gmatch_SERVER_URL` env overrides both.
   - **host** (opt-in in Settings → Server): spawn the bundled server on
     `:8790` (world data lives in `userData/orbit.sqlite` + `userData/blobs`);
     the Server tab lists this machine's LAN URLs (`http://<ip>:8790`) to share
@@ -282,7 +282,7 @@ offline earnings). Each +5% click power. Persist across prestige.
   and `GET /u/:id` (profile), XSS-escaped, unauthenticated; `GET /api/users/:id`
   serves sanitized profiles. Deep links `#/feed?post=<id>` open the lightbox.
 - Build: `cd apps/desktop && npm run dist`. The canonical download is the
-  fly-hosted site (`https://gmatch.fly.dev/releases/gMatch-<version>-portable.exe`
+  fly-hosted site (`https://gmatch-wcz1.onrender.com/releases/gmatch-<version>-portable.exe`
   + hash in release.json, see site/build-release.mjs); tagging `v*` also fires
   `.github/workflows/release.yml` (lint+typecheck+test gate → GitHub Release
   asset), used for mirrors, not the primary link. Unsigned exe → SmartScreen

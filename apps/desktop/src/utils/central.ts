@@ -5,7 +5,7 @@
  * VITE_CENTRAL_URL (build-time), overridable at runtime via
  * localStorage['gmatch.central.url'] for packaged builds.
  */
-const DEFAULT_CENTRAL_URL = 'https://gmatch.fly.dev'
+const DEFAULT_CENTRAL_URL = 'https://gmatch-wcz1.onrender.com'
 const NO_CENTRAL = ['none', 'off', '0']
 
 export function getCentralApiUrl(): string {

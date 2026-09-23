@@ -2039,6 +2039,21 @@ export default function Home() {
       .catch(() => { })
   }, [identity, myProfile.displayName])
 
+  useEffect(() => {
+    const refreshChat = () => {
+      if (document.visibilityState !== 'visible') return
+      if (pmPeer?.id && pmPeer.id !== 'global_lobby' && pmPeer.id !== 'card_queue') void loadPmMessages(pmPeer.id)
+      if (activeGroupId) void loadGroupMessages(activeGroupId)
+      void loadChatGroups()
+    }
+    window.addEventListener('focus', refreshChat)
+    document.addEventListener('visibilitychange', refreshChat)
+    return () => {
+      window.removeEventListener('focus', refreshChat)
+      document.removeEventListener('visibilitychange', refreshChat)
+    }
+  }, [activeGroupId, loadChatGroups, loadGroupMessages, loadPmMessages, pmPeer?.id])
+
   const loadGroupMembers = useCallback(async (groupId: string): Promise<GroupMember[]> => {
     if (!identity) return []
     const res = await orbitFetch(`/api/groups/${groupId}/members`, {}, identity)
@@ -2632,8 +2647,12 @@ export default function Home() {
       })
       .then((data: OrbitObject[]) => {
         if (requestId !== storiesRequestRef.current || requestIdentity !== identity.orbitId) return
-        const list = Array.isArray(data) ? data : []
-        setStories(list)
+         const list = (Array.isArray(data) ? data : []).filter((story) => {
+           if (story.owner_id === identity.orbitId) return true
+           const owner = users.find((user) => user.id === story.owner_id)
+           return owner?.online !== false
+         })
+         setStories(list)
         try {
           localStorage.setItem('orbit_cached_stories', JSON.stringify(list.slice(0, 50)))
         } catch {}
@@ -2642,7 +2661,7 @@ export default function Home() {
         logger.error(err)
       })
       .finally(() => setStoriesLoading(false))
-  }, [identity])
+  }, [identity, users])
 
   const loadCards = useCallback(() => {
     if (!identity) return Promise.resolve()

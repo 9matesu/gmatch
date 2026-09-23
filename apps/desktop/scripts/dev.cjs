@@ -1,4 +1,4 @@
-// Dev runner: boots Vite pointed at the central node (gmatch.fly.dev) by
+// Dev runner: boots Vite pointed at the central node (gmatch-wcz1.onrender.com) by
 // default, so `npm run dev` behaves like the real network (other users,
 // roster, feed). Set GMATCH_LOCAL_API=1 to opt in to the local Orbit Bun API
 // sidecar (port 8790) instead — full offline parity, empty local DB.
@@ -36,7 +36,7 @@ async function main() {
   let apiProc = null
 
   if (!LOCAL_API) {
-    console.log('[dev] Using central node (gmatch.fly.dev) — set GMATCH_LOCAL_API=1 for the local sidecar.')
+    console.log('[dev] Using central node (gmatch-wcz1.onrender.com) — set GMATCH_LOCAL_API=1 for the local sidecar.')
   } else if (await isApiHealthy()) {
     console.log(`[dev] Local API already running at ${API_URL}`)
   } else {

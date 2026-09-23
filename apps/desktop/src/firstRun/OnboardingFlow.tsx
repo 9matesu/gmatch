@@ -99,7 +99,7 @@ export function OnboardingFlow(props: Props) {
       <div className="fixed inset-0 z-[var(--z-lightbox)] overflow-y-auto bg-retro-bg font-sans animate-orbit-fade-in text-retro-fg flex flex-col">
         {isDev && (
           <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center justify-between text-xs text-amber-300 z-50 shrink-0">
-            <span>Dev mode: connected to central node (gmatch.fly.dev)</span>
+            <span>Dev mode: connected to central node (gmatch-wcz1.onrender.com)</span>
             <button
               type="button"
               onClick={() => {

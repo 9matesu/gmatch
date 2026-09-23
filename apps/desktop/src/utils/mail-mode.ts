@@ -22,7 +22,7 @@ export function cachedMailMode(apiBase: string): MailMode | undefined {
 export function isKnownSiteCourier(url: string): boolean {
   try {
     const host = new URL(url.startsWith('http') ? url : `http://${url}`).hostname.toLowerCase()
-    return host === 'gmatch.fly.dev' || host === 'goonmatch.fly.dev'
+    return host === 'gmatch-wcz1.onrender.com' || host === 'goonmatch.fly.dev'
   } catch {
     return false
   }

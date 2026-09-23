@@ -198,16 +198,12 @@ export function ObjectImage({
   }, [signed, img.failed, hasError, onMediaUnavailable])
 
   if (!src) {
-    if (hideUnavailable) return null
-    // While a signed image is deferred (off-screen) or still fetching, show a
-    // blank placeholder instead of "No preview" to avoid a misleading flash.
-    // A P2P-only row with no live seeder says so honestly and retries when a
-    // peer comes online (see useObjectImage PEER_ONLINE_EVENT).
+    if (hideUnavailable && (signed ? img.failed : hasError)) return null
     const waiting = signed && !img.failed
     const seeding = signed && img.awaitingSeeder
     return (
       <div ref={placeholderRef} className={className || 'w-full aspect-[4/3] bg-retro-bg flex items-center justify-center text-[10px] text-retro-muted'}>
-        {seeding ? 'Waiting for poster…' : waiting ? '' : 'No preview'}
+        {waiting && !seeding ? <span className="inline-block h-4 w-4 rounded-full border-2 border-retro-muted/30 border-t-retro-muted animate-spin" aria-label="Loading media" /> : seeding ? 'Waiting for poster…' : 'No preview'}
       </div>
     )
   }

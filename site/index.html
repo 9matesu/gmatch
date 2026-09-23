@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>gMatch, adult P2P network with end-to-end encryption</title>
+<title>gmatch, adult P2P network with end-to-end encryption</title>
 <meta name="description" content="A single-file Windows app: an adult social network + card arcade between consenting adults. Everything is encrypted between you and the recipient, and the server reads nothing. Download it, verify the SHA-256, run it.">
 <style>
 :root { color-scheme: dark; }
@@ -132,9 +132,9 @@ footer {
 </aside>
 <div class="content">
 <header>
-<h1>gMatch</h1>
-<p><strong>Adult content: 18+ only.</strong> By downloading and using gMatch you declare you are a consenting adult in your jurisdiction.</p>
-<p>Built by two people who got annoyed that every "adult" platform keeps a copy of your most private moments on someone's server. gMatch has no ads, no data sales, no sign-up. The server you'll talk to is, by design, almost blind.</p>
+<h1>gmatch</h1>
+<p><strong>Adult content: 18+ only.</strong> By downloading and using gmatch you declare you are a consenting adult in your jurisdiction.</p>
+<p>Built by two people who got annoyed that every "adult" platform keeps a copy of your most private moments on someone's server. gmatch has no ads, no data sales, no sign-up. The server you'll talk to is, by design, almost blind.</p>
 <nav class="topnav" aria-label="Sections">
 <a href="#download">Download</a> ·
 <a href="#verify">Verify the file</a> ·
@@ -182,12 +182,12 @@ footer {
 
 <section id="updates">
 <h2>Staying current (updates)</h2>
-<p>From version 1.1.4, gMatch checks this server's <code>release.json</code> shortly after each start and once a day after that. When a newer build exists it downloads it automatically, verifies it against the SHA-256 published for that file, and a single <strong>Install &amp; Restart</strong> button in Settings swaps the .exe you already run and relaunches it. Same file, same folder, no installer, nothing else changes. If antivirus or SmartScreen refuses the swap, the app keeps running the old build and the exact downloaded file is left next to it; every step is written to <code>%APPDATA%\gMatch\main.log</code>. Builds 1.1.3 and older cannot self-update: download the new file once and it inherits everything.</p>
+<p>From version 1.1.4, gmatch checks this server's <code>release.json</code> shortly after each start and once a day after that. When a newer build exists it downloads it automatically, verifies it against the SHA-256 published for that file, and a single <strong>Install &amp; Restart</strong> button in Settings swaps the .exe you already run and relaunches it. Same file, same folder, no installer, nothing else changes. If antivirus or SmartScreen refuses the swap, the app keeps running the old build and the exact downloaded file is left next to it; every step is written to <code>%APPDATA%\gmatch\main.log</code>. Builds 1.1.3 and older cannot self-update: download the new file once and it inherits everything.</p>
 </section>
 
 <section id="what-it-is">
 <h2>What this application is</h2>
-<p>gMatch is a Windows program. One <code>.exe</code>, no installer. It works as an adult social network plus a card-game arcade, and inside it you get:</p>
+<p>gmatch is a Windows program. One <code>.exe</code>, no installer. It works as an adult social network plus a card-game arcade, and inside it you get:</p>
 <ul>
 <li>A feed of photos/videos that <strong>you</strong> publish, and you pick who sees each post;</li>
 <li>Private chat and group rooms, end-to-end encrypted, addressed only through rotating masks (see <a href="#masks">Masks &amp; metadata</a>);</li>
@@ -200,15 +200,15 @@ footer {
 <section id="looks-like">
 <h2>What it looks like</h2>
 <p>Real screenshots from the current build. One honest note first: the image tiles inside the feed and arena are <strong>synthetic 1×1 placeholders our automated tests use</strong>, not adult content. This is a public page, and we keep our moderation promises here too. On your machine the feed shows what your own tags pull, and it stays between you and whoever you share it with.</p>
-<p><img src="img/idle-grid.png" alt="gMatch idle-clicker arena: sidebar navigation, foe stage, balance and upgrade column"></p>
+<p><img src="img/idle-grid.png" alt="gmatch idle-clicker arena: sidebar navigation, foe stage, balance and upgrade column"></p>
 <p><em>The Idle Clicker arena. Sidebar on the left, stage in the middle, your wallet and upgrades on the right. Everything you see runs locally.</em></p>
-<p><img src="img/games-hub.png" alt="gMatch games hub with sub-tabs: Play Cards, Gallery and Cards, Idle Clicker, Store, Babecock, Rankings"></p>
+<p><img src="img/games-hub.png" alt="gmatch games hub with sub-tabs: Play Cards, Gallery and Cards, Idle Clicker, Store, Babecock, Rankings"></p>
 <p><em>The Games hub. Every mode reachable from the nested sidebar: Play Cards, Gallery &amp; Cards, Idle Clicker, Store, Babecock, Rankings.</em></p>
-<p><img src="img/cards.png" alt="gMatch card arena lobby with matchmaking queue and collection"></p>
+<p><img src="img/cards.png" alt="gmatch card arena lobby with matchmaking queue and collection"></p>
 <p><em>The 1v1 card arena. Queue up, spectate, and trade cards on the player market.</em></p>
-<p><img src="img/feed.png" alt="gMatch social feed with posts, stories row and right-side utility dock"></p>
+<p><img src="img/feed.png" alt="gmatch social feed with posts, stories row and right-side utility dock"></p>
 <p><em>The social feed. Posts, stories, likes. The envelopes that cross the internet are encrypted, and the server relays them without opening them.</em></p>
-<p><img src="img/servers.png" alt="gMatch server browser: joined nodes, public directory, host-your-own panel"></p>
+<p><img src="img/servers.png" alt="gmatch server browser: joined nodes, public directory, host-your-own panel"></p>
 <p><em>The server browser. Join a friend's node, browse the public directory, or host your own. You are never forced onto our infrastructure.</em></p>
 </section>
 
@@ -222,7 +222,7 @@ footer {
 <li>Feed images are cached to your disk, not held in RAM. Each file is encrypted with AES-256-GCM using a local key that never leaves your machine, and evicted on an LRU basis when the byte cap fills up. Server responses are still marked <code>no-store</code>.</li>
 <li>Your private keys sit inside Windows' own crypto vault (DPAPI). Never in plaintext, never on any server.</li>
 <li>IP addresses are never stored, echoed, logged or rendered by the application layer; the optional TURN relay hands out random short-lived credentials unlinked to your identity. See <a href="#limits">honest limits</a> for what that does not cover.</li>
-<li>You can skip our server entirely: gMatch can host its own node (your machine holds all data) or join a friend's. The public directory lists only server names and descriptions; content and user lists never touch it. Password-protected nodes verify the password on the <em>host's</em> machine (scrypt, lockout on failed attempts), never centrally.</li>
+<li>You can skip our server entirely: gmatch can host its own node (your machine holds all data) or join a friend's. The public directory lists only server names and descriptions; content and user lists never touch it. Password-protected nodes verify the password on the <em>host's</em> machine (scrypt, lockout on failed attempts), never centrally.</li>
 </ul>
 <p>Read the full report: <a href="legal/security.html">security audit</a>, four rounds, every finding cites code.</p>
 </section>
@@ -241,7 +241,7 @@ footer {
 
 <section id="masks">
 <h2>Masks, handles and metadata</h2>
-<p>gMatch borrows the Session/SimpleX idea: nobody talks to "you". They talk to a mask.</p>
+<p>gmatch borrows the Session/SimpleX idea: nobody talks to "you". They talk to a mask.</p>
 <ul>
 <li><strong>Peer addressing is mask-only.</strong> Every conversation, receipt and room invite is addressed to an opaque delivery token rendered as <code>handle.gmatch.com/&lt;token&gt;</code>. Hosts, IPs and account ids never appear in the peer layer.</li>
 <li><strong>Tokens rotate.</strong> Your permanent address is <code>blake3(pubkey)</code>. Each app session also derives a fresh <code>blake3(pubkey‖epoch)</code> box, and the epoch travels to your contacts sealed inside the encrypted message bodies themselves. The courier therefore cannot link yesterday's traffic to today's for the same key. Old boxes stay readable for one boot as a fallback, so nothing is lost mid-rotation.</li>
@@ -253,7 +253,7 @@ footer {
 <section id="topology">
 <h2>Server topology: courier, nodes, and life without the hub</h2>
 <ul>
-<li><strong>Default (courier mode):</strong> the packaged app talks to <code>gmatch.fly.dev</code>, which runs only a blind courier (encrypted mail + TURN relay) and the download. It writes no content tables, verified by an automated "site blindness" test, and does not know who connects.</li>
+<li><strong>Default (courier mode):</strong> the packaged app talks to <code>gmatch-wcz1.onrender.com</code>, which runs only a blind courier (encrypted mail + TURN relay) and the download. It writes no content tables, verified by an automated "site blindness" test, and does not know who connects.</li>
 <li><strong>Host mode (opt-in):</strong> every copy bundles a complete server, no install needed. Turn it on in Settings → Server and your machine becomes the node: friends join by address, and the host administers their world. What a host can see is stated plainly in the <a href="legal/e2e.html">encryption disclaimer</a>.</li>
 <li><strong>Nodes without the hub:</strong> the server directory gossips. Whichever node you join hands you its list of other nodes, cached locally. A node can also be joined directly from a shareable <code>gmatch://node/…</code> code the host gives you out-of-band. If the central node disappears tomorrow, the mesh of community nodes keeps working.</li>
 <li><strong>Updates</strong> come from this server's <code>release.json</code> and are hash-verified before install (see <a href="#updates">Staying current</a>).</li>

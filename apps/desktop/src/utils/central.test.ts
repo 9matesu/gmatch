@@ -1,4 +1,4 @@
-﻿// @vitest-environment jsdom
+// @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { getCentralApiUrl, setCentralApiUrl, hasCentral } from './central'
 
@@ -18,7 +18,7 @@ afterEach(() => {
 
 describe('central utils', () => {
   it('returns default central URL in test environment', () => {
-    expect(getCentralApiUrl()).toBe('https://gmatch.fly.dev')
+    expect(getCentralApiUrl()).toBe('https://gmatch-wcz1.onrender.com')
     expect(hasCentral()).toBe(true)
   })
 
@@ -26,7 +26,7 @@ describe('central utils', () => {
     setCentralApiUrl('http://custom-node:9000')
     expect(getCentralApiUrl()).toBe('http://custom-node:9000')
     setCentralApiUrl('')
-    expect(getCentralApiUrl()).toBe('https://gmatch.fly.dev')
+    expect(getCentralApiUrl()).toBe('https://gmatch-wcz1.onrender.com')
   })
 
   it('handles "none" central keyword', () => {
