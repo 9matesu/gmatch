@@ -30,5 +30,6 @@ export function siteAllows(services: Set<string>, pathname: string): boolean {
   if (pathname === '/api/servers' || pathname.startsWith('/api/servers/')) return true
   if (services.has('mail') && pathname.startsWith('/api/mail')) return true
   if (services.has('turn') && pathname.startsWith('/api/turn')) return true
+  if (services.has('admin') && pathname.startsWith('/api/admin/')) return true
   return false
 }

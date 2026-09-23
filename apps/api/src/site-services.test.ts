@@ -17,8 +17,16 @@ describe('SITE_SERVICES gate', () => {
     expect(siteAllows(s, '/api/health')).toBe(true)
     expect(siteAllows(s, '/api/mail/' + 'a'.repeat(64))).toBe(true)
     expect(siteAllows(s, '/api/mail/ws')).toBe(true)
-    expect(siteAllows(s, '/api/turn/credentials')).toBe(true)
-  })
+     expect(siteAllows(s, '/api/turn/credentials')).toBe(true)
+   })
+
+   it('site mode allows admin only when explicitly enabled', () => {
+     const courier = parseSiteServices({ SITE_SERVICES: 'mail,turn' })!
+     const admin = parseSiteServices({ SITE_SERVICES: 'mail,turn,admin' })!
+     expect(siteAllows(courier, '/api/admin/verify-pin')).toBe(false)
+     expect(siteAllows(admin, '/api/admin/verify-pin')).toBe(true)
+     expect(siteAllows(admin, '/api/posts')).toBe(false)
+   })
 
   it('site mode 404s every contentful/stateful route — the law at the edge', () => {
     const s = parseSiteServices({ SITE_SERVICES: 'mail,turn' })!

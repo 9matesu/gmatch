@@ -216,6 +216,20 @@ Bun.serve({
   async fetch(req: Request, server: any) {
     const url = new URL(req.url)
 
+        if (req.method === 'OPTIONS' && isApiPath(url.pathname)) {
+          const origin = req.headers.get('Origin') || '*'
+          return new Response(null, {
+            status: 204,
+            headers: {
+              'Access-Control-Allow-Origin': origin,
+              'Access-Control-Allow-Headers': req.headers.get('Access-Control-Request-Headers') || '*',
+              'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+              'Access-Control-Max-Age': '600',
+              Vary: 'Origin',
+            },
+          })
+        }
+
         // SITE_SERVICES gate (plan P2.3): the official site = blind courier only.
         // Everything not in the allow-list 404s at the edge, including the legacy
         // identity-bound swarm WS (presence/rooms) — the courier never learns who
