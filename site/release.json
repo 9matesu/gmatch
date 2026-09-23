@@ -1,8 +1,8 @@
 {
-  "file": "gMatch-1.4.7-portable.exe",
-  "version": "1.4.7",
-  "sha256": "28504c1f614acd07ef5e5470ad7120e184d89f2680d1d2c508fc85f89e038dff",
-  "sha512": "169f1565e1905c87c98f74a114e6115433b8e4fccd6b21f73ad49aafd2aa225421508235e1c5a6c9d4d7c25a7c1370dcd4746de5e953be4863793fdb9111c906",
-  "buildDate": "2026-09-21T03:22:07.600Z",
-  "sizeBytes": 110157492
+  "file": "gMatch-1.4.9-portable.exe",
+  "version": "1.4.9",
+  "sha256": "f5dd77e07a440df723293d6ab77c80e6501d7e0e1f0c806890808314261a13dd",
+  "sha512": "e2ee26b945b4ce37e07747fb139f50c2e56f01a6442609074816e04f2dcec0ee4b9b13224a32d10b96f5e6d93f6f33e16cb06a2c9b44e78e1d16c5acda464e4c",
+  "buildDate": "2026-09-23T01:22:14.636Z",
+  "sizeBytes": 109939078
 }
