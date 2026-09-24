@@ -376,12 +376,7 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
               <span className="w-2 h-2 rounded-full bg-retro-accent" />
               <h1 className="text-sm font-bold text-retro-fg uppercase tracking-wider">Admin Operations</h1>
             </div>
-            <a
-              href="/"
-              className="text-xs font-bold text-retro-muted hover:text-retro-fg transition-colors border border-border-glass px-2 py-0.5 rounded-md"
-            >
-              Back to App
-            </a>
+
           </div>
 
           <p className="text-xs text-retro-muted leading-relaxed">

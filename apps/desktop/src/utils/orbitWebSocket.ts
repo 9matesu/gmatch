@@ -17,6 +17,7 @@ let generation = 0
 let reconnectDelay = 1000
 let closeTimer: ReturnType<typeof setTimeout> | null = null
 let loopbackFailCount = 0
+let permanentlyUnavailable = false
 const listeners = new Set<Listener>()
 
 function isLoopbackBase(): boolean {
@@ -132,10 +133,15 @@ async function connect(identity: OrbitIdentity, expectedGeneration: number): Pro
 }
 
 async function ensureConnected(identity: OrbitIdentity, expectedGeneration: number) {
+  if (permanentlyUnavailable) return
   if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) return
   if (connectPromise) return connectPromise
   connectPromise = connect(identity, expectedGeneration).catch((error) => {
     connectPromise = null
+    if (/ticket failed: (404|403)/.test(String(error?.message || error))) {
+      permanentlyUnavailable = true
+      return
+    }
     if (listeners.size > 0 && expectedGeneration === generation) {
       clearReconnect()
       reconnectTimer = setTimeout(() => {

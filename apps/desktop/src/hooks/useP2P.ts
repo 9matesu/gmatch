@@ -337,6 +337,7 @@ export function useP2P(identity: OrbitIdentity | null) {
 
     // 3. Setup WebSocket relay via the API worker
     const API_WS = getApiWebSocketUrl('/api/ws');
+    const courierOnlyWs = /gmatch-wcz1\.onrender\.com/i.test(API_WS);
 
     // The WS relay only serves authenticated identities: fetch a one-time
     // ws-ticket and present it right after the socket opens. Heartbeat and any
@@ -388,7 +389,7 @@ export function useP2P(identity: OrbitIdentity | null) {
     };
 
     const connectWebSocket = () => {
-      if (cancelled) return;
+       if (cancelled || courierOnlyWs) return;
       if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
         return;
       }

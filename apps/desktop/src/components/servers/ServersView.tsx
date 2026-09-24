@@ -947,7 +947,7 @@ export function ServersView({
                           onClick={() => {
                             setCentralApiUrl('https://gmatch-wcz1.onrender.com')
                             setCentral('https://gmatch-wcz1.onrender.com')
-                            toast('Switched to fly.dev', 'info')
+                            toast('Switched to render', 'info')
                             void refresh()
                           }}
                           className={`px-1.5 py-0.5 rounded text-[10px] font-mono cursor-pointer ${
@@ -956,7 +956,7 @@ export function ServersView({
                               : 'bg-glass-w10 text-retro-muted hover:text-retro-fg'
                           }`}
                         >
-                          fly.dev
+                          render
                         </button>
                       </div>
                     </div>

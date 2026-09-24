@@ -9,14 +9,25 @@ function computeApiBase(): string {
   try {
     const manual = typeof localStorage !== 'undefined' ? localStorage.getItem('gmatch.api.url') : null
     if (manual?.trim()) {
-      return manual.trim().replace(/\/+$/, '')
+      const normalized = manual.trim().replace(/\/+$/, '')
+      if (/^https?:\/\/(gmatch|goonmatch)\.fly\.dev$/i.test(normalized)) {
+        localStorage.removeItem('gmatch.api.url')
+      } else {
+        return normalized
+      }
     }
   } catch { /* private mode */ }
 
   const envUrl =
     (import.meta.env.VITE_API_URL as string | undefined) ||
     (typeof window !== 'undefined' && (window as unknown as { __API_BASE__?: string }).__API_BASE__)
-  if (envUrl) return envUrl.replace(/\/+$/, '')
+  if (envUrl) {
+    const normalized = envUrl.replace(/\/+$/, '')
+    if (/^https?:\/\/(gmatch|goonmatch)\.fly\.dev$/i.test(normalized)) {
+      return 'https://gmatch-wcz1.onrender.com'
+    }
+    return normalized
+  }
 
   // In browser dev mode (e.g. http://localhost:5173 without Electron bridge), use relative ''
   // so requests hit the Vite dev proxy to https://gmatch-wcz1.onrender.com, eliminating CORS blocks.
@@ -344,7 +355,19 @@ export async function orbitFetch(
     }
   }
 
-  const doFetch = async (): Promise<Response> => {
+  const canRetry = !isFormUpload && (method === 'GET' || method === 'HEAD')
+  const retryDelay = (attempt: number, response?: Response): number => {
+    if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+      return 1
+    }
+    const retryAfter = response?.headers.get('Retry-After')
+    const parsed = retryAfter ? Number(retryAfter) * 1000 : 0
+    const base = Math.min(1000 * (2 ** attempt), 8000)
+    return Math.min(parsed || base, 10000) + Math.floor(Math.random() * 250)
+  }
+  const waitRetry = (attempt: number, response?: Response) => new Promise<void>((resolve) => setTimeout(resolve, retryDelay(attempt, response)))
+
+  const doFetch = async (attempt = 0): Promise<Response> => {
     const controller = new AbortController()
     const isUpload = options.body instanceof FormData
     const timeout = setTimeout(() => controller.abort(), isUpload ? 120000 : 30000)
@@ -381,24 +404,11 @@ export async function orbitFetch(
         }
         return retryRes
       }
-      if (res.status === 429) {
-        logger.warn('[orbitFetch] Rate limited, retrying after delay...')
-        const retryAfter = parseInt(res.headers.get('Retry-After') || '5', 10)
-        await new Promise(r => setTimeout(r, Math.min(retryAfter * 1000, 10000)))
-        // Re-sign with a fresh timestamp so the retry is not rejected as expired.
-        const retryHeaders = await buildHeaders()
-        const retryRes = await fetchImpl(url, { ...options, headers: retryHeaders, ...bodyInitFor(retryHeaders), signal: controller.signal })
-        if (retryRes.ok) {
-          if (method === 'GET') {
-            responseCache.set(ck, { data: retryRes.clone(), expiry: Date.now() + CACHE_TTL })
-            pruneResponseCache()
-          }
-        }
-        return retryRes
+      if (canRetry && attempt < 4 && (res.status === 408 || res.status === 425 || res.status === 429 || res.status >= 500)) {
+        logger.warn(`[orbitFetch] transient ${res.status}; retry ${attempt + 1}/4`)
+        await waitRetry(attempt, res)
+        return doFetch(attempt + 1)
       }
-      // The server responded with an error status (404/403/400/500, ...).
-      // Surface it to callers — never mask server errors or offline state with
-      // locally fabricated mock data.
       return res
     } catch {
       clearTimeout(timeout)

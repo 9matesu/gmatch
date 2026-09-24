@@ -189,7 +189,6 @@ export function GMatchDMs({
   const [deleteThreadPeerId, setDeleteThreadPeerId] = useState<string | null>(null);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
   const [loadingHistory, setLoadingHistory] = useState(false);
-  const [showUnavailable, setShowUnavailable] = useState(false);
 
   // The chat main page defaults to the public lobby when nothing is selected.
   const openTarget: OpenTarget = listMode
@@ -385,9 +384,7 @@ export function GMatchDMs({
       : isQueueGroup
       ? queueMessages
       : pmMessages;
-  const onlineIds = useMemo(() => new Set(peers.filter((p) => p.is_online !== false).map((p) => p.orbitId)), [peers]);
-  const hiddenUnavailableCount = rawDisplayedMessages.filter((msg) => msg.senderId !== identity?.orbitId && !onlineIds.has(msg.senderId)).length;
-  const displayedMessages = showUnavailable ? rawDisplayedMessages : rawDisplayedMessages.filter((msg) => msg.senderId === identity?.orbitId || onlineIds.has(msg.senderId));
+  const displayedMessages: ChatMessage[] = rawDisplayedMessages;
 
   const messageBlocks = useMemo(() => {
     const blocks: ChatMessage[][] = [];
@@ -908,13 +905,7 @@ export function GMatchDMs({
                  className="flex-1 min-h-0 flex flex-col"
                >
                <div ref={messageStreamRef} className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-3 styled-scrollbar select-text bg-surface-canvas">
-               {hiddenUnavailableCount > 0 && (
-                 <div className="text-center text-[10px] text-retro-muted/70 py-2 select-none">
-                   {hiddenUnavailableCount} messages unavailable
-                   <button type="button" className="ml-2 underline hover:text-retro-muted" onClick={() => setShowUnavailable((v) => !v)}>{showUnavailable ? 'hide' : 'show'}</button>
-                 </div>
-               )}
-               {displayedMessages.length === 0 ? (
+                              {displayedMessages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-2 text-retro-muted my-auto select-none">
                   <MessageSquare className="w-6 h-6" />
                   <p className="text-xs text-retro-body">{headerTitle}</p>

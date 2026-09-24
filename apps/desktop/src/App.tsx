@@ -237,7 +237,8 @@ export default function Home() {
     const resolved = fromHash || (saved && ROUTE_VIEWS.includes(saved as RoutedView) ? saved : 'servers')
     return resolved === 'messages' ? 'rooms' : resolved
   });
-  const [showCreatePostModal, setShowCreatePostModal] = useState(false);
+   const [showCreatePostModal, setShowCreatePostModal] = useState(false);
+   const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [createPostInitialData, setCreatePostInitialData] = useState<{
     mediaList?: Array<{ id: string; previewUrl: string; isExternalUrl?: boolean; file?: File; kind?: 'video' | 'image'; mimeType?: string }>;
     tags?: string;
@@ -1063,36 +1064,41 @@ export default function Home() {
       )
       .map(normalizeFeedPost);
 
-    // Only local objects explicitly uploaded as public posts by the user
+    // Public posts: both own uploaded public posts and peer public posts received via P2P
     const seenServerIds = new Set(serverVisible.map((p) => p.id));
-    const myLocalPublicPosts: FeedPost[] = items
-      .filter((obj) => (obj as any).is_public === 1 && obj.owner_id === identity?.orbitId && !deletedPostIds.has(obj.id) && !seenServerIds.has(obj.id))
+    const localPublicPosts: FeedPost[] = items
+      .filter((obj) => ((obj as any).is_public === 1 || (obj as any).is_public === true) && !deletedPostIds.has(obj.id) && !seenServerIds.has(obj.id))
       .map((obj) => {
-        // Blind image/jpeg defaults mislabel video rows (cover-all has no
-        // extension to sniff): keep image default, but let video-ish URLs
-        // stay video so tiles pick the player, not a broken image.
-        const localUrl = obj.content_url || (obj as any).data || (obj as any).url || `/api/objects/${obj.id}`
+        const isSelf = obj.owner_id === identity?.orbitId;
+        const authorUser = !isSelf && obj.owner_id ? users.find((u) => u.id === obj.owner_id || (u as any).orbitId === obj.owner_id) : null;
+        const authorName = isSelf
+          ? (myProfile.displayName || 'You')
+          : (authorUser?.display_name || (obj as any).author_name || (obj as any).sender_name || 'Player');
+        const authorAvatar = isSelf
+          ? (profilePics[identity?.orbitId || ''] || null)
+          : (authorUser?.pfp_url || (obj.owner_id ? profilePics[obj.owner_id] : null) || null);
+        const localUrl = obj.content_url || (obj as any).data || (obj as any).url || `/api/objects/${obj.id}`;
         return ({
-        id: obj.id,
-        author_id: identity?.orbitId || 'peer',
-        author_name: myProfile.displayName || 'You',
-        author_avatar: profilePics[identity?.orbitId || ''] || null,
-        url: localUrl,
-        mime_type: obj.mime_type || (isMediaVideo(localUrl) ? 'video/mp4' : 'image/jpeg'),
-        caption: obj.caption || (obj as any).post_caption || '',
-        location: (obj as any).location || '',
-        tags: Array.isArray((obj as any).tags) ? (obj as any).tags : [],
-        created_at: obj.created_at || new Date().toISOString(),
-        like_count: (obj as any).likes_count || (obj as any).like_count || 0,
-        comment_count: (obj as any).comment_count || 0,
-        is_liked: false,
-        is_saved: false,
-        is_archived: archivedPostIds.has(obj.id),
-        })
-      })
+          id: obj.id,
+          author_id: obj.owner_id || identity?.orbitId || 'peer',
+          author_name: authorName,
+          author_avatar: authorAvatar,
+          url: localUrl,
+          mime_type: obj.mime_type || (isMediaVideo(localUrl) ? 'video/mp4' : 'image/jpeg'),
+          caption: obj.caption || (obj as any).post_caption || '',
+          location: (obj as any).location || '',
+          tags: Array.isArray((obj as any).tags) ? (obj as any).tags : [],
+          created_at: obj.created_at || new Date().toISOString(),
+          like_count: (obj as any).likes_count || (obj as any).like_count || 0,
+          comment_count: (obj as any).comment_count || 0,
+          is_liked: false,
+          is_saved: false,
+          is_archived: archivedPostIds.has(obj.id),
+        });
+      });
 
-    return [...serverVisible, ...repostedPosts, ...myLocalPublicPosts];
-  }, [items, profilePics, identity, myProfile, repostedPosts, archivedPostIds, deletedPostIds, serverPosts, normalizeFeedPost]);
+    return [...serverVisible, ...repostedPosts, ...localPublicPosts];
+  }, [items, profilePics, identity, myProfile, repostedPosts, archivedPostIds, deletedPostIds, serverPosts, normalizeFeedPost, users]);
 
   // ─── Public posts feed (server) ───
   const [isLoadingMoreFeed, setIsLoadingMoreFeed] = useState(false)
@@ -2647,11 +2653,7 @@ export default function Home() {
       })
       .then((data: OrbitObject[]) => {
         if (requestId !== storiesRequestRef.current || requestIdentity !== identity.orbitId) return
-         const list = (Array.isArray(data) ? data : []).filter((story) => {
-           if (story.owner_id === identity.orbitId) return true
-           const owner = users.find((user) => user.id === story.owner_id)
-           return owner?.online !== false
-         })
+         const list = Array.isArray(data) ? data : []
          setStories(list)
         try {
           localStorage.setItem('orbit_cached_stories', JSON.stringify(list.slice(0, 50)))
@@ -3823,12 +3825,7 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* Admin dashboard (vendored orbit admin app, PIN-gated) */}
-                  {mainView === 'admin' && (
-                    <div className="flex-1 min-h-0 w-full overflow-y-auto">
-                      <AdminApp identity={identity} />
-                    </div>
-                  )}
+
 
                   {/* Fullscreen Store (mirrors the game store as an independent view) */}
                   {mainView === 'store' && (
@@ -4391,8 +4388,9 @@ export default function Home() {
               }}
               themeOpen={showThemeDrawer}
               onLogout={() => { setChatOpen(false); setIdentityModalMode('logout'); }}
-              onOpenProfile={() => handleSetMainView('profile')}
-              onOpenCreateCard={() => { setChatOpen(false); setShowCreateCardModal(true); }}
+               onOpenProfile={() => handleSetMainView('profile')}
+               onOpenAdmin={() => setAdminModalOpen(true)}
+               onOpenCreateCard={() => { setChatOpen(false); setShowCreateCardModal(true); }}
               gridSize={idleViewMode}
               onGridSizeChange={(m) => setIdleViewMode(m)}
             />
@@ -4400,7 +4398,17 @@ export default function Home() {
         )}
       </div>
 
-      <ThemeDrawer
+       {adminModalOpen && (
+         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-2 sm:p-6" role="dialog" aria-modal="true" aria-label="Admin control panel" onMouseDown={(e) => { if (e.target === e.currentTarget) setAdminModalOpen(false) }}>
+           <div className="relative flex h-[92vh] w-full max-w-[1500px] min-h-0 flex-col overflow-hidden rounded-xl border border-border-glass bg-retro-bg shadow-2xl">
+             <button type="button" aria-label="Close admin control panel" onClick={() => setAdminModalOpen(false)} className="absolute right-3 top-3 z-20 rounded-md border border-border-glass bg-surface-raised px-2 py-1 text-xs text-retro-muted hover:text-retro-fg cursor-pointer">Close</button>
+             <div className="min-h-0 flex-1 overflow-y-auto"><AdminApp identity={identity} /></div>
+           </div>
+         </div>
+       )}
+
+       <ThemeDrawer
+
         isOpen={showThemeDrawer}
         onClose={() => setShowThemeDrawer(false)}
         settings={settings}

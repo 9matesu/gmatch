@@ -91,6 +91,7 @@ export interface CommandIslandProps {
   themeOpen?: boolean;
   onLogout?: () => void;
   onOpenProfile?: () => void;
+  onOpenAdmin?: () => void;
   onOpenCreateCard?: () => void;
   settingsOpen?: boolean;
   /** Active Clicker layout; the pill only renders when this prop pair is given. */
@@ -111,7 +112,7 @@ export function CommandIsland({
   recessed = false,
   displayName = 'You',
   profilePic,
-  isAdmin = false,
+  isAdmin: _isAdmin = false,
   onOpenCreatePost,
   onOpenSettings,
   settingsOpen = false,
@@ -124,6 +125,7 @@ export function CommandIsland({
   themeOpen = false,
   onLogout,
   onOpenProfile,
+  onOpenAdmin,
   onOpenCreateCard,
   gridSize,
   onGridSizeChange,
@@ -506,15 +508,14 @@ export function CommandIsland({
             </button>
 
             {/* Admin (conditional on admin flag) */}
-            {isAdmin && (
-              <button
+             <button
                 type="button"
                 onClick={() => {
                   playPress(840);
-                  handleNavClick('admin');
+                   onOpenAdmin?.();
                 }}
                 aria-label="Admin"
-                aria-current={mainView === 'admin' ? 'page' : undefined}
+                 aria-current={undefined}
                 title="Admin Control Panel"
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
                   mainView === 'admin'
@@ -524,10 +525,9 @@ export function CommandIsland({
               >
                 <ShieldCheck className="w-3.5 h-3.5 text-retro-error shrink-0" weight={mainView === 'admin' ? 'fill' : 'regular'} />
                 <span className="text-xs hidden sm:inline">Admin</span>
-              </button>
-            )}
+               </button>
 
-            {/* Logout (conditional on onLogout) */}
+             {/* Logout (conditional on onLogout) */}
             {onLogout && (
               <>
                 <div className="h-3.5 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />

@@ -14,11 +14,20 @@ export function getCentralApiUrl(): string {
     if (manual?.trim()) {
       const value = manual.trim()
       if (NO_CENTRAL.includes(value.toLowerCase())) return ''
-      return value.replace(/\/+$/, '')
+      const normalized = value.replace(/\/+$/, '')
+      if (/^https?:\/\/(gmatch|goonmatch)\.fly\.dev$/i.test(normalized)) {
+        localStorage.removeItem('gmatch.central.url')
+      } else {
+        return normalized
+      }
     }
   } catch { /* private mode */ }
   if (import.meta.env.VITE_CENTRAL_URL) {
-    return (import.meta.env.VITE_CENTRAL_URL as string).replace(/\/+$/, '')
+    const envUrl = (import.meta.env.VITE_CENTRAL_URL as string).replace(/\/+$/, '')
+    if (/^https?:\/\/(gmatch|goonmatch)\.fly\.dev$/i.test(envUrl)) {
+      return DEFAULT_CENTRAL_URL
+    }
+    return envUrl
   }
   return DEFAULT_CENTRAL_URL
 }
