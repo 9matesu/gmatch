@@ -11,6 +11,7 @@ import { maskedServerUrl } from '../../utils/ipMask'
 import { ServerPasswordSection } from './ServerPasswordSection'
 import { SnapshotSection } from './SnapshotSection'
 import { useIdentity } from '../../hooks/useIdentity'
+import { runLegacyBackfill } from '../../services/legacyBackfill'
 
 type State = { packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[]; adminPin?: string }
 
@@ -20,6 +21,8 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
   const [clientUrl, setClientUrl] = useState('')
   const [saving, setSaving] = useState(false)
   const [restartPending, setRestartPending] = useState(false)
+  const [isBackfilling, setIsBackfilling] = useState(false)
+  const [backfillMsg, setBackfillMsg] = useState('')
 
   useEffect(() => {
     window.gmatch?.serverState?.().then((s) => {
@@ -45,6 +48,27 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
     toast?.(mode === 'host' ? 'Now hosting. Restart to apply.' : 'Connecting to a friend. Restart to apply.', 'success')
     if (window.gmatch.serverRelaunch && state.packaged) {
       setRestartPending(true)
+    }
+  }
+
+  const handleManualBackfill = async () => {
+    if (!identity || isBackfilling) return
+    setIsBackfilling(true)
+    setBackfillMsg('Connecting to gmatch.fly.dev...')
+    try {
+      const res = await runLegacyBackfill(identity, (p) => {
+        setBackfillMsg(p.message)
+      })
+      if (res.migratedCount > 0) {
+        toast?.(`Preserved ${res.migratedCount} legacy posts and media files`, 'success')
+      } else {
+        toast?.(backfillMsg || 'Sync complete: no new posts found', 'info')
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      toast?.(`Legacy sync failed: ${msg}`, 'error')
+    } finally {
+      setIsBackfilling(false)
     }
   }
 
@@ -137,6 +161,28 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
           )}
         </div>
       )}
+
+      <div className="glass-card p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="space-y-0.5 min-w-0">
+            <h4 className="text-xs font-medium text-retro-fg">Legacy content migration (Fly.dev)</h4>
+            <p className="text-[11px] text-retro-muted">
+              Preserve your posts, comments, and media from gmatch.fly.dev to your local device.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={isBackfilling || !identity}
+            onClick={() => void handleManualBackfill()}
+            className="rounded-lg bg-surface-interactive border border-border-glass px-3 py-1.5 text-xs text-retro-fg hover:bg-glass-w10 cursor-pointer disabled:opacity-50 whitespace-nowrap"
+          >
+            {isBackfilling ? 'Preserving...' : 'Sync from legacy Fly'}
+          </button>
+        </div>
+        {backfillMsg && (
+          <p className="text-[11px] text-cyan-300 font-mono break-all">{backfillMsg}</p>
+        )}
+      </div>
 
       {restartPending && (
         <div className="glass-panel p-3 flex items-center gap-3">

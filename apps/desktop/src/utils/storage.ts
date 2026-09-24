@@ -19,6 +19,17 @@ export interface StoredObject {
   is_story?: number | null
   is_chat?: number | null
   is_avatar?: number | null
+  caption?: string | null
+  post_caption?: string | null
+  tags?: string[] | string | null
+  location?: string | null
+  author_name?: string | null
+  author_avatar?: string | null
+  comments?: unknown[] | null
+  likes_count?: number | null
+  like_count?: number | null
+  comment_count?: number | null
+  post_group?: string | null
 }
 
 export interface EncryptedChunk {

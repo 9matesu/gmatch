@@ -42,4 +42,27 @@ describe('buildMirrorRow', () => {
     const row = buildMirrorRow(story, undefined, 'blob:local', 'You')
     expect(row.is_story).toBe(1)
   })
+
+  it('preserves post caption, tags, author info, and comments on mirrored rows', () => {
+    const postRow: MirrorStoredRow = {
+      ...bare,
+      owner_id: 'user-1',
+      is_public: 1,
+      caption: 'Memories from legacy server',
+      tags: ['classic', 'vintage'],
+      author_name: 'Alice',
+      author_avatar: 'https://example.com/alice.png',
+      location: 'Tokyo',
+      likes_count: 42,
+      comment_count: 5,
+      comments: [{ id: 'c1', text: 'nice!' }],
+    }
+    const row = buildMirrorRow(postRow, undefined, 'blob:local', 'Fallback')
+    expect(row.caption).toBe('Memories from legacy server')
+    expect((row as any).tags).toEqual(['classic', 'vintage'])
+    expect(row.display_name).toBe('Alice')
+    expect((row as any).author_avatar).toBe('https://example.com/alice.png')
+    expect((row as any).likes_count).toBe(42)
+    expect((row as any).comments).toHaveLength(1)
+  })
 })

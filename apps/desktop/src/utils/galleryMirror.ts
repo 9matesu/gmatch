@@ -14,6 +14,16 @@ export interface MirrorStoredRow {
   is_story?: number | null
   is_chat?: number | null
   is_avatar?: number | null
+  caption?: string | null
+  post_caption?: string | null
+  tags?: string[] | string | null
+  location?: string | null
+  author_name?: string | null
+  author_avatar?: string | null
+  comments?: unknown[] | null
+  likes_count?: number | null
+  like_count?: number | null
+  comment_count?: number | null
 }
 
 const FLAG_KEYS = ['is_public', 'is_story', 'is_chat', 'is_avatar'] as const
@@ -40,9 +50,19 @@ export function buildMirrorRow(
     mime_type: dbObj.mime_type,
     created_at: dbObj.created_at,
     content_url: contentUrl,
-    display_name: displayName,
+    display_name: dbObj.author_name || prev?.display_name || displayName,
     sender_pubkey: dbObj.sender_pubkey,
     sender_enc_pubkey: dbObj.sender_enc_pubkey,
+    caption: dbObj.caption || dbObj.post_caption || prev?.caption || '',
+    ...(dbObj.tags ? { tags: dbObj.tags } : {}),
+    ...(dbObj.location ? { location: dbObj.location } : {}),
+    ...(dbObj.author_name ? { author_name: dbObj.author_name } : {}),
+    ...(dbObj.author_avatar ? { author_avatar: dbObj.author_avatar } : {}),
+    ...(dbObj.comments ? { comments: dbObj.comments } : {}),
+    ...(typeof dbObj.likes_count === 'number' || typeof dbObj.like_count === 'number'
+      ? { likes_count: dbObj.likes_count ?? dbObj.like_count ?? 0, like_count: dbObj.like_count ?? dbObj.likes_count ?? 0 }
+      : {}),
+    ...(typeof dbObj.comment_count === 'number' ? { comment_count: dbObj.comment_count } : {}),
   } as OrbitObject
   for (const flag of FLAG_KEYS) {
     const v = dbObj[flag]

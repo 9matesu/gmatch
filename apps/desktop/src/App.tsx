@@ -21,6 +21,7 @@ import { ImageViewer } from "./components/ImageViewer";
 import { PasskeyManager } from "./components/PasskeyManager";
 import { IdleOverlay } from "./components/IdleOverlay";
 import { useP2P } from "./hooks/useP2P";
+import { useLegacyBackfill } from "./hooks/useLegacyBackfill";
 import type { ChatMessage } from "./hooks/useP2P";
 import { useGame } from "./hooks/useGame";
 import { enqueueableItems, isP2pLocal, shouldEnqueue } from "./utils/game";
@@ -2641,6 +2642,8 @@ export default function Home() {
       });
   }, [identity, updateSettings, toast, enqueueDecision, myProfile.displayName]);
 
+  const legacyBackfill = useLegacyBackfill(identity, toast, loadGallery);
+
   const loadStories = useCallback(() => {
     if (!identity) return Promise.resolve()
     const requestId = ++storiesRequestRef.current
@@ -3508,6 +3511,22 @@ export default function Home() {
                     <div className="bg-retro-panel border border-retro-warning p-3 text-center text-xs text-retro-warning flex items-center justify-center gap-2">
                       <span className="w-2 h-2 bg-retro-warning flex-shrink-0" />
                       {transferProgress}
+                    </div>
+                  )}
+
+                  {legacyBackfill.isSyncing && (
+                    <div className="mx-auto my-2 max-w-lg px-4 py-2 rounded-full bg-surface-canvas/90 backdrop-blur-md border border-cyan-500/40 text-cyan-200 text-xs flex items-center justify-between gap-3 shadow-lg z-30">
+                      <div className="flex items-center gap-2 truncate">
+                        <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse flex-shrink-0" />
+                        <span className="font-mono text-[11px] truncate">
+                          {legacyBackfill.progress.message || 'Backfilling legacy posts from gmatch.fly.dev...'}
+                        </span>
+                      </div>
+                      {legacyBackfill.progress.total > 0 && (
+                        <span className="text-[10px] text-cyan-300 font-mono whitespace-nowrap bg-cyan-950/60 px-2 py-0.5 rounded-full border border-cyan-500/30">
+                          {legacyBackfill.progress.current}/{legacyBackfill.progress.total}
+                        </span>
+                      )}
                     </div>
                   )}
 

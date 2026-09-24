@@ -247,7 +247,9 @@ async function getNodePubkey(fetchImpl: typeof globalThis.fetch, targetUrl: stri
  * Builds signed auth headers for a request. Timestamp + nonce are generated
  * fresh on every call so retries re-sign instead of reusing a stale timestamp.
  */
-function signRequestHeaders(
+export const LEGACY_FLY_ORIGIN = 'https://gmatch.fly.dev'
+
+export function signRequestHeaders(
   method: string,
   pathname: string,
   bodyForSig: string,

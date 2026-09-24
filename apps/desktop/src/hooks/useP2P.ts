@@ -318,6 +318,13 @@ export function useP2P(identity: OrbitIdentity | null) {
             is_story: flagOf((newItem as any).is_story ?? newItem.is_story),
             is_chat: flagOf((newItem as any).is_chat),
             is_avatar: flagOf((newItem as any).is_avatar),
+            caption: (newItem as any).caption || (newItem as any).post_caption || '',
+            tags: (newItem as any).tags || [],
+            author_name: (newItem as any).author_name || (newItem as any).sender_name || '',
+            location: (newItem as any).location || '',
+            comments: (newItem as any).comments || [],
+            likes_count: (newItem as any).likes_count || (newItem as any).like_count || 0,
+            comment_count: (newItem as any).comment_count || 0,
           }).catch(() => {})
         }
 
