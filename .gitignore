@@ -23,6 +23,7 @@ apps/api/test-blobs-*/
 api-stage/
 apps/desktop/release/
 apps/desktop/release*/
+apps/desktop/dist-bin/
 .dev-storage.key
 apps/api/node.key
 node.key

@@ -14,7 +14,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "icon": "node scripts/make-icon.cjs",
-    "dist": "npm run icon && npm run stage:api && npm run build && electron-builder --win portable --config.directories.output=release-build",
+    "dist": "npm run icon && npm run stage:api && npm run build && electron-builder --win portable --config.directories.output=dist-bin",
     "pack": "electron-builder --win portable",
     "stage:api": "node scripts/stage-api.cjs"
   },

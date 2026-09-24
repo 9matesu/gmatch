@@ -248,6 +248,22 @@ offline earnings). Each +5% click power. Persist across prestige.
   on, so nodes stay reachable without the hub. Every image entering or
   leaving the app is metadata-stripped (`apps/api/src/metadata-strip.ts`);
   post tags live in the DB, never in the file.
+
+## 10d. P2P Swarm & Blind Courier Presence (ARCHITECTURE-P2P.md)
+
+- Central courier (`https://gmatch-wcz1.onrender.com`) is strictly a blind, zero-knowledge
+  forwarder (`SITE_SERVICES=mail,turn,admin`). All legacy central routes (`/api/users/online`,
+  `/api/posts`, `/api/objects`, `/api/signal/*`) intentionally 404.
+- **Presence & Discovery:** Ephemeral signed beacons (`PresenceBeacon`) broadcast to public
+  presence token `sha256Hex('orbit-global-presence-v1')`. Client compiles and verifies in-memory
+  roster with 60s TTL and 120s drop threshold. Zero presence state stored on server.
+- **Signaling over Courier:** WebRTC signaling (SDP offer/answer, ICE) sealed with X25519 ECIES
+  and routed as `kind: 'signal'` envelopes via `/api/mail/:token`.
+- **Swarm Media Distribution:** Media divided into 64KB chunks (`SWARM_WANT`, `SWARM_CHUNK`)
+  over direct WebRTC DataChannels (`gmatch-mesh`). All received/created media stored in local
+  IndexedDB and automatically seeded on boot (`hydrateLocalObjects`).
+- Full specification documented in `docs/ARCHITECTURE-P2P.md`.
+
 ## 11. Save
 
 - zustand state → localStorage `gmatch.save.v1`, autosave every 10s + on unload.

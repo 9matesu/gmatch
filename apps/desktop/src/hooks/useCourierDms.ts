@@ -8,6 +8,7 @@ import { RoomManager, type Room, type RoomMessage } from '../utils/rooms'
 import { detectMailMode, cachedMailMode, isKnownSiteCourier, type MailMode } from '../utils/mail-mode'
 import { getApiBaseUrl } from '../utils/api'
 import { logger } from '../utils/logger'
+import { handleInboundSignal } from '../utils/courierSignaling'
 
 export interface CourierDeps {
   webSocketFactory?: (url: string) => MailSocket
@@ -95,9 +96,15 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
       identity,
       webSocketFactory: depsRef.current.webSocketFactory,
       fetchImpl: depsRef.current.fetchImpl,
-      // DM first; if the opened body is not a DM/ack, try the room layer.
+      // DM first; if the opened body is not a DM/ack, try the room layer, then signal routing.
       onMail: (opened, env) => {
-        if (!manager.handleOpened(opened, env)) roomMgr.handleOpened(opened)
+        if (!manager.handleOpened(opened, env)) {
+          if (!roomMgr.handleOpened(opened)) {
+            if (opened.kind === 'signal') {
+              void handleInboundSignal(opened, identity, undefined, depsRef.current.fetchImpl)
+            }
+          }
+        }
       },
       log: (m) => logger.log(m),
     })

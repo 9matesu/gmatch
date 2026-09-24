@@ -1,0 +1,212 @@
+# gmatch P2P / Swarm Architecture Specification
+
+> **Status:** Authoritative (v1.5.0+)  
+> **Core Principle:** Blind Courier Routing + Zero-Knowledge WebRTC Mesh + Local-First Swarm Seeding.
+
+---
+
+## 1. System Overview
+
+In `gmatch` v1.5.0, the central deployment (`https://gmatch-wcz1.onrender.com`) is strictly a **blind, stateless courier** (`SITE_SERVICES=mail,turn,admin`). It does not store user profiles, online presence, posts, feeds, or media objects. All user data, media, and interactions are served **end-to-end directly between peer nodes**.
+
+```
+                   +----------------------------------+
+                   |          BLIND COURIER           |
+                   | (Render: mail, turn, admin only) |
+                   +----------------------------------+
+                        ^         ^            ^
+           Blind Mail   |         | STUN/TURN  |   Ephemeral
+           Put/Get/WS   |         | Traversal  |   Beacons
+                        v         v            v
+             +--------------+                +--------------+
+             |    Node A    |<==============>|    Node B    |
+             | (Edge Peer)  |  WebRTC Mesh   | (Edge Peer)  |
+             +--------------+  DataChannels  +--------------+
+                    |                               |
+              Local IndexedDB                 Local IndexedDB
+              64KB Chunk Seed                 64KB Chunk Seed
+```
+
+### Core Architecture Pillars
+
+1. **Blind Courier Relay (`/api/mail/:token` & `/api/mail/ws`):**
+   - The courier only handles sealed binary envelopes (`Envelope v2`) addressed by 64-hex BLAKE3 delivery tokens.
+   - The courier learns nothing about the sender's identity, the message body, or the routing kind.
+   - Deliberately returns `404 Not Found` for legacy central endpoints: `/api/users/online`, `/api/posts`, `/api/objects`, and `/api/signal/*`.
+
+2. **Ephemeral Presence Discovery:**
+   - Peers discover each other by broadcasting signed presence beacons to a shared public presence mailbox token (`sha256Hex('orbit-global-presence-v1')`).
+   - The courier stores no roster database. Beacons have a 60-second TTL. Clients query the mailbox or watch it via WebSocket, maintaining an in-memory roster of currently active peers.
+
+3. **Courier-Routed WebRTC Signaling:**
+   - Peer connection setup (SDP Offers, SDP Answers, ICE Candidates) is routed via sealed 1-to-1 envelopes over the blind courier (`/api/mail/:token`).
+   - Envelopes are encrypted using X25519 ECIES under the recipient's encryption public key. Even the signaling negotiation is completely zero-knowledge to the courier.
+
+4. **WebRTC DataChannel Mesh & Chunked Swarm:**
+   - Direct peer-to-peer data channels (`gmatch-mesh`) transmit social feeds, chats, and image/video media.
+   - Large media files are divided into 64KB chunks and distributed via `SWARM_WANT` and `SWARM_CHUNK` protocols.
+   - Every node that downloads or creates media persists it to local IndexedDB and acts as a seeder (`hydrateLocalObjects`).
+
+---
+
+## 2. Presence & Discovery Protocol
+
+### Global Presence Token
+
+Peers derive the shared public presence mailbox token via a deterministic SHA-256 hash:
+
+```typescript
+const PRESENCE_TOKEN = sha256Hex('orbit-global-presence-v1')
+```
+
+### Presence Beacon Structure
+
+Every 60 seconds (or immediately upon returning to foreground), an active peer generates and signs an announcement beacon:
+
+```typescript
+export interface PresenceBeacon {
+  orbitId: string             // SHA-256 of Ed25519 public key
+  publicKeyHex: string        // Ed25519 public key
+  encryptionPubHex: string    // X25519 encryption public key
+  displayName: string         // User's configured handle
+  pfpUrl?: string             // Avatar URL or local object ID
+  timestamp: number           // Current Unix epoch ms
+  sig: string                 // Ed25519 signature over canonical beacon data
+}
+```
+
+### Wire Transmission
+
+The beacon is packed into an `announce` envelope and posted to the courier:
+
+```http
+PUT /api/mail/e5f3c1a... (PRESENCE_TOKEN)
+Content-Type: application/json
+
+{
+  "env": {
+    "v": 2,
+    "kind": "announce",
+    "to": "e5f3c1a...",
+    "id": "e4a7b9c1d2e3f4a5",
+    "sealed": "<base64 encoded inner beacon>",
+    "exp": 1727180400000
+  }
+}
+```
+
+### Roster Compilation & Verification
+
+Peers retrieve active beacons via `GET /api/mail/:PRESENCE_TOKEN` or listen in real-time via `wss://.../api/mail/ws`.
+Upon receipt:
+1. **Freshness Verification:** Drops any beacon where `Date.now() - beacon.timestamp > 120_000` ms (or in the future by > 30s).
+2. **Signature Verification:** Verifies `beacon.sig` against `beacon.publicKeyHex`.
+3. **Orbit ID Verification:** Ensures `sha256Hex(beacon.publicKeyHex) === beacon.orbitId`.
+4. **Roster Synthesis:** Compiles the live peer list without any server-side database.
+
+---
+
+## 3. WebRTC Signaling Protocol
+
+Legacy centralized signaling via `/api/signal/*` is deprecated on the blind courier. Signaling now occurs over E2E-encrypted mailboxes.
+
+### Envelope Routing
+
+1. Peer A determines Peer B's delivery token:
+   $$\text{token} = \text{blake3}(\text{Peer B's Ed25519 Public Key})$$
+2. Peer A seals the SDP Offer or ICE candidate using Peer B's X25519 `encryptionPubHex`:
+   ```typescript
+   seal1to1(payload, 'signal', senderKeys, recipientKeys, { to: token, exp: Date.now() + 60_000 })
+   ```
+3. Peer A sends the sealed envelope:
+   ```http
+   PUT /api/mail/<Peer B Token>
+   ```
+4. Peer B (watching its token on `/api/mail/ws`) receives the notification, fetches the envelope, decrypts the payload with its private X25519 key, and responds with an SDP Answer via Peer A's delivery token.
+
+### Signaling Payload Formats
+
+```typescript
+type CourierSignalPayload =
+  | {
+      type: 'offer'
+      sessionId: string
+      fromOrbitId: string
+      fromPubKeyHex: string
+      fromEncPubHex: string
+      sdp: RTCSessionDescriptionInit
+    }
+  | {
+      type: 'answer'
+      sessionId: string
+      fromOrbitId: string
+      fromPubKeyHex: string
+      fromEncPubHex: string
+      sdp: RTCSessionDescriptionInit
+    }
+  | {
+      type: 'ice'
+      sessionId: string
+      fromOrbitId: string
+      candidate: RTCIceCandidateInit
+    }
+```
+
+### NAT Traversal & ICE Hygiene
+
+- Peer connections configure STUN and TURN relays provided by the environment (`defaultIceConfig(readTurnEnv())`).
+- Private LAN IP candidates are stripped/sanitized before dispatch over the courier (`sanitizeCandidate`) to prevent internal network leakage.
+
+---
+
+## 4. P2P Swarm & Content Sharing Protocol
+
+### Swarm Framing
+
+Media and posts are exchanged over the established WebRTC DataChannel (`gmatch-mesh`) using chunked frames:
+
+```typescript
+type SwarmMessage =
+  | { type: 'SWARM_HAVE'; ids: string[] }
+  | { type: 'SWARM_WANT'; id: string }
+  | {
+      type: 'SWARM_CHUNK'
+      id: string
+      index: number
+      total: number
+      mimeType: string
+      dataBase64: string
+    }
+```
+
+### Chunking Mechanics
+
+- **Chunk Size:** Standard 64KB (`64 * 1024` bytes) per chunk.
+- **Request Cycle:** When a peer sees an image announcement or post referencing `objectId`, it broadcasts `SWARM_WANT` with the ID across:
+  1. Active WebRTC mesh data channels (`broadcastMeshFrame`).
+  2. Local tab cross-process `BroadcastChannel('orbit_p2p_swarm')`.
+- **Response Cycle:** Any peer holding the object slices the binary buffer into 64KB chunks and sends sequential `SWARM_CHUNK` frames.
+- **Reassembly:** The requesting peer tracks received chunk indices in memory. Once all chunks are present, it assembles the final `Blob`, verifies the SHA-256 digest against `objectId`, and commits it to local IndexedDB.
+
+### Local-First Seeding Lifecycle
+
+1. **Upload/Creation:** When a user creates a post or story, the binary payload is forged locally (`forgeMediaLocally`) and stored directly in IndexedDB.
+2. **Rehydration on Boot:** When the desktop app launches, `hydrateLocalObjects()` scans IndexedDB and mounts stored objects into the in-memory seeder index (`localObjects`).
+3. **Zero Server Upload:** Media binaries are never uploaded to the courier. The courier only routes encrypted metadata. Content availability relies entirely on the peer swarm.
+
+---
+
+## 5. Honest Boundaries & Fallback Behavior
+
+| Feature | Courier (Render) | Peer Node (Client) |
+| :--- | :--- | :--- |
+| **User Accounts / Passwords** | None (Zero knowledge) | Self-generated Ed25519/X25519 Identity in local DPAPI / localStorage |
+| **Media / Content Storage** | 404 (None stored) | Stored in local IndexedDB; seeded over WebRTC DataChannel |
+| **Online Roster** | 404 (No server DB table) | In-memory roster synthesized from ephemeral 60s beacons |
+| **Direct Messages** | Sealed 1-to-1 envelopes | Decrypted locally with private key; saved in local storage |
+| **Network Relaying** | Blinds forwarding + TURN | Direct P2P transmission |
+
+### Offline & Degraded Network Handling
+
+- If no seeders are online for a requested media object, the client does not crash or hang: it renders an offline SVG placeholder indicating the media is currently dormant until a seeder comes online.
+- When an offline peer returns, `announcePeerOnline` is triggered, causing failed tiles to re-issue `SWARM_WANT` requests.

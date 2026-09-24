@@ -9,6 +9,8 @@ import { mergeRoster } from '../utils/peerRoster';
 import { CHAT_WIPE_SECONDS } from '@orbit/shared';
 import { logger } from '../utils/logger';
 import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, announcePeerOnline, type SwarmMessage } from '../utils/p2pSwarm';
+import { broadcastPresence, fetchPresenceRoster } from '../services/courierPresence';
+import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh } from '../utils/courierSignaling';
 
 const CHAT_WIPE_MS = CHAT_WIPE_SECONDS * 1000;
 const DIRECT_WEBRTC_FANOUT_LIMIT = 3;
@@ -226,13 +228,25 @@ export function useP2P(identity: OrbitIdentity | null) {
     const selfUser = selfUserRef.current;
 
     // Swarm transport wire: allow requestSwarmObject / handleSwarmMessage to
-    // fan out WANT and CHUNK frames over both the BroadcastChannel (same-device
-    // tabs) and the WebSocket relay (network peers).
+    // fan out WANT and CHUNK frames over BroadcastChannel (same-device tabs),
+    // WebSocket relay (network peers), and direct WebRTC DataChannel mesh.
     setSwarmTransport((msg: SwarmMessage) => {
       try { channel.postMessage({ type: 'SWARM_FRAME', swarm: msg }); } catch {}
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: 'SWARM_FRAME', swarm: msg }));
       }
+      broadcastMeshFrame(JSON.stringify({ type: 'SWARM_FRAME', swarm: msg }));
+    });
+
+    const unsubMesh = onMeshMessage((data: string) => {
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed.type === 'SWARM_FRAME' && parsed.swarm) {
+          void handleSwarmMessage(parsed.swarm);
+        } else {
+          processSwarmMessage(parsed as P2PSwarmMessage);
+        }
+      } catch {}
     });
     // Local-first seeding: reload persisted bytes into RAM so this client
     // keeps retransmitting its own posts after a restart (packaged exe).
@@ -535,6 +549,8 @@ export function useP2P(identity: OrbitIdentity | null) {
 
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify(msg));
+      } else if (courierOnlyWs && identity) {
+        void broadcastPresence(identity, { displayName: currentSelf.display_name, pfpUrl: currentSelf.pfp_url });
       }
 
       // NOTE: No direct WebRTC connections on heartbeat — causes RTCPeerConnection exhaustion.
@@ -550,8 +566,10 @@ export function useP2P(identity: OrbitIdentity | null) {
     // the server's current online set instead of waiting passively for the
     // next swarm event. Refresh rides the same 60s cadence as presence.
     const pullRoster = () => {
-      orbitFetch('/api/users/online', {}, identity)
-        .then((r) => (r.ok ? r.json() : { users: [] }))
+      ;(courierOnlyWs
+        ? fetchPresenceRoster(selfUserRef.current.id).then((users) => ({ users }))
+        : orbitFetch('/api/users/online', {}, identity).then((r) => (r.ok ? r.json() : { users: [] })).catch(() => ({ users: [] })))
+        .then((res: any) => (res && 'users' in res ? res : (res && res.ok ? res.json() : { users: [] })))
         .then(({ users }: { users?: User[] }) => {
           // NOTE: an empty roster is a valid signal (everyone left) — it
           // still runs so leavers decay to offline instead of lingering.
@@ -567,6 +585,11 @@ export function useP2P(identity: OrbitIdentity | null) {
           for (const u of users) {
             if (u?.id && u.id !== selfUserRef.current.id && !wasOnline.has(u.id)) {
               announcePeerOnline(u.id)
+              const pubKey = u.publicKey || (u as any).public_key
+              const encKey = u.encryptionPubKey || (u as any).encryption_pub_key
+              if (courierOnlyWs && pubKey && encKey) {
+                void connectToPeerMesh({ id: u.id, public_key: pubKey, encryption_pub_key: encKey }, identity).catch(() => {})
+              }
             }
           }
         })
@@ -653,6 +676,7 @@ export function useP2P(identity: OrbitIdentity | null) {
       channel.close();
       channelRef.current = null;
       setSwarmTransport(null);
+      unsubMesh();
       if (wsRef.current) {
         wsRef.current.close();
       }
@@ -762,6 +786,7 @@ export function useP2P(identity: OrbitIdentity | null) {
 
       // Broadcast over network WebSocket to remote swarm peers with chunking/queuing
       transmitOverWebSocket(wsRef.current, queuedMessagesRef.current, msg);
+      broadcastMeshFrame(JSON.stringify(msg));
 
       // Broadcast direct WebRTC DataChannel payloads to all discovered peers via PeerJS
       if (relayRef.current) {
@@ -808,6 +833,7 @@ export function useP2P(identity: OrbitIdentity | null) {
     } catch {}
 
     transmitOverWebSocket(wsRef.current, queuedMessagesRef.current, msg);
+    broadcastMeshFrame(JSON.stringify(msg));
 
     if (relayRef.current) {
       const directPeers = Array.from(peerMapRef.current.values())
