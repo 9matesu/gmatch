@@ -22,6 +22,7 @@ import { SERVER_MARKER_KEY } from '../../firstRun/onboardingState'
 import { playPress } from '../../utils/sounds'
 import { resolveMediaUrl } from '../../utils/media'
 import { CentralAdminPanel } from './CentralAdminPanel'
+import { fetchPresenceRoster } from '../../services/courierPresence'
 import type { User } from '@orbit/shared'
 
 export interface DirectoryServer {
@@ -201,28 +202,73 @@ export function ServersView({
 
   const isLocalHost = (url: string) => url.includes('127.0.0.1') || url.includes('localhost')
 
-  const centralServer = useMemo((): DirectoryServer => ({
-    id: 'central-node',
-    name: isLocalHost(central) ? 'Central Node (Local)' : 'gMatch Central',
-    description: isLocalHost(central)
-      ? 'Local dev node (127.0.0.1:8790)'
-      : 'Official central network directory & public node',
-    owner_id: 'central',
-    endpoint_hint: central,
+  const RENDER_COURIER_URL = 'https://gmatch-wcz1.onrender.com'
+  const FLY_LEGACY_URL = 'https://gmatch.fly.dev'
+
+  const [p2pProbe, setP2pProbe] = useState<{ online: boolean; count: number | null }>({ online: true, count: null })
+  const [legacyProbe, setLegacyProbe] = useState<{ online: boolean; count: number | null }>({ online: false, count: null })
+
+  const p2pServer: DirectoryServer = useMemo(() => ({
+    id: 'central-p2p',
+    name: 'gMatch Central (p2p)',
+    description: 'Blind courier & P2P WebRTC swarm mesh',
+    owner_id: 'central-p2p',
+    endpoint_hint: RENDER_COURIER_URL,
     password_required: 0,
     is_private: 0,
-    user_count: dash?.active_24h_count ?? dash?.members_total ?? null,
-    online_count: dash?.online_count ?? (dash?.users ? dash.users.filter((u) => u.online).length : null),
-    last_seen: new Date().toISOString(),
-  }), [central, dash])
+    online_count: p2pProbe.count,
+    last_seen: p2pProbe.online ? new Date().toISOString() : undefined,
+  }), [p2pProbe])
 
-  // The pinned Official row renders outside the directory list, but it is a
-  // visible row — counts share this so tab/sub-bar totals stay honest.
-  const showOfficial = Boolean(
-    central && !passwordOnly && (!query || `${centralServer.name} ${centralServer.description}`.toLowerCase().includes(query.toLowerCase())),
-  )
+  const legacyServer: DirectoryServer = useMemo(() => ({
+    id: 'central-deprecated',
+    name: 'gMatch Central (deprecated)',
+    description: 'Legacy centralized server (deprecated)',
+    owner_id: 'central-deprecated',
+    endpoint_hint: FLY_LEGACY_URL,
+    password_required: 0,
+    is_private: 0,
+    online_count: legacyProbe.count,
+    last_seen: legacyProbe.online ? new Date().toISOString() : undefined,
+  }), [legacyProbe])
+
+  const localDevServer: DirectoryServer | null = useMemo(() => {
+    if (!isLocalHost(central)) return null
+    return {
+      id: 'central-local',
+      name: 'Central Node (Local)',
+      description: 'Local dev node (127.0.0.1:8790)',
+      owner_id: 'central-local',
+      endpoint_hint: central,
+      password_required: 0,
+      is_private: 0,
+      user_count: dash?.active_24h_count ?? dash?.members_total ?? null,
+      online_count: dash?.online_count ?? (dash?.users ? dash.users.filter((u) => u.online).length : null),
+      last_seen: new Date().toISOString(),
+    }
+  }, [central, dash])
+
 
   const refresh = useCallback(async () => {
+    // Live probe: P2P courier presence roster
+    void fetchPresenceRoster(identity?.orbitId)
+      .then((users) => setP2pProbe({ online: true, count: users.length }))
+      .catch(() => setP2pProbe({ online: false, count: null }))
+
+    // Live probe: Legacy Fly server
+    void fetch(`${FLY_LEGACY_URL}/api/health`, { signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined })
+      .then(async (r) => {
+        if (!r.ok) throw new Error()
+        const onlineRes = await fetch(`${FLY_LEGACY_URL}/api/users/online`, { signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(3000) : undefined }).catch(() => null)
+        let count: number | null = null
+        if (onlineRes && onlineRes.ok) {
+          const json = await onlineRes.json().catch(() => null)
+          if (json && Array.isArray(json.users)) count = json.users.length
+        }
+        setLegacyProbe({ online: true, count })
+      })
+      .catch(() => setLegacyProbe({ online: false, count: null }))
+
     // Anonymous browser: public directory only — never touch node routes
     // (no ID yet, nothing to sign with).
     if (!identity) {
@@ -356,15 +402,26 @@ export function ServersView({
     toast('Central node saved', 'success')
   }
 
+  const officialServers: DirectoryServer[] = useMemo(() => {
+    const list: DirectoryServer[] = []
+    if (localDevServer) list.push(localDevServer)
+    list.push(p2pServer)
+    list.push(legacyServer)
+    return list
+  }, [localDevServer, p2pServer, legacyServer])
+
   const visibleServers = useMemo(() => {
     const q = query.trim().toLowerCase()
     const centralNorm = (central || '').trim().replace(/\/+$/, '').toLowerCase()
+    const p2pNorm = RENDER_COURIER_URL.trim().replace(/\/+$/, '').toLowerCase()
+    const flyNorm = FLY_LEGACY_URL.trim().replace(/\/+$/, '').toLowerCase()
     return servers
       .filter((s) => {
-        if (s.id === 'central-node') return false
+        if (s.id === 'central-node' || s.id === 'central-p2p' || s.id === 'central-deprecated' || s.id === 'central-local') return false
         if (s.name.trim().toLowerCase() === 'gmatch') return false
         if (s.endpoint_hint?.includes('127.0.0.1:8790') || s.endpoint_hint?.includes('localhost:8790')) return false
-        if (s.endpoint_hint && normalizeServerUrl(s.endpoint_hint)?.toLowerCase() === centralNorm) return false
+        const hintNorm = s.endpoint_hint ? normalizeServerUrl(s.endpoint_hint)?.toLowerCase() : ''
+        if (hintNorm && (hintNorm === centralNorm || hintNorm === p2pNorm || hintNorm === flyNorm)) return false
         return true
       })
       .filter((s) => !passwordOnly || s.password_required)
@@ -376,8 +433,32 @@ export function ServersView({
       })
   }, [servers, query, sort, passwordOnly, central])
 
-  // Total visible rows = directory rows + the pinned Official row (when shown).
-  const visibleRowCount = visibleServers.length + (showOfficial ? 1 : 0)
+  const allVisibleServers = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const filteredOfficial = officialServers
+      .filter((s) => !passwordOnly || s.password_required)
+      .filter((s) => !q || `${s.name} ${s.description ?? ''} ${s.endpoint_hint ?? ''} ${(s.tags ?? []).join(' ')}`.toLowerCase().includes(q))
+    return [...filteredOfficial, ...visibleServers]
+  }, [officialServers, visibleServers, query, passwordOnly])
+
+  // Total visible rows = official servers + directory rows.
+  const visibleRowCount = allVisibleServers.length
+
+  const currentServerTitle = useMemo(() => {
+    const apiBase = getApiBaseUrl()
+    if (isCurrentServerUrl(apiBase, RENDER_COURIER_URL) || apiBase.includes('onrender.com')) {
+      return 'gMatch Central (p2p)'
+    }
+    if (isCurrentServerUrl(apiBase, FLY_LEGACY_URL) || apiBase.includes('fly.dev')) {
+      return 'gMatch Central (deprecated)'
+    }
+    if (localDevServer && isCurrentServerUrl(apiBase, localDevServer.endpoint_hint || '')) {
+      return localDevServer.name
+    }
+    const matched = servers.find((s) => isCurrentServerUrl(apiBase, s.endpoint_hint || ''))
+    if (matched?.name) return matched.name
+    return serverName || 'Hub'
+  }, [servers, serverName, localDevServer])
 
   const closeCreateForm = () => {
     setShowCreate(false); setName(''); setDescription(''); setHint(''); setNeedsPassword(false); setIsPrivate(false); setServerPassword('')
@@ -595,27 +676,35 @@ export function ServersView({
   const askPassword = (name: string) =>
     new Promise<string | null>((resolve) => { pendingAsk.current = resolve; setAskPasswordFor(name) })
 
-  const connectToCentral = async () => {
-    if (!central) return
-    const target = normalizeServerUrl(central) || normalizeServerUrl('http://' + central) || central
-    try {
-      localStorage.setItem(SERVER_MARKER_KEY, target)
-      localStorage.setItem('gmatch.api.url', target)
-    } catch { /* private mode */ }
-    if (!window.gmatch?.serverSet) {
-      toast(`Connected to ${centralServer.name}.`, 'success')
-      onServerJoined?.(centralServer)
-      return
-    }
-    const res = await window.gmatch.serverSet({ mode: 'client', url: target })
-    if (!res.ok) { toast(res.error || 'Could not switch servers', 'error'); return }
-    toast(`Switching to ${centralServer.name}. The app restarts.`, 'success')
-    window.gmatch.serverRelaunch?.()
-  }
 
   const join = async (s: DirectoryServer) => {
-    if (s.id === 'central-node' || (s.endpoint_hint && s.endpoint_hint === central)) {
-      await connectToCentral()
+    if (
+      s.id === 'central-p2p' ||
+      s.id === 'central-deprecated' ||
+      s.id === 'central-node' ||
+      (s.endpoint_hint && (
+        s.endpoint_hint === central ||
+        s.endpoint_hint === RENDER_COURIER_URL ||
+        s.endpoint_hint === FLY_LEGACY_URL
+      ))
+    ) {
+      const rawTarget = s.endpoint_hint || central
+      const target = normalizeServerUrl(rawTarget) || normalizeServerUrl('http://' + rawTarget) || rawTarget
+      setCentralApiUrl(target)
+      setCentral(target)
+      try {
+        localStorage.setItem(SERVER_MARKER_KEY, target)
+        localStorage.setItem('gmatch.api.url', target)
+      } catch { /* private mode */ }
+      if (!window.gmatch?.serverSet) {
+        toast(`Connected to ${s.name}.`, 'success')
+        onServerJoined?.(s)
+        return
+      }
+      const res = await window.gmatch.serverSet({ mode: 'client', url: target })
+      if (!res.ok) { toast(res.error || 'Could not switch servers', 'error'); return }
+      toast(`Switching to ${s.name}. The app restarts.`, 'success')
+      window.gmatch.serverRelaunch?.()
       return
     }
     if (!window.gmatch?.serverSet) {
@@ -859,14 +948,14 @@ export function ServersView({
                 <button
                   type="button"
                   onClick={() => { playPress(750); setActiveTab('hub'); }}
-                  aria-label={`Hub: ${serverName || 'your server'}`}
+                  aria-label={`Hub: ${currentServerTitle || 'your server'}`}
                   className={`flex items-center gap-2 text-sm font-bold transition-colors cursor-pointer max-w-[220px] ${
                     activeTab === 'hub'
                       ? 'text-retro-fg'
                       : 'text-retro-muted hover:text-retro-fg'
                   }`}
                 >
-                  <span className="truncate">{serverName || 'Hub'}</span>
+                  <span className="truncate">{currentServerTitle || 'Hub'}</span>
                   {dash ? <span className="text-[10px] font-mono font-normal opacity-80 shrink-0">({dash.members_total})</span> : null}
                 </button>
               </div>
@@ -1029,7 +1118,7 @@ export function ServersView({
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <h2 className="truncate text-lg font-bold text-retro-fg">{serverName || 'gmatch'}</h2>
+                      <h2 className="truncate text-lg font-bold text-retro-fg">{currentServerTitle || serverName || 'gmatch'}</h2>
                       {serverMode && (
                         <span className="text-[10px] px-2 py-0.5 rounded font-mono uppercase tracking-wider bg-surface-interactive border border-border-subtle text-retro-muted">
                           {serverMode}
@@ -1459,59 +1548,8 @@ export function ServersView({
                     </div>
                   ) : (
                     <div className="space-y-1.5">
-                      {/* Pinned Official Node Row */}
-                      {showOfficial && (
-                        <div
-                          key="central-node"
-                          className="group relative flex items-center justify-between gap-2.5 px-3 py-2 rounded-lg border border-border-glass bg-glass-w5 hover:border-border-strong transition-colors duration-150"
-                        >
-                          <div className="flex min-w-0 items-center gap-2.5">
-                            <div className="w-6 h-6 rounded-md bg-surface-interactive border border-border-subtle text-retro-fg flex items-center justify-center shrink-0">
-                              <Globe className="w-3.5 h-3.5" />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1 min-w-0">
-                                <h3 className="text-xs font-bold text-retro-fg truncate">{centralServer.name}</h3>
-                                <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider text-retro-fg border border-border-glass bg-glass-w8 shrink-0">
-                                  Official
-                                </span>
-                              </div>
-                              <p className="text-[10px] text-retro-muted truncate max-w-[320px]">
-                                {centralServer.description}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex shrink-0 items-center justify-end gap-2">
-                            <div className="hidden sm:flex items-center gap-1 text-[10px] text-retro-muted font-mono tabular-nums">
-                              <span className="inline-flex items-center gap-1 text-retro-online">
-                                <span className="w-1.5 h-1.5 rounded-full bg-retro-online" />
-                                <span>{typeof centralServer.online_count === 'number' ? `${centralServer.online_count}` : '–'}</span>
-                              </span>
-                              {typeof centralServer.user_count === 'number' && (
-                                <span>· {centralServer.user_count}</span>
-                              )}
-                            </div>
-
-                            {isCurrent(centralServer) && identity ? (
-                              <span className="h-6 px-2 rounded-md text-xs font-semibold text-retro-muted bg-surface-canvas border border-border-subtle flex items-center justify-center cursor-default">
-                                Connected
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => void join(centralServer)}
-                                className="flex items-center gap-1 px-1 py-0.5 rounded text-xs font-semibold text-retro-muted hover:text-retro-fg hover:bg-glass-w8 transition-colors duration-150 cursor-pointer"
-                              >
-                                <UserPlus className="w-3 h-3" /> Connect
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
                       <ul className="divide-y divide-border-subtle rounded-lg border border-border-glass bg-surface-canvas/80 overflow-hidden">
-                        {visibleServers.length === 0 && (
+                        {allVisibleServers.length === 0 && (
                           <li className="p-6 text-xs text-retro-muted text-center flex flex-col items-center justify-center gap-1.5">
                             <Globe className="w-5 h-5 text-retro-muted/40" />
                             <p className="font-semibold text-retro-fg">
@@ -1534,11 +1572,12 @@ export function ServersView({
                           </li>
                         )}
 
-                        {visibleServers.map((s) => {
+                        {allVisibleServers.map((s) => {
                           const isMenuOpen = openMenuId === s.id
                           const isMyServer = mine(s)
                           const isCurrentServer = isCurrent(s)
                           const isExpanded = expandedServerId === s.id
+                          const isOfficial = s.id === 'central-p2p' || s.id === 'central-deprecated' || s.id === 'central-local'
                           const code = s.endpoint_hint ? buildNodeCode(s.endpoint_hint, s.name) : ''
 
                           return (
@@ -1557,13 +1596,44 @@ export function ServersView({
                                   <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${isExpanded ? 'rotate-180 text-retro-fg' : ''}`} />
                                 </button>
 
-                                <div className="flex min-w-0 items-center gap-2.5 flex-1">
+                                <div
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => setExpandedServerId(isExpanded ? null : s.id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault()
+                                      setExpandedServerId(isExpanded ? null : s.id)
+                                    }
+                                  }}
+                                  aria-label={s.name}
+                                  className="flex min-w-0 items-center gap-2.5 flex-1 cursor-pointer select-none group/title"
+                                >
                                   <div className="w-6 h-6 rounded-md bg-surface-interactive border border-border-subtle text-retro-fg flex items-center justify-center text-[10px] font-mono font-bold shrink-0">
-                                    {s.name.slice(0, 2).toUpperCase()}
+                                    {s.id === 'central-p2p' || s.id === 'central-deprecated' ? (
+                                      <Globe className="w-3.5 h-3.5" />
+                                    ) : (
+                                      s.name.slice(0, 2).toUpperCase()
+                                    )}
                                   </div>
                                   <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-1 min-w-0">
-                                      <h3 className="text-xs font-bold text-retro-fg truncate">{s.name}</h3>
+                                      <h3 className="text-xs font-bold text-retro-fg group-hover/title:text-accent transition-colors truncate">{s.name}</h3>
+                                      {s.id === 'central-p2p' && (
+                                        <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider text-cyan-300 border border-cyan-500/30 bg-cyan-500/10 shrink-0">
+                                          P2P
+                                        </span>
+                                      )}
+                                      {s.id === 'central-deprecated' && (
+                                        <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider text-amber-300 border border-amber-500/30 bg-amber-500/10 shrink-0">
+                                          Deprecated
+                                        </span>
+                                      )}
+                                      {s.id === 'central-local' && (
+                                        <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider text-emerald-300 border border-emerald-500/30 bg-emerald-500/10 shrink-0">
+                                          Local
+                                        </span>
+                                      )}
                                       {!!s.password_required && (
                                         <span className="p-0.5 rounded bg-surface-interactive text-amber-300 border border-border-glass shrink-0" title="Password required">
                                           <Lock className="w-3 h-3" aria-label="password required" />
@@ -1591,7 +1661,17 @@ export function ServersView({
 
                                 <div className="flex shrink-0 items-center justify-end gap-2">
                                   <div className="hidden sm:flex items-center font-mono text-[10px] text-retro-muted tabular-nums">
-                                    {(typeof s.online_count === 'number' || typeof s.user_count === 'number') ? (
+                                    {s.id === 'central-p2p' ? (
+                                      <span className="inline-flex items-center gap-1">
+                                        <span className={`w-1.5 h-1.5 rounded-full ${p2pProbe.online ? 'bg-retro-online' : 'bg-rose-500'}`} />
+                                        <span>{typeof p2pProbe.count === 'number' ? `${p2pProbe.count}` : (p2pProbe.online ? 'online' : 'offline')}</span>
+                                      </span>
+                                    ) : s.id === 'central-deprecated' ? (
+                                      <span className="inline-flex items-center gap-1">
+                                        <span className={`w-1.5 h-1.5 rounded-full ${legacyProbe.online ? 'bg-retro-online' : 'bg-rose-500'}`} />
+                                        <span>{typeof legacyProbe.count === 'number' ? `${legacyProbe.count}` : (legacyProbe.online ? 'online' : 'offline')}</span>
+                                      </span>
+                                    ) : (typeof s.online_count === 'number' || typeof s.user_count === 'number') ? (
                                       <span className="inline-flex items-center gap-1">
                                         {typeof s.online_count === 'number' && (
                                           <>
@@ -1631,7 +1711,7 @@ export function ServersView({
                                         onClick={() => void join(s)}
                                         className="flex items-center gap-1 px-1 py-0.5 rounded text-xs font-semibold text-retro-muted hover:text-retro-fg hover:bg-glass-w8 transition-colors duration-150 cursor-pointer"
                                       >
-                                        <UserPlus className="w-3 h-3" /> {!identity ? 'Enter' : 'Join'}
+                                        <UserPlus className="w-3 h-3" /> {isOfficial ? 'Connect' : (!identity ? 'Enter' : 'Join')}
                                       </button>
                                     )}
 

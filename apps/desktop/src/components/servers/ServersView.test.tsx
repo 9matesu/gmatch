@@ -94,9 +94,9 @@ describe('ServersView', () => {
     })
     render(<ServersView identity={identity} toast={() => {}} />)
     await waitFor(() => expect(screen.getByText('Alpha Node')).toBeInTheDocument())
-    // count includes the pinned Official row on top of the 2 directory rows
-    expect(screen.getByText(/server browser \(3\)/i)).toBeInTheDocument()
-    expect(screen.getAllByRole('listitem').length).toBe(2)
+    // count includes the two official servers (p2p and deprecated) on top of the 2 directory rows
+    expect(screen.getByText(/server browser \(4\)/i)).toBeInTheDocument()
+    expect(screen.getAllByRole('listitem').length).toBe(4)
   })
 
   it('register form posts name and shows created server', async () => {
@@ -304,8 +304,8 @@ describe('ServersView', () => {
     render(<ServersView identity={identity} toast={() => {}} onSelectUser={onSelectUser} />)
 
     // Browse view keeps no presence chrome: no Manage Hub, no Online pills.
-    // Count is 1: no directory rows, but the pinned Official row shows.
-    expect(await screen.findByText('Server browser (1)')).toBeInTheDocument()
+    // Count is 2: no directory rows, but the 2 official central servers show.
+    expect(await screen.findByText('Server browser (2)')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /manage hub/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /online \(/i })).toBeNull()
 
@@ -333,7 +333,7 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('Server browser (1)')
+    await screen.findByText('Server browser (2)')
     // The button no longer pre-gates on node.isAdmin: the user's .exe is the
     // central admin. CentralAdminPanel itself refuses until the PIN unlocks.
     expect(screen.getByRole('button', { name: /central admin/i })).toBeInTheDocument()
@@ -349,8 +349,8 @@ describe('ServersView', () => {
     })
     render(<ServersView identity={null as never} toast={() => {}} />)
     await screen.findByText('Alpha Node')
-    // anonymous browser still pins the Official row: 1 directory + 1 official
-    expect(screen.getByText(/server browser \(2\)/i)).toBeInTheDocument()
+    // anonymous browser lists the 2 official servers: 1 directory + 2 official = 3
+    expect(screen.getByText(/server browser \(3\)/i)).toBeInTheDocument()
     expect(calls.some((c) => c.url.includes('/api/servers/dashboard'))).toBe(false)
     expect(calls.some((c) => c.url.includes('/api/servers/node'))).toBe(false)
   })
@@ -434,7 +434,8 @@ describe('ServersView', () => {
     render(<ServersView identity={identity} toast={() => {}} />)
     // owner row stays compact: Switch inline, the rest behind the overflow menu.
     expect(await screen.findByRole('button', { name: /switch/i })).toBeInTheDocument()
-    expect(within(screen.getByRole('listitem')).getAllByRole('button').length).toBeGreaterThanOrEqual(2)
+    const myRow = screen.getAllByRole('listitem').find((el) => el.textContent?.includes('My Realm'))!
+    expect(within(myRow).getAllByRole('button').length).toBeGreaterThanOrEqual(2)
     fireEvent.click(screen.getByRole('button', { name: /more actions for my realm/i }))
     expect(await screen.findByText('Make private')).toBeInTheDocument()
     expect(screen.getByText('unregister')).toBeInTheDocument()
@@ -494,7 +495,7 @@ describe('ServersView', () => {
     expect(screen.queryByTestId('admin-pin-banner')).toBeNull()
     unmount()
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('Server browser (1)')
+    await screen.findByText('Server browser (2)')
     expect(screen.queryByTestId('admin-pin-banner')).toBeNull()
     spy.mockRestore()
     delete (window as unknown as { gmatch?: unknown }).gmatch
@@ -515,15 +516,15 @@ describe('ServersView', () => {
     fireEvent.click(screen.getByRole('button', { name: /hide filters/i }))
     expect(screen.queryByLabelText('Search servers')).toBeNull()
     // hiding the band never hides the directory itself
-    expect(screen.getByText(/server browser \(2\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/server browser \(3\)/i)).toBeInTheDocument()
     unmount()
     // the choice survives a reload
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText(/server browser \(2\)/i)
+    await screen.findByText(/server browser \(3\)/i)
     expect(screen.queryByLabelText('Search servers')).toBeNull()
   })
 
-  it('browse count includes the pinned Official row', async () => {
+  it('browse count includes the official central servers', async () => {
     mockFetch(async (url) => {
       if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
       if (url.includes('/api/servers')) return json({ servers: [
@@ -533,9 +534,9 @@ describe('ServersView', () => {
     })
     render(<ServersView identity={identity} toast={() => {}} />)
     await screen.findByText('Alpha Node')
-    // 1 directory row + 1 pinned Official row = 2 visible rows
-    expect(screen.getByText(/server browser \(2\)/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /browse \(2\)/i })).toBeInTheDocument()
+    // 1 directory row + 2 official central rows = 3 visible rows
+    expect(screen.getByText(/server browser \(3\)/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /browse \(3\)/i })).toBeInTheDocument()
   })
 
   it('expandable browser row shows tags and server info', async () => {
@@ -580,5 +581,42 @@ describe('ServersView', () => {
     fireEvent.change(screen.getByLabelText('Search servers'), { target: { value: 'chill' } })
     expect(await screen.findByText('Chill Zone')).toBeInTheDocument()
     expect(screen.queryByText('Other Realm')).toBeNull()
+  })
+
+  it('allows clicking on the server name to expand details', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 's1', name: 'Chill Zone', description: 'a cool place to hang', owner_id: 'o1', password_required: 0, tags: ['chill'], endpoint_hint: '' },
+      ] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await screen.findByText('Chill Zone')
+    expect(screen.queryByTestId('server-details-s1')).not.toBeInTheDocument()
+
+    // Click on the server name/title block instead of the chevron
+    fireEvent.click(screen.getByText('Chill Zone'))
+    await waitFor(() => expect(screen.getByTestId('server-details-s1')).toBeInTheDocument())
+    expect(screen.getByTestId('server-details-s1')).toHaveTextContent('a cool place to hang')
+  })
+
+  it('renders both P2P and deprecated central servers and connects to them', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [] })
+      return json({})
+    })
+    const onServerJoined = vi.fn()
+    render(<ServersView identity={identity} toast={() => {}} onServerJoined={onServerJoined} />)
+    expect(await screen.findByText('gMatch Central (p2p)')).toBeInTheDocument()
+    expect(screen.getByText('gMatch Central (deprecated)')).toBeInTheDocument()
+    expect(screen.getByText('P2P')).toBeInTheDocument()
+    expect(screen.getByText('Deprecated')).toBeInTheDocument()
+
+    // Connect to deprecated server
+    const deprecatedRow = screen.getAllByRole('listitem').find((el) => el.textContent?.includes('gMatch Central (deprecated)'))!
+    fireEvent.click(within(deprecatedRow).getByRole('button', { name: /connect/i }))
+    expect(onServerJoined).toHaveBeenCalledWith(expect.objectContaining({ id: 'central-deprecated' }))
   })
 })

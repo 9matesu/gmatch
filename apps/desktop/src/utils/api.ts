@@ -9,12 +9,7 @@ function computeApiBase(): string {
   try {
     const manual = typeof localStorage !== 'undefined' ? localStorage.getItem('gmatch.api.url') : null
     if (manual?.trim()) {
-      const normalized = manual.trim().replace(/\/+$/, '')
-      if (/^https?:\/\/(gmatch|goonmatch)\.fly\.dev$/i.test(normalized)) {
-        localStorage.removeItem('gmatch.api.url')
-      } else {
-        return normalized
-      }
+      return manual.trim().replace(/\/+$/, '')
     }
   } catch { /* private mode */ }
 

@@ -24,6 +24,8 @@ api-stage/
 apps/desktop/release/
 apps/desktop/release*/
 apps/desktop/dist-bin/
+apps/desktop/dist-build/
+apps/desktop/test-dist/
 .dev-storage.key
 apps/api/node.key
 node.key

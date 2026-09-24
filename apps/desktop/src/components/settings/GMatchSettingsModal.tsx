@@ -26,7 +26,6 @@ function VaultUsage() {
 }
 import { useGame, MAX_USER_EXCLUDES } from '../../game/store';
 import { FeedTuneStep } from '../../firstRun/FeedTuneStep';
-import { ServerTab } from './ServerTab';
 import { DeleteAccountSection } from './DeleteAccountSection';
 import { UpdateSection } from './UpdateSection';
 import { BlocklistSection } from './BlocklistSection';
@@ -47,20 +46,18 @@ import {
   ChevronUp,
   Upload,
   Rss,
-  Server,
 } from 'lucide-react';
 
 export type SettingsTabId =
   | 'preferences'
   | 'account'
   | 'feed'
-  | 'blocklist'
-  | 'server';
+  | 'blocklist';
 
 /** What opens Settings: a real tab, or Preferences with the wallpaper section expanded. */
 export type SettingsOpenTarget = SettingsTabId | 'wallpaper';
 
-const TAB_IDS: readonly SettingsTabId[] = ['preferences', 'account', 'feed', 'blocklist', 'server']
+const TAB_IDS: readonly SettingsTabId[] = ['preferences', 'account', 'feed', 'blocklist']
 const resolveTab = (t: SettingsOpenTarget): SettingsTabId =>
   t !== 'wallpaper' && TAB_IDS.includes(t) ? t : 'preferences';
 
@@ -331,7 +328,6 @@ export function GMatchSettingsModal({
     { id: 'account', label: 'Account & Security', icon: User },
     { id: 'feed', label: 'Feed & Tags', icon: Rss },
     { id: 'blocklist', label: 'Blocklist (JSON)', icon: ShieldAlert },
-    { id: 'server', label: 'Server', icon: Server },
   ];
 
   return (
@@ -885,9 +881,6 @@ export function GMatchSettingsModal({
 
             {/* ──────── 4. BLOCKLIST (JSON) ──────── */}
             {activeTab === 'blocklist' && <BlocklistSection toast={toast} />}
-
-            {/* ──────── 5. SERVER (no central server topology) ──────── */}
-            {activeTab === 'server' && <ServerTab toast={toast} />}
           </div>
         </div>
       </div>
