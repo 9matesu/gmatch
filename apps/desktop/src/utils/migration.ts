@@ -112,40 +112,8 @@ function migrateBrandKeys(): void {
   }
 }
 
-function migrateLegacyDomain(): void {
-  if (typeof window === "undefined" || !window.localStorage) return;
-  try {
-    const keysToCheck = ['gmatch.api.url', 'gmatch.central.url', 'gmatch.server.url'];
-    for (const key of keysToCheck) {
-      const val = localStorage.getItem(key);
-      if (val && /fly\.dev/i.test(val)) {
-        localStorage.removeItem(key);
-      }
-    }
-    const dirRaw = localStorage.getItem('orbit_node_directory_v1');
-    if (dirRaw && /fly\.dev/i.test(dirRaw)) {
-      try {
-        const parsed = JSON.parse(dirRaw);
-        if (Array.isArray(parsed)) {
-          let updated = false;
-          for (const s of parsed) {
-            if (s.endpoint_hint && /fly\.dev/i.test(s.endpoint_hint)) {
-              s.endpoint_hint = 'https://gmatch-wcz1.onrender.com';
-              updated = true;
-            }
-          }
-          if (updated) localStorage.setItem('orbit_node_directory_v1', JSON.stringify(parsed));
-        }
-      } catch { /* parse error */ }
-    }
-  } catch {
-    /* storage unavailable */
-  }
-}
-
 export async function runMigrations(): Promise<void> {
   migrateBrandKeys();
-  migrateLegacyDomain();
   migrateLocalStorage();
   migrateConfigBackup();
   await migrateIndexedDB();

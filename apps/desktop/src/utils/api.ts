@@ -3,6 +3,17 @@ import { sealApiRequest } from '@orbit/protocol';
 import { logger } from './logger';
 
 function computeApiBase(): string {
+  // In browser dev mode (e.g. http://localhost:5173 without Electron bridge), use relative ''
+  // so requests hit the Vite dev proxy (which routes dynamically via gmatch_server_url cookie),
+  // eliminating CORS blocks for both central and legacy nodes.
+  if (
+    typeof window !== 'undefined' &&
+    !(window as unknown as { gmatch?: unknown }).gmatch &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ) {
+    return ''
+  }
+
   // Desktop merge (D3): VITE_API_URL, or the Electron preload's __API_BASE__
   // (local sidecar). Default: central node; local sidecar is opt-in via the
   // server-mode switch in Settings.
@@ -19,16 +30,6 @@ function computeApiBase(): string {
   if (envUrl) {
     const normalized = envUrl.replace(/\/+$/, '')
     return normalized
-  }
-
-  // In browser dev mode (e.g. http://localhost:5173 without Electron bridge), use relative ''
-  // so requests hit the Vite dev proxy to https://gmatch-wcz1.onrender.com, eliminating CORS blocks.
-  if (
-    typeof window !== 'undefined' &&
-    !(window as unknown as { gmatch?: unknown }).gmatch &&
-    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ) {
-    return ''
   }
 
   // Dev (electron) and packaged builds both default to the gmatch central node;

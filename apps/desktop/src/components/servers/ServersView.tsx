@@ -6,7 +6,7 @@
 // Right = public directory browser (search, join, create).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Lock, Globe, UserPlus, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, Share2, ArrowLeft, Plus, Trash2, MoreVertical, ClipboardPaste, ChevronDown } from 'lucide-react'
+import { Lock, Globe, UserPlus, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, Share2, ArrowLeft, Plus, Trash2, MoreVertical, ClipboardPaste, ChevronDown, Loader2 } from 'lucide-react'
 import { generateIdentity } from '@orbit/crypto'
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
 import { orbitFetch, getApiBaseUrl } from '../../utils/api'
@@ -218,6 +218,7 @@ export function ServersView({
   const [deleteError, setDeleteError] = useState('')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [expandedServerId, setExpandedServerId] = useState<string | null>(null)
+  const [connectingId, setConnectingId] = useState<string | null>(null)
   const [showCentralPopover, setShowCentralPopover] = useState(false)
   // Collapsible filter band (the chatroom idiom): the search/sort row eats a
   // full strip above the list and is only needed while narrowing. Starts
@@ -677,11 +678,29 @@ export function ServersView({
 
   // Switch = join another node, or hop back to this machine's own host node.
   const switchTo = async (s: DirectoryServer) => {
-    if (!mine(s)) { void joinServer(s, toast, askPassword); return }
-    if (!window.gmatch?.serverSet) return
-    const res = await window.gmatch.serverSet({ mode: 'host', url: '' })
-    if (res.ok) { toast('Switching to your own server. The app restarts.', 'success'); window.gmatch.serverRelaunch?.() }
-    else toast(res.error || 'Could not switch servers', 'error')
+    if (connectingId) return
+    setConnectingId(s.id)
+    try {
+      if (!mine(s)) {
+        const out = await joinServer(s, toast, askPassword)
+        if (out !== 'relaunching') setConnectingId(null)
+        return
+      }
+      if (!window.gmatch?.serverSet) {
+        setConnectingId(null)
+        return
+      }
+      const res = await window.gmatch.serverSet({ mode: 'host', url: '' })
+      if (res.ok) {
+        toast('Switching to your own server. The app restarts.', 'success')
+        window.gmatch.serverRelaunch?.()
+      } else {
+        toast(res.error || 'Could not switch servers', 'error')
+        setConnectingId(null)
+      }
+    } catch {
+      setConnectingId(null)
+    }
   }
 
   // One settings save for the connected node (host admin): name, description,
@@ -776,60 +795,81 @@ export function ServersView({
 
 
   const join = async (s: DirectoryServer) => {
-    if (
-      s.id === 'central-p2p' ||
-      s.id === 'central-deprecated' ||
-      s.id === 'central-node' ||
-      (s.endpoint_hint && (
-        s.endpoint_hint === central ||
-        s.endpoint_hint === RENDER_COURIER_URL ||
-        s.endpoint_hint === FLY_LEGACY_URL
-      ))
-    ) {
-      const rawTarget = s.endpoint_hint || central
-      const target = normalizeServerUrl(rawTarget) || normalizeServerUrl('http://' + rawTarget) || rawTarget
-      setCentralApiUrl(target)
-      setCentral(target)
-      try {
-        localStorage.setItem(SERVER_MARKER_KEY, target)
-        localStorage.setItem('gmatch.api.url', target)
-        if (typeof document !== 'undefined') {
-          document.cookie = `gmatch_server_url=${encodeURIComponent(target)}; path=/; max-age=31536000`
+    if (connectingId) return
+    setConnectingId(s.id)
+    try {
+      if (
+        s.id === 'central-p2p' ||
+        s.id === 'central-deprecated' ||
+        s.id === 'central-node' ||
+        (s.endpoint_hint && (
+          s.endpoint_hint === central ||
+          s.endpoint_hint === RENDER_COURIER_URL ||
+          s.endpoint_hint === FLY_LEGACY_URL
+        ))
+      ) {
+        const rawTarget = s.endpoint_hint || central
+        const target = normalizeServerUrl(rawTarget) || normalizeServerUrl('http://' + rawTarget) || rawTarget
+        setCentralApiUrl(target)
+        setCentral(target)
+        try {
+          localStorage.setItem(SERVER_MARKER_KEY, target)
+          localStorage.setItem('gmatch.api.url', target)
+          if (typeof document !== 'undefined') {
+            document.cookie = `gmatch_server_url=${encodeURIComponent(target)}; path=/; max-age=31536000`
+          }
+        } catch { /* private mode */ }
+        if (!window.gmatch?.serverSet) {
+          toast(`Connected to ${s.name}. Reloading...`, 'success')
+          onServerJoined?.(s)
+          if (typeof window !== 'undefined' && import.meta.env.MODE !== 'test') {
+            window.location.reload()
+          } else {
+            setConnectingId(null)
+          }
+          return
         }
-      } catch { /* private mode */ }
+        const res = await window.gmatch.serverSet({ mode: 'client', url: target })
+        if (!res.ok) {
+          toast(res.error || 'Could not switch servers', 'error')
+          setConnectingId(null)
+          return
+        }
+        toast(`Switching to ${s.name}. The app restarts.`, 'success')
+        window.gmatch.serverRelaunch?.()
+        return
+      }
       if (!window.gmatch?.serverSet) {
+        const url = s.endpoint_hint
+        if (!url) {
+          toast('This server has no address to join (owner is offline?)', 'warning')
+          setConnectingId(null)
+          return
+        }
+        const target = normalizeServerUrl(url) || normalizeServerUrl('http://' + url) || url
+        try {
+          localStorage.setItem(SERVER_MARKER_KEY, target)
+          localStorage.setItem('gmatch.api.url', target)
+          if (typeof document !== 'undefined') {
+            document.cookie = `gmatch_server_url=${encodeURIComponent(target)}; path=/; max-age=31536000`
+          }
+        } catch { /* private mode */ }
         toast(`Connected to ${s.name}. Reloading...`, 'success')
         onServerJoined?.(s)
         if (typeof window !== 'undefined' && import.meta.env.MODE !== 'test') {
           window.location.reload()
+        } else {
+          setConnectingId(null)
         }
         return
       }
-      const res = await window.gmatch.serverSet({ mode: 'client', url: target })
-      if (!res.ok) { toast(res.error || 'Could not switch servers', 'error'); return }
-      toast(`Switching to ${s.name}. The app restarts.`, 'success')
-      window.gmatch.serverRelaunch?.()
-      return
-    }
-    if (!window.gmatch?.serverSet) {
-      const url = s.endpoint_hint
-      if (!url) { toast('This server has no address to join (owner is offline?)', 'warning'); return }
-      const target = normalizeServerUrl(url) || normalizeServerUrl('http://' + url) || url
-      try {
-        localStorage.setItem(SERVER_MARKER_KEY, target)
-        localStorage.setItem('gmatch.api.url', target)
-        if (typeof document !== 'undefined') {
-          document.cookie = `gmatch_server_url=${encodeURIComponent(target)}; path=/; max-age=31536000`
-        }
-      } catch { /* private mode */ }
-      toast(`Connected to ${s.name}. Reloading...`, 'success')
-      onServerJoined?.(s)
-      if (typeof window !== 'undefined' && import.meta.env.MODE !== 'test') {
-        window.location.reload()
+      const out = await joinServer(s, toast, askPassword)
+      if (out !== 'relaunching') {
+        setConnectingId(null)
       }
-      return
+    } catch {
+      setConnectingId(null)
     }
-    void joinServer(s, toast, askPassword)
   }
 
   // Copy the gmatch://node/ code a friend pastes into "Node code" here.
@@ -1752,23 +1792,36 @@ export function ServersView({
 
                                 <div className="flex shrink-0 items-center justify-end gap-1">
                                   <div className="flex items-center gap-1">
-                                    {isCurrentServer ? (
-                                      <span className="h-6 px-2 rounded-md text-xs font-semibold text-retro-muted bg-surface-canvas border border-border-subtle flex items-center justify-center cursor-default">
+                                    {connectingId === s.id ? (
+                                      <span
+                                        data-testid={`connecting-${s.id}`}
+                                        className="h-6 px-2.5 rounded-md text-xs font-bold text-retro-fg bg-surface-canvas border border-border-subtle flex items-center gap-1.5 cursor-wait animate-pulse"
+                                      >
+                                        <Loader2 className="w-3 h-3 animate-spin text-retro-muted" /> Connecting...
+                                      </span>
+                                    ) : isCurrentServer ? (
+                                      <span
+                                        className={`h-6 px-2.5 rounded-md text-xs font-semibold text-retro-muted bg-surface-canvas border border-border-subtle flex items-center justify-center cursor-default transition-opacity ${
+                                          connectingId ? 'opacity-40' : ''
+                                        }`}
+                                      >
                                         Connected
                                       </span>
                                     ) : isMyServer ? (
                                       <button
                                         type="button"
+                                        disabled={!!connectingId}
                                         onClick={() => { playPress(620); void switchTo(s); }}
-                                        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold text-retro-muted hover:text-retro-fg hover:bg-glass-w8 transition-colors duration-150 cursor-pointer"
+                                        className="glass-action glass-action-primary h-6 px-2.5 rounded-md text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98]"
                                       >
                                         <ArrowLeft className="w-3 h-3" /> Switch
                                       </button>
                                     ) : (
                                       <button
                                         type="button"
+                                        disabled={!!connectingId}
                                         onClick={() => void join(s)}
-                                        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold text-retro-muted hover:text-retro-fg hover:bg-glass-w8 transition-colors duration-150 cursor-pointer"
+                                        className="glass-action glass-action-primary h-6 px-2.5 rounded-md text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98]"
                                       >
                                         <UserPlus className="w-3 h-3" /> {isOfficial ? 'Connect' : (!identity ? 'Enter' : 'Join')}
                                       </button>

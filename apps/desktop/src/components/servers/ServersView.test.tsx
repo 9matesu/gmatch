@@ -620,8 +620,29 @@ describe('ServersView', () => {
 
     // Connect to deprecated server
     const deprecatedRow = screen.getAllByRole('listitem').find((el) => el.textContent?.includes('gMatch Central (deprecated)'))!
-    fireEvent.click(within(deprecatedRow).getByRole('button', { name: /connect/i }))
+    const connectBtn = within(deprecatedRow).getByRole('button', { name: /connect/i })
+    expect(connectBtn).toHaveClass('glass-action-primary')
+
+    fireEvent.click(connectBtn)
     expect(onServerJoined).toHaveBeenCalledWith(expect.objectContaining({ id: 'central-deprecated' }))
     expect(localStorage.getItem('gmatch.api.url')).toBe('https://gmatch.fly.dev')
+  })
+
+  it('displays white connect button, transitions feedback to connecting, and dims previous connected badge', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    expect(await screen.findByText('gMatch Central (p2p)')).toBeInTheDocument()
+
+    const p2pRow = screen.getAllByRole('listitem').find((el) => el.textContent?.includes('gMatch Central (p2p)'))!
+    const deprecatedRow = screen.getAllByRole('listitem').find((el) => el.textContent?.includes('gMatch Central (deprecated)'))!
+
+    // Initially, P2P is connected and Deprecated has a white Connect button
+    expect(within(p2pRow).getByText('Connected')).toBeInTheDocument()
+    const connectBtn = within(deprecatedRow).getByRole('button', { name: /connect/i })
+    expect(connectBtn).toHaveClass('glass-action-primary')
   })
 })
