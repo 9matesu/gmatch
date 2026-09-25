@@ -124,10 +124,16 @@ export function getParty(id: string): Party | null {
 }
 
 /** Open public parties for the browse list. */
-export function listParties(): Array<{ id: string; name: string; members: number; mediaName: string }> {
+export function listParties(): Array<{ id: string; name: string; members: number; mediaName: string; mediaUrl: string }> {
   return [...parties.values()]
     .filter((p) => !p.isPrivate)
-    .map((p) => ({ id: p.id, name: p.name, members: p.members.size, mediaName: p.mediaName }))
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      members: p.members.size,
+      mediaName: p.mediaName,
+      mediaUrl: p.queue.find((q) => q.id === p.current)?.url || p.mediaUrl || '',
+    }))
 }
 
 export function partyRoom(id: string): string {
@@ -147,14 +153,6 @@ function dropParty(party: Party): void {
 }
 
 function gcTick(): void {
-  const now = Date.now()
-  for (const [id, p] of parties) {
-    if (p.emptySince && now - p.emptySince > 15 * 60 * 1000) {
-      dropParty(p)
-    } else if (!p.emptySince && now - p.lastSeen > IDLE_MS) {
-      dropParty(p)
-    }
-  }
   while (parties.size > MAX_PARTIES) {
     // Audit A6: evict the least-recently-SEEN room, not the first created.
     let victimId = ''
@@ -257,17 +255,14 @@ export function leaveAll(userId: string): Array<{ room: string; payload: any }> 
 }
 
 function removeMember(party: Party, userId: string, forceClose: boolean): { room: string; payload: any } | null {
+  void forceClose
   const who = party.members.get(userId)?.name || userId.slice(0, 8)
   party.members.delete(userId)
   const room = partyRoom(party.id)
   if (party.members.size === 0) {
-    if (forceClose) {
-      // # ponytail: socket disconnects / reloads get a 15m grace period so the party isn't destroyed mid-stream
-      party.emptySince = Date.now()
-      return { room, payload: [pushSystem(party, `${who} left`)] }
-    }
-    dropParty(party)
-    return { room, payload: [pushSystem(party, `${who} left`)] }
+    // Rooms are persistent: do NOT delete when empty so peers can re-enter anytime.
+    party.emptySince = Date.now()
+    return { room, payload: [pushSystem(party, `${who} left`), rosterPayload(party)] }
   }
   party.emptySince = undefined
   if (party.hostId === userId) {

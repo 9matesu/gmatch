@@ -42,6 +42,7 @@ export interface NativeVideoPlayerProps {
   onPlay?: () => void;
   onPause?: () => void;
   onError?: (e: React.SyntheticEvent<HTMLVideoElement, Event>) => void;
+  disableViewportGating?: boolean;
 }
 
 export function formatVideoTime(seconds: number): string {
@@ -83,6 +84,7 @@ export function NativeVideoPlayer({
   onPlay,
   onPause,
   onError,
+  disableViewportGating = false,
 }: NativeVideoPlayerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -135,6 +137,10 @@ export function NativeVideoPlayer({
   // Viewport gating: keep preload='none' and pause when scrolled out of
   // viewport so off-screen players allocate ZERO GPU hardware video decoders.
   useEffect(() => {
+    if (disableViewportGating) {
+      setInView(true);
+      return;
+    }
     const el = containerRef.current;
     if (!el || typeof IntersectionObserver === 'undefined') return;
     const obs = new IntersectionObserver(
@@ -157,7 +163,7 @@ export function NativeVideoPlayer({
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [autoPlay]);
+  }, [autoPlay, disableViewportGating]);
 
   const resetHideControlsTimer = useCallback(() => {
     setShowControls(true);

@@ -73,7 +73,6 @@ export function WatchPartySlot({
   useEffect(() => {
     if (!party?.frame || !videoSrc) return
     const timer = setInterval(() => {
-      if (document.hidden) return
       const v = wrapRef.current?.querySelector('video')
       if (!v || !party.frame || !videoSrc) return
       const target = computeTargetPosition(party.frame, serverNow())
@@ -178,6 +177,7 @@ export function WatchPartySlot({
             key={`${videoSrc}:${party?.current || ''}`}
             src={videoSrc}
             preload="auto"
+            disableViewportGating={true}
             loop={false}
             autoPlay={false}
             controls={false}

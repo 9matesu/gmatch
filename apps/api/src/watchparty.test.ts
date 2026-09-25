@@ -83,10 +83,11 @@ describe('room model (host, private, queue, chat history)', () => {
     expect(b.members.has('u9')).toBe(false)
   })
 
-  it('last member leaving deletes the party', () => {
+  it('last member leaving keeps the room persistent with 0 members', () => {
     const p = makeParty()
     leaveWatch('u1', { party: p.id })
-    expect(getParty(p.id)).toBeNull()
+    expect(getParty(p.id)).not.toBeNull()
+    expect(getParty(p.id)!.members.size).toBe(0)
   })
 })
 

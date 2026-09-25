@@ -47,31 +47,19 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
 
   const inRoom = parties.length > 0
 
-  // BROWSE MODE: Two-column layout matching Electron (room list on left, placeholder rail on right)
+  // BROWSE MODE: Full-width gallery layout (room list gallery without placeholder chat rail)
   if (!inRoom) {
     return (
-      <div className="p-2 sm:p-4 h-full flex-1 flex flex-row gap-3 min-h-0 overflow-hidden">
-        {/* Left Column: Room List */}
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden glass-card">
-          <div className="glass-header flex items-center justify-between px-4 py-3">
+      <div className="p-2 sm:p-4 h-full flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden glass-card rounded-xl border border-border-glass bg-surface-canvas/60 backdrop-blur-md">
+          <div className="glass-header flex items-center justify-between px-4 py-3 border-b border-border-glass">
             <h3 className="text-xs font-bold uppercase tracking-wider text-retro-fg flex items-center gap-2">
-              <Clapperboard className="w-4 h-4" />
+              <Clapperboard className="w-4 h-4 text-retro-accent" />
               Watch
             </h3>
           </div>
           <WatchPartyRoomList identity={identity} onNewParty={() => setModalOpen(true)} kickedNotice={kickedNotice} />
         </div>
-
-        {/* Right Column: Placeholder side rail */}
-        <aside className="w-72 shrink-0 md:flex hidden flex-col min-h-0 overflow-hidden glass-card">
-          <div className="px-3 py-2 border-b border-border-glass">
-            <p className={MUTED}>No room open</p>
-          </div>
-          <div className="flex items-start justify-between gap-2 px-3 py-1.5 border-b border-border-glass">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-retro-fg">In this room</p>
-          </div>
-          <WatchPartyChat party={null} profilePics={profilePics} myId={identity.orbitId} isHost={false} />
-        </aside>
 
         {modalOpen && (
           <WatchPartyUrlModal

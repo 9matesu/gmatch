@@ -14,6 +14,11 @@ const wallpaperWin = require('./wallpaperWin.cjs')
 const { sanitizeBounds } = require('./window-bounds-core.cjs')
 const { dapiSource, booruOrgSource } = require('./booru-sources-core.cjs')
 
+// Background video & screen sharing fix: keep video playback running and prevent black screen when alt-tabbed / occluded.
+app.commandLine.appendSwitch('disable-background-timer-throttling')
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
+app.commandLine.appendSwitch('disable-renderer-backgrounding')
+
 // A portable exe can run twice from one double-click (and did: two sidecars
 // fight over :8790 and the second window never appeared). One install, one
 // process — the second launch just focuses the first window.
@@ -1350,6 +1355,7 @@ function createWindow() {
     backgroundColor: '#080A0D',
     title: 'gMatch',
     webPreferences: {
+      backgroundThrottling: false,
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,

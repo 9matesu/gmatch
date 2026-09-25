@@ -58,14 +58,14 @@ describe('WatchPartyView Component', () => {
     vi.clearAllMocks()
   })
 
-  it('renders two-column layout in browse mode when no party is active', () => {
+  it('renders full-width gallery in browse mode when no party is active', () => {
     mockParties = []
     render(<WatchPartyView identity={identity} profilePics={{}} />)
 
     expect(screen.getByTestId('room-list')).toBeDefined()
     expect(screen.getByText('Watch')).toBeDefined()
-    expect(screen.getByText('No room open')).toBeDefined()
-    expect(screen.getByText('In this room')).toBeDefined()
+    expect(screen.queryByText('No room open')).toBeNull()
+    expect(screen.queryByText('In this room')).toBeNull()
   })
 
   it('renders video theater and toggles docked side rail in room mode', () => {
