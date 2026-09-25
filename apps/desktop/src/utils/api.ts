@@ -84,7 +84,12 @@ export function getApiBaseUrl(): string {
 }
 
 export function getApiWebSocketUrl(path = '/api/ws'): string {
-  const base = (API_BASE || 'https://gmatch-wcz1.onrender.com').replace(/\/+$/, '')
+  let base = API_BASE
+  try {
+    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('gmatch.api.url') : null
+    if (stored?.trim()) base = stored.trim()
+  } catch { /* session-only */ }
+  base = (base || 'https://gmatch-wcz1.onrender.com').replace(/\/+$/, '')
   const scheme = base.startsWith('https') ? 'wss' : 'ws'
   const hostAndPath = base.includes('://') ? base.slice(base.indexOf('://') + 3) : base.replace(/^\/+/, '')
   const cleanPath = path.startsWith('/') ? path : `/${path}`
@@ -333,6 +338,12 @@ export async function orbitFetch(
     return signed
   }
   const headers = await buildHeaders()
+  try {
+    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('gmatch.api.url') : null
+    if (stored?.trim() && !API_BASE) {
+      headers.set('X-GMatch-Server', stored.trim())
+    }
+  } catch { /* session-only */ }
   const sealedBody = headers.has('X-Orbit-Sealed') ? 'sealed' : bodyForSig
   const ck = cacheKey(method, endpoint, identity?.orbitId || 'anon')
 

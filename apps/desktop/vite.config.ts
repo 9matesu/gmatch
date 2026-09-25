@@ -2,7 +2,8 @@ import { defineConfig, type Plugin, type ProxyOptions } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
-import type { IncomingMessage, ServerResponse } from 'node:http'
+import http, { type IncomingMessage, type ServerResponse } from 'node:http'
+import https from 'node:https'
 
 // Hosts the dev /px byte-proxy may fetch (allowlist — no open proxy).
 const PX_ALLOW = /(^|\.)(imhentai\.xxx|babesource\.com|paheal\.net|tbib\.org|xbooru\.com|redgifs\.com|konachan\.com|yande\.re|files\.yande\.re|realbooru\.com|booru\.org|discordapp\.(com|net)|discord\.com|imgur\.com|redd\.it|twimg\.com|unsplash\.com|cloudinary\.com|postimg\.cc|imgbb\.com)$/
@@ -93,22 +94,102 @@ function devPxPlugin(): Plugin {
   }
 }
 
-function devCorsPlugin(): Plugin {
+function devApiProxyPlugin(): Plugin {
   return {
-    name: 'gmatch-dev-cors',
+    name: 'gmatch-dev-api-proxy',
     configureServer(server) {
       server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
-        if (req.url?.startsWith('/fly-api') || req.url?.startsWith('/api')) {
-          res.setHeader('Access-Control-Allow-Origin', '*')
-          res.setHeader('Access-Control-Allow-Headers', '*')
-          res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH')
-          if (req.method === 'OPTIONS') {
-            res.statusCode = 204
-            res.end()
-            return
+        if (!req.url?.startsWith('/api')) {
+          if (req.url?.startsWith('/fly-api')) {
+            res.setHeader('Access-Control-Allow-Origin', '*')
+            res.setHeader('Access-Control-Allow-Headers', '*')
+            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH')
+            if (req.method === 'OPTIONS') {
+              res.statusCode = 204
+              res.end()
+              return
+            }
+          }
+          return next()
+        }
+
+        // Handle preflight OPTIONS
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.setHeader('Access-Control-Allow-Headers', '*')
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH')
+        if (req.method === 'OPTIONS') {
+          res.statusCode = 204
+          res.end()
+          return
+        }
+
+        // Determine dynamic target from cookie, custom header, or env/default
+        let target = process.env.VITE_API_URL || 'https://gmatch-wcz1.onrender.com'
+        const cookie = req.headers.cookie || ''
+        const match = cookie.match(/gmatch_server_url=([^;]+)/)
+        if (match) {
+          try {
+            const decoded = decodeURIComponent(match[1]).trim().replace(/\/+$/, '')
+            if (decoded.startsWith('http://') || decoded.startsWith('https://')) {
+              target = decoded
+            }
+          } catch { /* ignore */ }
+        }
+        const custom = req.headers['x-gmatch-server']
+        if (typeof custom === 'string' && (custom.startsWith('http://') || custom.startsWith('https://'))) {
+          target = custom.trim().replace(/\/+$/, '')
+        }
+
+        try {
+          const targetUrl = new URL(req.url, target)
+          const isHttps = targetUrl.protocol === 'https:'
+          const client = isHttps ? https : http
+
+          const headers: Record<string, string | string[] | undefined> = { ...req.headers }
+          delete headers.host
+          headers['host'] = targetUrl.host
+          headers['origin'] = targetUrl.origin
+          headers['referer'] = `${targetUrl.origin}/`
+
+          const proxyReq = client.request(targetUrl, {
+            method: req.method,
+            headers: headers as http.OutgoingHttpHeaders,
+            timeout: 30000,
+          }, (proxyRes) => {
+            const respHeaders = { ...proxyRes.headers }
+            respHeaders['access-control-allow-origin'] = '*'
+            respHeaders['access-control-allow-headers'] = '*'
+            respHeaders['access-control-allow-methods'] = '*'
+            res.writeHead(proxyRes.statusCode || 500, respHeaders)
+            proxyRes.pipe(res)
+          })
+
+          proxyReq.on('error', (err: unknown) => {
+            const code = (err as { code?: string })?.code
+            if (code === 'ECONNRESET' || code === 'EPIPE' || code === 'ERR_STREAM_PREMATURE_CLOSE') {
+              return
+            }
+            if (!res.headersSent) {
+              res.writeHead(502, { 'Content-Type': 'application/json', 'access-control-allow-origin': '*' })
+              res.end(JSON.stringify({ error: `Central node waking up or unreachable (${target}): ${(err as Error).message}` }))
+            }
+          })
+
+          proxyReq.on('timeout', () => {
+            proxyReq.destroy()
+            if (!res.headersSent) {
+              res.writeHead(504, { 'Content-Type': 'application/json', 'access-control-allow-origin': '*' })
+              res.end(JSON.stringify({ error: 'Gateway timeout' }))
+            }
+          })
+
+          req.pipe(proxyReq)
+        } catch (err) {
+          if (!res.headersSent) {
+            res.writeHead(500, { 'Content-Type': 'application/json', 'access-control-allow-origin': '*' })
+            res.end(JSON.stringify({ error: (err as Error).message }))
           }
         }
-        next()
       })
     },
   }
@@ -133,64 +214,15 @@ function booruOrgProxy(target: string, prefix: string): ProxyOptions {
 // base './' so Electron can load dist/index.html over file://
 export default defineConfig({
   base: './',
-  plugins: [react(), tailwindcss(), devPxPlugin(), devCorsPlugin()],
+  plugins: [react(), tailwindcss(), devPxPlugin(), devApiProxyPlugin()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
   server: {
-    // Dev-only proxy: routes /api directly to central node at gmatch-wcz1.onrender.com (no CORS issues).
-    // Also proxies Grid feed's booru mirrors for browser dev.
+    // Dev-only proxy: routes booru mirrors and legacy fly endpoints for browser dev.
     proxy: {
-      '^/api': {
-        target: process.env.VITE_API_URL || 'https://gmatch-wcz1.onrender.com',
-        bypass: (req, _res, options) => {
-          const cookie = req.headers.cookie || ''
-          const match = cookie.match(/gmatch_server_url=([^;]+)/)
-          if (match) {
-            try {
-              const decoded = decodeURIComponent(match[1]).trim().replace(/\/+$/, '')
-              if (decoded.startsWith('http://') || decoded.startsWith('https://')) {
-                options.target = decoded
-              }
-            } catch { /* ignore */ }
-          }
-          const custom = req.headers['x-gmatch-server']
-          if (typeof custom === 'string' && (custom.startsWith('http://') || custom.startsWith('https://'))) {
-            options.target = custom.trim().replace(/\/+$/, '')
-          }
-          return undefined
-        },
-        changeOrigin: true,
-        secure: (process.env.VITE_API_URL || 'https://gmatch-wcz1.onrender.com').startsWith('https:'),
-        ws: true,
-        // Fly.io sleeps idle machines: the first request wakes it (~4s) and
-        // http-proxy would otherwise drop the socket, logging a raw 502 that
-        // useObjectImage then caches as a permanent failure ("Image
-        // unavailable" forever). Answer proxy transport errors with a clean
-        // JSON 502 so callers can retry instead of caching death.
-        configure: (proxy) => {
-          proxy.on('proxyRes', (proxyRes) => {
-            proxyRes.headers['access-control-allow-origin'] = '*'
-            proxyRes.headers['access-control-allow-headers'] = '*'
-            proxyRes.headers['access-control-allow-methods'] = '*'
-          })
-          proxy.on('error', (err: unknown, _req, res) => {
-            const code = (err as { code?: string })?.code
-            // Ignore client socket aborts/resets (normal during video seeks and queue changes)
-            if (code === 'ECONNRESET' || code === 'EPIPE' || code === 'ERR_STREAM_PREMATURE_CLOSE') {
-              return
-            }
-            try {
-              if (res && 'writeHead' in res && !(res as { headersSent?: boolean }).headersSent) {
-                ;(res as { writeHead: (s: number, h: Record<string, string>) => void; end: (b: string) => void }).writeHead(502, { 'Content-Type': 'application/json' })
-                ;(res as { end: (b: string) => void }).end(JSON.stringify({ error: 'Central node waking up, retry shortly' }))
-              }
-            } catch { /* socket already gone */ }
-          })
-        },
-      },
       '^/fly-api': {
         target: 'https://gmatch.fly.dev',
         changeOrigin: true,
