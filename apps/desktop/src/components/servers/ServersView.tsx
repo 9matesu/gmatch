@@ -115,6 +115,57 @@ function formatDomain(hint?: string | null): string {
   return hint.trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '')
 }
 
+function formatServerCounts(
+  s: DirectoryServer,
+  isCurrentServer: boolean,
+  dash: Dashboard | null,
+  p2pProbe: { online: boolean; count: number | null },
+  legacyProbe: { online: boolean; count: number | null },
+): string {
+  if (isCurrentServer && dash) {
+    const online = typeof dash.online_count === 'number'
+      ? dash.online_count
+      : (Array.isArray(dash.users) ? dash.users.filter((u) => u.online).length : 0)
+    const total = typeof dash.members_total === 'number'
+      ? dash.members_total
+      : (Array.isArray(dash.users) ? dash.users.length : 0)
+    return `${online} / ${total}`
+  }
+
+  if (s.id === 'central-p2p') {
+    if (!p2pProbe.online) return 'offline'
+    if (typeof p2pProbe.count === 'number' && typeof s.user_count === 'number') {
+      return `${p2pProbe.count} / ${s.user_count}`
+    }
+    if (typeof p2pProbe.count === 'number') {
+      return `${p2pProbe.count} / —`
+    }
+    return '— / —'
+  }
+
+  if (s.id === 'central-deprecated') {
+    if (!legacyProbe.online) return 'offline'
+    if (typeof legacyProbe.count === 'number' && typeof s.user_count === 'number') {
+      return `${legacyProbe.count} / ${s.user_count}`
+    }
+    if (typeof legacyProbe.count === 'number') {
+      return `${legacyProbe.count} / —`
+    }
+    return '— / —'
+  }
+
+  if (typeof s.online_count === 'number' && typeof s.user_count === 'number') {
+    return `${s.online_count} / ${s.user_count}`
+  }
+  if (typeof s.online_count === 'number') {
+    return `${s.online_count} / —`
+  }
+  if (typeof s.user_count === 'number') {
+    return `0 / ${s.user_count}`
+  }
+  return '— / —'
+}
+
 export function ServersView({
   identity,
   toast,
@@ -1666,81 +1717,36 @@ export function ServersView({
                                     }
                                   }}
                                   aria-label={s.name}
-                                  className="flex min-w-0 items-center gap-2.5 flex-1 cursor-pointer select-none group/title"
+                                  className="flex min-w-0 items-center gap-3 flex-1 cursor-pointer select-none group/title"
                                 >
-                                  <div className="w-6 h-6 rounded-md bg-surface-interactive border border-border-subtle text-retro-fg flex items-center justify-center text-[10px] font-mono font-bold shrink-0">
-                                    {s.id === 'central-p2p' || s.id === 'central-deprecated' ? (
-                                      <Globe className="w-3.5 h-3.5" />
-                                    ) : (
-                                      s.name.slice(0, 2).toUpperCase()
+                                  <span className="font-mono text-xs text-retro-muted tabular-nums shrink-0 min-w-[56px] text-right font-medium">
+                                    {formatServerCounts(s, isCurrentServer, dash, p2pProbe, legacyProbe)}
+                                  </span>
+
+                                  <div className="flex items-baseline gap-2 min-w-0 flex-1 truncate">
+                                    <h3 className="text-xs font-bold text-retro-fg group-hover/title:text-accent transition-colors truncate">
+                                      {s.name}
+                                    </h3>
+                                    {s.endpoint_hint && (isOfficial || (!/^https?:\/\/\d+\.\d+\.\d+\.\d+/i.test(s.endpoint_hint) && !/^\d+\.\d+\.\d+\.\d+/.test(s.endpoint_hint))) && (
+                                      <span className="text-[11px] font-mono text-retro-muted/60 truncate shrink-0">
+                                        {formatDomain(s.endpoint_hint)}
+                                      </span>
                                     )}
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-1.5 min-w-0">
-                                      <h3 className="text-xs font-bold text-retro-fg group-hover/title:text-accent transition-colors truncate">{s.name}</h3>
-                                      {s.id === 'central-p2p' && (
-                                        <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider text-retro-muted/90 border border-border-glass bg-glass-w5 shrink-0">
-                                          p2p
-                                        </span>
-                                      )}
-                                      {s.id === 'central-deprecated' && (
-                                        <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider text-retro-muted/70 border border-border-glass bg-glass-w5 shrink-0">
-                                          deprecated
-                                        </span>
-                                      )}
-                                      {s.id === 'central-local' && (
-                                        <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider text-retro-muted/90 border border-border-glass bg-glass-w5 shrink-0">
-                                          local
-                                        </span>
-                                      )}
-                                      {!!s.password_required && (
-                                        <span className="p-0.5 rounded text-retro-muted shrink-0" title="Password required">
-                                          <Lock className="w-3 h-3" aria-label="password required" />
-                                        </span>
-                                      )}
-                                      {!!s.is_private && (
-                                        <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider text-retro-muted/70 border border-border-glass bg-glass-w5 shrink-0">
-                                          private
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-1.5 text-[11px] font-mono text-retro-muted/80 truncate mt-0.5">
-                                      {s.endpoint_hint && (isOfficial || (!/^https?:\/\/\d+\.\d+\.\d+\.\d+/i.test(s.endpoint_hint) && !/^\d+\.\d+\.\d+\.\d+/.test(s.endpoint_hint))) && (
-                                        <span className="truncate text-retro-muted/70">
-                                          {formatDomain(s.endpoint_hint)}
-                                        </span>
-                                      )}
-                                      <span className="text-retro-muted/40">·</span>
-                                      {s.id === 'central-p2p' ? (
-                                        <span className="inline-flex items-center gap-1 shrink-0">
-                                          <span className={`w-1.5 h-1.5 rounded-full ${p2pProbe.online ? 'bg-retro-online' : 'bg-retro-muted'}`} />
-                                          <span>{typeof p2pProbe.count === 'number' ? `${p2pProbe.count} online` : (p2pProbe.online ? 'live' : 'offline')}</span>
-                                        </span>
-                                      ) : s.id === 'central-deprecated' ? (
-                                        <span className="inline-flex items-center gap-1 shrink-0">
-                                          <span className={`w-1.5 h-1.5 rounded-full ${legacyProbe.online ? 'bg-retro-online' : 'bg-retro-muted'}`} />
-                                          <span>{typeof legacyProbe.count === 'number' ? `${legacyProbe.count} online` : (legacyProbe.online ? 'live' : 'offline')}</span>
-                                        </span>
-                                      ) : (typeof s.online_count === 'number' || typeof s.user_count === 'number') ? (
-                                        <span className="inline-flex items-center gap-1 shrink-0">
-                                          <span className={`w-1.5 h-1.5 rounded-full ${(s.online_count ?? 0) > 0 ? 'bg-retro-online' : 'bg-retro-muted'}`} />
-                                          <span>{typeof s.online_count === 'number' ? `${s.online_count} online` : 'online'}</span>
-                                        </span>
-                                      ) : (
-                                        <span className="inline-flex items-center gap-1 shrink-0 text-retro-muted/60">
-                                          <span className="w-1.5 h-1.5 rounded-full bg-retro-muted/50" />
-                                          <span>idle</span>
-                                        </span>
-                                      )}
-                                      {s.description && s.description.trim() && s.id !== 'central-p2p' && s.id !== 'central-deprecated' && (
-                                        <>
-                                          <span className="text-retro-muted/40 hidden md:inline">·</span>
-                                          <span className="hidden md:inline text-[10px] text-retro-muted/60 truncate font-sans">
-                                            {s.description}
-                                          </span>
-                                        </>
-                                      )}
-                                    </div>
+                                    {s.description && s.description.trim() && s.id !== 'central-p2p' && s.id !== 'central-deprecated' && (
+                                      <span className="hidden md:inline text-[11px] text-retro-muted/60 truncate font-sans">
+                                        · <span>{s.description}</span>
+                                      </span>
+                                    )}
+                                    {!!s.password_required && (
+                                      <span className="p-0.5 rounded text-retro-muted shrink-0" title="Password required">
+                                        <Lock className="w-3 h-3" aria-label="password required" />
+                                      </span>
+                                    )}
+                                    {!!s.is_private && (
+                                      <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider text-retro-muted/70 border border-border-glass bg-glass-w5 shrink-0">
+                                        private
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
 

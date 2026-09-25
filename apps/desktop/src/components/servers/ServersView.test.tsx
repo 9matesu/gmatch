@@ -615,8 +615,6 @@ describe('ServersView', () => {
     render(<ServersView identity={identity} toast={() => {}} onServerJoined={onServerJoined} />)
     expect(await screen.findByText('gMatch Central (p2p)')).toBeInTheDocument()
     expect(screen.getByText('gMatch Central (deprecated)')).toBeInTheDocument()
-    expect(screen.getByText('p2p')).toBeInTheDocument()
-    expect(screen.getByText('deprecated')).toBeInTheDocument()
     expect(screen.getByText('gmatch-wcz1.onrender.com')).toBeInTheDocument()
     expect(screen.getByText('gmatch.fly.dev')).toBeInTheDocument()
 
