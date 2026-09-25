@@ -6,7 +6,7 @@
 // Right = public directory browser (search, join, create).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Lock, Globe, UserPlus, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, Share2, ArrowLeft, Plus, Trash2, MoreVertical, ClipboardPaste, ChevronDown, Loader2 } from 'lucide-react'
+import { Lock, Globe, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, Share2, ArrowLeft, Plus, Trash2, MoreVertical, ClipboardPaste, ChevronDown, Loader2 } from 'lucide-react'
 import { generateIdentity } from '@orbit/crypto'
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
 import { orbitFetch, getApiBaseUrl } from '../../utils/api'
@@ -337,10 +337,11 @@ export function ServersView({
       let onlineCount: number | null = null
       let totalMembers: number | null = null
       try {
+        const shouldFetchDash = isOnline && (Boolean(identity) || (isDev && import.meta.env.MODE !== 'test'))
         if (window.gmatch?.serverProbe) {
           const probeRes = await window.gmatch.serverProbe(`${FLY_LEGACY_URL}/api/health`).catch(() => null)
           isOnline = Boolean(probeRes?.ok)
-          if (isOnline && identity) {
+          if (shouldFetchDash) {
             const dashRes = await fetch(`${FLY_LEGACY_URL}/api/servers/dashboard`, {
               signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
             }).catch(() => null)
@@ -355,7 +356,7 @@ export function ServersView({
             signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
           }).catch(() => null)
           isOnline = Boolean(res?.ok)
-          if (isOnline && identity) {
+          if (shouldFetchDash) {
             const dashRes = await fetch('/fly-api/api/servers/dashboard', {
               signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
             }).catch(() => null)
@@ -370,7 +371,7 @@ export function ServersView({
             signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
           }).catch(() => null)
           isOnline = Boolean(res?.ok)
-          if (isOnline && identity) {
+          if (shouldFetchDash) {
             const dashRes = await fetch(`${FLY_LEGACY_URL}/api/servers/dashboard`, {
               signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
             }).catch(() => null)
@@ -393,7 +394,7 @@ export function ServersView({
     if (!identity) {
       if (!central) { setServers(readDirectoryCache()); setDirError(false); return }
       try {
-        const res = await fetch(`${central}/api/servers?_ts=${Date.now()}`, { method: 'GET' })
+        const res = await orbitFetch(`${central}/api/servers?_ts=${Date.now()}`, { method: 'GET' }, null)
         if (res.ok) {
           const data = (await res.json()) as { servers: DirectoryServer[] }
           const merged = mergeDirectory(readDirectoryCache(), Array.isArray(data.servers) ? data.servers : [])
@@ -899,9 +900,9 @@ export function ServersView({
           }
         } catch { /* private mode */ }
         if (!window.gmatch?.serverSet) {
-          toast(`Connected to ${s.name}. Reloading...`, 'success')
+          toast(`Connected to ${s.name}.`, 'success')
           onServerJoined?.(s)
-          if (typeof window !== 'undefined' && import.meta.env.MODE !== 'test') {
+          if (!onServerJoined && typeof window !== 'undefined' && import.meta.env.MODE !== 'test') {
             window.location.reload()
           } else {
             setConnectingId(null)
@@ -933,9 +934,9 @@ export function ServersView({
             document.cookie = `gmatch_server_url=${encodeURIComponent(target)}; path=/; max-age=31536000`
           }
         } catch { /* private mode */ }
-        toast(`Connected to ${s.name}. Reloading...`, 'success')
+        toast(`Connected to ${s.name}.`, 'success')
         onServerJoined?.(s)
-        if (typeof window !== 'undefined' && import.meta.env.MODE !== 'test') {
+        if (!onServerJoined && typeof window !== 'undefined' && import.meta.env.MODE !== 'test') {
           window.location.reload()
         } else {
           setConnectingId(null)
@@ -943,6 +944,9 @@ export function ServersView({
         return
       }
       const out = await joinServer(s, toast, askPassword)
+      if (out === 'connected' && onServerJoined) {
+        onServerJoined(s)
+      }
       if (out !== 'relaunching') {
         setConnectingId(null)
       }
@@ -1937,9 +1941,9 @@ export function ServersView({
                                         type="button"
                                         disabled={!!connectingId}
                                         onClick={() => void join(s)}
-                                        className="glass-action glass-action-primary h-6 px-2.5 rounded-md text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98]"
+                                        className="bg-white hover:bg-zinc-200 text-black font-semibold text-xs rounded-md px-3 h-6 flex items-center justify-center cursor-pointer transition-colors active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed glass-action-primary"
                                       >
-                                        <UserPlus className="w-3 h-3" /> {isOfficial ? 'Connect' : (!identity ? 'Enter' : 'Join')}
+                                        {isOfficial || !identity ? 'Connect' : 'Join'}
                                       </button>
                                     )}
 

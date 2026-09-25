@@ -38,6 +38,7 @@ interface Props {
   /** createIdentity() from useIdentity — local keypair only, no server call. */
   ensureIdentity: () => OrbitIdentity | null;
   tagSuggestions?: string[];
+  toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 }
 
 function sameOrigin(a: string, b: string): boolean {
@@ -45,13 +46,18 @@ function sameOrigin(a: string, b: string): boolean {
 }
 
 export function OnboardingFlow(props: Props) {
-  const { identity, initialProfile } = props;
+  const { identity, initialProfile, toast } = props;
   const identityId = identity?.orbitId || null;
   const [state, setState] = useState<OnboardingState>(() => readOnboardingState(identityId));
   const [step, setStep] = useState<'server' | 'profile'>(() => {
     try {
       const marker = localStorage.getItem(SERVER_MARKER_KEY);
-      return marker && sameOrigin(marker, API_BASE) ? 'profile' : 'server';
+      const chosenUrl = localStorage.getItem('gmatch.api.url');
+      if (!marker) return 'server';
+      if (!API_BASE || sameOrigin(marker, API_BASE) || (chosenUrl && sameOrigin(marker, chosenUrl))) {
+        return 'profile';
+      }
+      return 'server';
     } catch {
       return 'server';
     }
@@ -89,35 +95,14 @@ export function OnboardingFlow(props: Props) {
   };
 
   // Server step = native browser, full-bleed, no ID: join stamps the marker
-  // and relaunches (or in browser/dev mode transitions directly to profile).
+  // and smoothly transitions to profile.
   if (step === 'server') {
-    const isDev = Boolean(import.meta.env.DEV) ||
-      (typeof window !== 'undefined' &&
-        (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1'));
-
     return (
       <div className="fixed inset-0 z-[var(--z-lightbox)] overflow-y-auto bg-retro-bg font-sans animate-orbit-fade-in text-retro-fg flex flex-col">
-        {isDev && (
-          <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center justify-between text-xs text-amber-300 z-50 shrink-0">
-            <span>Dev mode: connected to central node (gmatch-wcz1.onrender.com)</span>
-            <button
-              type="button"
-              onClick={() => {
-                try {
-                  localStorage.setItem(SERVER_MARKER_KEY, API_BASE);
-                } catch { /* private mode */ }
-                setStep('profile');
-              }}
-              className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-bold cursor-pointer text-xs flex items-center gap-1"
-            >
-              Skip to Profile setup &rarr;
-            </button>
-          </div>
-        )}
         <div className="flex-1 min-h-0 overflow-y-auto">
           <ServersView
             identity={null}
-            toast={() => { /* toasts */ }}
+            toast={toast || (() => { /* toasts */ })}
             onServerJoined={() => setStep('profile')}
           />
         </div>

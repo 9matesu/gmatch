@@ -3404,6 +3404,7 @@ export default function Home() {
               ensureIdentity={() => createIdentity()}
               onOpenTos={() => { setLegalDoc('terms'); setShowTosModal(true) }}
               tagSuggestions={myPostTags}
+              toast={toast}
               onLogin={async (name, tags, customKey, pfpUrl) => {
                 if (!customKey) throw new Error('Missing secret key');
                 const res = loginWithExportedId(customKey);
@@ -4277,6 +4278,7 @@ export default function Home() {
                 initialProfile={{ displayName: myProfile.displayName, tags: myProfile.tags, pfpUrl: myProfile.pfpUrl }}
                 ensureIdentity={() => createIdentity()}
                 tagSuggestions={myPostTags}
+                toast={toast}
                 onLogin={async (name, tags, customKey, pfpUrl) => {
                   if (!customKey) throw new Error('Missing secret key');
                   const result = loginWithExportedId(customKey);
