@@ -53,5 +53,10 @@ test('capture landing screenshots', async ({ browser }) => {
   await page.waitForTimeout(2000)
   await shot(page, 'servers')
 
+  // 6. Watch party gallery
+  await page.goto('/#/watch')
+  await page.waitForTimeout(2000)
+  await shot(page, 'watch')
+
   await ctx.close()
 })

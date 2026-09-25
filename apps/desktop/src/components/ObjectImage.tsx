@@ -41,6 +41,10 @@ export interface ObjectImageProps {
   onMediaUnavailable?: () => void
   /** When true, hides the element cleanly on missing/failed media instead of placeholder box */
   hideUnavailable?: boolean
+  /** Invoked when media successfully finishes loading */
+  onLoad?: () => void
+  /** Invoked whenever loading state changes */
+  onLoadingChange?: (loading: boolean) => void
 }
 
 const OBJECT_PATH = '/api/objects/'
@@ -119,6 +123,8 @@ export function ObjectImage({
   onError,
   onMediaUnavailable,
   hideUnavailable = false,
+  onLoad,
+  onLoadingChange,
 }: ObjectImageProps) {
   const signed = needsSignedFetch(contentUrl, objectId)
   const effObjectId = extractObjectId(contentUrl, objectId)
@@ -195,8 +201,23 @@ export function ObjectImage({
   useEffect(() => {
     if ((signed && img.failed) || hasError) {
       onMediaUnavailable?.()
+      onLoadingChange?.(false)
     }
-  }, [signed, img.failed, hasError, onMediaUnavailable])
+  }, [signed, img.failed, hasError, onMediaUnavailable, onLoadingChange])
+
+  // Strict availability timeout (6 seconds): if media cannot be resolved or fails to load,
+  // treat as unavailable so broken/loading containers collapse to 0 space.
+  useEffect(() => {
+    if (!src && !hasError && !(signed && img.failed)) {
+      onLoadingChange?.(true)
+      const timer = setTimeout(() => {
+        setHasError(true)
+        onMediaUnavailable?.()
+        onLoadingChange?.(false)
+      }, 6000)
+      return () => clearTimeout(timer)
+    }
+  }, [src, hasError, signed, img.failed, onMediaUnavailable, onLoadingChange])
 
   if (!src) {
     if (hideUnavailable && (signed ? img.failed : hasError)) return null
@@ -252,9 +273,15 @@ export function ObjectImage({
           alwaysShowControls={alwaysShowControls}
           onExpand={onExpand}
           onDoubleTapLike={onDoubleTapLike}
+          onLoadedData={() => {
+            onLoad?.()
+            onLoadingChange?.(false)
+          }}
           onError={(_e) => {
             onError?.()
             setHasError(true)
+            onMediaUnavailable?.()
+            onLoadingChange?.(false)
           }}
         />
       )
@@ -271,9 +298,15 @@ export function ObjectImage({
       playsInline={playsInline}
       preload={preload}
       data-media-url={contentUrl || undefined}
+      onLoadedData={() => {
+        onLoad?.()
+        onLoadingChange?.(false)
+      }}
       onError={(_e) => {
         onError?.()
         setHasError(true)
+        onMediaUnavailable?.()
+        onLoadingChange?.(false)
       }}
     />
   )
@@ -288,9 +321,15 @@ export function ObjectImage({
       decoding="async"
       fetchPriority={fetchPriority}
       data-media-url={contentUrl || undefined}
+      onLoad={() => {
+        onLoad?.()
+        onLoadingChange?.(false)
+      }}
       onError={(_e) => {
         onError?.()
         setHasError(true)
+        onMediaUnavailable?.()
+        onLoadingChange?.(false)
       }}
       draggable={false}
     />

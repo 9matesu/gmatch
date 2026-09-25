@@ -55,6 +55,7 @@ export async function seedApp(
       // lastSeenAt must be load-time or the offline-earnings modal pops on
       // every journey (passive income accrues between seed and page load).
       save.lastSeenAt = Date.now()
+      localStorage.setItem('gmatch_last_seen_changelog', '1.5.1')
       // Onboarding: mark every step complete so the flow doesn't block.
       localStorage.setItem(
         `orbit_onboarding_v2:${id.orbitId}`,

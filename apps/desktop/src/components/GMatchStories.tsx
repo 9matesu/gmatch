@@ -75,6 +75,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
   const [openOrder, setOpenOrder] = useState<string[] | null>(null);
   const [activeStoryIndex, setActiveStoryIndex] = useState<number>(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [mediaLoading, setMediaLoading] = useState(true);
   // Avatar URLs that 404'd (e.g. deleted object refs) fall back to initials.
   const [pfpFailed, setPfpFailed] = useState<Record<string, boolean>>({});
   const [progress, setProgress] = useState(0); // 0 to 100
@@ -208,9 +209,15 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
     }
   };
 
-  // Story auto-advance timer (5 seconds)
+  // Reset loading state and progress on story change
   useEffect(() => {
-    if (openUserId === null || !currentStory || isPaused) return;
+    setMediaLoading(true);
+    setProgress(0);
+  }, [openUserId, activeStoryIndex]);
+
+  // Story auto-advance timer (5 seconds) - held while media is loading
+  useEffect(() => {
+    if (openUserId === null || !currentStory || isPaused || mediaLoading) return;
 
     markAsSeen(currentStory.id);
     setProgress(0);
@@ -232,7 +239,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
     }, INTERVAL_MS);
 
     return () => clearInterval(timer);
-  }, [openUserId, activeStoryIndex, isPaused, currentStory?.id]);
+  }, [openUserId, activeStoryIndex, isPaused, mediaLoading, currentStory?.id]);
 
   // Auto-open when a user id is targeted from outside the tray (avatar click,
   // profile, followers). Guards on the currently-open id so re-sorting caused by
@@ -501,6 +508,12 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
                 alt={currentStory.caption || "Story content"}
                 className="w-full h-full object-contain select-none"
                 videoClassName="w-full h-full object-contain"
+                onLoad={() => setMediaLoading(false)}
+                onLoadingChange={(loading) => setMediaLoading(loading)}
+                onMediaUnavailable={() => {
+                  setMediaLoading(false)
+                  goToNextStory()
+                }}
               />
 
               {/* Floating Animated Hearts */}

@@ -7,22 +7,18 @@ import { useCallback, useEffect, useState } from 'react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import {
   ArrowRight,
-  ArrowLeft,
   CheckCircle2,
   Dices,
   KeyRound,
 } from 'lucide-react';
-import { API_BASE } from '../utils/api';
-import { ServersView } from '../components/servers/ServersView';
 import {
-  SERVER_MARKER_KEY,
   type OnboardingState,
   isOnboardingComplete,
   readOnboardingState,
   writeOnboardingState,
 } from './onboardingState';
 import { saveUserProfile } from '../utils/profile';
-import { playPress, playWin } from '../utils/sounds';
+import { playWin, playPress } from '../utils/sounds';
 import { isDefaultPeerName } from '@orbit/shared';
 
 type Profile = { displayName: string; tags: string[]; pfpUrl?: string };
@@ -41,29 +37,12 @@ interface Props {
   toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 }
 
-function sameOrigin(a: string, b: string): boolean {
-  return a.replace(/\/+$/, '').toLowerCase() === b.replace(/\/+$/, '').toLowerCase();
-}
-
 export function OnboardingFlow(props: Props) {
-  const { identity, initialProfile, toast } = props;
+  const { identity, initialProfile } = props;
   const identityId = identity?.orbitId || null;
   const [state, setState] = useState<OnboardingState>(() => readOnboardingState(identityId));
-  const [step, setStep] = useState<'server' | 'profile'>(() => {
-    try {
-      const marker = localStorage.getItem(SERVER_MARKER_KEY);
-      const chosenUrl = localStorage.getItem('gmatch.api.url');
-      if (!marker) return 'server';
-      if (!API_BASE || sameOrigin(marker, API_BASE) || (chosenUrl && sameOrigin(marker, chosenUrl))) {
-        return 'profile';
-      }
-      return 'server';
-    } catch {
-      return 'server';
-    }
-  });
 
-  // Returning-user migration (kept from the old wall): a real display name or
+  // Returning-user migration: a real display name or
   // a completed anonymous run means login-onboarding is done.
   useEffect(() => {
     const nextState = readOnboardingState(identityId);
@@ -73,7 +52,7 @@ export function OnboardingFlow(props: Props) {
       nextState.completed.length === 0 &&
       (anonymous.completed.includes('ready') || !isDefaultPeerName(initialProfile.displayName))
     ) {
-      migrated = { version: 1, completed: ['server', 'profile', 'ready'], current: 'ready' };
+      migrated = { version: 1, completed: ['profile', 'ready'], current: 'ready' };
     }
     if (migrated !== nextState) {
       writeOnboardingState(identityId, migrated);
@@ -88,39 +67,17 @@ export function OnboardingFlow(props: Props) {
   if (isOnboardingComplete(state)) return null;
 
   const finish = () => {
-    const next: OnboardingState = { version: 1, completed: ['server', 'profile', 'ready'], current: 'ready' };
+    const next: OnboardingState = { version: 1, completed: ['profile', 'ready'], current: 'ready' };
     writeOnboardingState(identityId, next);
     setState(next);
     props.onComplete();
   };
-
-  // Server step = native browser, full-bleed, no ID: join stamps the marker
-  // and smoothly transitions to profile.
-  if (step === 'server') {
-    return (
-      <div className="fixed inset-0 z-[var(--z-lightbox)] overflow-y-auto bg-retro-bg font-sans animate-orbit-fade-in text-retro-fg flex flex-col">
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <ServersView
-            identity={null}
-            toast={toast || (() => { /* toasts */ })}
-            onServerJoined={() => setStep('profile')}
-          />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="fixed inset-0 z-[var(--z-lightbox)] overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg">
       <div className="w-full max-w-2xl bg-retro-bg border border-border-glass rounded-xl p-6 sm:p-8 shadow-2xl space-y-5 animate-orbit-slide-up">
         <ProfileStep
           {...props}
-          onBack={() => {
-            try {
-              localStorage.removeItem(SERVER_MARKER_KEY);
-            } catch { /* private mode */ }
-            setStep('server');
-          }}
           onDone={finish}
         />
       </div>
@@ -137,8 +94,8 @@ function generateRandomHandle(): string {
   return `${prefix}${suffix}_${num}`;
 }
 
-function ProfileStep(props: Props & { onBack: () => void; onDone: () => void }) {
-  const { identity, initialProfile, onLogin, onCreateAccount, onProfileUpdated, onBack, onDone } = props;
+function ProfileStep(props: Props & { onDone: () => void }) {
+  const { identity, initialProfile, onLogin, onCreateAccount, onProfileUpdated, onDone } = props;
   const [name, setName] = useState(() => {
     if (initialProfile.displayName && !isDefaultPeerName(initialProfile.displayName)) {
       return initialProfile.displayName;
@@ -181,13 +138,6 @@ function ProfileStep(props: Props & { onBack: () => void; onDone: () => void }) 
           <h1 className="text-xl font-semibold tracking-tight text-white">Set up your profile</h1>
           <p className="text-xs text-retro-muted">Only your name is required. Everything else you can add later.</p>
         </div>
-        <button
-          type="button"
-          onClick={() => { playPress(620); onBack(); }}
-          className="glass-action h-8 px-2.5 rounded-lg text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1 shrink-0"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" /> Change server
-        </button>
       </div>
 
       {isImporting ? (

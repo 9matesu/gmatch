@@ -42,6 +42,7 @@ export interface NativeVideoPlayerProps {
   onPlay?: () => void;
   onPause?: () => void;
   onError?: (e: React.SyntheticEvent<HTMLVideoElement, Event>) => void;
+  onLoadedData?: () => void;
   disableViewportGating?: boolean;
 }
 
@@ -84,6 +85,7 @@ export function NativeVideoPlayer({
   onPlay,
   onPause,
   onError,
+  onLoadedData,
   disableViewportGating = false,
 }: NativeVideoPlayerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -472,6 +474,7 @@ export function NativeVideoPlayer({
           setIsPlaying(true);
         }}
         onPause={() => setIsPlaying(false)}
+        onLoadedData={() => onLoadedData?.()}
         onError={(e) => {
           setHasError(true);
           setIsBuffering(false);

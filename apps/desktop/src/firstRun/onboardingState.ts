@@ -1,5 +1,4 @@
 export const ONBOARDING_STEPS = [
-  'server',
   'profile',
   'ready',
 ] as const;
@@ -23,7 +22,7 @@ export function onboardingStorageKey(identityId?: string | null) {
 }
 
 export function initialOnboardingState(): OnboardingState {
-  return { version: 1, current: 'server', completed: [] };
+  return { version: 1, current: 'profile', completed: [] };
 }
 
 export function readOnboardingState(identityId?: string | null): OnboardingState {
@@ -49,7 +48,7 @@ export function readOnboardingState(identityId?: string | null): OnboardingState
       ? (parsed.current as OnboardingStep)
       : isLegacyDone
       ? 'ready'
-      : 'server';
+      : 'profile';
 
     return { version: 1, current, completed: Array.from(new Set(completed)) };
   } catch {

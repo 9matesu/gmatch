@@ -6,7 +6,7 @@
 // 2. Open rooms with video miniature/thumbnail, title, media title, and member count badge.
 
 import { useEffect, useState } from 'react'
-import { Clapperboard, Plus, Users, Play, Film } from 'lucide-react'
+import { Plus, Users, Play, Film } from 'lucide-react'
 import { orbitFetch } from '../../utils/api'
 import { joinPartyById } from '../../hooks/watchPartyStore'
 import { useObjectImage } from '../../hooks/useObjectImage'
@@ -188,14 +188,6 @@ export function WatchPartyRoomList({
           </button>
         ))}
       </div>
-
-      {!loading && !failed && rooms.length === 0 && (
-        <div className="mt-8 p-8 rounded-xl border border-border-glass bg-surface-canvas/30 text-center max-w-md mx-auto space-y-2">
-          <Clapperboard className="w-8 h-8 text-retro-muted mx-auto" />
-          <p className="text-xs font-medium text-retro-fg">No watch rooms active right now</p>
-          <p className="text-[11px] text-retro-muted">Click the Create Room card to start the first party and stream videos with your friends.</p>
-        </div>
-      )}
 
       {failed && (
         <div className="mt-8 p-4 rounded-xl border border-red-500/20 bg-red-500/10 text-center max-w-md mx-auto text-xs text-red-400">

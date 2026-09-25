@@ -79,6 +79,7 @@ import { WallpaperBackground } from "./components/WallpaperBackground";
 import { ContextOverlay, ReportModal, type ContextMenuState } from "./components/ContextOverlay";
 import { isMediaVideo, resolveMediaUrl } from "./utils/media";
 import { GlobalModals } from "./components/GlobalModals";
+import { ChangelogModal, CURRENT_CHANGELOG_VERSION } from "./components/ChangelogModal";
 import { GalleryTabView } from "./components/views/GalleryTabView";
 import { CreateCardModal } from "./components/CreateCardModal";
 import { CardDetailView } from "./components/CardDetailView";
@@ -847,6 +848,27 @@ export default function Home() {
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [showPointsHelpModal, setShowPointsHelpModal] = useState(false);
   const [showFlashModal, setShowFlashModal] = useState(false);
+  const [showChangelogModal, setShowChangelogModal] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return localStorage.getItem('gmatch_last_seen_changelog') !== CURRENT_CHANGELOG_VERSION;
+    } catch {
+      return false;
+    }
+  });
+
+  const handleCloseChangelog = useCallback(() => {
+    setShowChangelogModal(false);
+    try {
+      localStorage.setItem('gmatch_last_seen_changelog', CURRENT_CHANGELOG_VERSION);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const onOpen = () => setShowChangelogModal(true);
+    window.addEventListener('gmatch-open-changelog', onOpen);
+    return () => window.removeEventListener('gmatch-open-changelog', onOpen);
+  }, []);
   const [,setAnnouncements] = useState<{ id: string; message: string; created_at: string; created_by_name: string | null }[]>([])
   const [showPasskeys,] = useState(false);
   const [identityModalMode, setIdentityModalMode] = useState<'export' | 'login' | 'logout' | null>(null);
@@ -4311,6 +4333,10 @@ export default function Home() {
                 identity={identity}
                 title={attachmentModal?.target === 'pm' ? 'Attach to Message' : 'Attach to Group Chat'}
                 recipientId={attachmentModal?.peerId}
+              />
+              <ChangelogModal
+                isOpen={showChangelogModal}
+                onClose={handleCloseChangelog}
               />
               {groupPickerOpen && chatGroups.length > 0 && (
                 <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">

@@ -5,7 +5,7 @@
 // this very .exe and relaunches). Dev/browser builds fall back to the old
 // release.json check that links straight to the download.
 import { useEffect, useState } from 'react';
-import { Download, RefreshCw, ShieldCheck, ShieldAlert, Rocket } from 'lucide-react';
+import { Download, RefreshCw, ShieldCheck, ShieldAlert, Rocket, Sparkles } from 'lucide-react';
 import { getApiBaseUrl } from '../../utils/api';
 import { isNewer } from '../../utils/version';
 import { playPress } from '../../utils/sounds';
@@ -25,7 +25,7 @@ export function UpdateSection({ toast }: {
 }) {
   const bridge = window.gmatch;
   const updater = Boolean(bridge?.updateCheck && bridge?.onUpdateStatus);
-  const [installed, setInstalled] = useState<string | null>(null);
+  const [installed, setInstalled] = useState<string | null>('1.5.1');
   const [status, setStatus] = useState<GmatchUpdateStatus | null>(null);
   const [checking, setChecking] = useState(false);
   const [installing, setInstalling] = useState(false);
@@ -43,14 +43,12 @@ export function UpdateSection({ toast }: {
     return bridge.onUpdateStatus(setStatus);
   }, [updater, bridge]);
 
-  if (!bridge?.appVersion) return null;
-
   const phase = status?.phase ?? 'idle';
   const busy = checking || phase === 'checking';
   const downloadPct = phase === 'downloading' ? Math.max(0, Math.min(100, status?.percent ?? 0)) : 0;
 
   const check = async () => {
-    if (busy || !bridge.updateCheck) return;
+    if (busy || !bridge?.updateCheck) return;
     setChecking(true);
     try {
       const s = await bridge.updateCheck();
@@ -68,7 +66,7 @@ export function UpdateSection({ toast }: {
     if (checking) return;
     setChecking(true);
     try {
-      const cur = await bridge.appVersion!();
+      const cur = bridge?.appVersion ? await bridge.appVersion() : (installed || '1.5.1');
       setInstalled(cur);
       const base = getApiBaseUrl() || (typeof window !== 'undefined' ? window.location.origin : 'https://gmatch-wcz1.onrender.com');
       const res = await fetch(`${base.replace(/\/+$/, '')}/release.json`, { cache: 'no-store' });
@@ -85,7 +83,7 @@ export function UpdateSection({ toast }: {
   };
 
   const install = async () => {
-    if (!bridge.updateInstall || installing) return;
+    if (!bridge?.updateInstall || installing) return;
     if (!window.confirm(`Install gMatch ${status?.version ?? ''} now? The app closes and reopens updated.`)) return;
     setInstalling(true);
     try {
@@ -100,7 +98,8 @@ export function UpdateSection({ toast }: {
 
   const openReleases = () => {
     playPress(820);
-    void bridge.openExternal?.(RELEASES_URL);
+    if (bridge?.openExternal) void bridge.openExternal(RELEASES_URL);
+    else if (typeof window !== 'undefined') window.open(RELEASES_URL, '_blank');
   };
 
   const hasUpdateFallback = Boolean(installed && latest && isNewer(latest.version, installed));
@@ -134,13 +133,15 @@ export function UpdateSection({ toast }: {
             >
               <Rocket className="w-3.5 h-3.5" /> {installing ? 'Restarting…' : `Install & Restart`}
             </button>
-          ) : !updater && hasUpdateFallback && bridge.openExternal && latest ? (
+          ) : !updater && hasUpdateFallback && latest ? (
             <button
               type="button"
               onClick={() => {
                 playPress(820);
                 const base = getApiBaseUrl() || (typeof window !== 'undefined' ? window.location.origin : 'https://gmatch-wcz1.onrender.com');
-                void bridge.openExternal!(new URL(`/releases/${latest.file}`, base).href);
+                const url = new URL(`/releases/${latest.file}`, base).href;
+                if (bridge?.openExternal) void bridge.openExternal(url);
+                else if (typeof window !== 'undefined') window.open(url, '_blank');
               }}
               className="px-3 py-1.5 rounded-lg bg-retro-accent text-black text-xs font-bold cursor-pointer flex items-center gap-1.5"
             >
@@ -154,6 +155,16 @@ export function UpdateSection({ toast }: {
             className="px-3 py-1.5 rounded-lg border border-border-glass text-xs text-retro-muted hover:text-retro-fg disabled:opacity-40 cursor-pointer flex items-center gap-1.5"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${busy ? 'animate-spin' : ''}`} /> {busy ? 'Checking…' : 'Check for updates'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              playPress(700);
+              window.dispatchEvent(new CustomEvent('gmatch-open-changelog'));
+            }}
+            className="px-3 py-1.5 rounded-lg border border-border-glass text-xs text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1.5"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-retro-accent" /> What&apos;s New
           </button>
         </div>
       </div>

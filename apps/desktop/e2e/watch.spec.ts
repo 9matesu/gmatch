@@ -2,10 +2,10 @@ import { test, expect } from '@playwright/test'
 import { seedApp } from './helpers'
 
 test.describe('Watch tab — browse view clickability', () => {
-  test('START A PARTY opens the Watch Party modal', async ({ page }) => {
+  test('Create Room card opens the Watch Party modal', async ({ page }) => {
     await seedApp(page)
     await page.goto('/#/watch')
-    const btn = page.getByRole('button', { name: /START A PARTY/i })
+    const btn = page.getByLabel('Create a new room')
     // Cold start (vite + bun sidecar) can take >5s before the tab hydrates.
     await expect(btn).toBeVisible({ timeout: 15_000 })
 
@@ -19,7 +19,7 @@ test.describe('Watch tab — browse view clickability', () => {
       },
       [box!.x + box!.width / 2, box!.y + box!.height / 2],
     )
-    expect(topText.toUpperCase()).toContain('START A PARTY')
+    expect(topText).toContain('Create Room')
 
     await btn.click()
     // Modal.tsx renders an <h3> title; WatchPartyUrlModal passes 'Watch Party'.
@@ -27,13 +27,11 @@ test.describe('Watch tab — browse view clickability', () => {
     await expect(page.getByRole('textbox', { name: 'Video URL' })).toBeVisible()
   })
 
-  test('Join button with a bad room code shows the inline error', async ({ page }) => {
+  test('Gallery displays Create Room card in grid', async ({ page }) => {
     await seedApp(page)
     await page.goto('/#/watch')
-    const input = page.getByRole('textbox', { name: 'Join by room code' })
-    await expect(input).toBeVisible()
-    await input.fill('00000000')
-    await page.getByRole('button', { name: /^Join$/ }).click()
-    await expect(page.getByText(/No room with that code/i)).toBeVisible()
+    const createCard = page.getByLabel('Create a new room')
+    await expect(createCard).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('Start a new watch party')).toBeVisible()
   })
-})
+})

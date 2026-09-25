@@ -165,6 +165,14 @@ export function GMatchDMs({
   const [searchQuery, setSearchQuery] = useState('');
   const [pendingAttachment, setPendingAttachment] = useState<{ id: string; url: string; isVideo: boolean } | null>(null);
   const messageStreamRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+    }
+  }, [inputText]);
   const [readPeerIds, setReadPeerIds] = useState<Set<string>>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -959,16 +967,16 @@ export function GMatchDMs({
                           const isLast = msg.id === block[block.length - 1].id;
                           const showActions = actionFor === msg.id;
                           return (
-                            <div key={msg.id} className="w-full">
+                            <div key={msg.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-full`}>
                               {replyTarget && (
-                                <div className="text-[10px] text-retro-muted px-2.5 py-1 mb-0.5 bg-glass-w5 rounded-md border-l-2 border-retro-accent/50 truncate max-w-full">
+                                <div className="text-[10px] text-retro-muted px-2.5 py-1 mb-0.5 bg-glass-w5 rounded-md border-l-2 border-retro-accent/50 truncate max-w-full w-fit">
                                   <CornerUpLeft className="w-3 h-3 inline mr-1" />
                                   {replyTarget.senderId === identity?.orbitId ? 'You' : displayNameFor(replyTarget.senderId)}: {replyTarget.text}
                                 </div>
                               )}
                               <div
                                 onClick={() => setActionFor(showActions ? null : msg.id)}
-                                className={`px-3 py-2 rounded-lg text-xs leading-relaxed select-text cursor-pointer break-words whitespace-pre-wrap ${block.length > 1 ? 'mt-0.5' : ''} ${
+                                className={`w-fit max-w-full px-3 py-2 rounded-lg text-xs leading-relaxed select-text cursor-pointer break-words whitespace-pre-wrap ${block.length > 1 ? 'mt-0.5' : ''} ${
                                   isOwn ? 'bg-retro-accent/25 border border-retro-accent/30 text-retro-fg rounded-br-sm backdrop-blur-sm' : 'bg-glass-w10 border border-border-glass text-retro-body rounded-bl-sm backdrop-blur-sm'
                                 }`}
                               >
@@ -1136,8 +1144,9 @@ export function GMatchDMs({
                 </button>
               ) : null}
               <div className="flex-1 flex items-center gap-2 bg-glass-w10 border border-border-glass rounded-md px-3 py-2 text-xs focus-within:border-retro-accent/50 transition-colors">
-                <input
-                  type="text"
+                <textarea
+                  ref={textareaRef}
+                  rows={1}
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={(e) => {
@@ -1150,7 +1159,7 @@ export function GMatchDMs({
                     }
                   }}
                   placeholder={openTarget === 'room' ? `Message ${activeRoom?.name || 'room'} (sealed)…` : openTarget === 'group' ? 'Message group...' : isLobbyGroup ? 'Message Lobby Lounge...' : isQueueGroup ? 'Message Card Queue...' : activePmPeer ? `Message ${displayNameFor(activePmPeer.orbitId, activePmPeer.name)}...` : 'Message...'}
-                  className="w-full bg-transparent focus:outline-none placeholder:text-retro-muted text-retro-fg border-none"
+                  className="w-full bg-transparent focus:outline-none placeholder:text-retro-muted text-retro-fg border-none resize-none max-h-32 py-0.5 leading-normal text-xs styled-scrollbar"
                 />
               </div>
               <button

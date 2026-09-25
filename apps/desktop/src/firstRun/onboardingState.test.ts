@@ -26,25 +26,23 @@ describe('onboarding state', () => {
 
   it('advances deterministically through the required steps', () => {
     let state = initialOnboardingState();
-    expect(nextIncompleteStep(state)).toBe('server');
-    state = completeStep(state, 'server');
-    expect(state.current).toBe('profile');
+    expect(nextIncompleteStep(state)).toBe('profile');
     state = completeStep(state, 'profile');
     expect(state.current).toBe('ready');
   });
 
   it('persists progress per identity and resumes it', () => {
-    const state = completeStep(completeStep(initialOnboardingState(), 'server'), 'profile');
+    const state = completeStep(initialOnboardingState(), 'profile');
     writeOnboardingState('orbit-a', state);
     writeOnboardingState('orbit-b', initialOnboardingState());
 
     expect(readOnboardingState('orbit-a')).toEqual(state);
-    expect(readOnboardingState('orbit-b').current).toBe('server');
-    expect(localStorage.getItem(onboardingStorageKey('orbit-a'))).toContain('profile');
+    expect(readOnboardingState('orbit-b').current).toBe('profile');
+    expect(localStorage.getItem(onboardingStorageKey('orbit-a'))).toContain('ready');
   });
 
   it('marks the guide complete only after the ready step', () => {
-    const welcomeDone: OnboardingState = { ...initialOnboardingState(), current: 'ready', completed: ['server', 'profile'] };
+    const welcomeDone: OnboardingState = { ...initialOnboardingState(), current: 'ready', completed: ['profile'] };
     const complete = completeStep(welcomeDone, 'ready');
     expect(complete.completed).toContain('ready');
     expect(nextIncompleteStep(complete)).toBeNull();
@@ -55,7 +53,7 @@ describe('onboarding state', () => {
   it('keeps completion persisted for the same identity', () => {
     const complete = completeStep({
       ...initialOnboardingState(),
-      completed: ['server'],
+      completed: ['profile'],
       current: 'ready',
     }, 'ready');
 

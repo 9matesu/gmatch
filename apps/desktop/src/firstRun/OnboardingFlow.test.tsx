@@ -29,8 +29,7 @@ describe('OnboardingFlow', () => {
     }) as unknown as typeof fetch;
   });
 
-  it('renders initial server browser without amber dev banner and connects cleanly to profile step', async () => {
-    const toast = vi.fn();
+  it('mounts directly at profile step without initial server browser and creates account', async () => {
     const onCreateAccount = vi.fn().mockResolvedValue(undefined);
     const onLogin = vi.fn().mockResolvedValue(undefined);
     const onComplete = vi.fn();
@@ -45,33 +44,23 @@ describe('OnboardingFlow', () => {
         onComplete={onComplete}
         onOpenTos={() => {}}
         ensureIdentity={() => null}
-        toast={toast}
       />
     );
 
-    // Initial server browser step
-    expect(screen.queryByText(/dev mode: connected to central node/i)).not.toBeInTheDocument();
-    expect(await screen.findByText('gMatch Central (p2p)')).toBeInTheDocument();
-    expect(screen.getByText('gMatch Central (deprecated)')).toBeInTheDocument();
+    // Mounts straight to profile setup without server browser
+    expect(screen.getByText('Set up your profile')).toBeInTheDocument();
+    expect(screen.queryByText('gMatch Central (p2p)')).not.toBeInTheDocument();
 
-    // Deprecated server has a Connect button
-    const deprecatedRow = screen.getAllByRole('listitem').find((el) => el.textContent?.includes('gMatch Central (deprecated)'))!;
-    const connectBtn = within(deprecatedRow).getByRole('button', { name: /^connect$/i });
-    expect(connectBtn).toBeInTheDocument();
+    const nameInput = screen.getByRole('textbox', { name: /display name/i });
+    fireEvent.change(nameInput, { target: { value: 'DirectP2PUser' } });
 
-    // Click Connect on the server
-    fireEvent.click(connectBtn);
+    const enterBtn = screen.getByRole('button', { name: /enter/i });
+    fireEvent.click(enterBtn);
 
-    // Toast triggered and seamlessly switches to Profile setup
-    expect(toast).toHaveBeenCalledWith('Connected to gMatch Central (deprecated).', 'success');
-    expect(localStorage.getItem(SERVER_MARKER_KEY)).toBe('https://gmatch.fly.dev');
-    expect(await screen.findByText('Set up your profile')).toBeInTheDocument();
-
-    // Can change server to go back
-    const changeServerBtn = screen.getByRole('button', { name: /change server/i });
-    fireEvent.click(changeServerBtn);
-    expect(localStorage.getItem(SERVER_MARKER_KEY)).toBeNull();
-    expect(await screen.findByText('gMatch Central (p2p)')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(onCreateAccount).toHaveBeenCalledWith('DirectP2PUser', '', undefined);
+      expect(onComplete).toHaveBeenCalled();
+    });
   });
 
   it('mounts directly at profile step when server marker is already set and creates account', async () => {

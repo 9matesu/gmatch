@@ -6,6 +6,7 @@
 <title>gmatch, adult P2P network with end-to-end encryption</title>
 <meta name="description" content="A single-file Windows app: an adult social network + card arcade between consenting adults. Everything is encrypted between you and the recipient, and the server reads nothing. Download it, verify the SHA-256, run it.">
 <style>
+*, *::before, *::after { box-sizing: border-box; }
 :root { color-scheme: dark; }
 html { background: #09090b; scroll-behavior: smooth; }
 body {
@@ -13,8 +14,8 @@ body {
   padding: 56px 32px 96px;
   background: #09090b;
   color: #d4d4d8;
-  font: 13px/1.7 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  letter-spacing: -0.08em;
+  font: 14px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  letter-spacing: -0.01em;
   text-align: left;
   -webkit-font-smoothing: antialiased;
 }
@@ -22,26 +23,26 @@ body {
   display: flex;
   gap: 48px;
   align-items: flex-start;
-  max-width: 960px;
+  max-width: 1040px;
   margin: 0 auto;
 }
 aside.sidebar {
   position: sticky;
   top: 40px;
-  flex: 0 0 168px;
+  flex: 0 0 180px;
   font-size: 12px;
   line-height: 2;
   border-left: 1px solid #1f1f23;
   padding-left: 16px;
 }
-aside.sidebar .group { color: #52525b; text-transform: uppercase; letter-spacing: 0.08em; font-size: 10px; margin: 18px 0 2px; }
+aside.sidebar .group { color: #71717a; text-transform: uppercase; letter-spacing: 0.08em; font-size: 10px; margin: 18px 0 2px; font-weight: 600; }
 aside.sidebar .group:first-child { margin-top: 0; }
-aside.sidebar a { color: #71717a; text-decoration: none; display: block; }
+aside.sidebar a { color: #a1a1aa; text-decoration: none; display: block; }
 aside.sidebar a:hover { color: #fafafa; }
-.content { flex: 1 1 auto; min-width: 0; max-width: 560px; }
+.content { flex: 1 1 auto; min-width: 0; max-width: 720px; }
 h1, h2, h3, strong { color: #fafafa; font-weight: 600; }
-h1 { font-size: 21px; line-height: 1.25; margin: 0 0 16px; }
-h2 { font-size: 14px; margin: 56px 0 14px; scroll-margin-top: 24px; }
+h1 { font-size: 22px; line-height: 1.25; margin: 0 0 16px; }
+h2 { font-size: 15px; margin: 56px 0 14px; scroll-margin-top: 24px; }
 h3 { font-size: 13px; margin: 30px 0 10px; }
 p { margin: 0 0 14px; }
 em { color: #71717a; }
@@ -53,7 +54,7 @@ a {
 }
 a:hover { color: #fff; text-decoration-color: #fff; }
 nav.topnav { margin: 20px 0 0; line-height: 2; }
-nav.topnav a { color: #71717a; text-decoration: none; }
+nav.topnav a { color: #a1a1aa; text-decoration: none; }
 nav.topnav a:hover { color: #fafafa; text-decoration: underline; text-underline-offset: 3px; }
 ul { margin: 0 0 16px; padding-left: 20px; }
 li { margin: 7px 0; }
@@ -70,10 +71,11 @@ code {
   color: #e4e4e7;
 }
 pre {
+  box-sizing: border-box;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
-  letter-spacing: normal;
-  line-height: 1.65;
+  letter-spacing: 0.02em;
+  line-height: 1.6;
   background: #121215;
   border: 1px solid #27272a;
   border-radius: 6px;
@@ -82,6 +84,9 @@ pre {
   color: #fafafa;
   overflow-wrap: anywhere;
   word-break: break-all;
+  white-space: pre-wrap;
+  width: 100%;
+  max-width: 100%;
 }
 img {
   display: block;
@@ -115,6 +120,7 @@ footer {
 <a href="#updates">Updates</a>
 <div class="group">Product</div>
 <a href="#what-it-is">What it is</a>
+<a href="#watchparty">Watch Party</a>
 <a href="#looks-like">Screenshots</a>
 <a href="#faq">FAQ</a>
 <div class="group">Docs</div>
@@ -139,6 +145,7 @@ footer {
 <a href="#download">Download</a> ·
 <a href="#verify">Verify the file</a> ·
 <a href="#what-it-is">What it is</a> ·
+<a href="#watchparty">Watch Party</a> ·
 <a href="#looks-like">What it looks like</a> ·
 <a href="#security">Security</a> ·
 <a href="#crypto">Cryptography</a> ·
@@ -154,8 +161,8 @@ footer {
 <main>
 <section id="download">
 <h2>Download (Windows x64, single file)</h2>
-<p>Version <strong id="version">1.5.0</strong> · file <code>gMatch-1.5.0-portable.exe</code> · 110,035,676 bytes (104.9 MiB) · built <span id="build-date">2026-09-24T23:15:02.752Z</span> (UTC).</p>
-<p><a href="releases/gMatch-1.5.0-portable.exe" download>gMatch-1.5.0-portable.exe</a></p>
+<p>Version <strong id="version">1.5.1</strong> · file <code>gMatch-1.5.1-portable.exe</code> · 110,035,676 bytes (104.9 MiB) · built <span id="build-date">2026-09-25T13:00:00.000Z</span> (UTC).</p>
+<p><a href="releases/gMatch-1.5.1-portable.exe" download>gMatch-1.5.1-portable.exe</a></p>
 <p>Expected <strong>SHA-256</strong>. Copy the value below and check it against the next section before running anything:</p>
 <pre id="sha256">4e0d2670b8ed57aec7323a17bc489efbed0587c80b44aafcdcf75101311e5c17</pre>
 <p>Expected <strong>SHA-512</strong>, for extra paranoia (the file is 110 MB):</p>
@@ -175,7 +182,7 @@ footer {
 <section id="verify">
 <h2>Verify the hash on Windows (20 seconds, nothing to install)</h2>
 <p>Open the Start menu, type <code>PowerShell</code>, and run (adjust the path if you saved elsewhere):</p>
-<pre>Get-FileHash "$env:USERPROFILE\Downloads\gMatch-1.5.0-portable.exe" -Algorithm SHA256</pre>
+<pre>Get-FileHash "$env:USERPROFILE\Downloads\gMatch-1.5.1-portable.exe" -Algorithm SHA256</pre>
 <p>Compare the <code>Hash</code> value with the one published above. If it differs by even ONE character, do NOT run the file: delete it and report it through the abuse page linked under Terms below.</p>
 <p>Same idea, any algorithm you prefer: <code>Get-FileHash ... -Algorithm SHA512</code> must match the SHA-512 block above.</p>
 </section>
@@ -197,9 +204,22 @@ footer {
 <p>There is no sign-up, no e-mail, no phone. Your "account" is a pair of cryptographic keys generated on your own computer. Nobody can reset your password because there is no password to reset. That's on purpose, and the app makes you back your key up to a file so you can restore it later.</p>
 </section>
 
+<section id="watchparty">
+<h2>Watch Party: Synced Theater &amp; Background Playback</h2>
+<p>gmatch features a synchronized Watch Party cinema designed for streaming media among consenting friends over peer-to-peer or authenticated relays:</p>
+<ul>
+<li><strong>16:9 Cinema Gallery:</strong> Discover active and persistent rooms with video miniatures, room status pills, and live member counters (up to 8 peers).</li>
+<li><strong>Persistent Rooms:</strong> Watch rooms remain active in the room directory even when all members leave (0/8 members), allowing friends to reconvene without re-creating rooms.</li>
+<li><strong>Unthrottled Background Playback:</strong> Tuned for screen-sharing via Discord, Google Meet, or Microsoft Teams. Background renderer throttling and window occlusion checks are disabled so video playback never freezes or renders black frames when alt-tabbed.</li>
+<li><strong>Direct P2P &amp; Adaptive Chat:</strong> Watch rooms feature ephemeral low-latency chat with self-sizing message bubbles and auto-expanding input fields.</li>
+</ul>
+</section>
+
 <section id="looks-like">
 <h2>What it looks like</h2>
 <p>Real screenshots from the current build. One honest note first: the image tiles inside the feed and arena are <strong>synthetic 1×1 placeholders our automated tests use</strong>, not adult content. This is a public page, and we keep our moderation promises here too. On your machine the feed shows what your own tags pull, and it stays between you and whoever you share it with.</p>
+<p><img src="img/watch.png" alt="gmatch Watch Party theater with 16:9 cinema cards, live miniatures, and persistent rooms"></p>
+<p><em>The Watch Party Theater. Browse 16:9 cinema rooms with live video miniatures and member indicators. Rooms remain persistent and unthrottled during background playback and screen-sharing.</em></p>
 <p><img src="img/idle-grid.png" alt="gmatch idle-clicker arena: sidebar navigation, foe stage, balance and upgrade column"></p>
 <p><em>The Idle Clicker arena. Sidebar on the left, stage in the middle, your wallet and upgrades on the right. Everything you see runs locally.</em></p>
 <p><img src="img/games-hub.png" alt="gmatch games hub with sub-tabs: Play Cards, Gallery and Cards, Idle Clicker, Store, Babecock, Rankings"></p>

@@ -240,9 +240,10 @@ export function useObjectImage(
         const res = await orbitFetch(`/api/objects/${cleanId}`, { method: 'GET' }, identity)
         if (cancelled) return
         if (!res.ok) {
-          if (res.status === 502 || res.status === 503 || res.status === 504) return
           const failedState: ImageState = { cardId: cleanId, url: '', failed: true, isVideo: false, isLink: false, linkUrl: null }
-          cacheSet(cleanId, identity?.orbitId || '', failedState)
+          if (res.status !== 502 && res.status !== 503 && res.status !== 504) {
+            cacheSet(cleanId, identity?.orbitId || '', failedState)
+          }
           setImg(failedState)
           if (res.status === 404 && typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('orbit-object-404', { detail: { cardId: cleanId } }))
@@ -278,16 +279,14 @@ export function useObjectImage(
               setImg(loaded)
               return
             }
-            // Ask the swarm by object id, then by content_hash alias — a
-            // restarted seeder may only hold the hash-keyed copy. 30s each:
-            // chunked WS-relay retransmit of multi-MB photos needs headroom.
+            // Ask the swarm by object id, then by content_hash alias — 5s timeout
             let blob: Blob | null = null
             try {
-              blob = await requestSwarmObject(cleanId, 30000)
+              blob = await requestSwarmObject(cleanId, 5000)
             } catch {
               if (hash) {
                 try {
-                  blob = await requestSwarmObject(hash, 30000)
+                  blob = await requestSwarmObject(hash, 5000)
                 } catch {
                   blob = null
                 }

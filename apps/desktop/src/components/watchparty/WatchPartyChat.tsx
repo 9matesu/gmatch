@@ -18,6 +18,14 @@ export function WatchPartyChat({ party, profilePics, myId, isHost }: {
 }) {
   const [text, setText] = useState('')
   const listRef = useRef<HTMLDivElement | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 96)}px`
+    }
+  }, [text])
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight })
@@ -64,14 +72,21 @@ export function WatchPartyChat({ party, profilePics, myId, isHost }: {
       </div>
       {party && (
         <div className="p-2 border-t border-border-glass">
-          <input
+          <textarea
+            ref={textareaRef}
+            rows={1}
             value={text}
             aria-label="Party chat message"
             placeholder="Message"
             maxLength={80}
             onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') send() }}
-            className="glass-inset w-full px-2.5 py-1.5 text-xs"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                send()
+              }
+            }}
+            className="glass-inset w-full px-2.5 py-1.5 text-xs resize-none max-h-24 styled-scrollbar leading-normal"
           />
           {text.length >= 60 && <p className={`pt-1 text-right ${MUTED}`}>{text.length}/80</p>}
         </div>
