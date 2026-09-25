@@ -78,6 +78,16 @@ interface LegacyPostSummary {
   }>
 }
 
+function getLegacyFlyOrigin(): string {
+  const isDev = Boolean(import.meta.env.DEV) ||
+    (typeof window !== 'undefined' &&
+      (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1'))
+  if (isDev && typeof window !== 'undefined' && !(window as unknown as { gmatch?: unknown }).gmatch) {
+    return '/fly-api'
+  }
+  return LEGACY_FLY_ORIGIN
+}
+
 /**
  * Executes a signed GET request against gmatch.fly.dev
  */
@@ -87,7 +97,8 @@ async function legacyGet(
   fetchImpl: typeof globalThis.fetch = globalThis.fetch,
   timeoutMs = 10000,
 ): Promise<Response> {
-  const url = `${LEGACY_FLY_ORIGIN}${pathnameWithQuery}`
+  const baseOrigin = getLegacyFlyOrigin()
+  const url = `${baseOrigin}${pathnameWithQuery}`
   const pathname = pathnameWithQuery.split('?')[0]
   const headers = signRequestHeaders('GET', pathname, '', identity)
   const controller = new AbortController()
@@ -113,18 +124,26 @@ async function downloadMediaBytes(
   fetchImpl: typeof globalThis.fetch = globalThis.fetch,
 ): Promise<ArrayBuffer | null> {
   try {
+    const baseOrigin = getLegacyFlyOrigin()
     let fullUrl = mediaUrl
     if (mediaUrl.startsWith('/')) {
-      fullUrl = `${LEGACY_FLY_ORIGIN}${mediaUrl}`
+      fullUrl = `${baseOrigin}${mediaUrl}`
     } else if (!/^https?:\/\//i.test(mediaUrl)) {
-      fullUrl = `${LEGACY_FLY_ORIGIN}/api/objects/${mediaUrl}`
+      fullUrl = `${baseOrigin}/api/objects/${mediaUrl}`
+    } else if (mediaUrl.startsWith(LEGACY_FLY_ORIGIN) && baseOrigin !== LEGACY_FLY_ORIGIN) {
+      fullUrl = mediaUrl.replace(LEGACY_FLY_ORIGIN, baseOrigin)
     }
 
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 20000)
     try {
-      const headers = fullUrl.startsWith(LEGACY_FLY_ORIGIN)
-        ? signRequestHeaders('GET', new URL(fullUrl).pathname, '', identity)
+      const isFly = fullUrl.startsWith(LEGACY_FLY_ORIGIN) || fullUrl.startsWith('/fly-api')
+      let reqPath = fullUrl
+      try {
+        reqPath = new URL(fullUrl, 'http://localhost').pathname.replace(/^\/fly-api/, '')
+      } catch { /* ignore */ }
+      const headers = isFly
+        ? signRequestHeaders('GET', reqPath, '', identity)
         : new Headers()
       const res = await fetchImpl(fullUrl, { headers, signal: controller.signal })
       if (!res.ok) return null

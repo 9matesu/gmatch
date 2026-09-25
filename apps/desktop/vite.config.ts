@@ -93,6 +93,27 @@ function devPxPlugin(): Plugin {
   }
 }
 
+function devCorsPlugin(): Plugin {
+  return {
+    name: 'gmatch-dev-cors',
+    configureServer(server) {
+      server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
+        if (req.url?.startsWith('/fly-api') || req.url?.startsWith('/api')) {
+          res.setHeader('Access-Control-Allow-Origin', '*')
+          res.setHeader('Access-Control-Allow-Headers', '*')
+          res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH')
+          if (req.method === 'OPTIONS') {
+            res.statusCode = 204
+            res.end()
+            return
+          }
+        }
+        next()
+      })
+    },
+  }
+}
+
 function booruOrgProxy(target: string, prefix: string): ProxyOptions {
   return {
     target,
@@ -112,7 +133,7 @@ function booruOrgProxy(target: string, prefix: string): ProxyOptions {
 // base './' so Electron can load dist/index.html over file://
 export default defineConfig({
   base: './',
-  plugins: [react(), tailwindcss(), devPxPlugin()],
+  plugins: [react(), tailwindcss(), devPxPlugin(), devCorsPlugin()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -174,7 +195,7 @@ export default defineConfig({
         target: 'https://gmatch.fly.dev',
         changeOrigin: true,
         secure: true,
-        rewrite: (p) => p.replace(/^\/fly-api/, '/api'),
+        rewrite: (p) => p.replace(/^\/fly-api/, ''),
         configure: (proxy) => {
           proxy.on('proxyRes', (proxyRes) => {
             proxyRes.headers['access-control-allow-origin'] = '*'

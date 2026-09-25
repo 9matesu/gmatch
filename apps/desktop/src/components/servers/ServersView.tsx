@@ -283,7 +283,7 @@ export function ServersView({
         const probeRes = await window.gmatch.serverProbe(`${FLY_LEGACY_URL}/api/health`).catch(() => null)
         isOnline = Boolean(probeRes?.ok)
       } else if (isDev) {
-        const res = await fetch('/fly-api/health', {
+        const res = await fetch('/fly-api/api/health', {
           signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
         }).catch(() => null)
         isOnline = Boolean(res?.ok)
