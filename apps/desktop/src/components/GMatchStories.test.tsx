@@ -114,3 +114,17 @@ describe('GMatchStories author view count (T-W3c)', () => {
     expect(screen.queryByText('3 views')).toBeNull()
   })
 });
+
+describe('GMatchStories loading state', () => {
+  it('hides user story bubbles while loading is true, keeping only Your story', () => {
+    render(
+      <ToastProvider>
+        <GMatchStories stories={[story()]} loading={true} currentUserId="me" profilePics={{}} />
+      </ToastProvider>,
+    )
+    expect(screen.getByText('Your story')).toBeInTheDocument()
+    expect(screen.queryByAltText('Story Gal')).toBeNull()
+    expect(screen.queryByText('No active stories yet.')).toBeNull()
+  })
+});
+

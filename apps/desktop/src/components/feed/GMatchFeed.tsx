@@ -26,6 +26,7 @@ import {
   Zap,
   RefreshCw,
   X,
+  Loader2,
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject as StoryItem } from '@orbit/shared';
@@ -655,6 +656,14 @@ export function GMatchFeed({
           </div>
         }
       />
+
+      {/* Discreet grey loading label when stories/content are loading */}
+      {storiesLoading && (
+        <div className="w-full py-1.5 px-3 flex items-center justify-center gap-1.5 text-[10px] font-mono text-retro-muted border-b border-border-glass bg-glass-w4 select-none">
+          <Loader2 className="w-3 h-3 animate-spin text-retro-muted shrink-0" />
+          <span>Loading content...</span>
+        </div>
+      )}
 
       {/* Stories Tray Carousel — below the header */}
       <div className="bg-transparent border-b border-border-glass py-3 px-1">

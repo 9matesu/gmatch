@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { isMediaVideo, resolveMediaUrl } from '../utils/media'
 import { useObjectImage } from '../hooks/useObjectImage'
 import { NativeVideoPlayer } from './media/NativeVideoPlayer'
@@ -202,8 +203,23 @@ export function ObjectImage({
     const waiting = signed && !img.failed
     const seeding = signed && img.awaitingSeeder
     return (
-      <div ref={placeholderRef} className={className || 'w-full aspect-[4/3] bg-retro-bg flex items-center justify-center text-[10px] text-retro-muted'}>
-        {waiting && !seeding ? <span className="inline-block h-4 w-4 rounded-full border-2 border-retro-muted/30 border-t-retro-muted animate-spin" aria-label="Loading media" /> : seeding ? 'Waiting for poster…' : 'No preview'}
+      <div
+        ref={placeholderRef}
+        className="w-full py-3.5 px-3 flex items-center justify-center gap-1.5 text-[10px] font-mono text-retro-muted bg-surface-canvas/40"
+      >
+        {waiting && !seeding ? (
+          <>
+            <Loader2 className="w-3 h-3 animate-spin text-retro-muted shrink-0" aria-label="Loading media" />
+            <span>Loading media...</span>
+          </>
+        ) : seeding ? (
+          <>
+            <Loader2 className="w-3 h-3 animate-spin text-retro-muted shrink-0" />
+            <span>Waiting for poster…</span>
+          </>
+        ) : (
+          <span>No preview</span>
+        )}
       </div>
     )
   }
@@ -213,8 +229,11 @@ export function ObjectImage({
   if (hasError) {
     if (hideUnavailable) return null
     return (
-      <div ref={placeholderRef} className={className || 'w-full aspect-[4/3] bg-retro-bg flex items-center justify-center text-[10px] text-retro-muted'}>
-        Image unavailable
+      <div
+        ref={placeholderRef}
+        className="w-full py-3.5 px-3 flex items-center justify-center gap-1.5 text-[10px] font-mono text-retro-muted bg-surface-canvas/40"
+      >
+        <span>Image unavailable</span>
       </div>
     )
   }

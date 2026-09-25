@@ -132,6 +132,11 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
     return arr;
   }, [stories, seenStoryIds, profilePics]);
 
+  const visibleGroupedUsers = useMemo(() => {
+    if (loading) return [];
+    return groupedUsers;
+  }, [loading, groupedUsers]);
+
   const activeGroup = openUserId
     ? groupedUsers.find((g) => g.userId === openUserId) || null
     : null;
@@ -337,7 +342,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
         </div>
 
         {/* Grouped User Story Circles */}
-        {groupedUsers.map((group) => (
+        {visibleGroupedUsers.map((group) => (
           <div
             key={group.userId}
             className="flex flex-col items-center gap-1 shrink-0 group cursor-pointer"
@@ -376,7 +381,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
             </span>
           </div>
         ))}
-        {groupedUsers.length === 0 && !loading && (
+        {visibleGroupedUsers.length === 0 && !loading && (
           <div className="text-xs text-retro-muted py-2 italic px-2">
             No active stories yet.
           </div>
