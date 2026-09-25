@@ -64,4 +64,13 @@ describe('CreatePostModal URL uploads', () => {
     await userEvent.click(screen.getByRole('button', { name: /^add$/i }));
     expect(toast).toHaveBeenCalledWith(expect.stringMatching(/https/), 'warning');
   });
+  it('renders story mode with Create Story title and Share Story button', () => {
+    render(<CreatePostModal mode="story" identity={identity} onClose={() => {}} toast={vi.fn()} />);
+    expect(screen.getByText(/Create Story/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Share Story/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /upload \/ files/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /camera/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /paste url/i })).toBeInTheDocument();
+  });
 });
+

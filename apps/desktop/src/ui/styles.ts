@@ -18,7 +18,7 @@ export const MUTED = 'text-xs text-retro-muted'
 export const DISPLAY = 'font-sans'
 
 /** Panel surface — flat cyber-slate card on the hairline border token. */
-export const PLATE = 'rounded-lg border border-border-glass bg-glass-w5'
+export const PLATE = 'rounded-lg border border-border-glass bg-glass-w5 backdrop-blur-md'
 
 /** Scrollable panel body. */
 export const PANEL = 'min-h-0 overflow-y-auto p-3.5 sm:p-4'
@@ -43,7 +43,7 @@ export const SKIN =
 
 /** Feed stage frame: canvas well with hairline border. */
 export const STAGE_FRAME =
-  'overflow-hidden rounded-lg border border-border-glass bg-surface-canvas shadow-xl select-none'
+  'overflow-hidden rounded-lg border border-border-glass bg-surface-canvas/60 backdrop-blur-md shadow-xl select-none'
 
 /** HP bar track + fill. Modern precision gauge. */
 export const HP_BAR =

@@ -64,7 +64,7 @@ export function GamesHub({
       {/* Sleek Arena Mode Pills */}
       {subTab !== 'idle' && (
         <div className="flex items-center justify-between gap-2 px-3 sm:px-4 pt-3 pb-1">
-          <div className="flex items-center gap-1 p-1 rounded-full bg-retro-panel border border-border-glass" role="tablist" aria-label="Arena Modes">
+          <div className="flex items-center gap-1 p-1 rounded-full bg-surface-raised/60 backdrop-blur-md border border-border-glass" role="tablist" aria-label="Arena Modes">
             {[
               { id: 'duel' as const, label: '1v1 Arena' },
               { id: 'ranks' as const, label: 'Rankings' },
@@ -100,7 +100,7 @@ export function GamesHub({
         )}
 
         {subTab === 'babecock' && (
-          <div className="glass-surface rounded-lg p-4">
+          <div className="solid-panel rounded-xl p-4 backdrop-blur-md">
             <BabecockPanel identity={identity} />
           </div>
         )}
@@ -109,7 +109,7 @@ export function GamesHub({
         {subTab === 'idle' && (
           <div
             ref={idleBoxRef}
-            className={`relative min-h-0 flex-1 w-full rounded-lg overflow-hidden bg-surface-canvas p-1 sm:p-2 flex flex-col ${idleFullscreen ? 'h-dvh' : 'h-[calc(100dvh-72px)] min-h-[580px]'}`}
+            className={`relative min-h-0 flex-1 w-full rounded-lg overflow-hidden bg-transparent p-1 sm:p-2 flex flex-col ${idleFullscreen ? 'h-dvh' : 'h-[calc(100dvh-72px)] min-h-[580px]'}`}
           >
             <GridWorkspace
               idleFullscreen={idleFullscreen}

@@ -1157,7 +1157,7 @@ export function ServersView({
       )}
 
       {/* Unified dashboard — Discord-style framed container, narrow column */}
-      <div className="glass-card flex flex-col h-full min-h-0 flex-1 w-full max-w-[680px] overflow-hidden rounded-lg border border-border-glass bg-surface-canvas">
+      <div className="glass-card flex flex-col h-full min-h-0 flex-1 w-full max-w-[680px] overflow-hidden rounded-lg border border-border-glass bg-surface-canvas/60 backdrop-blur-md">
         {/* Discord-style Unified Top Bar */}
         <div className="glass-toolbar border-0 border-b border-border-glass rounded-none h-12 px-4 flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-2 min-w-0">

@@ -336,7 +336,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
       {!arsenalOnly && (
       <>
       {/* Header */}
-      <section className="w-full bg-surface-raised border border-border-glass rounded-lg p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <section className="w-full solid-panel backdrop-blur-md p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-surface-interactive flex items-center justify-center text-retro-muted">
             <ShoppingBag className="w-4 h-4" />
@@ -360,7 +360,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
 
       {/* Economy Dashboard */}
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-surface-raised border border-border-glass rounded-lg p-3.5 col-span-2 lg:col-span-1">
+        <div className="solid-panel backdrop-blur-md p-3.5 col-span-2 lg:col-span-1">
           <div className="flex items-center gap-1.5 text-retro-muted text-[10px] font-semibold uppercase tracking-wider">
             <Coins className="w-3.5 h-3.5 text-retro-accent" />
             Balance
@@ -368,7 +368,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
           <div className="mt-1 text-lg font-bold font-mono tabular-nums text-retro-fg">{formatGc(points)}</div>
         </div>
 
-        <div className="bg-surface-raised border border-border-glass rounded-lg p-3.5">
+        <div className="solid-panel backdrop-blur-md p-3.5">
           <div className="flex items-center gap-1.5 text-retro-muted text-[10px] font-semibold uppercase tracking-wider">
             <Layers className="w-3.5 h-3.5" />
             Portfolio Value
@@ -377,7 +377,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
           <div className="text-[10px] text-retro-muted mt-0.5">{portfolio.length} card{portfolio.length === 1 ? '' : 's'}</div>
         </div>
 
-        <div className="bg-surface-raised border border-amber-500/20 rounded-lg p-3.5">
+        <div className="solid-panel backdrop-blur-md border border-amber-500/20 p-3.5">
           <div className="flex items-center gap-1.5 text-amber-400 text-[10px] font-semibold uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5" />
             Cashout Value
@@ -431,7 +431,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
           )}
         </div>
 
-        <div className="bg-surface-raised border border-border-glass rounded-lg p-3.5 col-span-2 lg:col-span-1">
+        <div className="solid-panel backdrop-blur-md p-3.5 col-span-2 lg:col-span-1">
           <div className="text-retro-muted text-[10px] font-semibold uppercase tracking-wider mb-1.5">Rarity Mix</div>
           <div className="flex flex-wrap gap-1.5">
             {RARITY_ORDER.map((r) => {
@@ -457,7 +457,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
       {!arsenalOnly && (
       <>
       {/* Most valuable cards */}
-      <section className="bg-surface-raised border border-border-glass rounded-lg p-4">
+      <section className="solid-panel backdrop-blur-md p-4">
         <div className="flex items-center justify-between gap-2 mb-3">
           <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Most valuable cards</h3>
           {onOpenCardCollection && (
@@ -498,7 +498,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
       </section>
 
       {/* Inventory (read-only) */}
-      <section className="bg-surface-raised border border-border-glass rounded-lg p-4">
+      <section className="solid-panel backdrop-blur-md p-4">
         <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider mb-3">Inventory</h3>
         {(() => {
           const owned = storeItems.filter((item) => (inventory[item.id] || 0) > 0);
@@ -517,7 +517,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
       </section>
 
       {/* Community Market — Steam-style buy/sell between players */}
-      <section className="bg-surface-raised border border-border-glass rounded-lg p-4">
+      <section className="solid-panel backdrop-blur-md p-4">
         <div className="flex items-center justify-between gap-2 mb-3">
           <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Community Market</h3>
           <span className="text-[10px] text-retro-muted">{marketListings.length} open listing{marketListings.length === 1 ? '' : 's'}</span>
@@ -583,7 +583,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
           return (
             <div
               key={item.id}
-              className="relative bg-surface-raised border rounded-lg p-4 flex flex-col justify-between transition-colors border-rose-500/30"
+              className="relative solid-panel backdrop-blur-md p-4 flex flex-col justify-between transition-colors border-rose-500/30"
             >
               <div className="space-y-2">
                 <div className="flex items-start justify-between">

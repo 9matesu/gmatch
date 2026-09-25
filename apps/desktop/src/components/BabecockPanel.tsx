@@ -550,14 +550,14 @@ export function BabecockPanel({
 
       {/* Invites Banner */}
       {invites.length > 0 && (
-        <div className="bg-retro-panel/90 border border-border-glass rounded-lg p-3.5 space-y-2">
+        <div className="solid-panel rounded-xl p-3.5 space-y-2 backdrop-blur-md">
           <div className="text-xs font-semibold text-retro-fg flex items-center gap-1.5">
             <Mail className="w-3.5 h-3.5 text-retro-muted" />
             <span>Babecock Invitations ({invites.length})</span>
           </div>
           <div className="space-y-1.5">
             {invites.map((inv) => (
-              <div key={inv.id} className="flex items-center justify-between gap-2 p-2.5 bg-retro-bg border border-border-glass rounded-md text-xs shadow-xs">
+              <div key={inv.id} className="flex items-center justify-between gap-2 p-2.5 bg-retro-bg/60 border border-border-glass rounded-md text-xs shadow-xs">
                 <span className="text-retro-fg">
                   <strong className="text-retro-fg font-medium">{inv.host_name || 'Someone'}</strong> invited you to their round!
                 </span>
@@ -587,8 +587,8 @@ export function BabecockPanel({
       )}
 
       {/* Live Round Section */}
-      <div className="bg-retro-panel/60 border border-border-glass rounded-lg overflow-hidden shadow-xs">
-        <div className="flex items-center justify-between px-4 py-3 bg-retro-panel/80 border-b border-border-glass">
+      <div className="solid-panel rounded-xl overflow-hidden shadow-xs backdrop-blur-md">
+        <div className="flex items-center justify-between px-4 py-3 bg-glass-w8 backdrop-blur-md border-b border-border-glass">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-md bg-glass-w12 border border-border-glass flex items-center justify-center text-amber-400">
               <Flame className="w-4 h-4" />
@@ -826,11 +826,11 @@ export function BabecockPanel({
       </div>
 
       {/* Gallery Section */}
-      <div className="bg-surface-raised border border-border-glass rounded-xl overflow-hidden shadow-xs">
+      <div className="solid-panel rounded-xl overflow-hidden shadow-xs backdrop-blur-md">
         <button
           type="button"
           onClick={() => setGalleryOpen((v) => !v)}
-          className="w-full flex items-center justify-between px-4 py-3.5 bg-surface-raised hover:bg-glass-w10 transition-colors cursor-pointer text-left border-b border-border-glass"
+          className="w-full flex items-center justify-between px-4 py-3.5 bg-glass-w8 backdrop-blur-md hover:bg-glass-w12 transition-colors cursor-pointer text-left border-b border-border-glass"
         >
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-retro-muted" />

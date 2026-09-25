@@ -48,6 +48,7 @@ export function CreatePostModal({
   initialMedia,
   initialTags,
   initialCaption,
+  mode = 'post',
 }: {
   identity: OrbitIdentity | null;
   onClose: () => void;
@@ -56,6 +57,7 @@ export function CreatePostModal({
   initialMedia?: PostMediaItem[];
   initialTags?: string;
   initialCaption?: string;
+  mode?: 'post' | 'story';
 }) {
   const [activeTab, setActiveTab] = useState<'upload' | 'camera' | 'url'>('upload');
   const [mediaList, setMediaList] = useState<PostMediaItem[]>(() => initialMedia || []);
@@ -372,7 +374,8 @@ function extForMime(mime: string): string {
             postCaption: i === 0 ? caption.trim() : undefined,
             location: i === 0 ? location.trim() : undefined,
             tags: i === 0 ? tags.trim() : undefined,
-            isPublic: true,
+            isPublic: mode !== 'story',
+            isStory: mode === 'story',
             postGroup,
           });
           ids.push(forged.id);
@@ -390,7 +393,10 @@ function extForMime(mime: string): string {
             throw new Error('Could not read those local bytes for sharing — try again or pick the file directly');
           }
           formData.append('url', item.previewUrl);
-          formData.append('is_public', '1');
+          formData.append('is_public', mode === 'story' ? '0' : '1');
+          if (mode === 'story') {
+            formData.append('is_story', '1');
+          }
           formData.append('post_group', postGroup);
           const fallbackMime = urlFallbackMime(item as any);
           if (!primaryMime) primaryMime = item.mimeType || fallbackMime;
@@ -422,7 +428,7 @@ function extForMime(mime: string): string {
       const objectId = primaryId || 'post_' + Math.random().toString(36).substring(2, 9);
  
       playPress(800);
-      toast?.('Post shared.', 'success');
+      toast?.(mode === 'story' ? 'Added to your story.' : 'Post shared.', 'success');
 
       onPostCreated?.({
         id: objectId,
@@ -472,7 +478,7 @@ function extForMime(mime: string): string {
           </button>
 
           <span className="font-semibold text-xs text-retro-fg">
-            Create Post {mediaList.length > 0 ? `(${mediaList.length} media)` : ''}
+            {mode === 'story' ? 'Create Story' : 'Create Post'} {mediaList.length > 0 ? `(${mediaList.length} media)` : ''}
           </span>
 
           <button
@@ -481,7 +487,7 @@ function extForMime(mime: string): string {
             disabled={uploading || mediaList.length === 0}
             className="text-xs font-semibold text-retro-bg bg-white hover:bg-retro-fg disabled:opacity-40 cursor-pointer transition-all duration-150 active:scale-[0.96] px-4 py-1.5 rounded-md shadow-xs"
           >
-            {uploading ? 'Sharing...' : 'Share'}
+            {uploading ? 'Sharing...' : (mode === 'story' ? 'Share Story' : 'Share')}
           </button>
         </div>
 

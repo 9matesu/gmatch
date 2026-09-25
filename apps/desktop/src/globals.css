@@ -291,8 +291,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .glass-panel {
-    -webkit-backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7)));
-    backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7)));
+    -webkit-backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
+    backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
   }
 }
 
@@ -325,8 +325,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .glass-surface {
-    -webkit-backdrop-filter: blur(calc(22px * var(--glass-blur, 0.7)));
-    backdrop-filter: blur(calc(22px * var(--glass-blur, 0.7)));
+    -webkit-backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
+    backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
   }
 }
 
@@ -501,8 +501,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .glass-sidebar {
-    -webkit-backdrop-filter: blur(calc(24px * var(--glass-blur, 0.7)));
-    backdrop-filter: blur(calc(24px * var(--glass-blur, 0.7)));
+    -webkit-backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
+    backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
   }
 }
 
@@ -522,8 +522,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .glass-card {
-    -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7)));
-    backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7)));
+    -webkit-backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
+    backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
   }
 }
 
@@ -739,8 +739,8 @@
   .app-glass .bg-surface-interactive,
   .app-glass .bg-surface-elevated,
   .app-glass .bg-surface-elevated\/50 {
-    -webkit-backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7)));
-    backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7)));
+    -webkit-backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
+    backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
   }
 }
 
@@ -758,8 +758,8 @@
 @supports (backdrop-filter: blur(1px)) {
   .module,
   .module-primary {
-    -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7)));
-    backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7)));
+    -webkit-backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
+    backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
   }
 }
 
@@ -837,8 +837,8 @@
 
 @supports (backdrop-filter: blur(1px)) {
   .solid-panel {
-    -webkit-backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7)));
-    backdrop-filter: blur(calc(18px * var(--glass-blur, 0.7)));
+    -webkit-backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
+    backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
   }
 }
 
