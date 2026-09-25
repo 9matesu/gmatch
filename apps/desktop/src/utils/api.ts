@@ -18,9 +18,6 @@ function computeApiBase(): string {
     (typeof window !== 'undefined' && (window as unknown as { __API_BASE__?: string }).__API_BASE__)
   if (envUrl) {
     const normalized = envUrl.replace(/\/+$/, '')
-    if (/^https?:\/\/(gmatch|goonmatch)\.fly\.dev$/i.test(normalized)) {
-      return 'https://gmatch-wcz1.onrender.com'
-    }
     return normalized
   }
 

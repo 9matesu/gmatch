@@ -1577,6 +1577,14 @@ app.whenReady().then(async () => {
     }
     return { ok: true }
   })
+  ipcMain.handle('server:probe', async (_event, url) => {
+    try {
+      const res = await net.fetch(String(url || ''))
+      return { ok: res.ok, status: res.status }
+    } catch (err) {
+      return { ok: false, error: err?.message || String(err) }
+    }
+  })
   // Apply the new mode NOW: relaunch the app (used by the Settings button).
   ipcMain.handle('server:relaunch', () => {
     apiSidecar.stopApi()

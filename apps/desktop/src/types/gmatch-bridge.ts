@@ -46,6 +46,7 @@ export interface GmatchBridge {
   openExternal?: (url: string) => Promise<void>
   serverSet?: (payload: { mode: 'host' | 'client'; url?: string }) => Promise<{ ok: boolean; error?: string }>
   serverRelaunch?: () => Promise<void>
+  serverProbe?: (url: string) => Promise<{ ok: boolean; status?: number; error?: string }>
   updateCheck?: () => Promise<GmatchUpdateStatus>
   updateState?: () => Promise<GmatchUpdateStatus>
   updateInstall?: () => Promise<{ ok: boolean; error?: string }>

@@ -28,11 +28,6 @@ function readServerMode() {
     }
     if (raw && raw.mode === 'client' && /^https?:\/\/[\w.-]+(:\d+)?$/.test(raw.url || '')) {
       const url = raw.url.replace(/\/+$/, '')
-      if (/^https?:\/\/(gmatch|goonmatch)\.fly\.dev$/i.test(url)) {
-        const migratedUrl = 'https://gmatch-wcz1.onrender.com'
-        try { writeServerMode('client', migratedUrl) } catch { /* ignore */ }
-        return { mode: 'client', url: migratedUrl }
-      }
       return { mode: 'client', url }
     }
   } catch {

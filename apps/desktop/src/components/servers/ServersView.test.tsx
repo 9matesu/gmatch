@@ -624,5 +624,6 @@ describe('ServersView', () => {
     const deprecatedRow = screen.getAllByRole('listitem').find((el) => el.textContent?.includes('gMatch Central (deprecated)'))!
     fireEvent.click(within(deprecatedRow).getByRole('button', { name: /connect/i }))
     expect(onServerJoined).toHaveBeenCalledWith(expect.objectContaining({ id: 'central-deprecated' }))
+    expect(localStorage.getItem('gmatch.api.url')).toBe('https://gmatch.fly.dev')
   })
 })

@@ -244,6 +244,11 @@ export function ServersView({
       if (!stored) {
         localStorage.setItem('gmatch.api.url', RENDER_COURIER_URL)
         localStorage.setItem(SERVER_MARKER_KEY, RENDER_COURIER_URL)
+        if (typeof document !== 'undefined') {
+          document.cookie = `gmatch_server_url=${encodeURIComponent(RENDER_COURIER_URL)}; path=/; max-age=31536000`
+        }
+      } else if (typeof document !== 'undefined' && !document.cookie.includes('gmatch_server_url=')) {
+        document.cookie = `gmatch_server_url=${encodeURIComponent(stored)}; path=/; max-age=31536000`
       }
     } catch { /* private mode */ }
   }, [])
@@ -271,19 +276,26 @@ export function ServersView({
       .then((users) => setP2pProbe({ online: true, count: users.length }))
       .catch(() => setP2pProbe({ online: false, count: null }))
 
-    // Live probe: Legacy Fly server
-    void fetch(`${FLY_LEGACY_URL}/api/health`, { signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined })
-      .then(async (r) => {
-        if (!r.ok) throw new Error()
-        const onlineRes = await fetch(`${FLY_LEGACY_URL}/api/users/online`, { signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(3000) : undefined }).catch(() => null)
-        let count: number | null = null
-        if (onlineRes && onlineRes.ok) {
-          const json = await onlineRes.json().catch(() => null)
-          if (json && Array.isArray(json.users)) count = json.users.length
-        }
-        setLegacyProbe({ online: true, count })
-      })
-      .catch(() => setLegacyProbe({ online: false, count: null }))
+    // Live probe: Legacy Fly server (Electron IPC -> Vite dev proxy -> direct fetch)
+    const probeFly = async () => {
+      let isOnline = false
+      if (window.gmatch?.serverProbe) {
+        const probeRes = await window.gmatch.serverProbe(`${FLY_LEGACY_URL}/api/health`).catch(() => null)
+        isOnline = Boolean(probeRes?.ok)
+      } else if (isDev) {
+        const res = await fetch('/fly-api/health', {
+          signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
+        }).catch(() => null)
+        isOnline = Boolean(res?.ok)
+      } else {
+        const res = await fetch(`${FLY_LEGACY_URL}/api/health`, {
+          signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
+        }).catch(() => null)
+        isOnline = Boolean(res?.ok)
+      }
+      setLegacyProbe({ online: isOnline, count: null })
+    }
+    void probeFly()
 
     // Anonymous browser: public directory only — never touch node routes
     // (no ID yet, nothing to sign with).
@@ -460,8 +472,16 @@ export function ServersView({
   // Total visible rows = official servers + directory rows.
   const visibleRowCount = allVisibleServers.length
 
+  const getEffectiveServerUrl = useCallback((): string => {
+    try {
+      const stored = localStorage.getItem('gmatch.api.url') || localStorage.getItem(SERVER_MARKER_KEY)
+      if (stored?.trim()) return stored.trim()
+    } catch { /* private mode */ }
+    return getApiBaseUrl()
+  }, [])
+
   const currentServerTitle = useMemo(() => {
-    const apiBase = getApiBaseUrl()
+    const apiBase = getEffectiveServerUrl()
     if (isCurrentServerUrl(apiBase, RENDER_COURIER_URL) || apiBase.includes('onrender.com')) {
       return 'gMatch Central (p2p)'
     }
@@ -474,7 +494,7 @@ export function ServersView({
     const matched = servers.find((s) => isCurrentServerUrl(apiBase, s.endpoint_hint || ''))
     if (matched?.name) return matched.name
     return serverName || 'Hub'
-  }, [servers, serverName, localDevServer])
+  }, [servers, serverName, localDevServer, getEffectiveServerUrl])
 
   const closeCreateForm = () => {
     setShowCreate(false); setName(''); setDescription(''); setHint(''); setNeedsPassword(false); setIsPrivate(false); setServerPassword('')
@@ -592,9 +612,11 @@ export function ServersView({
   const mine = (s: DirectoryServer) => !!identity && s.owner_id === (identity as unknown as { orbitId: string }).orbitId
 
   const isCurrent = (s: DirectoryServer) => {
-    const base = getApiBaseUrl()
+    const base = getEffectiveServerUrl()
     if (s.id === 'central-p2p') {
-      return !base || isCurrentServerUrl(base, RENDER_COURIER_URL) || base.includes('onrender.com')
+      if (isCurrentServerUrl(base, RENDER_COURIER_URL) || base.includes('onrender.com')) return true
+      if (!base || base === '/') return true
+      return false
     }
     if (s.id === 'central-deprecated') {
       return !!base && (isCurrentServerUrl(base, FLY_LEGACY_URL) || base.includes('fly.dev'))
@@ -720,10 +742,16 @@ export function ServersView({
       try {
         localStorage.setItem(SERVER_MARKER_KEY, target)
         localStorage.setItem('gmatch.api.url', target)
+        if (typeof document !== 'undefined') {
+          document.cookie = `gmatch_server_url=${encodeURIComponent(target)}; path=/; max-age=31536000`
+        }
       } catch { /* private mode */ }
       if (!window.gmatch?.serverSet) {
-        toast(`Connected to ${s.name}.`, 'success')
+        toast(`Connected to ${s.name}. Reloading...`, 'success')
         onServerJoined?.(s)
+        if (typeof window !== 'undefined' && import.meta.env.MODE !== 'test') {
+          window.location.reload()
+        }
         return
       }
       const res = await window.gmatch.serverSet({ mode: 'client', url: target })
@@ -739,9 +767,15 @@ export function ServersView({
       try {
         localStorage.setItem(SERVER_MARKER_KEY, target)
         localStorage.setItem('gmatch.api.url', target)
+        if (typeof document !== 'undefined') {
+          document.cookie = `gmatch_server_url=${encodeURIComponent(target)}; path=/; max-age=31536000`
+        }
       } catch { /* private mode */ }
-      toast(`Connected to ${s.name}.`, 'success')
+      toast(`Connected to ${s.name}. Reloading...`, 'success')
       onServerJoined?.(s)
+      if (typeof window !== 'undefined' && import.meta.env.MODE !== 'test') {
+        window.location.reload()
+      }
       return
     }
     void joinServer(s, toast, askPassword)

@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('gmatch', {
   openExternal: (url) => ipcRenderer.invoke('shell:open', url),
   serverSet: (payload) => ipcRenderer.invoke('server:set', payload),
   serverRelaunch: () => ipcRenderer.invoke('server:relaunch'),
+  serverProbe: (url) => ipcRenderer.invoke('server:probe', url),
   // Portable self-update (GitHub Releases).
   updateCheck: () => ipcRenderer.invoke('update:check'),
   updateState: () => ipcRenderer.invoke('update:state'),

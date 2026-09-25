@@ -124,6 +124,23 @@ export default defineConfig({
     proxy: {
       '^/api': {
         target: process.env.VITE_API_URL || 'https://gmatch-wcz1.onrender.com',
+        bypass: (req, _res, options) => {
+          const cookie = req.headers.cookie || ''
+          const match = cookie.match(/gmatch_server_url=([^;]+)/)
+          if (match) {
+            try {
+              const decoded = decodeURIComponent(match[1]).trim().replace(/\/+$/, '')
+              if (decoded.startsWith('http://') || decoded.startsWith('https://')) {
+                options.target = decoded
+              }
+            } catch { /* ignore */ }
+          }
+          const custom = req.headers['x-gmatch-server']
+          if (typeof custom === 'string' && (custom.startsWith('http://') || custom.startsWith('https://'))) {
+            options.target = custom.trim().replace(/\/+$/, '')
+          }
+          return undefined
+        },
         changeOrigin: true,
         secure: (process.env.VITE_API_URL || 'https://gmatch-wcz1.onrender.com').startsWith('https:'),
         ws: true,
@@ -133,6 +150,11 @@ export default defineConfig({
         // unavailable" forever). Answer proxy transport errors with a clean
         // JSON 502 so callers can retry instead of caching death.
         configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes) => {
+            proxyRes.headers['access-control-allow-origin'] = '*'
+            proxyRes.headers['access-control-allow-headers'] = '*'
+            proxyRes.headers['access-control-allow-methods'] = '*'
+          })
           proxy.on('error', (err: unknown, _req, res) => {
             const code = (err as { code?: string })?.code
             // Ignore client socket aborts/resets (normal during video seeks and queue changes)
@@ -145,6 +167,19 @@ export default defineConfig({
                 ;(res as { end: (b: string) => void }).end(JSON.stringify({ error: 'Central node waking up, retry shortly' }))
               }
             } catch { /* socket already gone */ }
+          })
+        },
+      },
+      '^/fly-api': {
+        target: 'https://gmatch.fly.dev',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (p) => p.replace(/^\/fly-api/, '/api'),
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes) => {
+            proxyRes.headers['access-control-allow-origin'] = '*'
+            proxyRes.headers['access-control-allow-headers'] = '*'
+            proxyRes.headers['access-control-allow-methods'] = '*'
           })
         },
       },
