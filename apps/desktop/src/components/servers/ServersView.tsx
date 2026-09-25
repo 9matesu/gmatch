@@ -120,7 +120,7 @@ function formatServerCounts(
   isCurrentServer: boolean,
   dash: Dashboard | null,
   p2pProbe: { online: boolean; count: number | null },
-  legacyProbe: { online: boolean; count: number | null },
+  legacyProbe: { online: boolean; count: number | null; total?: number | null },
 ): string {
   if (isCurrentServer && dash) {
     const online = typeof dash.online_count === 'number'
@@ -145,13 +145,16 @@ function formatServerCounts(
 
   if (s.id === 'central-deprecated') {
     if (!legacyProbe.online) return 'offline'
-    if (typeof legacyProbe.count === 'number' && typeof s.user_count === 'number') {
-      return `${legacyProbe.count} / ${s.user_count}`
+    const online = typeof legacyProbe.count === 'number'
+      ? legacyProbe.count
+      : (typeof s.online_count === 'number' ? s.online_count : 0)
+    const total = typeof legacyProbe.total === 'number'
+      ? legacyProbe.total
+      : (typeof s.user_count === 'number' ? s.user_count : null)
+    if (total !== null) {
+      return `${online} / ${total}`
     }
-    if (typeof legacyProbe.count === 'number') {
-      return `${legacyProbe.count} / —`
-    }
-    return '— / —'
+    return `${online} / —`
   }
 
   if (typeof s.online_count === 'number' && typeof s.user_count === 'number') {
@@ -210,7 +213,6 @@ export function ServersView({
   type ServerBridgeState = { packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[]; adminPin?: string }
   const [hostState, setHostState] = useState<ServerBridgeState | null>(null)
   const [pinToDismiss, setPinToDismiss] = useState('')
-  const [userTab, setUserTab] = useState<'online' | 'all24h'>('online')
   const [activeTab, setActiveTab] = useState<'browse' | 'hub'>('browse')
   const [deleteTarget, setDeleteTarget] = useState<DirectoryServer | null>(null)
   const [deletePasscode, setDeletePasscode] = useState('')
@@ -263,7 +265,7 @@ export function ServersView({
   const FLY_LEGACY_URL = 'https://gmatch.fly.dev'
 
   const [p2pProbe, setP2pProbe] = useState<{ online: boolean; count: number | null }>({ online: true, count: null })
-  const [legacyProbe, setLegacyProbe] = useState<{ online: boolean; count: number | null }>({ online: false, count: null })
+  const [legacyProbe, setLegacyProbe] = useState<{ online: boolean; count: number | null; total: number | null }>({ online: false, count: null, total: null })
 
   const p2pServer: DirectoryServer = useMemo(() => ({
     id: 'central-p2p',
@@ -286,6 +288,7 @@ export function ServersView({
     password_required: 0,
     is_private: 0,
     online_count: legacyProbe.count,
+    user_count: legacyProbe.total,
     last_seen: legacyProbe.online ? new Date().toISOString() : undefined,
   }), [legacyProbe])
 
@@ -331,21 +334,57 @@ export function ServersView({
     // Live probe: Legacy Fly server (Electron IPC -> Vite dev proxy -> direct fetch)
     const probeFly = async () => {
       let isOnline = false
-      if (window.gmatch?.serverProbe) {
-        const probeRes = await window.gmatch.serverProbe(`${FLY_LEGACY_URL}/api/health`).catch(() => null)
-        isOnline = Boolean(probeRes?.ok)
-      } else if (isDev) {
-        const res = await fetch('/fly-api/api/health', {
-          signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
-        }).catch(() => null)
-        isOnline = Boolean(res?.ok)
-      } else {
-        const res = await fetch(`${FLY_LEGACY_URL}/api/health`, {
-          signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
-        }).catch(() => null)
-        isOnline = Boolean(res?.ok)
+      let onlineCount: number | null = null
+      let totalMembers: number | null = null
+      try {
+        if (window.gmatch?.serverProbe) {
+          const probeRes = await window.gmatch.serverProbe(`${FLY_LEGACY_URL}/api/health`).catch(() => null)
+          isOnline = Boolean(probeRes?.ok)
+          if (isOnline && identity) {
+            const dashRes = await fetch(`${FLY_LEGACY_URL}/api/servers/dashboard`, {
+              signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
+            }).catch(() => null)
+            if (dashRes?.ok) {
+              const dj = await dashRes.json().catch(() => null)
+              onlineCount = typeof dj?.online_count === 'number' ? dj.online_count : null
+              totalMembers = typeof dj?.members_total === 'number' ? dj.members_total : null
+            }
+          }
+        } else if (isDev) {
+          const res = await fetch('/fly-api/api/health', {
+            signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
+          }).catch(() => null)
+          isOnline = Boolean(res?.ok)
+          if (isOnline && identity) {
+            const dashRes = await fetch('/fly-api/api/servers/dashboard', {
+              signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
+            }).catch(() => null)
+            if (dashRes?.ok) {
+              const dj = await dashRes.json().catch(() => null)
+              onlineCount = typeof dj?.online_count === 'number' ? dj.online_count : null
+              totalMembers = typeof dj?.members_total === 'number' ? dj.members_total : null
+            }
+          }
+        } else {
+          const res = await fetch(`${FLY_LEGACY_URL}/api/health`, {
+            signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
+          }).catch(() => null)
+          isOnline = Boolean(res?.ok)
+          if (isOnline && identity) {
+            const dashRes = await fetch(`${FLY_LEGACY_URL}/api/servers/dashboard`, {
+              signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
+            }).catch(() => null)
+            if (dashRes?.ok) {
+              const dj = await dashRes.json().catch(() => null)
+              onlineCount = typeof dj?.online_count === 'number' ? dj.online_count : null
+              totalMembers = typeof dj?.members_total === 'number' ? dj.members_total : null
+            }
+          }
+        }
+      } catch {
+        /* probe failed */
       }
-      setLegacyProbe({ online: isOnline, count: null })
+      setLegacyProbe({ online: isOnline, count: onlineCount, total: totalMembers })
     }
     void probeFly()
 
@@ -373,12 +412,45 @@ export function ServersView({
     // Local node dashboard — always available, even with no central (plan §4).
     try {
       const d = await orbitFetch('/api/servers/dashboard', { method: 'GET' }, identity)
+      let dj: Dashboard | null = null
       if (d.ok) {
-        const dj = (await d.json()) as Dashboard
-        if (Array.isArray(dj?.users)) {
-          setDash(dj)
-          if (typeof dj?.name === 'string' && dj.name.trim()) setServerName(dj.name.trim())
+        dj = (await d.json()) as Dashboard
+      }
+
+      // Also query /api/users to populate all server members including offline members
+      const uRes = await orbitFetch('/api/users?limit=100', { method: 'GET' }, identity).catch(() => null)
+      if (uRes && uRes.ok) {
+        const uList = await uRes.json().catch(() => null)
+        const rawUsers: Array<{ id: string; display_name?: string; pfp_url?: string; last_seen?: string | null; online?: boolean }> =
+          Array.isArray(uList) ? uList : (Array.isArray(uList?.users) ? uList.users : [])
+        if (rawUsers.length > 0) {
+          const userMap = new Map<string, DashboardUser>()
+          if (dj && Array.isArray(dj.users)) {
+            for (const u of dj.users) userMap.set(u.id, u)
+          }
+          for (const ru of rawUsers) {
+            if (!userMap.has(ru.id)) {
+              userMap.set(ru.id, {
+                id: ru.id,
+                display_name: ru.display_name?.trim() || undefined,
+                pfp_url: ru.pfp_url || undefined,
+                last_seen: ru.last_seen,
+                online: Boolean(ru.online),
+              })
+            }
+          }
+          const mergedUsers = Array.from(userMap.values())
+          if (!dj) {
+            dj = { users: mergedUsers, posts_24h: 0, members_total: mergedUsers.length }
+          } else {
+            dj.users = mergedUsers
+          }
         }
+      }
+
+      if (dj && Array.isArray(dj.users)) {
+        setDash(dj)
+        if (typeof dj?.name === 'string' && dj.name.trim()) setServerName(dj.name.trim())
       }
     } catch { /* node without dashboard route. Fine */ }
 
@@ -482,6 +554,27 @@ export function ServersView({
     toast('Central node saved', 'success')
   }
 
+  const getEffectiveServerUrl = useCallback((): string => {
+    try {
+      const stored = localStorage.getItem('gmatch.api.url') || localStorage.getItem(SERVER_MARKER_KEY)
+      if (stored?.trim()) return stored.trim()
+    } catch { /* private mode */ }
+    return getApiBaseUrl()
+  }, [])
+
+  const isCurrent = useCallback((s: DirectoryServer) => {
+    const base = getEffectiveServerUrl()
+    if (s.id === 'central-p2p') {
+      if (isCurrentServerUrl(base, RENDER_COURIER_URL) || base.includes('onrender.com')) return true
+      if (!base || base === '/') return true
+      return false
+    }
+    if (s.id === 'central-deprecated') {
+      return !!base && (isCurrentServerUrl(base, FLY_LEGACY_URL) || base.includes('fly.dev'))
+    }
+    return isCurrentServerUrl(base, s.endpoint_hint || '')
+  }, [getEffectiveServerUrl])
+
   const officialServers: DirectoryServer[] = useMemo(() => {
     const list: DirectoryServer[] = []
     if (localDevServer) list.push(localDevServer)
@@ -518,19 +611,18 @@ export function ServersView({
     const filteredOfficial = officialServers
       .filter((s) => !passwordOnly || s.password_required)
       .filter((s) => !q || `${s.name} ${s.description ?? ''} ${s.endpoint_hint ?? ''} ${(s.tags ?? []).join(' ')}`.toLowerCase().includes(q))
-    return [...filteredOfficial, ...visibleServers]
-  }, [officialServers, visibleServers, query, passwordOnly])
+    const list = [...filteredOfficial, ...visibleServers]
+    // Connected server always stays on top of the browser
+    return list.sort((a, b) => {
+      const aCur = isCurrent(a) ? 1 : 0
+      const bCur = isCurrent(b) ? 1 : 0
+      if (aCur !== bCur) return bCur - aCur
+      return 0
+    })
+  }, [officialServers, visibleServers, query, passwordOnly, isCurrent])
 
   // Total visible rows = official servers + directory rows.
   const visibleRowCount = allVisibleServers.length
-
-  const getEffectiveServerUrl = useCallback((): string => {
-    try {
-      const stored = localStorage.getItem('gmatch.api.url') || localStorage.getItem(SERVER_MARKER_KEY)
-      if (stored?.trim()) return stored.trim()
-    } catch { /* private mode */ }
-    return getApiBaseUrl()
-  }, [])
 
   const currentServerTitle = useMemo(() => {
     const apiBase = getEffectiveServerUrl()
@@ -662,19 +754,6 @@ export function ServersView({
   }
 
   const mine = (s: DirectoryServer) => !!identity && s.owner_id === (identity as unknown as { orbitId: string }).orbitId
-
-  const isCurrent = (s: DirectoryServer) => {
-    const base = getEffectiveServerUrl()
-    if (s.id === 'central-p2p') {
-      if (isCurrentServerUrl(base, RENDER_COURIER_URL) || base.includes('onrender.com')) return true
-      if (!base || base === '/') return true
-      return false
-    }
-    if (s.id === 'central-deprecated') {
-      return !!base && (isCurrentServerUrl(base, FLY_LEGACY_URL) || base.includes('fly.dev'))
-    }
-    return isCurrentServerUrl(base, s.endpoint_hint || '')
-  }
 
   // Switch = join another node, or hop back to this machine's own host node.
   const switchTo = async (s: DirectoryServer) => {
@@ -1039,7 +1118,7 @@ export function ServersView({
 
   const allUsers = dash?.users || []
   const onlineUsers = useMemo(() => allUsers.filter((u) => u.online), [allUsers])
-  const displayedUsers = userTab === 'online' ? onlineUsers : allUsers
+  const offlineUsers = useMemo(() => allUsers.filter((u) => !u.online), [allUsers])
 
   const handleUserClick = (u: DashboardUser) => {
     if (!onSelectUser) return
@@ -1415,76 +1494,113 @@ export function ServersView({
               )}
             </section>
 
-            {/* Active Members & 24h Activity List */}
-           <section className="glass-inset p-4 space-y-3" aria-label="Server members">
-              <div className="flex items-center justify-between pb-2 border-b border-border-glass">
-                <div className="flex items-center gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setUserTab('online')}
-                    aria-pressed={userTab === 'online'}
-                    className={`text-xs font-bold cursor-pointer transition-colors ${
-                      userTab === 'online' ? 'text-retro-fg' : 'text-retro-muted hover:text-retro-fg'
-                    }`}
-                  >
-                    Online ({typeof dash?.online_count === 'number' ? dash.online_count : onlineUsers.length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setUserTab('all24h')}
-                    aria-pressed={userTab === 'all24h'}
-                    className={`text-xs font-bold cursor-pointer transition-colors ${
-                      userTab === 'all24h' ? 'text-retro-fg' : 'text-retro-muted hover:text-retro-fg'
-                    }`}
-                  >
-                    Last 24h ({typeof dash?.active_24h_count === 'number' ? dash.active_24h_count : allUsers.length})
-                  </button>
+            {/* Active & Offline Server Members */}
+            <section className="glass-inset p-4 space-y-4 overflow-y-auto max-h-[60vh]" aria-label="Server members">
+              {/* Online Section */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between pb-1.5 border-b border-border-glass">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-retro-online shrink-0" />
+                    <span className="text-xs font-bold text-retro-fg uppercase tracking-wider font-mono">
+                      Online ({typeof dash?.online_count === 'number' ? Math.max(dash.online_count, onlineUsers.length) : onlineUsers.length})
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                {displayedUsers.length === 0 ? (
-                  <div className="col-span-full text-xs text-retro-muted py-6 text-center italic">
-                    {userTab === 'online' ? 'No other members online right now' : 'No active members in the last 24 hours'}
+                {onlineUsers.length === 0 ? (
+                  <div className="text-xs text-retro-muted py-3 text-center italic">
+                    No members online right now
                   </div>
                 ) : (
-                  displayedUsers.map((u) => {
-                    const initial = (u.display_name || u.id || '?').charAt(0).toUpperCase();
-                    return (
-                      <div
-                        key={u.id}
-                        onClick={() => handleUserClick(u)}
-                        className="group flex items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-interactive/40 border border-border-subtle hover:border-border-strong hover:bg-surface-interactive transition-colors cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="relative w-8 h-8 rounded-full overflow-hidden bg-surface-raised border border-border-subtle shrink-0 flex items-center justify-center text-xs font-bold text-retro-muted">
-                            {u.pfp_url ? (
-                              <img src={resolveMediaUrl(u.pfp_url)} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <span>{initial}</span>
-                            )}
-                            {u.online && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {onlineUsers.map((u) => {
+                      const initial = (u.display_name || u.id || '?').charAt(0).toUpperCase()
+                      return (
+                        <div
+                          key={u.id}
+                          onClick={() => handleUserClick(u)}
+                          className="group flex items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-interactive/40 border border-border-subtle hover:border-border-strong hover:bg-surface-interactive transition-colors cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="relative w-8 h-8 rounded-full overflow-hidden bg-surface-raised border border-border-subtle shrink-0 flex items-center justify-center text-xs font-bold text-retro-muted">
+                              {u.pfp_url ? (
+                                <img src={resolveMediaUrl(u.pfp_url)} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <span>{initial}</span>
+                              )}
                               <span
                                 className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-retro-online ring-1 ring-black"
                                 aria-label="online"
                               />
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-xs font-bold text-retro-fg truncate group-hover:text-retro-accent transition-colors">
-                              {u.display_name || u.id}
                             </div>
-                            <div className="text-[10px] text-retro-muted truncate font-mono">
-                              {u.online ? 'active now' : formatRelativeTime(u.last_seen)}
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold text-retro-fg truncate group-hover:text-retro-accent transition-colors">
+                                {u.display_name || u.id}
+                              </div>
+                              <div className="text-[10px] text-retro-online truncate font-mono">
+                                active now
+                              </div>
                             </div>
                           </div>
+                          <span className="text-[10px] text-retro-muted opacity-0 group-hover:opacity-100 transition-opacity pr-1">
+                            profile →
+                          </span>
                         </div>
-                        <span className="text-[10px] text-retro-muted opacity-0 group-hover:opacity-100 transition-opacity pr-1">
-                          profile →
-                        </span>
-                      </div>
-                    );
-                  })
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Offline Section */}
+              <div className="space-y-2 pt-2">
+                <div className="flex items-center justify-between pb-1.5 border-b border-border-glass">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-retro-muted/40 shrink-0" />
+                    <span className="text-xs font-bold text-retro-muted uppercase tracking-wider font-mono">
+                      Offline ({offlineUsers.length})
+                    </span>
+                  </div>
+                </div>
+
+                {offlineUsers.length === 0 ? (
+                  <div className="text-xs text-retro-muted py-3 text-center italic">
+                    No offline members recorded
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {offlineUsers.map((u) => {
+                      const initial = (u.display_name || u.id || '?').charAt(0).toUpperCase()
+                      return (
+                        <div
+                          key={u.id}
+                          onClick={() => handleUserClick(u)}
+                          className="group flex items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-interactive/20 border border-border-subtle/50 hover:border-border-strong hover:bg-surface-interactive/60 transition-colors cursor-pointer opacity-85 hover:opacity-100"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="relative w-8 h-8 rounded-full overflow-hidden bg-surface-raised border border-border-subtle shrink-0 flex items-center justify-center text-xs font-bold text-retro-muted opacity-75">
+                              {u.pfp_url ? (
+                                <img src={resolveMediaUrl(u.pfp_url)} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <span>{initial}</span>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold text-retro-fg/90 truncate group-hover:text-retro-accent transition-colors">
+                                {u.display_name || u.id}
+                              </div>
+                              <div className="text-[10px] text-retro-muted truncate font-mono">
+                                {formatRelativeTime(u.last_seen)}
+                              </div>
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-retro-muted opacity-0 group-hover:opacity-100 transition-opacity pr-1">
+                            profile →
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
                 )}
               </div>
             </section>

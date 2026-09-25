@@ -48,6 +48,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
 })
 
 describe('ServersView', () => {
@@ -283,7 +284,7 @@ describe('ServersView', () => {
     vi.restoreAllMocks()
   })
 
-  it('allows switching between online and 24h tabs and clicking user card opens profile', async () => {
+  it('renders online and offline members in stacked sections and clicking user card opens profile', async () => {
     const orbitApi = await import('../../utils/api')
     const spy = vi.spyOn(orbitApi, 'orbitFetch').mockImplementation(async (endpoint: string) => {
       if (String(endpoint).includes('/api/servers/dashboard')) {
@@ -311,13 +312,11 @@ describe('ServersView', () => {
 
     // Hub members section owns presence: switch to the hub tab first.
     fireEvent.click(screen.getByRole('button', { name: /^hub/i }))
-    // Online tab is default: BobOnline is visible, CarolRecent is hidden
+    // Stacked sections: BobOnline is in Online section, CarolRecent is in Offline section
     expect(await screen.findByText('BobOnline', {}, { timeout: 3000 })).toBeInTheDocument()
-    expect(screen.queryByText('CarolRecent')).toBeNull()
-
-    // Switch to Last 24h tab: CarolRecent is visible too
-    fireEvent.click(screen.getByRole('button', { name: /last 24h/i }))
-    expect(await screen.findByText('CarolRecent')).toBeInTheDocument()
+    expect(screen.getByText('CarolRecent')).toBeInTheDocument()
+    expect(screen.getByText(/Online \(1\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/Offline \(1\)/i)).toBeInTheDocument()
 
     // Click Bob's card: triggers onSelectUser
     fireEvent.click(screen.getByText('BobOnline'))
