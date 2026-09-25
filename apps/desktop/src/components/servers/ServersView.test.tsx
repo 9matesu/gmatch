@@ -511,7 +511,10 @@ describe('ServersView', () => {
     })
     const { unmount } = render(<ServersView identity={identity} toast={() => {}} />)
     await screen.findByText('Alpha Node')
-    // band starts open: the search field is on screen
+    // band starts retracted by default: search field is hidden
+    expect(screen.queryByLabelText('Search servers')).toBeNull()
+    // expanding the band reveals the search field
+    fireEvent.click(screen.getByRole('button', { name: /show filters/i }))
     expect(screen.getByLabelText('Search servers')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /hide filters/i }))
     expect(screen.queryByLabelText('Search servers')).toBeNull()
@@ -578,6 +581,7 @@ describe('ServersView', () => {
     })
     render(<ServersView identity={identity} toast={() => {}} />)
     await screen.findByText('Chill Zone')
+    fireEvent.click(screen.getByRole('button', { name: /show filters/i }))
     fireEvent.change(screen.getByLabelText('Search servers'), { target: { value: 'chill' } })
     expect(await screen.findByText('Chill Zone')).toBeInTheDocument()
     expect(screen.queryByText('Other Realm')).toBeNull()
@@ -611,8 +615,10 @@ describe('ServersView', () => {
     render(<ServersView identity={identity} toast={() => {}} onServerJoined={onServerJoined} />)
     expect(await screen.findByText('gMatch Central (p2p)')).toBeInTheDocument()
     expect(screen.getByText('gMatch Central (deprecated)')).toBeInTheDocument()
-    expect(screen.getByText('P2P')).toBeInTheDocument()
-    expect(screen.getByText('Deprecated')).toBeInTheDocument()
+    expect(screen.getByText('p2p')).toBeInTheDocument()
+    expect(screen.getByText('deprecated')).toBeInTheDocument()
+    expect(screen.getByText('gmatch-wcz1.onrender.com')).toBeInTheDocument()
+    expect(screen.getByText('gmatch.fly.dev')).toBeInTheDocument()
 
     // Connect to deprecated server
     const deprecatedRow = screen.getAllByRole('listitem').find((el) => el.textContent?.includes('gMatch Central (deprecated)'))!

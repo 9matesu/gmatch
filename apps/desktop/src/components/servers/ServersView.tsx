@@ -110,6 +110,11 @@ function formatRelativeTime(iso?: string | null): string {
   return `${Math.floor(hours / 24)}d ago`
 }
 
+function formatDomain(hint?: string | null): string {
+  if (!hint) return ''
+  return hint.trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '')
+}
+
 export function ServersView({
   identity,
   toast,
@@ -164,10 +169,10 @@ export function ServersView({
   const [expandedServerId, setExpandedServerId] = useState<string | null>(null)
   const [showCentralPopover, setShowCentralPopover] = useState(false)
   // Collapsible filter band (the chatroom idiom): the search/sort row eats a
-  // full strip above the list and is only needed while narrowing. Persisted so
-  // the choice survives a reload.
+  // full strip above the list and is only needed while narrowing. Starts
+  // retracted by default to keep the HUD quiet.
   const [filtersCollapsed, setFiltersCollapsed] = useState<boolean>(() => {
-    try { return localStorage.getItem('gmatch.servers.filters_collapsed_v1') === '1' } catch { return false }
+    try { return localStorage.getItem('gmatch.servers.filters_collapsed_v1') !== '0' } catch { return true }
   })
   const toggleFilters = () => {
     setFiltersCollapsed((v) => {
@@ -211,7 +216,7 @@ export function ServersView({
   const p2pServer: DirectoryServer = useMemo(() => ({
     id: 'central-p2p',
     name: 'gMatch Central (p2p)',
-    description: 'Blind courier & P2P WebRTC swarm mesh',
+    description: '',
     owner_id: 'central-p2p',
     endpoint_hint: RENDER_COURIER_URL,
     password_required: 0,
@@ -223,7 +228,7 @@ export function ServersView({
   const legacyServer: DirectoryServer = useMemo(() => ({
     id: 'central-deprecated',
     name: 'gMatch Central (deprecated)',
-    description: 'Legacy centralized server (deprecated)',
+    description: '',
     owner_id: 'central-deprecated',
     endpoint_hint: FLY_LEGACY_URL,
     password_required: 0,
@@ -231,6 +236,17 @@ export function ServersView({
     online_count: legacyProbe.count,
     last_seen: legacyProbe.online ? new Date().toISOString() : undefined,
   }), [legacyProbe])
+
+  // Automatically join the P2P server on startup if not explicitly set
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('gmatch.api.url')
+      if (!stored) {
+        localStorage.setItem('gmatch.api.url', RENDER_COURIER_URL)
+        localStorage.setItem(SERVER_MARKER_KEY, RENDER_COURIER_URL)
+      }
+    } catch { /* private mode */ }
+  }, [])
 
   const localDevServer: DirectoryServer | null = useMemo(() => {
     if (!isLocalHost(central)) return null
@@ -575,7 +591,16 @@ export function ServersView({
 
   const mine = (s: DirectoryServer) => !!identity && s.owner_id === (identity as unknown as { orbitId: string }).orbitId
 
-  const isCurrent = (s: DirectoryServer) => isCurrentServerUrl(getApiBaseUrl(), s.endpoint_hint || '')
+  const isCurrent = (s: DirectoryServer) => {
+    const base = getApiBaseUrl()
+    if (s.id === 'central-p2p') {
+      return !base || isCurrentServerUrl(base, RENDER_COURIER_URL) || base.includes('onrender.com')
+    }
+    if (s.id === 'central-deprecated') {
+      return !!base && (isCurrentServerUrl(base, FLY_LEGACY_URL) || base.includes('fly.dev'))
+    }
+    return isCurrentServerUrl(base, s.endpoint_hint || '')
+  }
 
   // Switch = join another node, or hop back to this machine's own host node.
   const switchTo = async (s: DirectoryServer) => {
@@ -1617,99 +1642,93 @@ export function ServersView({
                                     )}
                                   </div>
                                   <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-1 min-w-0">
+                                    <div className="flex items-center gap-1.5 min-w-0">
                                       <h3 className="text-xs font-bold text-retro-fg group-hover/title:text-accent transition-colors truncate">{s.name}</h3>
                                       {s.id === 'central-p2p' && (
-                                        <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider text-cyan-300 border border-cyan-500/30 bg-cyan-500/10 shrink-0">
-                                          P2P
+                                        <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider text-retro-muted/90 border border-border-glass bg-glass-w5 shrink-0">
+                                          p2p
                                         </span>
                                       )}
                                       {s.id === 'central-deprecated' && (
-                                        <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider text-amber-300 border border-amber-500/30 bg-amber-500/10 shrink-0">
-                                          Deprecated
+                                        <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider text-retro-muted/70 border border-border-glass bg-glass-w5 shrink-0">
+                                          deprecated
                                         </span>
                                       )}
                                       {s.id === 'central-local' && (
-                                        <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider text-emerald-300 border border-emerald-500/30 bg-emerald-500/10 shrink-0">
-                                          Local
+                                        <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider text-retro-muted/90 border border-border-glass bg-glass-w5 shrink-0">
+                                          local
                                         </span>
                                       )}
                                       {!!s.password_required && (
-                                        <span className="p-0.5 rounded bg-surface-interactive text-amber-300 border border-border-glass shrink-0" title="Password required">
+                                        <span className="p-0.5 rounded text-retro-muted shrink-0" title="Password required">
                                           <Lock className="w-3 h-3" aria-label="password required" />
                                         </span>
                                       )}
-                                      {isMyServer && (
-                                        <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider bg-glass-w10 text-retro-fg border border-border-glass shrink-0">
-                                          Yours
-                                        </span>
-                                      )}
                                       {!!s.is_private && (
-                                        <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider text-retro-muted border border-border-subtle bg-surface-interactive shrink-0">
-                                          Private
+                                        <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider text-retro-muted/70 border border-border-glass bg-glass-w5 shrink-0">
+                                          private
                                         </span>
                                       )}
-                                      <span className="hidden sm:inline text-[10px] text-retro-muted font-mono truncate">
-                                        {formatRelativeTime(s.last_seen)}
-                                      </span>
                                     </div>
-                                    <p className="text-[10px] text-retro-muted truncate max-w-[320px]">
-                                      {s.description || 'No description.'}
-                                    </p>
+                                    <div className="flex items-center gap-1.5 text-[11px] font-mono text-retro-muted/80 truncate mt-0.5">
+                                      {s.endpoint_hint && (isOfficial || (!/^https?:\/\/\d+\.\d+\.\d+\.\d+/i.test(s.endpoint_hint) && !/^\d+\.\d+\.\d+\.\d+/.test(s.endpoint_hint))) && (
+                                        <span className="truncate text-retro-muted/70">
+                                          {formatDomain(s.endpoint_hint)}
+                                        </span>
+                                      )}
+                                      <span className="text-retro-muted/40">·</span>
+                                      {s.id === 'central-p2p' ? (
+                                        <span className="inline-flex items-center gap-1 shrink-0">
+                                          <span className={`w-1.5 h-1.5 rounded-full ${p2pProbe.online ? 'bg-retro-online' : 'bg-retro-muted'}`} />
+                                          <span>{typeof p2pProbe.count === 'number' ? `${p2pProbe.count} online` : (p2pProbe.online ? 'live' : 'offline')}</span>
+                                        </span>
+                                      ) : s.id === 'central-deprecated' ? (
+                                        <span className="inline-flex items-center gap-1 shrink-0">
+                                          <span className={`w-1.5 h-1.5 rounded-full ${legacyProbe.online ? 'bg-retro-online' : 'bg-retro-muted'}`} />
+                                          <span>{typeof legacyProbe.count === 'number' ? `${legacyProbe.count} online` : (legacyProbe.online ? 'live' : 'offline')}</span>
+                                        </span>
+                                      ) : (typeof s.online_count === 'number' || typeof s.user_count === 'number') ? (
+                                        <span className="inline-flex items-center gap-1 shrink-0">
+                                          <span className={`w-1.5 h-1.5 rounded-full ${(s.online_count ?? 0) > 0 ? 'bg-retro-online' : 'bg-retro-muted'}`} />
+                                          <span>{typeof s.online_count === 'number' ? `${s.online_count} online` : 'online'}</span>
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 shrink-0 text-retro-muted/60">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-retro-muted/50" />
+                                          <span>idle</span>
+                                        </span>
+                                      )}
+                                      {s.description && s.description.trim() && s.id !== 'central-p2p' && s.id !== 'central-deprecated' && (
+                                        <>
+                                          <span className="text-retro-muted/40 hidden md:inline">·</span>
+                                          <span className="hidden md:inline text-[10px] text-retro-muted/60 truncate font-sans">
+                                            {s.description}
+                                          </span>
+                                        </>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
 
-                                <div className="flex shrink-0 items-center justify-end gap-2">
-                                  <div className="hidden sm:flex items-center font-mono text-[10px] text-retro-muted tabular-nums">
-                                    {s.id === 'central-p2p' ? (
-                                      <span className="inline-flex items-center gap-1">
-                                        <span className={`w-1.5 h-1.5 rounded-full ${p2pProbe.online ? 'bg-retro-online' : 'bg-rose-500'}`} />
-                                        <span>{typeof p2pProbe.count === 'number' ? `${p2pProbe.count}` : (p2pProbe.online ? 'online' : 'offline')}</span>
-                                      </span>
-                                    ) : s.id === 'central-deprecated' ? (
-                                      <span className="inline-flex items-center gap-1">
-                                        <span className={`w-1.5 h-1.5 rounded-full ${legacyProbe.online ? 'bg-retro-online' : 'bg-rose-500'}`} />
-                                        <span>{typeof legacyProbe.count === 'number' ? `${legacyProbe.count}` : (legacyProbe.online ? 'online' : 'offline')}</span>
-                                      </span>
-                                    ) : (typeof s.online_count === 'number' || typeof s.user_count === 'number') ? (
-                                      <span className="inline-flex items-center gap-1">
-                                        {typeof s.online_count === 'number' && (
-                                          <>
-                                            <span className={`w-1.5 h-1.5 rounded-full ${s.online_count > 0 ? 'bg-retro-online' : 'bg-retro-muted'}`} />
-                                            <span>{s.online_count}</span>
-                                          </>
-                                        )}
-                                        {typeof s.user_count === 'number' && (
-                                          <span>· {s.user_count}</span>
-                                        )}
-                                      </span>
-                                    ) : null}
-                                  </div>
-
+                                <div className="flex shrink-0 items-center justify-end gap-1">
                                   <div className="flex items-center gap-1">
-                                    {isMyServer ? (
-                                      !isCurrentServer ? (
-                                        <button
-                                          type="button"
-                                          onClick={() => { playPress(620); void switchTo(s); }}
-                                          className="flex items-center gap-1 px-1 py-0.5 rounded text-xs font-semibold text-retro-muted hover:text-retro-fg hover:bg-glass-w8 transition-colors duration-150 cursor-pointer"
-                                        >
-                                          <ArrowLeft className="w-3 h-3" /> Switch
-                                        </button>
-                                      ) : (
-                                        <span className="h-6 px-2 rounded-md text-xs font-medium text-retro-muted bg-surface-canvas border border-border-subtle flex items-center justify-center cursor-default">
-                                          Connected
-                                        </span>
-                                      )
-                                    ) : isCurrentServer && identity ? (
+                                    {isCurrentServer ? (
                                       <span className="h-6 px-2 rounded-md text-xs font-semibold text-retro-muted bg-surface-canvas border border-border-subtle flex items-center justify-center cursor-default">
                                         Connected
                                       </span>
+                                    ) : isMyServer ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => { playPress(620); void switchTo(s); }}
+                                        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold text-retro-muted hover:text-retro-fg hover:bg-glass-w8 transition-colors duration-150 cursor-pointer"
+                                      >
+                                        <ArrowLeft className="w-3 h-3" /> Switch
+                                      </button>
                                     ) : (
                                       <button
                                         type="button"
                                         onClick={() => void join(s)}
-                                        className="flex items-center gap-1 px-1 py-0.5 rounded text-xs font-semibold text-retro-muted hover:text-retro-fg hover:bg-glass-w8 transition-colors duration-150 cursor-pointer"
+                                        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold text-retro-muted hover:text-retro-fg hover:bg-glass-w8 transition-colors duration-150 cursor-pointer"
                                       >
                                         <UserPlus className="w-3 h-3" /> {isOfficial ? 'Connect' : (!identity ? 'Enter' : 'Join')}
                                       </button>
@@ -1813,7 +1832,10 @@ export function ServersView({
                                         <button
                                           key={tag}
                                           type="button"
-                                          onClick={() => setQuery(tag)}
+                                          onClick={() => {
+                                            setQuery(tag)
+                                            setFiltersCollapsed(false)
+                                          }}
                                           className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-surface-interactive hover:bg-surface-elevated text-retro-fg border border-border-subtle cursor-pointer transition-colors"
                                           title={`Filter by tag "${tag}"`}
                                         >
