@@ -5,7 +5,7 @@ import { LocalBlobStore } from './blob'
 import { resolveStorageKey } from './storage-key'
 import { resolveNodeKey } from './node-key'
 import app from './index'
-import { join, dirname, extname } from 'node:path'
+import { join, dirname, extname, basename } from 'node:path'
 import { handleIncoming, conns, broadcastToRoom, watchDisconnect, WsConn } from './ws-bus'
 import { mailWatchers, handleMailSocketMessage, unwatchMailSocket } from './routes/mail'
 import { isApiPath, parseSiteServices, siteAllows } from './site-services'
@@ -301,9 +301,19 @@ Bun.serve({
 
     if (await file.exists()) {
       const ext = extname(filePath)
-      return new Response(file, {
-        headers: { 'Content-Type': MIME[ext] || 'application/octet-stream' },
-      })
+      const headers: Record<string, string> = {
+        'Content-Type': MIME[ext] || 'application/octet-stream',
+      }
+      if (ext === '.exe') {
+        headers['Content-Disposition'] = `attachment; filename="${basename(filePath)}"`
+      }
+      return new Response(file, { headers })
+    }
+
+    // Never serve SPA index.html for static assets, releases, or paths with extensions
+    const reqExt = extname(url.pathname)
+    if (reqExt || url.pathname.startsWith('/releases/')) {
+      return new Response('Not Found', { status: 404 })
     }
 
     // SPA fallback: serve index.html for unmatched routes

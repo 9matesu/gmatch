@@ -1,9 +1,8 @@
 {
   "file": "gMatch-1.5.2-portable.exe",
   "version": "1.5.2",
-  "sha256": "0bc9ee546701fe37b7c46e61d5a8500736f3287320f81367d9e1243c26a93fde",
-  "sha512": "a1ac204fd8c387b5e34b37e62c990c0c5bd3d8f8f6171747ea892c44c3905f2ce50f9a8777219e88e705c4d1e215cfb70686c01549a6dfeaa9c3c24d443ed2de",
-  "buildDate": "2026-09-28T14:58:10.197Z",
-  "sizeBytes": 109953353,
-  "downloadUrl": "https://github.com/9matesu/goongrid/releases/download/v1.5.2/gMatch-1.5.2-portable.exe"
+  "sha256": "d49887fbb2d44eb7ddbad1e6b45d45a4ef6f7b6fd1a2e1d8f0e1f0b50b893758",
+  "sha512": "516cfe2526f20e4081cfd4d13613865e66ea6beb02174b6fa1eca27afb303a37b3b938d32980238e436c6f288dd2a2f295e54abf9859c8fec1fe307270a12ac7",
+  "buildDate": "2026-09-28T15:27:57.113Z",
+  "sizeBytes": 100521823
 }
