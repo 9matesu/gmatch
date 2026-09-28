@@ -6,8 +6,18 @@ import { useSettings } from './useSettings';
 import type { LobbyState } from '@orbit/shared';
 import { playMatchOnce, playMsgReceive, playQueueJoin, playPress } from '../utils/sounds';
 
+/**
+ * Mirrors the server's `NotificationType` (apps/api/src/notifications.ts:20).
+ * It used to list 6 values, so like/follow/comment engagement never rendered
+ * as a browser notification even when the row existed. Keep the two in sync.
+ */
+type ServerNotificationType =
+  | 'match_invite' | 'match_result' | 'pm' | 'babecock_invite' | 'babecock_start'
+  | 'like' | 'comment' | 'follow' | 'card_received' | 'card_purchase' | 'system';
+
 interface NotificationData {
-  type: 'match_invite' | 'match_start' | 'match_result' | 'pm' | 'babecock_invite' | 'system';
+  /** `match_start` is legacy-local; the rest come straight off the server union. */
+  type: ServerNotificationType | 'match_start';
   title: string;
   body: string;
   icon?: string;
@@ -17,12 +27,18 @@ interface NotificationData {
     url?: string;
     matchId?: string;
     inviteId?: string;
+    postId?: string;
     action?: string;
   };
   actions?: Array<{ action: string; title: string }>;
   requireInteraction?: boolean;
   sound?: string;
 }
+
+/** Engagement that should surface even when the app is in the background. */
+const ENGAGEMENT_TYPES = new Set<ServerNotificationType>([
+  'like', 'comment', 'follow', 'card_purchase', 'card_received',
+]);
 
 interface MatchInviteData {
   id: string;
@@ -46,6 +62,25 @@ export function useNotifications(lobbyState?: LobbyState | null) {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       setNotificationPermission(Notification.permission);
     }
+  }, []);
+
+  // Live server pushes -> browser notification. `orbit-incoming-notification`
+  // carries the whole notification row (useLobby dispatches it on the WS
+  // `notification:new` frame). PMs and match invites are excluded: they have
+  // their own channels and would double up.
+  const showServerNotificationRef = useRef<
+    ((row: { id?: string; type: string; title?: string; body?: string | null; data?: unknown }) => void) | null
+  >(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onIncoming = (e: Event) => {
+      const row = (e as CustomEvent<{ type?: string }>).detail;
+      const type = row?.type;
+      if (!type || type === 'pm' || type === 'match_invite') return;
+      showServerNotificationRef.current?.({ ...row, type });
+    };
+    window.addEventListener('orbit-incoming-notification', onIncoming);
+    return () => window.removeEventListener('orbit-incoming-notification', onIncoming);
   }, []);
 
   // Register Service Worker
@@ -156,6 +191,37 @@ export function useNotifications(lobbyState?: LobbyState | null) {
     } catch {
     }
   }, []);
+
+  // Show a server notification row (likes, follows, comments, ...) as a browser
+  // notification. This path did not exist: engagement rows were written by the
+  // server but only ever rendered inside the in-app bell, so a backgrounded
+  // tab showed nothing at all.
+  const showServerNotification = useCallback((row: {
+    id?: string
+    type: string
+    title?: string
+    body?: string | null
+    data?: unknown
+  }) => {
+    if (!row?.title) return
+    const type = row.type as ServerNotificationType
+    const data = (typeof row.data === 'string'
+      ? (() => { try { return JSON.parse(row.data) as Record<string, unknown> } catch { return {} } })()
+      : (row.data as Record<string, unknown> | undefined)) || {}
+    const postId = typeof data.post_id === 'string' ? data.post_id : undefined
+    showBrowserNotification({
+      type,
+      title: row.title,
+      body: row.body || '',
+      tag: `gmatch-${type}-${row.id ?? ''}`,
+      data: postId ? { postId, action: type } : { action: type },
+      // Engagement is FYI: don't demand interaction, or the tab keeps a
+      // notification parked on screen forever.
+      requireInteraction: !ENGAGEMENT_TYPES.has(type),
+      sound: ENGAGEMENT_TYPES.has(type) ? 'like' : undefined,
+    })
+  }, [showBrowserNotification]);
+  showServerNotificationRef.current = showServerNotification;
 
   // Show match invite notification
   const showMatchInviteNotification = useCallback((invite: MatchInviteData) => {
@@ -369,6 +435,7 @@ export function useNotifications(lobbyState?: LobbyState | null) {
     showMatchStartNotification,
     showMatchResultNotification,
     showPMNotification,
+    showServerNotification,
     playSFX,
     focusAndNavigate,
   };

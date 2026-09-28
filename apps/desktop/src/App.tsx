@@ -56,7 +56,7 @@ import { ProfileView } from "./components/views/ProfileView";
 import { DmMinimizedView } from "./components/views/MessagesView";
 import { MessagesRail } from "./components/chat/MessagesRail";
 import { WatchPartyView } from "./components/watchparty/WatchPartyView";
-import { setWatchDisplayName, useWatchParty } from "./hooks/watchPartyStore";
+import { setWatchDisplayName, useWatchParty, restoreRememberedParties } from "./hooks/watchPartyStore";
 import { GameView } from "./components/views/GameView";
 import { AgeGateModal } from "./components/auth/AgeGateModal";
 import { LegalCenter, isLegalAccepted } from "./components/LegalCenter";
@@ -78,6 +78,7 @@ import { ChatCircleText } from "@phosphor-icons/react";
 import { WallpaperBackground } from "./components/WallpaperBackground";
 import { ContextOverlay, ReportModal, type ContextMenuState } from "./components/ContextOverlay";
 import { isMediaVideo, resolveMediaUrl } from "./utils/media";
+import { prefetchObject, isRequestableObjectId } from "./hooks/useObjectImage";
 import { GlobalModals } from "./components/GlobalModals";
 import { ChangelogModal, CURRENT_CHANGELOG_VERSION } from "./components/ChangelogModal";
 import { GalleryTabView } from "./components/views/GalleryTabView";
@@ -99,6 +100,11 @@ import { dataUrlToBlob, localObjectBlobUrl } from "./utils/mediaData";
 import { mediaUrlToCachedFile } from "./utils/cacheMedia";
 
 const MAX_GALLERY_ITEMS_IN_MEMORY = 80;
+// Story tray warm-up: how many leading stories to prefetch, and how many of
+// those signed fetches may be in flight at once. Kept small on purpose — the
+// tray is browsed by tapping the first ring, not by scrolling 200 items.
+const STORY_PREFETCH_COUNT = 8;
+const STORY_PREFETCH_CONCURRENCY = 3;
 const MAX_PROFILE_PICS_IN_MEMORY = 120;
 
 const isDesktopViewport = () =>
@@ -123,8 +129,15 @@ export default function Home() {
     let dead = false;
     void (async () => {
       try {
-        const { clearDeadLoopbackApiBase, getApiBaseUrl } = await import('./utils/api');
+        const { clearDeadLoopbackApiBase, getApiBaseUrl, purgeCourierApiState } = await import('./utils/api');
         if (dead) return;
+        // Older builds auto-joined the central courier, which is a directory
+        // node: it cannot serve lobby/feed/users at all. Purge that state and
+        // reload once so API_BASE (computed at import) picks up the real node.
+        if (purgeCourierApiState()) {
+          if (!dead) window.location.reload();
+          return;
+        }
         if (await clearDeadLoopbackApiBase()) {
           if (!dead && /127\.0\.0\.1|localhost/.test(getApiBaseUrl())) window.location.reload();
         }
@@ -180,6 +193,15 @@ export default function Home() {
   const { peers, p2pItems, sendP2PItem, sendChatMessage, chatMessages, isWsConnected } = useP2P(identity);
   const { settings, update: updateSettings } = useSettings();
   useEffect(() => { setWatchDisplayName(myProfile.displayName || '') }, [myProfile.displayName]);
+  // Watch-party rooms persist server-side (an emptied room is never deleted),
+  // but the client's room list is a module singleton: without this a reload or
+  // an app restart forgot every room, and a PRIVATE room you had left was
+  // unreachable because the public listing omits private rooms. Re-join what
+  // this device remembers, once per identity.
+  useEffect(() => {
+    if (!identity) return;
+    void restoreRememberedParties(identity);
+  }, [identity]);
   // Watch tab: only a live ROOM gets the fullscreen treatment (see theater).
   const watchRoomOpen = useWatchParty().parties.length > 0;
   const [users, setUsers] = useState<User[]>([]);
@@ -999,6 +1021,30 @@ export default function Home() {
     if (target) setSelectedProfileUser(target)
   }, [users])
 
+  // Notification deep link: prefer the post a group folds around, via the
+  // feed's existing `#/feed?post=<id>` permalink (GMatchFeed opens the
+  // lightbox from it), else the actor's profile. Rows were inert before, so a
+  // "liked your post" bell gave you nowhere to go.
+  const handleOpenNotificationTarget = useCallback((target: { postId?: string; userId?: string }) => {
+    if (target.postId) {
+      setNotifOpen(false);
+      setMainView('feed');
+      const want = `#/feed?post=${encodeURIComponent(target.postId)}`;
+      if (window.location.hash === want) {
+        // Same hash: force the lightbox to re-open.
+        window.dispatchEvent(new CustomEvent('gmatch-open-post', { detail: { postId: target.postId } }));
+      } else {
+        window.history.pushState(null, '', want);
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      }
+      return;
+    }
+    if (target.userId) {
+      openProfileById(target.userId);
+      setNotifOpen(false);
+    }
+  }, [openProfileById])
+
   const [galleryPage, setGalleryPage] = useState(0);
   const [gallerySort, setGallerySort] = useState<'newest' | 'oldest' | 'likes' | 'score'>('newest');
   const [batchDownloading, setBatchDownloading] = useState(false);
@@ -1011,7 +1057,16 @@ export default function Home() {
       return [];
     }
   })
-  const [storiesLoading, setStoriesLoading] = useState(true)
+  // Stale-first: the boot mirror above is real data, so a revalidating fetch
+  // must NOT blank the tray. Loading starts true only when we have nothing to
+  // show, which is what makes the tray pop in empty on every cold start.
+  const [storiesLoading, setStoriesLoading] = useState(() => {
+    try {
+      return !localStorage.getItem('orbit_cached_stories')
+    } catch {
+      return true
+    }
+  })
   const storiesRequestRef = useRef(0)
   const [showStoryModal, setShowStoryModal] = useState(false)
   const [showCreateCardModal, setShowCreateCardModal] = useState(false)
@@ -1298,9 +1353,26 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body: text }),
       }, identity)
+      // Returns null on failure, which the caller surfaces as "not saved" and
+      // rolls its optimistic row back — previously the row survived forever.
       if (!res.ok) return null
       const data = await res.json()
-      return { id: data?.id || `c_${Date.now()}`, author_id: identity.orbitId, author_name: myProfile.displayName || 'You', author_avatar: profilePics[identity.orbitId] || null, text, created_at: 'Just now', like_count: 0, is_liked: false }
+      // The feed's comment_count is stale the moment a comment lands, and the
+      // 3s response cache would serve the pre-comment list to any refetch.
+      invalidateCache(`/api/posts/${postId}/comments`)
+      invalidateCache('/api/posts')
+      return {
+        id: data?.id || `c_${Date.now()}`,
+        author_id: identity.orbitId,
+        author_name: myProfile.displayName || 'You',
+        author_avatar: profilePics[identity.orbitId] || null,
+        text,
+        // The server's own timestamp, not the literal "Just now" that used to sit
+        // next to rows formatted as "2026-09-28 12:34:56".
+        created_at: typeof data?.created_at === 'string' ? data.created_at : new Date().toISOString(),
+        like_count: 0,
+        is_liked: false,
+      }
     } catch {
       return null
     }
@@ -2358,14 +2430,24 @@ export default function Home() {
           if (selfEntry) {
             selfEntry.online = true;
           } else {
+            // Synthetic self-entry (the server's 100-row directory can omit
+            // you). It is built from scratch every poll, so anything not seeded
+            // here reads as NaN/0 in the top bar and the Store — and, worse,
+            // "now created" is itself an unstable field. Carry the last known
+            // balance/score forward instead of inventing them.
+            const prior = users.find((u) => u.id === identity.orbitId);
             mergedMap.set(identity.orbitId, {
               id: identity.orbitId,
               publicKey: identity.publicKeyHex,
               encryptionPubKey: identity.encryptionPubHex,
-              createdAt: new Date().toISOString(),
-              display_name: localName || undefined,
+              createdAt: prior?.createdAt || new Date().toISOString(),
+              display_name: localName || prior?.display_name,
               online: true,
               last_seen: new Date().toISOString(),
+              pfp_url: prior?.pfp_url,
+              balance: prior?.balance ?? 0,
+              score: prior?.score ?? 0,
+              reputation: prior?.reputation ?? 0,
             } as User);
           }
         }
@@ -2681,7 +2763,9 @@ export default function Home() {
          const list = Array.isArray(data) ? data : []
          setStories(list)
         try {
-          localStorage.setItem('orbit_cached_stories', JSON.stringify(list.slice(0, 50)))
+          // Cap matches the server's own 200-row ceiling (routes/objects.ts),
+          // so a warm boot can render the whole tray while we revalidate.
+          localStorage.setItem('orbit_cached_stories', JSON.stringify(list.slice(0, 200)))
         } catch {}
       })
       .catch(err => {
@@ -2770,6 +2854,46 @@ export default function Home() {
     void mapLimit([...urls], 3, (u) => vaultPin(u).then(() => undefined));
   }, [settings.localVault, idleGallery, myCards, feedPosts, stories, users]);
 
+  // Story preload: warm the media for the stories the user is about to tap.
+  // Opening the tray used to start a cold signed fetch + decrypt per story, so
+  // the first tap always paid the full latency (and a 6s unavailability
+  // watchdog could outlast a 5s story). prefetchObject runs the exact same
+  // resolution + LRU path as a real mount and dedupes against it, so a
+  // prefetched story costs nothing extra when it renders.
+  useEffect(() => {
+    if (!identity || stories.length === 0) return;
+    if (typeof document !== 'undefined' && document.hidden) return;
+    // Only the head of the tray: these are the ones a tap can reach instantly.
+    //
+    // The key is subtle, because a story's media can live in three places:
+    //  1. /api/objects/<id>  -> prefetch that (normalizeCardId maps it onto the
+    //     same cache key the viewer uses, so the prefetch dedupes for real).
+    //  2. a magnet:/urn: descriptor (zero-media P2P) or nothing at all -> the
+    //     bytes are fetched BY s.id. Never by content_url: a magnet in a path
+    //     is truncated at its `?`, so the node was asked for the id "magnet:",
+    //     404'd, and the story died.
+    //  3. an external http(s)/data: URL -> the viewer loads it directly and
+    //     there is nothing to warm. Prefetching s.id here 404s on an object
+    //     that never existed, and the 404 handler prunes the story row.
+    const warm = stories
+      .slice(0, STORY_PREFETCH_COUNT)
+      .map((s) => {
+        const url = s.content_url || '';
+        if (/^(https?:|data:|blob:)/i.test(url)) return null;
+        if (url.startsWith('/api/objects/')) return url;
+        return s.id;
+      })
+      .filter((v): v is string => typeof v === 'string' && v.length > 0);
+    if (warm.length === 0) return;
+    // mapLimit paces the signed fetches so a 200-row tray cannot stampede the
+    // node (nor blow the RAM tripwires in perf.spec.ts).
+    void mapLimit(warm, STORY_PREFETCH_CONCURRENCY, async (target) => {
+      prefetchObject(target, identity)
+      // Yield so the concurrency cap is real work, not just N queued calls.
+      await new Promise((r) => setTimeout(r, 0))
+    });
+  }, [identity, stories]);
+
 
   // Prune dead 404 content when notified
   useEffect(() => {
@@ -2777,6 +2901,10 @@ export default function Home() {
       const customEvent = e as CustomEvent<{ cardId?: string }>
       const id = customEvent.detail?.cardId
       if (!id) return
+      // Only a real id can name a row we own. A descriptor (magnet/urn/URL)
+      // compares unequal to every story/item id anyway, but it would still
+      // fire a delete against a key that never existed.
+      if (!isRequestableObjectId(id)) return
       setItems(prev => prev.filter(item => item.id !== id))
       setStories(prev => prev.filter(story => story.id !== id))
       deleteObject(id).catch(() => { })
@@ -3507,8 +3635,11 @@ export default function Home() {
                       embedded
                       notifications={lobby.notifications}
                       unreadCount={lobby.unreadCount}
+                      unreadByType={lobby.unreadByType}
                       invites={lobby.invites}
                       onMarkAllRead={() => lobby.markNotificationsRead()}
+                      onMarkRead={(ids) => { void lobby.markNotificationsRead(ids); }}
+                      onOpenTarget={handleOpenNotificationTarget}
                       onRespondInvite={(id, accept) => lobby.respondToInvite(id, accept)}
                       onRespondBabecock={handleRespondBabecock}
                       onOpenBabecock={() => { setNotifOpen(false); setGamesSubTab('babecock'); setMainView('games'); }}
@@ -3744,7 +3875,7 @@ export default function Home() {
                       identity={identity}
                       myCards={myCards}
                       hasActiveDeck={hasActiveDeck}
-                      users={users}
+                      users={visibleUsers}
                       profilePics={profilePics}
                       lobby={lobby}
                       toggleAutoQueue={toggleAutoQueue}
@@ -4100,8 +4231,11 @@ export default function Home() {
                         embedded
                         notifications={lobby.notifications}
                         unreadCount={lobby.unreadCount}
+                        unreadByType={lobby.unreadByType}
                         invites={lobby.invites}
                         onMarkAllRead={() => lobby.markNotificationsRead()}
+                        onMarkRead={(ids) => { void lobby.markNotificationsRead(ids); }}
+                        onOpenTarget={handleOpenNotificationTarget}
                         onRespondInvite={(id, accept) => lobby.respondToInvite(id, accept)}
                         onRespondBabecock={handleRespondBabecock}
                         onOpenBabecock={() => { setNotifOpen(false); setGamesSubTab('babecock'); setMainView('games'); }}

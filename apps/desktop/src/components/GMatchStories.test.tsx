@@ -116,15 +116,29 @@ describe('GMatchStories author view count (T-W3c)', () => {
 });
 
 describe('GMatchStories loading state', () => {
-  it('hides user story bubbles while loading is true, keeping only Your story', () => {
+  // Stale-first (2026-09): `stories` already holds the localStorage boot
+  // mirror while the network revalidates, so the tray must NOT blank itself
+  // just because a request is in flight. The old contract ("hide everything
+  // while loading") popped the tray in empty on every cold start even though
+  // up to 200 cached rows were available.
+  it('keeps cached story bubbles visible while revalidating', () => {
     render(
       <ToastProvider>
         <GMatchStories stories={[story()]} loading={true} currentUserId="me" profilePics={{}} />
       </ToastProvider>,
     )
     expect(screen.getByText('Your story')).toBeInTheDocument()
+    expect(screen.getByAltText('Story Gal')).toBeInTheDocument()
+  })
+
+  it('hides story bubbles when loading AND there is nothing cached to show', () => {
+    render(
+      <ToastProvider>
+        <GMatchStories stories={[]} loading={true} currentUserId="me" profilePics={{}} />
+      </ToastProvider>,
+    )
+    expect(screen.getByText('Your story')).toBeInTheDocument()
     expect(screen.queryByAltText('Story Gal')).toBeNull()
-    expect(screen.queryByText('No active stories yet.')).toBeNull()
   })
 });
 

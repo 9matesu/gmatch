@@ -8,6 +8,8 @@ out
 tmp/
 orbit.snapshot.sqlite
 *.sqlite
+*.sqlite-*
+*.sqlite.*
 blobs/
 test-blobs-*/
 *.tsbuildinfo
@@ -44,6 +46,7 @@ site/releases/*.exe
 .preview.log
 
 apps/desktop/.electron-dist/
+apps/desktop/.hermes/
 
 # dev scratch + local server state
 apps/api/probe-*.ts

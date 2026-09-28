@@ -388,8 +388,18 @@ export async function maybeResetDailyScores(db: D1Turso, now: number = Date.now(
   const lastDay = last ? last.slice(0, 10) : null
   if (lastDay === day) return false
 
-  await db.prepare('UPDATE Users SET score = 0').run().catch(() => {})
-  await setMeta(db, 'last_score_reset_at', isoFromMs(now))
+  // One batch. These were two independent statements: a crash between them
+  // left last_score_reset_at at yesterday, so the next request zeroed EVERYONE's
+  // score a second time and wiped a full day of earned score. The .catch(() => {})
+  // also swallowed the failure while the marker still moved.
+  // (db.batch is a real transaction on D1/Turso; the embedded dev shim runs
+  // statements sequentially, which is a weaker but still not-worse guarantee.)
+  await db.batch([
+    db.prepare('UPDATE Users SET score = 0'),
+    db.prepare(
+      "INSERT INTO SystemMeta (key, value) VALUES ('last_score_reset_at', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+    ).bind(isoFromMs(now)),
+  ])
   return true
 }
 

@@ -1,5 +1,17 @@
 const UNITS = ['k', 'M', 'B', 'T', 'Qa', 'Qi']
 
+/**
+ * Whole-number formatting for currency/wallet displays, with thousands
+ * separators. Guards non-finite input: `Math.floor(undefined).toLocaleString()`
+ * is NaN, and `NaN.toLocaleString()` renders the literal string "NaN" in the
+ * top bar and the Store whenever the server roster omits the caller's row.
+ */
+export function formatCount(n: number | null | undefined): string {
+  const v = Number(n)
+  if (!Number.isFinite(v) || v < 0) return '0'
+  return Math.floor(v).toLocaleString()
+}
+
 /** Compact monospace-friendly number formatting for in-game point displays. */
 export function formatNum(n: number): string {
   if (!Number.isFinite(n) || n < 0) return '0'

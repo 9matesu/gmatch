@@ -1,7 +1,11 @@
 'use client'
 
 // Party chat: relayed text over the watch WS room (server rate-limits).
-// Session history only; a room is ephemeral, so no persistence by design.
+// History is kept by the ROOM, not this component: the server stores the last
+// 80 entries in memory and serializes them into watchparties.json, and the
+// `watch.join` snapshot hands the backlog back on rejoin. It is also persisted
+// client-side only as a room id (see watchPartyStore `rememberedRooms`), never
+// as message text.
 
 import { useEffect, useRef, useState } from 'react'
 import { Trash2 } from 'lucide-react'

@@ -1473,6 +1473,9 @@ admin.get('/users', async (c) => {
            COALESCE(u.gacha_items_collected, 0) as gacha_items_collected,
            COALESCE(g.sum_downloads, 0) as gacha_downloads_received,
            COALESCE(u.score, 0) as score,
+           COALESCE(u.score_total, 0) as score_total,
+           COALESCE(lr.wins, 0) as matches_won,
+           COALESCE(lr.losses, 0) as matches_lost,
            COALESCE(w.balance, 0) as balance,
            COALESCE(u.followers_count, 0) as followers_count,
            lp.status as lobby_status,
@@ -1483,6 +1486,7 @@ admin.get('/users', async (c) => {
     LEFT JOIN Bans b ON u.id = b.user_id
     LEFT JOIN Wallets w ON w.user_id = u.id
     LEFT JOIN LobbyPlayers lp ON u.id = lp.user_id
+    LEFT JOIN LeagueRank lr ON lr.user_id = u.id
     LEFT JOIN (
       SELECT owner_id, SUM(COALESCE(gacha_downloads_count, 0)) as sum_downloads
       FROM Objects
@@ -1521,6 +1525,12 @@ admin.get('/users', async (c) => {
       gacha_items_collected: Number(u.gacha_items_collected || 0),
       gacha_downloads_received: Number(u.gacha_downloads_received || 0),
       score: Number(u.score ?? 0),
+      // Reputation + duel record: the admin users table edits `score` but had no
+      // visibility into score_total, which is what the public "XP" board sorts
+      // on — so an admin could zero a daily score without seeing the lifetime one.
+      score_total: Number(u.score_total ?? 0),
+      matches_won: Number(u.matches_won ?? 0),
+      matches_lost: Number(u.matches_lost ?? 0),
       balance: Number(u.balance ?? 0),
       followers_count: Number(u.followers_count ?? 0),
       is_admin: u.is_admin ? true : false,

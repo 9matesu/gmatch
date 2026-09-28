@@ -195,7 +195,10 @@ export function SpectateModal({
     ) {
       return trimmed
     }
-    return `/api/objects/${trimmed}`
+    // encodeURIComponent: an id is one path segment. Without it a descriptor
+    // that slipped through (magnet:?xt=… carries ? and &) would truncate the
+    // path and 404 on the fragment before the id.
+    return `/api/objects/${encodeURIComponent(trimmed)}`
   }
 
   const cardAUrl = formatCardUrl(pA.card)

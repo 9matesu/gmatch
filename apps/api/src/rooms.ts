@@ -686,10 +686,11 @@ export async function getRoomSnapshot(db: D1Turso, roomId: string, _viewerId?: s
 export async function getLeague(db: D1Turso, limit: number = 20): Promise<LeagueEntry[]> {
   const rows = await db
     .prepare(`
-      SELECT lr.user_id, u.display_name, lr.wins, lr.points
+      SELECT lr.user_id, u.display_name, u.pfp_url, lr.wins, lr.losses, lr.points
       FROM LeagueRank lr
       LEFT JOIN Users u ON u.id = lr.user_id
-      ORDER BY lr.points DESC, lr.wins DESC
+      WHERE u.hidden_at IS NULL
+      ORDER BY lr.points DESC, lr.wins DESC, lr.user_id ASC
       LIMIT ?
     `)
     .bind(limit)
@@ -697,7 +698,9 @@ export async function getLeague(db: D1Turso, limit: number = 20): Promise<League
   return rows.results.map((r) => ({
     user_id: r.user_id,
     display_name: r.display_name ?? null,
+    pfp_url: r.pfp_url ?? null,
     wins: Number(r.wins || 0),
+    losses: Number(r.losses || 0),
     points: Number(r.points || 0),
     tier: Math.floor(Number(r.points || 0) / (LEAGUE_CHAMPION_POINTS / 2)),
   }))

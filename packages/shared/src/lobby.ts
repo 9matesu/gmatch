@@ -357,7 +357,11 @@ export interface RoomSnapshot {
 export interface LeagueEntry {
   user_id: OrbitId;
   display_name?: string | null;
+  /** Avatar for the board row; the server selects it so the league doesn't
+   *  fall back to generated SVGs for players outside the client roster. */
+  pfp_url?: string | null;
   wins: number;
+  losses: number;
   points: number;
   tier: number;
 }

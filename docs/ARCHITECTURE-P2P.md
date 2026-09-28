@@ -194,6 +194,22 @@ type SwarmMessage =
 2. **Rehydration on Boot:** When the desktop app launches, `hydrateLocalObjects()` scans IndexedDB and mounts stored objects into the in-memory seeder index (`localObjects`).
 3. **Zero Server Upload:** Media binaries are never uploaded to the courier. The courier only routes encrypted metadata. Content availability relies entirely on the peer swarm.
 
+### Story tray warm-up (2026-09-25)
+
+Browsing the feed should not pay a cold fetch per story. Three client-side
+pieces, no protocol change:
+
+- `useObjectImage` dedupes concurrent resolutions of the same object id
+  (`inflight` map keyed like the LRU), so a feed tile and the story player can
+  ask for the same object without racing — the loser previously orphaned a
+  blob URL into leaked RAM.
+- `prefetchObject(id, identity)` runs the same resolution path and populates
+  the LRU, so a warm object costs nothing extra when it renders. The shell
+  warms the leading stories (`STORY_PREFETCH_COUNT`, concurrency 3) whenever
+  the list changes and the window is visible.
+- The tray renders the localStorage boot mirror while the network revalidates
+  (stale-first), instead of blanking itself for the whole first fetch.
+
 ---
 
 ## 5. Honest Boundaries & Fallback Behavior
@@ -210,3 +226,25 @@ type SwarmMessage =
 
 - If no seeders are online for a requested media object, the client does not crash or hang: it renders an offline SVG placeholder indicating the media is currently dormant until a seeder comes online.
 - When an offline peer returns, `announcePeerOnline` is triggered, causing failed tiles to re-issue `SWARM_WANT` requests.
+
+### Watch-party rooms are persistent (2026-09-25)
+
+A room outlives everyone in it, by design: `removeMember` never deletes, and
+`serializeParties` writes name, media, queue, `current`, frame **and chat** to
+`watchparties.json` every 30s (plus on SIGTERM). The *client* used to be the
+weak link — a module-level store with no persistence, so a reload or a leave
+forgot the room, and a **private** room you had left was unreachable because
+the public listing hides private rooms.
+
+- The client remembers joined room ids (`gmatch_watchparties_v1`, ids + name +
+  last media URL only — never chat text) and re-joins on boot through the
+  existing `GET /api/watchparty/:id`, whose snapshot carries the authoritative
+  media, queue, position and chat. A `404` means the room really ended and the
+  entry is forgotten; a network error keeps it for the next boot.
+- Browse mode lists those remembered rooms as "Recently watched", which is the
+  only way back into a private room you are not currently in.
+- Because rooms are immortal, the server cap (`MAX_PARTIES`, 25) is the only
+  reclaim path, and it now evicts **oldest-created-first** so a long-lived room
+  you use daily is not the first casualty. A room with nobody in it stops
+  holding its media blob after `EMPTY_MEDIA_LEASE_MS` (6h) — the room survives,
+  the bytes do not.

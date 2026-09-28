@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import { formatCount } from '../../ui/format';
 import {
   Monitor,
   Shield,
@@ -606,7 +607,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                       <span className="text-amber-400/80"> · offline, sends will be refused (free)</span>
                     )}
                   </div>
-                  <div className="text-xs font-mono text-retro-muted">{points.toLocaleString()} g$</div>
+                  <div className="text-xs font-mono text-retro-muted">{formatCount(points)} g$</div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {ACTION_ORDER.map((action) => {

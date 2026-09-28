@@ -234,18 +234,23 @@ export async function applyLikeDecision(
     // must never roll back a like that already landed (counters are committed).
     try {
       const { createNotification } = await import('./notifications')
+      const { broadcastToUser } = await import('./ws-bus')
       const liker = await db
         .prepare('SELECT display_name FROM Users WHERE id = ?')
         .bind(userId)
         .first<{ display_name: string | null }>()
-      await createNotification(
+      const likerName = liker?.display_name?.trim() || 'Someone'
+      const notif = await createNotification(
         db,
         obj.owner_id,
         'like',
-        `${liker?.display_name?.trim() || 'Someone'} liked your post`,
+        `${likerName} liked your post`,
         null,
-        { object_id: objectId, liker_id: userId },
+        { object_id: objectId, liker_id: userId, actor_id: userId, actor_name: likerName },
       )
+      // Push like every other notification writer does. Without this the bell
+      // only filled on the next reload.
+      if (notif) broadcastToUser(obj.owner_id, { type: 'notification', action: 'new', notification: notif })
     } catch { /* bell is best-effort */ }
   } else if (!isPositive && wasPositive) {
     await db.batch([

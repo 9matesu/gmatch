@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { STORE_ITEMS, type StoreItem, type User, formatGc, computeCashoutPayout, clampCashoutRateBps, DEFAULT_CASHOUT_RATE_BPS, RARITY_TIERS } from '@orbit/shared';
-import { orbitFetch } from '../utils/api';
+import { orbitFetch, invalidateCache } from '../utils/api';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { ActiveHackSession } from './home/CommandIsland';
 import { playPress, playLike } from '../utils/sounds';
+import { formatCount } from '../ui/format';
 import { TargetSelectorModal } from './hacks/TargetSelectorModal';
 import { ObjectImage } from './ObjectImage';
 import { CardDetailView } from './CardDetailView';
@@ -279,6 +280,14 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
         playLike();
         toast?.(`Purchased ${item.name}`, 'success');
         onPurchase?.(item);
+        // A purchase moves the wallet, so the balance everywhere (top bar,
+        // Store, rankings) is now stale. The two sibling handlers above already
+        // do this; the buy path was the outlier and left the number frozen for
+        // a full poll interval. invalidateCache because /api/users is served
+        // from the 3s response cache, which would otherwise hand back the
+        // pre-purchase snapshot.
+        invalidateCache('/api/users');
+        window.dispatchEvent(new CustomEvent('orbit-score-refresh'));
 
         if (item.category === 'hack' && targetId) {
           // Deferred so the purity rule doesn't see Date.now() during render paths.
@@ -354,7 +363,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
         <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-interactive border border-border-glass rounded-lg">
           <Coins className="w-3.5 h-3.5 text-retro-accent" />
           <span className="text-xs text-retro-muted">Balance:</span>
-          <span className="text-sm font-medium font-mono text-retro-fg tabular-nums">g$ {points.toLocaleString()}</span>
+          <span className="text-sm font-medium font-mono text-retro-fg tabular-nums">g$ {formatCount(points)}</span>
         </div>
       </section>
 
@@ -608,7 +617,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
 
               <div className="pt-3 border-t border-border-glass mt-3 flex items-center justify-between gap-2">
                 <span className="text-sm font-medium font-mono tabular-nums text-rose-400">
-                  g$ {item.cost.toLocaleString()}
+                  g$ {formatCount(item.cost)}
                 </span>
 
                 <button

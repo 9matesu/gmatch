@@ -68,6 +68,8 @@ export function useLobby({
   const [babecockVersion, setBabecockVersion] = useState(0)
   const [notifications, setNotifications] = useState<Array<{ id: string; type: string; title: string; body: string | null; data: any; read: boolean; created_at: string }>>([])
   const [unreadCount, setUnreadCount] = useState(0)
+  /** Unread split per notification type — badges for likes/follows separately. */
+  const [unreadByType, setUnreadByType] = useState<Record<string, number>>({})
   const [invites, setInvites] = useState<Array<{ id: string; inviter_id: string; invitee_id: string; status: string; created_at: string; expires_at: string; inviter_name: string | null; inviter_pfp_url: string | null }>>([])
   // Match id the player just quit (optimistically cleared). WS pushes for this
   // id are suppressed until either (a) a fresh snapshot confirms the quit OR
@@ -221,6 +223,13 @@ export function useLobby({
         if (Array.isArray(body.notifications)) {
           setNotifications(body.notifications)
           setUnreadCount(Number(body.unread || 0))
+          // Per-type badges (likes/follows separate). Additive on the server:
+          // older nodes omit the field and we simply keep an empty map.
+          setUnreadByType(
+            body.unread_by_type && typeof body.unread_by_type === 'object'
+              ? (body.unread_by_type as Record<string, number>)
+              : {},
+          )
         }
       }
       if (invitesRes.ok) {
@@ -929,7 +938,29 @@ export function useLobby({
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) },
       identity
     )
+    // Mark-all (no ids) clears everything; a targeted read only clears the
+    // rows we were asked about, so the other badges survive.
+    if (ids && ids.length > 0) {
+      const hit = new Set(ids)
+      setNotifications((prev) => {
+        const next = prev.map((n) => (hit.has(n.id) ? { ...n, read: true } : n))
+        // Recount per type from the rows themselves — deriving from the old
+        // map meant a badge could disagree with the list it labels.
+        const byType: Record<string, number> = {}
+        let stillUnread = 0
+        for (const n of next) {
+          if (n.read) continue
+          stillUnread += 1
+          byType[n.type] = (byType[n.type] || 0) + 1
+        }
+        setUnreadByType(byType)
+        setUnreadCount(stillUnread)
+        return next
+      })
+      return
+    }
     setUnreadCount(0)
+    setUnreadByType({})
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
   }, [identity])
 
@@ -976,6 +1007,7 @@ export function useLobby({
     babecockVersion,
     notifications,
     unreadCount,
+    unreadByType,
     invites,
     refreshNotifications,
     respondToInvite,

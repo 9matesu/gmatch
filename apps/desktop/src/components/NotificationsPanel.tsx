@@ -12,9 +12,10 @@ import {
   Heart,
   UserPlus,
   Sparkles,
+  ShoppingBag,
   X,
 } from "lucide-react";
-import { groupNotifications, groupTitle, type NotifItem } from "../utils/groupNotifications";
+import { groupNotifications, groupTitle, groupItemIds, groupTarget, type NotifItem } from "../utils/groupNotifications";
 import { playPress } from "../utils/sounds";
 import { resolveMediaUrl } from "../utils/media";
 
@@ -41,8 +42,14 @@ export interface MatchInviteItem {
 export interface NotificationsPanelProps {
   notifications?: NotificationItem[];
   unreadCount?: number;
+  /** Unread split per type, for per-row badges. */
+  unreadByType?: Record<string, number>;
   invites?: MatchInviteItem[];
   onMarkAllRead: () => void;
+  /** Mark just these notification ids read (per-group / per-row tap). */
+  onMarkRead?: (ids: string[]) => void;
+  /** Navigate to the post a group folds around, or to the actor's profile. */
+  onOpenTarget?: (target: { postId?: string; userId?: string }) => void;
   onRespondInvite?: (inviteId: string, accept: boolean) => void;
   onRespondBabecock?: (inviteId: string, accept: boolean) => void;
   onOpenBabecock?: () => void;
@@ -60,14 +67,20 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   comment: <MessageSquare className="w-4 h-4 text-sky-400" />,
   follow: <UserPlus className="w-4 h-4 text-purple-400" />,
   card_received: <Sparkles className="w-4 h-4 text-amber-300" />,
+  // Was missing: the group fold still folded these, but the row fell back to a
+  // generic bell, so "bought your card" had no icon.
+  card_purchase: <ShoppingBag className="w-4 h-4 text-emerald-300" />,
   system: <Bell className="w-4 h-4 text-retro-muted" />,
 };
 
 export function NotificationsPanel({
   notifications = [],
   unreadCount = 0,
+  unreadByType = {},
   invites = [],
   onMarkAllRead,
+  onMarkRead,
+  onOpenTarget,
   onRespondInvite,
   onRespondBabecock,
   onOpenBabecock,
@@ -78,7 +91,7 @@ export function NotificationsPanel({
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const items = useMemo(
@@ -88,11 +101,27 @@ export function NotificationsPanel({
         .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || "")),
     [notifications]
   );
-  // Instagram-style fold: "Rafael and 3 others liked your card" — pure view
-  // logic; read-state plumbing stays as-is (mark-all), no per-group action.
+  // Instagram-style fold: "Rafael and 3 others liked your post" — pure view
+  // logic over the server list (already capped at 50, no memo needed).
   const groups = useMemo(() => groupNotifications(items as unknown as NotifItem[]), [items]);
 
+
   const openInvites = invites.filter((invite) => new Date(invite.expires_at).getTime() > now);
+
+  // Per-type summary line, so "likes" and "follows" are legible instead of one
+  // anonymous total. Only rendered when the split actually says something.
+  const unreadBreakdown = useMemo(() => {
+    const entries = Object.entries(unreadByType).filter(([, n]) => n > 0)
+    if (entries.length < 2) return ''
+    const LABELS: Record<string, string> = {
+      like: 'likes', comment: 'comments', follow: 'follows',
+      card_purchase: 'purchases', card_received: 'cards', pm: 'messages',
+    }
+    return entries
+      .sort((a, b) => b[1] - a[1])
+      .map(([type, n]) => `${n} ${LABELS[type] || type}`)
+      .join(' · ')
+  }, [unreadByType]);
 
   return (
     <div className={`flex flex-col h-full min-h-0 overflow-hidden ${embedded ? 'bg-transparent' : 'solid-panel'}`}>
@@ -134,6 +163,11 @@ export function NotificationsPanel({
           )}
         </div>
       </div>
+      {unreadBreakdown && (
+        <div className="px-3 py-1.5 text-[10px] text-retro-muted border-b border-border-glass shrink-0">
+          {unreadBreakdown}
+        </div>
+      )}
 
       <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar p-2 space-y-1">
         {openInvites.length > 0 && (
@@ -203,14 +237,31 @@ export function NotificationsPanel({
             const isBabecockInvite = n.type === "babecock_invite";
             const inviteId = typeof n.data === 'string' ? (() => { try { return JSON.parse(n.data)?.invite_id; } catch { return undefined; } })() : (n.data as { invite_id?: string })?.invite_id;
             const title = g.items.length > 1 ? groupTitle(g.type, g.actors) : n.title;
+            // Tapping a group marks exactly its rows read and jumps to whatever
+            // it folds around (the post, else the actor). Rows used to be inert.
+            const actionable = Boolean(onOpenTarget) && !isBabecockInvite;
             return (
               <div
                 key={g.key}
+                role={actionable ? 'button' : undefined}
+                tabIndex={actionable ? 0 : undefined}
+                aria-label={actionable ? `Open: ${title}` : undefined}
+                onClick={actionable ? () => {
+                  playPress(700);
+                  if (g.unread > 0) onMarkRead?.(groupItemIds(g));
+                  onOpenTarget?.(groupTarget(g));
+                } : undefined}
+                onKeyDown={actionable ? (e) => {
+                  if (e.key !== 'Enter' && e.key !== ' ') return;
+                  e.preventDefault();
+                  if (g.unread > 0) onMarkRead?.(groupItemIds(g));
+                  onOpenTarget?.(groupTarget(g));
+                } : undefined}
                 className={`p-3 rounded-lg flex items-start gap-3 border ${
                   g.unread === 0
                     ? "border-border-glass bg-glass-w5"
                     : "glass-inset border-border-glass"
-                }`}
+                }${actionable ? ' cursor-pointer hover:bg-glass-w8 transition-colors' : ''}`}
               >
                 <div className="w-8 h-8 rounded-full glass-inset flex items-center justify-center shrink-0">
                   {TYPE_ICONS[n.type] || <Bell className="w-4 h-4" />}

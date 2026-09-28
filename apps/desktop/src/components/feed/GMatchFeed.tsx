@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useCropper } from '../../hooks/useCropper';
 import { DEFAULT_FEED_SORT, FEED_SORT_LABELS, firstLikeCrossed, type FeedSort } from './feedSort'
+import { formatLikedBy } from '../../utils/likedBy'
 import { suggestFollows } from './suggestFollows'
 import { playPress, playWin, playMsgReceive, playLikeOnce } from '../../utils/sounds';
 import {
@@ -50,7 +51,6 @@ import { GAME_AD_TEMPLATES } from '../../utils/gameAds';
 import { ExploreSearchModal } from './ExploreSearchModal';
 import { useNow } from '../../hooks/useNow';
 import { SharePostModal } from './SharePostModal';
-import { CommentsModal } from './CommentsModal';
 import { PostOptionsModal } from './PostOptionsModal';
 import { ReportPostModal } from './ReportPostModal';
 import { PostCreatorModal } from './PostCreatorModal';
@@ -67,6 +67,8 @@ export interface PostComment {
   created_at: string;
   like_count: number;
   is_liked?: boolean;
+  /** Optimistic row not yet confirmed by the server. */
+  pending?: boolean;
 }
 
 export interface FeedPost {
@@ -86,6 +88,8 @@ export interface FeedPost {
   tags?: string[];
   created_at: string;
   like_count: number;
+  /** Newest-first liker names for the "Liked by X and N others" line. */
+  likers?: { user_id: string; display_name: string; pfp_url?: string | null }[];
   comment_count: number;
   share_count?: number;
   is_liked?: boolean;
@@ -272,15 +276,24 @@ export function GMatchFeed({
   });
 
   // Comments State (No mockups)
-  const [activeCommentsPostId, setActiveCommentsPostId] = useState<string | null>(null);
   const [commentsMap, setCommentsMap] = useState<Record<string, PostComment[]>>({});
+  /** Posts whose comment list is already in `commentsMap` — a ref, not state, so
+   *  the fetch effect doesn't re-run (and refetch) on every list mutation. */
+  const commentsLoadedRef = useRef<Set<string>>(new Set());
+  const [commentsLoadingId, setCommentsLoadingId] = useState<string | null>(null);
 
   // Share Modal State
   const [sharingPost, setSharingPost] = useState<FeedPost | null>(null);
 
-  // Deep link: #/feed?post=<id> (from share/permalink) opens the post lightbox
-  // once the post is loaded. One-shot — later list changes don't reopen it.
+  // Deep link: #/feed?post=<id> (from share/permalink, or a notification deep
+  // link) opens the post lightbox once the post is loaded. One-shot — later
+  // list changes don't reopen it. The custom event covers the case where the
+  // hash is already correct and only the intent is new.
   const deepLinkDoneRef = useRef(false);
+  const openFromDeepLink = useCallback((postId: string) => {
+    const target = posts.find((p) => p.id === postId);
+    if (target) setActiveLightboxPost(target);
+  }, [posts]);
   useEffect(() => {
     if (deepLinkDoneRef.current || posts.length === 0) return;
     const m = /post=([\w-]+)/.exec(window.location.hash);
@@ -291,6 +304,16 @@ export function GMatchFeed({
       setActiveLightboxPost(target);
     }
   }, [posts]);
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const postId = (e as CustomEvent<{ postId?: string }>).detail?.postId;
+      if (!postId) return;
+      deepLinkDoneRef.current = false;
+      openFromDeepLink(postId);
+    };
+    window.addEventListener('gmatch-open-post', onOpen);
+    return () => window.removeEventListener('gmatch-open-post', onOpen);
+  }, [openFromDeepLink]);
 
   // Post Options Modal State
   const [optionsPost, setOptionsPost] = useState<FeedPost | null>(null);
@@ -524,53 +547,92 @@ export function GMatchFeed({
     const text = (textToAdd || '').trim();
     if (!text) return;
     playMsgReceive();
-    const newComment: PostComment = {
-      id: `c_${Date.now()}`,
-      author_id: identity?.orbitId || 'me',
-      author_name: 'You',
-      author_avatar: profilePics[identity?.orbitId || ''],
-      text,
-      created_at: 'Just now',
-      like_count: 0,
-    };
-
-    setCommentsMap((prev) => ({
-      ...prev,
-      [postId]: [...(prev[postId] || []), newComment],
-    }));
 
     const post = posts.find((p) => p.id === postId);
     if (post) boostTagAffinity(post.tags);
 
-    toast?.('Comment posted!', 'success');
+    // Sponsored posts have no persist path, so a "Comment posted!" toast there
+    // was claiming a write that never happened.
+    if (post?.is_sponsored) {
+      toast?.('Comments are closed on sponsored posts', 'info');
+      return;
+    }
 
-    if (!post?.is_sponsored) {
-      onPersistComment?.(postId, text).then((serverComment) => {
+    const draftId = `c_pending_${Date.now()}`;
+    const draft: PostComment = {
+      id: draftId,
+      author_id: identity?.orbitId || 'me',
+      author_name: 'You',
+      author_avatar: profilePics[identity?.orbitId || ''],
+      text,
+      // A real timestamp, not the literal string "Just now" that then sat next
+      // to server rows formatted as "2026-09-28 12:34:56".
+      created_at: new Date().toISOString(),
+      like_count: 0,
+      pending: true,
+    };
+    setCommentsMap((prev) => ({ ...prev, [postId]: [...(prev[postId] || []), draft] }));
+
+    const dropDraft = (message: string) => {
+      setCommentsMap((prev) => ({
+        ...prev,
+        [postId]: (prev[postId] || []).filter((c) => c.id !== draftId),
+      }));
+      toast?.(message, 'error');
+    };
+
+    const persist = onPersistComment?.(postId, text);
+    if (!persist) {
+      // No persist handler wired: nothing to confirm against, so keep the row
+      // rather than silently deleting the user's comment.
+      setCommentsMap((prev) => ({
+        ...prev,
+        [postId]: (prev[postId] || []).map((c) => (c.id === draftId ? { ...c, pending: false } : c)),
+      }));
+      return;
+    }
+    void persist
+      .then((serverComment) => {
         if (serverComment) {
           setCommentsMap((prev) => ({
             ...prev,
-            [postId]: (prev[postId] || []).map((c) =>
-              c.id === newComment.id ? serverComment : c
-            ),
+            [postId]: (prev[postId] || []).map((c) => (c.id === draftId ? { ...serverComment, pending: false } : c)),
           }));
+        } else {
+          // persistComment returns null on any failure; keeping the draft would
+          // show a comment that does not exist on the server.
+          dropDraft('Comment not saved — try again');
         }
-      });
-    }
+      })
+      .catch(() => dropDraft('Comment not saved — try again'));
   };
 
+  // The server route is like-only and idempotent (INSERT OR IGNORE, no unlike
+  // endpoint), so this does NOT pretend to toggle: an already-liked comment is
+  // left alone, and the server's own count is what lands in state.
   const handleToggleCommentLike = (postId: string, commentId: string) => {
+    const target = (commentsMap[postId] || []).find((c) => c.id === commentId);
+    if (!target || target.pending) return;
+    if (target.is_liked) {
+      toast?.('Likes on comments cannot be undone', 'info');
+      return;
+    }
+    if (!identity) return;
     playPress(850);
-    setCommentsMap((prev) => {
-      const list = prev[postId] || [];
-      return {
-        ...prev,
-        [postId]: list.map((c) =>
-          c.id === commentId
-            ? { ...c, is_liked: !c.is_liked, like_count: c.like_count + (c.is_liked ? -1 : 1) }
-            : c
-        ),
-      };
-    });
+    void orbitFetch(`/api/posts/${postId}/comments/${commentId}/like`, { method: 'POST' }, identity)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`like failed: ${res.status}`);
+        const data = await res.json().catch(() => null);
+        setCommentsMap((prev) => ({
+          ...prev,
+          [postId]: (prev[postId] || []).map((c) =>
+            c.id === commentId
+              ? { ...c, is_liked: true, like_count: Number(data?.like_count ?? c.like_count + 1) }
+              : c
+          ),
+        }));
+      })
+      .catch(() => toast?.('Could not like that comment', 'error'));
   };
 
   const handleCopyLink = (post: FeedPost) => {
@@ -580,27 +642,36 @@ export function GMatchFeed({
     setOptionsPost(null);
   };
 
-  const activeCommentsPost = useMemo(() => {
-    if (!activeCommentsPostId) return null;
-    return posts.find((p) => p.id === activeCommentsPostId) || null;
-  }, [activeCommentsPostId, posts]);
-
-  // Fetch persisted comments whenever a post's comment modal is opened
+  // Fetch the comments for the post the lightbox is showing.
+  //
+  // This used to be keyed on `activeCommentsPostId`, which was only ever
+  // initialised to null and reset to null — nothing in the app ever assigned a
+  // post id to it. So the fetch could not run, `CommentsModal` was unreachable,
+  // and the lightbox (the ONLY comment surface a user can reach) rendered an
+  // always-empty list. Keyed on the post that is actually open instead.
+  const lightboxPostId = activeLightboxPost?.id ?? null;
   useEffect(() => {
-    if (!activeCommentsPostId || !identity) return;
-    orbitFetch(`/api/posts/${activeCommentsPostId}/comments`, {}, identity)
+    if (!lightboxPostId || !identity) return;
+    if (commentsLoadedRef.current.has(lightboxPostId)) return;
+    let cancelled = false;
+    setCommentsLoadingId(lightboxPostId);
+    orbitFetch(`/api/posts/${lightboxPostId}/comments`, {}, identity)
       .then(async (res) => {
         if (!res.ok) return;
         const list = await res.json();
-        if (Array.isArray(list)) {
-          setCommentsMap((prev) => ({
-            ...prev,
-            [activeCommentsPostId]: list,
-          }));
-        }
+        if (cancelled || !Array.isArray(list)) return;
+        setCommentsMap((prev) => ({ ...prev, [lightboxPostId]: list }));
       })
-      .catch(() => {});
-  }, [activeCommentsPostId, identity]);
+      .catch(() => {})
+      .finally(() => {
+        if (cancelled) return;
+        // Marked loaded even on failure: a post with no accessible comments must
+        // not be re-requested on every open, and the empty state is the truth.
+        commentsLoadedRef.current.add(lightboxPostId);
+        setCommentsLoadingId(null);
+      });
+    return () => { cancelled = true; };
+  }, [lightboxPostId, identity]);
 
   return (
     <div className="w-full flex flex-col font-sans select-none pb-12 text-retro-fg">
@@ -687,8 +758,18 @@ export function GMatchFeed({
            {displayPosts.map((post, _idx) => {
             const isLiked = !!likedPosts[post.id];
             const isSaved = !!savedPosts[post.id];
-            const currentLikes = likeCounts[post.id] ?? post.like_count ?? 0;
+             const currentLikes = likeCounts[post.id] ?? post.like_count ?? 0;
+             // The preview only names OTHER people; while I am the only liker
+             // (or the summary would read "Liked by me") the bare count shows.
+             const likersPreview = isLiked
+               ? post.likers?.filter((l) => l.user_id !== identity?.orbitId)
+               : post.likers;
+             const likedByLabel = formatLikedBy(likersPreview, currentLikes);
+
             const postComments = commentsMap[post.id] || [];
+            // Server truth for the count; the local map is only warm once the
+            // lightbox has been opened for this post.
+            const postCommentCount = Math.max(post.comment_count ?? 0, postComments.length);
             const authorHasStory = storyOwners.has(post.author_id);
             const isObjectMedia = post.url.includes('/api/objects/') || post.url.startsWith('vault://') || !post.url || post.url.startsWith('magnet:') || post.url.startsWith('urn:sha256:') || post.url.startsWith('p2p-');
             const isVideo = isVideoPost(post.mime_type, post.url, siblingMimesFor(post));
@@ -1040,7 +1121,9 @@ export function GMatchFeed({
                     </button>
                   </div>
 
-                  {/* Likes Count */}
+                  {/* Likes: "Liked by Ana, Bo and 12 others" (falls back to
+                      the bare count until the preview arrives or when this
+                      client is the only liker). */}
                   <button
                     type="button"
                     onClick={() => {
@@ -1050,7 +1133,7 @@ export function GMatchFeed({
                     className="text-left text-xs font-semibold text-retro-fg tracking-tight hover:underline cursor-pointer w-fit transition-colors"
                     aria-label="View who liked this post"
                   >
-                    {currentLikes.toLocaleString()} {currentLikes === 1 ? 'like' : 'likes'}
+                    {likedByLabel || `${currentLikes.toLocaleString()} ${currentLikes === 1 ? 'like' : 'likes'}`}
                   </button>
 
                   {/* Caption & Tags */}
@@ -1081,24 +1164,30 @@ export function GMatchFeed({
                     </div>
                   )}
 
-                  {/* Comments Trigger & Recent Preview */}
-                  {postComments.length > 0 ? (
+                  {/* Comments Trigger & Recent Preview.
+                      The count comes from post.comment_count (server truth),
+                      NOT from the local map: the map only fills once the
+                      lightbox has been opened, so gating on it made every post
+                      read "Add a comment..." even with a dozen replies. */}
+                  {postCommentCount > 0 ? (
                     <div className="space-y-1 mt-0.5">
                       <button
                         type="button"
                         onClick={() => { playPress(750); setActiveLightboxPost(post); }}
                         className="text-left text-xs text-retro-muted hover:text-retro-fg cursor-pointer font-medium block"
                       >
-                        View all {postComments.length} comments
+                        View all {postCommentCount} comment{postCommentCount === 1 ? '' : 's'}
                       </button>
 
-                      {/* Show top recent comment snippet */}
-                      <div className="text-xs text-retro-fg flex items-center justify-between">
-                        <div className="truncate">
-                          <strong className="font-semibold text-retro-fg mr-1.5">{postComments[postComments.length - 1].author_name}</strong>
-                          <span className="text-retro-muted"><Linkify text={postComments[postComments.length - 1].text} /></span>
+                      {/* Snippet: only once we've actually loaded the list. */}
+                      {postComments.length > 0 && (
+                        <div className="text-xs text-retro-fg flex items-center justify-between">
+                          <div className="truncate">
+                            <strong className="font-semibold text-retro-fg mr-1.5">{postComments[postComments.length - 1].author_name}</strong>
+                            <span className="text-retro-muted"><Linkify text={postComments[postComments.length - 1].text} /></span>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   ) : (
                     <button
@@ -1203,22 +1292,6 @@ export function GMatchFeed({
         document.body,
       )}
 
-      {/* ─── MODAL 2: Comments Slide-Up Sheet (portaled) ─── */}
-      {activeCommentsPost && createPortal(
-<CommentsModal
-            post={activeCommentsPost}
-            onClose={() => setActiveCommentsPostId(null)}
-            comments={commentsMap[activeCommentsPost.id] || []}
-            profilePics={profilePics}
-            onAddComment={handleAddComment}
-            onToggleCommentLike={handleToggleCommentLike}
-            onAvatarClick={handleAvatarClick}
-            onReportComment={onReportComment}
-            toast={toast}
-          />,
-        document.body,
-      )}
-
       {/* ─── MODAL 3: Post Options Action Sheet (portaled) ─── */}
       {optionsPost && createPortal(
         <PostOptionsModal
@@ -1258,10 +1331,12 @@ export function GMatchFeed({
         isSaved={activeLightboxPost ? !!savedPosts[activeLightboxPost.id] : false}
         likeCount={activeLightboxPost ? likeCounts[activeLightboxPost.id] ?? activeLightboxPost.like_count ?? 0 : 0}
         comments={activeLightboxPost ? commentsMap[activeLightboxPost.id] || [] : []}
+        commentsLoading={!!activeLightboxPost && commentsLoadingId === activeLightboxPost.id}
         onToggleLike={toggleLike}
         onToggleSave={toggleSave}
         onAddComment={handleAddComment}
         onToggleCommentLike={handleToggleCommentLike}
+        onReportComment={onReportComment}
         onOpenShare={(p) => {
           setActiveLightboxPost(null);
           setSharingPost(p);

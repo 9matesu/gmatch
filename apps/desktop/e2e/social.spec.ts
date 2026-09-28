@@ -41,7 +41,7 @@ async function newPeerContext(page: import('@playwright/test').Page, name: strin
 
 async function publishPost(page: import('@playwright/test').Page, caption: string) {
   await page.goto('/#/feed')
-  await page.getByRole('button', { name: 'Create post', exact: true }).click()
+  await page.getByRole('button', { name: 'Create Post', exact: true }).click()
   const drop = page.getByText('Drag & drop photos or click to browse')
   await expect(drop).toBeVisible({ timeout: 20_000 })
   // Real user flow: clicking the dropzone opens the OS file chooser; other
@@ -84,6 +84,48 @@ test('journey 2: like + comment round trip on a post', async ({ page }) => {
   await expect(page.getByText(text).first()).toBeVisible({ timeout: 15_000 })
 })
 
+// The comment list used to be read from a map seeded off `post.comments`, which
+// no feed endpoint returns, and the only fetch in the app was keyed on a state
+// that was never assigned a post id. So EVERY post read "No comments yet" and
+// the assertion above passed purely on an optimistic local append that never
+// touched the server. Reopening the lightbox after a reload is what proves the
+// list is actually read back.
+test('journey 2b: a comment survives a reload and reappears in the lightbox', async ({ page }) => {
+  // Publish + comment + reload + reopen is more work than any other journey.
+  test.slow()
+  await seedApp(page)
+  const caption = `comment reload ${Date.now()}`
+  await publishPost(page, caption)
+  const text = `persisted comment ${Date.now()}`
+  // Scope to THIS post's card. The feed can hold several posts with one
+  // comment, so a bare `.first()` on "View all N comments" can open someone
+  // else's post.
+  const card = page.locator('article').filter({ hasText: caption }).first()
+
+  await card.locator('button[aria-label="Comment"]').click()
+  const box = page.getByPlaceholder('Add a comment...')
+  await expect(box).toBeVisible({ timeout: 15_000 })
+  await box.fill(text)
+  await box.press('Enter')
+  await expect(page.getByText(text).first()).toBeVisible({ timeout: 15_000 })
+
+  // Reload: nothing survives in React state, so the comment can only come back
+  // from GET /api/posts/:id/comments. (persistComment invalidates that path, so
+  // the 3s response cache cannot serve the pre-comment list here.)
+  await page.reload()
+  const cardAfter = page.locator('article').filter({ hasText: caption }).first()
+  await expect(cardAfter).toBeVisible({ timeout: 20_000 })
+  // The card must advertise the real count from the server, not "Add a
+  // comment…" — that gate used to read the always-empty local map.
+  const viewAll = cardAfter.getByRole('button', { name: /View all 1 comment/ })
+  await expect(viewAll).toBeVisible({ timeout: 20_000 })
+
+  await viewAll.click()
+  await expect(page.getByText(text).first()).toBeVisible({ timeout: 20_000 })
+  // Server timestamps render as relative time, not a raw SQLite string.
+  await expect(page.getByText('just now').first()).toBeVisible({ timeout: 10_000 })
+})
+
 test('journey 3: DM a peer and both sides see the message', async ({ page }) => {
   await seedApp(page)
   const peerName = `E2E Peer ${Date.now()}`
@@ -92,8 +134,8 @@ test('journey 3: DM a peer and both sides see the message', async ({ page }) => 
   await expect(pageB.getByText(peerName).first()).toBeVisible({ timeout: 25_000 })
 
   await page.goto('/#/messages')
-  // Desktop: #/messages lands on the dock preview; open the unified chat.
-  await page.getByText('Open rooms →').click({ timeout: 20_000 })
+  // '#/messages' resolves straight to the unified rooms/chat view (App maps
+  // messages -> rooms), so there is no "Open rooms →" interstitial any more.
   const search = page.getByPlaceholder('Search...')
   await expect(search).toBeVisible({ timeout: 20_000 })
   await search.fill(peerName)
@@ -107,7 +149,6 @@ test('journey 3: DM a peer and both sides see the message', async ({ page }) => 
   await expect(page.getByText(msg).first()).toBeVisible({ timeout: 15_000 })
 
   await pageB.goto('/#/messages')
-  await pageB.getByText('Open rooms →').click({ timeout: 20_000 })
   await expect(pageB.getByText(msg).first()).toBeVisible({ timeout: 25_000 })
   await ctxB.close()
 })
@@ -134,9 +175,14 @@ test('journey 5: store renders priced items from the server', async ({ page }) =
   await expect(page.locator('text=/g\\$\\s?[\\d.,]+/').first()).toBeVisible({ timeout: 25_000 })
 })
 
-test('journey 6: admin route shows the PIN gate (reachable, not dead)', async ({ page }) => {
+// The admin suite is a PIN-gated MODAL opened from the HUD, not a route.
+// It used to be '#/admin', and that route was left registered after it became
+// a modal — so it resolved to a view with no render branch (blank stage) and
+// persisted into orbit_main_view. This journey drives the real entry point.
+test('journey 6: admin panel opens from the HUD and shows the PIN gate', async ({ page }) => {
   await seedApp(page)
-  await page.goto('/#/admin')
+  await page.goto('/#/grid')
+  await page.getByRole('button', { name: 'Admin', exact: true }).click()
   await expect(page.getByText('Admin Operations')).toBeVisible({ timeout: 15_000 })
   await expect(page.getByPlaceholder('Secret Passcode')).toBeVisible()
 })

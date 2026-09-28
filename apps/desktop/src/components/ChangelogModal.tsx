@@ -7,7 +7,7 @@ export interface ChangelogModalProps {
   onClose: () => void
 }
 
-export const CURRENT_CHANGELOG_VERSION = '1.5.1'
+export const CURRENT_CHANGELOG_VERSION = '1.5.2'
 
 export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
   if (!isOpen) return null
@@ -16,7 +16,7 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="What's New in version 1.5.1"
+      aria-label="What's New in version 1.5.2"
       className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 sm:p-6 animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()

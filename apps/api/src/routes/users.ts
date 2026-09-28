@@ -161,6 +161,11 @@ users.get('/', async (c) => {
   const limit = isNaN(limitParam) ? 100 : Math.min(Math.max(1, limitParam), 200)
   const cursor = c.req.query('cursor') || ''
 
+  // Lazy daily score reset so the leaderboard always reflects today's haul.
+  // BEFORE the directory query, not after: reading first returned yesterday's
+  // totals to the first request of every UTC day.
+  await maybeResetDailyScores(c.env.DB, Date.now()).catch(() => {})
+
   let results: any[] = []
   try {
     let queryStr = `
@@ -206,10 +211,25 @@ users.get('/', async (c) => {
 
     const res = await c.env.DB.prepare(queryStr).bind(...params).all()
     results = res.results || []
-  } catch  {
+  } catch (primaryErr) {
+    // The fallback must be COLUMN-IDENTICAL to the primary query. It used to
+    // omit pfp_url, matches_won/lost, balance, gacha_items_collected,
+    // likes_given/received and matches_total, and the mapper then read them as
+    // undefined -> 0. That silently emptied the Card Duel board, zeroed every
+    // W/L, blanked every avatar and showed "0 likes" for the whole roster —
+    // with no log line to explain it. Only the Objects aggregation (g) is
+    // dropped: that is the fragile part on older schemas.
+    console.error('[users] directory query failed, using degraded fallback:', primaryErr)
     let queryStr = `
-      SELECT u.id, u.public_key, u.encryption_pub_key, u.display_name, u.tags, u.last_seen, u.attention_at,
+      SELECT u.id, u.public_key, u.encryption_pub_key, u.display_name, u.tags, u.pfp_url, u.last_seen, u.attention_at,
              COALESCE(u.objects_sent_count, 0) as objects_sent_count,
+             COALESCE(u.gacha_items_collected, 0) as gacha_items_collected,
+             COALESCE(u.maximum_gooner, 0) as maximum_gooner,
+             COALESCE(u.is_admin, 0) as is_admin,
+             COALESCE(u.is_moderator, 0) as is_moderator,
+             COALESCE(u.likes_given, 0) as likes_given,
+             COALESCE(u.likes_received, 0) as likes_received,
+             COALESCE(u.matches_total, 0) as matches_total,
              COALESCE(u.score, 0) as score,
              COALESCE(u.score_total, 0) as score_total,
              COALESCE(u.bio, '') as bio,
@@ -218,9 +238,13 @@ users.get('/', async (c) => {
              (SELECT COUNT(*) FROM Followers gc WHERE gc.follower_id = u.id AND gc.accepted = 1) as following_count,
              COALESCE(u.posts_count, 0) as posts_count,
              COALESCE(u.is_private, 0) as is_private,
-             COALESCE(u.is_moderator, 0) as is_moderator,
-             COALESCE(u.is_admin, 0) as is_admin
+             0 as gacha_downloads_received,
+             COALESCE(lr.wins, 0) as matches_won,
+             COALESCE(lr.losses, 0) as matches_lost,
+             COALESCE(w.balance, 0) as balance
       FROM Users u
+      LEFT JOIN LeagueRank lr ON lr.user_id = u.id
+      LEFT JOIN Wallets w ON w.user_id = u.id
     `
     const params: any[] = []
     if (cursor) {
@@ -237,8 +261,6 @@ users.get('/', async (c) => {
   }
 
   const now = Date.now()
-  // Lazy daily score reset so the leaderboard always reflects today's haul.
-  await maybeResetDailyScores(c.env.DB, now).catch(() => {})
   const mapped = (results as any[]).map(u => {
     let tags: string[] = []
     try { tags = u.tags ? JSON.parse(u.tags) : [] } catch { tags = [] }
@@ -388,11 +410,18 @@ users.get('/:id', async (c) => {
   // denormalized followers_count/following_count drift after cascade deletes
   // and admin edits (and the columns stay there purely as the bump target).
   const row = await c.env.DB.prepare(
-    `SELECT id, public_key, encryption_pub_key, display_name, bio, website,
-            tags, pfp_url, last_seen, score, posts_count, likes_received, is_private, is_admin, is_moderator,
-            (SELECT COUNT(*) FROM Followers f WHERE f.followee_id = Users.id AND f.accepted = 1) as followers_count,
-            (SELECT COUNT(*) FROM Followers f WHERE f.follower_id = Users.id AND f.accepted = 1) as following_count
-     FROM Users WHERE id = ? AND hidden_at IS NULL`,
+    `SELECT u.id, u.public_key, u.encryption_pub_key, u.display_name, u.bio, u.website,
+            u.tags, u.pfp_url, u.last_seen, u.score, u.posts_count, u.likes_received,
+            u.is_private, u.is_admin, u.is_moderator,
+            COALESCE(u.score_total, 0) as score_total,
+            COALESCE(u.objects_sent_count, 0) as objects_sent_count,
+            COALESCE(u.gacha_items_collected, 0) as gacha_items_collected,
+            COALESCE(lr.wins, 0) as matches_won,
+            COALESCE(lr.losses, 0) as matches_lost,
+            (SELECT COUNT(*) FROM Followers f WHERE f.followee_id = u.id AND f.accepted = 1) as followers_count,
+            (SELECT COUNT(*) FROM Followers f WHERE f.follower_id = u.id AND f.accepted = 1) as following_count
+     FROM Users u LEFT JOIN LeagueRank lr ON lr.user_id = u.id
+     WHERE u.id = ? AND u.hidden_at IS NULL`,
   ).bind(id).first<Record<string, unknown>>()
   if (!row) return c.json({ error: 'User not found' }, 404)
   let tags: string[] = []
@@ -409,6 +438,14 @@ users.get('/:id', async (c) => {
       pfp_url: row.pfp_url || undefined,
       last_seen: row.last_seen || undefined,
       score: row.score ?? 0,
+      // Reputation + duel record: the rankings boards sort on these, so the
+      // profile "details" has to show them or it explains nothing. (balance is
+      // deliberately NOT here — wallets stay private to their owner.)
+      reputation: row.score_total ?? 0,
+      objects_sent_count: row.objects_sent_count ?? 0,
+      gacha_items_collected: row.gacha_items_collected ?? 0,
+      matches_won: row.matches_won ?? 0,
+      matches_lost: row.matches_lost ?? 0,
       followers_count: row.followers_count ?? 0,
       following_count: row.following_count ?? 0,
       posts_count: row.posts_count ?? 0,

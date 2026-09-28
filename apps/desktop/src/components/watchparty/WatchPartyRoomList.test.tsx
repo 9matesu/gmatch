@@ -18,6 +18,8 @@ vi.mock('../../hooks/useObjectImage', () => ({
 const mockJoinPartyById = vi.fn()
 vi.mock('../../hooks/watchPartyStore', () => ({
   joinPartyById: (...args: any[]) => mockJoinPartyById(...args),
+  // The gallery also offers rooms this device remembers but has left.
+  rememberedRooms: () => [],
 }))
 
 const mockOrbitFetch = vi.fn()

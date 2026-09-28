@@ -1,17 +1,26 @@
 "use client";
 
 import { useMemo, useState } from 'react';
-import { Trophy, MousePointerClick, Swords, Heart, Search } from 'lucide-react';
+import { Trophy, Swords, Heart, Search, Sparkles } from 'lucide-react';
 import { Avatar } from '../Avatar';
+import { formatNum } from '../../ui/format';
 import type { User } from '@orbit/shared';
 
-type Board = 'idle' | 'arena' | 'social';
+type Board = 'collection' | 'arena' | 'social';
 type SocialMetric = 'all' | 'today';
 
-const BOARDS: { id: Board; label: string; icon: typeof Trophy }[] = [
-  { id: 'idle', label: 'Wallet', icon: MousePointerClick },
-  { id: 'arena', label: 'Card Duel', icon: Swords },
-  { id: 'social', label: 'Social', icon: Heart },
+const BOARDS: { id: Board; label: string; hint: string; icon: typeof Trophy }[] = [
+  {
+    id: 'collection',
+    label: 'Collection',
+    // Wallet balances are deliberately private: the directory only returns
+    // `balance` for the caller, so a balance-ranked board was empty for everyone
+    // else. Collection finds are public, so the board ranks on those instead.
+    hint: 'Most gacha finds collected. Wallet balances stay private.',
+    icon: Sparkles,
+  },
+  { id: 'arena', label: 'Card Duel', hint: 'Ranked by duel wins.', icon: Swords },
+  { id: 'social', label: 'Social', hint: 'Ranked by reputation, or by today’s score.', icon: Heart },
 ];
 
 function shortId(id: string): string {
@@ -23,62 +32,91 @@ function displayName(user: User): string {
   return name || shortId(user.id);
 }
 
-function formatNum(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 10_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
-
 function primaryScore(board: Board, metric: SocialMetric, u: User): number {
-  if (board === 'idle') return u.balance ?? 0;
+  if (board === 'collection') return u.gacha_items_collected ?? 0;
   if (board === 'arena') return u.matches_won ?? 0;
   return metric === 'today' ? (u.daily_score ?? u.score ?? 0) : (u.reputation ?? 0);
 }
 
 function scoreLabel(board: Board, value: number): string {
-  if (board === 'idle') return `${formatNum(value)} g$`;
+  if (board === 'collection') return `${formatNum(value)} find${value === 1 ? '' : 's'}`;
   if (board === 'arena') return `${value} win${value === 1 ? '' : 's'}`;
   return `${formatNum(value)} ${value === 1 ? 'pt' : 'pts'}`;
 }
 
 function secondaryLine(board: Board, u: User): string {
-  if (board === 'idle') {
-    const kos = u.gacha_items_collected ?? 0;
-    return `${u.objects_sent_count ?? 0} cards \u00b7 ${kos} finds`;
+  if (board === 'collection') {
+    return `${u.objects_sent_count ?? 0} cards sent \u00b7 ${u.likes_received ?? 0} likes`;
   }
   if (board === 'arena') {
     const won = u.matches_won ?? 0;
     const lost = u.matches_lost ?? 0;
-    return `${u.matches_total ?? 0} duels \u00b7 ${won}W ${lost}L`;
+    // matches_total is a mutual-LIKE count, not duels — the old line printed
+    // it as "N duels" next to a W/L from LeagueRank, which are unrelated.
+    return `${won + lost} duel${won + lost === 1 ? '' : 's'} \u00b7 ${won}W ${lost}L`;
   }
   return `${u.likes_received ?? 0} likes \u00b7 ${u.followers_count ?? 0} followers`;
 }
 
+const MEDALS = ['\u{1F3C6}', '\u{2461}', '\u{2462}'];
+
+/** 1st/2nd/3rd get a medal; everyone else a muted `#n`. Previously only #1 got
+ *  an icon, so #2 and #3 rendered identically to #4. */
+function RankBadge({ rank }: { rank: number }) {
+  if (rank >= 1 && rank <= 3) {
+    return (
+      <span className="text-sm leading-none" aria-label={`Rank ${rank}`} role="img">
+        {MEDALS[rank - 1]}
+      </span>
+    );
+  }
+  return <span className="text-xs font-mono text-retro-muted">#{rank}</span>;
+}
+
 export function RankingsPanel({
   users,
+  currentUserId,
   onSelectUser,
 }: {
   users: User[];
+  currentUserId?: string;
   onSelectUser: (userId: string) => void;
 }) {
-  const [board, setBoard] = useState<Board>('idle');
+  const [board, setBoard] = useState<Board>('collection');
   const [socialMetric, setSocialMetric] = useState<SocialMetric>('all');
   const [onlineOnly, setOnlineOnly] = useState(false);
   const [query, setQuery] = useState('');
 
-  const ranked = useMemo(() => {
-    const q = query.trim().toLowerCase();
+  // Rank is assigned ONCE from the full, sorted board, before search and the
+  // "Online only" toggle narrow the view. It used to be `idx + 1` on the
+  // filtered array, so typing a search restarted the list at #1 and two
+  // players could be shown different ranks for the same person.
+  const boardList = useMemo(() => {
     return users
-      .filter((u) => (onlineOnly ? u.online : true))
-      .filter((u) => (q ? displayName(u).toLowerCase().includes(q) || u.id.toLowerCase().startsWith(q) : true))
       .filter((u) => primaryScore(board, socialMetric, u) > 0)
       .sort((a, b) => {
         const diff = primaryScore(board, socialMetric, b) - primaryScore(board, socialMetric, a);
         if (diff !== 0) return diff;
         return a.id.localeCompare(b.id);
-      })
+      });
+  }, [users, board, socialMetric]);
+
+  const rankById = useMemo(() => {
+    const map = new Map<string, number>();
+    boardList.forEach((u, i) => map.set(u.id, i + 1));
+    return map;
+  }, [boardList]);
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return boardList
+      .filter((u) => (onlineOnly ? u.online : true))
+      .filter((u) => (q ? displayName(u).toLowerCase().includes(q) || u.id.toLowerCase().startsWith(q) : true))
       .slice(0, 100);
-  }, [users, board, socialMetric, onlineOnly, query]);
+  }, [boardList, onlineOnly, query]);
+
+  const myRank = currentUserId ? rankById.get(currentUserId) : undefined;
+  const boardHint = BOARDS.find((b) => b.id === board)?.hint;
 
   return (
     <div className="glass-surface rounded-lg p-4 space-y-3">
@@ -146,15 +184,28 @@ export function RankingsPanel({
         )}
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-retro-muted">
+        <span>{boardHint}</span>
+        {myRank && (
+          <span className="font-mono" data-testid="rankings-my-rank">
+            Your rank: #{myRank} of {boardList.length}
+          </span>
+        )}
+      </div>
+
       <div className="space-y-1 max-h-[calc(100dvh-360px)] min-h-[200px] overflow-y-auto styled-scrollbar pr-1">
-        {ranked.length === 0 ? (
+        {visible.length === 0 ? (
           <p className="text-xs text-retro-muted text-center py-10">
-            Nobody on this board yet{query ? ' for your search' : ''}.
+            {boardList.length === 0
+              ? 'Nobody on this board yet.'
+              : query
+                ? `No players match your search on this board.`
+                : 'No online players on this board yet.'}
           </p>
         ) : (
-          ranked.map((user, idx) => {
+          visible.map((user) => {
             const value = primaryScore(board, socialMetric, user);
-            const rank = idx + 1;
+            const rank = rankById.get(user.id) ?? 0;
             return (
               <button
                 key={user.id}
@@ -162,12 +213,8 @@ export function RankingsPanel({
                 onClick={() => onSelectUser(user.id)}
                 className="w-full text-left bg-surface-interactive border border-border-glass rounded-lg p-2.5 flex items-center gap-3 hover:border-border-glass transition-colors cursor-pointer"
               >
-                <span className="w-6 flex-shrink-0 text-center text-xs font-mono text-retro-muted">
-                  {rank <= 3 && rank === 1 ? (
-                    <Trophy className="w-3.5 h-3.5 text-retro-accent mx-auto" />
-                  ) : (
-                    `#${rank}`
-                  )}
+                <span className="w-6 flex-shrink-0 text-center">
+                  <RankBadge rank={rank} />
                 </span>
                 <div className="relative flex-shrink-0">
                   <Avatar id={user.id} imageUrl={user.pfp_url || undefined} size={32} />

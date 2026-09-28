@@ -75,7 +75,7 @@ const dbReadyPromise = (async () => {
 // /data volume as the DB snapshot. 30 s tick + SIGTERM flush; file is tiny
 // (<=50 rooms) so unconditional rewrite is fine. Workers mode has no FS and
 // skips this entirely (routes only run here).
-import { serializeParties, restoreParties, liveMediaObjectIds } from './watchparty'
+import { serializeParties, restoreParties, liveMediaObjectIds, takePartiesDirty } from './watchparty'
 const PARTIES_PATH = process.env.WATCH_PARTIES_PATH ||
   (process.env.SNAPSHOT_PATH ? join(dirname(process.env.SNAPSHOT_PATH), 'watchparties.json') : './watchparties.json')
 async function flushParties(): Promise<void> {
@@ -88,11 +88,15 @@ import('node:fs/promises').then(({ readFile }) =>
     .catch(() => { /* first boot: no file yet */ }),
 ).catch(() => {})
 setInterval(() => {
+  // A room that just emptied sets a dirty flag (see removeMember): the snapshot
+  // below is already unconditional, so the flag only documents that this state
+  // matters. Consume it here so it cannot latch forever.
+  takePartiesDirty()
   flushParties().catch((e) => console.warn('[WATCH] snapshot failed', (e as Error)?.message || e))
-  // Live rooms re-extend their media leases (Objects.expires_at, A4); a
-  // room that truly dies stops refreshing and expires +1 day after last
-  // use. Without this, an all-night room eventually served a purged
-  // object ("No preview") while touchRooms kept it alive.
+  // Live rooms re-extend their media leases (Objects.expires_at, A4); a room
+  // that truly dies stops refreshing and expires +1 day after last use.
+  // `liveMediaObjectIds` also drops rooms that have been empty past
+  // EMPTY_MEDIA_LEASE_MS, so an abandoned room stops holding blobs hostage.
   const ids = liveMediaObjectIds()
   if (ids.length && dbReady) {
     const ph = ids.map(() => '?').join(',')

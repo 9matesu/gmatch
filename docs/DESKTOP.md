@@ -53,8 +53,11 @@ Help → Troubleshooting → Open log folder):
 | `orbit.sqlite`, `blobs/` | the host-mode world | server-managed |
 | `secure-*.json` | DPAPI-encrypted KV | identity keys etc. |
 
-Feed images are RAM-only (`gmcache://` protocol, `imageCache.cjs`) — bytes
-never hit disk, nothing sensitive survives a shutdown.
+Feed images are served from the main-process cache over the `gmcache://`
+protocol (`imageCache.cjs`) into `diskImageCache.cjs`: bytes are **encrypted on
+disk** (AES-256-GCM, `userData/imgcache/*.enc`, 500 MB LRU-by-last-use), not
+held in RAM as this doc previously claimed. Nothing sensitive is stored
+unencrypted — but bytes *do* survive a shutdown and are re-used next launch.
 
 ## Failure paths (what the user sees when each layer breaks)
 
@@ -108,8 +111,9 @@ dark by design.
 1. `apps/desktop/package.json`: bump `version`.
 2. `npm run lint && npm run typecheck && npm run test` (0 errors, green).
 3. `node electron/*.test.cjs` battery (admin-pin, customFolders, imageCache,
-   imageCacheMemory, secureStore, mainlog, window-bounds, booru-sources,
-   server-mode, updater).
+   secureStore, mainlog, window-bounds, booru-sources). `imageCacheMemory` was
+   removed with the RAM cache it covered — the disk cache is exercised by
+   `imageCache.test.cjs` plus the vitest suites.
 4. `cd apps/desktop && npm run dist` → `release/gmatch-<version>-portable.exe`.
 5. Smoke the artifact: single-instance, log writes, server switch panel,
    window bounds restore, update check.

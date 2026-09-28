@@ -21,6 +21,11 @@ export function Modal({
       onClick={dismissable ? onClose : undefined}
     >
       <div
+        // Every modal in the app is a dialog; without this it is an anonymous
+        // div to assistive tech and to end-to-end tests.
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         onClick={e => e.stopPropagation()}
         className={`w-full ${maxWidth} glass-panel shadow-xl animate-orbit-pop`}
       >

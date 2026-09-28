@@ -17,7 +17,13 @@ export const ROUTE_VIEWS = [
   'grid',
   'rooms',
   'servers',
-  'admin',
+  // NOT a route: the admin suite is a PIN-gated MODAL opened from the HUD
+  // (AdminApp, CommandIsland's Admin button). It was briefly a view and was
+  // left registered here after that reverted, so '#/admin' resolved to a view
+  // with no render branch — a blank stage, persisted into orbit_main_view and
+  // therefore on every launch. Keep it out of ROUTE_VIEWS so viewFromHash
+  // rejects the deep link and App's persisted-view guard falls back to
+  // 'servers'.
   'watch',
 ] as const
 

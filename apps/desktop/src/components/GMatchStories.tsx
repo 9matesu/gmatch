@@ -9,8 +9,7 @@ import { useToast } from './Toast';
 import { useNow } from '../hooks/useNow';
 import { playPress, playLike } from '../utils/sounds';
 import { ObjectImage } from './ObjectImage';
-import { isMediaVideo, resolveMediaUrl } from '../utils/media';
-import { LazyVideo } from './LazyVideo';
+import CachedImg from '../ui/CachedImg';
 import {
   Heart,
   X,
@@ -20,8 +19,36 @@ import {
   MessageCircle,
 } from 'lucide-react';
 
-interface GMatchStoriesProps {
-  stories: OrbitObject[];
+/** How long a story stays on screen once its media is ready. */
+const STORY_DURATION_MS = 5000;
+/**
+ * A dead story must be skipped by its OWN clock. The strict-availability
+ * watchdog on ObjectImage defaults to 6s, which used to outlast the 5s story
+ * and leave the stage spinning after the next one had already advanced.
+ */
+const STORY_MEDIA_TIMEOUT_MS = 4000;
+/** Cap on the persisted seen-id set (it only drives ring styling). */
+const SEEN_STORIES_MAX = 500;
+const SEEN_PERSIST_DEBOUNCE_MS = 800;
+
+let seenPersistTimer: ReturnType<typeof setTimeout> | null = null;
+/**
+ * Coalesce the seen-id write. Stories advance every 5s, so a synchronous
+ * stringify+write per view was pure main-thread churn for a value that only
+ * affects ring styling.
+ */
+function scheduleSeenPersist(ids: Set<string>): void {
+  if (typeof window === 'undefined') return;
+  if (seenPersistTimer) clearTimeout(seenPersistTimer);
+  seenPersistTimer = setTimeout(() => {
+    seenPersistTimer = null;
+    try {
+      localStorage.setItem('orbit_seen_stories', JSON.stringify(Array.from(ids)));
+    } catch { /* private mode */ }
+  }, SEEN_PERSIST_DEBOUNCE_MS);
+}
+
+interface GMatchStoriesProps {  stories: OrbitObject[];
   loading?: boolean;
   relationships?: Relationship[];
   currentUserId: string;
@@ -64,15 +91,12 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
       let changed = false;
       for (const id of viewedIds) if (!next.has(id)) { next.add(id); changed = true; }
       if (!changed) return prev;
-      try {
-        localStorage.setItem('orbit_seen_stories', JSON.stringify(Array.from(next)));
-      } catch {}
+      scheduleSeenPersist(next);
       return next;
     });
   }, [stories]);
 
-  const [openUserId, setOpenUserId] = useState<string | null>(null);
-  const [openOrder, setOpenOrder] = useState<string[] | null>(null);
+  const [openUserId, setOpenUserId] = useState<string | null>(null);  const [openOrder, setOpenOrder] = useState<string[] | null>(null);
   const [activeStoryIndex, setActiveStoryIndex] = useState<number>(0);
   const [isPaused, setIsPaused] = useState(false);
   const [mediaLoading, setMediaLoading] = useState(true);
@@ -134,7 +158,11 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
   }, [stories, seenStoryIds, profilePics]);
 
   const visibleGroupedUsers = useMemo(() => {
-    if (loading) return [];
+    // Stale-first: `stories` already holds the boot mirror while the network
+    // revalidates, so hide the tray only when there is genuinely nothing to
+    // show. Gating on `loading` alone blanked the tray on every cold start
+    // even though 50-200 cached rows were sitting right there.
+    if (loading && groupedUsers.length === 0) return [];
     return groupedUsers;
   }, [loading, groupedUsers]);
 
@@ -153,14 +181,23 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
     setIsPaused(false);
   };
 
-  // Mark story as seen
+  // Mark story as seen.
+  // The seen set grows without bound (a 7h TTL per story, so ids accumulate
+  // forever) and used to be JSON.stringify'd into localStorage on EVERY story
+  // view. Cap it and debounce the write: the ids only drive ring styling, so
+  // losing the oldest few is harmless.
   const markAsSeen = (id: string) => {
     if (!id || seenStoryIds.has(id)) return;
     setSeenStoryIds((prev) => {
       const next = new Set(prev).add(id);
-      try {
-        localStorage.setItem('orbit_seen_stories', JSON.stringify(Array.from(next)));
-      } catch {}
+      if (next.size > SEEN_STORIES_MAX) {
+        // Sets iterate in insertion order, so this drops the oldest ids.
+        for (const old of next) {
+          if (next.size <= SEEN_STORIES_MAX) break;
+          next.delete(old);
+        }
+      }
+      scheduleSeenPersist(next);
       return next;
     });
     // Fire-and-forget cross-device record; the endpoint is idempotent.
@@ -222,7 +259,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
     markAsSeen(currentStory.id);
     setProgress(0);
 
-    const DURATION_MS = 5000;
+    const DURATION_MS = STORY_DURATION_MS;
     const INTERVAL_MS = 100;
     const step = (INTERVAL_MS / DURATION_MS) * 100;
 
@@ -336,7 +373,12 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
           <div className="relative p-[2px] rounded-full">
             <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-surface-interactive overflow-hidden flex items-center justify-center border border-border-glass">
               {profilePics[currentUserId] ? (
-                <img src={resolveMediaUrl(profilePics[currentUserId])} alt="You" className="w-full h-full object-cover" />
+                <CachedImg
+                  src={profilePics[currentUserId]}
+                  alt="You"
+                  loading="lazy"
+                  className="w-full h-full object-cover"
+                />
               ) : (
                 <span className="text-xs font-black text-retro-muted">YOU</span>
               )}
@@ -369,9 +411,10 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
               <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-surface-raised p-[2px] overflow-hidden">
                 <div className="w-full h-full rounded-full bg-surface-interactive overflow-hidden flex items-center justify-center">
                   {group.pfpUrl && !pfpFailed[group.userId] ? (
-                    <img
-                      src={resolveMediaUrl(group.pfpUrl)}
+                    <CachedImg
+                      src={group.pfpUrl}
                       alt={group.displayName}
+                      loading="lazy"
                       className="w-full h-full object-cover"
                       onError={() => setPfpFailed((prev) => (prev[group.userId] ? prev : { ...prev, [group.userId]: true }))}
                     />
@@ -443,9 +486,10 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
                 <div className="w-8 h-8 rounded-full p-[1.5px] bg-retro-accent">
                   <div className="w-full h-full rounded-full bg-surface-canvas overflow-hidden flex items-center justify-center">
                     {activeGroup.pfpUrl && !pfpFailed[activeGroup.userId] ? (
-                      <img
-                        src={resolveMediaUrl(activeGroup.pfpUrl)}
+                      <CachedImg
+                        src={activeGroup.pfpUrl}
                         alt=""
+                        loading="eager"
                         className="w-full h-full object-cover"
                         onError={() => setPfpFailed((prev) => (prev[activeGroup.userId] ? prev : { ...prev, [activeGroup.userId]: true }))}
                       />
@@ -510,6 +554,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
                 videoClassName="w-full h-full object-contain"
                 onLoad={() => setMediaLoading(false)}
                 onLoadingChange={(loading) => setMediaLoading(loading)}
+                unavailableTimeoutMs={STORY_MEDIA_TIMEOUT_MS}
                 onMediaUnavailable={() => {
                   setMediaLoading(false)
                   goToNextStory()

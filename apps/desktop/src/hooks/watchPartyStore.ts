@@ -49,6 +49,137 @@ export const MAX_SLOTS = 4
 
 const state: WatchPartyState = { open: false, parties: [], subscribed: false, kickedNotice: '' }
 
+// ---------------------------------------------------------------------------
+// Remembered rooms
+//
+// The server deliberately never deletes an emptied room (watchparty.ts
+// removeMember), and it serializes name/media/queue/chat to watchparties.json
+// every 30s. So the room survives — but this store is a MODULE-LEVEL SINGLETON
+// with no persistence at all: a reload, a crash or an app restart wiped
+// `parties`, and a private room you left then became unreachable (listParties
+// filters out private rooms). Remembering the ids locally is what makes "I
+// created a room, left, came back" actually work.
+//
+// Entries are a re-entry hint only. The authoritative name/media/queue/chat
+// always come back from GET /api/watchparty/:id, so a stale entry can never
+// resurrect a room that really ended — restore treats 404 as "forget it".
+// ---------------------------------------------------------------------------
+const REMEMBERED_KEY = 'gmatch_watchparties_v1'
+const REMEMBERED_MAX = 12
+
+export interface RememberedRoom {
+  id: string
+  name: string
+  /** Last known media URL, for instant title/poster before the snapshot lands. */
+  url?: string
+  /** ISO timestamp of the last time we were in this room. */
+  at: number
+}
+
+function readRemembered(): RememberedRoom[] {
+  try {
+    if (typeof localStorage === 'undefined') return []
+    const raw = localStorage.getItem(REMEMBERED_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter((r: any) => r && typeof r.id === 'string' && r.id)
+      .map((r: any) => ({ id: String(r.id), name: String(r.name || 'Watch party'), url: r.url ? String(r.url) : undefined, at: Number(r.at) || 0 }))
+  } catch {
+    return []
+  }
+}
+
+let rememberedCache: RememberedRoom[] | null = null
+/** The remembered set, in memory, seeded from storage on first use. */
+function remembered(): RememberedRoom[] {
+  if (rememberedCache === null) rememberedCache = readRemembered()
+  return rememberedCache
+}
+
+let rememberedWriteTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleRememberedWrite(): void {
+  if (typeof window === 'undefined') return
+  if (rememberedWriteTimer) clearTimeout(rememberedWriteTimer)
+  rememberedWriteTimer = setTimeout(() => {
+    rememberedWriteTimer = null
+    try {
+      const rows = remembered()
+        .slice()
+        .sort((a, b) => b.at - a.at)
+        .slice(0, REMEMBERED_MAX)
+      localStorage.setItem(REMEMBERED_KEY, JSON.stringify(rows))
+    } catch { /* private mode */ }
+  }, 400)
+}
+
+/** Note a room as mine (join/create/rejoin). */
+function rememberRoom(id: string, name: string, url?: string): void {
+  const rows = remembered().filter((r) => r.id !== id)
+  rows.push({ id, name: name || 'Watch party', url, at: Date.now() })
+  rememberedCache = rows
+  scheduleRememberedWrite()
+}
+
+/**
+ * Drop a room we no longer want to remember — ONLY when the server says it
+ * really ended. Leaving does not forget: that is the whole point of this list.
+ */
+function forgetRemembered(partyId: string): void {
+  const rows = remembered().filter((r) => r.id !== partyId)
+  if (rows.length === remembered().length) return
+  rememberedCache = rows
+  scheduleRememberedWrite()
+}
+
+/**
+ * Rooms this device opened that are not currently joined — the "recently
+ * watched" list. Includes PRIVATE rooms, which the server's public listing
+ * deliberately omits, so a private room is still reachable after leaving it.
+ * `excludeIds` should carry the currently-joined rooms: a room you are IN is
+ * not "recently watched", and it must be listed immediately after you leave it
+ * (an age-based filter would hide it for exactly as long as you are most
+ * likely to be looking for it).
+ */
+export function rememberedRooms(excludeIds: string[] = []): RememberedRoom[] {
+  const skip = new Set(excludeIds)
+  return remembered()
+    .filter((r) => !skip.has(r.id))
+    .sort((a, b) => b.at - a.at)
+}
+
+/**
+ * Re-join every room this device remembers. Runs at boot once the identity is
+ * known: fetches each snapshot, re-joins what still exists, and forgets the
+ * rest (a room the host disbanded is gone, not resurrected).
+ */
+export async function restoreRememberedParties(identity: IdentityLike): Promise<{ restored: number; gone: number }> {
+  const rows = rememberedRooms()
+  if (rows.length === 0) return { restored: 0, gone: 0 }
+  let restored = 0
+  let gone = 0
+  for (const row of rows) {
+    try {
+      const res = await orbitFetch(`/api/watchparty/${encodeURIComponent(row.id)}`, {}, identity)
+      if (!res.ok) {
+        // 404 = the room ended for good. Anything else (offline, 5xx) is
+        // transient, so keep the entry and try again next boot.
+        if (res.status === 404) forgetRemembered(row.id)
+        else continue
+        gone += 1
+        continue
+      }
+      const snap = await res.json() as any
+      if (!snap?.id) continue
+      joinParty(identity, { id: snap.id, name: snap.name || row.name, url: snap.url || row.url })
+      restored += 1
+    } catch {
+      /* offline: keep the entry */
+    }
+  }
+  return { restored, gone }
+}
+
 // Immutable snapshot rebuilt on every mutation (getSnapshot must change
 // reference when data changes, or useSyncExternalStore never re-renders).
 let snapshot: WatchPartyState = { ...state, parties: [] }
@@ -107,7 +238,16 @@ function upsertParty(info: PartyInfo): PartyRuntime {
   } else {
     Object.assign(existing, info)
   }
-  if (state.parties.length > MAX_SLOTS) state.parties.shift()
+  if (state.parties.length > MAX_SLOTS) {
+    // This used to shift() the oldest room out with no signal at all, which is
+    // indistinguishable from "the room disappeared". Say so instead — and keep
+    // the room remembered so it is not lost, just closed.
+    const dropped = state.parties.shift()
+    if (dropped) {
+      rememberRoom(dropped.id, dropped.name, dropped.url)
+      watchPartyStore.set({ kickedNotice: `${MAX_SLOTS} rooms open — "${dropped.name}" was closed to make room.` })
+    }
+  }
   return existing
 }
 
@@ -134,6 +274,8 @@ export function handleWatchMessage(msg: any): void {
     const party = state.parties.find((p) => p.id === msg.party)
     if (party) {
       state.parties = state.parties.filter((p) => p.id !== msg.party)
+      // Kicked is still a room I may return to; "gone" means it is over.
+      if (msg.type === 'watch.gone') forgetRemembered(msg.party)
       watchPartyStore.set({
         kickedNotice: msg.type === 'watch.gone'
           ? `"${party.name}" has closed.`
@@ -414,6 +556,7 @@ export function joinParty(identity: IdentityLike, party: PartyInfo): void {
   watchPartyStore.set({ kickedNotice: '' })
   upsertParty(party)
   watchPartyStore.set({ open: true })
+  rememberRoom(party.id, party.name, party.url)
   sendOrbitWebSocket({ type: 'watch.join', party: party.id, name: myDisplayName || identity.orbitId })
 }
 
@@ -459,6 +602,11 @@ export function disbandParty(partyId: string): void {
   sendRoomFrame('watch.disband', { party: partyId })
 }
 
+/**
+ * Leave the room (the X button). Deliberately does NOT delete it: the server
+ * keeps an emptied room, and the id stays in the remembered list so this device
+ * can re-enter — including a PRIVATE room, which the public listing omits.
+ */
 export function leaveParty(partyId: string): void {
   sendOrbitWebSocket({ type: 'watch.leave', party: partyId })
   state.parties = state.parties.filter((p) => p.id !== partyId)

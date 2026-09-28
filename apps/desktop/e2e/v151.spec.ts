@@ -55,7 +55,7 @@ test.describe('v1.5.1 features and regressions', () => {
     await page.goto('/#/servers')
 
     // Changelog modal should appear automatically
-    const dialog = page.getByRole('dialog', { name: /What's New in version 1.5.1/i })
+    const dialog = page.getByRole('dialog', { name: /What's New in version 1\.5\.[12]/i })
     await expect(dialog).toBeVisible({ timeout: 15_000 })
     await expect(page.getByRole('heading', { name: "What's New" })).toBeVisible()
     await expect(page.getByText('Watch Party Theater')).toBeVisible()
@@ -65,13 +65,13 @@ test.describe('v1.5.1 features and regressions', () => {
     await gotItBtn.click()
     await expect(dialog).not.toBeVisible()
 
-    // Verify localStorage has 1.5.1
+    // Verify localStorage has 1.5.2
     const stored = await page.evaluate(() => localStorage.getItem('gmatch_last_seen_changelog'))
-    expect(stored).toBe('1.5.1')
+    expect(stored).toBe('1.5.2')
 
     // Reload page -> modal should NOT reopen
     await page.reload()
-    await expect(page.getByRole('dialog', { name: /What's New in version 1.5.1/i })).not.toBeVisible()
+    await expect(page.getByRole('dialog', { name: /What's New in version 1\.5\.[12]/i })).not.toBeVisible()
   })
 
   test('changelog can be reopened from settings What\'s New button', async ({ page }) => {
@@ -106,7 +106,7 @@ test.describe('v1.5.1 features and regressions', () => {
         // No display name set, so user enters onboarding ProfileStep
         localStorage.removeItem('orbit_display_name')
         localStorage.removeItem(`orbit_onboarding_v2:${id.orbitId}`)
-        localStorage.setItem('gmatch_last_seen_changelog', '1.5.1')
+        localStorage.setItem('gmatch_last_seen_changelog', '1.5.2')
       },
       [identity, legalVersionKey()],
     )

@@ -25,7 +25,7 @@ export function UpdateSection({ toast }: {
 }) {
   const bridge = window.gmatch;
   const updater = Boolean(bridge?.updateCheck && bridge?.onUpdateStatus);
-  const [installed, setInstalled] = useState<string | null>('1.5.1');
+  const [installed, setInstalled] = useState<string | null>('1.5.2');
   const [status, setStatus] = useState<GmatchUpdateStatus | null>(null);
   const [checking, setChecking] = useState(false);
   const [installing, setInstalling] = useState(false);
@@ -66,7 +66,7 @@ export function UpdateSection({ toast }: {
     if (checking) return;
     setChecking(true);
     try {
-      const cur = bridge?.appVersion ? await bridge.appVersion() : (installed || '1.5.1');
+      const cur = bridge?.appVersion ? await bridge.appVersion() : (installed || '1.5.2');
       setInstalled(cur);
       const base = getApiBaseUrl() || (typeof window !== 'undefined' ? window.location.origin : 'https://gmatch-wcz1.onrender.com');
       const res = await fetch(`${base.replace(/\/+$/, '')}/release.json`, { cache: 'no-store' });

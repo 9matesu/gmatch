@@ -10,11 +10,13 @@ Posture: measure first, change only what the data justifies (ponytail).
 
 ## Changes made (measured/evidence-driven)
 
-1. **Electron image LRU budget 256MB → 96MB** (`electron/imageCacheMemory.cjs`).
-   Rationale: one feed page ≈ 20 images × ~300KB; 96MB keeps the working set
-   while capping the worst case at what a scrollback-heavy session can
-   plausibly re-touch. Regression tests added (400×1MB storm stays inside the
-   default budget; oldest evicted first). Revert knob: one constant.
+1. **Electron image cache budget** — now an encrypted DISK LRU, 500 MB
+   (`electron/diskImageCache.cjs MAX_DEFAULT`), evicted least-recently-used.
+   (This entry used to name `electron/imageCacheMemory.cjs` and a 96 MB RAM
+   budget; that file was deleted and the RAM cache replaced — the two facts
+   below are the surviving consequences: a 20-image feed page still fits the
+   working set comfortably, and the worst case is bounded by the 500 MB
+   ceiling rather than the heap. Revert knob: one constant.)
 2. **Feed-query memo 100 → 40** (`electron/imageCache.cjs FEED_MAX_QUERIES`).
    Prune path already existed and was untested; new test `electron/imageCache.test.cjs`
    (RED before the constant change) proves eviction order.

@@ -190,8 +190,60 @@ posts.get('/', async (c) => {
     }))
   }
 
-  return c.json({ posts: primaries.map(serializePost) })
+  return c.json({ posts: await withLikersPreview(db, primaries.map(serializePost)) })
 })
+
+/** How many liker names ride along on a post ("Liked by Ana, Bo and 9 others"). */
+const LIKERS_PREVIEW_MAX = 3
+
+/**
+ * Instagram-style "Liked by" summary, batched.
+ *
+ * ONE extra query for the whole page (not a correlated subquery per post):
+ * the newest N likers per post come back in a single round trip, grouped in
+ * memory. `like_count` stays authoritative for the "and N others" tail, so the
+ * summary can never disagree with the count.
+ */
+async function withLikersPreview(db: D1Turso, posts: any[]): Promise<any[]> {
+  const liked = posts.filter((p) => Number(p.like_count || 0) > 0)
+  if (liked.length === 0) return posts
+  try {
+    const ids = liked.map((p) => p.id)
+    const rows = await db
+      .prepare(
+        `SELECT pl.object_id, pl.user_id, u.display_name, u.pfp_url
+         FROM PostLikes pl
+         LEFT JOIN Users u ON u.id = pl.user_id
+         WHERE pl.object_id IN (${ids.map(() => '?').join(',')})
+         ORDER BY pl.object_id, pl.created_at DESC`
+      )
+      .bind(...ids)
+      .all<{ object_id: string; user_id: string; display_name: string | null; pfp_url?: string | null }>()
+
+    const byPost = new Map<string, any[]>()
+    // Seed every post's bucket first: rows are filtered by "is this post one we
+    // asked about", so an unseeded map drops every liker.
+    for (const p of liked) byPost.set(p.id, [])
+    for (const r of rows.results || []) {
+      const list = byPost.get(r.object_id)
+      if (!list) continue
+      if (list.length >= LIKERS_PREVIEW_MAX) continue
+      list.push({
+        user_id: r.user_id,
+        display_name: r.display_name?.trim() || generateFallbackName(r.user_id),
+        pfp_url: r.pfp_url || null,
+      })
+    }
+    for (const p of liked) {
+      const names = byPost.get(p.id) || []
+      if (names.length) p.likers = names
+    }
+  } catch (err) {
+    // A summary is decoration: never fail the feed over it.
+    console.warn('[posts] likers preview failed:', err)
+  }
+  return posts
+}
 
 // Single post with its comments inline.
 posts.get('/:id', async (c) => {
@@ -225,7 +277,7 @@ posts.get('/:id', async (c) => {
     ORDER BY c.created_at ASC
   `).bind(orbitId, id).all<any>()
 
-  return c.json({
+  const payload = {
     ...serializePost(row),
     comments: (comments.results || []).map((c: any) => ({
       id: c.id,
@@ -237,7 +289,9 @@ posts.get('/:id', async (c) => {
       is_liked: Number(c.is_liked || 0) > 0,
       created_at: c.created_at,
     })),
-  })
+  }
+  // Same "Liked by" summary as the feed.
+  return c.json((await withLikersPreview(db, [payload]))[0])
 })
 
 // Like a post (idempotent)
@@ -246,7 +300,10 @@ posts.post('/:id/like', async (c) => {
   const orbitId = c.get('orbitId')
   const id = c.req.param('id')
 
-  const obj = await db.prepare('SELECT id FROM Objects WHERE id = ? AND is_public = 1 AND hidden_at IS NULL').bind(id).first()
+  // owner_id MUST be in this SELECT: the notification guard below reads it,
+  // and selecting only `id` made it permanently undefined — so liking a feed
+  // post never notified the owner and never pushed over the socket.
+  const obj = await db.prepare('SELECT id, owner_id FROM Objects WHERE id = ? AND is_public = 1 AND hidden_at IS NULL').bind(id).first<{ id: string; owner_id: string | null }>()
   if (!obj) return c.json({ error: 'Post not found' }, 404)
 
   const res = await db.prepare('INSERT OR IGNORE INTO PostLikes (object_id, user_id) VALUES (?, ?)').bind(id, orbitId).run()
@@ -254,13 +311,13 @@ posts.post('/:id/like', async (c) => {
     await db.prepare('UPDATE Objects SET like_count = like_count + 1 WHERE id = ?').bind(id).run()
 
     try {
-      const postOwner = (obj as any).owner_id
+      const postOwner = obj.owner_id
       if (postOwner && postOwner !== orbitId) {
         const liker = await db.prepare('SELECT display_name FROM Users WHERE id = ?').bind(orbitId).first<{ display_name: string | null }>()
         const name = liker?.display_name?.trim() || 'Someone'
         const { createNotification } = await import('../notifications')
         const { broadcastToUser } = await import('../ws-bus')
-        const notif = await createNotification(db, postOwner, 'like', `${name} liked your post`, null, { post_id: id, liker_id: orbitId })
+        const notif = await createNotification(db, postOwner, 'like', `${name} liked your post`, null, { post_id: id, liker_id: orbitId, actor_id: orbitId, actor_name: name })
         if (notif) broadcastToUser(postOwner, { type: 'notification', action: 'new', notification: notif })
       }
     } catch {}
@@ -377,7 +434,9 @@ posts.post('/:id/comments', async (c) => {
   const clean = body.trim().slice(0, 500)
   if (!clean) return c.json({ error: 'Comment body is required' }, 400)
 
-  const obj = await db.prepare('SELECT id FROM Objects WHERE id = ? AND is_public = 1 AND hidden_at IS NULL').bind(id).first()
+  // owner_id must be selected — see the like route: reading it off a row that
+  // never selected it silently killed every comment notification.
+  const obj = await db.prepare('SELECT id, owner_id FROM Objects WHERE id = ? AND is_public = 1 AND hidden_at IS NULL').bind(id).first<{ id: string; owner_id: string | null }>()
   if (!obj) return c.json({ error: 'Post not found' }, 404)
 
   const commentId = crypto.randomUUID()
@@ -385,18 +444,42 @@ posts.post('/:id/comments', async (c) => {
   await db.prepare('UPDATE Objects SET comment_count = comment_count + 1 WHERE id = ?').bind(id).run()
 
   try {
-    const postOwner = (obj as any).owner_id
+    const postOwner = obj.owner_id
     if (postOwner && postOwner !== orbitId) {
       const commenter = await db.prepare('SELECT display_name FROM Users WHERE id = ?').bind(orbitId).first<{ display_name: string | null }>()
       const name = commenter?.display_name?.trim() || 'Someone'
       const { createNotification } = await import('../notifications')
       const { broadcastToUser } = await import('../ws-bus')
-      const notif = await createNotification(db, postOwner, 'comment', `${name} commented: "${clean.slice(0, 60)}"`, null, { post_id: id, comment_id: commentId })
+      const notif = await createNotification(db, postOwner, 'comment', `${name} commented: "${clean.slice(0, 60)}"`, null, { post_id: id, comment_id: commentId, actor_id: orbitId, actor_name: name })
       if (notif) broadcastToUser(postOwner, { type: 'notification', action: 'new', notification: notif })
     }
   } catch {}
 
-  return c.json({ id: commentId, ok: true }, 201)
+  // Return the created row, not just the id: the client was fabricating
+  // created_at ("Just now") and re-reading its own display name because the
+  // response carried nothing to render.
+  const created = await db.prepare(`
+    SELECT c.id, c.author_id, c.body AS text, c.like_count, c.created_at,
+           COALESCE(u.display_name, 'Someone') AS author_name, u.pfp_url AS author_avatar
+    FROM Comments c LEFT JOIN Users u ON u.id = c.author_id
+    WHERE c.id = ?
+  `).bind(commentId).first()
+
+  return c.json({
+    id: commentId,
+    ok: true,
+    ...(created
+      ? {
+          author_id: String(created.author_id || ''),
+          text: String(created.text || clean),
+          author_name: String(created.author_name || 'Someone'),
+          author_avatar: created.author_avatar ?? null,
+          created_at: String(created.created_at || ''),
+          like_count: Number(created.like_count || 0),
+          is_liked: false,
+        }
+      : {}),
+  }, 201)
 })
 
 // Like a comment (idempotent)

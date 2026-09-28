@@ -51,6 +51,9 @@ export interface Party {
   /** Session chat log (server-authoritative; joiners get the backlog). */
   chat: ChatEntry[]
   lastSeen: number
+  /** Creation time (ms). Eviction order: rooms die oldest-created-first, so a
+   *  long-lived room you still use is never the first casualty. */
+  createdAt: number
   /** Grace timestamp when the room emptied, giving peers 15m to reconnect */
   emptySince?: number
   /** ponytail: last chat msg ts per user; global bucket if flood persists. */
@@ -59,7 +62,10 @@ export interface Party {
 }
 
 const parties = new Map<string, Party>()
-const MAX_PARTIES = 50
+// Rooms are deliberately immortal (an emptied room is never deleted, so peers
+// can re-enter any time), which makes this cap the ONLY reclaim path. Tighter
+// than the old 50 so an abandoned node does not accumulate forever.
+const MAX_PARTIES = 25
 // Overnight rooms: an open tab pings every 30s (touchRooms), so 4h only
 // bounds abandoned rooms. 30 min GC'd a room during one long movie.
 export const IDLE_MS = 4 * 60 * 60_000
@@ -76,6 +82,7 @@ export function createParty(
   relay?: { upstream: string; referer: string },
   creatorId = '',
   forcedId = '',
+  createdAt = 0,
 ): Party {
   gcTick()
   const party: Party = {
@@ -94,6 +101,7 @@ export function createParty(
     current: '',
     chat: [],
     lastSeen: Date.now(),
+    createdAt: createdAt || Date.now(),
     lastChat: new Map(),
     lastControl: new Map(),
   }
@@ -154,12 +162,18 @@ function dropParty(party: Party): void {
 
 function gcTick(): void {
   while (parties.size > MAX_PARTIES) {
-    // Audit A6: evict the least-recently-SEEN room, not the first created.
+    // Evict the OLDEST-CREATED room, not the least-recently-seen one. The old
+    // order meant a room created months ago that you open every evening was the
+    // first casualty the moment a 26th room appeared — the room you actually
+    // care about died to protect one nobody had touched since it was made.
+    // `lastSeen` still breaks ties (all restored rooms share a boot timestamp).
     let victimId = ''
-    let victimSeen = Infinity
+    let victimCreated = Infinity
     for (const [id, p] of parties) {
-      if (p.lastSeen < victimSeen) { victimSeen = p.lastSeen; victimId = id }
+      const created = p.createdAt || 0
+      if (created < victimCreated) { victimCreated = created; victimId = id }
     }
+    if (!victimId) break
     const p = parties.get(victimId)
     if (p) dropParty(p)
     parties.delete(victimId)
@@ -262,6 +276,9 @@ function removeMember(party: Party, userId: string, forceClose: boolean): { room
   if (party.members.size === 0) {
     // Rooms are persistent: do NOT delete when empty so peers can re-enter anytime.
     party.emptySince = Date.now()
+    // Flush now rather than waiting for the next 30s tick: this is the moment
+    // the room becomes "abandoned", and that state must be durable.
+    markPartiesDirty()
     return { room, payload: [pushSystem(party, `${who} left`), rosterPayload(party)] }
   }
   party.emptySince = undefined
@@ -320,7 +337,13 @@ export function kickWatch(userId: string, msg: any): { room: string; payload: an
   party.members.delete(target)
   const room = partyRoom(party.id)
   const payloads: any[] = [pushSystem(party, `${who} was removed`), rosterPayload(party)]
-  if (party.members.size === 0) dropParty(party)
+  // Do NOT drop the room when a kick empties it. Leaving deliberately keeps the
+  // room (removeMember), and "the room must persist" cannot depend on HOW the
+  // last member left — a kick used to destroy the room, its queue and its chat
+  // while an ordinary leave preserved all of it. Disband stays the explicit
+  // "close the room" action.
+  party.emptySince = Date.now()
+  markPartiesDirty()
   return { room, payload: payloads, kicked: target }
 }
 
@@ -474,20 +497,44 @@ export function serializeParties(): string {
     frame: p.frame, queue: p.queue, current: p.current,
     // chat persists with the room (applyChat caps it at 80 entries)
     chat: p.chat,
+    // Eviction order must survive a restart, or every restored room looks
+    // brand new and the cap evicts arbitrary rooms.
+    createdAt: p.createdAt,
   })))
 }
 
-/** Register an extra media grant (queue restore) without touching current. */
-export function addPartyMedia(party: Party, mediaUrl: string): void {
-  if (mediaUrl) partyMedia.set(mediaUrl, party.id)
+/** Ask the host process to flush the snapshot on its next pass (or now). */
+let partiesDirty = false
+export function markPartiesDirty(): void {
+  partiesDirty = true
+}
+export function takePartiesDirty(): boolean {
+  if (!partiesDirty) return false
+  partiesDirty = false
+  return true
 }
 
+/**
+ * How long a room with nobody in it keeps its media blob leased.
+ *
+ * Rooms are immortal by design, and the media lease used to follow that
+ * literally: `liveMediaObjectIds` walked every room regardless of membership,
+ * so a room abandoned for weeks pinned its Objects rows forever and the blobs
+ * were never reclaimed. The room itself stays (that is the product promise);
+ * only the lease lapses, so a room that comes back after a day finds its video
+ * purged instead of holding storage hostage forever.
+ */
+export const EMPTY_MEDIA_LEASE_MS = 6 * 60 * 60_000
+
 /** Object ids of every media a LIVE room serves right now (current frame +
- * queue). serve.ts re-extends their expires_at each flush: a room pinned
- * alive by member pings must never serve a purged object ("No preview"). */
+ *  queue). serve.ts re-extends their expires_at each flush: a room pinned
+ *  alive by member pings must never serve a purged object ("No preview"). */
 export function liveMediaObjectIds(): string[] {
   const out = new Set<string>()
+  const now = Date.now()
   for (const p of parties.values()) {
+    // Lapsed lease: room still exists, but it no longer owns the bytes.
+    if (p.members.size === 0 && p.emptySince && now - p.emptySince > EMPTY_MEDIA_LEASE_MS) continue
     for (const u of [p.mediaUrl, ...p.queue.map((q) => q.url)]) {
       const m = /^\/api\/objects\/([0-9a-fA-F-]{36})$/.exec(u)
       if (m) out.add(m[1])
@@ -496,7 +543,13 @@ export function liveMediaObjectIds(): string[] {
   return [...out]
 }
 
+/** Register an extra media grant (queue restore) without touching current. */
+export function addPartyMedia(party: Party, mediaUrl: string): void {
+  if (mediaUrl) partyMedia.set(mediaUrl, party.id)
+}
+
 export function restoreParties(json: string): number {
+
   let rows: unknown
   try { rows = JSON.parse(json) } catch { return 0 }
   if (!Array.isArray(rows)) return 0
@@ -505,7 +558,7 @@ export function restoreParties(json: string): number {
     const s = raw as any
     if (!s || typeof s.id !== 'string' || typeof s.mediaUrl !== 'string' || !s.frame) continue
     if (parties.has(s.id)) continue
-    const p = createParty(String(s.name || 'Party'), s.mediaUrl, s.mediaUrl, s.relay, String(s.hostId || ''), s.id)
+    const p = createParty(String(s.name || 'Party'), s.mediaUrl, s.mediaUrl, s.relay, String(s.hostId || ''), s.id, Number(s.createdAt) || 0)
     if (p.hostId) p.members.delete(p.hostId) // roster re-forms via watch.join
     p.mediaName = String(s.mediaName || '')
     p.isPrivate = Boolean(s.isPrivate)

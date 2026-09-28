@@ -13,15 +13,18 @@ import {
   ChevronRight,
   ZoomIn,
   ZoomOut,
+  Flag,
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { FeedPost, PostComment } from './GMatchFeed';
 import { ObjectImage } from '../ObjectImage';
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
 import { isMediaVideo, isVideoPost, resolveMediaUrl } from '../../utils/media';
+import { formatLikedBy } from '../../utils/likedBy';
+import { timeAgo } from '../../utils/timeAgo';
 import { Linkify } from '../Linkify';
 
-export function InstagramPostModal({ post, isOpen, onClose, identity, profilePics = {}, isLiked = false, isSaved = false, likeCount = 0, comments = [], onToggleLike, onToggleSave, onAddComment, onToggleCommentLike, onOpenShare, onOptionsClick, onOpenLikers, onSelectUser, onAvatarClick, onOpenNetwork, toast, zIndexClass = 'z-[var(--z-modal)]' }: {
+export function InstagramPostModal({ post, isOpen, onClose, identity, profilePics = {}, isLiked = false, isSaved = false, likeCount = 0, comments = [], commentsLoading = false, onToggleLike, onToggleSave, onAddComment, onToggleCommentLike, onReportComment, onOpenShare, onOptionsClick, onOpenLikers, onSelectUser, onAvatarClick, onOpenNetwork, toast, zIndexClass = 'z-[var(--z-modal)]' }: {
   post: FeedPost | null;
   isOpen: boolean;
   onClose: () => void;
@@ -31,10 +34,13 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
   isSaved?: boolean;
   likeCount?: number;
   comments?: PostComment[];
+  /** The list is in flight: show a loading row, not "No comments yet". */
+  commentsLoading?: boolean;
   onToggleLike?: (post: FeedPost) => void;
   onToggleSave?: (post: FeedPost) => void;
   onAddComment?: (postId: string, text: string) => void;
   onToggleCommentLike?: (postId: string, commentId: string) => void;
+  onReportComment?: (commentId: string) => void;
   onOpenShare?: (post: FeedPost) => void;
   onOptionsClick?: (post: FeedPost) => void;
   onOpenLikers?: (postId: string) => void;
@@ -49,6 +55,12 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [doubleTapAnimation, setDoubleTapAnimation] = useState(false);
+
+  // Never name myself in my own likes summary.
+  const likedByLabel = formatLikedBy(
+    post?.likers?.filter((l) => l.user_id !== identity?.orbitId),
+    likeCount,
+  );
 
   // Reset carousel/zoom/draft whenever a different post is opened.
   useEffect(() => {
@@ -132,6 +144,9 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
   return createPortal(
     (
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Post"
         className={`fixed inset-0 ${zIndexClass} bg-black/70 backdrop-blur-sm flex items-center justify-center p-0 pb-[var(--island-clearance)] sm:p-4 md:p-6 md:pb-[calc(var(--island-clearance)+1.5rem)] animate-orbit-fade-in select-none`}
         onClick={onClose}
       >
@@ -283,8 +298,13 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
             </div>
           </div>
 
-          {/* Right Column: Author, Caption, Comments Stream & Input */}
-          <div className="w-full md:w-[380px] lg:w-[420px] bg-retro-bg flex flex-col justify-between border-t md:border-t-0 md:border-l border-border-glass h-full">
+          {/* Right Column: Author, Caption, Comments Stream & Input.
+              min-h-0 + flex-1 on mobile: the dialog is overflow-hidden and the
+              media column above already takes min-h-[340px], so a plain h-full
+              here overflowed the box and pushed the action bar + comment input
+              off the bottom of a narrow window — the comments looked
+              half-rendered and you could not post. */}
+          <div className="w-full md:w-[380px] lg:w-[420px] bg-retro-bg flex flex-col justify-between border-t md:border-t-0 md:border-l border-border-glass min-h-0 flex-1 md:h-full md:flex-none">
             {/* Header */}
             <div className="p-3.5 border-b border-border-glass flex items-center justify-between">
               <div
@@ -358,38 +378,62 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
 
               {/* Comments List */}
               {comments.map((c) => (
-                <div key={c.id} className="flex items-start justify-between gap-2">
+                <div key={c.id} className={`flex items-start justify-between gap-2 ${c.pending ? 'opacity-60' : ''}`}>
                   <div className="flex items-start gap-2.5">
                     <div className="w-7 h-7 rounded-full bg-surface-interactive overflow-hidden shrink-0 flex items-center justify-center text-[10px] font-bold text-retro-fg">
                       {c.author_avatar ? (
                         <img src={resolveMediaUrl(c.author_avatar)} alt="" className="w-full h-full object-cover" />
                       ) : (
-                        c.author_name.charAt(0).toUpperCase()
+                        // A P2P/legacy row can arrive without an author_name;
+                        // charAt on undefined would blank the whole modal.
+                        (c.author_name || '?').charAt(0).toUpperCase()
                       )}
                     </div>
                     <div>
                       <div className="flex items-baseline gap-1.5">
                         <span className="text-xs font-bold text-retro-fg">{c.author_name}</span>
-                        <span className="text-[10px] text-retro-muted">{c.created_at}</span>
+                        <span className="text-[10px] text-retro-muted">{timeAgo(c.created_at)}</span>
+                        {c.pending && <span className="text-[10px] text-retro-muted italic">sending…</span>}
                       </div>
-                      <p className="text-xs text-retro-body mt-0.5 leading-relaxed">{c.text}</p>
+                      <p className="text-xs text-retro-body mt-0.5 leading-relaxed">
+                        <Linkify text={c.text} />
+                      </p>
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => onToggleCommentLike?.(post.id, c.id)}
-                    className="p-1 text-retro-muted hover:text-red-500 cursor-pointer shrink-0"
-                  >
-                    <Heart className={`w-3.5 h-3.5 ${c.is_liked ? 'text-red-500 fill-red-500' : ''}`} />
-                    {c.like_count > 0 && (
-                      <span className="text-[10px] font-bold block text-center mt-0.5 text-retro-muted">{c.like_count}</span>
-                    )}
-                  </button>
+                  <div className="flex items-start gap-0.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => onReportComment?.(c.id)}
+                      aria-label={`Report comment by ${c.author_name || 'user'}`}
+                      className="p-1 text-retro-muted hover:text-retro-error cursor-pointer"
+                    >
+                      <Flag className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onToggleCommentLike?.(post.id, c.id)}
+                      aria-label={c.is_liked ? 'Comment liked' : 'Like comment'}
+                      aria-pressed={!!c.is_liked}
+                      disabled={c.pending}
+                      className="p-1 text-retro-muted hover:text-red-500 cursor-pointer disabled:cursor-default"
+                    >
+                      <Heart className={`w-3.5 h-3.5 ${c.is_liked ? 'text-red-500 fill-red-500' : ''}`} />
+                      {c.like_count > 0 && (
+                        <span className="text-[10px] font-bold block text-center mt-0.5 text-retro-muted">{c.like_count}</span>
+                      )}
+                    </button>
+                  </div>
                 </div>
               ))}
 
-              {comments.length === 0 && (
+              {commentsLoading && (
+                <div className="py-8 text-center text-xs text-retro-muted" role="status">
+                  Loading comments…
+                </div>
+              )}
+
+              {!commentsLoading && comments.length === 0 && (
                 <div className="py-8 text-center text-xs text-retro-muted italic">
                   No comments yet. Be the first to leave a comment!
                 </div>
@@ -404,6 +448,8 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                   <button
                     type="button"
                     onClick={() => onToggleLike?.(post)}
+                    aria-label={isLiked ? 'Unlike post' : 'Like post'}
+                    aria-pressed={isLiked}
                     className="cursor-pointer transition-transform duration-150 active:scale-[0.92]"
                   >
                     <Heart
@@ -414,6 +460,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                   <button
                     type="button"
                     onClick={() => onOpenShare?.(post)}
+                    aria-label="Share post"
                     className="text-retro-muted hover:text-retro-fg cursor-pointer transition-transform duration-150 active:scale-[0.92]"
                   >
                     <Send className="w-5 h-5 stroke-[1.75]" />
@@ -423,6 +470,8 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                 <button
                   type="button"
                   onClick={() => onToggleSave?.(post)}
+                  aria-label={isSaved ? 'Remove bookmark' : 'Bookmark post'}
+                  aria-pressed={isSaved}
                   className="cursor-pointer transition-transform duration-150 active:scale-[0.92]"
                 >
                   <Bookmark
@@ -432,7 +481,8 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                 </button>
               </div>
 
-              {/* Likes Summary */}
+              {/* Likes Summary — "Liked by Ana, Bo and 12 others" when the
+                  payload carries liker names, bare count otherwise. */}
               <button
                 type="button"
                 onClick={() => {
@@ -444,7 +494,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                 className="text-left px-3 pb-2 text-xs font-semibold text-retro-fg tracking-tight hover:underline cursor-pointer w-fit transition-colors"
                 aria-label="View who liked this post"
               >
-                {likeCount.toLocaleString()} {likeCount === 1 ? 'like' : 'likes'}
+                {likedByLabel || `${likeCount.toLocaleString()} ${likeCount === 1 ? 'like' : 'likes'}`}
               </button>
 
               {/* Comment Input */}

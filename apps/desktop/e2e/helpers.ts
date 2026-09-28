@@ -55,7 +55,7 @@ export async function seedApp(
       // lastSeenAt must be load-time or the offline-earnings modal pops on
       // every journey (passive income accrues between seed and page load).
       save.lastSeenAt = Date.now()
-      localStorage.setItem('gmatch_last_seen_changelog', '1.5.1')
+      localStorage.setItem('gmatch_last_seen_changelog', '1.5.2')
       // Onboarding: mark every step complete so the flow doesn't block.
       localStorage.setItem(
         `orbit_onboarding_v2:${id.orbitId}`,
@@ -96,4 +96,100 @@ export async function mockBooruFeed(page: import('@playwright/test').Page): Prom
   await page.route('**/__e2e__/**', async (route) => {
     await route.fulfill({ status: 200, contentType: 'image/png', body: PNG })
   })
+}
+
+/**
+ * 404s that are a FEATURE-DETECTION SIGNAL, not a fault. The mail-mode probe
+ * (utils/mail-mode.ts:3-10) deliberately hits `/api/pm`: on any current node
+ * that route is retired and the 404 is how the client learns "courier sealed
+ * mail is the only DM path". Guarding against it would make the probe a bug.
+ */
+export const EXPECTED_404_PROBES = [/\/api\/pm(\?|$)/]
+
+/** Pass to `watchApiNetwork({ allow })` alongside the auth-status exemption. */
+export function allowExpected(status: number, url: string): boolean {
+  if (status === 401 || status === 403) return true
+  return status === 404 && EXPECTED_404_PROBES.some((re) => re.test(url))
+}
+
+export interface ApiNetworkGuard {
+  /** Every `/api/**` response observed — the non-vacuity counter. */
+  apiCalls(): number
+  /** `/api/**` responses that came back 4xx/5xx (method + path + status). */
+  apiFailures(): string[]
+  /** Requests that never got a response (aborted socket, refused, timeout). */
+  requestFailures(): string[]
+  /** Console errors + uncaught exceptions, e.g. a Vite 500 module reload. */
+  pageErrors(): string[]
+  /** Throws with everything collected, or returns void when clean. */
+  assertClean(extra?: string): void
+}
+
+/**
+ * Opt-in network guard. The dev 404 storm (every lobby/feed/users poll 404ing
+ * because /api pointed at the blind courier) was invisible to assertions that
+ * only look at pixels — this makes it a hard failure. Anything the test itself
+ * stubs or blocks is not a failure, and non-/api traffic is ignored on
+ * purpose: booru mirrors and P2P peers are allowed to be down.
+ */
+export function watchApiNetwork(
+  page: import('@playwright/test').Page,
+  opts: { allow?: (status: number, url: string) => boolean } = {},
+): ApiNetworkGuard {
+  let calls = 0
+  const api: string[] = []
+  const requests: string[] = []
+  const errors: string[] = []
+  // Chromium reports some answered requests (e.g. HEAD probes) as BOTH a
+  // response and a requestfailed/aborted. If a response was already seen the
+  // request did reach the server, so it is not a request failure.
+  const responded = new Set<string>()
+
+  page.on('response', (res) => {
+    const url = res.url()
+    if (!/\/api\//.test(url)) return
+    calls += 1
+    const key = `${res.request().method()} ${url}`
+    responded.add(key)
+    const status = res.status()
+    if (status < 400) return
+    if (opts.allow?.(status, url)) return
+    api.push(`${status} ${key}`)
+  })
+  page.on('requestfailed', (req) => {
+    if (!/\/api\//.test(req.url())) return
+    const key = `${req.method()} ${req.url()}`
+    if (responded.has(key)) return
+    requests.push(`${key} (${req.failure()?.errorText ?? 'failed'})`)
+  })
+  page.on('console', (msg) => {
+    if (msg.type() !== 'error') return
+    // Chromium logs one "Failed to load resource: NNN" console error per
+    // non-2xx response. That duplicates the `response` handler above, which
+    // records the same failure with method + URL and honours `allow`. Keeping
+    // it would make every allowed probe (e.g. the /api/pm mail-mode 404) an
+    // unfilterable failure. Real console errors still surface here.
+    if (msg.text().startsWith('Failed to load resource')) return
+    const at = msg.location()
+    errors.push(`console: ${msg.text()}${at?.url ? ` (${at.url})` : ''}`)
+  })
+  page.on('pageerror', (err) => errors.push(`pageerror: ${err.message}`))
+
+  return {
+    apiCalls: () => calls,
+    apiFailures: () => api,
+    requestFailures: () => requests,
+    pageErrors: () => errors,
+    assertClean(extra = '') {
+      const problems = [
+        ...api.map((f) => `  api:        ${f}`),
+        ...requests.map((f) => `  request:    ${f}`),
+        ...errors.map((f) => `  ${f}`),
+      ]
+      if (!problems.length) return
+      throw new Error(
+        `Network guard tripped${extra ? ` (${extra})` : ''}:\n${problems.join('\n')}`,
+      )
+    },
+  }
 }

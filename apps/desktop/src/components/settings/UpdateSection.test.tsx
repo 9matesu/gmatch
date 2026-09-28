@@ -112,9 +112,11 @@ describe('UpdateSection (legacy fallback without updater bridge)', () => {
     expect(await screen.findByText(/verify before running/i)).toBeInTheDocument()
   })
 
-  it('renders nothing without any bridge (pure browser)', async () => {
-    const { container } = render(<UpdateSection toast={() => {}} />)
+  it('renders fallback update section without any bridge (pure browser)', async () => {
+    render(<UpdateSection toast={() => {}} />)
     await new Promise((r) => setTimeout(r, 20))
-    expect(container).toBeEmptyDOMElement()
+    expect(screen.getByRole('button', { name: /check for updates/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /what's new/i })).toBeInTheDocument()
   })
 })
+

@@ -58,7 +58,12 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
               Watch
             </h3>
           </div>
-          <WatchPartyRoomList identity={identity} onNewParty={() => setModalOpen(true)} kickedNotice={kickedNotice} />
+          <WatchPartyRoomList
+            identity={identity}
+            onNewParty={() => setModalOpen(true)}
+            kickedNotice={kickedNotice}
+            joinedIds={parties.map((p) => p.id)}
+          />
         </div>
 
         {modalOpen && (

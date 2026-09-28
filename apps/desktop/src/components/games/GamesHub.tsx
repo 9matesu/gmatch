@@ -126,6 +126,7 @@ export function GamesHub({
         {subTab === 'ranks' && (
           <RankingsPanel
             users={users}
+            currentUserId={identity?.orbitId}
             onSelectUser={(uId) => onSelectUser?.(uId)}
           />
         )}

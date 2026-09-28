@@ -6,6 +6,8 @@ interface CachedImgProps extends ImgHTMLAttributes<HTMLImageElement> {
   src: string
   /** Shown when the (cached or remote) source fails to load. */
   fallbackSrc?: string
+  /** Fired true when the img starts loading, false once it has loaded/failed. */
+  onLoadingChange?: (loading: boolean) => void
 }
 
 /**
@@ -14,7 +16,7 @@ interface CachedImgProps extends ImgHTMLAttributes<HTMLImageElement> {
  * Viewport-gated via native IntersectionObserver to prevent 50+ concurrent
  * decodes/fetches when rendering long feeds.
  */
-export default function CachedImg({ src: rawSrc, fallbackSrc, onError, ...rest }: CachedImgProps) {
+export default function CachedImg({ src: rawSrc, fallbackSrc, onError, onLoadingChange, onLoad, ...rest }: CachedImgProps) {
   // Normalize first: relative paths and bare object ids against the API base
   // (a raw uuid would fire a file:// request -> ERR_FILE_NOT_FOUND).
   const src = resolveMediaUrl(rawSrc)
@@ -24,6 +26,19 @@ export default function CachedImg({ src: rawSrc, fallbackSrc, onError, ...rest }
   const [resolved, setResolved] = useState<boolean>(isLocal)
   const imgRef = useRef<HTMLImageElement | null>(null)
 
+  // Consumers (the story ring avatars) need to know "still decoding" vs
+  // "painted" — without this a caller literally cannot tell an empty box from
+  // a loaded picture.
+  const notifyRef = useRef(onLoadingChange)
+  notifyRef.current = onLoadingChange
+  useEffect(() => {
+    if (!display) return
+    notifyRef.current?.(true)
+  }, [display])
+
+  // Viewport gate: a long feed mounts 50+ of these, and decoding them all up
+  // front is the exact CPU/RAM spike the cache exists to avoid. Only resolve
+  // once the element is near the viewport (or the caller asked for eager).
   useEffect(() => {
     if (inView) return
     const el = imgRef.current
@@ -76,7 +91,12 @@ export default function CachedImg({ src: rawSrc, fallbackSrc, onError, ...rest }
       src={display || undefined}
       decoding="async"
       {...rest}
+      onLoad={(e) => {
+        notifyRef.current?.(false)
+        onLoad?.(e)
+      }}
       onError={(e) => {
+        notifyRef.current?.(false)
         if (fallbackSrc && e.currentTarget.src !== fallbackSrc) {
           e.currentTarget.src = fallbackSrc
           return

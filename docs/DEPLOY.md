@@ -24,3 +24,13 @@ legacy path stays implemented).
 
 `ADMIN_PIN=<pin> [ADMIN_ORBIT_ID=<orbitId>] npm run dev` in apps/desktop
 (vite spawns the bun sidecar with the env). Never commit PIN values.
+
+`GMATCH_DEV_API=remote` points dev at a remote FULL node (`gmatch.fly.dev`)
+instead of the local sidecar. Default is the local sidecar so browser dev
+debugs the same node the packaged app runs.
+
+**The central node is a directory/mail/TURN courier, never a data base.** It
+404s (and the dev proxy 503s) every stateful route, so no client may persist it
+as `gmatch.api.url` — older builds did, which is why `purgeCourierApiState()`
+(`apps/desktop/src/utils/api.ts`) clears that state on boot. e2e
+`api-network.spec.ts` fails if the dev `/api` ever points back at a courier.

@@ -5,6 +5,7 @@ import type { D1Turso } from '../db'
 import {
   listNotifications,
   unreadNotificationCount,
+  unreadNotificationCountsByType,
   markNotificationsRead,
   listMyInvites,
   createMatchInvite,
@@ -32,14 +33,21 @@ matchInvites.use('*', orbitAuth)
 notifications.get('/', async (c) => {
   const userId = c.get('orbitId')
   const items = await listNotifications(c.env.DB, userId)
-  const unread = await unreadNotificationCount(c.env.DB, userId)
-  return c.json({ notifications: items, unread })
+  const [unread, unreadByType] = await Promise.all([
+    unreadNotificationCount(c.env.DB, userId),
+    unreadNotificationCountsByType(c.env.DB, userId),
+  ])
+  // `unread_by_type` is additive: older clients keep reading `unread`.
+  return c.json({ notifications: items, unread, unread_by_type: unreadByType })
 })
 
 notifications.get('/unread-count', async (c) => {
   const userId = c.get('orbitId')
-  const unread = await unreadNotificationCount(c.env.DB, userId)
-  return c.json({ unread })
+  const [unread, unreadByType] = await Promise.all([
+    unreadNotificationCount(c.env.DB, userId),
+    unreadNotificationCountsByType(c.env.DB, userId),
+  ])
+  return c.json({ unread, unread_by_type: unreadByType })
 })
 
 // Mark notifications read. Body: `{ ids: string[] }` — omit ids (or send [])

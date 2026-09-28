@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { playPress, playMsgReceive } from '../../utils/sounds';
-import { postShareUrl } from '../../utils/api';
+import { orbitFetch, postShareUrl } from '../../utils/api';
 import { InstagramPostModal } from './InstagramPostModal';
 import { SharePostModal } from './SharePostModal';
 import { PostOptionsModal } from './PostOptionsModal';
@@ -69,19 +69,41 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
   const [saved, setSaved] = useState<Record<string, boolean>>({});
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [commentsMap, setCommentsMap] = useState<Record<string, PostComment[]>>({});
+  const [commentsLoadingId, setCommentsLoadingId] = useState<string | null>(null);
   const [sharingPost, setSharingPost] = useState<FeedPost | null>(null);
   const [optionsPost, setOptionsPost] = useState<FeedPost | null>(null);
   const [likersPostId, setLikersPostId] = useState<string | null>(null);
 
-  const openPost = useCallback((post: FeedPost) => {
-    setLiked((prev) => (prev[post.id] === undefined ? { ...prev, [post.id]: !!post.is_liked } : prev));
-    setSaved((prev) => (prev[post.id] === undefined ? { ...prev, [post.id]: !!post.is_saved } : prev));
-    setCounts((prev) => (prev[post.id] === undefined ? { ...prev, [post.id]: post.like_count ?? 0 } : prev));
-    setCommentsMap((prev) =>
-      prev[post.id] === undefined ? { ...prev, [post.id]: post.comments || [] } : prev,
-    );
-    setActivePost(post);
-  }, []);
+  const openPost = useCallback(
+    (post: FeedPost) => {
+      setLiked((prev) => (prev[post.id] === undefined ? { ...prev, [post.id]: !!post.is_liked } : prev));
+      setSaved((prev) => (prev[post.id] === undefined ? { ...prev, [post.id]: !!post.is_saved } : prev));
+      setCounts((prev) => (prev[post.id] === undefined ? { ...prev, [post.id]: post.like_count ?? 0 } : prev));
+      setActivePost(post);
+      // The profile endpoints don't inline comments (post.comments is only
+      // populated on the single-post route, which the app never calls), so
+      // seeding from it left every profile lightbox permanently empty. Fetch
+      // the list the same way the feed does.
+      if (!identity) return;
+      let cancelled = false;
+      setCommentsLoadingId(post.id);
+      orbitFetch(`/api/posts/${post.id}/comments`, {}, identity)
+        .then(async (res) => {
+          if (cancelled || !res.ok) return;
+          const list = await res.json();
+          if (cancelled || !Array.isArray(list)) return;
+          setCommentsMap((prev) => ({ ...prev, [post.id]: list }));
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (!cancelled) setCommentsLoadingId(null);
+        });
+      return () => {
+        cancelled = true;
+      };
+    },
+    [identity],
+  );
 
   const closePost = useCallback(() => setActivePost(null), []);
 
@@ -118,40 +140,78 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
       const text = (textToAdd || '').trim();
       if (!text) return;
       playMsgReceive();
+      const draftId = `c_pending_${Date.now()}`;
       const comment: PostComment = {
-        id: `c_${Date.now()}`,
+        id: draftId,
         author_id: identity?.orbitId || 'me',
         author_name: 'You',
         author_avatar: profilePics[identity?.orbitId || ''],
         text,
-        created_at: 'Just now',
+        created_at: new Date().toISOString(),
         like_count: 0,
+        pending: true,
       };
       setCommentsMap((prev) => ({ ...prev, [postId]: [...(prev[postId] || []), comment] }));
-      toast?.('Comment posted!', 'success');
-      onPersistComment?.(postId, text).then((serverComment) => {
-        if (serverComment) {
+
+      const persist = onPersistComment?.(postId, text);
+      if (!persist) {
+        setCommentsMap((prev) => ({
+          ...prev,
+          [postId]: (prev[postId] || []).map((c) => (c.id === draftId ? { ...c, pending: false } : c)),
+        }));
+        return;
+      }
+      void persist
+        .then((serverComment) => {
+          if (serverComment) {
+            setCommentsMap((prev) => ({
+              ...prev,
+              [postId]: (prev[postId] || []).map((c) =>
+                c.id === draftId ? { ...serverComment, pending: false } : c,
+              ),
+            }));
+          } else {
+            setCommentsMap((prev) => ({
+              ...prev,
+              [postId]: (prev[postId] || []).filter((c) => c.id !== draftId),
+            }));
+            toast?.('Comment not saved — try again', 'error');
+          }
+        })
+        .catch(() => {
           setCommentsMap((prev) => ({
             ...prev,
-            [postId]: (prev[postId] || []).map((c) => (c.id === comment.id ? serverComment : c)),
+            [postId]: (prev[postId] || []).filter((c) => c.id !== draftId),
           }));
-        }
-      });
+          toast?.('Comment not saved — try again', 'error');
+        });
     },
     [identity, profilePics, onPersistComment, toast],
   );
 
-  const handleToggleCommentLike = useCallback((postId: string, commentId: string) => {
-    playPress(850);
-    setCommentsMap((prev) => ({
-      ...prev,
-      [postId]: (prev[postId] || []).map((c) =>
-        c.id === commentId
-          ? { ...c, is_liked: !c.is_liked, like_count: c.like_count + (c.is_liked ? -1 : 1) }
-          : c,
-      ),
-    }));
-  }, []);
+  // Like-only server route (no unlike endpoint), so no local toggle.
+  const handleToggleCommentLike = useCallback(
+    (postId: string, commentId: string) => {
+      const target = (commentsMap[postId] || []).find((c) => c.id === commentId);
+      if (!target || target.pending || target.is_liked || !identity) return;
+      playPress(850);
+      void orbitFetch(`/api/posts/${postId}/comments/${commentId}/like`, { method: 'POST' }, identity)
+        .then(async (res) => {
+          if (!res.ok) throw new Error(`like failed: ${res.status}`);
+          const data = await res.json().catch(() => null);
+          setCommentsMap((prev) => ({
+            ...prev,
+            [postId]: (prev[postId] || []).map((c) =>
+              c.id === commentId
+                ? { ...c, is_liked: true, like_count: Number(data?.like_count ?? c.like_count + 1) }
+                : c,
+            ),
+          }));
+        })
+        .catch(() => toast?.('Could not like that comment', 'error'));
+    },
+    [commentsMap, identity, toast],
+  );
 
   const handleCopyLink = useCallback(
     (post: FeedPost) => {
@@ -203,6 +263,7 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
         isSaved={activePost ? !!saved[activePost.id] : false}
         likeCount={activePost ? counts[activePost.id] ?? activePost.like_count ?? 0 : 0}
         comments={activePost ? commentsMap[activePost.id] || [] : []}
+        commentsLoading={!!activePost && commentsLoadingId === activePost.id}
         onToggleLike={toggleLike}
         onToggleSave={toggleSave}
         onAddComment={handleAddComment}

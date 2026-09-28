@@ -6,9 +6,9 @@
 // 2. Open rooms with video miniature/thumbnail, title, media title, and member count badge.
 
 import { useEffect, useState } from 'react'
-import { Plus, Users, Play, Film } from 'lucide-react'
+import { Plus, Users, Play, Film, History } from 'lucide-react'
 import { orbitFetch } from '../../utils/api'
-import { joinPartyById } from '../../hooks/watchPartyStore'
+import { joinPartyById, rememberedRooms, type RememberedRoom } from '../../hooks/watchPartyStore'
 import { useObjectImage } from '../../hooks/useObjectImage'
 
 interface IdentityLike {
@@ -78,14 +78,21 @@ export function WatchPartyRoomList({
   identity,
   onNewParty,
   kickedNotice,
+  joinedIds = [],
 }: {
   identity: IdentityLike
   onNewParty: () => void
   kickedNotice?: string
+  /** Rooms currently open — a remembered room you are IN is not "recent". */
+  joinedIds?: string[]
 }) {
   const [rooms, setRooms] = useState<RoomItem[]>([])
   const [failed, setFailed] = useState(false)
   const [loading, setLoading] = useState(true)
+  // Rooms this device remembers but is not currently in. Re-read whenever the
+  // list mounts so a room left a moment ago shows up immediately.
+  const [recents, setRecents] = useState<RememberedRoom[]>(() => rememberedRooms(joinedIds))
+  const joinedKey = joinedIds.join(',')
 
   useEffect(() => {
     let dead = false
@@ -109,11 +116,46 @@ export function WatchPartyRoomList({
     return () => { dead = true }
   }, [identity])
 
+  // Drop anything the server also lists (it is already a card below) and any
+  // room we are currently in. Re-run when either changes, so leaving a room
+  // makes it appear here immediately. joinedKey carries the joinedIds value
+  // (the array identity changes on every render).
+  useEffect(() => {
+    if (loading) return
+    const listed = rooms.map((r) => r.id)
+    setRecents(rememberedRooms([...joinedIds, ...listed]))
+  }, [rooms, loading, joinedKey])
+
   return (
     <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 styled-scrollbar">
       {kickedNotice && (
         <div role="status" className="mb-4 p-3 rounded-lg bg-retro-error/10 border border-retro-error/30 text-center text-xs text-retro-error">
           {kickedNotice}
+        </div>
+      )}
+
+      {/* Recently watched: rooms this device opened that are not joined right
+          now. The server listing hides private rooms, so without this a room
+          you left was simply gone from the UI. */}
+      {recents.length > 0 && (
+        <div className="mb-5">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-retro-muted mb-2">
+            Recently watched
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {recents.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => void joinPartyById(identity, r.id)}
+                aria-label={`Reopen room ${r.name}`}
+                className="px-3 py-1.5 rounded-full border border-border-glass bg-surface-canvas/60 hover:bg-surface-raised text-xs text-retro-fg hover:text-white transition-colors cursor-pointer active:scale-[0.98]"
+              >
+                <History className="w-3 h-3 inline mr-1.5 -mt-0.5" />
+                {r.name}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

@@ -7,6 +7,7 @@ import { X, Copy, Check, Star, Ban, Send, Grid, MessageCircle, Play, Swords, Fla
 import { playPress } from '../utils/sounds';
 import { resolveMediaUrl } from '../utils/media';
 import { ObjectImage } from './ObjectImage';
+import { formatNum } from '../ui/format';
 import { useProfilePostLightbox } from './feed/useProfilePostLightbox';
 import type { FeedPost, PostComment } from './feed/GMatchFeed';
 import { orbitFetch } from '../utils/api';
@@ -274,6 +275,22 @@ export function UserProfileModal({
                   <span>{copied ? 'Copied' : 'Copy'}</span>
                 </button>
               </div>
+            </div>
+
+            {/* Ranking details — the numbers the leaderboards actually sort on.
+                Without these the modal showed posts/followers/following only, so
+                clicking a ranked player never explained WHY they rank there. */}
+            <div className="grid grid-cols-3 gap-2 rounded-lg border border-border-glass bg-surface-interactive p-2.5">
+              {([
+                ['Reputation', formatNum(user.reputation ?? 0), 'All-time score — the "XP" board'],
+                ['Duel record', `${user.matches_won ?? 0}W ${user.matches_lost ?? 0}L`, 'Card Duel board'],
+                ['Collection', formatNum(user.gacha_items_collected ?? 0), 'Gacha finds collected'],
+              ] as const).map(([label, value, title]) => (
+                <div key={label} className="text-center min-w-0" title={title}>
+                  <div className="text-xs font-semibold font-mono text-retro-fg tabular-nums truncate">{value}</div>
+                  <div className="text-[10px] text-retro-muted mt-0.5 truncate">{label}</div>
+                </div>
+              ))}
             </div>
 
             {/* Tags */}

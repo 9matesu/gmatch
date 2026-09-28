@@ -257,8 +257,8 @@ export async function recordLeagueRank(db: D1Turso, winnerId: string | null, los
     for (const uid of [winnerId, loserId].filter(Boolean) as string[]) {
       await db
         .prepare(`
-          INSERT INTO LeagueRank (user_id, wins, points, updated_at)
-          VALUES (?, 0, 10, CURRENT_TIMESTAMP)
+          INSERT INTO LeagueRank (user_id, wins, losses, points, updated_at)
+          VALUES (?, 0, 0, 10, CURRENT_TIMESTAMP)
           ON CONFLICT(user_id) DO UPDATE SET
             points = points + 10,
             updated_at = CURRENT_TIMESTAMP
@@ -272,25 +272,28 @@ export async function recordLeagueRank(db: D1Turso, winnerId: string | null, los
   if (winnerId) {
     await db
       .prepare(`
-        INSERT INTO LeagueRank (user_id, wins, points, updated_at)
-        VALUES (?, 1, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(user_id) DO UPDATE SET
-          wins = wins + 1,
-          points = points + ?,
-          updated_at = CURRENT_TIMESTAMP
+          INSERT INTO LeagueRank (user_id, wins, points, updated_at)
+          VALUES (?, 1, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(user_id) DO UPDATE SET
+            wins = wins + 1,
+            points = points + ?,
+            updated_at = CURRENT_TIMESTAMP
       `)
       .bind(winnerId, LEAGUE_CHAMPION_POINTS, LEAGUE_CHAMPION_POINTS)
       .run()
     await addPoints(db, winnerId, LEAGUE_CHAMPION_POINTS)
   }
   if (loserId) {
+    // losses was READ everywhere ("5W 0L" on the rankings board) and WRITTEN
+    // nowhere, so every player showed a permanent 0 losses.
     await db
       .prepare(`
-        INSERT INTO LeagueRank (user_id, wins, points, updated_at)
-        VALUES (?, 0, 5, CURRENT_TIMESTAMP)
-        ON CONFLICT(user_id) DO UPDATE SET
-          points = points + 5,
-          updated_at = CURRENT_TIMESTAMP
+          INSERT INTO LeagueRank (user_id, wins, losses, points, updated_at)
+          VALUES (?, 0, 1, 5, CURRENT_TIMESTAMP)
+          ON CONFLICT(user_id) DO UPDATE SET
+            losses = losses + 1,
+            points = points + 5,
+            updated_at = CURRENT_TIMESTAMP
       `)
       .bind(loserId)
       .run()

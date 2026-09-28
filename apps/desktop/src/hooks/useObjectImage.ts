@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { orbitFetch } from '../utils/api'
 import { getLocalObject, requestSwarmObject, PEER_ONLINE_EVENT } from '../utils/p2pSwarm'
 import { resolveVideoMime, sniffFileHead } from '../utils/media'
+import { isMagnetUri } from '../utils/magnet'
 
 /**
  * Video detection for bytes in hand: trusts a concrete blob/stored MIME, but
@@ -71,7 +72,10 @@ export function __resetObjectImageCacheForTests(): void {
   objectCache.clear()
   cacheSource.clear()
   pinned.clear()
-}function pinKey(cardId: string, source: string): string {
+  inflight.clear()
+}
+
+function pinKey(cardId: string, source: string): string {
   // Normalize /api/objects/<id> and bare <id> to the same key so lookups,
   // saves, and pins always agree (split callers otherwise unpin/evict
   // entries each other still display).
@@ -82,6 +86,30 @@ export function normalizeCardId(cardId: string): string {
   if (!cardId) return cardId
   if (cardId.startsWith('/api/objects/')) return cardId.slice('/api/objects/'.length).split(/[?#]/)[0]
   return cardId
+}
+
+/**
+ * Can this value be used as an object id in a request path?
+ *
+ * `Objects.id` is always a UUID or a short opaque token (`p2p-obj-…`,
+ * `story-preload-1`, …). A `magnet:?…` or `urn:sha256:…` descriptor is what the
+ * API *returns* for an object, never something you can ask for — and feeding
+ * one back as an id is silent data loss: the literal `?` in `magnet:?xt=…`
+ * terminates the path, so the browser requests `/api/objects/magnet:` and the
+ * node 404s on the truncated id. That 404 then also fired `orbit-object-404`
+ * (which tried to delete the story row) and cached a permanent failure that
+ * evicted a real entry from the 24-slot LRU.
+ *
+ * Rejecting is the honest answer rather than encoding: these are not ids.
+ */
+export function isRequestableObjectId(raw: string | null | undefined): boolean {
+  if (!raw) return false
+  const id = normalizeCardId(raw.trim())
+  if (!id) return false
+  if (isMagnetUri(id)) return false
+  // No path separators or terminators: a single path segment, nothing that can
+  // split the URL. Catches magnets, urns, absolute URLs and file paths at once.
+  return !/[/\\?#\s]/.test(id)
 }
 
 function cacheGet(rawCardId: string, source: string): ImageState | null {
@@ -119,6 +147,181 @@ function cacheSet(rawCardId: string, source: string, img: ImageState): void {
 }
 
 /**
+ * In-flight resolution, keyed like the LRU. Two consumers of the same
+ * objectId (a feed tile and the post lightbox, or a story ring and the story
+ * player) used to race: each issued its own signed fetch, and the loser's
+ * object URL was orphaned into leaked RAM. Now the first caller starts the
+ * work and the rest await the same promise.
+ */
+const inflight = new Map<string, Promise<ResolvedObject>>()
+
+interface ResolvedObject {
+  state: ImageState
+  /** False for transient/seeder-offline states that must NOT poison the LRU. */
+  cache: boolean
+  /** Server confirmed a P2P-only row but no seeder answered. */
+  awaitingSeeder: boolean
+}
+
+const FAILED = (cardId: string): ImageState =>
+  ({ cardId, url: '', failed: true, isVideo: false, isLink: false, linkUrl: null })
+
+/** Local (P2P/vault/IndexedDB) → signed GET → swarm. Never throws. */
+async function resolveObject(cleanId: string, identity: IdentityLike): Promise<ResolvedObject> {
+  // A descriptor (magnet/urn/absolute URL) is not an id. Fail without touching
+  // the network: no request to 404 on, no orbit-object-404 to delete a live row,
+  // and nothing cached to evict a warm entry on the next story.
+  if (!isRequestableObjectId(cleanId)) {
+    return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
+  }
+
+  const commit = (state: ImageState): ResolvedObject => {
+    cacheSet(cleanId, identity.orbitId, state)
+    return { state, cache: true, awaitingSeeder: false }
+  }
+
+  // P2P first; the network is only touched on a miss.
+  let localBlob: Blob | null = null
+  try {
+    localBlob = await getLocalObject(cleanId)
+  } catch {
+    localBlob = null
+  }
+  if (localBlob) {
+    return commit({
+      cardId: cleanId,
+      url: URL.createObjectURL(localBlob),
+      failed: false,
+      isVideo: await isVideoBlob(localBlob, ''),
+      isLink: false,
+      linkUrl: null,
+    })
+  }
+
+  let res: Response
+  try {
+    res = await orbitFetch(`/api/objects/${cleanId}`, { method: 'GET' }, identity)
+  } catch {
+    return commit(FAILED(cleanId))
+  }
+
+  if (!res.ok) {
+    if (res.status === 404 && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('orbit-object-404', { detail: { cardId: cleanId } }))
+    }
+    // 502/503/504 = the node is waking up / restarting. Caching that failure
+    // blanks the tile until LRU eviction, so leave it out of the cache.
+    return res.status === 502 || res.status === 503 || res.status === 504
+      ? { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
+      : commit(FAILED(cleanId))
+  }
+
+  const contentType = (res.headers.get('Content-Type') || '').toLowerCase()
+
+  if (contentType.includes('json')) {
+    const data = await res.json().catch(() => null)
+    if (data && data.type === 'p2p') {
+      // Zero-media register-only row: bytes live on the swarm, not the server.
+      // Resolve order: local store (also keyed by content_hash) -> swarm peers.
+      const hash: string | null = typeof data.content_hash === 'string' ? data.content_hash : null
+      const mime: string = typeof data.mime_type === 'string' ? data.mime_type : 'application/octet-stream'
+      let blob: Blob | null = null
+      try {
+        blob = (await getLocalObject(cleanId)) || (hash ? await getLocalObject(hash) : null)
+      } catch {
+        blob = null
+      }
+      if (!blob) {
+        // Ask the swarm by object id, then by content_hash alias — 5s timeout
+        try {
+          blob = await requestSwarmObject(cleanId, 5000)
+        } catch {
+          if (!hash) blob = null
+          else {
+            try {
+              blob = await requestSwarmObject(hash, 5000)
+            } catch {
+              blob = null
+            }
+          }
+        }
+      }
+      if (blob) {
+        try {
+          const { registerLocalObject } = await import('../utils/p2pSwarm')
+          registerLocalObject(cleanId, blob)
+          if (hash && hash !== cleanId) registerLocalObject(hash, blob)
+        } catch {
+          /* cache alias best-effort */
+        }
+        return commit({
+          cardId: cleanId,
+          url: URL.createObjectURL(blob),
+          failed: false,
+          isVideo: await isVideoBlob(blob, mime),
+          isLink: false,
+          linkUrl: null,
+        })
+      }
+      // Seeder offline (or still hydrating): fail WITHOUT caching so a later
+      // remount/scroll retries once the seeder is back. Marked awaitingSeeder
+      // so the tile reads "waiting for poster" and PEER_ONLINE_EVENT retries.
+      return { state: FAILED(cleanId), cache: false, awaitingSeeder: true }
+    }
+    return commit({
+      cardId: cleanId,
+      url: '',
+      failed: false,
+      isVideo: false,
+      isLink: true,
+      linkUrl: typeof data?.url === 'string' ? data.url : null,
+    })
+  }
+
+  const blob = await res.blob()
+  return commit({
+    cardId: cleanId,
+    url: URL.createObjectURL(blob),
+    failed: false,
+    isVideo: await isVideoBlob(blob, contentType),
+    isLink: false,
+    linkUrl: null,
+  })
+}
+
+/** Dedupe entry point: concurrent callers share one resolution. */
+function resolveObjectOnce(cleanId: string, identity: IdentityLike): Promise<ResolvedObject> {
+  const key = pinKey(cleanId, identity.orbitId)
+  const running = inflight.get(key)
+  if (running) return running
+  const p = resolveObject(cleanId, identity).finally(() => inflight.delete(key))
+  inflight.set(key, p)
+  return p
+}
+
+/**
+ * Warm the cache for an object the user is about to see (next story in the
+ * tray, next feed tile). Uses the exact same resolution + LRU path as a real
+ * mount, so a prefetched object costs zero extra work when it renders. Safe to
+ * call repeatedly and for objects already cached.
+ */
+export function prefetchObject(cardId: string | null, identity: IdentityLike | null): void {
+  if (!cardId || !identity) return
+  if (isDirectUrlLike(cardId)) return
+  if (!isRequestableObjectId(cardId)) return
+  const cleanId = normalizeCardId(cardId)
+  if (!cleanId || cacheGet(cleanId, identity.orbitId)) return
+  void resolveObjectOnce(cleanId, identity).catch(() => { /* prefetch is best-effort */ })
+}
+
+function isDirectUrlLike(cardId: string): boolean {
+  return cardId.startsWith('data:') ||
+    cardId.startsWith('blob:') ||
+    ((cardId.startsWith('http://') || cardId.startsWith('https://')) && !isProtectedObjectUrl(cardId)) ||
+    (cardId.startsWith('/api/') && !cardId.startsWith('/api/objects/'))
+}
+
+/**
  * Fetch an object from the API and expose it as a revokable object URL.
  *
  * - The prior image stays visible while the next one loads (no placeholder
@@ -133,14 +336,7 @@ export function useObjectImage(
 ): ObjectImageResult {
   const enabled = options?.enabled !== false
   // If cardId is already a direct URL (http, https, data, blob, or static endpoint)
-  const isDirectUrl = Boolean(
-      cardId && (
-        cardId.startsWith('data:') ||
-        cardId.startsWith('blob:') ||
-        ((cardId.startsWith('http://') || cardId.startsWith('https://')) && !isProtectedObjectUrl(cardId)) ||
-        (cardId.startsWith('/api/') && !cardId.startsWith('/api/objects/'))
-      )
-  )
+  const isDirectUrl = Boolean(cardId && isDirectUrlLike(cardId))
 
   const [img, setImg] = useState<ImageState | null>(() => {
     if (!cardId) return null
@@ -211,157 +407,19 @@ export function useObjectImage(
     if (cacheGet(cleanId, identity.orbitId)) return
 
     let cancelled = false
-    let freshUrl: string | null = null
 
-// P2P first, then network only if P2P misses. Concurrent fetches race
-    // and the loser's blob URL gets orphaned into leaked RAM.
-    getLocalObject(cleanId).then(async (localBlob) => {
+    // Shared, deduped resolution: concurrent consumers of the same object id
+    // await one fetch instead of racing (and orphaning blob URLs). The result
+    // is committed to the LRU inside resolveObject, so a cancelled consumer
+    // leaves a warm entry behind rather than a leak.
+    void resolveObjectOnce(cleanId, identity).then(({ state, awaitingSeeder }) => {
       if (cancelled) return
-      if (localBlob) {
-        freshUrl = URL.createObjectURL(localBlob)
-        const loaded: ImageState = {
-          cardId: cleanId,
-          url: freshUrl,
-          failed: false,
-          isVideo: await isVideoBlob(localBlob, ''),
-          isLink: false,
-          linkUrl: null,
-        }
-        cacheSet(cleanId, identity.orbitId, loaded)
-        setImg(loaded)
-        return // P2P hit: skip network entirely
-      }
-      await fetchFromNetwork()
-    }).catch(() => { fetchFromNetwork() })
-
-    async function fetchFromNetwork() {
-      if (cancelled) return
-      try {
-        const res = await orbitFetch(`/api/objects/${cleanId}`, { method: 'GET' }, identity)
-        if (cancelled) return
-        if (!res.ok) {
-          const failedState: ImageState = { cardId: cleanId, url: '', failed: true, isVideo: false, isLink: false, linkUrl: null }
-          if (res.status !== 502 && res.status !== 503 && res.status !== 504) {
-            cacheSet(cleanId, identity?.orbitId || '', failedState)
-          }
-          setImg(failedState)
-          if (res.status === 404 && typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('orbit-object-404', { detail: { cardId: cleanId } }))
-          }
-          return
-        }
-
-        const contentType = (res.headers.get('Content-Type') || '').toLowerCase()
-
-        if (contentType.includes('json')) {
-          const data = await res.json().catch(() => null)
-          if (cancelled) return
-          if (data && data.type === 'p2p') {
-            // Zero-media register-only row: bytes live on the swarm, not the server.
-            // Resolve order: local store (also keyed by content_hash) -> swarm peers.
-            const hash: string | null = typeof data.content_hash === 'string' ? data.content_hash : null
-            const mime: string = typeof data.mime_type === 'string' ? data.mime_type : 'application/octet-stream'
-            const local =
-              (await getLocalObject(cleanId)) ||
-              (hash ? await getLocalObject(hash) : null)
-            if (local) {
-              if (cancelled) return
-              freshUrl = URL.createObjectURL(local)
-              const loaded: ImageState = {
-                cardId: cleanId,
-                url: freshUrl,
-                failed: false,
-                isVideo: await isVideoBlob(local, mime),
-                isLink: false,
-                linkUrl: null,
-              }
-              cacheSet(cleanId, identity?.orbitId || '', loaded)
-              setImg(loaded)
-              return
-            }
-            // Ask the swarm by object id, then by content_hash alias — 5s timeout
-            let blob: Blob | null = null
-            try {
-              blob = await requestSwarmObject(cleanId, 5000)
-            } catch {
-              if (hash) {
-                try {
-                  blob = await requestSwarmObject(hash, 5000)
-                } catch {
-                  blob = null
-                }
-              }
-            }
-            if (blob) {
-              try {
-                const { registerLocalObject } = await import('../utils/p2pSwarm')
-                registerLocalObject(cleanId, blob)
-                if (hash && hash !== cleanId) registerLocalObject(hash, blob)
-              } catch {
-                /* cache alias best-effort */
-              }
-              if (cancelled) return
-              freshUrl = URL.createObjectURL(blob)
-              const loaded: ImageState = {
-                cardId: cleanId,
-                url: freshUrl,
-                failed: false,
-                isVideo: await isVideoBlob(blob, mime),
-                isLink: false,
-                linkUrl: null,
-              }
-              cacheSet(cleanId, identity?.orbitId || '', loaded)
-              setImg(loaded)
-            } else {
-              if (cancelled) return
-              // Seeder offline (or still hydrating): fail WITHOUT caching so
-              // a later remount/scroll retries once the seeder is back. A
-              // cached failure would blank the image until LRU eviction.
-              // Mark awaitingSeeder so the tile reads "waiting for poster"
-              // and the PEER_ONLINE_EVENT listener retries automatically.
-              awaitingSeederRef.current = true
-              setImg({ cardId: cleanId, url: '', failed: true, isVideo: false, isLink: false, linkUrl: null })
-            }
-            return
-          }
-          const linkState: ImageState = {
-            cardId: cleanId,
-            url: '',
-            failed: false,
-            isVideo: false,
-            isLink: true,
-            linkUrl: typeof data?.url === 'string' ? data.url : null,
-          }
-          cacheSet(cleanId, identity?.orbitId || '', linkState)
-          setImg(linkState)
-          return
-        }
-
-        const blob = await res.blob()
-        if (cancelled) return
-        freshUrl = URL.createObjectURL(blob)
-        const loaded: ImageState = {
-          cardId: cleanId,
-          url: freshUrl,
-          failed: false,
-          isVideo: await isVideoBlob(blob, contentType),
-          isLink: false,
-          linkUrl: null,
-        }
-        cacheSet(cleanId, identity?.orbitId || '', loaded)
-        setImg(loaded)
-      } catch {
-        if (!cancelled) {
-          const failedState: ImageState = { cardId: cleanId, url: '', failed: true, isVideo: false, isLink: false, linkUrl: null }
-          cacheSet(cleanId, identity?.orbitId || '', failedState)
-          setImg(failedState)
-        }
-      }
-    }
-    return () => {
-      cancelled = true
-      if (freshUrl && !objectCache.has(cleanId)) URL.revokeObjectURL(freshUrl)
-    }
+      awaitingSeederRef.current = awaitingSeeder
+      setImg(state)
+    }).catch(() => {
+      if (!cancelled) setImg(FAILED(cleanId))
+    })
+    return () => { cancelled = true }
   }, [cardId, identity, enabled, retryNonce])
 
   // Hold a pin for as long as this consumer is mounted, so the LRU can never

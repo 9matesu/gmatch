@@ -45,7 +45,16 @@ export interface ObjectImageProps {
   onLoad?: () => void
   /** Invoked whenever loading state changes */
   onLoadingChange?: (loading: boolean) => void
+  /**
+   * How long to wait for a signed object before declaring it unavailable.
+   * Default 6s. Timeboxed surfaces (a 5s story) pass less, otherwise a dead
+   * story keeps the stage spinning for longer than the story itself lasts.
+   */
+  unavailableTimeoutMs?: number
 }
+
+/** Default strict-availability budget for unbounded surfaces. */
+const DEFAULT_UNAVAILABLE_TIMEOUT_MS = 6000
 
 const OBJECT_PATH = '/api/objects/'
 
@@ -125,6 +134,7 @@ export function ObjectImage({
   hideUnavailable = false,
   onLoad,
   onLoadingChange,
+  unavailableTimeoutMs = DEFAULT_UNAVAILABLE_TIMEOUT_MS,
 }: ObjectImageProps) {
   const signed = needsSignedFetch(contentUrl, objectId)
   const effObjectId = extractObjectId(contentUrl, objectId)
@@ -205,8 +215,10 @@ export function ObjectImage({
     }
   }, [signed, img.failed, hasError, onMediaUnavailable, onLoadingChange])
 
-  // Strict availability timeout (6 seconds): if media cannot be resolved or fails to load,
+  // Strict availability timeout: if media cannot be resolved or fails to load,
   // treat as unavailable so broken/loading containers collapse to 0 space.
+  // Timeboxed surfaces (a story lasts 5s) pass a shorter budget so a dead
+  // story is skipped by its own clock instead of outlasting it.
   useEffect(() => {
     if (!src && !hasError && !(signed && img.failed)) {
       onLoadingChange?.(true)
@@ -214,10 +226,10 @@ export function ObjectImage({
         setHasError(true)
         onMediaUnavailable?.()
         onLoadingChange?.(false)
-      }, 6000)
+      }, unavailableTimeoutMs)
       return () => clearTimeout(timer)
     }
-  }, [src, hasError, signed, img.failed, onMediaUnavailable, onLoadingChange])
+  }, [src, hasError, signed, img.failed, unavailableTimeoutMs, onMediaUnavailable, onLoadingChange])
 
   if (!src) {
     if (hideUnavailable && (signed ? img.failed : hasError)) return null

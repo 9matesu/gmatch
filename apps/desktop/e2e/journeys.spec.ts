@@ -17,24 +17,26 @@ test('idle: click the stage, points balance grows', async ({ page }) => {
     .not.toBe('0')
 })
 
-// Journey 2: open -> navigate to Games -> duel hub renders.
+// Journey 2: open -> navigate to Games -> hub renders its sub-tabs.
+// The tablist is "1v1 Arena | Rankings | Babecock"; the idle clicker is no
+// longer a games sub-tab (it is its own #/grid route), and "Play Cards" was
+// renamed to "1v1 Arena".
 test('games: hub reachable with sub-tabs', async ({ page }) => {
   await seedApp(page)
   await page.goto('/#/games')
-  // 1.1 layout: games opens on the default tab and the sidebar exposes the
-  // sub-tabs; the old page heading was removed with the games-group nav.
-  await expect(page.getByRole('button', { name: 'Idle Clicker' }).first()).toBeVisible({ timeout: 20_000 })
-  await expect(page.getByRole('button', { name: 'Play Cards', exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('tablist', { name: 'Arena Modes' })).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByRole('button', { name: '1v1 Arena', exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Rankings', exact: true }).first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'Babecock', exact: true }).first()).toBeVisible()
 })
 
-// Journey 3: Games hub -> Idle Clicker tab -> play -> duel tab -> back; state preserved.
-// (Idle Clicker moved from the top-level sidebar into Porn Games in 1.0.1.)
+// Journey 3: idle clicker -> play -> away -> back; state preserved.
+// The clicker lives on its own #/grid route, so the round trip is now across
+// two routes rather than two games sub-tabs.
 test('navigation round-trip preserves idle state', async ({ page }) => {
   await seedApp(page, { points: 0 })
   await mockBooruFeed(page)
-  await page.goto('/#/games')
-  await page.getByRole('button', { name: 'Idle Clicker' }).click()
+  await page.goto('/#/grid')
   const stage = page.getByRole('button', { name: /attack the current foe/i })
   await expect(stage).toBeVisible({ timeout: 20_000 })
   await expect
@@ -44,8 +46,8 @@ test('navigation round-trip preserves idle state', async ({ page }) => {
     }, { timeout: 15_000 })
     .not.toBe('0')
   const afterClick = await page.getByTestId('gc-balance').textContent()
-  await page.getByRole('button', { name: 'Play Cards', exact: true }).click()
-  await page.getByRole('button', { name: 'Idle Clicker' }).click()
+  await page.goto('/#/games')
+  await page.goto('/#/grid')
   await expect(stage).toBeVisible()
   expect(await page.getByTestId('gc-balance').textContent()).toBe(afterClick)
 })
@@ -88,17 +90,18 @@ test('offline card shows and retry recovers', async ({ page }) => {
 })
 
 // Navigation: back/forward buttons move between views.
-// The Admin sidebar entry was removed in db66606; the #/admin route (PIN gate)
-// stays reachable — navigate by hash, which is exactly what this journey tests.
+// Both targets are real routes. (The admin panel is a modal reached from the
+// HUD, not a route — see social.spec.ts journey 6.)
 test('browser back/forward navigate views', async ({ page }) => {
   await seedApp(page)
   await page.goto('/#/grid')
   const stage = page.getByRole('button', { name: /attack the current foe/i })
   await expect(stage).toBeVisible({ timeout: 20_000 })
-  await page.goto('/#/admin')
-  await expect(page.getByText('Admin Operations')).toBeVisible({ timeout: 15_000 })
+  await page.goto('/#/store')
+  const storePrice = page.locator('text=/g\\$\\s?[\\d.,]+/').first()
+  await expect(storePrice).toBeVisible({ timeout: 20_000 })
   await page.goBack()
   await expect(stage).toBeVisible()
   await page.goForward()
-  await expect(page.getByText('Admin Operations')).toBeVisible()
+  await expect(storePrice).toBeVisible()
 })

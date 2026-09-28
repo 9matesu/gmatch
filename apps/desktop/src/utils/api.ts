@@ -2,6 +2,24 @@ import { signMessage } from '@orbit/crypto';
 import { sealApiRequest } from '@orbit/protocol';
 import { logger } from './logger';
 
+/**
+ * Courier nodes (the central Render deployment) are BLIND: `SITE_SERVICES`
+ * makes every route outside directory/mail/TURN/admin 404 at the edge
+ * (apps/api/src/serve.ts + site-services.ts). They are a valid *directory*,
+ * never a valid *data* base — pointing the data API at one turns every
+ * lobby/feed/users poll into a 404. Used by computeApiBase + the WS builder.
+ */
+const COURIER_HOSTS = /(^|\.)onrender\.com$/;
+
+export function isCourierApiUrl(url: string | null | undefined): boolean {
+  if (!url?.trim()) return false;
+  try {
+    return COURIER_HOSTS.test(new URL(url.trim()).hostname);
+  } catch {
+    return false;
+  }
+}
+
 function computeApiBase(): string {
   // In browser dev mode (e.g. http://localhost:5173 without Electron bridge), use relative ''
   // so requests hit the Vite dev proxy (which routes dynamically via gmatch_server_url cookie),
@@ -18,8 +36,10 @@ function computeApiBase(): string {
   // (local sidecar). Default: central node; local sidecar is opt-in via the
   // server-mode switch in Settings.
   try {
-    const manual = typeof localStorage !== 'undefined' ? localStorage.getItem('gmatch.api.url') : null
-    if (manual?.trim()) {
+    const manual = typeof localStorage !== 'undefined' ? localStorage.getItem('gmatch.api.url') : null;
+    // A courier left over in the key (older builds auto-joined "central p2p")
+    // would 404 every data route and shadow the real sidecar — ignore it.
+    if (manual?.trim() && !isCourierApiUrl(manual)) {
       return manual.trim().replace(/\/+$/, '')
     }
   } catch { /* private mode */ }
@@ -32,8 +52,10 @@ function computeApiBase(): string {
     return normalized
   }
 
-  // Dev (electron) and packaged builds both default to the gmatch central node;
-  // the local sidecar is opt-in via VITE_API_URL / __API_BASE__ / server-mode.
+  // Last resort (no preload/env/stored server, e.g. a browser build served
+  // from a public host): the central courier. It serves the directory and the
+  // share pages; stateful routes 404 there, which is why it must never be
+  // selected as a data base above.
   return 'https://gmatch-wcz1.onrender.com'
 }
 
@@ -87,9 +109,19 @@ export function getApiWebSocketUrl(path = '/api/ws'): string {
   let base = API_BASE
   try {
     const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('gmatch.api.url') : null
-    if (stored?.trim()) base = stored.trim()
+    if (stored?.trim() && !isCourierApiUrl(stored)) base = stored.trim()
   } catch { /* session-only */ }
-  base = (base || 'https://gmatch-wcz1.onrender.com').replace(/\/+$/, '')
+  // Browser dev: API_BASE is relative (''), so the socket must ride the dev
+  // proxy on the page's own origin. Falling through to the courier opened a
+  // socket the courier 404s by design (serve.ts:243) — a dead peer swarm.
+  if (!base) {
+    if (typeof window !== 'undefined' && window.location?.host) {
+      const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws'
+      return `${scheme}://${window.location.host}${path.startsWith('/') ? path : `/${path}`}`
+    }
+    return `ws://127.0.0.1:8790${path.startsWith('/') ? path : `/${path}`}`
+  }
+  base = base.replace(/\/+$/, '')
   const scheme = base.startsWith('https') ? 'wss' : 'ws'
   const hostAndPath = base.includes('://') ? base.slice(base.indexOf('://') + 3) : base.replace(/^\/+/, '')
   const cleanPath = path.startsWith('/') ? path : `/${path}`
@@ -132,6 +164,54 @@ export function clearStaleLoopbackApiBase(): boolean {
     }
   } catch { /* private mode */ }
   return false
+}
+
+/** Cookie the dev proxy reads to route /api (vite.config.ts `resolveDevApiTarget`). */
+const SERVER_COOKIE = 'gmatch_server_url'
+/** Marker key the Servers tab keeps in sync with the connected node (onboardingState.ts). */
+const SERVER_MARKER = 'gmatch.onboarding.serverUrl'
+
+/**
+ * Boot migration: older builds auto-joined the central node on first run, which
+ * wrote the BLIND COURIER into `gmatch.api.url`, the marker key and a 1-year
+ * `gmatch_server_url` cookie. A courier 404s (now 503s) every stateful route, so
+ * that state wedges dev and packaged clients alike until it is cleared by hand.
+ * The courier is a directory/mail/TURN node, never a data base — drop it and
+ * let API_BASE fall through to the sidecar / dev node. Returns true when
+ * something was purged.
+ */
+export function purgeCourierApiState(): boolean {
+  let purged = false
+  try {
+    if (typeof localStorage !== 'undefined') {
+      for (const key of ['gmatch.api.url', SERVER_MARKER]) {
+        const value = localStorage.getItem(key)
+        if (value?.trim() && isCourierApiUrl(value)) {
+          localStorage.removeItem(key)
+          purged = true
+        }
+      }
+    }
+  } catch { /* private mode */ }
+  try {
+    if (typeof document !== 'undefined' && document.cookie.includes(`${SERVER_COOKIE}=`)) {
+      const value = readCookie(SERVER_COOKIE)
+      if (isCourierApiUrl(value)) {
+        document.cookie = `${SERVER_COOKIE}=; path=/; max-age=0`
+        purged = true
+      }
+    }
+  } catch { /* cookies disabled */ }
+  return purged
+}
+
+function readCookie(name: string): string | null {
+  try {
+    const hit = document.cookie.split(';').map((c) => c.trim()).find((c) => c.startsWith(`${name}=`))
+    return hit ? decodeURIComponent(hit.slice(name.length + 1)) : null
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -340,7 +420,8 @@ export async function orbitFetch(
   const headers = await buildHeaders()
   try {
     const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('gmatch.api.url') : null
-    if (stored?.trim() && !API_BASE) {
+    // Same rule as computeApiBase: a courier must not steer data traffic.
+    if (stored?.trim() && !isCourierApiUrl(stored) && !API_BASE) {
       headers.set('X-GMatch-Server', stored.trim())
     }
   } catch { /* session-only */ }

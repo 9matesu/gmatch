@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Lock, Globe, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, Share2, ArrowLeft, Plus, Trash2, MoreVertical, ClipboardPaste, ChevronDown, Loader2 } from 'lucide-react'
 import { generateIdentity } from '@orbit/crypto'
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
-import { orbitFetch, getApiBaseUrl } from '../../utils/api'
+import { orbitFetch, getApiBaseUrl, isCourierApiUrl } from '../../utils/api'
 import { normalizeServerUrl, isCurrentServerUrl } from '../../utils/serverUrl'
 import { joinServer } from '../../utils/join-server'
 import { rememberPendingHost } from '../../utils/server-host-pending'
@@ -292,18 +292,28 @@ export function ServersView({
     last_seen: legacyProbe.online ? new Date().toISOString() : undefined,
   }), [legacyProbe])
 
-  // Automatically join the P2P server on startup if not explicitly set
+  // Mirror the connected server into the dev-proxy cookie so browser /api
+  // traffic follows it. A courier is a DIRECTORY, not a data node (it 404s
+  // every stateful route), so it is never written to `gmatch.api.url` — doing
+  // so pointed the data API at the courier and 404'd every lobby/feed poll,
+  // in dev and in the packaged app alike. A cookie left by an older build is
+  // expired here too: the dev proxy honours it and would keep answering 503.
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('gmatch.api.url')
-      if (!stored) {
-        localStorage.setItem('gmatch.api.url', RENDER_COURIER_URL)
-        localStorage.setItem(SERVER_MARKER_KEY, RENDER_COURIER_URL)
-        if (typeof document !== 'undefined') {
-          document.cookie = `gmatch_server_url=${encodeURIComponent(RENDER_COURIER_URL)}; path=/; max-age=31536000`
+      if (typeof document !== 'undefined' && document.cookie.includes('gmatch_server_url=')) {
+        const raw = document.cookie.split(';').map((c) => c.trim())
+          .find((c) => c.startsWith('gmatch_server_url='))
+        const value = raw ? decodeURIComponent(raw.slice('gmatch_server_url='.length)) : ''
+        if (isCourierApiUrl(value)) {
+          document.cookie = 'gmatch_server_url=; path=/; max-age=0'
         }
-      } else if (typeof document !== 'undefined' && !document.cookie.includes('gmatch_server_url=')) {
-        document.cookie = `gmatch_server_url=${encodeURIComponent(stored)}; path=/; max-age=31536000`
+      }
+      const stored = localStorage.getItem('gmatch.api.url')
+      if (stored?.trim() && !isCourierApiUrl(stored)) {
+        localStorage.setItem(SERVER_MARKER_KEY, stored)
+        if (typeof document !== 'undefined' && !document.cookie.includes('gmatch_server_url=')) {
+          document.cookie = `gmatch_server_url=${encodeURIComponent(stored)}; path=/; max-age=31536000`
+        }
       }
     } catch { /* private mode */ }
   }, [])

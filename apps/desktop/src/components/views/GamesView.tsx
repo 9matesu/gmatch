@@ -11,6 +11,7 @@ import { GamesHub } from '../games/GamesHub';
 import { LobbyPanel } from '../LobbyPanel';
 import CustomSourcesModal from '../grid/CustomSourcesModal';
 import type { MainViewType } from '../home/CommandIsland';
+import { orbitFetch } from '../../utils/api';
 
 type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 type GamesSubTab = 'duel' | 'babecock' | 'ranks' | 'idle';
@@ -27,9 +28,8 @@ export function GamesView({
   toggleAutoQueue,
   sendInvite,
   soundEnabled,
-  toast: _toast,
-  setSelectedProfileUser,
-  setLobbyLightboxUrl,
+  toast,
+  setSelectedProfileUser,  setLobbyLightboxUrl,
   setExpandedItemId,
   setShowHelpModal,
   setPmPeer,
@@ -80,8 +80,25 @@ export function GamesView({
       identity={identity}
       users={users}
       onSelectUser={(uId) => {
-        const target = users.find((u) => u.id === uId || (u as any).orbitId === uId);
-        if (target) setSelectedProfileUser(target);
+        const target = users.find((u) => u.id === uId);
+        if (target) {
+          setSelectedProfileUser(target);
+          return;
+        }
+        // The directory is capped (100 rows server-side, then a 24h stale
+        // filter), so a ranked player can be absent from `users`. This used to
+        // be a silent no-op — the click looked broken. Fetch the one row.
+        if (!identity) {
+          toast('Could not load that player', 'error');
+          return;
+        }
+        void orbitFetch(`/api/users/${encodeURIComponent(uId)}`, {}, identity)
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (data?.id) setSelectedProfileUser(data as User);
+            else toast('That player is no longer on this node', 'info');
+          })
+          .catch(() => toast('Could not load that player', 'error'));
       }}
       subTab={gamesSubTab}
       onSubTabChange={setGamesSubTab}

@@ -1,6 +1,7 @@
 import type { OrbitIdentity } from '@orbit/crypto'
 import { signRequestHeaders, LEGACY_FLY_ORIGIN } from '../utils/api'
 import { saveObject, getObject, type StoredObject } from '../utils/storage'
+import { isMagnetUri } from '../utils/magnet'
 
 export interface LegacyBackfillProgress {
   phase: 'idle' | 'checking' | 'downloading' | 'completed' | 'error'
@@ -128,8 +129,13 @@ async function downloadMediaBytes(
     let fullUrl = mediaUrl
     if (mediaUrl.startsWith('/')) {
       fullUrl = `${baseOrigin}${mediaUrl}`
-    } else if (!/^https?:\/\//i.test(mediaUrl)) {
-      fullUrl = `${baseOrigin}/api/objects/${mediaUrl}`
+    } else if (!/^https?:\/\//i.test(mediaUrl) && !isMagnetUri(mediaUrl)) {
+      // encodeURIComponent: a legacy mediaUrl can be a bare id OR a
+      // descriptor (a magnet-registered post's content_url). An unencoded
+      // magnet truncates the path at its `?` and 404s on "magnet:".
+      fullUrl = `${baseOrigin}/api/objects/${encodeURIComponent(mediaUrl)}`
+    } else if (isMagnetUri(mediaUrl)) {
+      return null
     } else if (mediaUrl.startsWith(LEGACY_FLY_ORIGIN) && baseOrigin !== LEGACY_FLY_ORIGIN) {
       fullUrl = mediaUrl.replace(LEGACY_FLY_ORIGIN, baseOrigin)
     }

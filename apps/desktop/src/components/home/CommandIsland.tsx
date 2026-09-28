@@ -25,8 +25,9 @@ import {
 import { playPress } from '../../utils/sounds';
 import { resolveMediaUrl } from '../../utils/media';
 import { CountBadge } from './CountBadge';
+import { formatCount } from '../../ui/format';
 import type { ViewMode } from '../../game/types';
-export type MainViewType = 'feed' | 'games' | 'create' | 'messages' | 'profile' | 'game' | 'gallery' | 'store' | 'pc_domination' | 'grid' | 'rooms' | 'servers' | 'admin' | 'watch';
+export type MainViewType = 'feed' | 'games' | 'create' | 'messages' | 'profile' | 'game' | 'gallery' | 'store' | 'pc_domination' | 'grid' | 'rooms' | 'servers' | 'watch';
 
 /** Layout pill on the bar: 1x1 / 1x2 / 2x2 / 3x3. */
 const GRID_SIZES: ViewMode[] = ['1x1', '1x2', '2x2', '3x3'];
@@ -260,7 +261,7 @@ export function CommandIsland({
         {/* Left Telemetry: $G Balance */}
         <div className="flex items-center px-2.5 py-1 rounded-full bg-glass-w5 border border-border-glass text-xs font-mono tabular-nums text-retro-body shrink-0">
           <span className="font-semibold text-retro-fg tracking-tight">
-            ${Math.floor(balance).toLocaleString()}
+            ${formatCount(balance)}
           </span>
         </div>
 
@@ -507,7 +508,8 @@ export function CommandIsland({
               <span className="text-xs hidden sm:inline">Settings</span>
             </button>
 
-            {/* Admin (conditional on admin flag) */}
+            {/* Admin — a PIN-gated modal, not a route, so it has no persistent
+                "current page" highlight (aria-current stays undefined). */}
              <button
                 type="button"
                 onClick={() => {
@@ -517,14 +519,10 @@ export function CommandIsland({
                 aria-label="Admin"
                  aria-current={undefined}
                 title="Admin Control Panel"
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-                  mainView === 'admin'
-                    ? 'bg-retro-accent text-retro-accent-text'
-                    : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
-                }`}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
               >
-                <ShieldCheck className="w-3.5 h-3.5 text-retro-error shrink-0" weight={mainView === 'admin' ? 'fill' : 'regular'} />
-                <span className="text-xs hidden sm:inline">Admin</span>
+                <ShieldCheck className="w-3.5 h-3.5 text-retro-error shrink-0" weight="regular" />
+                <span className="text-xs">Admin</span>
                </button>
 
              {/* Logout (conditional on onLogout) */}

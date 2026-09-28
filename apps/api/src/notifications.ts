@@ -92,6 +92,28 @@ export async function unreadNotificationCount(db: D1Turso, userId: string): Prom
   }
 }
 
+/**
+ * Unread broken down per type, so the bell can badge "likes" and "follows"
+ * separately instead of one anonymous total. Same query shape as the scalar
+ * count, one extra GROUP BY.
+ */
+export async function unreadNotificationCountsByType(
+  db: D1Turso,
+  userId: string,
+): Promise<Record<string, number>> {
+  try {
+    const { results } = await db
+      .prepare('SELECT type, COUNT(*) as n FROM Notifications WHERE user_id = ? AND read = 0 GROUP BY type')
+      .bind(userId)
+      .all<{ type: string; n: number }>()
+    const out: Record<string, number> = {}
+    for (const r of results || []) out[r.type] = Number(r.n) || 0
+    return out
+  } catch {
+    return {}
+  }
+}
+
 /** Mark a set of notifications read for a user. Empty ids = mark all. */
 export async function markNotificationsRead(db: D1Turso, userId: string, ids: string[]): Promise<void> {
   if (ids.length === 0) {
