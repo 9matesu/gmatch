@@ -71,14 +71,16 @@ describe('WatchPartyTimeline Component', () => {
   })
 
   it('handles play/pause toggle clicking controlPlayback', () => {
-    render(<WatchPartyTimeline party={sampleParty} />)
+    // Transport is host-only server-side, so the host is the only identity for
+    // which the control does anything.
+    render(<WatchPartyTimeline party={sampleParty} isHost />)
     const pauseBtn = screen.getByLabelText('Pause party')
     fireEvent.click(pauseBtn)
     expect(mockControlPlayback).toHaveBeenCalledWith('party-1', 'pause', expect.any(Number))
   })
 
   it('handles prev and next queue operations', () => {
-    render(<WatchPartyTimeline party={sampleParty} />)
+    render(<WatchPartyTimeline party={sampleParty} isHost />)
     fireEvent.click(screen.getByLabelText('Previous video'))
     expect(mockQueueOp).toHaveBeenCalledWith('party-1', 'prev')
 
@@ -86,8 +88,18 @@ describe('WatchPartyTimeline Component', () => {
     expect(mockQueueOp).toHaveBeenCalledWith('party-1', 'next')
   })
 
+  it('disables transport for a non-host and sends nothing when clicked', () => {
+    render(<WatchPartyTimeline party={sampleParty} isHost={false} />)
+    for (const label of ['Previous video', 'Pause party', 'Next video']) {
+      const btn = screen.getByLabelText(label) as HTMLButtonElement
+      expect(btn.disabled, label).toBe(true)
+    }
+    fireEvent.click(screen.getByLabelText('Pause party'))
+    expect(mockControlPlayback).not.toHaveBeenCalled()
+  })
+
   it('toggles audio mute and updates volume slider', () => {
-    render(<WatchPartyTimeline party={sampleParty} />)
+    render(<WatchPartyTimeline party={sampleParty} isHost />)
     const muteBtn = screen.getByLabelText('Mute')
     fireEvent.click(muteBtn)
 

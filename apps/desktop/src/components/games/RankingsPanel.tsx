@@ -125,15 +125,15 @@ export function RankingsPanel({
           <Trophy className="w-4 h-4 text-retro-accent" />
           <h2 className="text-sm font-medium text-retro-fg">Rankings</h2>
         </div>
-        <div className="flex bg-surface-interactive border border-border-glass p-0.5 rounded-md text-xs">
+        <div className="flex bg-surface-interactive border border-border-glass p-0.5 rounded-md text-xs" role="group" aria-label="Ranking boards">
           {BOARDS.map((b) => {
             const Icon = b.icon;
             return (
               <button
                 key={b.id}
                 type="button"
-                onClick={() => setBoard(b.id)}
                 aria-pressed={board === b.id}
+                onClick={() => setBoard(b.id)}
                 className={`px-2.5 py-1 rounded transition-colors cursor-pointer font-medium flex items-center gap-1.5 ${board === b.id ? 'bg-surface-raised text-retro-fg' : 'text-retro-muted hover:text-retro-fg'
                   }`}
               >
@@ -168,13 +168,13 @@ export function RankingsPanel({
           Online only
         </button>
         {board === 'social' && (
-          <div className="flex bg-surface-interactive border border-border-glass p-0.5 rounded-md text-xs">
+          <div className="flex bg-surface-interactive border border-border-glass p-0.5 rounded-md text-xs" role="group" aria-label="Social metric timeframe">
             {(['all', 'today'] as const).map((m) => (
               <button
                 key={m}
                 type="button"
-                onClick={() => setSocialMetric(m)}
                 aria-pressed={socialMetric === m}
+                onClick={() => setSocialMetric(m)}
                 className={`px-2.5 py-1 rounded transition-colors cursor-pointer capitalize font-medium ${socialMetric === m ? 'bg-surface-raised text-retro-fg' : 'text-retro-muted hover:text-retro-fg'}`}
               >
                 {m === 'all' ? 'XP' : 'Today'}

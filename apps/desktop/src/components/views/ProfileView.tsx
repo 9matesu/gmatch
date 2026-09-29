@@ -80,8 +80,11 @@ export function ProfileView({
         cards={myCards as any}
         savedPosts={feedPosts.filter((p) => p.is_saved)}
         repostPosts={repostedPosts}
-        followersCount={myUser?.followers_count ?? myUser?.likes_received ?? 0}
-        followingCount={myUser?.following_count ?? followingIds.length}
+        // No `?? likes_received` fallback: that is a LIKES count rendered under
+        // a "followers" label, which is why the number could disagree with the
+        // list you get by clicking it.
+        followersCount={myUser?.followers_count ?? 0}
+        followingCount={followingIds.length}
         onOpenSettings={() => setShowSettingsModal(true)}
         onOpenFollowers={(tab) => setFollowersModalState({ isOpen: true, initialTab: tab, targetUserId: null, targetName: null })}
         onOpenCardViewer={(card) => {

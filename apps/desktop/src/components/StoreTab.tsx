@@ -7,6 +7,7 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import type { ActiveHackSession } from './home/CommandIsland';
 import { playPress, playLike } from '../utils/sounds';
 import { formatCount } from '../ui/format';
+import type { CanonicalCard } from '../utils/cardCollection';
 import { TargetSelectorModal } from './hacks/TargetSelectorModal';
 import { ObjectImage } from './ObjectImage';
 import { CardDetailView } from './CardDetailView';
@@ -21,16 +22,34 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 
+/**
+ * A row in the "your portfolio" table. `ownerName` is joined server-side with
+ * the card; this projection used to discard it, so the table could only show a
+ * bare card id, and the community market had no way to credit the seller even
+ * though `sellerId` was in the payload.
+ */
 interface PortfolioCard {
   id: string;
   value: number;
   rarity: string;
   marketStatus: string;
+  ownerId?: string;
+  ownerName?: string | null;
+  name?: string | null;
+}
+
+interface MarketListing {
+  listingId: string;
+  cardId: string;
+  price: number;
+  sellerId: string;
+  sellerName?: string | null;
+  card: CanonicalCard;
 }
 
 const RARITY_ORDER = ['common', 'copper', 'silver', 'gold', 'diamond'] as const;
 
-export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCardCollection, onOpenFlash, users = [], profilePics = {}, toast, arsenalOnly = false }: {
+export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCardCollection, onOpenFlash, onOpenOwner, users = [], profilePics = {}, toast, arsenalOnly = false }: {
   points: number;
   onPurchase?: (item: StoreItem) => void;
   onUseConsumable?: (item: StoreItem) => void;
@@ -38,6 +57,8 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
   identity?: OrbitIdentity | null;
   onOpenCardCollection?: () => void;
   onOpenFlash?: () => void;
+  /** Open a user's profile from a card's owner credit. */
+  onOpenOwner?: (userId: string) => void;
   users?: User[];
   profilePics?: Record<string, string>;
   toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
@@ -53,7 +74,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
   const [confirmCashoutAll, setConfirmCashoutAll] = useState(false);
   const [cashingOutAll, setCashingOutAll] = useState(false);
   const [cashoutProgress, setCashoutProgress] = useState<{ done: number; total: number } | null>(null);
-  const [marketListings, setMarketListings] = useState<Array<{ listingId: string; cardId: string; price: number; sellerId: string; card: any }>>([]);
+  const [marketListings, setMarketListings] = useState<MarketListing[]>([]);
   const [buyingCardId, setBuyingCardId] = useState<string | null>(null);
   const [marketCardId, setMarketCardId] = useState<string | null>(null);
 
@@ -62,7 +83,15 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
     if (!identity) return;
     orbitFetch('/api/cards/market?limit=24', {}, identity)
       .then((r) => (r.ok ? r.json() : null))
-      .then((data) => { if (Array.isArray(data?.listings)) setMarketListings(data.listings); })
+      .then((data) => {
+        if (!Array.isArray(data?.listings)) return;
+        // Every listing carries its seller id, and the seller is the card's
+        // current owner — so the joined `card.ownerName` IS the seller name.
+        // Lift it out so the grid can credit them without a directory lookup.
+        setMarketListings(
+          data.listings.map((l: MarketListing) => ({ ...l, sellerName: l.card?.ownerName ?? null })),
+        );
+      })
       .catch(() => { });
   };
 
@@ -124,12 +153,16 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
         if (cancelled || !Array.isArray(data?.cards)) return;
         setPortfolio(
           data.cards
-            .filter((c: any) => c.marketStatus !== 'cashed_out')
-            .map((c: any) => ({
+            .filter((c: CanonicalCard) => c.marketStatus !== 'cashed_out')
+            .map((c: CanonicalCard) => ({
               id: c.id,
               value: Number(c.value || 0),
               rarity: String(c.rarity || 'common'),
               marketStatus: String(c.marketStatus || 'none'),
+              // Keep the identity fields: the table credits each card by name.
+              ownerId: c.ownerId,
+              ownerName: c.ownerName ?? null,
+              name: c.name ?? null,
             }))
         );
       })
@@ -156,12 +189,15 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
         if (!Array.isArray(data?.cards)) return;
         setPortfolio(
           data.cards
-            .filter((c: any) => c.marketStatus !== 'cashed_out')
-            .map((c: any) => ({
+            .filter((c: CanonicalCard) => c.marketStatus !== 'cashed_out')
+            .map((c: CanonicalCard) => ({
               id: c.id,
               value: Number(c.value || 0),
               rarity: String(c.rarity || 'common'),
               marketStatus: String(c.marketStatus || 'none'),
+              ownerId: c.ownerId,
+              ownerName: c.ownerName ?? null,
+              name: c.name ?? null,
             }))
         );
       })
@@ -290,6 +326,13 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
         window.dispatchEvent(new CustomEvent('orbit-score-refresh'));
 
         if (item.category === 'hack' && targetId) {
+          // The debuff window is the SERVER's, not ours: `deny` lasts 5 minutes
+          // and `mobile_virus` 1. This used to hardcode 3 minutes for every
+          // hack, so the countdown disagreed with when the effect actually
+          // stopped. Read it off the purchase response, and only fall back to
+          // polling if an older node omits it.
+          const bought = await res.json().catch(() => null as { debuff?: { expires_at?: number } } | null);
+          const expiresAt = Number(bought?.debuff?.expires_at) || 0;
           // Deferred so the purity rule doesn't see Date.now() during render paths.
           setTimeout(() => {
             onDeployHack?.({
@@ -297,8 +340,9 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
               itemName: item.name,
               targetUserId: targetId,
               targetUserName: targetName || 'Target Player',
-              expiresAt: Date.now() + 180000,
+              expiresAt,
             });
+            if (!expiresAt) toast?.('Session length unknown — recheck the Hacks tab for the timer', 'info');
           }, 0);
           return;
         }
@@ -496,7 +540,14 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                       {tier.label}
                     </span>
                   )}
-                  <span className="min-w-0 flex-1 truncate font-mono text-xs text-retro-muted">{c.id.slice(0, 12)}…</span>
+                  <span className="min-w-0 flex-1 truncate text-xs text-retro-body">
+                    {c.name || `${c.id.slice(0, 12)}…`}
+                  </span>
+                  {c.ownerId !== identity?.orbitId && c.ownerName && (
+                    <span className="hidden sm:inline max-w-[8rem] shrink-0 truncate text-[10px] text-retro-muted">
+                      by {c.ownerName}
+                    </span>
+                  )}
                   <span className="text-xs font-bold font-mono tabular-nums text-retro-fg shrink-0">{formatGc(c.value)}</span>
                   <span className="text-[10px] font-mono tabular-nums text-amber-300 shrink-0">→ {formatGc(computeCashoutPayout(c.value, cashoutRate))}</span>
                 </div>
@@ -557,6 +608,24 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                   <div className="p-2">
                     <div className="text-xs font-bold text-retro-fg truncate">{l.card?.name || 'Unnamed Card'}</div>
                     <div className="text-[10px] capitalize text-retro-muted">{l.card?.rarity}</div>
+                    {/* Credit the seller. The name is joined server-side: the
+                        local `users` roster is capped at 100 rows and filtered
+                        to 24h freshness, so it cannot name a stranger. */}
+                    <div className="mt-0.5 flex items-center gap-1 text-[10px] text-retro-muted min-w-0">
+                      <span className="shrink-0">by</span>
+                      {l.sellerId === identity?.orbitId ? (
+                        <span className="truncate font-medium text-retro-body">you</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onOpenOwner?.(l.sellerId)}
+                          className="min-w-0 truncate text-left font-medium text-retro-body hover:text-retro-accent hover:underline cursor-pointer"
+                          aria-label={`Open profile of ${l.sellerName || 'seller'}`}
+                        >
+                          {l.sellerName || `User_${l.sellerId.slice(0, 6)}`}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </button>
                 <div className="flex items-center justify-between gap-1.5 px-2 pb-2">

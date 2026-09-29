@@ -362,6 +362,19 @@ users.post('/heartbeat', async (c) => {
 // ghost report. One constant, every caller.
 const PRESENCE_WINDOW_MS = 60_000
 
+/**
+ * SQLite writes `datetime(...)` as `YYYY-MM-DD HH:MM:SS` in UTC with no zone
+ * marker, so `new Date(v)` parses it as LOCAL time and every sighting lands
+ * hours in the past. Append Z when it is missing. The client has the same
+ * normalisation in utils/presence.ts.
+ */
+function parseSeenMs(v: string | null | undefined): number {
+  if (!v) return 0
+  const s = !v.endsWith('Z') && !v.includes('+') ? (v.includes('T') ? `${v}Z` : `${v.replace(' ', 'T')}Z`) : v
+  const t = new Date(s).getTime()
+  return Number.isFinite(t) ? t : 0
+}
+
 // Discovery roster: who is online RIGHT NOW (last_seen within 60s, the same
 // window `GET /api/users` uses). A joining client seeds its peer map from
 // this instead of waiting passively for a swarm event.
@@ -426,6 +439,13 @@ users.get('/:id', async (c) => {
   if (!row) return c.json({ error: 'User not found' }, 404)
   let tags: string[] = []
   try { tags = row.tags ? JSON.parse(String(row.tags)) : [] } catch { tags = [] }
+  // Presence, derived on the same canonical window every other endpoint uses
+  // (PRESENCE_WINDOW_MS). Without this field the profile payload carried a bare
+  // `last_seen` and no boolean, so the client's isUserOnline fell through to
+  // `Boolean(user.online)` = false and the modal showed "Offline" for anyone
+  // opened straight from this route — including active users.
+  const lastSeen = parseSeenMs(row.last_seen as string | null)
+  const online = lastSeen > 0 && Date.now() - lastSeen < PRESENCE_WINDOW_MS
   return c.json({
     user: {
       id: row.id,
@@ -437,6 +457,7 @@ users.get('/:id', async (c) => {
       tags,
       pfp_url: row.pfp_url || undefined,
       last_seen: row.last_seen || undefined,
+      online,
       score: row.score ?? 0,
       // Reputation + duel record: the rankings boards sort on these, so the
       // profile "details" has to show them or it explains nothing. (balance is
@@ -676,6 +697,19 @@ async function bumpFollowCounts(db: D1Turso, followerId: string, followeeId: str
   }
 }
 
+/** Table-derived follow counts, same definition the profile read paths use. */
+async function followCounts(db: D1Turso, userId: string): Promise<{ followers_count: number; following_count: number }> {
+  const row = await db.prepare(`
+    SELECT
+      (SELECT COUNT(*) FROM Followers f WHERE f.followee_id = ? AND f.accepted = 1) as followers_count,
+      (SELECT COUNT(*) FROM Followers f WHERE f.follower_id = ? AND f.accepted = 1) as following_count
+  `).bind(userId, userId).first<{ followers_count: number; following_count: number }>()
+  return {
+    followers_count: Number(row?.followers_count || 0),
+    following_count: Number(row?.following_count || 0),
+  }
+}
+
 users.post('/:id/follow', async (c) => {
   const db = c.env.DB
   const followerId = c.get('orbitId')
@@ -699,7 +733,15 @@ users.post('/:id/follow', async (c) => {
       if (notif) broadcastToUser(followeeId, { type: 'notification', action: 'new', notification: notif })
     } catch {}
   }
-  return c.json({ following: true })
+  // The counts the caller actually needs back: their own new "following"
+  // total, and the new follower total for the person they followed. Returning
+  // only { following: true } left the client with nothing to apply, so the
+  // profile number could only ever be refreshed by a blind refetch.
+  return c.json({
+    following: true,
+    following_count: (await followCounts(db, followerId)).following_count,
+    followers_count: (await followCounts(db, followeeId)).followers_count,
+  })
 })
 
 users.delete('/:id/follow', async (c) => {
@@ -710,8 +752,13 @@ users.delete('/:id/follow', async (c) => {
   const res = await db.prepare('DELETE FROM Followers WHERE follower_id = ? AND followee_id = ?').bind(followerId, followeeId).run()
   if (Number(res.meta?.changes || 0) > 0) {
     await bumpFollowCounts(db, followerId, followeeId, -1)
+    broadcastToRoom('global', { type: 'follow', action: 'removed', follower_id: followerId, followee_id: followeeId })
   }
-  return c.json({ following: false })
+  return c.json({
+    following: false,
+    following_count: (await followCounts(db, followerId)).following_count,
+    followers_count: (await followCounts(db, followeeId)).followers_count,
+  })
 })
 
 users.get('/:id/followers', async (c) => {
@@ -1122,6 +1169,9 @@ users.post('/store/purchase', async (c) => {
   // (inventory/unlock/hack debuff), each gated on changes().
   let extra: AtomicStatement[] = []
   let debitGate: { clause: string; args: any[] } | undefined
+  // Set only on the hack branch, and echoed back so the client can count down
+  // the SERVER's window instead of guessing one.
+  let hackDebuff: ServerHackDebuff | null = null
 
 if (baseItem.id === 'item-flash-drop') {
     // Flash Drop is a broadcast, not a targeted debuff: buying it grants an
@@ -1172,6 +1222,7 @@ if (baseItem.id === 'item-flash-drop') {
       created_at: now,
       expires_at: now + durationMs,
     }
+    hackDebuff = debuff
     // Durable: the INSERT rides the same atomic batch as the debit, gated on
     // changes() like every other store side effect (a failed debit mints no
     // debuff).
@@ -1233,7 +1284,20 @@ if (baseItem.id === 'item-flash-drop') {
 
   const balance = (res[balanceIndex].rows[0]?.balance as number) ?? 0
 
-  return c.json({ ok: true, item_id: baseItem.id, cost, score: balance, balance })
+  // The server owns the debuff's lifetime. The client used to invent its own
+  // countdown (a hardcoded 3 minutes for every hack) while the server mints 5
+  // for `deny` and 1 for `mobile_virus`, so the UI could claim a session was
+  // over — or still running — minutes away from the truth.
+  return c.json({
+    ok: true,
+    item_id: baseItem.id,
+    cost,
+    score: balance,
+    balance,
+    ...(hackDebuff
+      ? { debuff: { id: hackDebuff.id, type: hackDebuff.type, expires_at: hackDebuff.expires_at } }
+      : {}),
+  })
 })
 
 // Query active hack debuffs affecting the current user or launched by current user

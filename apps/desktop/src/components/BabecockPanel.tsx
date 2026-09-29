@@ -575,7 +575,8 @@ export function BabecockPanel({
                   <button
                     type="button"
                     onClick={() => dismissInvite(inv.id)}
-                    className="p-1 text-retro-muted hover:text-retro-fg rounded-md cursor-pointer transition-colors"
+                    aria-label="Dismiss invite"
+                    className="p-1 min-w-[28px] min-h-[28px] flex items-center justify-center text-retro-muted hover:text-retro-fg rounded-md cursor-pointer transition-colors"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -607,14 +608,16 @@ export function BabecockPanel({
             {round && (
               <span className={`px-2.5 py-1 text-xs font-mono font-semibold rounded-md border flex items-center gap-1 ${secsLeft > 0 ? 'bg-red-500/10 text-red-400 border-red-500/30' : 'text-retro-muted border-border-glass'
                 }`}>
-                <Clock className="w-3 h-3" />
+                <Clock className="w-3.5 h-3.5" />
                 <span>{secsLeft > 0 ? fmt(secsLeft) : 'CLOSED'}</span>
               </span>
             )}
             {round && round.entries.length > 1 && (
-              <div className="flex bg-retro-bg p-0.5 rounded-md border border-border-glass text-[10px] font-medium">
+              <div className="flex bg-retro-bg p-0.5 rounded-md border border-border-glass text-[10px] font-medium" role="radiogroup" aria-label="Layout view">
                 <button
                   type="button"
+                  role="radio"
+                  aria-checked={viewLayout === 'collage'}
                   onClick={() => setViewLayout('collage')}
                   className={`px-2 py-0.5 rounded cursor-pointer transition-all duration-150 active:scale-[0.96] ${viewLayout === 'collage' ? 'bg-glass-w12 text-retro-fg shadow-xs font-semibold' : 'text-retro-muted hover:text-retro-fg'}`}
                   title="Collage Grid"
@@ -624,6 +627,8 @@ export function BabecockPanel({
                 </button>
                 <button
                   type="button"
+                  role="radio"
+                  aria-checked={viewLayout === 'strip'}
                   onClick={() => setViewLayout('strip')}
                   className={`px-2 py-0.5 rounded cursor-pointer transition-all duration-150 active:scale-[0.96] ${viewLayout === 'strip' ? 'bg-glass-w12 text-retro-fg shadow-xs font-semibold' : 'text-retro-muted hover:text-retro-fg'}`}
                   title="Strip View"
@@ -636,7 +641,9 @@ export function BabecockPanel({
             <button
               type="button"
               onClick={() => setLiveOpen((v) => !v)}
-              className="p-1 text-retro-muted hover:text-retro-fg rounded-md cursor-pointer transition-colors"
+              aria-label={liveOpen ? "Collapse live round" : "Expand live round"}
+              aria-expanded={liveOpen}
+              className="p-1 min-w-[28px] min-h-[28px] flex items-center justify-center text-retro-muted hover:text-retro-fg rounded-md cursor-pointer transition-colors"
             >
               {liveOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             </button>

@@ -3,7 +3,7 @@ import {
   createParty, getParty, listParties, applyWatch, joinWatch, leaveWatch, leaveAll, applyChat,
   deleteChat, kickWatch, banWatch, muteWatch, transferHost, settingsWatch,
   queueOps, setPartyMedia, __resetParties, partyRoom, IDLE_MS, MAX_QUEUE, isPartyMediaObject,
-  serializeParties, restoreParties, liveMediaObjectIds, type Party,
+  serializeParties, restoreParties, liveMediaObjectIds, HOST_SEAT_GRACE_MS, type Party,
 } from './watchparty'
 import { handleIncoming, conns, createWsTicket, type WsConn } from './ws-bus'
 
@@ -28,6 +28,72 @@ beforeEach(() => {
 function makeParty(creator = 'u1'): Party {
   return createParty('T', 'u', 'u', undefined, creator)
 }
+
+/** An authenticated socket for `userId`, subscribed to the room. */
+function hostConn(p: Party, userId = p.hostId): WsConn & { sent: string[] } {
+  const c = fakeConn()
+  conns.add(c)
+  authed(c, userId)
+  handleIncoming(c, JSON.stringify({ type: 'watch.join', party: p.id, name: userId }))
+  c.sent.length = 0
+  return c
+}
+
+describe('transport is host-only', () => {
+  it('accepts a play/pause/seek frame from the host', () => {
+    const p = makeParty('u0')
+    joinWatch('u1', 'Viewer', { party: p.id })
+    const res = applyWatch('u0', { party: p.id, action: 'play', position: 7 })
+    expect(res?.payload.frame.action).toBe('play')
+    expect(res?.payload.frame.position).toBe(7)
+  })
+
+  it('refuses a frame from a non-host member (the seek-to-0 report)', () => {
+    const p = makeParty('u0')
+    joinWatch('u1', 'Viewer', { party: p.id })
+    // A viewer clicking their own player used to broadcast its position and
+    // drag the whole room with it.
+    expect(applyWatch('u1', { party: p.id, action: 'play', position: 0 })).toBeNull()
+    expect(applyWatch('u1', { party: p.id, action: 'pause', position: 42 })).toBeNull()
+    // …and the room frame is untouched.
+    expect(p.frame.action).not.toBe('play')
+  })
+
+  it('refuses a frame from a non-member entirely', () => {
+    const p = makeParty('u0')
+    expect(applyWatch('stranger', { party: p.id, action: 'play', position: 1 })).toBeNull()
+  })
+
+  it('keeps the host seat across a disconnect + rejoin inside the grace window', () => {
+    const p = makeParty('u0')
+    joinWatch('u1', 'Viewer', { party: p.id })
+    leaveAll('u0')
+    // Host dropped: the crown must NOT move to the viewer.
+    expect(p.hostId).toBe('u0')
+    expect(p.members.has('u1')).toBe(true)
+    expect(p.hostLeftAt).toBeTruthy()
+    // Rejoining inside the window restores the seat for good, with no promotion
+    // in between — this is the "my controls stopped working after a reload"
+    // report.
+    joinWatch('u0', 'Host', { party: p.id })
+    expect(p.hostId).toBe('u0')
+    expect(p.hostLeftAt).toBeUndefined()
+    expect(applyWatch('u0', { party: p.id, action: 'pause', position: 3 })).not.toBeNull()
+  })
+
+  it('promotes a viewer only after the grace window expires', () => {
+    const p = makeParty('u0')
+    joinWatch('u1', 'Viewer', { party: p.id })
+    leaveAll('u0')
+    expect(p.hostId).toBe('u0')
+    // Age the retained seat past the window; the control attempt reconciles it
+    // lazily. (One frame only — the 200ms per-member transport throttle would
+    // drop a second one in the same tick.)
+    p.hostLeftAt = Date.now() - HOST_SEAT_GRACE_MS - 1000
+    expect(applyWatch('u1', { party: p.id, action: 'play', position: 1 })).not.toBeNull()
+    expect(p.hostId).toBe('u1')
+  })
+})
 
 describe('room model (host, private, queue, chat history)', () => {
   it('createParty sets host and auto-joins the creator', () => {
@@ -58,17 +124,28 @@ describe('room model (host, private, queue, chat history)', () => {
 
   it('applyWatch stamps the acting member name on the frame', () => {
     const p = makeParty()
-    joinWatch('u2', 'Bob', { party: p.id })
-    const res = applyWatch('u2', { party: p.id, action: 'play', position: 4 })!
-    expect(res.payload.frame.by).toBe('Bob')
+    // The acting member must be the host: transport is host-only, so this now
+    // exercises the stamp from the one identity allowed to issue a frame.
+    const res = applyWatch('u1', { party: p.id, action: 'play', position: 4 })!
+    // makeParty() creates the host with an EMPTY display name, so this asserts
+    // the id fallback rather than the name.
+    expect(p.members.get('u1')!.name).toBe('')
+    expect(res.payload.frame.by).toBe('u1')
   })
 
-  it('leaveWatch removes member and broadcasts system + roster; host promotes', () => {
+  it('leaveWatch removes the member and broadcasts system + roster; the host seat is RETAINED', () => {
     const p = makeParty()
     joinWatch('u2', 'Bob', { party: p.id })
     const res = leaveWatch('u1', { party: p.id })!
     expect(p.members.has('u1')).toBe(false)
-    expect(p.hostId).toBe('u2') // promotion
+    // Seat retention: the host seat is held for HOST_SEAT_GRACE_MS so a reload
+    // or blip doesn't hand the room to a viewer permanently. Promotion now only
+    // happens once that window expires.
+    expect(p.hostId).toBe('u1')
+    expect(p.hostLeftAt).toBeTruthy()
+    p.hostLeftAt = Date.now() - HOST_SEAT_GRACE_MS - 1
+    applyWatch('u2', { party: p.id, action: 'play', position: 1 })
+    expect(p.hostId).toBe('u2') // promoted once the window closed
     expect(res.payload.find((r: any) => r.type === 'watch.system') !== undefined || res.payload.type === 'watch.system').toBe(true)
   })
 
@@ -299,11 +376,17 @@ describe('ws relay integration', () => {
     expect(rosterA.length).toBe(2)
     b.sent.length = 0
     a.sent.length = 0
+    // The HOST is u0 (makeParty('u0')), so a play frame from u1 is now refused.
+    // This test used to assert the opposite — that any member could drive the
+    // room's transport, which is how a viewer clicking their own player dragged
+    // everyone to their currentTime.
     handleIncoming(a, JSON.stringify({ type: 'watch', party: p.id, action: 'play', position: 3 }))
+    expect(b.sent.map(JSON.parse).filter((m) => m.type === 'watch.sync').length).toBe(0)
+    // The host's frame is accepted and relayed to the member.
+    handleIncoming(hostConn(p), JSON.stringify({ type: 'watch', party: p.id, action: 'play', position: 3 }))
     const syncs = b.sent.map(JSON.parse).filter((m) => m.type === 'watch.sync')
     expect(syncs.length).toBe(1)
     expect(syncs[0].frame.position).toBe(3)
-    expect(a.sent.length).toBe(1)
   })
 
   it('watch.ping answers on the socket only', () => {
@@ -391,7 +474,9 @@ describe('room persistence', () => {
   it('round-trips rooms through serialize/restore', () => {
     const p = makeParty('u1')
     joinWatch('u2', 'Bob', { party: p.id })
-    applyWatch('u2', { party: p.id, action: 'play', position: 42 })
+    // Host issues the frame (transport is host-only), so the persisted position
+    // is a real one rather than a rejected write.
+    applyWatch('u1', { party: p.id, action: 'play', position: 42 })
     queueOps('u1', { party: p.id, op: 'add', name: 'next', url: '/api/objects/n' })
     applyChat('u2', 'Bob', { party: p.id, text: 'gn everyone' })
     const dump = serializeParties()

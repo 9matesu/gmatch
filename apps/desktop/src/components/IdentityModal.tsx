@@ -230,7 +230,7 @@ export function IdentityModal({
             type="button"
             onClick={() => setMode("logout")}
             className={`flex-1 py-1.5 text-center rounded text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
-              mode === "logout" ? "bg-rose-500/10 text-rose-400" : "text-rose-400/60 hover:text-rose-400"
+              mode === "logout" ? "bg-retro-error/15 text-retro-error" : "text-retro-muted hover:text-retro-error"
             }`}
           >
             <LogOut className="w-3.5 h-3.5" />
@@ -367,7 +367,7 @@ export function IdentityModal({
 
           {mode === "logout" && (
             <div className="space-y-4 text-center py-2">
-              <div className="w-10 h-10 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mx-auto">
+              <div className="w-10 h-10 rounded-lg bg-retro-error/15 border border-retro-error/30 flex items-center justify-center text-retro-error mx-auto">
                 <AlertTriangle className="w-5 h-5" />
               </div>
 
@@ -384,7 +384,7 @@ export function IdentityModal({
                 <button
                   type="button"
                   onClick={() => setMode("export")}
-                  className="flex-1 py-2.5 bg-surface-interactive border border-border-glass text-retro-body font-medium text-xs rounded-lg transition-colors cursor-pointer hover:border-border-strong"
+                  className="flex-1 py-2.5 bg-glass-w8 border border-border-glass text-retro-fg font-medium text-xs rounded-lg transition-colors cursor-pointer hover:bg-glass-w12 active:scale-[0.98]"
                 >
                   Export key first
                 </button>
@@ -392,7 +392,7 @@ export function IdentityModal({
                 <button
                   type="button"
                   onClick={handleConfirmLogout}
-                  className="flex-1 py-2.5 bg-rose-500/15 text-rose-400 font-medium text-xs rounded-lg transition-colors cursor-pointer hover:bg-rose-500/20"
+                  className="flex-1 py-2.5 bg-retro-error/15 border border-retro-error/40 text-retro-error font-semibold text-xs rounded-lg transition-colors cursor-pointer hover:bg-retro-error/25 active:scale-[0.98]"
                 >
                   Sign out
                 </button>

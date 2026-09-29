@@ -38,4 +38,15 @@ export default tseslint.config(
     files: ['vite.config.ts'],
     languageOptions: { globals: globals.node },
   },
+  {
+    // Node maintenance scripts (.mjs). Without this block they fell through to
+    // js.configs.recommended with no globals, so `process`, `console` and
+    // `fetch` all read as undefined.
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      sourceType: 'module',
+      globals: globals.node,
+      ecmaVersion: 2022,
+    },
+  },
 )

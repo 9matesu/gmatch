@@ -121,7 +121,16 @@ export function handleIncoming(conn: WsConn, data: string): void {
   }
   if (msg.type === 'watch') {
     const res = applyWatch(conn.userId || '', msg)
-    if (res) broadcastToRoom(res.room, res.payload)
+    if (res) {
+      broadcastToRoom(res.room, res.payload)
+      return
+    }
+    // Refused frames used to vanish with no signal: applyWatch returns null for
+    // a non-host, a non-member, a bad position and for the 200ms transport
+    // throttle. The client showed "playing" and the user pressed pause and
+    // nothing happened, with zero evidence anywhere. Tell the sender, so the
+    // UI can be optimistic and a dropped command is explainable.
+    conn.send(JSON.stringify({ type: 'watch.nack', party: msg.party, action: msg.action }))
     return
   }
   if (msg.type === 'watch.chat') {

@@ -1060,16 +1060,16 @@ export const useGame = create<GameState>((set, get) => ({
         // Dev-only round trace: which query won which source (wrong-tag
         // reports become a one-line answer). Stripped from prod builds and
         // silent under vitest.
-        if (import.meta.env.DEV && import.meta.env.MODE !== 'test') {
+        if (res && import.meta.env.DEV && import.meta.env.MODE !== 'test') {
           console.debug(`[feed] picks=${picks.join('+')} source=${res.source} posts=${res.posts.length} ok=${res.ok}`)
         }
         cursor = s.feedCursor + 1
         // Seen-exhausted (not broken): gentle path — no backoff escalation,
         // distinct UI copy; auto-poll still recovers.
-        if (!res.ok && (res as { emptyFresh?: boolean }).emptyFresh === true) {
+        if (res && !res.ok && (res as { emptyFresh?: boolean }).emptyFresh === true) {
           emptyFreshRound = true
         }
-        if (res.ok && res.posts.length > 0) {
+        if (res?.ok && res.posts?.length > 0) {
           // Random order every round — never push API sequence straight to the feed.
           posts = shufflePosts(res.posts)
           if (priority) set({ priorityTag: null })

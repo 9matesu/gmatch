@@ -830,7 +830,7 @@ export function GMatchFeed({
               <article
                 key={post.id}
                 onContextMenu={(e) => { e.preventDefault(); setOptionsPost(post) }}
-                className={`relative bg-retro-panel border border-border-glass rounded-lg overflow-hidden flex flex-col shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
+                className={`relative solid-panel border border-border-glass rounded-lg overflow-hidden flex flex-col shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
                 {/* Repost Header Banner */}
                 {post.is_reposted && (
@@ -852,6 +852,7 @@ export function GMatchFeed({
                       onClick={() => handleAvatarClick(post.author_id)}
                       onKeyDown={(e) => e.key === 'Enter' && handleAvatarClick(post.author_id)}
                       title={authorHasStory ? 'Watch story' : 'View profile'}
+                      aria-label={authorHasStory ? `Watch story of ${post.author_name}` : `View profile of ${post.author_name}`}
                       className={`relative w-8 h-8 rounded-full p-[1.5px] flex-shrink-0 cursor-pointer ${authorHasStory ? 'bg-gradient-to-tr from-zinc-300 to-zinc-600' : 'bg-glass-w12 border border-border-glass'}`}
                     >
                       <div className="relative w-full h-full rounded-full bg-retro-panel overflow-hidden flex items-center justify-center text-xs font-semibold text-retro-fg">
@@ -1204,7 +1205,7 @@ export function GMatchFeed({
           })}
 
           {displayPosts.length === 0 && (
-            <div className="bg-retro-panel border border-border-glass rounded-lg p-8 text-center space-y-4 shadow-xs my-4 max-w-md mx-auto">
+            <div className="solid-panel border border-border-glass rounded-lg p-8 text-center space-y-4 shadow-xs my-4 max-w-md mx-auto">
               <div>
                 <h4 className="text-sm font-semibold text-retro-fg">Empty in here? Start posting and get things moving.</h4>
                 <p className="text-xs text-retro-muted mt-1 leading-relaxed">

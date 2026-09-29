@@ -267,11 +267,14 @@ export function FollowersFollowingModal({
                 key={user.id}
                 className="flex items-center justify-between p-2 rounded-xl hover:bg-glass-w5 transition-colors group"
               >
-                {/* User Avatar + Display Name */}
-                <div
-                  className="flex items-center gap-3 cursor-pointer min-w-0 flex-1"
+                {/* User Avatar + Display Name. A real button: this was a
+                    clickable div with only a title, so it had no accessible
+                    name and no way to be targeted by a test. */}
+                <button
+                  type="button"
                   onClick={() => handleAvatarClick(user.id)}
-                  title={hasStory ? 'Watch live story' : 'View profile'}
+                  aria-label={`View profile of ${user.display_name?.trim() || 'user'}`}
+                  className="flex items-center gap-3 text-left min-w-0 flex-1 cursor-pointer"
                 >
                   <div
                     className={`w-11 h-11 rounded-full p-[2px] shrink-0 transition-transform group-hover:scale-105 ${hasStory
@@ -310,7 +313,7 @@ export function FollowersFollowingModal({
                       ) : null}
                     </div>
                   </div>
-                </div>
+                </button>
 
                 {/* Action Buttons */}
                 <div className="flex items-center gap-1.5 shrink-0 ml-2">

@@ -187,16 +187,21 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
               <p className={feedError ? 'text-amber-300 font-bold' : 'text-emerald-300 font-bold'}>
                 {feedError || 'Live'}
               </p>
-              <p className="text-[10px] text-retro-muted">Their posts and recent messages are visible while the timer runs</p>
+              <p className="text-[10px] text-retro-muted">Their public posts are visible while the timer runs</p>
             </div>
           </div>
         </div>
 
-        {/* Recent messages (real, server-gated) */}
+        {/* Intercepted messages.
+            The spy-feed endpoint deliberately returns `intercepted: []` — reading
+            a stranger's DM bodies was removed from this feature on purpose (see
+            docs/ADMIN-SUITE.md and the security-greps gate). So this card is
+            permanently empty, and the copy above used to advertise "recent
+            messages" for something the server will never hand over. */}
         <div className="glass-surface border border-border-glass rounded-xl p-5 space-y-4 shadow-2xl">
           <div className="flex items-center gap-2 text-xs font-bold text-retro-fg tracking-wide">
             <MessageSquare className="w-4 h-4 text-retro-muted" />
-            <span>Recent messages</span>
+            <span>Messages</span>
           </div>
 
           {feed && feed.intercepted.length > 0 ? (
@@ -213,7 +218,9 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
             </div>
           ) : (
             <p className="text-xs text-retro-muted">
-              {feed ? 'Nothing new from them right now.' : 'Loading…'}
+              {feed
+                ? 'Private messages stay private. This hack cannot read them, by design.'
+                : 'Loading…'}
             </p>
           )}
         </div>

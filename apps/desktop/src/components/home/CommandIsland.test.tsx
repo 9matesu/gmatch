@@ -121,4 +121,24 @@ describe('CommandIsland count badges', () => {
     expect(badges).toHaveLength(2);
     for (const b of badges) expect(b).toHaveTextContent('99+');
   });
-})
+});
+
+describe('CommandIsland styling & layout compliance', () => {
+  it('pill bar has no scrollbar and uses overflow-hidden flex-nowrap', () => {
+    render(<CommandIsland mainView="feed" setMainView={vi.fn()} />);
+    const nav = screen.getByRole('navigation', { name: 'Command Island' });
+    expect(nav.className).toContain('overflow-hidden');
+    expect(nav.className).toContain('flex-nowrap');
+    expect(nav.className).not.toContain('styled-scrollbar');
+    expect(nav.className).not.toContain('overflow-x-auto');
+  });
+
+  it('servers button is uncolored and does not have text-retro-online green', async () => {
+    render(<CommandIsland mainView="feed" setMainView={vi.fn()} />);
+    openMore();
+    const serversButton = screen.getByRole('button', { name: 'Servers' });
+    expect(serversButton).toBeInTheDocument();
+    const icon = serversButton.querySelector('svg');
+    expect(icon?.className.baseVal || icon?.getAttribute('class') || '').not.toContain('text-retro-online');
+  });
+});

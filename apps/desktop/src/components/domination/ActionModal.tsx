@@ -221,6 +221,7 @@ export function ActionModal({
               </div>
               <input
                 type="range"
+                aria-label="Duration"
                 min="3"
                 max="60"
                 value={duration}

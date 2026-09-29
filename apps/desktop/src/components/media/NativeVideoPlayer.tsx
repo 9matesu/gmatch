@@ -108,7 +108,17 @@ export function NativeVideoPlayer({
   const [isBuffering, setIsBuffering] = useState<boolean>(false);
   const [hasError, setHasError] = useState<boolean>(false);
   const [actionPulse, setActionPulse] = useState<'play' | 'pause' | null>(null);
-  const [inView, setInView] = useState<boolean>(() => typeof IntersectionObserver === 'undefined');
+  // Viewport gating off => start IN VIEW, not "in view as of the first effect
+  // tick". Initialising to false made the first commit render preload='none'
+  // and autoPlay={false}; the effect below then set inView=true, but flipping
+  // the preload attribute after the fact does NOT re-run the resource selection
+  // algorithm, so the element never issued a single request. It sat at
+  // readyState 0 forever with no buffer and no spinner (a spinner needs
+  // `waiting`, which needs a fetch in flight). See WatchPartySlot, which is the
+  // caller that reports "the video is not buffering".
+  const [inView, setInView] = useState<boolean>(
+    () => disableViewportGating || typeof IntersectionObserver === 'undefined',
+  );
 
   // Scrubber hover state
   const [isScrubbing, setIsScrubbing] = useState<boolean>(false);
@@ -126,6 +136,22 @@ export function NativeVideoPlayer({
     setCurrentTime(0);
     setIsBuffering(false);
   }, [resolvedSrc]);
+
+  // Kick off resource selection explicitly. Setting `src` on a live element is
+  // supposed to do this, but when the previous state was preload='none' (or the
+  // element was reused across a src swap) the browser will happily sit at
+  // NETWORK_EMPTY. load() is the only reliable trigger, and it is what makes
+  // "paused" still buffer ahead.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !resolvedSrc) return;
+    if (preload === 'none' && !autoPlay) return;
+    try {
+      v.load();
+    } catch {
+      /* element not ready yet; the next src/autoplay will retry */
+    }
+  }, [resolvedSrc, preload, autoPlay]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {

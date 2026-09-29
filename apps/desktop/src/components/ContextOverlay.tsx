@@ -125,6 +125,11 @@ export function ContextOverlay({
       }}
     >
       <div
+        // A context menu should be a menu: without this it is an anonymous
+        // div, so assistive tech announces nothing and no test can target it.
+        role="menu"
+        aria-label="Context menu"
+        data-testid="context-menu"
         className="fixed bg-retro-panel/95 backdrop-blur-md border border-border-glass rounded-xl shadow-2xl p-1.5 w-56 text-xs z-[var(--z-system)] space-y-0.5 animate-orbit-fade-in text-retro-fg"
         style={{ top, left }}
         onClick={(e) => e.stopPropagation()}

@@ -76,13 +76,14 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
               {pending.options.title}
             </h2>
             {pending.options.description && (
-              <p className="text-xs text-retro-muted leading-relaxed mb-4">
+              <p className="text-xs text-retro-body leading-relaxed mb-4">
                 {pending.options.description}
               </p>
             )}
             <div className="flex items-center justify-end gap-2 mt-5">
               <button
                 type="button"
+                autoFocus
                 onClick={() => settle(false)}
                 className="px-3 py-1.5 text-xs font-medium border border-border-glass rounded-md text-retro-fg hover:bg-glass-w12 hover:text-white transition-all duration-150 active:scale-[0.96] cursor-pointer"
               >

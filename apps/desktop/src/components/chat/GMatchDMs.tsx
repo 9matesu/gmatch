@@ -629,7 +629,7 @@ export function GMatchDMs({
   return (
     <div className="flex-1 min-h-0 h-full w-full overflow-hidden flex flex-row font-sans text-retro-fg animate-orbit-fade-in bg-transparent">
       {/* 1. Left Column: Channels, Rooms & DMs */}
-      <div className="w-60 lg:w-64 border-r border-border-glass flex flex-col bg-surface-raised/40 backdrop-blur-md shrink-0 min-h-0 select-none">
+      <div className="w-60 lg:w-64 border-r border-border-glass flex flex-col bg-glass-w5 shrink-0 min-h-0 select-none">
         <div className="p-3 sm:p-4 border-b border-border-glass flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <h2 className="font-semibold text-sm text-retro-fg truncate">
@@ -909,7 +909,7 @@ export function GMatchDMs({
       <div className="flex-1 min-h-0 flex flex-col bg-transparent min-w-0 overflow-hidden">
         {openTarget ? (
           <>
-            <div className="p-3 sm:p-3.5 px-4 border-b border-border-glass bg-surface-raised/40 backdrop-blur-md flex items-center justify-between shrink-0 select-none">
+            <div className="p-3 sm:p-3.5 px-4 border-b border-border-glass bg-glass-w5 flex items-center justify-between shrink-0 select-none">
               <div className="flex items-center gap-3 min-w-0">
                 <button
                   type="button"
@@ -1020,7 +1020,7 @@ export function GMatchDMs({
                  bare
                  className="flex-1 min-h-0 flex flex-col"
                >
-               <div ref={messageStreamRef} className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-3 styled-scrollbar select-text bg-surface-canvas">
+               <div ref={messageStreamRef} className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-3 styled-scrollbar select-text bg-transparent">
                               {displayedMessages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-2 text-retro-muted my-auto select-none">
                   <MessageSquare className="w-6 h-6" />
@@ -1263,7 +1263,7 @@ export function GMatchDMs({
               </div>
             )}
 
-            <form onSubmit={handleSend} className="p-3 border-t border-border-glass bg-surface-raised/40 backdrop-blur-md flex items-center gap-2 shrink-0">
+            <form onSubmit={handleSend} className="p-3 border-t border-border-glass bg-glass-w5 flex items-center gap-2 shrink-0">
               {(activePmPeer && openTarget === 'peer') || openTarget === 'group' ? (
                 <button
                   type="button"
@@ -1340,7 +1340,7 @@ export function GMatchDMs({
       </div>
 
       {/* 3. Right Column: Expanded Player List */}
-      <div className="w-60 lg:w-64 border-l border-border-glass flex flex-col bg-surface-raised/40 backdrop-blur-md shrink-0 min-h-0 select-none">
+      <div className="w-60 lg:w-64 border-l border-border-glass flex flex-col bg-glass-w5 shrink-0 min-h-0 select-none">
         <ChatPlayerList
           identity={identity}
           users={users}

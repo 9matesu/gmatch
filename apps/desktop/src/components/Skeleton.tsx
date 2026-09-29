@@ -32,7 +32,7 @@ export function IdentityCardSkeleton() {
 
 export function PageSkeleton() {
   return (
-    <main className="flex-grow flex items-center justify-center">
+    <main id="main-content" role="status" aria-label="Loading page" className="flex-grow flex items-center justify-center">
       <div className="font-sans text-sm text-retro-muted animate-pulse">Loading…</div>
     </main>
   );

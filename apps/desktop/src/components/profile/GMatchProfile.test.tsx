@@ -86,4 +86,29 @@ describe('GMatchProfile', () => {
     expect(screen.getByText('Edit Profile')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
   });
+
+  it('updates following count dynamically on the tab from followingIds', () => {
+    const { rerender } = render(
+      <GMatchProfile
+        identity={fakeIdentity}
+        myUser={fakeUser}
+        posts={[]}
+        cards={[]}
+        followingIds={['user_2', 'user_3']}
+      />
+    );
+    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByText('following')).toBeInTheDocument();
+
+    rerender(
+      <GMatchProfile
+        identity={fakeIdentity}
+        myUser={fakeUser}
+        posts={[]}
+        cards={[]}
+        followingIds={['user_2', 'user_3', 'user_4']}
+      />
+    );
+    expect(screen.getByText('3')).toBeInTheDocument();
+  });
 });

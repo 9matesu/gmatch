@@ -307,9 +307,13 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
           <div className="w-full md:w-[380px] lg:w-[420px] bg-retro-bg flex flex-col justify-between border-t md:border-t-0 md:border-l border-border-glass min-h-0 flex-1 md:h-full md:flex-none">
             {/* Header */}
             <div className="p-3.5 border-b border-border-glass flex items-center justify-between">
-              <div
-                className="flex items-center gap-3 cursor-pointer"
+              {/* A real button, not a clickable div: it was unreachable by
+                  keyboard/AT and unaddressable by any test or selector. */}
+              <button
+                type="button"
                 onClick={handleAuthorClick}
+                aria-label={`View profile of ${post.author_name}`}
+                className="flex items-center gap-3 text-left cursor-pointer"
               >
                 <div className="w-8 h-8 rounded-full bg-glass-w12 border border-border-glass p-[1px] flex-shrink-0">
                   <div className="w-full h-full rounded-full bg-retro-panel overflow-hidden flex items-center justify-center text-xs font-semibold text-retro-fg">
@@ -328,7 +332,7 @@ export function InstagramPostModal({ post, isOpen, onClose, identity, profilePic
                     <span className="text-[10px] text-retro-muted font-medium block">{post.location}</span>
                   )}
                 </div>
-              </div>
+              </button>
 
               <button
                 type="button"

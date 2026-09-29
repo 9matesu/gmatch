@@ -41,6 +41,30 @@ const USER_ECONOMY_FIELDS = [
   'maximum_gooner',
 ] as const satisfies readonly (keyof User)[];
 
+/**
+ * Presence bucket width, in ms.
+ *
+ * `last_seen` is rewritten by the heartbeat every 10-30s for every user who is
+ * online, and `online` stays true across all of it. So the roster guard below
+ * could never compare the raw timestamp without re-rendering on every poll, and
+ * it could not ignore it either: `isUserOnline` treats a present-but-stale
+ * timestamp as authoritative over the boolean, so a frozen `last_seen` pins
+ * the profile modal to "Offline" while the arena and chat hub — which read
+ * fresh server-side presence — say "Online". That was the split brain.
+ *
+ * Bucketing to 15s is comfortably finer than the 60s freshness window, so no
+ * online/offline TRANSITION can fall inside one bucket and be missed, while a
+ * busy roster re-renders at most ~4x/min instead of continuously.
+ */
+const PRESENCE_BUCKET_MS = 15_000;
+
+/** Bucket index for a presence timestamp; 0 when there is no usable one. */
+export function presenceBucket(lastSeen?: string | null): number {
+  if (!lastSeen) return 0;
+  const t = Date.parse(lastSeen);
+  return Number.isFinite(t) ? Math.floor(t / PRESENCE_BUCKET_MS) : 0;
+}
+
 export function areUsersStructurallyEqual(a: User[], b: User[]): boolean {
   if (a === b) return true;
   if (a.length !== b.length) return false;
@@ -49,6 +73,7 @@ export function areUsersStructurallyEqual(a: User[], b: User[]): boolean {
     if (ua.id !== ub.id || ua.online !== ub.online || ua.display_name !== ub.display_name) return false;
     if (JSON.stringify(ua.tags || []) !== JSON.stringify(ub.tags || [])) return false;
     if (ua.pfp_url !== ub.pfp_url) return false;
+    if (presenceBucket(ua.last_seen) !== presenceBucket(ub.last_seen)) return false;
     for (const field of USER_ECONOMY_FIELDS) {
       // Normalised on BOTH sides: the synthetic self-entry the app injects when
       // the roster omits you carries no `balance`, and a raw comparison against

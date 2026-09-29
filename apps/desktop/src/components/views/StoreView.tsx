@@ -17,6 +17,7 @@ export function StoreView({
   toast,
   onSetMainView,
   onOpenFlash,
+  onSelectUser,
   setActiveHack,
 }: {
   myUser: User | undefined;
@@ -26,6 +27,8 @@ export function StoreView({
   toast: ToastFn;
   onSetMainView: (view: MainViewType) => void;
   onOpenFlash: () => void;
+  /** Open a profile from a card's owner credit on a market listing. */
+  onSelectUser?: (userId: string) => void;
   setActiveHack: React.Dispatch<React.SetStateAction<ActiveHackSession | null>>;
 }) {
   return (
@@ -35,6 +38,7 @@ export function StoreView({
         identity={identity}
         onOpenCardCollection={() => onSetMainView('gallery')}
         onOpenFlash={onOpenFlash}
+        onOpenOwner={onSelectUser}
         users={users}
         profilePics={profilePics}
         toast={toast}

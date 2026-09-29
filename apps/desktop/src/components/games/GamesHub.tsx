@@ -73,11 +73,12 @@ export function GamesHub({
               <button
                 key={mode.id}
                 type="button"
+                id={`arena-tab-${mode.id}`}
+                aria-pressed={subTab === mode.id}
                 onClick={() => {
                   playPress(780);
                   onSubTabChange?.(mode.id);
                 }}
-                aria-pressed={subTab === mode.id}
                 className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                   subTab === mode.id
                     ? 'bg-retro-accent text-retro-accent-text '
@@ -94,13 +95,13 @@ export function GamesHub({
       {/* Content */}
       <div className={subTab === 'idle' ? 'p-1 sm:p-2 flex-1 min-h-0 h-full w-full flex flex-col overflow-hidden' : 'p-3 sm:p-4'}>
         {subTab === 'duel' && (
-          <div className="space-y-4">
+          <div role="tabpanel" id="arena-panel-duel" aria-labelledby="arena-tab-duel" className="space-y-4">
             {renderDuelContent()}
           </div>
         )}
 
         {subTab === 'babecock' && (
-          <div className="solid-panel rounded-xl p-4 backdrop-blur-md">
+          <div role="tabpanel" id="arena-panel-babecock" aria-labelledby="arena-tab-babecock" className="solid-panel rounded-xl p-4 backdrop-blur-md">
             <BabecockPanel identity={identity} />
           </div>
         )}
@@ -124,11 +125,13 @@ export function GamesHub({
         )}
 
         {subTab === 'ranks' && (
-          <RankingsPanel
-            users={users}
-            currentUserId={identity?.orbitId}
-            onSelectUser={(uId) => onSelectUser?.(uId)}
-          />
+          <div role="tabpanel" id="arena-panel-ranks" aria-labelledby="arena-tab-ranks">
+            <RankingsPanel
+              users={users}
+              currentUserId={identity?.orbitId}
+              onSelectUser={(uId) => onSelectUser?.(uId)}
+            />
+          </div>
         )}
       </div>
     </div>

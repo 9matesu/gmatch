@@ -38,12 +38,36 @@
   }
 }
 
-/* Click feedback — subtle shake on the clicked tile, triggers once per click */
-@keyframes gg-shake {
+/* Click feedback — subtle shake on the clicked tile, triggers once per click.
+
+   gg-shake-a and gg-shake-b are byte-identical on purpose. The stage alternates
+   between the two names per hit, because changing `animation-name` restarts a
+   CSS animation on an element WITHOUT remounting it. The previous
+   implementation bumped a React `key` to retrigger the shake, which unmounted
+   the <img>/<video> inside the tile: images flashed a blank frame (CachedImg
+   mounts with an empty src) and videos restarted from 0 on every click. */
+@keyframes gg-shake-a {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-2px); }
   50% { transform: translateX(2px); }
   75% { transform: translateX(-1px); }
+}
+@keyframes gg-shake-b {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  50% { transform: translateX(2px); }
+  75% { transform: translateX(-1px); }
+}
+
+/* Per-hit spike layered over DamageTint. Same a/b alternation trick so the
+   flash restarts per hit without a remount. */
+@keyframes gg-hit-flash-a {
+  0% { opacity: 0.55; }
+  100% { opacity: 0; }
+}
+@keyframes gg-hit-flash-b {
+  0% { opacity: 0.55; }
+  100% { opacity: 0; }
 }
 
 /* Low HP blink — game semantics */

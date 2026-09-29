@@ -122,6 +122,87 @@ describe('economy/cards/decks route wiring', () => {
     expect(giftNotifs.results[0].title).toContain('Alice')
   })
 
+  // Store/collection cards used to have no owner name at all: the card queries
+  // never joined Users, so every card rendered as "by " with nothing after it.
+  it('cards: owner name is resolved on collection, single card and market', async () => {
+    await env.DB.prepare("UPDATE Users SET display_name = 'Alice' WHERE id = ?").bind(alice.orbitId).run()
+    await env.DB.prepare("UPDATE Users SET display_name = 'Bob' WHERE id = ?").bind(bob.orbitId).run()
+    await seedMedia(env.DB, 'media-owner-1', alice.orbitId)
+
+    const createBody = JSON.stringify({ media_object_id: 'media-owner-1', name: 'Owned Card' })
+    const created: any = await (
+      await app.request('/api/cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders(alice, 'POST', '/api/cards', createBody) },
+        body: createBody,
+      }, env)
+    ).json()
+    const cardId = created.card.id
+
+    // 1. Collection: owner is the caller.
+    const col: any = await (
+      await app.request('/api/cards', { headers: authHeaders(alice, 'GET', '/api/cards') }, env)
+    ).json()
+    const inCollection = col.cards.find((c: any) => c.id === cardId)
+    expect(inCollection.ownerId).toBe(alice.orbitId)
+    expect(inCollection.ownerName).toBe('Alice')
+
+    // 2. Single card read by a third party.
+    const one: any = await (
+      await app.request(`/api/cards/${cardId}`, { headers: authHeaders(bob, 'GET', `/api/cards/${cardId}`) }, env)
+    ).json()
+    expect(one.card.ownerName).toBe('Alice')
+
+    // 3. Transfer: the name follows the OWNER, not the creator.
+    const transferBody = JSON.stringify({ to_user_id: bob.orbitId })
+    const moved: any = await (
+      await app.request(`/api/cards/${cardId}/transfer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders(alice, 'POST', `/api/cards/${cardId}/transfer`, transferBody) },
+        body: transferBody,
+      }, env)
+    ).json()
+    expect(moved.card.ownerName).toBe('Bob')
+
+    // 4. Market listing carries the seller name via the joined card.
+    const listBody = JSON.stringify({ price: 400 })
+    const listRes = await app.request(`/api/cards/${cardId}/list`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(bob, 'POST', `/api/cards/${cardId}/list`, listBody) },
+      body: listBody,
+    }, env)
+    expect(listRes.status).toBe(200)
+    const marketRes = await app.request('/api/cards/market', {
+      headers: authHeaders(alice, 'GET', '/api/cards/market'),
+    }, env)
+    expect(marketRes.status).toBe(200)
+    const market: any = await marketRes.json()
+    const listing = market.listings.find((l: any) => l.cardId === cardId)
+    expect(listing).toBeTruthy()
+    expect(listing.sellerId).toBe(bob.orbitId)
+    expect(listing.card.ownerName).toBe('Bob')
+  })
+
+  it('cards: owner name is null when the owner has no display name', async () => {
+    await seedMedia(env.DB, 'media-orphan-1', alice.orbitId)
+    const createBody = JSON.stringify({ media_object_id: 'media-orphan-1', name: 'Orphan Card' })
+    const created: any = await (
+      await app.request('/api/cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders(alice, 'POST', '/api/cards', createBody) },
+        body: createBody,
+      }, env)
+    ).json()
+    // Unnamed account: the LEFT JOIN yields null rather than dropping the card.
+    await env.DB.prepare('UPDATE Users SET display_name = NULL WHERE id = ?').bind(alice.orbitId).run()
+    const col: any = await (
+      await app.request('/api/cards', { headers: authHeaders(alice, 'GET', '/api/cards') }, env)
+    ).json()
+    const card = col.cards.find((c: any) => c.id === created.card.id)
+    expect(card).toBeTruthy()
+    expect(card.ownerName).toBeNull()
+  })
+
   it('POST /api/decks/:id/validate rejects a deck owned by another user', async () => {
     const body = JSON.stringify({ name: 'Alice Deck', game_id: 'card-duel' })
     const createRes = await app.request('/api/decks', {

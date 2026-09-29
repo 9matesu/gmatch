@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { seedApp } from './helpers'
+import { seedApp, firstRunOverlayKeys } from './helpers'
 import { generateIdentity } from '../src/identity.cjs'
 
 import { legalVersionKey } from '../src/legal/documents'
@@ -21,7 +21,7 @@ async function newPeerContext(page: import('@playwright/test').Page, name: strin
   const ctx = await page.context().browser()!.newContext({ serviceWorkers: 'block' })
   const p = await ctx.newPage()
   await p.addInitScript(
-    ([i, n, legalKey]: [Record<string, unknown>, string, string]) => {
+    ([i, n, legalKey, overlayKeys]: [Record<string, unknown>, string, string, [string, string][]]) => {
       localStorage.setItem('orbit_identity', JSON.stringify(i))
       localStorage.setItem('goonMatch_age_verified', 'true')
 
@@ -29,18 +29,25 @@ async function newPeerContext(page: import('@playwright/test').Page, name: strin
 
       localStorage.setItem('orbit_display_name', n)
       localStorage.setItem('orbit_tags', JSON.stringify(['e2e']))
-      localStorage.setItem(
-        `orbit_onboarding_v2:${i.orbitId}`,
-        JSON.stringify({ version: 1, current: 'ready', completed: ['welcome', 'auth', 'profile', 'platform', 'feed', 'tune', 'cards', 'economy', 'games', 'ready'] }),
-      )
+      // Same first-run overlay dismissal as seedApp. Missing it put a z-120
+      // "What's New" modal over the feed, so the peer's clicks went nowhere.
+      for (const [k, v] of overlayKeys) localStorage.setItem(k, v)
     },
-    [id, name, legalVersionKey()],
+    [id, name, legalVersionKey(), firstRunOverlayKeys(id.orbitId)],
   )
   return { ctx, p, id }
 }
 
 async function publishPost(page: import('@playwright/test').Page, caption: string) {
   await page.goto('/#/feed')
+  await composePost(page, caption)
+  await page.waitForTimeout(3500) // outlast the 3s orbitFetch GET cache
+  await page.reload()
+  await expect(page.getByText(caption).first()).toBeVisible({ timeout: 20_000 })
+}
+
+/** The composer flow, usable from any page (a peer's context included). */
+async function composePost(page: import('@playwright/test').Page, caption: string) {
   await page.getByRole('button', { name: 'Create Post', exact: true }).click()
   const drop = page.getByText('Drag & drop photos or click to browse')
   await expect(drop).toBeVisible({ timeout: 20_000 })
@@ -58,9 +65,12 @@ async function publishPost(page: import('@playwright/test').Page, caption: strin
   await page.getByPlaceholder('Write a caption...').fill(caption)
   await page.getByRole('button', { name: 'Share', exact: true }).click()
   await expect(page.getByText('Post shared.')).toBeVisible({ timeout: 20_000 })
-  await page.waitForTimeout(3500) // outlast the 3s orbitFetch GET cache
-  await page.reload()
-  await expect(page.getByText(caption).first()).toBeVisible({ timeout: 20_000 })
+}
+
+/** Profile stats render <div><span>{value}</span><span>{label}</span></div>. */
+async function statValue(page: import('@playwright/test').Page, label: string) {
+  const el = page.getByText(label, { exact: true }).first()
+  return ((await el.locator('xpath=preceding-sibling::span[1]').textContent()) || '').trim()
 }
 
 test('journey 1: publish a post from Create and see it in the feed', async ({ page }) => {
@@ -160,13 +170,48 @@ test('journey 4: view a post author profile from the feed', async ({ page }) => 
   await seedApp(page)
   const caption = `profile probe ${Date.now()}`
   await publishPost(page, caption)
-  await page.getByText(caption).first().click() // open the post lightbox
-  // The 1.1 lightbox header exposes the author as a clickable avatar strip
-  // titled "View profile" (a div, not a button) — open the profile via that.
-  const author = page.getByTitle(/View profile|Watch story/i).first()
+  // Open the author from that post's own card. (The caption is not a click
+  // target — clicking it does not open the lightbox.)
+  const card = page.locator('article').filter({ hasText: caption }).first()
+  await expect(card).toBeVisible({ timeout: 20_000 })
+  const author = card.getByRole('button', { name: /^View profile of |^Watch story of / }).first()
   await expect(author).toBeVisible({ timeout: 15_000 })
   await author.click()
-  await expect(page.getByText(/Follow|posts|Following/i).first()).toBeVisible({ timeout: 15_000 })
+  // The post's author is ME here, so the profile modal correctly has no Follow
+  // button (onToggleFollow is undefined for self). Assert the modal opened.
+  await expect(page.getByRole('dialog', { name: /^Profile of / })).toBeVisible({ timeout: 15_000 })
+})
+
+test('journey 4b: a new follower updates my "followers" count on the profile tab', async ({ page }) => {
+  test.setTimeout(180_000)
+  await seedApp(page)
+  const peerName = `E2E Follower ${Date.now()}`
+  const { ctx: ctxB, p: pageB } = await newPeerContext(page, peerName)
+  const caption = `follow target ${Date.now()}`
+  await publishPost(page, caption)
+
+  // The peer opens my profile from my post's card and follows me.
+  await pageB.goto('/#/feed')
+  const card = pageB.locator('article').filter({ hasText: caption }).first()
+  await expect(card).toBeVisible({ timeout: 30_000 })
+  const authorBtn = card.getByRole('button', { name: /^View profile of |^Watch story of / }).first()
+  await expect(authorBtn).toBeVisible({ timeout: 20_000 })
+  // force: the feed re-renders on every roster poll / WS frame, so Playwright's
+  // stability check never settles on this second page and the click hangs until
+  // the test times out. The element is present and visible; skip only the
+  // actionability wait.
+  await authorBtn.click({ force: true })
+  await expect(pageB.getByRole('dialog', { name: /^Profile of / })).toBeVisible({ timeout: 20_000 })
+  await pageB.getByRole('button', { name: 'Follow', exact: true }).click()
+  await expect(pageB.getByRole('button', { name: 'Following', exact: true })).toBeVisible({ timeout: 20_000 })
+
+  // My own profile, opened with NO manual reload. Regression: the tab read
+  // followers_count from a cached roster refreshed only every 60-120s, and for
+  // anyone outside the server's capped directory it fell through to
+  // likes_received (or a hardcoded 0) and never moved at all.
+  await page.goto('/#/profile')
+  await expect.poll(() => statValue(page, 'followers'), { timeout: 45_000 }).toBe('1')
+  await ctxB.close()
 })
 
 test('journey 5: store renders priced items from the server', async ({ page }) => {

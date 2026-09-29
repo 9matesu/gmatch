@@ -59,32 +59,69 @@ export function WatchPartySlot({
 
   useEffect(() => {
     setVideoSrc(src)
+    // Announce the (re)created element so the transport bar can re-apply the
+    // remembered per-room volume to the NEW <video>, not the discarded one.
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('watch-video-element', { detail: { src } }))
+    }
   }, [src])
 
-  // Autoplay-safe start: Chrome only allows unattended play while muted; the
-  // timeline volume slider (at 0) is the source of truth.
+  // Autoplay-safe start: Chrome only allows unattended play() while muted, so
+  // a party that opens already-playing must start muted or the host's play
+  // frame is rejected. Volume/mute ownership is reconciled in Step 4 (the
+  // timeline owns it); this only guarantees the element can start at all.
   useEffect(() => {
     const v = wrapRef.current?.querySelector('video')
     if (v) v.muted = true
   }, [videoSrc])
 
+  // Start loading the media even while the room is PAUSED, and honour an
+  // already-playing frame on arrival. Without this the element sat at
+  // readyState 0: rooms are created with action:'pause', the tick only calls
+  // play() when the frame says 'play', and nothing else ever kicked off
+  // resource selection — so "the video is not buffering" (no data, and no
+  // spinner either, because a spinner needs a request in flight).
+  useEffect(() => {
+    if (!videoSrc) return
+    // NativeVideoPlayer's own load() effect covers the first commit; this
+    // covers arriving at an already-playing room and a src swap.
+    const id = setTimeout(() => {
+      const v = wrapRef.current?.querySelector('video')
+      if (!v) return
+      if (v.readyState === 0) {
+        try { v.load() } catch { /* not ready */ }
+      }
+      if (party?.frame?.action === 'play' && v.paused) void v.play().catch(() => { })
+    }, 0)
+    return () => clearTimeout(id)
+  }, [videoSrc, party?.frame?.action])
+
+  // The sync tick reads the frame through a ref. It used to list
+  // `party?.frame` in its dependency array, and every inbound watch.sync /
+  // watch.roster / watch.queue replaces that with a freshly parsed object — so
+  // the interval was destroyed and recreated on every frame, resetting the
+  // 250ms phase and starving the reconciler during chat/roster traffic.
+  const frameRef = useRef(party?.frame ?? null)
+  frameRef.current = party?.frame ?? null
+
   // 250 ms sync tick, only while a party exists. The video element is read
   // imperatively from the DOM: NativeVideoPlayer keeps it in its own ref.
   useEffect(() => {
-    if (!party?.frame || !videoSrc) return
+    if (!videoSrc) return
     const timer = setInterval(() => {
       const v = wrapRef.current?.querySelector('video')
-      if (!v || !party.frame || !videoSrc) return
-      const target = computeTargetPosition(party.frame, serverNow())
-      if (v.duration > 0 && target >= v.duration - 0.25 && party.frame.action === 'play') {
+      const frame = frameRef.current
+      if (!v || !frame || !videoSrc || !party) return
+      const target = computeTargetPosition(frame, serverNow())
+      if (v.duration > 0 && target >= v.duration - 0.25 && frame.action === 'play') {
         // Video ended: the host advances the queue. Keyed by media+frame
         // stamp so a wrap back to the same entry re-arms the guard.
         if (!v.paused) { endPauseRef.current = Date.now(); v.pause() }
-        const endedKey = `${party.current}:${party.frame.updatedAt}`
+        const endedKey = `${party.current}:${frame.updatedAt}`
         if (shouldFireQueueNext({
           isHost: party.host === identity.orbitId,
           queueLength: party.queue.length,
-          action: party.frame.action,
+          action: frame.action,
           endedKey,
           lastFiredKey: endedRef.current,
         })) {
@@ -94,22 +131,34 @@ export function WatchPartySlot({
         return
       }
       const localPlaying = !v.paused
-      const plan = driftCorrection(v.currentTime, target, localPlaying, party.frame.action)
+      const plan = driftCorrection(v.currentTime, target, localPlaying, frame.action)
       // Buffering must never move the needle: seeking into a stalled element
       // just restarts the buffer (the lurching-playhead report). Transport
       // (play/pause) still applies; the next data-rich tick re-seeks once.
       const buffering = v.seeking || v.readyState < 3
-      if (plan.seekTo !== null && !buffering) v.currentTime = plan.seekTo
+      if (plan.seekTo !== null && !buffering) {
+        // Clamp to what is actually buffered. Without this, a stalled element
+        // gets seeked to a target that grows without bound (the extrapolation
+        // keeps adding elapsed time), which restarts the buffer at an even more
+        // distant offset — the seek/underrun loop that reads as "never buffers".
+        // With nothing buffered yet, seek anyway: the element then buffers from
+        // the right place instead of from 0.
+        const bufEnd = v.buffered.length ? v.buffered.end(v.buffered.length - 1) : 0
+        v.currentTime = bufEnd > 0 ? Math.min(plan.seekTo, bufEnd) : plan.seekTo
+      }
       if (plan.play && v.paused) void v.play().catch(() => {})
       if (plan.pause && !v.paused) v.pause()
     }, 250)
     return () => clearInterval(timer)
-  }, [party?.id, videoSrc, party?.frame, party?.current, party?.host, party?.queue.length, identity.orbitId])
+  }, [party?.id, videoSrc, party?.current, party?.host, party?.queue.length, identity.orbitId])
 
-  // Stream hiccup recovery: a relay blip or upstream abort leaves a frozen
-  // frame forever otherwise. Reload the element; the 250 ms sync tick above
-  // re-joins the party position (driftCorrection seeks + plays). One shot
-  // per 5 s so a dead URL cannot spin the network.
+  // Stream hiccup recovery. Only a real `error` is worth reloading the
+  // element: `stalled` is Chrome's "I asked for data and got nothing" signal,
+  // i.e. ORDINARY buffering, and load() resets currentTime and readyState — so
+  // treating `stalled` as fatal threw away the buffer on every underrun and
+  // restarted the fetch (up to once per 5s), which is exactly why playback
+  // never got anywhere on a slow upstream. One shot per 5s so a dead URL
+  // cannot spin the network.
   useEffect(() => {
     if (!videoSrc) return
     let attached = false
@@ -126,7 +175,6 @@ export function WatchPartySlot({
         v.load()
       }
       v.addEventListener('error', recover)
-      v.addEventListener('stalled', recover)
     }
     // The <video> mounts inside NativeVideoPlayer; give it a tick to exist.
     const probe = setInterval(attach, 500)
@@ -136,7 +184,6 @@ export function WatchPartySlot({
       const v = wrapRef.current?.querySelector('video')
       if (v && recover) {
         v.removeEventListener('error', recover)
-        v.removeEventListener('stalled', recover)
       }
     }
   }, [videoSrc])
@@ -156,6 +203,24 @@ export function WatchPartySlot({
 
   const isPlaying = party.frame?.action === 'play'
 
+  // Live element diagnostics, sampled only while there is nothing to show. This
+  // is what distinguishes "never requested anything" (readyState 0 /
+  // networkState 0) from "downloading" (1/2) from "buffered" (3/4) — the single
+  // measurement that splits the "the video is not buffering" report in half.
+  const [diag, setDiag] = useState<string | null>(null)
+  useEffect(() => {
+    if (videoSrc) {
+      setDiag(null)
+      return
+    }
+    const id = setInterval(() => {
+      const v = wrapRef.current?.querySelector('video')
+      if (!v) return
+      setDiag(`readyState ${v.readyState} · networkState ${v.networkState} · src ${v.currentSrc ? v.currentSrc.slice(0, 48) : 'none'}`)
+    }, 1000)
+    return () => clearInterval(id)
+  }, [videoSrc, media.failed])
+
   const togglePlayback = () => {
     const v = wrapRef.current?.querySelector('video')
     const pos = v ? v.currentTime : 0
@@ -174,7 +239,16 @@ export function WatchPartySlot({
       {videoSrc ? (
         <>
           <NativeVideoPlayer
-            key={`${videoSrc}:${party?.current || ''}`}
+            // Keyed on the ROOM, never on the media. It used to be
+            // `${videoSrc}:${party.current}`, so every "next" built a brand new
+            // <video> — discarding position, volume, mute, buffered range and
+            // readyState together. Worse, for /api/objects/ media the src
+            // transiently resolves to null during the swap, which UNMOUNTED the
+            // element and made the 250ms tick below return early, so the whole
+            // slot went inert until it remounted. A <video> resets and reloads
+            // on its own when src changes; NativeVideoPlayer resets its state on
+            // resolvedSrc and calls load().
+            key={party.id}
             src={videoSrc}
             preload="auto"
             disableViewportGating={true}
@@ -186,6 +260,10 @@ export function WatchPartySlot({
             showSpeedButton={false}
             showLoopButton={false}
             onPlay={() => {
+              // Host-only: a viewer's local play/pause is a client-side echo,
+              // and broadcasting it dragged the whole room. The server refuses
+              // it now too; not sending it avoids a pointless round trip.
+              if (party.host !== identity.orbitId) return
               const v = wrapRef.current?.querySelector('video')
               controlPlayback(party.id, 'play', v ? v.currentTime : 0)
             }}
@@ -193,6 +271,7 @@ export function WatchPartySlot({
               // End-of-video pauses are local: echoing them races the host's
               // 'next' frame and pauses the room at the next video's start.
               if (Date.now() - endPauseRef.current < 2000) return
+              if (party.host !== identity.orbitId) return
               const v = wrapRef.current?.querySelector('video')
               controlPlayback(party.id, 'pause', v ? v.currentTime : 0)
             }}
@@ -219,10 +298,26 @@ export function WatchPartySlot({
           )}
         </>
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-4 text-center">
           <span className="text-[10px] uppercase tracking-wider text-retro-muted">
             {media.failed ? 'Media unavailable' : 'Loading...'}
           </span>
+          {/* Say WHY, not just that it failed. "Media unavailable" is
+              indistinguishable between a 404, a refused SSRF probe, a
+              truncated relay and a 20-minute fetch, which made this impossible
+              to diagnose from the UI. The real element state is right here. */}
+          {diag && (
+            <span
+              className="text-[9px] font-mono text-retro-muted/70 tabular-nums"
+              data-testid="watch-media-diag"
+              title="readyState / networkState — 0 = nothing requested, 1 = loading, 4 = enough data"
+            >
+              {diag}
+            </span>
+          )}
+          {media.failed && !diag && (
+            <span className="text-[9px] font-mono text-retro-muted/70">{videoSrc?.slice(0, 60)}</span>
+          )}
         </div>
       )}
     </div>

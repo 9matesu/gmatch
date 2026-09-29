@@ -22,16 +22,22 @@ import {
 import { formatVideoTime } from '../media/NativeVideoPlayer'
 import { controlPlayback, queueOp, serverNow, type PartyRuntime } from '../../hooks/watchPartyStore'
 import { computeTargetPosition } from '../../utils/watchSync'
+import { getRoomVolume, setRoomVolume, readElementVolume, applyRoomVolume } from '../../utils/watchVolume'
 
 const BTN_ICON =
   'p-1.5 rounded-md hover:bg-glass-w10 text-white/90 hover:text-white cursor-pointer transition-colors duration-150 select-none'
 
 export function WatchPartyTimeline({
   party,
+  isHost = false,
   onToggleRail,
   railOpen = false,
 }: {
   party: PartyRuntime | null
+  /** Holds the room's transport controls. Non-hosts get a read-only bar: the
+   *  server refuses their frames (applyWatch is host-gated), so showing live
+   *  controls that silently do nothing is worse than no controls. */
+  isHost?: boolean
   onToggleRail?: () => void
   railOpen?: boolean
 }) {
@@ -50,6 +56,15 @@ export function WatchPartyTimeline({
   const [isMuted, setIsMuted] = useState(false)
 
   const frame = party?.frame || null
+  const roomId = party?.id || null
+  // Bumped by the slot whenever a new <video> is created, so the volume effects
+  // below re-apply to the fresh element instead of the discarded one.
+  const [videoNonce, setVideoNonce] = useState(0)
+  useEffect(() => {
+    const onNew = () => setVideoNonce((n) => n + 1)
+    window.addEventListener('watch-video-element', onNew)
+    return () => window.removeEventListener('watch-video-element', onNew)
+  }, [])
 
   useEffect(() => {
     if (!frame) return
@@ -60,6 +75,45 @@ export function WatchPartyTimeline({
   const video = useCallback(() => {
     return document.querySelector<HTMLVideoElement>('.watch-party-slot[data-active="true"] video')
   }, [])
+
+  /**
+   * Volume ownership.
+   *
+   * The slider used to be a mirror of the last *command* (`useState(1)`, never
+   * seeded from the element, never reset per room, and there is not a single
+   * `volumechange` listener in the app), so it disagreed with the element and
+   * lost the value on every media change. Now: seeded from localStorage per
+   * room, re-applied to the element whenever it appears, and kept in sync by
+   * listening to the element itself.
+   */
+  useEffect(() => {
+    const el = video()
+    if (!el) return
+    const remembered = getRoomVolume(roomId)
+    applyRoomVolume(el, remembered)
+    setVolume(remembered.volume)
+    setPrevVolume(remembered.volume > 0 ? remembered.volume : 1)
+    setIsMuted(remembered.muted)
+    const onVolumeChange = () => {
+      const live = readElementVolume(el)
+      if (!live) return
+      setVolume(live.volume)
+      setIsMuted(live.muted)
+      if (live.volume > 0) setPrevVolume(live.volume)
+      setRoomVolume(roomId, live)
+    }
+    el.addEventListener('volumechange', onVolumeChange)
+    const cleanup = () => el.removeEventListener('volumechange', onVolumeChange)
+    return cleanup
+    // Re-runs when the slot announces a new element (see WatchPartySlot), so a
+    // media change re-applies the remembered volume to the fresh <video>.
+  }, [roomId, video, videoNonce])
+
+  // Re-apply on room switch: the element is recreated, so the remembered value
+  // has to land on the NEW element rather than the old one.
+  useEffect(() => {
+    applyRoomVolume(video(), getRoomVolume(roomId))
+  }, [roomId, video, videoNonce])
 
   useEffect(() => {
     const el = video()
@@ -84,6 +138,7 @@ export function WatchPartyTimeline({
 
   const handleTogglePlay = (e?: React.MouseEvent) => {
     e?.stopPropagation()
+    if (!isHost) return
     controlPlayback(party.id, playing ? 'pause' : 'play', target)
   }
 
@@ -97,12 +152,14 @@ export function WatchPartyTimeline({
       v.volume = restored
       setVolume(restored)
       setIsMuted(false)
+      setRoomVolume(roomId, { volume: restored, muted: false })
     } else {
       setPrevVolume(volume > 0 ? volume : 1)
       v.muted = true
       v.volume = 0
       setVolume(0)
       setIsMuted(true)
+      setRoomVolume(roomId, { volume: 0, muted: true })
     }
   }
 
@@ -117,10 +174,14 @@ export function WatchPartyTimeline({
     setVolume(val)
     setIsMuted(val === 0)
     if (val > 0) setPrevVolume(val)
+    setRoomVolume(roomId, { volume: val, muted: val === 0 })
   }
 
   const handleScrubPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.stopPropagation()
+    // Seeking is transport, so it is host-only too: a viewer dragging the bar
+    // had their frame refused and the playhead snapped back with no feedback.
+    if (!isHost) return
     const el = scrubBarRef.current
     if (!el || duration <= 0) return
     el.setPointerCapture(e.pointerId)
@@ -213,11 +274,16 @@ export function WatchPartyTimeline({
       <div className="flex items-center justify-between gap-2 mt-1 text-white">
         {/* Left Cluster: Transport, Volume, and Time Readout */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Transport is host-only server-side. A viewer clicking these had
+              their frame refused and simply nothing happened; render them
+              disabled with a reason instead of a dead control. */}
           <button
             type="button"
             aria-label="Previous video"
-            onClick={() => queueOp(party.id, 'prev')}
-            className={BTN_ICON}
+            disabled={!isHost}
+            title={isHost ? undefined : 'Only the host controls playback'}
+            onClick={() => isHost && queueOp(party.id, 'prev')}
+            className={`${BTN_ICON} disabled:opacity-40 disabled:cursor-not-allowed`}
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -225,8 +291,13 @@ export function WatchPartyTimeline({
           <button
             type="button"
             aria-label={playing ? 'Pause party' : 'Play party'}
+            // The slot's big centre button has the same accessible label, so
+            // give the transport one a stable hook.
+            data-testid="watch-transport-play"
+            disabled={!isHost}
+            title={isHost ? undefined : 'Only the host controls playback'}
             onClick={handleTogglePlay}
-            className={BTN_ICON}
+            className={`${BTN_ICON} disabled:opacity-40 disabled:cursor-not-allowed`}
           >
             {playing ? <Pause className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white translate-x-0.5" />}
           </button>
@@ -234,8 +305,10 @@ export function WatchPartyTimeline({
           <button
             type="button"
             aria-label="Next video"
-            onClick={() => queueOp(party.id, 'next')}
-            className={BTN_ICON}
+            disabled={!isHost}
+            title={isHost ? undefined : 'Only the host controls playback'}
+            onClick={() => isHost && queueOp(party.id, 'next')}
+            className={`${BTN_ICON} disabled:opacity-40 disabled:cursor-not-allowed`}
           >
             <ChevronRight className="w-4 h-4" />
           </button>

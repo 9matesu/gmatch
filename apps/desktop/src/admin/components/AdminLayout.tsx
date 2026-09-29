@@ -97,11 +97,11 @@ export function AdminLayout({
           />
         )}
 
-        <main className="flex-1 overflow-y-auto min-w-0 lg:ml-0">
+        <section aria-label="Admin workspace" className="flex-1 overflow-y-auto min-w-0 lg:ml-0">
           <div className="p-4 md:p-6 space-y-6">
             {children}
           </div>
-        </main>
+        </section>
       </div>
     </div>
   );

@@ -56,3 +56,11 @@ release2/
 
 # local storage signing key (never commit)
 storage.key
+
+# local secrets — ADMIN_PIN / STORAGE_ENCRYPTION_KEY. Bun loads these
+# automatically from apps/api (the sidecar's cwd), so a self-hoster can run
+# their own admin console without the value ever entering git.
+.env
+.env.local
+apps/api/.env
+apps/api/.env.local

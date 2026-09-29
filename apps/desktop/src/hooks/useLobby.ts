@@ -520,6 +520,17 @@ export function useLobby({
               }
               return
             }
+            if (msg.type === 'follow' && (msg.action === 'new' || msg.action === 'removed')) {
+              // The server already broadcasts this (users.ts) but nothing
+              // handled it, so a new follower only showed up in the profile
+              // count on the next 60-120s roster poll.
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('orbit-follow-event', {
+                  detail: { follower_id: msg.follower_id, followee_id: msg.followee_id, action: msg.action },
+                }))
+              }
+              return
+            }
             if (msg.type === 'notification' && msg.action === 'new') {
               if (msg.notification && typeof msg.notification === 'object') {
                 const incoming = msg.notification

@@ -58,7 +58,10 @@ test.describe('v1.5.1 features and regressions', () => {
     const dialog = page.getByRole('dialog', { name: /What's New in version 1\.5\.[12]/i })
     await expect(dialog).toBeVisible({ timeout: 15_000 })
     await expect(page.getByRole('heading', { name: "What's New" })).toBeVisible()
-    await expect(page.getByText('Watch Party Theater')).toBeVisible()
+    // The body is a discrete list of changes now, so assert on its SHAPE
+    // rather than one hard-coded sentence: every release edits that copy, and
+    // pinning a specific line meant this failed the moment a release shipped.
+    await expect(dialog.getByRole('listitem')).not.toHaveCount(0)
 
     // Dismiss by clicking the Got it button
     const gotItBtn = page.getByRole('button', { name: 'Got it' })
@@ -86,7 +89,10 @@ test.describe('v1.5.1 features and regressions', () => {
     await expect(whatsNewBtn).toBeVisible({ timeout: 15_000 })
     await whatsNewBtn.click()
 
-    const dialog = page.getByRole('dialog', { name: /What's New in version 1.5.1/i })
+    // Any version, not just 1.5.1: the app has since shipped 1.5.2, and this
+    // test is about the changelog REOPENING from settings, not about which
+    // release it shows. (Its sibling assertion above already matches 1.5.[12].)
+    const dialog = page.getByRole('dialog', { name: /What's New in version \d+\.\d+/i })
     await expect(dialog).toBeVisible()
 
     // Close via close X button

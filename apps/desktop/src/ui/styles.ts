@@ -17,8 +17,8 @@ export const MUTED = 'text-xs text-retro-muted'
 /** Display face for headings/labels — the shell's sans (Outfit). */
 export const DISPLAY = 'font-sans'
 
-/** Panel surface — flat cyber-slate card on the hairline border token. */
-export const PLATE = 'rounded-lg border border-border-glass bg-glass-w5 backdrop-blur-md'
+/** Panel surface — unified solid-panel glass card. */
+export const PLATE = 'rounded-lg border border-border-glass solid-panel'
 
 /** Scrollable panel body. */
 export const PANEL = 'min-h-0 overflow-y-auto p-3.5 sm:p-4'

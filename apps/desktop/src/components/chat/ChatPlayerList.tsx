@@ -233,6 +233,7 @@ export function ChatPlayerList({
           <Search className="w-3.5 h-3.5 text-retro-muted shrink-0" />
           <input
             type="text"
+            aria-label="Search players"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search players..."

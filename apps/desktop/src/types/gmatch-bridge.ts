@@ -51,8 +51,12 @@ export interface GmatchBridge {
   updateState?: () => Promise<GmatchUpdateStatus>
   updateInstall?: () => Promise<{ ok: boolean; error?: string }>
   onUpdateStatus?: (cb: (status: GmatchUpdateStatus) => void) => () => void
-  wallpaperSetData?: (buf: ArrayBuffer, mime: string) => Promise<{ ok: boolean; hadPrevious?: boolean }>
-  wallpaperRestore?: () => Promise<{ ok: boolean }>
+  /** `reason` distinguishes a missing desktop bridge from a non-Windows host. */
+  wallpaperSetData?: (
+    buf: ArrayBuffer,
+    mime: string,
+  ) => Promise<{ ok: boolean; hadPrevious?: boolean; reason?: 'unsupported-platform' | 'no-data' | 'set-failed' | 'error' }>
+  wallpaperRestore?: () => Promise<{ ok: boolean; reason?: string }>
   wallpaperCleanupFiles?: () => Promise<{ ok: boolean }>
   grantCameraOnce?: () => Promise<{ ok: boolean }>
   blocklistGet?: () => Promise<{ current: BlocklistData; defaults: BlocklistData; isCustom?: boolean }>

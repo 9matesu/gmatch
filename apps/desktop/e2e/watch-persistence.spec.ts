@@ -102,8 +102,72 @@ test('a room with its video and chat survives leaving and a reload', async ({ pa
   await say(page, 'still here after the reload')
 })
 
-test('a private room left by its host is still reachable', async ({ page }) => {
+/**
+ * Playback itself. Nothing in the suite ever touched a <video> before this:
+ * watch.spec.ts only clicked browse UI and the persistence spec only asserted
+ * the presence of a Leave button. So "the video is not buffering", "it doesn't
+ * pause on command" and "volume doesn't keep" were all invisible to CI.
+ */
+test('the host can play, pause and the video keeps its volume', async ({ page }) => {
   await seedApp(page)
+  await page.goto('/#/watch')
+  await createRoom(page)
+
+  // The element must EXIST and have actually started loading. readyState 0 with
+  // networkState 0 is the "nothing was ever requested" failure mode: the room
+  // opens paused, and the player used to mount with preload="none" and never
+  // issue a request at all.
+  const video = page.locator('.watch-party-slot[data-active="true"] video')
+  await expect(video).toBeVisible({ timeout: 60_000 })
+  await expect
+    .poll(
+      async () => {
+        const rs = await video.evaluate((v: HTMLVideoElement) => v.readyState)
+        return rs > 0
+      },
+      { timeout: 60_000, message: 'video never began loading (readyState stayed 0)' },
+    )
+    .toBe(true)
+
+  // Play: the host's frame must actually advance the element's clock. Scoped by
+  // test id — the slot's big centre button carries the same accessible label.
+  const playBtn = page.getByTestId('watch-transport-play')
+  await expect(playBtn).toBeVisible({ timeout: 20_000 })
+  await playBtn.click()
+  await expect
+    .poll(
+      async () => {
+        const t = await video.evaluate((v: HTMLVideoElement) => v.currentTime)
+        return t > 0
+      },
+      { timeout: 45_000, message: 'host pressed play but currentTime never advanced' },
+    )
+    .toBe(true)
+
+  // Pause: the element must actually stop.
+  await page.getByRole('button', { name: 'Pause party' }).click()
+  await expect
+    .poll(
+      async () => video.evaluate((v: HTMLVideoElement) => v.paused),
+      { timeout: 30_000, message: 'host pressed pause but the element kept playing' },
+    )
+    .toBe(true)
+
+  // Volume: local, per-room, remembered — and it must survive a re-apply.
+  await page.locator('.watch-party-slot[data-active="true"] video').evaluate((v: HTMLVideoElement) => {
+    v.volume = 0.25
+  })
+  await page.waitForTimeout(600)
+  expect(
+    await page.evaluate(() => {
+      const raw = JSON.parse(localStorage.getItem('gmatch_watch_volumes_v1') || '{}')
+      return Object.values(raw).some((r) => Math.abs((r as { volume: number }).volume - 0.25) < 0.01)
+    }),
+    'volume was not remembered for the room',
+  ).toBe(true)
+})
+
+test('a private room left by its host is still reachable', async ({ page }) => {  await seedApp(page)
   await page.goto('/#/watch')
   await createRoom(page)
 

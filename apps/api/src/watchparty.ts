@@ -56,6 +56,9 @@ export interface Party {
   createdAt: number
   /** Grace timestamp when the room emptied, giving peers 15m to reconnect */
   emptySince?: number
+  /** When the host last dropped. The host seat is held open for
+   *  HOST_SEAT_GRACE_MS so a reload/blip doesn't promote a viewer for good. */
+  hostLeftAt?: number
   /** ponytail: last chat msg ts per user; global bucket if flood persists. */
   lastChat: Map<string, number>
   lastControl: Map<string, number>
@@ -69,6 +72,9 @@ const MAX_PARTIES = 25
 // Overnight rooms: an open tab pings every 30s (touchRooms), so 4h only
 // bounds abandoned rooms. 30 min GC'd a room during one long movie.
 export const IDLE_MS = 4 * 60 * 60_000
+/** How long a departed host's seat is reserved before it is promoted away.
+ *  Long enough to cover a tab reload or a short network drop. */
+export const HOST_SEAT_GRACE_MS = 3 * 60_000
 // ponytail: fixed cap, per-room playlist size setting if someone hits 50.
 export const MAX_QUEUE = 50
 // media URL -> owning party id. Lets the objects route authorize reads for
@@ -152,6 +158,21 @@ function serverNow(): number {
   return Date.now() / 1000
 }
 
+/** Coerce anything frame-shaped into a valid PartyFrame (see restoreParties). */
+function sanitizeFrame(raw: any, fallbackUrl: string): PartyFrame {
+  const position = Number(raw?.position)
+  const updatedAt = Number(raw?.updatedAt)
+  const rate = Number(raw?.rate)
+  return {
+    url: typeof raw?.url === 'string' && raw.url ? raw.url : fallbackUrl,
+    action: raw?.action === 'play' ? 'play' : 'pause',
+    position: Number.isFinite(position) && position >= 0 ? position : 0,
+    rate: Number.isFinite(rate) && rate === 1 ? 1 : 1,
+    updatedAt: Number.isFinite(updatedAt) ? updatedAt : serverNow(),
+    by: typeof raw?.by === 'string' ? raw.by : undefined,
+  }
+}
+
 function dropParty(party: Party): void {
   parties.delete(party.id)
   // Audit A8: every queued URL registered a capability, not just the
@@ -198,12 +219,46 @@ function pushSystem(party: Party, text: string): any {
   return { type: 'watch.system', party: party.id, text }
 }
 
+/**
+ * Promote a new host once the departed host's grace window has expired. Called
+ * lazily (join + control attempts) rather than on a timer, so an idle room
+ * costs nothing. No-op while the seat is still live.
+ */
+function reconcileHost(party: Party): void {
+  if (party.hostLeftAt === undefined) return
+  if (Date.now() - party.hostLeftAt < HOST_SEAT_GRACE_MS) return
+  party.hostId = party.members.keys().next().value || ''
+  party.hostLeftAt = undefined
+}
+
+/**
+ * Does this user hold the room's transport controls?
+ *
+ * `removeMember` keeps `hostId` pointed at a departed host for
+ * HOST_SEAT_GRACE_MS, so this equality also covers "host mid-reload": nobody
+ * else can grab the controls while the tab is restarting, and the host regains
+ * them the moment they rejoin inside the window.
+ */
+export function controlsParty(party: Party, userId: string): boolean {
+  reconcileHost(party)
+  return Boolean(party.hostId) && party.hostId === userId
+}
+
 /** Validate + apply one client control frame. Returns null to drop it. */
 export function applyWatch(userId: string, msg: any): { room: string; payload: any } | null {
   if (!msg || typeof msg !== 'object') return null
   const party = parties.get(String(msg.party || ''))
   const member = party?.members.get(userId)
   if (!party || !member) return null
+  // Transport is host-only. This used to gate on MEMBERSHIP alone, so any
+  // viewer could play/pause/seek the room — and because the video canvas
+  // broadcasts the local position on click, a viewer clicking their own player
+  // dragged the whole room to their currentTime (often 0). Every other
+  // privileged action here (kick/ban/mute/transfer/settings/disband) already
+  // checks hostId; transport was the one that didn't.
+  // A host mid-reload is still "inside the grace window" and keeps control, so
+  // their pending frames are not refused while the socket is down.
+  if (!controlsParty(party, userId)) return null
   if (msg.action !== 'play' && msg.action !== 'pause') return null
   const position = Number(msg.position)
   if (!Number.isFinite(position) || position < 0) return null
@@ -235,6 +290,10 @@ export function joinWatch(userId: string, displayName: string, msg: any): { room
   party.members.set(userId, { name: String(displayName || '').slice(0, 40), muted: party.members.get(userId)?.muted || false })
   party.lastSeen = Date.now()
   party.emptySince = undefined
+  // Back inside the grace window: the retained seat is live again, so stop
+  // promoting it away later.
+  if (party.hostId === userId) party.hostLeftAt = undefined
+  else reconcileHost(party)
   const room = partyRoom(party.id)
   const who = String(displayName || '').slice(0, 40) || userId.slice(0, 8)
   const snap = snapshotPayload(party)
@@ -276,14 +335,21 @@ function removeMember(party: Party, userId: string, forceClose: boolean): { room
   if (party.members.size === 0) {
     // Rooms are persistent: do NOT delete when empty so peers can re-enter anytime.
     party.emptySince = Date.now()
-    // Flush now rather than waiting for the next 30s tick: this is the moment
-    // the room becomes "abandoned", and that state must be durable.
+    // The 30s snapshot is unconditional, so this flag does not schedule anything
+    // (it only marks the state as worth persisting and keeps it from latching).
+    // An earlier comment here claimed an immediate flush that never existed.
     markPartiesDirty()
     return { room, payload: [pushSystem(party, `${who} left`), rosterPayload(party)] }
   }
   party.emptySince = undefined
   if (party.hostId === userId) {
-    party.hostId = party.members.keys().next().value || ''
+    // Don't hand the crown to a viewer the instant the host's socket drops.
+    // A tab reload or a network blip trips the 8s disconnect grace, and the
+    // old behaviour promoted somebody else for good — the real host came back
+    // as an ordinary member, so their controls silently stopped working and
+    // auto-advance (client-side, host-gated) never fired again. Hold the seat
+    // open for HOST_SEAT_GRACE_MS; joinWatch/controlsParty reconcile it later.
+    party.hostLeftAt = Date.now()
   }
   const payloads: any[] = [pushSystem(party, `${who} left`), rosterPayload(party)]
   return { room, payload: payloads }
@@ -503,7 +569,9 @@ export function serializeParties(): string {
   })))
 }
 
-/** Ask the host process to flush the snapshot on its next pass (or now). */
+/** Mark the snapshot as worth persisting. Consumed (and cleared) by the host
+ *  process's 30s pass; the flush itself is unconditional, so this is a
+ *  bookkeeping flag, not a scheduling one. */
 let partiesDirty = false
 export function markPartiesDirty(): void {
   partiesDirty = true
@@ -563,7 +631,12 @@ export function restoreParties(json: string): number {
     p.mediaName = String(s.mediaName || '')
     p.isPrivate = Boolean(s.isPrivate)
     p.lockVideo = Boolean(s.lockVideo)
-    p.frame = s.frame
+    // Sanitize, don't adopt wholesale. A stored frame with a missing/garbage
+    // position or updatedAt used to be handed straight to every client, where
+    // computeTargetPosition turned it into NaN and — because every comparison
+    // against NaN is false — the whole reconciler for that slot stopped
+    // seeking, pausing and advancing, with the scrubber frozen at 0:00.
+    p.frame = sanitizeFrame(s.frame, s.mediaUrl)
     if (Array.isArray(s.queue)) p.queue = s.queue
     if (typeof s.current === 'string') p.current = s.current
     if (Array.isArray(s.chat)) p.chat = s.chat.filter((m: any) => m && typeof m.text === 'string').slice(-80)

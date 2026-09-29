@@ -11,10 +11,24 @@ export interface SyncFrame {
   updatedAt: number
 }
 
-/** Where the party SHOULD be right now, per the server clock. */
+/** Where the party SHOULD be right now, per the server clock.
+ *
+ *  NaN-safe on purpose. A frame restored from the persisted snapshot can arrive
+ *  with a missing/garbage `position`, `rate` or `updatedAt` (restoreParties
+ *  adopts the stored frame wholesale). One NaN here propagated into every
+ *  comparison in the sync tick — and `NaN > x` is false for every x — so the
+ *  reconciler silently stopped seeking, pausing and advancing for that slot,
+ *  forever, with the scrubber stuck at 0:00. Garbage in, 0 out, no NaN.
+ */
 export function computeTargetPosition(frame: SyncFrame, serverNow: number): number {
-  if (frame.action === 'pause') return frame.position
-  return frame.position + frame.rate * Math.max(0, serverNow - frame.updatedAt)
+  const position = Number(frame.position)
+  if (!Number.isFinite(position) || position < 0) return 0
+  if (frame.action === 'pause') return position
+  const rate = Number.isFinite(Number(frame.rate)) ? Number(frame.rate) : 1
+  const updatedAt = Number(frame.updatedAt)
+  if (!Number.isFinite(updatedAt)) return position
+  const now = Number.isFinite(serverNow) ? serverNow : updatedAt
+  return position + rate * Math.max(0, now - updatedAt)
 }
 
 /**
@@ -31,6 +45,11 @@ export function driftCorrection(
   deadband = 0.3,
   hardresync = 2,
 ): { seekTo: number | null; play: boolean; pause: boolean } {
+  // Transport still applies if the positions are unusable — play/pause are
+  // absolute, so a NaN position must not disable them.
+  if (!Number.isFinite(target) || !Number.isFinite(current)) {
+    return { seekTo: null, play: partyAction === 'play' && !localPlaying, pause: partyAction === 'pause' && localPlaying }
+  }
   const drift = current - target
   const seek =
     partyAction === 'pause' || !localPlaying

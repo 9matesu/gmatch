@@ -97,9 +97,14 @@ export function GalleryTabView({
 }) {
   const tab = (id: 'cards' | 'deck', label: string) => (
     <button
+      key={id}
       type="button"
+      role="tab"
+      id={`gallery-tab-${id}`}
+      aria-selected={subTab === id}
+      aria-controls={`gallery-panel-${id}`}
+      tabIndex={subTab === id ? 0 : -1}
       onClick={() => setSubTab(id)}
-      aria-pressed={subTab === id}
       className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
         subTab === id
           ? 'bg-surface-interactive text-retro-fg border-border-glass'
@@ -117,48 +122,50 @@ export function GalleryTabView({
       </div>
 
       {subTab === 'cards' ? (
-        <GalleryView
-          filteredItems={filteredItems}
-          itemsLoading={itemsLoading}
-          galleryFilter={galleryFilter}
-          setGalleryFilter={setGalleryFilter}
-          gallerySort={gallerySort}
-          setGallerySort={setGallerySort}
-          cardSearch={cardSearch}
-          setCardSearch={setCardSearch}
-          cardTypeFilter={cardTypeFilter}
-          setCardTypeFilter={setCardTypeFilter}
-          galleryPage={galleryPage}
-          setGalleryPage={setGalleryPage}
-          selectedGalleryIds={selectedGalleryIds}
-          setSelectedGalleryIds={setSelectedGalleryIds}
-          totalPages={totalPages}
-          paginatedItems={paginatedItems}
-          batchDownloading={batchDownloading}
-          handleDownloadAll={handleDownloadAll}
-          handleBatchDownload={handleBatchDownload}
-          handleBatchDelete={handleBatchDelete}
-          dragActive={dragActive}
-          setDragActive={setDragActive}
-          dragAnchorId={dragAnchorId}
-          setDragAnchorId={setDragAnchorId}
-          onOpenCreateCard={onOpenCreateCard}
-          onCreateCardFromMedia={onCreateCardFromMedia}
-          onItemContextMenu={onItemContextMenu}
-          onSetWallpaper={onSetWallpaper}
-          users={users}
-          identity={identity}
-          setExpandedItemId={setExpandedItemId}
-          posts={posts}
-          toast={toast}
-          cardByMedia={cardByMedia}
-          onOpenOwnerProfile={onOpenOwnerProfile}
-          onOpenProfile={onOpenOwnerProfile}
-          onRepostGalleryImage={onRepostGalleryImage}
-          onAddGalleryImageToStory={onAddGalleryImageToStory}
-        />
+        <div role="tabpanel" id="gallery-panel-cards" aria-labelledby="gallery-tab-cards">
+          <GalleryView
+            filteredItems={filteredItems}
+            itemsLoading={itemsLoading}
+            galleryFilter={galleryFilter}
+            setGalleryFilter={setGalleryFilter}
+            gallerySort={gallerySort}
+            setGallerySort={setGallerySort}
+            cardSearch={cardSearch}
+            setCardSearch={setCardSearch}
+            cardTypeFilter={cardTypeFilter}
+            setCardTypeFilter={setCardTypeFilter}
+            galleryPage={galleryPage}
+            setGalleryPage={setGalleryPage}
+            selectedGalleryIds={selectedGalleryIds}
+            setSelectedGalleryIds={setSelectedGalleryIds}
+            totalPages={totalPages}
+            paginatedItems={paginatedItems}
+            batchDownloading={batchDownloading}
+            handleDownloadAll={handleDownloadAll}
+            handleBatchDownload={handleBatchDownload}
+            handleBatchDelete={handleBatchDelete}
+            dragActive={dragActive}
+            setDragActive={setDragActive}
+            dragAnchorId={dragAnchorId}
+            setDragAnchorId={setDragAnchorId}
+            onOpenCreateCard={onOpenCreateCard}
+            onCreateCardFromMedia={onCreateCardFromMedia}
+            onItemContextMenu={onItemContextMenu}
+            onSetWallpaper={onSetWallpaper}
+            users={users}
+            identity={identity}
+            setExpandedItemId={setExpandedItemId}
+            posts={posts}
+            toast={toast}
+            cardByMedia={cardByMedia}
+            onOpenOwnerProfile={onOpenOwnerProfile}
+            onOpenProfile={onOpenOwnerProfile}
+            onRepostGalleryImage={onRepostGalleryImage}
+            onAddGalleryImageToStory={onAddGalleryImageToStory}
+          />
+        </div>
       ) : (
-        <div className="bg-surface-raised border border-border-glass rounded-xl p-4">
+        <div role="tabpanel" id="gallery-panel-deck" aria-labelledby="gallery-tab-deck" className="solid-panel border border-border-glass rounded-xl p-4">
           <DeckBuilder
             identity={identity}
             cards={allOwnedCards as any}

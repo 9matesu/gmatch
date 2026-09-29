@@ -1,6 +1,43 @@
 import { generateIdentity } from '../src/identity.cjs'
 import { legalVersionKey } from '../src/legal/documents'
 
+/** Changelog version the specs pretend to have already read. Bump with the app. */
+export const E2E_CHANGELOG_VERSION = '1.5.2'
+
+/**
+ * Discovery tag every seeded spec identity carries, on the server as well as in
+ * localStorage. It is what makes a run's leftovers identifiable and purgeable:
+ * spec identities are random keypairs with no id prefix, so the tag is the only
+ * handle on them.
+ */
+export const E2E_TAG = 'e2e'
+
+/**
+ * Keys that dismiss every first-run OVERLAY for an identity. These are separate
+ * from onboarding, and each one silently swallows every click on the page when
+ * it is missing — a "What's New" modal at z-120 makes a peer context's feed
+ * completely unclickable, and the test then fails with a baffling
+ * "element(s) not found" instead of "a modal is in the way".
+ *
+ * Returns [key, value] PAIRS rather than doing the writing: these are used
+ * inside page.addInitScript, whose function body is serialized and evaluated in
+ * the browser, where an imported helper is simply not defined.
+ */
+export function firstRunOverlayKeys(orbitId: string): [string, string][] {
+  return [
+    ['gmatch_last_seen_changelog', E2E_CHANGELOG_VERSION],
+    ['orbit_tour_v1:' + orbitId, JSON.stringify({ version: 1, index: 0, status: 'done' })],
+    [
+      'orbit_onboarding_v2:' + orbitId,
+      JSON.stringify({
+        version: 1,
+        current: 'ready',
+        completed: ['welcome', 'auth', 'profile', 'platform', 'feed', 'tune', 'cards', 'economy', 'games', 'ready'],
+      }),
+    ],
+  ]
+}
+
 /**
  * Seed a returning-user state so E2E skips onboarding deterministically:
  * real Ed25519 identity (shell), age-verified (shell + idle store mirror),
@@ -40,7 +77,7 @@ export async function seedApp(
     lastSeenAt: Date.now(),
   }
   await page.addInitScript(
-    ([id, save, LEGAL_KEY]: [Record<string, unknown>, Record<string, unknown>, string]) => {
+    ([id, save, LEGAL_KEY, overlayKeys, e2eTag]: [Record<string, unknown>, Record<string, unknown>, string, [string, string][], string]) => {
       localStorage.setItem('orbit_identity', JSON.stringify(id))
       localStorage.setItem('goonMatch_age_verified', 'true')
       // Legal acceptance gate (C.2): seeded with the CURRENT canonical key
@@ -49,24 +86,26 @@ export async function seedApp(
       // Non-default display name: the onboarding migration treats default
       // peer names as "never onboarded" and reopens the profile step.
       localStorage.setItem('orbit_display_name', 'E2E Tester')
-      localStorage.setItem('orbit_tags', JSON.stringify(['e2e']))
+      // The 'e2e' tag is the only thing distinguishing a throwaway spec
+      // identity from a real user: generateIdentity() mints a random keypair
+      // with no prefix, and the server creates the Users row as a side effect of
+      // the first signed request. Without a marker, leftover rows render as
+      // User_1da964 in the directory with no way to purge just them.
+      // Passed IN, not referenced: this function body is serialized and
+      // evaluated in the browser, where a module-level const is undefined —
+      // and the resulting ReferenceError silently aborts the rest of this
+      // script, leaving the app stuck on the age gate.
+      localStorage.setItem('orbit_tags', JSON.stringify([e2eTag]))
       localStorage.setItem(`gmatch.save.v1:${id.orbitId}`, JSON.stringify(save))
       localStorage.setItem('gmatch.save.v1', JSON.stringify(save))
       // lastSeenAt must be load-time or the offline-earnings modal pops on
       // every journey (passive income accrues between seed and page load).
       save.lastSeenAt = Date.now()
       localStorage.setItem('gmatch_last_seen_changelog', '1.5.2')
-      // Onboarding: mark every step complete so the flow doesn't block.
-      localStorage.setItem(
-        `orbit_onboarding_v2:${id.orbitId}`,
-        JSON.stringify({
-          version: 1,
-          current: 'ready',
-          completed: ['welcome', 'auth', 'profile', 'platform', 'feed', 'tune', 'cards', 'economy', 'games', 'ready'],
-        }),
-      )
+      // Onboarding + tour + changelog overlays (see firstRunOverlayKeys).
+      for (const [k, v] of overlayKeys) localStorage.setItem(k, v)
     },
-    [identity, idleSave, legalVersionKey()],
+    [identity, idleSave, legalVersionKey(), firstRunOverlayKeys(identity.orbitId), E2E_TAG],
   )
   return identity
 }

@@ -41,7 +41,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ toast }}>
       {children}
-      <div className="fixed bottom-20 md:bottom-5 right-5 z-[var(--z-toast)] flex flex-col gap-2 max-w-sm pointer-events-none">
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="fixed bottom-20 md:bottom-5 right-5 z-[var(--z-toast)] flex flex-col gap-2 max-w-sm pointer-events-none"
+      >
         {messages.map(msg => (
           <ToastItem key={msg.id} message={msg} onDone={() => remove(msg.id)} />
         ))}

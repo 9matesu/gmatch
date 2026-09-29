@@ -448,6 +448,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
             type="button"
             role="switch"
             aria-checked={receiving}
+            aria-label="Receive domination effects"
             onClick={() => handleUpdateMaster(!receiving)}
             className="relative flex h-4 w-9 shrink-0 cursor-pointer items-center border-0 p-0 ml-1"
           >
@@ -524,6 +525,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search players…"
+                aria-label="Search players"
                 className="w-full glass-field rounded-md px-3 py-1.5 text-xs outline-none placeholder:text-retro-muted"
               />
             </div>

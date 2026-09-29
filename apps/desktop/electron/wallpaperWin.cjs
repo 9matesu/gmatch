@@ -7,6 +7,13 @@ const os = require('os')
 const fs = require('fs')
 const path = require('path')
 const { execFile } = require('child_process')
+const {
+  isSupportedPlatform,
+  wallpaperExtension,
+  rejectReason,
+  restorePlan,
+  tempFileCap,
+} = require('./wallpaper-core.cjs')
 
 const PS = 'powershell.exe'
 const SCRIPT = `
@@ -36,32 +43,39 @@ function runPs(args) {
 }
 
 let previousPath = null // remembered once per session until restore()
+let swapped = false // true between a successful set and its restore
 const tmpFiles = new Set() // deleted on restore() AFTER the fade-out window
 
 async function getWallpaper() {
   return runPs(['get'])
 }
 
+/** True when this process has the OS wallpaper swapped and owes a restore. */
+function hasPendingSwap() {
+  return swapped
+}
+
 /** Write the image to a session temp file and set it as the OS wallpaper. */
 async function setWallpaperFromBuffer(buf, mime) {
-  if (process.platform !== 'win32' || !Buffer.isBuffer(buf)) return { ok: false }
+  const reject = rejectReason(process.platform, buf)
+  if (reject) return { ok: false, reason: reject }
   try {
-    const ext = /png/i.test(String(mime)) ? '.png' : /webp/i.test(String(mime)) ? '.webp' : '.jpg'
-    const tmpFile = path.join(os.tmpdir(), `gmatch-wallpaper-${Date.now()}${ext}`)
+    const tmpFile = path.join(os.tmpdir(), `gmatch-wallpaper-${Date.now()}${wallpaperExtension(mime)}`)
     fs.writeFileSync(tmpFile, buf)
     tmpFiles.add(tmpFile)
-    // best-effort hygiene: never accumulate more than 3 candidates
-    while (tmpFiles.size > 3) {
+    // best-effort hygiene: never accumulate more than a few candidates
+    while (tmpFiles.size > tempFileCap()) {
       const victim = tmpFiles.values().next().value
       tmpFiles.delete(victim)
       try { fs.unlinkSync(victim) } catch { /* gone */ }
     }
     if (previousPath === null) previousPath = (await getWallpaper()) || null
     const out = await runPs(['set', tmpFile])
-    if (out !== 'ok') return { ok: false }
+    if (out !== 'ok') return { ok: false, reason: 'set-failed' }
+    swapped = true
     return { ok: true, hadPrevious: Boolean(previousPath) }
   } catch {
-    return { ok: false }
+    return { ok: false, reason: 'error' }
   }
 }
 
@@ -73,19 +87,28 @@ function cleanupWallpaperFiles() {
 
 /** Restore the wallpaper captured before the first swap; clears the temp file. */
 async function restoreWallpaper() {
-  if (process.platform !== 'win32') return { ok: false }
+  const plan = restorePlan(process.platform, swapped, previousPath)
+  if (!plan.ok) return plan
+  if (plan.skipSet && !swapped) return plan
   try {
-    if (previousPath) {
-      const exists = fs.existsSync(previousPath)
-      await runPs(['set', exists ? previousPath : ''])
-    }
+    // Guard the existence check. The old code ran `set ''` when the captured
+    // file was gone, and SystemParametersInfo with an empty string CLEARS the
+    // desktop — so a user whose original wallpaper had been deleted got a
+    // blank background instead of their own.
+    if (plan.set && fs.existsSync(plan.set)) await runPs(['set', plan.set])
   } catch { /* best-effort */ } finally {
     // Windows copies the file into its own wallpaper store when SPI runs, so
     // the temp file is disposable once the swap (or its restore) is done.
     cleanupWallpaperFiles()
     previousPath = null
+    swapped = false
   }
   return { ok: true }
 }
 
-module.exports = { setWallpaperFromBuffer, restoreWallpaper, cleanupWallpaperFiles }
+module.exports = {
+  setWallpaperFromBuffer,
+  restoreWallpaper,
+  cleanupWallpaperFiles,
+  hasPendingSwap,
+}

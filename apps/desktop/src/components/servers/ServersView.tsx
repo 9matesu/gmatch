@@ -1621,7 +1621,7 @@ export function ServersView({
           </aside>
         ) : (
           /* BROWSE SERVERS VIEW */
-          <main className="flex flex-col min-h-0 h-full overflow-hidden" aria-label="Server directory">
+          <section className="flex flex-col min-h-0 h-full overflow-hidden" aria-label="Server directory">
             {!identity && (
               <div className="px-3 py-1.5 bg-surface-interactive/60 border-b border-border-subtle text-xs text-retro-muted shrink-0">
                 No account yet. One is created for you on the server you pick.
@@ -1631,9 +1631,9 @@ export function ServersView({
             {/* Sub-Bar: Title & Filter Controls */}
             <div className="glass-header h-8 px-3 flex items-center justify-between gap-2 shrink-0">
               <div className="flex items-center gap-1.5 shrink-0">
-                <h1 className="text-xs font-bold text-retro-fg uppercase tracking-wider whitespace-nowrap">
+                <h2 className="text-xs font-bold text-retro-fg uppercase tracking-wider whitespace-nowrap">
                   Server browser ({visibleRowCount})
-                </h1>
+                </h2>
                 <button
                   type="button"
                   onClick={() => { playPress(720); toggleFilters() }}
@@ -1828,7 +1828,7 @@ export function ServersView({
                     </div>
                   ) : (
                     <div className="space-y-1.5">
-                      <ul className="divide-y divide-border-subtle rounded-lg border border-border-glass bg-surface-canvas/80 overflow-hidden">
+                      <ul className="divide-y divide-border-subtle rounded-lg border border-border-glass solid-panel overflow-hidden">
                         {allVisibleServers.length === 0 && (
                           <li className="p-6 text-xs text-retro-muted text-center flex flex-col items-center justify-center gap-1.5">
                             <Globe className="w-5 h-5 text-retro-muted/40" />
@@ -2210,7 +2210,7 @@ export function ServersView({
         </div>
       )}
             </div>
-          </main>
+          </section>
         )}
       </div>
     </div>

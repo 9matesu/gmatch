@@ -51,7 +51,7 @@ export function NativeHeaderBar({
             }}
             title="Back"
             aria-label="Back"
-            className="p-1 rounded-md hover:bg-glass-w10 hover:text-retro-fg transition-colors cursor-pointer"
+            className="p-1 min-w-[28px] min-h-[28px] flex items-center justify-center rounded-md hover:bg-glass-w10 hover:text-retro-fg transition-colors cursor-pointer"
           >
             <CaretLeft className="w-3.5 h-3.5" />
           </button>
@@ -64,7 +64,7 @@ export function NativeHeaderBar({
             }}
             title="Forward"
             aria-label="Forward"
-            className="p-1 rounded-md hover:bg-glass-w10 hover:text-retro-fg transition-colors cursor-pointer"
+            className="p-1 min-w-[28px] min-h-[28px] flex items-center justify-center rounded-md hover:bg-glass-w10 hover:text-retro-fg transition-colors cursor-pointer"
           >
             <CaretRight className="w-3.5 h-3.5" />
           </button>
@@ -83,7 +83,7 @@ export function NativeHeaderBar({
         <button
           type="button"
           onClick={toggleSound}
-          className="p-1.5 rounded-md hover:bg-glass-w10 hover:text-retro-fg transition-colors cursor-pointer"
+          className="p-1.5 min-w-[28px] min-h-[28px] flex items-center justify-center rounded-md hover:bg-glass-w10 hover:text-retro-fg transition-colors cursor-pointer"
           aria-label={isMuted ? 'Unmute audio' : 'Mute audio'}
           title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
         >

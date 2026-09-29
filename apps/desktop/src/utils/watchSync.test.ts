@@ -15,6 +15,37 @@ describe('computeTargetPosition', () => {
   it('never rewinds before updatedAt', () => {
     expect(computeTargetPosition(frame(), 90)).toBe(10)
   })
+
+  // A frame restored from the persisted snapshot can arrive with a missing or
+  // garbage field. NaN used to flow straight into every comparison in the sync
+  // tick — and `NaN > x` is false for every x — so the slot silently stopped
+  // seeking, pausing and advancing, with the scrubber frozen at 0:00.
+  it('never returns NaN for a corrupt frame', () => {
+    for (const bad of [
+      { position: NaN },
+      { position: undefined as unknown as number },
+      { position: -1 },
+      { updatedAt: NaN },
+      { rate: NaN },
+      { rate: undefined as unknown as number },
+    ]) {
+      const t = computeTargetPosition(frame(bad), 112)
+      expect(Number.isNaN(t), JSON.stringify(bad)).toBe(false)
+      expect(Number.isFinite(t), JSON.stringify(bad)).toBe(true)
+    }
+  })
+  it('degrades a corrupt frame to a usable position', () => {
+    expect(computeTargetPosition(frame({ position: NaN }), 112)).toBe(0)
+    expect(computeTargetPosition(frame({ position: 10, updatedAt: NaN }), 112)).toBe(10)
+  })
+})
+
+describe('driftCorrection with unusable positions', () => {
+  it('still applies absolute transport when the positions are NaN', () => {
+    // play/pause are absolute; a NaN position must not disable them.
+    expect(driftCorrection(NaN, NaN, true, 'pause')).toEqual({ seekTo: null, play: false, pause: true })
+    expect(driftCorrection(NaN, NaN, false, 'play')).toEqual({ seekTo: null, play: true, pause: false })
+  })
 })
 
 describe('driftCorrection', () => {

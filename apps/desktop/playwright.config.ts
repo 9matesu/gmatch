@@ -46,6 +46,13 @@ export default defineConfig({
       BLOB_STORE_DIR: 'I:/tmp/gmatch-e2e/blobs',
       STORAGE_ENCRYPTION_KEY:
         '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+      // Pin the admin console for the run. Two reasons: the dev sidecar's
+      // default is the literal "admin", and a developer's own
+      // apps/api/.env.local (Bun loads it from this cwd) would otherwise
+      // override it — so the run silently inherited whatever PIN the machine
+      // had. Set here, the parent env wins and the suite is hermetic.
+      // Test-only value for a throwaway database; not a real secret.
+      ADMIN_PIN: 'e2e-admin-pin',
     },
   },
 })

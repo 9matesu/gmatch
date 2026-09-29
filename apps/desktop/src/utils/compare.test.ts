@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { User } from '@orbit/shared'
-import { areItemsStructurallyEqual, areUsersStructurallyEqual } from './compare'
+import { areItemsStructurallyEqual, areUsersStructurallyEqual, presenceBucket } from './compare'
 
 const user = (over: Partial<User> = {}): User =>
   ({
@@ -31,6 +31,7 @@ describe('areUsersStructurallyEqual', () => {
     ['gacha_items_collected', { gacha_items_collected: 5 }],
     ['likes_received', { likes_received: 8 }],
     ['followers_count', { followers_count: 2 }],
+    ['following_count', { following_count: 2 }],
     ['posts_count', { posts_count: 4 }],
   ])('detects a changed %s', (_field, over) => {
     expect(areUsersStructurallyEqual([user()], [user(over)])).toBe(false)
@@ -60,6 +61,47 @@ describe('areUsersStructurallyEqual', () => {
   it('normalises boolean-ish flags', () => {
     expect(areUsersStructurallyEqual([user()], [user({ is_private: 0 as never })])).toBe(true)
     expect(areUsersStructurallyEqual([user()], [user({ is_private: true })])).toBe(false)
+  })
+
+  // THE PRESENCE SPLIT BRAIN. `last_seen` was never compared, and `online`
+  // stays true across every heartbeat, so for any continuously-active user the
+  // guard returned true, setUsers returned `prev`, and the roster's `last_seen`
+  // froze. isUserOnline treats a present-but-stale timestamp as authoritative
+  // over the flag, so the profile modal read "Offline" for someone the arena
+  // and chat hub — which compute presence server-side, fresh — called Online.
+  it('detects a last_seen that moved by more than one bucket', () => {
+    const t = Date.parse('2026-01-01T00:00:00.000Z')
+    expect(areUsersStructurallyEqual([user()], [user({ last_seen: new Date(t).toISOString() })])).toBe(false)
+  })
+
+  it('ignores heartbeat jitter inside a single bucket (no render storm)', () => {
+    const t = Date.parse('2026-01-01T00:00:00.000Z')
+    const a = user({ last_seen: new Date(t).toISOString() })
+    // +10s is inside the 15s bucket: the heartbeat moved, but nothing the UI
+    // renders has.
+    const b = user({ last_seen: new Date(t + 10_000).toISOString() })
+    expect(areUsersStructurallyEqual([a], [b])).toBe(true)
+    // +40s crosses a bucket boundary and must be seen.
+    const c = user({ last_seen: new Date(t + 40_000).toISOString() })
+    expect(areUsersStructurallyEqual([a], [c])).toBe(false)
+  })
+
+  it('cannot hide an offline transition inside a bucket', () => {
+    // Bucketing must never make a stale sighting look unchanged to a caller
+    // that also flipped the flag, and must never swallow first/last sighting.
+    const t = Date.parse('2026-01-01T00:00:00.000Z')
+    expect(
+      areUsersStructurallyEqual(
+        [user({ last_seen: new Date(t).toISOString(), online: true })],
+        [user({ last_seen: undefined, online: false })],
+      ),
+    ).toBe(false)
+  })
+
+  it('buckets an unparseable timestamp as no sighting', () => {
+    expect(presenceBucket(undefined)).toBe(0)
+    expect(presenceBucket('not-a-date')).toBe(0)
+    expect(presenceBucket('2026-01-01T00:00:00.000Z')).toBeGreaterThan(0)
   })
 })
 

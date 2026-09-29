@@ -8,19 +8,22 @@ export const Switch = memo(function Switch({
   checked,
   onChange,
   label,
+  id,
 }: {
   checked: boolean
   onChange: () => void
   label?: string
+  id?: string
 }) {
   return (
     <button
       type="button"
       role="switch"
+      id={id}
       aria-checked={checked}
       aria-label={label}
       onClick={onChange}
-      className="relative flex h-4 w-9 shrink-0 cursor-pointer items-center border-0 p-0"
+      className="relative flex h-6 w-9 shrink-0 cursor-pointer items-center border-0 p-0 focus-visible:outline-2 focus-visible:outline-offset-2 rounded-full"
     >
       <span
         aria-hidden="true"

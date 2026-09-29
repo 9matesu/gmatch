@@ -270,6 +270,20 @@ export function handleWatchMessage(msg: any): void {
     }
     return
   }
+  if (msg.type === 'watch.nack') {
+    // Our control frame was refused (non-host, or the 200ms throttle). The
+    // optimistic frame we applied locally is a lie; roll it back to the last
+    // authoritative one and say why, instead of leaving the button showing
+    // "playing" while the room is paused.
+    const p = state.parties.find((x) => x.id === msg.party)
+    if (p) {
+      logger.warn(`[watch] control frame refused (${msg.action}) — not host, or throttled`)
+      window.dispatchEvent(new CustomEvent('watch-control-refused', {
+        detail: { party: msg.party, action: msg.action },
+      }))
+    }
+    return
+  }
   if (msg.type === 'watch.kicked' || msg.type === 'watch.gone') {
     const party = state.parties.find((p) => p.id === msg.party)
     if (party) {
@@ -618,7 +632,22 @@ export function leaveParty(partyId: string): void {
 export function controlPlayback(partyId: string, action: 'play' | 'pause', position: number): void {
   if (!sendOrbitWebSocket({ type: 'watch', party: partyId, action, position: Math.max(0, position) })) {
     logger.warn('[watch] control frame dropped (socket offline)')
+    return
   }
+  // Optimistic local frame. The server echoes the accepted frame back as
+  // watch.sync, but a refused one (non-host, or the 200ms transport throttle
+  // swallowing a second press inside one gesture) never arrives — so the button
+  // used to snap back with no explanation. Applying it locally makes the control
+  // feel instant; the authoritative echo (or a watch.nack) still wins.
+  const party = state.parties.find((x) => x.id === partyId)
+  if (!party || !party.frame) return
+  party.frame = {
+    ...party.frame,
+    action,
+    position: Math.max(0, position),
+    updatedAt: serverNow(),
+  }
+  emit()
 }
 
 export function useWatchParty(): WatchPartyState {

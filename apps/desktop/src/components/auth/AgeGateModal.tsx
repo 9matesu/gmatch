@@ -37,7 +37,12 @@ export function AgeGateModal({
   if (isVerified) return null;
 
   return (
-    <div className="fixed inset-0 z-[var(--z-toast)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="age-gate-title"
+      className="fixed inset-0 z-[var(--z-toast)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in"
+    >
       <div
         className="bg-retro-bg border border-border-glass rounded-xl max-w-md w-full p-6 sm:p-7 shadow-2xl space-y-5 text-center flex flex-col items-center animate-orbit-slide-up text-retro-fg"
         onClick={(e) => e.stopPropagation()}
@@ -48,11 +53,11 @@ export function AgeGateModal({
         </div>
 
         <div className="space-y-1.5">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-retro-muted bg-retro-panel px-2.5 py-1 rounded-md border border-border-glass">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-retro-body bg-retro-panel px-2.5 py-1 rounded-md border border-border-glass">
             Age Verification
           </span>
-          <h2 className="text-xl font-semibold text-white tracking-tight">Are you 18 or older?</h2>
-          <p className="text-xs text-retro-muted leading-relaxed max-w-xs mx-auto">
+          <h2 id="age-gate-title" className="text-xl font-semibold text-white tracking-tight">Are you 18 or older?</h2>
+          <p className="text-xs text-retro-body leading-relaxed max-w-xs mx-auto">
             gMatch contains adult media and community content intended exclusively for mature audiences (18+).
           </p>
         </div>
@@ -61,6 +66,7 @@ export function AgeGateModal({
         <div className="w-full space-y-2 pt-1">
           <button
             type="button"
+            autoFocus
             onClick={handleConfirmAge}
             className="w-full py-2.5 px-4 rounded-lg bg-white hover:bg-retro-fg active:scale-[0.99] text-black font-semibold text-xs shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2"
           >
