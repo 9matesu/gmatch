@@ -1595,8 +1595,7 @@ admin.post('/users/:id/unban', async (c) => {
 })
 
 // Toggle moderator role for a user
-admin.post('/users/:id/moderator', async (c) => {
-  const orbitId = c.get('orbitId')
+admin.post('/users/:id/moderator', async (c) => {  const orbitId = c.get('orbitId')
   const userId = c.req.param('id')
 
   let isModerator = true
@@ -1613,6 +1612,128 @@ admin.post('/users/:id/moderator', async (c) => {
   await logAdminAction(c.env.DB, orbitId, isModerator ? 'grant_moderator' : 'revoke_moderator', { id: userId, type: 'user' })
 
   return c.json({ success: true, user_id: userId, is_moderator: isModerator })
+})
+
+/**
+ * The profile tag every seeded E2E identity carries (e2e/helpers.ts sets
+ * orbit_tags = ['e2e']). It is deliberately the ONLY handle on those accounts:
+ * generateIdentity() mints a random keypair with no id prefix, and the server
+ * creates the Users row as a side effect of the first signed request, so
+ * leftover spec users are otherwise indistinguishable from real ones and
+ * render in the directory as User_1da964.
+ *
+ * Kept in sync with E2E_TAG in apps/desktop/e2e/helpers.ts by
+ * admin-purge-e2e.test.ts, which asserts both files agree.
+ */
+const E2E_PROFILE_TAG = 'e2e'
+
+/**
+ * Purge E2E test accounts and everything they created.
+ *
+ * The suite is meant to be hermetic (playwright.config.ts points the sidecar at
+ * a throwaway DB and GMATCH_API_FRESH=1 wipes it), but runs against a shared
+ * node before that was enforced left hundreds of accounts in the directory and
+ * in chat history. This is the cleanup.
+ *
+ * Always dry-run first: `POST { dryRun: true }` reports what WOULD be deleted,
+ * including a sample of the victims, without touching anything. Deletion goes
+ * through the same deleteUserCascade a real account deletion uses, so blobs,
+ * cards, decks, messages and groups all go with the row.
+ *
+ * `limit` caps how many are removed per call so a large backlog can be drained
+ * in batches and observed; omit it for all of them.
+ */
+admin.post('/purge-e2e', async (c) => {
+  const orbitId = c.get('orbitId')
+  let dryRun = true
+  let limit: number | null = null
+  try {
+    const body = await c.req.json()
+    // Default to a dry run: deleting accounts is not reversible and this is a
+    // bulk operation, so making the destructive call explicit is the only safe
+    // default.
+    if (typeof body?.dryRun === 'boolean') dryRun = body.dryRun
+    if (typeof body?.dry_run === 'boolean') dryRun = body.dry_run
+    if (body?.limit !== undefined && body?.limit !== null) {
+      const n = Number(body.limit)
+      if (Number.isFinite(n) && n > 0) limit = Math.min(Math.floor(n), 5000)
+    }
+  } catch { /* bodyless = dry run */ }
+
+  // Users.tags is a JSON array string, but it is written by a lenient parser
+  // (users.ts catches JSON.parse failures and stores whatever it got), so a row
+  // can hold a non-array or plain text. Feeding those to json_each() raises
+  // "malformed JSON" and aborts the whole query — one bad row would make the
+  // purge unreachable. So: coarse LIKE prefilter in SQL, exact tag comparison
+  // in JS where a parse failure is one skipped row.
+  const candidates = await c.env.DB.prepare(
+    `SELECT id, display_name, last_seen, tags FROM Users
+     WHERE tags IS NOT NULL AND tags LIKE ?
+     ORDER BY last_seen ASC NULLS FIRST`,
+  ).bind(`%"${E2E_PROFILE_TAG}"%`).all<{ id: string; display_name: string | null; last_seen: string | null; tags: string | null }>()
+
+  const matchesTag = (raw: string | null): boolean => {
+    if (!raw) return false
+    try {
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) && parsed.some((t) => String(t).toLowerCase() === E2E_PROFILE_TAG)
+    } catch {
+      return false
+    }
+  }
+  const all = candidates.results.filter((v) => matchesTag(v.tags))
+  const victims = limit ? all.slice(0, limit) : all
+  const ids = victims.map((v) => v.id)
+
+  if (dryRun) {
+    return c.json({
+      dryRun: true,
+      tag: E2E_PROFILE_TAG,
+      // The FULL backlog, not the sliced count: the point of a dry run is to see
+      // how much is actually there before deciding whether a `limit` is needed.
+      matched: all.length,
+      wouldDelete: ids.length,
+      limited: limit !== null,
+      // A sample, not the whole list: a 500-account backlog should not be
+      // echoed into the admin log / network panel.
+      sample: victims.slice(0, 10).map((v) => ({ id: v.id, display_name: v.display_name, last_seen: v.last_seen })),
+    })
+  }
+
+  if (ids.length === 0) {
+    return c.json({ success: true, dryRun: false, deleted: 0, errors: [] })
+  }
+
+  // Refuse to purge an admin account. An E2E run can legitimately hold the admin
+  // PIN (playwright.config.ts pins one), so this is a live footgun.
+  const admins = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM Users
+     WHERE id IN (${ids.map(() => '?').join(',')}) AND COALESCE(is_admin, 0) = 1`,
+  ).bind(...ids as never).first<{ n: number }>()
+  if (Number(admins?.n || 0) > 0) {
+    return c.json({ error: 'refusing to purge: at least one matched account is an admin' }, 400)
+  }
+
+  const errors: Array<{ id: string; error: string }> = []
+  let deleted = 0
+  for (const id of ids) {
+    try {
+      await deleteUserCascade(c.env.DB, id, { BUCKET: c.env.BUCKET })
+      deleted++
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.warn('[admin] purge-e2e failed for', id, message)
+      errors.push({ id, error: message })
+    }
+  }
+
+  await logAdminAction(
+    c.env.DB, orbitId, 'purge_e2e',
+    { count: deleted, failed: errors.length, tag: E2E_PROFILE_TAG },
+    `deleted ${deleted}/${ids.length} e2e accounts`,
+  )
+
+  return c.json({ success: true, dryRun: false, matched: ids.length, deleted, errors })
 })
 
 // Edit user balances directly. Supports metric-specific adjustments:

@@ -14,6 +14,7 @@ import {
   Eye,
   ChevronDown,
   ChevronUp,
+  FlaskConical,
 } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { AdminMediaThumbnail } from "../AdminMediaThumbnail";
@@ -31,6 +32,7 @@ const subTabs = [
   { id: "users", label: "User Directory", icon: Users },
   { id: "cards_market", label: "Cards & Marketplace", icon: CreditCard },
   { id: "wallets_ledger", label: "Wallets & Ledger", icon: Wallet },
+  { id: "test_cleanup", label: "Test Cleanup", icon: FlaskConical },
 ] as const;
 
 type SubTab = typeof subTabs[number]["id"];
@@ -76,6 +78,18 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
 
   const [isLoading, setIsLoading] = useState(false);
 
+  // E2E purge state lives here; the callbacks are below fetchUsers, which the
+  // delete path re-runs to refresh the directory.
+  const [purgePreview, setPurgePreview] = useState<{
+    matched: number
+    wouldDelete: number
+    tag: string
+    sample: Array<{ id: string; display_name: string | null; last_seen: string | null }>
+  } | null>(null);
+  const [purgeLimit, setPurgeLimit] = useState("");
+  const [purgeBusy, setPurgeBusy] = useState(false);
+  const [purgeResult, setPurgeResult] = useState<string | null>(null);
+
   const fetchUsers = useCallback(async () => {
     if (!identity || !pinVerified) return;
     setIsLoading(true);
@@ -89,6 +103,56 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
       setIsLoading(false);
     }
   }, [identity, pinVerified, usersParams]);
+
+  const runPurgePreview = useCallback(async () => {
+    if (!identity || !pinVerified || purgeBusy) return;
+    setPurgeBusy(true);
+    setPurgeResult(null);
+    try {
+      const limit = Number(purgeLimit);
+      const res = await adminApi.purgeE2e(identity, {
+        dryRun: true,
+        ...(Number.isFinite(limit) && limit > 0 ? { limit: Math.floor(limit) } : {}),
+      });
+      setPurgePreview({
+        matched: res.matched ?? 0,
+        wouldDelete: res.wouldDelete ?? 0,
+        tag: res.tag ?? "e2e",
+        sample: res.sample ?? [],
+      });
+    } catch {
+      setPurgePreview(null);
+      setPurgeResult("Could not reach the server.");
+    } finally {
+      setPurgeBusy(false);
+    }
+  }, [identity, pinVerified, purgeLimit, purgeBusy]);
+
+  const runPurge = useCallback(async () => {
+    if (!identity || !pinVerified || !purgePreview || purgeBusy) return;
+    setPurgeBusy(true);
+    setPurgeResult(null);
+    try {
+      // Re-send the same batch size the preview covered, so the count the
+      // operator confirmed is the count that gets deleted.
+      const res = await adminApi.purgeE2e(identity, {
+        dryRun: false,
+        ...(purgePreview.wouldDelete !== purgePreview.matched ? { limit: purgePreview.wouldDelete } : {}),
+      });
+      const failed = res.errors?.length ?? 0;
+      setPurgeResult(
+        `Deleted ${res.deleted ?? 0} of ${purgePreview.wouldDelete} account(s)` + (failed ? `, ${failed} failed` : "") + ".",
+      );
+      // Drop the preview so the delete button cannot be pressed twice against
+      // stale numbers, and refresh the directory.
+      setPurgePreview(null);
+      await fetchUsers();
+    } catch {
+      setPurgeResult("Purge failed.");
+    } finally {
+      setPurgeBusy(false);
+    }
+  }, [identity, pinVerified, purgePreview, purgeBusy, fetchUsers]);
 
   const fetchCards = useCallback(async () => {
     if (!identity || !pinVerified) return;
@@ -798,6 +862,86 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
             />
           </div>
         </ConfirmDialog>
+      )}
+
+      {activeSubTab === "test_cleanup" && (
+        <div className="space-y-4">
+          <div className="bg-surface-canvas border border-border-glass rounded-lg p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <FlaskConical className="w-4 h-4 text-amber-400" />
+              <h3 className="text-sm font-medium text-retro-fg">Purge E2E test accounts</h3>
+            </div>
+            <p className="text-xs text-retro-muted leading-relaxed">
+              The test suite is meant to be hermetic, but earlier runs against a shared node left hundreds of
+              spec accounts in the directory and in chat history. They are identifiable only by the
+              <code className="font-mono bg-black/30 px-1 py-0.5 rounded mx-1">e2e</code>
+              profile tag, since the suite mints anonymous keypairs. This removes every matching account and
+              everything it created (objects, messages, cards, groups).
+            </p>
+            <p className="text-xs text-amber-300/80 leading-relaxed">
+              Always preview first. The server refuses to delete anything unless deletion is explicitly
+              requested, and refuses outright if an admin account matches.
+            </p>
+
+            <div className="flex items-end gap-2 flex-wrap">
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] uppercase tracking-wide text-retro-muted">Batch size (optional)</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={purgeLimit}
+                  onChange={e => setPurgeLimit(e.target.value)}
+                  placeholder="all"
+                  className="w-32 bg-surface-raised border border-border-glass rounded px-2.5 py-1.5 text-xs text-retro-fg outline-none"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => void runPurgePreview()}
+                disabled={purgeBusy}
+                className="px-3 py-1.5 rounded-md text-xs font-bold bg-surface-raised border border-border-glass text-retro-fg hover:border-retro-accent/60 disabled:opacity-40 cursor-pointer"
+              >
+                {purgeBusy ? "Working…" : "Preview"}
+              </button>
+            </div>
+
+            {purgePreview && (
+              <div className="rounded-md border border-border-glass bg-surface-raised/50 p-3 space-y-2">
+                <div className="text-xs text-retro-fg font-mono">
+                  {purgePreview.matched} account(s) tagged “{purgePreview.tag}”
+                  {purgePreview.wouldDelete !== purgePreview.matched && (
+                    <> — this batch would remove {purgePreview.wouldDelete}</>
+                  )}
+                </div>
+                {purgePreview.sample.length > 0 && (
+                  <ul className="text-[10px] font-mono text-retro-muted space-y-0.5">
+                    {purgePreview.sample.map(s => (
+                      <li key={s.id} className="truncate">
+                        {s.display_name || "User_…"} · {s.id.slice(0, 16)}
+                      </li>
+                    ))}
+                    {purgePreview.matched > purgePreview.sample.length && (
+                      <li>…and {purgePreview.matched - purgePreview.sample.length} more</li>
+                    )}
+                  </ul>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!window.confirm(`Permanently delete ${purgePreview.wouldDelete} E2E account(s) and all their content? This cannot be undone.`)) return;
+                    void runPurge();
+                  }}
+                  disabled={purgeBusy || purgePreview.wouldDelete === 0}
+                  className="px-3 py-1.5 rounded-md text-xs font-bold bg-red-600/80 hover:bg-red-600 text-white disabled:opacity-40 cursor-pointer"
+                >
+                  {purgeBusy ? "Deleting…" : `Delete ${purgePreview.wouldDelete} account(s)`}
+                </button>
+              </div>
+            )}
+
+            {purgeResult && <div className="text-xs text-retro-fg">{purgeResult}</div>}
+          </div>
+        </div>
       )}
 
       {detailUser && (

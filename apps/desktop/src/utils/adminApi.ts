@@ -280,6 +280,31 @@ export const adminApi = {
   deleteUser: (identity: OrbitIdentity, userId: string) =>
     fetchJson<{ success: boolean }>(`${ADMIN_BASE}/users/${userId}/delete`, identity, { method: "POST" }),
 
+  /**
+   * Bulk-remove E2E test accounts and everything they created.
+   *
+   * The server refuses to do anything unless `dryRun` is explicitly false, so
+   * an accidental call here cannot delete anything. Always preview first: the
+   * dry run reports the FULL backlog (`matched`) alongside what one batch
+   * would take (`wouldDelete`), which is how you decide whether a `limit` is
+   * needed.
+   */
+  purgeE2e: (identity: OrbitIdentity, opts: { dryRun: boolean; limit?: number }) =>
+    fetchJson<{
+      dryRun?: boolean
+      success?: boolean
+      tag?: string
+      matched?: number
+      wouldDelete?: number
+      deleted?: number
+      errors?: Array<{ id: string; error: string }>
+      sample?: Array<{ id: string; display_name: string | null; last_seen: string | null }>
+    }>(`${ADMIN_BASE}/purge-e2e`, identity, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(opts),
+    }),
+
   editUserTags: (identity: OrbitIdentity, userId: string, tags: string[]) =>
     fetchJson<{ success: boolean; tags: string[] }>(`${ADMIN_BASE}/users/${userId}/tags`, identity, {
       method: "PATCH",
