@@ -86,6 +86,92 @@ const HTML_TIMEOUT_MS = 8_000
 export const VIEW_POST_CAP = 6
 export const VIEW_POST_LANES = 3
 
+/**
+ * Hard budget for ONE feed round.
+ *
+ * Without this a round has no ceiling at all. `dapiPass` walks up to 10
+ * mirrors x 3 query variants sequentially at TIMEOUT_MS each, the caller
+ * re-runs it up to twice more on seen-exhaustion (the "deepen" loop), and
+ * every HTML mirror then spends up to HTML_TIMEOUT_MS per post-view fetch
+ * across VIEW_POST_LANES lanes. The product of those is a round that can run
+ * for minutes with nothing on screen but "Loading" — which is exactly the
+ * "clicker takes forever to show me a picture" report.
+ *
+ * This is a ROUND budget, not a per-request one: it caps the total time from
+ * asking to having something to show. Per-request budgets still apply
+ * (TIMEOUT_MS / HTML_TIMEOUT_MS) and are merged with it, so a single slow
+ * mirror is cut short without abandoning the whole cascade.
+ *
+ * Generous enough that a cold cache plus one slow gallery page still lands
+ * real posts; short enough that a player never thinks the app hung.
+ */
+export const ROUND_DEADLINE_MS = 8_000
+
+/** Deadline token threaded through a round so nested fetches can be cut. */
+export interface RoundBudget {
+  signal: AbortSignal
+  /** True once the budget is spent; cheap to check, safe to call anywhere. */
+  expired: () => boolean
+  /** Clear the deadline timer. Always call this when the round ends. */
+  dispose: () => void
+}
+
+/**
+ * Start a round budget. The returned signal aborts when the deadline passes,
+ * and `expired()` lets hot loops bail without catching an AbortError.
+ *
+ * Timers are unref'd where supported so a pending budget never holds a test
+ * runner (or a quitting renderer) open.
+ */
+export function startRoundBudget(ms: number = ROUND_DEADLINE_MS): RoundBudget {
+  const controller = new AbortController()
+  const timer = setTimeout(
+    () => controller.abort(new DOMException('round deadline', 'TimeoutError')),
+    ms,
+  )
+  // Node (vitest) and browsers both return a handle with unref; Electron's
+  // main/renderer too. Guard anyway — a plain number has no unref.
+  const unref = (timer as unknown as { unref?: () => void }).unref
+  if (typeof unref === 'function') unref.call(timer)
+  return {
+    signal: controller.signal,
+    expired: () => controller.signal.aborted,
+    dispose: () => clearTimeout(timer),
+  }
+}
+
+/** Clear a budget's timer, tolerating a budget-less call. */
+function budgetDispose(budget: RoundBudget | undefined): void {
+  budget?.dispose()
+}
+
+
+/**
+ * Merge an outer round budget into a per-request timeout, so one signal
+ * expresses "this request must not outlive the round".
+ *
+ * Returns an object rather than a bare AbortSignal because the caller often
+ * needs to know whether the REQUEST or the ROUND was what failed — the two
+ * have different consequences for mirror health (a sick mirror should be
+ * cooled; a round that simply ran out of time should not).
+ */
+export function withRequestTimeout(
+  timeoutMs: number,
+  budget: RoundBudget | undefined,
+): { signal: AbortSignal; timedOut: () => boolean } {
+  if (!budget) {
+    return { signal: AbortSignal.timeout(timeoutMs), timedOut: () => true }
+  }
+  const request = AbortSignal.timeout(timeoutMs)
+  const signal = AbortSignal.any([budget.signal, request])
+  return { signal, timedOut: () => request.aborted }
+}
+
+/** True when a fetch failed because the ROUND ran out of time (not the mirror). */
+function isDeadlineAbort(err: unknown, budget: RoundBudget | undefined): boolean {
+  return Boolean(budget?.expired())
+}
+
 // No-repeat memory: ids + file URLs seen this session AND in past sessions
 // (localStorage), capped so it can't grow forever. Same file under a
 // different mirror id still counts as seen via its URL.
@@ -713,14 +799,18 @@ export async function expandPostViews(
   entries: Array<RealbooruEntry | BooruOrgEntry>,
   viewBase: string,
   parseView: (html: string) => { url: string; kind: 'image' | 'video' } | null,
+  budget?: RoundBudget,
 ): Promise<BooruPost[]> {
   const withId = entries.filter((e) => e.postId).slice(0, VIEW_POST_CAP)
   if (withId.length === 0) return entries.map(stripAnyEntryPostId)
   const expanded = await mapLimit(withId, VIEW_POST_LANES, async (entry) => {
+    // Post-view pages are the slowest part of an HTML mirror (up to
+    // VIEW_POST_CAP of them), so they inherit the round budget: a burst of
+    // slow galleries must not push the round past its ceiling.
+    if (budget?.expired()) return undefined
     try {
-      const res = await fetch(`${viewBase}/index.php?page=post&s=view&id=${entry.postId}`, {
-        signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
-      })
+      const { signal } = withRequestTimeout(HTML_TIMEOUT_MS, budget)
+      const res = await fetch(`${viewBase}/index.php?page=post&s=view&id=${entry.postId}`, { signal })
       if (!res.ok || typeof res.text !== 'function') return undefined
       const hit = parseView(await res.text())
       if (!hit) return undefined
@@ -811,19 +901,177 @@ async function directFetch(req: BooruRequest): Promise<BooruResponse> {
   // Round tally: distinguishes "mirrors answered but everything was seen"
   // (emptyFresh — gentle path, no cooldown escalation) from true outages.
   const tally = { parsed: 0, fresh: 0 }
-  const hit = await dapiPass(req, tally)
-  if (hit) return hit
-  return dapiFallbacks(req, tally, allowReal, allowHentai)
+  // One budget for the WHOLE round, including the scraper fallback chain and
+  // the deepen pass — not per stage. Otherwise a round that misses on every
+  // DAPI mirror still gets the full budget again from redgifs, then again from
+  // babesource, and the ceiling is meaningless.
+  const budget = startRoundBudget()
+  try {
+    const hit = await dapiPass(req, tally, budget)
+    if (hit) return hit
+    return await dapiFallbacks(req, tally, allowReal, allowHentai, budget)
+  } finally {
+    budgetDispose(budget)
+  }
+}
+
+/** Build the request URL for one (mirror, variant) pair. */
+function variantUrl(
+  src: { id: string; type: string; proxy: string; sub?: string },
+  variant: string,
+  req: BooruRequest,
+  isProbe: boolean,
+  pid: number,
+  neg: string,
+): { url: string; kind: 'dapi' | 'moe' | 'html'; pageNum: number } {
+  if (src.type === 'moebooru') {
+    const pageNum = isProbe ? 1 : drawFreshPage(`moe::${src.id}::${variant}`, 50)
+    const tags = src.id === 'konachan-direct' ? `${variant} rating:explicit` : variant
+    return { url: `${src.proxy}/post.json?tags=${encodeURIComponent(tags)}&limit=${req.limit}&page=${pageNum}`, kind: 'moe', pageNum }
+  }
+  if (src.type === 'realhtml') {
+    // Realbooru `pid` is a result offset: any nonzero pid over-pages small
+    // pools (live: skylar_vox base list carries 42 thumbs while pid=500
+    // returns a blank page). Always fetch the base list; variety comes from
+    // shuffling expanded view results + seen-memory.
+    // Preserve multi-word tags with underscores (e.g. skylar_vox).
+    const tagParam = variant.trim().replace(/\s+/g, '_')
+    return { url: `${src.proxy}/index.php?page=post&s=list&tags=${encodeURIComponent(tagParam)}`, kind: 'html', pageNum: 1 }
+  }
+  if (src.type === 'booruorg') {
+    // booru.org Cloudflare WAF challenges `tags=` queries with 403; omitting
+    // `tags=` and paginating via random `pid` bypasses WAF (200 OK). Each
+    // booru.org sub is already dedicated to its niche theme. Probes jitter
+    // across the first pages too: all subdomains hitting pid=0 in lockstep
+    // trips the shared IP limiter (429 + 5min cooldown).
+    const booruPid = isProbe
+      ? Math.floor(Math.random() * 3) * 20
+      : drawFreshPid(`boorg::${src.sub}::${variant}`, 50) * 20
+    return { url: `${src.proxy}/index.php?page=post&s=list&pid=${booruPid}`, kind: 'html', pageNum: 1 }
+  }
+  // Explicit page/probe pins the pid; rounds sample without replacement per
+  // source+query so the same window is never re-rolled twice.
+  const usePid = isProbe || req.page !== undefined ? pid : drawFreshPid(`dapi::${src.id}::${variant}`, 1000)
+  return {
+    url: `${src.proxy}/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
+      `${variant} rating:explicit ${neg}`,
+    )}&limit=${req.limit}&json=1&pid=${usePid}`,
+    kind: 'dapi',
+    pageNum: 1,
+  }
+}
+
+/** Outcome of one variant attempt, including whether the mirror looked sick. */
+interface VariantOutcome {
+  posts: BooruPost[] | null
+  /** The mirror itself failed (network error / non-2xx) — worth cooling. */
+  sick: boolean
+}
+
+/**
+ * Fetch one (mirror, variant) pair: request, parse, expand, sanitize.
+ *
+ * Health reporting is deliberate: a request killed by the ROUND deadline is
+ * NOT a sick mirror. Cooling a healthy mirror because the player moved on
+ * would shrink the pool until the feed looked broken.
+ */
+async function fetchVariant(
+  src: { id: string; type: string; proxy: string; sub?: string; origin: string },
+  variant: string,
+  req: BooruRequest,
+  budget: RoundBudget | undefined,
+  isProbe: boolean,
+  pid: number,
+  neg: string,
+): Promise<VariantOutcome> {
+  const { url, kind } = variantUrl(src, variant, req, isProbe, pid, neg)
+  const timeoutMs = kind === 'html' ? HTML_TIMEOUT_MS : TIMEOUT_MS
+  const { signal, timedOut } = withRequestTimeout(timeoutMs, budget)
+
+  let res: Response
+  try {
+    res = await fetch(url, { signal })
+  } catch {
+    // Aborted by the ROUND, not by this request: nobody's fault but the clock.
+    if (isDeadlineAbort(undefined, budget)) return { posts: null, sick: false }
+    markUnhealthy(src.id)
+    return { posts: null, sick: true }
+  }
+  if (!res.ok) {
+    if (timedOut()) return { posts: null, sick: false }
+    // HTTP error = sick mirror: cool it down.
+    if (res.status === 429) {
+      // booru.org subdomains share an IP rate limit; cool down all of them.
+      const duration = 300_000
+      markUnhealthy(src.id, duration)
+      if (src.type === 'booruorg') {
+        for (const s of DIRECT_SOURCES) {
+          if (s.type === 'booruorg') markUnhealthy(s.id, duration)
+        }
+      }
+    } else {
+      markUnhealthy(src.id)
+    }
+    return { posts: null, sick: true }
+  }
+
+  let parsed: BooruPost[]
+  if (kind === 'html') {
+    let html: string
+    try {
+      html = await res.text()
+    } catch {
+      return { posts: null, sick: false }
+    }
+    // Post-view expansion is the expensive part of an HTML mirror: up to
+    // VIEW_POST_CAP extra requests across VIEW_POST_LANES lanes. It inherits
+    // the round budget so a burst of slow galleries cannot blow the ceiling.
+    parsed = (
+      await expandPostViews(
+        src.type === 'realhtml' ? parseRealbooruEntries(html) : parseBooruOrgEntries(html),
+        src.proxy,
+        src.type === 'realhtml' ? parseRealbooruPost : parseBooruOrgPost,
+        budget,
+      )
+    ).slice(0, req.limit)
+  } else {
+    let data: unknown
+    try {
+      data = await res.json()
+    } catch {
+      return { posts: null, sick: false }
+    }
+    parsed = kind === 'moe' ? toMoePosts(data, src.origin) : toPosts(data, src.origin)
+  }
+
+  let clean: BooruPost[] = []
+  if (src.type === 'booruorg') {
+    // Single tagless fetch; check all variants against the page's posts in memory.
+    for (const v of queryVariants(req.tags)) {
+      clean = sanitize(parsed, v)
+      if (clean.length > 0) break
+    }
+  } else {
+    clean = sanitize(parsed, variant)
+  }
+  return { posts: clean, sick: false }
 }
 
 /**
  * One pass over the DAPI/moebooru/HTML mirrors with the full→top2→single
  * variant ladder. Page ids re-roll every pass, so a second (deep) pass
  * probes different pages. Returns a fresh hit or null.
+ *
+ * Mirrors are still tried in health order, but the ladder WITHIN a mirror is
+ * raced rather than walked: the widest query usually wins, and when it does
+ * not the narrower fallbacks were being awaited one after another for up to
+ * 3x TIMEOUT_MS. Racing them cuts the per-mirror worst case to one timeout
+ * and lets a narrow variant win early when the wide one is merely slow.
  */
 async function dapiPass(
   req: BooruRequest,
   tally: { parsed: number; fresh: number },
+  budget?: RoundBudget,
 ): Promise<BooruResponse | null> {
   const allowReal = req.allowReal !== false
   const allowHentai = req.allowHentai !== false
@@ -839,142 +1087,103 @@ async function dapiPass(
   const pool = filteredSources.length > 0 ? filteredSources : DIRECT_SOURCES
   const healthy = pool.filter((s) => isHealthy(s.id))
   for (const src of healthy.length > 0 ? healthy : pool) {
-    let reachable = true
+    if (budget?.expired()) return null
     // booru.org subdomains are tagless and dedicated to niche themes;
-    // querying once avoids hammering *.booru.org with redundant requests per round.
+    // querying once avoids hammering *.booru.org with redundant requests.
     const variants = src.type === 'booruorg' ? [req.tags] : queryVariants(req.tags)
-    for (const variant of variants) {
-      if (!reachable) break
-      let url: string
-      let kind: 'dapi' | 'moe' | 'html' = 'dapi'
-      let pageNum = 1
-      if (src.type === 'moebooru') {
-        kind = 'moe'
-        pageNum = isProbe ? 1 : drawFreshPage(`moe::${src.id}::${variant}`, 50)
-        const tags = src.id === 'konachan-direct' ? `${variant} rating:explicit` : variant
-        url = `${src.proxy}/post.json?tags=${encodeURIComponent(tags)}&limit=${req.limit}&page=${pageNum}`
-      } else if (src.type === 'realhtml') {
-        kind = 'html'
-        // Realbooru `pid` is a result offset: any nonzero pid over-pages
-        // small pools (live: skylar_vox base list carries 42 thumbs while
-        // pid=500 returns a blank page). Always fetch the base list;
-        // variety comes from shuffling expanded view results + seen-memory.
-        // Preserve multi-word tags with underscores (e.g. skylar_vox),
-        // don't drop the rest of the query with split(/\s+/)[0].
-        const tagParam = variant.trim().replace(/\s+/g, '_')
-        url = `${src.proxy}/index.php?page=post&s=list&tags=${encodeURIComponent(tagParam)}`
-      } else if (src.type === 'booruorg') {
-        // booru.org Cloudflare WAF challenges `tags=` queries with 403;
-        // omitting `tags=` and paginating via random `pid` bypasses WAF (200 OK).
-        // Each booru.org sub is already dedicated to its niche theme.
-        // Probes jitter across the first pages too: all 5 subdomains hitting
-        // pid=0 in lockstep trips the shared IP limiter (429 + 5min cooldown).
-        kind = 'html'
-        const booruPid = isProbe
-          ? Math.floor(Math.random() * 3) * 20
-          : drawFreshPid(`boorg::${src.sub}::${variant}`, 50) * 20
-        url = `${src.proxy}/index.php?page=post&s=list&pid=${booruPid}`
-      } else {
-        // Explicit page/probe pins the pid; rounds sample without replacement
-        // per source+query so the same window is never re-rolled twice.
-        const usePid = isProbe || req.page !== undefined ? pid : drawFreshPid(`dapi::${src.id}::${variant}`, 1000)
-        url = `${src.proxy}/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(
-          `${variant} rating:explicit ${neg}`,
-        )}&limit=${req.limit}&json=1&pid=${usePid}`
-      }
-      let res: Response
-      try {
-        res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) })
-      } catch {
-        // Network down / proxy gone: cool the mirror, stop its variants.
-        markUnhealthy(src.id)
-        reachable = false
-        continue
-      }
-      if (!res.ok) {
-        // HTTP error = sick mirror: cool it down, move to the next one.
-        if (res.status === 429) {
-          // 429 Too Many Requests: cool down for 5 minutes.
-          // booru.org subdomains share an IP rate limit; cool down all of them.
-          const duration = 300_000
-          markUnhealthy(src.id, duration)
-          if (src.type === 'booruorg') {
-            for (const s of DIRECT_SOURCES) {
-              if (s.type === 'booruorg') markUnhealthy(s.id, duration)
-            }
-          }
-        } else {
-          markUnhealthy(src.id)
-        }
-        reachable = false
-        continue
-      }
-      let parsed: BooruPost[]
-      if (kind === 'html') {
-        let html: string
-        try {
-          html = await res.text()
-        } catch {
-          continue
-        }
-        parsed =
-          src.type === 'realhtml'
-            ? (await expandPostViews(parseRealbooruEntries(html), src.proxy, parseRealbooruPost)).slice(
-                0,
-                req.limit,
-              )
-            : (await expandPostViews(parseBooruOrgEntries(html), src.proxy, parseBooruOrgPost)).slice(
-                0,
-                req.limit,
-              )
-      } else {
-        let data: unknown
-        try {
-          data = await res.json()
-        } catch {
-          continue
-        }
-        parsed = kind === 'moe' ? toMoePosts(data, src.origin) : toPosts(data, src.origin)
-      }
 
-
-      let clean: BooruPost[] = []
-      if (src.type === 'booruorg') {
-        // Single tagless fetch; check all variants against the page's posts in memory
-        for (const v of queryVariants(req.tags)) {
-          clean = sanitize(parsed, v)
-          if (clean.length > 0) break
-        }
-      } else {
-        clean = sanitize(parsed, variant)
-      }
-      if (clean.length === 0) continue
-      const fresh = rememberCounted(clean, tally, req.tags, req.silent)
-      if (fresh.length === 0) continue // all repeats — narrower pages may be new
-      unhealthyUntil.delete(src.id)
-      return { posts: fresh, source: src.id, ok: true }
-    }
+    // Race the ladder instead of walking it. Combo queries frequently return
+    // nothing for the full tag set, and walking meant paying TIMEOUT_MS again
+    // for each narrower fallback before the mirror could contribute at all.
+    // Racing costs at most `variants.length` concurrent requests to ONE mirror
+    // and cuts its worst case from N x TIMEOUT_MS to a single timeout.
+    // fetchVariant records its own health verdict, so the race only has to pick
+    // a winner: the first attempt that actually yields posts.
+    const clean = await firstWithPosts(
+      variants.map((variant) =>
+        fetchVariant(src, variant, req, budget, isProbe, pid, neg)
+          .then((r) => r.posts)
+          .catch(() => null),
+      ),
+    )
+    if (budget?.expired()) return null
+    if (!clean || clean.length === 0) continue
+    const fresh = rememberCounted(clean, tally, req.tags, req.silent)
+    // All repeats: a later pass over a different page may still be new, so keep
+    // going rather than treating this mirror as exhausted.
+    if (fresh.length === 0) continue
+    unhealthyUntil.delete(src.id)
+    return { posts: fresh, source: src.id, ok: true }
   }
   return null
+}
+
+/**
+ * Resolve to the first attempt that yields a non-empty result, or null once
+ * every attempt has settled with nothing.
+ *
+ * Deliberately does NOT return early on the first *settlement*: a variant that
+ * answers "nothing here" must not beat a sibling that is about to answer with
+ * posts, or racing would make a slow good answer lose to a fast empty one.
+ */
+export async function firstWithPosts(
+  attempts: Array<Promise<BooruPost[] | null | undefined>>,
+): Promise<BooruPost[] | null> {
+  if (attempts.length === 0) return null
+  if (attempts.length === 1) return (await attempts[0]) ?? null
+  return new Promise<BooruPost[] | null>((resolve) => {
+    let pending = attempts.length
+    let settled = false
+    for (const attempt of attempts) {
+      attempt.then(
+        (posts) => {
+          if (settled) return
+          if (posts && posts.length > 0) {
+            settled = true
+            resolve(posts)
+            return
+          }
+          if (--pending === 0) {
+            settled = true
+            resolve(null)
+          }
+        },
+        () => {
+          // fetchVariant already recorded the health verdict; a rejection here
+          // is just this variant being unusable.
+          if (--pending === 0 && !settled) {
+            settled = true
+            resolve(null)
+          }
+        },
+      )
+    }
+  })
 }
 
 /**
  * Redgifs → Babesource → imhentai → paheal fallback chain, then non-stop
  * handling: one deep DAPI re-pass on seen-exhaustion, else an emptyFresh
  * verdict (gentle) or an offline throw (true outage).
+ *
+ * The chain is a sequence of SCRAPERS — each of which fans out into its own
+ * multi-request crawl — so it is the part of a round most able to run away.
+ * Every stage checks the round budget before starting, and the fetches inside
+ * inherit it.
  */
 async function dapiFallbacks(
   req: BooruRequest,
   tally: { parsed: number; fresh: number },
   allowReal: boolean,
   allowHentai: boolean,
+  budget?: RoundBudget,
 ): Promise<BooruResponse> {
   // Redgifs (real/hardcore short mp4 loops + gifs), then Babesource (real
   // stills galleries), then imhentai (hentai gallery scrape), before the
   // paheal single-tag fallback. Long-form videos are dropped by postFilter
   // (duration metadata only) — short mp4 loops always stay.
-  if (allowReal && isHealthy('redgifs-direct')) {
-    const rg = await redgifsDirect(req.tags, req.limit)
+  if (allowReal && isHealthy('redgifs-direct') && !budget?.expired()) {
+    const rg = await redgifsDirect(req.tags, req.limit, budget)
     if (rg) {
       const fresh = rememberCounted(sanitize(rg, req.tags), tally, req.tags, req.silent)
       if (fresh.length > 0) {
@@ -985,9 +1194,9 @@ async function dapiFallbacks(
       markUnhealthy('redgifs-direct')
     }
   }
-  if (allowReal && isHealthy('babesource-direct')) {
+  if (allowReal && isHealthy('babesource-direct') && !budget?.expired()) {
     try {
-      const bs = await babesourceDirect(req.tags, req.limit)
+      const bs = await babesourceDirect(req.tags, req.limit, budget)
       if (bs.length > 0) {
         const fresh = rememberCounted(sanitize(bs, req.tags), tally, req.tags, req.silent)
         if (fresh.length > 0) {
@@ -998,12 +1207,14 @@ async function dapiFallbacks(
       // Empty (rare query, single-page search, all repeats) is NOT a sick
       // mirror — only hard failures (thrown below) cool the source down.
     } catch {
-      markUnhealthy('babesource-direct')
+      // A deadline abort is not a sick mirror: do not shrink the pool because
+      // the player stopped waiting.
+      if (!isDeadlineAbort(undefined, budget)) markUnhealthy('babesource-direct')
     }
   }
-  if (allowHentai && isHealthy('imh-direct')) {
+  if (allowHentai && isHealthy('imh-direct') && !budget?.expired()) {
     try {
-      const scraped = await imhentaiDirect(req.tags, req.limit)
+      const scraped = await imhentaiDirect(req.tags, req.limit, budget)
       // Empty gallery results are NOT a sick mirror (Cloudflare may simply
       // have challenged this round) — only hard failures cool it down.
         const fresh = rememberCounted(sanitize(scraped, req.tags), tally, req.tags, req.silent)
@@ -1012,16 +1223,17 @@ async function dapiFallbacks(
         return { posts: fresh, source: 'imh-direct', ok: true }
       }
     } catch {
-      markUnhealthy('imh-direct')
+      if (!isDeadlineAbort(undefined, budget)) markUnhealthy('imh-direct')
     }
   }
   // paheal only answers single tags — use the leading one. Pages rotate
   // without replacement (unpainted page param = same newest posts forever).
   const single = req.tags.split(/\s+/).filter(Boolean)[0]
-  if (allowHentai && single && isHealthy('paheal-direct')) {
+  if (allowHentai && single && isHealthy('paheal-direct') && !budget?.expired()) {
     try {
       const url = `/booru/paheal/api/danbooru/find_posts?tags=${encodeURIComponent(single)}&limit=${req.limit}&page=${drawFreshPage(`paheal::${single}`, 5)}`
-      const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) })
+      const { signal } = withRequestTimeout(TIMEOUT_MS, budget)
+      const res = await fetch(url, { signal })
       if (!res.ok) {
         markUnhealthy('paheal-direct')
       } else {
@@ -1033,15 +1245,17 @@ async function dapiFallbacks(
         }
       }
     } catch {
-      markUnhealthy('paheal-direct')
+      if (!isDeadlineAbort(undefined, budget)) markUnhealthy('paheal-direct')
     }
   }
-  // Deepen (non-stop feed, phase 1): mirrors answered but everything was
-  // already seen — up to two more full DAPI passes over fresh pages (page
-  // memory keeps every pass on unseen windows) before declaring exhaustion.
+  // Deepen (non-stop feed): mirrors answered but everything was already seen,
+  // so re-roll the page ids and try ONCE more. One pass, not two — a second
+  // pass costs a whole extra sweep of every mirror and, for a pool that is
+  // genuinely exhausted, produces nothing. The round budget gates this too, so
+  // a slow round never deepens at all.
   // parsed === 0 means true outage: never deepen dead mirrors.
-  for (let i = 0; i < 2 && tally.parsed > 0 && tally.fresh === 0; i++) {
-    const deep = await dapiPass(req, tally)
+  if (tally.parsed > 0 && tally.fresh === 0 && !budget?.expired()) {
+    const deep = await dapiPass(req, tally, budget)
     if (deep) return deep
   }
   if (tally.parsed > 0 && tally.fresh === 0) {
@@ -1065,20 +1279,27 @@ function toProxy(url: string, origin: string, prefix: string): string {
  * (upstream ignores search_text — every query returns the same global feed).
  * Null when unusable (caller moves to the next source). Never throws.
  */
-export async function redgifsDirect(query: string, limit: number): Promise<BooruPost[] | null> {
+export async function redgifsDirect(
+  query: string,
+  limit: number,
+  budget?: RoundBudget,
+): Promise<BooruPost[] | null> {
   for (let attempt = 0; attempt < 2; attempt++) {
+    // A 401 retry is worth a second go; a spent round budget is not.
+    if (budget?.expired()) return null
     try {
       const token = await ensureRedgifsToken()
       if (!token) return null
       // 1. Niche-targeted attempt (query-aware). Niche posts are tagged
       // with the matched query tokens so matchesQuery actually matches.
       try {
-        const niche = await redgifsNicheForQuery(query, token)
+        const niche = await redgifsNicheForQuery(query, token, budget)
         if (niche) {
           const page = drawFreshPage(`rg::${query}`, 5)
           const res = await fetchRedgifsAuthed(
             toProxy(redgifsNicheGifsUrl(niche.id, limit, page), REDGIFS_API, '/rg-auth'),
             token,
+            budget,
           )
           if (res.ok) {
             const posts = parseRedgifs(await res.json())
@@ -1097,9 +1318,10 @@ export async function redgifsDirect(query: string, limit: number): Promise<Booru
         /* niche lookup is best-effort — fall through to generic */
       }
       // 2. Generic trending fallback (query-blind upstream, untagged posts).
+      if (budget?.expired()) return null
       const page = drawFreshPage(`rg::${query}`, 5)
       const url = toProxy(redgifsSearchUrl(query, limit, page), REDGIFS_API, '/rg-auth')
-      const res = await fetchRedgifsAuthed(url, token)
+      const res = await fetchRedgifsAuthed(url, token, budget)
       if (!res.ok) return null
       return parseRedgifs(await res.json())
     } catch (e) {
@@ -1131,9 +1353,14 @@ async function ensureRedgifsToken(): Promise<string | null> {
   }
 }
 
-async function fetchRedgifsAuthed(url: string, token: string): Promise<Response> {
+async function fetchRedgifsAuthed(
+  url: string,
+  token: string,
+  budget?: RoundBudget,
+): Promise<Response> {
+  const { signal } = withRequestTimeout(TIMEOUT_MS, budget)
   const res = await fetch(url, {
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+    signal,
     headers: { Authorization: `Bearer ${token}` },
   })
   if (res.status === 401) {
@@ -1150,16 +1377,38 @@ async function fetchRedgifsAuthed(url: string, token: string): Promise<Response>
 const redgifsNicheCache = new Map<string, { niche: RedgifsNiche | null; exp: number }>()
 const REDGIFS_NICHE_CACHE_MS = 3600_000
 
-async function redgifsNicheForQuery(query: string, token: string): Promise<RedgifsNiche | null> {
+/**
+ * How many niche lookups a single uncached query may make.
+ *
+ * Candidates are the query itself plus every query token, each costing a
+ * TIMEOUT_MS request, and that set is UNCAPPED — a five-word query meant six
+ * sequential requests (~21s) just to decide which niche to browse, before a
+ * single gif was fetched. The full query is tried first and matches the niche
+ * most of the time; the tokens are only there to rescue a phrasing the niche
+ * search did not recognise, so a couple is plenty. Results are cached for an
+ * hour either way, so a cap costs one broader fallback, not correctness.
+ */
+const REDGIFS_NICHE_MAX_CANDIDATES = 3
+
+async function redgifsNicheForQuery(
+  query: string,
+  token: string,
+  budget?: RoundBudget,
+): Promise<RedgifsNiche | null> {
   const key = query.trim().toLowerCase()
   if (!key) return null
   const cached = redgifsNicheCache.get(key)
   if (cached && Date.now() < cached.exp) return cached.niche
-  const candidates = [key, ...redgifsQueryTags(query).map((t) => t.replace(/_/g, ' '))]
-  for (const q of [...new Set(candidates)]) {
+  const candidates = [...new Set([key, ...redgifsQueryTags(query).map((t) => t.replace(/_/g, ' '))])].slice(
+    0,
+    REDGIFS_NICHE_MAX_CANDIDATES,
+  )
+  for (const q of candidates) {
+    if (budget?.expired()) break
     try {
+      const { signal } = withRequestTimeout(TIMEOUT_MS, budget)
       const res = await fetch(toProxy(redgifsNicheSearchUrl(q), REDGIFS_API, '/rg-auth'), {
-        signal: AbortSignal.timeout(TIMEOUT_MS),
+        signal,
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) continue
@@ -1193,7 +1442,11 @@ function withRedgifsQueryTags(posts: BooruPost[], query: string): BooruPost[] {
 /** Galleries expanded per gallery-source round; lanes expanded in parallel. */
 const GALLERY_CAP = 6
 const GALLERY_LANES = 3
-export async function babesourceDirect(query: string, limit: number): Promise<BooruPost[]> {
+export async function babesourceDirect(
+  query: string,
+  limit: number,
+  budget?: RoundBudget,
+): Promise<BooruPost[]> {
   const slug = babesourceSlug(query)
   if (!slug) return []
   const fetchSearchPage = async (page: number): Promise<string | null> => {
@@ -1204,7 +1457,8 @@ export async function babesourceDirect(query: string, limit: number): Promise<Bo
     )
     let searchRes: Response
     try {
-      searchRes = await fetch(searchUrl, { signal: AbortSignal.timeout(HTML_TIMEOUT_MS) })
+      const { signal } = withRequestTimeout(HTML_TIMEOUT_MS, budget)
+      searchRes = await fetch(searchUrl, { signal })
     } catch {
       throw new Error('babesource search unreachable')
     }
@@ -1231,8 +1485,10 @@ export async function babesourceDirect(query: string, limit: number): Promise<Bo
   // Variety: extra random search pages until the gallery set is full or
   // pages run out. Up to two extra DISTINCT pages (page memory keeps rounds
   // off already-crawled pages) — page 1 alone re-serves the same galleries.
+  // Skipped entirely once the round budget is gone: the cover fallback below
+  // can still land real images from the page we already have.
   const maxPage = Math.min(parseBabesourceMaxPage(firstHtml), 5)
-  if (maxPage > 1 && galleryUrls.length < GALLERY_CAP) {
+  if (maxPage > 1 && galleryUrls.length < GALLERY_CAP && !budget?.expired()) {
     const extra = new Set<number>()
     for (let i = 0; i < 6 && extra.size < 2; i++) {
       extra.add(Math.max(2, drawFreshPage(`babe::${slug}`, maxPage)))
@@ -1250,10 +1506,10 @@ export async function babesourceDirect(query: string, limit: number): Promise<Bo
   // round-robin across galleries so one gallery can't fill the batch alone.
   const perGallery = Math.max(1, Math.ceil(limit / galleryUrls.length))
   const sets = await mapLimit(galleryUrls, GALLERY_LANES, async (gUrl) => {
+    if (budget?.expired()) return undefined
     try {
-      const gRes = await fetch(toProxy(gUrl, BABESOURCE_ROOT, '/booru/babe'), {
-        signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
-      })
+      const { signal } = withRequestTimeout(HTML_TIMEOUT_MS, budget)
+      const gRes = await fetch(toProxy(gUrl, BABESOURCE_ROOT, '/booru/babe'), { signal })
       if (!gRes.ok || typeof gRes.text !== 'function') return undefined
       const gHtml = await gRes.text()
       const images = parseBabesourceGallery(gHtml, perGallery)
@@ -1287,10 +1543,15 @@ export async function babesourceDirect(query: string, limit: number): Promise<Bo
  * full-book expansion so one round returns several image sets, not one
  * cover. Never throws.
  */
-async function imhentaiDirect(query: string, limit: number): Promise<BooruPost[]> {
+async function imhentaiDirect(
+  query: string,
+  limit: number,
+  budget?: RoundBudget,
+): Promise<BooruPost[]> {
   try {
+    const { signal: searchSignal } = withRequestTimeout(HTML_TIMEOUT_MS, budget)
     const searchRes = await fetch(toProxy(imhentaiSearchUrl(query), IMHENTAI_ROOT, '/booru/imh'), {
-      signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
+      signal: searchSignal,
     })
     if (!searchRes.ok || typeof searchRes.text !== 'function') return []
     const html = await searchRes.text()
@@ -1308,10 +1569,10 @@ async function imhentaiDirect(query: string, limit: number): Promise<BooruPost[]
     if (entries.length === 0) return []
     const perGallery = Math.max(1, Math.ceil(limit / Math.min(entries.length, GALLERY_LANES)))
     const sets = await mapLimit(entries, GALLERY_LANES, async ({ id }) => {
+      if (budget?.expired()) return undefined
       try {
-        const gRes = await fetch(toProxy(imhentaiGalleryUrl(id), IMHENTAI_ROOT, '/booru/imh'), {
-          signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
-        })
+        const { signal } = withRequestTimeout(HTML_TIMEOUT_MS, budget)
+        const gRes = await fetch(toProxy(imhentaiGalleryUrl(id), IMHENTAI_ROOT, '/booru/imh'), { signal })
         // Cloudflare trips on gallery bursts — back the source off entirely.
         if (gRes.status === 403) {
           markUnhealthy('imh-direct')
@@ -1370,7 +1631,22 @@ export async function fetchPosts(req: BooruRequest): Promise<BooruResponse> {
   if (!req.tags.trim() || isQueryBlocked(req.tags)) return offline
   try {
     if (typeof window !== 'undefined' && window.gmatch?.booruFetch) {
-      const res = await window.gmatch.booruFetch(req)
+      // An IPC invoke cannot be cancelled once sent, so the round deadline is
+      // applied HERE as a wait, not as an abort: if main has not answered by
+      // the budget we stop waiting and report offline. Main applies the same
+      // ceiling to its own source walk, so the abandoned round is already on
+      // its way out rather than still burning the network.
+      const budget = startRoundBudget()
+      const res = await Promise.race([
+        window.gmatch.booruFetch(req),
+        budget.signal.aborted
+          ? Promise.reject(new DOMException('round deadline', 'TimeoutError'))
+          : new Promise<never>((_, reject) => {
+              budget.signal.addEventListener('abort', () => reject(budget.signal.reason), { once: true })
+            }),
+      ]).catch(() => null)
+      budgetDispose(budget)
+      if (!res) return { ...offline }
       if (res.ok) {
         const fetched = res.posts || []
         if (req.silent) {
