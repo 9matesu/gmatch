@@ -6,6 +6,8 @@
 // size. One system, one surface; the dock is just a door.
 
 import { Globe, Gamepad2, Lock, Users, MessageSquare } from 'lucide-react';
+import { nameFor } from '../../game/nameDirectory';
+import { UNKNOWN_NAME } from '../../utils/displayName';
 import { playPress } from '../../utils/sounds';
 import type { ThreadItem } from './GMatchDMs';
 
@@ -109,7 +111,12 @@ export function buildPreviewRows(opts: {
     rows.push({
       id: t.peer_id,
       kind: 'dm',
-      name: t.peer_name || 'User',
+      // Not `|| 'User'`. In courier mode the thread row deliberately carries a
+      // null peer_name (the hub resolves it from the directory), so every DM
+      // row in the dock was hard-labelled "User" for everyone. The directory
+      // is the same source the message stream uses, so the dock and the
+      // conversation now agree.
+      name: t.peer_name || nameFor(t.peer_id) || UNKNOWN_NAME,
       last: t.last_body,
       unread,
     });

@@ -96,7 +96,14 @@ export function resolveDisplayName(opts: ResolveNameOptions): string {
       if (isUsableName(entry.name)) return entry.name.trim()
     }
   }
-  if (isUsableName(fallback)) return fallback.trim()
+  // A `fallback` is only meaningful as "a name we already know belongs to THIS
+  // sender" (a thread's cached peer_name). It is never the viewer's own name —
+  // applying that to a remote sender is how a stranger got rendered as "dev",
+  // the viewer's username, in everyone's chat. Refusing it here rather than
+  // trusting every call site means the next caller cannot reintroduce the bug.
+  if (senderId && isUsableName(fallback) && fallback.trim() !== ownDisplayName()) {
+    return fallback.trim()
+  }
   return UNKNOWN_NAME
 }
 

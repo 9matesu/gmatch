@@ -151,6 +151,37 @@ describe('resolveDisplayName', () => {
     ).toBe(UNKNOWN_NAME)
   })
 
+  it('NEVER renders a remote sender under the viewer own name', () => {
+    // The reported bug: a stranger showed up as "dev" — the viewer's own
+    // username — because the hub passed its own name down as the universal
+    // fallback and the resolver applied it to any sender.
+    const store = stubLocalStorage()
+    store.set(DISPLAY_NAME_KEY, 'dev')
+    // A peer the roster has never heard of, with no name on the payload: the
+    // exact shape that used to fall through to the viewer's own name.
+    const stranger = 'stranger-outside-roster'
+    expect(resolveDisplayName({ selfId: SELF, senderId: stranger, roster })).not.toBe('dev')
+    // Even when the caller explicitly hands the viewer's own name back.
+    expect(
+      resolveDisplayName({ selfId: SELF, senderId: stranger, roster, fallback: ownDisplayName() }),
+    ).toBe(UNKNOWN_NAME)
+  })
+
+  it('still resolves SELF to the viewer own name', () => {
+    const store = stubLocalStorage()
+    store.set(DISPLAY_NAME_KEY, 'dev')
+    expect(resolveDisplayName({ selfId: SELF, senderId: SELF, roster })).toBe('dev')
+  })
+
+  it('a genuine per-sender fallback still works even if it collides with ours', () => {
+    // Two accounts may share a display name. Guarding the leak must not break
+    // the legitimate case, so the refusal is scoped to remote senders only.
+    const other = toNameRoster([{ orbitId: 'other', display_name: 'dev' }])
+    expect(
+      resolveDisplayName({ selfId: SELF, senderId: 'other', roster: other, fallback: 'dev' }),
+    ).toBe('dev')
+  })
+
   it('ignores a placeholder in the roster', () => {
     // The row exists but its name is a minted default: "Unknown User" is the
     // honest answer, not "User_1da964".

@@ -101,6 +101,8 @@ import { dataUrlToBlob, localObjectBlobUrl } from "./utils/mediaData";
 import { mediaUrlToCachedFile } from "./utils/cacheMedia";
 import { fresherPresence } from './utils/presence';
 import { resolveDisplayName, toNameRoster } from './utils/displayName';
+import { nameRoster as nameRosterFromDirectory, nameFor, rememberName, rememberNames } from './game/nameDirectory';
+import { UNKNOWN_NAME } from './utils/displayName';
 
 const MAX_GALLERY_ITEMS_IN_MEMORY = 80;
 // Story tray warm-up: how many leading stories to prefetch, and how many of
@@ -214,7 +216,24 @@ export default function Home() {
   // render "Unknown User". Sealed DMs and rooms now carry the name in the
   // message, and this is the fallback for the lanes that do not (server PM,
   // groups, lobby) plus for threads written before the change.
-  const nameRoster = useMemo(() => toNameRoster(users), [users]);
+  // The durable name directory, overlaid with the fresh /api/users page.
+  // The page is authoritative but capped (100 rows, 24h-stale-filtered), so
+  // anyone outside it used to have NO name and the UI invented one. Names we
+  // have learned elsewhere — a sealed DM, a group roster, an earlier session —
+  // fill those gaps instead, which is what makes a name "permanent".
+  const nameRoster = useMemo(() => {
+    const merged = nameRosterFromDirectory()
+    for (const u of users) {
+      if (u.id) merged.set(u.id, u)
+    }
+    return merged
+  }, [users]);
+
+  // Persist whatever the directory tells us, so a name learned once survives a
+  // restart and a later query that does not happen to return that row.
+  useEffect(() => {
+    if (users.length > 0) rememberNames(users as never);
+  }, [users]);
 
   // Panel opacity preference drives the glass chrome through a CSS variable.
   useEffect(() => {
@@ -3779,6 +3798,7 @@ export default function Home() {
                   </MessagesRail>
 
                   <div ref={mainScrollRef} className="mobile-app-scroll flex-1 min-w-0 min-h-0 w-full flex flex-col relative z-10 overflow-y-auto styled-scrollbar pb-24">
+                    <h1 className="sr-only">{`gMatch - ${typeof mainView === 'string' ? mainView.charAt(0).toUpperCase() + mainView.slice(1) : 'Home'}`}</h1>
 
                   {/* Modals & Config */}
                   {isIdle && settings.idleEnabled && (
@@ -4418,7 +4438,7 @@ export default function Home() {
                     }}
                     onSendCard={selectedProfileUser.id === identity?.orbitId ? undefined : (userId) => {
                       const target = selectedProfileUser;
-                      setSendCardTarget({ id: userId, name: target?.display_name || 'User' });
+                      setSendCardTarget({ id: userId, name: target?.display_name || nameFor(userId) || UNKNOWN_NAME });
                     }}
                     onStartPm={selectedProfileUser.id === identity?.orbitId ? undefined : (u) => {
                       const targetUser = users.find((usr) => usr.id === u.id) || ({ id: u.id, display_name: u.display_name } as User);

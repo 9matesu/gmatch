@@ -15,6 +15,13 @@ import { resolveDisplayName, type NameRosterEntry } from '../../utils/displayNam
  * Both are gone. The important change in behaviour: a name that travelled
  * with the message (sealed DMs and rooms now carry one) is preferred over the
  * roster, so a renamed user is not relabelled retroactively.
+ *
+ * `selfName` is accepted but deliberately NOT forwarded. It used to be passed
+ * down as the universal `fallback`, and `resolveDisplayName` applies a fallback
+ * to ANY sender — so a remote participant with no sealed name and no roster row
+ * rendered under the VIEWER's own name. That is how a stranger ended up labelled
+ * "dev" in everyone's chat: my username, worn by someone else. Self is resolved
+ * by id inside the resolver, which is the only place a local name belongs.
  */
 export function chatDisplayName(opts: {
   /** Participant id: an orbit id, or one of the two channel sentinels. */
@@ -34,7 +41,6 @@ export function chatDisplayName(opts: {
     senderId: id,
     payloadName: opts.payloadName,
     roster: opts.roster,
-    // The viewer's own name is the last resort, never a channel label.
-    fallback: opts.selfName,
   })
 }
+

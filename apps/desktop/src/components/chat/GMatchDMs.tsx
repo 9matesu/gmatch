@@ -36,6 +36,8 @@ import { DropZone, readClipboard } from '../DropZone';
 import { ChatPlayerList } from './ChatPlayerList';
 import { Linkify } from '../Linkify';
 import { chatDisplayName } from './chatDisplayName';
+import { nameFor, nameRoster as nameRosterFromDirectory, rememberName } from '../../game/nameDirectory';
+import { UNKNOWN_NAME } from '../../utils/displayName';
 
 export interface PeerInfo {
   orbitId: string;
@@ -436,7 +438,14 @@ export function GMatchDMs({
     setLoadingHistory(false);
   };
 
+  // Peers the caller knows, overlaid with the durable name directory. The
+  // `peers` prop is the capped /api/users page; the directory remembers every
+  // name we have ever been told, so a DM or room partner who has fallen out of
+  // that page keeps their name instead of falling back to "User".
   const peerMap = new Map<string, PeerInfo>();
+  for (const [id, entry] of nameRosterFromDirectory()) {
+    peerMap.set(id, { orbitId: id, name: entry.display_name || '' });
+  }
   for (const p of peers) {
     peerMap.set(p.orbitId, p);
   }
@@ -451,7 +460,7 @@ export function GMatchDMs({
   if (activePmPeer && activePmPeer.orbitId !== identity?.orbitId && activePmPeer.orbitId !== 'global_lobby' && activePmPeer.orbitId !== 'card_queue' && !threadMap.has(activePmPeer.orbitId)) {
     threadMap.set(activePmPeer.orbitId, {
       peer_id: activePmPeer.orbitId,
-      peer_name: activePmPeer.name || 'User',
+      peer_name: activePmPeer.name || nameFor(activePmPeer.orbitId) || UNKNOWN_NAME,
       last_body: 'New conversation',
       last_sender_id: identity?.orbitId,
       last_created_at: new Date().toISOString(),
@@ -483,6 +492,20 @@ export function GMatchDMs({
       ? queueMessages
       : pmMessages;
   const displayedMessages: ChatMessage[] = rawDisplayedMessages;
+
+  // Learn names from the traffic. Every surface the hub renders funnels
+  // through this one array, so a single effect here picks up a name from a
+  // sealed DM, a room, a group, or the lobby and makes it durable. Doing it
+  // per-call-site would be eight copies of the same three lines and four of
+  // them would eventually be forgotten.
+  //
+  // An effect, not render-body work: remembering is a side effect, and running
+  // it during render would fire on every paint.
+  useEffect(() => {
+    for (const msg of displayedMessages) {
+      if (msg.senderId && msg.senderName) rememberName(msg.senderId, msg.senderName);
+    }
+  }, [displayedMessages]);
 
   const messageBlocks = useMemo(() => {
     const blocks: ChatMessage[][] = [];
@@ -668,6 +691,7 @@ export function GMatchDMs({
             <Search className="w-3.5 h-3.5 text-retro-muted shrink-0" />
             <input
               type="text"
+              aria-label="Search conversations"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search..."
@@ -985,7 +1009,7 @@ export function GMatchDMs({
                    loadMembers={onLoadGroupMembers}
                    meId={identity?.orbitId}
                    isOwner={!!activeGroup && !!identity && activeGroup.owner_id === identity.orbitId}
-                   peers={peers.filter((p) => p.orbitId !== 'global_lobby' && p.orbitId !== 'card_queue').map((p) => ({ orbitId: p.orbitId, name: p.name || 'User' }))}
+                   peers={peers.filter((p) => p.orbitId !== 'global_lobby' && p.orbitId !== 'card_queue').map((p) => ({ orbitId: p.orbitId, name: p.name || nameFor(p.orbitId) || UNKNOWN_NAME }))}
                    onAddMembers={onAddGroupMembers}
                  />
                </div>
@@ -1276,11 +1300,14 @@ export function GMatchDMs({
                     }
                   }}
                   placeholder={openTarget === 'room' ? `Message ${activeRoom?.name || 'room'} (sealed)…` : openTarget === 'group' ? 'Message group...' : isLobbyGroup ? 'Message Lobby Lounge...' : isQueueGroup ? 'Message Card Queue...' : activePmPeer ? `Message ${displayNameFor(activePmPeer.orbitId, activePmPeer.name)}...` : 'Message...'}
+                  aria-label="Write a message"
                   className="w-full bg-transparent focus:outline-none placeholder:text-retro-muted text-retro-fg border-none resize-none max-h-32 py-0.5 leading-normal text-xs styled-scrollbar"
                 />
               </div>
               <button
                 type="submit"
+                aria-label="Send message"
+                title="Send message"
                 disabled={!inputText.trim() && !pendingAttachment}
                 className="p-2 rounded-md bg-retro-accent hover:bg-retro-accent-hover text-black disabled:opacity-30 cursor-pointer transition-colors"
               >
