@@ -1,17 +1,17 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { parseTags, type User, type OrbitObject } from '@orbit/shared';
 import { X, Copy, Check, Star, Ban, Send, Grid, MessageCircle, Play, Swords, Flag } from 'lucide-react';
 import { playPress } from '../utils/sounds';
 import { resolveMediaUrl } from '../utils/media';
 import { ObjectImage } from './ObjectImage';
-import { formatNum } from '../ui/format';
 import { useProfilePostLightbox } from './feed/useProfilePostLightbox';
 import type { FeedPost, PostComment } from './feed/GMatchFeed';
-import { orbitFetch } from '../utils/api';
-import { isUserOnline } from '../utils/presence';
+import { orbitFetch, invalidateCache } from '../utils/api';
+import { isUserOnline, fresherPresence } from '../utils/presence';
+import { usePresence } from '../game/presenceStore';
 
 interface UserProfileModalProps {
   user: User | null;
@@ -34,7 +34,12 @@ interface UserProfileModalProps {
   onOpenFollowers?: (tab: 'followers' | 'following') => void;
   onReportUser?: (userId: string, name: string) => void;
   followingIds?: string[];
-  users?: Array<{ id: string; display_name?: string }>;
+  /**
+   * Roster for presence cross-checking. Typed with the presence fields
+   * because this modal actually reads them — it used to declare
+   * `{id, display_name}` and then cast to `User` to reach `last_seen`.
+   */
+  users?: Array<{ id: string; display_name?: string; last_seen?: string | null; online?: boolean }>;
   shareGroups?: { id: string; name: string; member_count: number }[];
   onSendDm?: (peerId: string, text: string) => Promise<boolean>;
   onPersistLike?: (postId: string, liked: boolean) => Promise<number | undefined>;
@@ -81,6 +86,14 @@ export function UserProfileModal({
   const [selectedCardImage, setSelectedCardImage] = useState<string | null>(null);
   const [followersCount, setFollowersCount] = useState<number | null>(null);
   const [followingCount, setFollowingCount] = useState<number | null>(null);
+  // Presence is a function of Date.now(), so a modal opened while someone is
+  // online silently becomes wrong as the 60s window passes — with no event to
+  // re-render it. Re-evaluate on a timer so the dot tracks reality while open.
+  const [presenceTick, setPresenceTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setPresenceTick((t) => t + 1), 15_000);
+    return () => window.clearInterval(id);
+  }, []);
   // Fully-wired lightbox suite (like/save/comment/share/options/likers).
   // z-90: this modal lives at z-system(80), so the lightbox + sub-modals
   // must stack above it instead of the default z-modal(50).
@@ -103,9 +116,17 @@ export function UserProfileModal({
   // Fetch follower/following counts for every profile INCLUDING your own:
   // without this, the own-profile fallback rendered likes_received labeled
   // "followers" (the wrong-count report).
-  useEffect(() => {
+  //
+  // Split into a callback + two triggers because the deps are [user, identity]
+  // only: a live follow (or any roster change) never re-ran it, so the modal
+  // could sit on a stale number while the profile tab moved.
+  const loadFollowCounts = useCallback(() => {
     if (!identity || !user) return;
     let cancelled = false;
+    // Invalidate first: these GETs are served from the 3s response cache, so a
+    // refetch straight after a follow would return the pre-follow lists.
+    invalidateCache(`/api/users/${encodeURIComponent(user.id)}/followers`);
+    invalidateCache(`/api/users/${encodeURIComponent(user.id)}/following`);
     Promise.all([
       orbitFetch(`/api/users/${encodeURIComponent(user.id)}/followers`, {}, identity)
         .then(r => r.ok ? r.json() : [])
@@ -122,12 +143,51 @@ export function UserProfileModal({
     return () => { cancelled = true; };
   }, [user, identity]);
 
+  useEffect(() => {
+    const cleanup = loadFollowCounts();
+    return typeof cleanup === 'function' ? cleanup : undefined;
+  }, [loadFollowCounts]);
+
+  // Someone followed (or unfollowed) this person while the modal is open.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ follower_id?: string; followee_id?: string }>).detail;
+      if (!detail) return;
+      if (detail.followee_id !== user?.id && detail.follower_id !== user?.id) return;
+      loadFollowCounts();
+    };
+    window.addEventListener('orbit-follow-event', handler);
+    window.addEventListener('orbit-profilesync', handler);
+    return () => {
+      window.removeEventListener('orbit-follow-event', handler);
+      window.removeEventListener('orbit-profilesync', handler);
+    };
+  }, [loadFollowCounts, user?.id]);
+
   if (!user) return null;
 
   const displayName = user.display_name?.trim() || 'Unknown User';
-  // ponytail: canonical presence via shared isUserOnline; sync with props.users if fresher
-  const liveUser = (users?.find((u) => u.id === user.id) as User) || user;
-  const isOnline = isUserOnline(liveUser);
+  // Canonical presence via the shared helper, taking whichever record carries
+  // the FRESHER sighting. The roster entry is not automatically the better one:
+  // the chat hub hands us a 30s-dashboard record while the roster's last_seen
+  // only moves when the roster poll commits.
+  //
+  // `presenceTick` is the clock this read: the interval above re-renders the
+  // modal so `Date.now()` advances past the 60s window and the dot tracks
+  // reality while the modal stays open. It is deliberately not a dependency —
+  // it is the trigger, not the input.
+  // One presence source for the whole app. The store already holds the newest
+  // sighting this client has seen for anyone, from every feed (shared
+  // dashboard poll, peer updates, the user directory), so the modal does not
+  // have to re-derive an answer from whichever object the opener happened to
+  // hand it — the reason the same person showed "Online" in the chat list and
+  // "Offline" here. The local fresherPresence/user check is kept only as a
+  // fallback for a user the store has never seen.
+  const storeOnline = usePresence((s) => s.isOnline(user.id, Date.now()));
+  const storeKnows = usePresence((s) => s.records.has(user.id));
+  const liveUser = fresherPresence(user, users?.find((u) => u.id === user.id));
+  const isOnline = storeKnows ? storeOnline : isUserOnline(liveUser as User | undefined, Date.now());
+  void presenceTick;
   const tags: string[] = parseTags(user.tags);
   const userStories = stories.filter((s) => s.owner_id === user.id || (s as any).user_id === user.id);
   const hasStories = userStories.length > 0;
@@ -164,6 +224,9 @@ export function UserProfileModal({
   return (
     <>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Profile of ${user.display_name?.trim() || 'user'}`}
         className="fixed inset-0 z-[var(--z-system)] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 pb-[var(--island-clearance)] sm:p-4 sm:pb-[calc(1rem+var(--island-clearance))] animate-orbit-fade-in select-none font-sans"
         onClick={onClose}
       >
@@ -183,6 +246,7 @@ export function UserProfileModal({
             <button
               type="button"
               onClick={onClose}
+              aria-label="Close profile"
               className="text-retro-muted hover:text-retro-fg p-1 rounded-md cursor-pointer hover:bg-glass-w12 transition-colors"
             >
               <X className="w-4 h-4" />
@@ -275,22 +339,6 @@ export function UserProfileModal({
                   <span>{copied ? 'Copied' : 'Copy'}</span>
                 </button>
               </div>
-            </div>
-
-            {/* Ranking details — the numbers the leaderboards actually sort on.
-                Without these the modal showed posts/followers/following only, so
-                clicking a ranked player never explained WHY they rank there. */}
-            <div className="grid grid-cols-3 gap-2 rounded-lg border border-border-glass bg-surface-interactive p-2.5">
-              {([
-                ['Reputation', formatNum(user.reputation ?? 0), 'All-time score — the "XP" board'],
-                ['Duel record', `${user.matches_won ?? 0}W ${user.matches_lost ?? 0}L`, 'Card Duel board'],
-                ['Collection', formatNum(user.gacha_items_collected ?? 0), 'Gacha finds collected'],
-              ] as const).map(([label, value, title]) => (
-                <div key={label} className="text-center min-w-0" title={title}>
-                  <div className="text-xs font-semibold font-mono text-retro-fg tabular-nums truncate">{value}</div>
-                  <div className="text-[10px] text-retro-muted mt-0.5 truncate">{label}</div>
-                </div>
-              ))}
             </div>
 
             {/* Tags */}

@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Search, Users, X } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { User } from '@orbit/shared';
-import { orbitFetch } from '../../utils/api';
 import { playPress } from '../../utils/sounds';
 import { Avatar } from '../Avatar';
-import { parseSeenMs, isUserOnline } from '../../utils/presence';
+import { parseSeenMs } from '../../utils/presence';
+import { usePresence } from '../../game/presenceStore';
+import { usePresencePoll } from '../../hooks/usePresencePoll';
 
 export interface ChatPlayerItem {
   id: string;
@@ -49,44 +50,29 @@ export function ChatPlayerList({
   onOpenProfile,
 }: ChatPlayerListProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [dashboardUsers, setDashboardUsers] = useState<ChatPlayerItem[]>([]);
-  const [dashboardCounts, setDashboardCounts] = useState<{ online: number; active: number } | null>(null);
-  // Snapshot stamps: an `online:true` flag is only trustworthy while the
-  // snapshot that carried it is fresh. A stale flag with an old timestamp
-  // is a ghost — presence must decay, never stick.
-  const usersAtRef = useRef(0);
-  const dashboardAtRef = useRef(0);
-  useEffect(() => {
-    usersAtRef.current = Date.now();
-  }, [users]);
+  // Presence now lives in one app-wide store fed by one ref-counted poll, so
+  // this list and the profile modal can no longer disagree about who is online.
+  // Previously each surface ran its own 30s dashboard poll and derived its own
+  // answer from whatever user object it happened to hold.
+  const isOnline = usePresence((s) => s.isOnline);
+  const records = usePresence((s) => s.records);
+  const counts = usePresence((s) => s.counts);
+  const countsAt = usePresence((s) => s.countsAt);
+  const ingest = usePresence((s) => s.ingest);
+  const setSelfId = usePresence((s) => s.setSelfId);
 
-  const fetchDashboardUsers = useCallback(async () => {
-    try {
-      const res = await orbitFetch('/api/servers/dashboard', { method: 'GET' }, identity);
-      if (res.ok) {
-        const data = (await res.json()) as { users?: ChatPlayerItem[]; online_count?: number; active_24h_count?: number };
-        if (Array.isArray(data?.users)) {
-          dashboardAtRef.current = Date.now();
-          setDashboardUsers(data.users);
-          if (typeof data.online_count === 'number' && typeof data.active_24h_count === 'number') {
-            setDashboardCounts({ online: data.online_count, active: data.active_24h_count });
-          } else {
-            setDashboardCounts(null);
-          }
-        }
-      }
-    } catch {
-      /* Fallback to users prop */
-    }
-  }, [identity]);
+  usePresencePoll(identity);
+
+  // Props users are a second, independently-fresh presence source (peer
+  // updates, the profile directory). Feed them to the same store rather than
+  // merging them privately, so every consumer sees the same record.
+  useEffect(() => {
+    if (users.length > 0) ingest(users as never);
+  }, [users, ingest]);
 
   useEffect(() => {
-    void fetchDashboardUsers();
-    const timer = setInterval(() => {
-      void fetchDashboardUsers();
-    }, 30_000);
-    return () => clearInterval(timer);
-  }, [fetchDashboardUsers]);
+    setSelfId(identity?.orbitId ?? null);
+  }, [identity?.orbitId, setSelfId]);
 
   const mergedPlayers = useMemo(() => {
     const map = new Map<string, ChatPlayerItem>();
@@ -94,15 +80,15 @@ export function ChatPlayerList({
     const oneDayMs = 24 * 60 * 60 * 1000;
     const seenMs = parseSeenMs;
 
-    // 1. Seed from dashboard 24h query
-    for (const du of dashboardUsers) {
-      if (!du.id) continue;
-      map.set(du.id, {
-        id: du.id,
-        display_name: du.display_name,
-        pfp_url: du.pfp_url || profilePics[du.id],
-        last_seen: du.last_seen,
-        online: isUserOnline(du, now),
+    // 1. Seed from the shared presence store — the same record the profile
+    // modal and the roster read, so the three can never disagree.
+    for (const [id, rec] of records) {
+      map.set(id, {
+        id,
+        display_name: rec.displayName,
+        pfp_url: rec.pfpUrl || profilePics[id],
+        last_seen: rec.lastSeenMs > 0 ? new Date(rec.lastSeenMs).toISOString() : null,
+        online: isOnline(id, now),
       });
     }
 
@@ -110,7 +96,7 @@ export function ChatPlayerList({
     for (const u of users) {
       if (!u.id) continue;
       const lastSeenMs = seenMs(u.last_seen);
-      const online = isUserOnline(u, now);
+      const online = isOnline(u.id, now);
       const isWithin24h = online || (lastSeenMs > 0 && (now - lastSeenMs) <= oneDayMs);
 
       const existing = map.get(u.id);
@@ -120,7 +106,7 @@ export function ChatPlayerList({
         // Keep the NEWEST sighting; a stale snapshot must not revive presence.
         const existingSeenMs = seenMs(existing.last_seen);
         if (lastSeenMs >= existingSeenMs) existing.last_seen = u.last_seen || existing.last_seen;
-        existing.online = isUserOnline({ ...existing, last_seen: lastSeenMs >= existingSeenMs ? u.last_seen : existing.last_seen }, now);
+        existing.online = isOnline(u.id, now);
       } else if (isWithin24h || (identity && u.id === identity.orbitId)) {
         map.set(u.id, {
           id: u.id,
@@ -184,14 +170,15 @@ export function ChatPlayerList({
     });
 
     return list;
-  }, [dashboardUsers, users, profilePics, identity]);
+  }, [records, isOnline, users, profilePics, identity]);
 
   const localOnlineCount = useMemo(() => mergedPlayers.filter((p) => p.online).length, [mergedPlayers]);
-  const isDashboardCountsFresh = Boolean(
-    dashboardCounts && (Date.now() - dashboardAtRef.current) < 75_000
-  );
-  const displayOnlineCount = isDashboardCountsFresh && dashboardCounts ? dashboardCounts.online : localOnlineCount;
-  const displayActiveCount = isDashboardCountsFresh && dashboardCounts ? dashboardCounts.active : mergedPlayers.length;
+  // Server counts are only trustworthy while the snapshot carrying them is
+  // fresh. Two polls can be missed inside the 60s presence window, so the
+  // fallback is 75s — after that the number is a lie and we use our own count.
+  const isDashboardCountsFresh = Boolean(counts && countsAt > 0 && (Date.now() - countsAt) < 75_000);
+  const displayOnlineCount = isDashboardCountsFresh && counts ? counts.online : localOnlineCount;
+  const displayActiveCount = isDashboardCountsFresh && counts ? counts.active : mergedPlayers.length;
 
   const filteredPlayers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();

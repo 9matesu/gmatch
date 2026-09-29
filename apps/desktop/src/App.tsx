@@ -93,6 +93,7 @@ import { useNotifications } from './hooks/useNotifications';
 import { isKnownSiteCourier, cachedMailMode, detectMailMode } from "./utils/mail-mode";
 import { useCourierDms } from './hooks/useCourierDms';
 import { useServerHeartbeat } from './hooks/useServerHeartbeat';
+import { usePresencePoll } from './hooks/usePresencePoll';
 import { usePendingJoinVerify } from './hooks/usePendingJoinVerify';
 import { usePendingServerHost } from './hooks/usePendingServerHost';
 import { OfflineWarningBanner } from "./components/OfflineWarningBanner";
@@ -1587,6 +1588,12 @@ export default function Home() {
   // Blind-courier DM path (plan P3.3): inert on full nodes (legacy inbox),
   // active only when the API 404s /api/pm (official SITE).
   useServerHeartbeat(identity ?? null);
+  // Presence, fed once here for the whole app. Mounted at the root rather than
+  // inside a surface so the feed exists even when no list is on screen — a
+  // profile opened from the arena used to have nothing to read and silently
+  // fell back to whatever record the opener had. The hook is reference
+  // counted, so a surface may also mount it without adding a second poll.
+  usePresencePoll(identity ?? null);
   usePendingJoinVerify(identity, toast);
   usePendingServerHost(identity ?? null, toast);
   // Global update toasts: the portable self-update runs whether or not the

@@ -2,6 +2,8 @@
 
 import { useMemo } from 'react'
 import { parseTags, type User } from '@orbit/shared'
+import { isUserOnline } from '../../utils/presence'
+import { usePresence } from '../../game/presenceStore'
 import { Avatar } from '../Avatar'
 
 interface PlayerInfo {
@@ -46,6 +48,21 @@ function PlayerTile({
   const isPlaying = player.queueStatus === 'in_match'
 
   const base = users?.find(u => u.id === player.id)
+  // One presence rule for the whole app: read the shared store, the same
+  // record the profile modal and the chat list read. Each surface used to
+  // re-derive this from whatever object it held, which is how the badge
+  // beside the button and the modal it opens could say opposite things.
+  //
+  // Two fallbacks remain for players the store has never seen: the roster's
+  // own sighting, and — with no roster row at all — membership of the
+  // server's online_users list, which is what `queueStatus: 'online'` encodes.
+  const inLiveRoster =
+    player.queueStatus === 'online' || player.queueStatus === 'in_match' || player.queueStatus === 'in_queue'
+  const storeKnows = usePresence((s) => s.records.has(player.id))
+  const storeOnline = usePresence((s) => s.isOnline(player.id, Date.now()))
+  const presentOnline = storeKnows
+    ? storeOnline
+    : isUserOnline(base ?? { online: inLiveRoster })
   let localSelfPfp = ''
   if (player.id === selfId && typeof window !== 'undefined') {
     try {
@@ -55,6 +72,13 @@ function PlayerTile({
   const effectivePfp = player.pfp_url || base?.pfp_url || profilePics?.[player.id] || localSelfPfp || undefined
 
   const handleClick = () => {
+    // The arena's roster IS a live presence source: `queueStatus` is only
+    // 'online' for players the server's online_users query returned, i.e.
+    // last_seen inside the 60s window. The fallback branch below used to carry
+    // no presence fields at all, so opening a profile for someone outside the
+    // 100-row user directory handed the modal a record that isUserOnline reads
+    // as Offline — while the badge right next to the button said Online.
+    const inLiveRoster = player.queueStatus === 'online' || player.queueStatus === 'in_match' || player.queueStatus === 'in_queue'
     const userObj: User = base
       ? {
           ...base,
@@ -62,7 +86,13 @@ function PlayerTile({
           pfp_url: effectivePfp || base.pfp_url,
           tags: (player.tags && player.tags.length > 0 ? player.tags : base.tags) as string[],
         }
-      : { id: player.id, display_name: player.display_name, pfp_url: effectivePfp, tags: player.tags } as User
+      : ({
+          id: player.id,
+          display_name: player.display_name,
+          pfp_url: effectivePfp,
+          tags: player.tags,
+          online: inLiveRoster,
+        } as User)
     onOpenProfile?.(userObj)
   }
 
@@ -97,6 +127,8 @@ function PlayerTile({
       >
         {isPlaying
           ? `R${player.matchRound || 1}/5`
+          : !presentOnline
+          ? 'Offline'
           : player.queueStatus === 'in_queue'
           ? 'Queued'
           : player.queueStatus === 'idle'
@@ -176,6 +208,9 @@ function DuelPair({
                     display_name: m.display_name,
                     pfp_url: m.pfp_url,
                     tags: m.tags,
+                    // A live duel means the server has them in a match right
+                    // now — same reasoning as the roster tile above.
+                    online: true,
                   } as User)
                 }}
                 className="truncate text-retro-body hover:text-retro-accent hover:underline cursor-pointer"
