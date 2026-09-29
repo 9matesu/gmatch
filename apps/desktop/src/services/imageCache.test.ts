@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { clearImageCache, devFetchable, imageCacheStats, prefetchImages, resolveImage, _test } from './imageCache'
+import { clearImageCache, devFetchable, imageCacheStats, prefetchImages, resolveImage, resolveImageNow, _test } from './imageCache'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -17,6 +17,74 @@ describe('imageCache (no backends)', () => {
     vi.stubGlobal('window', undefined)
     vi.stubGlobal('indexedDB', undefined)
     expect(() => prefetchImages(['https://x/1.png', 'https://x/2.png'])).not.toThrow()
+  })
+
+  it('bounds concurrent prefetch so a sweep cannot starve the on-demand path', async () => {
+    // A queue update can produce 27 prefetches at once. Firing them all
+    // straight at the IPC bridge means the picture the player is actually
+    // waiting on queues behind 26 speculative ones.
+    let inFlight = 0
+    let peak = 0
+    const release: Array<() => void> = []
+    const cacheImage = vi.fn(
+      () =>
+        new Promise<{ local: string | null }>((r) => {
+          inFlight++
+          peak = Math.max(peak, inFlight)
+          release.push(() => {
+            inFlight--
+            r({ local: null })
+          })
+        }),
+    )
+    vi.stubGlobal('window', { gmatch: { cacheImage } })
+
+    const urls = Array.from({ length: 12 }, (_, i) => `https://x/${i}.png`)
+    prefetchImages(urls, 12)
+    // Only the bounded number start immediately.
+    await Promise.resolve()
+    expect(peak).toBeLessThanOrEqual(2)
+
+    // Draining lets the rest through.
+    for (let i = 0; i < 40 && release.length; i++) {
+      const next = release.shift()
+      next?.()
+      await new Promise((r) => setTimeout(r, 0))
+    }
+    await new Promise((r) => setTimeout(r, 20))
+    expect(cacheImage).toHaveBeenCalledTimes(12)
+    expect(peak).toBeLessThanOrEqual(2)
+  })
+
+  it('resolveImageNow bypasses the prefetch queue', async () => {
+    // The current picture must never wait behind speculative fetches. Only
+    // the PREFETCH urls hang here; the urgent one answers immediately, which
+    // is the whole claim being tested.
+    const hold: Array<() => void> = []
+    const cacheImage = vi.fn((url: string) => {
+      if (url.endsWith('urgent.png')) return Promise.resolve({ local: 'gmcache://now.png' })
+      return new Promise<{ local: string | null }>((r) => hold.push(() => r({ local: null })))
+    })
+    vi.stubGlobal('window', { gmatch: { cacheImage } })
+
+    // Occupy both background lanes.
+    prefetchImages(['https://x/a.png', 'https://x/b.png', 'https://x/c.png'], 3)
+    await new Promise((r) => setTimeout(r, 0))
+    expect(hold.length).toBeGreaterThan(0)
+
+    // Even with both lanes busy, the on-demand resolve returns immediately.
+    await expect(resolveImageNow('https://x/urgent.png')).resolves.toBe('gmcache://now.png')
+    for (const h of hold) h()
+  })
+
+  it('dedupes a URL that is already being prefetched', async () => {
+    const cacheImage = vi.fn(() => new Promise<{ local: string | null }>(() => {}))
+    vi.stubGlobal('window', { gmatch: { cacheImage } })
+    prefetchImages(['https://x/1.png'], 1)
+    await Promise.resolve()
+    prefetchImages(['https://x/1.png'], 1)
+    await Promise.resolve()
+    expect(cacheImage).toHaveBeenCalledTimes(1)
   })
 
   it('stats report no backend, clear is a no-op', async () => {

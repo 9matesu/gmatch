@@ -73,7 +73,10 @@ function isDev(): boolean {
   }
 }
 
-// Limit concurrent background byte fetches to 2 so browser sockets are never starved
+// Background (speculative) byte fetches are limited so browser sockets — and
+// the IPC channel to the main-process cache — are never starved by a prefetch
+// sweep. This only ever gates PREFETCH: the on-demand path (resolveImageNow)
+// deliberately bypasses it, because the player is waiting on that one.
 const MAX_CONCURRENT_BG_FETCHES = 2
 let activeBgFetches = 0
 const bgFetchQueue: Array<() => void> = []
@@ -135,12 +138,28 @@ export function prefetchImages(urls: string[], limit = 11): void {
     for (const u of urls) {
       if (!u || seen.has(u)) continue
       seen.add(u)
-      void resolveImage(u)
+      // Through the bounded queue, not straight to IPC. A queue update can
+      // produce 27 of these at once, and firing 27 concurrent cacheImage
+      // invokes has the requests competing with the one the player is actually
+      // waiting on. resolveImage() (the on-demand path) stays immediate, so
+      // prefetch can never delay it.
+      queueBgFetch(u, async () => {
+        await resolveImage(u)
+      })
       if (seen.size >= limit) break
     }
   } catch {
     /* best effort */
   }
+}
+
+/**
+ * Resolve a URL ahead of any queued prefetch, bypassing the background
+ * concurrency limit. This is the current picture / an avatar: the player is
+ * looking at it, so it must not sit behind 27 speculative fetches.
+ */
+export async function resolveImageNow(url: string): Promise<string> {
+  return resolveImage(url)
 }
 
 export async function imageCacheStats(): Promise<ImageCacheStats> {
@@ -196,8 +215,16 @@ export async function clearFeedCache(): Promise<void> {
 }
 
 export const _test = {
-  resetSessionCache: () => {},
+  resetSessionCache: () => {
+    // Drain the speculative-fetch queue and its bookkeeping. Without this a
+    // queued prefetch leaks into the next test, which then sees cacheImage
+    // calls it never made.
+    bgFetchQueue.length = 0
+    inFlightUrls.clear()
+    activeBgFetches = 0
+  },
   sessionCacheSize: () => 0,
   clearSessionCache: async () => {},
   SESSION_CAP: 0,
+  inFlightCount: () => inFlightUrls.size,
 }

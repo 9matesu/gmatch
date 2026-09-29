@@ -360,11 +360,21 @@ function postMatchesIntent(post: BooruPost, intent: string): boolean {
  * Success clears via clearFeedRetry. Test hook: lastFeedRetryMs + reset. */
 let feedRetryTimer: ReturnType<typeof setTimeout> | null = null
 let feedRetryStep = 0
+/**
+ * A fetch was requested while a round was in flight. Drained once, when that
+ * round finishes — see fetchFeed's guard. Coalesced to a single follow-up:
+ * the feed only needs "something new once", and a KO burst must not queue a
+ * burst of rounds behind itself.
+ */
+let feedRerunPending = false
+export let feedRerunCount = 0
 export let lastFeedRetryMs = 0
 export function __resetFeedRetryForTests() {
   if (feedRetryTimer) clearTimeout(feedRetryTimer)
   feedRetryTimer = null
   feedRetryStep = 0
+  feedRerunPending = false
+  feedRerunCount = 0
   lastFeedRetryMs = 0
 }
 function clearFeedRetry() {
@@ -628,6 +638,13 @@ export const useGame = create<GameState>((set, get) => ({
     const cell = s.grid[index]
     // Empty square: dead click, no reward, no counters.
     if (!cell) return { gain: 0, crit: false, killed: false, heat: 1 }
+    // NOTE: deliberately NOT gated on `imageReady`, unlike clickImage.
+    // That flag is a SINGLE-image signal — in grid mode the store never
+    // populates `current` (see fetchFeed), so GoonPanel holds imageReady
+    // false and a guard here would make every grid click permanently dead.
+    // A per-cell load signal would be the real fix; until then the grid is
+    // pre-warmed (see GoonPanel's prefetch sweep) and squares are small enough
+    // that blind scoring is not the reported problem.
     const clicksOnCell = cell.clicks + 1
     const hpLeft = cell.hp - gain
     if (hpLeft > 0) {
@@ -975,154 +992,174 @@ export const useGame = create<GameState>((set, get) => ({
 
   fetchFeed: async (opts?: { manual?: boolean }) => {
     const s = get()
-    if (s.fetching) return
+    if (s.fetching) {
+      // Latch it instead of dropping it. A request that arrives while a round
+      // is in flight was almost always a KO/advance that ran the queue dry,
+      // and silently discarding it left the feed stuck on a picture the player
+      // had already used. One pending round is enough — the feed only ever
+      // needs "give me something new once", and coalescing avoids a pile-up
+      // when several KOs land together.
+      feedRerunPending = true
+      return
+    }
     if (opts?.manual) {
       // Manual retry starts clean: cancel pending auto-timer, reset backoff,
       // lift mirror cooldowns. First click must work when sources are up.
       clearFeedRetry()
       clearMirrorCooldowns()
     }
-    set({ fetching: true })
-    let cursor = s.feedCursor
-    let posts: BooruPost[] | null = null
-    // Seen-exhausted (not broken): gentle path — no backoff escalation,
-    // distinct UI copy; auto-poll still recovers.
-    let emptyFreshRound = false
-    // Player-owned sources first: custom URLs / local folders need no tags,
-    // so they also feed fresh setups. Built-ins stay as the fallback.
-    const customs = (s.customSources || []).filter((c) => c.enabled)
-    if (customs.length > 0) {
-      const customPosts = await sampleCustomSources(customs, 10)
-      if (customPosts.length > 0) posts = shufflePosts(customPosts)
-    }
-    if (!posts) {
-      const owned = feedQuery(s.tags)
-      // Round-robin: ONE player-owned tag per fetch, rotating. No owned tags
-      // (setup not done / melted): stay offline — setup picks drive the feed.
-      if (owned.length === 0) {
-        set({
-          current: null,
-          queue: [],
-          grid: [],
-          foeHp: 0,
-          foeMaxHp: 0,
-          foeClicks: 0,
-          feedOffline: true,
-          fetching: false,
-        })
-        return
-      }
-      // Smart rotation: a random single-pill subset every round (merged
-      // pills stay intact — combos exist ONLY via merge). Recent round keys
-      // are refused, so consecutive rounds never repeat queries. A fresh
-      // pick/solo (priorityTag) force-steers its round, then decays back
-      // into the mix once its batch lands.
-      const force = s.priorityTag && owned.includes(s.priorityTag) ? s.priorityTag : null
-      const picks = buildRoundQueries({
-        pills: owned,
-        count: Math.min(PILLS_PER_ROUND, owned.length),
-        forceInclude: force,
-        recentKeys: s.recentQueryKeys,
-      })
-      setFeedIntent(picks)
-      set({ recentQueryKeys: [...s.recentQueryKeys, roundQueryKey(picks)].slice(-RECENT_QUERY_DEPTH) })
-      const priority = force
-      // ponytail: in grid mode pull a larger batch (30) so queue stays ahead of the 3x3 grid
-      const batchLimit = isGridMode(get().viewMode) ? 30 : 15
-      const res = await fetchPostsMulti({ tags: picks, limit: batchLimit, priority, allowReal: s.allowReal, allowHentai: s.allowHentai, fresh: true })
-      // Dev-only round trace: which query won which source (wrong-tag
-      // reports become a one-line answer). Stripped from prod builds and
-      // silent under vitest.
-      if (import.meta.env.DEV && import.meta.env.MODE !== 'test') {
-        console.debug(`[feed] picks=${picks.join('+')} source=${res.source} posts=${res.posts.length} ok=${res.ok}`)
-      }
-      cursor = s.feedCursor + 1
+    try {
+      set({ fetching: true })
+      let cursor = s.feedCursor
+      let posts: BooruPost[] | null = null
       // Seen-exhausted (not broken): gentle path — no backoff escalation,
       // distinct UI copy; auto-poll still recovers.
-      if (!res.ok && (res as { emptyFresh?: boolean }).emptyFresh === true) {
-        emptyFreshRound = true
+      let emptyFreshRound = false
+      // Player-owned sources first: custom URLs / local folders need no tags,
+      // so they also feed fresh setups. Built-ins stay as the fallback.
+      const customs = (s.customSources || []).filter((c) => c.enabled)
+      if (customs.length > 0) {
+        const customPosts = await sampleCustomSources(customs, 10)
+        if (customPosts.length > 0) posts = shufflePosts(customPosts)
       }
-      if (res.ok && res.posts.length > 0) {
-        // Random order every round — never push API sequence straight to the feed.
-        posts = shufflePosts(res.posts)
-        if (priority) set({ priorityTag: null })
-      }
-    }
-    if (posts && posts.length > 0) {
-      // Success: clear the offline flag + reset the retry backoff.
-      clearFeedRetry()
-      const foe = foeMaxHp(s.defeated)
-      // Filter any post already known (queue/grid/past/gallery/current): never repeat
-      const existingUrls = new Set([
-        ...get().past.map((p) => p.url),
-        ...get().gallery.map((g) => g.url),
-        ...get().grid.map((c) => c.post.url),
-        ...get().queue.map((p) => p.url),
-        ...(get().current ? [get().current!.url] : []),
-      ])
-      const freshPosts = posts.filter((p) => !existingUrls.has(p.url))
-      // # ponytail: skip seen posts completely; never repeat into usablePosts
-      const usablePosts = freshPosts
-      if (usablePosts.length > 0) {
-        if (isGridMode(get().viewMode)) {
-          // Grid consumes the whole batch: append to the queue, top up squares.
-          const target = gridSizeForMode(get().viewMode)
-          const q = [...get().queue, ...usablePosts]
-          const filled = fillGrid(get().grid, q, get().defeated, target)
+      if (!posts) {
+        const owned = feedQuery(s.tags)
+        // Round-robin: ONE player-owned tag per fetch, rotating. No owned tags
+        // (setup not done / melted): stay offline — setup picks drive the feed.
+        if (owned.length === 0) {
           set({
-            queue: filled.queue,
-            grid: filled.grid,
+            current: null,
+            queue: [],
+            grid: [],
+            foeHp: 0,
+            foeMaxHp: 0,
+            foeClicks: 0,
+            feedOffline: true,
+            fetching: false,
+          })
+          return
+        }
+        // Smart rotation: a random single-pill subset every round (merged
+        // pills stay intact — combos exist ONLY via merge). Recent round keys
+        // are refused, so consecutive rounds never repeat queries. A fresh
+        // pick/solo (priorityTag) force-steers its round, then decays back
+        // into the mix once its batch lands.
+        const force = s.priorityTag && owned.includes(s.priorityTag) ? s.priorityTag : null
+        const picks = buildRoundQueries({
+          pills: owned,
+          count: Math.min(PILLS_PER_ROUND, owned.length),
+          forceInclude: force,
+          recentKeys: s.recentQueryKeys,
+        })
+        setFeedIntent(picks)
+        set({ recentQueryKeys: [...s.recentQueryKeys, roundQueryKey(picks)].slice(-RECENT_QUERY_DEPTH) })
+        const priority = force
+        // ponytail: in grid mode pull a larger batch (30) so queue stays ahead of the 3x3 grid
+        const batchLimit = isGridMode(get().viewMode) ? 30 : 15
+        const res = await fetchPostsMulti({ tags: picks, limit: batchLimit, priority, allowReal: s.allowReal, allowHentai: s.allowHentai, fresh: true })
+        // Dev-only round trace: which query won which source (wrong-tag
+        // reports become a one-line answer). Stripped from prod builds and
+        // silent under vitest.
+        if (import.meta.env.DEV && import.meta.env.MODE !== 'test') {
+          console.debug(`[feed] picks=${picks.join('+')} source=${res.source} posts=${res.posts.length} ok=${res.ok}`)
+        }
+        cursor = s.feedCursor + 1
+        // Seen-exhausted (not broken): gentle path — no backoff escalation,
+        // distinct UI copy; auto-poll still recovers.
+        if (!res.ok && (res as { emptyFresh?: boolean }).emptyFresh === true) {
+          emptyFreshRound = true
+        }
+        if (res.ok && res.posts.length > 0) {
+          // Random order every round — never push API sequence straight to the feed.
+          posts = shufflePosts(res.posts)
+          if (priority) set({ priorityTag: null })
+        }
+      }
+      if (posts && posts.length > 0) {
+        // Success: clear the offline flag + reset the retry backoff.
+        clearFeedRetry()
+        const foe = foeMaxHp(s.defeated)
+        // Filter any post already known (queue/grid/past/gallery/current): never repeat
+        const existingUrls = new Set([
+          ...get().past.map((p) => p.url),
+          ...get().gallery.map((g) => g.url),
+          ...get().grid.map((c) => c.post.url),
+          ...get().queue.map((p) => p.url),
+          ...(get().current ? [get().current!.url] : []),
+        ])
+        const freshPosts = posts.filter((p) => !existingUrls.has(p.url))
+        // # ponytail: skip seen posts completely; never repeat into usablePosts
+        const usablePosts = freshPosts
+        if (usablePosts.length > 0) {
+          if (isGridMode(get().viewMode)) {
+            // Grid consumes the whole batch: append to the queue, top up squares.
+            const target = gridSizeForMode(get().viewMode)
+            const q = [...get().queue, ...usablePosts]
+            const filled = fillGrid(get().grid, q, get().defeated, target)
+            set({
+              queue: filled.queue,
+              grid: filled.grid,
+              feedCursor: cursor,
+              feedOffline: false,
+              feedEmptyFresh: false,
+              fetching: false,
+            })
+            return
+          }
+          set({
+            current: usablePosts[0],
+            queue: usablePosts.slice(1),
+            foeHp: foe,
+            foeMaxHp: foe,
+            foeClicks: 0,
             feedCursor: cursor,
             feedOffline: false,
             feedEmptyFresh: false,
             fetching: false,
           })
-          return
+        } else {
+          scheduleFeedRetry()
+          set({ fetching: false })
         }
-        set({
-          current: usablePosts[0],
-          queue: usablePosts.slice(1),
-          foeHp: foe,
-          foeMaxHp: foe,
-          foeClicks: 0,
-          feedCursor: cursor,
-          feedOffline: false,
-          feedEmptyFresh: false,
-          fetching: false,
-        })
       } else {
-        scheduleFeedRetry()
-        set({ fetching: false })
+        // Sources unreachable or pool exhausted: keep the game playable.
+        // Seen-exhausted polls gently (fixed 5s, no escalation, no cursor
+        // advance) since recovery just needs new tags, not backoff.
+        if (emptyFreshRound) scheduleFeedRetry(true)
+        else scheduleFeedRetry()
+        if (isGridMode(get().viewMode)) {
+          // Only use live, unseen queue posts — never recycle past.
+          const target = gridSizeForMode(get().viewMode)
+          const filled = fillGrid(get().grid, get().queue, get().defeated, target)
+          set({
+            fetching: false,
+            feedOffline: filled.grid.length === 0,
+            feedEmptyFresh: emptyFreshRound,
+            grid: filled.grid,
+            queue: filled.queue,
+          })
+        } else {
+          const keep = get().current
+          set({
+            current: keep,
+            queue: get().queue, // NEVER pull from past
+            foeHp: keep ? get().foeHp : 0,
+            foeMaxHp: keep ? get().foeMaxHp : 0,
+            foeClicks: keep ? get().foeClicks : 0,
+            feedOffline: !keep && get().queue.length === 0,
+            feedEmptyFresh: emptyFreshRound,
+            fetching: false,
+          })
+        }
       }
-    } else {
-      // Sources unreachable or pool exhausted: keep the game playable.
-      // Seen-exhausted polls gently (fixed 5s, no escalation, no cursor
-      // advance) since recovery just needs new tags, not backoff.
-      if (emptyFreshRound) scheduleFeedRetry(true)
-      else scheduleFeedRetry()
-      if (isGridMode(get().viewMode)) {
-        // Only use live, unseen queue posts — never recycle past.
-        const target = gridSizeForMode(get().viewMode)
-        const filled = fillGrid(get().grid, get().queue, get().defeated, target)
-        set({
-          fetching: false,
-          feedOffline: filled.grid.length === 0,
-          feedEmptyFresh: emptyFreshRound,
-          grid: filled.grid,
-          queue: filled.queue,
-        })
-      } else {
-        const keep = get().current
-        set({
-          current: keep,
-          queue: get().queue, // NEVER pull from past
-          foeHp: keep ? get().foeHp : 0,
-          foeMaxHp: keep ? get().foeMaxHp : 0,
-          foeClicks: keep ? get().foeClicks : 0,
-          feedOffline: !keep && get().queue.length === 0,
-          feedEmptyFresh: emptyFreshRound,
-          fetching: false,
-        })
+    } finally {
+      // Every exit from a round lands here, including the early return when
+      // there are no owned tags. Drain the latch last so the follow-up round
+      // starts from a settled store.
+      if (feedRerunPending) {
+        feedRerunPending = false
+        feedRerunCount += 1
+        void get().fetchFeed()
       }
     }
   },

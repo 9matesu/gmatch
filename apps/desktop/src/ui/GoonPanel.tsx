@@ -26,6 +26,7 @@ import {
   PLATE,
   STAGE_FRAME,
 } from './styles'
+import { DamageTint } from './DamageTint'
 import CachedImg from './CachedImg'
 import OfflineCard from './OfflineCard'
 import { Badge } from '../components/Badge'
@@ -112,8 +113,12 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   const [dropsOpen, setDropsOpen] = useState(false)
   const [dragFrom, setDragFrom] = useState<number | null>(null)
   const [dragOver, setDragOver] = useState<number | null>(null)
+  // Shake + hit-flash are retriggered by REMOUNTING a child span, not the tile
+  // that holds the media. See the note on GoonPanel's `key` props: bumping the
+  // tile's key used to unmount the <img>/<video> on every click.
   const [shakeKey, setShakeKey] = useState(0)
   const [shakeCell, setShakeCell] = useState<number | null>(null)
+  const [critCell, setCritCell] = useState<number | null>(null)
   const floatId = useRef(0)
   const stageRef = useRef<HTMLElement | null>(null)
   const reduceMotion = useReducedMotion()
@@ -129,15 +134,44 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
     advanceFeed()
   }, [advanceFeed, current, shownUrl])
 
-  // Warm the cache so player never waits: prefetch active grid + next 18 queue items (2 full 3x3 boards ahead)
+  // Warm the cache so the player never waits: the active grid + the next 18
+  // queue items (two full 3x3 boards ahead).
+  //
+  // Debounced, and the CURRENT picture goes first. This effect keys on
+  // [queue, past, grid], so it re-fired on every queue mutation — up to 27
+  // resolveImage IPC round-trips each time, at a concurrency of 2 and up to
+  // 15s per byte fetch. Those requests queue BEHIND the fetch the player is
+  // actually waiting for, so the prefetch was making the wait it exists to
+  // prevent.
   useEffect(() => {
-    const urls = [
-      ...grid.flatMap((c) => [c.post.url, ...(c.post.preview ? [c.post.preview] : [])]),
-      ...queue.slice(0, 18).flatMap((p) => [p.url, ...(p.preview ? [p.preview] : [])]),
-      ...past.slice(-3).flatMap((p) => [p.url, ...(p.preview ? [p.preview] : [])]),
-    ]
-    prefetchImages(urls, 27)
-  }, [queue, past, grid])
+    // Keyed on current.url, not shownUrl: shownUrl also changes when the
+    // cache resolves to a gmcache:// URL, which would restart this debounce
+    // for a picture the player is already looking at.
+    const head = current?.url
+    const ids = new Set<string>()
+    const ordered: string[] = []
+    const add = (u?: string) => {
+      if (!u || ids.has(u)) return
+      ids.add(u)
+      ordered.push(u)
+    }
+    add(head)
+    for (const c of grid) {
+      add(c.post.url)
+      add(c.post.preview)
+    }
+    for (const p of queue.slice(0, 18)) {
+      add(p.url)
+      add(p.preview)
+    }
+    for (const p of past.slice(-3)) {
+      add(p.url)
+      add(p.preview)
+    }
+    // Coalesce the burst of renders a queue update produces into one sweep.
+    const timer = window.setTimeout(() => prefetchImages(ordered, 27), 250)
+    return () => window.clearTimeout(timer)
+  }, [queue, past, grid, current?.url])
 
   // Grid top-up: after load (persisted grid mode) or whenever squares run dry.
   // Stops once the feed flags offline — the Retry button takes it from there.
@@ -212,7 +246,15 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
     }
   }
 
-  const triggerShake = (cell: number | null) => {
+  /**
+   * Retrigger the click feedback. The shake and hit-flash alternate between two
+   * identically-named keyframe pairs (`gg-shake-a`/`-b`), because changing
+   * `animation-name` restarts a CSS animation in place. Nothing is remounted,
+   * so the tile's <img>/<video> keeps its DOM node ÔÇö which is what stops a
+   * click from restarting a video or blanking an already-decoded image.
+   */
+  const triggerShake = (cell: number | null, crit = false) => {
+    setCritCell(crit ? cell : null)
     if (reduceMotion) return
     setShakeCell(cell)
     setShakeKey((k) => k + 1)
@@ -223,7 +265,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
     const { gain, crit, heat } = clickImage()
     playHit(crit)
     spawnFloat(e.clientX - rect.left, e.clientY - rect.top, gain, crit, null, heat)
-    triggerShake(null)
+    triggerShake(null, crit)
   }
 
   const handleCellClick = (index: number, e: MouseEvent<HTMLButtonElement>) => {
@@ -231,7 +273,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
     const { gain, crit, heat } = clickCell(index)
     playHit(crit)
     if (gain > 0) spawnFloat(e.clientX - rect.left, e.clientY - rect.top, gain, crit, index, heat)
-    triggerShake(index)
+    triggerShake(index, crit)
   }
 
   /** Middle-click anywhere on the stage advances to the next foe — no reward. */
@@ -252,6 +294,9 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
     !/\.gif(?:[?#]|$)/i.test(current.url)
   const inBattle = !showOffline && foeMaxHp > 0
 
+  const [stageLoaded, setStageLoaded] = useState(false)
+  const stageImgRef = useRef<HTMLImageElement | null>(null)
+
   // Verified stage swap: keep the last decoded picture on screen until the
   // next one is cached + decoded successfully — arrows never show a blank
   // frame, and scoring stays locked (store.imageReady) until it is visible.
@@ -269,7 +314,13 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
     let live = true
     const url = current.url
     setShownUrl(url)
-    setImageReady(true)
+    // NOT ready yet. This used to be set immediately, which meant clicks
+    // scored against a picture that had not painted: the "Loading" overlay was
+    // unreachable and the first click or two of every picture were lost (or
+    // worse, scored while the old frame was still up). The stage <img> now
+    // reports its own load, and readiness follows the pixels.
+    setImageReady(false)
+    setStageLoaded(false)
     void (async () => {
       try {
         const resolved = await resolveImage(url)
@@ -293,6 +344,32 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
       live = false
     }
   }, [current, queue, showOffline, isMotion, setImageReady])
+
+  // A picture counts as ready once the browser says it decoded. onLoad fires
+  // for the blurred cover and the stage image alike, so readiness is gated on
+  // the stage element's own src matching what is on screen — otherwise the
+  // cover (which paints first) would unlock scoring before the real picture.
+  const onStageLoad = useCallback(() => {
+    setStageLoaded(true)
+    setImageReady(true)
+  }, [setImageReady])
+
+  /**
+   * Stage ref callback: also treats an ALREADY-COMPLETE element as loaded.
+   *
+   * `onLoad` is not reliable for a cached picture — the browser can finish
+   * decoding between the element mounting and React attaching the handler,
+   * in which case no load event ever fires and scoring would stay locked
+   * forever. `complete` is the documented way to close that gap.
+   */
+  const onStageRef = useCallback((el: HTMLImageElement | null) => {
+    stageImgRef.current = el
+    if (el?.complete && el.naturalWidth > 0) {
+      setStageLoaded(true)
+      setImageReady(true)
+    }
+  }, [setImageReady])
+
   const hpPct = inBattle ? Math.max(0, (foeHp / foeMaxHp) * 100) : 0
   // Heat combo HUD: live multiplier + whether the streak is still inside the
   // 2s window (goes cold visually the moment you stop clicking).
@@ -371,7 +448,11 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             const pct = Math.max(0, (cell.hp / cell.maxHp) * 100)
             return (
               <button
-                key={`${cell.post.id}:${i}:${shakeCell === i ? shakeKey : 0}`}
+                // Stable across clicks: only the foe's identity and the cell
+                // index belong here. This key used to include `shakeKey`, so
+                // every click remounted the media inside ÔÇö video restarted
+                // from 0 and the image flashed a blank frame.
+                key={`${cell.post.id}:${i}`}
                 type="button"
                 draggable
                 onDragStart={(e) => {
@@ -400,7 +481,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                   setDragOver(null)
                 }}
                 className={`relative min-h-0 cursor-grab overflow-hidden rounded-lg border bg-black p-0 text-left font-[inherit] text-[color:inherit] active:cursor-grabbing ${dragOver === i ? 'border-retro-accent ring-2 ring-retro-accent/60' : 'border-border-glass'
-                  } ${dragFrom === i ? 'opacity-50' : ''} ${shakeCell === i ? 'animate-[gg-shake_0.18s_ease-out]' : ''}`}
+                  } ${dragFrom === i ? 'opacity-50' : ''}`}
                 onClick={(e) => handleCellClick(i, e)}
                 onAuxClick={handleAuxClick}
                 onContextMenu={(e) => { e.preventDefault(); purgePost(cell.post) }}
@@ -430,6 +511,22 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                     draggable={false}
                   />
                 )}
+                {/* Click feedback. The a/b alternation restarts each animation
+                    per hit without changing the tile's key, so the <img>/<video>
+                    above keep their DOM nodes. */}
+                {shakeCell === i && (
+                  <span
+                    aria-hidden="true"
+                    data-testid="goon-shake"
+                    className={`pointer-events-none absolute inset-0 z-[4] ${shakeKey % 2 ? 'animate-[gg-shake-b_0.18s_ease-out]' : 'animate-[gg-shake-a_0.18s_ease-out]'}`}
+                  />
+                )}
+                <DamageTint
+                  dmg={1 - pct / 100}
+                  flashKey={shakeCell === i ? shakeKey : 0}
+                  crit={critCell === i}
+                  reducedMotion={reduceMotion}
+                />
                 <span className="pointer-events-none absolute inset-x-0 bottom-0 z-[2]">
                   <span className={`${HP_BAR} h-[2px] rounded-none`}>
                     <span
@@ -498,8 +595,9 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
         </div>
       ) : (
         <div
-          key={shakeCell === null ? shakeKey : 0}
-          className={`${STAGE_FRAME} relative min-h-0 flex-1 ${imageReady ? 'cursor-pointer active:cursor-grabbing' : 'cursor-progress'} max-[1100px]:min-h-[320px] ${shakeCell === null && shakeKey > 0 ? 'animate-[gg-shake_0.18s_ease-out]' : ''}`}
+          // No `key` here on purpose ÔÇö see the grid tile above. This div holds
+          // the <img>/<video>, and a per-click key remounted them.
+          className={`${STAGE_FRAME} relative min-h-0 flex-1 ${imageReady ? 'cursor-pointer active:cursor-grabbing' : 'cursor-progress'} max-[1100px]:min-h-[320px]`}
           onClick={handleClick}
           onAuxClick={handleAuxClick}
           role="button"
@@ -513,6 +611,23 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           }}
         >
           {critFlashEl}
+          {/* Shake on its own keyed-free overlay, and the progressive damage
+              wash. Both sit above the media and below the controls. */}
+          {shakeCell === null && shakeKey > 0 && (
+            <span
+              aria-hidden="true"
+              data-testid="goon-shake"
+              className={`pointer-events-none absolute inset-0 z-[4] ${shakeKey % 2 ? 'animate-[gg-shake-b_0.18s_ease-out]' : 'animate-[gg-shake-a_0.18s_ease-out]'}`}
+            />
+          )}
+          {inBattle && (
+            <DamageTint
+              dmg={1 - hpPct / 100}
+              flashKey={shakeKey}
+              crit={critFlash}
+              reducedMotion={reduceMotion}
+            />
+          )}
           {inBattle && (
             <span className="pointer-events-none absolute inset-x-0 bottom-0 z-[5]">
               <span className={`${HP_BAR} h-[2px] rounded-none`}>
@@ -548,15 +663,19 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             />
           ) : !showOffline && shownUrl ? (
             <img
+              ref={onStageRef}
               className={`${GOON_IMAGE} relative z-[1]`}
               src={shownUrl}
               alt="goon feed"
               referrerPolicy="no-referrer"
+              onLoad={onStageLoad}
               onError={onImageError}
               draggable={false}
             />
           ) : null}
-          {!imageReady && !showOffline && !isMotion && (
+          {/* Only the stage picture counts. While it has not painted, the
+              "Loading" label is real UI rather than dead markup. */}
+          {!stageLoaded && !showOffline && !isMotion && shownUrl && (
             <span
               className={`${MONO} absolute left-1/2 top-1/2 z-[2] -translate-x-1/2 -translate-y-1/2 rounded-lg bg-black/60 px-3 py-1.5 text-xs text-retro-muted`}
               role="status"
