@@ -1709,7 +1709,7 @@ admin.post('/purge-e2e', async (c) => {
   const admins = await c.env.DB.prepare(
     `SELECT COUNT(*) AS n FROM Users
      WHERE id IN (${ids.map(() => '?').join(',')}) AND COALESCE(is_admin, 0) = 1`,
-  ).bind(...ids as never).first<{ n: number }>()
+  ).bind(...ids).first<{ n: number }>()
   if (Number(admins?.n || 0) > 0) {
     return c.json({ error: 'refusing to purge: at least one matched account is an admin' }, 400)
   }
@@ -1729,8 +1729,8 @@ admin.post('/purge-e2e', async (c) => {
 
   await logAdminAction(
     c.env.DB, orbitId, 'purge_e2e',
-    { count: deleted, failed: errors.length, tag: E2E_PROFILE_TAG },
-    `deleted ${deleted}/${ids.length} e2e accounts`,
+    { id: 'e2e-batch', type: 'user' },
+    `deleted ${deleted}/${ids.length} e2e accounts (failed: ${errors.length}, tag: ${E2E_PROFILE_TAG})`,
   )
 
   return c.json({ success: true, dryRun: false, matched: ids.length, deleted, errors })

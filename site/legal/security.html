@@ -87,7 +87,7 @@ th, td { border: 1px solid #27272a; padding: 6px 12px; text-align: left; font-we
 <h2>Threats modeled → coverage</h2>
 <table>
 <tr><th>Threat</th><th>Mitigation in code</th></tr>
-<tr><td>(a) User-disk forensics</td><td>F1/F2/F3/F8 → encrypted cache: images encrypted on disk (AES-256-GCM via local storage key), <code>no-store</code> on HTTP, keys and threads in DPAPI</td></tr>
+<tr><td>(a) User-disk forensics</td><td>F1/F2/F3/F8 → runtime-only: images in RAM only, <code>no-store</code>, keys and threads in DPAPI, local <code>storage.key</code></td></tr>
 <tr><td>(b) User-level malware</td><td>DPAPI does not help (same session), mitigated by: key export only via explicit modal + <code>will-prevent-unload</code> warning; honest limit stated in the ToS</td></tr>
 <tr><td>(c) Server operator</td><td>Blind courier + envelope signature + public token + random TURN + ICE hygiene + SITE gate: the official host does NOT see content, conversation identity, presence, or the graph. Full-node: the HOST IS the server, and <code>e2e-disclaimer</code> says so</td></tr>
 <tr><td>(d) Network MITM</td><td>TLS on the API + payloads already E2EE; replay protected by nonce/signature; CSP without arbitrary origins (F7 fixed)</td></tr>

@@ -33,7 +33,7 @@ apps/api/node.key
 node.key
 apps/desktop/dist-log.txt
 site/releases/*.exe
-!site/releases/gMatch-1.5.2-portable.exe
+!site/releases/gMatch-1.5.3-portable.exe
 !site/releases/.gitkeep
 
 # local perf sweep scratch (CDP probe outputs, seeded identity)

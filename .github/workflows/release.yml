@@ -3,6 +3,7 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -38,21 +39,27 @@ jobs:
       - name: Compute artifact SHA-256 (published in the release body + summary)
         shell: pwsh
         run: |
-          $exe = Get-ChildItem apps/desktop/release/gMatch-*-portable.exe | Select-Object -First 1
+          $exe = Get-ChildItem -Path apps/desktop -Filter "gMatch-*-portable.exe" -Recurse | Select-Object -First 1
+          if (!$exe) {
+            Write-Error "Portable exe not found in apps/desktop"
+            exit 1
+          }
           $hash = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLower()
           "GMATCH_SHA256=$hash" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "GMATCH_EXE_PATH=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "GMATCH_EXE_NAME=$($exe.Name)" | Out-File -FilePath $env:GITHUB_ENV -Append
           Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "## Artifact integrity`n- ``$($exe.Name)`` SHA-256: ``$hash``"
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          files: apps/desktop/release/gMatch-*-portable.exe
+          files: ${{ env.GMATCH_EXE_PATH }}
           append_body: true
           body: |
             **Verify before running (Windows PowerShell):**
             ~~~
-            Get-FileHash "$env:USERPROFILE\Downloads\gMatch-*-portable.exe" -Algorithm SHA256
+            Get-FileHash "$env:USERPROFILE\Downloads\${{ env.GMATCH_EXE_NAME }}" -Algorithm SHA256
             ~~~
             Expected SHA-256: ``${{ env.GMATCH_SHA256 }}``
             Unsigned binary => SmartScreen warns; that is normal, not a virus.
             Public scan: https://www.virustotal.com (paste the file or hash).
-            Reproducible: clone this repo at tag ${{ github.ref_name }} and run npm ci && npm run dist.
+            Reproducible: clone this repo at tag ${{ github.ref_name || github.sha }} and run npm ci && npm run dist.

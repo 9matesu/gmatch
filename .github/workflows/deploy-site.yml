@@ -7,8 +7,6 @@ on:
   push:
     branches: [main]
     paths: ['site/**', 'apps/desktop/src/legal/**', 'apps/desktop/public/legal/**', 'apps/desktop/scripts/gen-legal.cjs', 'docs/SECURITY-AUDIT.md', '.github/workflows/deploy-site.yml']
-  release:
-    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -60,6 +58,7 @@ jobs:
 
   deploy:
     needs: build
+    if: github.ref == 'refs/heads/main'
     permissions:
       pages: write
       id-token: write

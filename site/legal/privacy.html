@@ -75,7 +75,7 @@ th, td { border: 1px solid #27272a; padding: 6px 12px; text-align: left; font-we
 <li>No cookies: the desktop software uses no cookies and no trackers.</li>
 </ul>
 <ul>
-<li>No plaintext media on your disk: feed images are encrypted at rest (AES-256-GCM via local storage key) in an LRU disk cache to keep RAM under 200–300 MB; keys and credentials sit in the Windows DPAPI vault; content HTTP responses use Cache-Control: no-store.</li>
+<li>Nothing on your disk beyond the session: images live ONLY in memory (RAM cache, gone at exit); keys and history are encrypted by the Windows DPAPI; content HTTP responses use Cache-Control: no-store.</li>
 </ul>
 <h2>4. What IS processed, and by whom</h2>
 <ul>
