@@ -12,6 +12,7 @@ import {
   CaretLeft,
   CaretRight,
   Gear,
+  Question,
   ShoppingBag,
   HardDrives,
   ShieldCheck,
@@ -83,6 +84,8 @@ export interface CommandIslandProps {
   isAdmin?: boolean;
   onOpenCreatePost?: () => void;
   onOpenSettings?: () => void;
+  /** Open the Help & documentation modal. */
+  onOpenHelp?: () => void;
   onOpenStore?: () => void;
   onOpenNotifications?: () => void;
   notificationsOpen?: boolean;
@@ -116,6 +119,7 @@ export function CommandIsland({
   isAdmin: _isAdmin = false,
   onOpenCreatePost,
   onOpenSettings,
+  onOpenHelp,
   settingsOpen = false,
   onOpenStore,
   onOpenNotifications,
@@ -220,7 +224,7 @@ export function CommandIsland({
             playPress(900);
             onOpenCreateCard?.();
           }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-chrome-lav text-retro-fg hover:bg-chrome-lav/90 active:scale-95 transition-all text-xs font-semibold"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-chrome-lav text-black font-bold hover:bg-chrome-lav/90 active:scale-95 transition-all text-xs"
           title="Forge Card"
           aria-label="Forge Card"
         >
@@ -238,7 +242,7 @@ export function CommandIsland({
             playPress(940);
             handleNavClick('games');
           }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-retro-online text-retro-fg hover:bg-retro-online/90 active:scale-95 transition-all text-xs font-semibold"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-retro-online text-black font-bold hover:bg-retro-online/90 active:scale-95 transition-all text-xs"
           title="Quick Match"
           aria-label="Quick Match"
         >
@@ -259,7 +263,10 @@ export function CommandIsland({
         className={`command-island fixed bottom-5 left-1/2 -translate-x-1/2 z-[var(--z-dropdown)] flex max-w-[calc(100vw-1.5rem)] items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full select-none transition-all duration-300 overflow-x-auto styled-scrollbar ${recessed ? 'island-recessed' : ''}`}
       >
         {/* Left Telemetry: $G Balance */}
-        <div className="flex items-center px-2.5 py-1 rounded-full bg-glass-w5 border border-border-glass text-xs font-mono tabular-nums text-retro-body shrink-0">
+        <div
+          aria-label={`Balance: ${formatCount(balance)} dollars`}
+          className="flex items-center px-2.5 py-1 rounded-full bg-glass-w5 border border-border-glass text-xs font-mono tabular-nums text-retro-body shrink-0"
+        >
           <span className="font-semibold text-retro-fg tracking-tight">
             ${formatCount(balance)}
           </span>
@@ -506,6 +513,25 @@ export function CommandIsland({
             >
               <Gear className="w-3.5 h-3.5 shrink-0" weight={settingsOpen ? 'fill' : 'regular'} />
               <span className="text-xs hidden sm:inline">Settings</span>
+            </button>
+
+            {/* Help. This was the only feature in the app reachable solely by
+                keyboard: "?" and Ctrl+H, and nothing on screen pointed at it.
+                Anyone who did not already know the shortcut had no way in,
+                which is the same reason the LobbyPanel help prop was dead. */}
+            <button
+              type="button"
+              data-help-toggle="true"
+              onClick={() => {
+                playPress(760);
+                onOpenHelp?.();
+              }}
+              aria-label="Help"
+              title="Help & documentation"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
+            >
+              <Question className="w-3.5 h-3.5 shrink-0" />
+              <span className="text-xs hidden sm:inline">Help</span>
             </button>
 
             {/* Admin — a PIN-gated modal, not a route, so it has no persistent

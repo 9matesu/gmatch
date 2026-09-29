@@ -4721,6 +4721,7 @@ export default function Home() {
               isAdmin={myProfile.isAdmin}
               onOpenCreatePost={() => { setChatOpen(false); setShowCreatePostModal(true); }}
               onOpenSettings={() => { setChatOpen(false); setShowSettingsModal((v) => !v); }}
+              onOpenHelp={() => { setChatOpen(false); setShowHelpModal(true); }}
               settingsOpen={showSettingsModal}
               onOpenStore={() => handleSetMainView('store')}
               onOpenNotifications={() => {

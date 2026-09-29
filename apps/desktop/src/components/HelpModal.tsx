@@ -1,10 +1,18 @@
 "use client";
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { wipeAllTourStates } from '../firstRun/tourState'
-import { HelpCircle, X, UploadCloud, Globe, Shield, Keyboard } from 'lucide-react'
+import { HelpCircle, X, UploadCloud, Globe, Shield, Keyboard, Swords, MousePointerClick, Rss, MessageSquare, MonitorPlay, ShieldAlert, Coins } from 'lucide-react'
+import { HELP_TOPICS } from '../help/helpContent'
 
-const TABS = [
+/**
+ * The five original tabs are hand-written JSX and are kept as-is: they were
+ * written before this file had a content pipeline and they read fine. The
+ * feature guides (card duels, clicker, feed, chat, watch parties, domination,
+ * money) come from help/helpContent.ts, so a new feature is a new entry there
+ * and nothing else.
+ */
+const BUILT_IN_TABS = [
   { id: 'getting-started', label: 'Getting Started', icon: HelpCircle },
   { id: 'sending', label: 'Sending', icon: UploadCloud },
   { id: 'network', label: 'Network', icon: Globe },
@@ -12,10 +20,81 @@ const TABS = [
   { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
 ] as const
 
-type TabId = typeof TABS[number]['id']
+/** Icon per content topic. Kept beside the tab so adding one is one edit. */
+const TOPIC_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  duels: Swords,
+  idle: MousePointerClick,
+  feed: Rss,
+  chat: MessageSquare,
+  watch: MonitorPlay,
+  domination: ShieldAlert,
+  economy: Coins,
+}
+
+const TABS = [
+  { id: 'getting-started', label: 'Getting Started', icon: HelpCircle },
+  // Feature guides come from the content module, in the order declared there.
+  ...HELP_TOPICS.map((t) => ({ id: t.id, label: t.tabLabel, icon: TOPIC_ICONS[t.id] ?? HelpCircle })),
+  { id: 'sending', label: 'Sending', icon: UploadCloud },
+  { id: 'network', label: 'Network', icon: Globe },
+  { id: 'privacy', label: 'Privacy', icon: Shield },
+  { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
+] as const
+
+type TabId = (typeof TABS)[number]['id']
+
+/** Help content lives in a data module; resolve a tab to its topic. */
+const TOPIC_BY_ID = new Map(HELP_TOPICS.map((t) => [t.id, t]))
+
+function TopicBody({ topicId }: { topicId: string }) {
+  const topic = TOPIC_BY_ID.get(topicId)
+  if (!topic) return null
+  return (
+    <div className="space-y-4">
+      {/* The topic's own title, not just its short tab label. Without it the
+          body opened straight into "What a duel is" with no indication of
+          which feature was being described. */}
+      <h3 className="text-sm font-medium text-retro-fg">{topic.title}</h3>
+      {topic.sections.map((s) => (
+        <section key={s.heading} className="space-y-1.5">
+          <h3 className="text-xs font-medium text-retro-fg">{s.heading}</h3>
+          {s.body && <p className="text-xs text-retro-muted leading-relaxed">{s.body}</p>}
+          {s.bullets && (
+            <ul className="text-xs text-retro-muted leading-relaxed list-disc pl-5 space-y-1">
+              {s.bullets.map((b) => (
+                <li key={b}>{b}</li>
+              ))}
+            </ul>
+          )}
+          {s.callout && (
+            <p className="text-xs text-retro-body leading-relaxed bg-surface-interactive border border-border-glass rounded-lg p-3">
+              {s.callout}
+            </p>
+          )}
+        </section>
+      ))}
+    </div>
+  )
+}
 
 export function HelpModal({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<TabId>('getting-started')
+
+  // Escape to close. Every other modal in the app has this; Help and the
+  // Changelog were the two that did not, so a keyboard user who opened help
+  // with "?" had to find the X.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const topic = TOPIC_BY_ID.get(tab)
 
   return (
     <div
@@ -23,6 +102,9 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Help"
         className="bg-surface-raised border border-border-glass rounded-lg max-w-xl w-full max-h-[85vh] flex flex-col shadow-xl overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
@@ -32,6 +114,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close help"
             className="text-retro-muted hover:text-retro-body p-1.5 rounded cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -47,6 +130,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                 key={t.id}
                 type="button"
                 onClick={() => setTab(t.id)}
+                aria-current={tab === t.id ? 'true' : undefined}
                 className={`px-2.5 py-1.5 text-xs font-medium rounded transition-colors whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
                   tab === t.id
                     ? 'bg-surface-interactive text-retro-fg'
@@ -56,13 +140,13 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                 <IconComp className="w-3.5 h-3.5" />
                 <span>{t.label}</span>
               </button>
-            );
+            )
           })}
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 styled-scrollbar text-xs text-retro-body">
-          {tab === 'getting-started' && (
+          {topic ? <TopicBody topicId={topic.id} /> : tab === 'getting-started' && (
             <div className="space-y-4">
               <section className="space-y-1.5">
                 <h3 className="text-xs font-medium text-retro-fg">What is gMatch?</h3>
