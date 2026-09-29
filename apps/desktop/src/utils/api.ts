@@ -358,6 +358,21 @@ export function signRequestHeaders(
 /**
  * Client-Side P2P OrbitFetch Adapter
  */
+/**
+ * The admin passcode endpoint is excluded from the automatic 401 retry.
+ *
+ * The retry exists because a stale request signature 401s and a fresh one
+ * succeeds — harmless, and the correct thing to do transparently. On
+ * /api/admin/verify-pin it is actively harmful: a 401 there means the passcode
+ * was wrong, the retry is guaranteed to be wrong too, and the server counts
+ * each attempt against a 5-strikes/15-minutes lockout. One mistyped passcode
+ * therefore cost two strikes and three mistypes locked the user out of the
+ * console for a quarter of an hour.
+ */
+function isPasscodeProbe(url: string): boolean {
+  return url.includes('/api/admin/verify-pin');
+}
+
 export async function orbitFetch(
   endpoint: string,
   options: RequestInit,
@@ -457,7 +472,13 @@ export async function orbitFetch(
   const doFetch = async (attempt = 0): Promise<Response> => {
     const controller = new AbortController()
     const isUpload = options.body instanceof FormData
-    const timeout = setTimeout(() => controller.abort(), isUpload ? 120000 : 30000)
+    // Media GETs (watch party video, full object blobs) are big and the node
+    // decrypts/relays the WHOLE body before responding, so the 30s header
+    // deadline is a real constraint for them but not for anything else. Give
+    // them the upload-scale budget rather than letting the abort masquerade as
+    // a hard failure (see the catch below).
+    const isMedia = method === 'GET' && /\/api\/(objects|watchparty\/[^/]+\/stream)/.test(url)
+    const timeout = setTimeout(() => controller.abort(), isUpload || isMedia ? 120000 : 30000)
     try {
       // GET must never carry a body (real fetch throws) — the seal lives in
       // the header alone; only non-GET sealed requests send the placeholder.
@@ -480,7 +501,7 @@ export async function orbitFetch(
       // page route. For non-upload mutations and for GET, retry once with a
       // freshly signed header (the most common case: the client sat idle a
       // while and the X-Orbit-Timestamp expired before the request arrived).
-      if (res.status === 401 && !isUpload) {
+      if (res.status === 401 && !isUpload && !isPasscodeProbe(url)) {
         const retryHeaders = await buildHeaders()
         const retryRes = await fetchImpl(url, { ...options, headers: retryHeaders, ...bodyInitFor(retryHeaders), signal: controller.signal })
         if (retryRes.ok) {
@@ -497,8 +518,18 @@ export async function orbitFetch(
         return doFetch(attempt + 1)
       }
       return res
-    } catch {
+    } catch (err) {
       clearTimeout(timeout)
+      // A deadline abort is NOT "the node is offline". It used to be converted
+      // into a synthetic 503 here, which (a) told the caller the object was
+      // unavailable and (b) bypassed the retry ladder above, since that lives
+      // inside the try. A big media GET that simply took too long therefore
+      // surfaced as "Media unavailable" with no retry. Retry a real timeout.
+      if ((err as Error)?.name === 'AbortError' && attempt < 2) {
+        logger.warn(`[orbitFetch] ${isMedia ? 'media ' : ''}request timed out; retry ${attempt + 1}/2`)
+        await waitRetry(attempt)
+        return doFetch(attempt + 1)
+      }
       return offlineErrorResponse()
     }
   }

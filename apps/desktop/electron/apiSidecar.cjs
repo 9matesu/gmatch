@@ -90,13 +90,34 @@ async function startApi() {
     const { app: electronApp } = require('electron')
     console.log(`[api] spawning ${bunPath} in ${apiDir} (packaged=${electronApp.isPackaged})`)
   } catch { /* logging only */ }
+
+  // ADMIN_PIN, and why it is or is not injected.
+  //
+  // In a PACKAGED install there is no repo, so a self-hoster has nowhere to
+  // configure one: the generated per-install 8-hex PIN is minted, persisted to
+  // userData/admin-pin.txt, and shown in Settings -> Server. That is the whole
+  // point of it.
+  //
+  // Unpackaged (running from the repo) we deliberately do NOT inject it. A real
+  // process env var beats a `.env` file in Bun, so injecting here SHADOWED
+  // apps/api/.env.local — the developer set ADMIN_PIN in .env.local, the
+  // sidecar overrode it with a random 8-hex, and their passcode silently did
+  // not work with nothing in the UI to explain why. In dev, .env.local is the
+  // single source of truth and the launcher stops fighting it.
+  const injected = injectingPin ? adminPin(app.getPath('userData')) : null
+  if (!injected) {
+    console.log(
+      '[api] no ADMIN_PIN injected — the node reads ADMIN_PIN/ADMIN_PIN_HASH ' +
+        'from apps/api/.env.local or the ambient environment',
+    )
+  }
   const entry = fs.existsSync(path.join(apiDir, 'serve.js')) ? 'serve.js' : 'src/serve.ts'
   proc = spawn(bunPath, ['run', entry], {
     cwd: apiDir,
     env: {
       ...process.env,
+      ...(injected ? { ADMIN_PIN: injected } : {}),
       PORT: String(PORT),
-      ADMIN_PIN: adminPin(app.getPath('userData')),
       STORAGE_ENCRYPTION_KEY: storageKey,
       SNAPSHOT_PATH: path.join(app.getPath('userData'), 'orbit.sqlite'),
       BLOB_STORE_DIR: path.join(app.getPath('userData'), 'blobs'),

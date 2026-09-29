@@ -25,6 +25,25 @@ legacy path stays implemented).
 `ADMIN_PIN=<pin> [ADMIN_ORBIT_ID=<orbitId>] npm run dev` in apps/desktop
 (vite spawns the bun sidecar with the env). Never commit PIN values.
 
+Or put `ADMIN_PIN=...` in `apps/api/.env.local` (gitignored). Bun loads that
+file from the sidecar's cwd, so it applies to `npm run dev` AND to
+`npm run electron` — the Electron main deliberately does NOT inject a generated
+ADMIN_PIN when unpackaged, precisely so it cannot shadow `.env.local`. A real
+process env var beats a `.env` file in Bun, so injecting one silently overrode
+whatever the developer had configured.
+
+In a PACKAGED install there is no repo and no `.env.local`, so
+`electron/apiSidecar.cjs` mints an 8-hex PIN into
+`userData/admin-pin.txt` and Settings -> Server displays it. That is the
+self-hoster path and it is unaffected by the rule above.
+
+Reading the failure: the admin console now names the node and the reason.
+`401` wrong PIN (or the identity is not `ADMIN_ORBIT_ID` — that gate runs
+*before* the PIN compare, so a correct PIN from the wrong account also 401s);
+`403` admin grant expired; `404` the node does not run the admin service
+(`SITE_SERVICES` without `admin`); `429` 5-strikes/15-minutes lockout; `503`
+no `ADMIN_PIN`/`ADMIN_PIN_HASH` set, so nothing to compare against.
+
 `GMATCH_DEV_API=remote` points dev at a remote FULL node (`gmatch.fly.dev`)
 instead of the local sidecar. Default is the local sidecar so browser dev
 debugs the same node the packaged app runs.

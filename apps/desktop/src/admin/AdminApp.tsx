@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 
 import { orbitFetch, getApiBaseUrl } from "../utils/api";
 import { useToast } from "../components/Toast";
+import { describePinFailure } from "./pinFailure";
 import { useConfirm } from "../components/ConfirmDialog";
 import { logger } from "../utils/logger";
 import { AdminLayout } from "./components/AdminLayout";
@@ -149,8 +150,15 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
         window.dispatchEvent(new Event("gmatch-admin-granted"));
         toast("Admin passcode verified", "success");
       } else {
+        // Say which node refused and what its status means. The old message
+        // was the server's raw string, and the three ways this fails look
+        // nothing alike: a wrong PIN is 401, a node with no ADMIN_PIN configured
+        // at all is 503 (nothing to compare against), and a courier node
+        // without the admin service is 404 at the edge. "Unauthenticated" for
+        // any of them sent people hunting for a password problem they did not
+        // have.
         const data = await res.json().catch(() => null);
-        toast(data?.error || "Invalid secret passcode", "error");
+        toast(describePinFailure(res.status, data?.error, getApiBaseUrl()), "error");
       }
     } catch {
       toast("Authentication request failed", "error");
