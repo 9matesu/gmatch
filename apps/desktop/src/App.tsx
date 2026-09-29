@@ -98,6 +98,8 @@ import { usePendingServerHost } from './hooks/usePendingServerHost';
 import { OfflineWarningBanner } from "./components/OfflineWarningBanner";
 import { dataUrlToBlob, localObjectBlobUrl } from "./utils/mediaData";
 import { mediaUrlToCachedFile } from "./utils/cacheMedia";
+import { fresherPresence } from './utils/presence';
+import { resolveDisplayName, toNameRoster } from './utils/displayName';
 
 const MAX_GALLERY_ITEMS_IN_MEMORY = 80;
 // Story tray warm-up: how many leading stories to prefetch, and how many of
@@ -205,6 +207,13 @@ export default function Home() {
   // Watch tab: only a live ROOM gets the fullscreen treatment (see theater).
   const watchRoomOpen = useWatchParty().parties.length > 0;
   const [users, setUsers] = useState<User[]>([]);
+
+  // Name roster shared by every chat surface. /api/users is a CAPPED page, so
+  // anyone outside it has no entry — which is exactly why each lane used to
+  // render "Unknown User". Sealed DMs and rooms now carry the name in the
+  // message, and this is the fallback for the lanes that do not (server PM,
+  // groups, lobby) plus for threads written before the change.
+  const nameRoster = useMemo(() => toNameRoster(users), [users]);
 
   // Panel opacity preference drives the glass chrome through a CSS variable.
   useEffect(() => {
@@ -402,6 +411,10 @@ export default function Home() {
   const notifiedIdsRef = useRef(new Set<string>())
   const decisionMapRef = useRef(decisionMap)
   const usersRequestRef = useRef(0)
+  /** loadUsers is declared ~1100 lines below the first caller (toggleFollowUser),
+   *  so early callers reach it through this ref instead of re-creating the
+   *  callback with loadUsers in its dependency list. */
+  const loadUsersRef = useRef<(() => void) | null>(null)
 
   useEffect(() => { usersRef.current = users }, [users])
   useEffect(() => { decisionMapRef.current = decisionMap }, [decisionMap])
@@ -581,6 +594,19 @@ export default function Home() {
   // them to the Electron wallpaper bridge. Images only; no-op in browser.
   const handleSetOsWallpaper = async (url: string) => {
     if (!url) return;
+    // Check the bridge BEFORE resolving the image. Fetching first meant a
+    // signed object spent up to the full media timeout on the proxy before
+    // discovering there was nothing to hand the bytes to — so on a slow or
+    // unreachable media host the user waited ~15s and then got a confusing
+    // "needs an image file" instead of the real reason.
+    const bridge = window.gmatch?.wallpaperSetData;
+    if (!bridge) {
+      // Distinguish "no desktop bridge" (browser build) from "no OS support".
+      // A macOS/Linux desktop user used to be told this was only available in
+      // the desktop app while sitting in the desktop app.
+      toast('OS wallpaper needs the gMatch desktop app', 'warning');
+      return;
+    }
     try {
       let blob: Blob | null = null;
       if (/^https?:/i.test(url) || url.startsWith('gmcache://')) {
@@ -595,9 +621,10 @@ export default function Home() {
         toast('OS wallpaper needs an image file', 'warning');
         return;
       }
-      const out = await window.gmatch?.wallpaperSetData?.(await blob.arrayBuffer(), blob.type);
+      const out = await bridge(await blob.arrayBuffer(), blob.type);
       if (out?.ok) toast('OS wallpaper updated', 'success');
-      else toast('OS wallpaper is only available in the desktop app', 'warning');
+      else if (out?.reason === 'unsupported-platform') toast('OS wallpaper is Windows-only. Try "Set as app background" instead.', 'warning');
+      else toast('Could not set OS wallpaper', 'error');
     } catch {
       toast('Could not set OS wallpaper', 'error');
     }
@@ -1310,6 +1337,15 @@ export default function Home() {
       if (!res.ok) {
         setFollowingIds(prev => wasFollowing ? [...prev, userId] : prev.filter(id => id !== userId))
       } else {
+        // Invalidate BEFORE refetching. A bare loadUsers() (what this used to
+        // dispatch) was served by orbitFetch's 3s response cache, so the
+        // roster came back with the PRE-follow counts and the profile tab
+        // number never moved.
+        invalidateCache('/api/users')
+        invalidateCache(`/api/users/${userId}/followers`)
+        invalidateCache(`/api/users/${userId}/following`)
+        invalidateCache(`/api/users/${identity.orbitId}/following`)
+        void loadUsersRef.current?.()
         window.dispatchEvent(new CustomEvent('orbit-profilesync'))
       }
     } catch {
@@ -1318,7 +1354,10 @@ export default function Home() {
   }, [identity, followingIds])
 
   const openUserNetwork = useCallback((userId: string, tab: 'followers' | 'following' = 'followers') => {
-    const target = users.find((u) => u.id === userId || (u as any).orbitId === userId)
+    // No `(u as any).orbitId` check here: OrbitId is a string alias and nothing
+    // ever sets a separate `.orbitId` property, so it could only ever match the
+    // wrong row.
+    const target = users.find((u) => u.id === userId)
     setFollowersModalState({
       isOpen: true,
       initialTab: tab,
@@ -1635,11 +1674,17 @@ export default function Home() {
   )
   // RoomMessage -> ChatMessage adapter so the existing thread renderer/blocks
   // work untouched for sealed rooms.
+  //
+  // The name comes from the message itself (sealed into the room payload by
+  // RoomManager.say). This used to hardcode `senderName: ''`, which combined
+  // with the renderer's roster fallback is why EVERY room sender showed up as
+  // "User" — a room member is often absent from the capped /api/users page, and
+  // the room's own roster only carries orbit ids, never names.
   const chatRoomMessages = useCallback((roomId: string): ChatMessage[] =>
     courier.roomMessages(roomId).map((m) => ({
       id: m.id,
       senderId: m.senderOrbitId,
-      senderName: '',
+      senderName: m.displayName ?? '',
       text: m.text,
       timestamp: m.ts,
     })), [courier.roomMessages])
@@ -1722,7 +1767,14 @@ export default function Home() {
         const msgs = (courier.threadFor(peerId) || []).map((m) => ({
           id: m.id,
           senderId: m.own ? identity.orbitId : peerId,
-          senderName: m.own ? (myProfile.displayName || 'You') : (users.find((u) => u.id === peerId)?.display_name || 'Unknown User'),
+          // `m.senderName` is the name sealed into the DM body, so a peer who
+          // is not in the capped /api/users page still renders by name.
+          senderName: resolveDisplayName({
+            selfId: identity.orbitId,
+            senderId: m.own ? identity.orbitId : peerId,
+            payloadName: m.own ? undefined : m.senderName,
+            roster: nameRoster,
+          }),
           text: m.text,
           timestamp: m.ts,
           readByRecipient: m.status === 'delivered',
@@ -1742,11 +1794,15 @@ export default function Home() {
         if (!res.ok) return
         const data = await res.json()
         if (Array.isArray(data)) {
-          const peerUser = users.find((u) => u.id === peerId || (u as any).orbitId === peerId)
           const msgs: ChatMessage[] = data.map((m: any) => ({
             id: m.id,
             senderId: m.sender_id,
-            senderName: m.sender_id === identity.orbitId ? (myProfile.displayName || 'You') : (m.sender_name?.trim() || peerUser?.display_name?.trim() || 'Unknown User'),
+            senderName: resolveDisplayName({
+              selfId: identity.orbitId,
+              senderId: m.sender_id,
+              payloadName: m.sender_name,
+              roster: nameRoster,
+            }),
             text: m.body,
             timestamp: new Date(m.created_at).getTime() || Date.now(),
             replyToId: m.reply_to || undefined,
@@ -1807,7 +1863,7 @@ export default function Home() {
     const optimistic: ChatMessage = {
       id: optimisticId,
       senderId: identity.orbitId,
-      senderName: myProfile.displayName || 'You',
+      senderName: resolveDisplayName({ selfId: identity.orbitId, senderId: identity.orbitId, roster: nameRoster }),
       text: text.trim(),
       timestamp: Date.now(),
       replyToId,
@@ -1862,12 +1918,16 @@ export default function Home() {
           ? incoming
           : (typeof detail.recipient_id === 'string' ? detail.recipient_id : '')
         if (peerId && peerId !== 'global_lobby' && peerId !== 'card_queue') {
-          const peerUser = users.find((u) => u.id === peerId || (u as any).orbitId === peerId)
           const attachmentId = typeof detail.attachment_id === 'string' ? detail.attachment_id : undefined
           const msg: ChatMessage = {
             id: String(detail.id),
             senderId: incoming || identity.orbitId,
-            senderName: incoming === identity.orbitId ? (myProfile.displayName || 'You') : (typeof detail.sender_name === 'string' && detail.sender_name.trim() ? detail.sender_name : peerUser?.display_name?.trim() || 'Unknown User'),
+            senderName: resolveDisplayName({
+              selfId: identity.orbitId,
+              senderId: incoming || identity.orbitId,
+              payloadName: typeof detail.sender_name === 'string' ? detail.sender_name : null,
+              roster: nameRoster,
+            }),
             text: typeof detail.body === 'string' ? detail.body : '',
             timestamp: new Date(String(detail.created_at || Date.now())).getTime() || Date.now(),
             replyToId: typeof detail.reply_to === 'string' ? detail.reply_to : undefined,
@@ -1949,9 +2009,12 @@ export default function Home() {
       const msg: ChatMessage = {
         id: String(detail.id),
         senderId: senderId || identity.orbitId,
-        senderName: senderId === identity.orbitId
-          ? (myProfile.displayName || 'You')
-          : (typeof detail.sender_name === 'string' && detail.sender_name.trim() ? detail.sender_name : 'Unknown User'),
+        senderName: resolveDisplayName({
+          selfId: identity.orbitId,
+          senderId: senderId || identity.orbitId,
+          payloadName: typeof detail.sender_name === 'string' ? detail.sender_name : null,
+          roster: nameRoster,
+        }),
         text: typeof detail.body === 'string' ? detail.body : '',
         timestamp: new Date(String(detail.created_at || Date.now())).getTime() || Date.now(),
         replyToId: typeof detail.reply_to === 'string' ? detail.reply_to : undefined,
@@ -2054,11 +2117,15 @@ export default function Home() {
       if (!res.ok) return false
       const data = await res.json()
       if (!data || !Array.isArray(data.messages)) return false
-      const peerUser = users.find((u) => u.id === peerId || (u as any).orbitId === peerId)
       const older: ChatMessage[] = data.messages.map((m: any) => ({
         id: m.id,
         senderId: m.sender_id,
-        senderName: m.sender_id === identity.orbitId ? (myProfile.displayName || 'You') : (m.sender_name?.trim() || peerUser?.display_name?.trim() || 'Unknown User'),
+        senderName: resolveDisplayName({
+          selfId: identity.orbitId,
+          senderId: m.sender_id,
+          payloadName: m.sender_name,
+          roster: nameRoster,
+        }),
         text: m.body,
         timestamp: new Date(m.created_at).getTime() || Date.now(),
         replyToId: m.reply_to || undefined,
@@ -2126,7 +2193,12 @@ export default function Home() {
           const msgs: ChatMessage[] = data.map((m: any) => ({
             id: m.id,
             senderId: m.sender_id,
-            senderName: m.sender_id === identity.orbitId ? (myProfile.displayName || 'You') : (m.sender_name?.trim() || 'Unknown User'),
+            senderName: resolveDisplayName({
+              selfId: identity.orbitId,
+              senderId: m.sender_id,
+              payloadName: m.sender_name,
+              roster: nameRoster,
+            }),
             text: m.body,
             timestamp: new Date(m.created_at).getTime() || Date.now(),
             replyToId: m.reply_to || undefined,
@@ -2138,7 +2210,7 @@ export default function Home() {
         }
       })
       .catch(() => { })
-  }, [identity, myProfile.displayName])
+  }, [identity, nameRoster])
 
   useEffect(() => {
     const refreshChat = () => {
@@ -2448,6 +2520,13 @@ export default function Home() {
               balance: prior?.balance ?? 0,
               score: prior?.score ?? 0,
               reputation: prior?.reputation ?? 0,
+              // Follow counts too: without them the profile tab falls through
+              // to a hardcoded 0 (or, worse, to likes_received) and never moves
+              // for anyone outside the server's capped directory.
+              followers_count: prior?.followers_count ?? 0,
+              following_count: prior?.following_count ?? 0,
+              posts_count: prior?.posts_count ?? 0,
+              likes_received: prior?.likes_received ?? 0,
             } as User);
           }
         }
@@ -2544,6 +2623,31 @@ export default function Home() {
         }
       });
   }, [identity]);
+
+  // Publish loadUsers for the callbacks declared above it (toggleFollowUser).
+  useEffect(() => { loadUsersRef.current = loadUsers; }, [loadUsers]);
+
+  // A follow event just landed (live WS broadcast from users.ts). My follower
+  // count is a roster field, so refresh it instead of waiting for the 60-120s
+  // poll. Also notifies UserProfileModal, which re-reads its own counts.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ follower_id?: string; followee_id?: string }>).detail;
+      if (detail?.followee_id !== identity?.orbitId) return;
+      invalidateCache('/api/users')
+      loadUsers()
+      window.dispatchEvent(new CustomEvent('orbit-profilesync'))
+    }
+    window.addEventListener('orbit-follow-event', handler)
+    return () => window.removeEventListener('orbit-follow-event', handler)
+  }, [loadUsers, identity?.orbitId])
+
+  // Opening the profile tab must not show a count that is up to 120s stale.
+  useEffect(() => {
+    if (mainView !== 'profile' || !identity) return
+    invalidateCache('/api/users')
+    loadUsers()
+  }, [mainView, identity?.orbitId])
 
   // New admin grant -> refresh /api/users so myProfile.isAdmin (Admin button) updates now.
   useEffect(() => {
@@ -3738,8 +3842,22 @@ export default function Home() {
                                 onFollowSuggestion={(id) => { void toggleFollowUser(id); }}
                                 myProfileTags={myProfile.tags}
                                 onSelectUser={(uId) => {
-                                  const target = users.find((u) => u.id === uId || (u as any).orbitId === uId);
-                                  if (target) setSelectedProfileUser(target);
+                                  const target = users.find((u) => u.id === uId);
+                                  if (target) {
+                                    setSelectedProfileUser(target);
+                                    return;
+                                  }
+                                  // Same silent no-op GamesView had: the roster
+                                  // is capped (100 rows server-side) and a fresh
+                                  // peer may not be in it yet, so clicking a post
+                                  // author's avatar did NOTHING. Fetch the row.
+                                  if (!identity) return;
+                                  void orbitFetch(`/api/users/${encodeURIComponent(uId)}`, {}, identity)
+                                    .then((res) => (res.ok ? res.json() : null))
+                                    .then((data) => {
+                                      if (data?.user?.id) setSelectedProfileUser(data.user as User);
+                                    })
+                                    .catch(() => { });
                                 }}
                                 users={users}
                                 onStartPm={(user) => {
@@ -3929,7 +4047,10 @@ export default function Home() {
                           chatMessages={chatMessages}
                           pmMessages={pmPeer ? pmMessagesByPeer[pmPeer.id || (pmPeer as { orbitId?: string }).orbitId || ''] || [] : []}
                           activePmPeer={pmPeer ? { orbitId: pmPeer.id || (pmPeer as { orbitId?: string }).orbitId || '', name: pmPeer.display_name || 'User' } : null}
-                          peers={users.map((u) => ({ orbitId: u.id || (u as { orbitId?: string }).orbitId || '', name: u.display_name || 'User' }))}
+                          // No `|| 'User'` fallback: a placeholder name is not a
+                          // name, and resolveDisplayName treats it as such and
+                          // falls through to the real sources.
+                          peers={users.map((u) => ({ orbitId: u.id || (u as { orbitId?: string }).orbitId || '', name: u.display_name }))}
                           users={users}
                           threads={pmThreads}
                           profilePics={profilePics}
@@ -3972,7 +4093,13 @@ export default function Home() {
                           onSelectGroup={setActiveGroupId}
                           onOpenProfile={(userId, userObj) => {
                             const t = users.find((u) => u.id === userId || (u as { orbitId?: string }).orbitId === userId)
-                            setSelectedProfileUser(t || userObj || ({ id: userId, display_name: 'User' } as User))
+                            // Prefer the FRESHER sighting. The chat hub builds
+                            // userObj from a 30s dashboard poll, while the roster
+                            // entry's last_seen only moves when the roster poll
+                            // commits — taking `t` unconditionally threw that
+                            // fresher data away and produced the "online in the
+                            // list, offline in the profile" split.
+                            setSelectedProfileUser(fresherPresence(userObj, t) || ({ id: userId, display_name: 'User' } as User))
                           }}
                           onOpenImage={(msg) => setViewerMessage(msg)}
                           onUserContext={(e, peerId, name) => {
@@ -4010,6 +4137,7 @@ export default function Home() {
                       toast={toast}
                       onSetMainView={handleSetMainView}
                       onOpenFlash={() => setShowFlashModal(true)}
+                      onSelectUser={openProfileById}
                       setActiveHack={setActiveHack}
                     />
                   )}

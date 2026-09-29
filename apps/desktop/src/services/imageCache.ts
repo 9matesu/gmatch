@@ -59,49 +59,11 @@ function destroyLegacyIdb(): void {
   }
 }
 
-/**
- * Same-origin dev URL for fetching a remote picture's bytes: vite dev serves
- * known hosts through local proxies (no CORS block, no console spam).
- * Null = no dev proxy for this host — skip the background fetch in DEV.
- * Pure (exported for tests).
- */
-export function devFetchable(url: string): string | null {
-  try {
-    const u = new URL(url)
-    if (u.protocol !== 'https:') return null
-    const path = `${u.pathname}${u.search}`
-    if (u.hostname === 'media.redgifs.com') return `/rg-media${path}`
-    if (u.hostname === 'tbib.org') return `/booru/tbib${path}`
-    if (u.hostname === 'xbooru.com') return `/booru/xbooru${path}`
-    if (u.hostname === 'img.xbooru.com' || u.hostname.endsWith('.xbooru.com')) {
-      return `/px?u=${encodeURIComponent(url)}`
-    }
-    if (u.hostname === 'rule34.paheal.net') return `/booru/paheal${path}`
-    if (u.hostname === 'konachan.com') return `/booru/kona${path}`
-    if (u.hostname === 'yande.re' || u.hostname === 'files.yande.re') {
-      // yande.re 302s image bytes to files.yande.re; vite proxy passes the
-      // 302 through and the browser then dies on CORS. /px fetches
-      // server-side (follows redirect) and streams bytes same-origin.
-      return `/px?u=${encodeURIComponent(url)}`
-    }
-    if (u.hostname === 'imhentai.xxx' || u.hostname.endsWith('.imhentai.xxx')) {
-      return `/px?u=${encodeURIComponent(url)}`
-    }
-    if (u.hostname === 'video.twimg.com' || u.hostname === 'pbs.twimg.com') {
-      // X/Twitter direct media: raw cross-origin fetch dies on CORS in dev.
-      return `/px?u=${encodeURIComponent(url)}`
-    }
-    if (u.hostname === 'babesource.com' || u.hostname === 'media.babesource.com') {
-      return `/px?u=${encodeURIComponent(url)}`
-    }
-    if (u.hostname === 'realbooru.com' || u.hostname.endsWith('.booru.org')) {
-      return `/px?u=${encodeURIComponent(url)}`
-    }
-    return null
-  } catch {
-    return null
-  }
-}
+// Same-origin dev URL for fetching a remote picture's bytes: vite dev serves
+// known hosts through local proxies (no CORS block, no console spam). The host
+// table lives in shared/sources.json — this was the fourth hand-copied copy.
+// Pure (exported for tests).
+export { devFetchable } from './booruSources'
 
 function isDev(): boolean {
   try {

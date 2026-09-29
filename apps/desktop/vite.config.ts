@@ -4,13 +4,48 @@ import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 import http, { type IncomingMessage, type ServerResponse } from 'node:http'
 import https from 'node:https'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { Duplex } from 'node:stream'
+import registry from '../../shared/sources.json'
+import { pxAllowPattern } from './src/services/booruSources'
 
 // Hosts the dev /px byte-proxy may fetch (allowlist — no open proxy).
-const PX_ALLOW = /(^|\.)(imhentai\.xxx|babesource\.com|paheal\.net|tbib\.org|xbooru\.com|redgifs\.com|konachan\.com|yande\.re|files\.yande\.re|realbooru\.com|booru\.org|discordapp\.(com|net)|discord\.com|imgur\.com|redd\.it|twimg\.com|unsplash\.com|cloudinary\.com|postimg\.cc|imgbb\.com)$/
+// Derived from shared/sources.json (booru hosts) + its byteHosts list; this
+// regex was a 20-host hand-copy that had already drifted out of sync with the
+// three other copies of the same allowlist.
+const PX_ALLOW = pxAllowPattern()
+
+const SOURCES = (registry.sources as Array<{
+  id: string
+  kind: string
+  origin: string
+  devProxy: string | null
+  devApiProxy?: string
+  devMediaProxy?: string
+  referer?: string
+  imageHosts?: string[]
+  mediaOrigin?: string
+  apiOrigin?: string
+  devImageProxies?: Array<{ host: string; prefix: string }>
+  enabled?: boolean
+}>).filter((s) => s.enabled !== false)
+
+/**
+ * Referer a host requires, from the registry. Replaces a 7-branch hostname
+ * chain that had to be re-edited in four files whenever a mirror was added.
+ */
+function refererForUrl(target: URL): string {
+  for (const s of SOURCES) {
+    if (!s.referer) continue
+    const hosts = [s.origin, ...(s.imageHosts ?? []), s.mediaOrigin, s.apiOrigin]
+      .filter((h): h is string => !!h)
+      .map((h) => { try { return new URL(h).hostname } catch { return '' } })
+    if (hosts.includes(target.hostname)) return s.referer
+  }
+  return `https://${target.hostname}/`
+}
 
 const DEV_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36'
@@ -35,19 +70,7 @@ function devPxPlugin(): Plugin {
             return
           }
           const headers: Record<string, string> = { 'User-Agent': DEV_UA }
-          if (target.hostname === 'realbooru.com') {
-            headers['Referer'] = 'https://realbooru.com/'
-          } else if (target.hostname.endsWith('.booru.org')) {
-            headers['Referer'] = `https://${target.hostname}/`
-          } else if (target.hostname.includes('imhentai.xxx')) {
-            headers['Referer'] = 'https://imhentai.xxx/'
-          } else if (target.hostname === 'babesource.com' || target.hostname === 'media.babesource.com') {
-            headers['Referer'] = 'https://babesource.com/'
-          } else if (target.hostname.endsWith('xbooru.com')) {
-            headers['Referer'] = 'https://xbooru.com/'
-          } else if (target.hostname.endsWith('redgifs.com')) {
-            headers['Referer'] = 'https://www.redgifs.com/'
-          }
+          headers['Referer'] = refererForUrl(target)
 
           const urlsToTry: string[] = [target.toString()]
           if (target.hostname === 'realbooru.com') {
@@ -367,11 +390,57 @@ function devSidecarPlugin(): Plugin {
         }
       })
       if (DEV_API_REMOTE) return
+
+      // Tear the sidecar down with the dev server. Nothing did this before, so
+      // every e2e run left an orphaned `bun run src/serve.ts` holding port
+      // 8791. The NEXT run then found a healthy sidecar, adopted it, and
+      // returned BEFORE the GMATCH_API_FRESH wipe below — so runs silently
+      // stacked onto the previous run's database. That is where the ~41
+      // User_xxxxxx junk rows in the e2e DB came from.
+      const stopSidecar = () => {
+        if (!proc) return
+        const child = proc
+        proc = null
+        try {
+          if (process.platform === 'win32' && child.pid) {
+            // Bun spawns no children of its own here, so the tree flag is safe
+            // and guarantees a clean kill on Windows.
+            spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' })
+          } else {
+            child.kill('SIGTERM')
+          }
+        } catch {
+          /* already gone */
+        }
+      }
+      server.httpServer?.once('close', stopSidecar)
+      process.once('exit', stopSidecar)
+      for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+        process.once(sig, () => {
+          stopSidecar()
+          process.exit(0)
+        })
+      }
+
       // Adopt before spawning: a second window, a leftover process or
       // `npm run dev:electron` may already own the port, and the doomed
       // duplicate would crash with EADDRINUSE while our health poll happily
       // reported "ready" against the OTHER process (observed live).
       if (await isSidecarHealthy()) {
+        if (process.env.GMATCH_API_FRESH === '1') {
+          // Adopting here is the bug, not the feature: this run was asked for
+          // an EMPTY database and we cannot deliver one against a live process
+          // whose file we must not unlink. Fail loudly instead of silently
+          // inheriting whatever the last run left behind.
+          throw new Error(
+            `[dev-api] a sidecar is already healthy on ${DEV_API_LOCAL} but this run set ` +
+              `GMATCH_API_FRESH=1, which requires an empty database. The running sidecar is ` +
+              `an orphan from a previous run that was not torn down. Stop it and re-run:\n` +
+              (process.platform === 'win32'
+                ? `  for /f "tokens=5" %p in ('netstat -ano ^| findstr :${DEV_API_PORT} ^| findstr LISTENING') do taskkill /PID %p /F`
+                : `  lsof -ti tcp:${DEV_API_PORT} | xargs kill -9`),
+          )
+        }
         console.log(`[dev-api] adopting existing sidecar at ${DEV_API_LOCAL}`)
         return
       }
@@ -448,20 +517,88 @@ function devSidecarPlugin(): Plugin {
   }
 }
 
-function booruOrgProxy(target: string, prefix: string): ProxyOptions {
+function booruOrgProxy(target: string, prefix: string, referer?: string): ProxyOptions {
+  const ref = referer || `${target}/`
   return {
     target,
     changeOrigin: true,
     rewrite: (p) => p.replace(new RegExp(`^${prefix}`), ''),
-    headers: { Referer: `${target}/` },
+    headers: { Referer: ref },
     configure: (proxy) => {
       proxy.on('proxyReq', (proxyReq) => {
         proxyReq.removeHeader('origin')
-        proxyReq.setHeader('referer', `${target}/`)
+        proxyReq.setHeader('referer', ref)
         proxyReq.setHeader('user-agent', DEV_UA)
       })
     },
   }
+}
+
+/**
+ * imhentai's dev proxy. Kept out of sourceProxies() because it carries
+ * Cloudflare workarounds that no other mirror needs.
+ *
+ * Even with browser headers, Cloudflare still 403s gallery bursts from a bare
+ * dev IP. booru.ts already falls back to search-page covers when gallery pages
+ * fail — rewriting the status to 200 with the challenge body keeps that
+ * fallback clean and stops the red 403 rows in the dev console. The challenge
+ * HTML carries no data-src/parseJSON, so gallery parsing yields zero pages.
+ */
+function imhentaiProxy(): ProxyOptions {
+  const ref = 'https://imhentai.xxx/'
+  return {
+    target: 'https://imhentai.xxx',
+    changeOrigin: true,
+    rewrite: (p) => p.replace(/^\/booru\/imh/, ''),
+    headers: { Referer: ref },
+    configure: (proxy) => {
+      proxy.on('proxyReq', (proxyReq) => {
+        proxyReq.removeHeader('origin')
+        proxyReq.setHeader('referer', ref)
+        proxyReq.setHeader('user-agent', DEV_UA)
+        proxyReq.setHeader('accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8')
+        proxyReq.setHeader('accept-language', 'en-US,en;q=0.9')
+        proxyReq.setHeader('sec-fetch-dest', 'document')
+        proxyReq.setHeader('sec-fetch-mode', 'navigate')
+        proxyReq.setHeader('sec-fetch-site', 'same-origin')
+        proxyReq.setHeader('sec-fetch-user', '?1')
+        proxyReq.setHeader('upgrade-insecure-requests', '1')
+      })
+      proxy.on('proxyRes', (proxyRes, req) => {
+        try {
+          if (proxyRes.statusCode === 403 && req.url && req.url.includes('/gallery/')) {
+            proxyRes.statusCode = 200
+          }
+        } catch { /* passthrough */ }
+      })
+    },
+  }
+}
+
+/**
+ * Dev proxy entries for every registry source that declares a devProxy prefix.
+ * Booru hosts and the RedGifs API/CDN both need this: they 403/401 a foreign
+ * localhost Origin, so we same-origin the request and set the registry Referer.
+ */
+function sourceProxies(): Record<string, ProxyOptions> {
+  const out: Record<string, ProxyOptions> = {}
+  for (const s of SOURCES) {
+    if (s.devProxy) {
+      out[`^${s.devProxy}`] = booruOrgProxy(s.origin, s.devProxy, s.referer)
+    }
+    if (s.devApiProxy && s.apiOrigin) {
+      out[`^${s.devApiProxy}`] = booruOrgProxy(s.apiOrigin, s.devApiProxy, s.referer)
+    }
+    if (s.devMediaProxy && s.mediaOrigin) {
+      out[`^${s.devMediaProxy}`] = booruOrgProxy(s.mediaOrigin, s.devMediaProxy, s.referer)
+    }
+    // Byte hosts a source redirects to (yande.re 302s image bytes to
+    // files.yande.re; a direct cross-origin fetch then dies on CORS).
+    for (const p of s.devImageProxies ?? []) {
+      out[`^${p.prefix}`] = booruOrgProxy(p.host, p.prefix, s.referer)
+    }
+  }
+  return out
 }
 
 // base './' so Electron can load dist/index.html over file://
@@ -495,128 +632,15 @@ export default defineConfig({
         rewrite: (p) => p.replace(/^\/pmv-api/, '/api'),
         headers: { Referer: 'https://pmvhaven.com/', 'User-Agent': DEV_UA },
       },
-      '^/booru/tbib': {
-        target: 'https://tbib.org',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/booru\/tbib/, ''),
-      },
-      '^/booru/xbooru': {
-        target: 'https://xbooru.com',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/booru\/xbooru/, ''),
-      },
-      '^/booru/paheal': {
-        target: 'https://rule34.paheal.net',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/booru\/paheal/, ''),
-      },
-      '^/booru/imh': {
-        target: 'https://imhentai.xxx',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/booru\/imh/, ''),
-        headers: { Referer: 'https://imhentai.xxx/' },
-        configure: (proxy) => {
-          proxy.on('proxyReq', (proxyReq) => {
-            proxyReq.removeHeader('origin')
-            proxyReq.setHeader('referer', 'https://imhentai.xxx/')
-            proxyReq.setHeader('user-agent', DEV_UA)
-            // imhentai's Cloudflare 403-challenges /gallery/* when the
-            // request looks like a script (UA+Referer only). A full browser
-            // header set passes; this is what Electron's Chromium stack was
-            // implicitly sending, so dev now matches the packaged app.
-            proxyReq.setHeader('accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8')
-            proxyReq.setHeader('accept-language', 'en-US,en;q=0.9')
-            proxyReq.setHeader('sec-fetch-dest', 'document')
-            proxyReq.setHeader('sec-fetch-mode', 'navigate')
-            proxyReq.setHeader('sec-fetch-site', 'same-origin')
-            proxyReq.setHeader('sec-fetch-user', '?1')
-            proxyReq.setHeader('upgrade-insecure-requests', '1')
-          })
-          // Even with browser headers, Cloudflare still 403s gallery bursts
-          // from a bare dev IP. booru.ts already falls back to search-page
-          // covers when gallery pages fail — rewriting the status to 200
-          // with the challenge body keeps that fallback clean and stops the
-          // red 403 rows in the dev console. The challenge HTML carries no
-          // data-src/parseJSON, so gallery parsing yields zero pages.
-          proxy.on('proxyRes', (proxyRes, req) => {
-            try {
-              if (proxyRes.statusCode === 403 && req.url && req.url.includes('/gallery/')) {
-                proxyRes.statusCode = 200
-              }
-            } catch { /* passthrough */ }
-          })
-        },
-      },
-      '^/rg-media': {
-        // Same-origin RedGifs bytes: dodges host-based adblockers that
-        // ERR_FAILED media.redgifs.com <video> loads in dev browsers.
-        // CDN77-Turbo 403s on foreign localhost Origin — strip it and set redgifs Referer.
-        target: 'https://media.redgifs.com',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/rg-media/, ''),
-        headers: { Referer: 'https://www.redgifs.com/' },
-        configure: (proxy) => {
-          proxy.on('proxyReq', (proxyReq) => {
-            proxyReq.removeHeader('origin')
-            proxyReq.setHeader('referer', 'https://www.redgifs.com/')
-          })
-        },
-      },
-      '^/rg-auth': {
-        // RedGifs JSON API: same Origin-stripping as /rg-media — the API
-        // WAF 401s requests carrying a foreign localhost Origin even with a
-        // valid Bearer token. Authorization header passes through untouched.
-        target: 'https://api.redgifs.com',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/rg-auth/, ''),
-        headers: { Referer: 'https://www.redgifs.com/' },
-        configure: (proxy) => {
-          proxy.on('proxyReq', (proxyReq) => {
-            proxyReq.removeHeader('origin')
-            proxyReq.setHeader('referer', 'https://www.redgifs.com/')
-            proxyReq.setHeader('user-agent', DEV_UA)
-          })
-        },
-      },
-      '^/booru/kona': {
-        target: 'https://konachan.com',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/booru\/kona/, ''),
-      },
-      '^/booru/yand': {
-        target: 'https://yande.re',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/booru\/yand/, ''),
-      },
-      '^/booru/yandimg': {
-        target: 'https://files.yande.re',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/booru\/yandimg/, ''),
-      },
-      '^/booru/real': {
-        target: 'https://realbooru.com',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/booru\/real/, ''),
-        headers: { Referer: 'https://realbooru.com/' },
-      },
-      '^/booru/hgoon': booruOrgProxy('https://hgoon.booru.org', '/booru/hgoon'),
-      '^/booru/qoh': booruOrgProxy('https://qoh.booru.org', '/booru/qoh'),
-      '^/booru/celeb': booruOrgProxy('https://celeb.booru.org', '/booru/celeb'),
-      '^/booru/foot': booruOrgProxy('https://footfetishbooru.booru.org', '/booru/foot'),
-      '^/booru/blacked': booruOrgProxy('https://blacked.booru.org', '/booru/blacked'),
-      '^/booru/babe': {
-        target: 'https://babesource.com',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/booru\/babe/, ''),
-        headers: { Referer: 'https://babesource.com/' },
-        configure: (proxy) => {
-          proxy.on('proxyReq', (proxyReq) => {
-            proxyReq.removeHeader('origin')
-            proxyReq.setHeader('referer', 'https://babesource.com/')
-            proxyReq.setHeader('user-agent', DEV_UA)
-          })
-        },
-      },
+      // Every booru mirror, the RedGifs API and the RedGifs CDN, from
+      // shared/sources.json. Was 18 hand-written entries that had already
+      // drifted from the two runtime source lists.
+      ...sourceProxies(),
+      // imhentai is the one mirror that needs more than a Referer: Cloudflare
+      // 403-challenges /gallery/* when the request looks like a script. A full
+      // browser header set passes; this is what Electron's Chromium stack was
+      // implicitly sending, so dev matches the packaged app.
+      '^/booru/imh': imhentaiProxy(),
     },
   },
   build: {

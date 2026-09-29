@@ -44,8 +44,31 @@ export interface RoomMessage {
   id: string
   roomId: string
   senderOrbitId: string
+  /**
+   * Sender's display name at send time, sealed into the message body.
+   *
+   * A room is anonymous by construction: the courier stores opaque envelopes
+   * and the roster is not guaranteed to contain every member (a member can be
+   * offline, or simply absent from the capped /api/users page). Resolving names
+   * from the roster at render time is what made every room sender render as
+   * "User" / "Unknown User" / blank. Carrying the name in the sealed payload
+   * means it needs no lookup at all.
+   *
+   * Optional: rows written before this field existed have none, and the
+   * renderer falls back to the roster for those.
+   */
+  displayName?: string
   text: string
   ts: number
+}
+
+/** Inner (group-sealed) room message payload. */
+interface RoomMsgBody {
+  id: string
+  text: string
+  ts: number
+  /** Optional so messages sealed by an older client still open. */
+  n?: string
 }
 
 const ROOMS_KEY = 'orbit_rooms_v1'
@@ -160,13 +183,24 @@ export class RoomManager {
     return true
   }
 
-  /** Post: group-seal once, then ECIES-copy the group envelope to each member. */
-  async say(roomId: string, text: string): Promise<string | null> {
+  /**
+   * Post: group-seal once, then ECIES-copy the group envelope to each member.
+   *
+   * The sender's display name rides INSIDE the group envelope, so every member
+   * renders the author by name with no roster lookup — see RoomMessage.
+   */
+  async say(roomId: string, text: string, displayName?: string): Promise<string | null> {
     const room = this.rooms().find((r) => r.id === roomId)
     if (!room) return null
     const me = this.deps.identity.orbitId
     const msgId = randomHex(8)
-    const groupEnv = sealGroup(JSON.stringify({ id: msgId, text, ts: Date.now() }), 'announce', this.senderKeys(), room.id, fromHex(room.dekHex))
+    const now = Date.now()
+    const body: RoomMsgBody = { id: msgId, text, ts: now }
+    // Only a real name travels; an unset one stays absent so the receiver
+    // resolves it from its roster rather than stamping a placeholder over the
+    // name that roster already has.
+    if (displayName && displayName.trim()) body.n = displayName.trim()
+    const groupEnv = sealGroup(JSON.stringify(body), 'announce', this.senderKeys(), room.id, fromHex(room.dekHex))
     for (const memberId of room.members) {
       if (memberId === me) continue
       const keys = this.deps.peers.peerKeys(memberId)
@@ -178,7 +212,14 @@ export class RoomManager {
       }).catch(() => { /* member offline: their box holds it till TTL/next pull */ })
     }
     // Sender echoes into own history (courier never copies back to sender).
-    this.appendMessage({ id: msgId, roomId, senderOrbitId: me, text, ts: Date.now() })
+    this.appendMessage({
+      id: msgId,
+      roomId,
+      senderOrbitId: me,
+      ...(body.n ? { displayName: body.n } : {}),
+      text,
+      ts: now,
+    })
     return msgId
   }
 
@@ -247,8 +288,17 @@ export class RoomManager {
       if (!room) return true // group envelope for a room we don't hold — consume, ignore
       try {
         const inner = openGroup(wire.env, fromHex(room.dekHex))
-        const body = JSON.parse(inner.body) as { id: string; text: string; ts: number }
-        const msg: RoomMessage = { id: body.id, roomId: room.id, senderOrbitId: inner.senderOrbitId, text: body.text, ts: body.ts }
+        const body = JSON.parse(inner.body) as RoomMsgBody
+        const msg: RoomMessage = {
+          id: body.id,
+          roomId: room.id,
+          senderOrbitId: inner.senderOrbitId,
+          // Older clients sealed no name; leaving it undefined lets the renderer
+          // fall back to its roster instead of showing an empty author.
+          ...(body.n ? { displayName: body.n } : {}),
+          text: body.text,
+          ts: body.ts,
+        }
         if (this.appendMessage(msg)) this.deps.onIncoming?.(msg, room)
       } catch {
         // Stale DEK (epoch we haven't re-wrapped): ignore; a re-invite fixes it.

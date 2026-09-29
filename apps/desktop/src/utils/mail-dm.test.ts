@@ -50,6 +50,57 @@ describe('mail DM layer (courier-only, local source of truth)', () => {
     expect(decodeBody('not json')).toBeNull()
   })
 
+  it('seals the sender name into the body so the peer needs no roster lookup', () => {
+    // A DM thread can be read on a device that has never seen the peer, and
+    // /api/users is a capped page — the name has to travel with the message or
+    // the recipient renders "Unknown User".
+    const msg: DmMessage = { id: 'm1', peerId: 'p', own: true, text: 'hey', ts: 1, status: 'sending', senderName: 'Kenny' }
+    expect(decodeBody(encodeDmBody(msg))).toEqual({ t: 'dm', id: 'm1', text: 'hey', ts: 1, n: 'Kenny' })
+  })
+
+  it('trims the name and omits an empty one', () => {
+    const padded: DmMessage = { id: 'm', peerId: 'p', own: true, text: 't', ts: 1, status: 'sending', senderName: '  Kenny  ' }
+    expect(decodeBody(encodeDmBody(padded))?.n).toBe('Kenny')
+    // Absent rather than '': the reader then resolves from its own roster
+    // instead of overriding a name it already had.
+    for (const senderName of ['', '   ', undefined]) {
+      const m: DmMessage = { id: 'm', peerId: 'p', own: true, text: 't', ts: 1, status: 'sending', senderName }
+      expect(decodeBody(encodeDmBody(m))).not.toHaveProperty('n')
+    }
+  })
+
+  it('the inbound DM keeps the sender name from the sealed body', async () => {
+    const { mgr, store } = managerFor(bob)
+    const dmBody = encodeDmBody({
+      id: 'in-1', peerId: bob.orbitId, own: true, text: 'hi', ts: 42, status: 'sent', senderName: 'Alice',
+    })
+    const env = seal1to1(dmBody, 'mail', alice, bob)
+    const { open1to1 } = await import('@orbit/protocol')
+    mgr.handleOpened(open1to1(env, bob.encryptionPrivHex), env)
+    expect(store.thread(alice.orbitId)[0].senderName).toBe('Alice')
+  })
+
+  it('a DM from an older client (no name) decodes and is stored unchanged', async () => {
+    // Backwards compatibility: pre-change bodies carry no `n`, and the reader
+    // falls back to its roster exactly as before.
+    const { mgr, store } = managerFor(bob)
+    const dmBody = encodeDmBody({ id: 'in-2', peerId: bob.orbitId, own: true, text: 'old', ts: 7, status: 'sent' })
+    const env = seal1to1(dmBody, 'mail', alice, bob)
+    const { open1to1 } = await import('@orbit/protocol')
+    mgr.handleOpened(open1to1(env, bob.encryptionPrivHex), env)
+    expect(store.thread(alice.orbitId)[0].text).toBe('old')
+    expect(store.thread(alice.orbitId)[0].senderName).toBeUndefined()
+  })
+
+  it('send() stamps the name it was given onto the body and the local copy', async () => {
+    const { mgr, mail, store } = managerFor(alice)
+    store.rememberPeer(bob.orbitId, { publicKeyHex: bob.publicKeyHex, encryptionPubHex: bob.encryptionPubHex })
+    const msg = await mgr.send(bob.orbitId, 'hey', undefined, 'Alice')
+    expect(decodeBody(mail.sent[0].body)?.n).toBe('Alice')
+    expect(store.thread(bob.orbitId)[0].senderName).toBe('Alice')
+    expect(msg.senderName).toBe('Alice')
+  })
+
   it('send() appends optimistically, seals to the known peer key, marks sent', async () => {
     const { mgr, mail, store, changed } = managerFor(alice)
     store.rememberPeer(bob.orbitId, { publicKeyHex: bob.publicKeyHex, encryptionPubHex: bob.encryptionPubHex })

@@ -405,28 +405,11 @@ function sanitize(posts: BooruPost[], query?: string): BooruPost[] {
     .filter((p) => matchesQuery(p, query))
 }
 
-export interface DirectSourceDef {
-  id: string
-  origin: string
-  proxy: string
-  type: 'dapi' | 'moebooru' | 'realhtml' | 'booruorg'
-  category: 'real' | 'hentai'
-  sub?: string
-}
-
-/** Mirrors reachable through the Vite dev proxy (same-origin → no CORS). */
-export const DIRECT_SOURCES: readonly DirectSourceDef[] = [
-  { id: 'tbib-direct', origin: 'https://tbib.org', proxy: '/booru/tbib', type: 'dapi', category: 'hentai' },
-  { id: 'xbooru-direct', origin: 'https://xbooru.com', proxy: '/booru/xbooru', type: 'dapi', category: 'hentai' },
-  { id: 'konachan-direct', origin: 'https://konachan.com', proxy: '/booru/kona', type: 'moebooru', category: 'hentai' },
-  { id: 'yandere-direct', origin: 'https://yande.re', proxy: '/booru/yand', type: 'moebooru', category: 'hentai' },
-  { id: 'realbooru-direct', origin: 'https://realbooru.com', proxy: '/booru/real', type: 'realhtml', category: 'real' },
-  { id: 'hgoon-direct', origin: 'https://hgoon.booru.org', proxy: '/booru/hgoon', type: 'booruorg', sub: 'hgoon', category: 'hentai' },
-  { id: 'qoh-direct', origin: 'https://qoh.booru.org', proxy: '/booru/qoh', type: 'booruorg', sub: 'qoh', category: 'hentai' },
-  { id: 'celeb-direct', origin: 'https://celeb.booru.org', proxy: '/booru/celeb', type: 'booruorg', sub: 'celeb', category: 'real' },
-  { id: 'footfetish-direct', origin: 'https://footfetishbooru.booru.org', proxy: '/booru/foot', type: 'booruorg', sub: 'footfetishbooru', category: 'real' },
-  { id: 'blacked-direct', origin: 'https://blacked.booru.org', proxy: '/booru/blacked', type: 'booruorg', sub: 'blacked', category: 'real' },
-] as const
+// Source registry (shared/sources.json) — see services/booruSources.ts. Both
+// runtimes read the same rows, so the renderer and main can no longer drift
+// (allgirl.booru.org and rule34.booru.org were main-only for months).
+import { DIRECT_SOURCES } from './booruSources'
+export { ALL_SOURCES, refererFor, DIRECT_SOURCES, type DirectSourceDef } from './booruSources'
 
 /**
  * Combo queries (4-5 tags) get truncated by the mirrors — full query first,

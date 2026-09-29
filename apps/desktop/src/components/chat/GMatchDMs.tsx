@@ -35,6 +35,7 @@ import { ObjectImage } from '../ObjectImage';
 import { DropZone } from '../DropZone';
 import { ChatPlayerList } from './ChatPlayerList';
 import { Linkify } from '../Linkify';
+import { chatDisplayName } from './chatDisplayName';
 
 export interface PeerInfo {
   orbitId: string;
@@ -372,15 +373,8 @@ export function GMatchDMs({
       )
     : [];
 
-  const displayNameFor = (id: string, fallback?: string | null) => {
-    if (identity && id === identity.orbitId) return myDisplayName || 'You';
-    if (id === 'global_lobby') return 'Lobby Lounge (Everyone)';
-    if (id === 'card_queue') return 'Card Game Queue';
-    const peer = peerMap.get(id);
-    if (peer?.name && !peer.name.startsWith('0x') && peer.name.length < 32) return peer.name;
-    if (fallback && !fallback.startsWith('0x') && fallback.length < 32) return fallback;
-    return 'User';
-  };
+  const displayNameFor = (id: string, fallback?: string | null) =>
+    chatDisplayName({ id, payloadName: fallback, roster: peerMap, selfId: identity?.orbitId, selfName: myDisplayName });
 
   const rawDisplayedMessages: ChatMessage[] =
     openTarget === 'room'

@@ -32,6 +32,15 @@ export interface DmMessage {
   envelopeId?: string
   /** Private object id shared sealed-side; recipient pulls via Recipients. */
   attachmentId?: string
+  /**
+   * Sender's display name at send time, carried inside the sealed body.
+   *
+   * A DM thread can outlive any roster entry for the peer (they may be outside
+   * the capped directory, or the thread may be read on a device that has never
+   * seen them), which is why the reader used to render "Unknown User". Optional
+   * so threads written by an older client still decode.
+   */
+  senderName?: string
 }
 
 const THREADS_KEY = 'orbit_mail_threads_v1'
@@ -126,15 +135,28 @@ export class DmStore {
 /** Body format for DM envelopes + receipts (all sealed end-to-end).
  * `e` piggybacks the sender's current session epoch (wave 2 C2) so replies
  * address the rotating token instead of the static home token. `a` carries a
- * private attachment object id (uploaded with the peer as recipient). */
+ * private attachment object id (uploaded with the peer as recipient).
+ * `n` carries the sender's display name so the recipient never has to resolve
+ * it from a roster that may not contain them. */
 export function encodeDmBody(msg: DmMessage, epoch?: string): string {
-  return JSON.stringify({ t: 'dm', id: msg.id, text: msg.text, ts: msg.ts, ...(epoch ? { e: epoch } : {}), ...(msg.attachmentId ? { a: msg.attachmentId } : {}) })
+  const name = msg.senderName?.trim()
+  return JSON.stringify({
+    t: 'dm',
+    id: msg.id,
+    text: msg.text,
+    ts: msg.ts,
+    ...(epoch ? { e: epoch } : {}),
+    ...(msg.attachmentId ? { a: msg.attachmentId } : {}),
+    // Only a real name travels; an empty one is omitted so the reader resolves
+    // it from its roster rather than overriding a name the roster already has.
+    ...(name ? { n: name } : {}),
+  })
 }
 export function encodeAckBody(refId: string, epoch?: string): string {
   return JSON.stringify({ t: 'dm_ack', id: refId, ...(epoch ? { e: epoch } : {}) })
 }
 
-export function decodeBody(json: string): { t: 'dm' | 'dm_ack'; id: string; text?: string; ts?: number; e?: string; a?: string } | null {
+export function decodeBody(json: string): { t: 'dm' | 'dm_ack'; id: string; text?: string; ts?: number; e?: string; a?: string; n?: string } | null {
   try {
     const parsed = JSON.parse(json)
     if ((parsed.t === 'dm' || parsed.t === 'dm_ack') && typeof parsed.id === 'string') return parsed
@@ -154,8 +176,10 @@ export interface DmManagerDeps {
 export class DmManager {
   constructor(private readonly deps: DmManagerDeps) {}
 
-  /** Outgoing DM: optimistic append -> seal+PUT to courier via MailClient. */
-  async send(peerId: string, text: string, attachmentId?: string): Promise<DmMessage> {
+  /** Outgoing DM: optimistic append -> seal+PUT to courier via MailClient.
+   *  `senderName` is sealed into the body so the recipient renders the author
+   *  by name without a roster lookup. */
+  async send(peerId: string, text: string, attachmentId?: string, senderName?: string): Promise<DmMessage> {
     const keys = this.deps.store.peerKeys(peerId)
     const msg: DmMessage = {
       id: `dm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -165,6 +189,7 @@ export class DmManager {
       ts: Date.now(),
       status: 'sending',
       ...(attachmentId ? { attachmentId } : {}),
+      ...(senderName?.trim() ? { senderName: senderName.trim() } : {}),
     }
     this.deps.store.appendLocal(msg)
     this.deps.onThreadChanged(peerId)
@@ -229,6 +254,9 @@ export class DmManager {
       status: 'delivered',
       envelopeId: opened.id,
       ...(typeof body.a === 'string' && body.a ? { attachmentId: body.a } : {}),
+      // Absent on messages from an older client — the renderer falls back to
+      // its roster for those, which is the pre-fix behaviour.
+      ...(typeof body.n === 'string' && body.n ? { senderName: body.n } : {}),
     }
     this.deps.store.appendLocal(inbound)
     this.deps.onThreadChanged(peerId)

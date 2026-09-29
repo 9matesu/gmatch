@@ -13,6 +13,7 @@ const customFolders = require('./customFolders.cjs')
 const wallpaperWin = require('./wallpaperWin.cjs')
 const { sanitizeBounds } = require('./window-bounds-core.cjs')
 const { dapiSource, booruOrgSource } = require('./booru-sources-core.cjs')
+const { loadRegistry: loadBooruRegistry, refererFor: booruRefererFor } = require('./booru-registry.cjs')
 
 // Background video & screen sharing fix: keep video playback running and prevent black screen when alt-tabbed / occluded.
 app.commandLine.appendSwitch('disable-background-timer-throttling')
@@ -194,6 +195,11 @@ function loadBlocklistData() {
 
 loadBlocklistData()
 
+// Booru origins (shared/sources.json) — the same rows the renderer and the
+// vite dev proxy read, so a mirror can no longer exist in one runtime only.
+const booruRegistry = loadBooruRegistry(app)
+const booruSources = booruRegistry.sources
+
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
@@ -234,12 +240,10 @@ async function httpGet(url, headers, timeoutMs) {
   if (typeof url === 'string') {
     try {
       const u = new URL(url)
-      if (url.includes('imhentai.xxx')) ref = { Referer: 'https://imhentai.xxx/' }
-      else if (url.includes('paheal')) ref = { Referer: 'https://rule34.paheal.net/' }
-      else if (url.includes('realbooru.com')) ref = { Referer: 'https://realbooru.com/' }
-      else if (url.includes('booru.org')) ref = { Referer: 'https://booru.org/' }
-      else if (url.includes('redgifs.com')) ref = { Referer: 'https://www.redgifs.com/' }
-      else ref = { Referer: u.origin + '/' }
+      // Referer comes from shared/sources.json — this used to be a hand-written
+      // hostname chain duplicated in three other files, which is how
+      // babesource/xbooru/twimg quietly lost their Referer in one copy each.
+      ref = { Referer: booruRefererFor(u.hostname, booruSources) }
     } catch {
       /* ignore invalid url */
     }
@@ -583,7 +587,11 @@ function parseBooruOrgPost(html) {
 // ignores search_text — every query returns the same global feed, so plain
 // search is query-blind). Shape: gifs[] with urls.hd (.mp4), urls.poster
 // (.jpg), id, tags[], niches[], width, height.
-const REDGIFS_API = 'https://api.redgifs.com'
+// Registry-driven (shared/sources.json). No literal fallback on purpose: if the
+// registry fails to load, booruSources is empty, no redgifs source is ever
+// built, and this stays unread. A hardcoded copy here is exactly the drift the
+// registry exists to remove.
+const REDGIFS_API = (booruSources.find((s) => s.kind === 'redgifs') || {}).apiOrigin || ''
 let redgifsToken = null
 let redgifsTokenExp = 0
 // Niche id per query (null = generic fallback), 1h TTL.
@@ -1237,62 +1245,31 @@ async function fetchBabesource(variant, n) {
   return covers
 }
 
-// Round-robin over sources with simple health tracking (SPEC §6).
-// Explicit-rated human sources categorized as 'real' or 'hentai'.
-const SOURCES = [
-  dapiSource('tbib', 'https://tbib.org', { httpGet, parse: parseDanbooruJson, negatives: getQueryNegatives }, 'hentai'),
-  dapiSource('xbooru', 'https://xbooru.com', { httpGet, parse: parseDanbooruJson, negatives: getQueryNegatives }, 'hentai'),
-  {
-    // Real/hardcore porn: pornstars (skylar vox), BBC, mp4s/gifs.
-    id: 'redgifs',
-    category: 'real',
-    fetch: (variant, n) => fetchRedgifs(variant, n),
-  },
-  {
-    // paheal combos return 0 results — query a single tag only.
-    id: 'paheal',
-    category: 'hentai',
-    fetch: async (variant, n, opts) => {
-      const tag = variant.split(/\s+/)[0]
-      const page = opts && opts.deterministic ? 1 : 1 + Math.floor(Math.random() * 5)
-      let xml = await httpGet(
-        `https://rule34.paheal.net/api/danbooru/find_posts?tags=${encodeURIComponent(tag)}&limit=${n}&page=${page}`
-      )
-      let posts = parsePahealXml(xml)
-      if (posts.length === 0 && page > 1) {
-        xml = await httpGet(
-          `https://rule34.paheal.net/api/danbooru/find_posts?tags=${encodeURIComponent(tag)}&limit=${n}&page=1`
-        )
-        posts = parsePahealXml(xml)
-      }
-      return posts
-    },
-  },
-  {
-    // Slow (multi-fetch scrape) — last resort before giving up.
-    id: 'imhentai',
-    category: 'hentai',
-    fetch: (variant, n) => fetchImhentai(variant, n),
-  },
-  {
-    // Explicit hentai pools (Moebooru JSON, no key): biggest anime/hentai
-    // archive of the bunch. Serves uncensored per yandere/konachan probes.
-    id: 'konachan',
-    category: 'hentai',
+// Per-kind fetch strategy. Everything about WHICH mirrors exist and where they
+// live comes from shared/sources.json; this map only says how each protocol
+// shape is spoken. A source row with no entry here is skipped (and logged) so a
+// typo in the registry degrades loudly rather than silently.
+const SOURCE_FETCHERS = {
+  dapi: (s) =>
+    dapiSource(s.id, s.origin, { httpGet, parse: parseDanbooruJson, negatives: getQueryNegatives }, s.category),
+
+  // Explicit hentai pools (Moebooru JSON, no key). Serves uncensored per
+  // yandere/konachan probes.
+  moebooru: (s) => ({
+    id: s.id,
+    category: s.category,
     fetch: async (variant, n, opts) =>
-      parseMoebooruJson(await httpGet(moebooruUrl('https://konachan.com', variant, n, opts && opts.deterministic)), 'kona'),
-  },
-  {
-    id: 'yandere',
-    category: 'hentai',
-    fetch: async (variant, n, opts) =>
-      parseMoebooruJson(await httpGet(moebooruUrl('https://yande.re', variant, n, opts && opts.deterministic)), 'yand'),
-  },
-  {
-    // realbooru: real/hardcore porn (jav uncensored, pov, homemade).
-    // DAPI offline (API deliberately disabled) — HTML list scraper.
-    id: 'realbooru',
-    category: 'real',
+      parseMoebooruJson(
+        await httpGet(moebooruUrl(s.origin, variant, n, opts && opts.deterministic)),
+        s.parsePrefix || s.id,
+      ),
+  }),
+
+  // realbooru: real/hardcore porn (jav uncensored, pov, homemade).
+  // DAPI offline (API deliberately disabled) — HTML list scraper.
+  realhtml: (s) => ({
+    id: s.id,
+    category: s.category,
     fetch: async (variant, n) => {
       // Preserve multi-word tags with underscores (e.g. skylar_vox),
       // don't drop the rest of the query with split(/\s+/)[0].
@@ -1302,28 +1279,63 @@ const SOURCES = [
       // expanded view results + seen-memory.
       const tagParam = variant.trim().replace(/\s+/g, '_')
       const html = await httpGet(
-        `https://realbooru.com/index.php?page=post&s=list&tags=${encodeURIComponent(tagParam)}`
+        `${s.origin}/index.php?page=post&s=list&tags=${encodeURIComponent(tagParam)}`
       )
       // Exact file URLs via post-view expansion (guessed-url fallback).
-      const expanded = await expandPostViews(parseRealbooruEntries(html), 'https://realbooru.com', parseRealbooruPost)
+      const expanded = await expandPostViews(parseRealbooruEntries(html), s.origin, parseRealbooruPost)
       return expanded.slice(0, n)
     },
-  },
-  {
-    // babesource: real porn photo galleries (full-res stills, eporner replacement).
-    // Stills-only — no long videos by construction.
-    id: 'babesource',
-    category: 'real',
-    fetch: (variant, n) => fetchBabesource(variant, n),
-  },
-  booruOrgSource('hgoon.booru.org', { httpGet, parse: parseBooruOrgHtml, parseEntries: parseBooruOrgEntries, parsePost: parseBooruOrgPost }, 'hgoon', 'hentai'),
-  booruOrgSource('blacked.booru.org', { httpGet, parse: parseBooruOrgHtml, parseEntries: parseBooruOrgEntries, parsePost: parseBooruOrgPost }, 'blacked', 'real'),
-  booruOrgSource('allgirl.booru.org', { httpGet, parse: parseBooruOrgHtml, parseEntries: parseBooruOrgEntries, parsePost: parseBooruOrgPost }, 'allgirl', 'real'),
-  booruOrgSource('rule34.booru.org', { httpGet, parse: parseBooruOrgHtml, parseEntries: parseBooruOrgEntries, parsePost: parseBooruOrgPost }, 'rule34-org', 'hentai'),
-  booruOrgSource('qoh.booru.org', { httpGet, parse: parseBooruOrgHtml, parseEntries: parseBooruOrgEntries, parsePost: parseBooruOrgPost }, 'qoh', 'hentai'),
-  booruOrgSource('celeb.booru.org', { httpGet, parse: parseBooruOrgHtml, parseEntries: parseBooruOrgEntries, parsePost: parseBooruOrgPost }, 'celeb', 'real'),
-  booruOrgSource('footfetishbooru.booru.org', { httpGet, parse: parseBooruOrgHtml, parseEntries: parseBooruOrgEntries, parsePost: parseBooruOrgPost }, 'footfetish', 'real'),
-]
+  }),
+
+  booruorg: (s) =>
+    booruOrgSource(
+      s.origin.replace(/^https?:\/\//, ''),
+      { httpGet, parse: parseBooruOrgHtml, parseEntries: parseBooruOrgEntries, parsePost: parseBooruOrgPost },
+      s.id,
+      s.category,
+    ),
+
+  // Real/hardcore porn: pornstars (skylar vox), BBC, mp4s/gifs.
+  redgifs: (s) => ({ id: s.id, category: s.category, fetch: (variant, n) => fetchRedgifs(variant, n) }),
+
+  // babesource: real porn photo galleries (full-res stills, eporner replacement).
+  // Stills-only — no long videos by construction.
+  babesource: (s) => ({ id: s.id, category: s.category, fetch: (variant, n) => fetchBabesource(variant, n) }),
+
+  // Slow (multi-fetch scrape) — last resort before giving up.
+  imhentai: (s) => ({ id: s.id, category: s.category, fetch: (variant, n) => fetchImhentai(variant, n) }),
+
+  // paheal combos return 0 results — query a single tag only.
+  paheal: (s) => ({
+    id: s.id,
+    category: s.category,
+    fetch: async (variant, n, opts) => {
+      const tag = variant.split(/\s+/)[0]
+      const page = opts && opts.deterministic ? 1 : 1 + Math.floor(Math.random() * 5)
+      const url = (p) =>
+        `${s.origin}/api/danbooru/find_posts?tags=${encodeURIComponent(tag)}&limit=${n}&page=${p}`
+      let posts = parsePahealXml(await httpGet(url(page)))
+      if (posts.length === 0 && page > 1) {
+        posts = parsePahealXml(await httpGet(url(1)))
+      }
+      return posts
+    },
+  }),
+}
+
+// Round-robin over sources with simple health tracking (SPEC §6).
+// Explicit-rated human sources categorized as 'real' or 'hentai'. Built from
+// shared/sources.json — before this, main and the renderer kept independent
+// lists and allgirl.booru.org / rule34.booru.org shipped main-only.
+const SOURCES = booruSources.flatMap((s) => {
+  const make = SOURCE_FETCHERS[s.kind]
+  if (!make) {
+    mainLog(`[booru] no fetcher for kind "${s.kind}" (source ${s.id}) — skipped`)
+    return []
+  }
+  return [make(s)]
+})
+mainLog(`[booru] ${SOURCES.length} sources from registry: ${SOURCES.map((s) => s.id).join(', ')}`)
 
 const fetchBooru = createFetchBooru({
   sources: SOURCES,
@@ -1543,6 +1555,14 @@ app.whenReady().then(async () => {
   ipcMain.handle('wallpaper:set-data', (_event, buf, mime) => wallpaperWin.setWallpaperFromBuffer(Buffer.from(buf), String(mime || '')))
   ipcMain.handle('wallpaper:restore', () => wallpaperWin.restoreWallpaper())
   ipcMain.handle('wallpaper:cleanup-files', () => { wallpaperWin.cleanupWallpaperFiles(); return { ok: true } })
+  // A domination wallpaper that outlives the app is the worst failure mode of
+  // this feature: the victim closes gMatch and their desktop is still
+  // somebody else's picture, with the only copy of the original living in this
+  // process. Nothing called restore on the way out (cleanup-files only deletes
+  // temp files, it does not put the wallpaper back), so close it here.
+  for (const evt of ['before-quit', 'will-quit']) {
+    app.on(evt, () => { if (wallpaperWin.hasPendingSwap()) void wallpaperWin.restoreWallpaper() })
+  }
   // Camera stays denied by default; the renderer consumes a one-shot grant
   // only AFTER the victim clicks "Allow once" on the in-app prompt.
   ipcMain.handle('camera:grant-once', () => { cameraGrantOnce = true; return { ok: true } })

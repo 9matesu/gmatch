@@ -173,3 +173,73 @@ describe('Ares-style rooms over the blind courier', () => {
     expect(JSON.parse(o.outbox[0].body).env.sealed).toBe(JSON.parse(o.outbox[1].body).env.sealed)
   })
 })
+
+describe('room messages carry the author name (sealed, not roster-resolved)', () => {
+  /** Set up owner+member sharing one room, return both managers. */
+  async function sharedRoom() {
+    const o = managerFor(owner, [member])
+    const room = o.mgr.createRoom('lounge')
+    await o.mgr.invite(room.id, member.orbitId)
+    const m = managerFor(member, [owner])
+    m.mgr.handleOpened({
+      kind: 'invite', id: 'i', to: '', body: o.outbox[0].body,
+      senderPubHex: owner.publicKeyHex, senderOrbitId: owner.orbitId,
+    })
+    return { o, m, room }
+  }
+
+  it('the recipient sees the sender name with no roster entry for them', async () => {
+    // The point: a room member is often absent from the capped /api/users page,
+    // which is why the old hardcoded `senderName: ''` rendered every room
+    // sender as "User".
+    const { o, m, room } = await sharedRoom()
+    o.outbox.length = 0
+    await o.mgr.say(room.id, 'hello room', 'Kenny')
+    expect(m.mgr.handleOpened({
+      kind: 'mail', id: 'm', to: '', body: o.outbox[0].body,
+      senderPubHex: owner.publicKeyHex, senderOrbitId: owner.orbitId,
+    })).toBe(true)
+    const msgs = m.mgr.messages(room.id)
+    expect(msgs[0].displayName).toBe('Kenny')
+    expect(msgs[0].senderOrbitId).toBe(owner.orbitId)
+  })
+
+  it('the sender sees their own name on the local echo', async () => {
+    const { o, room } = await sharedRoom()
+    await o.mgr.say(room.id, 'hi', 'Kenny')
+    expect(o.mgr.messages(room.id)[0].displayName).toBe('Kenny')
+  })
+
+  it('trims the name and omits an empty one', async () => {
+    const { o, m, room } = await sharedRoom()
+    o.outbox.length = 0
+    await o.mgr.say(room.id, 'padded', '  Kenny  ')
+    m.mgr.handleOpened({
+      kind: 'mail', id: 'm1', to: '', body: o.outbox[0].body,
+      senderPubHex: owner.publicKeyHex, senderOrbitId: owner.orbitId,
+    })
+    expect(m.mgr.messages(room.id)[0].displayName).toBe('Kenny')
+
+    o.outbox.length = 0
+    await o.mgr.say(room.id, 'blank', '   ')
+    m.mgr.handleOpened({
+      kind: 'mail', id: 'm2', to: '', body: o.outbox[0].body,
+      senderPubHex: owner.publicKeyHex, senderOrbitId: owner.orbitId,
+    })
+    // Absent, not '': the reader then resolves from its own roster instead of
+    // stamping a blank over a name it already had.
+    expect(m.mgr.messages(room.id)[1].displayName).toBeUndefined()
+  })
+
+  it('says() with no name arg still works (older callers)', async () => {
+    const { o, m, room } = await sharedRoom()
+    o.outbox.length = 0
+    await o.mgr.say(room.id, 'no name given')
+    m.mgr.handleOpened({
+      kind: 'mail', id: 'm', to: '', body: o.outbox[0].body,
+      senderPubHex: owner.publicKeyHex, senderOrbitId: owner.orbitId,
+    })
+    expect(m.mgr.messages(room.id)[0].text).toBe('no name given')
+    expect(m.mgr.messages(room.id)[0].displayName).toBeUndefined()
+  })
+})

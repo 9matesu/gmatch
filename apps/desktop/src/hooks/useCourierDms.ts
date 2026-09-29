@@ -9,6 +9,7 @@ import { detectMailMode, cachedMailMode, isKnownSiteCourier, type MailMode } fro
 import { getApiBaseUrl } from '../utils/api'
 import { logger } from '../utils/logger'
 import { handleInboundSignal } from '../utils/courierSignaling'
+import { ownDisplayName } from '../utils/displayName'
 
 export interface CourierDeps {
   webSocketFactory?: (url: string) => MailSocket
@@ -135,9 +136,12 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
     }
   }, [identity, mode])
 
+  // The sender is always the local user, so the name is read from the shared
+  // storage key rather than threaded through every call site — a caller that
+  // forgot to pass it is exactly how names went missing.
   const send = useCallback(async (peerId: string, text: string, attachmentId?: string): Promise<DmMessage | null> => {
     if (!managerRef.current) return null
-    return managerRef.current.send(peerId, text, attachmentId)
+    return managerRef.current.send(peerId, text, attachmentId, ownDisplayName() || undefined)
   }, [])
 
   const pull = useCallback(async () => {
@@ -161,7 +165,7 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
   }, [])
   const sayInRoom = useCallback((roomId: string, text: string) => {
     const r = roomsRef.current
-    return r ? r.say(roomId, text) : Promise.resolve(null)
+    return r ? r.say(roomId, text, ownDisplayName() || undefined) : Promise.resolve(null)
   }, [])
   const leaveRoom = useCallback((roomId: string) => roomsRef.current?.leave(roomId), [])
   const roomMessages = useCallback((roomId: string) => roomsRef.current?.messages(roomId) ?? [], [])

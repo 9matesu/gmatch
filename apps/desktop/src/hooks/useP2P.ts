@@ -6,11 +6,13 @@ import { saveObject } from '../utils/storage';
 import { OrbitPeerRelay } from '../utils/peer-relay';
 import { getApiWebSocketUrl, orbitFetch } from '../utils/api';
 import { mergeRoster } from '../utils/peerRoster';
+import { presenceBucket } from '../utils/compare';
 import { CHAT_WIPE_SECONDS } from '@orbit/shared';
 import { logger } from '../utils/logger';
 import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, announcePeerOnline, type SwarmMessage } from '../utils/p2pSwarm';
 import { broadcastPresence, fetchPresenceRoster } from '../services/courierPresence';
 import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh } from '../utils/courierSignaling';
+import { resolveDisplayName } from '../utils/displayName';
 
 const CHAT_WIPE_MS = CHAT_WIPE_SECONDS * 1000;
 const DIRECT_WEBRTC_FANOUT_LIMIT = 3;
@@ -54,6 +56,11 @@ function arePeersStructurallyEqual(a: User[], b: User[]): boolean {
     ) {
       return false;
     }
+    // `last_seen` too, bucketed: the swarm re-stamps it on every PRESENCE
+    // frame while `online` stays true, and a frozen timestamp pins the profile
+    // modal to Offline even though the peer is plainly in the roster. 15s is
+    // well inside the 60s freshness window so no transition is missed.
+    if (presenceBucket(a[i].last_seen) !== presenceBucket(b[i].last_seen)) return false;
   }
   return true;
 }
@@ -807,7 +814,15 @@ export function useP2P(identity: OrbitIdentity | null) {
     const chatMsg: ChatMessage = {
       id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       senderId: selfUser.id,
-       senderName: selfUser.display_name?.trim() || 'Unknown User',
+      // The lobby is a PUBLIC channel, so this name is what every other client
+      // renders — resolving it through the shared helper (local storage first)
+      // keeps it identical to what the chat hub shows for the same person.
+      senderName: resolveDisplayName({
+        selfId: selfUser.id,
+        senderId: selfUser.id,
+        roster: peerMapRef.current,
+        fallback: selfUser.display_name,
+      }),
       text,
       timestamp: Date.now(),
       channel,

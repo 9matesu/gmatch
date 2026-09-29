@@ -12,7 +12,8 @@
     "electron": "electron .",
     "lint": "eslint .",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+      "typecheck": "tsc --noEmit",
+      "e2e:clean": "node scripts/clean-e2e-state.mjs",
     "icon": "node scripts/make-icon.cjs",
     "dist": "npm run icon && npm run stage:api && npm run build && electron-builder --win portable --config.directories.output=dist-bin",
     "pack": "electron-builder --win portable",
@@ -98,6 +99,10 @@
       {
         "from": "../../shared/blocklist.json",
         "to": "shared/blocklist.json"
+      },
+      {
+        "from": "../../shared/sources.json",
+        "to": "shared/sources.json"
       }
     ]
   },
