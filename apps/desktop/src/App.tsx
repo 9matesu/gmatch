@@ -381,6 +381,9 @@ export default function Home() {
     peerId?: string
     groupId?: string
     replyToId?: string
+    /** Pre-seeded from a chat paste: a copied image, or a pasted image link. */
+    initialFiles?: File[]
+    initialUrl?: string
   } | null>(null)
   const [groupPickerOpen, setGroupPickerOpen] = useState(false)
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null)
@@ -2295,14 +2298,25 @@ export default function Home() {
     }
   }, [identity, loadGroupMessages, toast])
 
-  const openAttachmentModal = useCallback((target: 'pm' | 'group', peerId?: string, groupId?: string, replyToId?: string) => {
+  const openAttachmentModal = useCallback((
+    target: 'pm' | 'group',
+    peerId?: string,
+    groupId?: string,
+    replyToId?: string,
+    files?: File[],
+    url?: string,
+  ) => {
     if (target === 'group' && !groupId) {
       // No specific group selected - open group picker first
       setGroupPickerOpen(true)
         // Store the replyToId for later
-        ; (window as any).__pendingGroupReplyToId = replyToId
+      ; (window as any).__pendingGroupReplyToId = replyToId
+        // A paste into the group-less state still has to survive the picker,
+        // or choosing a group would silently discard the image.
+      ; (window as any).__pendingAttachmentFiles = files
+      ; (window as any).__pendingAttachmentUrl = url
     } else {
-      setAttachmentModal({ isOpen: true, target, peerId, groupId, replyToId })
+      setAttachmentModal({ isOpen: true, target, peerId, groupId, replyToId, initialFiles: files, initialUrl: url })
     }
   }, [])
 
@@ -2332,15 +2346,20 @@ export default function Home() {
   const handleGroupPickerSelect = useCallback((groupId: string) => {
     const pendingAttachment = (window as any).__pendingBabecockAttachment
     const replyToId = (window as any).__pendingGroupReplyToId
+    const pastedFiles = (window as any).__pendingAttachmentFiles as File[] | undefined
+    const pastedUrl = (window as any).__pendingAttachmentUrl as string | undefined
       ; (window as any).__pendingBabecockAttachment = null
       ; (window as any).__pendingGroupReplyToId = null
+      ; (window as any).__pendingAttachmentFiles = undefined
+      ; (window as any).__pendingAttachmentUrl = undefined
     setGroupPickerOpen(false)
     if (pendingAttachment) {
       // Send directly without opening attachment modal
       void sendGroupMessage(groupId, '', replyToId, pendingAttachment)
     } else {
-      // Open attachment modal for this group
-      setAttachmentModal({ isOpen: true, target: 'group', groupId, replyToId })
+      // Open attachment modal for this group, carrying the pasted image (if
+      // any) through the picker rather than dropping it on the floor.
+      setAttachmentModal({ isOpen: true, target: 'group', groupId, replyToId, initialFiles: pastedFiles, initialUrl: pastedUrl })
     }
   }, [sendGroupMessage])
 
@@ -4595,6 +4614,8 @@ export default function Home() {
                 identity={identity}
                 title={attachmentModal?.target === 'pm' ? 'Attach to Message' : 'Attach to Group Chat'}
                 recipientId={attachmentModal?.peerId}
+                initialFiles={attachmentModal?.initialFiles}
+                initialUrl={attachmentModal?.initialUrl}
               />
               <ChangelogModal
                 isOpen={showChangelogModal}

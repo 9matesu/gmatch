@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { playPress } from '../../utils/sounds';
 import { resolveMediaUrl } from '../../utils/media';
 import { GroupMembersPopover, type GroupMember } from './GroupMembersPopover';
@@ -32,7 +32,7 @@ import type { User } from '@orbit/shared';
 import type { ChatMessage } from '../../hooks/useP2P';
 import { orbitFetch } from '../../utils/api';
 import { ObjectImage } from '../ObjectImage';
-import { DropZone } from '../DropZone';
+import { DropZone, readClipboard } from '../DropZone';
 import { ChatPlayerList } from './ChatPlayerList';
 import { Linkify } from '../Linkify';
 import { chatDisplayName } from './chatDisplayName';
@@ -141,7 +141,20 @@ export function GMatchDMs({
   getRoomMessages?: (roomId: string) => ChatMessage[];
   onSendMessage?: (text: string, channel?: string) => void;
   onSendPm?: (peerId: string, text: string, replyToId?: string, attachment?: { id: string; url: string; isVideo?: boolean }) => void;
-  onOpenAttachment?: (target: 'pm' | 'group', peerId?: string, groupId?: string, replyToId?: string) => void;
+  /**
+   * Open the attachment modal, optionally pre-seeded from a paste: `files` for
+   * a copied image, `url` for a pasted image link. Pre-seeding (rather than
+   * uploading silently) keeps the crop step, preview and validation in one
+   * place instead of duplicating them for pasted media.
+   */
+  onOpenAttachment?: (
+    target: 'pm' | 'group',
+    peerId?: string,
+    groupId?: string,
+    replyToId?: string,
+    files?: File[],
+    url?: string,
+  ) => void;
   onSelectPeer: (peer: PeerInfo | null) => void;
   onBackToThreads?: () => void;
   onReportMessage?: (messageId: string) => void;
@@ -270,6 +283,89 @@ export function GMatchDMs({
     setInputText('');
     setReplyingTo(null);
     setPendingAttachment(null);
+  };
+
+  /** Where an attachment can be sent right now, or null if attachments are off. */
+  const attachmentTarget = (): { target: 'pm' | 'group'; peerId?: string; groupId?: string } | null => {
+    if (openTarget === 'group' && activeGroupId) return { target: 'group', groupId: activeGroupId };
+    if (openTarget === 'peer' && activePmPeer) return { target: 'pm', peerId: activePmPeer.orbitId };
+    return null;
+  };
+
+  /**
+   * Inline notice for a rejected paste and for the copy-image result. The hub
+   * has no toast surface of its own, and silently dropping a paste is exactly
+   * the bug this replaces — the player needs to be told why nothing happened.
+   */
+  const [pasteNotice, setPasteNotice] = useState<string | null>(null);
+  const showPasteNotice = useCallback((msg: string) => {
+    setPasteNotice(msg);
+    window.setTimeout(() => setPasteNotice((cur) => (cur === msg ? null : cur)), 2600);
+  }, []);
+
+  /**
+   * Paste into the composer.
+   *
+   * The composer's <form>/<textarea> sit OUTSIDE the DropZone, so paste events
+   * here never reached its handler: pasting an image into a conversation did
+   * nothing at all, and pasting a link was silently dropped because the chat
+   * DropZone had no onPasteUrl. This handles it on the textarea itself, using
+   * the shared readClipboard so both surfaces agree on what an image paste is.
+   *
+   * A pasted file is handed to the SAME attachment modal the paperclip opens
+   * (pre-seeded), rather than uploaded behind the player's back — so the crop
+   * step, the preview and the validation all still apply.
+   */
+  const handleComposerPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const payload = readClipboard(e);
+    if (payload.kind === 'text') return; // plain text: let the textarea paste it
+
+    e.preventDefault();
+
+    const where = attachmentTarget();
+    if (!where) {
+      // Sealed rooms are text-only (handleSend blocks attachments there too),
+      // and the lobby/queue are broadcast text channels. Say so rather than
+      // accepting the paste and dropping it.
+      showPasteNotice(
+        openTarget === 'room'
+          ? 'Sealed rooms are text only.'
+          : 'Attachments need a direct message or a group.',
+      );
+      return;
+    }
+
+    if (payload.kind === 'files') {
+      const image = payload.files.find((f) => f.type.startsWith('image/')) ?? payload.files[0];
+      onOpenAttachment?.(where.target, where.peerId, where.groupId, replyingTo?.id, [image]);
+      return;
+    }
+
+    if (payload.kind !== 'url') return; // 'empty' — nothing to attach
+
+    // A pasted image URL goes through the same modal, which is the only place
+    // that can resolve and validate a remote link.
+    onOpenAttachment?.(where.target, where.peerId, where.groupId, replyingTo?.id, undefined, payload.url);
+  };
+
+  /**
+   * Copy an attachment's IMAGE to the clipboard, so it can be pasted straight
+   * into another conversation. The only other copy-image affordance in the app
+   * is on the fullscreen context overlay, so re-sending a picture meant
+   * saving it and uploading it again.
+   */
+  const [copyingImage, setCopyingImage] = useState<string | null>(null);
+  const copyAttachmentImage = async (msg: ChatMessage) => {
+    const url = msg.attachmentUrl;
+    if (!url) return;
+    setCopyingImage(msg.id);
+    // Imported lazily: the clipboard bridge pulls in media resolution the chat
+    // hub does not otherwise need.
+    const { copyImageToClipboard } = await import('../../utils/media');
+    const ok = await copyImageToClipboard(url).catch(() => false);
+    setCopyingImage(null);
+    setActionFor(null);
+    showPasteNotice(ok ? 'Image copied to clipboard.' : 'Could not copy that image.');
   };
 
   const handleEditMessage = async (msg: ChatMessage) => {
@@ -409,7 +505,6 @@ export function GMatchDMs({
     if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
     setActionFor(null);
   };
-
   useEffect(() => {
     const stream = messageStreamRef.current;
     if (stream) stream.scrollTop = stream.scrollHeight;
@@ -1032,6 +1127,9 @@ export function GMatchDMs({
                                   return (
                                     <div className={`flex flex-wrap items-center gap-1 mt-1 ${isOwn ? 'justify-end' : ''}`}>
                                       <button type="button" onClick={() => copyMessage(msg.text)} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Copy className="w-3 h-3" /> Copy</button>
+                                      {!msg.attachmentMime?.startsWith('video/') && msg.attachmentUrl && (
+                                        <button type="button" onClick={() => void copyAttachmentImage(msg)} disabled={copyingImage === msg.id} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer hover:bg-glass-w12 disabled:opacity-50"><ImagePlus className="w-3 h-3" /> {copyingImage === msg.id ? 'Copying…' : 'Copy image'}</button>
+                                      )}
                                     </div>
                                   );
                                 }
@@ -1041,6 +1139,9 @@ export function GMatchDMs({
                                 <div className={`flex flex-wrap items-center gap-1 mt-1 ${isOwn ? 'justify-end' : ''}`}>
                                   <button type="button" onClick={() => { setReplyingTo(msg); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Reply className="w-3 h-3" /> Reply</button>
                                   <button type="button" onClick={() => copyMessage(msg.text)} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Copy className="w-3 h-3" /> Copy</button>
+                                  {!msg.attachmentMime?.startsWith('video/') && msg.attachmentUrl && (
+                                    <button type="button" onClick={() => void copyAttachmentImage(msg)} disabled={copyingImage === msg.id} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer hover:bg-glass-w12 disabled:opacity-50"><ImagePlus className="w-3 h-3" /> {copyingImage === msg.id ? 'Copying…' : 'Copy image'}</button>
+                                  )}
                                   {canEdit && (
                                     <button
                                       type="button"
@@ -1119,6 +1220,12 @@ export function GMatchDMs({
               </div>
             )}
 
+            {pasteNotice && (
+              <div role="status" className="px-3 pt-2 text-xs text-retro-muted shrink-0 border-t border-border-glass">
+                {pasteNotice}
+              </div>
+            )}
+
             <form onSubmit={handleSend} className="p-3 border-t border-border-glass bg-surface-raised/40 backdrop-blur-md flex items-center gap-2 shrink-0">
               {(activePmPeer && openTarget === 'peer') || openTarget === 'group' ? (
                 <button
@@ -1131,7 +1238,7 @@ export function GMatchDMs({
                       onOpenAttachment?.('pm', activePmPeer.orbitId, undefined, replyingTo?.id);
                     }
                   }}
-                  title="Attach an image or video"
+                  title="Attach an image or video — or just paste one"
                   className="p-2 rounded-md bg-glass-w10 border border-border-glass text-retro-muted hover:text-retro-accent cursor-pointer transition-colors"
                 >
                   <ImagePlus className="w-4 h-4" />
@@ -1143,6 +1250,7 @@ export function GMatchDMs({
                   rows={1}
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
+                  onPaste={handleComposerPaste}
                   onKeyDown={(e) => {
                     // Enter sends explicitly — do not rely on implicit form
                     // submit: with focus left on the (type=button) attach
@@ -1150,6 +1258,21 @@ export function GMatchDMs({
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault()
                       handleSend()
+                    }
+                    // Shift+Enter inserts a newline. The textarea is single-row
+                    // by default, so without this there was no way to write a
+                    // two-line message at all.
+                    else if (e.key === 'Enter' && e.shiftKey) {
+                      e.preventDefault()
+                      const el = e.currentTarget
+                      const start = el.selectionStart ?? inputText.length
+                      const end = el.selectionEnd ?? inputText.length
+                      setInputText(`${inputText.slice(0, start)}\n${inputText.slice(end)}`)
+                      // Put the caret after the inserted newline, or the
+                      // default would drop it back to the old offset.
+                      requestAnimationFrame(() => {
+                        el.selectionStart = el.selectionEnd = start + 1
+                      })
                     }
                   }}
                   placeholder={openTarget === 'room' ? `Message ${activeRoom?.name || 'room'} (sealed)…` : openTarget === 'group' ? 'Message group...' : isLobbyGroup ? 'Message Lobby Lounge...' : isQueueGroup ? 'Message Card Queue...' : activePmPeer ? `Message ${displayNameFor(activePmPeer.orbitId, activePmPeer.name)}...` : 'Message...'}

@@ -5,6 +5,49 @@ import { useState, useRef } from 'react'
 export const DND_KEEPSAKE = 'application/x-gmatch-keepsake'
 export const DND_CARD = 'application/x-gmatch-card'
 
+/** What a paste actually carried. */
+export type ClipboardPayload =
+  | { kind: 'files'; files: File[] }
+  | { kind: 'url'; url: string }
+  | { kind: 'text'; text: string }
+  | { kind: 'empty' }
+
+/**
+ * Read a paste into a discriminated payload.
+ *
+ * Split out of the DropZone's own handler because the chat composer needs the
+ * exact same rules, and it is NOT a descendant of the DropZone — its <form>
+ * and <textarea> live outside, so paste events there never reached the zone's
+ * handler and pasting an image into a conversation silently did nothing.
+ * Sharing one implementation also means the two surfaces can never disagree
+ * about what counts as an image paste.
+ *
+ * Files win over text: copying an image out of a browser puts both an image
+ * blob and an html/text flavour on the clipboard, and the blob is what the
+ * player meant.
+ */
+export function readClipboard(e: { clipboardData?: DataTransfer | null }): ClipboardPayload {
+  const items = e.clipboardData?.items
+  if (items) {
+    const files: File[] = []
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (item.kind === 'file') {
+        const file = item.getAsFile()
+        if (file) files.push(file)
+      }
+    }
+    if (files.length > 0) return { kind: 'files', files }
+  }
+
+  const text = e.clipboardData?.getData('text')?.trim() || ''
+  if (text.startsWith('http://') || text.startsWith('https://') || text.startsWith('data:')) {
+    return { kind: 'url', url: text }
+  }
+  if (text) return { kind: 'text', text }
+  return { kind: 'empty' }
+}
+
 export function DropZone({
   onFiles,
   onPasteUrl,
@@ -60,36 +103,19 @@ export function DropZone({
 
   const handlePasteEvent = (e: React.ClipboardEvent | ClipboardEvent) => {
     if (disabled) return
-
-    // 1. Check for file items in clipboard (e.g. copied image or video)
-    const items = e.clipboardData?.items
-    if (items) {
-      const files: File[] = []
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i]
-        if (item.kind === 'file') {
-          const file = item.getAsFile()
-          if (file) files.push(file)
-        }
-      }
-      if (files.length > 0) {
-        e.preventDefault()
-        onFiles(files)
-        return
-      }
+    const payload = readClipboard(e)
+    if (payload.kind === 'files') {
+      e.preventDefault()
+      onFiles(payload.files)
+      return
     }
-
-    // 2. Check for text / URL in clipboard (e.g. image link, video link, or Twitter/X post)
-    const text = e.clipboardData?.getData('text')?.trim()
-    if (text && (text.startsWith('http://') || text.startsWith('https://') || text.startsWith('data:'))) {
+    if (payload.kind === 'url') {
       e.preventDefault()
       // Twitter/X and other page URLs are resolved server-side by the proxy
       // (SSRF-guarded, CORS-safe). A browser-side fetch to api.vxtwitter.com
       // would be blocked by CSP and would leak the client IP, so pass the raw
       // URL through and let /api/objects handle extraction.
-      if (onPasteUrl) {
-        onPasteUrl(text)
-      }
+      onPasteUrl?.(payload.url)
     }
   }
 

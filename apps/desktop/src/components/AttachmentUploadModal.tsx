@@ -32,6 +32,18 @@ interface AttachmentUploadModalProps {
   title?: string
   recipientId?: string
   recipients?: string[]
+  /**
+   * Files handed in from outside the modal (the chat composer's paste
+   * handler). They are ingested exactly like a drop/browse: cropped, previewed
+   * and uploaded on submit, so there is one upload path and one set of
+   * validation rules rather than a second copy for pasted images.
+   */
+  initialFiles?: File[]
+  /**
+   * A pasted image LINK. Switches the modal to URL mode with the link
+   * prefilled, so the player confirms before anything is fetched.
+   */
+  initialUrl?: string
 }
 
 export function AttachmentUploadModal({
@@ -42,6 +54,8 @@ export function AttachmentUploadModal({
   title = 'Attach Image or Video',
   recipientId,
   recipients,
+  initialFiles,
+  initialUrl,
 }: AttachmentUploadModalProps) {
   const [mode, setMode] = useState<'camera' | 'upload' | 'url'>('upload')
   const [urlInput, setUrlInput] = useState('')
@@ -62,6 +76,8 @@ export function AttachmentUploadModal({
       setError(null)
     }
   }, [isOpen])
+
+  // (the paste-ingest effect lives below handleFile/handleUrl, which it calls)
 
   const handleFile = useCallback(async (files: FileList | File[]) => {
     let file = Array.from(files)[0]
@@ -109,6 +125,26 @@ export function AttachmentUploadModal({
     setHasFile(false)
     setPreview(trimmed)
   }, [])
+
+  // A pasted image LINK: open in URL mode with it prefilled, so the player
+  // confirms before anything is fetched. A file paste wins — they copied
+  // pixels, not a page.
+  useEffect(() => {
+    if (!isOpen || !initialUrl || initialFiles?.length) return
+    setMode('url')
+    handleUrl(initialUrl)
+  }, [isOpen, initialUrl, handleUrl])
+
+  // Files arriving from the composer's paste handler: ingest them as if they
+  // had been dropped in, so a pasted image is croppable and previewable
+  // exactly like a browsed one. The batch is keyed by name+size, so handing in
+  // the same file twice does not re-ingest it; the File[] identity itself is
+  // deliberately not a dep (a fresh array each parent render would loop).
+  const initialKey = initialFiles?.length ? initialFiles.map((f) => `${f.name}:${f.size}`).join('|') : ''
+  useEffect(() => {
+    if (!isOpen || !initialFiles || initialFiles.length === 0) return
+    void handleFile(initialFiles)
+  }, [isOpen, initialKey, handleFile])
 
   const submit = useCallback(async () => {
     if (uploading || !identity) return
