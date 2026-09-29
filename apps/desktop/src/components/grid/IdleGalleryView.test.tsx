@@ -84,13 +84,13 @@ describe('IdleGalleryView', () => {
 
     render(<IdleGalleryView />)
 
-    const videoFilterBtn = screen.getByRole('button', { name: /^video$/i })
+    const videoFilterBtn = screen.getByRole('button', { name: /^Filter: video$/i })
     await userEvent.click(videoFilterBtn)
 
     const videoItems = screen.getAllByRole('button', { name: /^View /i })
     expect(videoItems.length).toBe(1)
 
-    const imageFilterBtn = screen.getByRole('button', { name: /^image$/i })
+    const imageFilterBtn = screen.getByRole('button', { name: /^Filter: image$/i })
     await userEvent.click(imageFilterBtn)
 
     const imageItems = screen.getAllByRole('button', { name: /^View /i })

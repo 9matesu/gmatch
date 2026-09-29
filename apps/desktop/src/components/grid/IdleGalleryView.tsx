@@ -342,6 +342,11 @@ export default function IdleGalleryView({
                   setTypeFilter(t)
                   setPage(0)
                 }}
+                // The bare word "all" was an ambiguous accessible name — the
+                // audit found two controls on the gallery reading "all" and
+                // nothing to tell a screen-reader user which was which.
+                aria-label={`Filter: ${t}`}
+                aria-pressed={typeFilter === t}
                 className={`px-2.5 py-1 rounded-md cursor-pointer uppercase tracking-wider transition-colors ${
                   typeFilter === t ? 'bg-glass-w12 text-retro-fg font-bold shadow-sm' : 'text-retro-muted hover:text-retro-body'
                 }`}

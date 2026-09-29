@@ -31,7 +31,6 @@ export function GamesView({
   toast,
   setSelectedProfileUser,  setLobbyLightboxUrl,
   setExpandedItemId,
-  setShowHelpModal,
   setPmPeer,
   setDmMinimized,
   setMainView,
@@ -59,7 +58,6 @@ export function GamesView({
   setSelectedProfileUser: (user: User) => void;
   setLobbyLightboxUrl: (url: string | null) => void;
   setExpandedItemId: (id: string | null) => void;
-  setShowHelpModal: (v: boolean) => void;
   setPmPeer: React.Dispatch<React.SetStateAction<User | null>>;
   setDmMinimized: (v: boolean) => void;
   setMainView: React.Dispatch<React.SetStateAction<MainViewType>>;
@@ -95,7 +93,11 @@ export function GamesView({
         void orbitFetch(`/api/users/${encodeURIComponent(uId)}`, {}, identity)
           .then((res) => (res.ok ? res.json() : null))
           .then((data) => {
-            if (data?.id) setSelectedProfileUser(data as User);
+            // The endpoint returns { user: {...} }. This read `data.id`, which
+            // is always undefined, so this path always toasted "no longer on
+            // this node" instead of opening the profile.
+            const row = data?.user;
+            if (row?.id) setSelectedProfileUser(row as unknown as User);
             else toast('That player is no longer on this node', 'info');
           })
           .catch(() => toast('Could not load that player', 'error'));
@@ -113,7 +115,6 @@ export function GamesView({
           soundEnabled={soundEnabled}
           onOpenImage={(url) => setLobbyLightboxUrl(url)}
           onExpandItem={(id) => setExpandedItemId(id)}
-          onOpenHelp={() => setShowHelpModal(true)}
           onOpenProfile={(user) => setSelectedProfileUser(user)}
           onOpenCardChat={() => {
             setPmPeer({ id: 'card_queue', display_name: 'Card Game Queue' } as any)

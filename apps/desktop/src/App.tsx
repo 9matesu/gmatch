@@ -4049,7 +4049,6 @@ export default function Home() {
                       setSelectedProfileUser={setSelectedProfileUser}
                       setLobbyLightboxUrl={setLobbyLightboxUrl}
                       setExpandedItemId={setExpandedItemId}
-                      setShowHelpModal={setShowHelpModal}
                       setPmPeer={setPmPeer}
                       setDmMinimized={setDmMinimized}
                       setMainView={setMainView}
@@ -4264,7 +4263,6 @@ export default function Home() {
                       sendP2PItem={sendP2PItem}
                       setLobbyLightboxUrl={setLobbyLightboxUrl}
                       setExpandedItemId={setExpandedItemId}
-                      setShowHelpModal={setShowHelpModal}
                       setSelectedProfileUser={setSelectedProfileUser}
                       setSpectateViewerItems={setSpectateViewerItems}
                       openCreateCardModal={openCreateCardModal}
@@ -4717,8 +4715,7 @@ export default function Home() {
               feedNewPostsCount={feedNewPostsCount}
               recessed={mainView === 'watch' && watchRoomOpen}
               displayName={myProfile.displayName || myUser?.display_name || 'You'}
-              profilePic={profilePics[identity?.orbitId || '']}
-              isAdmin={myProfile.isAdmin}
+              profilePic={profilePics[identity?.orbitId || ''] || myProfile.pfpUrl}
               onOpenCreatePost={() => { setChatOpen(false); setShowCreatePostModal(true); }}
               onOpenSettings={() => { setChatOpen(false); setShowSettingsModal((v) => !v); }}
               onOpenHelp={() => { setChatOpen(false); setShowHelpModal(true); }}

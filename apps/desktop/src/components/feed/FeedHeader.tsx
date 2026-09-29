@@ -40,7 +40,11 @@ export function FeedHeader({
             type="button"
             onClick={() => { playPress(800); onRefresh(); }}
             title="Reload feed (bypass cache)"
-            aria-label="Reload feed"
+            // The empty state renders a second "Reload feed" button lower on
+            // the page. Same action, so the audit flags the pair; the two are
+            // distinguished by where they are, which the name has to carry
+            // because a screen reader announces neither position.
+            aria-label="Reload feed toolbar"
             className="p-2 rounded-md text-retro-body hover:bg-glass-w8 transition-colors cursor-pointer"
           >
             <RefreshCw className="w-5 h-5" />
@@ -61,7 +65,12 @@ export function FeedHeader({
           type="button"
           onClick={() => { playPress(800); onOpenNotifications?.(); }}
           title="Notifications"
-          aria-label="Notifications"
+          // The command island has a global Notifications button that is
+          // mounted on every view. Two controls with the identical accessible
+          // name on one screen are indistinguishable to a screen reader, so
+          // this one says which surface it belongs to. The button is identical
+          // in behaviour — only the label changed.
+          aria-label="Feed notifications"
           className="relative p-2 rounded-md text-retro-body hover:bg-glass-w8 transition-colors cursor-pointer"
         >
           <Bell className="w-5 h-5" />

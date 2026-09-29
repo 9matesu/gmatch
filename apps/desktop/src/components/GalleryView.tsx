@@ -167,11 +167,17 @@ export function GalleryView({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap text-xs">
-            <div className="glass-inset flex p-0.5 rounded-lg text-xs font-semibold">
+            <div className="glass-inset flex p-0.5 rounded-lg text-xs font-semibold" role="radiogroup" aria-label="Filter cards by category">
               {(['all', 'received', 'sent', 'starred'] as const).map(t => (
                 <button
                   key={t}
                   type="button"
+                  role="radio"
+                  aria-checked={galleryFilter === t}
+                  // There are two "all" chips on this screen — this one filters
+                  // by provenance, the other by media type. Bare "all" gave a
+                  // screen-reader user no way to tell which was which.
+                  aria-label={`Category: ${t}`}
                   onClick={() => {
                     setGalleryFilter(t)
                     setGalleryPage(0)
@@ -188,6 +194,7 @@ export function GalleryView({
             <div className="glass-field flex items-center gap-1 px-2 py-1 text-xs">
               <span className="text-retro-muted font-semibold text-[10px] uppercase tracking-wider">Sort:</span>
               <select
+                aria-label="Sort cards by"
                 value={gallerySort}
                 onChange={(e) => {
                   setGallerySort(e.target.value as any)
@@ -206,6 +213,7 @@ export function GalleryView({
               <Search className="w-3.5 h-3.5 text-retro-muted" />
               <input
                 type="text"
+                aria-label="Filter cards by name or tag"
                 value={cardSearch}
                 onChange={(e) => { setCardSearch(e.target.value); setGalleryPage(0) }}
                 placeholder="Filter cards…"
@@ -213,11 +221,14 @@ export function GalleryView({
               />
             </div>
 
-            <div className="glass-inset flex p-0.5 rounded-lg text-xs font-semibold">
+            <div className="glass-inset flex p-0.5 rounded-lg text-xs font-semibold" role="radiogroup" aria-label="Filter cards by media type">
               {(['all', 'image', 'video'] as const).map(t => (
                 <button
                   key={t}
                   type="button"
+                  role="radio"
+                  aria-checked={cardTypeFilter === t}
+                  aria-label={`Type: ${t}`}
                   onClick={() => { setCardTypeFilter(t); setGalleryPage(0) }}
                   className={`px-2.5 py-1 rounded-md cursor-pointer uppercase tracking-wider transition-colors ${
                     cardTypeFilter === t ? 'bg-glass-w12 text-retro-fg font-bold shadow-sm' : 'text-retro-muted hover:text-retro-body'

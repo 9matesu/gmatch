@@ -34,7 +34,6 @@ export function GameView({
   sendP2PItem,
   setLobbyLightboxUrl,
   setExpandedItemId,
-  setShowHelpModal,
   setSelectedProfileUser,
   setSpectateViewerItems,
   openCreateCardModal,
@@ -62,7 +61,6 @@ export function GameView({
   sendP2PItem: (item: OrbitObject) => void;
   setLobbyLightboxUrl: (url: string | null) => void;
   setExpandedItemId: (id: string | null) => void;
-  setShowHelpModal: (v: boolean) => void;
   setSelectedProfileUser: (user: User) => void;
   setSpectateViewerItems: (items: OrbitObject[] | null) => void;
   openCreateCardModal: () => void;
@@ -80,7 +78,6 @@ export function GameView({
         soundEnabled={soundEnabled}
         onOpenImage={(url) => setLobbyLightboxUrl(url)}
         onExpandItem={(id) => setExpandedItemId(id)}
-        onOpenHelp={() => setShowHelpModal(true)}
         onOpenProfile={(user) => setSelectedProfileUser(user)}
         onOpenCreateCard={openCreateCardModal}
         onOpenDeckBuilder={navigateToDeckBuilder}

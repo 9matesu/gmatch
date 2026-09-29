@@ -8,7 +8,6 @@ import {
   Cards,
   ChatCircleText,
   Plus,
-  GameController,
   CaretLeft,
   CaretRight,
   Gear,
@@ -29,17 +28,6 @@ import { CountBadge } from './CountBadge';
 import { formatCount } from '../../ui/format';
 import type { ViewMode } from '../../game/types';
 export type MainViewType = 'feed' | 'games' | 'create' | 'messages' | 'profile' | 'game' | 'gallery' | 'store' | 'pc_domination' | 'grid' | 'rooms' | 'servers' | 'watch';
-
-/** Layout pill on the bar: 1x1 / 1x2 / 2x2 / 3x3. */
-const GRID_SIZES: ViewMode[] = ['1x1', '1x2', '2x2', '3x3'];
-/** Legacy aliases read as their canonical layout ('single'→1x1, 'grid'→3x3). */
-function gridSizeMatches(mode: ViewMode, active?: ViewMode): boolean {
-  if (!active) return false
-  if (mode === active) return true
-  if (mode === '1x1' && active === 'single') return true
-  if (mode === '3x3' && active === 'grid') return true
-  return false
-}
 
 export type GamesNavTab = 'duel' | 'cards' | 'babecock' | 'ranks' | 'idle';
 
@@ -81,7 +69,6 @@ export interface CommandIslandProps {
   recessed?: boolean;
   displayName?: string;
   profilePic?: string;
-  isAdmin?: boolean;
   onOpenCreatePost?: () => void;
   onOpenSettings?: () => void;
   /** Open the Help & documentation modal. */
@@ -116,7 +103,6 @@ export function CommandIsland({
   recessed = false,
   displayName = 'You',
   profilePic,
-  isAdmin: _isAdmin = false,
   onOpenCreatePost,
   onOpenSettings,
   onOpenHelp,
@@ -132,8 +118,8 @@ export function CommandIsland({
   onOpenProfile,
   onOpenAdmin,
   onOpenCreateCard,
-  gridSize,
-  onGridSizeChange,
+  gridSize: _gridSize,
+  onGridSizeChange: _onGridSizeChange,
 }: CommandIslandProps) {
   const [satelliteOpen, setSatelliteOpen] = useState<boolean>(readSatelliteOpen);
 
@@ -224,7 +210,7 @@ export function CommandIsland({
             playPress(900);
             onOpenCreateCard?.();
           }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-chrome-lav text-black font-bold hover:bg-chrome-lav/90 active:scale-95 transition-all text-xs"
+          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full bg-retro-accent text-retro-accent-text hover:bg-retro-accent-hover active:scale-[0.98] transition-all text-xs font-semibold"
           title="Forge Card"
           aria-label="Forge Card"
         >
@@ -234,23 +220,14 @@ export function CommandIsland({
       );
     }
 
-    if (mainView === 'games') {
-      return (
-        <button
-          type="button"
-          onClick={() => {
-            playPress(940);
-            handleNavClick('games');
-          }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-retro-online text-black font-bold hover:bg-retro-online/90 active:scale-95 transition-all text-xs"
-          title="Quick Match"
-          aria-label="Quick Match"
-        >
-          <GameController className="w-3.5 h-3.5" weight="fill" />
-          <span className="hidden sm:inline">Play</span>
-        </button>
-      );
-    }
+    // There is deliberately no "Play" button here for the Arena view. It used
+    // to render one that called handleNavClick('games') from inside the branch
+    // that only renders when mainView is ALREADY 'games' — so it set the view
+    // to the value it already had and did nothing but make a noise. Labelled
+    // "Play" and styled as the primary green CTA, that is worse than no button:
+    // it is the most prominent control on the screen and it does not work. The
+    // real action is "Queue for Perverts" in the Arena itself, and the Help >
+    // Card Duels guide now says so.
 
     return null;
   };
@@ -260,12 +237,12 @@ export function CommandIsland({
       {/* Primary Floating Command Island Dock */}
       <nav
         aria-label="Command Island"
-        className={`command-island fixed bottom-5 left-1/2 -translate-x-1/2 z-[var(--z-dropdown)] flex max-w-[calc(100vw-1.5rem)] items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full select-none transition-all duration-300 overflow-x-auto styled-scrollbar ${recessed ? 'island-recessed' : ''}`}
+        className={`command-island fixed bottom-5 left-1/2 -translate-x-1/2 z-[var(--z-dropdown)] flex max-w-[calc(100vw-1.5rem)] items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full select-none transition-all duration-300 overflow-hidden flex-nowrap ${recessed ? 'island-recessed' : ''}`}
       >
         {/* Left Telemetry: $G Balance */}
         <div
           aria-label={`Balance: ${formatCount(balance)} dollars`}
-          className="flex items-center px-2.5 py-1 rounded-full bg-glass-w5 border border-border-glass text-xs font-mono tabular-nums text-retro-body shrink-0"
+          className="flex items-center px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-glass-w5 border border-border-glass text-xs font-mono tabular-nums text-retro-body shrink-0"
         >
           <span className="font-semibold text-retro-fg tracking-tight">
             ${formatCount(balance)}
@@ -287,10 +264,10 @@ export function CommandIsland({
                 onClick={() => handleNavClick(item.id)}
                 aria-label={item.label}
                 aria-current={isActive ? 'page' : undefined}
-                className={`relative flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                className={`relative flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full text-xs font-medium transition-all ${
                   isActive
                     ? 'bg-retro-accent text-retro-accent-text'
-                    : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+                    : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
                 }`}
               >
                 <Icon className="w-4 h-4" weight={isActive ? 'fill' : 'regular'} />
@@ -315,10 +292,10 @@ export function CommandIsland({
             aria-label="Notifications"
             aria-pressed={notificationsOpen}
             title="Activity Notifications"
-            className={`relative flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+            className={`relative flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full text-xs font-medium transition-all ${
               notificationsOpen
                 ? 'bg-retro-accent text-retro-accent-text'
-                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
             }`}
           >
             <Bell
@@ -341,10 +318,10 @@ export function CommandIsland({
               }
             }}
             aria-label="Messages"
-            className={`relative flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+            className={`relative flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full text-xs font-medium transition-all ${
               messagesOpen || mainView === 'messages' || mainView === 'rooms'
                 ? 'bg-retro-accent text-retro-accent-text'
-                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
             }`}
           >
             <ChatCircleText
@@ -369,7 +346,7 @@ export function CommandIsland({
             className={`relative flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
               mainView === 'profile'
                 ? 'bg-retro-accent text-retro-accent-text'
-                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
             }`}
           >
             <div className="w-5 h-5 rounded-full overflow-hidden border border-white/20 bg-black/40 flex items-center justify-center shrink-0">
@@ -402,7 +379,7 @@ export function CommandIsland({
           aria-label="More options"
           aria-pressed={satelliteOpen}
           title={satelliteOpen ? 'Collapse extra tools' : 'Expand extra tools to the right'}
-          className={`p-1.5 rounded-full transition-all shrink-0 active:scale-95 ${
+          className={`p-1.5 rounded-full transition-all shrink-0 active:scale-[0.98] ${
             satelliteOpen
               ? 'bg-glass-w15 text-retro-fg shadow-inner'
               : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8'
@@ -429,14 +406,14 @@ export function CommandIsland({
               aria-label="Store"
               aria-current={mainView === 'store' ? 'page' : undefined}
               title="Store & Boosters"
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all ${
                 mainView === 'store'
                   ? 'bg-retro-accent text-retro-accent-text'
-                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
               }`}
             >
-              <ShoppingBag className="w-3.5 h-3.5 text-retro-warning shrink-0" weight={mainView === 'store' ? 'fill' : 'regular'} />
-              <span className="text-xs hidden sm:inline">Store</span>
+              <ShoppingBag className="w-3.5 h-3.5 shrink-0" weight={mainView === 'store' ? 'fill' : 'regular'} />
+              <span className="text-xs hidden xl:inline">Store</span>
             </button>
 
             {/* Servers */}
@@ -446,14 +423,14 @@ export function CommandIsland({
               aria-label="Servers"
               aria-current={mainView === 'servers' ? 'page' : undefined}
               title="Public & Private Servers"
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all ${
                 mainView === 'servers'
                   ? 'bg-retro-accent text-retro-accent-text'
-                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
               }`}
             >
-              <HardDrives className="w-3.5 h-3.5 text-retro-online shrink-0" weight={mainView === 'servers' ? 'fill' : 'regular'} />
-              <span className="text-xs hidden sm:inline">Servers</span>
+              <HardDrives className="w-3.5 h-3.5 shrink-0" weight={mainView === 'servers' ? 'fill' : 'regular'} />
+              <span className="text-xs hidden xl:inline">Servers</span>
             </button>
 
             {/* Domination */}
@@ -463,14 +440,14 @@ export function CommandIsland({
               aria-label="Domination"
               aria-current={mainView === 'pc_domination' ? 'page' : undefined}
               title="PC Domination Battles"
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all ${
                 mainView === 'pc_domination'
                   ? 'bg-retro-accent text-retro-accent-text'
-                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
               }`}
             >
-              <Monitor className="w-3.5 h-3.5 text-retro-info shrink-0" weight={mainView === 'pc_domination' ? 'fill' : 'regular'} />
-              <span className="text-xs hidden sm:inline">Domination</span>
+              <Monitor className="w-3.5 h-3.5 shrink-0" weight={mainView === 'pc_domination' ? 'fill' : 'regular'} />
+              <span className="text-xs hidden xl:inline">Domination</span>
             </button>
 
             {/* Wallpaper */}
@@ -484,14 +461,14 @@ export function CommandIsland({
               aria-label="Wallpaper"
               aria-pressed={themeOpen}
               title="Custom Wallpaper Settings"
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all ${
                 themeOpen
                   ? 'bg-retro-accent text-retro-accent-text'
-                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
               }`}
             >
               <PaintBrush className="w-3.5 h-3.5 shrink-0" weight={themeOpen ? 'fill' : 'regular'} />
-              <span className="text-xs hidden sm:inline">Theme</span>
+              <span className="text-xs hidden xl:inline">Theme</span>
             </button>
 
             {/* Settings */}
@@ -505,20 +482,17 @@ export function CommandIsland({
               aria-label="Settings"
               aria-pressed={settingsOpen}
               title="Application Settings"
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all ${
                 settingsOpen
                   ? 'bg-retro-accent text-retro-accent-text'
-                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
               }`}
             >
               <Gear className="w-3.5 h-3.5 shrink-0" weight={settingsOpen ? 'fill' : 'regular'} />
-              <span className="text-xs hidden sm:inline">Settings</span>
+              <span className="text-xs hidden xl:inline">Settings</span>
             </button>
 
-            {/* Help. This was the only feature in the app reachable solely by
-                keyboard: "?" and Ctrl+H, and nothing on screen pointed at it.
-                Anyone who did not already know the shortcut had no way in,
-                which is the same reason the LobbyPanel help prop was dead. */}
+            {/* Help */}
             <button
               type="button"
               data-help-toggle="true"
@@ -528,30 +502,29 @@ export function CommandIsland({
               }}
               aria-label="Help"
               title="Help & documentation"
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
+              className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98] transition-all"
             >
               <Question className="w-3.5 h-3.5 shrink-0" />
-              <span className="text-xs hidden sm:inline">Help</span>
+              <span className="text-xs hidden xl:inline">Help</span>
             </button>
 
-            {/* Admin — a PIN-gated modal, not a route, so it has no persistent
-                "current page" highlight (aria-current stays undefined). */}
-             <button
-                type="button"
-                onClick={() => {
-                  playPress(840);
-                   onOpenAdmin?.();
-                }}
-                aria-label="Admin"
-                 aria-current={undefined}
-                title="Admin Control Panel"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-95 transition-all"
-              >
-                <ShieldCheck className="w-3.5 h-3.5 text-retro-error shrink-0" weight="regular" />
-                <span className="text-xs">Admin</span>
-               </button>
+            {/* Admin */}
+            <button
+              type="button"
+              onClick={() => {
+                playPress(840);
+                onOpenAdmin?.();
+              }}
+              aria-label="Admin"
+              aria-current={undefined}
+              title="Admin Control Panel"
+              className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98] transition-all"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 shrink-0" weight="regular" />
+              <span className="text-xs hidden xl:inline">Admin</span>
+            </button>
 
-             {/* Logout (conditional on onLogout) */}
+            {/* Logout (conditional on onLogout) */}
             {onLogout && (
               <>
                 <div className="h-3.5 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
@@ -563,10 +536,10 @@ export function CommandIsland({
                   }}
                   aria-label="Log out"
                   title="Log out"
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-error/80 hover:text-retro-error hover:bg-retro-error/10 active:scale-95 transition-all"
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98] transition-all"
                 >
                   <SignOut className="w-3.5 h-3.5 shrink-0" />
-                  <span className="text-xs hidden sm:inline">Logout</span>
+                  <span className="text-xs hidden xl:inline">Logout</span>
                 </button>
               </>
             )}

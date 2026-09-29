@@ -24,9 +24,9 @@ import { ProfileEditorModal } from './ProfileEditorModal';
 import { ProfilePicModal } from './ProfilePicModal';
 import { useProfilePostLightbox } from '../feed/useProfilePostLightbox';
 import { ObjectImage } from '../ObjectImage';
-import { isMediaVideo, isVideoPost, resolveMediaUrl } from '../../utils/media';
+import { isVideoPost, resolveMediaUrl } from '../../utils/media';
 import { saveUserProfile } from '../../utils/profile';
-import { profileShareUrl } from '../../utils/api';
+import { profileShareUrl, orbitFetch, invalidateCache } from '../../utils/api';
 
 export function GMatchProfile({
   identity,
@@ -198,8 +198,58 @@ export function GMatchProfile({
     });
   };
 
-  const effectiveFollowersCount = followersCount ?? myUser?.followers_count ?? 0;
-  const effectiveFollowingCount = followingCount ?? myUser?.following_count ?? 0;
+  const [liveFollowersCount, setLiveFollowersCount] = useState<number | null>(null);
+  const [liveFollowingCount, setLiveFollowingCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    const targetId = isSelf ? identity?.orbitId : myUser?.id;
+    if (!targetId) return;
+
+    let cancelled = false;
+    const fetchCounts = async () => {
+      invalidateCache(`/api/users/${encodeURIComponent(targetId)}/followers`);
+      if (!isSelf) {
+        invalidateCache(`/api/users/${encodeURIComponent(targetId)}/following`);
+      }
+      try {
+        const [followersRes, followingRes] = await Promise.all([
+          orbitFetch(`/api/users/${encodeURIComponent(targetId)}/followers`, {}, identity),
+          !isSelf ? orbitFetch(`/api/users/${encodeURIComponent(targetId)}/following`, {}, identity) : Promise.resolve(null),
+        ]);
+        const followers = followersRes && followersRes.ok ? await followersRes.json() : null;
+        const following = followingRes && followingRes.ok ? await followingRes.json() : null;
+        if (!cancelled) {
+          if (Array.isArray(followers)) setLiveFollowersCount(followers.length);
+          if (Array.isArray(following)) setLiveFollowingCount(following.length);
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+
+    void fetchCounts();
+
+    const onSync = () => { void fetchCounts(); };
+    const onFollow = (e: Event) => {
+      const detail = (e as CustomEvent<{ follower_id?: string; followee_id?: string }>).detail;
+      if (!detail || detail.followee_id === targetId || detail.follower_id === targetId) {
+        void fetchCounts();
+      }
+    };
+
+    window.addEventListener('orbit-profilesync', onSync);
+    window.addEventListener('orbit-follow-event', onFollow);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('orbit-profilesync', onSync);
+      window.removeEventListener('orbit-follow-event', onFollow);
+    };
+  }, [identity, identity?.orbitId, myUser?.id, isSelf]);
+
+  const effectiveFollowersCount = liveFollowersCount ?? followersCount ?? myUser?.followers_count ?? 0;
+  const effectiveFollowingCount = isSelf
+    ? followingIds.length
+    : (liveFollowingCount ?? followingCount ?? myUser?.following_count ?? 0);
 
   const stats = [
     { label: 'posts', value: displayPosts.length, onClick: () => setProfileTab('posts') },
@@ -332,7 +382,11 @@ export function GMatchProfile({
             type="button"
             onClick={() => { playPress(750); onOpenSettings?.(); }}
             title="Settings"
-            aria-label="Settings"
+            // The command island renders a Settings button that is mounted on
+            // every view, including the profile. Two controls named "Settings"
+            // on one screen are indistinguishable to a screen reader, so this
+            // one names its surface. Behaviour is unchanged.
+            aria-label="Profile settings"
             className="p-2 rounded-lg bg-surface-interactive border border-border-glass hover:border-border-glass text-retro-body cursor-pointer transition-colors"
           >
             <Settings className="w-4 h-4" />

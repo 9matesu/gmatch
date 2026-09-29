@@ -32,7 +32,6 @@ interface Props {
   soundEnabled: boolean
   onOpenImage?: (url: string) => void
   onExpandItem?: (itemId: string) => void
-  onOpenHelp?: () => void
   onOpenProfile?: (user: User) => void
   users?: User[]
   profilePics?: Record<string, string>

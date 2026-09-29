@@ -89,7 +89,7 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
             identity={identity}
             active
             fill
-            onSelect={() => {}}
+            onSelect={() => parties[0] && setActiveId(parties[0].id)}
             onEmptyClick={() => setModalOpen(true)}
           />
         ) : (
@@ -113,6 +113,7 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
         {/* Cohesive Video Player Controls */}
         <WatchPartyTimeline
           party={active}
+          isHost={!!isHost}
           onToggleRail={() => setRailOpen((v) => !v)}
           railOpen={railOpen}
         />
@@ -120,7 +121,7 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
 
       {/* Docked Side Rail (Room info + Participants + Queue + Chat) */}
       <aside
-        className={`w-72 lg:w-80 shrink-0 h-full flex-col min-h-0 overflow-hidden border-l border-border-glass bg-retro-panel z-20 ${
+        className={`w-72 lg:w-80 shrink-0 h-full flex-col min-h-0 overflow-hidden border-l border-border-glass solid-panel z-20 ${
           railOpen ? 'flex animate-orbit-fade-in' : 'hidden'
         }`}
       >
