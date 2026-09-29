@@ -105,6 +105,42 @@ describe('mergeMyCards', () => {
     const merged = mergeMyCards(items as OrbitObject[], [], 'me', '/api/objects/avatar-url-match')
     expect(merged).toEqual([])
   })
+
+  it('drops a canonical card whose backing object is a chat attachment', () => {
+    // The API refuses to mint one of these and now filters them on read, but
+    // `items` is the client's own view of the Objects table: this is the check
+    // that still holds for a row that predates the server guard or arrives
+    // from an older node. The flags live on the object, not on the card row.
+    const items = [
+      { ...base, id: 'chat-pic', owner_id: 'me', is_chat: 1 },
+      { ...base, id: 'plain-card', owner_id: 'me' },
+    ]
+    const chatCard: CanonicalCard = { ...cardBase, id: 'card-chat', mediaObjectId: 'chat-pic' }
+    const merged = mergeMyCards(items as OrbitObject[], [chatCard, cardBase], 'me')
+    expect(merged.map((m) => m.id)).toEqual(['obj-1'])
+  })
+
+  it('drops canonical cards backed by a post, story or avatar', () => {
+    const items = [
+      { ...base, id: 'post', owner_id: 'me', is_public: 1 },
+      { ...base, id: 'story', owner_id: 'me', is_story: 1 },
+      { ...base, id: 'avatar', owner_id: 'me', is_avatar: 1 },
+    ]
+    const cards: CanonicalCard[] = [
+      { ...cardBase, id: 'c1', mediaObjectId: 'post' },
+      { ...cardBase, id: 'c2', mediaObjectId: 'story' },
+      { ...cardBase, id: 'c3', mediaObjectId: 'avatar' },
+    ]
+    expect(mergeMyCards(items as OrbitObject[], cards, 'me')).toEqual([])
+  })
+
+  it('keeps a card whose object is absent from the items list', () => {
+    // Absence of the object is not evidence it was a chat attachment — the
+    // list is a page, not the whole table. Hiding these would silently lose
+    // real cards.
+    const merged = mergeMyCards([], [cardBase], 'me')
+    expect(merged.map((m) => m.card_id)).toEqual(['card-1'])
+  })
 })
 describe('filterToActiveDeck', () => {
   const mk = (id: string, card_id?: string) => ({ id, ...(card_id ? { card_id } : {}) })

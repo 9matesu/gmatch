@@ -187,6 +187,50 @@ describe('CardService', () => {
     expect(collection).toHaveLength(1)
   })
 
+  it('never returns a chat/post/story/avatar-backed card in the collection', async () => {
+    // The creation guard refuses these, but rows can predate it or arrive from
+    // an older node, and 056 exempted market-adopted ones. The collection read
+    // is the boundary that decides what renders, so it filters too.
+    const kinds: Array<[string, string]> = [
+      ['coll-chat', 'is_chat'],
+      ['coll-post', 'is_public'],
+      ['coll-story', 'is_story'],
+      ['coll-avatar', 'is_avatar'],
+    ]
+    for (const [mediaId, flag] of kinds) {
+      await db
+        .prepare(`INSERT INTO Objects (id, owner_id, size_bytes, mime_type, ${flag}) VALUES (?, ?, 100, 'image/jpeg', 1)`)
+        .bind(mediaId, CREATOR)
+        .run()
+      // Inserted straight into Cards, bypassing createCard's guard: this is the
+      // shape a pre-guard (or exempted) row has.
+      await db
+        .prepare("INSERT INTO Cards (id, creator_id, media_object_id, name, rarity, value, market_status, moderation_state) VALUES (?, ?, ?, 'Legacy', 'common', 5, 'none', 'active')")
+        .bind(`card-${mediaId}`, CREATOR, mediaId)
+        .run()
+      await db.prepare('INSERT INTO CardOwnership (card_id, owner_id) VALUES (?, ?)').bind(`card-${mediaId}`, CREATOR).run()
+    }
+    await seedMedia(db, 'coll-clean', CREATOR)
+    await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'coll-clean', name: 'Real Card' })
+
+    const ids = (await cards.getCollection(CREATOR)).map((c) => c.mediaObjectId)
+    expect(ids).toEqual(['coll-clean'])
+  })
+
+  it('keeps a card whose backing object is simply missing', async () => {
+    // A dangling media_object_id is a data-integrity problem, not a chat
+    // attachment. Hiding those would silently lose legitimately minted cards
+    // whenever a blob is cleaned up out from under them.
+    await db
+      .prepare("INSERT INTO Cards (id, creator_id, media_object_id, name, rarity, value, market_status, moderation_state) VALUES ('card-orphan', ?, 'no-such-object', 'Orphan', 'common', 5, 'none', 'active')")
+      .bind(CREATOR)
+      .run()
+    await db.prepare('INSERT INTO CardOwnership (card_id, owner_id) VALUES (?, ?)').bind('card-orphan', CREATOR).run()
+
+    const collection = await cards.getCollection(CREATOR)
+    expect(collection.map((c) => c.id)).toContain('card-orphan')
+  })
+
   it('sells a listed card atomically and moves funds', async () => {
     await seedMedia(db, 'media-0004', CREATOR)
     const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-0004', name: 'Test Card' })

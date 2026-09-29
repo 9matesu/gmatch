@@ -32,6 +32,8 @@ export interface CanonicalCard {
   marketStatus: string;
   moderationState: string;
   ownerId: string;
+  /** Display name of the current owner, resolved server-side. */
+  ownerName?: string | null;
   createdAt: string;
   updatedAt: string;
   contentUrl?: string | null;
@@ -181,6 +183,13 @@ export function deriveMyCards(items: readonly OrbitObject[], ownerId: string, pf
  * cards and never render as one — that phantom-mint path is removed.
  * Canonical rows from other owners are ignored (defense in depth; the API
  * already scopes `/api/cards` to the caller).
+ *
+ * A canonical card is also dropped when its backing object is a chat
+ * attachment, post, story or avatar. The API refuses to MINT one of those
+ * (cards.ts) and filters them on read, but `items` is the client's own view of
+ * the Objects table and carries the flags, so this is the check that still
+ * holds if a row predates the server guard or arrives from an older node. The
+ * flags are read off `items` because a canonical card row does not carry them.
  */
 export function mergeMyCards(
   items: readonly OrbitObject[],
@@ -188,14 +197,22 @@ export function mergeMyCards(
   ownerId: string,
   pfpUrl?: string | null
 ): MergedCard[] {
-  void items;
-  void pfpUrl;
+  // Objects that must never present as a card, keyed by id. Built once rather
+  // than per row: the collection render calls this on every poll.
+  const nonCardMedia = new Set<string>();
+  for (const it of items) {
+    if (isChatAttachment(it) || isPublicPost(it) || isAvatarObject(it, pfpUrl) || it.is_story) {
+      nonCardMedia.add(it.id);
+    }
+  }
+
   const result: MergedCard[] = [];
   const seen = new Set<string>();
 
   for (const c of canonicalCards) {
     if ((c.ownerId || ownerId) !== ownerId) continue;
     if (!c.mediaObjectId || seen.has(c.mediaObjectId)) continue;
+    if (nonCardMedia.has(c.mediaObjectId)) continue;
     seen.add(c.mediaObjectId);
     const parsedCardTags = Array.isArray(c.tags) ? c.tags : parseTags(c.tags);
     result.push({

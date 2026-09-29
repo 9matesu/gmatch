@@ -54,6 +54,18 @@ export interface CardRecord {
   marketStatus: MarketStatus
   moderationState: ModerationState
   ownerId: string
+  /**
+   * Display name of the current owner, joined from Users.
+   *
+   * The Store, the collection grid and CardTile all want to credit whoever owns
+   * a card, and every one of them used to fall back to looking the id up in the
+   * local `users` directory — which is capped at 100 rows and stale-filtered, so
+   * most cards rendered as "by " with no name. Resolving it here means one join
+   * instead of a directory that usually does not contain the owner.
+   *
+   * Null when the owner row is gone (deleted account) or unnamed.
+   */
+  ownerName: string | null
   createdAt: string
   updatedAt: string
   // Media projection (joined from Objects) so consumers can render the card
@@ -118,6 +130,9 @@ interface CardRow {
   content_url?: string | null
   mime_type?: string | null
   caption?: string | null
+  /** Joined from Users on the owner id (see CardRecord.ownerName). */
+  owner_name?: string | null
+  owner_pfp_url?: string | null
 }
 
 function isConstraintError(err: unknown): boolean {
@@ -154,6 +169,7 @@ function mapCard(row: CardRow, ownerId: string): CardRecord {
     marketStatus: row.market_status,
     moderationState: row.moderation_state,
     ownerId,
+    ownerName: row.owner_name ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     contentUrl: row.content_url,
@@ -397,17 +413,50 @@ export class CardService {
     if (row.moderation_state !== 'active' && callerId !== ownerId && callerId !== row.creator_id) {
       return null
     }
-    return mapCard(row, ownerId)
+    return mapCard({ ...row, ...(await this.ownerIdentity(ownerId)) }, ownerId)
+  }
+
+  /**
+   * Resolve an owner id to a display name + avatar. The Cards queries carry
+   * `c.creator_id`, but the OWNER lives in CardOwnership, so the join is done
+   * here against whichever id is current for that card.
+   */
+  private async ownerIdentity(ownerId: string): Promise<{ owner_name: string | null; owner_pfp_url: string | null }> {
+    const u = await this.db
+      .prepare('SELECT display_name, pfp_url FROM Users WHERE id = ?')
+      .bind(ownerId)
+      .first<{ display_name: string | null; pfp_url: string | null }>()
+    return { owner_name: u?.display_name ?? null, owner_pfp_url: u?.pfp_url ?? null }
   }
 
   async getCollection(userId: string): Promise<CardRecord[]> {
     requireId(userId, 'userId')
+    // Defence in depth at the READ path, not just at creation.
+    // createCard already refuses a post/story/chat/avatar backing object, and
+    // migration 056 purged the rows that predate that guard - but it exempted
+    // anything with a purchase/transfer/cashout in its history, so a card
+    // adopted on the market from chat-backed media survived and kept rendering
+    // in the owner's collection. The server should never hand one back, whoever
+    // ends up holding it.
+    //
+    // The join is a LEFT JOIN (media may be gone), so a missing object is NOT
+    // treated as chat-backed: only a real row with a flag set is excluded.
     const rows = await this.db
       .prepare(
-        `SELECT c.*, o.content_url, o.mime_type, o.caption, co.owner_id FROM Cards c
+        `SELECT c.*, o.content_url, o.mime_type, o.caption, co.owner_id,
+                u.display_name AS owner_name, u.pfp_url AS owner_pfp_url
+         FROM Cards c
          JOIN CardOwnership co ON co.card_id = c.id
          LEFT JOIN Objects o ON o.id = c.media_object_id
+         LEFT JOIN Users u ON u.id = co.owner_id
          WHERE co.owner_id = ?
+           AND NOT (
+             o.id IS NOT NULL
+             AND (COALESCE(o.is_chat, 0) = 1
+               OR COALESCE(o.is_public, 0) = 1
+               OR COALESCE(o.is_story, 0) = 1
+               OR COALESCE(o.is_avatar, 0) = 1)
+           )
          ORDER BY c.value DESC, c.created_at ASC`,
       )
       .bind(userId)
@@ -464,11 +513,13 @@ export class CardService {
     const rows = await this.db
       .prepare(
         `SELECT ml.id AS listing_id, ml.card_id, ml.price, ml.seller_id, ml.created_at AS listed_at,
-                c.*, o.content_url, o.mime_type, o.caption, co.owner_id
+                c.*, o.content_url, o.mime_type, o.caption, co.owner_id,
+                u.display_name AS owner_name, u.pfp_url AS owner_pfp_url
          FROM MarketListings ml
          JOIN Cards c ON c.id = ml.card_id
          JOIN CardOwnership co ON co.card_id = c.id
          LEFT JOIN Objects o ON o.id = c.media_object_id
+         LEFT JOIN Users u ON u.id = co.owner_id
          WHERE ml.status = 'open' AND c.moderation_state = 'active'
          ORDER BY ml.created_at DESC
          LIMIT ? OFFSET ?`,

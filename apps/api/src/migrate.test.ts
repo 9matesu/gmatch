@@ -27,11 +27,11 @@ async function userVersion(client: Awaited<ReturnType<typeof createClient>>): Pr
 }
 
 describe('gMatch Phase 1 migrations', () => {
-  it('migrates a fresh in-memory DB to user_version 56 with all new tables/columns', async () => {
+  it('migrates a fresh in-memory DB to user_version 57 with all new tables/columns', async () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)
 
-    expect(await userVersion(client)).toBe(56)
+    expect(await userVersion(client)).toBe(57)
 
     // Gossip relay envelopes (migration 055, plan G1)
     expect(await tableExists(client, 'GossipEnvelopes')).toBe(true)
@@ -241,6 +241,59 @@ describe('gMatch Phase 1 migrations', () => {
     expect(Number(again.rows[0]?.count)).toBe(3)
   })
 
+  it('purges chat-backed cards even when adopted on the market (057)', async () => {
+    const client = createClient({ url: ':memory:' })
+    await migrate(client)
+
+    await client.execute("INSERT INTO Users (id, public_key, display_name) VALUES ('c57-owner', 'c57-key', 'Owner')")
+    await client.execute("INSERT INTO Users (id, public_key, display_name) VALUES ('c57-buyer', 'c57-key2', 'Buyer')")
+    await client.execute("INSERT INTO Objects (id, owner_id, size_bytes, mime_type, is_chat) VALUES ('c57-chat', 'c57-owner', 1, 'image/jpeg', 1)")
+    await client.execute("INSERT INTO Objects (id, owner_id, size_bytes, mime_type, is_public) VALUES ('c57-post', 'c57-owner', 1, 'image/jpeg', 1)")
+    await client.execute("INSERT INTO Objects (id, owner_id, size_bytes, mime_type) VALUES ('c57-clean', 'c57-owner', 1, 'image/jpeg')")
+
+    // Adopted on the market from a chat attachment — exactly what 056 exempted
+    // and therefore never removed.
+    await client.execute("INSERT INTO Cards (id, creator_id, media_object_id, name, rarity, value, market_status, moderation_state) VALUES ('c57-adopted-chat', 'c57-owner', 'c57-chat', 'Adopted Chat', 'rare', 99, 'none', 'active')")
+    await client.execute("INSERT INTO CardHistory (id, card_id, event, to_user) VALUES ('c57-h1', 'c57-adopted-chat', 'backfilled', 'c57-owner')")
+    await client.execute("INSERT INTO CardHistory (id, card_id, event, from_user, to_user) VALUES ('c57-h2', 'c57-adopted-chat', 'purchased', 'c57-owner', 'c57-buyer')")
+    await client.execute("INSERT INTO CardOwnership (card_id, owner_id) VALUES ('c57-adopted-chat', 'c57-buyer')")
+
+    // Transferred, and listed for sale, from post media.
+    await client.execute("INSERT INTO Cards (id, creator_id, media_object_id, name, rarity, value, market_status, moderation_state) VALUES ('c57-listed-post', 'c57-owner', 'c57-post', 'Listed Post', 'common', 5, 'open', 'active')")
+    await client.execute("INSERT INTO CardHistory (id, card_id, event, to_user) VALUES ('c57-h3', 'c57-listed-post', 'created', 'c57-owner')")
+    await client.execute("INSERT INTO CardOwnership (card_id, owner_id) VALUES ('c57-listed-post', 'c57-owner')")
+    await client.execute("INSERT INTO MarketListings (id, card_id, seller_id, price, status) VALUES ('c57-listing', 'c57-listed-post', 'c57-owner', 50, 'open')")
+
+    // A genuine minted card, also bought, must survive.
+    await client.execute("INSERT INTO Cards (id, creator_id, media_object_id, name, rarity, value, market_status, moderation_state) VALUES ('c57-real', 'c57-owner', 'c57-clean', 'Real Card', 'legendary', 500, 'none', 'active')")
+    await client.execute("INSERT INTO CardHistory (id, card_id, event, to_user) VALUES ('c57-h4', 'c57-real', 'created', 'c57-owner')")
+    await client.execute("INSERT INTO CardHistory (id, card_id, event, from_user, to_user) VALUES ('c57-h5', 'c57-real', 'purchased', 'c57-owner', 'c57-buyer')")
+    await client.execute("INSERT INTO CardOwnership (card_id, owner_id) VALUES ('c57-real', 'c57-buyer')")
+
+    // Only migration 057 should run.
+    await client.execute('PRAGMA user_version = 56')
+    await migrate(client)
+
+    const remaining = await client.execute('SELECT id FROM Cards ORDER BY id')
+    expect(remaining.rows.map((r: any) => r.id)).toEqual(['c57-real'])
+    // The buyer of a real card keeps it.
+    const held = await client.execute("SELECT owner_id FROM CardOwnership WHERE card_id = 'c57-real'")
+    expect(held.rows[0]?.owner_id).toBe('c57-buyer')
+    // No dangling references, and the market listing for the bogus card is gone.
+    for (const table of ['CardOwnership', 'CardHistory', 'MarketListings', 'DeckCards']) {
+      const dangling = await client.execute(`SELECT COUNT(*) AS count FROM ${table} WHERE card_id NOT IN (SELECT id FROM Cards)`)
+      expect(Number(dangling.rows[0]?.count), table).toBe(0)
+    }
+    // Backing media untouched: the chat message referencing it stays readable.
+    const media = await client.execute("SELECT COUNT(*) AS count FROM Objects WHERE id IN ('c57-chat','c57-post','c57-clean')")
+    expect(Number(media.rows[0]?.count)).toBe(3)
+    // Rerunnable.
+    await client.execute('PRAGMA user_version = 56')
+    await migrate(client)
+    const again = await client.execute('SELECT COUNT(*) AS count FROM Cards')
+    expect(Number(again.rows[0]?.count)).toBe(1)
+  })
+
   it('backfills legacy players into the economy (040): XP, wallets, and card valuation', async () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)
@@ -289,7 +342,7 @@ describe('gMatch Phase 1 migrations', () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)
     const versionAfterFirst = await userVersion(client)
-    expect(versionAfterFirst).toBe(56)
+    expect(versionAfterFirst).toBe(57)
     expect(await columnExists(client, 'ServerDirectory', 'tags')).toBe(true)
 
     // Running migrate() again is a no-op
@@ -301,10 +354,10 @@ describe('gMatch Phase 1 migrations', () => {
     expect(await columnExists(client, 'Users', 'is_moderator')).toBe(true)
   })
 
-  it('upgrades a pre-gMatch snapshot (user_version 13) by applying 014-056', async () => {
+  it('upgrades a pre-gMatch snapshot (user_version 13) by applying 014-057', async () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)
-    expect(await userVersion(client)).toBe(56)
+    expect(await userVersion(client)).toBe(57)
 
     // Tear down gMatch additions so we're effectively at pre-014 state.
     await client.execute('DROP TABLE IF EXISTS Saves')
@@ -327,10 +380,10 @@ describe('gMatch Phase 1 migrations', () => {
     // Pretend we're still on the pre-gMatch migration version.
     await client.execute('PRAGMA user_version = 13')
 
-    // Re-run migrate — it should detect user_version=13 and apply 014-056 in order
+    // Re-run migrate — it should detect user_version=13 and apply 014-057 in order
     await migrate(client)
 
-    expect(await userVersion(client)).toBe(56)
+    expect(await userVersion(client)).toBe(57)
     expect(await tableExists(client, 'Followers')).toBe(true)
     expect(await tableExists(client, 'Comments')).toBe(true)
     expect(await tableExists(client, 'CommentLikes')).toBe(true)
