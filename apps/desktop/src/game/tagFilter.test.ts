@@ -112,6 +112,86 @@ describe('hard blocklist (SPEC §8)', () => {
   })
 })
 
+describe('token-boundary matching (must-block / must-allow)', () => {
+  // Every one of these is a real compound of a banned term. They are the
+  // reason matching is token-ALIGNED and not token-EQUAL: a stricter rule
+  // would be a child-safety regression, which is worse than over-blocking.
+  it('MUST BLOCK: real compounds of a banned term', () => {
+    for (const tag of [
+      'lolicon',
+      'lolicon_shota',
+      'shotacon',
+      'teenager',
+      'teens',
+      'childhood_friends',
+      'child_friendly',
+      'kiddy',
+      'infantile',
+      'minors',
+      'necrophilia',
+      'necromancer',
+      'zoo_philia',
+      'zoophilia',
+      'raped',
+      'non-consensual',
+      'nonconsensual',
+      'ageplay',
+      'age_play',
+      'schoolgirl',
+      'Loli',
+      'x_loli_y',
+    ]) {
+      expect(isTagBlocked(tag), tag).toBe(true)
+    }
+  })
+
+  // The bug this replaced: raw substring matching blocked all of these purely
+  // because the letters appear somewhere inside the word.
+  it('MUST ALLOW: legal tags that merely contain a banned substring', () => {
+    for (const tag of [
+      'fifteen',
+      'scrape',
+      'grape',
+      'grapes',
+      'nineteen',
+      'candid',
+      'thumbnail',
+      'interior',
+      'accumulate',
+      'wizard',
+    ]) {
+      expect(isTagBlocked(tag), tag).toBe(false)
+    }
+  })
+
+  it('matches on underscores, not on mid-word positions', () => {
+    // 'teen' is a banned term; the tag's own token must be the one that trips.
+    expect(isTagBlocked('teen_school')).toBe(true)
+    expect(isTagBlocked('sweet_teen')).toBe(true)
+    expect(isTagBlocked('sweet_sixteen')).toBe(false)
+  })
+
+  it('treats hyphens and spaces as the same token boundary as underscores', () => {
+    expect(isTagBlocked('non-consensual')).toBe(true)
+    expect(isTagBlocked('non consensual')).toBe(true)
+    expect(isTagBlocked('non_consensual')).toBe(true)
+  })
+
+  it('is case-insensitive on both sides of the match', () => {
+    expect(isTagBlocked('FIFTEEN')).toBe(false)
+    expect(isTagBlocked('ScRaPe')).toBe(false)
+    expect(isTagBlocked('SCRAPE_XXX')).toBe(false)
+    expect(isTagBlocked('LOLICON')).toBe(true)
+  })
+
+  it('queries get the same treatment, not a separate substring path', () => {
+    expect(isQueryBlocked('fifteen')).toBe(false)
+    expect(isQueryBlocked('grape girl')).toBe(false)
+    expect(isQueryBlocked('lolicon girl')).toBe(true)
+    expect(isQueryBlocked('sweet girl')).toBe(false)
+  })
+})
+
 describe('ratings', () => {
   it('allows explicit/adult, rejects everything else', () => {
     expect(isRatingAllowed('e')).toBe(true)

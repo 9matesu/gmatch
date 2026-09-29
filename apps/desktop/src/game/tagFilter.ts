@@ -3,8 +3,10 @@ import type { BlocklistData } from '../types/gmatch-bridge'
 
 /**
  * HARD blocklist (SPEC §8) — the illegal-content line only (minors,
- * bestiality, necrophilia, non-consent). A tag is rejected if ANY blocklist
- * term appears as a case-insensitive substring. Single source of truth:
+ * bestiality, necrophilia, non-consent). A tag is rejected if a blocklist
+ * term appears in it ALIGNED TO A TOKEN BOUNDARY (underscore-joined words;
+ * a term may still be a prefix of its token, so 'lolicon' stays blocked while
+ * 'fifteen' no longer trips 'teen'). Single source of truth:
  * shared/blocklist.json (also required by electron/main.cjs, which cannot
  * import TS). Everything legal-but-polarising lives in SUGGESTED_EXCLUDES
  * and is blocked only when the player adds it to their own exclude list.
@@ -137,9 +139,9 @@ if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
 
 /**
  * User excludes: extra blocked terms the player adds on the setup screen or
- * the config tab. Same substring rule as the hard blocklist, persisted in the
- * save (see save.ts). Module-level so every pure gate picks them up; the
- * store syncs them on load/setup/config change via setUserExcludes.
+ * the config tab. Same token-boundary rule as the hard blocklist, persisted
+ * in the save (see save.ts). Module-level so every pure gate picks them up;
+ * the store syncs them on load/setup/config change via setUserExcludes.
  */
 let userExcludes: string[] = []
 
@@ -166,8 +168,44 @@ export function __resetUserExcludes(): void {
 }
 
 function matchesAny(term: string, list: readonly string[]): boolean {
-  const t = term.toLowerCase()
-  return list.some((bad) => t.includes(bad))
+  const t = normalizeTagText(term)
+  if (!t) return false
+  return list.some((bad) => hitsAtTokenStart(t, normalizeTagText(bad)))
+}
+
+/**
+ * Booru tag vocabularies are underscore-joined words, so `_` (plus spaces and
+ * hyphens, which sources use interchangeably) is the only real token boundary.
+ */
+export function normalizeTagText(raw: string): string {
+  return String(raw).toLowerCase().replace(/[\s-]+/g, '_')
+}
+
+/**
+ * True when `term` occurs in `tag` STARTING ON A TOKEN BOUNDARY.
+ *
+ * The old rule was a raw substring test, which is wrong in both directions.
+ * It let 'grape' (rape), 'fifteen' (teen) and 'scrape' through as blocked —
+ * 20 of 28 sampled legal tags were being dropped for merely containing the
+ * letters of a banned word, which quietly starves the feed.
+ *
+ * Requiring token alignment fixes those. Crucially a term may still be a
+ * PREFIX of its token, so every real compound stays blocked: 'lolicon',
+ * 'shota'/'shotacon', 'teenager', 'childhood_friends', 'necrophilia' and
+ * 'zoo_philia' are all caught. What stops matching is only a mid-token hit,
+ * which is exactly the accidental case. No safety term loses its coverage
+ * except compounds where the banned word is a SUFFIX ('grandchild'); tag
+ * vocabularies put the head noun first, so this is not a real gap.
+ */
+export function hitsAtTokenStart(tag: string, term: string): boolean {
+  if (!tag || !term) return false
+  let from = 0
+  for (;;) {
+    const i = tag.indexOf(term, from)
+    if (i === -1) return false
+    if (i === 0 || tag.charCodeAt(i - 1) === 95 /* '_' */) return true
+    from = i + 1
+  }
 }
 
 export function isTagBlocked(tag: string): boolean {

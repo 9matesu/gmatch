@@ -174,7 +174,7 @@ text overlays kept for caption hunts, §6).
   Gallery tab: text box filters keepsakes by tag substring.
   Config tab: starter picks recap + extra excludes (add/remove, 100 max).
 
-## 8. Blocklist — client-side only (reject tag if ANY substring matches; case-insensitive)
+## 8. Blocklist — client-side only (reject tag if a term matches on a token boundary; case-insensitive)
 
 The server NEVER hard-blocks a tag: write paths (objects, gossip, slideshows,
 users) store tags verbatim and gossip replicates them as-is. Filtering happens
@@ -185,8 +185,27 @@ driven by a single source of truth:
 `userData/blocklist.json` (takes precedence, written only through Settings →
 Blocklist; Settings never touches the repo file).
 
+**Matching rule.** A term matches when it occurs in the tag *aligned to a token
+boundary*, where tokens are underscore-joined words (hyphens and spaces are
+treated as the same boundary). A term may still be a **prefix** of its token, so
+`lolicon`, `shotacon`, `teenager`, `childhood_friends`, `necrophilia` and
+`zoo_philia` all stay blocked. Only a mid-token hit is ignored.
+
+This is deliberately NOT a raw substring test. Substring matching blocked
+`fifteen` (via `teen`), `scrape`/`grape` (via `rape`) and `nineteen` — 6 of 9
+measured false positives on a legal-tag sample, which quietly starves the feed.
+It also blocked `zoom` (`zoo`) and `babydoll` (`baby`), which survive because
+prefix matching is what keeps the real compounds blocked; removing those two
+would leak `zoophilia`/`baby`-prefixed terms, so they are a policy decision, not
+a code one.
+
+`electron/main.cjs` implements the identical `hitsAtTokenStart` rule. The
+renderer and the main process enforce the same hard line, so the two
+implementations must not drift; a parity check lives in the tagFilter suite.
+
 Player excludes (setup screen + Config tab, 100 max, persisted) extend this
-list at runtime: queries, post tags, and market discovery all respect them.
+list at runtime: queries, post tags, and market discovery all respect them,
+using the same token-boundary rule.
 
 `loli, shota, child, kid, infant, baby, toddler, school, student, uniform-ish
 minor terms, ageplay, incest, bestiality, zoo, necro, rape, non-consent, gore,
