@@ -173,13 +173,17 @@ describe('mail DM layer (courier-only, local source of truth)', () => {
     expect(Object.keys(store.threads())).toHaveLength(0)
   })
 
-  it('thread history persists in localStorage and caps at 500', () => {
+  it('thread history persists in localStorage and only trims past the storage backstop', () => {
+    // The cap is a localStorage backstop, not a retention policy — DM history
+    // is meant to be permanent. It dropped the OLDEST rows, the half anyone
+    // would miss, and at 500 it was cutting real history in an active thread
+    // long before the browser's ~5MB origin ceiling was anywhere near.
     const store = new DmStore(alice)
-    for (let i = 0; i < 520; i++) store.appendLocal({ id: `m${i}`, peerId: 'p', own: true, text: 'x', ts: i, status: 'sent' })
+    for (let i = 0; i < 2100; i++) store.appendLocal({ id: `m${i}`, peerId: 'p', own: true, text: 'x', ts: i, status: 'sent' })
     const t = store.thread('p')
-    expect(t).toHaveLength(500)
-    expect(t[0].id).toBe('m20') // oldest dropped, newest kept
+    expect(t).toHaveLength(2000)
+    expect(t[0].id).toBe('m100') // oldest dropped, newest kept
     // survives reload (fresh instance reading the same localStorage):
-    expect(new DmStore(alice).thread('p')).toHaveLength(500)
+    expect(new DmStore(alice).thread('p')).toHaveLength(2000)
   })
 })

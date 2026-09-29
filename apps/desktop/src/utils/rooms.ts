@@ -73,7 +73,13 @@ interface RoomMsgBody {
 
 const ROOMS_KEY = 'orbit_rooms_v1'
 const MSGS_KEY = 'orbit_room_messages_v1'
-const MAX_PER_ROOM = 300
+/**
+ * Per-room backstop, NOT a retention policy — see the same note on
+ * MAX_PER_THREAD in mail-dm.ts. Room history is permanent; this only keeps the
+ * secure-storage blob from outgrowing the browser's origin-wide localStorage
+ * ceiling, and it drops the OLDEST rows, which is the half anyone would miss.
+ */
+const MAX_PER_ROOM = 2000
 
 type RoomWire =
   | { t: 'room_invite'; room: Room }

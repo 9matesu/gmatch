@@ -79,6 +79,15 @@ groups.get('/:id/messages', async (c) => {
   const userId = c.get('orbitId')
   const groupId = c.req.param('id')
   if (!(await isMember(c.env.DB, groupId, userId))) return c.json({ error: 'Not a member' }, 403)
+  // No LIMIT. Group history is permanent.
+  //
+  // This used to be `ORDER BY gm.created_at ASC LIMIT 200`, which was not
+  // merely a truncation — combined with the ascending order it returned the
+  // OLDEST 200 rows. Once a group passed 200 messages, reloading the
+  // conversation showed the start of its history and silently dropped
+  // everything after it, including messages sent seconds earlier. Live
+  // messages still arrived over the socket, so the missing middle read as
+  // "nothing happened today".
   const { results } = await c.env.DB.prepare(`
     SELECT gm.id, gm.group_id, gm.sender_id, gm.body, gm.reply_to, gm.attachment_id, gm.created_at, u.display_name as sender_name,
            o.content_url as attachment_url, o.mime_type as attachment_mime
@@ -87,7 +96,6 @@ groups.get('/:id/messages', async (c) => {
     LEFT JOIN Objects o ON o.id = gm.attachment_id
     WHERE gm.group_id = ? AND gm.hidden_at IS NULL
     ORDER BY gm.created_at ASC
-    LIMIT 200
   `).bind(groupId).all()
   return c.json(results || [])
 })

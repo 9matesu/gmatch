@@ -154,4 +154,40 @@ describe('Group Chat Messages API', () => {
     }, env)
     expect(postRes.status).toBe(200)
   })
+
+  it('returns the WHOLE history, not the oldest 200 rows', async () => {
+    // Regression guard. The query used to be `ORDER BY created_at ASC LIMIT
+    // 200`, which returned the OLDEST 200 — so once a group passed 200
+    // messages, reloading dropped everything after it, including messages sent
+    // seconds earlier. Live messages still arrived over the socket, so the
+    // missing middle looked like "nothing happened today".
+    const createBody = JSON.stringify({ name: 'History Group', member_ids: [] })
+    const createRes = await app.request('/api/groups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(sender, 'POST', '/api/groups', createBody) },
+      body: createBody,
+    }, env)
+    const groupId = (await createRes.json() as any).group?.id
+
+    // Seed straight to the table: posting 250 messages over HTTP is slow and
+    // this is a read-path guarantee, not a write-path one.
+    const now = Date.now()
+    const rows = Array.from({ length: 250 }, (_, i) =>
+      env.DB.prepare(
+        'INSERT INTO GroupMessages (id, group_id, sender_id, body, created_at) VALUES (?, ?, ?, ?, ?)',
+      ).bind(`gmsg-${i}`, groupId, sender.orbitId, `msg ${i}`, new Date(now - (250 - i) * 1000).toISOString()),
+    )
+    for (const r of rows) await r.run()
+
+    const res = await app.request(`/api/groups/${groupId}/messages`, {
+      headers: authHeaders(sender, 'GET', `/api/groups/${groupId}/messages`),
+    }, env)
+    expect(res.status).toBe(200)
+    const msgs = await res.json() as any[]
+    expect(msgs.length).toBe(250)
+    // Chronological, and the newest message is present — the part the old
+    // query dropped.
+    expect(msgs[0].body).toBe('msg 0')
+    expect(msgs[msgs.length - 1].body).toBe('msg 249')
+  })
 })

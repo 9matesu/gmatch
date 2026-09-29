@@ -45,7 +45,20 @@ export interface DmMessage {
 
 const THREADS_KEY = 'orbit_mail_threads_v1'
 const KEYS_KEY = 'orbit_mail_peerkeys_v1'
-const MAX_PER_THREAD = 500
+/**
+ * Per-thread backstop, NOT a retention policy. DM history is permanent; this
+ * exists only because threads live in localStorage, which browsers cap at
+ * roughly 5 MB for the whole origin. At 500 it was truncating real history in
+ * an active conversation long before that ceiling was anywhere near, and the
+ * oldest messages were the ones dropped — the same mistake as the group route's
+ * `ORDER BY ... ASC LIMIT`.
+ *
+ * Raised to 2000, which is about 400 KB of JSON for a text-only thread. The
+ * honest fix for an unbounded archive is IndexedDB, not a bigger number; this
+ * is the interim bound, sized to stay well clear of the origin-wide ceiling
+ * even with several large threads in one install.
+ */
+const MAX_PER_THREAD = 2000
 
 export interface PeerKeys {
   publicKeyHex: string
