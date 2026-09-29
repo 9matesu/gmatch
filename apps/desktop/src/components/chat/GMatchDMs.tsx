@@ -37,6 +37,7 @@ import { ChatPlayerList } from './ChatPlayerList';
 import { Linkify } from '../Linkify';
 import { chatDisplayName } from './chatDisplayName';
 import { nameFor, nameRoster as nameRosterFromDirectory, rememberName } from '../../game/nameDirectory';
+import { groupMessagesByDay } from '../../utils/chatDays';
 import { UNKNOWN_NAME } from '../../utils/displayName';
 
 export interface PeerInfo {
@@ -64,7 +65,8 @@ export interface GroupInfo {
   is_member: number;
 }
 
-const GROUP_WINDOW_MS = 5 * 60 * 1000;
+// GROUP_WINDOW_MS now lives with the block grouping it belongs to, in
+// utils/chatDays.ts, alongside the day separators computed in the same pass.
 
 type OpenTarget = 'group' | 'lobby' | 'queue' | 'peer' | 'room' | null;
 
@@ -507,19 +509,12 @@ export function GMatchDMs({
     }
   }, [displayedMessages]);
 
-  const messageBlocks = useMemo(() => {
-    const blocks: ChatMessage[][] = [];
-    for (const msg of displayedMessages) {
-      const prev = blocks[blocks.length - 1];
-      const prevMsg = prev ? prev[prev.length - 1] : null;
-      if (prevMsg && prevMsg.senderId === msg.senderId && (msg.timestamp - prevMsg.timestamp) < GROUP_WINDOW_MS) {
-        prev.push(msg);
-      } else {
-        blocks.push([msg]);
-      }
-    }
-    return blocks;
-  }, [displayedMessages]);
+  // Day separators and author blocks in one pass. These used to be two
+  // independent concerns computed separately, which meant the "start of a
+  // conversation" the block grouping implied and the day a message fell on
+  // could disagree.
+  const messageRows = useMemo(() => groupMessagesByDay(displayedMessages), [displayedMessages]);
+
 
   const findMessage = (id?: string): ChatMessage | undefined =>
     id ? displayedMessages.find((m) => m.id === id) : undefined;
@@ -1049,13 +1044,31 @@ export function GMatchDMs({
                     </button>
                   </div>
                 )}
-                {messageBlocks.map((block, bi) => {
+                {messageRows.map((row, bi) => {
+                  if (row.kind === 'day') {
+                    return (
+                      <div
+                        key={row.key}
+                        data-testid="chat-day-separator"
+                        className="flex items-center gap-3 py-2 select-none"
+                        role="separator"
+                        aria-label={`Messages from ${row.label}`}
+                      >
+                        <span className="h-px flex-1 bg-border-glass" />
+                        <span className="text-[10px] font-medium uppercase tracking-wider text-retro-muted">
+                          {row.label}
+                        </span>
+                        <span className="h-px flex-1 bg-border-glass" />
+                      </div>
+                    );
+                  }
+                  const block = row.messages;
                   const first = block[0];
                   const isOwn = identity && first.senderId === identity.orbitId;
                   const senderName = isOwn ? (myDisplayName || 'You') : displayNameFor(first.senderId, first.senderName);
                   const pfp = profilePics[first.senderId];
                   return (
-                    <div key={block[0].id || bi} className={`flex items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                    <div key={row.key} className={`flex items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
                       {!isOwn && (
                         <div
                           className="w-6 h-6 rounded-full bg-surface-raised border border-border-glass text-retro-muted overflow-hidden flex items-center justify-center text-[10px] font-medium shrink-0 mb-1 select-none cursor-pointer hover:ring-1 hover:ring-retro-accent/50 transition-shadow"
