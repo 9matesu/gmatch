@@ -91,3 +91,8 @@
   Noise-encrypted P2P transports; each package is one responsibility, all from
   the maintained libp2p project. No relay/DHT/gossipsub packages: the slice is
   fail-closed by construction.
+- Slice 2 adds `@noble/curves` + `@noble/hashes` as explicit desktop deps: main
+  verifies the orbit-signed binding with the same noble primitives
+  `@orbit/crypto` uses, but main cannot import TS sources, so the 15-line
+  mirror in `p2p-protocol.mjs` is pinned by the shared fixed vector (both
+  `peer-binding.test.ts` and `p2p-protocol.test.mjs` must accept it).

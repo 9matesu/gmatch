@@ -26,6 +26,8 @@
     "@libp2p/mdns": "^12.0.33",
     "@libp2p/ping": "^3.1.14",
     "@libp2p/tcp": "^11.0.29",
+    "@noble/curves": "^1.9.0",
+    "@noble/hashes": "^1.8.0",
     "libp2p": "^3.3.12"
   },
   "devDependencies": {

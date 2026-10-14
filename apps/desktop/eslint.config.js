@@ -48,5 +48,8 @@ export default tseslint.config(
       globals: globals.node,
       ecmaVersion: 2022,
     },
+    rules: {
+      'no-empty': ['error', { allowEmptyCatch: true }],
+    },
   },
 )
