@@ -51,6 +51,7 @@ import { GAME_AD_TEMPLATES } from '../../utils/gameAds';
 import { ExploreSearchModal } from './ExploreSearchModal';
 import { useNow } from '../../hooks/useNow';
 import { SharePostModal } from './SharePostModal';
+import { PostTimestamp } from './PostTimestamp';
 import { PostOptionsModal } from './PostOptionsModal';
 import { ReportPostModal } from './ReportPostModal';
 import { PostCreatorModal } from './PostCreatorModal';
@@ -870,9 +871,7 @@ export function GMatchFeed({
                         >
                           {post.author_name}
                         </span>
-                        <time className="text-xs text-retro-muted leading-tight shrink-0" dateTime={post.created_at}>
-                          {new Date(post.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                        </time>
+                        <PostTimestamp createdAt={post.created_at} />
                       </div>
                       {post.location && (
                         <span className="text-xs text-retro-muted leading-tight block truncate">{post.location}</span>

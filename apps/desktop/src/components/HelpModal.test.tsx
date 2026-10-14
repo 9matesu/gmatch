@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { HelpModal } from './HelpModal'
+import { HelpModal, hasSeenHelp, markHelpSeen } from './HelpModal'
 import { HELP_TOPICS } from '../help/helpContent'
 
 /**
@@ -141,4 +141,26 @@ describe('HelpModal — every feature has a guide', () => {
     const ids = HELP_TOPICS.map((t) => t.id)
     expect(new Set(ids).size).toBe(ids.length)
   })
+})
+
+describe('HelpModal — first-startup auto-show', () => {
+  it('auto-shows once per identity, then never again', () => {
+    // This file runs without a DOM localStorage; the helper fails closed
+    // (seen) without one, so stub the store it reads.
+    const store = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => { store.set(k, v); },
+      removeItem: (k: string) => { store.delete(k); },
+    } as unknown as Storage);
+    expect(hasSeenHelp('orb-seen-test')).toBe(false);
+    markHelpSeen('orb-seen-test');
+    expect(hasSeenHelp('orb-seen-test')).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it('never auto-shows without an identity (fail closed, not open)', () => {
+    expect(hasSeenHelp(null)).toBe(true);
+    expect(hasSeenHelp(undefined)).toBe(true);
+  });
 })

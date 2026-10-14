@@ -19,6 +19,15 @@
   "shadcn/tailwind.css"` from `globals.css` (resolved only via a stray
   undeclared install; nothing consumes it). Clean-`npm ci` build was broken
   without this; now green — see `RECONSTRUCTION.md` §9–§10 for the full gate.
+- Salvaged from the abandoned branch (tested, reviewed against this line):
+  post timestamps (`PostTimestamp`: relative by default, absolute on
+  hover/click-latch with sticky preference); the booru fetch layer (two-phase
+  cheap-first rounds, mirror cooldowns, hedged attempt runner, page memory,
+  pre-gated tagless lists, `red` source + disabled `rule34-org`/`utopia` rows,
+  canonical post-id namespaces); the Help modal rework (tab groups, per-topic
+  screenshots, auto-show once per identity). The abandoned branch's
+  click-only-economy help copy was NOT carried: this line still has passive
+  income, and docs must describe the code.
 - Known limitations: off-mesh reachability still rides hosted rendezvous;
   no peer-address exchange; symmetric NAT needs relay; `/register` stays
   client-claimed; rooms lack forward secrecy. Full list in `P2P.md`/`SECURITY.md`.

@@ -12,7 +12,7 @@ const vaultServer = require('./vaultServer.cjs')
 const customFolders = require('./customFolders.cjs')
 const wallpaperWin = require('./wallpaperWin.cjs')
 const { sanitizeBounds } = require('./window-bounds-core.cjs')
-const { dapiSource, booruOrgSource } = require('./booru-sources-core.cjs')
+const { dapiSource, booruOrgSource, gateBooruOrgEntry } = require('./booru-sources-core.cjs')
 const { loadRegistry: loadBooruRegistry, refererFor: booruRefererFor } = require('./booru-registry.cjs')
 
 // Background video & screen sharing fix: keep video playback running and prevent black screen when alt-tabbed / occluded.
@@ -208,13 +208,30 @@ const TIMEOUT_MS = 3_500
 // galleries ~300KB). JSON APIs stay on the tight TIMEOUT_MS.
 const HTML_TIMEOUT_MS = 8_000
 
-// Build negative query terms directly from the active blocklist (single source of truth).
+// Build negative query terms directly from the active blocklist (single source
+// of truth), PLUS whatever player excludes this round asks for.
+//
+// Excludes used to be applied only in the renderer's post-filter, so a booru
+// happily returned the excluded content and we paid to download it only to
+// throw it away. Sending `-term` in the query means the source never offers it.
+// The renderer still post-filters, so this is an optimisation, not a gate.
+let roundExcludes = []
+function setRoundExcludes(list) {
+  roundExcludes = Array.isArray(list) ? list.filter((t) => typeof t === 'string') : []
+}
+
 function getQueryNegatives() {
-  if (!currentBlocklist || currentBlocklist.length === 0) return ''
-  return currentBlocklist
-    .filter((b) => /^[a-z0-9_-]+$/i.test(b))
-    .map((b) => `-${b}`)
-    .join(' ')
+  const seen = new Set()
+  const terms = []
+  const add = (b) => {
+    const t = String(b || '').trim().toLowerCase()
+    if (!/^[a-z0-9_-]+$/.test(t) || seen.has(t)) return
+    seen.add(t)
+    terms.push(`-${t}`)
+  }
+  for (const b of currentBlocklist || []) add(b)
+  for (const b of roundExcludes) add(b)
+  return terms.join(' ')
 }
 
 // Post-level floor (user spec: high quality always; loosened from 700px to
@@ -278,15 +295,38 @@ async function httpGet(url, headers, timeoutMs) {
 
   if (net && typeof net.fetch === 'function') {
     try {
-      const res = await net.fetch(url, {
-        headers: allHeaders,
-        redirect: 'follow',
-      })
+      // The net.fetch branch MUST carry its own timeout. Electron's net.fetch
+      // has no implicit one, and `net` is always present in the packaged app,
+      // so without this the branch that always runs is the only branch with no
+      // timeout: a hung mirror holds its race lane indefinitely, and since
+      // firstWithPosts waits for all lanes the whole round stalls past the 8s
+      // deadline. The https.get fallback below does set one; these must match.
+      const controller = new AbortController()
+      const budgetMs = timeoutMs || TIMEOUT_MS
+      const timer = setTimeout(() => controller.abort(), budgetMs)
+      const unref = timer.unref
+      if (typeof unref === 'function') unref.call(timer)
+      let res
+      try {
+        res = await net.fetch(url, {
+          headers: allHeaders,
+          redirect: 'follow',
+          signal: controller.signal,
+        })
+      } finally {
+        clearTimeout(timer)
+      }
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`)
       }
       return await res.text()
     } catch (err) {
+      // An aborted fetch is a TIMEOUT, not a network failure — report it as
+      // the same quality-gate timeout the https path uses so callers treat
+      // both the same. HTTP errors still propagate as before.
+      if (err && (err.name === 'AbortError' || /abort/i.test(String(err.message || err)))) {
+        throw new Error('quality-gate timeout')
+      }
       if (err && /HTTP \d+/.test(err.message)) throw err
       /* fallback to https.get if net.fetch fails */
     }
@@ -322,7 +362,7 @@ async function httpGet(url, headers, timeoutMs) {
 
 // --- source parsers -------------------------------------------------------
 
-function parseDanbooruJson(body, baseUrl) {
+function parseDanbooruJson(body, baseUrl, prefix = '') {
   if (!body || typeof body !== 'string' || !body.trim()) return []
   let data
   try {
@@ -335,10 +375,16 @@ function parseDanbooruJson(body, baseUrl) {
   return list
     .filter((p) => p && typeof p === 'object')
     .map((p) => ({
-      id: String(p.id ?? ''),
+      // Source-scoped id: tbib #102 and xbooru #102 are different pictures, and
+      // a shared bare numeric id made the renderer's seen-set swallow one.
+      id: prefix + String(p.id ?? ''),
       url: p.file_url || `${baseUrl}/images/${p.directory}/${p.image}`,
       tags: typeof p.tags === 'string' ? p.tags.split(/\s+/).filter(Boolean) : [],
-      rating: typeof p.rating === 'string' ? p.rating : 'e',
+      // Only what the source actually said. This used to default to 'e', which
+      // turned the rating check below into a tautology: it was approving posts
+      // whose rating had never been reported. DAPI does return a real rating;
+      // anything else is genuinely unknown and must stay that way.
+      rating: typeof p.rating === 'string' && p.rating ? p.rating : undefined,
       width: Number(p.width) || 0,
       height: Number(p.height) || 0,
     }))
@@ -348,8 +394,10 @@ function parseDanbooruJson(body, baseUrl) {
         // Localhost parity: same media set as the renderer's allowOnly
         // (stills + gifs + short mp4/webm loops). Floor is 400px, not 700px.
         /\.(jpe?g|png|gif|webp|mp4|webm)(?:[?#]|$)/i.test(p.url) &&
-        // DAPI spells it 'explicit'; e621-style sources use 'e'. Missing
-        // ratings default to 'e' above, mirroring isRatingAllowed.
+        // DAPI spells it 'explicit'; e621-style sources use 'e'. A MISSING
+        // rating now fails here, matching the renderer's fail-closed
+        // isRatingAllowed. This path only serves dapi/moebooru, both of which
+        // return a real rating, so nothing legitimate is lost.
         (p.rating === 'explicit' || p.rating === 'e' || p.rating === 'adult') &&
         (p.width === 0 || p.width >= 400) &&
         (p.height === 0 || p.height >= 400) &&
@@ -373,11 +421,14 @@ function parsePahealXml(body) {
     const width = Number(attr(m[1], 'width')) || 0
     const height = Number(attr(m[1], 'height')) || 0
     posts.push({
-      id: attr(m[1], 'id') || fileUrl,
+      // Source-scoped (matches the renderer parser).
+      id: `paheal-${attr(m[1], 'id') || fileUrl}`,
       url: fileUrl,
       fileName,
       tags: attr(m[1], 'tags') ? attr(m[1], 'tags').split(/\s+/).filter(Boolean) : [],
-      rating: 'e',
+        // No rating asserted: this source cannot report one. The renderer gate fails
+        // closed without an explicit no-rating-channel declaration.
+        rating: undefined,
       width,
       height,
     })
@@ -396,7 +447,10 @@ function parsePahealXml(body) {
 // ignores the rating filter, so rating is enforced client-side below.
 // Both paginate with ?page=N — random page per call keeps rounds fresh.
 function moebooruUrl(base, variant, n, deterministic) {
-  const page = deterministic ? 1 : 1 + Math.floor(Math.random() * 50)
+  const key = `moe::${base}::${variant}`
+  // Sample pages without replacement (shared with the dapi path) so a
+  // thin pool does not keep re-answering the same page.
+  const page = deterministic ? 1 : 1 + drawFreshPage(key, 50)
   const tags = base.includes('konachan') ? `${variant} rating:explicit` : variant
   return `${base}/post.json?tags=${encodeURIComponent(tags)}&limit=${n}&page=${page}`
 }
@@ -415,7 +469,12 @@ function parseMoebooruJson(body, prefix) {
       id: `${prefix}-${p.id ?? ''}`,
       url: typeof p.file_url === 'string' ? p.file_url : '',
       tags: typeof p.tags === 'string' ? p.tags.split(/[^a-z0-9_]+/i).filter(Boolean) : [],
-      rating: typeof p.rating === 'string' ? p.rating : 'e',
+      // Fail CLOSED like parseDanbooruJson. This defaulted to 'e', asserting an
+      // explicit rating the source never reported — and yandere ignores the
+      // server-side rating filter, so that fabricated 'e' was the ONLY thing
+      // letting its posts through the gate. Missing rating is unknown, and
+      // unknown must not pass as explicit.
+      rating: typeof p.rating === 'string' && p.rating ? p.rating : undefined,
       width: Number(p.width) || 0,
       height: Number(p.height) || 0,
     }))
@@ -451,7 +510,7 @@ function realbooruPostFromThumb(thumbSrc, rawTitle, postId) {
   const altId = postId || ''
   if (!altId) return null
   if (hasBadTag(tags)) return null
-  return { id: `rb-${altId}`, url, preview, tags, rating: 'e', kind: isVideo ? 'video' : 'image', width: 1200, height: 1200, postId }
+  return { id: `rb-${altId}`, url, preview, tags, rating: undefined, kind: isVideo ? 'video' : 'image', width: 1200, height: 1200, postId }
 }
 
 function parseRealbooruEntries(html) {
@@ -514,7 +573,9 @@ function parseRealbooruPost(html) {
 // --- booru.org subdomains (hgoon, blacked, allgirl, rule34) ------------------
 function booruOrgPostFromFields(bSub, dir, hash, ext, rawTitle) {
   const ratingMatch = /rating:([a-z]+)/i.exec(rawTitle)
-  const rating = ratingMatch ? ratingMatch[1].toLowerCase() : 'e'
+  // A missing rating token is UNKNOWN, not explicit. Defaulting to 'e' here is
+  // what made the 18+ check a tautology for every booru.org sub.
+  const rating = ratingMatch ? ratingMatch[1].toLowerCase() : null
   const tagsPart = rawTitle
     .replace(/score:\d+/i, '')
     .replace(/rating:[a-z]+/i, '')
@@ -523,9 +584,12 @@ function booruOrgPostFromFields(bSub, dir, hash, ext, rawTitle) {
   const url = `https://img.booru.org/${bSub}/images/${dir}/${hash}.${ext}`
   const preview = `https://thumbs.booru.org/${bSub}/thumbnails/${dir}/thumbnail_${hash}.${ext}`
   const id = `${bSub}-${hash.slice(0, 10)}`
-  if (rating === 'explicit' || rating === 'e' || rating === 'questionable') {
+  // Pass the stated rating through verbatim. This accepted `questionable` and
+  // returned `rating: 'e'`, promoting a questionable post straight past the
+  // 18+ gate; a title with no rating token is unclassified, not explicit.
+  if (rating === 'explicit' || rating === 'e') {
     if (!hasBadTag(tags)) {
-      return { id, url, preview, tags, rating: 'e', width: 1200, height: 1200 }
+      return { id, url, preview, tags, rating, width: 1200, height: 1200 }
     }
   }
   return null
@@ -540,19 +604,15 @@ function parseBooruOrgEntries(html, query) {
     seen.add(e.id)
     out.push({ ...e, postId: postId || null })
   }
-  // WAF forces tagless browsing; enforce the query locally so the feed still
-  // shows what the player asked for (mirror of matchesQuery in booru.ts).
-  const tokens = String(query || '').toLowerCase().split(/\s+/).filter(Boolean)
-  const gated = (e) => {
-    if (!e || !tokens.length) return e
-    const tagSet = e.tags.map((t) => t.toLowerCase().replace(/[\s-]+/g, '_'))
-    const ok = tokens.some((tok) =>
-      tagSet.some(
-        (t) => t === tok || t.includes(tok) || (t.length >= 4 && tok.includes(t)),
-      ),
-    )
-    return ok ? e : null
-  }
+  // WAF forces tagless browsing, so the query is enforced HERE — in memory,
+  // against the tags booru.org publishes in the thumb's `title=` attribute, and
+  // BEFORE any post-view expansion (those entries would otherwise cost up to six
+  // fetches inside the round budget only to be dropped).
+  //
+  // The rule itself is gateBooruOrgEntry in ./booru-sources-core.cjs: shared with
+  // both test suites, and pinned against the renderer's matchesQuery by a
+  // case-table parity test. See BOORU-API.md §9 invariant 0d.
+  const gated = (e) => gateBooruOrgEntry(e, query)
   let m
   const anchorRe = /<a\b[^>]*\bid="p(\d+)"[^>]*href="[^"]*?s=view&(?:amp;)?id=(\d+)"[^>]*>\s*<img\b([^>]*)>/gi
   while ((m = anchorRe.exec(html)) !== null) {
@@ -618,6 +678,36 @@ let redgifsTokenExp = 0
 // Niche id per query (null = generic fallback), 1h TTL.
 const redgifsNicheCache = new Map()
 const REDGIFS_NICHE_CACHE_MS = 3600_000
+// Sequential niche-probe cap per uncached query (matches the renderer).
+const REDGIFS_NICHE_MAX_CANDIDATES = 3
+
+// Page memory: recently-drawn pages per source+variant, so rounds sample
+// WITHOUT replacement instead of re-rolling a seen window. The renderer has
+// this (drawFreshPid/drawFreshPage in src/services/booru.ts) but the IPC path
+// used plain Math.random(), so a 5-page pool like paheal or redgifs kept
+// re-answering the same posts until the seen-set filtered them and the round
+// came back empty.
+const PAGE_MEMORY_DEPTH = 20
+const recentPages = new Map()
+
+function recordPage(key, page) {
+  recentPages.set(key, [...(recentPages.get(key) || []), page].slice(-PAGE_MEMORY_DEPTH))
+}
+
+/** Draw a 0-based page in [0, maxExclusive) avoiding the last few draws. */
+function drawFreshPage(key, maxExclusive) {
+  const pool = Math.max(1, maxExclusive)
+  if (pool <= 1) return 0
+  const seen = recentPages.get(key) || []
+  for (let i = 0; i < 6; i++) {
+    const p = Math.floor(Math.random() * pool)
+    if (!seen.includes(p)) {
+      recordPage(key, p)
+      return p
+    }
+  }
+  return Math.floor(Math.random() * pool)
+}
 
 function redgifsWords(query) {
   return String(query).replace(/_/g, ' ').trim().replace(/\s+/g, ' ')
@@ -636,7 +726,7 @@ function normRedgifsTag(t) {
 
 async function redgifsAuth() {
   if (redgifsToken && Date.now() < redgifsTokenExp) return redgifsToken
-  const body = await httpGet(`${REDGIFS_API}/v2/auth/temporary`)
+  const body = await httpGet(`${REDGIFS_API}/v2/auth/temporary`, undefined, TIMEOUT_MS)
   const token = JSON.parse(body).token
   if (typeof token !== 'string' || !token) throw new Error('redgifs auth failed')
   redgifsToken = token
@@ -665,7 +755,9 @@ function parseRedgifsJson(body) {
         id: typeof g.id === 'string' ? `rg-${g.id}` : '',
         url: typeof urls.hd === 'string' ? urls.hd : '',
         tags,
-        rating: 'e',
+        // No rating asserted: this source cannot report one. The renderer gate fails
+        // closed without an explicit no-rating-channel declaration.
+        rating: undefined,
         preview: typeof urls.poster === 'string' ? urls.poster : undefined,
         kind: 'video',
         width: Number(g.width) || 0,
@@ -689,13 +781,23 @@ async function fetchRedgifs(variant, n) {
     try {
       const token = await redgifsAuth()
       // 1. Niche-targeted attempt (query-aware), tagged with query tokens.
+      //
+      // There is deliberately NO generic-trending fallback. Upstream ignores
+      // `search_text` on /v2/gifs/search, so that endpoint returns the same
+      // GLOBAL trending feed for every query: it cannot answer "images related
+      // to <tag>" at all. Serving it made the shipped app show whatever was
+      // trending worldwide for a tag the player had never heard of. When no
+      // niche matches, this source returns [] — "I don't have that tag" — and
+      // the round moves to a source that does. The renderer path already
+      // refused this; main is now aligned with it.
       try {
         const niche = await redgifsNicheForQuery(variant, token)
         if (niche) {
-          const page = 1 + Math.floor(Math.random() * 5)
+          const page = drawFreshPage(`rg::${variant}`, 5)
           const body = await httpGet(
             `${REDGIFS_API}/v2/niches/${encodeURIComponent(niche.id)}/gifs?count=${n}&page=${page}`,
             { Authorization: `Bearer ${token}` },
+            TIMEOUT_MS,
           )
           const posts = tagNichePosts(parseRedgifsJson(body), variant, niche)
           if (posts.length > 0) return posts
@@ -707,15 +809,10 @@ async function fetchRedgifs(variant, n) {
           redgifsTokenExp = 0
           continue
         }
-        /* niche lookup is best-effort — fall through to generic */
+        /* niche lookup is best-effort — no match means no posts here */
       }
-      // 2. Generic trending fallback (query-blind upstream, untagged posts).
-      const page = 1 + Math.floor(Math.random() * 5)
-      const url =
-        `${REDGIFS_API}/v2/gifs/search?search_text=${encodeURIComponent(redgifsWords(variant))}` +
-        `&order=trending&count=${n}&page=${page}`
-      const body = await httpGet(url, { Authorization: `Bearer ${token}` })
-      return parseRedgifsJson(body)
+      // No niche for this query: an HONEST empty, not a trending substitute.
+      return []
     } catch (e) {
       if (!/401/.test(String((e && e.message) || e))) throw e
       // Stale cached temp token; drop it and retry once fresh.
@@ -724,8 +821,7 @@ async function fetchRedgifs(variant, n) {
       redgifsTokenExp = 0
     }
   }
-  // Both attempts 401'd (or niche+generic came back empty) — surface
-  // empty so the caller moves to the next source.
+  // Both attempts 401'd — surface empty so the caller moves to the next source.
   return []
 }
 
@@ -785,12 +881,17 @@ async function redgifsNicheForQuery(variant, token) {
   const cached = redgifsNicheCache.get(key)
   if (cached && Date.now() < cached.exp) return cached.niche
   const candidates = [redgifsWords(variant), ...redgifsQueryTokens(variant).map((t) => t.replace(/_/g, ' '))]
-  for (const q of [...new Set(candidates)]) {
+  // Cap the sequential lookups. An uncached multi-word query previously spent
+  // one HTTP round-trip PER candidate (full query + every token) inside a race
+  // lane, burning the 8s round budget on niche probing alone. The renderer
+  // already caps this at 3; keep the two ends identical.
+  for (const q of [...new Set(candidates)].slice(0, REDGIFS_NICHE_MAX_CANDIDATES)) {
     if (!q) continue
     try {
       const body = await httpGet(
         `${REDGIFS_API}/v2/niches/search?query=${encodeURIComponent(q)}`,
         { Authorization: `Bearer ${token}` },
+        TIMEOUT_MS,
       )
       let niches = []
       try {
@@ -912,6 +1013,44 @@ function parseImhentaiSearchResults(html, limit) {
 
 // EVERY page image from a gallery page (the $.parseJSON ext map carries the
 // whole book) — one fetch yields all pages, zero extra requests.
+/**
+ * Real tags for an imhentai gallery, from its own tag links/title.
+ *
+ * imhentai has no JSON API, so relevance used to be FAKED: the search key was
+ * split into sub-words and stamped onto every page of every gallery the search
+ * returned. That made `matchesQuery` pass by construction, so whatever the
+ * site's fuzzy search handed back was presented as if it carried the tag. It
+ * also broke compounds — `shrooms_q` was stamped as `shrooms`, which the
+ * renderer's whole-token gate then rejected, so the whole multi-fetch scrape
+ * was spent producing results that got thrown away.
+ *
+ * Now the gallery's own tags decide. If the page publishes none (markup drift,
+ * a book with no tags), we fall back to the search key as ONE whole tag —
+ * search-attested rather than invented, and at least consistent with what the
+ * renderer can match.
+ */
+function parseImhentaiGalleryTags(html) {
+  const out = []
+  if (!html || typeof html !== 'string') return out
+  const push = (t) => {
+    const n = normRedgifsTag(String(t || '').replace(/\s+/g, '_'))
+    if (n && !out.includes(n)) out.push(n)
+  }
+  // `<div class="tags">` block: each tag is a link to /tag/<name>/
+  const tagsBlock = /class="tags"[\s\S]{0,4000}?<\/div>/i.exec(html)
+  const scope = tagsBlock ? tagsBlock[0] : html
+  const linkRe = /href="\/(?:tag|tags)\/([^"/?#]+)\/?"/gi
+  let m
+  while ((m = linkRe.exec(scope)) !== null) {
+    try {
+      push(decodeURIComponent(m[1]))
+    } catch {
+      push(m[1])
+    }
+  }
+  return out
+}
+
 function parseImhentaiGalleryPages(html, limit) {
   const max = Math.max(1, limit || 20)
   if (!html || typeof html !== 'string') return []
@@ -1033,11 +1172,12 @@ async function fetchImhentai(variant, n) {
   // Cloudflare challenges Node-TLS fetches (403 "Just a moment") — Electron's
   // net stack is Chromium TLS and passes like a real browser tab. Plain-node
   // fallback stays for contexts without Electron.
-  const searchBody = await imhGet(`${IMHENTAI_ROOT}/search/?key=${encodeURIComponent(key)}`)
-  const tags = key
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((t) => t.length >= 2)
+  const searchBody = await imhGet(`${IMHENTAI_ROOT}/search/?key=${encodeURIComponent(key)}`, undefined, HTML_TIMEOUT_MS)
+  // The FULL query as ONE token. Splitting it into sub-words (`shrooms_q` ->
+  // `shrooms`) produced tags the renderer's whole-token gate rejects, so the
+  // scrape was paid for and discarded.
+  const queryTag = normRedgifsTag(key.replace(/\s+/g, '_'))
+  const tags = queryTag ? [queryTag] : []
   if (hasBadTag(tags)) return []
 
   // Direct results from search HTML give gallery ids + cover thumbs. Enter EVERY gallery from the search page: covers are only thumbs and
@@ -1053,9 +1193,15 @@ async function fetchImhentai(variant, n) {
   const perGallery = Math.max(1, Math.ceil(n / Math.min(entries.length, GALLERY_LANES)))
   const sets = await mapLimit(entries, GALLERY_LANES, async ({ id, coverUrl }) => {
     try {
-      const galleryBody = await imhGet(`${IMHENTAI_ROOT}/gallery/${encodeURIComponent(id)}/`)
+      const galleryBody = await imhGet(`${IMHENTAI_ROOT}/gallery/${encodeURIComponent(id)}/`, undefined, HTML_TIMEOUT_MS)
       const pages = parseImhentaiGalleryPages(galleryBody, perGallery)
       const thumb = pages.length > 0 ? pages[0].url : coverUrl
+      // Prefer the gallery's OWN tags: then the renderer gate can actually
+      // verify relevance instead of trusting a stamp. Fall back to the search
+      // key when the page publishes none — search-attested, not invented.
+      const own = parseImhentaiGalleryTags(galleryBody)
+      const postTags = own.length > 0 ? own : tags
+      if (hasBadTag(postTags)) return undefined
       const set = []
       pages.forEach((cover, i) => {
         // Dims gate only when known — map-less covers skip it. Floor 400px
@@ -1063,7 +1209,7 @@ async function fetchImhentai(variant, n) {
         if (cover.width > 0 && cover.height > 0) {
           if (cover.width < FLOOR_PX || cover.height < FLOOR_PX) return
         }
-        set.push({ id: `imh-${id}-p${i + 1}`, url: cover.url, preview: thumb, tags, rating: 'e', kind: 'image' })
+        set.push({ id: `imh-${id}-p${i + 1}`, url: cover.url, preview: thumb, tags: postTags, rating: undefined, kind: 'image' })
       })
       return set.length > 0 ? set : undefined
     } catch {
@@ -1076,7 +1222,7 @@ async function fetchImhentai(variant, n) {
   for (const { id, coverUrl } of results) {
     const full = coverUrl.replace(/\/(?:thumb|t)\.([a-z0-9]+)(?:[?#]|$)/i, '/1.$1')
     if (!full || /\/(?:thumb|thumbs)(?:[?#/.]|$)/i.test(full)) continue
-    directPosts.push({ id: `imh-${id}`, url: full, preview: coverUrl, tags, rating: 'e', kind: 'image' })
+    directPosts.push({ id: `imh-${id}`, url: full, preview: coverUrl, tags, rating: undefined, kind: 'image' })
     if (directPosts.length >= n) break
   }
   return directPosts
@@ -1157,13 +1303,18 @@ function parseBabesourceGallery(html, limit) {
   return out
 }
 
+/**
+ * Real tags for a babesource gallery: its own meta keywords / search links.
+ *
+ * The query used to be split into sub-words and unioned in, which meant every
+ * gallery the search returned was stamped as if it carried the tag — so
+ * `matchesQuery` passed by construction and a loosely-related gallery was
+ * indistinguishable from an exact one. Now the gallery's own keywords decide,
+ * and the query is only a fallback (as ONE whole token) for a page that
+ * publishes none.
+ */
 function parseBabesourceTags(html, query) {
-  const tags = new Set(
-    String(query || '')
-      .toLowerCase()
-      .split(/[^a-z0-9]+/)
-      .filter((t) => t.length >= 2),
-  )
+  const tags = new Set()
   if (html && typeof html === 'string') {
     const meta = /<meta\s+name="keywords"\s+content="([^"]*)"/i.exec(html)
     if (meta) {
@@ -1172,6 +1323,18 @@ function parseBabesourceTags(html, query) {
         if (n.length >= 2) tags.add(n)
       }
     }
+    // Gallery pages link to their own performers/search facets.
+    const linkRe = /href="https:\/\/babesource\.com\/(?:pornstars?|search)\/([^"/?#]+)\/?"/gi
+    let m
+    while ((m = linkRe.exec(html)) !== null) {
+      const n = normRedgifsTag(decodeURIComponent(m[1]))
+      if (n) tags.add(n)
+    }
+  }
+  if (tags.size === 0) {
+    // No tags published: attest the search itself, as ONE whole token.
+    const q = normRedgifsTag(String(query || '').replace(/[\s-]+/g, '_'))
+    if (q) tags.add(q)
   }
   return [...tags]
 }
@@ -1231,7 +1394,7 @@ async function fetchBabesource(variant, n) {
       const gid = idMatch ? idMatch[1] : 'x'
       const images = parseBabesourceGallery(gHtml, perGallery)
       if (images.length === 0) return undefined
-      return images.map((img, i) => ({ id: `bs-${gid}-${i}`, url: img.url, preview: img.preview, tags, rating: 'e', kind: 'image' }))
+      return images.map((img, i) => ({ id: `bs-${gid}-${i}`, url: img.url, preview: img.preview, tags, rating: undefined, kind: 'image' }))
     } catch {
       return undefined /* one dead gallery never kills the round */
     }
@@ -1256,7 +1419,9 @@ async function fetchBabesource(variant, n) {
         url: full,
         preview: m[0],
         tags: parseBabesourceTags(null, variant),
-        rating: 'e',
+        // No rating asserted: this source cannot report one. The renderer gate fails
+        // closed without an explicit no-rating-channel declaration.
+        rating: undefined,
         kind: 'image',
       })
       if (covers.length >= n) break
@@ -1281,7 +1446,7 @@ const SOURCE_FETCHERS = {
     category: s.category,
     fetch: async (variant, n, opts) =>
       parseMoebooruJson(
-        await httpGet(moebooruUrl(s.origin, variant, n, opts && opts.deterministic)),
+        await httpGet(moebooruUrl(s.origin, variant, n, opts && opts.deterministic), undefined, TIMEOUT_MS),
         s.parsePrefix || s.id,
       ),
   }),
@@ -1300,7 +1465,9 @@ const SOURCE_FETCHERS = {
       // expanded view results + seen-memory.
       const tagParam = variant.trim().replace(/\s+/g, '_')
       const html = await httpGet(
-        `${s.origin}/index.php?page=post&s=list&tags=${encodeURIComponent(tagParam)}`
+        `${s.origin}/index.php?page=post&s=list&tags=${encodeURIComponent(tagParam)}`,
+        undefined,
+        HTML_TIMEOUT_MS,
       )
       // Exact file URLs via post-view expansion (guessed-url fallback).
       const expanded = await expandPostViews(parseRealbooruEntries(html), s.origin, parseRealbooruPost)
@@ -1331,20 +1498,25 @@ const SOURCE_FETCHERS = {
     id: s.id,
     category: s.category,
     fetch: async (variant, n, opts) => {
+      // A multi-word query cannot be answered by paheal (combos return 0, and
+      // a leading-word answer is exactly the "I asked for two things and got
+      // one" report). Return nothing BEFORE spending a request: another source
+      // may genuinely have the whole query.
+      if (variant.split(/\s+/).filter(Boolean).length > 1) return []
       const tag = variant.split(/\s+/)[0]
-      const page = opts && opts.deterministic ? 1 : 1 + Math.floor(Math.random() * 5)
+      const page = opts && opts.deterministic ? 1 : 1 + drawFreshPage(`paheal::${tag}`, 5)
       const url = (p) =>
         `${s.origin}/api/danbooru/find_posts?tags=${encodeURIComponent(tag)}&limit=${n}&page=${p}`
-      let posts = parsePahealXml(await httpGet(url(page)))
+      let posts = parsePahealXml(await httpGet(url(page), undefined, TIMEOUT_MS))
       if (posts.length === 0 && page > 1) {
-        posts = parsePahealXml(await httpGet(url(1)))
+        posts = parsePahealXml(await httpGet(url(1), undefined, TIMEOUT_MS))
       }
       return posts
     },
   }),
 }
 
-// Round-robin over sources with simple health tracking (SPEC §6).
+// Round-robin over sources with mirror health tracking (BOORU-API.md §7).
 // Explicit-rated human sources categorized as 'real' or 'hentai'. Built from
 // shared/sources.json — before this, main and the renderer kept independent
 // lists and allgirl.booru.org / rule34.booru.org shipped main-only.
@@ -1354,7 +1526,10 @@ const SOURCES = booruSources.flatMap((s) => {
     mainLog(`[booru] no fetcher for kind "${s.kind}" (source ${s.id}) — skipped`)
     return []
   }
-  return [make(s)]
+  // Carry `kind` through: createFetchBooru splits cheap single-request sources
+  // from the multi-fetch HTML scrapers so a slow gallery crawl cannot occupy a
+  // lane while a mirror that answers in 300ms is never tried (FAST_PHASE).
+  return [{ ...make(s), kind: s.kind }]
 })
 mainLog(`[booru] ${SOURCES.length} sources from registry: ${SOURCES.map((s) => s.id).join(', ')}`)
 
@@ -1490,7 +1665,11 @@ app.whenReady().then(async () => {
   protocol.handle(imageCache.SCHEME, (request) => imageCache.serveImage(request))
   protocol.handle(vault.SCHEME, (request) => vault.serveVault(request))
   customFolders.init(app.getPath('userData'), { ipcMain, BrowserWindow })
-  ipcMain.handle('booru:fetch', (_event, payload) => fetchBooru(payload ?? {}))
+  ipcMain.handle('booru:fetch', (_event, payload) => {
+    // Player excludes arrive per round and become query negatives.
+    setRoundExcludes((payload && payload.excludes) || [])
+    return fetchBooru(payload ?? {})
+  })
   ipcMain.handle('pmv:playlist', async (_event, id) => {
     const rawId = String(id || '').trim()
     if (!/^(?:[0-9a-fA-F]{24}|[a-zA-Z0-9_-]{12,32})$/.test(rawId)) return null

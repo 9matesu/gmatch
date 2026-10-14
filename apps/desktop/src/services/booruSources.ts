@@ -63,6 +63,17 @@ export interface DirectSourceDef {
   type: 'dapi' | 'moebooru' | 'realhtml' | 'booruorg'
   category: 'real' | 'hentai'
   sub?: string
+  /**
+   * Post-id namespace for this source, e.g. `tbib-`, `kona-`.
+   *
+   * Derived from the CANONICAL id (or the source's `parsePrefix`), never from
+   * `id` — `id` is the healthId (`tbib-direct`) and Electron main namespaces
+   * posts by the canonical id. Using healthId here produced `tbib-direct-102`
+   * in the renderer against `tbib-102` in main, so dev and prod disagreed about
+   * which posts had been seen. Renderer and main must build the same string:
+   * see BOORU-API.md §6.
+   */
+  prefix: string
 }
 
 /**
@@ -77,6 +88,9 @@ export const DIRECT_SOURCES: readonly DirectSourceDef[] = ALL.filter(
   proxy: s.devProxy as string,
   type: s.kind as DirectSourceDef['type'],
   category: s.category,
+  // Mirrors main's rule exactly (SOURCE_FETCHERS: `s.parsePrefix || s.id`, and
+  // the parsers append `${prefix}-`). One namespace per source, both runtimes.
+  prefix: `${s.parsePrefix || s.id}-`,
   ...(s.sub ? { sub: s.sub } : {}),
 }))
 

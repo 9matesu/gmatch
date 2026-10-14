@@ -14,6 +14,8 @@ import {
   sourceByKind,
   sourceById,
 } from './booruSources'
+// Raw registry, including `enabled: false` rows that ALL_SOURCES filters out.
+import registry from '../../../../shared/sources.json'
 
 /**
  * Registry guards. The registry exists to kill drift between the renderer's
@@ -66,6 +68,49 @@ describe('booru source registry', () => {
     }
   })
 
+  it('registers red, which was measured at ~98% explicit', () => {
+    // Probed live across pid 0/400/8000: 59/60 posts were rating:Explicit, so it
+    // survives the fail-closed gate. It carries bestiality/rape tags, which the
+    // HARD blocklist drops per-post (bestiality, rape), and furry/anthro/
+    // kemonomimi, which are opt-in `suggested` excludes.
+    const red = sourceById('red')
+    expect(red, 'red must be registered').toBeTruthy()
+    expect(red!.kind).toBe('booruorg')
+    expect(red!.enabled).not.toBe(false)
+    expect(red!.referer).toBe('https://booru.org/')
+    expect(red!.imageHosts).toContain('img.booru.org')
+  })
+
+  it('keeps utopia disabled — it is 100% Questionable, so it yields nothing', () => {
+    // 80 posts sampled across pid 0/400/8000/16000 were ALL rating:Questionable,
+    // in both the thumb title= and the posts[N] JS literal, so this is genuine
+    // source data and not a parser artifact. Under the fail-closed 18+ gate it
+    // can never contribute. The row stays documented (enabled:false) so the
+    // probe result survives; `enabled: false` must keep it out of every runtime.
+    const row = (registry.sources as Array<Record<string, unknown>>).find((s) => s.id === 'utopia')
+    expect(row, 'utopia row should still be documented').toBeTruthy()
+    expect(row!.enabled).toBe(false)
+    expect(row!._disabledReason, 'a disabled row must say why').toMatch(/questionable/i)
+    expect(sourceById('utopia'), 'a disabled source must not resolve').toBeUndefined()
+    expect(DIRECT_SOURCES.map((d) => d.id)).not.toContain('utopia-direct')
+  })
+
+  it('keeps rule34-org disabled — the "sub" is a 301 to rule34.xxx', () => {
+    // Verified live 2026-10-07: rule34.booru.org answers
+    // `301 Moved Permanently` with `Location: https://rule34.xxx/`, i.e. this
+    // subdomain now redirects to the login-walled source that was removed from
+    // the registry on purpose. In browser dev the redirect escapes the Vite
+    // proxy and dies on CORS; in Electron main it follows to a login page that
+    // parses to nothing. Either way it is one wasted request per round, so the
+    // row is disabled but kept documented (same contract as utopia).
+    const row = (registry.sources as Array<Record<string, unknown>>).find((s) => s.id === 'rule34-org')
+    expect(row, 'rule34-org row should still be documented').toBeTruthy()
+    expect(row!.enabled).toBe(false)
+    expect(row!._disabledReason, 'a disabled row must say why').toMatch(/rule34\.xxx/)
+    expect(sourceById('rule34-org'), 'a disabled source must not resolve').toBeUndefined()
+    expect(DIRECT_SOURCES.map((d) => d.id)).not.toContain('rule34-org-direct')
+  })
+
   it('lookups resolve by canonical id, health id and kind', () => {
     expect(sourceById('tbib')?.origin).toBe('https://tbib.org')
     expect(sourceByHealthId('tbib-direct')?.id).toBe('tbib')
@@ -96,6 +141,30 @@ describe('DIRECT_SOURCES (renderer dev-proxy path)', () => {
       const s = sourceByKind(kind)
       if (!s) continue
       expect(DIRECT_SOURCES.map((d) => d.id), `${s.id} must not be a DIRECT source`).not.toContain(s.healthId)
+    }
+  })
+
+  it('namespaces post ids by CANONICAL id, never the healthId', () => {
+    // Regression: the renderer used `${src.id}-` where `id` is the healthId, so
+    // it stamped `tbib-direct-101` while Electron main stamped `tbib-101` (main
+    // passes the canonical `s.id`). The two runtimes therefore disagreed about
+    // which posts had been seen, and a new source inherited the mismatch.
+    for (const d of DIRECT_SOURCES) {
+      const src = sourceByHealthId(d.id)
+      expect(d.prefix, `${d.id}: prefix`).toBe(`${src?.parsePrefix || src?.id}-`)
+      expect(d.prefix.startsWith(d.id), `${d.id}: must not use the healthId`).toBe(false)
+    }
+  })
+
+  it('builds the same id namespace main does, for every DIRECT source', () => {
+    // main's rule, read from electron/booru-sources-core.cjs (dapiSource passes
+    // `` `${id}-` ``) and main.cjs SOURCE_FETCHERS (`s.parsePrefix || s.id`).
+    // Pinned here so a registry rename cannot silently fork the two runtimes.
+    for (const d of DIRECT_SOURCES) {
+      const src = sourceByHealthId(d.id)
+      expect(src, `${d.id}: registry row`).toBeTruthy()
+      const mainPrefix = d.type === 'moebooru' ? `${src!.parsePrefix || src!.id}` : `${src!.id}`
+      expect(d.prefix, `${d.id}: renderer vs main`).toBe(`${mainPrefix}-`)
     }
   })
 })

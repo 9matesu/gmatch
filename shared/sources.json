@@ -170,7 +170,35 @@
       "referer": "https://booru.org/",
       "imageHosts": ["img.booru.org", "thumbs.booru.org"],
       "devBytes": "px",
+      "enabled": false,
+      "_disabledReason": "rule34.booru.org answers 301 -> https://rule34.xxx/ (verified 2026-10-07, Cloudflare Location header): this 'booru.org sub' is now a redirect to rule34.xxx, the login-walled source removed from the registry on purpose. In the browser dev proxy the redirect escapes the proxy and dies on CORS; in Electron main it follows to a login page that parses to nothing. Either way it is a wasted request in every round. Kept as a disabled row (like utopia) so the measurement is not lost; re-enable if the subdomain ever serves its own list again."
+    },
+    {
+      "id": "red",
+      "healthId": "red-direct",
+      "kind": "booruorg",
+      "category": "hentai",
+      "origin": "https://red.booru.org",
+      "devProxy": "/booru/red",
+      "sub": "red",
+      "referer": "https://booru.org/",
+      "imageHosts": ["img.booru.org", "thumbs.booru.org"],
+      "devBytes": "px",
       "enabled": true
+    },
+    {
+      "id": "utopia",
+      "healthId": "utopia-direct",
+      "kind": "booruorg",
+      "category": "hentai",
+      "origin": "https://no.booru.org",
+      "devProxy": "/booru/utopia",
+      "sub": "no",
+      "referer": "https://booru.org/",
+      "imageHosts": ["img.booru.org", "thumbs.booru.org"],
+      "devBytes": "px",
+      "enabled": false,
+      "_disabledReason": "Every sampled page (80 posts across pid 0/400/8000/16000) is rating:Questionable, never Explicit — confirmed in both the thumb title= and the posts[N] JS literal. Under the fail-closed 18+ gate this source yields ZERO posts forever. Kept documented rather than deleted so the probe result is not lost; re-check if its ratings ever change."
     },
     {
       "id": "paheal",
