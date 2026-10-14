@@ -66,6 +66,34 @@ export interface GmatchBridge {
   logError?: (scope: string, msg: string) => void
   /** Opens the userData folder (main.log, saves) in the OS file manager. */
   openLogFolder?: () => Promise<string>
+  // P2P mesh (Slice 3): sealed Envelope-v2 objects only. `transport` is the
+  // observed multiaddr — direct (/tcp/, /webrtc-direct/) vs relayed
+  // (/p2p-circuit/); the UI must label relayed links as relayed.
+  p2pStatus?: () => Promise<P2pStatus>
+  p2pPeers?: () => Promise<P2pPeer[]>
+  p2pSend?: (payload: { peer: string; binding: unknown; envelope: unknown }) => Promise<{ ok: boolean; error?: string }>
+  onP2pMessage?: (cb: (frame: P2pFrame) => void) => () => void
+}
+
+export interface P2pStatus {
+  started: boolean
+  peerId?: string
+  addrs?: string[]
+  peers?: P2pPeer[]
+  error?: string
+}
+
+export interface P2pPeer {
+  id: string
+  addr: string | null
+  relayed: boolean
+}
+
+export interface P2pFrame {
+  binding: { orbitId: string; orbitPubkeyHex: string; peerId: string; sigHex: string }
+  envelope: { v: 2; kind: string; to: string; id: string; sealed: string }
+  peerId: string
+  transport: string
 }
 
 export interface BlocklistData {

@@ -59,6 +59,16 @@ contextBridge.exposeInMainWorld('gmatch', {
   blocklistSet: (data) => ipcRenderer.invoke('blocklist:set', data),
   blocklistReset: () => ipcRenderer.invoke('blocklist:reset'),
   pmvPlaylist: (id) => ipcRenderer.invoke('pmv:playlist', id),
+  // P2P mesh (Slice 3): main owns the libp2p node; the renderer sends and
+  // receives sealed Envelope-v2 objects only (never keys, never plaintext).
+  p2pStatus: () => ipcRenderer.invoke('p2p:status'),
+  p2pPeers: () => ipcRenderer.invoke('p2p:peers'),
+  p2pSend: (payload) => ipcRenderer.invoke('p2p:send', payload),
+  onP2pMessage: (cb) => {
+    const listener = (_event, frame) => cb(frame)
+    ipcRenderer.on('p2p:message', listener)
+    return () => ipcRenderer.removeListener('p2p:message', listener)
+  },
   logError: (scope, msg) => { try { ipcRenderer.send('log:renderer', { scope: String(scope || ''), msg: String(msg || '') }) } catch { /* never log-loop */ } },
   openLogFolder: () => ipcRenderer.invoke('app:open-log'),
 })

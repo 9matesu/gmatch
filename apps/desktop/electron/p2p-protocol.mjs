@@ -7,6 +7,7 @@
 import { ed25519 } from '@noble/curves/ed25519'
 import { sha256 } from '@noble/hashes/sha256'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils'
+import { multiaddr } from '@multiformats/multiaddr'
 
 export const GMATCH_PROTOCOL = '/gmatch/1.0.0'
 export const PEER_BINDING_DOMAIN = 'gmatch-peer-binding-v1'
@@ -96,7 +97,10 @@ export async function registerGmatchProtocol(node, { onFrame, onDrop = () => {} 
 }
 
 export async function sendFrame(node, peer, binding, envelope, signal) {
-  const stream = await node.dialProtocol(peer, GMATCH_PROTOCOL, { signal })
+  // dialProtocol takes PeerId | Multiaddr, not strings: invitation multiaddrs
+  // are coerced; bare PeerIds resolve via the peer store (or fail closed).
+  const target = typeof peer === 'string' && peer.startsWith('/') ? multiaddr(peer) : peer
+  const stream = await node.dialProtocol(target, GMATCH_PROTOCOL, { signal })
   try {
     await stream.send(enc.encode(encodeFrame(binding, envelope)))
   } finally {
