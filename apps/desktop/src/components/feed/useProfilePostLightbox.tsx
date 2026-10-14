@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { OrbitIdentity } from '@orbit/crypto';
+import { createLikeGovernor, type LikeGovernor } from '../../utils/likeReconcile';
 import { playPress, playMsgReceive } from '../../utils/sounds';
 import { orbitFetch, postShareUrl } from '../../utils/api';
 import { InstagramPostModal } from './InstagramPostModal';
@@ -73,6 +74,23 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
   const [sharingPost, setSharingPost] = useState<FeedPost | null>(null);
   const [optionsPost, setOptionsPost] = useState<FeedPost | null>(null);
   const [likersPostId, setLikersPostId] = useState<string | null>(null);
+  // Fresh reads for the governor without recreating the toggle on every
+  // keystroke elsewhere in the tree (same pattern as the feed version, which
+  // instead re-creates the callback from render-scope state).
+  const likedRef = useRef(liked);
+  likedRef.current = liked;
+  const countsRef = useRef(counts);
+  countsRef.current = counts;
+  // Same single-flight governor as the feed toggle (see utils/likeReconcile):
+  // persist runs once per gesture outside any updater, stale resolutions are
+  // discarded by generation, failures roll back.
+  const likeGov = useRef<LikeGovernor | null>(null);
+  if (!likeGov.current) {
+    likeGov.current = createLikeGovernor({
+      setLiked: (id, v) => setLiked((prev) => ({ ...prev, [id]: v })),
+      setCount: (id, n) => setCounts((c) => ({ ...c, [id]: n })),
+    });
+  }
 
   const openPost = useCallback(
     (post: FeedPost) => {
@@ -110,14 +128,12 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
   const toggleLike = useCallback(
     (post: FeedPost) => {
       playPress(820);
-      setLiked((prev) => {
-        const next = !prev[post.id];
-        setCounts((c) => ({ ...c, [post.id]: Math.max(0, (c[post.id] ?? 0) + (next ? 1 : -1)) }));
-        onPersistLike?.(post.id, next).then((count) => {
-          if (typeof count === 'number') setCounts((c) => ({ ...c, [post.id]: count }));
-        });
-        return { ...prev, [post.id]: next };
-      });
+      likeGov.current!.toggle(
+        post.id,
+        !!likedRef.current[post.id],
+        countsRef.current[post.id] ?? post.like_count ?? 0,
+        { persist: onPersistLike ?? undefined },
+      );
     },
     [onPersistLike],
   );

@@ -1390,16 +1390,15 @@ export default function Home() {
   }, [users])
 
   // ─── Post engagement persistence (like/save/comment/report/delete) ───
+  // Throws on transport failure or non-OK status so callers can roll back
+  // optimistic state; returns undefined only when there is no identity or the
+  // response carries no count (keep the optimistic value, don't roll back).
   const persistLike = useCallback(async (postId: string, liked: boolean): Promise<number | undefined> => {
     if (!identity) return undefined
-    try {
-      const res = await orbitFetch(`/api/posts/${postId}/like`, { method: liked ? 'POST' : 'DELETE' }, identity)
-      if (!res.ok) return undefined
-      const data = await res.json()
-      return typeof data?.like_count === 'number' ? data.like_count : undefined
-    } catch {
-      return undefined
-    }
+    const res = await orbitFetch(`/api/posts/${postId}/like`, { method: liked ? 'POST' : 'DELETE' }, identity)
+    if (!res.ok) throw new Error(`like failed: ${res.status}`)
+    const data = await res.json()
+    return typeof data?.like_count === 'number' ? data.like_count : undefined
   }, [identity])
 
   const persistSave = useCallback((postId: string, saved: boolean) => {

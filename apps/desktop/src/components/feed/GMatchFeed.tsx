@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { useCropper } from '../../hooks/useCropper';
 import { DEFAULT_FEED_SORT, FEED_SORT_LABELS, firstLikeCrossed, type FeedSort } from './feedSort'
 import { formatLikedBy } from '../../utils/likedBy'
+import { createLikeGovernor, type LikeGovernor } from '../../utils/likeReconcile'
 import { suggestFollows } from './suggestFollows'
 import { playPress, playWin, playMsgReceive, playLikeOnce } from '../../utils/sounds';
 import {
@@ -217,6 +218,15 @@ export function GMatchFeed({
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [savedPosts, setSavedPosts] = useState<Record<string, boolean>>({});
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
+  // Mutation governor owns no state itself — it only sequences persist calls
+  // against the maps above (generation per post, rollback on failure).
+  const likeGov = useRef<LikeGovernor | null>(null);
+  if (!likeGov.current) {
+    likeGov.current = createLikeGovernor({
+      setLiked: (id, v) => setLikedPosts((prev) => ({ ...prev, [id]: v })),
+      setCount: (id, n) => setLikeCounts((counts) => ({ ...counts, [id]: n })),
+    });
+  }
   const [doubleTapAnimationId, setDoubleTapAnimationId] = useState<string | null>(null);
   const [mediaIdx, setMediaIdx] = useState<Record<string, number>>({});
   const [internalLoadingMore, setInternalLoadingMore] = useState(false);
@@ -503,24 +513,22 @@ export function GMatchFeed({
 
   const toggleLike = useCallback((post: FeedPost) => {
     playPress(820);
-    setLikedPosts((prev) => {
-      const isCurrentlyLiked = !!prev[post.id];
-      const next = !isCurrentlyLiked;
-      setLikeCounts((counts) => ({
-        ...counts,
-        [post.id]: Math.max(0, (counts[post.id] ?? 0) + (next ? 1 : -1)),
-      }));
-      if (next) boostTagAffinity(post.tags);
-      if (post.is_sponsored) return { ...prev, [post.id]: next };
-      // Persist server-side; reconcile the authoritative count when it comes back.
-      onPersistLike?.(post.id, next).then((count) => {
-        if (typeof count === 'number') {
-          setLikeCounts((counts) => ({ ...counts, [post.id]: count }));
-        }
-      });
-      return { ...prev, [post.id]: next };
-    });
-  }, [boostTagAffinity, onPersistLike]);
+    // Single-flight-per-post reconciliation (see utils/likeReconcile): the
+    // persist runs exactly once per gesture outside any setState updater, a
+    // generation per post discards stale resolutions, failures roll back,
+    // and the feed GET cache is invalidated only on fresh success.
+    likeGov.current!.toggle(
+      post.id,
+      !!likedPosts[post.id],
+      likeCounts[post.id] ?? post.like_count ?? 0,
+      {
+        persist: onPersistLike ?? undefined,
+        tags: post.tags,
+        localOnly: post.is_sponsored,
+        onOptimisticLike: (_id, tags) => boostTagAffinity(tags),
+      },
+    );
+  }, [boostTagAffinity, onPersistLike, likedPosts, likeCounts]);
 
   const handleDoubleTap = (post: FeedPost) => {
     playWin();
