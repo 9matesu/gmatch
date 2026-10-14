@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased (main)
+
+- Likes: single-flight reconciliation (`utils/likeReconcile`) — persist once
+  per gesture outside setState updaters, per-post generation discards stale
+  resolutions, failures roll back, feed cache invalidated on fresh success.
+  `persistLike` now throws on transport/HTTP failure instead of stranding
+  optimistic state.
+- Objects: `GET /api/objects/:id` no longer deletes rows with missing bytes
+  (read-triggered `purgeDeadObject` removed); answers `Object bytes
+  unavailable` and keeps the metadata row. Guards: posts (with/without media)
+  never change the `Cards` table; only `POST /api/cards` mints.
+
 ## 1.5.5 — clean recovery release
 
 - Recovery: new `recover/1.5.5-base` line cut from verified `v1.5.3`

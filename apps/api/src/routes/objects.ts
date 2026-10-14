@@ -421,25 +421,6 @@ objects.post('/', orbitAuth, async (c) => {
   }
 })
 
-async function purgeDeadObject(db: any, bucket: any, id: string) {
-  try {
-    await db.prepare('DELETE FROM Objects WHERE id = ?').bind(id).run()
-    await db.prepare('DELETE FROM Recipients WHERE object_id = ?').bind(id).run()
-    await db.prepare('DELETE FROM Favorites WHERE object_id = ?').bind(id).run()
-    await db.prepare('DELETE FROM Likes WHERE object_id = ?').bind(id).run()
-    await db.prepare('DELETE FROM LobbyImages WHERE id = ? OR content_url LIKE ?').bind(id, `%${id}%`).run()
-    await db.prepare('UPDATE GameMatches SET card_a = NULL WHERE card_a = ?').bind(id).run()
-    await db.prepare('UPDATE GameMatches SET card_b = NULL WHERE card_b = ?').bind(id).run()
-    await db.prepare('UPDATE TierMatches SET card_a = NULL WHERE card_a = ?').bind(id).run()
-    await db.prepare('UPDATE TierMatches SET card_b = NULL WHERE card_b = ?').bind(id).run()
-    if (bucket) {
-      await bucket.delete(`objects/${id}`).catch(() => { })
-    }
-  } catch (err) {
-    console.error(`[objects] Failed purging dead object ${id}:`, err)
-  }
-}
-
 objects.get('/stories', orbitAuth, async (c) => {
   const orbitId = c.get('orbitId')
   try {
@@ -721,15 +702,18 @@ objects.get('/:id', async (c, next) => {
   try {
     const blob = await c.env.BUCKET.get(`objects/${id}`)
     if (!blob) {
-      // Missing blob: delete dead content from DB so it stops throwing 404s
-      await purgeDeadObject(c.env.DB, c.env.BUCKET, id)
-      return c.json({ error: 'Object not found', purged: true }, 404)
+      // Missing bytes must NEVER delete the metadata row: blobless rows are
+      // legitimate (gossip replicas, offline posts, pending uploads), and a
+      // GET that destroys data turns one transient 404 into permanent loss.
+      // Orphan cleanup, if ever wanted, belongs to an explicit sweep — not a read.
+      console.warn(`[objects] bytes missing for row ${id} (row kept)`)
+      return c.json({ error: 'Object bytes unavailable' }, 404)
     }
 
     const reader = blob.body?.getReader()
     if (!reader) {
-      await purgeDeadObject(c.env.DB, c.env.BUCKET, id)
-      return c.json({ error: 'Failed to read blob', purged: true }, 404)
+      console.warn(`[objects] unreadable blob for row ${id} (row kept)`)
+      return c.json({ error: 'Object bytes unavailable' }, 404)
     }
 
     const chunks: Uint8Array[] = []
