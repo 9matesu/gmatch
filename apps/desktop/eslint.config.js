@@ -42,7 +42,7 @@ export default tseslint.config(
     // Node maintenance scripts (.mjs). Without this block they fell through to
     // js.configs.recommended with no globals, so `process`, `console` and
     // `fetch` all read as undefined.
-    files: ['scripts/**/*.mjs'],
+    files: ['scripts/**/*.mjs', 'electron/**/*.mjs'],
     languageOptions: {
       sourceType: 'module',
       globals: globals.node,

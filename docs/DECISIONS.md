@@ -76,3 +76,18 @@
 - No new dependency without a rung-5 justification recorded here first.
 - Speculative tunables stay constants with tests; generalization needs a second
   measurement.
+
+## ADR-1.5.5-08 — Slice 1 libp2p dependencies (accepted)
+
+- Added to `apps/desktop` runtime deps (Spike 0 proven, `docs/NET.md` §7):
+  `libp2p@^3.3.12` (core), `@libp2p/tcp@^11.0.29` (listen/dial),
+  `@libp2p/mdns@^12.0.33` (LAN discovery), `@chainsafe/libp2p-noise@^17.0.0`
+  (mandatory encryption), `@chainsafe/libp2p-yamux@^8.0.1` (muxer),
+  `@libp2p/ping@^3.1.14` (liveness proof), `@libp2p/crypto@^5.1.24`
+  (keypair generate/marshal — v3 PeerIds carry no private key and
+  `createLibp2p` wants the key object, so generation + protobuf persistence
+  cannot reuse anything in-tree).
+- Rung-5 check: no stdlib/native/installed alternative exists for
+  Noise-encrypted P2P transports; each package is one responsibility, all from
+  the maintained libp2p project. No relay/DHT/gossipsub packages: the slice is
+  fail-closed by construction.
