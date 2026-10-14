@@ -102,3 +102,54 @@ before any verdict — they are not part of this inventory.
 ADRs (`docs/DECISIONS.md`) + target-architecture docs + version bump. The
 reproduce/redesign rows above are the queued reconstruction backlog, not claimed
 as done. No row is marked complete until its port lands with tests on this line.
+
+## 9. Verification on this line (2026-10-14, clean `npm ci`, 771 packages)
+
+- `npm run lint` — **0 errors** (47 warnings; gate is 0 errors).
+- `npm run test` — desktop vitest **191 files / 1373 tests pass**; packages
+  crypto/protocol/shared pass (7+17+16); API vitest **95 files / 936 pass on
+  retry** — first run lost one worker fork (`Worker exited unexpectedly`, zero
+  assertion failures), a pool-resource flake, not a code failure.
+- Electron main suites (`electron/*.test.cjs`, 12 files) have **no npm runner
+  at baseline** (`test` = `vitest run` only); run directly with node: **12/12
+  pass**. Wiring a `test:main` script is queued (the doomed branch added
+  `run-main-tests.mjs` — port the runner, not a new one).
+- `npm run typecheck` — clean across all 5 workspaces.
+- `npm run build` — **failed at pristine baseline**, fixed in 1.5.5: see §10.
+- Local boot proof: throwaway sidecar (`PORT=8877`, fresh sqlite, no env keys,
+  `GOSSIP_UPSTREAM=off`) answers
+  `{"status":"ok","db_ready":true,"mode":"legacy","services":["all"]}`.
+  No cloud account, no outbound dependency for start + local persistence.
+- **Not verified here (stated, not claimed):** two-PC direct exchange without
+  hosted infra (needs two machines — acceptance plan in §11); Playwright e2e;
+  packaged `dist` installer.
+
+## 10. Recovery fix included in 1.5.5: phantom `shadcn` stylesheet import
+
+- `apps/desktop/src/globals.css` (baseline and doomed tip alike) contained
+  `@import "shadcn/tailwind.css"`. No manifest declares `shadcn`, no lockfile
+  entry exists, no vite alias covers it — it resolved only via a stray
+  manually-installed `shadcn@4.21.1` CLI folder in one machine's
+  `node_modules` (its `dist/tailwind.css`: accordion keyframes, `data-*`
+  custom variants, shimmer utilities).
+- Grep over `apps/desktop/src` proves nothing consumes any of it (no
+  `data-open:`/`data-closed:`/`accordion-*`/`animate-shimmer` usage; sidebar and
+  chart tokens are self-defined stubs; shimmer is our own `orbit-shimmer`).
+- Decision: **deleted the import line** (deletion over addition). Clean
+  `npm ci` + `vite build` now succeeds (6753 modules, `dist/` emitted).
+  Release CI (`release.yml`: `npm ci` → `npm run dist`) was broken the same way
+  on any clean runner; the doomed branch never hit it because `ci.yml` verify
+  does not build. Do not re-add a `shadcn` dependency to restore it.
+
+## 11. Acceptance-test plan for the queued reconstruction (two-PC proof)
+
+1. Two PCs, same LAN, all hosted infra disabled (no courier, no Fly, no TURN):
+   each installs from this line, creates identity offline, publishes a post.
+2. Assert each PC reads the other's post + media via the **direct** path only
+   (transport log must show no relayed hop; labeling per `docs/P2P.md`).
+3. Disconnect both from the network: local feed/gallery/DM history remain
+   usable; queued messages persist; reconnect replays them per protocol.
+4. Fresh install with empty state initializes with no cloud account.
+5. Re-enable only the explicit fallback: traffic is labeled relayed, and
+   disabling it again breaks nothing local.
+6. Same-machine success does not count; relayed success does not count as direct.

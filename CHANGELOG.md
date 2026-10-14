@@ -15,6 +15,10 @@
   `MIGRATION.md`, `DECISIONS.md`, `RECONSTRUCTION.md`.
 - Fixes: none claimed — the RECONSTRUCTION triage (≈100 useful rows) is the
   queued backlog; nothing is marked done until ported with tests.
+- One recovery fix IS included: dropped the phantom `@import
+  "shadcn/tailwind.css"` from `globals.css` (resolved only via a stray
+  undeclared install; nothing consumes it). Clean-`npm ci` build was broken
+  without this; now green — see `RECONSTRUCTION.md` §9–§10 for the full gate.
 - Known limitations: off-mesh reachability still rides hosted rendezvous;
   no peer-address exchange; symmetric NAT needs relay; `/register` stays
   client-claimed; rooms lack forward secrecy. Full list in `P2P.md`/`SECURITY.md`.
