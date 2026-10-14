@@ -7,7 +7,7 @@ export interface ChangelogModalProps {
   onClose: () => void
 }
 
-export const CURRENT_CHANGELOG_VERSION = '1.5.3'
+export const CURRENT_CHANGELOG_VERSION = '1.5.5'
 
 /**
  * One entry per change, in the reader's words.
