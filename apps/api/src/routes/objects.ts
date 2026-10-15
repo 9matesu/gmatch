@@ -123,6 +123,33 @@ objects.post('/register', orbitAuth, async (c) => {
     const contentUrl = magnetUri || (contentHash ? `urn:sha256:${contentHash}` : `/api/objects/${objectId}`)
     const recipientsRaw = typeof body.recipients === 'string' ? body.recipients : null
 
+    // Idempotent retry (Phase 3 outbox): the client reuses its own objectId
+    // across attempts. Same owner => return the existing row (no duplicate,
+    // no double posts_count, no second broadcast). Foreign owner => 409 so a
+    // client id can never squat or overwrite another owner's row.
+    const existing = await c.env.DB.prepare(
+      'SELECT id, owner_id, content_hash, content_url, size_bytes, mime_type, is_public, is_avatar FROM Objects WHERE id = ?'
+    ).bind(objectId).first<{
+      id: string; owner_id: string; content_hash: string | null;
+      content_url: string | null; size_bytes: number; mime_type: string; is_public: number; is_avatar: number;
+    }>().catch(() => null)
+    if (existing) {
+      if (existing.owner_id !== orbitId) {
+        return c.json({ error: 'Object id already registered by another owner' }, 409)
+      }
+      return c.json({
+        id: existing.id,
+        content_hash: existing.content_hash,
+        magnet_uri: existing.content_url?.startsWith('magnet:') ? existing.content_url : null,
+        content_url: existing.content_url,
+        size_bytes: existing.size_bytes,
+        mime_type: existing.mime_type,
+        is_public: existing.is_public,
+        is_avatar: existing.is_avatar,
+        reused: true,
+      }, 200)
+    }
+
     await c.env.DB.prepare(
       'INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, caption, is_public, post_caption, location, post_tags, is_story, expires_at, content_hash, post_group, is_chat, is_avatar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(
