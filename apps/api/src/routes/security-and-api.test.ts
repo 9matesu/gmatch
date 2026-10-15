@@ -559,7 +559,7 @@ describe('WS-3: Recommendations — user submit', () => {
     expect(res.status).toBe(400)
   })
 
-  it('GET /api/objects/:id purges orphaned object row from DB when blob is missing', async () => {
+  it('GET /api/objects/:id keeps the metadata row when the blob is missing (no purge-on-read)', async () => {
     await env.DB.prepare(
       "INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url) VALUES (?, ?, 100, 'image/jpeg', NULL)"
     ).bind('ghost-obj-404', user.orbitId).run()
@@ -567,12 +567,14 @@ describe('WS-3: Recommendations — user submit', () => {
     const res = await app.request('/api/objects/ghost-obj-404', {
       headers: authHeaders(user, 'GET', '/api/objects/ghost-obj-404'),
     }, env)
+    // Bytes are gone, but the row is durable: a transient 404 must never
+    // destroy the post/object metadata (data-integrity milestone).
     expect(res.status).toBe(404)
     const json: any = await res.json()
-    expect(json.purged).toBe(true)
+    expect(json.error).toMatch(/unavailable/i)
 
-    const row = await env.DB.prepare('SELECT 1 FROM Objects WHERE id = ?').bind('ghost-obj-404').first()
-    expect(row).toBeFalsy()
+    const row = await env.DB.prepare('SELECT id FROM Objects WHERE id = ?').bind('ghost-obj-404').first()
+    expect(row).toBeTruthy()
   })
 
   it('GET /api/users/me returns authenticated caller profile and last_seen', async () => {
