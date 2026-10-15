@@ -22,7 +22,7 @@ import {
 } from './save'
 import type { SaveData } from './save'
 import { fetchPosts, fetchPostsMulti, matchesQuery, clearMirrorCooldowns, clearSeenMemory } from '../services/booru'
-import { vaultPin, vaultUnpin, vaultRemove } from '../services/vault'
+import { vaultUnpin, vaultRemove } from '../services/vault'
 import { evictImage, clearFeedCache } from '../services/imageCache'
 import { isCustomMediaUrl, sampleCustomSources } from '../services/customSources'
 import type { ActiveCap, BooruPost, CapId, CustomSource, GalleryImage, GridCell, KoDrop, OwnedTag, ViewMode } from './types'
@@ -439,7 +439,8 @@ export function isGridMode(mode: ViewMode): boolean {
 }
 
 /** Shared drain reward: gallery keep + market discovery + past + KO count + novelty drop. */
-function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: number) {  const defeated = s.defeated + 1
+function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: number) {
+  const defeated = s.defeated + 1
   const rarityBase = rarityBaseForPost(post.id)
   const bonus = killBonusPoints(rarityBase)
   const img: GalleryImage = {
@@ -518,7 +519,8 @@ function kickKeepsakePersist(img: GalleryImage) {
     })
 }
 
-function koFoe(s: GameState, now: number, clicksOnFoe: number) {  const post = s.current as BooruPost
+function koFoe(s: GameState, now: number, clicksOnFoe: number) {
+  const post = s.current as BooruPost
   const spoil = gallerySpoils(s, post, clicksOnFoe, now)
   const current = s.queue[0] ?? null
   const queue = s.queue.slice(1)
