@@ -4,10 +4,15 @@
 const { matchesQuery } = require('./matchRule.cjs')
 
 function queryVariants(query) {
-  // Narrows POSITIVES only; every negative term is carried into every variant
-  // (see the twin in src/services/booru.ts). Negatives are the blocklist and
-  // slop exclusions, so dropping one while widening a query re-admitted
-  // precisely what the query excluded.
+  // OVER-FETCH LADDER, deliberately looser than the query. Narrow providers
+  // commonly return 0 for multi-tag ANDs, so we walk progressively wider
+  // requests and let the strict gate above sort out what actually matches.
+  // Two invariants:
+  //   - every negative term is carried into every variant (they are the
+  //     blocklist and slop exclusions; dropping one while widening re-admits
+  //     exactly what the query excluded);
+  //   - a variant is a REQUEST, never an answer. Results are gated on the full
+  //     query, so widening can never widen the result set.
   const parts = String(query).split(/\s+/).filter(Boolean)
   const neg = parts.filter((p) => p.startsWith('-'))
   const pos = parts.filter((p) => !p.startsWith('-'))
@@ -76,20 +81,23 @@ function createFetchBooru({ sources, httpGet, cache, blocked = () => false, dead
           const posts = source.fetch
             ? await source.fetch(variant, n, fetchOpts)
             : source.parse(await httpGet(source.url(variant, n)))
-          // Validate against the variant ACTUALLY SENT, not the original
-          // query: the ladder walks narrower queries (full -> first-two ->
-          // first tag) so a two-tag request is answered by a one-tag request.
-          // Gating on `variant` is what stops that walk from quietly widening
-          // the search. Main had NO query gate at all before this, so the
-          // packaged app trusted provider semantics while the browser filtered.
-          const kept = (posts || []).filter((p) => matchesQuery(p.tags, variant, { trustUntagged: true }))
+          // Validate against the FULL query, never the variant sent. The
+          // ladder deliberately over-fetches (full -> first-two -> first tag)
+          // because providers return 0 for some narrow AND combos, but every
+          // returned post must still match EVERY requested tag. Gating on
+          // `variant` is what let a one-tag request's results answer a two-tag
+          // query: the search got quietly wider while the count still looked
+          // healthy. Over-fetch wide, then filter strict.
+          const kept = (posts || []).filter((p) => matchesQuery(p.tags, query, { trustUntagged: true }))
           if (kept.length > 0) {
             rrIndex = (pool.indexOf(source) + 1) % pool.length
             // Random round pages must NOT poison the tag slot: a memoized
             // random page would repeat for 10 minutes on probe/market reads.
-            // Only deterministic (probe/page-0) results are memoized.
-            if (!fresh) cache?.setFeedCache?.(variant, kept)
-            return { posts: kept, source: source.id, ok: true, query: variant }
+            // Only deterministic (probe/page-0) results are memoized, and
+            // under the FULL query so a memo entry can never hand back posts
+            // that answer fewer tags than asked.
+            if (!fresh) cache?.setFeedCache?.(query, kept)
+            return { posts: kept, source: source.id, ok: true, query }
           }
         } catch {
           // try next variant / source

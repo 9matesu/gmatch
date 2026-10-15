@@ -485,6 +485,11 @@ export { ALL_SOURCES, refererFor, DIRECT_SOURCES, type DirectSourceDef } from '.
 /**
  * Combo queries (4-5 tags) get truncated by the mirrors — full query first,
  * then top-2 tags, then the single leading tag. Mirrors electron/main.cjs.
+ *
+ * These are OVER-FETCH requests, never answers: `sanitize()` below gates every
+ * returned post on the FULL query, so a wider variant can surface extra
+ * candidates but can never widen the result set. Keep it that way in the main
+ * process twin too.
  */
 export function queryVariants(query: string): string[] {
   // Narrowing keeps every POSITIVE tag and every NEGATIVE term. Negatives

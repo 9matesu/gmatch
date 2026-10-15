@@ -79,9 +79,11 @@ async function queryGate() {
     assert.deepStrictEqual(res.posts.map((p) => p.id), ['both'], 'single-tag match is rejected')
   }
 
-  // The ladder walks to a ONE-tag variant; the gate follows the variant
-  // actually sent, so the narrowed request may legitimately return the
-  // single-tag post — but it must not come back under a two-tag query.
+  // The ladder over-fetches (it walks down to a ONE-tag request to dodge
+  // providers that return 0 for narrow ANDs), but the gate follows the FULL
+  // query, never the variant sent. So the widened request may legitimately
+  // return the single-tag post as a CANDIDATE and it must be dropped: a
+  // two-tag query may never answer with a one-tag post.
   {
     let seen = []
     const fetchBooru = createFetchBooru({
@@ -96,9 +98,16 @@ async function queryGate() {
     })
     const res = await fetchBooru({ tags: 'alpha beta', limit: 10 })
     assert.ok(seen.length >= 1, 'at least one variant was requested')
+    assert.ok(seen.some((v) => v.startsWith('alpha')), 'the wide first tag was requested')
+    assert.deepStrictEqual(
+      res.posts.map((p) => p.id),
+      ['both'],
+      'only the genuine two-tag post survives; the widened one-tag candidate is dropped',
+    )
+    assert.strictEqual(res.query, 'alpha beta', 'the reported query is the full one, not the widened variant')
     assert.ok(
-      res.posts.every((p) => matchesQuery(p.tags, res.query, { trustUntagged: true })),
-      'every returned post satisfies the variant that was sent',
+      (res.posts || []).every((p) => matchesQuery(p.tags, 'alpha beta', { trustUntagged: true })),
+      'every returned post satisfies the FULL query',
     )
   }
 
