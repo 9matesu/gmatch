@@ -5,6 +5,7 @@ import type { BooruPost } from '../game/types'
 import { isQueryBlocked, isUserExcluded } from '../game/tagFilter'
 import { blockedPair, getCoRules, isFeedIntent } from '../game/tagCooccur'
 import { matchesQuery as matchMatchesQuery, parseQuery } from '../game/matchRule'
+import { endRound, markStage, startRound } from './queryTiming'
 import { allowOnly } from './postFilter'
 import {
   REDGIFS_API,
@@ -1623,6 +1624,22 @@ function parsePaheal(xml: string): BooruPost[] {
 export async function fetchPosts(req: BooruRequest): Promise<BooruResponse> {
   const offline: BooruResponse = { posts: [], source: null, ok: false, offline: true }
   if (!req.tags.trim() || isQueryBlocked(req.tags)) return offline
+  // No renderer-side result cache, deliberately. Every call site opts out of
+  // memoization on purpose: probes and the tag market pass silent/probe (a
+  // validation read must never be cached) and the feed passes fresh:true so the
+  // idle loop keeps drawing new pictures. Replaying a cached response would
+  // also bypass the seen-ledger that stops the same image coming back.
+  // Reuse lives where it already does: the main-process feed memo, which only
+  // serves non-fresh reads.
+  return fetchPostsUncached(req)
+}
+
+async function fetchPostsUncached(req: BooruRequest): Promise<BooruResponse> {
+  const offline: BooruResponse = { posts: [], source: null, ok: false, offline: true }
+  if (!req.tags.trim() || isQueryBlocked(req.tags)) return offline
+  // Stage timing so the per-split cost of a round is measurable rather than
+  // guessed. Read it with readQueryTimings()/timingSummary().
+  const round = startRound(req.tags)
   try {
     if (typeof window !== 'undefined' && window.gmatch?.booruFetch) {
       // An IPC invoke cannot be cancelled once sent, so the round deadline is
@@ -1631,6 +1648,7 @@ export async function fetchPosts(req: BooruRequest): Promise<BooruResponse> {
       // ceiling to its own source walk, so the abandoned round is already on
       // its way out rather than still burning the network.
       const budget = startRoundBudget()
+      const t0 = Date.now()
       const res = await Promise.race([
         window.gmatch.booruFetch(req),
         budget.signal.aborted
@@ -1639,25 +1657,38 @@ export async function fetchPosts(req: BooruRequest): Promise<BooruResponse> {
               budget.signal.addEventListener('abort', () => reject(budget.signal.reason), { once: true })
             }),
       ]).catch(() => null)
+      markStage(round, 'request', Date.now() - t0)
       budgetDispose(budget)
-      if (!res) return { ...offline }
+      if (!res) {
+        endRound(round)
+        return { ...offline }
+      }
       if (res.ok) {
         const fetched = res.posts || []
+        const f0 = Date.now()
         if (req.silent) {
           // Validation-only: checked, never memoized (see BooruRequest.silent).
           const clean = sanitize(fetched, req.tags)
+          markStage(round, 'filter', Date.now() - f0)
+          endRound(round)
           return clean.length > 0 ? { ...res, posts: clean } : { ...offline }
         }
         const fresh = remember(sanitize(fetched, req.tags), req.tags)
+        markStage(round, 'filter', Date.now() - f0)
+        endRound(round)
         if (fresh.length > 0) {
           emptyStreak = 0
           return { ...res, posts: fresh }
         }
         return emptyRound(fetched.length, req.limit, res, req.tags)
       }
+      endRound(round)
       return { ...offline }
     }
+    const t1 = Date.now()
     const res = await directFetch(req)
+    markStage(round, 'request', Date.now() - t1)
+    endRound(round)
     if (res.ok && res.posts.length > 0) {
       emptyStreak = 0
       return res
