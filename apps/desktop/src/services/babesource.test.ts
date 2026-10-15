@@ -117,6 +117,10 @@ describe('babesource adapter', () => {
     expect(posts).toHaveLength(1)
     expect(posts[0].id).toBe('bs-c-6a7594d0172fe-0')
     expect(posts[0].kind).toBe('image')
-    expect(posts[0].tags).toEqual(expect.arrayContaining(['skylar', 'vox']))
+    // The query token verbatim, NOT split into its words: stamping
+    // `skylar`/`vox` on a result the query asked for as `skylar_vox` meant
+    // strict AND validation threw babesource's own hits away.
+    expect(posts[0].tags).toContain('skylar_vox')
+    expect(posts[0].tags).not.toContain('skylar')
   })
 })

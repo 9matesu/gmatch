@@ -4,6 +4,7 @@
 import type { BooruPost } from '../game/types'
 import { isQueryBlocked, isUserExcluded } from '../game/tagFilter'
 import { blockedPair, getCoRules, isFeedIntent } from '../game/tagCooccur'
+import { matchesQuery as matchMatchesQuery, parseQuery } from '../game/matchRule'
 import { allowOnly } from './postFilter'
 import {
   REDGIFS_API,
@@ -443,37 +444,20 @@ function feedTagsSafe(tags: string[]): Set<string> {
   return new Set(tags.filter(isFeedIntent))
 }
 
+/**
+ * Result validation for a query. Delegates to the shared rule (strict AND on
+ * normalized tag equality — see src/game/matchRule.ts and its authoritative
+ * CJS twin). This used to be a local `some()` + `includes()` + underscore
+ * split, which let a 2-tag query return posts matching ONE tag and matched
+ * `large_breasts` against a post tagged `large`.
+ *
+ * `trustUntagged` keeps the existing policy for providers that return no tags
+ * at all (redgifs / imhentai / babesource / paheal): nothing to validate
+ * against, so their own search stands. Tagged providers are always validated.
+ */
 export function matchesQuery(post: BooruPost, query?: string): boolean {
-  // Untagged posts come from tag-targeted searches (redgifs/imhentai/paheal):
-  // nothing to check against, trust the search.
-  if (!query || post.tags.length === 0) return true
-  // Caption hunts: covers/doujins often don't have booru tags — pass through
-  if (/caption/i.test(query)) return true
-  const rawTokens = query
-    .trim()
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-  if (rawTokens.length === 0) return true
-  const tokens = new Set<string>()
-  for (const t of rawTokens) {
-    tokens.add(t)
-    tokens.add(t.replace(/[\s-]+/g, '_'))
-    for (const sub of t.split('_')) {
-      if (sub.length > 2) tokens.add(sub)
-    }
-  }
-  const tags = post.tags.map((t) => t.toLowerCase().replace(/[\s-]+/g, '_'))
-  return Array.from(tokens).some((tok) =>
-    tags.some(
-      (t) =>
-        t === tok ||
-        t.includes(tok) ||
-        // Reversed clause (query ⊃ tag) needs a meaningful tag: without a
-        // floor, a 3-letter tag like `sky` passes as `skylar_vox`.
-        (t.length >= 4 && tok.includes(t)),
-    ),
-  )
+  if (!query) return true
+  return matchMatchesQuery(post.tags, query, { trustUntagged: true })
 }
 
 /**
@@ -502,11 +486,18 @@ export { ALL_SOURCES, refererFor, DIRECT_SOURCES, type DirectSourceDef } from '.
  * then top-2 tags, then the single leading tag. Mirrors electron/main.cjs.
  */
 export function queryVariants(query: string): string[] {
+  // Narrowing keeps every POSITIVE tag and every NEGATIVE term. Negatives
+  // are safety, not preference: they carry the blocklist and slop exclusions,
+  // so a narrower variant that quietly dropped `-solo` (or a whole run of
+  // `-furry -ai_generated`) would re-admit exactly what the query excluded.
   const parts = query.split(/\s+/).filter(Boolean)
-  const variants = [query]
-  if (parts.length > 2) variants.push(parts.slice(0, 2).join(' '))
-  if (parts.length > 1) variants.push(parts[0])
-  return [...new Set(variants)]
+  const neg = parts.filter((p) => p.startsWith('-'))
+  const pos = parts.filter((p) => !p.startsWith('-'))
+  const tail = neg.length ? ` ${neg.join(' ')}` : ''
+  const variants = [`${pos.join(' ')}${tail}`.trim()]
+  if (pos.length > 2) variants.push(`${pos.slice(0, 2).join(' ')}${tail}`)
+  if (pos.length > 1) variants.push(`${pos[0]}${tail}`)
+  return [...new Set(variants.filter(Boolean))]
 }
 
 /**
@@ -1425,9 +1416,12 @@ async function redgifsNicheForQuery(
   return null
 }
 
-/** Tag niche-sourced posts with the matched query tokens (niche items ship untagged). */
+/** Tag niche-sourced posts with the query they actually answered.
+ *  Normalized query tokens verbatim — NOT redgifsQueryTags, which splits into
+ *  niche-name words: stamping `skylar` on a result the query asked for as
+ *  `skylar_vox` made strict AND validation discard the provider's own hits. */
 function withRedgifsQueryTags(posts: BooruPost[], query: string): BooruPost[] {
-  const tags = redgifsQueryTags(query)
+  const tags = [...new Set(parseQuery(query).required)]
   if (tags.length === 0) return posts
   return posts.map((p) => ({
     ...p,

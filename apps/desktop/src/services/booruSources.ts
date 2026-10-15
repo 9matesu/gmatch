@@ -29,6 +29,10 @@ export interface SourceDef {
   id: string
   healthId: string
   kind: SourceKind
+  /** Audited adapter capabilities. Every field is optional: ABSENT MEANS
+   *  UNKNOWN, never a default — we do not infer an API guarantee from the fact
+   *  that our client-side filter happened to pass. See shared/sources.json. */
+  caps?: SourceCaps
   category: 'real' | 'hentai'
   origin: string
   devProxy: string | null
@@ -44,6 +48,19 @@ export interface SourceDef {
   devBytes?: 'proxy' | 'px'
   pxSubdomains?: boolean
   enabled: boolean
+}
+
+/** How many query tags an adapter forwards, when that is provable. */
+export type TagSupport = 'and' | 'or' | 'single' | 'none'
+
+export interface SourceCaps {
+  tags?: TagSupport
+  maxTags?: number
+  /** true = the adapter cannot filter server-side, so results are filtered
+   *  locally AFTER a full fetch. True costs a round per candidate. */
+  postFilter?: boolean
+  pagination?: 'random-pid' | 'page' | 'none'
+  rendition?: 'thumb' | 'preview' | 'full'
 }
 
 const ALL = (registry.sources as SourceDef[]).filter((s) => s.enabled !== false)
@@ -93,6 +110,30 @@ export function sourceById(id: string): SourceDef | undefined {
 
 export function sourceByKind(kind: SourceKind): SourceDef | undefined {
   return ALL.find((s) => s.kind === kind)
+}
+
+/** Audited capabilities for a source. Unknowns stay absent, never defaulted. */
+export function capabilitiesFor(idOrHealthId: string): SourceCaps {
+  return sourceById(idOrHealthId)?.caps ?? sourceByHealthId(idOrHealthId)?.caps ?? {}
+}
+
+/**
+ * Sources that can serve a `tagCount`-tag query.
+ *
+ * Tagless adapters (booru.org: the WAF forces tagless browsing, so the query
+ * never reaches them) are excluded whenever a tag is required, and
+ * single-tag adapters (paheal) only for multi-tag queries. Sources with
+ * UNKNOWN tag support stay eligible — we cannot exclude a provider we have not
+ * measured, and the authoritative gate is client-side (game/matchRule).
+ */
+export function sourcesForTags(tagCount: number): SourceDef[] {
+  if (tagCount <= 0) return ALL
+  return ALL.filter((s) => {
+    const mode = s.caps?.tags
+    if (mode === 'none') return false
+    if (tagCount > 1 && (mode === 'single' || (s.caps?.maxTags ?? Infinity) < tagCount)) return false
+    return true
+  })
 }
 
 /**

@@ -2,13 +2,17 @@
 // A query whose posts are cached must NOT reach a provider a second time.
 const assert = require('assert')
 const { createFetchBooru } = require('./booruSources.cjs')
+const { matchesQuery } = require('./matchRule.cjs')
 
 let providerCalls = 0
 const sources = [
   {
     id: 'fake',
     category: 'hentai',
-    fetch: async () => { providerCalls += 1; return [{ id: 'p1', url: 'http://x/1.jpg', tags: ['a'], rating: 'e' }] },
+    // Tag must satisfy the query below: createFetchBooru validates results
+    // against the variant it sent, so a fixture tagged 'a' queried 'alpha'
+    // would (correctly) be discarded and this memo test would prove nothing.
+    fetch: async () => { providerCalls += 1; return [{ id: 'p1', url: 'http://x/1.jpg', tags: ['alpha'], rating: 'e' }] },
   },
 ]
 
@@ -55,6 +59,66 @@ async function main() {
   console.log('booruSources: all assertions passed')
 }
 
+/**
+ * The query gate main.cjs never had. Before this, the packaged app returned
+ * whatever a provider said: a two-tag request could come back full of posts
+ * matching one tag. Asserted here because createFetchBooru is pure/injectable,
+ * so no Electron boot is needed.
+ */
+async function queryGate() {
+  const mk = (tags, id) => ({ id, url: `http://x/${id}.jpg`, tags, rating: 'e' })
+  const loose = [mk(['alpha'], 'only-alpha'), mk(['alpha', 'beta'], 'both')]
+
+  // Strict AND: only the post carrying BOTH tags survives.
+  {
+    const fetchBooru = createFetchBooru({
+      sources: [{ id: 'fake', category: 'hentai', fetch: async () => loose }],
+      httpGet: async () => '',
+    })
+    const res = await fetchBooru({ tags: 'alpha beta', limit: 10 })
+    assert.deepStrictEqual(res.posts.map((p) => p.id), ['both'], 'single-tag match is rejected')
+  }
+
+  // The ladder walks to a ONE-tag variant; the gate follows the variant
+  // actually sent, so the narrowed request may legitimately return the
+  // single-tag post — but it must not come back under a two-tag query.
+  {
+    let seen = []
+    const fetchBooru = createFetchBooru({
+      sources: [
+        {
+          id: 'fake',
+          category: 'hentai',
+          fetch: async (variant) => { seen.push(variant); return loose },
+        },
+      ],
+      httpGet: async () => '',
+    })
+    const res = await fetchBooru({ tags: 'alpha beta', limit: 10 })
+    assert.ok(seen.length >= 1, 'at least one variant was requested')
+    assert.ok(
+      res.posts.every((p) => matchesQuery(p.tags, res.query, { trustUntagged: true })),
+      'every returned post satisfies the variant that was sent',
+    )
+  }
+
+  // Negatives stay enforced on the main side too.
+  {
+    const fetchBooru = createFetchBooru({
+      sources: [
+        { id: 'fake', category: 'hentai', fetch: async () => [mk(['alpha', 'solo'], 'nope')] },
+      ],
+      httpGet: async () => '',
+    })
+    const res = await fetchBooru({ tags: 'alpha -solo', limit: 10 })
+    assert.strictEqual(res.posts.length, 0, 'negated tag rejects the post')
+  }
+
+  console.log('booruSources query gate: all assertions passed')
+}
+
 function fs_cleanup() { /* no temp files in this test */ }
 
-main().then(() => process.exit(0), (err) => { console.error('booruSources test FAILED:', err); process.exit(1) })
+main()
+  .then(queryGate)
+  .then(() => process.exit(0), (err) => { console.error('booruSources test FAILED:', err); process.exit(1) })

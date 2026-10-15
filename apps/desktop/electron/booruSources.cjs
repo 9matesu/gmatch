@@ -1,12 +1,21 @@
 // Provider query ladder for the idle feed, extracted from main.cjs so the
 // cache-read path is testable without booting Electron. Pure orchestration:
 // sources, httpGet and the feed memo are all injected.
+const { matchesQuery } = require('./matchRule.cjs')
+
 function queryVariants(query) {
+  // Narrows POSITIVES only; every negative term is carried into every variant
+  // (see the twin in src/services/booru.ts). Negatives are the blocklist and
+  // slop exclusions, so dropping one while widening a query re-admitted
+  // precisely what the query excluded.
   const parts = String(query).split(/\s+/).filter(Boolean)
-  const variants = [query]
-  if (parts.length > 2) variants.push(parts.slice(0, 2).join(' '))
-  if (parts.length > 1) variants.push(parts[0])
-  return [...new Set(variants)]
+  const neg = parts.filter((p) => p.startsWith('-'))
+  const pos = parts.filter((p) => !p.startsWith('-'))
+  const tail = neg.length ? ` ${neg.join(' ')}` : ''
+  const variants = [`${pos.join(' ')}${tail}`.trim()]
+  if (pos.length > 2) variants.push(`${pos.slice(0, 2).join(' ')}${tail}`)
+  if (pos.length > 1) variants.push(`${pos[0]}${tail}`)
+  return [...new Set(variants.filter(Boolean))]
 }
 
 // Hard ceiling for ONE source walk, mirroring ROUND_DEADLINE_MS in
@@ -67,13 +76,20 @@ function createFetchBooru({ sources, httpGet, cache, blocked = () => false, dead
           const posts = source.fetch
             ? await source.fetch(variant, n, fetchOpts)
             : source.parse(await httpGet(source.url(variant, n)))
-          if (posts && posts.length > 0) {
+          // Validate against the variant ACTUALLY SENT, not the original
+          // query: the ladder walks narrower queries (full -> first-two ->
+          // first tag) so a two-tag request is answered by a one-tag request.
+          // Gating on `variant` is what stops that walk from quietly widening
+          // the search. Main had NO query gate at all before this, so the
+          // packaged app trusted provider semantics while the browser filtered.
+          const kept = (posts || []).filter((p) => matchesQuery(p.tags, variant, { trustUntagged: true }))
+          if (kept.length > 0) {
             rrIndex = (pool.indexOf(source) + 1) % pool.length
             // Random round pages must NOT poison the tag slot: a memoized
             // random page would repeat for 10 minutes on probe/market reads.
             // Only deterministic (probe/page-0) results are memoized.
-            if (!fresh) cache?.setFeedCache?.(variant, posts)
-            return { posts, source: source.id, ok: true, query: variant }
+            if (!fresh) cache?.setFeedCache?.(variant, kept)
+            return { posts: kept, source: source.id, ok: true, query: variant }
           }
         } catch {
           // try next variant / source
