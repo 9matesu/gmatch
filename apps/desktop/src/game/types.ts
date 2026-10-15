@@ -23,6 +23,13 @@ export interface GalleryImage {
   rarityBase: number
   clicks: number
   rarity: Rarity
+  /** Phase 5 local-first: whether the keep's bytes are cached locally.
+   *  'pending' while the fetch/store runs, 'local' only after the stored
+   *  object is read back and verified, 'failed' when caching did not happen
+   *  (the source url is kept for a retry). Absent on legacy keepsakes. */
+  localStatus?: 'pending' | 'local' | 'failed'
+  /** Content hash of the cached bytes (verification + swarm alias). */
+  localHash?: string
   boughtAt?: number
   /** 'video' for mp4/webm posts (redgifs), so cells render <video>. */
   kind?: 'image' | 'video'

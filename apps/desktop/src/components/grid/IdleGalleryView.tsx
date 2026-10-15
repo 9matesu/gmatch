@@ -104,6 +104,44 @@ export function resolveGalleryTileUrl(img: GalleryImage, vaultUrl?: string): str
   return u
 }
 
+/**
+ * Phase 5: resolve keepsakes to locally stored BYTES (swarm IndexedDB), keyed
+ * by source url. Vault (Electron) is preferred where present; this covers the
+ * dev/browser case and keeps the gallery off third-party URLs once cached.
+ * Only entries already verified 'local' are resolved; blob URLs are revoked
+ * on change/unmount.
+ */
+function useKeepsakeLocalUrls(images: GalleryImage[], vaultUrls: Record<string, string>): Record<string, string> {
+  const [map, setMap] = useState<Record<string, string>>({})
+  const key = images.map((i) => i.url || '').filter(Boolean).join('|')
+  useEffect(() => {
+    let dead = false
+    const created: string[] = []
+    void (async () => {
+      const { getLocalObject } = await import('../../utils/p2pSwarm')
+      const next: Record<string, string> = {}
+      for (const img of images) {
+        const u = img.url || ''
+        if (!u || img.localStatus !== 'local' || vaultUrls[u]) continue
+        try {
+          const blob = (await getLocalObject(u)) || (img.localHash ? await getLocalObject(img.localHash) : null)
+          if (blob) {
+            const obj = URL.createObjectURL(blob)
+            created.push(obj)
+            next[u] = obj
+          }
+        } catch { /* unresolved stays unresolved */ }
+      }
+      if (!dead && Object.keys(next).length) setMap((prev) => ({ ...prev, ...next }))
+    })()
+    return () => {
+      dead = true
+      for (const o of created) URL.revokeObjectURL(o)
+    }
+  }, [key, JSON.stringify(vaultUrls)])
+  return map
+}
+
 export interface IdleGalleryViewProps {
   onCreateCard?: (media: { url: string; tags: string[]; name: string }) => void
   onSetWallpaper?: (url: string, mime?: string) => void
@@ -231,6 +269,8 @@ export default function IdleGalleryView({
 
   // Local vault (opt-in): render pinned bytes from disk instead of remote.
   const vaultUrls = useVaultUrls(paginatedGallery.map((g) => g.url))
+  // Phase 5: local bytes from the swarm store (covers dev / vault-off).
+  const localUrls = useKeepsakeLocalUrls(paginatedGallery, vaultUrls)
   // Viewer may sit outside the current page; resolve its url separately.
   const viewerVaultUrl = useVaultUrl(
     (viewerId && sortedGallery.find((g) => g.id === viewerId)?.url) || null,
@@ -500,7 +540,7 @@ export default function IdleGalleryView({
               const isBackdrop = backgroundUrl === img.url
               const isMotion = img.kind === 'video'
               const isSelected = selectedIds.has(img.id)
-              const tileUrl = resolveGalleryTileUrl(img, vaultUrls[img.url || ''])
+              const tileUrl = resolveGalleryTileUrl(img, vaultUrls[img.url || ''] || localUrls[img.url || ''])
 
               return (
                 <div
@@ -579,6 +619,30 @@ export default function IdleGalleryView({
                       />
                     )}
                   </button>
+
+                  {/* Phase 5: local-cache status — never imply a keep is saved
+                      when its bytes are not locally stored. */}
+                  {img.localStatus === 'pending' && (
+                    <span className="pointer-events-none absolute bottom-1.5 left-1.5 z-20 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-mono text-white/80 backdrop-blur-md">
+                      Caching…
+                    </span>
+                  )}
+                  {img.localStatus === 'failed' && (
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        useGame.setState((s) => ({ gallery: s.gallery.map((g) => (g.id === img.id ? { ...g, localStatus: 'pending' as const } : g)) }))
+                        const { persistKeepsake } = await import('../../services/keepsake')
+                        const res = await persistKeepsake(img.url)
+                        useGame.setState((s) => ({ gallery: s.gallery.map((g) => (g.id === img.id ? { ...g, localStatus: res.status, localHash: res.hash } : g)) }))
+                      }}
+                      title="Could not cache this keep locally. The source link is kept for a retry."
+                      className="absolute bottom-1.5 left-1.5 z-20 rounded-md border border-rose-500/40 bg-black/75 px-1.5 py-0.5 text-[10px] font-mono text-rose-300 backdrop-blur-md cursor-pointer hover:bg-black/90"
+                    >
+                      Not cached · Retry
+                    </button>
+                  )}
 
                   {/* Top-right More Options Menu Button & Dropdown */}
                   <div className="absolute right-1.5 top-1.5 z-20">

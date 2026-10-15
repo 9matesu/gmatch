@@ -439,8 +439,7 @@ export function isGridMode(mode: ViewMode): boolean {
 }
 
 /** Shared drain reward: gallery keep + market discovery + past + KO count + novelty drop. */
-function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: number) {
-  const defeated = s.defeated + 1
+function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: number) {  const defeated = s.defeated + 1
   const rarityBase = rarityBaseForPost(post.id)
   const bonus = killBonusPoints(rarityBase)
   const img: GalleryImage = {
@@ -453,6 +452,9 @@ function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: 
     boughtAt: now,
     kind: post.kind,
     preview: post.preview,
+    // Phase 5 local-first: bytes are cached asynchronously; the keep is only
+    // 'local' after fetch+store+read-back verify (kickKeepsakePersist below).
+    localStatus: post.url ? 'pending' : 'failed',
   }
   // Novelty drop (non-blocking): one suggested tag + one anti-tag from the foe.
   const ownedNames = new Set(s.tags.map((t) => t.name.toLowerCase()))
@@ -476,9 +478,10 @@ function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: 
   const pendingDrops = newDrop
     ? [newDrop, ...s.pendingDrops.filter((d) => d.id !== newDrop.id)].slice(0, 8)
     : s.pendingDrops
-  // Local vault (opt-in): pin the keep's bytes to disk in the background.
-  // Lookup-only reads never write, so this is the single write trigger.
-  if (img.url) void vaultPin(img.url)
+  // Local-first: persist the keep's BYTES (IndexedDB + optional vault) before
+  // it can be considered saved. Replaces the old fire-and-forget vaultPin: the
+  // gallery must resolve local bytes, never a live third-party URL.
+  kickKeepsakePersist(img)
   return {
     defeated,
     bonus,
@@ -492,8 +495,30 @@ function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: 
   }
 }
 
-function koFoe(s: GameState, now: number, clicksOnFoe: number) {
-  const post = s.current as BooruPost
+/** Persist a keep's bytes, then reconcile its local status in the gallery. */
+function kickKeepsakePersist(img: GalleryImage) {
+  if (!img.url) return
+  void import('../services/keepsake')
+    .then(({ persistKeepsake }) => persistKeepsake(img.url))
+    .then((res) => {
+      useGame.setState((s) => ({
+        gallery: s.gallery.map((g) =>
+          g.id === img.id
+            ? { ...g, localStatus: res.status, localHash: res.hash }
+            : g,
+        ),
+      }))
+    })
+    .catch(() => {
+      useGame.setState((s) => ({
+        gallery: s.gallery.map((g) =>
+          g.id === img.id ? { ...g, localStatus: 'failed' as const } : g,
+        ),
+      }))
+    })
+}
+
+function koFoe(s: GameState, now: number, clicksOnFoe: number) {  const post = s.current as BooruPost
   const spoil = gallerySpoils(s, post, clicksOnFoe, now)
   const current = s.queue[0] ?? null
   const queue = s.queue.slice(1)
