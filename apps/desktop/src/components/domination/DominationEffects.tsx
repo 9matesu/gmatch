@@ -168,6 +168,16 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
     }
   }
 
+  // Mesh camera decision (Fase 5/6): the courier hook seals the receipt back
+  // (landed | declined) keyed on the mesh request id. Server-path payloads
+  // carry no meshId and skip this entirely (their ack is the /ack POST).
+  const meshCameraDecision = (approved: boolean, meshId?: string) => {
+    if (!meshId) return;
+    window.dispatchEvent(new CustomEvent('gmatch:domination-camera-decision', {
+      detail: { id: meshId, approved },
+    }));
+  };
+
   useEffect(() => {
     if (!identity || !settings.pcDominationEnabled) return;
 
@@ -284,7 +294,36 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
     };
 
     window.addEventListener('orbit-domination', handleDomination as EventListener);
-    return () => window.removeEventListener('orbit-domination', handleDomination as EventListener);
+    // Mesh inbound (Fase 5/6): sealed dom_request bodies arrive via the
+    // courier hook as 'gmatch:domination-mesh-effect'. Reuse the server path
+    // 1:1 — same consent gates, same panic pause, same rendering. Only the
+    // id source differs: the mesh request id rides as payload.meshId (no
+    // server actionId, no ledger, no victim payout).
+    const handleMeshEffect = (e: Event) => {
+      const d = (e as CustomEvent<{
+        action?: string;
+        from?: string;
+        senderName?: string;
+        payload?: any;
+        meshId?: string;
+      }>).detail;
+      if (!d || typeof d.action !== 'string') return;
+      void handleDomination(new CustomEvent('orbit-domination', {
+        detail: {
+          type: 'domination',
+          action: d.action,
+          // `from` stays the sender orbit id (camera forging addresses it);
+          // the sealed display name rides alongside for rendering.
+          payload: { ...(d.payload ?? {}), meshId: d.meshId, senderName: d.senderName },
+          from: d.from,
+        },
+      }) as Event);
+    };
+    window.addEventListener('gmatch:domination-mesh-effect', handleMeshEffect);
+    return () => {
+      window.removeEventListener('orbit-domination', handleDomination as EventListener);
+      window.removeEventListener('gmatch:domination-mesh-effect', handleMeshEffect);
+    };
   }, [identity, settings, addEffect, update]);
 
   const blurEffect = activeEffects.find(e => e.type === 'blur');
@@ -429,7 +468,11 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setCameraAsk(null)}
+                onClick={() => {
+                  const ask = cameraAsk;
+                  setCameraAsk(null);
+                  if (ask) meshCameraDecision(false, ask.payload?.meshId);
+                }}
                 className="flex-1 px-4 py-2 rounded-lg border border-border-glass text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer"
               >
                 Decline
@@ -439,7 +482,10 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
                 onClick={() => {
                   const ask = cameraAsk;
                   setCameraAsk(null);
-                  if (ask) void captureAndSend(ask.from, ask.payload);
+                  if (ask) {
+                    meshCameraDecision(true, ask.payload?.meshId);
+                    void captureAndSend(ask.from, ask.payload);
+                  }
                 }}
                 className="flex-1 px-4 py-2 rounded-lg bg-white text-black text-xs font-bold hover:bg-retro-fg cursor-pointer"
               >

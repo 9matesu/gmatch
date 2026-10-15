@@ -140,4 +140,35 @@ describe('useCourierDms mesh domination (Fase 5/6 slice 3)', () => {
     const opened = open1to1(receiptEnv, bob.encryptionPrivHex)
     expect(decodeDomBody(opened.body)).toEqual({ t: 'dom_receipt', id: 'dom-in-2', status: 'declined' })
   })
+
+  it('mesh camera decision approved seals a landed receipt for the request id', async () => {
+    const box: { value: unknown[] } = { value: [] }
+    box.value.push(seal1to1(
+      JSON.stringify({ t: 'dom_request', id: 'dom-cam-9', action: 'camera' }),
+      'mail', bob, alice,
+    ))
+    const onDomEffect = vi.fn()
+    renderHook(
+      () => useCourierDms(alice, {
+        fetchImpl: mockFetch(box),
+        webSocketFactory: () => new FakeSocket(),
+        dominationConsent: (a) => a === 'camera',
+        onDomEffect,
+      }),
+      { wrapper },
+    )
+    await waitFor(() => expect(onDomEffect).toHaveBeenCalledWith('camera', bob.orbitId, undefined))
+    // Live approval pending: no receipt yet.
+    await new Promise((r) => setTimeout(r, 50))
+    expect(box.value).toHaveLength(1)
+    act(() => {
+      window.dispatchEvent(new CustomEvent('gmatch:domination-camera-decision', {
+        detail: { id: 'dom-cam-9', approved: true },
+      }))
+    })
+    await waitFor(() => expect(box.value.length).toBeGreaterThan(1))
+    const receiptEnv = box.value[box.value.length - 1] as never
+    const opened = open1to1(receiptEnv, bob.encryptionPrivHex)
+    expect(decodeDomBody(opened.body)).toEqual({ t: 'dom_receipt', id: 'dom-cam-9', status: 'landed' })
+  })
 })

@@ -128,11 +128,16 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
         depsRef.current.onDomReceipt?.(id, status);
         window.dispatchEvent(new CustomEvent('gmatch:domination-receipt', { detail: { id, status } }));
       },
-      onIncomingEffect: (action, from, senderName) => {
-        depsRef.current.onDomEffect?.(action, from, senderName);
-        window.dispatchEvent(new CustomEvent('gmatch:domination-mesh-effect', {
-          detail: { action, from, senderName },
-        }));
+      onIncomingEffect: (action, from, extra) => {
+        const detail = {
+          action,
+          from,
+          senderName: extra?.senderName,
+          payload: extra?.payload,
+          meshId: extra?.id,
+        };
+        depsRef.current.onDomEffect?.(action, from, extra?.senderName);
+        window.dispatchEvent(new CustomEvent('gmatch:domination-mesh-effect', { detail }));
       },
     })
     const client = new MailClient({
@@ -221,6 +226,19 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
   const meshPeerKnown = useCallback((orbitId: string): boolean => {
     const k = storeRef.current?.peerKeys(orbitId);
     return Boolean(k?.publicKeyHex && k?.encryptionPubHex);
+  }, [])
+
+  // Mesh camera verdicts (Fase 5/6): the receiver approved/denied a pending
+  // request in DominationEffects — seal the receipt back (landed | declined).
+  useEffect(() => {
+    const onCameraDecision = (e: Event) => {
+      const d = (e as CustomEvent<{ id?: string; approved?: boolean }>).detail;
+      if (!d?.id || !domMgrRef.current) return;
+      if (d.approved) void domMgrRef.current.land(d.id);
+      else void domMgrRef.current.decline(d.id);
+    };
+    window.addEventListener('gmatch:domination-camera-decision', onCameraDecision);
+    return () => window.removeEventListener('gmatch:domination-camera-decision', onCameraDecision);
   }, [])
 
   const createRoom = useCallback((name: string): Room | null => roomsRef.current?.createRoom(name) ?? null, [])

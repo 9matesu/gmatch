@@ -28,7 +28,11 @@ export interface DominationMeshDeps {
   /** Sender outbox flip when a receipt arrives (landed | declined). */
   onOutboxStatus: (requestId: string, status: 'landed' | 'declined') => void;
   /** Receiver render hook: a consented action arrived — show the effect. */
-  onIncomingEffect: (action: string, fromOrbitId: string, senderName?: string) => void;
+  onIncomingEffect: (
+    action: string,
+    fromOrbitId: string,
+    extra?: { id: string; senderName?: string; payload?: unknown },
+  ) => void;
 }
 
 /**
@@ -98,11 +102,19 @@ export class DominationMeshManager {
       // Live approval per request (same posture as the server path): the UI
       // renders the ask and calls land()/decline() on user decision.
       this.pending.set(body.id, returnKeys);
-      this.deps.onIncomingEffect(body.action, opened.senderOrbitId, body.n);
+      this.deps.onIncomingEffect(body.action, opened.senderOrbitId, {
+        id: body.id,
+        senderName: body.n,
+        payload: body.payload,
+      });
       return true;
     }
 
-    this.deps.onIncomingEffect(body.action, opened.senderOrbitId, body.n);
+    this.deps.onIncomingEffect(body.action, opened.senderOrbitId, {
+      id: body.id,
+      senderName: body.n,
+      payload: body.payload,
+    });
     void this.sendReceipt(returnKeys, body.id, 'landed');
     return true;
   }
