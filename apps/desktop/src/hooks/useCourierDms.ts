@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { OrbitIdentity } from '@orbit/crypto'
 import { MailClient, type MailSocket } from '../utils/mail-client'
 import { DmManager, DmStore, scopedKey, type DmMessage } from '../utils/mail-dm'
-import { rotateEpoch, type EpochState } from '../utils/handleRotation'
+import { DominationMeshManager } from '../utils/dominationMeshManager'
+import { deliveryToken } from '@orbit/protocol'
+import { rotateEpoch, peerAddressToken, type EpochState } from '../utils/handleRotation'
 import { getSecureItem, setSecureItem } from '../utils/secure-storage'
 import { RoomManager, type Room, type RoomMessage } from '../utils/rooms'
 import { detectMailMode, cachedMailMode, isKnownSiteCourier, type MailMode } from '../utils/mail-mode'
@@ -18,6 +20,13 @@ export interface CourierDeps {
   onNotify?: (msg: DmMessage) => void
   /** Inbound room message arrived. */
   onRoomMessage?: (msg: RoomMessage, room: Room) => void
+  /** Receiver local consent lookup for mesh domination actions. Closed by
+   *  default: without this, every inbound action is declined. */
+  dominationConsent?: (action: string) => boolean
+  /** A consented mesh domination action arrived — render the effect. */
+  onDomEffect?: (action: string, fromOrbitId: string, senderName?: string) => void
+  /** A mesh receipt arrived for our outbox (landed | declined). */
+  onDomReceipt?: (requestId: string, status: 'landed' | 'declined') => void
 }
 
 /**
@@ -39,6 +48,7 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
   const [rooms, setRoomsState] = useState<Room[]>([])
   const clientRef = useRef<MailClient | null>(null)
   const managerRef = useRef<DmManager | null>(null)
+  const domMgrRef = useRef<DominationMeshManager | null>(null)
   const roomsRef = useRef<RoomManager | null>(null)
   const storeRef = useRef<DmStore | null>(null)
   const depsRef = useRef(deps)
@@ -59,6 +69,7 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
     if (!identity || mode !== 'courier') {
       storeRef.current = null
       managerRef.current = null
+      domMgrRef.current = null
       clientRef.current = null
       setThreads({})
       return
@@ -92,17 +103,52 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
       onThreadChanged: refresh,
       onIncoming: (m) => depsRef.current.onNotify?.(m),
     })
+    // Mesh domination (Fase 5/6): same sealed transport as DMs, receiver's
+    // local consent is authoritative. Events are the stable contract for the
+    // UI (DominationEffects + outbox listeners); explicit dep callbacks exist
+    // for tests and direct wiring.
+    const domMgr = new DominationMeshManager({
+      mail: {
+        send: (body, keys) => {
+          if (!clientRef.current) return Promise.reject(new Error('mail client not ready'));
+          return clientRef.current.send(body, 'mail', keys, {
+            to: peerAddressToken(keys, deliveryToken),
+          });
+        },
+      },
+      getPeerKeys: (peerId) => {
+        const k = store.peerKeys(peerId);
+        return k?.publicKeyHex && k?.encryptionPubHex
+          ? { publicKeyHex: k.publicKeyHex, encryptionPubHex: k.encryptionPubHex }
+          : null;
+      },
+      addressPeer: (keys) => peerAddressToken(keys, deliveryToken),
+      isConsented: (action) => depsRef.current.dominationConsent?.(action) === true,
+      onOutboxStatus: (id, status) => {
+        depsRef.current.onDomReceipt?.(id, status);
+        window.dispatchEvent(new CustomEvent('gmatch:domination-receipt', { detail: { id, status } }));
+      },
+      onIncomingEffect: (action, from, senderName) => {
+        depsRef.current.onDomEffect?.(action, from, senderName);
+        window.dispatchEvent(new CustomEvent('gmatch:domination-mesh-effect', {
+          detail: { action, from, senderName },
+        }));
+      },
+    })
     const client = new MailClient({
       apiBase: getApiBaseUrl(),
       identity,
       webSocketFactory: depsRef.current.webSocketFactory,
       fetchImpl: depsRef.current.fetchImpl,
-      // DM first; if the opened body is not a DM/ack, try the room layer, then signal routing.
+      // DM first; if the opened body is not a DM/ack, try domination mesh,
+      // then the room layer, then signal routing.
       onMail: (opened, env) => {
         if (!manager.handleOpened(opened, env)) {
-          if (!roomMgr.handleOpened(opened)) {
-            if (opened.kind === 'signal') {
-              void handleInboundSignal(opened, identity, undefined, depsRef.current.fetchImpl)
+          if (!domMgr.handleOpened(opened, env)) {
+            if (!roomMgr.handleOpened(opened)) {
+              if (opened.kind === 'signal') {
+                void handleInboundSignal(opened, identity, undefined, depsRef.current.fetchImpl)
+              }
             }
           }
         }
@@ -121,6 +167,7 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
     client.epoch = rotated
     storeRef.current = store
     managerRef.current = manager
+    domMgrRef.current = domMgr
     roomsRef.current = roomMgr
     clientRef.current = client
     client.start()
@@ -131,6 +178,7 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
       client.stop()
       clientRef.current = null
       managerRef.current = null
+      domMgrRef.current = null
       roomsRef.current = null
       storeRef.current = null
     }
@@ -158,6 +206,23 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
     storeRef.current?.rememberPeer(orbitId, { publicKeyHex, encryptionPubHex })
   }, [])
 
+  /** Mesh domination send (Fase 5/6): sealed dom_request, free, no server.
+   *  Null when the peer has no known keys — the caller falls back to the
+   *  server route; the mesh never fires blind. */
+  const meshSend = useCallback(
+    async (targetOrbitId: string, action: string, payload: unknown, senderName?: string) => {
+      if (!domMgrRef.current) return { ok: false as const, reason: 'not-ready' as const };
+      return domMgrRef.current.sendEffect(targetOrbitId, action, payload, senderName);
+    },
+    [],
+  )
+
+  /** Whether the peer is mesh-addressable (keys known from roster/TOFU). */
+  const meshPeerKnown = useCallback((orbitId: string): boolean => {
+    const k = storeRef.current?.peerKeys(orbitId);
+    return Boolean(k?.publicKeyHex && k?.encryptionPubHex);
+  }, [])
+
   const createRoom = useCallback((name: string): Room | null => roomsRef.current?.createRoom(name) ?? null, [])
   const inviteToRoom = useCallback((roomId: string, peerId: string) => {
     const r = roomsRef.current
@@ -172,5 +237,5 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
 
   const courierActive = useMemo(() => mode === 'courier' && !!identity, [mode, identity])
 
-  return { mode, courierActive, send, pull, threadFor, registerPeerKeys, threads, rooms, createRoom, inviteToRoom, sayInRoom, leaveRoom, roomMessages }
+  return { mode, courierActive, send, pull, threadFor, registerPeerKeys, meshSend, meshPeerKnown, threads, rooms, createRoom, inviteToRoom, sayInRoom, leaveRoom, roomMessages }
 }
