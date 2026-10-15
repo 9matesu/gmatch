@@ -8,7 +8,7 @@ vi.mock('../utils/api', () => ({
   orbitFetch: vi.fn().mockResolvedValue({ ok: true, json: async () => [] }),
 }));
 vi.mock('./feed/useProfilePostLightbox', () => ({
-  useProfilePostLightbox: () => ({ openPost: vi.fn(), modals: null }),
+  useProfilePostLightbox: () => ({ openPost: vi.fn(), expandedNode: null, modals: null }),
 }));
 
 describe('UserProfileModal presence sync', () => {

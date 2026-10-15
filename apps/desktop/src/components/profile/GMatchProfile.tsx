@@ -90,7 +90,7 @@ export function GMatchProfile({
 }) {
   const [profileTab, setProfileTab] = useState<'posts' | 'saved' | 'reposts' | 'cards'>('posts');
   const [showEditor, setShowEditor] = useState(false);
-  const { openPost, modals: postLightboxModals } = useProfilePostLightbox({
+  const { openPost, expandedNode, modals: postLightboxModals } = useProfilePostLightbox({
     identity,
     profilePics: profilePic ? { [identity?.orbitId || '']: profilePic } : {},
     users,
@@ -584,6 +584,9 @@ export function GMatchProfile({
         )}
       </div>
 
+      {/* Inline expansion for the clicked grid post (no modal) */}
+      {expandedNode}
+
       {/* Profile Picture Modal */}
       {showPfpModal && (
         <ProfilePicModal
@@ -618,7 +621,7 @@ export function GMatchProfile({
         />
       )}
 
-      {/* Lightbox for clicked post (fully wired: like/save/comment/share/options/likers) */}
+      {/* Share / options / likers sheets for the expanded post */}
       {postLightboxModals}
     </div>
   );

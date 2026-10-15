@@ -5,7 +5,7 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import { createLikeGovernor, type LikeGovernor } from '../../utils/likeReconcile';
 import { playPress, playMsgReceive } from '../../utils/sounds';
 import { orbitFetch, postShareUrl } from '../../utils/api';
-import { InstagramPostModal } from './InstagramPostModal';
+import { ProfileExpandedPost } from './ProfileExpandedPost';
 import { SharePostModal } from './SharePostModal';
 import { PostOptionsModal } from './PostOptionsModal';
 import { PostLikersModal } from './PostLikersModal';
@@ -37,11 +37,13 @@ export interface ProfileLightboxDeps {
 }
 
 /**
- * Fully-wired post lightbox suite for profile surfaces (own profile grid,
- * other-user profile modal). Mirrors the GMatchFeed lightbox behavior —
- * like/save/comment/share/options/likers all live — so profile grids never
- * open a dead modal. Local optimistic state reconciles with the optional
- * App-level persist callbacks.
+ * Fully-wired inline post expansion for profile surfaces (own profile grid,
+ * other-user profile modal). Mirrors the feed inline behavior — like/save/
+ * comment/share/options/likers all live — so profile grids never open a dead
+ * surface. The open post renders as an <article> in the page flow
+ * (`expandedNode`, mounted by the consumer under its grid); share/options/
+ * likers stay true overlays (`modals`). Local optimistic state reconciles
+ * with the optional App-level persist callbacks.
  */
 export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
   const {
@@ -267,45 +269,48 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
 
   const userNames = Object.fromEntries(users.map((u) => [u.id, u.display_name || '']));
 
+  // Inline expansion, rendered by the consumer directly under its grid —
+  // the card lives in the page flow, not in a dialog. Share/options/likers
+  // stay true overlays and render wherever the consumer mounts `modals`.
+  const expandedNode = activePost ? (
+    <ProfileExpandedPost
+      post={activePost}
+      onClose={closePost}
+      identity={identity}
+      profilePics={profilePics}
+      isLiked={!!liked[activePost.id]}
+      isSaved={!!saved[activePost.id]}
+      likeCount={counts[activePost.id] ?? activePost.like_count ?? 0}
+      comments={commentsMap[activePost.id] || []}
+      commentsLoading={commentsLoadingId === activePost.id}
+      onToggleLike={toggleLike}
+      onToggleSave={toggleSave}
+      onAddComment={handleAddComment}
+      onToggleCommentLike={handleToggleCommentLike}
+      onOpenShare={(p) => {
+        setActivePost(null);
+        setSharingPost(p);
+      }}
+      onOptionsClick={(p) => {
+        setActivePost(null);
+        setOptionsPost(p);
+      }}
+      onOpenLikers={(postId) => setLikersPostId(postId)}
+      onSelectUser={handleAvatar}
+      onAvatarClick={handleAvatar}
+      onOpenNetwork={
+        onOpenNetwork
+          ? (uId) => {
+              setActivePost(null);
+              onOpenNetwork(uId);
+            }
+          : undefined
+      }
+    />
+  ) : null;
+
   const modals = (
     <>
-      <InstagramPostModal
-        isOpen={!!activePost}
-        post={activePost}
-        onClose={closePost}
-        identity={identity}
-        profilePics={profilePics}
-        isLiked={activePost ? !!liked[activePost.id] : false}
-        isSaved={activePost ? !!saved[activePost.id] : false}
-        likeCount={activePost ? counts[activePost.id] ?? activePost.like_count ?? 0 : 0}
-        comments={activePost ? commentsMap[activePost.id] || [] : []}
-        commentsLoading={!!activePost && commentsLoadingId === activePost.id}
-        onToggleLike={toggleLike}
-        onToggleSave={toggleSave}
-        onAddComment={handleAddComment}
-        onToggleCommentLike={handleToggleCommentLike}
-        onOpenShare={(p) => {
-          setActivePost(null);
-          setSharingPost(p);
-        }}
-        onOptionsClick={(p) => {
-          setActivePost(null);
-          setOptionsPost(p);
-        }}
-        onOpenLikers={(postId) => setLikersPostId(postId)}
-        onSelectUser={handleAvatar}
-        onAvatarClick={handleAvatar}
-        onOpenNetwork={
-          onOpenNetwork
-            ? (uId) => {
-                setActivePost(null);
-                onOpenNetwork(uId);
-              }
-            : undefined
-        }
-        toast={toast}
-        zIndexClass={zIndexClass}
-      />
       {sharingPost && (
         <SharePostModal
           post={sharingPost}
@@ -359,5 +364,5 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
     </>
   );
 
-  return { activePost, openPost, closePost, modals };
+  return { activePost, openPost, closePost, expandedNode, modals };
 }

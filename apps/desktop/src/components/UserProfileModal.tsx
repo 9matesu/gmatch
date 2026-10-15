@@ -94,10 +94,10 @@ export function UserProfileModal({
     const id = window.setInterval(() => setPresenceTick((t) => t + 1), 15_000);
     return () => window.clearInterval(id);
   }, []);
-  // Fully-wired lightbox suite (like/save/comment/share/options/likers).
-  // z-90: this modal lives at z-system(80), so the lightbox + sub-modals
+  // Fully-wired inline expansion (like/save/comment/share/options/likers).
+  // z-90: this modal lives at z-system(80), so the sub-modals (share/options/
   // must stack above it instead of the default z-modal(50).
-  const { openPost, modals: postLightboxModals } = useProfilePostLightbox({
+  const { openPost, expandedNode, modals: postLightboxModals } = useProfilePostLightbox({
     identity: identity || null,
     profilePics: profilePic ? { [user?.id || '']: profilePic } : {},
     users,
@@ -476,6 +476,9 @@ export function UserProfileModal({
                 </div>
               </div>
             )}
+
+            {/* Inline expansion for the clicked grid post (no modal) */}
+            {expandedNode}
 
             {/* Cards Gallery */}
             {userCards.length > 0 && (
