@@ -248,3 +248,34 @@ the public listing hides private rooms.
   you use daily is not the first casualty. A room with nobody in it stops
   holding its media blob after `EMPTY_MEDIA_LEASE_MS` (6h) â€” the room survives,
   the bytes do not.
+
+---
+
+## 6. Durability & replication levels (2026-10-15, data-integrity milestone)
+
+Four distinct outcomes, never conflated in the UI or in claims:
+
+1. **Local durability** — the post (an `Objects` row) and its media bytes live
+   on this machine. Media: IndexedDB `orbit-gallery` seed (survives restart) +
+   optional `media-vault/`; metadata: a persisted publish outbox
+   (`gmatch_post_outbox_v1`) commits locally *before* any network call, so a
+   server timeout never loses the post. Replication state is shown as
+   `local` ? `pending` ? `replicated` on the optimistic tile. This is the only
+   level the app guarantees without any peer or server.
+2. **Direct peer-to-peer delivery** — another *connected* peer received the
+   bytes over the WebRTC/BroadcastChannel swarm. Not proof of durability on
+   their side; not universal. A disconnected peer cannot receive until it
+   reconnects.
+3. **Hosted rendezvous / courier** — the blind courier carries sealed
+   envelopes and metadata (mail, gossip relay) but stores no content. It is
+   never the authority for locally persisted content; it makes delivery
+   *possible* between nodes, not *durable*.
+4. **Multi-peer replication** — the object has been verified present on =1
+   other node's durable store. Bytes are only accepted after SHA-256
+   verification against the object's `content_hash` (`sha256HexBlob` in
+   `utils/p2pSwarm.ts`); a peer's chunk stream or URL is never proof.
+
+Pending swarm transfers persist (`gmatch_pending_transfers_v1`) and resume on
+boot and on `PEER_ONLINE_EVENT`, so an offline seeder is retried later rather
+than lost. Two-machine delivery remains **unverified** until tested on real
+hardware; same-machine tests exercise the protocol, not NAT traversal.

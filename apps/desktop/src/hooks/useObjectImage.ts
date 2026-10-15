@@ -232,14 +232,15 @@ async function resolveObject(cleanId: string, identity: IdentityLike): Promise<R
         blob = null
       }
       if (!blob) {
-        // Ask the swarm by object id, then by content_hash alias — 5s timeout
+        // Ask the swarm by object id, then by content_hash alias — 5s timeout.
+        // expectedHash verifies the reassembled bytes (untrusted peers).
         try {
-          blob = await requestSwarmObject(cleanId, 5000)
+          blob = await requestSwarmObject(cleanId, 5000, hash ?? undefined)
         } catch {
           if (!hash) blob = null
           else {
             try {
-              blob = await requestSwarmObject(hash, 5000)
+              blob = await requestSwarmObject(hash, 5000, hash)
             } catch {
               blob = null
             }
@@ -254,6 +255,9 @@ async function resolveObject(cleanId: string, identity: IdentityLike): Promise<R
         } catch {
           /* cache alias best-effort */
         }
+        void import('../utils/pendingTransfers')
+          .then(({ removePendingTransfer }) => removePendingTransfer(cleanId))
+          .catch(() => {})
         return commit({
           cardId: cleanId,
           url: URL.createObjectURL(blob),
@@ -266,6 +270,10 @@ async function resolveObject(cleanId: string, identity: IdentityLike): Promise<R
       // Seeder offline (or still hydrating): fail WITHOUT caching so a later
       // remount/scroll retries once the seeder is back. Marked awaitingSeeder
       // so the tile reads "waiting for poster" and PEER_ONLINE_EVENT retries.
+      // Persist the id (+ content hash) so a restart/reconnect can resume.
+      void import('../utils/pendingTransfers')
+        .then(({ enqueuePendingTransfer }) => enqueuePendingTransfer(cleanId, hash))
+        .catch(() => {})
       return { state: FAILED(cleanId), cache: false, awaitingSeeder: true }
     }
     return commit({

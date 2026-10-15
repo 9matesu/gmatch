@@ -9,7 +9,7 @@ import { mergeRoster } from '../utils/peerRoster';
 import { presenceBucket } from '../utils/compare';
 import { CHAT_WIPE_SECONDS } from '@orbit/shared';
 import { logger } from '../utils/logger';
-import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, announcePeerOnline, type SwarmMessage } from '../utils/p2pSwarm';
+import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, announcePeerOnline, PEER_ONLINE_EVENT, type SwarmMessage } from '../utils/p2pSwarm';
 import { broadcastPresence, fetchPresenceRoster } from '../services/courierPresence';
 import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh } from '../utils/courierSignaling';
 import { resolveDisplayName } from '../utils/displayName';
@@ -257,7 +257,21 @@ export function useP2P(identity: OrbitIdentity | null) {
     });
     // Local-first seeding: reload persisted bytes into RAM so this client
     // keeps retransmitting its own posts after a restart (packaged exe).
-    void hydrateLocalObjects().catch(() => {});
+    void hydrateLocalObjects().catch(() => {})
+
+    // Phase 4: resume swarm transfers that failed while a seeder was offline.
+    // Bytes only land after hash verification (requestSwarmObject).
+    const resumeTransfers = () => {
+      void import('../utils/pendingTransfers').then(({ resumePendingTransfers }) =>
+        resumePendingTransfers((id, hash) =>
+          import('../utils/p2pSwarm').then(({ requestSwarmObject }) =>
+            requestSwarmObject(id, 5000, hash ?? undefined),
+          ),
+        ),
+      ).catch(() => {})
+    }
+    resumeTransfers()
+    window.addEventListener(PEER_ONLINE_EVENT, resumeTransfers);
 
     // Load saved known peers from storage on mount. Entries unseen for over
     // 24h are dropped so ancient ghosts never resurrect; the rest hydrate as
@@ -683,6 +697,7 @@ export function useP2P(identity: OrbitIdentity | null) {
       channel.close();
       channelRef.current = null;
       setSwarmTransport(null);
+      window.removeEventListener(PEER_ONLINE_EVENT, resumeTransfers);
       unsubMesh();
       if (wsRef.current) {
         wsRef.current.close();

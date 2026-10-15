@@ -336,7 +336,7 @@ function extForMime(mime: string): string {
                     blob = (await getLocalObject(data.content_hash)) || null;
                     if (!blob) {
                       try {
-                        blob = await requestSwarmObject(data.content_hash, 3000);
+                        blob = await requestSwarmObject(data.content_hash, 3000, data.content_hash);
                       } catch {
                         /* fallback */
                       }

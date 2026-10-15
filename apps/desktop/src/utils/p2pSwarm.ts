@@ -20,6 +20,14 @@ export type SwarmMessage =
 const localObjects = new Map<string, Blob>()
 const CHUNK_SIZE = 64 * 1024 // 64KB per WebRTC DataChannel chunk
 
+/** SHA-256 hex of a blob's bytes (Web Crypto). Used to VERIFY reassembled
+ *  swarm media against the object's content_hash before accepting it —
+ *  a peer's chunk stream is not proof the bytes are the real object. */
+export async function sha256HexBlob(blob: Blob): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer())
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 /** Broadcast by useP2P whenever a peer transitions to online (swarm or
  *  roster). Failed P2P tiles listen for it to retry an offline seeder. */
 export const PEER_ONLINE_EVENT = 'orbit-peer-online'
@@ -171,6 +179,7 @@ interface PendingFetch {
   chunks: Map<number, Uint8Array>
   total: number
   mimeType: string
+  expectedHash?: string
 }
 const pendingFetches = new Map<string, PendingFetch>()
 
@@ -190,6 +199,20 @@ function finishFetch(id: string, req: PendingFetch): void {
     if (chunk) parts.push(chunk)
   }
   const assembled = new Blob(parts as BlobPart[], { type: req.mimeType || 'application/octet-stream' })
+  // Verify content hash (when the object advertises one) BEFORE registering:
+  // a chunk stream from an arbitrary peer is untrusted transport, and a
+  // hash-mismatched blob must never enter the durable local store.
+  if (req.expectedHash) {
+    void sha256HexBlob(assembled).then((got) => {
+      if (got !== req.expectedHash) {
+        req.reject(new Error(`Swarm object ${id} failed hash verification`))
+        return
+      }
+      registerLocalObject(id, assembled)
+      req.resolve(assembled)
+    }).catch(() => req.reject(new Error(`Swarm object ${id} verification failed`)))
+    return
+  }
   registerLocalObject(id, assembled)
   req.resolve(assembled)
 }
@@ -228,8 +251,10 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
   return false
 }
 
-/** Ask the swarm for an object by id (or content_hash alias). */
-export function requestSwarmObject(id: string, timeoutMs = 15000): Promise<Blob> {
+/** Ask the swarm for an object by id (or content_hash alias). When
+ *  `expectedHash` is given, the assembled bytes must hash to it or the
+ *  transfer is rejected (never registered). */
+export function requestSwarmObject(id: string, timeoutMs = 15000, expectedHash?: string): Promise<Blob> {
   const cached = localObjects.get(id)
   if (cached) return Promise.resolve(cached)
   if (!swarmSend) return Promise.reject(new Error('swarm transport unavailable'))
@@ -247,7 +272,7 @@ export function requestSwarmObject(id: string, timeoutMs = 15000): Promise<Blob>
       pendingFetches.delete(id)
       reject(new Error(`Timed out waiting for swarm object ${id}`))
     }, timeoutMs)
-    pendingFetches.set(id, { resolve, reject, timer, chunks: new Map(), total: 0, mimeType: '' })
+    pendingFetches.set(id, { resolve, reject, timer, chunks: new Map(), total: 0, mimeType: '', expectedHash })
     try {
       swarmSend!({ type: 'SWARM_WANT', id })
     } catch (err) {
@@ -265,7 +290,7 @@ export interface SwarmSessionOptions {
 
 export interface SwarmSession {
   handleMessage: (msg: SwarmMessage) => Promise<void>
-  requestObject: (id: string, timeoutMs?: number) => Promise<Blob>
+  requestObject: (id: string, timeoutMs?: number, expectedHash?: string) => Promise<Blob>
   registerLocalObject: (id: string, blob: Blob) => void
 }
 
@@ -280,6 +305,7 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
       chunks: Map<number, Uint8Array>
       total: number
       mimeType: string
+      expectedHash?: string
     }
   >()
 
@@ -344,13 +370,24 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
         }
 
         const assembledBlob = new Blob(parts as BlobPart[], { type: req.mimeType })
-        registerLocalObject(msg.id, assembledBlob)
-        req.resolve(assembledBlob)
+        if (req.expectedHash) {
+          void sha256HexBlob(assembledBlob).then((got) => {
+            if (got !== req.expectedHash) {
+              req.reject(new Error(`Swarm object ${msg.id} failed hash verification`))
+              return
+            }
+            registerLocalObject(msg.id, assembledBlob)
+            req.resolve(assembledBlob)
+          }).catch(() => req.reject(new Error(`Swarm object ${msg.id} verification failed`)))
+        } else {
+          registerLocalObject(msg.id, assembledBlob)
+          req.resolve(assembledBlob)
+        }
       }
     }
   }
 
-  function requestObject(id: string, timeoutMs = 15000): Promise<Blob> {
+  function requestObject(id: string, timeoutMs = 15000, expectedHash?: string): Promise<Blob> {
     // Immediate local session hit
     if (sessionStore.has(id)) {
       return Promise.resolve(sessionStore.get(id)!)
@@ -369,6 +406,7 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
         chunks: new Map(),
         total: 0,
         mimeType: '',
+        expectedHash,
       })
 
       options.send({ type: 'SWARM_WANT', id })
