@@ -1,12 +1,10 @@
 import crypto from 'crypto'
 import type { D1Turso } from './db'
 import type { LocalBlobStore } from './blob'
-import { PICTURE_WIPE_SECONDS, normalizeTags, OFFLINE_DELETION_SECONDS, OFFLINE_WARNING_SECONDS } from '@orbit/shared'
+import { PICTURE_WIPE_SECONDS, normalizeTags } from '@orbit/shared'
 import { purgeExpiredBabecock } from './babecock'
 
 const PICTURE_WIPE_MS = PICTURE_WIPE_SECONDS * 1000
-const OFFLINE_DELETION_MS = OFFLINE_DELETION_SECONDS * 1000
-const OFFLINE_WARNING_MS = OFFLINE_WARNING_SECONDS * 1000
 
 function isoFromMs(ms: number): string {
   return new Date(ms).toISOString()
@@ -37,8 +35,6 @@ export interface CleanupStats {
   sweptOrphanBlobs: number
   pictureWiped: boolean
   dailyScoresReset: boolean
-  offlineUsersDeleted: number
-  offlineUsersWarned: number
 }
 
 /**
@@ -403,211 +399,16 @@ export async function maybeResetDailyScores(db: D1Turso, now: number = Date.now(
   return true
 }
 
-/**
- * Delete users who have been offline for more than 3 days (OFFLINE_DELETION_SECONDS).
- * Deletes ALL their content and the user account itself.
- * Runs during periodic maintenance.
- */
-export async function deleteOfflineUsers(
-  db: D1Turso,
-  bucket?: LocalBlobStore,
-  now: number = Date.now()
-): Promise<{ deletedUsers: number; deletedObjects: number; deletedCards: number; deletedBlobs: number }> {
-  const cutoffIso = isoFromMs(now - OFFLINE_DELETION_MS)
-  const stats = { deletedUsers: 0, deletedObjects: 0, deletedCards: 0, deletedBlobs: 0 }
-
-  // Find offline users (excluding bots)
-  const offlineUsers = await db
-    .prepare(
-      `SELECT id FROM Users 
-       WHERE id NOT LIKE 'bot_%' 
-       AND (last_seen IS NULL OR datetime(last_seen) < datetime(?))`
-    )
-    .bind(cutoffIso)
-    .all<{ id: string }>()
-
-  if (!offlineUsers.results || offlineUsers.results.length === 0) {
-    return stats
-  }
-
-  console.log(`[MAINT] Deleting ${offlineUsers.results.length} offline users`)
-
-  for (const user of offlineUsers.results) {
-    const userId = user.id
-    try {
-      // Delete user's objects and blobs
-      const userObjects = await db
-        .prepare('SELECT id FROM Objects WHERE owner_id = ?')
-        .bind(userId)
-        .all<{ id: string }>()
-      
-      if (userObjects.results && bucket) {
-        for (const obj of userObjects.results) {
-          await bucket.delete(`objects/${obj.id}`).catch(() => {})
-          stats.deletedBlobs++
-        }
-      }
-      if (userObjects.results) {
-        stats.deletedObjects += userObjects.results.length
-      }
-      await db.prepare('DELETE FROM Objects WHERE owner_id = ?').bind(userId).run()
-
-      // Delete user's cards and related data
-      const userCards = await db
-        .prepare('SELECT id FROM Cards WHERE creator_id = ?')
-        .bind(userId)
-        .all<{ id: string }>()
-      
-      if (userCards.results) {
-        stats.deletedCards += userCards.results.length
-        for (const card of userCards.results) {
-          await db.prepare('DELETE FROM CardOwnership WHERE card_id = ?').bind(card.id).run()
-          await db.prepare('DELETE FROM CardHistory WHERE card_id = ?').bind(card.id).run()
-          await db.prepare('DELETE FROM MarketListings WHERE card_id = ?').bind(card.id).run()
-          await db.prepare('DELETE FROM DeckCards WHERE card_id = ?').bind(card.id).run()
-        }
-      }
-      await db.prepare('DELETE FROM Cards WHERE creator_id = ?').bind(userId).run()
-
-      // Delete lobby images and blobs
-      const userLobbyImages = await db
-        .prepare('SELECT id FROM LobbyImages WHERE owner_id = ?')
-        .bind(userId)
-        .all<{ id: string }>()
-      
-      if (userLobbyImages.results && bucket) {
-        for (const img of userLobbyImages.results) {
-          await bucket.delete(`lobby/${img.id}`).catch(() => {})
-          stats.deletedBlobs++
-        }
-      }
-      await db.prepare('DELETE FROM LobbyImages WHERE owner_id = ?').bind(userId).run()
-
-      // Delete match-local cards
-      await db.prepare('DELETE FROM MatchCards WHERE owner_id = ?').bind(userId).run()
-
-      // Delete relational data
-      await db.prepare('DELETE FROM Recipients WHERE recipient_id = ?').bind(userId).run()
-      await db.prepare('DELETE FROM Favorites WHERE user_id = ?').bind(userId).run()
-      await db.prepare('DELETE FROM Likes WHERE user_id = ?').bind(userId).run()
-      await db.prepare('DELETE FROM LobbyComments WHERE user_id = ?').bind(userId).run()
-      await db.prepare('DELETE FROM LobbyLikes WHERE user_id = ?').bind(userId).run()
-      await db.prepare('DELETE FROM PrivateMessages WHERE sender_id = ? OR recipient_id = ?').bind(userId, userId).run()
-      await db.prepare('DELETE FROM MatchChat WHERE sender_id = ?').bind(userId).run()
-      await db.prepare('DELETE FROM LobbyChat WHERE sender_id = ?').bind(userId).run()
-      await db.prepare('DELETE FROM Notifications WHERE user_id = ?').bind(userId).run()
-      await db.prepare('DELETE FROM MatchInvites WHERE inviter_id = ? OR invitee_id = ?').bind(userId, userId).run()
-      await db.prepare('DELETE FROM BabecockEntries WHERE user_id = ?').bind(userId).run()
-      await db.prepare('DELETE FROM BabecockInvites WHERE host_id = ? OR invitee_id = ?').bind(userId, userId).run()
-      await db.prepare('DELETE FROM Followers WHERE follower_id = ? OR followee_id = ?').bind(userId, userId).run()
-      await db.prepare('DELETE FROM Friends WHERE user_id = ? OR friend_id = ?').bind(userId, userId).run()
-      await db.prepare('DELETE FROM FriendRequests WHERE sender_id = ? OR receiver_id = ?').bind(userId, userId).run()
-      await db.prepare('DELETE FROM UserBlocks WHERE blocker_id = ? OR blocked_id = ?').bind(userId, userId).run()
-      await db.prepare('DELETE FROM UserReports WHERE reporter_id = ? OR reported_id = ?').bind(userId, userId).run()
-      await db.prepare('DELETE FROM Playtime WHERE user_id = ?').bind(userId).run()
-      await db.prepare('DELETE FROM DonationAcknowledgement WHERE user_id = ?').bind(userId).run()
-      await db.prepare('DELETE FROM SessionEvents WHERE user_id = ?').bind(userId).run()
-      await db.prepare('DELETE FROM StoreUnlocks WHERE user_id = ?').bind(userId).run()
-      await db.prepare('DELETE FROM UserInventory WHERE user_id = ?').bind(userId).run()
-      await db.prepare('DELETE FROM DominationActions WHERE dominator_id = ? OR victim_id = ?').bind(userId, userId).run()
-      await db.prepare('DELETE FROM HackDebuffs WHERE attacker_id = ? OR target_id = ?').bind(userId, userId).run()
-      await db.prepare('DELETE FROM LeagueRank WHERE user_id = ?').bind(userId).run()
-      await db.prepare('DELETE FROM MatchArchive WHERE user_a = ? OR user_b = ?').bind(userId, userId).run()
-      await db.prepare('DELETE FROM Wallets WHERE user_id = ?').bind(userId).run()
-      await db.prepare('DELETE FROM LedgerTransactions WHERE user_id = ?').bind(userId).run()
-      await db.prepare('DELETE FROM EconomicOperations WHERE user_id = ?').bind(userId).run()
-
-      // Delete the user account
-      await db.prepare('DELETE FROM Users WHERE id = ?').bind(userId).run()
-
-      // Log to audit
-      await db.prepare(
-        'INSERT INTO AdminAuditLog (id, admin_id, action, target_id, target_type, reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-      ).bind(crypto.randomUUID(), 'system', 'offline_user_purge', userId, 'user', `Offline > ${OFFLINE_DELETION_SECONDS / 86400} days`, isoFromMs(now)).run()
-
-      stats.deletedUsers++
-    } catch (err) {
-      console.error(`[MAINT] Failed to delete offline user ${userId}:`, err)
-    }
-  }
-
-  return stats
-}
-
-/**
- * Send warning notifications to users who have been offline for 2-3 days.
- * Only sends once per warning period (tracked via SystemMeta).
- */
-export async function sendOfflineWarnings(
-  db: D1Turso,
-  now: number = Date.now()
-): Promise<number> {
-  const warningCutoffIso = isoFromMs(now - OFFLINE_WARNING_MS)
-  const deletionCutoffIso = isoFromMs(now - OFFLINE_DELETION_MS)
-  let warnedCount = 0
-
-  // Find users in warning window (offline 2-3 days, not bots)
-  const warningUsers = await db
-    .prepare(
-      `SELECT id, last_seen FROM Users 
-       WHERE id NOT LIKE 'bot_%' 
-       AND last_seen IS NOT NULL 
-       AND datetime(last_seen) < datetime(?) 
-       AND datetime(last_seen) >= datetime(?)`
-    )
-    .bind(warningCutoffIso, deletionCutoffIso)
-    .all<{ id: string; last_seen: string }>()
-
-  if (!warningUsers.results || warningUsers.results.length === 0) {
-    return 0
-  }
-
-  for (const user of warningUsers.results) {
-    const userId = user.id
-    const lastSeen = user.last_seen
-    try {
-      // Check if we already sent a warning today
-      const todayKey = `offline_warning_${userId}_${new Date().toISOString().slice(0, 10)}`
-      const existing = await db.prepare('SELECT 1 FROM SystemMeta WHERE key = ?').bind(todayKey).first()
-      if (existing) continue
-
-      const lastSeenMs = new Date(lastSeen).getTime()
-      const daysOffline = Math.floor((now - lastSeenMs) / (24 * 60 * 60 * 1000))
-      const hoursLeft = Math.ceil((OFFLINE_DELETION_MS - (now - lastSeenMs)) / (60 * 60 * 1000))
-
-      await db.prepare(
-        `INSERT INTO Notifications (id, user_id, type, title, body, data, read, created_at) 
-         VALUES (?, ?, 'offline_warning', ?, ?, ?, 0, ?)`
-      ).bind(
-        crypto.randomUUID(),
-        userId,
-        'Account expires soon',
-        `You've been offline for ${daysOffline} day(s). Your account and all content will be permanently deleted in ~${hoursLeft} hour(s). Log in now to keep your data.`,
-        JSON.stringify({ daysOffline, hoursLeft }),
-        isoFromMs(now)
-      ).run()
-
-      await db.prepare('INSERT INTO SystemMeta (key, value) VALUES (?, ?)').bind(todayKey, '1').run()
-      warnedCount++
-    } catch (err) {
-      console.error(`[MAINT] Failed to send offline warning to ${userId}:`, err)
-    }
-  }
-
-  return warnedCount
-}
-
-/** Run every maintenance task; used by the server interval and lazy request guards. */
 export async function runPeriodicMaintenance(
   db: D1Turso,
   bucket?: LocalBlobStore,
   now: number = Date.now(),
   forceWipe = false
 ): Promise<CleanupStats> {
-  // Run offline user deletion FIRST (most critical)
-  const offlineStats = await deleteOfflineUsers(db, bucket, now)
-  const warnedCount = await sendOfflineWarnings(db, now)
-
+  // NOTE: the 3-day `deleteOfflineUsers` wipe and its warning were REMOVED
+  // (data-integrity milestone). Users and their content now survive any
+  // inactivity period; the app is local-first and must never destroy a
+  // user's posts/cards/media merely for being offline.
   const expiredStats = await deleteExpiredContent(db, bucket, now)
   const wiped = forceWipe
     ? (await setMeta(db, 'last_picture_wipe_at', '1970-01-01T00:00:00.000Z'), await maybeWipePictures(db, bucket, now))
@@ -635,7 +436,5 @@ export async function runPeriodicMaintenance(
     sweptOrphanBlobs: sweptBlobs,
     pictureWiped: wiped,
     dailyScoresReset: resetScores,
-    offlineUsersDeleted: offlineStats.deletedUsers,
-    offlineUsersWarned: warnedCount,
   }
 }

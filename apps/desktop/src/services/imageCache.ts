@@ -1,11 +1,14 @@
 /**
- * Renderer-side picture cache — SESSION MEMORY ONLY (security plan B.1/F1).
+ * Renderer-side picture cache.
  *
  * Resolution order per URL:
- *   1. Electron bridge → gmcache:// served from the MAIN-process RAM LRU
- *      (imageCacheMemory.cjs) — never disk.
- *   2. This module's in-memory Map (browser dev mode): blobs live only for
- *      the page session; a reload/quit leaves NOTHING on disk.
+ *   1. Electron bridge -> gmcache:// served by the MAIN process. Bytes live in
+ *      an ENCRYPTED disk LRU (`<userData>/imgcache/*.enc`, AES-256-GCM, 500MB
+ *      budget, see electron/diskImageCache.cjs) with a RAM index. The old
+ *      "RAM-only" note was stale: the F1 concern is met by encryption + the
+ *      feed index staying RAM-only, not by avoiding disk. Do NOT delete the
+ *      cached .enc files as part of that investigation.
+ *   2. This module's in-memory Map (browser/dev): blobs live for the session.
  *   3. Remote URL (fetch-through; caller's <img> onError still applies).
  *
  * The legacy IndexedDB store ('goongrid-img', blobs in the OS user folder)

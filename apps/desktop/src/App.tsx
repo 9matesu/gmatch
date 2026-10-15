@@ -98,7 +98,6 @@ import { useServerHeartbeat } from './hooks/useServerHeartbeat';
 import { usePresencePoll } from './hooks/usePresencePoll';
 import { usePendingJoinVerify } from './hooks/usePendingJoinVerify';
 import { usePendingServerHost } from './hooks/usePendingServerHost';
-import { OfflineWarningBanner } from "./components/OfflineWarningBanner";
 import { dataUrlToBlob, localObjectBlobUrl } from "./utils/mediaData";
 import { mediaUrlToCachedFile } from "./utils/cacheMedia";
 import { fresherPresence } from './utils/presence';
@@ -3732,7 +3731,8 @@ export default function Home() {
         onRestore={() => setHideUiForWallpaper(false)}
       />
 
-      <OfflineWarningBanner identity={identity} />
+      {/* OfflineWarningBanner removed: the 3-day account-deletion policy it
+          warned about no longer exists (data-integrity milestone). */}
 
       {identity && tourState.status === 'active' && tourState.index > 0 && isOnboardingComplete(readOnboardingState(identity.orbitId)) && (
         <TourDock

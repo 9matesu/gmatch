@@ -128,15 +128,19 @@ text overlays kept for caption hunts, §6).
 - Browser/dev mode: direct fetch may CORS-fail → offline SVG placeholder
   (generated gradient + tag text + "OFFLINE" badge). Never crash on fetch error.
 - Dedupe by post id across a session; cache last 40 urls.
-- Picture + feed caching (no re-parse, no re-download) — **RAM-only since the
-  F1 security fix**: nothing persists to disk. Parsed post lists live in the
-  main process for 10 min (100 queries max); picture bytes live in a
-  main-process LRU (256 MB budget, `gmcache://`) or a renderer session Map
-  in browser dev mode. `init()` destroys the legacy on-disk caches
-  (`<userData>/image-cache/`, `feed-cache.json`) and the legacy IndexedDB
-  store (`goongrid-img`). The 5-up/5-down window (past 5 + queue 5 + video
-  posters, images AND videos) is prefetched so skip/back is instant; cache
-  stats + Clear live in the left stats panel.
+- Picture + feed caching (no re-parse, no re-download). **Storage policy
+  (reconciled 2026-10-15):** picture bytes persist to an ENCRYPTED disk LRU
+  (`<userData>/imgcache/*.enc`, AES-256-GCM, 500MB, `electron/diskImageCache.cjs`)
+  served as `gmcache://`, plus a renderer session Map in browser dev mode;
+  the parsed-post FEED index stays RAM-only in the main process for 10 min
+  (40 queries). The earlier "nothing persists to disk" claim was stale — the
+  F1 concern is met by encryption + RAM-only feed metadata, not by avoiding
+  disk. Existing `.enc` files are not deleted by this policy. `init()` still
+  destroys the LEGACY on-disk caches (`<userData>/image-cache/`,
+  `feed-cache.json`) and the legacy IndexedDB store (`goongrid-img`). The
+  5-up/5-down window (past 5 + queue 5 + video posters, images AND videos) is
+  prefetched so skip/back is instant; cache stats + Clear live in the left
+  stats panel.
 
 ### 6b. Feed/market queries (user spec: player picks, no hardcodes)
 
