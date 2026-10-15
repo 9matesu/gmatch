@@ -21,6 +21,7 @@ import {
   Radio,
 } from 'lucide-react';
 import { orbitFetch } from '../../utils/api';
+import { ownDisplayName } from '../../utils/displayName';
 import { useSettings } from '../../hooks/useSettings';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { User } from '@orbit/shared';
@@ -43,6 +44,17 @@ interface Props {
   activeHack: ActiveHackSession | null;
   setActiveHack: React.Dispatch<React.SetStateAction<ActiveHackSession | null>>;
   onOpenFlash: () => void;
+  /** Mesh-first transport (Fase 5/6): sealed courier send, free, no server.
+   *  Absent (legacy/no courier) => every send uses the server trigger route. */
+  mesh?: {
+    peerKnown: (orbitId: string) => boolean;
+    send: (
+      targetOrbitId: string,
+      action: string,
+      payload: unknown,
+      senderName?: string,
+    ) => Promise<{ ok: true; id: string } | { ok: false; reason: string }>;
+  };
 }
 
 interface DominationTarget {
@@ -174,7 +186,7 @@ function payloadSummary(action: string, payload: any): string {
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
-export function PCDominationTab({ identity, allUsers, profilePics, points, toast: toastFn, activeHack, setActiveHack, onOpenFlash }: Props) {
+export function PCDominationTab({ identity, allUsers, profilePics, points, toast: toastFn, activeHack, setActiveHack, onOpenFlash, mesh }: Props) {
   const { settings, update } = useSettings();
   const [targets, setTargets] = useState<DominationTarget[]>([]);
   const [targetsState, setTargetsState] = useState<LoadState>('idle');
@@ -184,6 +196,21 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [history, setHistory] = useState<any[]>([]);
   const [outgoing, setOutgoing] = useState<any[]>([]);
+  // Mesh outbox (Fase 5/6): sealed sends never touch the server, so their
+  // entries live here — merged into the Outbox list below, flipped by the
+  // receipt event the courier hook dispatches (landed | declined).
+  const [meshOutgoing, setMeshOutgoing] = useState<any[]>([]);
+  useEffect(() => {
+    const onReceipt = (e: Event) => {
+      const detail = (e as CustomEvent<{ id?: string; status?: string }>).detail;
+      if (!detail?.id) return;
+      setMeshOutgoing((prev) =>
+        prev.map((m) => (m.id === detail.id ? { ...m, status: detail.status } : m)),
+      );
+    };
+    window.addEventListener('gmatch:domination-receipt', onReceipt);
+    return () => window.removeEventListener('gmatch:domination-receipt', onReceipt);
+  }, []);
   const [historyState, setHistoryState] = useState<LoadState>('idle');
   const [historyPane, setHistoryPane] = useState<'incoming' | 'outgoing'>('outgoing');
   const [actionModal, setActionModal] = useState<{ action: string; title: string } | null>(null);
@@ -315,6 +342,37 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
   const sendAction = async (action: string, payload: any) => {
     if (!identity || !selectedTarget) return;
     setSending(action);
+    const label = ACTION_LABELS[action]?.label || action;
+    const consentKey = ACTION_LABELS[action]?.consent;
+    const consented = consentKey ? Boolean(selectedTarget.consents?.[consentKey]) : false;
+    // Mesh-first (Fase 5/6): peer mesh-addressable + consented => sealed
+    // courier send, free, no server in the path. Anything else (unknown
+    // keys, mesh throw) falls through to the server trigger route below.
+    if (mesh && mesh.peerKnown(selectedTarget.id) && consented) {
+      try {
+        const r = await mesh.send(selectedTarget.id, action, payload, ownDisplayName() || undefined);
+        if (r.ok) {
+          setMeshOutgoing((prev) => [
+            {
+              id: r.id,
+              action,
+              payload,
+              victim_name: selectedTarget.displayName,
+              created_at: new Date().toISOString(),
+              status: 'sent',
+              mesh: true,
+            },
+            ...prev,
+          ]);
+          toastFn(`${label} sent to ${selectedTarget.displayName} — free via mesh. Receipt shows in Outbox.`, 'success');
+          setSending(null);
+          return;
+        }
+      } catch {
+        // Mesh throw => server fallback below (same honest outcome as the
+        // server path's own connection-drop handling).
+      }
+    }
     try {
       const res = await orbitFetch('/api/domination/trigger', {
         method: 'POST',
@@ -326,7 +384,6 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
           intensity: settings.dominationIntensity,
         }),
       }, identity);
-      const label = ACTION_LABELS[action]?.label || action;
       if (res.ok) {
         const data = await res.json().catch(() => ({}) as any);
         const cost = typeof data?.cost === 'number' ? data.cost : prices[action];
@@ -381,6 +438,16 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
 
   const consentCountOf = (t: DominationTarget) =>
     ACTION_ORDER.filter((a) => Boolean(t.consents?.[ACTION_LABELS[a].consent])).length;
+
+  // Server outbox + local mesh outbox, newest first. Mesh entries never come
+  // from the server history fetch, so they merge here at render.
+  const outgoingAll = useMemo(
+    () =>
+      [...meshOutgoing, ...outgoing].sort(
+        (a, b) => (Date.parse(b.created_at || '') || 0) - (Date.parse(a.created_at || '') || 0),
+      ),
+    [meshOutgoing, outgoing],
+  );
 
   // ── unauthenticated shell ─────────────────────────────────────────────
   if (!identity) {
@@ -616,6 +683,9 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     const { label, icon: Icon, description, consent } = ACTION_LABELS[action];
                     const allowed = Boolean(selectedTarget.consents?.[consent]);
                     const sendable = allowed && Boolean(selectedTarget.enabled) && selectedTarget.online !== false;
+                    // Mesh-addressable peers skip the ledger entirely: no
+                    // price, no charge — the badge says so up front.
+                    const meshable = Boolean(mesh && mesh.peerKnown(selectedTarget.id));
                     const price = prices[action];
                     return (
                       <button
@@ -639,7 +709,9 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <Icon className="w-4 h-4 text-retro-muted" />
-                          {price != null ? (
+                          {meshable ? (
+                            <span className="text-xs font-mono text-emerald-400/80">Free via mesh</span>
+                          ) : price != null ? (
                             <span className="text-xs font-mono text-retro-muted">{price} g$</span>
                           ) : (
                             <Zap className="w-3.5 h-3.5 text-retro-muted opacity-40" />
@@ -784,7 +856,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
               </button>
             </div>
           )}
-          {historyState === 'ready' && (historyPane === 'outgoing' ? outgoing : history).length === 0 && (
+          {historyState === 'ready' && (historyPane === 'outgoing' ? outgoingAll : history).length === 0 && (
             <div className="py-12 text-center space-y-2 rounded-xl border border-dashed border-border-glass">
               <Inbox className="w-5 h-5 mx-auto text-retro-muted" />
               <p className="text-xs text-retro-muted">
@@ -793,7 +865,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
             </div>
           )}
           <div className="space-y-2">
-            {(historyPane === 'outgoing' ? outgoing : history).map((action: any) => {
+            {(historyPane === 'outgoing' ? outgoingAll : history).map((action: any) => {
               const meta = ACTION_LABELS[action.action];
               const Icon = meta?.icon || Monitor;
               const st: string = action.status || 'sent';
@@ -835,7 +907,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
               );
             })}
           </div>
-          {historyPane === 'outgoing' && historyState === 'ready' && outgoing.length > 0 && (
+          {historyPane === 'outgoing' && historyState === 'ready' && outgoingAll.length > 0 && (
             <p className="text-xs text-retro-muted px-1">
               <span className="font-mono">awaiting</span> = charged and relayed; it flips to{' '}
               <span className="font-mono text-emerald-400/80">landed</span> once their client confirms, or to{' '}

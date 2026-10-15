@@ -34,6 +34,7 @@ import { mapLimit } from "./services/booru";
 import { vaultPin, vaultHttpUrl } from "./services/vault";
 import { devFetchable } from "./services/imageCache";
 import { hashForView, resolveInitialView, viewFromHash } from "./utils/routing";
+import { DOM_ACTION_CONSENT } from "./utils/dominationMesh";
 import { playChime, playPress, playMsgReceive } from "./utils/sounds";
 import { useLobby } from "./hooks/useLobby";
 import { UserProfileModal } from "./components/UserProfileModal";
@@ -1625,6 +1626,12 @@ export default function Home() {
   }, [toast]);
 
   const courier = useCourierDms(identity, {
+    dominationConsent: (action: string) => {
+      // Receiver-side consent authority for mesh domination (Fase 5/6):
+      // the local settings map decides, never the server.
+      const key = DOM_ACTION_CONSENT[action];
+      return key ? (settings as unknown as Record<string, unknown>)[key] === true : false;
+    },
     onNotify: (msg) => {
       if (settings.chatNotificationSfx) playMsgReceive()
       const name = usersRef.current.find((u) => u.id === msg.peerId)?.display_name || 'Someone'
@@ -1646,6 +1653,8 @@ export default function Home() {
   const courierPull = courier.pull
   const courierThreadFor = courier.threadFor
   const courierSend = courier.send
+  const meshSend = courier.meshSend
+  const meshPeerKnown = courier.meshPeerKnown
   useEffect(() => {
     if (!courierActive) return
     for (const u of users) {
@@ -4280,6 +4289,7 @@ export default function Home() {
                       activeHack={activeHack}
                       setActiveHack={setActiveHack}
                       onOpenFlash={() => setShowFlashModal(true)}
+                      mesh={{ peerKnown: meshPeerKnown, send: meshSend }}
                     />
                   )}
 

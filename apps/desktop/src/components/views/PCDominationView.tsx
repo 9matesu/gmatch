@@ -18,6 +18,7 @@ export function PCDominationView({
   activeHack,
   setActiveHack,
   onOpenFlash,
+  mesh,
 }: {
   identity: OrbitIdentity | null;
   users: User[];
@@ -27,6 +28,15 @@ export function PCDominationView({
   activeHack: ActiveHackSession | null;
   setActiveHack: React.Dispatch<React.SetStateAction<ActiveHackSession | null>>;
   onOpenFlash: () => void;
+  mesh?: {
+    peerKnown: (orbitId: string) => boolean;
+    send: (
+      targetOrbitId: string,
+      action: string,
+      payload: unknown,
+      senderName?: string,
+    ) => Promise<{ ok: true; id: string } | { ok: false; reason: string }>;
+  };
 }) {
   return (
     <div className="w-full flex-1 flex flex-col items-center justify-start p-2 sm:p-6">
@@ -40,6 +50,7 @@ export function PCDominationView({
         activeHack={activeHack}
         setActiveHack={setActiveHack}
         onOpenFlash={onOpenFlash}
+        mesh={mesh}
       />
     </div>
   );
