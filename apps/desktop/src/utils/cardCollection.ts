@@ -253,3 +253,32 @@ export function filterToActiveDeck<T extends { id: string; card_id?: string | nu
   const inDeck = allCards.filter((c) => activeDeck.cards.includes(c.card_id || c.id))
   return inDeck.length > 0 ? inDeck : [...allCards]
 }
+
+/**
+ * Cards-grid visibility gate (Phase 1): the collection renders MINTED media
+ * only. Unminted rows — even owned, named, with content_url (dev's 46 private
+ * urn: rows rendered as "Cards Collection (46)") — are inbox/forge material,
+ * never cards. Canonical membership is the single criterion; the old
+ * display_name/p2p-prefix heuristic let named unminted rows through.
+ */
+export function galleryItemVisible(
+  item: OrbitObject,
+  opts: {
+    canonicalMediaIds: ReadonlySet<string>;
+    blockedIds: readonly string[];
+    galleryFilter: string;
+    identityOrbitId?: string;
+  },
+): boolean {
+  if (!item.content_url) return false;
+  if (item.is_story || (item as unknown as { is_public?: unknown }).is_public) return false;
+  if (opts.blockedIds.includes(item.owner_id)) return false;
+  // Canonical membership subsumes the old p2p-prefix heuristic: unminted
+  // p2p-local rows drop here, minted ones (referenced by a real card) stay.
+  if (!opts.canonicalMediaIds.has(item.id)) return false;
+  if (opts.galleryFilter === 'received') return item.owner_id !== opts.identityOrbitId;
+  if (opts.galleryFilter === 'sent') return item.owner_id === opts.identityOrbitId;
+  if (opts.galleryFilter === 'starred') return Boolean(item.is_favorited);
+  // Default collection view is mine-only.
+  return item.owner_id === opts.identityOrbitId;
+}

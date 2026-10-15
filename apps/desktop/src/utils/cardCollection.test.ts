@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { deriveMyCards, mergeMyCards, filterToActiveDeck, type CanonicalCard } from './cardCollection'
+import { deriveMyCards, mergeMyCards, filterToActiveDeck, galleryItemVisible, type CanonicalCard } from './cardCollection'
 import type { OrbitObject } from '@orbit/shared'
 
 const base = {
@@ -155,5 +155,55 @@ describe('filterToActiveDeck', () => {
   it('falls back to all cards when deck members are not in the list', () => {
     const cards = [mk('m1', 'c1')]
     expect(filterToActiveDeck(cards, { cards: ['zz'] } as any)).toEqual(cards)
+  })
+})
+describe('galleryItemVisible (Phase 1: cards grid shows minted cards only)', () => {
+  const minted = new Set(['obj-1'])
+  const opts = (over: Record<string, unknown> = {}) => ({
+    canonicalMediaIds: minted,
+    blockedIds: [] as string[],
+    galleryFilter: 'all',
+    identityOrbitId: 'me',
+    ...over,
+  })
+  const item = (over: Record<string, unknown> = {}) => ({
+    id: 'obj-1',
+    owner_id: 'me',
+    content_url: '/api/objects/obj-1',
+    display_name: 'Me',
+    ...over,
+  } as unknown as OrbitObject)
+
+  it('keeps a minted owned row', () => {
+    expect(galleryItemVisible(item(), opts())).toBe(true)
+  })
+  it('drops an unminted owned row even with a display name (the 46 phantoms)', () => {
+    // dev's 46 private urn: rows: owned, named, content_url set, no card.
+    expect(galleryItemVisible(
+      item({ id: 'urn-row', content_url: 'urn:sha256:abc' }),
+      opts(),
+    )).toBe(false)
+  })
+  it('drops unminted p2p-local rows', () => {
+    expect(galleryItemVisible(item({ id: 'p2p-obj-9' }), opts())).toBe(false)
+  })
+  it('keeps a minted row referenced by canonical set even when p2p-local', () => {
+    expect(galleryItemVisible(
+      item({ id: 'p2p-obj-9' }),
+      opts({ canonicalMediaIds: new Set(['p2p-obj-9']) }),
+    )).toBe(true)
+  })
+  it('drops rows without content, stories, public posts, blocked owners', () => {
+    expect(galleryItemVisible(item({ content_url: '' }), opts())).toBe(false)
+    expect(galleryItemVisible(item({ is_story: 1 }), opts())).toBe(false)
+    expect(galleryItemVisible(item({ is_public: 1 } as never), opts())).toBe(false)
+    expect(galleryItemVisible(item({ owner_id: 'bad' }), opts({ blockedIds: ['bad'] }))).toBe(false)
+  })
+  it('respects received/sent/starred and the mine-only default', () => {
+    expect(galleryItemVisible(item({ owner_id: 'you' }), opts({ galleryFilter: 'received' }))).toBe(true)
+    expect(galleryItemVisible(item(), opts({ galleryFilter: 'received' }))).toBe(false)
+    expect(galleryItemVisible(item(), opts({ galleryFilter: 'sent' }))).toBe(true)
+    expect(galleryItemVisible(item({ is_favorited: 1 } as never), opts({ galleryFilter: 'starred' }))).toBe(true)
+    expect(galleryItemVisible(item({ owner_id: 'you' }), opts())).toBe(false)
   })
 })

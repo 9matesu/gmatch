@@ -25,7 +25,7 @@ import { useLegacyBackfill } from "./hooks/useLegacyBackfill";
 import type { ChatMessage } from "./hooks/useP2P";
 import { useGame } from "./hooks/useGame";
 import { enqueueableItems, isP2pLocal, shouldEnqueue } from "./utils/game";
-import { mergeMyCards, filterToActiveDeck, type CanonicalCard } from "./utils/cardCollection";
+import { mergeMyCards, filterToActiveDeck, galleryItemVisible, type CanonicalCard } from "./utils/cardCollection";
 import { buildMirrorRow } from "./utils/galleryMirror";
 import { collectConfigBundle, applyConfigBundle, applyStashFromBundle, parseConfigBundle, configDownloadFilename, bundleToString } from "./utils/configBackup";
 import { runMigrations } from "./utils/migration";
@@ -3456,20 +3456,15 @@ export default function Home() {
   const ITEMS_PER_PAGE = 18
 
   const filteredItems = useMemo(() => {
-    const rawList = items.filter(item => {
-      if (!item.content_url) return false
-      if (item.is_story || (item as any).is_public === 1 || (item as any).is_public) return false
-      if (isP2pLocal(item.id)) return false
-      if (blockedIds.includes(item.owner_id)) return false
-      // Posts as posts, cards as cards: reject unminted p2p objects or cards with no resolvable owner
-      if ((item.id.startsWith('p2p-obj-') || !item.display_name?.trim()) && !canonicalCards.some(c => c.mediaObjectId === item.id)) return false
-      if (galleryFilter === 'received') return item.owner_id !== identity?.orbitId
-      if (galleryFilter === 'sent') return item.owner_id === identity?.orbitId
-      if (galleryFilter === 'starred') return Boolean(item.is_favorited)
-      // Default collection view is mine-only: foreign inbox objects and
-      // unattributed local mirror rows (owner_id '') never render as my cards.
-      return item.owner_id === identity?.orbitId
-    })
+    // Canonical membership once (Phase 1): the cards grid renders MINTED
+    // media only — unminted rows never reach the collection count or tiles.
+    const canonicalMediaIds = new Set(canonicalCards.map((c) => c.mediaObjectId))
+    const rawList = items.filter(item => galleryItemVisible(item, {
+      canonicalMediaIds,
+      blockedIds,
+      galleryFilter,
+      identityOrbitId: identity?.orbitId,
+    }))
 
     const q = cardSearch.trim().toLowerCase()
     const typeFiltered = rawList.filter((item) => {
