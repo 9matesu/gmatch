@@ -1,5 +1,36 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { hashFileSha256, forgeMediaLocally } from './mediaForge'
+import { listOutbox } from './postOutbox'
+
+const mem = new Map<string, string>()
+const storageStub = {
+  getItem: (k: string) => mem.get(k) ?? null,
+  setItem: (k: string, v: string) => { mem.set(k, v) },
+  removeItem: (k: string) => { mem.delete(k) },
+  clear: () => { mem.clear() },
+}
+
+beforeEach(() => {
+  mem.clear()
+  vi.stubGlobal('localStorage', storageStub)
+})
+
+describe('mediaForge durable publish (Phase 3)', () => {
+  it('offline: durable forge does not throw, commits locally, queues outbox', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+    const identity = { orbitId: 'u1', publicKeyHex: 'a'.repeat(64), privateKeyHex: 'b'.repeat(64) }
+    const file = new File(['bytes'], 'p.jpg', { type: 'image/jpeg' })
+    const forged = await forgeMediaLocally(file, identity as any, { isPublic: true, durable: true })
+    expect(forged.id).toBeDefined()
+    const entries = listOutbox()
+    expect(entries).toHaveLength(1)
+    expect(entries[0].objectId).toBe(forged.id)
+    expect(entries[0].state).toBe('local')
+    expect(entries[0].gossipInput).not.toBeNull()
+    const { getLocalObject } = await import('../utils/p2pSwarm')
+    expect(await getLocalObject(forged.id)).not.toBeNull()
+  })
+})
 
 describe('mediaForge (Zero-Fly Local Seeding)', () => {
   it('computes SHA-256 hex digest of a blob using Web Crypto', async () => {

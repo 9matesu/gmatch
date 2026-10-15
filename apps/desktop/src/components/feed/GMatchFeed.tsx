@@ -94,6 +94,9 @@ export interface FeedPost {
   tags?: string[];
   created_at: string;
   like_count: number;
+  /** Phase 3 durable publish: optimistic own-post sync badge. Absent on
+   *  reconciled server rows (nothing to show). */
+  sync_state?: 'local' | 'pending' | 'replicated';
   /** Newest-first liker names for the "Liked by X and N others" line. */
   likers?: { user_id: string; display_name: string; pfp_url?: string | null }[];
   comment_count: number;
@@ -911,6 +914,19 @@ export function GMatchFeed({
                           {post.author_name}
                         </span>
                         <PostTimestamp createdAt={post.created_at} />
+                        {post.sync_state && post.sync_state !== 'replicated' && (
+                          <span
+                            className="inline-flex items-center gap-1 text-[10px] font-mono text-retro-muted"
+                            title={
+                              post.sync_state === 'local'
+                                ? 'Saved on this device. Will upload when online.'
+                                : 'Uploading to the network…'
+                            }
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400/80" aria-hidden="true" />
+                            {post.sync_state === 'local' ? 'Saved locally' : 'Syncing…'}
+                          </span>
+                        )}
                       </div>
                       {post.location && (
                         <span className="text-xs text-retro-muted leading-tight block truncate">{post.location}</span>

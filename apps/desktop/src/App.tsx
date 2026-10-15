@@ -26,6 +26,7 @@ import type { ChatMessage } from "./hooks/useP2P";
 import { useGame } from "./hooks/useGame";
 import { enqueueableItems, isP2pLocal, shouldEnqueue } from "./utils/game";
 import { mergeMyCards, filterToActiveDeck, galleryItemVisible, type CanonicalCard } from "./utils/cardCollection";
+import { outboxStatesByGroup } from "./services/postOutbox";
 import { buildMirrorRow } from "./utils/galleryMirror";
 import { collectConfigBundle, applyConfigBundle, applyStashFromBundle, parseConfigBundle, configDownloadFilename, bundleToString } from "./utils/configBackup";
 import { runMigrations } from "./utils/migration";
@@ -1501,6 +1502,7 @@ export default function Home() {
           isPublic: true,
           postGroup,
           authorName: myProfile.displayName || undefined,
+          durable: true,
         })
         if (forged?.id) {
           uploadedAny = true
@@ -1527,6 +1529,7 @@ export default function Home() {
           created_at: new Date().toISOString(),
           like_count: 0,
           comment_count: 0,
+          sync_state: outboxStatesByGroup()[postGroup] || 'local',
         }
         // Prepend immediately so the new post appears on Latest with its
         // entrance animation, then reconcile with the authoritative feed.
@@ -1548,6 +1551,50 @@ export default function Home() {
   }, [identity, loadServerFeed, myProfile.displayName, profilePics])
 
   // ─── Server-side private messages (1:1 DMs) ───
+  // Phase 3 durable publish: drive the persisted post outbox on boot and
+  // whenever connectivity returns, so locally committed posts that never
+  // reached the server (offline publish, timeout) replicate without user
+  // action. Flush is idempotent (client objectId) and refreshes the feed once
+  // something actually moved.
+  useEffect(() => {
+    if (!identity) return
+    let cancelled = false
+    const flush = async () => {
+      const { flushPostOutbox } = await import('./services/postOutbox')
+      const summary = await flushPostOutbox(identity).catch(() => null)
+      if (cancelled || !summary) return
+      if (summary.registered > 0 || summary.replicated > 0) {
+        invalidateCache('/api/posts')
+        loadServerFeed()
+      }
+    }
+    void flush()
+    window.addEventListener('online', flush)
+    return () => {
+      cancelled = true
+      window.removeEventListener('online', flush)
+    }
+  }, [identity, loadServerFeed])
+
+  // Sync badge: reflect each optimistic own-post's outbox state (local /
+  // pending / replicated) without re-fetching. Reconciled server rows carry
+  // no sync_state, so the badge disappears once the post is authoritative.
+  useEffect(() => {
+    const apply = () => {
+      const states = outboxStatesByGroup()
+      setServerPosts((prev) =>
+        prev.map((p) =>
+          p.id.startsWith('group_')
+            ? { ...p, sync_state: states[p.id.slice('group_'.length)] }
+            : p,
+        ),
+      )
+    }
+    apply()
+    window.addEventListener('gmatch:post-outbox-changed', apply)
+    return () => window.removeEventListener('gmatch:post-outbox-changed', apply)
+  }, [])
+
   const [pmThreads, setPmThreads] = useState<{
     peer_id: string;
     peer_name?: string | null;

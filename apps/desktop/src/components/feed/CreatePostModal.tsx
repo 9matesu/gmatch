@@ -377,6 +377,7 @@ function extForMime(mime: string): string {
             isPublic: mode !== 'story',
             isStory: mode === 'story',
             postGroup,
+            durable: true,
           });
           ids.push(forged.id);
           if (!primaryId) primaryId = forged.id;

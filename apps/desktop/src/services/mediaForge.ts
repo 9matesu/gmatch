@@ -2,6 +2,7 @@ import { orbitFetch, type OrbitIdentityLike } from '../utils/api'
 import { buildMagnetUri } from '../utils/magnet'
 import { registerLocalObject } from '../utils/p2pSwarm'
 import { resolveVideoMime, sniffFileHead } from '../utils/media'
+import { enqueueOutbox, flushPostOutbox } from './postOutbox'
 
 export interface ForgedMedia {
   id: string
@@ -39,6 +40,10 @@ export async function forgeMediaLocally(
     recipients?: string
     /** Display-name snapshot for the gossip envelope (falls back to storage). */
     authorName?: string
+    /** Phase 3 durable publish: local commit first, metadata register + gossip
+     *  queued through the persisted outbox and retried on reconnect/boot. The
+     *  call never throws on network failure — the post stays local-first. */
+    durable?: boolean
   } = {}
 ): Promise<ForgedMedia> {
   const contentHash = await hashFileSha256(file)
@@ -99,6 +104,30 @@ export async function forgeMediaLocally(
     recipients: options.recipients || null,
   }
 
+  const gossipable = (options.isPublic ?? true) && !options.isStory && !options.isAvatar && !options.isChat
+  const gossipInput = gossipable
+    ? {
+        id: objectId,
+        contentHash,
+        mimeType,
+        sizeBytes: file.size,
+        magnetUri,
+        caption: options.postCaption || options.caption,
+        location: options.location || undefined,
+        tags: options.tags || undefined,
+        postGroup: options.postGroup || null,
+        authorName: options.authorName,
+      }
+    : null
+
+  if (options.durable) {
+    // Phase 3 durable publish: the local commit above (swarm seed + session
+    // URL) is already done, so the post is visible and survives restart even
+    // with the network down. Register + gossip are queued and driven by
+    // flushPostOutbox (this call, plus boot/reconnect), never blocking publish.
+    enqueueOutbox({ objectId, postGroup: options.postGroup ?? null, registerBody: payload, gossipInput })
+    void flushPostOutbox(identity).catch(() => { })
+  } else {
   const res = await orbitFetch('/api/objects/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -114,24 +143,14 @@ export async function forgeMediaLocally(
   // pull them into their own dbs. Stories/avatars/chats/DMs never gossip —
   // same flags as the register payload above. Fire-and-forget: the post is
   // already live locally; relay failure must not fail the share.
-  if ((options.isPublic ?? true) && !options.isStory && !options.isAvatar && !options.isChat) {
+  if (gossipInput) {
     try {
       const { gossipOwnPost } = await import('./gossip')
-      void gossipOwnPost(identity, {
-        id: objectId,
-        contentHash,
-        mimeType,
-        sizeBytes: file.size,
-        magnetUri,
-        caption: options.postCaption || options.caption,
-        location: options.location || undefined,
-        tags: options.tags || undefined,
-        postGroup: options.postGroup || null,
-        authorName: options.authorName,
-      }).catch(() => { })
+      void gossipOwnPost(identity, gossipInput).catch(() => { })
     } catch {
       /* gossip unavailable (tests/SSR) */
     }
+  }
   }
 
   return {
