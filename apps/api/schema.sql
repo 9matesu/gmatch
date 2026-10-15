@@ -5,6 +5,22 @@
 -- Note: no FOREIGN KEY constraints, matching the historical runtime schema.
 -- Row-level integrity is enforced in application code, and FK enforcement
 -- would reject legitimate orphaned-row flows in persistence/tests.
+--
+-- Entity boundaries (Phase 2, data-integrity milestone — do not blur):
+--   Objects  = stored content + media references. Posts ARE Objects rows
+--              with is_public=1; there is no Posts table. GossipEnvelopes
+--              replicates posts (INSERT OR IGNORE); replication never mints.
+--   Cards    = explicitly minted collectibles ONLY. The only production
+--              writers are POST /api/cards (user mint), starter-deck init
+--              (SystemMeta-gated), and pack opening (inventory-gated).
+--              Publishing, loading, replicating posts, and saving clicker
+--              keepsakes must NEVER write Cards (guarded by
+--              routes/post-no-mint.test.ts, routes/gossip-no-mint.test.ts,
+--              desktop game/store.nomint.test.ts).
+--   Decks    = ordered collections of card references (DeckCards); membership
+--              moves never mint. Snapshot import (admin-only) is the sole
+--              replication writer for Cards/CardOwnership — an explicit
+--              handoff, never an automatic side effect.
 
 CREATE TABLE IF NOT EXISTS Users (
   id TEXT PRIMARY KEY,
