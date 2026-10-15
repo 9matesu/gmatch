@@ -33,7 +33,7 @@ import { useGame as useIdleGame } from "./game/store";
 import { mapLimit } from "./services/booru";
 import { vaultPin, vaultHttpUrl } from "./services/vault";
 import { devFetchable } from "./services/imageCache";
-import { ROUTE_VIEWS, hashForView, viewFromHash, type RoutedView } from "./utils/routing";
+import { hashForView, resolveInitialView, viewFromHash } from "./utils/routing";
 import { playChime, playPress, playMsgReceive } from "./utils/sounds";
 import { useLobby } from "./hooks/useLobby";
 import { UserProfileModal } from "./components/UserProfileModal";
@@ -284,11 +284,11 @@ export default function Home() {
   const [itemsLoading, setItemsLoading] = useState(true);
   const [mainView, setMainView] = useState<MainViewType>(() => {
     if (typeof window === 'undefined') return 'servers'
-    // Direct URL wins over the last-visited persisted view (plan §5).
-    const fromHash = viewFromHash(window.location.hash)
-    const saved = localStorage.getItem('orbit_main_view') as MainViewType | null
-    const resolved = fromHash || (saved && ROUTE_VIEWS.includes(saved as RoutedView) ? saved : 'servers')
-    return resolved === 'messages' ? 'rooms' : resolved
+    // Direct URL > last-visited persisted view > feed (see routing).
+    return resolveInitialView(
+      window.location.hash,
+      localStorage.getItem('orbit_main_view'),
+    )
   });
    const [showCreatePostModal, setShowCreatePostModal] = useState(false);
    const [adminModalOpen, setAdminModalOpen] = useState(false);

@@ -23,7 +23,7 @@ export const ROUTE_VIEWS = [
   // with no render branch — a blank stage, persisted into orbit_main_view and
   // therefore on every launch. Keep it out of ROUTE_VIEWS so viewFromHash
   // rejects the deep link and App's persisted-view guard falls back to
-  // 'servers'.
+  // 'feed'.
   'watch',
 ] as const
 
@@ -53,4 +53,16 @@ export function viewFromHash(hash: string): RoutedView | null {
 /** Canonical hash for a view. */
 export function hashForView(view: RoutedView): string {
   return `#/${view}`
+}
+
+/**
+ * Initial view: direct URL wins, then the last-visited persisted view, then
+ * the feed. Fresh boot (no hash, no saved view) lands on the timeline —
+ * the app's home — never the server directory or the profile.
+ */
+export function resolveInitialView(hash: string, saved: string | null): RoutedView {
+  const fromHash = viewFromHash(hash)
+  if (fromHash) return fromHash === 'messages' ? 'rooms' : fromHash
+  if (saved && isRoutedView(saved)) return saved === 'messages' ? 'rooms' : saved
+  return 'feed'
 }

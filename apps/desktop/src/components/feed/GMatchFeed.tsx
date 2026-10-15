@@ -61,6 +61,7 @@ import { ReportPostModal } from './ReportPostModal';
 import { PostCreatorModal } from './PostCreatorModal';
 import { PostLikersModal } from './PostLikersModal';
 import { FeedHeader } from './FeedHeader';
+import { FeedStatusPills } from './FeedStatusPills';
 import { Linkify } from '../Linkify';
 
 export interface PostComment {
@@ -758,6 +759,10 @@ export function GMatchFeed({
           </div>
         }
       />
+
+      {/* Selective status pills: only empty/conflict states, never a
+          healthy timeline (see FeedStatusPills). */}
+      <FeedStatusPills postCount={displayPosts.length} />
 
       {/* Discreet grey loading label when stories/content are loading */}
       {storiesLoading && (

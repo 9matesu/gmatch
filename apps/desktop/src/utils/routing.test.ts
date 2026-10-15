@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ROUTE_VIEWS, hashForView, isRoutedView, viewFromHash } from './routing'
+import { ROUTE_VIEWS, hashForView, isRoutedView, resolveInitialView, viewFromHash } from './routing'
 
 describe('view routing (hash <-> view)', () => {
   it('parses canonical hashes for every routed view', () => {
@@ -41,5 +41,22 @@ describe('view routing (hash <-> view)', () => {
   it('every nav view has a canonical hash', () => {
     expect(hashForView('grid')).toBe('#/grid')
     expect(hashForView('watch')).toBe('#/watch')
+  })
+
+  it('resolveInitialView: hash wins, then saved view, then the feed', () => {
+    // Fresh boot: no hash, nothing saved -> feed (never servers/profile).
+    expect(resolveInitialView('', null)).toBe('feed')
+    // Unknown hash + nothing saved -> feed.
+    expect(resolveInitialView('#/nonsense', null)).toBe('feed')
+    // Saved view beats the default.
+    expect(resolveInitialView('', 'grid')).toBe('grid')
+    expect(resolveInitialView('', 'profile')).toBe('profile')
+    // Unroutable saved value falls back to feed.
+    expect(resolveInitialView('', 'admin')).toBe('feed')
+    // Hash beats saved.
+    expect(resolveInitialView('#/grid', 'profile')).toBe('grid')
+    // Legacy messages alias normalises to rooms in both slots.
+    expect(resolveInitialView('#/dm', null)).toBe('rooms')
+    expect(resolveInitialView('', 'messages')).toBe('rooms')
   })
 })
