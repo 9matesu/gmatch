@@ -25,6 +25,9 @@ import {
   Gamepad2,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ZoomIn,
+  ZoomOut,
   Zap,
   RefreshCw,
   X,
@@ -33,7 +36,7 @@ import {
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject as StoryItem } from '@orbit/shared';
 import { GMatchStories } from '../GMatchStories';
-import { InstagramPostModal } from './InstagramPostModal';
+import { PostComments } from './PostComments';
 import { LiveCameraModal } from '../camera/LiveCameraModal';
 import { ObjectImage } from '../ObjectImage';
 import { Avatar } from '../Avatar';
@@ -161,7 +164,6 @@ export function GMatchFeed({
   unreadCount = 0,
   onRefreshNotifications,
   onOpenNotifications,
-  onOpenNetwork,
   onUserContext,
   onForceRefresh,
   apiNodeLabel,
@@ -265,7 +267,26 @@ export function GMatchFeed({
   // Modals State
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [showExploreSearch, setShowExploreSearch] = useState(false);
-  const [activeLightboxPost, setActiveLightboxPost] = useState<FeedPost | null>(null);
+  // Inline expansion (replaces the feed lightbox): one post at a time, same
+  // card element (no remount, reader position preserved). Zoom is a bounded
+  // scale cycle on the same media node, reset on every expand/collapse.
+  const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const toggleExpand = useCallback((post: FeedPost) => {
+    playPress(700);
+    setExpandedPostId((prev) => (prev === post.id ? null : post.id));
+    setZoomLevel(1);
+  }, []);
+  const openInline = useCallback((post: FeedPost, scroll = false) => {
+    playPress(700);
+    setExpandedPostId(post.id);
+    setZoomLevel(1);
+    if (scroll) {
+      requestAnimationFrame(() => {
+        document.querySelector(`[data-post-id="${post.id}"]`)?.scrollIntoView?.({ block: 'nearest' });
+      });
+    }
+  }, []);
   const [likersModalPostId, setLikersModalPostId] = useState<string | null>(null);
   const [showCustomPostCreator, setShowCustomPostCreator] = useState(false);
 
@@ -297,14 +318,14 @@ export function GMatchFeed({
   const [sharingPost, setSharingPost] = useState<FeedPost | null>(null);
 
   // Deep link: #/feed?post=<id> (from share/permalink, or a notification deep
-  // link) opens the post lightbox once the post is loaded. One-shot — later
+  // link) expands the post inline once it is loaded. One-shot — later
   // list changes don't reopen it. The custom event covers the case where the
   // hash is already correct and only the intent is new.
   const deepLinkDoneRef = useRef(false);
   const openFromDeepLink = useCallback((postId: string) => {
     const target = posts.find((p) => p.id === postId);
-    if (target) setActiveLightboxPost(target);
-  }, [posts]);
+    if (target) openInline(target, true);
+  }, [posts, openInline]);
   useEffect(() => {
     if (deepLinkDoneRef.current || posts.length === 0) return;
     const m = /post=([\w-]+)/.exec(window.location.hash);
@@ -312,9 +333,9 @@ export function GMatchFeed({
     const target = posts.find((p) => p.id === m[1]);
     if (target) {
       deepLinkDoneRef.current = true;
-      setActiveLightboxPost(target);
+      openInline(target, true);
     }
-  }, [posts]);
+  }, [posts, openInline]);
   useEffect(() => {
     const onOpen = (e: Event) => {
       const postId = (e as CustomEvent<{ postId?: string }>).detail?.postId;
@@ -651,14 +672,15 @@ export function GMatchFeed({
     setOptionsPost(null);
   };
 
-  // Fetch the comments for the post the lightbox is showing.
+  // Fetch the comments for the post that is open — lightbox (profile grids,
+  // Etapa B) or inline expansion. Keyed on the post that is actually open.
   //
   // This used to be keyed on `activeCommentsPostId`, which was only ever
   // initialised to null and reset to null — nothing in the app ever assigned a
   // post id to it. So the fetch could not run, `CommentsModal` was unreachable,
   // and the lightbox (the ONLY comment surface a user can reach) rendered an
   // always-empty list. Keyed on the post that is actually open instead.
-  const lightboxPostId = activeLightboxPost?.id ?? null;
+  const lightboxPostId = expandedPostId;
   useEffect(() => {
     if (!lightboxPostId || !identity) return;
     if (commentsLoadedRef.current.has(lightboxPostId)) return;
@@ -777,14 +799,17 @@ export function GMatchFeed({
 
             const postComments = commentsMap[post.id] || [];
             // Server truth for the count; the local map is only warm once the
-            // lightbox has been opened for this post.
+            // post has been opened (inline expansion or lightbox).
             const postCommentCount = Math.max(post.comment_count ?? 0, postComments.length);
             const authorHasStory = storyOwners.has(post.author_id);
             const isObjectMedia = post.url.includes('/api/objects/') || post.url.startsWith('vault://') || !post.url || post.url.startsWith('magnet:') || post.url.startsWith('urn:sha256:') || post.url.startsWith('p2p-');
             const isVideo = isVideoPost(post.mime_type, post.url, siblingMimesFor(post));
            const isNewPost = animatedPostIds.has(post.id);
            const multiMedia = Array.isArray(post.media) && post.media.length > 1 ? post.media : null;
-           const currentIdx = multiMedia ? Math.min(Math.max(0, mediaIdx[post.id] || 0), multiMedia.length - 1) : 0;
+            const currentIdx = multiMedia ? Math.min(Math.max(0, mediaIdx[post.id] || 0), multiMedia.length - 1) : 0;
+            const expanded = expandedPostId === post.id;
+            const rawAvatar = profilePics[post.author_id] || post.author_avatar;
+            const authorAvatarUrl = rawAvatar ? resolveMediaUrl(rawAvatar) : '';
 
             return post.is_sponsored ? (
               <article
@@ -838,6 +863,7 @@ export function GMatchFeed({
             ) : (
               <article
                 key={post.id}
+                data-post-id={post.id}
                 onContextMenu={(e) => { e.preventDefault(); setOptionsPost(post) }}
                 className={`relative solid-panel border border-border-glass rounded-lg overflow-hidden flex flex-col shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
@@ -906,11 +932,21 @@ export function GMatchFeed({
 
                   return (
                     <div
-                      className={`relative w-full bg-surface-canvas flex items-center justify-center overflow-hidden rounded-none ${isCurrentVideo ? '' : 'cursor-pointer'}`}
+                      className={`group/post relative w-full bg-surface-canvas flex items-center justify-center overflow-hidden rounded-none transition-[max-height] duration-300 ease-out motion-reduce:transition-none ${isCurrentVideo ? '' : 'cursor-pointer'}`}
+                      data-expanded={expanded}
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={expanded}
+                      aria-label={expanded ? 'Post image, expanded' : 'Expand post'}
                       onClick={() => {
                         if (!isCurrentVideo) {
-                          playPress(700);
-                          setActiveLightboxPost(post);
+                          toggleExpand(post);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if ((e.key === 'Enter' || e.key === ' ') && !isCurrentVideo) {
+                          e.preventDefault();
+                          toggleExpand(post);
                         }
                       }}
                       onDoubleClick={(e) => {
@@ -918,6 +954,13 @@ export function GMatchFeed({
                         handleDoubleTap(post);
                       }}
                     >
+                      {/* Zoom applies on the media node only (controls stay put);
+                          transform never affects layout, so zoom can't move
+                          the reader's scroll position. */}
+                      <div
+                        className="w-full flex items-center justify-center transition-transform duration-300 ease-out motion-reduce:transition-none"
+                        style={expanded && zoomLevel > 1 ? { transform: `scale(${zoomLevel})` } : undefined}
+                      >
                       {multiMedia ? (() => {
                         const item = multiMedia[currentIdx];
                         const url = item.url;
@@ -932,8 +975,8 @@ export function GMatchFeed({
                                 contentUrl={url}
                                 identity={identity}
                                 mimeType={mime}
-                                className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
-                                videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
+                                className="w-full h-auto max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
+                                videoClassName="w-full max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
                                 controls={true}
                                 alwaysShowControls={true}
                                 autoPlay={true}
@@ -941,27 +984,27 @@ export function GMatchFeed({
                                 loop={true}
                                 hideUnavailable={true}
                                 onMediaUnavailable={() => markPostUnavailable(post.id)}
-                                onExpand={() => setActiveLightboxPost(post)}
+                                onExpand={() => toggleExpand(post)}
                                 onDoubleTapLike={() => handleDoubleTap(post)}
                               />
                             ) : isVid ? (
                               <NativeVideoPlayer
                                 src={url}
-                                videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
+                                videoClassName="w-full max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
                                 controls={true}
                                 alwaysShowControls={true}
                                 autoPlay={true}
                                 muted={true}
                                 loop={true}
                                 onError={() => markPostUnavailable(post.id)}
-                                onExpand={() => setActiveLightboxPost(post)}
+                                onExpand={() => toggleExpand(post)}
                                 onDoubleTapLike={() => handleDoubleTap(post)}
                               />
                             ) : (
                               <CachedImg
                                 src={url}
                                 alt={post.caption || 'Post image'}
-                                className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
+                                className="w-full h-auto max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
                                 loading="lazy"
                                 onError={() => markPostUnavailable(post.id)}
                               />
@@ -974,20 +1017,20 @@ export function GMatchFeed({
                         isVideo ? (
                           <NativeVideoPlayer
                             src={post.localPreviewUrl}
-                            videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
+                            videoClassName="w-full max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
                             controls={true}
                             alwaysShowControls={true}
                             autoPlay={true}
                             muted={true}
                             loop={true}
-                            onExpand={() => setActiveLightboxPost(post)}
+                            onExpand={() => toggleExpand(post)}
                             onDoubleTapLike={() => handleDoubleTap(post)}
                           />
                         ) : (
                           <img
                             src={post.localPreviewUrl}
                             alt={post.caption || 'Post image'}
-                            className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
+                            className="w-full h-auto max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
                             draggable={false}
                           />
                         )
@@ -997,8 +1040,8 @@ export function GMatchFeed({
                           contentUrl={post.url}
                           identity={identity}
                           mimeType={post.mime_type}
-                          className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
-                          videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
+                          className="w-full h-auto max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
+                          videoClassName="w-full max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
                           controls={true}
                           alwaysShowControls={true}
                           autoPlay={true}
@@ -1006,30 +1049,58 @@ export function GMatchFeed({
                           loop={true}
                           hideUnavailable={true}
                           onMediaUnavailable={() => markPostUnavailable(post.id)}
-                          onExpand={() => setActiveLightboxPost(post)}
+                          onExpand={() => toggleExpand(post)}
                           onDoubleTapLike={() => handleDoubleTap(post)}
                         />
                       ) : isVideo ? (
                         <NativeVideoPlayer
                           src={post.url}
-                          videoClassName="w-full max-h-[min(680px,80vh)] object-contain rounded-none"
+                          videoClassName="w-full max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
                           controls={true}
                           alwaysShowControls={true}
                           autoPlay={true}
                           muted={true}
                           loop={true}
                           onError={() => markPostUnavailable(post.id)}
-                          onExpand={() => setActiveLightboxPost(post)}
+                          onExpand={() => toggleExpand(post)}
                           onDoubleTapLike={() => handleDoubleTap(post)}
                         />
                       ) : (
                         <CachedImg
                           src={post.url}
                           alt={post.caption || 'Post image'}
-                          className="w-full h-auto max-h-[min(680px,80vh)] object-contain rounded-none"
+                          className="w-full h-auto max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
                           loading="lazy"
                           onError={() => markPostUnavailable(post.id)}
                         />
+                      )}
+                      </div>
+
+                      {/* Zoom + collapse overlays (expanded only) */}
+                      {expanded && (
+                        <>
+                          <button
+                            type="button"
+                            aria-label="Collapse post"
+                            onClick={(e) => { e.stopPropagation(); toggleExpand(post); }}
+                            className="absolute left-2 top-2 z-10 w-8 h-8 rounded-full bg-black/45 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/70 transition-colors cursor-pointer"
+                          >
+                            <ChevronUp className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={zoomLevel > 1 ? 'Reset zoom' : 'Zoom image'}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              playPress(700);
+                              setZoomLevel((z) => (z === 1 ? 1.8 : z === 1.8 ? 2.6 : 1));
+                            }}
+                            className="absolute bottom-2 right-2 z-10 h-8 pl-2.5 pr-3 rounded-full bg-black/60 backdrop-blur-sm text-white flex items-center gap-1.5 hover:bg-black/70 transition-colors cursor-pointer"
+                          >
+                            {zoomLevel > 1 ? <ZoomOut className="w-3.5 h-3.5" /> : <ZoomIn className="w-3.5 h-3.5" />}
+                            <span className="font-mono text-[10px]">{Math.round(zoomLevel * 100)}%</span>
+                          </button>
+                        </>
                       )}
 
                       {/* Carousel controls + counter for multi-image posts */}
@@ -1096,10 +1167,7 @@ export function GMatchFeed({
 
                       <button
                         type="button"
-                        onClick={() => {
-                          playPress(750);
-                          setActiveLightboxPost(post);
-                        }}
+                        onClick={() => toggleExpand(post)}
                         aria-label="Comment"
                         className="text-retro-muted hover:text-retro-fg cursor-pointer transition-transform duration-150 active:scale-[0.92]"
                       >
@@ -1144,6 +1212,22 @@ export function GMatchFeed({
                     {likedByLabel || `${currentLikes.toLocaleString()} ${currentLikes === 1 ? 'like' : 'likes'}`}
                   </button>
 
+                  {expanded ? (
+                    <div className="motion-safe:animate-orbit-fade-in border-t border-border-glass">
+                      <PostComments
+                        key={post.id}
+                        post={post}
+                        comments={postComments}
+                        commentsLoading={commentsLoadingId === post.id}
+                        authorAvatar={authorAvatarUrl}
+                        onAuthorClick={() => handleAvatarClick(post.author_id)}
+                        onAddComment={handleAddComment}
+                        onToggleCommentLike={handleToggleCommentLike}
+                        onReportComment={onReportComment}
+                      />
+                    </div>
+                  ) : (
+                  <>
                   {/* Caption & Tags */}
                   {post.caption && (
                     <div className="text-xs text-retro-fg leading-relaxed">
@@ -1181,7 +1265,7 @@ export function GMatchFeed({
                     <div className="space-y-1 mt-0.5">
                       <button
                         type="button"
-                        onClick={() => { playPress(750); setActiveLightboxPost(post); }}
+                        onClick={() => toggleExpand(post)}
                         className="text-left text-xs text-retro-muted hover:text-retro-fg cursor-pointer font-medium block"
                       >
                         View all {postCommentCount} comment{postCommentCount === 1 ? '' : 's'}
@@ -1200,11 +1284,13 @@ export function GMatchFeed({
                   ) : (
                     <button
                       type="button"
-                      onClick={() => { playPress(750); setActiveLightboxPost(post); }}
+                      onClick={() => toggleExpand(post)}
                       className="text-left text-xs text-retro-muted hover:text-retro-fg cursor-pointer"
                     >
                       Add a comment...
                     </button>
+                  )}
+                  </>
                   )}
                 </div>
               </article>
@@ -1328,44 +1414,6 @@ export function GMatchFeed({
         document.body,
       )}
 
-      {/* ─── MODAL 5: 2-Column Instagram Lightbox Post Modal with Zoom & Real Comments ─── */}
-      <InstagramPostModal
-        isOpen={!!activeLightboxPost}
-        post={activeLightboxPost}
-        onClose={() => setActiveLightboxPost(null)}
-        identity={identity}
-        profilePics={profilePics}
-        isLiked={activeLightboxPost ? !!likedPosts[activeLightboxPost.id] : false}
-        isSaved={activeLightboxPost ? !!savedPosts[activeLightboxPost.id] : false}
-        likeCount={activeLightboxPost ? likeCounts[activeLightboxPost.id] ?? activeLightboxPost.like_count ?? 0 : 0}
-        comments={activeLightboxPost ? commentsMap[activeLightboxPost.id] || [] : []}
-        commentsLoading={!!activeLightboxPost && commentsLoadingId === activeLightboxPost.id}
-        onToggleLike={toggleLike}
-        onToggleSave={toggleSave}
-        onAddComment={handleAddComment}
-        onToggleCommentLike={handleToggleCommentLike}
-        onReportComment={onReportComment}
-        onOpenShare={(p) => {
-          setActiveLightboxPost(null);
-          setSharingPost(p);
-        }}
-        onOptionsClick={(p) => {
-          setActiveLightboxPost(null);
-          setOptionsPost(p);
-        }}
-        onOpenLikers={(postId) => setLikersModalPostId(postId)}
-        onSelectUser={onSelectUser}
-        onAvatarClick={(uId) => {
-          setActiveLightboxPost(null);
-          handleAvatarClick(uId);
-        }}
-        onOpenNetwork={(uId) => {
-          setActiveLightboxPost(null);
-          onOpenNetwork?.(uId);
-        }}
-        toast={toast}
-      />
-
       {/* ─── MODAL 5b: Likers Modal ─── */}
       {likersModalPostId && (
         <PostLikersModal
@@ -1376,7 +1424,6 @@ export function GMatchFeed({
           profilePics={profilePics}
           onSelectUser={(userId) => {
             setLikersModalPostId(null);
-            setActiveLightboxPost(null);
             handleAvatarClick(userId);
           }}
           toast={toast}
@@ -1414,7 +1461,7 @@ export function GMatchFeed({
         }}
         onOpenPost={(post) => {
           setShowExploreSearch(false);
-          setActiveLightboxPost(post);
+          openInline(post, true);
         }}
         onStartPm={onStartPm}
         toast={toast}
