@@ -4,6 +4,7 @@ import {
   ArrowsOut,
   FolderOpen,
   Images,
+  MagnifyingGlass,
   SidebarSimple,
   X,
 } from '@phosphor-icons/react'
@@ -17,6 +18,7 @@ import { useGame } from '../../game/store'
 import { useResizablePanel } from '../../hooks/useResizablePanel'
 import { PanelResizer } from '../../ui/PanelResizer'
 import IdleGalleryView from './IdleGalleryView'
+import TagBrowser from './TagBrowser'
 import { playPress } from '../../utils/sounds'
 import '../../ui/grid-animations.css'
 
@@ -59,6 +61,7 @@ export default function GridWorkspace({
   const right = useResizablePanel('dock')
   const [collapsed, setCollapsed] = useState<boolean>(readCollapsed)
   const [galleryOpen, setGalleryOpen] = useState(false)
+  const [browserOpen, setBrowserOpen] = useState(false)
   const toggleCollapsed = () => {
     setCollapsed((v) => {
       try {
@@ -129,6 +132,16 @@ export default function GridWorkspace({
                 >
                   <Images size={14} weight="bold" className="text-retro-accent" />
                   <span className="hidden sm:inline">Gallery</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { playPress(720); setBrowserOpen(true); }}
+                  title="Browse images by owned tag"
+                  aria-label="Browse by tag"
+                  className="h-7 px-2 rounded-md border border-border-glass bg-glass-w8 text-retro-muted hover:text-white hover:bg-glass-w10 hover:border-border-strong transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
+                >
+                  <MagnifyingGlass size={14} weight="bold" className="text-retro-accent" />
+                  <span className="hidden sm:inline">Browse</span>
                 </button>
                 {onOpenSources && (
                   <button
@@ -238,6 +251,45 @@ export default function GridWorkspace({
                 onSetWallpaper={onSetWallpaper}
               />
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tag Browser Modal */}
+      {browserOpen && (
+        <div
+          className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 p-3 sm:p-6 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Browse by tag"
+          onClick={() => setBrowserOpen(false)}
+        >
+          <div
+            className="relative flex h-full max-h-[90dvh] w-full max-w-4xl flex-col rounded-xl border border-border-glass bg-retro-panel p-5 shadow-xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-border-glass">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-retro-accent/15 text-retro-accent border border-retro-accent/30">
+                  <MagnifyingGlass size={16} weight="bold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white tracking-wide uppercase">
+                    Tag Browser
+                  </h3>
+                  <p className="text-xs text-white/40">Browse live images by your owned tags</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBrowserOpen(false)}
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-border-glass bg-glass-w5 text-retro-muted hover:text-white hover:bg-glass-w10 hover:border-border-strong transition-all cursor-pointer"
+                aria-label="Close tag browser"
+              >
+                <X size={14} weight="bold" />
+              </button>
+            </div>
+            <TagBrowser />
           </div>
         </div>
       )}
