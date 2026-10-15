@@ -275,4 +275,49 @@ describe('IdleGalleryView', () => {
       'https://realbooru.com/thumbnails/38/f9/thumbnail_38f9dd17899412d912bc38fbe6916d35.jpg',
     )
   })
+
+  it('resolveGalleryTileUrl prefers a verified localRef over everything', () => {
+    const img: GalleryImage = {
+      id: 'local-1',
+      url: 'https://tbib.org/images/1/2/abc.jpg',
+      tags: ['t'],
+      rarityBase: 1,
+      clicks: 0,
+      rarity: 'Common',
+      preview: 'https://preview.com/thumb.jpg',
+      saveState: 'persisted',
+      localRef: 'vault://f/abc.jpg',
+    }
+    // Local bytes win over the preview and over the remote URL.
+    expect(resolveGalleryTileUrl(img)).toBe('vault://f/abc.jpg')
+  })
+
+  it('never hotlinks a record marked persisted when the local ref is gone', () => {
+    // The bytes are supposed to be on disk; silently rendering the provider's
+    // URL would hide a broken vault entry behind a working-looking tile.
+    const img: GalleryImage = {
+      id: 'local-2',
+      url: 'https://tbib.org/images/1/2/def.jpg',
+      tags: ['t'],
+      rarityBase: 1,
+      clicks: 0,
+      rarity: 'Common',
+      saveState: 'persisted',
+    }
+    expect(resolveGalleryTileUrl(img)).toBe('')
+  })
+
+  it('legacy records without saveState keep their old remote rendering', () => {
+    // Backward compatibility: saves written before this change carry neither
+    // saveState nor localRef and must render exactly as they always have.
+    const legacy: GalleryImage = {
+      id: 'legacy-1',
+      url: 'https://tbib.org/images/1/2/legacy.jpg',
+      tags: ['t'],
+      rarityBase: 1,
+      clicks: 0,
+      rarity: 'Common',
+    }
+    expect(resolveGalleryTileUrl(legacy)).toBe('https://tbib.org/images/1/2/legacy.jpg')
+  })
 })

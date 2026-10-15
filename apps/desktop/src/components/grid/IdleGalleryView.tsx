@@ -79,12 +79,18 @@ function toResolvedItems(images: GalleryImage[]): ResolvedItem[] {
 /**
  * Fast thumbnail resolution for gallery grid tiles:
  * 1. Pinned local vault SSD URL if ready (vault://)
- * 2. Pre-computed preview thumbnail if available
- * 3. Inferred thumbnail for known hosts (booru.org, realbooru) to avoid multi-MB full PNG/JPEG stalls
- * 4. Full image URL fallback
+ * 2. Verified local reference stored on the record itself (localRef)
+ * 3. Pre-computed preview thumbnail if available
+ * 4. Inferred thumbnail for known hosts (booru.org, realbooru) to avoid multi-MB full PNG/JPEG stalls
+ * 5. Full image URL fallback — legacy records (no saveState) and explicitly
+ *    failed saves only; a record marked `persisted` never falls back here,
+ *    because its bytes are supposed to be on disk and a hotlink would hide a
+ *    broken vault entry.
  */
 export function resolveGalleryTileUrl(img: GalleryImage, vaultUrl?: string): string {
   if (vaultUrl) return vaultUrl
+  if (img.localRef) return img.localRef
+  if (img.saveState === 'persisted') return '' // local bytes claimed, none resolvable
   if (img.preview) return img.preview
   const u = String(img.url || '')
   if (u.includes('img.booru.org')) {

@@ -28,6 +28,18 @@ export interface GalleryImage {
   kind?: 'image' | 'video'
   /** Still preview for video items (redgifs poster). */
   preview?: string
+  /**
+   * Save state. Older saves have none of these and are treated as
+   * `persisted: undefined` — i.e. "legacy record, local ref unknown", which
+   * still renders through the existing vault->preview->remote fallback so no
+   * historical keep is lost or rewritten.
+   */
+  saveState?: 'discovered' | 'downloading' | 'persisted' | 'failed'
+  /** Verified local reference (vault:// path or vault http url). Only set once
+   *  bytes are actually on disk — never a remote URL. */
+  localRef?: string
+  /** Provenance, kept separate from where the bytes live. */
+  sourceRef?: { providerId?: string; postId?: string }
 }
 
 export interface ActiveCap {

@@ -40,15 +40,19 @@ describe('vaultPin negative cache', () => {
     expect(vaultOptIn()).toBe(true)
   })
 
-  it('saves MP4s and media to localStorage by default when bridge is absent', async () => {
+  it('indexes the URL but reports NO local file when the bridge is absent', async () => {
     delete (window as any).gmatch
     delete storage['goonmatch-settings']
     const { vaultPin, vaultGet } = await import('./vault')
     const mp4Url = 'https://example.com/clips/video.mp4'
+    // The localStorage map is a URL INDEX that stops us re-fetching, not a byte
+    // store. It used to be returned as the "local" path, which marked images
+    // persisted when nothing had been downloaded — so callers requiring
+    // verified bytes must see a failure here.
     const pinned = await vaultPin(mp4Url)
-    expect(pinned).toBe(mp4Url)
-    const stored = await vaultGet(mp4Url)
-    expect(stored).toBe(mp4Url)
+    expect(pinned).toBeNull()
+    // Index still works for lookups, so nothing regressed for dev sessions.
+    expect(await vaultGet(mp4Url)).toBe(mp4Url)
     expect(storage['gmatch_vault_v1']).toContain(mp4Url)
   })
 })

@@ -22,7 +22,7 @@ import {
 } from './save'
 import type { SaveData } from './save'
 import { fetchPosts, fetchPostsMulti, matchesQuery, clearMirrorCooldowns, clearSeenMemory } from '../services/booru'
-import { vaultPin, vaultUnpin, vaultRemove } from '../services/vault'
+import { vaultPin, vaultGet, vaultUnpin, vaultRemove } from '../services/vault'
 import { evictImage, clearFeedCache } from '../services/imageCache'
 import { isCustomMediaUrl, sampleCustomSources } from '../services/customSources'
 import type { ActiveCap, BooruPost, CapId, CustomSource, GalleryImage, GridCell, KoDrop, OwnedTag, ViewMode } from './types'
@@ -453,6 +453,11 @@ function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: 
     boughtAt: now,
     kind: post.kind,
     preview: post.preview,
+    // Honest starting state: the provider gave us a URL, nothing more. It is
+    // NOT "saved" until verifyGalleryPersistence confirms bytes on disk.
+    saveState: 'downloading',
+    // Provenance kept apart from wherever the bytes end up living.
+    sourceRef: { postId: post.id },
   }
   // Novelty drop (non-blocking): one suggested tag + one anti-tag from the foe.
   const ownedNames = new Set(s.tags.map((t) => t.name.toLowerCase()))
@@ -478,7 +483,8 @@ function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: 
     : s.pendingDrops
   // Local vault (opt-in): pin the keep's bytes to disk in the background.
   // Lookup-only reads never write, so this is the single write trigger.
-  if (img.url) void vaultPin(img.url)
+  // The pin is NOT awaited here — the caller (koFoe) resolves it and the store
+  // flips the record to persisted/failed once the outcome is known.
   return {
     defeated,
     bonus,
@@ -492,8 +498,38 @@ function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: 
   }
 }
 
-function koFoe(s: GameState, now: number, clicksOnFoe: number) {
-  const post = s.current as BooruPost
+/**
+ * Persist one keep's bytes and mark it saved ONLY once the bytes are readable.
+ *
+ * The old flow wrote the gallery record and fired `void vaultPin(url)`, so the
+ * item existed as "kept" before any byte was downloaded; a refused download
+ * was swallowed by the session negative cache and the record kept a remote URL
+ * forever. Now: pin -> read back -> only then `persisted`. Anything else is
+ * `failed` with the provenance retained, and stays retryable.
+ *
+ * Never deletes or overwrites an existing valid keep: this only ever adds
+ * localRef/saveState to the record it was asked about.
+ */
+async function verifyGalleryPersistence(id: string, url: string): Promise<void> {
+  const local = url ? await vaultPin(url) : null
+  // Read back rather than trusting the pin's return value: a vault can report a
+  // path it can no longer open.
+  const confirmed = local ? await vaultGet(url) : null
+  const ok = Boolean(confirmed)
+  useGame.setState((s) => ({
+    gallery: s.gallery.map((g) =>
+      g.id === id
+        ? {
+            ...g,
+            saveState: ok ? ('persisted' as const) : ('failed' as const),
+            localRef: ok ? confirmed! : undefined,
+          }
+        : g,
+    ),
+  }))
+}
+
+function koFoe(s: GameState, now: number, clicksOnFoe: number) {  const post = s.current as BooruPost
   const spoil = gallerySpoils(s, post, clicksOnFoe, now)
   const current = s.queue[0] ?? null
   const queue = s.queue.slice(1)
@@ -601,6 +637,11 @@ export const useGame = create<GameState>((set, get) => ({
       foeClicks: ko.foeClicks,
     }
     next.toasts = pushToast(next, `Drained ${ko.img.rarity} foe (+${ko.bonus} pts) — kept in gallery`)
+    // Local-first persistence, verified before it is called saved: the pin is
+    // awaited, read back, and only then does the record become `persisted`.
+    // A failure marks it `failed` and retries later instead of silently
+    // leaving a remote-only URL looking like a local keep.
+    void verifyGalleryPersistence(ko.img.id, ko.img.url)
     set({
       points: next.points,
       totalEarned: next.totalEarned,

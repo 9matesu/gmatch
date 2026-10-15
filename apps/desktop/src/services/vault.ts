@@ -75,7 +75,14 @@ export async function vaultGet(url: string): Promise<string | null> {
   return stored[url] ?? null
 }
 
-/** Get-or-fetch + pin. Fire-and-forget for keeps/cards; resolves vault:// or cached url. */
+/** Get-or-fetch + pin. Fire-and-forget for keeps/cards; resolves vault:// or cached url.
+ *
+ *  The localStorage fallback below is a URL INDEX, not a byte store: it lets a
+ *  browser dev session resolve a URL it has already fetched through the dev
+ *  proxy. It is NOT local persistence, so it must never be reported as one —
+ *  it used to store `url -> url` and return the remote URL as the "local"
+ *  path, which marked an image persisted when nothing had been downloaded.
+ *  A caller that needs verified bytes must see a failure here. */
 export async function vaultPin(url: string): Promise<string | null> {
   if (!url || !enabled()) return null
   if (sessionFailed.has(url)) return null
@@ -90,16 +97,22 @@ export async function vaultPin(url: string): Promise<string | null> {
         }
         return res.local
       }
+      // Bridge present but the pin did not produce a local file: the bytes did
+      // NOT land. Say so instead of pretending the remote URL is a local one.
+      sessionFailed.add(url)
+      return null
     }
-    // Browser fallback / localStorage: persist pinned URL directly
+    // Browser dev session with no Electron bridge: record the URL so a later
+    // lookup can skip re-fetching, but report that no bytes were persisted.
+    // Callers that require verified local media must handle the null.
     const stored = getStoredVault()
     stored[url] = url
     saveStoredVault(stored)
     sessionPinned.add(url)
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('orbit-vault-updated', { detail: { url, local: url } }))
+      window.dispatchEvent(new CustomEvent('orbit-vault-updated', { detail: { url, local: null } }))
     }
-    return url
+    return null
   } catch {
     sessionFailed.add(url)
     return null
