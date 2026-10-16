@@ -171,7 +171,7 @@ export function WatchLocalFile({
             {meta.duration !== null && Number.isFinite(meta.duration) ? ` · ${Math.round(meta.duration)}s` : ''}
             {` · sha256:${meta.hash.slice(0, 12)}…`}
           </p>
-          <label className="mt-2 flex cursor-pointer items-start gap-2 text-[11px] text-retro-muted">
+            <label className="mt-2 flex cursor-pointer items-start gap-2 text-xs text-retro-muted">
             <input
               type="checkbox"
               checked={consent}

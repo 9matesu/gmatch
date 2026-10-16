@@ -56,7 +56,7 @@ async function createRoom(page: Page) {
   await expect(dialog).toBeVisible({ timeout: 20_000 })
   await dialog.getByLabel('Video URL').fill(clip)
   await dialog.getByLabel('Party name').fill(ROOM_NAME)
-  await dialog.getByRole('button', { name: 'START PARTY' }).click()
+  await dialog.getByRole('button', { name: 'START PARTY', exact: true }).click()
   // The room opens: the header (with its Leave button) is the marker.
   await expect(page.getByRole('button', { name: 'Leave room' })).toBeVisible({ timeout: 60_000 })
 }
@@ -98,6 +98,10 @@ test('a room with its video and chat survives leaving and a reload', async ({ pa
   // boot restore is the only path that can bring the room back.
   await page.reload()
   await expect(page.getByRole('button', { name: 'Leave room' })).toBeVisible({ timeout: 60_000 })
+  // The Leave button renders from the local snapshot, but chatting needs the
+  // WS rejoin to have landed server-side (otherwise the frame is dropped as a
+  // non-member). Our own membership pill in the rail is that signal.
+  await expect(page.locator('aside', { hasText: 'In this room' }).getByText('you', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
   // Video and chat came back with it.
   await say(page, 'still here after the reload')
 })
