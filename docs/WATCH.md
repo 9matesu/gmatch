@@ -82,8 +82,24 @@ and playback stays frame-accurate within the drift deadband.
 | `watch.kick` / `watch.ban` | `{party, target}` | host only, target != host; relay system + roster; direct `watch.kicked` |
 | `watch.mute` | `{party, target, on}` | host only; relays `watch.settings.muted` |
 | `watch.host` | `{party, target}` | host only, target is member; relays `watch.roster` |
-| `watch.settings` | `{party, name?, isPrivate?, lockVideo?, cmdId?}` | host only; clamped; repeated `cmdId` returns current settings; relays `watch.settings` with `settingsRev` |
-| `watch.queue` | `{party, op: add\|remove\|play\|next, id?, url?, name?, relay?, cmdId?}` | member; `add`/`play` need `lockVideo` off unless host; repeated `cmdId` returns the current queue without duplicating work; relays `watch.queue` `{queue, current, frame, queueRev}` |
+| `watch.settings` | `{party, name?, isPrivate?, lockVideo?, sharedControl?, requireApproval?, cmdId?}` | host only; clamped; repeated `cmdId` returns current settings; relays `watch.settings` with `settingsRev` |
+| `watch.queue` | `{party, op: add\|remove\|move\|play\|next\|prev\|approve\|flag\|unflag, id?, url?, name?, relay?, hash?, size?, local?, before?, cmdId?}` | member; `add` needs `lockVideo` off unless host; remove/move/play/next/prev/flag need transport rights (host, or members with sharedControl); approve is host-only; repeated `cmdId` returns the current queue without duplicating work; relays `watch.queue` `{queue, current, frame, queueRev, ready}` |
+| `watch.ready` | `{party, id, hash?}` | member; entry must exist (and the hash must match when the entry carries one); records readiness, relays `watch.queue` |
+
+## Permissions and proposals
+
+- Default: the host controls transport and queue mutation. Members add videos
+  (or propose them) and chat.
+- `lockVideo`: only the host loads or queues videos at all.
+- `sharedControl` (host setting): members share play/pause/seek/next/prev and
+  remove/move/flag. Transport frames from non-holders are refused server-side.
+- `requireApproval` (host setting): non-host adds land as `proposed` and never
+  auto-play; the host approves explicitly, or plays the proposal directly
+  (implicit approval). Non-hosts cannot approve.
+- Queue adds dedupe by verified hash, relay upstream, or normalized URL: the
+  same file queued twice is one entry.
+- Entries flagged `unavailable` are skipped by next/prev and cannot play until
+  unflagged by a controller.
 | `watch.ping` | `{t0}` | anyone authed; direct `watch.pong {t0, t1}` (never broadcast) |
 | room -> all | `watch.sync`, `watch.roster`, `watch.system`, `watch.chat`, `watch.chat_del`, `watch.settings`, `watch.queue` | |
 

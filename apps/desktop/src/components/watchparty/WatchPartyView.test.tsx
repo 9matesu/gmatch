@@ -6,17 +6,21 @@ import type { PartyRuntime } from '../../hooks/watchPartyStore'
 
 let mockParties: PartyRuntime[] = []
 
-vi.mock('../../hooks/watchPartyStore', () => ({
-  useWatchParty: () => ({
-    parties: mockParties,
-    kickedNotice: null,
-  }),
-  joinPartyById: vi.fn(),
-  MAX_SLOTS: 4,
-  controlPlayback: vi.fn(),
-  queueOp: vi.fn(),
-  serverNow: () => 100,
-}))
+vi.mock('../../hooks/watchPartyStore', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../hooks/watchPartyStore')>()
+  return {
+    ...actual,
+    useWatchParty: () => ({
+      parties: mockParties,
+      kickedNotice: null,
+    }),
+    joinPartyById: vi.fn(),
+    MAX_SLOTS: 4,
+    controlPlayback: vi.fn(),
+    queueOp: vi.fn(),
+    serverNow: () => 100,
+  }
+})
 
 vi.mock('./WatchPartyRoomList', () => ({
   WatchPartyRoomList: () => <div data-testid="room-list">Room List</div>,

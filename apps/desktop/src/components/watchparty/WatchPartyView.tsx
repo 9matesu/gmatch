@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 import { Clapperboard } from 'lucide-react'
 import { Avatar } from '../Avatar'
 import { MUTED } from '../../ui/styles'
-import { useWatchParty, joinPartyById, MAX_SLOTS } from '../../hooks/watchPartyStore'
+import { useWatchParty, joinPartyById, canControlParty, MAX_SLOTS } from '../../hooks/watchPartyStore'
 import { watchInviteFromHash, stripWatchRoom } from './invite'
 import { WatchPartySlot } from './WatchPartySlot'
 import { WatchPartyTimeline } from './WatchPartyTimeline'
@@ -31,6 +31,7 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
   const [railOpen, setRailOpen] = useState(true)
   const active = parties.find((p) => p.id === activeId) || parties[parties.length - 1] || null
   const isHost = active?.host === identity.orbitId
+  const canControl = active ? canControlParty(active, identity.orbitId) : false
 
   // Deep link joining
   useEffect(() => {
@@ -114,7 +115,7 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
         {/* Cohesive Video Player Controls */}
         <WatchPartyTimeline
           party={active}
-          isHost={!!isHost}
+          isHost={!!canControl}
           onToggleRail={() => setRailOpen((v) => !v)}
           railOpen={railOpen}
         />

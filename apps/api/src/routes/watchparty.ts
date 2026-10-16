@@ -463,6 +463,8 @@ watchparty.get('/:id', orbitAuth, async (c) => {
     current: party.current,
     queueRev: party.queueRev,
     settingsRev: party.settingsRev,
+    sharedControl: party.sharedControl,
+    requireApproval: party.requireApproval,
     chat: party.chat,
     members: [...party.members.entries()].map(([id, m]) => ({ id, name: m.name, muted: m.muted })),
   })

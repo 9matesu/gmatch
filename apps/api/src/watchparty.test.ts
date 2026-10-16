@@ -716,3 +716,84 @@ describe('local-file readiness', () => {
     expect(q.queue.map((e) => e.id).sort()).toEqual([p.queue[0].id, 'x1'].sort())
   })
 })
+
+describe('shared control, proposals, and queue permissions', () => {
+  it('transport and queue mutation are host-only by default', () => {
+    const p = makeParty('u1')
+    joinWatch('u2', 'Bob', { party: p.id })
+    queueOps('u1', { party: p.id, op: 'add', name: 'a', url: '/api/objects/a' })
+    expect(applyWatch('u2', { party: p.id, action: 'play', position: 0 })).toBeNull()
+    expect(queueOps('u2', { party: p.id, op: 'play', id: p.queue[0].id })).toBeNull()
+    expect(queueOps('u2', { party: p.id, op: 'next' })).toBeNull()
+    expect(queueOps('u2', { party: p.id, op: 'remove', id: p.queue[0].id })).toBeNull()
+    expect(queueOps('u2', { party: p.id, op: 'move', id: p.queue[0].id })).toBeNull()
+    expect(p.queue).toHaveLength(1)
+  })
+
+  it('sharedControl opens transport and queue mutation to members', () => {
+    const p = makeParty('u1')
+    joinWatch('u2', 'Bob', { party: p.id })
+    queueOps('u1', { party: p.id, op: 'add', name: 'a', url: '/api/objects/a' })
+    settingsWatch('u1', { party: p.id, sharedControl: true })
+    expect(applyWatch('u2', { party: p.id, action: 'play', position: 0 })).not.toBeNull()
+    expect(queueOps('u2', { party: p.id, op: 'next' })).not.toBeNull()
+    expect(queueOps('u2', { party: p.id, op: 'remove', id: p.queue[0].id })).not.toBeNull()
+    expect(p.queue).toHaveLength(0)
+  })
+
+  it('requireApproval turns non-host adds into proposals; host approves', () => {
+    const p = makeParty('u1')
+    joinWatch('u2', 'Bob', { party: p.id })
+    settingsWatch('u1', { party: p.id, requireApproval: true })
+    const res = queueOps('u2', { party: p.id, op: 'add', name: 'suggestion', url: '/api/objects/s' })!
+    expect(p.queue[0].status).toBe('proposed')
+    expect(res.payload.queue[0].status).toBe('proposed')
+    // A proposal never auto-plays: non-host play is refused.
+    expect(queueOps('u2', { party: p.id, op: 'play', id: p.queue[0].id })).toBeNull()
+    expect(p.frame.url).not.toBe('/api/objects/s')
+    // Non-hosts cannot approve; the host can, or plays it directly.
+    expect(queueOps('u2', { party: p.id, op: 'approve', id: p.queue[0].id })).toBeNull()
+    queueOps('u1', { party: p.id, op: 'approve', id: p.queue[0].id })
+    expect(p.queue[0].status).toBeUndefined()
+  })
+
+  it('host adds skip approval even when required', () => {
+    const p = makeParty('u1')
+    settingsWatch('u1', { party: p.id, requireApproval: true })
+    queueOps('u1', { party: p.id, op: 'add', name: 'host pick', url: '/api/objects/h' })
+    expect(p.queue[0].status).toBeUndefined()
+  })
+
+  it('duplicate adds collapse onto the existing entry', () => {
+    const p = makeParty('u1')
+    queueOps('u1', { party: p.id, op: 'add', name: 'a', url: '/api/objects/a' })
+    const res = queueOps('u1', { party: p.id, op: 'add', name: 'a again', url: '/api/objects/a#t=10' })!
+    expect(p.queue).toHaveLength(1)
+    expect(res.payload.queue).toHaveLength(1)
+  })
+
+  it('flagged entries are skipped by next/prev and cannot play', () => {
+    const p = makeParty('u1')
+    queueOps('u1', { party: p.id, op: 'add', name: 'a', url: '/api/objects/a' })
+    queueOps('u1', { party: p.id, op: 'add', name: 'b', url: '/api/objects/b' })
+    queueOps('u1', { party: p.id, op: 'add', name: 'c', url: '/api/objects/c' })
+    queueOps('u1', { party: p.id, op: 'play', id: p.queue[0].id })
+    queueOps('u1', { party: p.id, op: 'flag', id: p.queue[1].id })
+    queueOps('u1', { party: p.id, op: 'next' })
+    expect(p.current).toBe(p.queue[2].id)
+    expect(queueOps('u1', { party: p.id, op: 'play', id: p.queue[1].id })!.payload.frame.url).not.toBe('/api/objects/b')
+    queueOps('u1', { party: p.id, op: 'unflag', id: p.queue[1].id })
+    expect(p.queue[1].status).toBeUndefined()
+  })
+
+  it('settings persist sharedControl and requireApproval', () => {
+    const p = makeParty('u1')
+    settingsWatch('u1', { party: p.id, sharedControl: true, requireApproval: true })
+    const dump = serializeParties()
+    __resetParties()
+    expect(restoreParties(dump)).toBe(1)
+    const q = getParty(p.id)!
+    expect(q.sharedControl).toBe(true)
+    expect(q.requireApproval).toBe(true)
+  })
+})

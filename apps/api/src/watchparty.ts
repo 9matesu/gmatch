@@ -31,6 +31,12 @@ export interface QueueEntry {
   size?: number
   /** True for consent-shared local files (bytes live on the swarm, not the server). */
   local?: boolean
+  /**
+   * Queue state. Absent/queued = playable now; proposed = a participant's
+   * suggestion awaiting host approval; unavailable = flagged (broken source)
+   * and skipped by next/prev. Never auto-plays while proposed.
+   */
+  status?: 'queued' | 'proposed' | 'unavailable'
 }
 
 export interface ChatEntry {
@@ -51,6 +57,10 @@ export interface Party {
   hostId: string
   isPrivate: boolean
   lockVideo: boolean
+  /** When true, members (not just the host) hold transport + queue controls. */
+  sharedControl: boolean
+  /** When true, non-host adds become proposals awaiting host approval. */
+  requireApproval: boolean
   bans: Set<string>
   frame: PartyFrame
   /** Monotonic revisions, stamped only by the server. */
@@ -120,6 +130,8 @@ export function createParty(
     hostId: creatorId,
     isPrivate: false,
     lockVideo: false,
+    sharedControl: false,
+    requireApproval: false,
     bans: new Set(),
     frame: { url: seedUrl, action: 'pause', position: 0, rate: 1, updatedAt: serverNow(), rev: 1 },
     frameRev: 1,
@@ -214,6 +226,7 @@ function sanitizeQueueEntry(raw: any): QueueEntry | null {
   if (!id || !url) return null
   const hash = typeof raw.hash === 'string' && /^[0-9a-f]{64}$/i.test(raw.hash.trim()) ? raw.hash.trim().toLowerCase() : undefined
   const size = Number(raw.size)
+  const status = raw.status === 'proposed' || raw.status === 'unavailable' ? raw.status : undefined
   const entry: QueueEntry = {
     id,
     name: (typeof raw.name === 'string' ? raw.name : '').slice(0, 60) || 'Untitled',
@@ -222,6 +235,7 @@ function sanitizeQueueEntry(raw: any): QueueEntry | null {
     hash,
     size: Number.isFinite(size) && size > 0 ? Math.floor(size) : undefined,
     local: raw.local === true ? true : undefined,
+    status,
   }
   return entry
 }
@@ -294,7 +308,7 @@ function rosterPayload(party: Party): any {
 
 /** Full room snapshot for joiners (position + chat + queue recovery). */
 function snapshotPayload(party: Party): any {
-  return { ...rosterPayload(party), frame: party.frame, chat: party.chat, queue: party.queue, current: party.current, queueRev: party.queueRev, settingsRev: party.settingsRev, ready: readyPayload(party) }
+  return { ...rosterPayload(party), frame: party.frame, chat: party.chat, queue: party.queue, current: party.current, queueRev: party.queueRev, settingsRev: party.settingsRev, ready: readyPayload(party), sharedControl: party.sharedControl, requireApproval: party.requireApproval, lockVideo: party.lockVideo, isPrivate: party.isPrivate }
 }
 
 function pushSystem(party: Party, text: string): any {
@@ -320,10 +334,13 @@ function reconcileHost(party: Party): void {
  * HOST_SEAT_GRACE_MS, so this equality also covers "host mid-reload": nobody
  * else can grab the controls while the tab is restarting, and the host regains
  * them the moment they rejoin inside the window.
+ *
+ * With sharedControl on (and lockVideo off), members share the transport.
  */
 export function controlsParty(party: Party, userId: string): boolean {
   reconcileHost(party)
-  return Boolean(party.hostId) && party.hostId === userId
+  if (Boolean(party.hostId) && party.hostId === userId) return true
+  return party.sharedControl && !party.lockVideo && party.members.has(userId)
 }
 
 /** Validate + apply one client control frame. Returns null to drop it. */
@@ -332,7 +349,8 @@ export function applyWatch(userId: string, msg: any): { room: string; payload: a
   const party = parties.get(String(msg.party || ''))
   const member = party?.members.get(userId)
   if (!party || !member) return null
-  // Transport is host-only. This used to gate on MEMBERSHIP alone, so any
+  // Transport is holder-only (host, or members when sharedControl is on).
+  // This used to gate on MEMBERSHIP alone, so any
   // viewer could play/pause/seek the room — and because the video canvas
   // broadcasts the local position on click, a viewer clicking their own player
   // dragged the whole room to their currentTime (often 0). Every other
@@ -599,14 +617,22 @@ export function settingsWatch(userId: string, msg: any): { room: string; payload
     party.lockVideo = msg.lockVideo
     payload.lockVideo = party.lockVideo
   }
-  if (payload.name === undefined && payload.isPrivate === undefined && payload.lockVideo === undefined) return null
+  if (typeof msg.sharedControl === 'boolean') {
+    party.sharedControl = msg.sharedControl
+    payload.sharedControl = party.sharedControl
+  }
+  if (typeof msg.requireApproval === 'boolean') {
+    party.requireApproval = msg.requireApproval
+    payload.requireApproval = party.requireApproval
+  }
+  if (payload.name === undefined && payload.isPrivate === undefined && payload.lockVideo === undefined && payload.sharedControl === undefined && payload.requireApproval === undefined) return null
   party.settingsRev += 1
   payload.settingsRev = party.settingsRev
   return { room: partyRoom(party.id), payload }
 }
 
 function currentSettingsPayload(party: Party): any {
-  return { type: 'watch.settings', party: party.id, name: party.name, isPrivate: party.isPrivate, lockVideo: party.lockVideo, settingsRev: party.settingsRev }
+  return { type: 'watch.settings', party: party.id, name: party.name, isPrivate: party.isPrivate, lockVideo: party.lockVideo, sharedControl: party.sharedControl, requireApproval: party.requireApproval, settingsRev: party.settingsRev }
 }
 
 /** Queue ops (entries are already resolved media; resolution lives in the
@@ -637,6 +663,14 @@ export function queueOps(userId: string, msg: any): { room: string; payload: any
       size: Number.isFinite(size) && size > 0 ? Math.floor(size) : undefined,
       local: msg.local === true ? true : undefined,
     }
+    // No silent duplicates: the same file queued twice is one entry. Identity
+    // is the verified hash when present, else the relay upstream, else the
+    // normalized URL.
+    if (party.queue.some((q) => entryIdentity(q) === entryIdentity(entry))) {
+      return { room: partyRoom(party.id), payload: currentQueuePayload(party) }
+    }
+    // Approval rooms: a non-host add is a proposal, never an auto-play.
+    if (party.requireApproval && party.hostId !== userId) entry.status = 'proposed'
     party.queue.push(entry)
     addPartyMedia(party, url)
     while (party.queue.length > MAX_QUEUE) {
@@ -644,8 +678,10 @@ export function queueOps(userId: string, msg: any): { room: string; payload: any
       party.queue.splice(dropIdx < 0 ? 0 : dropIdx, 1)
     }
   } else if (op === 'remove') {
+    if (!controlsParty(party, userId)) return null
     party.queue = party.queue.filter((q) => q.id !== String(msg.id || ''))
   } else if (op === 'move') {
+    if (!controlsParty(party, userId)) return null
     const from = party.queue.findIndex((q) => q.id === String(msg.id || ''))
     if (from < 0) return null
     const beforeRaw = String(msg.before || '')
@@ -658,15 +694,34 @@ export function queueOps(userId: string, msg: any): { room: string; payload: any
       party.queue.splice(to, 0, entry)
     }
   } else if (op === 'play') {
+    if (!controlsParty(party, userId)) return null
     const entry = party.queue.find((q) => q.id === String(msg.id || ''))
-    if (entry) applyQueueMedia(party, entry, member.name || userId.slice(0, 8), 'play')
-    else mutated = false
+    if (!entry || entry.status === 'unavailable') mutated = false
+    else {
+      // A host pressing play on a proposal approves it implicitly.
+      if (entry.status === 'proposed') {
+        if (party.hostId !== userId) return null
+        delete entry.status
+      }
+      applyQueueMedia(party, entry, member.name || userId.slice(0, 8), 'play')
+    }
   } else if (op === 'next') {
-    if (party.queue.length === 0) mutated = false
-    else stepQueue(party, userId, member.name, 1)
+    if (!controlsParty(party, userId)) return null
+    if (!stepQueue(party, userId, member.name, 1)) mutated = false
   } else if (op === 'prev') {
-    if (party.queue.length === 0) mutated = false
-    else stepQueue(party, userId, member.name, -1)
+    if (!controlsParty(party, userId)) return null
+    if (!stepQueue(party, userId, member.name, -1)) mutated = false
+  } else if (op === 'approve') {
+    if (party.hostId !== userId) return null
+    const entry = party.queue.find((q) => q.id === String(msg.id || ''))
+    if (!entry || entry.status !== 'proposed') return null
+    delete entry.status
+  } else if (op === 'flag' || op === 'unflag') {
+    if (!controlsParty(party, userId)) return null
+    const entry = party.queue.find((q) => q.id === String(msg.id || ''))
+    if (!entry) return null
+    if (op === 'flag') entry.status = 'unavailable'
+    else if (entry.status === 'unavailable') delete entry.status
   } else {
     return null
   }
@@ -731,16 +786,27 @@ function applyQueueMedia(party: Party, entry: QueueEntry, by: string, action: 'p
   party.frame = { url: entry.url, action, position: 0, rate: 1, updatedAt: serverNow(), rev: party.frameRev, by }
 }
 
+/** Identity for queue dedupe: verified hash wins, else relay upstream, else URL. */
+function entryIdentity(q: QueueEntry): string {
+  if (q.hash) return `hash:${q.hash}`
+  if (q.relay?.upstream) return `relay:${q.relay.upstream}`
+  return `url:${q.url.trim().replace(/#.*$/, '')}`
+}
+
 /** Step the playing entry +/-1 (wraps: prev at the first entry lands on the
  * last). Continuous playlist: a PLAYING room moves into a playing frame
- * (video ended mid-run); a paused room moves paused. */
-function stepQueue(party: Party, userId: string, name: string, dir: 1 | -1): void {
-  if (party.queue.length === 0) return
-  const idx = party.queue.findIndex((q) => q.id === party.current)
-  const nextIdx = (idx + dir + party.queue.length) % party.queue.length
-  const entry = idx < 0 ? party.queue[0] : party.queue[nextIdx]
-  if (entry) applyQueueMedia(party, entry, name || userId.slice(0, 8),
+ * (video ended mid-run); a paused room moves paused. Unavailable entries are
+ * skipped. Returns false when nothing could move. */
+function stepQueue(party: Party, userId: string, name: string, dir: 1 | -1): boolean {
+  const playable = party.queue.filter((q) => q.status !== 'unavailable')
+  if (playable.length === 0) return false
+  const idx = playable.findIndex((q) => q.id === party.current)
+  const nextIdx = idx < 0 ? 0 : (idx + dir + playable.length) % playable.length
+  const entry = playable[nextIdx]
+  if (!entry) return false
+  applyQueueMedia(party, entry, name || userId.slice(0, 8),
     party.frame.action === 'play' ? 'play' : 'pause')
+  return true
 }
 
 /** Persistence: rooms die with the process otherwise, so every deploy
@@ -751,6 +817,7 @@ export function serializeParties(): string {
   return JSON.stringify([...parties.values()].map((p) => ({
     id: p.id, name: p.name, mediaUrl: p.mediaUrl, mediaName: p.mediaName,
     relay: p.relay, hostId: p.hostId, isPrivate: p.isPrivate, lockVideo: p.lockVideo,
+    sharedControl: p.sharedControl, requireApproval: p.requireApproval,
     frame: p.frame, queue: p.queue, current: p.current,
     frameRev: p.frameRev, queueRev: p.queueRev, settingsRev: p.settingsRev,
     // chat persists with the room (applyChat caps it at 80 entries)
@@ -823,6 +890,8 @@ export function restoreParties(json: string): number {
     p.mediaName = String(s.mediaName || '')
     p.isPrivate = Boolean(s.isPrivate)
     p.lockVideo = Boolean(s.lockVideo)
+    p.sharedControl = Boolean((s as any).sharedControl)
+    p.requireApproval = Boolean((s as any).requireApproval)
     // Sanitize, don't adopt wholesale. A stored frame with a missing/garbage
     // position or updatedAt used to be handed straight to every client, where
     // computeTargetPosition turned it into NaN and — because every comparison

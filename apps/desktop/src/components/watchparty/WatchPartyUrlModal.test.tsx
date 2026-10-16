@@ -28,7 +28,7 @@ describe('WatchPartyUrlModal', () => {
     render(<WatchPartyUrlModal identity={identity} onClose={() => {}} />)
     const input = screen.getByLabelText('Video URL')
     expect(input).toBeTruthy()
-    const submit = screen.getByRole('button', { name: /start party/i }) as HTMLButtonElement
+    const submit = screen.getByRole('button', { name: 'START PARTY' }) as HTMLButtonElement
     expect(submit.disabled).toBe(true)
   })
 
@@ -36,7 +36,7 @@ describe('WatchPartyUrlModal', () => {
     const onClose = vi.fn()
     render(<WatchPartyUrlModal identity={identity} onClose={onClose} />)
     fireEvent.change(screen.getByLabelText('Video URL'), { target: { value: 'https://example.com/v' } })
-    fireEvent.click(screen.getByRole('button', { name: /start party/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'START PARTY' }))
     await waitFor(() => expect(createParty).toHaveBeenCalledWith(identity, 'https://example.com/v', ''))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
@@ -45,7 +45,7 @@ describe('WatchPartyUrlModal', () => {
     vi.mocked(createParty).mockResolvedValueOnce({ ok: false, error: 'Could not find a playable video at that link.' })
     render(<WatchPartyUrlModal identity={identity} onClose={() => {}} />)
     fireEvent.change(screen.getByLabelText('Video URL'), { target: { value: 'https://bad' } })
-    fireEvent.click(screen.getByRole('button', { name: /start party/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'START PARTY' }))
     expect(await screen.findByText(/playable video/)).toBeTruthy()
   })
 
@@ -67,7 +67,7 @@ describe('WatchPartyUrlModal', () => {
     const onClose = vi.fn()
     render(<WatchPartyUrlModal identity={identity} onClose={onClose} />)
     fireEvent.change(screen.getByLabelText('Video URL'), { target: { value: 'https://one\nhttps://two\nhttps://three' } })
-    fireEvent.click(screen.getByRole('button', { name: /start party/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'START PARTY' }))
     await waitFor(() => expect(createParty).toHaveBeenCalledWith(identity, 'https://one', ''))
     await waitFor(() => expect(loadPartyVideos).toHaveBeenCalledWith(identity, 'p9', ['https://two', 'https://three'], true))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
@@ -106,7 +106,7 @@ describe('WatchPartyUrlModal', () => {
     const onClose = vi.fn()
     render(<WatchPartyUrlModal identity={identity} onClose={onClose} />)
     fireEvent.change(screen.getByLabelText('Video URL'), { target: { value: 'https://pmvhaven.com/playlists/123' } })
-    fireEvent.click(screen.getByRole('button', { name: /start party/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'START PARTY' }))
 
     await waitFor(() => expect(createParty).toHaveBeenCalledWith(identity, 'https://video1', 'Awesome Playlist'))
     await waitFor(() => expect(loadPartyVideos).toHaveBeenCalledWith(identity, 'p9', ['https://video2', 'https://video3'], true))

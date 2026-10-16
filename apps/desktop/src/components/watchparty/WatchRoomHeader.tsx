@@ -122,6 +122,20 @@ export function WatchRoomHeader({ party, identity, profilePics: _profilePics }: 
               </div>
               <Switch checked={party.lockVideo} onChange={() => setPartySettings(party.id, { lockVideo: !party.lockVideo })} />
             </div>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-xs font-medium text-retro-fg">Shared control</div>
+                <div className="text-xs text-retro-muted">Members can play, pause, seek and manage the queue.</div>
+              </div>
+              <Switch checked={party.sharedControl} onChange={() => setPartySettings(party.id, { sharedControl: !party.sharedControl })} />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-xs font-medium text-retro-fg">Approve suggestions</div>
+                <div className="text-xs text-retro-muted">Member additions wait for host approval.</div>
+              </div>
+              <Switch checked={party.requireApproval} onChange={() => setPartySettings(party.id, { requireApproval: !party.requireApproval })} />
+            </div>
             <ul className="border-t border-border-glass pt-2 space-y-1 max-h-52 overflow-y-auto styled-scrollbar">
               <li className="text-[10px] uppercase tracking-wider text-retro-muted">Members</li>
               {party.members.map((m) => (

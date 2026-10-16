@@ -26,6 +26,7 @@ export interface QueueEntry {
   hash?: string
   size?: number
   local?: boolean
+  status?: 'queued' | 'proposed' | 'unavailable'
 }
 
 export interface PartyRuntime extends PartyInfo {
@@ -36,6 +37,8 @@ export interface PartyRuntime extends PartyInfo {
   mutedIds: Record<string, boolean>
   lockVideo: boolean
   isPrivate: boolean
+  sharedControl: boolean
+  requireApproval: boolean
   mediaName: string
   queue: QueueEntry[]
   current: string
@@ -232,6 +235,8 @@ function blankParty(info: PartyInfo): PartyRuntime {
     mutedIds: {},
     lockVideo: false,
     isPrivate: false,
+    sharedControl: false,
+    requireApproval: false,
     mediaName: '',
     queue: [],
     current: '',
@@ -337,7 +342,7 @@ export function handleWatchMessage(msg: any): void {
           if (Number.isFinite(rev) && rev >= 0) party.frameRev = Math.floor(rev)
         }
         if (Array.isArray(msg.chat)) party.chat = msg.chat.map((c: any) => ({ id: String(c.id || ''), from: String(c.from || ''), name: String(c.name || ''), text: String(c.text || ''), at: Number(c.at) || 0 }))
-        if (Array.isArray(msg.queue)) party.queue = msg.queue.map((q: any) => ({ id: String(q.id), name: String(q.name), url: String(q.url), hash: typeof q.hash === 'string' ? q.hash : undefined, size: Number.isFinite(Number(q.size)) ? Number(q.size) : undefined, local: q.local === true ? true : undefined }))
+        if (Array.isArray(msg.queue)) party.queue = msg.queue.map((q: any) => ({ id: String(q.id), name: String(q.name), url: String(q.url), hash: typeof q.hash === 'string' ? q.hash : undefined, size: Number.isFinite(Number(q.size)) ? Number(q.size) : undefined, local: q.local === true ? true : undefined, status: q.status === 'proposed' || q.status === 'unavailable' ? q.status : undefined }))
         if (typeof msg.current === 'string') {
           party.current = msg.current
           party.mediaName = party.queue.find((q) => q.id === party.current)?.name || party.mediaName
@@ -347,6 +352,10 @@ export function handleWatchMessage(msg: any): void {
         const settingsRev = Number((msg as any).settingsRev)
         if (Number.isFinite(settingsRev) && settingsRev >= 0) party.settingsRev = Math.floor(settingsRev)
         if (msg.ready && typeof msg.ready === 'object') party.ready = msg.ready as Record<string, string[]>
+        if (typeof (msg as any).sharedControl === 'boolean') party.sharedControl = (msg as any).sharedControl
+        if (typeof (msg as any).requireApproval === 'boolean') party.requireApproval = (msg as any).requireApproval
+        if (typeof (msg as any).lockVideo === 'boolean') party.lockVideo = (msg as any).lockVideo
+        if (typeof (msg as any).isPrivate === 'boolean') party.isPrivate = (msg as any).isPrivate
         break
       }
       case 'watch.chat':
@@ -364,6 +373,8 @@ export function handleWatchMessage(msg: any): void {
         if (typeof msg.name === 'string') party.name = msg.name
         if (typeof msg.isPrivate === 'boolean') party.isPrivate = msg.isPrivate
         if (typeof msg.lockVideo === 'boolean') party.lockVideo = msg.lockVideo
+        if (typeof (msg as any).sharedControl === 'boolean') party.sharedControl = (msg as any).sharedControl
+        if (typeof (msg as any).requireApproval === 'boolean') party.requireApproval = (msg as any).requireApproval
         if (msg.muted && typeof msg.muted === 'object') party.mutedIds = { ...party.mutedIds, ...msg.muted }
         if (Number.isFinite(settingsRev) && settingsRev >= 0) party.settingsRev = Math.floor(settingsRev)
         break
@@ -700,10 +711,16 @@ export function muteParty(partyId: string, target: string, on: boolean): void {
 export function transferParty(partyId: string, target: string): void {
   sendRoomFrame('watch.host', { party: partyId, target })
 }
-export function setPartySettings(partyId: string, patch: { name?: string; isPrivate?: boolean; lockVideo?: boolean }): void {
+export function setPartySettings(partyId: string, patch: { name?: string; isPrivate?: boolean; lockVideo?: boolean; sharedControl?: boolean; requireApproval?: boolean }): void {
   sendRoomFrame('watch.settings', { party: partyId, ...patch })
 }
-export function queueOp(partyId: string, op: 'remove' | 'play' | 'next' | 'prev', id = ''): void {
+
+/** UI mirror of the server transport gate: host, or members when shared. */
+export function canControlParty(party: Pick<PartyRuntime, 'host' | 'sharedControl' | 'lockVideo' | 'members'>, userId: string): boolean {
+  if (party.host && party.host === userId) return true
+  return party.sharedControl && !party.lockVideo && party.members.some((m) => m.id === userId)
+}
+export function queueOp(partyId: string, op: 'remove' | 'play' | 'next' | 'prev' | 'approve' | 'flag' | 'unflag', id = ''): void {
   sendRoomFrame('watch.queue', { party: partyId, op, id })
 }
 export function moveQueueEntry(partyId: string, id: string, before: string): void {

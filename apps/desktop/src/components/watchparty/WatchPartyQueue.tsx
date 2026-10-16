@@ -6,9 +6,9 @@
 // without interrupting playback.
 
 import { useRef, useState } from 'react'
-import { ListVideo, Play, Plus, X, Download, Loader2 } from 'lucide-react'
+import { ListVideo, Play, Plus, X, Download, Loader2, Flag } from 'lucide-react'
 import { BTN, BTN_PRIMARY, MUTED } from '../../ui/styles'
-import { loadPartyVideos, moveQueueEntry, queueOp, type PartyRuntime } from '../../hooks/watchPartyStore'
+import { loadPartyVideos, moveQueueEntry, queueOp, canControlParty, type PartyRuntime } from '../../hooks/watchPartyStore'
 import { signalLocalReady, useLocalEntryTransfer } from '../../hooks/watchLocalShare'
 
 interface IdentityLike {
@@ -93,6 +93,7 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
   const [error, setError] = useState('')
   const isHost = party.host === identity.orbitId
   const canAdd = isHost || !party.lockVideo
+  const canControl = canControlParty(party, identity.orbitId)
   const dragId = useRef<string | null>(null)
 
   const submit = async (queueOnly: boolean) => {
@@ -187,7 +188,7 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
           {party.queue.map((q, i) => (
             <li
               key={q.id}
-              draggable={canAdd}
+              draggable={canControl}
               onDragStart={(e) => { dragId.current = q.id; if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move' }}
               onDragOver={(e) => { if (dragId.current && dragId.current !== q.id) e.preventDefault() }}
               onDrop={(e) => {
@@ -199,12 +200,22 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
                 // last slot: drop the tail entry onto its own successor).
                 if (src && src !== q.id) moveQueueEntry(party.id, src, q.id)
               }}
-              className={`flex items-center gap-2 text-xs ${canAdd ? 'cursor-grab active:cursor-grabbing' : ''}`}
+              className={`flex items-center gap-2 text-xs ${canControl ? 'cursor-grab active:cursor-grabbing' : ''} ${q.status === 'unavailable' ? 'opacity-50' : ''}`}
             >
               <span className={MUTED}>{i + 1}</span>
               <span className={`truncate flex-1 ${q.id === party.current ? 'text-retro-fg font-semibold' : 'text-retro-muted'}`}>
                 {q.name || q.url}
               </span>
+              {q.status === 'proposed' && (
+                <span className="rounded-full border border-amber-400/40 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider text-amber-300" title="A participant suggestion — the host approves it before it can play">
+                  proposed
+                </span>
+              )}
+              {q.status === 'unavailable' && (
+                <span className="rounded-full border border-retro-error/40 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider text-retro-error" title="Flagged as unplayable — skipped by next/previous">
+                  unavailable
+                </span>
+              )}
               {q.local && (
                 <span className="font-mono text-[10px] text-retro-muted" title={`Local file · sha256:${(q.hash || '').slice(0, 12)}… · ready ${(party.ready[q.id] || []).length}/${party.members.length}`}>
                   {(party.ready[q.id] || []).length}/{party.members.length} ready
@@ -218,14 +229,29 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
                   hash={q.hash}
                 />
               )}
-              {isHost && q.id !== party.current && (
+              {isHost && q.status === 'proposed' && (
+                <button type="button" onClick={() => queueOp(party.id, 'approve', q.id)} aria-label={`Approve ${q.name || 'video'}`} title="Approve suggestion" className="px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 hover:bg-emerald-500/30 cursor-pointer text-[10px] font-bold uppercase tracking-wider">
+                  Approve
+                </button>
+              )}
+              {canControl && q.id !== party.current && q.status !== 'proposed' && q.status !== 'unavailable' && (
                 <button type="button" onClick={() => queueOp(party.id, 'play', q.id)} aria-label="Play now" className="p-1 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer">
                   <Play className="w-3 h-3" />
                 </button>
               )}
-              {isHost && (
+              {canControl && (
                 <button type="button" onClick={() => queueOp(party.id, 'remove', q.id)} aria-label="Remove from queue" className="p-1 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer">
                   <X className="w-3 h-3" />
+                </button>
+              )}
+              {canControl && q.status !== 'unavailable' && (
+                <button type="button" onClick={() => queueOp(party.id, 'flag', q.id)} aria-label="Flag as unavailable" title="Flag as unavailable" className="p-1 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-error cursor-pointer">
+                  <Flag className="w-3 h-3" />
+                </button>
+              )}
+              {canControl && q.status === 'unavailable' && (
+                <button type="button" onClick={() => queueOp(party.id, 'unflag', q.id)} aria-label="Mark as available" title="Mark as available again" className="px-2 py-0.5 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer text-[10px] font-semibold uppercase tracking-wider">
+                  Retry
                 </button>
               )}
             </li>
@@ -233,7 +259,7 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
         </ul>
       )}
       {party.queue.length === 0 && !adding && <p className="px-3 pb-2 text-[10px] text-retro-muted">Empty.</p>}
-      {canAdd && party.queue.length > 0 && (
+      {canControl && party.queue.length > 0 && (
         <div className="px-3 pb-2">
           <button type="button" onClick={() => queueOp(party.id, 'next')} className={`${BTN} px-2 py-1 text-[10px] uppercase tracking-wider`}>
             Play next
