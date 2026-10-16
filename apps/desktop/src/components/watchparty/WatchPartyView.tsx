@@ -72,6 +72,7 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
             onClose={() => setModalOpen(false)}
             joinPartyId={null}
             queueMode={false}
+            party={null}
           />
         )}
       </div>
@@ -156,6 +157,7 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
           joinPartyId={active?.id || null}
           queueMode
           lockVideo={Boolean(active?.lockVideo) && !isHost}
+          party={active}
         />
       )}
     </div>

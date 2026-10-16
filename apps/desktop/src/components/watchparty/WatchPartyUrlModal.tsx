@@ -6,8 +6,9 @@
 import { useState } from 'react'
 import { classifyStaticUrl } from '@orbit/shared'
 import { Modal } from '../Modal'
+import { WatchLocalFile } from './WatchLocalFile'
 import { BTN_PRIMARY } from '../../ui/styles'
-import { createParty, expandPlaylist, loadPartyVideo, loadPartyVideos } from '../../hooks/watchPartyStore'
+import { createParty, expandPlaylist, loadPartyVideo, loadPartyVideos, type PartyRuntime } from '../../hooks/watchPartyStore'
 
 interface IdentityLike {
   orbitId: string
@@ -21,6 +22,7 @@ export function WatchPartyUrlModal({
   joinPartyId = null,
   queueMode = false,
   lockVideo = false,
+  party = null,
 }: {
   identity: IdentityLike
   onClose: () => void
@@ -29,6 +31,8 @@ export function WatchPartyUrlModal({
   /** Load into the queue without interrupting playback. */
   queueMode?: boolean
   lockVideo?: boolean
+  /** Active room runtime (in-room mode), for local-file sharing. */
+  party?: PartyRuntime | null
 }) {
   const [url, setUrl] = useState('')
   const [name, setName] = useState('')
@@ -253,6 +257,17 @@ export function WatchPartyUrlModal({
             {busy ? (statusText || 'Parsing...') : inRoom ? (queueMode ? 'ADD TO QUEUE' : 'LOAD VIDEO') : 'START PARTY'}
           </button>
         </div>
+        {(!inRoom || (party && (party.host === identity.orbitId || !party.lockVideo))) && (
+          <div className="border-t border-border-glass pt-3">
+            <WatchLocalFile
+              identity={identity}
+              party={party}
+              roomName={name}
+              queueMode={queueMode}
+              onDone={onClose}
+            />
+          </div>
+        )}
       </div>
     </Modal>
   )

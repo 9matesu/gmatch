@@ -137,6 +137,36 @@ signature gets ONE new resolver function in the chain, plus a fixture in
   the party position. Players use `preload="auto"`; the relay answers with
   `private, max-age=60` so seek-back reads hit the browser cache.
 
+## Local files (consent-shared)
+
+A host path is never a remote source. The flow is explicit:
+
+1. The host picks or drops a video file in the room modal.
+2. The client classifies it (MIME, then extension), then reads SHA-256,
+   size, and duration locally. Images and unknown types are refused with a
+   reason; nothing leaves the machine yet.
+3. The host presses Share with an explicit consent checkbox.
+4. Metadata registers via `/api/objects/register` (private, recipients =
+   current members) and bytes seed the P2P swarm. The server never stores
+   the bytes for this path.
+5. The queue gains a `local` entry (`url: /api/objects/<id>`, `hash`,
+   `size`). Creating a room from a file uses `POST /api/watchparty`
+   `{localEntry}`; the server verifies the object row, its video MIME, the
+   hash, and owner/recipient access before seeding the room.
+6. Each participant fetches explicitly (Receive): 64KB swarm chunks with
+   progress + cancel, SHA-256 verified before the bytes count as available.
+   Partial or tampered transfers are dropped, never registered.
+7. Verified clients signal `watch.ready {party, id, hash}`; the server
+   records per-entry readiness (session-scoped, never persisted) and
+   broadcasts it in `watch.queue` payloads and snapshots. Shared playback is
+   declared available from the readiness counts, not from a bare resolve.
+
+Limits, stated honestly: recipients are the members at share time (late
+joiners need a re-share); large transfers ride the same 64KB-chunk swarm as
+everything else, so movies take a while and the 120s receive window plus
+cancel exist for exactly that; swarm chunks carry no per-chunk digest, so
+integrity is whole-file SHA-256 on completion.
+
 ## Trust boundaries
 
 - Single fly machine owns the room map; the JSON flush is that machine's

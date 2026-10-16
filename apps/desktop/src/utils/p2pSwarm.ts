@@ -171,6 +171,8 @@ interface PendingFetch {
   chunks: Map<number, Uint8Array>
   total: number
   mimeType: string
+  expectedHash?: string
+  onProgress?: (received: number, total: number) => void
 }
 const pendingFetches = new Map<string, PendingFetch>()
 
@@ -181,7 +183,14 @@ function decodeChunk(dataBase64: string): Uint8Array {
   return bytes
 }
 
-function finishFetch(id: string, req: PendingFetch): void {
+async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', buffer)
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+async function finishFetch(id: string, req: PendingFetch): Promise<void> {
   clearTimeout(req.timer)
   pendingFetches.delete(id)
   const parts: Uint8Array[] = []
@@ -189,7 +198,27 @@ function finishFetch(id: string, req: PendingFetch): void {
     const chunk = req.chunks.get(i)
     if (chunk) parts.push(chunk)
   }
-  const assembled = new Blob(parts as BlobPart[], { type: req.mimeType || 'application/octet-stream' })
+  // Concatenate once so a large file is hashed and registered as one blob —
+  // partial chunks are never marked available.
+  const bytes = new Uint8Array(parts.reduce((n, p) => n + p.length, 0))
+  let offset = 0
+  for (const p of parts) {
+    bytes.set(p, offset)
+    offset += p.length
+  }
+  if (req.expectedHash) {
+    try {
+      const actual = await sha256Hex(bytes.buffer as ArrayBuffer)
+      if (actual !== req.expectedHash.toLowerCase()) {
+        req.reject(new Error('swarm integrity check failed (hash mismatch)'))
+        return
+      }
+    } catch (err) {
+      req.reject(err instanceof Error ? err : new Error('swarm hash failed'))
+      return
+    }
+  }
+  const assembled = new Blob([bytes as BlobPart], { type: req.mimeType || 'application/octet-stream' })
   registerLocalObject(id, assembled)
   req.resolve(assembled)
 }
@@ -221,20 +250,39 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
     req.chunks.set(msg.index, decodeChunk(msg.dataBase64))
     req.total = msg.total
     req.mimeType = msg.mimeType
-    if (req.chunks.size === req.total) finishFetch(msg.id, req)
+    try {
+      req.onProgress?.(req.chunks.size, req.total)
+    } catch {
+      /* progress listener must never break assembly */
+    }
+    if (req.chunks.size === req.total) void finishFetch(msg.id, req)
     return true
   }
   if (msg.type === 'SWARM_HAVE') return true
   return false
 }
 
+export interface SwarmFetchOptions {
+  expectedHash?: string
+  onProgress?: (received: number, total: number) => void
+}
+
 /** Ask the swarm for an object by id (or content_hash alias). */
-export function requestSwarmObject(id: string, timeoutMs = 15000): Promise<Blob> {
+export function requestSwarmObject(id: string, timeoutMs = 15000, opts: SwarmFetchOptions = {}): Promise<Blob> {
   const cached = localObjects.get(id)
   if (cached) return Promise.resolve(cached)
   if (!swarmSend) return Promise.reject(new Error('swarm transport unavailable'))
   const existing = pendingFetches.get(id)
   if (existing) {
+    // A second waiter joins the in-flight fetch and inherits its integrity
+    // contract — a mismatched hash rejects everyone, never half-registers.
+    if (opts.expectedHash) existing.expectedHash = opts.expectedHash
+    if (opts.onProgress) {
+      const prev = existing.onProgress
+      existing.onProgress = prev
+        ? (r, t) => { try { prev(r, t) } catch { /* ignore */ } opts.onProgress!(r, t) }
+        : opts.onProgress
+    }
     return new Promise<Blob>((resolve, reject) => {
       const prevResolve = existing.resolve
       const prevReject = existing.reject
@@ -247,7 +295,7 @@ export function requestSwarmObject(id: string, timeoutMs = 15000): Promise<Blob>
       pendingFetches.delete(id)
       reject(new Error(`Timed out waiting for swarm object ${id}`))
     }, timeoutMs)
-    pendingFetches.set(id, { resolve, reject, timer, chunks: new Map(), total: 0, mimeType: '' })
+    pendingFetches.set(id, { resolve, reject, timer, chunks: new Map(), total: 0, mimeType: '', expectedHash: opts.expectedHash, onProgress: opts.onProgress })
     try {
       swarmSend!({ type: 'SWARM_WANT', id })
     } catch (err) {
@@ -256,6 +304,16 @@ export function requestSwarmObject(id: string, timeoutMs = 15000): Promise<Blob>
       reject(err instanceof Error ? err : new Error('swarm send failed'))
     }
   })
+}
+
+/** Cancel an in-flight swarm fetch. Partial chunks are dropped, never kept. */
+export function cancelSwarmObject(id: string): boolean {
+  const req = pendingFetches.get(id)
+  if (!req) return false
+  clearTimeout(req.timer)
+  pendingFetches.delete(id)
+  req.reject(new Error('swarm fetch cancelled'))
+  return true
 }
 
 export interface SwarmSessionOptions {

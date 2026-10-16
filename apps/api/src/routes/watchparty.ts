@@ -109,9 +109,64 @@ watchparty.post('/expand', orbitAuth, async (c) => {
   })
 })
 
+/**
+ * Create a room seeded by a consent-shared local file. The entry is already
+ * resolved (object id + verified hash); the server only checks that the
+ * requester may reference those bytes, then seeds queue/current from them.
+ */
+async function createPartyFromLocal(c: any, orbitId: string, localEntry: { objectId?: unknown; name?: unknown; hash?: unknown; size?: unknown }, roomName: string) {
+  const objectId = typeof localEntry?.objectId === 'string' ? localEntry.objectId.trim() : ''
+  const entryName = (typeof localEntry?.name === 'string' ? localEntry.name : '').trim().slice(0, 60) || 'Local file'
+  const hash = typeof localEntry?.hash === 'string' ? localEntry.hash.trim().toLowerCase() : ''
+  const size = Number(localEntry?.size)
+  if (!/^[0-9a-fA-F-]{36}$/.test(objectId)) return c.json({ error: 'That shared file reference is invalid.' }, 422)
+  if (!/^[0-9a-f]{64}$/.test(hash)) return c.json({ error: 'That shared file is missing its integrity hash.' }, 422)
+
+  // Ownership gate: only the owner, a recipient, or anyone for public rows
+  // may seed a room from these bytes. Private bytes stay private.
+  let row: any = null
+  try {
+    row = await c.env.DB.prepare(
+      'SELECT id, owner_id, mime_type, content_hash, is_public FROM Objects WHERE id = ?'
+    ).bind(objectId).first()
+  } catch {
+    return c.json({ error: 'Database temporarily unavailable' }, 503)
+  }
+  if (!row) return c.json({ error: 'That shared file is no longer registered.' }, 422)
+  if (row.mime_type && !String(row.mime_type).startsWith('video/')) {
+    return c.json({ error: 'That shared file is not a playable video.' }, 422)
+  }
+  if (row.content_hash && String(row.content_hash).toLowerCase() !== hash) {
+    return c.json({ error: 'That shared file failed its integrity check.' }, 422)
+  }
+  const allowed =
+    row.owner_id === orbitId ||
+    Number(row.is_public) === 1 ||
+    await c.env.DB.prepare('SELECT 1 FROM Recipients WHERE object_id = ? AND recipient_id = ? LIMIT 1')
+      .bind(objectId, orbitId).first().then((r: any) => Boolean(r)).catch(() => false)
+  if (!allowed) return c.json({ error: 'You do not have access to that shared file.' }, 403)
+
+  const mediaUrl = `/api/objects/${objectId}`
+  const party = createParty(roomName || entryName || 'Party', mediaUrl, mediaUrl, undefined, orbitId)
+  party.mediaName = entryName
+  const firstEntryId = crypto.randomUUID().slice(0, 8)
+  party.queue.push({
+    id: firstEntryId,
+    name: entryName,
+    url: mediaUrl,
+    hash,
+    size: Number.isFinite(size) && size > 0 ? Math.floor(size) : undefined,
+    local: true,
+  })
+  party.current = firstEntryId
+  return c.json({
+    party: { id: party.id, name: party.name, url: party.mediaUrl, queue: party.queue },
+    truncated: false,
+  }, 201)
+}
+
 watchparty.post('/', orbitAuth, async (c) => {
   const orbitId = c.get('orbitId')
-  if (!takeParseBudget(orbitId, 1)) return c.json({ error: 'Too many video parses. Wait a minute.' }, 429)
   let body: any
   try {
     body = await c.req.json()
@@ -120,7 +175,17 @@ watchparty.post('/', orbitAuth, async (c) => {
   }
   const rawUrl = typeof body?.url === 'string' ? body.url.trim() : ''
   const name = typeof body?.name === 'string' ? body.name.trim().slice(0, 40) : ''
+
+  // Local-first creation: the host already forged + registered a consent-shared
+  // file, so the server skips the URL pipeline and seeds the room from the
+  // verified entry. Ownership is checked below; bytes never touch the server.
+  const localEntry = body?.localEntry as { objectId?: unknown; name?: unknown; hash?: unknown; size?: unknown } | undefined
+  if (localEntry && typeof localEntry === 'object') {
+    return createPartyFromLocal(c, orbitId, localEntry, name)
+  }
+
   if (!rawUrl) return c.json({ error: PARSE_ERROR }, 422)
+  if (!takeParseBudget(orbitId, 1)) return c.json({ error: 'Too many video parses. Wait a minute.' }, 429)
 
   // Expand playlist if rawUrl contains a playlist link or multiple lines
   const lines = rawUrl.split(/\n+/).map((l: string) => l.trim()).filter(Boolean)

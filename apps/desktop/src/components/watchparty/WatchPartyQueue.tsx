@@ -6,9 +6,10 @@
 // without interrupting playback.
 
 import { useRef, useState } from 'react'
-import { ListVideo, Play, Plus, X } from 'lucide-react'
+import { ListVideo, Play, Plus, X, Download, Loader2 } from 'lucide-react'
 import { BTN, BTN_PRIMARY, MUTED } from '../../ui/styles'
 import { loadPartyVideos, moveQueueEntry, queueOp, type PartyRuntime } from '../../hooks/watchPartyStore'
+import { signalLocalReady, useLocalEntryTransfer } from '../../hooks/watchLocalShare'
 
 interface IdentityLike {
   orbitId: string
@@ -25,6 +26,64 @@ function parseLines(text: string): string[] {
 
 function isPmvPlaylist(u: string): boolean {
   return /pmvhaven\.com\/playlists\//i.test(u)
+}
+
+/**
+ * Receiver controls for a consent-shared local entry: explicit fetch with
+ * integrity + progress + cancel, then a readiness claim. Nothing auto-starts.
+ */
+function LocalEntryTransfer({ partyId, entryId, objectId, hash }: {
+  partyId: string
+  entryId: string
+  objectId: string | null
+  hash?: string
+}) {
+  const { status, received, total, error, receive, cancel } = useLocalEntryTransfer(objectId, hash)
+
+  // A verified local copy (own share, or a completed transfer) claims
+  // readiness once; the slot does the same for the playing entry.
+  if (status === 'have-local' || status === 'ready') {
+    return (
+      <button
+        type="button"
+        onClick={() => signalLocalReady(partyId, entryId, hash)}
+        title="Bytes verified on this machine — tell the room"
+        aria-label="Mark local file ready"
+        className="p-1 rounded-md hover:bg-glass-w10 text-emerald-400 hover:text-emerald-300 cursor-pointer"
+      >
+        <Download className="w-3 h-3" />
+      </button>
+    )
+  }
+  if (status === 'receiving') {
+    const pct = total > 0 ? Math.min(100, Math.round((received / total) * 100)) : 0
+    return (
+      <span className="flex items-center gap-1" title={`Receiving from peers (${pct}%)`}>
+        <Loader2 className="w-3 h-3 animate-spin text-retro-muted" />
+        <span className="font-mono text-[10px] text-retro-muted">{pct}%</span>
+        <button
+          type="button"
+          onClick={cancel}
+          aria-label="Cancel transfer"
+          title="Cancel transfer"
+          className="p-1 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </span>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => void receive()}
+      title={error ? `Receive from peers (last try: ${error})` : 'Receive from peers'}
+      aria-label="Receive local file from peers"
+      className="p-1 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer"
+    >
+      <Download className="w-3 h-3" />
+    </button>
+  )
 }
 
 export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; identity: IdentityLike }) {
@@ -146,6 +205,19 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
               <span className={`truncate flex-1 ${q.id === party.current ? 'text-retro-fg font-semibold' : 'text-retro-muted'}`}>
                 {q.name || q.url}
               </span>
+              {q.local && (
+                <span className="font-mono text-[10px] text-retro-muted" title={`Local file · sha256:${(q.hash || '').slice(0, 12)}… · ready ${(party.ready[q.id] || []).length}/${party.members.length}`}>
+                  {(party.ready[q.id] || []).length}/{party.members.length} ready
+                </span>
+              )}
+              {q.local && (
+                <LocalEntryTransfer
+                  partyId={party.id}
+                  entryId={q.id}
+                  objectId={(/\/api\/objects\/([0-9a-fA-F-]{36})/.exec(q.url || '') || [])[1] || null}
+                  hash={q.hash}
+                />
+              )}
               {isHost && q.id !== party.current && (
                 <button type="button" onClick={() => queueOp(party.id, 'play', q.id)} aria-label="Play now" className="p-1 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer">
                   <Play className="w-3 h-3" />

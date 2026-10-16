@@ -4,6 +4,10 @@ import {
   hasLocalObject,
   getLocalObject,
   createSwarmSession,
+  setSwarmTransport,
+  handleSwarmMessage,
+  requestSwarmObject,
+  cancelSwarmObject,
   type SwarmMessage,
 } from './p2pSwarm'
 
@@ -56,5 +60,87 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
     // Verify chunk transmission occurred over the simulated channel
     expect(peerBSentMessages.some((m) => m.type === 'SWARM_WANT')).toBe(true)
     expect(peerASentMessages.some((m) => m.type === 'SWARM_CHUNK')).toBe(true)
+  })
+
+  /** Feed crafted chunks through the module transport to test assembly. */
+  function serveBlob(id: string, blob: Blob, mime: string) {
+    setSwarmTransport((msg) => {
+      if (msg.type !== 'SWARM_WANT' || msg.id !== id) return
+      void (async () => {
+        const buffer = await blob.arrayBuffer()
+        const total = Math.ceil(buffer.byteLength / (64 * 1024)) || 1
+        for (let i = 0; i < total; i++) {
+          const slice = new Uint8Array(buffer.slice(i * 64 * 1024, Math.min((i + 1) * 64 * 1024, buffer.byteLength)))
+          let binaryStr = ''
+          for (let j = 0; j < slice.length; j++) binaryStr += String.fromCharCode(slice[j])
+          await handleSwarmMessage({ type: 'SWARM_CHUNK', id, index: i, total, mimeType: mime, dataBase64: btoa(binaryStr) })
+        }
+      })()
+    })
+  }
+
+  async function sha256HexText(text: string): Promise<string> {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
+    return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('')
+  }
+
+  it('verifies assembly integrity against the expected hash', async () => {
+    const text = 'b'.repeat(70 * 1024) // two chunks
+    const blob = new Blob([text], { type: 'video/mp4' })
+    serveBlob('hash-ok', blob, 'video/mp4')
+    const hash = await sha256HexText(text)
+    const received = await requestSwarmObject('hash-ok', 5000, { expectedHash: hash })
+    expect(received.size).toBe(blob.size)
+    expect(hasLocalObject('hash-ok')).toBe(true)
+    setSwarmTransport(null)
+  })
+
+  it('rejects tampered bytes and never registers them', async () => {
+    const text = 'c'.repeat(70 * 1024)
+    const blob = new Blob([text], { type: 'video/mp4' })
+    serveBlob('hash-bad', blob, 'video/mp4')
+    await expect(requestSwarmObject('hash-bad', 5000, { expectedHash: '0'.repeat(64) })).rejects.toThrow(/integrity|mismatch/i)
+    expect(hasLocalObject('hash-bad')).toBe(false)
+    setSwarmTransport(null)
+  })
+
+  it('reports transfer progress per chunk', async () => {
+    const text = 'd'.repeat(130 * 1024) // three chunks
+    const blob = new Blob([text], { type: 'video/mp4' })
+    serveBlob('progress-1', blob, 'video/mp4')
+    const seen: Array<[number, number]> = []
+    await requestSwarmObject('progress-1', 5000, { onProgress: (r, t) => { seen.push([r, t]) } })
+    expect(seen.length).toBeGreaterThanOrEqual(3)
+    expect(seen.at(-1)).toEqual([3, 3])
+    setSwarmTransport(null)
+  })
+
+  it('cancels an in-flight fetch and drops partial chunks', async () => {
+    const text = 'e'.repeat(200 * 1024)
+    const blob = new Blob([text], { type: 'video/mp4' })
+    // Serve slowly so cancel lands mid-transfer.
+    setSwarmTransport((msg) => {
+      if (msg.type !== 'SWARM_WANT' || msg.id !== 'cancel-1') return
+      void (async () => {
+        const buffer = await blob.arrayBuffer()
+        const total = 4
+        for (let i = 0; i < total; i++) {
+          await new Promise((r) => setTimeout(r, 25))
+          const slice = new Uint8Array(buffer.slice(i * 64 * 1024, Math.min((i + 1) * 64 * 1024, buffer.byteLength)))
+          let binaryStr = ''
+          for (let j = 0; j < slice.length; j++) binaryStr += String.fromCharCode(slice[j])
+          await handleSwarmMessage({ type: 'SWARM_CHUNK', id: 'cancel-1', index: i, total, mimeType: 'video/mp4', dataBase64: btoa(binaryStr) })
+        }
+      })()
+    })
+    const pending = requestSwarmObject('cancel-1', 5000)
+    await new Promise((r) => setTimeout(r, 40))
+    expect(cancelSwarmObject('cancel-1')).toBe(true)
+    await expect(pending).rejects.toThrow(/cancelled/i)
+    expect(hasLocalObject('cancel-1')).toBe(false)
+    // Late chunks for a cancelled fetch are ignored, not resurrected.
+    expect(await handleSwarmMessage({ type: 'SWARM_CHUNK', id: 'cancel-1', index: 3, total: 4, mimeType: 'video/mp4', dataBase64: 'eA==' })).toBe(false)
+    expect(cancelSwarmObject('cancel-1')).toBe(false)
+    setSwarmTransport(null)
   })
 })

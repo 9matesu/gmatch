@@ -17,6 +17,7 @@ import {
   resetWatchParty,
   handleWatchMessage,
   createParty,
+  createPartyFromLocal,
   expandPlaylist,
   loadPartyVideos,
   joinParty,
@@ -236,6 +237,19 @@ describe('watchPartyStore', () => {
     handleWatchMessage({ type: 'watch.queue', party: 'p1', queue: [], current: '', queueRev: 2 })
     handleWatchMessage({ type: 'watch.queue', party: 'p1', queue: [{ id: 'old', name: 'old', url: 'u' }], current: '', queueRev: 1 })
     expect(watchPartyStore.getSnapshot().parties[0].queue).toEqual([])
+  })
+
+  it('createPartyFromLocal posts the verified entry, then joins', async () => {
+    vi.mocked(orbitFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ party: { id: 'p1', name: 'Night', url: '/api/objects/o1' } }), { status: 201 }),
+    )
+    const entry = { objectId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', name: 'clip.mp4', hash: 'f'.repeat(64), size: 10 }
+    const res = await createPartyFromLocal(identity, entry, 'Night')
+    expect(res).toEqual({ ok: true, partyId: 'p1' })
+    const call = vi.mocked(orbitFetch).mock.calls.at(-1)!
+    expect(call[0]).toBe('/api/watchparty')
+    expect(JSON.parse(String((call[1] as RequestInit).body))).toEqual({ localEntry: entry, name: 'Night' })
+    expect(sendOrbitWebSocket).toHaveBeenCalledWith(expect.objectContaining({ type: 'watch.join', party: 'p1' }))
   })
 
   it('redeems a private invite before reading the snapshot', async () => {

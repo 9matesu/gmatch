@@ -143,3 +143,66 @@ describe('private-room authorization', () => {
     expect(snap.status).toBe(200)
   })
 })
+
+describe('POST /api/watchparty with localEntry', () => {
+  const HASH = 'c'.repeat(64)
+  let oidSeq = 0
+  const nextOid = () => {
+    oidSeq += 1
+    return `11111111-2222-3333-4444-55555555555${oidSeq}`
+  }
+
+  async function seedObject(oid: string, ownerId: string, isPublic = 0) {
+    await env.DB.prepare(
+      'INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, content_hash, is_public) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).bind(oid, ownerId, 1234, 'video/mp4', `urn:sha256:${HASH}`, HASH, isPublic).run()
+  }
+
+  it('creates a room from a verified local entry', async () => {
+    __resetParties()
+    const host = createTestIdentity()
+    const oid = nextOid()
+    await seedObject(oid, host.orbitId)
+    const hostAuth = (method: string, url: string, body?: string) => ({ 'Content-Type': 'application/json', ...signRequestHeaders(host, method, url, body) })
+    const body = JSON.stringify({ localEntry: { objectId: oid, name: 'clip.mp4', hash: HASH, size: 1234 }, name: 'Movie night' })
+    const res = await app.request('/api/watchparty', { method: 'POST', headers: hostAuth('POST', '/api/watchparty', body), body }, env)
+    expect(res.status).toBe(201)
+    const json: any = await res.json()
+    expect(json.party.queue[0].hash).toBe(HASH)
+    expect(json.party.queue[0].local).toBe(true)
+  })
+
+  it('rejects bad references, mismatched hashes, and missing rows', async () => {
+    __resetParties()
+    const host = createTestIdentity()
+    const hostAuth = (method: string, url: string, body?: string) => ({ 'Content-Type': 'application/json', ...signRequestHeaders(host, method, url, body) })
+    const post = async (entry: unknown) => {
+      const body = JSON.stringify({ localEntry: entry })
+      const res = await app.request('/api/watchparty', { method: 'POST', headers: hostAuth('POST', '/api/watchparty', body), body }, env)
+      return res.status
+    }
+    const oid = nextOid()
+    await seedObject(oid, host.orbitId)
+    expect(await post({ objectId: 'nope', name: 'x', hash: HASH, size: 1 })).toBe(422)
+    expect(await post({ objectId: oid, name: 'x', hash: 'd'.repeat(64), size: 1 })).toBe(422) // hash mismatch
+    expect(await post({ objectId: nextOid(), name: 'x', hash: HASH, size: 1 })).toBe(422) // no row seeded
+  })
+
+  it('refuses strangers for private rows but allows recipients', async () => {
+    __resetParties()
+    const host = createTestIdentity()
+    const guest = createTestIdentity()
+    const oid = nextOid()
+    await seedObject(oid, host.orbitId)
+    await env.DB.prepare('INSERT OR IGNORE INTO Recipients (object_id, recipient_id) VALUES (?, ?)').bind(oid, guest.orbitId).run()
+    const guestAuth = (method: string, url: string, body?: string) => ({ 'Content-Type': 'application/json', ...signRequestHeaders(guest, method, url, body) })
+    const body = JSON.stringify({ localEntry: { objectId: oid, name: 'clip.mp4', hash: HASH, size: 1234 } })
+    const res = await app.request('/api/watchparty', { method: 'POST', headers: guestAuth('POST', '/api/watchparty', body), body }, env)
+    expect(res.status).toBe(201)
+
+    const stranger = createTestIdentity()
+    const strangerAuth = (method: string, url: string, b?: string) => ({ 'Content-Type': 'application/json', ...signRequestHeaders(stranger, method, url, b) })
+    const denied = await app.request('/api/watchparty', { method: 'POST', headers: strangerAuth('POST', '/api/watchparty', body), body }, env)
+    expect(denied.status).toBe(403)
+  })
+})

@@ -19,7 +19,7 @@ const party = {
   id: 'p1', name: 'N', url: 'u', frame: null, members: [], chat: [],
   host: 'me', mutedIds: {}, lockVideo: false, isPrivate: false,
   mediaName: '', queue: [{ id: 'q1', name: 'a', url: '/api/objects/a' }, { id: 'q2', name: 'b', url: '/api/objects/b' }], current: 'q1',
-  frameRev: 0, queueRev: 0, settingsRev: 0,
+  frameRev: 0, queueRev: 0, settingsRev: 0, ready: {},
 } as PartyRuntime
 
 beforeEach(() => {
@@ -84,5 +84,20 @@ describe('WatchPartyQueue', () => {
     fireEvent.change(screen.getByLabelText('Queue video URLs'), { target: { value: 'https://a\nhttps://b\nhttps://c' } })
     fireEvent.click(screen.getByRole('button', { name: /^add$/i }))
     expect(await screen.findByText(/Queue limit \(50\) reached/)).toBeTruthy()
+  })
+
+  it('local entries show readiness counts and a receive control', () => {
+    const localParty = {
+      ...party,
+      members: [{ id: 'me', name: 'Me' }, { id: 'u2', name: 'Bob' }],
+      queue: [
+        { id: 'q1', name: 'clip.mp4', url: '/api/objects/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', hash: 'f'.repeat(64), size: 10, local: true },
+      ],
+      current: 'q1',
+      ready: { q1: ['u2'] },
+    } as PartyRuntime
+    render(<WatchPartyQueue party={localParty} identity={identity} />)
+    expect(screen.getByText('1/2 ready')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /receive local file from peers/i })).toBeTruthy()
   })
 })

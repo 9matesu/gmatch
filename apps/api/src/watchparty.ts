@@ -25,6 +25,12 @@ export interface QueueEntry {
   name: string
   url: string
   relay?: { upstream: string; referer: string }
+  /** SHA-256 of the bytes, when the entry is a consent-shared local file. */
+  hash?: string
+  /** Byte size, when known (local files, stored objects). */
+  size?: number
+  /** True for consent-shared local files (bytes live on the swarm, not the server). */
+  local?: boolean
 }
 
 export interface ChatEntry {
@@ -56,6 +62,9 @@ export interface Party {
   inviteToken?: string
   /** Recently seen client command IDs, for idempotent retries. Session-scoped. */
   recentCmds: Map<string, number>
+  /** Local-file readiness: entryId -> member ids that verified the bytes.
+   * Session-scoped by design (a restart re-verifies); never persisted. */
+  ready: Map<string, Set<string>>
   members: Map<string, PartyMember>
   queue: QueueEntry[]
   current: string
@@ -118,6 +127,7 @@ export function createParty(
     settingsRev: 0,
     inviteToken: undefined,
     recentCmds: new Map(),
+    ready: new Map(),
     members: new Map(),
     queue: [],
     current: '',
@@ -196,6 +206,26 @@ function sanitizeRev(raw: any): number {
   return Number.isFinite(rev) && rev >= 0 ? Math.floor(rev) : 0
 }
 
+/** Coerce anything queue-entry-shaped into a valid QueueEntry, or null. */
+function sanitizeQueueEntry(raw: any): QueueEntry | null {
+  if (!raw || typeof raw !== 'object') return null
+  const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim().slice(0, 8) : ''
+  const url = typeof raw.url === 'string' ? raw.url : ''
+  if (!id || !url) return null
+  const hash = typeof raw.hash === 'string' && /^[0-9a-f]{64}$/i.test(raw.hash.trim()) ? raw.hash.trim().toLowerCase() : undefined
+  const size = Number(raw.size)
+  const entry: QueueEntry = {
+    id,
+    name: (typeof raw.name === 'string' ? raw.name : '').slice(0, 60) || 'Untitled',
+    url,
+    relay: raw.relay && typeof raw.relay.upstream === 'string' ? raw.relay : undefined,
+    hash,
+    size: Number.isFinite(size) && size > 0 ? Math.floor(size) : undefined,
+    local: raw.local === true ? true : undefined,
+  }
+  return entry
+}
+
 /** Bounded idempotency registry for repeated client commands. */
 const CMD_TTL_MS = 60_000
 const MAX_CMDS = 200
@@ -264,7 +294,7 @@ function rosterPayload(party: Party): any {
 
 /** Full room snapshot for joiners (position + chat + queue recovery). */
 function snapshotPayload(party: Party): any {
-  return { ...rosterPayload(party), frame: party.frame, chat: party.chat, queue: party.queue, current: party.current, queueRev: party.queueRev, settingsRev: party.settingsRev }
+  return { ...rosterPayload(party), frame: party.frame, chat: party.chat, queue: party.queue, current: party.current, queueRev: party.queueRev, settingsRev: party.settingsRev, ready: readyPayload(party) }
 }
 
 function pushSystem(party: Party, text: string): any {
@@ -596,12 +626,18 @@ export function queueOps(userId: string, msg: any): { room: string; payload: any
     const url = typeof msg.url === 'string' ? msg.url : ''
     if (!url) return null
     const entryId = (typeof msg.id === 'string' && msg.id.trim()) ? msg.id.trim().slice(0, 8) : randomUUID().slice(0, 8)
-    party.queue.push({
+    const hash = typeof msg.hash === 'string' && /^[0-9a-f]{64}$/i.test(msg.hash.trim()) ? msg.hash.trim().toLowerCase() : undefined
+    const size = Number(msg.size)
+    const entry: QueueEntry = {
       id: entryId,
       name: (typeof msg.name === 'string' ? msg.name : '').slice(0, 60) || 'Untitled',
       url,
       relay: msg.relay && typeof msg.relay.upstream === 'string' ? msg.relay : undefined,
-    })
+      hash,
+      size: Number.isFinite(size) && size > 0 ? Math.floor(size) : undefined,
+      local: msg.local === true ? true : undefined,
+    }
+    party.queue.push(entry)
     addPartyMedia(party, url)
     while (party.queue.length > MAX_QUEUE) {
       const dropIdx = party.queue.findIndex((q) => q.id !== party.current)
@@ -650,7 +686,40 @@ function currentQueuePayload(party: Party): any {
     current: party.current,
     frame: party.frame,
     queueRev: party.queueRev,
+    ready: readyPayload(party),
   }
+}
+
+/** Local-file readiness, as plain JSON: entryId -> member ids. */
+function readyPayload(party: Party): Record<string, string[]> {
+  const out: Record<string, string[]> = {}
+  for (const [entryId, members] of party.ready) {
+    if (members.size > 0) out[entryId] = [...members]
+  }
+  return out
+}
+
+/**
+ * A member verified a queue entry's bytes locally (hash-checked on their own
+ * machine). Idempotent: repeated signals change nothing. Returns the queue
+ * payload so the room sees readiness converge.
+ */
+export function watchReady(userId: string, msg: any): { room: string; payload: any } | null {
+  const party = parties.get(String(msg?.party || ''))
+  if (!party || !party.members.has(userId)) return null
+  const entry = party.queue.find((q) => q.id === String(msg?.id || ''))
+  if (!entry) return null
+  const hash = typeof msg?.hash === 'string' ? msg.hash.trim().toLowerCase() : ''
+  // When the entry carries a hash, the signal must name it: readiness for a
+  // different file must not count toward this entry.
+  if (entry.hash && hash !== entry.hash) return null
+  let set = party.ready.get(entry.id)
+  if (!set) {
+    set = new Set()
+    party.ready.set(entry.id, set)
+  }
+  set.add(userId)
+  return { room: partyRoom(party.id), payload: currentQueuePayload(party) }
 }
 
 function applyQueueMedia(party: Party, entry: QueueEntry, by: string, action: 'play' | 'pause' = 'pause'): void {
@@ -764,7 +833,9 @@ export function restoreParties(json: string): number {
     p.frame.rev = p.frameRev
     p.queueRev = sanitizeRev((s as any).queueRev)
     p.settingsRev = sanitizeRev((s as any).settingsRev)
-    if (Array.isArray(s.queue)) p.queue = s.queue
+    // Sanitize, don't adopt wholesale: queue entries ride the same persisted
+    // file as the frame, and a corrupt entry used to 404 every client.
+    if (Array.isArray(s.queue)) p.queue = s.queue.map(sanitizeQueueEntry).filter((q: QueueEntry | null): q is QueueEntry => Boolean(q))
     if (typeof s.current === 'string') p.current = s.current
     if (Array.isArray(s.chat)) p.chat = s.chat.filter((m: any) => m && typeof m.text === 'string').slice(-80)
     // dropParty clears queue-entry capabilities; restore must re-mint ALL

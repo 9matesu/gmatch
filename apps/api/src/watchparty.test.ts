@@ -4,7 +4,7 @@ import {
   deleteChat, kickWatch, banWatch, muteWatch, transferHost, settingsWatch,
   queueOps, setPartyMedia, __resetParties, partyRoom, MAX_QUEUE, isPartyMediaObject,
   serializeParties, restoreParties, liveMediaObjectIds, HOST_SEAT_GRACE_MS, type Party,
-  mintInvite, revokeInvite, redeemInvite,
+  mintInvite, revokeInvite, redeemInvite, watchReady,
 } from './watchparty'
 import { handleIncoming, conns, createWsTicket, type WsConn } from './ws-bus'
 
@@ -653,5 +653,66 @@ describe('private-room invites', () => {
     const token = mintInvite('u1', p.id)!
     expect(redeemInvite('u2', p.id, token)).toBe(false)
     expect(joinWatch('u2', 'Bob', { party: p.id, invite: token })).toBeNull()
+  })
+})
+
+describe('local-file readiness', () => {
+  const HASH = 'a'.repeat(64)
+
+  it('records verified members per queue entry and reports it in the payload', () => {
+    const p = makeParty('u1')
+    joinWatch('u2', 'Bob', { party: p.id })
+    queueOps('u1', { party: p.id, op: 'add', name: 'local clip', url: '/api/objects/o1', hash: HASH, size: 1234, local: true })
+    const entry = p.queue[0]
+    expect(entry.hash).toBe(HASH)
+    expect(entry.local).toBe(true)
+
+    const first = watchReady('u1', { party: p.id, id: entry.id, hash: HASH })!
+    expect(first.payload.ready[entry.id]).toEqual(['u1'])
+    const second = watchReady('u2', { party: p.id, id: entry.id, hash: HASH })!
+    expect(second.payload.ready[entry.id].sort()).toEqual(['u1', 'u2'])
+  })
+
+  it('refuses readiness from non-members, unknown entries, and mismatched hashes', () => {
+    const p = makeParty('u1')
+    queueOps('u1', { party: p.id, op: 'add', name: 'local clip', url: '/api/objects/o1', hash: HASH, local: true })
+    const entry = p.queue[0]
+    expect(watchReady('stranger', { party: p.id, id: entry.id, hash: HASH })).toBeNull()
+    expect(watchReady('u1', { party: p.id, id: 'zzzzzzzz', hash: HASH })).toBeNull()
+    expect(watchReady('u1', { party: p.id, id: entry.id, hash: 'b'.repeat(64) })).toBeNull()
+    expect(p.ready.size).toBe(0)
+  })
+
+  it('repeating a ready signal is idempotent', () => {
+    const p = makeParty('u1')
+    queueOps('u1', { party: p.id, op: 'add', name: 'plain', url: '/api/objects/o2' })
+    const entry = p.queue[0]
+    watchReady('u1', { party: p.id, id: entry.id })
+    const res = watchReady('u1', { party: p.id, id: entry.id })!
+    expect(res.payload.ready[entry.id]).toEqual(['u1'])
+  })
+
+  it('persists entry metadata but never readiness across restarts', () => {
+    const p = makeParty('u1')
+    queueOps('u1', { party: p.id, op: 'add', name: 'local clip', url: '/api/objects/o1', hash: HASH, size: 99, local: true })
+    watchReady('u1', { party: p.id, id: p.queue[0].id, hash: HASH })
+    const dump = serializeParties()
+    __resetParties()
+    expect(restoreParties(dump)).toBe(1)
+    const q = getParty(p.id)!
+    expect(q.queue[0].hash).toBe(HASH)
+    expect(q.queue[0].local).toBe(true)
+    expect(q.ready.size).toBe(0)
+  })
+
+  it('drops corrupt queue entries on restore instead of adopting them', () => {
+    const p = makeParty('u1')
+    queueOps('u1', { party: p.id, op: 'add', name: 'good', url: '/api/objects/o1' })
+    const rows = JSON.parse(serializeParties())
+    rows[0].queue.push({ id: '', url: '' }, null, { id: 'x1', url: '/api/objects/x' })
+    __resetParties()
+    expect(restoreParties(JSON.stringify(rows))).toBe(1)
+    const q = getParty(p.id)!
+    expect(q.queue.map((e) => e.id).sort()).toEqual([p.queue[0].id, 'x1'].sort())
   })
 })

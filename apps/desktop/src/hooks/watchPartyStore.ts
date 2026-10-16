@@ -23,6 +23,9 @@ export interface QueueEntry {
   id: string
   name: string
   url: string
+  hash?: string
+  size?: number
+  local?: boolean
 }
 
 export interface PartyRuntime extends PartyInfo {
@@ -39,6 +42,8 @@ export interface PartyRuntime extends PartyInfo {
   frameRev: number
   queueRev: number
   settingsRev: number
+  /** Local-file readiness: entryId -> member ids that verified the bytes. */
+  ready: Record<string, string[]>
 }
 
 export interface WatchPartyState {
@@ -233,6 +238,7 @@ function blankParty(info: PartyInfo): PartyRuntime {
     frameRev: 0,
     queueRev: 0,
     settingsRev: 0,
+    ready: {},
   }
 }
 
@@ -331,7 +337,7 @@ export function handleWatchMessage(msg: any): void {
           if (Number.isFinite(rev) && rev >= 0) party.frameRev = Math.floor(rev)
         }
         if (Array.isArray(msg.chat)) party.chat = msg.chat.map((c: any) => ({ id: String(c.id || ''), from: String(c.from || ''), name: String(c.name || ''), text: String(c.text || ''), at: Number(c.at) || 0 }))
-        if (Array.isArray(msg.queue)) party.queue = msg.queue.map((q: any) => ({ id: String(q.id), name: String(q.name), url: String(q.url) }))
+        if (Array.isArray(msg.queue)) party.queue = msg.queue.map((q: any) => ({ id: String(q.id), name: String(q.name), url: String(q.url), hash: typeof q.hash === 'string' ? q.hash : undefined, size: Number.isFinite(Number(q.size)) ? Number(q.size) : undefined, local: q.local === true ? true : undefined }))
         if (typeof msg.current === 'string') {
           party.current = msg.current
           party.mediaName = party.queue.find((q) => q.id === party.current)?.name || party.mediaName
@@ -340,6 +346,7 @@ export function handleWatchMessage(msg: any): void {
         if (Number.isFinite(queueRev) && queueRev >= 0) party.queueRev = Math.floor(queueRev)
         const settingsRev = Number((msg as any).settingsRev)
         if (Number.isFinite(settingsRev) && settingsRev >= 0) party.settingsRev = Math.floor(settingsRev)
+        if (msg.ready && typeof msg.ready === 'object') party.ready = msg.ready as Record<string, string[]>
         break
       }
       case 'watch.chat':
@@ -375,6 +382,7 @@ export function handleWatchMessage(msg: any): void {
           party.mediaName = entry?.name || ''
         }
         if (Number.isFinite(queueRev) && queueRev >= 0) party.queueRev = Math.floor(queueRev)
+        if (msg.ready && typeof msg.ready === 'object') party.ready = msg.ready as Record<string, string[]>
         break
       }
     }
@@ -574,6 +582,28 @@ export async function createParty(identity: IdentityLike, url: string, name: str
   if (!res.ok) return { ok: false, error: body?.error || 'Could not find a playable video at that link.', source: body?.source }
   joinParty(identity, body.party)
   return { ok: true, partyId: body.party?.id, truncated: Boolean(body?.truncated) }
+}
+
+/** Create a room seeded by a consent-shared local file (no URL pipeline). */
+export async function createPartyFromLocal(
+  identity: IdentityLike,
+  entry: { objectId: string; name: string; hash: string; size: number },
+  roomName: string,
+): Promise<{ ok: boolean; partyId?: string; error?: string }> {
+  let res: Response
+  try {
+    res = await orbitFetch('/api/watchparty', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ localEntry: entry, name: roomName }),
+    }, identity)
+  } catch {
+    return { ok: false, error: 'Could not reach the server.' }
+  }
+  const body = await res.json().catch(() => ({})) as any
+  if (!res.ok) return { ok: false, error: body?.error || 'Could not start the party.' }
+  joinParty(identity, body.party)
+  return { ok: true, partyId: body.party?.id }
 }
 
 /** Resolve + queue/change a room's video over HTTP (the server runs the
