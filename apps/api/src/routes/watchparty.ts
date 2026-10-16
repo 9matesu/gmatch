@@ -157,6 +157,7 @@ async function createPartyFromLocal(c: any, orbitId: string, localEntry: { objec
     hash,
     size: Number.isFinite(size) && size > 0 ? Math.floor(size) : undefined,
     local: true,
+    provider: 'local',
   })
   party.current = firstEntryId
   return c.json({
@@ -225,7 +226,7 @@ watchparty.post('/', orbitAuth, async (c) => {
     firstEntryUrl = `/api/watchparty/${party.id}/stream?item=${firstEntryId}`
   }
   setPartyMedia(party, firstEntryUrl)
-  party.queue.push({ id: firstEntryId, name: party.mediaName, url: firstEntryUrl, relay: firstSource.relay })
+  party.queue.push({ id: firstEntryId, name: party.mediaName, url: firstEntryUrl, relay: firstSource.relay, provider: firstSource.provider })
   party.current = firstEntryId
 
   // Progressively enqueue remaining items in the background if any
@@ -259,6 +260,7 @@ watchparty.post('/', orbitAuth, async (c) => {
             name: itemTitle,
             url: entryUrl,
             relay: source.relay,
+            provider: source.provider,
           })
           if (added) anyAdded = true
         }
@@ -389,6 +391,7 @@ watchparty.post('/:id/video', orbitAuth, async (c) => {
         name: videoName,
         url: entryUrl,
         relay: source.relay,
+        provider: source.provider,
         cmdId: (it as any).cmdId,
       })
       if (!add) {

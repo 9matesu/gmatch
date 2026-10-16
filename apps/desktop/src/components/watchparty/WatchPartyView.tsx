@@ -28,7 +28,10 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
   const { parties, kickedNotice } = useWatchParty()
   const [activeId, setActiveId] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
-  const [railOpen, setRailOpen] = useState(true)
+  // Small windows start with the rail tucked away so the video keeps focus.
+  const [railOpen, setRailOpen] = useState(() =>
+    typeof window === 'undefined' ? true : window.innerWidth >= 900,
+  )
   const active = parties.find((p) => p.id === activeId) || parties[parties.length - 1] || null
   const isHost = active?.host === identity.orbitId
   const canControl = active ? canControlParty(active, identity.orbitId) : false

@@ -31,6 +31,8 @@ export interface QueueEntry {
   size?: number
   /** True for consent-shared local files (bytes live on the swarm, not the server). */
   local?: boolean
+  /** Provider label from source resolution (x, redgifs, pmvhaven, booru, page…). */
+  provider?: string
   /**
    * Queue state. Absent/queued = playable now; proposed = a participant's
    * suggestion awaiting host approval; unavailable = flagged (broken source)
@@ -236,6 +238,7 @@ function sanitizeQueueEntry(raw: any): QueueEntry | null {
     size: Number.isFinite(size) && size > 0 ? Math.floor(size) : undefined,
     local: raw.local === true ? true : undefined,
     status,
+    provider: typeof raw.provider === 'string' && raw.provider.trim() ? raw.provider.trim().slice(0, 24) : undefined,
   }
   return entry
 }
@@ -662,6 +665,7 @@ export function queueOps(userId: string, msg: any): { room: string; payload: any
       hash,
       size: Number.isFinite(size) && size > 0 ? Math.floor(size) : undefined,
       local: msg.local === true ? true : undefined,
+      provider: typeof msg.provider === 'string' && msg.provider.trim() ? msg.provider.trim().slice(0, 24) : undefined,
     }
     // No silent duplicates: the same file queued twice is one entry. Identity
     // is the verified hash when present, else the relay upstream, else the

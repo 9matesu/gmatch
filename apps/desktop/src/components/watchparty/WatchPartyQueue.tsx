@@ -203,7 +203,7 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
               className={`flex items-center gap-2 text-xs ${canControl ? 'cursor-grab active:cursor-grabbing' : ''} ${q.status === 'unavailable' ? 'opacity-50' : ''}`}
             >
               <span className={MUTED}>{i + 1}</span>
-              <span className={`truncate flex-1 ${q.id === party.current ? 'text-retro-fg font-semibold' : 'text-retro-muted'}`}>
+              <span className={`truncate flex-1 ${q.id === party.current ? 'text-retro-fg font-semibold' : 'text-retro-muted'}`} title={q.provider ? `via ${q.provider}` : undefined}>
                 {q.name || q.url}
               </span>
               {q.status === 'proposed' && (

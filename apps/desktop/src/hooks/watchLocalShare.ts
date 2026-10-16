@@ -93,6 +93,7 @@ export async function shareLocalFile(
     hash: meta.hash,
     size: meta.size,
     local: true,
+    provider: 'local',
   })
   if (opts.playNow) {
     sendRoomFrame('watch.queue', { party: party.id, op: 'play', id: entryId })

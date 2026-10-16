@@ -27,6 +27,7 @@ export interface QueueEntry {
   size?: number
   local?: boolean
   status?: 'queued' | 'proposed' | 'unavailable'
+  provider?: string
 }
 
 export interface PartyRuntime extends PartyInfo {
@@ -342,7 +343,7 @@ export function handleWatchMessage(msg: any): void {
           if (Number.isFinite(rev) && rev >= 0) party.frameRev = Math.floor(rev)
         }
         if (Array.isArray(msg.chat)) party.chat = msg.chat.map((c: any) => ({ id: String(c.id || ''), from: String(c.from || ''), name: String(c.name || ''), text: String(c.text || ''), at: Number(c.at) || 0 }))
-        if (Array.isArray(msg.queue)) party.queue = msg.queue.map((q: any) => ({ id: String(q.id), name: String(q.name), url: String(q.url), hash: typeof q.hash === 'string' ? q.hash : undefined, size: Number.isFinite(Number(q.size)) ? Number(q.size) : undefined, local: q.local === true ? true : undefined, status: q.status === 'proposed' || q.status === 'unavailable' ? q.status : undefined }))
+        if (Array.isArray(msg.queue)) party.queue = msg.queue.map((q: any) => ({ id: String(q.id), name: String(q.name), url: String(q.url), hash: typeof q.hash === 'string' ? q.hash : undefined, size: Number.isFinite(Number(q.size)) ? Number(q.size) : undefined, local: q.local === true ? true : undefined, status: q.status === 'proposed' || q.status === 'unavailable' ? q.status : undefined, provider: typeof q.provider === 'string' ? q.provider : undefined }))
         if (typeof msg.current === 'string') {
           party.current = msg.current
           party.mediaName = party.queue.find((q) => q.id === party.current)?.name || party.mediaName

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { WatchPartyRoomList } from './WatchPartyRoomList'
 
 vi.mock('../../hooks/useObjectImage', () => ({
@@ -59,6 +59,31 @@ describe('WatchPartyRoomList Gallery Grid', () => {
       }
       return { ok: true, status: 200, json: async () => ({}) }
     })
+  })
+
+  it('joins by bare room id', async () => {
+    mockJoinPartyById.mockResolvedValueOnce(true)
+    render(<WatchPartyRoomList identity={identity} onNewParty={() => {}} joinedIds={[]} />)
+    fireEvent.change(screen.getByLabelText('Room id or invite link'), { target: { value: 'abcdef12' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Join' }))
+    await waitFor(() => expect(mockJoinPartyById).toHaveBeenCalledWith(identity, 'abcdef12', undefined))
+  })
+
+  it('joins by full invite link, passing the token through', async () => {
+    mockJoinPartyById.mockResolvedValueOnce(true)
+    render(<WatchPartyRoomList identity={identity} onNewParty={() => {}} joinedIds={[]} />)
+    const token = 'b'.repeat(32)
+    fireEvent.change(screen.getByLabelText('Room id or invite link'), { target: { value: `https://node.example/#/watch?room=abcdef12&invite=${token}` } })
+    fireEvent.click(screen.getByRole('button', { name: 'Join' }))
+    await waitFor(() => expect(mockJoinPartyById).toHaveBeenCalledWith(identity, 'abcdef12', token))
+  })
+
+  it('rejects garbage join input without calling the server', () => {
+    render(<WatchPartyRoomList identity={identity} onNewParty={() => {}} joinedIds={[]} />)
+    fireEvent.change(screen.getByLabelText('Room id or invite link'), { target: { value: 'not a room' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Join' }))
+    expect(screen.getByText(/room id or paste an invite link/i)).toBeTruthy()
+    expect(mockJoinPartyById).not.toHaveBeenCalled()
   })
 
   it('renders Create Room silhouette card and triggers onNewParty when clicked', async () => {

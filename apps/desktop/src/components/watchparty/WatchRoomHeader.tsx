@@ -25,6 +25,13 @@ export function WatchRoomHeader({ party, identity, profilePics: _profilePics }: 
   const [copied, setCopied] = useState(false)
   const [inviteBusy, setInviteBusy] = useState(false)
   const [inviteError, setInviteError] = useState('')
+  const currentEntry = party.queue.find((q) => q.id === party.current) || null
+  const readyCount = currentEntry ? (party.ready?.[currentEntry.id] || []).length : 0
+  const syncLabel = !currentEntry
+    ? null
+    : currentEntry.local
+      ? `${readyCount}/${party.members.length} ready`
+      : 'synced'
   const invite = async () => {
     setInviteError('')
     // Public rooms keep the plain ID link. Private rooms need the host-minted,
@@ -91,6 +98,11 @@ export function WatchRoomHeader({ party, identity, profilePics: _profilePics }: 
         </p>
         {inviteError && <p className="text-xs text-retro-error">{inviteError}</p>}
         {party.mediaName && <p className={`truncate ${MUTED}`}>{party.mediaName}</p>}
+        {currentEntry && (
+          <p className={`truncate font-mono text-[10px] ${MUTED}`}>
+            via {currentEntry.provider || 'direct'} · {syncLabel}
+          </p>
+        )}
       </div>
 
       {settingsOpen && (
