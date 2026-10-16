@@ -8,7 +8,7 @@ import { Crown, Settings, Share, X } from 'lucide-react'
 import { BTN, BTN_PRIMARY, MUTED } from '../../ui/styles'
 import { Modal } from '../Modal'
 import { Switch } from '../../ui/Switch'
-import { kickParty, banParty, muteParty, transferParty, setPartySettings, leaveParty, disbandParty, type PartyRuntime } from '../../hooks/watchPartyStore'
+import { kickParty, banParty, muteParty, transferParty, setPartySettings, leaveParty, disbandParty, mintPartyInvite, revokePartyInvite, type PartyRuntime } from '../../hooks/watchPartyStore'
 
 interface IdentityLike {
   orbitId: string
@@ -23,8 +23,26 @@ export function WatchRoomHeader({ party, identity, profilePics: _profilePics }: 
   const isHost = party.host === identity.orbitId
 
   const [copied, setCopied] = useState(false)
-  const invite = () => {
-    void navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}#/watch?room=${party.id}`)
+  const [inviteBusy, setInviteBusy] = useState(false)
+  const [inviteError, setInviteError] = useState('')
+  const invite = async () => {
+    setInviteError('')
+    // Public rooms keep the plain ID link. Private rooms need the host-minted,
+    // revocable token; the token is copied once and never stored locally.
+    if (!party.isPrivate || !isHost) {
+      await navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}#/watch?room=${party.id}`)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+      return
+    }
+    setInviteBusy(true)
+    const res = await mintPartyInvite(identity, party.id)
+    setInviteBusy(false)
+    if (!res.ok || !res.invite) {
+      setInviteError(res.error || 'Could not mint an invite.')
+      return
+    }
+    await navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}#/watch?room=${party.id}&invite=${res.invite}`)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -54,7 +72,7 @@ export function WatchRoomHeader({ party, identity, profilePics: _profilePics }: 
               {party.name}
             </button>
           )}
-          <button type="button" onClick={invite} aria-label="Copy invite link" title={copied ? 'Copied' : 'Invite'} className="relative p-1.5 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer">
+          <button type="button" onClick={() => void invite()} aria-label="Copy invite link" title={copied ? 'Copied' : 'Invite'} className="relative p-1.5 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer">
             <Share className="w-4 h-4" />
             {copied && <span className="absolute -top-6 left-1/2 -translate-x-1/2 rounded-md bg-glass-w12 px-1.5 py-0.5 text-[10px] text-retro-fg">Copied</span>}
           </button>
@@ -69,8 +87,9 @@ export function WatchRoomHeader({ party, identity, profilePics: _profilePics }: 
         </div>
         <p className={`flex items-center gap-1 ${MUTED}`}>
           <Crown className="w-3 h-3" />
-          {party.members.length}/8 watching
+          {party.members.length} watching
         </p>
+        {inviteError && <p className="text-xs text-retro-error">{inviteError}</p>}
         {party.mediaName && <p className={`truncate ${MUTED}`}>{party.mediaName}</p>}
       </div>
 
@@ -80,10 +99,22 @@ export function WatchRoomHeader({ party, identity, profilePics: _profilePics }: 
             <div className="flex items-center justify-between gap-4">
               <div>
                 <div className="text-xs font-medium text-retro-fg">Private room</div>
-                <div className="text-xs text-retro-muted">Hidden from the open rooms list. Invite link still works.</div>
+                <div className="text-xs text-retro-muted">Hidden from the open rooms list. Joining needs a host invite.</div>
               </div>
               <Switch checked={party.isPrivate} onChange={() => setPartySettings(party.id, { isPrivate: !party.isPrivate })} />
             </div>
+            {party.isPrivate && (
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-xs font-medium text-retro-fg">Invite token</div>
+                  <div className="text-xs text-retro-muted">One active invite. Minting replaces it; revoke disables it.</div>
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => void invite()} disabled={inviteBusy} className={`${BTN} px-2 py-1 text-[10px] disabled:opacity-40`}>New invite</button>
+                  <button type="button" onClick={() => void revokePartyInvite(identity, party.id)} className={`${BTN} px-2 py-1 text-[10px]`}>Revoke</button>
+                </div>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-4">
               <div>
                 <div className="text-xs font-medium text-retro-fg">Lock video changes</div>

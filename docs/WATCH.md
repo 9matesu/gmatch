@@ -42,15 +42,19 @@ and playback stays frame-accurate within the drift deadband.
    the room. The creator is HOST and auto-joins. Rooms live in memory but
    are flushed to `WATCH_PARTIES_PATH` (default: beside the DB snapshot on
    /data) every 30 s and on SIGTERM, and restored at boot: a deploy no
-   longer kills live rooms. A room still dies on 4 h idle; clients then get
-   one `watch.gone` frame ("has closed"), never a 404 loop. Socket close
-   removes a member only after an 8 s grace, so a reconnect blip keeps the
+   longer kills live rooms. Rooms are persistent by design; emptied rooms are
+   kept so peers can re-enter. There is no idle-room sweeper. Clients get one
+   `watch.gone` frame only when a room is disbanded, evicted, or truly missing.
+   Socket close removes a member only after an 8 s grace, so a reconnect blip keeps the
    seat (and a last-member blip keeps the room). While a room is live, the
    flush tick re-extends `expires_at` (+1 d) for every object it serves
    (current + queue): overnight rooms never hand clients a purged media
    ("No preview"); dead rooms stop refreshing and expire as promised.
-2. Others join from the room list, the invite link `#/watch?room=<id>`, or
-   the 8-hex code. `watch.join` subscribes the socket to room `watch:<id>`
+2. Others join from the room list, the invite link `#/watch?room=<id>` for public
+   rooms, or `#/watch?room=<id>&invite=<token>` for private rooms. Private rooms
+   are hidden from listings and require membership or a current host-minted
+   invite token; an ID alone discloses nothing. Invite tokens are session-scoped,
+   revocable, never persisted, and never logged. `watch.join` subscribes the socket to room `watch:<id>`
    and the room receives a roster + "X joined" system line; the joiner
    receives ONE snapshot roster frame carrying `{host, members, frame, chat,
    queue, current}` (position + backlog recovery for free). Chat persists
@@ -59,8 +63,10 @@ and playback stays frame-accurate within the drift deadband.
    so an open room keeps playing in the background - the dock beside the
    feed is a switcher, never a second player.
 3. Leave: explicit `watch.leave`, or the last socket of a user closing
-   (`watchDisconnect` promotes the host to the oldest remaining member).
-   Empty room = deleted.
+   (`watchDisconnect` promotes the host to the oldest remaining member after
+   the host-seat grace window).
+   Empty room = kept, with `emptySince` set. Only disband, eviction, restore
+   failure, or explicit deletion removes a room.
 4. Kicked/banned targets get a direct `watch.kicked`, lose room membership,
    and (ban) cannot rejoin for the room's lifetime.
 
@@ -68,16 +74,16 @@ and playback stays frame-accurate within the drift deadband.
 
 | Frame | Payload | Server rule |
 |---|---|---|
-| `watch` | `{party, action: play\|pause, position}` | members only; position finite >=0; rate locked 1; re-stamped `updatedAt` = server clock + `by` = member name; relayed as `watch.sync` |
-| `watch.join` | `{party, name}` | member (not banned; limitless entry); replies with `watch.roster` (snapshot) to joiner + relays `watch.system` + roster to room |
+| `watch` | `{party, action: play\|pause, position, cmdId?}` | members only; host controls unless shared control is enabled; position finite >=0; rate locked 1; re-stamped `updatedAt` = server clock + `by` = member name; `frameRev` increments; repeated `cmdId` returns the authoritative frame without moving it; relayed as `watch.sync` |
+| `watch.join` | `{party, name, invite?}` | member (not banned; limitless entry); private rooms require membership or a current invite token; replies with `watch.roster` (snapshot) to joiner + relays `watch.system` + roster to room |
 | `watch.leave` | `{party}` | member; relays `watch.system` + `watch.roster` |
 | `watch.chat` | `{party, text}` | member, not muted; 80 chars; 1 msg/2s per user; stored + relayed as `watch.chat` with `msgId` |
 | `watch.chat.del` | `{party, msgId}` | author or host; relays `watch.chat_del` |
 | `watch.kick` / `watch.ban` | `{party, target}` | host only, target != host; relay system + roster; direct `watch.kicked` |
 | `watch.mute` | `{party, target, on}` | host only; relays `watch.settings.muted` |
 | `watch.host` | `{party, target}` | host only, target is member; relays `watch.roster` |
-| `watch.settings` | `{party, name?, isPrivate?, lockVideo?}` | host only; clamped; relays `watch.settings` |
-| `watch.queue` | `{party, op: add\|remove\|play\|next, id?, url?, name?, relay?}` | member; `add`/`play` need `lockVideo` off unless host; relays `watch.queue` `{queue, current, frame}` |
+| `watch.settings` | `{party, name?, isPrivate?, lockVideo?, cmdId?}` | host only; clamped; repeated `cmdId` returns current settings; relays `watch.settings` with `settingsRev` |
+| `watch.queue` | `{party, op: add\|remove\|play\|next, id?, url?, name?, relay?, cmdId?}` | member; `add`/`play` need `lockVideo` off unless host; repeated `cmdId` returns the current queue without duplicating work; relays `watch.queue` `{queue, current, frame, queueRev}` |
 | `watch.ping` | `{t0}` | anyone authed; direct `watch.pong {t0, t1}` (never broadcast) |
 | room -> all | `watch.sync`, `watch.roster`, `watch.system`, `watch.chat`, `watch.chat_del`, `watch.settings`, `watch.queue` | |
 

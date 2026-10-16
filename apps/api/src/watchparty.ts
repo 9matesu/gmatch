@@ -9,6 +9,8 @@ export interface PartyFrame {
   position: number
   rate: number
   updatedAt: number
+  /** Monotonic server revision. Clients apply only newer frames/snapshots. */
+  rev: number
   /** Display name of the member who last moved the transport. */
   by?: string
 }
@@ -45,6 +47,15 @@ export interface Party {
   lockVideo: boolean
   bans: Set<string>
   frame: PartyFrame
+  /** Monotonic revisions, stamped only by the server. */
+  frameRev: number
+  queueRev: number
+  settingsRev: number
+  /** Active private-room invite token. Session-scoped by design: it is never
+   * persisted, logged, or returned in snapshots/listings. */
+  inviteToken?: string
+  /** Recently seen client command IDs, for idempotent retries. Session-scoped. */
+  recentCmds: Map<string, number>
   members: Map<string, PartyMember>
   queue: QueueEntry[]
   current: string
@@ -69,9 +80,9 @@ const parties = new Map<string, Party>()
 // can re-enter any time), which makes this cap the ONLY reclaim path. Tighter
 // than the old 50 so an abandoned node does not accumulate forever.
 const MAX_PARTIES = 25
-// Overnight rooms: an open tab pings every 30s (touchRooms), so 4h only
-// bounds abandoned rooms. 30 min GC'd a room during one long movie.
-export const IDLE_MS = 4 * 60 * 60_000
+// Rooms are persistent by design: an emptied room is never deleted, so peers
+// can re-enter any time. There is no idle-room sweeper; only the 25-room cap,
+// empty-media lease, disband, and eviction reclaim resources.
 /** How long a departed host's seat is reserved before it is promoted away.
  *  Long enough to cover a tab reload or a short network drop. */
 export const HOST_SEAT_GRACE_MS = 3 * 60_000
@@ -101,7 +112,12 @@ export function createParty(
     isPrivate: false,
     lockVideo: false,
     bans: new Set(),
-    frame: { url: seedUrl, action: 'pause', position: 0, rate: 1, updatedAt: serverNow() },
+    frame: { url: seedUrl, action: 'pause', position: 0, rate: 1, updatedAt: serverNow(), rev: 1 },
+    frameRev: 1,
+    queueRev: 0,
+    settingsRev: 0,
+    inviteToken: undefined,
+    recentCmds: new Map(),
     members: new Map(),
     queue: [],
     current: '',
@@ -163,14 +179,50 @@ function sanitizeFrame(raw: any, fallbackUrl: string): PartyFrame {
   const position = Number(raw?.position)
   const updatedAt = Number(raw?.updatedAt)
   const rate = Number(raw?.rate)
+  const rev = Number(raw?.rev)
   return {
     url: typeof raw?.url === 'string' && raw.url ? raw.url : fallbackUrl,
     action: raw?.action === 'play' ? 'play' : 'pause',
     position: Number.isFinite(position) && position >= 0 ? position : 0,
     rate: Number.isFinite(rate) && rate === 1 ? 1 : 1,
     updatedAt: Number.isFinite(updatedAt) ? updatedAt : serverNow(),
+    rev: Number.isFinite(rev) && rev >= 0 ? Math.floor(rev) : 1,
     by: typeof raw?.by === 'string' ? raw.by : undefined,
   }
+}
+
+function sanitizeRev(raw: any): number {
+  const rev = Number(raw)
+  return Number.isFinite(rev) && rev >= 0 ? Math.floor(rev) : 0
+}
+
+/** Bounded idempotency registry for repeated client commands. */
+const CMD_TTL_MS = 60_000
+const MAX_CMDS = 200
+function pruneCmds(party: Party): void {
+  const now = Date.now()
+  for (const [id, at] of party.recentCmds) {
+    if (now - at > CMD_TTL_MS) party.recentCmds.delete(id)
+  }
+  while (party.recentCmds.size > MAX_CMDS) {
+    const oldest = party.recentCmds.keys().next()
+    if (oldest.done) break
+    party.recentCmds.delete(oldest.value)
+  }
+}
+function normalizeCmdId(raw: any): string | null {
+  const s = typeof raw === 'string' ? raw.trim() : ''
+  if (!s || s.length > 64) return null
+  return s
+}
+/** Returns true for a repeated command ID (already applied or in flight). */
+function claimCmd(party: Party, cmdId: string | null): boolean {
+  if (!cmdId) return false
+  pruneCmds(party)
+  if (party.recentCmds.has(cmdId)) return true
+  party.recentCmds.set(cmdId, Date.now())
+  pruneCmds(party)
+  return false
 }
 
 function dropParty(party: Party): void {
@@ -212,7 +264,7 @@ function rosterPayload(party: Party): any {
 
 /** Full room snapshot for joiners (position + chat + queue recovery). */
 function snapshotPayload(party: Party): any {
-  return { ...rosterPayload(party), frame: party.frame, chat: party.chat, queue: party.queue, current: party.current }
+  return { ...rosterPayload(party), frame: party.frame, chat: party.chat, queue: party.queue, current: party.current, queueRev: party.queueRev, settingsRev: party.settingsRev }
 }
 
 function pushSystem(party: Party, text: string): any {
@@ -265,18 +317,25 @@ export function applyWatch(userId: string, msg: any): { room: string; payload: a
   // V1 lock: party speed is always 1x. A rate != 1 frame is a desync bug or
   // a modified client; drop it.
   if (msg.rate !== undefined && Number(msg.rate) !== 1) return null
+  const cmdId = normalizeCmdId(msg.cmdId)
+  if (cmdId && claimCmd(party, cmdId)) {
+    // Idempotent retry: return the authoritative frame without moving it.
+    return { room: partyRoom(party.id), payload: { type: 'watch.sync', party: party.id, frame: party.frame } }
+  }
   // Audit A3: 200 ms/member transport throttle. Humans seek/play far less
   // often; a bot hammering this frame used to amplify x-members broadcasts.
   const now = Date.now()
   if (now - (party.lastControl.get(userId) || 0) < 200) return null
   party.lastControl.set(userId, now)
   party.lastSeen = now
+  party.frameRev += 1
   party.frame = {
     url: party.mediaUrl,
     action: msg.action,
     position,
     rate: 1,
     updatedAt: serverNow(),
+    rev: party.frameRev,
     by: member.name || userId.slice(0, 8),
   }
   return { room: partyRoom(party.id), payload: { type: 'watch.sync', party: party.id, frame: party.frame } }
@@ -286,8 +345,16 @@ export function applyWatch(userId: string, msg: any): { room: string; payload: a
 export function joinWatch(userId: string, displayName: string, msg: any): { room: string; payload: any; snapshot: any; broadcastPayload: any } | null {
   const party = parties.get(String(msg?.party || ''))
   if (!party || party.bans.has(userId)) return null
-  // # ponytail: limitless watch party entry (removed artificial 8-peer ceiling)
-  party.members.set(userId, { name: String(displayName || '').slice(0, 40), muted: party.members.get(userId)?.muted || false })
+  // Private rooms require membership or a current invite token. The token is
+  // compared only here and never logged, persisted, or broadcast.
+  if (party.isPrivate && !party.members.has(userId)) {
+    const invite = typeof msg?.invite === 'string' ? msg.invite : ''
+    if (!party.inviteToken || invite !== party.inviteToken) return null
+    party.members.set(userId, { name: String(displayName || '').slice(0, 40), muted: false })
+  } else {
+    // # ponytail: limitless watch party entry (removed artificial 8-peer ceiling)
+    party.members.set(userId, { name: String(displayName || '').slice(0, 40), muted: party.members.get(userId)?.muted || false })
+  }
   party.lastSeen = Date.now()
   party.emptySince = undefined
   // Back inside the grace window: the retained seat is live again, so stop
@@ -452,9 +519,43 @@ export function disbandWatch(userId: string, msg: any): { room: string; partyId:
   return { room, partyId }
 }
 
+/** Host mints one active private-room invite token. Replaces any previous token. */
+export function mintInvite(userId: string, partyId: string): string | null {
+  const party = parties.get(String(partyId || ''))
+  if (!party || party.hostId !== userId) return null
+  const token = randomUUID().replace(/-/g, '').slice(0, 32)
+  party.inviteToken = token
+  return token
+}
+
+/** Host revokes the active private-room invite token. */
+export function revokeInvite(userId: string, partyId: string): boolean {
+  const party = parties.get(String(partyId || ''))
+  if (!party || party.hostId !== userId) return false
+  party.inviteToken = undefined
+  return true
+}
+
+/** Redeem a private-room invite over HTTP before reading the snapshot. */
+export function redeemInvite(userId: string, partyId: string, invite: unknown): boolean {
+  const party = parties.get(String(partyId || ''))
+  if (!party || !party.isPrivate || party.bans.has(userId)) return false
+  if (typeof invite !== 'string' || !party.inviteToken || invite !== party.inviteToken) return false
+  if (!party.members.has(userId)) {
+    party.members.set(userId, { name: '', muted: false })
+    party.lastSeen = Date.now()
+    party.emptySince = undefined
+  }
+  return true
+}
+
 export function settingsWatch(userId: string, msg: any): { room: string; payload: any } | null {
   const party = parties.get(String(msg?.party || ''))
   if (!party || party.hostId !== userId) return null
+  const cmdId = normalizeCmdId(msg.cmdId)
+  if (cmdId && claimCmd(party, cmdId)) {
+    return { room: partyRoom(party.id), payload: currentSettingsPayload(party) }
+  }
   const payload: any = { type: 'watch.settings', party: party.id }
   if (typeof msg.name === 'string' && msg.name.trim()) {
     party.name = msg.name.trim().slice(0, 40)
@@ -469,7 +570,13 @@ export function settingsWatch(userId: string, msg: any): { room: string; payload
     payload.lockVideo = party.lockVideo
   }
   if (payload.name === undefined && payload.isPrivate === undefined && payload.lockVideo === undefined) return null
+  party.settingsRev += 1
+  payload.settingsRev = party.settingsRev
   return { room: partyRoom(party.id), payload }
+}
+
+function currentSettingsPayload(party: Party): any {
+  return { type: 'watch.settings', party: party.id, name: party.name, isPrivate: party.isPrivate, lockVideo: party.lockVideo, settingsRev: party.settingsRev }
 }
 
 /** Queue ops (entries are already resolved media; resolution lives in the
@@ -479,7 +586,12 @@ export function queueOps(userId: string, msg: any): { room: string; payload: any
   const member = party?.members.get(userId)
   if (!party || !member) return null
   if (party.lockVideo && party.hostId !== userId) return null
+  const cmdId = normalizeCmdId(msg.cmdId)
+  if (cmdId && claimCmd(party, cmdId)) {
+    return { room: partyRoom(party.id), payload: currentQueuePayload(party) }
+  }
   const op = String(msg.op || '')
+  let mutated = true
   if (op === 'add') {
     const url = typeof msg.url === 'string' ? msg.url : ''
     if (!url) return null
@@ -512,23 +624,32 @@ export function queueOps(userId: string, msg: any): { room: string; payload: any
   } else if (op === 'play') {
     const entry = party.queue.find((q) => q.id === String(msg.id || ''))
     if (entry) applyQueueMedia(party, entry, member.name || userId.slice(0, 8), 'play')
+    else mutated = false
   } else if (op === 'next') {
-    stepQueue(party, userId, member.name, 1)
+    if (party.queue.length === 0) mutated = false
+    else stepQueue(party, userId, member.name, 1)
   } else if (op === 'prev') {
-    stepQueue(party, userId, member.name, -1)
+    if (party.queue.length === 0) mutated = false
+    else stepQueue(party, userId, member.name, -1)
   } else {
     return null
   }
   party.lastSeen = Date.now()
+  if (mutated) party.queueRev += 1
   return {
     room: partyRoom(party.id),
-    payload: {
-      type: 'watch.queue',
-      party: party.id,
-      queue: party.queue,
-      current: party.current,
-      frame: party.frame,
-    },
+    payload: currentQueuePayload(party),
+  }
+}
+
+function currentQueuePayload(party: Party): any {
+  return {
+    type: 'watch.queue',
+    party: party.id,
+    queue: party.queue,
+    current: party.current,
+    frame: party.frame,
+    queueRev: party.queueRev,
   }
 }
 
@@ -537,7 +658,8 @@ function applyQueueMedia(party: Party, entry: QueueEntry, by: string, action: 'p
   party.mediaName = entry.name
   party.relay = entry.relay
   setPartyMedia(party, entry.url)
-  party.frame = { url: entry.url, action, position: 0, rate: 1, updatedAt: serverNow(), by }
+  party.frameRev += 1
+  party.frame = { url: entry.url, action, position: 0, rate: 1, updatedAt: serverNow(), rev: party.frameRev, by }
 }
 
 /** Step the playing entry +/-1 (wraps: prev at the first entry lands on the
@@ -561,6 +683,7 @@ export function serializeParties(): string {
     id: p.id, name: p.name, mediaUrl: p.mediaUrl, mediaName: p.mediaName,
     relay: p.relay, hostId: p.hostId, isPrivate: p.isPrivate, lockVideo: p.lockVideo,
     frame: p.frame, queue: p.queue, current: p.current,
+    frameRev: p.frameRev, queueRev: p.queueRev, settingsRev: p.settingsRev,
     // chat persists with the room (applyChat caps it at 80 entries)
     chat: p.chat,
     // Eviction order must survive a restart, or every restored room looks
@@ -637,6 +760,10 @@ export function restoreParties(json: string): number {
     // against NaN is false — the whole reconciler for that slot stopped
     // seeking, pausing and advancing, with the scrubber frozen at 0:00.
     p.frame = sanitizeFrame(s.frame, s.mediaUrl)
+    p.frameRev = sanitizeRev((s as any).frameRev ?? p.frame.rev)
+    p.frame.rev = p.frameRev
+    p.queueRev = sanitizeRev((s as any).queueRev)
+    p.settingsRev = sanitizeRev((s as any).settingsRev)
     if (Array.isArray(s.queue)) p.queue = s.queue
     if (typeof s.current === 'string') p.current = s.current
     if (Array.isArray(s.chat)) p.chat = s.chat.filter((m: any) => m && typeof m.text === 'string').slice(-80)
@@ -652,8 +779,7 @@ export function watchPong(t0: unknown): { type: string; t0: number; t1: number }
   return { type: 'watch.pong', t0: Number(t0) || 0, t1: serverNow() }
 }
 
-/** Keep-alive: an awake member's ping refreshes every room they belong to,
- * so an idle-but-watching room never hits IDLE_MS. */
+/** Keep-alive: an awake member's ping refreshes every room they belong to. */
 export function touchRooms(userId: string): void {
   if (!userId) return
   for (const p of parties.values()) {

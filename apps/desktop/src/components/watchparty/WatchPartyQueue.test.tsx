@@ -19,6 +19,7 @@ const party = {
   id: 'p1', name: 'N', url: 'u', frame: null, members: [], chat: [],
   host: 'me', mutedIds: {}, lockVideo: false, isPrivate: false,
   mediaName: '', queue: [{ id: 'q1', name: 'a', url: '/api/objects/a' }, { id: 'q2', name: 'b', url: '/api/objects/b' }], current: 'q1',
+  frameRev: 0, queueRev: 0, settingsRev: 0,
 } as PartyRuntime
 
 beforeEach(() => {

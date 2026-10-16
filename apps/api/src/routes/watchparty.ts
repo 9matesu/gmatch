@@ -4,7 +4,7 @@ import type { D1Turso } from '../db'
 import type { LocalBlobStore } from '../blob'
 import { proxyAndStoreExternal, classifyAndResolve, isPrivateTarget, pageTitleFor } from '../proxy'
 import { broadcastToRoom } from '../ws-bus'
-import { createParty, getParty, listParties, setPartyMedia, queueOps, type Party } from '../watchparty'
+import { createParty, getParty, listParties, setPartyMedia, queueOps, mintInvite, revokeInvite, redeemInvite, type Party } from '../watchparty'
 
 type Bindings = {
   DB: D1Turso
@@ -266,6 +266,7 @@ watchparty.post('/', orbitAuth, async (c) => {
             queue: party.queue,
             current: party.current,
             frame: party.frame,
+            queueRev: party.queueRev,
           })
         }
       }
@@ -306,10 +307,24 @@ watchparty.post('/:id/video', orbitAuth, async (c) => {
   const title = typeof body?.name === 'string' ? body.name.trim().slice(0, 60) : ''
   const queueOnly = body?.queueOnly === true
 
-  // Bulk shape: urls[] (1..10, or up to 30 pmvhaven playlists) or single url (split by newline).
-  const rawUrls: string[] = Array.isArray(body?.urls)
-    ? body.urls.map((u: unknown) => String(u).trim()).filter(Boolean)
-    : (url ? url.split(/\n+/).map((l: string) => l.trim()).filter(Boolean) : [])
+  // Bulk shape: items[] with per-item idempotency IDs (preferred), legacy
+  // urls[] (1..10, or up to 30 pmvhaven playlists), or single url split by newline.
+  const rawItems: Array<{ url: string; name?: string; cmdId?: string }> = Array.isArray(body?.items)
+    ? (body.items as unknown[]).map((it: unknown): { url: string; name?: string; cmdId?: string } => {
+        if (typeof it === 'string') return { url: it.trim() }
+        const o = it as { url?: unknown; name?: unknown; cmdId?: unknown }
+        return {
+          url: String(o?.url || '').trim(),
+          name: typeof o?.name === 'string' ? o.name : undefined,
+          cmdId: typeof o?.cmdId === 'string' ? o.cmdId : undefined,
+        }
+      }).filter((it: { url: string; name?: string; cmdId?: string }) => Boolean(it.url))
+    : []
+  const rawUrls: string[] = rawItems.length > 0
+    ? rawItems.map((it) => it.url)
+    : (Array.isArray(body?.urls)
+      ? body.urls.map((u: unknown) => String(u).trim()).filter(Boolean)
+      : (url ? url.split(/\n+/).map((l: string) => l.trim()).filter(Boolean) : []))
 
   const isPl = (u: string) => /pmvhaven\.com\/playlists\//i.test(u)
   if (rawUrls.length > 30 || (rawUrls.length > 10 && !rawUrls.every(isPl))) {
@@ -325,7 +340,13 @@ watchparty.post('/:id/video', orbitAuth, async (c) => {
     return c.json({ error: 'Queue is full (maximum 50 videos).' }, 400)
   }
 
-  const itemsToProcess = expanded.slice(0, remainingCapacity)
+  const itemsToProcess = expanded.slice(0, remainingCapacity).map((it: PlaylistItem, index: number) => {
+    // Idempotency survives playlist expansion: one parent cmdId fans out to
+    // deterministic child IDs, so retrying the same add cannot duplicate items.
+    const parent = rawItems.length === 1 ? rawItems[0] : rawItems.find((r) => r.url === it.url)
+    const parentCmd = parent?.cmdId || (typeof body?.cmdId === 'string' ? body.cmdId : undefined)
+    return { ...it, cmdId: parentCmd ? `${parentCmd}#${index}` : undefined }
+  })
   takeParseBudget(orbitId, itemsToProcess.length)
 
   const added: Array<{ id: string; name: string; url: string }> = []
@@ -360,6 +381,7 @@ watchparty.post('/:id/video', orbitAuth, async (c) => {
         name: videoName,
         url: entryUrl,
         relay: media.relay,
+        cmdId: (it as any).cmdId,
       })
       if (!add) { failed.push(it.url); continue }
 
@@ -376,6 +398,7 @@ watchparty.post('/:id/video', orbitAuth, async (c) => {
         queue: party.queue,
         current: party.current,
         frame: party.frame,
+        queueRev: party.queueRev,
       })
     }
   }
@@ -390,6 +413,7 @@ watchparty.post('/:id/video', orbitAuth, async (c) => {
       queue: party.queue,
       current: party.current,
       frame: party.frame,
+      queueRev: party.queueRev,
     })
   }
 
@@ -406,6 +430,10 @@ watchparty.post('/:id/video', orbitAuth, async (c) => {
 watchparty.get('/:id', orbitAuth, async (c) => {
   const party = getParty(c.req.param('id') || '')
   if (!party) return c.json({ error: 'Party not found' }, 404)
+  const orbitId = c.get('orbitId')
+  // Private rooms do not leak snapshots by ID. Members read state; everyone
+  // else gets the same 404 as a missing room, with or without an invite.
+  if (party.isPrivate && !party.members.has(orbitId)) return c.json({ error: 'Party not found' }, 404)
   return c.json({
     id: party.id,
     name: party.name,
@@ -417,9 +445,33 @@ watchparty.get('/:id', orbitAuth, async (c) => {
     mediaName: party.mediaName,
     queue: party.queue,
     current: party.current,
+    queueRev: party.queueRev,
+    settingsRev: party.settingsRev,
     chat: party.chat,
     members: [...party.members.entries()].map(([id, m]) => ({ id, name: m.name, muted: m.muted })),
   })
+})
+
+watchparty.post('/:id/invite', orbitAuth, async (c) => {
+  const orbitId = c.get('orbitId')
+  const token = mintInvite(orbitId, c.req.param('id') || '')
+  if (!token) return c.json({ error: 'Only the host can mint invites.' }, 403)
+  return c.json({ ok: true, invite: token })
+})
+
+watchparty.delete('/:id/invite', orbitAuth, async (c) => {
+  const orbitId = c.get('orbitId')
+  if (!revokeInvite(orbitId, c.req.param('id') || '')) return c.json({ error: 'Only the host can revoke invites.' }, 403)
+  return c.json({ ok: true })
+})
+
+watchparty.post('/:id/join', orbitAuth, async (c) => {
+  const orbitId = c.get('orbitId')
+  const body = await c.req.json().catch(() => null) as any
+  if (!redeemInvite(orbitId, c.req.param('id') || '', body?.invite)) {
+    return c.json({ error: 'Party not found' }, 404)
+  }
+  return c.json({ ok: true })
 })
 
 // Range-passthrough relay for bound (too-big-to-store) party videos.

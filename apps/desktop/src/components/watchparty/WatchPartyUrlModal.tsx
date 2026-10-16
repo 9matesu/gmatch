@@ -50,7 +50,9 @@ export function WatchPartyUrlModal({
     const isValidUrl = (val: string): boolean => {
       try {
         const u = new URL(val)
-        return u.protocol === 'http:' || u.protocol === 'https:' || u.protocol === 'ipfs:'
+        // The media pipeline only resolves HTTP/HTTPS. Accepting ipfs: here
+        // would pass client validation and fail server-side with no recovery.
+        return u.protocol === 'http:' || u.protocol === 'https:'
       } catch {
         return false
       }
@@ -58,7 +60,7 @@ export function WatchPartyUrlModal({
 
     if (lines.length === 0 || !lines.some(isValidUrl)) {
       setBusy(false)
-      setError('Please enter a valid HTTP, HTTPS, or media URL.')
+      setError('Please enter a valid HTTP or HTTPS media URL.')
       return
     }
 

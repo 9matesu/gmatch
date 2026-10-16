@@ -9,7 +9,7 @@ import { Clapperboard } from 'lucide-react'
 import { Avatar } from '../Avatar'
 import { MUTED } from '../../ui/styles'
 import { useWatchParty, joinPartyById, MAX_SLOTS } from '../../hooks/watchPartyStore'
-import { watchRoomFromHash, stripWatchRoom } from './invite'
+import { watchInviteFromHash, stripWatchRoom } from './invite'
 import { WatchPartySlot } from './WatchPartySlot'
 import { WatchPartyTimeline } from './WatchPartyTimeline'
 import { WatchPartyChat } from './WatchPartyChat'
@@ -35,10 +35,10 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
   // Deep link joining
   useEffect(() => {
     const tryJoin = () => {
-      const roomId = watchRoomFromHash(window.location.hash)
-      if (!roomId) return
+      const invite = watchInviteFromHash(window.location.hash)
+      if (!invite) return
       window.history.replaceState(null, '', stripWatchRoom(window.location.hash))
-      void joinPartyById(identity, roomId)
+      void joinPartyById(identity, invite.room, invite.invite)
     }
     tryJoin()
     window.addEventListener('hashchange', tryJoin)

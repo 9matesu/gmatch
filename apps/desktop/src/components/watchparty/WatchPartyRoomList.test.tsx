@@ -81,12 +81,12 @@ describe('WatchPartyRoomList Gallery Grid', () => {
 
     expect(await screen.findByText('Anime Chill Room')).toBeInTheDocument()
     expect(screen.getByText('Episode 12.mp4')).toBeInTheDocument()
-    expect(screen.getByText('4/8')).toBeInTheDocument()
+    expect(screen.getByText('4')).toBeInTheDocument()
     expect(screen.getByText('Active')).toBeInTheDocument()
 
     // Persistent empty room
     expect(screen.getByText('Late Night Cinema')).toBeInTheDocument()
-    expect(screen.getByText('0/8')).toBeInTheDocument()
+    expect(screen.getByText('0')).toBeInTheDocument()
     expect(screen.getByText('Persistent')).toBeInTheDocument()
 
     // Clicking room card joins the party

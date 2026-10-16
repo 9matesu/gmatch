@@ -195,7 +195,7 @@ export function WatchPartyRoomList({
               {/* Top-Right Member Badge */}
               <div className="absolute top-2 right-2 flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-black/80 backdrop-blur-md text-white border border-white/10 shadow-sm z-10">
                 <Users className="w-3 h-3 text-retro-muted" />
-                <span>{r.members}/8</span>
+                <span>{r.members}</span>
               </div>
 
               {/* Hover Play Button Overlay */}

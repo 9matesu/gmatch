@@ -23,7 +23,7 @@ vi.mock('../proxy', async (importOriginal) => {
 
 import app from '../index'
 import { createTestIdentity, signRequestHeaders, createMockEnv } from '../test-utils'
-import { __resetParties } from '../watchparty'
+import { __resetParties, settingsWatch } from '../watchparty'
 import type { TestIdentity } from '../test-utils'
 
 let env: Awaited<ReturnType<typeof createMockEnv>>
@@ -100,5 +100,46 @@ describe('POST /api/watchparty', () => {
       expect([201, 429]).toContain(last)
     }
     expect(last).toBe(429)
+  })
+})
+
+describe('private-room authorization', () => {
+  it('hides private snapshots by ID, then allows invite redeem + snapshot', async () => {
+    __resetParties()
+    const host = createTestIdentity()
+    const guest = createTestIdentity()
+    const hostAuth = (method: string, url: string, body?: string) => ({ 'Content-Type': 'application/json', ...signRequestHeaders(host, method, url, body) })
+    const guestAuth = (method: string, url: string, body?: string) => ({ 'Content-Type': 'application/json', ...signRequestHeaders(guest, method, url, body) })
+
+    const createBody = JSON.stringify({ url: 'https://example.com/private-video.mp4', name: 'Private' })
+    const created = await app.request('/api/watchparty', { method: 'POST', headers: hostAuth('POST', '/api/watchparty', createBody), body: createBody }, env)
+    expect(created.status).toBe(201)
+    const partyId = ((await created.json()) as any).party.id as string
+    expect(settingsWatch(host.orbitId, { party: partyId, isPrivate: true })).not.toBeNull()
+
+    // A stranger cannot mint invites for a room they do not host.
+    const mintBody = JSON.stringify({})
+    const denied = await app.request(`/api/watchparty/${partyId}/invite`, { method: 'POST', headers: guestAuth('POST', `/api/watchparty/${partyId}/invite`, mintBody), body: mintBody }, env)
+    expect(denied.status).toBe(403)
+
+    // Private snapshot is hidden by ID before redeem.
+    const hidden = await app.request(`/api/watchparty/${partyId}`, { headers: guestAuth('GET', `/api/watchparty/${partyId}`) }, env)
+    expect(hidden.status).toBe(404)
+
+    const minted = await app.request(`/api/watchparty/${partyId}/invite`, { method: 'POST', headers: hostAuth('POST', `/api/watchparty/${partyId}/invite`, mintBody), body: mintBody }, env)
+    expect(minted.status).toBe(200)
+    const invite = ((await minted.json()) as any).invite as string
+    expect(typeof invite).toBe('string')
+
+    const joinBody = JSON.stringify({ invite: 'wrong' })
+    const badRedeem = await app.request(`/api/watchparty/${partyId}/join`, { method: 'POST', headers: guestAuth('POST', `/api/watchparty/${partyId}/join`, joinBody), body: joinBody }, env)
+    expect(badRedeem.status).toBe(404)
+
+    const goodBody = JSON.stringify({ invite })
+    const goodRedeem = await app.request(`/api/watchparty/${partyId}/join`, { method: 'POST', headers: guestAuth('POST', `/api/watchparty/${partyId}/join`, goodBody), body: goodBody }, env)
+    expect(goodRedeem.status).toBe(200)
+
+    const snap = await app.request(`/api/watchparty/${partyId}`, { headers: guestAuth('GET', `/api/watchparty/${partyId}`) }, env)
+    expect(snap.status).toBe(200)
   })
 })
