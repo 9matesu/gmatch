@@ -49,6 +49,20 @@ describe('WatchPartyUrlModal', () => {
     expect(await screen.findByText(/playable video/)).toBeTruthy()
   })
 
+  it('warns immediately for image links before contacting the server', () => {
+    render(<WatchPartyUrlModal identity={identity} onClose={() => {}} />)
+    fireEvent.change(screen.getByLabelText('Video URL'), { target: { value: 'https://cdn.example.com/pic.jpg' } })
+    expect(screen.getByText(/image, not a playable video/i)).toBeTruthy()
+  })
+
+  it('surfaces provider failure reasons instead of bare URLs', async () => {
+    vi.mocked(loadPartyVideo).mockResolvedValueOnce({ ok: false, added: 0, failed: ['https://example.com/article'], failedDetails: [{ url: 'https://example.com/article', kind: 'provider-unresolved', provider: 'page', reason: 'No playable video was found at page.', sync: 'none' }], error: 'Could not load these videos.' })
+    render(<WatchPartyUrlModal identity={identity} onClose={() => {}} joinPartyId="p1" queueMode />)
+    fireEvent.change(screen.getByLabelText('Video URL'), { target: { value: 'https://example.com/article' } })
+    fireEvent.click(screen.getByRole('button', { name: /add to queue/i }))
+    expect(await screen.findByText(/No playable video was found at page/i)).toBeTruthy()
+  })
+
   it('multi-line create: first URL starts the party, the rest bulk-queue', async () => {
     const onClose = vi.fn()
     render(<WatchPartyUrlModal identity={identity} onClose={onClose} />)

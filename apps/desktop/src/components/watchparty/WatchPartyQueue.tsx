@@ -49,14 +49,15 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
     const res = await loadPartyVideos(identity, party.id, urls, queueOnly)
     setBusy(false)
     if (!res.ok) {
-      setError(res.failed.length
+      setError(res.failedDetails?.[0]?.reason || (res.failed.length
         ? `${res.error} Failed: ${res.failed.join(', ')}`
-        : (res.error || 'Could not queue these videos.'))
+        : (res.error || 'Could not queue these videos.')))
       return
     }
     if (res.failed.length > 0) {
       const truncNote = res.truncated ? ' (Queue reached 50 limit)' : ''
-      setError(`Added ${res.added}. Failed ${res.failed.length}: ${res.failed[0]}${truncNote}`)
+      const detail = res.failedDetails?.[0]?.reason
+      setError(detail || `Added ${res.added}. Failed ${res.failed.length}: ${res.failed[0]}${truncNote}`)
       if (res.added > 0) setText('')
       return
     }

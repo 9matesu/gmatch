@@ -559,7 +559,7 @@ export async function expandPlaylist(identity: IdentityLike, url: string): Promi
   return { ok: true, isPlaylist: false, count: 1, items: [{ url }] }
 }
 
-export async function createParty(identity: IdentityLike, url: string, name: string): Promise<{ ok: boolean; partyId?: string; error?: string; truncated?: boolean }> {
+export async function createParty(identity: IdentityLike, url: string, name: string): Promise<{ ok: boolean; partyId?: string; error?: string; truncated?: boolean; source?: { kind: string; provider?: string; reason?: string; sync: string } }> {
   let res: Response
   try {
     res = await orbitFetch('/api/watchparty', {
@@ -571,14 +571,14 @@ export async function createParty(identity: IdentityLike, url: string, name: str
     return { ok: false, error: 'Could not reach the server.' }
   }
   const body = await res.json().catch(() => ({})) as any
-  if (!res.ok) return { ok: false, error: body?.error || 'Could not find a playable video at that link.' }
+  if (!res.ok) return { ok: false, error: body?.error || 'Could not find a playable video at that link.', source: body?.source }
   joinParty(identity, body.party)
   return { ok: true, partyId: body.party?.id, truncated: Boolean(body?.truncated) }
 }
 
 /** Resolve + queue/change a room's video over HTTP (the server runs the
  * media pipeline, then relays the queue frame). */
-export async function loadPartyVideo(identity: IdentityLike, partyId: string, url: string, name: string, queueOnly = false): Promise<{ ok: boolean; error?: string; added?: number; failed?: string[]; truncated?: boolean }> {
+export async function loadPartyVideo(identity: IdentityLike, partyId: string, url: string, name: string, queueOnly = false): Promise<{ ok: boolean; error?: string; added?: number; failed?: string[]; failedDetails?: Array<{ url: string; kind: string; provider?: string; reason?: string; sync: string }>; truncated?: boolean }> {
   try {
     const res = await orbitFetch(`/api/watchparty/${partyId}/video`, {
       method: 'POST',
@@ -586,8 +586,8 @@ export async function loadPartyVideo(identity: IdentityLike, partyId: string, ur
       body: JSON.stringify({ url, name, queueOnly, cmdId: newCmdId() }),
     }, identity)
     const body = await res.json().catch(() => ({})) as any
-    if (!res.ok) return { ok: false, error: body?.error || 'Could not find a playable video at that link.' }
-    return { ok: true, added: (body.added || []).length, failed: body.failed || [], truncated: Boolean(body?.truncated) }
+    if (!res.ok) return { ok: false, error: body?.error || 'Could not find a playable video at that link.', failedDetails: body?.failedDetails }
+    return { ok: true, added: (body.added || []).length, failed: body.failed || [], failedDetails: body.failedDetails || [], truncated: Boolean(body?.truncated) }
   } catch {
     return { ok: false, error: 'Could not reach the server.' }
   }
@@ -595,7 +595,7 @@ export async function loadPartyVideo(identity: IdentityLike, partyId: string, ur
 
 export async function loadPartyVideos(
   identity: IdentityLike, partyId: string, urls: string[], queueOnly = false,
-): Promise<{ ok: boolean; added: number; failed: string[]; truncated?: boolean; error?: string }> {
+): Promise<{ ok: boolean; added: number; failed: string[]; failedDetails?: Array<{ url: string; kind: string; provider?: string; reason?: string; sync: string }>; truncated?: boolean; error?: string }> {
   try {
     const items = urls.map((url) => ({ url, cmdId: newCmdId() }))
     const res = await orbitFetch(`/api/watchparty/${partyId}/video`, {
@@ -604,8 +604,8 @@ export async function loadPartyVideos(
       body: JSON.stringify({ items, queueOnly }),
     }, identity)
     const body = await res.json().catch(() => ({})) as any
-    if (!res.ok) return { ok: false, added: 0, failed: Array.isArray(body?.failed) ? body.failed.map(String) : [], error: body?.error || 'Could not load these videos.' }
-    return { ok: true, added: (body.added || []).length, failed: body.failed || [], truncated: Boolean(body?.truncated) }
+    if (!res.ok) return { ok: false, added: 0, failed: Array.isArray(body?.failed) ? body.failed.map(String) : [], failedDetails: body?.failedDetails, error: body?.error || 'Could not load these videos.' }
+    return { ok: true, added: (body.added || []).length, failed: body.failed || [], failedDetails: body.failedDetails || [], truncated: Boolean(body?.truncated) }
   } catch {
     return { ok: false, added: 0, failed: [], error: 'Could not reach the server.' }
   }

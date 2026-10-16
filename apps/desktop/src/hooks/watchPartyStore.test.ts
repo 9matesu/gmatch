@@ -182,7 +182,7 @@ describe('watchPartyStore', () => {
     expect(body.queueOnly).toBe(true)
     expect(body.items.map((it: any) => it.url)).toEqual(['https://a', 'https://junk/2'])
     expect(body.items.every((it: any) => typeof it.cmdId === 'string' && it.cmdId.length > 0)).toBe(true)
-    expect(r).toEqual({ ok: true, added: 1, failed: ['https://junk/2'], truncated: false })
+    expect(r).toEqual({ ok: true, added: 1, failed: ['https://junk/2'], failedDetails: [], truncated: false })
   })
 
   it('loadPartyVideos surfaces server errors', async () => {

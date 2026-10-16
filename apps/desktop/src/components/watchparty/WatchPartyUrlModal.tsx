@@ -4,6 +4,7 @@
 // open; LOAD/QUEUE mode against the active room otherwise.
 
 import { useState } from 'react'
+import { classifyStaticUrl } from '@orbit/shared'
 import { Modal } from '../Modal'
 import { BTN_PRIMARY } from '../../ui/styles'
 import { createParty, expandPlaylist, loadPartyVideo, loadPartyVideos } from '../../hooks/watchPartyStore'
@@ -37,6 +38,15 @@ export function WatchPartyUrlModal({
 
   const inRoom = Boolean(joinPartyId)
   const blocked = inRoom && lockVideo
+  const firstLine = url.split(/\n+/).map((l) => l.trim()).filter(Boolean)[0] || ''
+  const hint = firstLine ? classifyStaticUrl(firstLine) : null
+  const hintText = !firstLine
+    ? 'Direct .mp4 links, playlists, and video pages (pmvhaven, redgifs, X, Reddit) are parsed server-side.'
+    : !hint?.ok
+      ? hint?.reason || 'That link will not play here.'
+      : hint.ext
+        ? `Direct video candidate (.${hint.ext}). The server still verifies it before playing.`
+        : `Provider page (${hint.provider || 'page'}). The server will try to find a playable file; some pages cannot be embedded.`
 
   const submit = async () => {
     if (!url.trim() || busy || blocked) return
@@ -92,7 +102,7 @@ export function WatchPartyUrlModal({
             setStatusText(`Party created! Queuing videos ${i + 1}-${end} of ${remainingUrls.length}...`)
             const bulk = await loadPartyVideos(identity, partyId, batch, true)
             if (!bulk.ok || bulk.failed.length === batch.length) {
-              setError(`Party started. ${bulk.failed.length} videos failed to queue.`)
+              setError(bulk.failedDetails?.[0]?.reason || `Party started. ${bulk.failed.length} videos failed to queue.`)
               setBusy(false)
               setStatusText(null)
               return
@@ -120,7 +130,7 @@ export function WatchPartyUrlModal({
             setStatusText(`Party created! Queuing videos ${i + 1}-${end} of ${remainingUrls.length}...`)
             const bulk = await loadPartyVideos(identity, partyId, batch, true)
             if (!bulk.ok || bulk.failed.length === batch.length) {
-              setError(`Party started. ${bulk.failed.length} videos failed to queue.`)
+              setError(bulk.failedDetails?.[0]?.reason || `Party started. ${bulk.failed.length} videos failed to queue.`)
               setBusy(false)
               setStatusText(null)
               return
@@ -152,11 +162,12 @@ export function WatchPartyUrlModal({
           if (!res.ok) {
             setBusy(false)
             setStatusText(null)
-            setError(res.error || 'Could not load these videos.')
+            setError(res.failedDetails?.[0]?.reason || res.error || 'Could not load these videos.')
             return
           }
           if (res.failed.length === batch.length) {
-            setError(`Failed to queue: ${res.failed[0]}`)
+            const detail = res.failedDetails?.[0]?.reason
+            setError(detail || `Failed to queue: ${res.failed[0]}`)
             setBusy(false)
             setStatusText(null)
             return
@@ -170,11 +181,12 @@ export function WatchPartyUrlModal({
         if (!res.ok) {
           setBusy(false)
           setStatusText(null)
-          setError(res.error || 'Could not load this video.')
+          setError(res.failedDetails?.[0]?.reason || res.error || 'Could not load this video.')
           return
         }
         if (res.failed && res.failed.length > 0) {
-          setError(`Failed to load: ${res.failed[0]}`)
+          const detail = res.failedDetails?.[0]?.reason
+          setError(detail || `Failed to load: ${res.failed[0]}`)
           setBusy(false)
           setStatusText(null)
           return
@@ -210,7 +222,7 @@ export function WatchPartyUrlModal({
           className="glass-field w-full px-3 py-2 text-xs font-mono resize-y"
         />
         <p className="text-[10px] text-retro-muted">
-          Direct .mp4 links, playlists, and video pages (pmvhaven, redgifs, X, Reddit) are parsed server-side.
+          {hintText}
         </p>
         {!inRoom && (
           <input
