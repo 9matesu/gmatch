@@ -3,8 +3,9 @@
 // Servers view (plan T3/T4, docs/ADR-002-servers.md). A "server" is a full
 // gMatch node; the CENTRAL node only keeps a public directory of metadata. One
 // page, one list, one row per server: the node on this machine, directory
-// destinations and the legacy Fly.dev world all share the same row. A courier
-// that hosts no world is infrastructure, not a destination, so it is not a row.
+// destinations and the official gMatch Central world all share the same row. A
+// courier that hosts no world is infrastructure, not a destination, so it is
+// not a row.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
@@ -126,7 +127,7 @@ function rowCounts(
   s: DirectoryServer,
   isCurrentServer: boolean,
   dash: Dashboard | null,
-  legacyProbe: { online: boolean; count: number | null; total?: number | null },
+  centralProbe: { online: boolean; count: number | null; total?: number | null },
 ): string | null {
   if (isCurrentServer && dash) {
     const online = typeof dash.online_count === 'number'
@@ -139,13 +140,13 @@ function rowCounts(
   }
 
   if (s.id === 'central-deprecated') {
-    if (!legacyProbe.online) return null
-    const online = typeof legacyProbe.count === 'number'
-      ? legacyProbe.count
+    if (!centralProbe.online) return null
+    const online = typeof centralProbe.count === 'number'
+      ? centralProbe.count
       : (typeof s.online_count === 'number' ? s.online_count : null)
     if (online === null) return null
-    const total = typeof legacyProbe.total === 'number'
-      ? legacyProbe.total
+    const total = typeof centralProbe.total === 'number'
+      ? centralProbe.total
       : (typeof s.user_count === 'number' ? s.user_count : null)
     return total === null ? `${online} online` : `${online} / ${total}`
   }
@@ -244,22 +245,22 @@ export function ServersView({
   const isLocalHost = (url: string) => url.includes('127.0.0.1') || url.includes('localhost')
 
   const RENDER_COURIER_URL = 'https://gmatch-wcz1.onrender.com'
-  const FLY_LEGACY_URL = 'https://gmatch.fly.dev'
+  const GM_CENTRAL_URL = 'https://gmatch.fly.dev'
 
-  const [legacyProbe, setLegacyProbe] = useState<{ online: boolean; count: number | null; total: number | null }>({ online: false, count: null, total: null })
+  const [centralProbe, setCentralProbe] = useState<{ online: boolean; count: number | null; total: number | null }>({ online: false, count: null, total: null })
 
-  const legacyServer: DirectoryServer = useMemo(() => ({
+  const centralServer: DirectoryServer = useMemo(() => ({
     id: 'central-deprecated',
-    name: 'gMatch Fly.dev',
+    name: 'gMatch Central',
     description: '',
     owner_id: 'central-deprecated',
-    endpoint_hint: FLY_LEGACY_URL,
+    endpoint_hint: GM_CENTRAL_URL,
     password_required: 0,
     is_private: 0,
-    online_count: legacyProbe.count,
-    user_count: legacyProbe.total,
-    last_seen: legacyProbe.online ? new Date().toISOString() : undefined,
-  }), [legacyProbe])
+    online_count: centralProbe.count,
+    user_count: centralProbe.total,
+    last_seen: centralProbe.online ? new Date().toISOString() : undefined,
+  }), [centralProbe])
 
   // Mirror the connected server into the dev-proxy cookie so browser /api
   // traffic follows it. A courier is a DIRECTORY, not a data node (it 404s
@@ -293,18 +294,18 @@ export function ServersView({
     const runBase = getApiBaseUrl()
     const switchedAway = () => getApiBaseUrl() !== runBase
 
-    // Live probe: Legacy Fly server (Electron IPC -> Vite dev proxy -> direct fetch)
-    const probeFly = async () => {
+    // Live probe: gMatch Central (Electron IPC -> Vite dev proxy -> direct fetch)
+    const probeCentral = async () => {
       let isOnline = false
       let onlineCount: number | null = null
       let totalMembers: number | null = null
       try {
         const shouldFetchDash = isOnline && (Boolean(identity) || (isDev && import.meta.env.MODE !== 'test'))
         if (window.gmatch?.serverProbe) {
-          const probeRes = await window.gmatch.serverProbe(`${FLY_LEGACY_URL}/api/health`).catch(() => null)
+          const probeRes = await window.gmatch.serverProbe(`${GM_CENTRAL_URL}/api/health`).catch(() => null)
           isOnline = Boolean(probeRes?.ok)
           if (shouldFetchDash) {
-            const dashRes = await fetch(`${FLY_LEGACY_URL}/api/servers/dashboard`, {
+            const dashRes = await fetch(`${GM_CENTRAL_URL}/api/servers/dashboard`, {
               signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
             }).catch(() => null)
             if (dashRes?.ok) {
@@ -329,12 +330,12 @@ export function ServersView({
             }
           }
         } else {
-          const res = await fetch(`${FLY_LEGACY_URL}/api/health`, {
+          const res = await fetch(`${GM_CENTRAL_URL}/api/health`, {
             signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
           }).catch(() => null)
           isOnline = Boolean(res?.ok)
           if (shouldFetchDash) {
-            const dashRes = await fetch(`${FLY_LEGACY_URL}/api/servers/dashboard`, {
+            const dashRes = await fetch(`${GM_CENTRAL_URL}/api/servers/dashboard`, {
               signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
             }).catch(() => null)
             if (dashRes?.ok) {
@@ -347,9 +348,9 @@ export function ServersView({
       } catch {
         /* probe failed */
       }
-      setLegacyProbe({ online: isOnline, count: onlineCount, total: totalMembers })
+      setCentralProbe({ online: isOnline, count: onlineCount, total: totalMembers })
     }
-    void probeFly()
+    void probeCentral()
 
     // Anonymous browser: public directory only — never touch node routes
     // (no ID yet, nothing to sign with).
@@ -541,7 +542,7 @@ export function ServersView({
   const isCurrent = useCallback((s: DirectoryServer) => {
     const base = getEffectiveServerUrl()
     if (s.id === 'central-deprecated') {
-      return !!base && (isCurrentServerUrl(base, FLY_LEGACY_URL) || base.includes('fly.dev'))
+      return !!base && (isCurrentServerUrl(base, GM_CENTRAL_URL) || base.includes('fly.dev'))
     }
     return isCurrentServerUrl(base, s.endpoint_hint || '')
   }, [getEffectiveServerUrl, apiBaseTick])
@@ -586,14 +587,15 @@ export function ServersView({
   const visibleServers = useMemo(() => {
     const q = query.trim().toLowerCase()
     const p2pNorm = RENDER_COURIER_URL.trim().replace(/\/+$/, '').toLowerCase()
-    const flyNorm = FLY_LEGACY_URL.trim().replace(/\/+$/, '').toLowerCase()
+    const centralNorm = GM_CENTRAL_URL.trim().replace(/\/+$/, '').toLowerCase()
     return servers.filter((s) => {
       if (s.id === 'central-node' || s.id === 'central-p2p' || s.id === 'central-deprecated' || s.id === 'central-local') return false
       if (s.name.trim().toLowerCase() === 'gmatch') return false
       const hintNorm = s.endpoint_hint ? (normalizeServerUrl(s.endpoint_hint)?.toLowerCase() || '') : ''
-      // The courier and the legacy Fly.dev world are drawn from their own rows;
-      // a stale directory mirror of either is never a second destination.
-      if (hintNorm && (hintNorm === p2pNorm || hintNorm === flyNorm)) return false
+      // The courier is infrastructure, never a destination, and the official
+      // gMatch Central world is drawn from its own row; a stale directory mirror
+      // of either is never a second destination.
+      if (hintNorm && (hintNorm === p2pNorm || hintNorm === centralNorm)) return false
       // A localhost row is a real destination only for the node on THIS machine;
       // someone else's localhost is not joinable from here.
       if (!mine(s) && isLocalHint(s.endpoint_hint)) return false
@@ -603,15 +605,15 @@ export function ServersView({
   }, [servers, query, apiBaseTick, identity])
 
   // ONE list. The node on this machine, the directory's destinations and the
-  // legacy Fly.dev world share the same row, deduped by address. The committed
-  // server sorts first.
+  // official gMatch Central world share the same row, deduped by address. The
+  // committed server sorts first.
   const serverRows: DirectoryServer[] = useMemo(() => {
     const q = query.trim().toLowerCase()
     const matches = (s: DirectoryServer) =>
       !q || `${s.name} ${s.description ?? ''}`.toLowerCase().includes(q)
     const listed = dedupeServers([
       ...visibleServers,
-      ...(matches(legacyServer) ? [legacyServer] : []),
+      ...(matches(centralServer) ? [centralServer] : []),
     ])
     // The node on this machine IS a server even when the directory does not
     // list it. Its own directory record wins when there is one (that is the
@@ -625,15 +627,16 @@ export function ServersView({
       if (ac !== bc) return ac - bc
       return (b.online_count ?? -1) - (a.online_count ?? -1) || a.name.localeCompare(b.name)
     })
-  }, [ownServer, visibleServers, legacyServer, query, apiBaseTick])
+  }, [ownServer, visibleServers, centralServer, query, apiBaseTick])
 
   const currentServerTitle = useMemo(() => {
     const apiBase = getEffectiveServerUrl()
+    // The onrender node is a directory courier (transport), not a world.
     if (isCurrentServerUrl(apiBase, RENDER_COURIER_URL) || apiBase.includes('onrender.com')) {
-      return 'gMatch Central (p2p)'
+      return 'gMatch Courier'
     }
-    if (isCurrentServerUrl(apiBase, FLY_LEGACY_URL) || apiBase.includes('fly.dev')) {
-      return 'gMatch Fly.dev'
+    if (isCurrentServerUrl(apiBase, GM_CENTRAL_URL) || apiBase.includes('fly.dev')) {
+      return 'gMatch Central'
     }
     const matched = servers.find((s) => isCurrentServerUrl(apiBase, s.endpoint_hint || ''))
     if (matched?.name) return matched.name
@@ -641,9 +644,9 @@ export function ServersView({
   }, [servers, serverName, getEffectiveServerUrl])
 
   /** One quiet type label, and only when it helps: a world running on this
-   *  machine, or the legacy Fly.dev world. Everything else is just hosted. */
+   *  machine. Everything else is just hosted, which is the norm and needs no
+   *  label. */
   const kindFor = (s: DirectoryServer): WorldRowState['kind'] => {
-    if (s.id === 'central-deprecated') return 'Legacy'
     if (isOwnNode(s)) return 'P2P'
     return undefined
   }
@@ -677,13 +680,13 @@ export function ServersView({
   ): WorldRowState => {
     const isCurrentServer = isCurrent(s)
     const base: WorldRowState = {
-      counts: rowCounts(s, isCurrentServer, dash, legacyProbe),
+      counts: rowCounts(s, isCurrentServer, dash, centralProbe),
       meta: metaFor(s, isCurrentServer),
       kind: kindFor(s),
     }
     if (opts.connecting) return { ...base, status: 'Connecting' }
     if (isCurrentServer) return { ...base, status: 'Current' }
-    if (s.id === 'central-deprecated') return legacyProbe.online ? base : { ...base, status: 'Unavailable' }
+    if (s.id === 'central-deprecated') return centralProbe.online ? base : { ...base, status: 'Unavailable' }
     if (!s.endpoint_hint) return { ...base, status: 'Unavailable' }
     return base
   }
@@ -937,7 +940,7 @@ export function ServersView({
         (s.endpoint_hint && (
           s.endpoint_hint === central ||
           s.endpoint_hint === RENDER_COURIER_URL ||
-          s.endpoint_hint === FLY_LEGACY_URL
+          s.endpoint_hint === GM_CENTRAL_URL
         ))
       ) {
         const rawTarget = s.endpoint_hint || central
@@ -1292,7 +1295,7 @@ export function ServersView({
             {s.id === 'central-deprecated' && !isCurrentServer && (
               <WorldMenuItem
                 icon={<ArrowLeft className="w-3 h-3" />}
-                label="Connect to legacy server"
+                label="Connect to gMatch Central"
                 disabled={!!connectingId}
                 onClick={() => { playPress(620); void join(s); setOpenMenuId(null) }}
               />

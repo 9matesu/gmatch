@@ -120,14 +120,15 @@ this machine. Now:
   and the local node collapse into one entry; never by display name, since two
   servers can share one. Current first, then most populated, then name.
 - **The courier is not a destination.** `onrender.com` and its roster probe
-  left the view entirely (mail/turn/directory only). Fly.dev stays visible with
-  one restrained `Legacy` label and the legacy actions it already had.
+  left the view entirely (mail/turn/directory only). The official `gMatch
+  Central` world (address `gmatch.fly.dev`) stays visible as an ordinary row,
+  with no type label and only the actions it already had.
 - **One header**: `Servers`, one primary `+ Add server`, one quiet search, a
   quiet refresh, and the directory gear (central address, admin panel, dev
   switch). Local groups became a footer link opening a small dialog — a label is
   not a server and must never look joinable.
 - **One row** (`WorldRow.tsx`): status dot, name, at most one quiet type label
-  (`P2P` only for this machine, `Legacy` only for Fly.dev), `Current` /
+  (`P2P` only for this machine), `Current` /
   `Connecting` / `Unavailable`, and a secondary line with description, domain
   and `listed Nm ago`. No raw IP, no transport, no diagnostics, no duplicate
   per-row buttons. Clicking the row joins/switches; the active row is inert.

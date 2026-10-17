@@ -1,11 +1,11 @@
 "use client";
 
 // One row for every server in the Browser: the node running on this machine,
-// directory destinations, and the legacy Fly.dev entry. Identity leads,
+// directory destinations, and the official gMatch Central entry. Identity leads,
 // infrastructure is a second line, and a row carries exactly one action
 // (join / switch — clicking the row) plus its contextual menu. Behaviour stays
-// in ServersView: this file owns layout, the vocabulary (P2P / Legacy, Current
-// / Connecting / Unavailable) and the two format helpers the row needs. A row
+// in ServersView: this file owns layout, the vocabulary (P2P, Current /
+// Connecting / Unavailable) and the two format helpers the row needs. A row
 // never claims reachability it has not measured.
 import { Loader2, Lock, MoreVertical } from 'lucide-react'
 import type { ReactNode } from 'react'
@@ -14,9 +14,9 @@ import { MONO } from '../../ui/styles'
 
 export interface WorldRowState {
   /** At most one quiet type label, and only when it helps: a world running on
-   *  this machine (P2P) or the legacy Fly.dev world. Everything else is hosted,
-   *  which is the norm and needs no label. */
-  kind?: 'P2P' | 'Legacy'
+   *  this machine (P2P). Everything else is hosted, which is the norm and
+   *  needs no label. */
+  kind?: 'P2P'
   /** Status word for the row. Omitted when the row is simply selectable. */
   status?: 'Current' | 'Connecting' | 'Unavailable'
   /** Right-aligned figure, only when real numbers back it (never a placeholder). */

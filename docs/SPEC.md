@@ -358,9 +358,10 @@ ADR-002 (`docs/ADR-002-servers.md`) é canônico; resumo de operação:
   no SQLite do host — sem token forjável.
 - **Lista**: um nó que hospeda um mundo é um servidor, inclusive o que roda nesta
   máquina — uma linha por endereço (`dedupeServers`), nunca por nome. O courier
-  central (mail/turn/diretório) é infraestrutura e não aparece; o Fly.dev legado
-  continua visível com a etiqueta `Legacy`. Grupos locais são rótulo só deste
-  dispositivo (rodapé → diálogo), nunca um destino.
+  central (mail/turn/diretório) é infraestrutura e não aparece; o mundo oficial
+  `gMatch Central` continua visível, como qualquer outro destino, sem etiqueta de
+  tipo. Grupos locais são rótulo só deste dispositivo (rodapé → diálogo), nunca
+  um destino.
 - **Admin**: quem HOSTEIA o nó vê o botão Admin no rodapé da sidebar (PIN da
   suíte admin existente). A suíte de moderação funciona igual em qualquer nó.
 - **Dashboard**: `GET /api/servers/dashboard` no nó atual → userlist (ids

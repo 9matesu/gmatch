@@ -119,7 +119,7 @@ describe('ServersView', () => {
     render(<ServersView identity={identity} toast={() => {}} />)
     await screen.findByText(/other\.test:8790/)
     const rows = screen.getAllByRole('listitem')
-    // current node (2 records collapsed) + the namesake on another address + legacy
+    // current node (2 records collapsed) + the namesake on another address + gMatch Central
     expect(rows).toHaveLength(3)
     expect(screen.getAllByText('My Realm')).toHaveLength(2)
   })
@@ -170,14 +170,14 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('gMatch Fly.dev')
+    await screen.findByText('gMatch Central')
     // the courier is a directory, not a destination: no row, no transport chip
     expect(screen.queryByText(/gMatch Central \(p2p\)/i)).toBeNull()
     expect(screen.queryByText('Relay')).toBeNull()
     expect(screen.queryByText(/relay transport/i)).toBeNull()
   })
 
-  it('keeps the legacy Fly.dev world with a restrained label and a menu-only connect', async () => {
+  it('keeps gMatch Central as an ordinary row with a menu-only connect', async () => {
     mockFetch(async (url) => {
       if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
       if (url.includes('/api/servers')) return json({ servers: [] })
@@ -185,15 +185,14 @@ describe('ServersView', () => {
     })
     const onServerJoined = vi.fn()
     render(<ServersView identity={identity} toast={() => {}} onServerJoined={onServerJoined} />)
-    await screen.findByText('gMatch Fly.dev')
+    await screen.findByText('gMatch Central')
 
-    const legacyRow = rowOf('gMatch Fly.dev')
-    expect(within(legacyRow).getByText('Legacy')).toBeInTheDocument()
-    expect(within(legacyRow).getByText(/gmatch\.fly\.dev/)).toBeInTheDocument()
+    const centralRow = rowOf('gMatch Central')
+    expect(within(centralRow).getByText(/gmatch\.fly\.dev/)).toBeInTheDocument()
     // the row is a destination, and it is the only place the old connect lives
-    expect(within(legacyRow).getByRole('button', { name: /connect to gmatch fly\.dev/i })).toBeInTheDocument()
-    fireEvent.click(within(legacyRow).getByRole('button', { name: /more actions/i }))
-    fireEvent.click(await within(legacyRow).findByText('Connect to legacy server'))
+    expect(within(centralRow).getByRole('button', { name: /connect to gmatch central/i })).toBeInTheDocument()
+    fireEvent.click(within(centralRow).getByRole('button', { name: /more actions/i }))
+    fireEvent.click(await within(centralRow).findByText('Connect to gMatch Central'))
     expect(onServerJoined).toHaveBeenCalledWith(expect.objectContaining({ id: 'central-deprecated' }))
     expect(localStorage.getItem('gmatch.api.url')).toBe('https://gmatch.fly.dev')
   })
@@ -206,10 +205,10 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('gMatch Fly.dev')
-    const legacyRow = rowOf('gMatch Fly.dev')
-    expect(within(legacyRow).getByText('Unavailable')).toBeInTheDocument()
-    expect(within(legacyRow).getByRole('button', { name: /connect to gmatch fly\.dev/i })).toBeDisabled()
+    await screen.findByText('gMatch Central')
+    const centralRow = rowOf('gMatch Central')
+    expect(within(centralRow).getByText('Unavailable')).toBeInTheDocument()
+    expect(within(centralRow).getByRole('button', { name: /connect to gmatch central/i })).toBeDisabled()
   })
 
   it('a listed server with no address is not offered as ready to connect', async () => {
@@ -235,10 +234,10 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('gMatch Fly.dev')
-    // the legacy entry stays visible and reports its real state...
-    const legacyRow = rowOf('gMatch Fly.dev')
-    expect(within(legacyRow).getByText('Unavailable')).toBeInTheDocument()
+    await screen.findByText('gMatch Central')
+    // the official entry stays visible and reports its real state...
+    const centralRow = rowOf('gMatch Central')
+    expect(within(centralRow).getByText('Unavailable')).toBeInTheDocument()
     // ...and no row invents a member figure out of nothing
     expect(screen.queryByText(/\d+ \/ \d+/)).toBeNull()
     // one header action, and no second "Add server" entry point outside it
@@ -408,7 +407,7 @@ describe('ServersView', () => {
     await waitFor(() => expect(screen.getByText(/directory unreachable/i)).toBeInTheDocument())
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument()
     // the list still renders what it knows instead of a blank page
-    expect(screen.getByText('gMatch Fly.dev')).toBeInTheDocument()
+    expect(screen.getByText('gMatch Central')).toBeInTheDocument()
   })
 
   it('central admin door lives behind the directory menu', async () => {
@@ -419,7 +418,7 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('gMatch Fly.dev')
+    await screen.findByText('gMatch Central')
     // The button no longer pre-gates on node.isAdmin: the user's .exe is the
     // central admin. CentralAdminPanel itself refuses until the PIN unlocks.
     fireEvent.click(screen.getByRole('button', { name: /directory options/i }))
@@ -434,7 +433,7 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('gMatch Fly.dev')
+    await screen.findByText('gMatch Central')
     await openJoinForm()
     expect(screen.getByRole('dialog', { name: /add server/i })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(/invite code/i), { target: { value: 'not-a-code' } })
@@ -452,7 +451,7 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('gMatch Fly.dev')
+    await screen.findByText('gMatch Central')
     // a label is never a server and adds no list row
     expect(screen.getAllByRole('listitem')).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: /local groups/i }))
@@ -732,7 +731,7 @@ describe('ServersView', () => {
     expect(screen.queryByTestId('admin-pin-banner')).toBeNull()
     unmount()
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('gMatch Fly.dev')
+    await screen.findByText('gMatch Central')
     expect(screen.queryByTestId('admin-pin-banner')).toBeNull()
     spy.mockRestore()
     delete (window as unknown as { gmatch?: unknown }).gmatch

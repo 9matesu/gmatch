@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createLabel, classifyServerId, removeMemberLocal, isOwnLabel } from './meshLabels'
+import { createLabel, removeMemberLocal, isOwnLabel } from './meshLabels'
 
 describe('meshLabels', () => {
   it('creates stable ids that survive rename', () => {
@@ -7,12 +7,6 @@ describe('meshLabels', () => {
     const renamed = { ...l, name: 'Beta' }
     expect(renamed.id).toBe(l.id)
     expect(renamed.name).toBe('Beta')
-  })
-
-  it('classifies legacy/courier/hosted rows', () => {
-    expect(classifyServerId('central-deprecated')).toBe('legacy')
-    expect(classifyServerId('central-p2p')).toBe('courier')
-    expect(classifyServerId('abc')).toBe('hosted')
   })
 
   it('local removal only hides from my view', () => {

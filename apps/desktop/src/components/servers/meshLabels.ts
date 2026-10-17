@@ -13,8 +13,6 @@ export interface LocalMeshLabel {
 
 export const MESH_LABELS_KEY = 'gmatch.meshLabels.v1'
 
-export type ServerKind = 'label' | 'peers' | 'hosted' | 'courier' | 'legacy'
-
 export function shortOwner(id: string): string {
   return (id || '').slice(0, 8)
 }
@@ -56,14 +54,6 @@ export function removeMemberLocal(labels: LocalMeshLabel[], labelId: string, pee
   return labels.map((l) =>
     l.id !== labelId ? l : { ...l, memberOrbitIds: l.memberOrbitIds.filter((m) => m !== peerId) }
   )
-}
-
-/** Classify a directory/synthetic row for the Browser sections. */
-export function classifyServerId(id: string): ServerKind {
-  if (id === 'central-deprecated') return 'legacy'
-  if (id === 'central-p2p') return 'courier'
-  if (id === 'central-local') return 'hosted'
-  return 'hosted'
 }
 
 export function isOwnLabel(label: LocalMeshLabel, orbitId?: string | null): boolean {
