@@ -136,7 +136,7 @@ export function ContextOverlay({
       >
         {/* ─── MEDIA CONTEXT MENU (Images, Videos) ─── */}
         {contextMenu.type === 'media' && (() => {
-          const { src, originalUrl, isVideo, videoEl, noWallpaper } = contextMenu.data;
+          const { src, originalUrl, isVideo, videoEl, noWallpaper, keepsakeId } = contextMenu.data;
           const resolved = resolveMediaUrl(src);
           const wallpaperUrl = originalUrl || src;
           const wallpaperMime = isVideo ? 'video/mp4' : 'image/jpeg';
@@ -249,6 +249,15 @@ export function ContextOverlay({
               <button
                 type="button"
                 onClick={() => {
+                  // Keepsakes resolve local-only through the gallery (never the
+                  // raw tile src, which may be an unresolved remote preview).
+                  if (keepsakeId) {
+                    window.dispatchEvent(
+                      new CustomEvent('gmatch:open-keepsake', { detail: { keepsakeId } }),
+                    );
+                    onDismiss();
+                    return;
+                  }
                   window.open(resolved, '_blank', 'noopener,noreferrer');
                   onDismiss();
                 }}

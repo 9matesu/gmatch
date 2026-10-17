@@ -39,7 +39,11 @@ describe('clicker keep persists bytes before "saved" (Phase 5)', () => {
     const keep = useGame.getState().gallery.at(-1)!
     expect(keep.localStatus).toBe('pending')
     await vi.waitFor(() => {
-      expect(vi.mocked(persistKeepsake)).toHaveBeenCalledWith('https://x/k1.jpg')
+      const calls = vi.mocked(persistKeepsake).mock.calls as unknown[][]
+      expect(calls.length).toBeGreaterThan(0)
+      // Full payload: the keep's kind must ride along (video takes the
+      // streaming route), not just the url.
+      expect(calls[0]).toEqual(['https://x/k1.jpg', {}, undefined])
     })
     // Wait for the dynamic import + status reconciliation.
     await vi.waitFor(() => {

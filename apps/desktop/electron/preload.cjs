@@ -15,6 +15,12 @@ contextBridge.exposeInMainWorld('gmatch', {
   // Opt-in local media vault (gallery keeps + card bytes on disk).
   vaultGet: (url) => ipcRenderer.invoke('vault:get', url),
   vaultPin: (url) => ipcRenderer.invoke('vault:pin', url),
+  vaultPinStream: (url) => ipcRenderer.invoke('vault:pin-stream', url),
+  onVaultPinProgress: (cb) => {
+    const l = (_event, data) => { try { cb(data) } catch {} }
+    ipcRenderer.on('vault:pin-stream-progress', l)
+    return () => ipcRenderer.removeListener('vault:pin-stream-progress', l)
+  },
   vaultUnpin: (url) => ipcRenderer.invoke('vault:unpin', url),
   vaultRemove: (url) => ipcRenderer.invoke('vault:remove', url),
   vaultStats: () => ipcRenderer.invoke('vault:stats'),

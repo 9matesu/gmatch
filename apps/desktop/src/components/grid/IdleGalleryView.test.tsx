@@ -1,10 +1,21 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import IdleGalleryView, { resolveGalleryTileUrl } from './IdleGalleryView'
 import { useGame } from '../../game/store'
 import type { GalleryImage } from '../../game/types'
+
+vi.mock('../../utils/p2pSwarm', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('../../utils/p2pSwarm')>()
+  return { ...mod, getLocalObject: vi.fn(async () => null) }
+})
+
+let vaultMap: Record<string, string> = {}
+vi.mock('../../services/vault', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('../../services/vault')>()
+  return { ...mod, useVaultUrls: () => vaultMap, useVaultUrl: () => null }
+})
 
 function makeGalleryImages(count: number): GalleryImage[] {
   return Array.from({ length: count }, (_, i) => ({
@@ -22,6 +33,7 @@ function makeGalleryImages(count: number): GalleryImage[] {
 describe('IdleGalleryView', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    vaultMap = {}
     useGame.setState({
       gallery: [],
       backgroundUrl: null,
@@ -225,7 +237,7 @@ describe('IdleGalleryView', () => {
     )
   })
 
-  it('opens slideshow from header and batch action bar', async () => {
+  it('slideshow plays verified local bytes only (skips remote-only keeps)', async () => {
     const images = makeGalleryImages(5)
     useGame.setState({ gallery: images })
 
@@ -235,13 +247,59 @@ describe('IdleGalleryView', () => {
     const headerSlideshowBtn = screen.getByRole('button', { name: /Slideshow/i })
     await userEvent.click(headerSlideshowBtn)
 
-    // Slideshow overlay should be open (has close button aria-label="Close slideshow")
-    const closeBtn = screen.getByLabelText(/Close slideshow/i)
-    expect(closeBtn).toBeInTheDocument()
-
-    // Close slideshow
-    await userEvent.click(closeBtn)
+    // Nothing local: no overlay, explicit notice instead of remote playback.
     expect(screen.queryByLabelText(/Close slideshow/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/nothing local to play yet/i)).toBeInTheDocument()
+  })
+
+  it('viewer opens verified local bytes and gates Browser on local-only', async () => {
+    const blob = new Blob(['local-bytes'], { type: 'image/jpeg' })
+    URL.createObjectURL = vi.fn(() => 'blob:local-test')
+    URL.revokeObjectURL = vi.fn()
+    const { getLocalObject } = await import('../../utils/p2pSwarm')
+    // IDB has bytes only for the verified keep.
+    vi.mocked(getLocalObject).mockImplementation(async (id: string) =>
+      id === 'https://provider/x.jpg' ? blob : null,
+    )
+    const images = [
+      {
+        id: 'k-local', url: 'https://provider/x.jpg', tags: ['e2e'], rarityBase: 1,
+        clicks: 1, rarity: 'Common', boughtAt: 1, kind: 'image', localStatus: 'local',
+      },
+      {
+        id: 'k-failed', url: 'https://provider/y.jpg', tags: ['e2e'], rarityBase: 1,
+        clicks: 1, rarity: 'Common', boughtAt: 2, kind: 'image', localStatus: 'failed',
+      },
+    ] as GalleryImage[]
+    useGame.setState({ gallery: images })
+    render(<IdleGalleryView />)
+
+    // Local keep: viewer renders blob:, Browser enabled.
+    const tiles = screen.getAllByRole('button', { name: /^View /i })
+    await userEvent.click(tiles[tiles.length - 1])
+    await waitFor(() => {
+      const blobImgs = document.querySelectorAll('img[src="blob:local-test"]')
+      expect(blobImgs.length).toBeGreaterThan(0)
+    })
+    expect(screen.getByRole('button', { name: /^Browser$/i })).toBeEnabled()
+  })
+
+  it('slideshow renders vault bytes, never the provider URL', async () => {
+    const images = makeGalleryImages(3)
+    vaultMap = {
+      'https://example.com/img-1.jpg': 'vault://f/a1',
+      'https://example.com/img-2.jpg': 'vault://f/a2',
+    }
+    useGame.setState({ gallery: images })
+
+    render(<IdleGalleryView />)
+    await userEvent.click(screen.getByRole('button', { name: /Slideshow/i }))
+
+    expect(screen.getByLabelText(/Close slideshow/i)).toBeInTheDocument()
+    const media = document.querySelector('.slideshow-player img, .slideshow-player video, [role="dialog"] img, [role="dialog"] video')
+      || document.querySelector('img[src^="vault://"], video[src^="vault://"]')
+    expect(media).not.toBeNull()
+    expect(media?.getAttribute('src')).toMatch(/^vault:\/\//)
   })
 
   it('resolveGalleryTileUrl prefers vault SSD url, then preview, then inferred thumbnail', () => {
@@ -274,5 +332,37 @@ describe('IdleGalleryView', () => {
     expect(resolveGalleryTileUrl(rbImg)).toBe(
       'https://realbooru.com/thumbnails/38/f9/thumbnail_38f9dd17899412d912bc38fbe6916d35.jpg',
     )
+  })
+
+  it('shows live vault pin progress on a pending keep, then nothing when it lands', async () => {
+    const img: GalleryImage = {
+      id: 'k-pending',
+      url: 'https://provider/clip.mp4',
+      tags: ['e2e'],
+      rarityBase: 1,
+      clicks: 0,
+      rarity: 'Common',
+      boughtAt: 1,
+      kind: 'video',
+      localStatus: 'pending',
+    }
+    useGame.setState({ gallery: [img] })
+
+    type ProgressCb = (p: { url: string; bytes: number; total: number }) => void
+    let emit: ProgressCb | null = null
+    const g = window as unknown as { gmatch?: unknown }
+    const prevBridge = g.gmatch
+    g.gmatch = { onVaultPinProgress: (cb: ProgressCb) => { emit = cb; return () => { emit = null } } }
+
+    try {
+      render(<IdleGalleryView />)
+      expect(screen.getByText(/Caching…$/)).toBeInTheDocument()
+
+      // Mid-stream progress from the main process drives the badge.
+      await act(async () => { emit?.({ url: img.url, bytes: 512, total: 1024 }) })
+      expect(screen.getByText(/Caching… 50%/)).toBeInTheDocument()
+    } finally {
+      g.gmatch = prevBridge
+    }
   })
 })

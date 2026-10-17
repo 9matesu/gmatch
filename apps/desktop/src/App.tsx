@@ -815,6 +815,8 @@ export default function Home() {
               isVideo,
               noWallpaper: mediaEl.closest('[data-no-wallpaper]') ? true : undefined,
               videoEl: videoEl || undefined,
+              // Keepsake tiles resolve local-only: the gallery owns opening.
+              keepsakeId: mediaEl.getAttribute('data-keepsake-id') || undefined,
             },
           });
           return;

@@ -43,6 +43,7 @@ function loadManifest() {
       for (const [url, e] of Object.entries(d)) {
         if (e && typeof e.key === 'string' && typeof e.bytes === 'number') {
           manifest[url] = { key: e.key, mime: String(e.mime || ''), bytes: e.bytes, atime: Number(e.atime) || 0, pins: Number(e.pins) || 0 }
+          if (typeof e.hash === 'string' && /^[0-9a-f]{64}$/i.test(e.hash)) manifest[url].hash = e.hash.toLowerCase()
         }
       }
     }
@@ -225,6 +226,132 @@ async function pin(url) {
   }
 }
 
+/**
+ * Streaming pin for large media (keepsake MP4s of any size). Downloads the
+ * response body in chunks straight to a temp file — the whole file is NEVER
+ * buffered in memory — while hashing incrementally (single pass). There is
+ * NO per-file byte cap: the only limits are the vault quota (disk space,
+ * genuine constraint) and free disk space. Incomplete/failed writes are
+ * deleted, never renamed into place, so a partial file can never read as
+ * complete. Returns { ok, key, mime, bytes, hash } or { ok:false, reason }.
+ */
+async function pinStream(url, { onProgress } = {}) {
+  const fail = (reason) => ({ ok: false, reason })
+  try {
+    if (!url || !dir) return fail('no-vault')
+    const str = String(url)
+    let u
+    try {
+      u = new URL(str)
+    } catch {
+      return fail('bad-url')
+    }
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return fail('bad-scheme')
+    const key = keyFor(str)
+    const dest = fileFor(key)
+    const tmp = `${dest}.part-${Date.now()}`
+    let res
+    try {
+      res = await fetch(str, { redirect: 'follow' })
+    } catch {
+      return fail('fetch')
+    }
+    if (!res || !res.ok || !res.body) {
+      try { if (res && res.body && res.body.cancel) await res.body.cancel() } catch {}
+      return fail(`http-${res ? res.status : 'none'}`)
+    }
+    const headerMime = String(res.headers.get('content-type') || '').split(';')[0].trim()
+    const isVideo =
+      /^video\//i.test(headerMime) ||
+      /\.(mp4|webm|mov|mkv)(?:[?#]|$)/i.test(str)
+    const mime = headerMime || (isVideo ? 'video/mp4' : 'application/octet-stream')
+    if (!/^(image|video)\//i.test(mime)) {
+      try { await res.body.cancel() } catch {}
+      return fail('not-media')
+    }
+    const total = Number(res.headers.get('content-length')) || 0
+    // Same policy as pin(): evict oldest UNPINNED entries to make room, never
+    // the pinned keepsakes. A file bigger than the whole quota can never fit.
+    if (total > 0 && (total > QUOTA_BYTES || !makeRoom(total))) {
+      try { await res.body.cancel() } catch {}
+      return fail('quota')
+    }
+    // Free disk space (best-effort; platform-dependent).
+    try {
+      const st = fs.statfsSync(dir)
+      const free = Number(st.bavail) * Number(st.bsize)
+      const need = total > 0 ? total : 64 * 1024 * 1024
+      if (Number.isFinite(free) && free < need) {
+        try { await res.body.cancel() } catch {}
+        return fail('disk-full')
+      }
+    } catch {
+      /* statfs unavailable — quota still enforced below */
+    }
+    const hash = nodeCrypto.createHash('sha256')
+    let bytes = 0
+    let lastEmit = 0
+    const out = fs.createWriteStream(tmp)
+    try {
+      const reader = res.body.getReader()
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        if (!value || value.length === 0) continue
+        // The .part file is not in the manifest, so it must fit on top of the
+        // quota: evict unpinned entries before giving up (parity with pin()).
+        if (totalBytes() + bytes + value.length > QUOTA_BYTES && !makeRoom(bytes + value.length)) {
+          try { await reader.cancel() } catch {}
+          throw new Error('quota')
+        }
+        hash.update(value)
+        bytes += value.length
+        const okWrite = out.write(value)
+        if (!okWrite) await new Promise((resolve) => out.once('drain', resolve))
+        const now = Date.now()
+        if (onProgress && now - lastEmit > 250) {
+          lastEmit = now
+          try { onProgress({ bytes, total }) } catch {}
+        }
+      }
+      await new Promise((resolve, reject) => {
+        out.on('finish', resolve)
+        out.on('error', reject)
+        out.end()
+      })
+    } catch (err) {
+      try { out.destroy() } catch {}
+      try { fs.rmSync(tmp, { force: true }) } catch {}
+      return fail(err && err.message === 'quota' ? 'quota' : 'write')
+    }
+    if (bytes === 0) {
+      try { fs.rmSync(tmp, { force: true }) } catch {}
+      return fail('empty')
+    }
+    try {
+      fs.renameSync(tmp, dest)
+    } catch {
+      try { fs.rmSync(tmp, { force: true }) } catch {}
+      return fail('write')
+    }
+    if (onProgress) {
+      try { onProgress({ bytes, total: total || bytes }) } catch {}
+    }
+    manifest[str] = {
+      key,
+      mime: String(mime || ''),
+      bytes,
+      hash: hash.digest('hex'),
+      atime: Date.now(),
+      pins: (manifest[str] && manifest[str].pins) || 1,
+    }
+    writeManifest()
+    return { ok: true, key, mime: String(mime || ''), bytes, hash: manifest[str].hash }
+  } catch {
+    return fail('error')
+  }
+}
+
 function unpin(url) {
   try {
     const e = manifest[String(url)]
@@ -326,6 +453,7 @@ module.exports = {
   stats,
   get,
   pin,
+  pinStream,
   unpin,
   remove,
   clear,

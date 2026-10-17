@@ -500,7 +500,7 @@ function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: 
 function kickKeepsakePersist(img: GalleryImage) {
   if (!img.url) return
   void import('../services/keepsake')
-    .then(({ persistKeepsake }) => persistKeepsake(img.url))
+    .then(({ persistKeepsake }) => persistKeepsake(img.url, {}, img.kind))
     .then((res) => {
       useGame.setState((s) => ({
         gallery: s.gallery.map((g) =>

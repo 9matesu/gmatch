@@ -30,6 +30,11 @@ export interface GmatchBridge {
   vaultClear?: () => Promise<{ files: number; bytes: number; quota: number; dir: boolean }>
   /** localhost http URL for a stored vault:// URL (browser-openable), else null. */
   vaultHttpUrl?: (url: string) => Promise<{ local: string | null }>
+  /** Streaming vault pin (large video): no per-file cap, quota-enforced. */
+  vaultPinStream?: (url: string) => Promise<{
+    ok: boolean; key?: string; mime?: string; bytes?: number; hash?: string; reason?: string;
+  }>
+  onVaultPinProgress?: (cb: (p: { url: string; bytes: number; total: number }) => void) => () => void
   customPickFolder?: () => Promise<{ ok: boolean; id?: string; path?: string; error?: string }>
   customListFolder?: (id: string) => Promise<{ ok: boolean; files?: { name: string; url: string }[]; error?: string }>
   customRemoveFolder?: (id: string) => Promise<{ ok: boolean }>

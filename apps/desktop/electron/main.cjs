@@ -1692,6 +1692,11 @@ app.whenReady().then(async () => {
   ipcMain.handle('cache:evict', (_event, url) => ({ ok: imageCache.evict(String(url ?? '')) }))
   ipcMain.handle('vault:get', (_event, url) => ({ local: vault.get(String(url ?? '')) }))
   ipcMain.handle('vault:pin', (_event, url) => vault.pin(String(url ?? '')).then((local) => ({ local })))
+  ipcMain.handle('vault:pin-stream', (event, url) => vault.pinStream(String(url ?? ''), {
+    onProgress: ({ bytes, total }) => {
+      try { event.sender.send('vault:pin-stream-progress', { url: String(url ?? ''), bytes, total }) } catch {}
+    },
+  }))
   ipcMain.handle('vault:unpin', (_event, url) => ({ ok: vault.unpin(String(url ?? '')) }))
   ipcMain.handle('vault:remove', (_event, url) => ({ ok: vault.remove(String(url ?? '')) }))
   ipcMain.handle('vault:stats', () => vault.stats())

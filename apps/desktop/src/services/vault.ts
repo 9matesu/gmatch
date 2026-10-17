@@ -90,16 +90,15 @@ export async function vaultPin(url: string): Promise<string | null> {
         }
         return res.local
       }
+      // Bridge refused (no bytes stored): negative-cache like a failure.
+      sessionFailed.add(url)
+      return null
     }
-    // Browser fallback / localStorage: persist pinned URL directly
-    const stored = getStoredVault()
-    stored[url] = url
-    saveStoredVault(stored)
-    sessionPinned.add(url)
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('orbit-vault-updated', { detail: { url, local: url } }))
-    }
-    return url
+    // No bridge (browser dev): there is no durable byte store behind the
+    // vault here, so pinning MUST NOT record url->url. That self-mapping used
+    // to make remote URLs resolve as "local", sending new-window opens to the
+    // provider. Return null: IndexedDB (registerLocalObject) is the dev bytes.
+    return null
   } catch {
     sessionFailed.add(url)
     return null
@@ -283,7 +282,8 @@ export function useVaultHttpUrls(urls: Array<string | null | undefined>): Record
 }
 
 /** Browser-openable localhost URL for a stored URL, else null. */
-export async function vaultHttpUrl(url: string): Promise<string | null> {  if (!url || !enabled()) return null
+export async function vaultHttpUrl(url: string): Promise<string | null> {
+  if (!url || !enabled()) return null
   if (vaultBridge()) {
     try {
       const res = await window.gmatch?.vaultHttpUrl?.(url)
