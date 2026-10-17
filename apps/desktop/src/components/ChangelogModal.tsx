@@ -7,7 +7,7 @@ export interface ChangelogModalProps {
   onClose: () => void
 }
 
-export const CURRENT_CHANGELOG_VERSION = '1.5.5'
+export const CURRENT_CHANGELOG_VERSION = '1.5.6'
 
 /**
  * One entry per change, in the reader's words.
@@ -23,12 +23,12 @@ export const CURRENT_CHANGELOG_VERSION = '1.5.5'
  * list.
  */
 const CHANGES: string[] = [
-  'Command bar: removed horizontal scrollbar and optimized dock width and button spacing.',
-  'Monochrome HUD: uncolored servers button and stripped arbitrary colored badges across the navigation dock and settings.',
-  'Profile: follower and following counts now update live in real time directly on the profile tab.',
-  'Visual uniformity: unified glass opacity and backdrop blur sliders across all tabs (clicker, chat, feed, gallery, and settings).',
-  'Account & Security: streamlined cryptographic key display, backup export, and session logout controls to match design tokens.',
-  'Accessibility: passed full WCAG 2.1 AA audit across all screens with zero high-severity violations.',
+  'Servers: the browser is now one list with one row per server and a single "Add server" button. The official world is named gMatch Central.',
+  'Feed: media-first post cards, the author overlay sits on the image, timestamps render as absolute dates in your own timezone.',
+  'Timeline: post text standardized to one body size so the feed reads consistently.',
+  'Look: one panel colour and one opacity knob. Panel Opacity and Glass blur now reach every panel, and chrome stays readable over bright wallpapers.',
+  'Clicker: the local points balance is hidden and the "Welcome back" collection prompt is gone. The economy itself is unchanged.',
+  'Legal: no forced terms popup on new accounts. The full legal documents are always available under Settings, Account & Security.',
 ]
 
 export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {

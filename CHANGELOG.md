@@ -1,7 +1,23 @@
 # Changelog
 
-## Unreleased (main)
+## 1.5.6
 
+- Servers: the browser rebuilt as one page, one list, one row per server
+  (`serverKey`/`dedupeServers` dedupe by address, never by name); the official
+  world is named **gMatch Central**, the onrender courier is infrastructure and
+  leaves the list, and the `Legacy` status label is gone (ADR-002, BROWSER-PERF §10).
+- Feed: media-first post cards (author overlay rides inside the media), absolute
+  timestamps render in the viewer's own timezone, and the timeline speaks one
+  body size (`text-xs`) with `text-[10px]` meta.
+- Chrome: one panel colour and one opacity token (`--panel-alpha`) under every
+  name, one blur scale pinned to Glass blur; `glass-toolbar` chrome stays opaque
+  and the wallpaper scrim is darker so text reads over bright wallpapers.
+- Clicker: the local points balance no longer renders in the stats column and
+  the forced "Welcome back" offline-collection prompt is removed. Economy,
+  persistence, prestige, rarity and achievements are untouched.
+- Legal: the forced acceptance popup on new accounts is removed; the full legal
+  documents are readable (no acceptance required) in Settings → Account &
+  Security, and the age gate no longer carries a terms link.
 - Likes: single-flight reconciliation (`utils/likeReconcile`) — persist once
   per gesture outside setState updaters, per-post generation discards stale
   resolutions, failures roll back, feed cache invalidated on fresh success.
