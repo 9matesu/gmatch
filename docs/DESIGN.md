@@ -11,9 +11,17 @@ rejected (dead code). Everything decorative that does not carry information
 (glow, hover-float, saturate tricks, emoji, hype copy) is banned.
 
 ## Surfaces (pick by role)
-- app bg: `bg-retro-bg` · card/panel: `PLATE` (`rounded-lg border border-border-glass bg-glass-w5`)
+- ONE panel opacity knob: `--panel-alpha` (Settings → Panel Opacity). Every panel
+  colour is a `var(--color-glass*|--color-surface-*)` token scaled by it — a
+  component never re-inlines a solid hex, or the slider silently stops reaching it.
+- app bg: `bg-retro-bg` (the only opaque plate) · card/panel: `PLATE` (`solid-panel`)
 - inset field: `glass-inset` · scrim: `bg-black/70` (the ONLY scrim value)
 - hover fill: `bg-glass-w10`
+- blur: the shell's `.app-glass` material pass (globals.css) supplies the panel
+  gradient + ONE backdrop blur; the `--blur-*` scale is pinned to the same Glass
+  blur setting, so no component re-inlines a fixed radius. The pass keys off the
+  surface utilities — a component picks a token colour, never a literal, or it
+  drops out of the material and reads as a different panel.
 - media overlay chip (label ON image/video): `bg-black/60` — the only black-alpha
   outside scrims
 
@@ -124,6 +132,8 @@ grep -rn "metro-rule" src
 # into the user's comment BODY (content, not chrome); their chrome is lucide.
 grep -rn "❤️\|⚡\|★\|✕" src --include=*.tsx | grep -v test | grep -v CommentsModal
 grep -rn "animate-fade-in\|animate-slide-up\|animate-slide-down" src --include=*.tsx | grep -v orbit
+grep -nE "^\s*--color-(surface-raised|surface-elevated|surface-interactive|retro-panel):\s*#" src/globals.css
+grep -n "text-sm" src/components/feed/GMatchFeed.tsx src/components/feed/PostComments.tsx
 ```
 Codified (with the exemption lists and the em-dash/placeholder nuances):
 `bash apps/desktop/design-gates.sh` — every count must read 0, all scrims /70.
