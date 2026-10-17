@@ -105,6 +105,30 @@ compact online-chips (cap 12 + `+N`), toolbar buttons unified to h-9.
 `ServersView.test.tsx` pins the merged counts line AND the absence of the
 duplicate header.
 
+### 10. Worlds browser redesign (1.5.6)
+The Servers tab had grown two tabs (`Browse`/`Hub`), a permanent create form and a
+column of identical cards. Now: one `Worlds` header (`+ Add world` is the only filled
+primary, plus a quiet refresh), one current-world anchor derived from **committed
+state** (never "last row clicked"), then Destinations → Local groups (device-only,
+subordinate) → Hosted servers — every row drawn by a single `WorldRow`, so the
+anatomy cannot drift between sections. Identity (name, one status word, one action)
+leads; infrastructure (endpoint, transport, peer codes, timestamps) is secondary
+text. The row's primary is the quiet glass button; the accent fill is reserved for
+the header, the anchor's `Open` and empty-state CTAs.
+
+The create form moved into the existing `Modal` as `Add world` with three tabs
+(New group · Join code · Host a server), so there is no permanent form and no second
+dialog framework. States are honest: `Current` / `Connecting` / `Relay` /
+`Deprecated` / `Unavailable`, a count nothing real backs is omitted (never `— / —`),
+and a failed directory fetch **keeps** cached worlds with a retry strip instead of
+erasing them. Escape and outside-click close the row menu, the anchor menu and the
+directory popover (`data-menu-trigger` / `data-menu-content`); a bad invite code is
+reported next to its field with the typed value preserved.
+
+`ServersView.test.tsx` (26 cases) pins the row states and the section/empty-state
+copy; `ServersView.mask.test.ts` now reads `WorldRow.tsx` as well, so moving row
+markup out of the view cannot quietly widen what reaches JSX.
+
 ## 401s/429s in the walk (honest note)
 Every walk logs `401 /api/pm` — the PM sync fires once before the sealed
 session is established; the app retries successfully after. DevTools counts

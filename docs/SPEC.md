@@ -346,12 +346,16 @@ offline earnings). Each +5% click power. Persist across prestige.
 
 ADR-002 (`docs/ADR-002-servers.md`) é canônico; resumo de operação:
 
-- **Criar**: Settings/Servers → "+ Create server" → publica nome/descrição/hint
-  no diretório do central (metadados assinados; conteúdo NUNCA sai do seu PC).
-  Heartbeat de 15 min mantém o listing vivo (24h sem ping = some da lista).
-- **Entrar**: aba Servers → "Join" → `serverSet({mode:'client'})` + relaunch.
-  Servidor com 🔒 pede a senha uma vez; ela é verificada NO HOST (scrypt,
-  lockout 5/15min) e a allowlist fica no SQLite do host — sem token forjável.
+- **Criar**: Servers → "+ Add world" → aba "Host a server" → publica
+  nome/descrição/hint no diretório do central (metadados assinados; conteúdo
+  NUNCA sai do seu PC). Heartbeat de 15 min mantém o listing vivo (24h sem ping
+  = some da lista).
+- **Entrar**: aba Servers → ação primária da linha ("Join") →
+  `serverSet({mode:'client'})` + relaunch. Colar um código de nó é a aba "Join
+  code" do mesmo "+ Add world" (erro de código inválido aparece no próprio
+  campo, sem fechar o diálogo). Servidor com 🔒 pede a senha uma vez; ela é
+  verificada NO HOST (scrypt, lockout 5/15min) e a allowlist fica no SQLite do
+  host — sem token forjável.
 - **Admin**: quem HOSTEIA o nó vê o botão Admin no rodapé da sidebar (PIN da
   suíte admin existente). A suíte de moderação funciona igual em qualquer nó.
 - **Dashboard**: `GET /api/servers/dashboard` no nó atual → userlist (ids

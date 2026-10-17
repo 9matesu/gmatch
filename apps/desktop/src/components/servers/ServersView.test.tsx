@@ -36,6 +36,12 @@ function stubLocalStorage(initial: Record<string, string> = {}) {
   } as Storage)
 }
 
+/** Add world is the single door; hosting lives on its third segment. */
+async function openHostForm() {
+  fireEvent.click(await screen.findByRole('button', { name: /add world/i }))
+  fireEvent.click(screen.getByRole('tab', { name: /host a server/i }))
+}
+
 import { _resetResponseCache } from '../../utils/api'
 
 beforeEach(() => {
@@ -70,17 +76,20 @@ describe('ServersView', () => {
     fireEvent.click(screen.getByRole('button', { name: /more actions for friend world/i }))
     expect(screen.getByTitle('Copy node code')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /more actions for friend world/i }))
-    expect(screen.getByText('chill')).toBeInTheDocument()
+    expect(screen.getByText(/chill/)).toBeInTheDocument()
     // password_required => visible lock marker
     expect(screen.getByLabelText('password required')).toBeInTheDocument()
     // browse view keeps no presence chrome: no Manage Hub, no Online pills.
     expect(screen.queryByRole('button', { name: /manage hub/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /online \(/i })).toBeNull()
     // dashboard userlist lives on the hub: open it to find Alice.
-    fireEvent.click(screen.getByRole('button', { name: /^hub/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^open$/i }))
     expect(await screen.findByText('Alice')).toBeInTheDocument()
     // hero is ONE row: counts live under the name, not in a duplicate header
     expect(await screen.findByText('9 members · 3 posts/24h')).toBeInTheDocument()
+    // the page header names the panel, never the world, so the hero is the only
+    // place the server's name appears.
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Hub')
     expect(screen.queryByText('This server')).not.toBeInTheDocument()
   })
 
@@ -96,7 +105,7 @@ describe('ServersView', () => {
     render(<ServersView identity={identity} toast={() => {}} />)
     await waitFor(() => expect(screen.getByText('Alpha Node')).toBeInTheDocument())
     // count includes the two official servers (p2p and deprecated) on top of the 2 directory rows
-    expect(screen.getByText(/server browser \(4\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/4 destinations/i)).toBeInTheDocument()
     expect(screen.getAllByRole('listitem').length).toBe(4)
   })
 
@@ -112,7 +121,7 @@ describe('ServersView', () => {
     })
     const toasts: string[] = []
     render(<ServersView identity={identity} toast={(m) => toasts.push(m)} />)
-    fireEvent.click(screen.getByRole('button', { name: /create server/i }))
+    await openHostForm()
     fireEvent.change(screen.getByLabelText(/server name/i), { target: { value: 'My Realm' } })
     fireEvent.click(screen.getByRole('button', { name: /^create$/i }))
     await waitFor(() => {
@@ -142,7 +151,7 @@ describe('ServersView', () => {
     })
     const toasts: string[] = []
     render(<ServersView identity={identity} toast={(m) => toasts.push(m)} />)
-    fireEvent.click(await screen.findByRole('button', { name: /create server/i }))
+    await openHostForm()
     fireEvent.change(screen.getByLabelText(/server name/i), { target: { value: 'My Realm' } })
     fireEvent.click(screen.getByRole('button', { name: /^create$/i }))
     await waitFor(() => expect(serverSet).toHaveBeenCalledWith({ mode: 'host', url: '' }))
@@ -181,7 +190,7 @@ describe('ServersView', () => {
     })
     const toasts: string[] = []
     render(<ServersView identity={identity} toast={(m) => toasts.push(m)} />)
-    fireEvent.click(await screen.findByRole('button', { name: /create server/i }))
+    await openHostForm()
     fireEvent.change(screen.getByLabelText(/server name/i), { target: { value: 'My Realm' } })
     fireEvent.click(screen.getByRole('checkbox', { name: /join password/i }))
     fireEvent.change(screen.getByLabelText(/server join password/i), { target: { value: 'secret' } })
@@ -214,7 +223,7 @@ describe('ServersView', () => {
     })
     const toasts: string[] = []
     render(<ServersView identity={identity} toast={(m) => toasts.push(m)} />)
-    fireEvent.click(await screen.findByRole('button', { name: /create server/i }))
+    await openHostForm()
     fireEvent.change(screen.getByLabelText(/server name/i), { target: { value: 'Second Server' } })
     fireEvent.click(screen.getByRole('button', { name: /^create$/i }))
     await waitFor(() => expect(toasts.join('|')).toMatch(/already hosts/i))
@@ -267,12 +276,15 @@ describe('ServersView', () => {
     fireEvent.change(screen.getByLabelText(/new group name/i), { target: { value: 'Friday crew' } })
     fireEvent.click(screen.getByRole('button', { name: /create group/i }))
     expect(await screen.findByText('Friday crew')).toBeInTheDocument()
-    // join tab with garbage: honest inline failure, nothing committed.
+    // join tab with garbage: the error belongs next to the field, the typed
+    // value survives, and nothing is committed.
     fireEvent.click(screen.getByRole('button', { name: /add world/i }))
     fireEvent.click(screen.getByRole('tab', { name: /join code/i }))
     fireEvent.change(screen.getByLabelText(/invite code/i), { target: { value: 'not-a-code' } })
     fireEvent.click(screen.getByRole('button', { name: /^join$/i }))
-    await waitFor(() => expect(toasts.join('|')).toMatch(/not a valid node code/i))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/node code/i)
+    expect(screen.getByRole('dialog', { name: /add world/i })).toBeInTheDocument()
+    expect(screen.getByLabelText(/invite code/i)).toHaveValue('not-a-code')
     expect(localStorage.getItem('gmatch.api.url')).toBeNull()
   })
 
@@ -338,12 +350,12 @@ describe('ServersView', () => {
 
     // Browse view keeps no presence chrome: no Manage Hub, no Online pills.
     // Count is 2: no directory rows, but the 2 official central servers show.
-    expect(await screen.findByText('Server browser (2)')).toBeInTheDocument()
+    expect(await screen.findByText(/2 destinations/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /manage hub/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /online \(/i })).toBeNull()
 
     // Hub members section owns presence: switch to the hub tab first.
-    fireEvent.click(screen.getByRole('button', { name: /^hub/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^open$/i }))
     // Stacked sections: BobOnline is in Online section, CarolRecent is in Offline section
     expect(await screen.findByText('BobOnline', {}, { timeout: 3000 })).toBeInTheDocument()
     expect(screen.getByText('CarolRecent')).toBeInTheDocument()
@@ -364,9 +376,11 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('Server browser (2)')
+    await screen.findByText(/2 destinations/i)
     // The button no longer pre-gates on node.isAdmin: the user's .exe is the
     // central admin. CentralAdminPanel itself refuses until the PIN unlocks.
+    // It lives with the directory address, one click deep.
+    fireEvent.click(screen.getByRole('button', { name: /directory options/i }))
     expect(screen.getByRole('button', { name: /central admin/i })).toBeInTheDocument()
     expect(screen.queryByLabelText('Central admin login')).not.toBeInTheDocument()
   })
@@ -381,7 +395,7 @@ describe('ServersView', () => {
     render(<ServersView identity={null as never} toast={() => {}} />)
     await screen.findByText('Alpha Node')
     // anonymous browser lists the 2 official servers: 1 directory + 2 official = 3
-    expect(screen.getByText(/server browser \(3\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/3 destinations/i)).toBeInTheDocument()
     expect(calls.some((c) => c.url.includes('/api/servers/dashboard'))).toBe(false)
     expect(calls.some((c) => c.url.includes('/api/servers/node'))).toBe(false)
   })
@@ -397,7 +411,7 @@ describe('ServersView', () => {
       return json({ servers: [] })
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    fireEvent.click(await screen.findByRole('button', { name: /create server/i }))
+    await openHostForm()
     fireEvent.change(screen.getByLabelText(/^Server name$/), { target: { value: 'My Realm' } })
     const preview = await screen.findByTestId('create-handle-preview')
     expect(preview.textContent).toContain('gmatch://node/')
@@ -423,7 +437,7 @@ describe('ServersView', () => {
       return json({ servers: [] })
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    fireEvent.click(await screen.findByRole('button', { name: /create server/i }))
+    await openHostForm()
     fireEvent.change(screen.getByLabelText(/^Server name$/), { target: { value: 'My Realm' } })
     fireEvent.click(screen.getByLabelText(/Private server/i))
     fireEvent.click(screen.getByRole('button', { name: /^create$/i }))
@@ -490,7 +504,7 @@ describe('ServersView', () => {
       return json({ servers: [] })
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    fireEvent.click(await screen.findByRole('button', { name: /^hub:/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /^open$/i }))
     fireEvent.click(await screen.findByRole('button', { name: /settings/i }))
     expect(screen.getByLabelText('Current server tags')).toBeInTheDocument()
     expect(screen.getByLabelText('New server join password')).toBeInTheDocument()
@@ -526,13 +540,13 @@ describe('ServersView', () => {
     expect(screen.queryByTestId('admin-pin-banner')).toBeNull()
     unmount()
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('Server browser (2)')
+    await screen.findByText(/2 destinations/i)
     expect(screen.queryByTestId('admin-pin-banner')).toBeNull()
     spy.mockRestore()
     delete (window as unknown as { gmatch?: unknown }).gmatch
   })
 
-  it('collapses the search/filter band and remembers it across a reload', async () => {
+  it('keeps one quiet filter row with the directory, and offers a way back from an empty search', async () => {
     mockFetch(async (url) => {
       if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
       if (url.includes('/api/servers')) return json({ servers: [
@@ -542,20 +556,23 @@ describe('ServersView', () => {
     })
     const { unmount } = render(<ServersView identity={identity} toast={() => {}} />)
     await screen.findByText('Alpha Node')
-    // band starts retracted by default: search field is hidden
-    expect(screen.queryByLabelText('Search servers')).toBeNull()
-    // expanding the band reveals the search field
-    fireEvent.click(screen.getByRole('button', { name: /show filters/i }))
+    // Part of the page now: no collapsed state to remember across a reload.
     expect(screen.getByLabelText('Search servers')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /hide filters/i }))
-    expect(screen.queryByLabelText('Search servers')).toBeNull()
-    // hiding the band never hides the directory itself
-    expect(screen.getByText(/server browser \(3\)/i)).toBeInTheDocument()
+    expect(screen.getByLabelText('Sort servers')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /password only/i })).toBeInTheDocument()
+
+    // A search that matches nothing says so, and gives one way back.
+    fireEvent.change(screen.getByLabelText('Search servers'), { target: { value: 'zzz' } })
+    expect(await screen.findByText(/no worlds match/i)).toBeInTheDocument()
+    expect(screen.queryByText('Alpha Node')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /clear filters/i }))
+    expect(await screen.findByText('Alpha Node')).toBeInTheDocument()
+    expect(screen.getByLabelText('Search servers')).toHaveValue('')
+
     unmount()
-    // the choice survives a reload
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText(/server browser \(3\)/i)
-    expect(screen.queryByLabelText('Search servers')).toBeNull()
+    expect(await screen.findByText(/3 destinations/i)).toBeInTheDocument()
+    expect(screen.getByLabelText('Search servers')).toBeInTheDocument()
   })
 
   it('browse count includes the official central servers', async () => {
@@ -569,8 +586,10 @@ describe('ServersView', () => {
     render(<ServersView identity={identity} toast={() => {}} />)
     await screen.findByText('Alpha Node')
     // 1 directory row + 2 official central rows = 3 visible rows
-    expect(screen.getByText(/server browser \(3\)/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /browse \(3\)/i })).toBeInTheDocument()
+    expect(screen.getByText(/3 destinations/i)).toBeInTheDocument()
+    // Two categories, both real endpoints: worlds to enter, servers that host.
+    expect(screen.getByRole('heading', { name: /destinations/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /hosted servers/i })).toBeInTheDocument()
   })
 
   it('expandable browser row shows tags and server info', async () => {
@@ -612,7 +631,6 @@ describe('ServersView', () => {
     })
     render(<ServersView identity={identity} toast={() => {}} />)
     await screen.findByText('Chill Zone')
-    fireEvent.click(screen.getByRole('button', { name: /show filters/i }))
     fireEvent.change(screen.getByLabelText('Search servers'), { target: { value: 'chill' } })
     expect(await screen.findByText('Chill Zone')).toBeInTheDocument()
     expect(screen.queryByText('Other Realm')).toBeNull()
@@ -646,8 +664,8 @@ describe('ServersView', () => {
     render(<ServersView identity={identity} toast={() => {}} onServerJoined={onServerJoined} />)
     expect(await screen.findByText('gMatch Central (p2p)')).toBeInTheDocument()
     expect(screen.getByText('gMatch Central (deprecated)')).toBeInTheDocument()
-    expect(screen.getByText('gmatch-wcz1.onrender.com')).toBeInTheDocument()
-    expect(screen.getByText('gmatch.fly.dev')).toBeInTheDocument()
+    expect(screen.getByText(/gmatch-wcz1\.onrender\.com/)).toBeInTheDocument()
+    expect(screen.getByText(/gmatch\.fly\.dev/)).toBeInTheDocument()
 
     // Legacy row is status-only: restrained label, no primary Connect button.
     const deprecatedRow = screen.getAllByRole('listitem').find((el) => el.textContent?.includes('gMatch Central (deprecated)'))!

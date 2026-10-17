@@ -21,6 +21,17 @@ Data: 2026-09-09 · Status: aceito · Plano: `.hermes/plans/2026-09-09_161233-po
 
 - **Codigo do no** (`gmatch://node/...`, `src/utils/nodeMask.ts`): coordenada compartilhavel que o HOST copia (Servers -> Share, no hero ou na linha do diretorio) e o amigo cola (Servers -> Node code). Nao e fronteira de seguranca; carrega host:port e so o `GET /api/servers` autenticado entrega `endpoint_hint`.
 - **Prompt de join e in-app** (`PromptDialog.tsx`): Electron nao implementa `window.prompt` (retorna null), entao senha de join e cola-codigo usam dialogos proprios.
-- **`owner_name` na linha do diretorio** (migracao 050): handle reportado pelo HOST, clampado a 40; classe best-effort identica a `user_count`/`online_count` (um host pode mentir sobre o proprio nome). Renderiza como by <nome>.
+- **`owner_name` na linha do diretorio** (migracao 050): handle reportado pelo HOST, clampado a 40; classe best-effort identica a `user_count`/`online_count` (um host pode mentir sobre o proprio nome). O payload de registro envia `owner_name`; a linha do browser **nao** o renderiza (nunca `by <nome>` — `ServersView.mask.test.ts` falha se `owner_name` voltar ao JSX).
 - **Vivacidade**: o heartbeat regrava a linha a cada 15min e agora bootstrapa o registro para instalacoes em modo host sem Create no jogo (troca via Settings -> Server). Linhas morrem em 24h de silencio; a UI mostra seen Xm ago.
 - **Alcance**: o codigo carrega endereco LAN; join entre redes diferentes segue dependendo de port-forwarding (limite ja documentado acima para `endpoint_hint`).
+
+## Apresentacao do browser (2026-10-17, 1.5.6)
+
+Sem mudanca de protocolo: e a mesma federacao, com uma superficie que diz a verdade.
+
+- **Uma ancora de mundo atual** derivada de estado comprometido (base URL efetiva ganha; senao dashboard/no vivo; sem nome resolvevel, o card diz honestamente que nao ha mundo). As abas `Browse`/`Hub` sumiram: o drill-in do hub entra pelo botao `Open` da ancora.
+- **Tres secoes com a mesma linha** (`WorldRow.tsx`): Destinations (diretorio que nao e seu) → Local groups (rotulo **so deste dispositivo**, subordinado) → Hosted servers (seu no + entradas oficiais; relay e o Fly.dev legado vivem aqui, com `Deprecated` textual discreto). `Local groups` nao cria rede alguma.
+- **Uma acao primaria por linha** (`Join`, ou `Switch` no proprio no) + menu contextual de tres pontos; titulos longos truncam, o endereco vira `domain` sem IP cru, e a segunda linha carrega `dominio · descricao · listed Nm ago`.
+- **Estados honestos**: `Current` / `Connecting` / `Relay` / `Deprecated` / `Unavailable`. Um numero sem dado real por tras nao vira `— / —`; um fetch falho do diretorio mantem o cache e mostra retry; linha sem endereco nao tem acao primaria.
+- **Um dialogo para tudo** (`AddWorldDialog.tsx`, sobre o `Modal` existente): `New group` / `Join code` / `Host a server`. O formulario permanente de criacao morreu; codigo invalido mostra erro no proprio campo e preserva o texto; `create`/`joinServer`/`leave`/`switchClientWorld` continuam intocados.
+- Docs do que a tela promete: `docs/BROWSER-PERF.md` §10; contrato de comportamento em `ServersView.test.tsx` (26 casos) + paridade de JSX em `ServersView.mask.test.ts` (agora tambem sobre `WorldRow.tsx`).

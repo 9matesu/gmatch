@@ -1,118 +1,164 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Modal } from '../Modal';
 
 /**
- * Single contextual entry point for world actions: create a device-local
- * group label, or join via an invite code. Host-server creation lives
- * elsewhere (toolbar Create) because it restarts the app into host mode.
+ * Single entry point for world actions: name a device-local group, join with an
+ * invite code, or host a server on this machine. The host form is owned by
+ * ServersView (its state and restart flow live there) and is handed in as
+ * `hostForm`, so there is one dialog and one modal implementation.
  */
 export function AddWorldDialog({
   open,
   onClose,
   onCreateLabel,
   onJoinCode,
+  hostForm,
+  initialTab = 'group',
 }: {
   open: boolean
   onClose: () => void
   onCreateLabel: (name: string) => void
-  onJoinCode: (code: string) => void
+  onJoinCode: (code: string) => Promise<boolean>
+  hostForm?: ReactNode
+  /** Which method the caller's entry point implies (the empty state points at hosting). */
+  initialTab?: 'group' | 'join' | 'host'
 }) {
-  const [tab, setTab] = useState<'create' | 'join'>('create')
+  const [tab, setTab] = useState<'group' | 'join' | 'host'>('group')
   const [labelName, setLabelName] = useState('')
   const [code, setCode] = useState('')
-  const firstRef = useRef<HTMLInputElement>(null);
+  const [joinError, setJoinError] = useState('')
+  const [joining, setJoining] = useState(false)
+  const firstRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!open) return
-    setTab('create')
+    setTab(initialTab)
     setLabelName('')
     setCode('')
+    setJoinError('')
+    setJoining(false)
+    // After Modal's own first-focus pass: land the caret in the useful field.
     const t = setTimeout(() => firstRef.current?.focus(), 30)
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => { clearTimeout(t); window.removeEventListener('keydown', onKey) }
-  }, [open, onClose])
+    return () => clearTimeout(t)
+  }, [open, initialTab])
 
   if (!open) return null
+
+  const tabs: Array<{ id: 'group' | 'join' | 'host'; label: string }> = [
+    { id: 'group', label: 'New group' },
+    { id: 'join', label: 'Join code' },
+    ...(hostForm ? [{ id: 'host' as const, label: 'Host a server' }] : []),
+  ]
+
   return (
-    <div
-      className="fixed inset-0 z-[var(--z-modal)] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Add world"
-        className="bg-surface-raised border border-border-glass rounded-xl max-w-sm w-full shadow-2xl overflow-hidden"
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass">
-          <h2 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Add world</h2>
-          <button type="button" onClick={onClose} aria-label="Close add world dialog" className="p-1 rounded-md text-retro-muted hover:text-retro-fg cursor-pointer">
-            <X className="w-4 h-4" />
+    <Modal title="Add world" onClose={onClose} maxWidth="max-w-md">
+      <div className="flex gap-1" role="tablist" aria-label="Add world method">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer transition-colors duration-150 ${
+              tab === t.id ? 'bg-glass-w12 text-retro-fg' : 'text-retro-muted hover:text-retro-fg'
+            }`}
+          >
+            {t.label}
           </button>
-        </div>
-        <div className="flex gap-1 px-4 pt-3" role="tablist" aria-label="Add world method">
-          {(['create', 'join'] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              role="tab"
-              aria-selected={tab === t}
-              onClick={() => setTab(t)}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer transition-colors ${tab === t ? 'bg-glass-w12 text-retro-fg' : 'text-retro-muted hover:text-retro-fg'}`}
-            >
-              {t === 'create' ? 'New group' : 'Join code'}
-            </button>
-          ))}
-        </div>
-        {tab === 'create' ? (
-          <form
-            className="p-4 space-y-2"
-            onSubmit={(e) => { e.preventDefault(); if (labelName.trim()) { onCreateLabel(labelName.trim()); onClose() } }}
-          >
-            <label className="block text-xs text-retro-muted">
-              Group name
-              <input
-                ref={firstRef}
-                aria-label="New group name"
-                value={labelName}
-                onChange={(e) => setLabelName(e.target.value)}
-                placeholder="e.g. Friday crew"
-                maxLength={40}
-                className="glass-field mt-1 w-full px-2.5 py-1.5 text-xs"
-              />
-            </label>
-            <p className="text-[11px] text-retro-muted">A label on this device for grouping known peers — not a network, visible to nobody else.</p>
-            <div className="flex justify-end gap-2 pt-1">
-              <button type="button" onClick={onClose} className="glass-action px-3 py-1.5 rounded-lg text-xs text-retro-muted cursor-pointer">Cancel</button>
-              <button type="submit" disabled={!labelName.trim()} className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50">Create group</button>
-            </div>
-          </form>
-        ) : (
-          <form
-            className="p-4 space-y-2"
-            onSubmit={(e) => { e.preventDefault(); if (code.trim()) { onJoinCode(code.trim()); onClose() } }}
-          >
-            <label className="block text-xs text-retro-muted">
-              Invite code
-              <input
-                ref={firstRef}
-                aria-label="Invite code"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="gmatch://node/…"
-                className="glass-field mt-1 w-full px-2.5 py-1.5 text-xs font-mono"
-              />
-            </label>
-            <div className="flex justify-end gap-2 pt-1">
-              <button type="button" onClick={onClose} className="glass-action px-3 py-1.5 rounded-lg text-xs text-retro-muted cursor-pointer">Cancel</button>
-              <button type="submit" disabled={!code.trim()} className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50">Join</button>
-            </div>
-          </form>
-        )}
+        ))}
       </div>
-    </div>
-  );
+
+      {tab === 'group' && (
+        <form
+          className="pt-3 space-y-2"
+          onSubmit={(e) => { e.preventDefault(); if (labelName.trim()) { onCreateLabel(labelName.trim()); onClose() } }}
+        >
+          <label className="block text-xs text-retro-muted">
+            Group name
+            <input
+              ref={firstRef}
+              aria-label="New group name"
+              value={labelName}
+              onChange={(e) => setLabelName(e.target.value)}
+              placeholder="e.g. Friday crew"
+              maxLength={40}
+              className="glass-field mt-1 w-full px-2.5 py-1.5 text-xs"
+            />
+          </label>
+          <p className="text-[10px] text-retro-muted">
+            A label on this device for grouping known peers. Not a network, and visible to nobody else.
+          </p>
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} className="glass-action px-3 py-1.5 rounded-lg text-xs text-retro-muted cursor-pointer">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!labelName.trim()}
+              className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50"
+            >
+              Create group
+            </button>
+          </div>
+        </form>
+      )}
+
+      {tab === 'join' && (
+        <form
+          className="pt-3 space-y-2"
+          onSubmit={async (e) => {
+            e.preventDefault()
+            const entered = code.trim()
+            if (!entered || joining) return
+            setJoining(true)
+            setJoinError('')
+            const accepted = await onJoinCode(entered)
+            setJoining(false)
+            // Entered code is preserved on a recoverable failure; the dialog
+            // only closes once the attempt left the dialog.
+            if (accepted) onClose()
+            else setJoinError('That does not look like a node code. Paste the whole gmatch://node/… string.')
+          }}
+        >
+          <label className="block text-xs text-retro-muted">
+            Invite code
+            <input
+              ref={firstRef}
+              aria-label="Invite code"
+              value={code}
+              onChange={(e) => { setCode(e.target.value); setJoinError('') }}
+              placeholder="gmatch://node/…"
+              aria-invalid={joinError ? true : undefined}
+              className="glass-field mt-1 w-full px-2.5 py-1.5 text-xs font-mono"
+            />
+          </label>
+          {joinError ? (
+            <p role="alert" className="text-[10px] text-retro-error">{joinError}</p>
+          ) : (
+            <p className="text-[10px] text-retro-muted">
+              Paste the code the host sent you. It carries the address, not a secret.
+            </p>
+          )}
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} className="glass-action px-3 py-1.5 rounded-lg text-xs text-retro-muted cursor-pointer">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!code.trim() || joining}
+              className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50"
+            >
+              {joining ? 'Joining…' : 'Join'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {tab === 'host' && hostForm && <div className="pt-3">{hostForm}</div>}
+    </Modal>
+  )
 }

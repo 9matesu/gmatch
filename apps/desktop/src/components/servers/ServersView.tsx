@@ -6,7 +6,8 @@
 // Right = public directory browser (search, join, create).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Lock, Globe, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, Share2, ArrowLeft, Plus, Trash2, MoreVertical, ChevronDown, Loader2 } from 'lucide-react'
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { Lock, Globe, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, Share2, ArrowLeft, Plus, Trash2, MoreVertical } from 'lucide-react'
 import { generateIdentity } from '@orbit/crypto'
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
 import { orbitFetch, getApiBaseUrl, isCourierApiUrl } from '../../utils/api'
@@ -19,7 +20,10 @@ import { createLabel, readLabels, writeLabels, isOwnLabel, type LocalMeshLabel }
 import { decodeNodeMask } from '../../utils/nodeMask'
 import { buildNodeCode } from '../../utils/nodeShare'
 import { PromptDialog } from '../PromptDialog'
+import { Modal } from '../Modal'
 import { AddWorldDialog } from './AddWorldDialog'
+import { WorldRow, WorldMenuItem, formatDomain, formatRelativeTime } from './WorldRow'
+import type { WorldRowState } from './WorldRow'
 import { claimPendingHost } from '../../hooks/usePendingServerHost'
 import { SERVER_MARKER_KEY } from '../../firstRun/onboardingState'
 import { playPress } from '../../utils/sounds'
@@ -96,36 +100,18 @@ export function parseServerTags(input: string): string[] {
   return [...seen]
 }
 
-function formatRelativeTime(iso?: string | null): string {
-  if (!iso) return 'recently'
-  const s = typeof iso === 'string' && !iso.endsWith('Z') && !iso.includes('+')
-    ? (iso.includes('T') ? `${iso}Z` : `${iso.replace(' ', 'T')}Z`)
-    : iso
-  const t = new Date(s).getTime()
-  if (isNaN(t) || t <= 0) return 'recently'
-  const ms = Date.now() - t
-  if (ms < 0 && ms >= -15_000) return 'just now'
-  if (ms < 0) return 'recently'
-  const mins = Math.floor(ms / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
-}
-
-function formatDomain(hint?: string | null): string {
-  if (!hint) return ''
-  return hint.trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '')
-}
-
-function formatServerCounts(
+/**
+ * Live counts for a row — or null when nothing real backs a number. The old
+ * version printed "— / —" and "0 / N", which read as facts about a world
+ * nobody had measured.
+ */
+function rowCounts(
   s: DirectoryServer,
   isCurrentServer: boolean,
   dash: Dashboard | null,
   p2pProbe: { online: boolean; count: number | null },
   legacyProbe: { online: boolean; count: number | null; total?: number | null },
-): string {
+): string | null {
   if (isCurrentServer && dash) {
     const online = typeof dash.online_count === 'number'
       ? dash.online_count
@@ -137,40 +123,32 @@ function formatServerCounts(
   }
 
   if (s.id === 'central-p2p') {
-    if (!p2pProbe.online) return 'offline'
+    if (!p2pProbe.online) return null
     if (typeof p2pProbe.count === 'number' && typeof s.user_count === 'number') {
       return `${p2pProbe.count} / ${s.user_count}`
     }
-    if (typeof p2pProbe.count === 'number') {
-      return `${p2pProbe.count} / —`
-    }
-    return '— / —'
+    if (typeof p2pProbe.count === 'number') return `${p2pProbe.count} online`
+    return null
   }
 
   if (s.id === 'central-deprecated') {
-    if (!legacyProbe.online) return 'offline'
+    if (!legacyProbe.online) return null
     const online = typeof legacyProbe.count === 'number'
       ? legacyProbe.count
-      : (typeof s.online_count === 'number' ? s.online_count : 0)
+      : (typeof s.online_count === 'number' ? s.online_count : null)
+    if (online === null) return null
     const total = typeof legacyProbe.total === 'number'
       ? legacyProbe.total
       : (typeof s.user_count === 'number' ? s.user_count : null)
-    if (total !== null) {
-      return `${online} / ${total}`
-    }
-    return `${online} / —`
+    return total === null ? `${online} online` : `${online} / ${total}`
   }
 
   if (typeof s.online_count === 'number' && typeof s.user_count === 'number') {
     return `${s.online_count} / ${s.user_count}`
   }
-  if (typeof s.online_count === 'number') {
-    return `${s.online_count} / —`
-  }
-  if (typeof s.user_count === 'number') {
-    return `0 / ${s.user_count}`
-  }
-  return '— / —'
+  if (typeof s.online_count === 'number') return `${s.online_count} online`
+  if (typeof s.user_count === 'number') return `${s.user_count} members`
+  return null
 }
 
 export function ServersView({
@@ -190,7 +168,6 @@ export function ServersView({
   const [servers, setServers] = useState<DirectoryServer[]>([])
   const [dash, setDash] = useState<Dashboard | null>(null)
   const [node, setNode] = useState<ServerNode | null>(null)
-  const [showCreate, setShowCreate] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [hint, setHint] = useState('')
@@ -199,6 +176,7 @@ export function ServersView({
   const [serverPassword, setServerPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [dirError, setDirError] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [setupUrl, setSetupUrl] = useState('')
   const [setupError, setSetupError] = useState('')
   const [showAdmin, setShowAdmin] = useState(false)
@@ -223,44 +201,38 @@ export function ServersView({
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [showAnchorMenu, setShowAnchorMenu] = useState(false)
   // Device-local mesh labels: UI grouping only, never a network or authority.
   const [labels, setLabels] = useState<LocalMeshLabel[]>(() => readLabels())
   const saveLabels = (next: LocalMeshLabel[]) => { setLabels(next); writeLabels(next) }
   const [expandedServerId, setExpandedServerId] = useState<string | null>(null)
   const [connectingId, setConnectingId] = useState<string | null>(null)
   const [showCentralPopover, setShowCentralPopover] = useState(false)
-  // Collapsible filter band (the chatroom idiom): the search/sort row eats a
-  // full strip above the list and is only needed while narrowing. Starts
-  // retracted by default to keep the HUD quiet.
-  const [filtersCollapsed, setFiltersCollapsed] = useState<boolean>(() => {
-    try { return localStorage.getItem('gmatch.servers.filters_collapsed_v1') !== '0' } catch { return true }
-  })
-  const toggleFilters = () => {
-    setFiltersCollapsed((v) => {
-      const next = !v
-      try { localStorage.setItem('gmatch.servers.filters_collapsed_v1', next ? '1' : '0') } catch { /* private mode */ }
-      return next
-    })
-  }
 
   useEffect(() => {
-    if (!openMenuId && !showCentralPopover) return
+    if (!openMenuId && !showCentralPopover && !showAnchorMenu) return
+    const closeMenus = () => { setOpenMenuId(null); setShowCentralPopover(false); setShowAnchorMenu(false) }
     const handleOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null
       if (target && !target.closest('[data-menu-trigger]') && !target.closest('[data-menu-content]')) {
-        setOpenMenuId(null)
-        setShowCentralPopover(false)
+        closeMenus()
       }
     }
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeMenus() }
     window.addEventListener('mousedown', handleOutside)
-    return () => window.removeEventListener('mousedown', handleOutside)
-  }, [openMenuId, showCentralPopover])
+    window.addEventListener('keydown', handleKey)
+    return () => {
+      window.removeEventListener('mousedown', handleOutside)
+      window.removeEventListener('keydown', handleKey)
+    }
+  }, [openMenuId, showCentralPopover, showAnchorMenu])
 
   // Join prompts (Electron has no window.prompt): one pending resolver ref,
   // one dialog kind at a time (password during join, or the paste-code modal).
   const pendingAsk = useRef<((v: string | null) => void) | null>(null)
   const [askPasswordFor, setAskPasswordFor] = useState<string | null>(null)
   const [addWorldOpen, setAddWorldOpen] = useState(false)
+  const [addWorldTab, setAddWorldTab] = useState<'group' | 'join' | 'host'>('group')
 
   const isDev = Boolean(import.meta.env.DEV) ||
     (typeof window !== 'undefined' &&
@@ -610,6 +582,8 @@ export function ServersView({
     return isCurrentServerUrl(base, s.endpoint_hint || '')
   }, [getEffectiveServerUrl, apiBaseTick])
 
+  const mine = (s: DirectoryServer) => !!identity && s.owner_id === (identity as unknown as { orbitId: string }).orbitId
+
   const officialServers: DirectoryServer[] = useMemo(() => {
     const list: DirectoryServer[] = []
     if (localDevServer) list.push(localDevServer)
@@ -641,28 +615,23 @@ export function ServersView({
       })
   }, [servers, query, sort, passwordOnly, central])
 
-  const allVisibleServers = useMemo(() => {
+  // The browser has two categories, both rendered by the same row: Destinations
+  // (worlds you can enter) and Hosted servers (this machine's own node plus the
+  // official relay/legacy/dev entries). Local groups stay separately, below.
+  const { destinationRows, hostedRows } = useMemo(() => {
     const q = query.trim().toLowerCase()
     const filteredOfficial = officialServers
       .filter((s) => !passwordOnly || s.password_required)
       .filter((s) => !q || `${s.name} ${s.description ?? ''} ${s.endpoint_hint ?? ''} ${(s.tags ?? []).join(' ')}`.toLowerCase().includes(q))
-    const list = [...filteredOfficial, ...visibleServers]
-    // Connected server always stays on top of the browser
-    return list.sort((a, b) => {
-      const aCur = isCurrent(a) ? 1 : 0
-      const bCur = isCurrent(b) ? 1 : 0
-      if (aCur !== bCur) return bCur - aCur
-      return 0
-    })
-  }, [officialServers, visibleServers, query, passwordOnly, isCurrent, apiBaseTick])
-
-  const currentWorld = useMemo(
-    () => allVisibleServers.find((s) => s.id !== 'central-p2p' && isCurrent(s)) || null,
-    [allVisibleServers, isCurrent],
-  )
+    const mineRows = visibleServers.filter((s) => mine(s))
+    return {
+      destinationRows: visibleServers.filter((s) => !mine(s)),
+      hostedRows: [...filteredOfficial, ...mineRows],
+    }
+  }, [officialServers, visibleServers, query, passwordOnly, apiBaseTick])
 
   // Total visible rows = official servers + directory rows.
-  const visibleRowCount = allVisibleServers.length
+  const visibleRowCount = destinationRows.length + hostedRows.length
 
   const currentServerTitle = useMemo(() => {
     const apiBase = getEffectiveServerUrl()
@@ -680,8 +649,86 @@ export function ServersView({
     return serverName || 'Hub'
   }, [servers, serverName, localDevServer, getEffectiveServerUrl])
 
+  // The anchor of the page: what you are inside right now, taken from committed
+  // state (dashboard/node + bridge state). It never depends on the last row
+  // clicked, and never on the filtered list — a search must not make your own
+  // world disappear from the page.
+  const anchor = useMemo(() => {
+    const base = getEffectiveServerUrl()
+    const dashUsers = Array.isArray(dash?.users) ? dash!.users : []
+    const online = dash
+      ? (typeof dash.online_count === 'number' ? dash.online_count : dashUsers.filter((u) => u.online).length)
+      : null
+    const total = dash
+      ? (typeof dash.members_total === 'number' ? dash.members_total : dashUsers.length)
+      : null
+    const name = (base ? currentServerTitle : (dash?.name || node?.name || serverName || '')).trim()
+    return {
+      name,
+      online,
+      total,
+      address: formatDomain(base),
+    }
+  }, [dash, node, serverName, currentServerTitle, getEffectiveServerUrl, apiBaseTick])
+
+  /** Secondary line: what a row is, plus what the directory actually told us. */
+  const metaFor = (s: DirectoryServer): string => {
+    const bits: string[] = []
+    const domain = formatDomain(s.endpoint_hint)
+    if (domain) bits.push(domain)
+    if (s.id === 'central-p2p') bits.push('relay transport, not a world')
+    else if (s.id === 'central-deprecated') bits.push('legacy hosted server')
+    else if (s.id === 'central-local') bits.push('this computer')
+    else {
+      if (s.description?.trim()) bits.push(s.description.trim())
+      else if (s.is_private) bits.push('private, join by code')
+      if (s.last_seen) bits.push(`listed ${formatRelativeTime(s.last_seen)}`)
+      else if (!s.endpoint_hint) bits.push('no address published yet')
+    }
+    return bits.join(' · ')
+  }
+
+  /**
+   * The one place that names a row's state. Status vocabulary: Current ·
+   * Connecting · Relay · Deprecated · Unavailable — and a row never claims
+   * reachability it has not measured (visibility in the directory is not a
+   * connection).
+   */
+  const rowStateFor = (
+    s: DirectoryServer,
+    opts: { connecting: boolean; isMine: boolean },
+  ): WorldRowState => {
+    const isCurrentServer = isCurrent(s)
+    const base: WorldRowState = {
+      counts: rowCounts(s, isCurrentServer, dash, p2pProbe, legacyProbe),
+      meta: metaFor(s),
+      primary: null,
+      tone: 'muted',
+    }
+    if (opts.connecting) return { ...base, label: 'Connecting' }
+    if (s.id === 'central-p2p') {
+      return {
+        ...base,
+        label: 'Relay',
+        status: p2pProbe.online ? (isCurrentServer ? 'Connected' : 'Transport') : 'Unreachable',
+      }
+    }
+    if (s.id === 'central-deprecated') {
+      return {
+        ...base,
+        label: 'Deprecated',
+        tone: legacyProbe.online ? 'muted' : 'warning',
+        status: legacyProbe.online ? null : 'Unavailable',
+      }
+    }
+    if (isCurrentServer) return { ...base, label: 'Current', tone: 'online' }
+    if (!s.endpoint_hint) return { ...base, label: 'Unavailable' }
+    if (opts.isMine) return { ...base, primary: 'Switch', primaryIcon: <ArrowLeft className="w-3 h-3" /> }
+    return { ...base, primary: 'Join' }
+  }
+
   const closeCreateForm = () => {
-    setShowCreate(false); setName(''); setDescription(''); setHint(''); setNeedsPassword(false); setIsPrivate(false); setServerPassword('')
+    setAddWorldOpen(false); setName(''); setDescription(''); setHint(''); setNeedsPassword(false); setIsPrivate(false); setServerPassword('')
   }
 
   // Snapshot the connected node's current settings into the Hub editor.
@@ -792,8 +839,6 @@ export function ServersView({
       setBusy(false)
     }
   }
-
-  const mine = (s: DirectoryServer) => !!identity && s.owner_id === (identity as unknown as { orbitId: string }).orbitId
 
   // Switch = join another node, or hop back to this machine's own host node.
   const switchTo = async (s: DirectoryServer) => {
@@ -1021,9 +1066,10 @@ export function ServersView({
 
   // Wave 2 (D2): out-of-band join — paste a gmatch://node/ code shared by the
   // host directly (no hub coordination needed to reach a node).
-  const joinByCode = async (entered: string) => {
+  const joinByCode = async (entered: string): Promise<boolean> => {
     const coord = decodeNodeMask(entered)
-    if (!coord) { toast('That is not a valid node code.', 'error'); return }
+    // Bad code never leaves the dialog: the field owns that error.
+    if (!coord) return false
     const host = coord.port ? `${coord.host}:${coord.port}` : coord.host
     // Persist before the relaunch kills the process.
     const serverObj = { id: `mask:${host}`, name: coord.name, owner_id: '', password_required: 0, endpoint_hint: host }
@@ -1032,6 +1078,7 @@ export function ServersView({
     if (res === 'connected') {
       onServerJoined?.(serverObj)
     }
+    return true
   }
 
   const leave = async () => {
@@ -1185,6 +1232,215 @@ export function ServersView({
     } as User)
   }
 
+  /** Shared ArrowUp/Down navigation inside a row list. */
+  const onRowListKeyDown = (e: ReactKeyboardEvent<HTMLUListElement>) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+    const items = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[data-world-row-focus]'))
+    if (items.length === 0) return
+    const idx = items.indexOf(document.activeElement as HTMLElement)
+    e.preventDefault()
+    const next = e.key === 'ArrowDown'
+      ? items[idx + 1] ?? items[0]
+      : items[idx - 1] ?? items[items.length - 1]
+    next?.focus()
+  }
+
+  const closeDeleteDialog = () => {
+    setDeleteTarget(null)
+    setDeletePasscode('')
+    setDeleteError('')
+  }
+
+  /**
+   * One row for both sections, so anatomy and states cannot drift. The row owns
+   * layout and the disclosure; the primary action and the contextual menu live
+   * here because they need this view's handlers.
+   */
+  const renderRow = (s: DirectoryServer) => {
+    const isMenuOpen = openMenuId === s.id
+    const isMyServer = mine(s)
+    const isCurrentServer = isCurrent(s)
+    const isExpanded = expandedServerId === s.id
+    const code = s.endpoint_hint ? buildNodeCode(s.endpoint_hint, s.name) : ''
+
+    return (
+      <WorldRow
+        key={s.id}
+        server={s}
+        state={rowStateFor(s, { connecting: connectingId === s.id, isMine: isMyServer })}
+        expanded={isExpanded}
+        onToggleDetails={() => setExpandedServerId(isExpanded ? null : s.id)}
+        menuOpen={isMenuOpen}
+        onMenuToggle={() => setOpenMenuId((cur) => (cur === s.id ? null : s.id))}
+        onPrimary={() => { playPress(620); if (isMyServer) void switchTo(s); else void join(s) }}
+        menuItems={
+          <>
+            {isMyServer && isCurrentServer && (
+              <WorldMenuItem
+                icon={<Pencil className="w-3 h-3" />}
+                label="Server settings"
+                title="Server settings"
+                onClick={() => { openEditor(); setOpenMenuId(null) }}
+              />
+            )}
+            {isMyServer && (
+              <WorldMenuItem
+                icon={<Lock className="w-3 h-3" />}
+                label={s.is_private ? 'Make public' : 'Make private'}
+                onClick={() => { playPress(740); void setPrivate(s, !s.is_private); setOpenMenuId(null) }}
+              />
+            )}
+            {isMyServer && (
+              <WorldMenuItem
+                icon={<Trash2 className="w-3 h-3" />}
+                label="unregister"
+                onClick={() => { void unregister(s); setOpenMenuId(null) }}
+              />
+            )}
+            {s.id === 'central-deprecated' && !isCurrentServer && (
+              <WorldMenuItem
+                icon={<ArrowLeft className="w-3 h-3" />}
+                label="Connect to legacy server"
+                disabled={!!connectingId}
+                onClick={() => { playPress(620); void join(s); setOpenMenuId(null) }}
+              />
+            )}
+            {s.endpoint_hint && (
+              <WorldMenuItem
+                icon={<Share2 className="w-3 h-3" />}
+                label="Copy Server Code"
+                title="Copy node code"
+                onClick={() => { playPress(820); void shareServer(s.endpoint_hint || '', s.name); setOpenMenuId(null) }}
+              />
+            )}
+            {s.id !== 'central-node' && (
+              <WorldMenuItem
+                icon={<Trash2 className="w-3 h-3" />}
+                label="Delete / Forget"
+                danger
+                onClick={() => { setDeleteTarget(s); setDeleteError(''); setDeletePasscode(''); setOpenMenuId(null) }}
+              />
+            )}
+          </>
+        }
+        details={
+          isExpanded ? (
+            <div
+              data-testid={`server-details-${s.id}`}
+              className="px-4 py-3 bg-surface-interactive/30 border-t border-border-subtle text-xs space-y-2.5 animate-orbit-fade-in"
+            >
+              {s.description && (
+                <p className="text-retro-fg leading-relaxed whitespace-pre-wrap">{s.description}</p>
+              )}
+
+              {Array.isArray(s.tags) && s.tags.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="text-[10px] text-retro-muted font-mono uppercase tracking-wider mr-1">Tags:</span>
+                  {s.tags.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => setQuery(tag)}
+                      className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-surface-interactive hover:bg-surface-elevated text-retro-fg border border-border-subtle cursor-pointer transition-colors"
+                      title={`Filter by tag "${tag}"`}
+                    >
+                      #{tag}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-4 text-[10px] text-retro-muted font-mono pt-1 border-t border-border-subtle/50">
+                <span>last seen: {formatRelativeTime(s.last_seen)}</span>
+                {typeof s.online_count === 'number' && <span>online: {s.online_count}</span>}
+                {typeof s.user_count === 'number' && <span>members: {s.user_count}</span>}
+                {s.password_required ? <span className="text-amber-300">password protected</span> : <span>public access</span>}
+                {code && (
+                  <span className="flex items-center gap-1.5 ml-auto">
+                    <span className="truncate max-w-[120px]">{code.slice(0, 20)}…</span>
+                    <button
+                      type="button"
+                      title="Copy node code"
+                      aria-label={`Copy code for ${s.name}`}
+                      onClick={() => { playPress(820); void shareServer(s.endpoint_hint || '', s.name) }}
+                      className="text-retro-fg hover:text-retro-accent cursor-pointer underline"
+                    >
+                      copy
+                    </button>
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : null
+        }
+      />
+    )
+  }
+
+  /** The host form — handed to the Add world dialog so hosting has one door. */
+  const hostForm = identity ? (
+    <div className="space-y-2">
+      <p className="text-xs text-retro-muted">
+        This machine becomes the server: you are logged into it (and off the node
+        you were connected to) automatically, and you are its admin. Friends join
+        from the address below.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <label className="block text-xs text-retro-muted">
+          Server name
+          <input aria-label="Server name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60}
+            className="glass-field mt-0.5 w-full px-2.5 py-1 text-xs" />
+        </label>
+        <label className="block text-xs text-retro-muted">
+          Advanced address override (optional)
+          <input aria-label="Address hint" value={hint} onChange={(e) => setHint(e.target.value)} maxLength={120} placeholder=""
+            className="glass-field mt-0.5 w-full px-2.5 py-1 text-xs font-mono" />
+        </label>
+      </div>
+      {(() => {
+        const preview = buildNodeCode(hint.trim() || hostState?.lanUrls?.[0] || '', name.trim())
+        return preview ? (
+          <div data-testid="create-handle-preview" className="flex items-center gap-2 text-xs font-mono text-retro-muted">
+            <span className="truncate max-w-[240px]">{preview.slice(0, 28)}…</span>
+            <button type="button" onClick={() => void navigator.clipboard.writeText(preview)}
+              className="glass-action px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer">Copy code</button>
+          </div>
+        ) : <p className="text-xs text-retro-muted">Type a name to get your share code.</p>
+      })()}
+      <label className="block text-xs text-retro-muted">
+        Description (public)
+        <input aria-label="Description" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={200}
+          className="glass-field mt-0.5 w-full px-2.5 py-1 text-xs" />
+      </label>
+      <label className="flex items-center gap-2 text-xs text-retro-muted cursor-pointer pt-0.5">
+        <input type="checkbox" className="w-4 h-4 accent-retro-accent cursor-pointer" checked={needsPassword} onChange={(e) => setNeedsPassword(e.target.checked)} />
+        Ask visitors for a join password
+      </label>
+      <label className="flex items-center gap-2 text-xs text-retro-muted cursor-pointer pt-0.5">
+        <input type="checkbox" className="w-4 h-4 accent-retro-accent cursor-pointer" aria-label="Private server" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
+        Private. Hide from the public browser (friends join with your code)
+      </label>
+      {needsPassword && (
+        <input
+          type="password"
+          aria-label="Server join password"
+          value={serverPassword}
+          onChange={(e) => setServerPassword(e.target.value)}
+          placeholder="At least 4 characters"
+          maxLength={64}
+          className="glass-field w-full px-2.5 py-1 text-xs"
+        />
+      )}
+      <div className="flex gap-2 pt-1">
+        <button type="button" disabled={!name.trim() || busy} onClick={() => void create()}
+          className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer">
+          {busy ? '…' : 'Create'}
+        </button>
+        <button type="button" onClick={closeCreateForm} className="glass-action px-3 py-1.5 rounded-lg text-xs text-retro-muted cursor-pointer">Cancel</button>
+      </div>
+    </div>
+  ) : undefined
+
   return (
     <div className="h-full min-h-0 flex-1 overflow-hidden p-2 animate-orbit-fade-in flex flex-col items-center">
       {/* First-login admin passcode */}
@@ -1213,71 +1469,54 @@ export function ServersView({
 
       {/* Unified dashboard — Discord-style framed container, narrow column */}
       <div className="glass-card flex flex-col h-full min-h-0 flex-1 w-full max-w-[680px] overflow-hidden rounded-lg border border-border-glass bg-surface-canvas/60 backdrop-blur-md">
-        {/* Discord-style Unified Top Bar */}
-        <div className="glass-toolbar border-0 border-b border-border-glass rounded-none h-12 px-4 flex items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-2 min-w-0">
-            {identity && (
-              <div className="flex items-center gap-5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => { playPress(750); setActiveTab('browse'); }}
-                  className={`flex items-center gap-2 text-sm font-bold transition-colors cursor-pointer ${
-                    activeTab === 'browse'
-                      ? 'text-retro-fg'
-                      : 'text-retro-muted hover:text-retro-fg'
-                  }`}
-                >
-                  Browse ({visibleRowCount})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { playPress(750); setActiveTab('hub'); }}
-                  aria-label={`Hub: ${currentServerTitle || 'your server'}`}
-                  className={`flex items-center gap-2 text-sm font-bold transition-colors cursor-pointer max-w-[220px] ${
-                    activeTab === 'hub'
-                      ? 'text-retro-fg'
-                      : 'text-retro-muted hover:text-retro-fg'
-                  }`}
-                >
-                  <span className="truncate">{currentServerTitle || 'Hub'}</span>
-                  {dash ? <span className="text-[10px] font-mono font-normal opacity-80 shrink-0">({dash.members_total})</span> : null}
-                </button>
-              </div>
-            )}
+        {/* Page header — identity first, infrastructure behind one menu, and a
+            single primary action. */}
+        <div className="glass-toolbar border-0 border-b border-border-glass rounded-none px-4 py-2.5 flex items-center justify-between gap-3 shrink-0">
+          <div className="min-w-0">
+            <h1 className="text-sm font-bold text-retro-fg leading-tight truncate">
+              {activeTab === 'hub' ? 'Hub' : 'Worlds'}
+            </h1>
+            <p className="text-[10px] text-retro-muted truncate">
+              {activeTab === 'hub'
+                ? 'Members, invites and settings'
+                : `${visibleRowCount} ${visibleRowCount === 1 ? 'destination' : 'destinations'}${anchor.name && identity ? ` · inside ${anchor.name}` : ''}`}
+            </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0 ml-auto">
-            {/* Central Directory Selector */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Directory: the central address, the dev switch and the admin door
+                live together, out of the way of the everyday action. */}
             <div className="relative">
               <button
                 type="button"
                 data-menu-trigger
-                onClick={() => setShowCentralPopover((v) => !v)}
-                aria-label="Change central node address"
+                aria-expanded={showCentralPopover}
+                onClick={() => { playPress(760); setShowCentralPopover((v) => !v) }}
+                aria-label="Directory options"
                 className="p-2 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w8 transition-colors cursor-pointer"
-                title={central ? `Directory: ${central.replace(/^https?:\/\//, '')} (change)` : 'Change central node address'}
+                title={central ? `Directory: ${central.replace(/^https?:\/\//, '')}` : 'Directory'}
               >
                 <Globe className="w-4 h-4" />
               </button>
 
-              {/* Central Node Popover */}
               {showCentralPopover && (
                 <div
                   data-menu-content
-                  className="absolute right-0 top-full mt-2 w-72 bg-surface-raised border border-border-glass rounded-lg p-3 shadow-xl z-30 space-y-2.5 animate-orbit-fade-in"
+                  className="absolute right-0 top-full mt-2 w-72 bg-surface-raised border border-border-glass rounded-lg p-3 shadow-xl z-[var(--z-dropdown)] space-y-2.5 animate-orbit-fade-in"
                 >
                   <div className="flex items-center justify-between border-b border-border-subtle pb-1.5">
-                    <span className="text-xs font-bold text-retro-fg">Central Directory Node</span>
+                    <span className="text-xs font-bold text-retro-fg">Directory</span>
                     <button
                       type="button"
                       onClick={() => setShowCentralPopover(false)}
+                      aria-label="Close directory menu"
                       className="text-retro-muted hover:text-retro-fg p-0.5 cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
                   <p className="text-[10px] text-retro-muted">
-                    Central directory address where servers register and publish metadata.
+                    Where servers register and publish metadata. Change it only if you run your own.
                   </p>
                   <div className="flex items-center gap-1.5">
                     <input
@@ -1285,12 +1524,12 @@ export function ServersView({
                       value={setupUrl || (central || '')}
                       onChange={(e) => setSetupUrl(e.target.value)}
                       placeholder="https://gmatch-wcz1.onrender.com"
-                      className="w-full px-2.5 py-1 text-xs font-mono bg-surface-canvas border border-border-glass rounded-md text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-retro-accent"
+                      className="glass-field w-full px-2.5 py-1 text-xs font-mono"
                     />
                     <button
                       type="button"
                       onClick={() => { saveCentral(); setShowCentralPopover(false); }}
-                      className="px-2.5 py-1 text-xs font-semibold bg-retro-accent text-retro-accent-text rounded-md hover:bg-retro-accent-hover transition-colors shrink-0 cursor-pointer active:scale-[0.98]"
+                      className="glass-action glass-action-primary px-2.5 py-1 text-xs font-bold rounded-lg shrink-0 cursor-pointer"
                     >
                       Save
                     </button>
@@ -1309,7 +1548,7 @@ export function ServersView({
                           }}
                           className={`px-1.5 py-0.5 rounded text-[10px] font-mono cursor-pointer ${
                             central === 'http://127.0.0.1:8790'
-                              ? 'bg-retro-accent text-white font-bold'
+                              ? 'bg-retro-accent text-retro-accent-text font-bold'
                               : 'bg-glass-w10 text-retro-muted hover:text-retro-fg'
                           }`}
                         >
@@ -1325,7 +1564,7 @@ export function ServersView({
                           }}
                           className={`px-1.5 py-0.5 rounded text-[10px] font-mono cursor-pointer ${
                             central === 'https://gmatch-wcz1.onrender.com'
-                              ? 'bg-retro-accent text-white font-bold'
+                              ? 'bg-retro-accent text-retro-accent-text font-bold'
                               : 'bg-glass-w10 text-retro-muted hover:text-retro-fg'
                           }`}
                         >
@@ -1334,43 +1573,41 @@ export function ServersView({
                       </div>
                     </div>
                   )}
+                  {central && (
+                    <button
+                      type="button"
+                      onClick={() => { setShowCentralPopover(false); playPress(760); setShowAdmin((v) => !v) }}
+                      aria-label="Central admin panel"
+                      className="w-full pt-2 border-t border-border-subtle flex items-center gap-2 text-xs text-retro-muted hover:text-retro-fg cursor-pointer transition-colors text-left"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" /> Central admin panel
+                    </button>
+                  )}
                 </div>
               )}
             </div>
 
-            {central && (
-              <button
-                type="button"
-                onClick={() => { playPress(760); setShowAdmin((v) => !v) }}
-                aria-expanded={showAdmin}
-                aria-label="Central admin panel"
-                title="Central admin panel"
-                className="p-2 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w8 cursor-pointer transition-colors active:scale-[0.98]"
-              >
-                <ShieldCheck className="w-4 h-4" />
-              </button>
-            )}
             <button
               type="button"
-              onClick={() => { playPress(700); setAddWorldOpen(true) }}
+              onClick={() => { playPress(700); setRefreshing(true); void refresh().finally(() => setRefreshing(false)) }}
+              disabled={refreshing}
+              aria-label="Refresh servers"
+              aria-busy={refreshing || undefined}
+              title="Refresh"
+              className="p-2 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w8 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { playPress(880); setAddWorldTab('group'); setAddWorldOpen(true) }}
               aria-label="Add world"
-              title="Add world — new group or join code"
-              className="flex items-center gap-1 px-1.5 py-1 rounded-md text-xs font-bold text-retro-fg hover:bg-glass-w8 transition-colors cursor-pointer"
+              title="Add a group, join with a code, or host on this computer"
+              className="glass-action glass-action-primary flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer"
             >
               <Plus className="w-3 h-3" /> Add world
             </button>
-            {identity && (
-              <button
-                type="button"
-                onClick={() => { playPress(880); setShowCreate((v) => !v) }}
-                aria-expanded={showCreate}
-                aria-label="Create server"
-                title="Create server"
-                className="flex items-center gap-1 px-1.5 py-1 rounded-md text-xs font-bold text-retro-fg hover:bg-glass-w8 transition-colors cursor-pointer"
-              >
-                <Plus className="w-3 h-3" /> Create
-              </button>
-            )}
           </div>
         </div>
 
@@ -1669,169 +1906,139 @@ export function ServersView({
               </div>
             )}
 
-            {/* Sub-Bar: Title & Filter Controls */}
-            <div className="glass-header h-8 px-3 flex items-center justify-between gap-2 shrink-0">
-              <div className="flex items-center gap-1.5 shrink-0">
-                <h2 className="text-xs font-bold text-retro-fg uppercase tracking-wider whitespace-nowrap">
-                  Server browser ({visibleRowCount})
-                </h2>
+            {/* Filter row: one quiet line, always visible. */}
+            <div className="glass-header px-3 py-1.5 flex items-center gap-2 shrink-0">
+              <div className="glass-field w-36 sm:w-56 flex items-center gap-1 px-2 h-7 text-xs shrink-0">
+                <Search className="w-3 h-3 text-retro-muted shrink-0" />
+                <input
+                  aria-label="Search servers"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search worlds…"
+                  className="w-full bg-transparent text-retro-fg outline-none placeholder:text-retro-muted text-xs"
+                />
+              </div>
+              <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                <label className="flex items-center gap-1 text-xs text-retro-muted">
+                  <ArrowDownUp className="w-3 h-3" />
+                  <select
+                    aria-label="Sort servers"
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value as 'recent' | 'name' | 'online')}
+                    className="glass-field px-1 h-7 text-xs font-medium"
+                  >
+                    <option value="recent">Recent</option>
+                    <option value="name">Name</option>
+                    <option value="online">Online</option>
+                  </select>
+                </label>
                 <button
                   type="button"
-                  onClick={() => { playPress(720); toggleFilters() }}
-                  aria-expanded={!filtersCollapsed}
-                  aria-label={filtersCollapsed ? 'Show filters' : 'Hide filters'}
-                  className="text-[10px] font-bold text-retro-muted hover:text-retro-fg cursor-pointer transition-colors px-1 py-px rounded hover:bg-glass-w8"
+                  onClick={() => setPasswordOnly((v) => !v)}
+                  aria-pressed={passwordOnly}
+                  aria-label="Password only"
+                  title="Password only"
+                  className={`h-7 w-7 rounded-md cursor-pointer flex items-center justify-center transition-colors shrink-0 ${passwordOnly ? 'glass-nav-active text-amber-200' : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8'}`}
                 >
-                  {filtersCollapsed ? '⌃' : '⌄'}
+                  <Lock className="w-3 h-3" />
                 </button>
               </div>
-
-              {!filtersCollapsed && (
-                <div className="flex items-center gap-1.5 flex-1 justify-end min-w-0">
-                  <div className="glass-field w-36 sm:w-48 flex items-center gap-1 px-2 h-6 text-xs shrink-0">
-                    <Search className="w-3 h-3 text-retro-muted shrink-0" />
-                    <input
-                      aria-label="Search servers"
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      placeholder="Search…"
-                      className="w-full bg-transparent text-retro-fg outline-none placeholder:text-retro-muted text-xs"
-                    />
-                  </div>
-                  <label className="flex items-center gap-1 text-xs text-retro-muted shrink-0">
-                    <ArrowDownUp className="w-3 h-3" />
-                    <select
-                      aria-label="Sort servers"
-                      value={sort}
-                      onChange={(e) => setSort(e.target.value as 'recent' | 'name' | 'online')}
-                      className="glass-field px-1 h-6 text-xs font-medium"
-                    >
-                      <option value="recent">Recent</option>
-                      <option value="name">Name</option>
-                      <option value="online">Online</option>
-                    </select>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setPasswordOnly((v) => !v)}
-                    aria-pressed={passwordOnly}
-                    aria-label="Password only"
-                    title="Password only"
-                    className={`h-6 w-6 rounded-md cursor-pointer flex items-center justify-center active:scale-[0.98] transition-colors shrink-0 ${passwordOnly ? 'glass-nav-active text-amber-200' : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8'}`}
-                  >
-                    <Lock className="w-3 h-3" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void refresh()}
-                    aria-label="Refresh servers"
-                    className="h-6 w-6 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w8 flex items-center justify-center cursor-pointer transition-colors shrink-0 active:scale-[0.98]"
-                    title="Refresh"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                  </button>
-                </div>
-              )}
             </div>
 
-            {/* Scrollable Directory Content */}
-            <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar px-3 py-2 space-y-1.5">
-              {/* Current world: unmistakable, with Open = focus existing hub */}
-              {currentWorld ? (
-                <section aria-label="Current world" className="px-3 py-2.5 rounded-lg bg-glass-w8 border border-border-glass flex items-center gap-3">
-                  <span className="w-2 h-2 rounded-full bg-retro-online shrink-0" aria-hidden />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[10px] uppercase tracking-wider text-retro-muted font-semibold">Current world</p>
-                    <h3 className="text-sm font-bold text-retro-fg truncate">{currentWorld.name}</h3>
-                    <p className="text-[11px] text-retro-muted truncate">
-                      {formatServerCounts(currentWorld, true, dash, p2pProbe, legacyProbe)}
-                      {currentWorld.description ? ` · ${currentWorld.description}` : ''}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => { playPress(700); setActiveTab('hub'); }}
-                    className="glass-action glass-action-primary h-7 px-3 rounded-md text-xs font-bold cursor-pointer shrink-0"
-                  >
-                    Open
-                  </button>
-                </section>
-              ) : (
-                <p className="px-1 text-[11px] text-retro-muted">Not connected to a listed world — pick one below.</p>
-              )}
-              {/* Create-server drawer */}
-              {showCreate && (
-                <div className="glass-panel p-3.5 space-y-2 shrink-0 rounded-lg border border-border-glass">
-                  <div className="flex items-center justify-between pb-1 border-b border-border-subtle">
-                    <span className="text-xs font-bold text-retro-fg">Create a server. Hosted on this computer</span>
+            {/* Scrollable content */}
+            <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar px-3 py-2 space-y-2.5">
+              {/* The current world — the page's anchor. Read from committed
+                  state, so a search can never make your own world disappear. */}
+              <section
+                aria-label="Current world"
+                className="px-3 py-2.5 rounded-lg bg-glass-w8 border border-border-glass flex items-center gap-3"
+              >
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${anchor.name ? 'bg-retro-online' : 'bg-retro-muted/40'}`}
+                  aria-hidden
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] uppercase tracking-wider text-retro-muted font-semibold">
+                    {serverMode === 'host' ? 'Current world · hosting here' : 'Current world'}
+                  </p>
+                  <h2 className="text-sm font-bold text-retro-fg truncate">
+                    {anchor.name || 'No world yet'}
+                  </h2>
+                  <p className="text-[10px] text-retro-muted truncate">
+                    {anchor.name
+                      ? [
+                          anchor.address,
+                          typeof anchor.online === 'number' && typeof anchor.total === 'number'
+                            ? `${anchor.online} / ${anchor.total}`
+                            : null,
+                        ].filter(Boolean).join(' · ') || 'Connected'
+                      : 'Pick a world below, or host one on this computer.'}
+                  </p>
+                </div>
+
+                {anchor.name && (
+                  <>
                     <button
                       type="button"
-                      onClick={closeCreateForm}
-                      className="text-retro-muted hover:text-retro-fg p-0.5 cursor-pointer"
+                      onClick={() => { playPress(700); setActiveTab('hub'); }}
+                      className="glass-action glass-action-primary h-7 px-3 rounded-md text-xs font-bold cursor-pointer shrink-0"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      Open
                     </button>
-                  </div>
-                  <p className="text-xs text-retro-muted">
-                    This machine becomes the server: you are logged into it (and off
-                    the node you were connected to) automatically, and you are its
-                    admin. Friends join from the address below.
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <label className="block text-xs text-retro-muted">
-                      Server name
-                      <input aria-label="Server name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60}
-                        className="glass-field mt-0.5 w-full px-2.5 py-1 text-xs" />
-                    </label>
-                    <label className="block text-xs text-retro-muted">
-                      Advanced address override (optional)
-                      <input aria-label="Address hint" value={hint} onChange={(e) => setHint(e.target.value)} maxLength={120} placeholder=""
-                        className="glass-field mt-0.5 w-full px-2.5 py-1 text-xs font-mono" />
-                    </label>
-                  </div>
-                  {(() => {
-                    const preview = buildNodeCode(hint.trim() || hostState?.lanUrls?.[0] || '', name.trim())
-                    return preview ? (
-                      <div data-testid="create-handle-preview" className="flex items-center gap-2 text-xs font-mono text-retro-muted">
-                        <span className="truncate max-w-[240px]">{preview.slice(0, 28)}…</span>
-                        <button type="button" onClick={() => void navigator.clipboard.writeText(preview)}
-                          className="glass-action px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer">Copy code</button>
-                      </div>
-                    ) : <p className="text-xs text-retro-muted">Type a name to get your share code.</p>
-                  })()}
-                  <label className="block text-xs text-retro-muted">
-                    Description (public)
-                    <input aria-label="Description" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={200}
-                      className="glass-field mt-0.5 w-full px-2.5 py-1 text-xs" />
-                  </label>
-                  <label className="flex items-center gap-2 text-xs text-retro-muted cursor-pointer pt-0.5">
-                    <input type="checkbox" checked={needsPassword} onChange={(e) => setNeedsPassword(e.target.checked)} />
-                    Ask visitors for a join password
-                  </label>
-                  <label className="flex items-center gap-2 text-xs text-retro-muted cursor-pointer pt-0.5">
-                    <input type="checkbox" aria-label="Private server" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
-                    Private. Hide from the public browser (friends join with your code)
-                  </label>
-                  {needsPassword && (
-                    <input
-                      type="password"
-                      aria-label="Server join password"
-                      value={serverPassword}
-                      onChange={(e) => setServerPassword(e.target.value)}
-                      placeholder="At least 4 characters"
-                      maxLength={64}
-                      className="glass-field w-full px-2.5 py-1 text-xs"
-                    />
-                  )}
-                  <div className="flex gap-2 pt-1">
-                    <button type="button" disabled={!name.trim() || busy} onClick={() => void create()}
-                      className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer">
-                      {busy ? '…' : 'Create'}
-                    </button>
-                    <button type="button" onClick={closeCreateForm} className="glass-action px-3 py-1.5 rounded-lg text-xs text-retro-muted cursor-pointer">Cancel</button>
-                  </div>
-                </div>
-              )}
+
+                    <div className="relative shrink-0">
+                      <button
+                        type="button"
+                        data-menu-trigger
+                        onClick={() => setShowAnchorMenu((v) => !v)}
+                        aria-label="More actions for the current world"
+                        title="More actions"
+                        className="h-7 w-7 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w10 flex items-center justify-center cursor-pointer transition-colors"
+                      >
+                        <MoreVertical className="w-3.5 h-3.5" />
+                      </button>
+                      {showAnchorMenu && (
+                        <div
+                          data-menu-content
+                          role="menu"
+                          aria-label="Actions for the current world"
+                          className="absolute right-0 top-full mt-1 w-52 bg-surface-raised border border-border-glass rounded-lg py-1 shadow-lg z-[var(--z-dropdown)] space-y-0.5 animate-orbit-fade-in"
+                        >
+                          {serverMode === 'host' && (
+                            <WorldMenuItem
+                              icon={<Share2 className="w-3 h-3" />}
+                              label="Copy share code"
+                              title="Copy node code"
+                              onClick={() => {
+                                setShowAnchorMenu(false)
+                                playPress(820)
+                                void window.gmatch?.serverState?.()
+                                  .then((st) => void shareServer(st?.lanUrls?.[0] || '', serverName))
+                                  .catch(() => void shareServer('', serverName))
+                              }}
+                            />
+                          )}
+                          {node?.isAdmin && (
+                            <WorldMenuItem
+                              icon={<Pencil className="w-3 h-3" />}
+                              label="Server settings"
+                              onClick={() => { setShowAnchorMenu(false); playPress(700); setActiveTab('hub') }}
+                            />
+                          )}
+                          {serverMode === 'client' && (
+                            <WorldMenuItem
+                              icon={<ArrowLeft className="w-3 h-3" />}
+                              label="Leave this world"
+                              danger
+                              onClick={() => { setShowAnchorMenu(false); playPress(620); void leave() }}
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </section>
 
               {/* Directory Setup / Not configured notice */}
               {!central || setupUrl ? (
@@ -1874,16 +2081,103 @@ export function ServersView({
                 </div>
               ) : null}
 
-              {/* Local groups: device-local peer labels, subordinate to real worlds */}
-              <section aria-label="Local groups on this device" className="px-1 space-y-1">
-                <h3 className="text-[11px] font-semibold text-retro-muted uppercase tracking-wider">Local groups <span className="normal-case font-normal">· this device only</span></h3>
+              {/* A failed directory request never erases worlds we already know. */}
+              {dirError && destinationRows.length > 0 && (
+                <div role="status" className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border-glass bg-glass-w5 text-[10px] text-retro-muted">
+                  <span className="min-w-0 flex-1 truncate">
+                    Directory unreachable. Showing the last known worlds.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void refresh()}
+                    className="shrink-0 text-retro-fg hover:text-retro-accent underline cursor-pointer"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {/* Destinations — the worlds you can enter. */}
+              <section aria-label="Destinations" className="space-y-1">
+                <h3 className="px-1 text-[10px] font-semibold text-retro-muted uppercase tracking-wider">
+                  Destinations{' '}
+                  {destinationRows.length > 1 && <span className="font-mono font-normal">{destinationRows.length}</span>}
+                </h3>
+                <ul
+                  className="rounded-lg border border-border-glass divide-y divide-border-subtle overflow-hidden"
+                  aria-label="Destinations"
+                  onKeyDown={onRowListKeyDown}
+                >
+                  {destinationRows.length === 0 ? (
+                    <li className="px-4 py-6 text-xs text-retro-muted text-center flex flex-col items-center justify-center gap-1.5">
+                      {dirError ? (
+                        <>
+                          <Globe className="w-5 h-5 text-retro-muted/40" />
+                          <p className="font-semibold text-retro-fg">Directory unavailable</p>
+                          <p className="max-w-sm text-[10px]">
+                            Could not reach <span className="font-mono">{central || 'the directory'}</span> and nothing is cached for this session.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => void refresh()}
+                            className="glass-action mt-1 h-7 px-2.5 rounded-md text-xs font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <RefreshCw className="w-3 h-3" /> Retry
+                          </button>
+                        </>
+                      ) : servers.length === 0 && !query && !passwordOnly ? (
+                        <>
+                          <Globe className="w-5 h-5 text-retro-muted/40" />
+                          <p className="font-semibold text-retro-fg">No public worlds yet</p>
+                          <p className="max-w-sm text-[10px]">A world appears here while its host is running gMatch.</p>
+                          <button
+                            type="button"
+                            onClick={() => { playPress(880); setAddWorldTab('host'); setAddWorldOpen(true) }}
+                            className="glass-action glass-action-primary mt-1 h-7 px-2.5 rounded-md text-xs font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3" /> Host a server
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <Search className="w-5 h-5 text-retro-muted/40" />
+                          <p className="font-semibold text-retro-fg">No worlds match</p>
+                          <p className="max-w-sm text-[10px]">
+                            {query ? `Nothing matches “${query}”` : 'No world matches the current filters'}
+                            {passwordOnly ? ' with a password' : ''}.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => { setQuery(''); setPasswordOnly(false) }}
+                            className="glass-action mt-1 h-7 px-2.5 rounded-md text-xs font-bold cursor-pointer"
+                          >
+                            Clear filters
+                          </button>
+                        </>
+                      )}
+                    </li>
+                  ) : (
+                    destinationRows.map((s) => renderRow(s))
+                  )}
+                </ul>
+              </section>
+
+              {/* Local groups — labels that exist only on this device, so they
+                  stay subordinate to real destinations. */}
+              <section aria-label="Local groups on this device" className="space-y-1">
+                <h3 className="px-1 text-[10px] font-semibold text-retro-muted uppercase tracking-wider">
+                  Local groups <span className="normal-case font-normal">· this device only</span>
+                </h3>
                 {labels.length === 0 ? (
-                  <p className="text-[11px] text-retro-muted">No local groups. Use + Add world to name one or join with a code.</p>
+                  <p className="px-1 text-[10px] text-retro-muted">
+                    None yet. A group is a local label for peers you keep track of. It adds no network.
+                  </p>
                 ) : (
-                  <ul className="space-y-0.5">
+                  <ul className="rounded-lg border border-border-glass divide-y divide-border-subtle overflow-hidden">
                     {labels.map((l) => (
-                      <li key={l.id} className="flex items-center justify-between gap-2 text-xs py-0.5">
-                        <span className="truncate text-retro-fg">{l.name}
+                      <li key={l.id} className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
+                        <span className="truncate text-retro-fg">
+                          {l.name}
                           <span className="ml-1 font-normal text-retro-muted">· {l.memberOrbitIds.length} peers{l.nodeCodes.length ? ` · ${l.nodeCodes.length} codes` : ''}</span>
                           {identity && isOwnLabel(l, (identity as { orbitId?: string }).orbitId) && (
                             <span className="ml-1 text-[10px] text-retro-muted">(this device)</span>
@@ -1892,9 +2186,9 @@ export function ServersView({
                         <button
                           type="button"
                           aria-label={`Forget group ${l.name}`}
-                          title="Forget this group (local only — removes nothing remotely)"
+                          title="Forget this group (local only, removes nothing remotely)"
                           onClick={() => saveLabels(labels.filter((x) => x.id !== l.id))}
-                          className="px-1.5 py-0.5 rounded text-[11px] text-retro-muted hover:text-rose-300 hover:bg-glass-w8 cursor-pointer"
+                          className="px-1.5 py-0.5 rounded text-[10px] text-retro-muted hover:text-retro-error hover:bg-glass-w8 cursor-pointer transition-colors"
                         >
                           Forget
                         </button>
@@ -1904,354 +2198,31 @@ export function ServersView({
                 )}
               </section>
 
-              <h3 className="text-[11px] font-semibold text-retro-muted uppercase tracking-wider pt-1">Hosted servers <span className="normal-case font-normal">· independently operated</span></h3>
-              {/* Directory Content List */}
-              <div className="min-h-0 pr-px">
-                  {dirError ? (
-                    <div className="glass-inset p-3 text-xs text-retro-muted space-y-2">
-                      <p>
-                        Could not reach the central directory at <span className="font-mono">{central}</span>.
-                        It may be offline, or the address is wrong.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => void refresh()}
-                        className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
-                      >
-                        <RefreshCw className="w-3 h-3" /> Retry
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-1.5">
-                      <ul
-                        className="divide-y divide-border-subtle rounded-lg border border-border-glass solid-panel overflow-hidden"
-                        aria-label="Worlds and servers"
-                        onKeyDown={(e) => {
-                          if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
-                          const items = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[data-world-row-focus]'))
-                          if (items.length === 0) return
-                          const idx = items.indexOf(document.activeElement as HTMLElement)
-                          e.preventDefault()
-                          const next = e.key === 'ArrowDown'
-                            ? items[idx + 1] ?? items[0]
-                            : items[idx - 1] ?? items[items.length - 1]
-                          next?.focus()
-                        }}
-                      >
-                        {allVisibleServers.length === 0 && (
-                          <li className="p-6 text-xs text-retro-muted text-center flex flex-col items-center justify-center gap-1.5">
-                            <Globe className="w-5 h-5 text-retro-muted/40" />
-                            <p className="font-semibold text-retro-fg">
-                              {servers.length === 0 ? 'No public servers online' : 'No servers match your search filters'}
-                            </p>
-                            <p className="max-w-sm text-[10px] text-retro-muted">
-                              {servers.length === 0
-                                ? 'A server appears here while its host is running gMatch.'
-                                : 'Try clearing your search query or password filter.'}
-                            </p>
-                            {servers.length > 0 && (query || passwordOnly) && (
-                              <button
-                                type="button"
-                                onClick={() => { setQuery(''); setPasswordOnly(false); }}
-                                className="mt-1 h-6 px-2 rounded-md text-xs font-medium border border-border-glass bg-glass-w8 hover:bg-glass-w12 text-retro-fg cursor-pointer transition-colors active:scale-[0.98]"
-                              >
-                                Clear filters
-                              </button>
-                            )}
-                          </li>
-                        )}
+              {/* Hosted servers — this machine's node plus the official entries
+                  (relay, legacy). Separate from local groups: these are real
+                  endpoints, and their labels say what they are. */}
+              <section aria-label="Hosted servers" className="space-y-1">
+                <h3 className="px-1 text-[10px] font-semibold text-retro-muted uppercase tracking-wider">
+                  Hosted servers <span className="normal-case font-normal">· independently operated</span>
+                </h3>
+                <ul
+                  className="rounded-lg border border-border-glass divide-y divide-border-subtle overflow-hidden"
+                  aria-label="Hosted servers"
+                  onKeyDown={onRowListKeyDown}
+                >
+                  {hostedRows.map((s) => renderRow(s))}
+                </ul>
+              </section>
 
-                        {allVisibleServers.map((s) => {
-                          const isMenuOpen = openMenuId === s.id
-                          const isMyServer = mine(s)
-                          const isCurrentServer = isCurrent(s)
-                          const isExpanded = expandedServerId === s.id
-                          const isOfficial = s.id === 'central-p2p' || s.id === 'central-deprecated' || s.id === 'central-local'
-                          const code = s.endpoint_hint ? buildNodeCode(s.endpoint_hint, s.name) : ''
+              <div className="flex items-center justify-between text-[10px] text-retro-muted shrink-0 pt-1">
+                <span className="flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-retro-muted" /> Private: directory mirrors only metadata. Never private content.
+                </span>
+              </div>
+            </div>
 
-                          return (
-                            <li
-                              key={s.id}
-                              className="group flex flex-col hover:bg-glass-w5 transition-colors duration-150"
-                            >
-                              <div className="flex items-center justify-between gap-2.5 px-3 py-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setExpandedServerId(isExpanded ? null : s.id)}
-                                  aria-expanded={isExpanded}
-                                  aria-label={`${isExpanded ? 'Hide' : 'Show'} details for ${s.name}`}
-                                  className="p-1 -ml-1 text-retro-muted hover:text-retro-fg cursor-pointer transition-colors"
-                                >
-                                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${isExpanded ? 'rotate-180 text-retro-fg' : ''}`} />
-                                </button>
-
-                                <div
-                                  role="button"
-                                  tabIndex={0}
-                                  data-world-row-focus
-                                  onClick={() => setExpandedServerId(isExpanded ? null : s.id)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                      e.preventDefault()
-                                      setExpandedServerId(isExpanded ? null : s.id)
-                                    }
-                                  }}
-                                  aria-label={s.name}
-                                  className="flex min-w-0 items-center gap-3 flex-1 cursor-pointer select-none group/title rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-retro-accent"
-                                >
-                                  <span className="font-mono text-xs text-retro-muted tabular-nums shrink-0 min-w-[56px] text-right font-medium">
-                                    {formatServerCounts(s, isCurrentServer, dash, p2pProbe, legacyProbe)}
-                                  </span>
-
-                                  <div className="flex items-baseline gap-2 min-w-0 flex-1 truncate">
-                                    <h3 className="text-xs font-bold text-retro-fg group-hover/title:text-accent transition-colors truncate">
-                                      {s.name}
-                                    </h3>
-                                    {s.endpoint_hint && (isOfficial || (!/^https?:\/\/\d+\.\d+\.\d+\.\d+/i.test(s.endpoint_hint) && !/^\d+\.\d+\.\d+\.\d+/.test(s.endpoint_hint))) && (
-                                      <span className="text-[11px] font-mono text-retro-muted/60 truncate shrink-0">
-                                        {formatDomain(s.endpoint_hint)}
-                                      </span>
-                                    )}
-                                    {s.id === 'central-deprecated' && (
-                                      <span className="text-[11px] text-retro-muted shrink-0" title="Deprecated hosted server — probe status only, not a P2P mesh">
-                                        Deprecated
-                                      </span>
-                                    )}
-                                    {s.id === 'central-p2p' && (
-                                      <span className="text-[11px] text-retro-muted shrink-0" title="Relay transport status (presence + mail), not a world">
-                                        Relay
-                                      </span>
-                                    )}
-                                    {s.description && s.description.trim() && s.id !== 'central-p2p' && s.id !== 'central-deprecated' && (
-                                      <span className="hidden md:inline text-[11px] text-retro-muted/60 truncate font-sans">
-                                        · <span>{s.description}</span>
-                                      </span>
-                                    )}
-                                    {!!s.password_required && (
-                                      <span className="p-0.5 rounded text-retro-muted shrink-0" title="Password required">
-                                        <Lock className="w-3 h-3" aria-label="password required" />
-                                      </span>
-                                    )}
-                                    {!!s.is_private && (
-                                      <span className="text-[10px] px-1 py-px rounded font-mono uppercase tracking-wider text-retro-muted/70 border border-border-glass bg-glass-w5 shrink-0">
-                                        private
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-
-                                <div className="flex shrink-0 items-center justify-end gap-1">
-                                  <div className="flex items-center gap-1">
-                                    {connectingId === s.id ? (
-                                      <span
-                                        data-testid={`connecting-${s.id}`}
-                                        className="h-6 px-2.5 rounded-md text-xs font-bold text-retro-fg bg-surface-canvas border border-border-subtle flex items-center gap-1.5 cursor-wait animate-pulse"
-                                      >
-                                        <Loader2 className="w-3 h-3 animate-spin text-retro-muted" /> Connecting...
-                                      </span>
-                                    ) : isCurrentServer ? (
-                                      <span
-                                        className={`h-6 px-2.5 rounded-md text-xs font-semibold text-retro-muted bg-surface-canvas border border-border-subtle flex items-center justify-center cursor-default transition-opacity ${
-                                          connectingId ? 'opacity-40' : ''
-                                        }`}
-                                      >
-                                        Connected
-                                      </span>
-                                    ) : s.id === 'central-deprecated' ? (
-                                      <span
-                                        className="h-6 px-2.5 rounded-md text-xs font-semibold text-amber-300/80 bg-surface-canvas border border-border-subtle flex items-center justify-center cursor-default"
-                                        title="Legacy entry is status-only — expand for details or copy the code"
-                                      >
-                                        Details below
-                                      </span>
-                                    ) : s.id === 'central-p2p' ? (
-                                      <span
-                                        className="h-6 px-2.5 rounded-md text-xs font-semibold text-retro-muted bg-surface-canvas border border-border-subtle flex items-center justify-center cursor-default"
-                                        title="Relay transport status — not a world to join"
-                                      >
-                                        {isCurrentServer ? 'Connected' : (p2pProbe.online ? 'Transport' : 'Unreachable')}
-                                      </span>
-                                    ) : isMyServer ? (
-                                      <button
-                                        type="button"
-                                        disabled={!!connectingId}
-                                        onClick={() => { playPress(620); void switchTo(s); }}
-                                        className="glass-action glass-action-primary h-6 px-2.5 rounded-md text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98]"
-                                      >
-                                        <ArrowLeft className="w-3 h-3" /> Switch
-                                      </button>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        disabled={!!connectingId}
-                                        onClick={() => void join(s)}
-                                        className="bg-white hover:bg-zinc-200 text-black font-semibold text-xs rounded-md px-3 h-6 flex items-center justify-center cursor-pointer transition-colors active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed glass-action-primary"
-                                      >
-                                        {isOfficial || !identity ? 'Connect' : 'Join'}
-                                      </button>
-                                    )}
-
-                                    <div className="relative">
-                                      <button
-                                        type="button"
-                                        data-menu-trigger
-                                        onClick={() => setOpenMenuId((cur) => (cur === s.id ? null : s.id))}
-                                        aria-label={`More actions for ${s.name}`}
-                                        className="h-6 w-6 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w8 flex items-center justify-center cursor-pointer transition-colors duration-150"
-                                        title="More actions"
-                                      >
-                                        <MoreVertical className="w-3.5 h-3.5" />
-                                      </button>
-
-                                      {isMenuOpen && (
-                                        <div
-                                          data-menu-content
-                                          className="absolute right-0 top-full mt-1 w-44 bg-surface-raised border border-border-glass rounded-lg py-1 shadow-lg z-20 space-y-0.5 animate-orbit-fade-in"
-                                        >
-                                          {isMyServer && (
-                                            <>
-                                              {isCurrentServer && (
-                                                <button
-                                                  type="button"
-                                                  onClick={() => { openEditor(); setOpenMenuId(null); }}
-                                                  title="Server settings"
-                                                  className="w-full px-3 py-1.5 text-xs text-left text-retro-fg hover:bg-glass-w8 flex items-center gap-2 cursor-pointer"
-                                                >
-                                                  <Pencil className="w-3.5 h-3.5 text-retro-muted" /> Server settings
-                                                </button>
-                                              )}
-                                              <button
-                                                type="button"
-                                                onClick={() => { playPress(740); void setPrivate(s, !s.is_private); setOpenMenuId(null); }}
-                                                className="w-full px-3 py-1.5 text-xs text-left text-retro-fg hover:bg-glass-w8 flex items-center gap-2 cursor-pointer"
-                                              >
-                                                <Lock className="w-3.5 h-3.5 text-retro-muted" /> {s.is_private ? 'Make public' : 'Make private'}
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => { void unregister(s); setOpenMenuId(null); }}
-                                                className="w-full px-3 py-1.5 text-xs text-left text-retro-fg hover:bg-glass-w8 flex items-center gap-2 cursor-pointer"
-                                              >
-                                                unregister
-                                              </button>
-                                            </>
-                                          )}
-                                          {s.id === 'central-deprecated' && !isCurrentServer && (
-                                            <button
-                                              type="button"
-                                              disabled={!!connectingId}
-                                              onClick={() => { void join(s); setOpenMenuId(null); }}
-                                              title="Connect to the legacy hosted server"
-                                              aria-label={`Connect to legacy server ${s.name}`}
-                                              className="w-full px-3 py-1.5 text-xs text-left text-retro-fg hover:bg-glass-w8 flex items-center gap-2 cursor-pointer disabled:opacity-50"
-                                            >
-                                              <ArrowLeft className="w-3.5 h-3.5 text-retro-muted" /> Connect (legacy)
-                                            </button>
-                                          )}
-                                          {s.endpoint_hint && (
-                                            <button
-                                              type="button"
-                                              onClick={() => {
-                                                playPress(820);
-                                                void shareServer(s.endpoint_hint || '', s.name);
-                                                setOpenMenuId(null);
-                                              }}
-                                              title="Copy node code"
-                                              aria-label={`Copy code for ${s.name}`}
-                                              className="w-full px-3 py-1.5 text-xs text-left text-retro-fg hover:bg-glass-w8 flex items-center gap-2 cursor-pointer"
-                                            >
-                                              <Share2 className="w-3.5 h-3.5 text-retro-muted" /> Copy Server Code
-                                            </button>
-                                          )}
-                                          {s.id !== 'central-node' && (
-                                            <button
-                                              type="button"
-                                              onClick={() => {
-                                                setDeleteTarget(s);
-                                                setDeleteError('');
-                                                setDeletePasscode('');
-                                                setOpenMenuId(null);
-                                              }}
-                                              className="w-full px-3 py-1.5 text-xs text-left text-rose-400 hover:bg-rose-500/10 flex items-center gap-2 cursor-pointer border-t border-border-subtle mt-0.5"
-                                            >
-                                              <Trash2 className="w-3.5 h-3.5 text-rose-400" /> Delete / Forget
-                                            </button>
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Expandable server info drawer */}
-                              {isExpanded && (
-                                <div
-                                  data-testid={`server-details-${s.id}`}
-                                  className="px-4 py-3 bg-surface-interactive/30 border-t border-border-subtle text-xs space-y-2.5 animate-orbit-fade-in"
-                                >
-                                  {s.description && (
-                                    <p className="text-retro-fg leading-relaxed whitespace-pre-wrap">{s.description}</p>
-                                  )}
-
-                                  {Array.isArray(s.tags) && s.tags.length > 0 && (
-                                    <div className="flex flex-wrap items-center gap-1">
-                                      <span className="text-[10px] text-retro-muted font-mono uppercase tracking-wider mr-1">Tags:</span>
-                                      {s.tags.map((tag) => (
-                                        <button
-                                          key={tag}
-                                          type="button"
-                                          onClick={() => {
-                                            setQuery(tag)
-                                            setFiltersCollapsed(false)
-                                          }}
-                                          className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-surface-interactive hover:bg-surface-elevated text-retro-fg border border-border-subtle cursor-pointer transition-colors"
-                                          title={`Filter by tag "${tag}"`}
-                                        >
-                                          #{tag}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  )}
-
-                                  <div className="flex flex-wrap items-center gap-4 text-[10px] text-retro-muted font-mono pt-1 border-t border-border-subtle/50">
-                                    <span>last seen: {formatRelativeTime(s.last_seen)}</span>
-                                    {typeof s.online_count === 'number' && <span>online: {s.online_count}</span>}
-                                    {typeof s.user_count === 'number' && <span>members: {s.user_count}</span>}
-                                    {s.password_required ? <span className="text-amber-300">password protected</span> : <span>public access</span>}
-                                    {code && (
-                                      <span className="flex items-center gap-1.5 ml-auto">
-                                        <span className="truncate max-w-[120px]">{code.slice(0, 20)}…</span>
-                                        <button
-                                          type="button"
-                                          title="Copy node code"
-                                          aria-label={`Copy code for ${s.name}`}
-                                          onClick={() => { playPress(820); void shareServer(s.endpoint_hint || '', s.name); }}
-                                          className="text-retro-fg hover:text-retro-accent cursor-pointer underline"
-                                        >
-                                          copy
-                                        </button>
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between text-[10px] text-retro-muted shrink-0 pt-1">
-                  <span className="flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5 text-retro-muted" /> Private: directory mirrors only metadata. Never private content.
-                  </span>
-                </div>
-
-              {/* Central master admin drawer */}
-              {showAdmin && <CentralAdminPanel central={central} identity={identity} toast={toast} />}
+            {/* Central master admin drawer */}
+            {showAdmin && <CentralAdminPanel central={central} identity={identity} toast={toast} />}
 
       {askPasswordFor !== null && (
         <PromptDialog
@@ -2270,35 +2241,20 @@ export function ServersView({
           saveLabels([...labels, createLabel(name, owner)])
           toast(`Group "${name}" saved on this device.`, 'success')
         }}
-        onJoinCode={(code) => { void joinByCode(code) }}
+        onJoinCode={(code) => joinByCode(code)}
+        hostForm={hostForm}
+        initialTab={addWorldTab}
       />
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-orbit-fade-in">
-          <div className="w-full max-w-md bg-surface-raised border border-border-glass rounded-xl p-5 shadow-lg space-y-4">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                  <Trash2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-retro-fg">Delete Server</h3>
-                  <p className="text-xs text-retro-muted font-mono truncate max-w-[240px]">{deleteTarget.name}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => { setDeleteTarget(null); setDeletePasscode(''); setDeleteError('') }}
-                className="text-retro-muted hover:text-retro-fg p-1 rounded-lg hover:bg-glass-w8 transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+        <Modal title="Delete server" onClose={closeDeleteDialog} maxWidth="max-w-md">
+          <div className="space-y-4">
+            <p className="text-xs text-retro-muted font-mono truncate">{deleteTarget.name}</p>
 
             <div className="text-xs text-retro-muted space-y-2">
               <p>
                 {mine(deleteTarget)
-                  ? 'You are the owner of this server. You can unregister it from the central directory or remove it from your local list.'
-                  : 'You do not own this server. You can enter the Central Admin Passcode to permanently delete it from the directory, or forget it from your local view.'}
+                  ? 'You own this server. Unregister it from the directory, or just forget it here.'
+                  : 'You do not own this server. Enter the Central Admin Passcode to delete it from the directory, or forget it here.'}
               </p>
 
               {!mine(deleteTarget) && (
@@ -2308,19 +2264,20 @@ export function ServersView({
                   </label>
                   <input
                     type="password"
+                    aria-label="Central admin passcode"
                     value={deletePasscode}
                     onChange={(e) => setDeletePasscode(e.target.value)}
                     placeholder="Enter central passcode (e.g. 1984)"
-                    className="w-full px-3 py-2 rounded-xl bg-surface-canvas border border-border-glass text-xs font-mono text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-retro-accent"
+                    className="glass-field w-full px-3 py-2 text-xs font-mono"
                   />
                   <p className="text-[10px] text-retro-muted">
-                    Required if deleting a server created by another identity or when unauthenticated.
+                    Required when deleting a server created by another identity, or while unauthenticated.
                   </p>
                 </div>
               )}
 
               {deleteError && (
-                <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 p-2 rounded-lg font-mono">
+                <p role="alert" className="text-xs text-retro-error bg-retro-error/10 border border-retro-error/20 p-2 rounded-lg font-mono">
                   {deleteError}
                 </p>
               )}
@@ -2330,7 +2287,7 @@ export function ServersView({
               <button
                 type="button"
                 onClick={() => forgetLocalServer(deleteTarget)}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-retro-muted hover:text-retro-fg hover:bg-glass-w8 border border-border-subtle transition-colors cursor-pointer"
+                className="glass-action px-3 py-1.5 rounded-lg text-xs font-semibold text-retro-muted cursor-pointer"
               >
                 Forget from local list
               </button>
@@ -2338,8 +2295,8 @@ export function ServersView({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => { setDeleteTarget(null); setDeletePasscode(''); setDeleteError('') }}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
+                  onClick={closeDeleteDialog}
+                  className="glass-action px-3 py-1.5 rounded-lg text-xs font-semibold text-retro-muted cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -2347,16 +2304,15 @@ export function ServersView({
                   type="button"
                   disabled={deleting}
                   onClick={() => void handleDeleteConfirm()}
-                  className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-rose-500 hover:bg-rose-600 text-white shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="glass-action glass-action-danger px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1.5"
                 >
-                  {deleting ? 'Deleting...' : (mine(deleteTarget) ? 'Unregister & Delete' : 'Permanently Delete')}
+                  {deleting ? 'Deleting…' : (mine(deleteTarget) ? 'Unregister & Delete' : 'Permanently Delete')}
                 </button>
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
-            </div>
           </section>
         )}
       </div>
