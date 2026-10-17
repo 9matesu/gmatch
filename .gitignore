@@ -30,6 +30,7 @@ apps/desktop/dist-build/
 apps/desktop/test-dist/
 .dev-storage.key
 apps/api/node.key
+apps/api/.dev-node.key
 node.key
 apps/desktop/dist-log.txt
 site/releases/*.exe
@@ -53,6 +54,7 @@ apps/desktop/.hermes/
 apps/api/probe-*.ts
 apps/api/watchparties.json
 release2/
+.tmp-*/
 
 # local storage signing key (never commit)
 storage.key
