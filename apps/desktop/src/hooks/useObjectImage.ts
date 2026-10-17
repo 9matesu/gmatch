@@ -235,12 +235,12 @@ async function resolveObject(cleanId: string, identity: IdentityLike): Promise<R
         // Ask the swarm by object id, then by content_hash alias — 5s timeout.
         // expectedHash verifies the reassembled bytes (untrusted peers).
         try {
-          blob = await requestSwarmObject(cleanId, 5000, hash ?? undefined)
+          blob = await requestSwarmObject(cleanId, 5000, { expectedHash: hash ?? undefined })
         } catch {
           if (!hash) blob = null
           else {
             try {
-              blob = await requestSwarmObject(hash, 5000, hash)
+              blob = await requestSwarmObject(hash, 5000, { expectedHash: hash })
             } catch {
               blob = null
             }

@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import {
   createParty, getParty, listParties, applyWatch, joinWatch, leaveWatch, leaveAll, applyChat,
   deleteChat, kickWatch, banWatch, muteWatch, transferHost, settingsWatch,
-  queueOps, setPartyMedia, __resetParties, partyRoom, IDLE_MS, MAX_QUEUE, isPartyMediaObject,
+  queueOps, setPartyMedia, __resetParties, partyRoom, MAX_QUEUE, isPartyMediaObject,
   serializeParties, restoreParties, liveMediaObjectIds, HOST_SEAT_GRACE_MS, type Party,
+  mintInvite, revokeInvite, redeemInvite, watchReady,
 } from './watchparty'
 import { handleIncoming, conns, createWsTicket, type WsConn } from './ws-bus'
 
@@ -321,8 +322,12 @@ describe('queue', () => {
     expect(p.queue[MAX_QUEUE - 1].name).toBe(`q${MAX_QUEUE + 4}`)
   })
 
-  it('room idle window covers an overnight run', () => {
-    expect(IDLE_MS).toBeGreaterThanOrEqual(4 * 60 * 60_000)
+  it('rooms are persistent by design: empty rooms are kept, not deleted', () => {
+    const p = makeParty()
+    leaveAll('u1')
+    expect(getParty(p.id)).not.toBeNull()
+    expect(p.members.size).toBe(0)
+    expect(p.emptySince).toBeGreaterThan(0)
   })
 
   it("'next' keeps the room playing when the previous frame was playing", () => {
@@ -563,5 +568,232 @@ describe('queue prev + playlist budget (autoplay wave)', () => {
     expect(p.members.size).toBe(0)
     expect(p.emptySince).toBeGreaterThan(0)
     expect(getParty(p.id)).toBeDefined()
+  })
+})
+
+describe('authoritative revisions and idempotent commands', () => {
+  it('stamps monotonic frame and queue revisions', () => {
+    const p = makeParty('u1')
+    const first = applyWatch('u1', { party: p.id, action: 'play', position: 1 })!
+    // The 200ms transport throttle would drop an immediate second frame in the
+    // same tick; age it out so this tests revisions, not throttling.
+    p.lastControl.set('u1', Date.now() - 1000)
+    const second = applyWatch('u1', { party: p.id, action: 'pause', position: 2 })!
+    expect(second.payload.frame.rev).toBeGreaterThan(first.payload.frame.rev)
+    const q1 = queueOps('u1', { party: p.id, op: 'add', name: 'a', url: '/api/objects/a' })!
+    const q2 = queueOps('u1', { party: p.id, op: 'add', name: 'b', url: '/api/objects/b' })!
+    expect(q2.payload.queueRev).toBeGreaterThan(q1.payload.queueRev)
+  })
+
+  it('replays a duplicate transport cmdId without moving the authoritative frame', () => {
+    const p = makeParty('u1')
+    const first = applyWatch('u1', { party: p.id, action: 'play', position: 3, cmdId: 'cmd-1' })!
+    const before = p.frame
+    const replay = applyWatch('u1', { party: p.id, action: 'play', position: 99, cmdId: 'cmd-1' })!
+    expect(replay.payload.frame.position).toBe(3)
+    expect(p.frame).toBe(before)
+  })
+
+  it('replays a duplicate queue add without duplicating the entry', () => {
+    const p = makeParty('u1')
+    queueOps('u1', { party: p.id, op: 'add', name: 'a', url: '/api/objects/a', cmdId: 'queue-1' })
+    queueOps('u1', { party: p.id, op: 'add', name: 'a', url: '/api/objects/a', cmdId: 'queue-1' })
+    expect(p.queue.filter((q) => q.url === '/api/objects/a')).toHaveLength(1)
+  })
+
+  it('persists revisions across serialize/restore', () => {
+    const p = makeParty('u1')
+    applyWatch('u1', { party: p.id, action: 'play', position: 4 })
+    queueOps('u1', { party: p.id, op: 'add', name: 'a', url: '/api/objects/a' })
+    const dump = serializeParties()
+    __resetParties()
+    expect(restoreParties(dump)).toBe(1)
+    const q = getParty(p.id)!
+    expect(q.frame.rev).toBe(p.frameRev)
+    expect(q.queueRev).toBe(p.queueRev)
+  })
+})
+
+describe('private-room invites', () => {
+  it('blocks private snapshots/joins without a current invite, then allows redeem', () => {
+    const p = makeParty('u1')
+    p.isPrivate = true
+    expect(joinWatch('u2', 'Bob', { party: p.id })).toBeNull()
+    const token = mintInvite('u1', p.id)!
+    expect(typeof token).toBe('string')
+    expect(joinWatch('u2', 'Bob', { party: p.id, invite: 'wrong' })).toBeNull()
+    const res = joinWatch('u2', 'Bob', { party: p.id, invite: token })!
+    expect(res.snapshot.party).toBe(p.id)
+    expect(p.members.has('u2')).toBe(true)
+  })
+
+  it('revokes invites and keeps bans effective', () => {
+    const p = makeParty('u1')
+    p.isPrivate = true
+    const token = mintInvite('u1', p.id)!
+    expect(revokeInvite('u2', p.id)).toBe(false)
+    expect(revokeInvite('u1', p.id)).toBe(true)
+    expect(joinWatch('u2', 'Bob', { party: p.id, invite: token })).toBeNull()
+  })
+
+  it('redeems a valid invite over HTTP without exposing room state', () => {
+    const p = makeParty('u1')
+    p.isPrivate = true
+    const token = mintInvite('u1', p.id)!
+    expect(redeemInvite('u2', p.id, 'wrong')).toBe(false)
+    expect(redeemInvite('u2', p.id, token)).toBe(true)
+    expect(p.members.has('u2')).toBe(true)
+  })
+
+  it('keeps banned users out even with a valid invite', () => {
+    const p = makeParty('u1')
+    joinWatch('u2', 'Bob', { party: p.id })
+    banWatch('u1', { party: p.id, target: 'u2' })
+    p.isPrivate = true
+    const token = mintInvite('u1', p.id)!
+    expect(redeemInvite('u2', p.id, token)).toBe(false)
+    expect(joinWatch('u2', 'Bob', { party: p.id, invite: token })).toBeNull()
+  })
+})
+
+describe('local-file readiness', () => {
+  const HASH = 'a'.repeat(64)
+
+  it('records verified members per queue entry and reports it in the payload', () => {
+    const p = makeParty('u1')
+    joinWatch('u2', 'Bob', { party: p.id })
+    queueOps('u1', { party: p.id, op: 'add', name: 'local clip', url: '/api/objects/o1', hash: HASH, size: 1234, local: true })
+    const entry = p.queue[0]
+    expect(entry.hash).toBe(HASH)
+    expect(entry.local).toBe(true)
+
+    const first = watchReady('u1', { party: p.id, id: entry.id, hash: HASH })!
+    expect(first.payload.ready[entry.id]).toEqual(['u1'])
+    const second = watchReady('u2', { party: p.id, id: entry.id, hash: HASH })!
+    expect(second.payload.ready[entry.id].sort()).toEqual(['u1', 'u2'])
+  })
+
+  it('refuses readiness from non-members, unknown entries, and mismatched hashes', () => {
+    const p = makeParty('u1')
+    queueOps('u1', { party: p.id, op: 'add', name: 'local clip', url: '/api/objects/o1', hash: HASH, local: true })
+    const entry = p.queue[0]
+    expect(watchReady('stranger', { party: p.id, id: entry.id, hash: HASH })).toBeNull()
+    expect(watchReady('u1', { party: p.id, id: 'zzzzzzzz', hash: HASH })).toBeNull()
+    expect(watchReady('u1', { party: p.id, id: entry.id, hash: 'b'.repeat(64) })).toBeNull()
+    expect(p.ready.size).toBe(0)
+  })
+
+  it('repeating a ready signal is idempotent', () => {
+    const p = makeParty('u1')
+    queueOps('u1', { party: p.id, op: 'add', name: 'plain', url: '/api/objects/o2' })
+    const entry = p.queue[0]
+    watchReady('u1', { party: p.id, id: entry.id })
+    const res = watchReady('u1', { party: p.id, id: entry.id })!
+    expect(res.payload.ready[entry.id]).toEqual(['u1'])
+  })
+
+  it('persists entry metadata but never readiness across restarts', () => {
+    const p = makeParty('u1')
+    queueOps('u1', { party: p.id, op: 'add', name: 'local clip', url: '/api/objects/o1', hash: HASH, size: 99, local: true })
+    watchReady('u1', { party: p.id, id: p.queue[0].id, hash: HASH })
+    const dump = serializeParties()
+    __resetParties()
+    expect(restoreParties(dump)).toBe(1)
+    const q = getParty(p.id)!
+    expect(q.queue[0].hash).toBe(HASH)
+    expect(q.queue[0].local).toBe(true)
+    expect(q.ready.size).toBe(0)
+  })
+
+  it('drops corrupt queue entries on restore instead of adopting them', () => {
+    const p = makeParty('u1')
+    queueOps('u1', { party: p.id, op: 'add', name: 'good', url: '/api/objects/o1' })
+    const rows = JSON.parse(serializeParties())
+    rows[0].queue.push({ id: '', url: '' }, null, { id: 'x1', url: '/api/objects/x' })
+    __resetParties()
+    expect(restoreParties(JSON.stringify(rows))).toBe(1)
+    const q = getParty(p.id)!
+    expect(q.queue.map((e) => e.id).sort()).toEqual([p.queue[0].id, 'x1'].sort())
+  })
+})
+
+describe('shared control, proposals, and queue permissions', () => {
+  it('transport and queue mutation are host-only by default', () => {
+    const p = makeParty('u1')
+    joinWatch('u2', 'Bob', { party: p.id })
+    queueOps('u1', { party: p.id, op: 'add', name: 'a', url: '/api/objects/a' })
+    expect(applyWatch('u2', { party: p.id, action: 'play', position: 0 })).toBeNull()
+    expect(queueOps('u2', { party: p.id, op: 'play', id: p.queue[0].id })).toBeNull()
+    expect(queueOps('u2', { party: p.id, op: 'next' })).toBeNull()
+    expect(queueOps('u2', { party: p.id, op: 'remove', id: p.queue[0].id })).toBeNull()
+    expect(queueOps('u2', { party: p.id, op: 'move', id: p.queue[0].id })).toBeNull()
+    expect(p.queue).toHaveLength(1)
+  })
+
+  it('sharedControl opens transport and queue mutation to members', () => {
+    const p = makeParty('u1')
+    joinWatch('u2', 'Bob', { party: p.id })
+    queueOps('u1', { party: p.id, op: 'add', name: 'a', url: '/api/objects/a' })
+    settingsWatch('u1', { party: p.id, sharedControl: true })
+    expect(applyWatch('u2', { party: p.id, action: 'play', position: 0 })).not.toBeNull()
+    expect(queueOps('u2', { party: p.id, op: 'next' })).not.toBeNull()
+    expect(queueOps('u2', { party: p.id, op: 'remove', id: p.queue[0].id })).not.toBeNull()
+    expect(p.queue).toHaveLength(0)
+  })
+
+  it('requireApproval turns non-host adds into proposals; host approves', () => {
+    const p = makeParty('u1')
+    joinWatch('u2', 'Bob', { party: p.id })
+    settingsWatch('u1', { party: p.id, requireApproval: true })
+    const res = queueOps('u2', { party: p.id, op: 'add', name: 'suggestion', url: '/api/objects/s' })!
+    expect(p.queue[0].status).toBe('proposed')
+    expect(res.payload.queue[0].status).toBe('proposed')
+    // A proposal never auto-plays: non-host play is refused.
+    expect(queueOps('u2', { party: p.id, op: 'play', id: p.queue[0].id })).toBeNull()
+    expect(p.frame.url).not.toBe('/api/objects/s')
+    // Non-hosts cannot approve; the host can, or plays it directly.
+    expect(queueOps('u2', { party: p.id, op: 'approve', id: p.queue[0].id })).toBeNull()
+    queueOps('u1', { party: p.id, op: 'approve', id: p.queue[0].id })
+    expect(p.queue[0].status).toBeUndefined()
+  })
+
+  it('host adds skip approval even when required', () => {
+    const p = makeParty('u1')
+    settingsWatch('u1', { party: p.id, requireApproval: true })
+    queueOps('u1', { party: p.id, op: 'add', name: 'host pick', url: '/api/objects/h' })
+    expect(p.queue[0].status).toBeUndefined()
+  })
+
+  it('duplicate adds collapse onto the existing entry', () => {
+    const p = makeParty('u1')
+    queueOps('u1', { party: p.id, op: 'add', name: 'a', url: '/api/objects/a' })
+    const res = queueOps('u1', { party: p.id, op: 'add', name: 'a again', url: '/api/objects/a#t=10' })!
+    expect(p.queue).toHaveLength(1)
+    expect(res.payload.queue).toHaveLength(1)
+  })
+
+  it('flagged entries are skipped by next/prev and cannot play', () => {
+    const p = makeParty('u1')
+    queueOps('u1', { party: p.id, op: 'add', name: 'a', url: '/api/objects/a' })
+    queueOps('u1', { party: p.id, op: 'add', name: 'b', url: '/api/objects/b' })
+    queueOps('u1', { party: p.id, op: 'add', name: 'c', url: '/api/objects/c' })
+    queueOps('u1', { party: p.id, op: 'play', id: p.queue[0].id })
+    queueOps('u1', { party: p.id, op: 'flag', id: p.queue[1].id })
+    queueOps('u1', { party: p.id, op: 'next' })
+    expect(p.current).toBe(p.queue[2].id)
+    expect(queueOps('u1', { party: p.id, op: 'play', id: p.queue[1].id })!.payload.frame.url).not.toBe('/api/objects/b')
+    queueOps('u1', { party: p.id, op: 'unflag', id: p.queue[1].id })
+    expect(p.queue[1].status).toBeUndefined()
+  })
+
+  it('settings persist sharedControl and requireApproval', () => {
+    const p = makeParty('u1')
+    settingsWatch('u1', { party: p.id, sharedControl: true, requireApproval: true })
+    const dump = serializeParties()
+    __resetParties()
+    expect(restoreParties(dump)).toBe(1)
+    const q = getParty(p.id)!
+    expect(q.sharedControl).toBe(true)
+    expect(q.requireApproval).toBe(true)
   })
 })

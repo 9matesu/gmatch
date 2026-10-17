@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path'
 import {
   ALL_SOURCES,
   DIRECT_SOURCES,
+  capabilitiesFor,
   devFetchable,
   pxAllowHosts,
   pxAllowPattern,
@@ -13,6 +14,7 @@ import {
   sourceByHealthId,
   sourceByKind,
   sourceById,
+  sourcesForTags,
 } from './booruSources'
 // Raw registry, including `enabled: false` rows that ALL_SOURCES filters out.
 import registry from '../../../../shared/sources.json'
@@ -30,6 +32,10 @@ const require = createRequire(import.meta.url)
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..')
 const MAIN_CJS = join(REPO_ROOT, 'apps', 'desktop', 'electron', 'main.cjs')
 const REGISTRY_CJS = join(REPO_ROOT, 'apps', 'desktop', 'electron', 'booru-registry.cjs')
+
+/** Shared sources.json read the way main.cjs reads it. */
+const loadRegistryCaps = (): { sources: Array<{ id: string; caps?: unknown }> } =>
+  require(REGISTRY_CJS).loadRegistry({ isPackaged: false })
 
 describe('booru source registry', () => {
   it('every source has the fields both runtimes need', () => {
@@ -236,6 +242,67 @@ describe('px allowlist (no open proxy)', () => {
     expect(re.test('media.babesource.com')).toBe(true)
     expect(re.test('evil.com')).toBe(false)
     expect(re.test('tbib.org.evil.com')).toBe(false)
+  })
+})
+
+describe('audited provider capabilities', () => {
+  it('every source declares caps (absent fields mean UNKNOWN, not false)', () => {
+    for (const s of ALL_SOURCES) {
+      expect(s.caps, `${s.id} must carry a caps block`).toBeTruthy()
+    }
+  })
+
+  it('booru.org is declared tagless + post-filtered, as its builder proves', () => {
+    // booru-sources-core.cjs accepts `variant` and never puts it in the URL.
+    for (const s of ALL_SOURCES.filter((x) => x.kind === 'booruorg')) {
+      expect(capabilitiesFor(s.id).tags, `${s.id}`).toBe('none')
+      expect(capabilitiesFor(s.id).postFilter, `${s.id}`).toBe(true)
+    }
+  })
+
+  it('paheal is declared single-tag, as main.cjs proves', () => {
+    // main.cjs: `const tag = variant.split(/\s+/)[0]`
+    expect(capabilitiesFor('paheal').tags).toBe('single')
+    expect(capabilitiesFor('paheal').maxTags).toBe(1)
+  })
+
+  it('excludes tagless sources whenever a tag is required', () => {
+    const one = sourcesForTags(1).map((s) => s.id)
+    expect(one).not.toContain('hgoon')
+    expect(one).not.toContain('allgirl')
+    expect(one).toContain('tbib')
+  })
+
+  it('excludes single-tag sources from a multi-tag query but keeps them for one tag', () => {
+    expect(sourcesForTags(1).map((s) => s.id)).toContain('paheal')
+    expect(sourcesForTags(2).map((s) => s.id)).not.toContain('paheal')
+    expect(sourcesForTags(2).map((s) => s.id)).toContain('tbib')
+  })
+
+  it('keeps unknown-capability sources eligible (cannot exclude what is unmeasured)', () => {
+    const unknown = ALL_SOURCES.filter((s) => s.caps?.tags === undefined).map((s) => s.id)
+    expect(unknown.length).toBeGreaterThan(0)
+    for (const id of unknown) {
+      expect(sourcesForTags(2).map((s) => s.id), `${id} must stay eligible`).toContain(id)
+    }
+  })
+
+  it('capabilitiesFor accepts a canonical id or a healthId', () => {
+    expect(capabilitiesFor('tbib').pagination).toBe('random-pid')
+    expect(capabilitiesFor('tbib-direct').pagination).toBe('random-pid')
+    expect(capabilitiesFor('no-such-source')).toEqual({})
+  })
+
+  it('an untagged query may use any source, tagless ones included', () => {
+    expect(sourcesForTags(0).length).toBe(ALL_SOURCES.length)
+  })
+
+  it('the main-process registry carries the same caps', () => {
+    const reg = loadRegistryCaps()
+    const byId = new Map(reg.sources.map((s) => [s.id, s.caps]))
+    for (const s of ALL_SOURCES) {
+      expect(byId.get(s.id), `${s.id} caps in main registry`).toEqual(s.caps)
+    }
   })
 })
 

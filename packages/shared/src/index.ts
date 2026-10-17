@@ -436,6 +436,7 @@ export * from './lobby';
 export * from './card-valuation';
 export * from './booru';
 export * from './gossip';
+export * from './watchSource';
 
 /** PC Domination action log entry */
 export interface DominationAction {

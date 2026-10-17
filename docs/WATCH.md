@@ -42,15 +42,19 @@ and playback stays frame-accurate within the drift deadband.
    the room. The creator is HOST and auto-joins. Rooms live in memory but
    are flushed to `WATCH_PARTIES_PATH` (default: beside the DB snapshot on
    /data) every 30 s and on SIGTERM, and restored at boot: a deploy no
-   longer kills live rooms. A room still dies on 4 h idle; clients then get
-   one `watch.gone` frame ("has closed"), never a 404 loop. Socket close
-   removes a member only after an 8 s grace, so a reconnect blip keeps the
+   longer kills live rooms. Rooms are persistent by design; emptied rooms are
+   kept so peers can re-enter. There is no idle-room sweeper. Clients get one
+   `watch.gone` frame only when a room is disbanded, evicted, or truly missing.
+   Socket close removes a member only after an 8 s grace, so a reconnect blip keeps the
    seat (and a last-member blip keeps the room). While a room is live, the
    flush tick re-extends `expires_at` (+1 d) for every object it serves
    (current + queue): overnight rooms never hand clients a purged media
    ("No preview"); dead rooms stop refreshing and expire as promised.
-2. Others join from the room list, the invite link `#/watch?room=<id>`, or
-   the 8-hex code. `watch.join` subscribes the socket to room `watch:<id>`
+2. Others join from the room list, the invite link `#/watch?room=<id>` for public
+   rooms, or `#/watch?room=<id>&invite=<token>` for private rooms. Private rooms
+   are hidden from listings and require membership or a current host-minted
+   invite token; an ID alone discloses nothing. Invite tokens are session-scoped,
+   revocable, never persisted, and never logged. `watch.join` subscribes the socket to room `watch:<id>`
    and the room receives a roster + "X joined" system line; the joiner
    receives ONE snapshot roster frame carrying `{host, members, frame, chat,
    queue, current}` (position + backlog recovery for free). Chat persists
@@ -59,8 +63,10 @@ and playback stays frame-accurate within the drift deadband.
    so an open room keeps playing in the background - the dock beside the
    feed is a switcher, never a second player.
 3. Leave: explicit `watch.leave`, or the last socket of a user closing
-   (`watchDisconnect` promotes the host to the oldest remaining member).
-   Empty room = deleted.
+   (`watchDisconnect` promotes the host to the oldest remaining member after
+   the host-seat grace window).
+   Empty room = kept, with `emptySince` set. Only disband, eviction, restore
+   failure, or explicit deletion removes a room.
 4. Kicked/banned targets get a direct `watch.kicked`, lose room membership,
    and (ban) cannot rejoin for the room's lifetime.
 
@@ -68,16 +74,32 @@ and playback stays frame-accurate within the drift deadband.
 
 | Frame | Payload | Server rule |
 |---|---|---|
-| `watch` | `{party, action: play\|pause, position}` | members only; position finite >=0; rate locked 1; re-stamped `updatedAt` = server clock + `by` = member name; relayed as `watch.sync` |
-| `watch.join` | `{party, name}` | member (not banned; limitless entry); replies with `watch.roster` (snapshot) to joiner + relays `watch.system` + roster to room |
+| `watch` | `{party, action: play\|pause, position, cmdId?}` | members only; host controls unless shared control is enabled; position finite >=0; rate locked 1; re-stamped `updatedAt` = server clock + `by` = member name; `frameRev` increments; repeated `cmdId` returns the authoritative frame without moving it; relayed as `watch.sync` |
+| `watch.join` | `{party, name, invite?}` | member (not banned; limitless entry); private rooms require membership or a current invite token; replies with `watch.roster` (snapshot) to joiner + relays `watch.system` + roster to room |
 | `watch.leave` | `{party}` | member; relays `watch.system` + `watch.roster` |
 | `watch.chat` | `{party, text}` | member, not muted; 80 chars; 1 msg/2s per user; stored + relayed as `watch.chat` with `msgId` |
 | `watch.chat.del` | `{party, msgId}` | author or host; relays `watch.chat_del` |
 | `watch.kick` / `watch.ban` | `{party, target}` | host only, target != host; relay system + roster; direct `watch.kicked` |
 | `watch.mute` | `{party, target, on}` | host only; relays `watch.settings.muted` |
 | `watch.host` | `{party, target}` | host only, target is member; relays `watch.roster` |
-| `watch.settings` | `{party, name?, isPrivate?, lockVideo?}` | host only; clamped; relays `watch.settings` |
-| `watch.queue` | `{party, op: add\|remove\|play\|next, id?, url?, name?, relay?}` | member; `add`/`play` need `lockVideo` off unless host; relays `watch.queue` `{queue, current, frame}` |
+| `watch.settings` | `{party, name?, isPrivate?, lockVideo?, sharedControl?, requireApproval?, cmdId?}` | host only; clamped; repeated `cmdId` returns current settings; relays `watch.settings` with `settingsRev` |
+| `watch.queue` | `{party, op: add\|remove\|move\|play\|next\|prev\|approve\|flag\|unflag, id?, url?, name?, relay?, hash?, size?, local?, before?, cmdId?}` | member; `add` needs `lockVideo` off unless host; remove/move/play/next/prev/flag need transport rights (host, or members with sharedControl); approve is host-only; repeated `cmdId` returns the current queue without duplicating work; relays `watch.queue` `{queue, current, frame, queueRev, ready}` |
+| `watch.ready` | `{party, id, hash?}` | member; entry must exist (and the hash must match when the entry carries one); records readiness, relays `watch.queue` |
+
+## Permissions and proposals
+
+- Default: the host controls transport and queue mutation. Members add videos
+  (or propose them) and chat.
+- `lockVideo`: only the host loads or queues videos at all.
+- `sharedControl` (host setting): members share play/pause/seek/next/prev and
+  remove/move/flag. Transport frames from non-holders are refused server-side.
+- `requireApproval` (host setting): non-host adds land as `proposed` and never
+  auto-play; the host approves explicitly, or plays the proposal directly
+  (implicit approval). Non-hosts cannot approve.
+- Queue adds dedupe by verified hash, relay upstream, or normalized URL: the
+  same file queued twice is one entry.
+- Entries flagged `unavailable` are skipped by next/prev and cannot play until
+  unflagged by a controller.
 | `watch.ping` | `{t0}` | anyone authed; direct `watch.pong {t0, t1}` (never broadcast) |
 | room -> all | `watch.sync`, `watch.roster`, `watch.system`, `watch.chat`, `watch.chat_del`, `watch.settings`, `watch.queue` | |
 
@@ -130,6 +152,36 @@ signature gets ONE new resolver function in the chain, plus a fixture in
   listeners reload the element (max once per 5 s) and the sync tick re-joins
   the party position. Players use `preload="auto"`; the relay answers with
   `private, max-age=60` so seek-back reads hit the browser cache.
+
+## Local files (consent-shared)
+
+A host path is never a remote source. The flow is explicit:
+
+1. The host picks or drops a video file in the room modal.
+2. The client classifies it (MIME, then extension), then reads SHA-256,
+   size, and duration locally. Images and unknown types are refused with a
+   reason; nothing leaves the machine yet.
+3. The host presses Share with an explicit consent checkbox.
+4. Metadata registers via `/api/objects/register` (private, recipients =
+   current members) and bytes seed the P2P swarm. The server never stores
+   the bytes for this path.
+5. The queue gains a `local` entry (`url: /api/objects/<id>`, `hash`,
+   `size`). Creating a room from a file uses `POST /api/watchparty`
+   `{localEntry}`; the server verifies the object row, its video MIME, the
+   hash, and owner/recipient access before seeding the room.
+6. Each participant fetches explicitly (Receive): 64KB swarm chunks with
+   progress + cancel, SHA-256 verified before the bytes count as available.
+   Partial or tampered transfers are dropped, never registered.
+7. Verified clients signal `watch.ready {party, id, hash}`; the server
+   records per-entry readiness (session-scoped, never persisted) and
+   broadcasts it in `watch.queue` payloads and snapshots. Shared playback is
+   declared available from the readiness counts, not from a bare resolve.
+
+Limits, stated honestly: recipients are the members at share time (late
+joiners need a re-share); large transfers ride the same 64KB-chunk swarm as
+everything else, so movies take a while and the 120s receive window plus
+cancel exist for exactly that; swarm chunks carry no per-chunk digest, so
+integrity is whole-file SHA-256 on completion.
 
 ## Trust boundaries
 

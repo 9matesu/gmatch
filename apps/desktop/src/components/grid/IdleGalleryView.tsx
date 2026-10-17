@@ -108,10 +108,16 @@ function toLocalSlideshowItems(
  * 1. Pinned local vault SSD URL if ready (vault://)
  * 2. Pre-computed preview thumbnail if available
  * 3. Inferred thumbnail for known hosts (booru.org, realbooru) to avoid multi-MB full PNG/JPEG stalls
- * 4. Full image URL fallback
+ * 4. Full image URL fallback — legacy records (no localStatus) and explicitly
+ *    failed saves only; a keep verified `local` never falls back here, because
+ *    its bytes are supposed to be on disk and a hotlink would hide a broken or
+ *    evicted local entry.
  */
 export function resolveGalleryTileUrl(img: GalleryImage, vaultUrl?: string): string {
   if (vaultUrl) return vaultUrl
+  // A keep verified local with no resolvable bytes shows nothing instead of
+  // hotlinking the provider: an empty tile is honest, a remote one is not.
+  if (img.localStatus === 'local') return ''
   if (img.preview) return img.preview
   const u = String(img.url || '')
   if (u.includes('img.booru.org')) {

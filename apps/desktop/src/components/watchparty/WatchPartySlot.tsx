@@ -8,6 +8,7 @@ import { Play, Plus } from 'lucide-react'
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer'
 import { useObjectImage } from '../../hooks/useObjectImage'
 import { controlPlayback, serverNow, queueOp, type PartyRuntime } from '../../hooks/watchPartyStore'
+import { isVerified, signalLocalReady } from '../../hooks/watchLocalShare'
 import { computeTargetPosition, driftCorrection, shouldFireQueueNext } from '../../utils/watchSync'
 
 export function WatchPartySlot({
@@ -27,6 +28,9 @@ export function WatchPartySlot({
 }) {
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const endedRef = useRef<string>('')
+  // Entries this slot already claimed readiness for: one signal per entry,
+  // only after local bytes verified (never on a bare successful resolve).
+  const readySentRef = useRef<Set<string>>(new Set())
   // Set when the slot's END handling pauses the element (sync tick) or the
   // video ends natively. The resulting 'pause' must NOT echo to the room:
   // arriving after the host's 'next' frame it would pause the room at the
@@ -63,6 +67,15 @@ export function WatchPartySlot({
     // remembered per-room volume to the NEW <video>, not the discarded one.
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('watch-video-element', { detail: { src } }))
+    }
+    // Local-file readiness: claim it only when THIS client verified the bytes
+    // (own share or hash-checked transfer). Resolving alone is not proof.
+    if (src && party && currentItem?.hash) {
+      const objectId = (/\/api\/objects\/([0-9a-fA-F-]{36})/.exec(currentItem.url || '') || [])[1]
+      if (!readySentRef.current.has(currentItem.id) && isVerified(objectId, currentItem.hash)) {
+        readySentRef.current.add(currentItem.id)
+        signalLocalReady(party.id, currentItem.id, currentItem.hash)
+      }
     }
   }, [src])
 

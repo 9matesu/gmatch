@@ -1,19 +1,38 @@
 /**
  * Pure cache policy helpers (SPEC §6 caching).
- * Shared naming/eviction rules used by the renderer session cache
- * (src/services/imageCache.ts) and the Electron memory cache
- * (electron/imageCacheMemory.cjs — cacheFileName is mirrored there; keep in sync).
- * NOTE (F1 fix): both backends are RAM-only — nothing persists to disk.
+ *
+ * These are the SHARED naming/eviction rules, not the live budgets. Audited
+ * 2026-10 against the running implementation, because the numbers here had
+ * drifted from every backend:
+ *
+ *  - MEDIA BYTES live on ENCRYPTED DISK in Electron main
+ *    (electron/diskImageCache.cjs: AES-256-GCM, 500 MB LRU, served over
+ *    gmcache:// with Range support). This is NOT RAM-only, and the previous
+ *    "nothing persists to disk" note was wrong.
+ *  - The renderer session Map is DISABLED (imageCache.ts SESSION_CAP = 0); a
+ *    picture reaches the renderer through the main-process disk cache.
+ *  - Feed-result memoization lives in Electron main (imageCache.cjs):
+ *    FEED_TTL_MS 10 min, FEED_MAX_QUERIES 40 — mirrored below.
+ *
+ * The constants here are what the renderer and the tests reason about. When a
+ * backend budget changes, change it in the backend and update these together;
+ * do not "fix" the doc and leave the two disagreeing again.
  */
 
-/** RAM cache budgets: 400 files / 400 MB, LRU-evicted. */
-export const IMAGE_CACHE_MAX_FILES = 400
-export const IMAGE_CACHE_MAX_BYTES = 400 * 1024 * 1024
-/** Single-file guard — a "picture" bigger than this is never cached. */
-export const IMAGE_MAX_BYTES = 25 * 1024 * 1024
-/** API-response cache: same tag query reuses parsed posts for 10 minutes. */
+/** Feed memo TTL. Mirrors FEED_TTL_MS in electron/imageCache.cjs. */
 export const FEED_CACHE_TTL_MS = 10 * 60 * 1000
-export const FEED_CACHE_MAX_QUERIES = 100
+/** Feed memo slot count. Mirrors FEED_MAX_QUERIES in electron/imageCache.cjs
+ *  (was documented as 100 here; the implementation has always been 40). */
+export const FEED_CACHE_MAX_QUERIES = 40
+
+/** Single-file guard — a "picture" bigger than this is never cached.
+ *  Mirrors the per-file cap in electron/imageCache.cjs. */
+export const IMAGE_MAX_BYTES = 25 * 1024 * 1024
+
+/** Total media budget. Mirrors MAX_DEFAULT in electron/diskImageCache.cjs.
+ *  There is no live per-FILE count: the disk cache is byte-bounded only. */
+export const IMAGE_CACHE_MAX_BYTES = 500 * 1024 * 1024
+export const IMAGE_CACHE_MAX_FILES = 0 // 0 = no file-count cap; bytes govern
 
 const EXT_RE = /\.(jpe?g|png|gif|webp|mp4|webm)(?:[?#]|$)/i
 

@@ -4,6 +4,8 @@
 import type { BooruPost } from '../game/types'
 import { isQueryBlocked, isUserExcluded } from '../game/tagFilter'
 import { blockedPair, getCoRules, isFeedIntent } from '../game/tagCooccur'
+import { matchesQuery as matchMatchesQuery, parseQuery } from '../game/matchRule'
+import { endRound, markStage, startRound } from './queryTiming'
 import { allowOnly } from './postFilter'
 import {
   REDGIFS_API,
@@ -443,37 +445,20 @@ function feedTagsSafe(tags: string[]): Set<string> {
   return new Set(tags.filter(isFeedIntent))
 }
 
+/**
+ * Result validation for a query. Delegates to the shared rule (strict AND on
+ * normalized tag equality — see src/game/matchRule.ts and its authoritative
+ * CJS twin). This used to be a local `some()` + `includes()` + underscore
+ * split, which let a 2-tag query return posts matching ONE tag and matched
+ * `large_breasts` against a post tagged `large`.
+ *
+ * `trustUntagged` keeps the existing policy for providers that return no tags
+ * at all (redgifs / imhentai / babesource / paheal): nothing to validate
+ * against, so their own search stands. Tagged providers are always validated.
+ */
 export function matchesQuery(post: BooruPost, query?: string): boolean {
-  // Untagged posts come from tag-targeted searches (redgifs/imhentai/paheal):
-  // nothing to check against, trust the search.
-  if (!query || post.tags.length === 0) return true
-  // Caption hunts: covers/doujins often don't have booru tags — pass through
-  if (/caption/i.test(query)) return true
-  const rawTokens = query
-    .trim()
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-  if (rawTokens.length === 0) return true
-  const tokens = new Set<string>()
-  for (const t of rawTokens) {
-    tokens.add(t)
-    tokens.add(t.replace(/[\s-]+/g, '_'))
-    for (const sub of t.split('_')) {
-      if (sub.length > 2) tokens.add(sub)
-    }
-  }
-  const tags = post.tags.map((t) => t.toLowerCase().replace(/[\s-]+/g, '_'))
-  return Array.from(tokens).some((tok) =>
-    tags.some(
-      (t) =>
-        t === tok ||
-        t.includes(tok) ||
-        // Reversed clause (query ⊃ tag) needs a meaningful tag: without a
-        // floor, a 3-letter tag like `sky` passes as `skylar_vox`.
-        (t.length >= 4 && tok.includes(t)),
-    ),
-  )
+  if (!query) return true
+  return matchMatchesQuery(post.tags, query, { trustUntagged: true })
 }
 
 /**
@@ -500,13 +485,25 @@ export { ALL_SOURCES, refererFor, DIRECT_SOURCES, type DirectSourceDef } from '.
 /**
  * Combo queries (4-5 tags) get truncated by the mirrors — full query first,
  * then top-2 tags, then the single leading tag. Mirrors electron/main.cjs.
+ *
+ * These are OVER-FETCH requests, never answers: `sanitize()` below gates every
+ * returned post on the FULL query, so a wider variant can surface extra
+ * candidates but can never widen the result set. Keep it that way in the main
+ * process twin too.
  */
 export function queryVariants(query: string): string[] {
+  // Narrowing keeps every POSITIVE tag and every NEGATIVE term. Negatives
+  // are safety, not preference: they carry the blocklist and slop exclusions,
+  // so a narrower variant that quietly dropped `-solo` (or a whole run of
+  // `-furry -ai_generated`) would re-admit exactly what the query excluded.
   const parts = query.split(/\s+/).filter(Boolean)
-  const variants = [query]
-  if (parts.length > 2) variants.push(parts.slice(0, 2).join(' '))
-  if (parts.length > 1) variants.push(parts[0])
-  return [...new Set(variants)]
+  const neg = parts.filter((p) => p.startsWith('-'))
+  const pos = parts.filter((p) => !p.startsWith('-'))
+  const tail = neg.length ? ` ${neg.join(' ')}` : ''
+  const variants = [`${pos.join(' ')}${tail}`.trim()]
+  if (pos.length > 2) variants.push(`${pos.slice(0, 2).join(' ')}${tail}`)
+  if (pos.length > 1) variants.push(`${pos[0]}${tail}`)
+  return [...new Set(variants.filter(Boolean))]
 }
 
 /**
@@ -1425,9 +1422,12 @@ async function redgifsNicheForQuery(
   return null
 }
 
-/** Tag niche-sourced posts with the matched query tokens (niche items ship untagged). */
+/** Tag niche-sourced posts with the query they actually answered.
+ *  Normalized query tokens verbatim — NOT redgifsQueryTags, which splits into
+ *  niche-name words: stamping `skylar` on a result the query asked for as
+ *  `skylar_vox` made strict AND validation discard the provider's own hits. */
 function withRedgifsQueryTags(posts: BooruPost[], query: string): BooruPost[] {
-  const tags = redgifsQueryTags(query)
+  const tags = [...new Set(parseQuery(query).required)]
   if (tags.length === 0) return posts
   return posts.map((p) => ({
     ...p,
@@ -1629,6 +1629,22 @@ function parsePaheal(xml: string): BooruPost[] {
 export async function fetchPosts(req: BooruRequest): Promise<BooruResponse> {
   const offline: BooruResponse = { posts: [], source: null, ok: false, offline: true }
   if (!req.tags.trim() || isQueryBlocked(req.tags)) return offline
+  // No renderer-side result cache, deliberately. Every call site opts out of
+  // memoization on purpose: probes and the tag market pass silent/probe (a
+  // validation read must never be cached) and the feed passes fresh:true so the
+  // idle loop keeps drawing new pictures. Replaying a cached response would
+  // also bypass the seen-ledger that stops the same image coming back.
+  // Reuse lives where it already does: the main-process feed memo, which only
+  // serves non-fresh reads.
+  return fetchPostsUncached(req)
+}
+
+async function fetchPostsUncached(req: BooruRequest): Promise<BooruResponse> {
+  const offline: BooruResponse = { posts: [], source: null, ok: false, offline: true }
+  if (!req.tags.trim() || isQueryBlocked(req.tags)) return offline
+  // Stage timing so the per-split cost of a round is measurable rather than
+  // guessed. Read it with readQueryTimings()/timingSummary().
+  const round = startRound(req.tags)
   try {
     if (typeof window !== 'undefined' && window.gmatch?.booruFetch) {
       // An IPC invoke cannot be cancelled once sent, so the round deadline is
@@ -1637,6 +1653,7 @@ export async function fetchPosts(req: BooruRequest): Promise<BooruResponse> {
       // ceiling to its own source walk, so the abandoned round is already on
       // its way out rather than still burning the network.
       const budget = startRoundBudget()
+      const t0 = Date.now()
       const res = await Promise.race([
         window.gmatch.booruFetch(req),
         budget.signal.aborted
@@ -1645,25 +1662,38 @@ export async function fetchPosts(req: BooruRequest): Promise<BooruResponse> {
               budget.signal.addEventListener('abort', () => reject(budget.signal.reason), { once: true })
             }),
       ]).catch(() => null)
+      markStage(round, 'request', Date.now() - t0)
       budgetDispose(budget)
-      if (!res) return { ...offline }
+      if (!res) {
+        endRound(round)
+        return { ...offline }
+      }
       if (res.ok) {
         const fetched = res.posts || []
+        const f0 = Date.now()
         if (req.silent) {
           // Validation-only: checked, never memoized (see BooruRequest.silent).
           const clean = sanitize(fetched, req.tags)
+          markStage(round, 'filter', Date.now() - f0)
+          endRound(round)
           return clean.length > 0 ? { ...res, posts: clean } : { ...offline }
         }
         const fresh = remember(sanitize(fetched, req.tags), req.tags)
+        markStage(round, 'filter', Date.now() - f0)
+        endRound(round)
         if (fresh.length > 0) {
           emptyStreak = 0
           return { ...res, posts: fresh }
         }
         return emptyRound(fetched.length, req.limit, res, req.tags)
       }
+      endRound(round)
       return { ...offline }
     }
+    const t1 = Date.now()
     const res = await directFetch(req)
+    markStage(round, 'request', Date.now() - t1)
+    endRound(round)
     if (res.ok && res.posts.length > 0) {
       emptyStreak = 0
       return res

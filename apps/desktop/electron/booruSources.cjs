@@ -11,13 +11,29 @@
 // primitive in src/services/booru/concurrency.ts and the two must behave
 // identically — see BOORU-API.md §9 invariant 0d.
 const { firstAnswer } = require('./booru-sources-core.cjs')
+// Result gating uses the shared tag-matching rule (renderer mirror:
+// src/game/matchRule.ts). The ladder over-FETCHES, but only posts answering the
+// FULL query are kept — never the widened variant's meaning.
+const { matchesQuery } = require('./matchRule.cjs')
 
 function queryVariants(query) {
+  // OVER-FETCH LADDER, deliberately looser than the query. Narrow providers
+  // commonly return 0 for multi-tag ANDs, so we walk progressively wider
+  // requests and let the strict gate above sort out what actually matches.
+  // Two invariants:
+  //   - every negative term is carried into every variant (they are the
+  //     blocklist and slop exclusions; dropping one while widening re-admits
+  //     exactly what the query excluded);
+  //   - a variant is a REQUEST, never an answer. Results are gated on the full
+  //     query, so widening can never widen the result set.
   const parts = String(query).split(/\s+/).filter(Boolean)
-  const variants = [query]
-  if (parts.length > 2) variants.push(parts.slice(0, 2).join(' '))
-  if (parts.length > 1) variants.push(parts[0])
-  return [...new Set(variants)]
+  const neg = parts.filter((p) => p.startsWith('-'))
+  const pos = parts.filter((p) => !p.startsWith('-'))
+  const tail = neg.length ? ` ${neg.join(' ')}` : ''
+  const variants = [`${pos.join(' ')}${tail}`.trim()]
+  if (pos.length > 2) variants.push(`${pos.slice(0, 2).join(' ')}${tail}`)
+  if (pos.length > 1) variants.push(`${pos[0]}${tail}`)
+  return [...new Set(variants.filter(Boolean))]
 }
 
 // Hard ceiling for ONE source walk, mirroring ROUND_DEADLINE_MS in
@@ -58,7 +74,7 @@ const COOLDOWN_429_MS = 300_000
 // answers in 300ms was never started. Two phases keep the cheap answer cheap.
 const FAST_PHASE = new Set(['dapi', 'moebooru', 'paheal', 'redgifs', 'realhtml', 'booruorg'])
 
-function createFetchBooru({ sources, httpGet, cache, blocked = () => false, deadlineMs = ROUND_DEADLINE_MS }) {
+function createFetchBooru({ sources, httpGet, cache, blocked = () => false, deadlineMs = ROUND_DEADLINE_MS, queryVariants: ladderOverride }) {
   let rrIndex = 0
   // sourceId -> timestamp until which it is skipped.
   const unhealthyUntil = new Map()
@@ -114,7 +130,9 @@ function createFetchBooru({ sources, httpGet, cache, blocked = () => false, dead
     if (pool.length === 0) {
       return { posts: [], source: null, ok: false, error: 'no enabled source for this category' }
     }
-    const variants = queryVariants(query)
+    // The ladder is injectable (tests pin it to a single variant to keep the
+    // round deterministic); unset, the module's over-fetch ladder is used.
+    const variants = ladderOverride ? ladderOverride(query) : queryVariants(query)
     const deadline = Date.now() + Math.max(0, deadlineMs || ROUND_DEADLINE_MS)
 
     const runPhase = async (candidates) => {
@@ -132,9 +150,16 @@ function createFetchBooru({ sources, httpGet, cache, blocked = () => false, dead
               const posts = source.fetch
                 ? await source.fetch(variant, n, fetchOpts)
                 : source.parse(await httpGet(source.url(variant, n)))
+              // Validate against the FULL query, never the variant sent. The
+              // ladder over-fetches (full -> top-2 -> leading tag) because
+              // providers return 0 for narrow AND combos, but a kept post must
+              // still answer EVERY requested tag; otherwise a one-tag request
+              // could satisfy a two-tag query and the count would look healthy
+              // while meaning nothing.
+              const kept = (posts || []).filter((p) => matchesQuery(p.tags, query, { trustUntagged: true }))
               // An empty answer is NOT a failure — this source simply has
               // nothing for this query. Do not cool it.
-              return posts && posts.length > 0 ? { source, variant, posts } : null
+              return kept.length > 0 ? { source, variant, posts: kept } : null
             } catch (err) {
               // Distinguish "we ran out of budget" from "this mirror is unwell".
               // httpGet reports both as errors, and cooling a healthy mirror
@@ -187,9 +212,11 @@ function createFetchBooru({ sources, httpGet, cache, blocked = () => false, dead
       unhealthyUntil.delete(meta.source.id)
       // Random round pages must NOT poison the tag slot: a memoized
       // random page would repeat for 10 minutes on probe/market reads.
-      // Only deterministic (probe/page-0) results are memoized.
-      if (!fresh) cache?.setFeedCache?.(meta.variant, winner)
-      return { posts: winner, source: meta.source.id, ok: true, query: meta.variant }
+      // Only deterministic (probe/page-0) results are memoized, and always
+      // under the FULL query: the gate above guarantees `winner` answers it,
+      // so a memo entry can never hand back posts that answer fewer tags.
+      if (!fresh) cache?.setFeedCache?.(query, winner)
+      return { posts: winner, source: meta.source.id, ok: true, query }
     }
 
     // Nothing in time, or everything empty: a stale memo beats a bare failure.

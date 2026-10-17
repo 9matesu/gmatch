@@ -4,9 +4,11 @@
 // open; LOAD/QUEUE mode against the active room otherwise.
 
 import { useState } from 'react'
+import { classifyStaticUrl } from '@orbit/shared'
 import { Modal } from '../Modal'
+import { WatchLocalFile } from './WatchLocalFile'
 import { BTN_PRIMARY } from '../../ui/styles'
-import { createParty, expandPlaylist, loadPartyVideo, loadPartyVideos } from '../../hooks/watchPartyStore'
+import { createParty, expandPlaylist, loadPartyVideo, loadPartyVideos, type PartyRuntime } from '../../hooks/watchPartyStore'
 
 interface IdentityLike {
   orbitId: string
@@ -20,6 +22,7 @@ export function WatchPartyUrlModal({
   joinPartyId = null,
   queueMode = false,
   lockVideo = false,
+  party = null,
 }: {
   identity: IdentityLike
   onClose: () => void
@@ -28,6 +31,8 @@ export function WatchPartyUrlModal({
   /** Load into the queue without interrupting playback. */
   queueMode?: boolean
   lockVideo?: boolean
+  /** Active room runtime (in-room mode), for local-file sharing. */
+  party?: PartyRuntime | null
 }) {
   const [url, setUrl] = useState('')
   const [name, setName] = useState('')
@@ -37,6 +42,15 @@ export function WatchPartyUrlModal({
 
   const inRoom = Boolean(joinPartyId)
   const blocked = inRoom && lockVideo
+  const firstLine = url.split(/\n+/).map((l) => l.trim()).filter(Boolean)[0] || ''
+  const hint = firstLine ? classifyStaticUrl(firstLine) : null
+  const hintText = !firstLine
+    ? 'Direct .mp4 links, playlists, and video pages (pmvhaven, redgifs, X, Reddit) are parsed server-side.'
+    : !hint?.ok
+      ? hint?.reason || 'That link will not play here.'
+      : hint.ext
+        ? `Direct video candidate (.${hint.ext}). The server still verifies it before playing.`
+        : `Provider page (${hint.provider || 'page'}). The server will try to find a playable file; some pages cannot be embedded.`
 
   const submit = async () => {
     if (!url.trim() || busy || blocked) return
@@ -50,7 +64,9 @@ export function WatchPartyUrlModal({
     const isValidUrl = (val: string): boolean => {
       try {
         const u = new URL(val)
-        return u.protocol === 'http:' || u.protocol === 'https:' || u.protocol === 'ipfs:'
+        // The media pipeline only resolves HTTP/HTTPS. Accepting ipfs: here
+        // would pass client validation and fail server-side with no recovery.
+        return u.protocol === 'http:' || u.protocol === 'https:'
       } catch {
         return false
       }
@@ -58,7 +74,7 @@ export function WatchPartyUrlModal({
 
     if (lines.length === 0 || !lines.some(isValidUrl)) {
       setBusy(false)
-      setError('Please enter a valid HTTP, HTTPS, or media URL.')
+      setError('Please enter a valid HTTP or HTTPS media URL.')
       return
     }
 
@@ -90,7 +106,7 @@ export function WatchPartyUrlModal({
             setStatusText(`Party created! Queuing videos ${i + 1}-${end} of ${remainingUrls.length}...`)
             const bulk = await loadPartyVideos(identity, partyId, batch, true)
             if (!bulk.ok || bulk.failed.length === batch.length) {
-              setError(`Party started. ${bulk.failed.length} videos failed to queue.`)
+              setError(bulk.failedDetails?.[0]?.reason || `Party started. ${bulk.failed.length} videos failed to queue.`)
               setBusy(false)
               setStatusText(null)
               return
@@ -118,7 +134,7 @@ export function WatchPartyUrlModal({
             setStatusText(`Party created! Queuing videos ${i + 1}-${end} of ${remainingUrls.length}...`)
             const bulk = await loadPartyVideos(identity, partyId, batch, true)
             if (!bulk.ok || bulk.failed.length === batch.length) {
-              setError(`Party started. ${bulk.failed.length} videos failed to queue.`)
+              setError(bulk.failedDetails?.[0]?.reason || `Party started. ${bulk.failed.length} videos failed to queue.`)
               setBusy(false)
               setStatusText(null)
               return
@@ -150,11 +166,12 @@ export function WatchPartyUrlModal({
           if (!res.ok) {
             setBusy(false)
             setStatusText(null)
-            setError(res.error || 'Could not load these videos.')
+            setError(res.failedDetails?.[0]?.reason || res.error || 'Could not load these videos.')
             return
           }
           if (res.failed.length === batch.length) {
-            setError(`Failed to queue: ${res.failed[0]}`)
+            const detail = res.failedDetails?.[0]?.reason
+            setError(detail || `Failed to queue: ${res.failed[0]}`)
             setBusy(false)
             setStatusText(null)
             return
@@ -168,11 +185,12 @@ export function WatchPartyUrlModal({
         if (!res.ok) {
           setBusy(false)
           setStatusText(null)
-          setError(res.error || 'Could not load this video.')
+          setError(res.failedDetails?.[0]?.reason || res.error || 'Could not load this video.')
           return
         }
         if (res.failed && res.failed.length > 0) {
-          setError(`Failed to load: ${res.failed[0]}`)
+          const detail = res.failedDetails?.[0]?.reason
+          setError(detail || `Failed to load: ${res.failed[0]}`)
           setBusy(false)
           setStatusText(null)
           return
@@ -208,7 +226,7 @@ export function WatchPartyUrlModal({
           className="glass-field w-full px-3 py-2 text-xs font-mono resize-y"
         />
         <p className="text-[10px] text-retro-muted">
-          Direct .mp4 links, playlists, and video pages (pmvhaven, redgifs, X, Reddit) are parsed server-side.
+          {hintText}
         </p>
         {!inRoom && (
           <input
@@ -239,6 +257,17 @@ export function WatchPartyUrlModal({
             {busy ? (statusText || 'Parsing...') : inRoom ? (queueMode ? 'ADD TO QUEUE' : 'LOAD VIDEO') : 'START PARTY'}
           </button>
         </div>
+        {(!inRoom || (party && (party.host === identity.orbitId || !party.lockVideo))) && (
+          <div className="border-t border-border-glass pt-3">
+            <WatchLocalFile
+              identity={identity}
+              party={party}
+              roomName={name}
+              queueMode={queueMode}
+              onDone={onClose}
+            />
+          </div>
+        )}
       </div>
     </Modal>
   )

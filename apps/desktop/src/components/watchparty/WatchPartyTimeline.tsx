@@ -281,7 +281,7 @@ export function WatchPartyTimeline({
             type="button"
             aria-label="Previous video"
             disabled={!isHost}
-            title={isHost ? undefined : 'Only the host controls playback'}
+            title={isHost ? undefined : 'Playback control is not shared with you in this room'}
             onClick={() => isHost && queueOp(party.id, 'prev')}
             className={`${BTN_ICON} disabled:opacity-40 disabled:cursor-not-allowed`}
           >
@@ -295,7 +295,7 @@ export function WatchPartyTimeline({
             // give the transport one a stable hook.
             data-testid="watch-transport-play"
             disabled={!isHost}
-            title={isHost ? undefined : 'Only the host controls playback'}
+            title={isHost ? undefined : 'Playback control is not shared with you in this room'}
             onClick={handleTogglePlay}
             className={`${BTN_ICON} disabled:opacity-40 disabled:cursor-not-allowed`}
           >
@@ -306,7 +306,7 @@ export function WatchPartyTimeline({
             type="button"
             aria-label="Next video"
             disabled={!isHost}
-            title={isHost ? undefined : 'Only the host controls playback'}
+            title={isHost ? undefined : 'Playback control is not shared with you in this room'}
             onClick={() => isHost && queueOp(party.id, 'next')}
             className={`${BTN_ICON} disabled:opacity-40 disabled:cursor-not-allowed`}
           >

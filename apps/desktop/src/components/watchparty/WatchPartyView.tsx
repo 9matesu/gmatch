@@ -8,8 +8,8 @@ import { useEffect, useState } from 'react'
 import { Clapperboard } from 'lucide-react'
 import { Avatar } from '../Avatar'
 import { MUTED } from '../../ui/styles'
-import { useWatchParty, joinPartyById, MAX_SLOTS } from '../../hooks/watchPartyStore'
-import { watchRoomFromHash, stripWatchRoom } from './invite'
+import { useWatchParty, joinPartyById, canControlParty, MAX_SLOTS } from '../../hooks/watchPartyStore'
+import { watchInviteFromHash, stripWatchRoom } from './invite'
 import { WatchPartySlot } from './WatchPartySlot'
 import { WatchPartyTimeline } from './WatchPartyTimeline'
 import { WatchPartyChat } from './WatchPartyChat'
@@ -28,17 +28,21 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
   const { parties, kickedNotice } = useWatchParty()
   const [activeId, setActiveId] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
-  const [railOpen, setRailOpen] = useState(true)
+  // Small windows start with the rail tucked away so the video keeps focus.
+  const [railOpen, setRailOpen] = useState(() =>
+    typeof window === 'undefined' ? true : window.innerWidth >= 900,
+  )
   const active = parties.find((p) => p.id === activeId) || parties[parties.length - 1] || null
   const isHost = active?.host === identity.orbitId
+  const canControl = active ? canControlParty(active, identity.orbitId) : false
 
   // Deep link joining
   useEffect(() => {
     const tryJoin = () => {
-      const roomId = watchRoomFromHash(window.location.hash)
-      if (!roomId) return
+      const invite = watchInviteFromHash(window.location.hash)
+      if (!invite) return
       window.history.replaceState(null, '', stripWatchRoom(window.location.hash))
-      void joinPartyById(identity, roomId)
+      void joinPartyById(identity, invite.room, invite.invite)
     }
     tryJoin()
     window.addEventListener('hashchange', tryJoin)
@@ -72,6 +76,7 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
             onClose={() => setModalOpen(false)}
             joinPartyId={null}
             queueMode={false}
+            party={null}
           />
         )}
       </div>
@@ -113,7 +118,7 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
         {/* Cohesive Video Player Controls */}
         <WatchPartyTimeline
           party={active}
-          isHost={!!isHost}
+          isHost={!!canControl}
           onToggleRail={() => setRailOpen((v) => !v)}
           railOpen={railOpen}
         />
@@ -156,6 +161,7 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
           joinPartyId={active?.id || null}
           queueMode
           lockVideo={Boolean(active?.lockVideo) && !isHost}
+          party={active}
         />
       )}
     </div>

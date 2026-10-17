@@ -2,9 +2,9 @@ import { Hono } from 'hono'
 import { orbitAuth } from '../middleware/auth'
 import type { D1Turso } from '../db'
 import type { LocalBlobStore } from '../blob'
-import { proxyAndStoreExternal, classifyAndResolve, isPrivateTarget, pageTitleFor } from '../proxy'
+import { resolveWatchSource } from '../watch-source'
 import { broadcastToRoom } from '../ws-bus'
-import { createParty, getParty, listParties, setPartyMedia, queueOps, type Party } from '../watchparty'
+import { createParty, getParty, listParties, setPartyMedia, queueOps, mintInvite, revokeInvite, redeemInvite, type Party } from '../watchparty'
 
 type Bindings = {
   DB: D1Turso
@@ -60,65 +60,7 @@ export async function expandPmvhavenPlaylists(urlList: string[]): Promise<Playli
   }
   return out
 }
-// Relay cap: bigger than the store cap, small enough that a party of 8
-// streaming through one bun process stays sane.
-const RELAY_MAX_BYTES = 500 * 1024 * 1024
-
-/**
- * The one media pipeline: try store-first (private Object, Range-streamed via
- * the isPartyMediaObject door), fall back to a party-bound relay for files
- * above the 50MB store cap. Returns the playable URL (+ relay binding) or
- * null when nothing playable was found.
- */
-async function resolveMedia(env: Bindings, orbitId: string, rawUrl: string): Promise<{ url: string; relay?: { upstream: string; referer: string }; stored?: boolean } | null> {
-  let parsed: URL
-  try {
-    parsed = new URL(rawUrl)
-  } catch {
-    return null
-  }
-  if (!['http:', 'https:'].includes(parsed.protocol) || rawUrl.length > 2048) return null
-
-  // pmvhaven videos are known large mp4s (>80MB) that exceed the 50MB store cap.
-  // Avoid attempting a 50MB buffer download that will be discarded.
-  const isPmvVideo = /pmvhaven\.com\/video\//i.test(rawUrl)
-  if (!isPmvVideo && env.BUCKET) {
-    const objectId = crypto.randomUUID()
-    const proxied = await proxyAndStoreExternal(rawUrl, env.BUCKET, 'objects', objectId)
-    if (proxied?.isVideo) {
-      await env.DB.prepare(
-        "INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, is_public, is_proxied, proxied_mime, expires_at) VALUES (?, ?, ?, ?, ?, 0, 1, ?, datetime('now', '+1 day'))"
-      ).bind(objectId, orbitId, proxied.bytesStored, proxied.mimeType, proxied.storedUrl, proxied.proxiedMime).run()
-      return { url: `/api/objects/${objectId}`, stored: true }
-    }
-  }
-
-  // Resolve direct upstream media URL
-  const resolved = await classifyAndResolve(rawUrl)
-  if (!resolved) return null
-  let up: URL
-  try {
-    up = new URL(resolved)
-  } catch {
-    return null
-  }
-  if (await isPrivateTarget(up)) return null
-  try {
-    const probe = await fetch(up.toString(), {
-      method: 'GET',
-      headers: { Range: 'bytes=0-1', 'User-Agent': 'Mozilla/5.0', Referer: `${parsed.protocol}//${parsed.host}/` },
-      signal: AbortSignal.timeout(8000),
-    })
-    const ct = probe.headers.get('content-type') || ''
-    const len = Number(probe.headers.get('content-length') || (probe.headers.get('content-range') || '').split('/')[1] || 0)
-    if (!probe.ok && probe.status !== 206) return null
-    if (!ct.startsWith('video/')) return null
-    if (len > RELAY_MAX_BYTES) return null
-  } catch {
-    return null
-  }
-  return { url: '', relay: { upstream: up.toString(), referer: `${parsed.protocol}//${parsed.host}/` } }
-}
+// The relay cap lives with the media pipeline in watch-source.ts.
 
 // Audit A5: each resolveMedia costs an upstream fetch + up to 50MB of R2
 // storage. Per-user sliding budget: 60 parsed URLs/minute across create +
@@ -140,16 +82,6 @@ function takeParseBudget(userId: string, n: number): boolean {
   return true
 }
 // ponytail: in-memory bucket dies with the isolate; fine for a 50-room app.
-
-function fallbackNameFromUrl(raw: string): string {
-  try {
-    const u = new URL(raw)
-    const base = u.pathname.split('/').filter(Boolean).pop() || u.hostname
-    return decodeURIComponent(base.replace(/\.(mp4|webm|m4v|mov)$/i, '').replace(/[-_]+/g, ' ')).trim().slice(0, 60)
-  } catch {
-    return ''
-  }
-}
 
 watchparty.post('/expand', orbitAuth, async (c) => {
   let body: any
@@ -177,9 +109,65 @@ watchparty.post('/expand', orbitAuth, async (c) => {
   })
 })
 
+/**
+ * Create a room seeded by a consent-shared local file. The entry is already
+ * resolved (object id + verified hash); the server only checks that the
+ * requester may reference those bytes, then seeds queue/current from them.
+ */
+async function createPartyFromLocal(c: any, orbitId: string, localEntry: { objectId?: unknown; name?: unknown; hash?: unknown; size?: unknown }, roomName: string) {
+  const objectId = typeof localEntry?.objectId === 'string' ? localEntry.objectId.trim() : ''
+  const entryName = (typeof localEntry?.name === 'string' ? localEntry.name : '').trim().slice(0, 60) || 'Local file'
+  const hash = typeof localEntry?.hash === 'string' ? localEntry.hash.trim().toLowerCase() : ''
+  const size = Number(localEntry?.size)
+  if (!/^[0-9a-fA-F-]{36}$/.test(objectId)) return c.json({ error: 'That shared file reference is invalid.' }, 422)
+  if (!/^[0-9a-f]{64}$/.test(hash)) return c.json({ error: 'That shared file is missing its integrity hash.' }, 422)
+
+  // Ownership gate: only the owner, a recipient, or anyone for public rows
+  // may seed a room from these bytes. Private bytes stay private.
+  let row: any = null
+  try {
+    row = await c.env.DB.prepare(
+      'SELECT id, owner_id, mime_type, content_hash, is_public FROM Objects WHERE id = ?'
+    ).bind(objectId).first()
+  } catch {
+    return c.json({ error: 'Database temporarily unavailable' }, 503)
+  }
+  if (!row) return c.json({ error: 'That shared file is no longer registered.' }, 422)
+  if (row.mime_type && !String(row.mime_type).startsWith('video/')) {
+    return c.json({ error: 'That shared file is not a playable video.' }, 422)
+  }
+  if (row.content_hash && String(row.content_hash).toLowerCase() !== hash) {
+    return c.json({ error: 'That shared file failed its integrity check.' }, 422)
+  }
+  const allowed =
+    row.owner_id === orbitId ||
+    Number(row.is_public) === 1 ||
+    await c.env.DB.prepare('SELECT 1 FROM Recipients WHERE object_id = ? AND recipient_id = ? LIMIT 1')
+      .bind(objectId, orbitId).first().then((r: any) => Boolean(r)).catch(() => false)
+  if (!allowed) return c.json({ error: 'You do not have access to that shared file.' }, 403)
+
+  const mediaUrl = `/api/objects/${objectId}`
+  const party = createParty(roomName || entryName || 'Party', mediaUrl, mediaUrl, undefined, orbitId)
+  party.mediaName = entryName
+  const firstEntryId = crypto.randomUUID().slice(0, 8)
+  party.queue.push({
+    id: firstEntryId,
+    name: entryName,
+    url: mediaUrl,
+    hash,
+    size: Number.isFinite(size) && size > 0 ? Math.floor(size) : undefined,
+    local: true,
+    provider: 'local',
+  })
+  party.current = firstEntryId
+  return c.json({
+    party: { id: party.id, name: party.name, url: party.mediaUrl, queue: party.queue },
+    truncated: false,
+  }, 201)
+}
+
 watchparty.post('/', orbitAuth, async (c) => {
   const orbitId = c.get('orbitId')
-  if (!takeParseBudget(orbitId, 1)) return c.json({ error: 'Too many video parses. Wait a minute.' }, 429)
   let body: any
   try {
     body = await c.req.json()
@@ -188,41 +176,57 @@ watchparty.post('/', orbitAuth, async (c) => {
   }
   const rawUrl = typeof body?.url === 'string' ? body.url.trim() : ''
   const name = typeof body?.name === 'string' ? body.name.trim().slice(0, 40) : ''
+
+  // Local-first creation: the host already forged + registered a consent-shared
+  // file, so the server skips the URL pipeline and seeds the room from the
+  // verified entry. Ownership is checked below; bytes never touch the server.
+  const localEntry = body?.localEntry as { objectId?: unknown; name?: unknown; hash?: unknown; size?: unknown } | undefined
+  if (localEntry && typeof localEntry === 'object') {
+    return createPartyFromLocal(c, orbitId, localEntry, name)
+  }
+
   if (!rawUrl) return c.json({ error: PARSE_ERROR }, 422)
+  if (!takeParseBudget(orbitId, 1)) return c.json({ error: 'Too many video parses. Wait a minute.' }, 429)
 
   // Expand playlist if rawUrl contains a playlist link or multiple lines
   const lines = rawUrl.split(/\n+/).map((l: string) => l.trim()).filter(Boolean)
   const expanded = await expandPmvhavenPlaylists(lines)
 
   // Find 1st valid video to launch the party
-  let firstMedia = null
+  let firstSource: Awaited<ReturnType<typeof resolveWatchSource>> | null = null
   let firstItem: PlaylistItem | null = null
   let firstIndex = -1
+  const firstFailures: Array<{ url: string; kind: string; provider?: string; reason?: string; sync: string }> = []
 
   for (let i = 0; i < expanded.length; i++) {
     const it = expanded[i]
-    const media = await resolveMedia(c.env, orbitId, it.url)
-    if (media) {
-      firstMedia = media
+    const source = await resolveWatchSource(c.env, orbitId, it.url, it.title).catch(() => null)
+    if (source && (source.playableUrl || source.relay)) {
+      firstSource = source
       firstItem = it
       firstIndex = i
       break
     }
+    if (source) firstFailures.push({ url: it.url, kind: source.kind, provider: source.provider, reason: source.reason, sync: source.sync })
   }
 
-  if (!firstMedia || !firstItem) return c.json({ error: PARSE_ERROR }, 422)
+  if (!firstSource || !firstItem) {
+    const first = firstFailures[0]
+    return c.json({ error: first?.reason || PARSE_ERROR, source: first || null, failed: firstFailures }, 422)
+  }
 
-  const firstTitle = (firstItem.title || pageTitleFor(firstItem.url) || fallbackNameFromUrl(firstItem.url)).slice(0, 60)
-  const party = createParty(name || firstTitle || 'Party', firstMedia.url, firstMedia.url, firstMedia.relay, orbitId)
+  const firstTitle = (firstItem.title || firstSource.title || 'Party').slice(0, 60)
+  const firstUrl = firstSource.playableUrl || ''
+  const party = createParty(name || firstTitle || 'Party', firstUrl, firstUrl, firstSource.relay, orbitId)
   party.mediaName = firstTitle || name
 
   const firstEntryId = crypto.randomUUID().slice(0, 8)
-  let firstEntryUrl = firstMedia.url
-  if (firstMedia.relay && !firstEntryUrl) {
+  let firstEntryUrl = firstSource.playableUrl || ''
+  if (firstSource.relay && !firstEntryUrl) {
     firstEntryUrl = `/api/watchparty/${party.id}/stream?item=${firstEntryId}`
   }
   setPartyMedia(party, firstEntryUrl)
-  party.queue.push({ id: firstEntryId, name: party.mediaName, url: firstEntryUrl, relay: firstMedia.relay })
+  party.queue.push({ id: firstEntryId, name: party.mediaName, url: firstEntryUrl, relay: firstSource.relay, provider: firstSource.provider })
   party.current = firstEntryId
 
   // Progressively enqueue remaining items in the background if any
@@ -235,27 +239,28 @@ watchparty.post('/', orbitAuth, async (c) => {
         const resolved = await Promise.all(
           chunk.map(async (it) => {
             try {
-              const media = await resolveMedia(c.env, orbitId, it.url)
-              return { it, media }
+              const source = await resolveWatchSource(c.env, orbitId, it.url, it.title)
+              return { it, source }
             } catch {
-              return { it, media: null }
+              return { it, source: null }
             }
           })
         )
         let anyAdded = false
-        for (const { it, media } of resolved) {
-          if (!media) continue
+        for (const { it, source } of resolved) {
+          if (!source || (!source.playableUrl && !source.relay)) continue
           const entryId = crypto.randomUUID().slice(0, 8)
-          let entryUrl = media.url
-          if (media.relay && !entryUrl) entryUrl = `/api/watchparty/${party.id}/stream?item=${entryId}`
-          const itemTitle = (it.title || pageTitleFor(it.url) || fallbackNameFromUrl(it.url)).slice(0, 60)
+          let entryUrl = source.playableUrl || ''
+          if (source.relay && !entryUrl) entryUrl = `/api/watchparty/${party.id}/stream?item=${entryId}`
+          const itemTitle = (it.title || source.title || 'Untitled').slice(0, 60)
           const added = queueOps(orbitId, {
             id: entryId,
             party: party.id,
             op: 'add',
             name: itemTitle,
             url: entryUrl,
-            relay: media.relay,
+            relay: source.relay,
+            provider: source.provider,
           })
           if (added) anyAdded = true
         }
@@ -266,6 +271,7 @@ watchparty.post('/', orbitAuth, async (c) => {
             queue: party.queue,
             current: party.current,
             frame: party.frame,
+            queueRev: party.queueRev,
           })
         }
       }
@@ -306,10 +312,24 @@ watchparty.post('/:id/video', orbitAuth, async (c) => {
   const title = typeof body?.name === 'string' ? body.name.trim().slice(0, 60) : ''
   const queueOnly = body?.queueOnly === true
 
-  // Bulk shape: urls[] (1..10, or up to 30 pmvhaven playlists) or single url (split by newline).
-  const rawUrls: string[] = Array.isArray(body?.urls)
-    ? body.urls.map((u: unknown) => String(u).trim()).filter(Boolean)
-    : (url ? url.split(/\n+/).map((l: string) => l.trim()).filter(Boolean) : [])
+  // Bulk shape: items[] with per-item idempotency IDs (preferred), legacy
+  // urls[] (1..10, or up to 30 pmvhaven playlists), or single url split by newline.
+  const rawItems: Array<{ url: string; name?: string; cmdId?: string }> = Array.isArray(body?.items)
+    ? (body.items as unknown[]).map((it: unknown): { url: string; name?: string; cmdId?: string } => {
+        if (typeof it === 'string') return { url: it.trim() }
+        const o = it as { url?: unknown; name?: unknown; cmdId?: unknown }
+        return {
+          url: String(o?.url || '').trim(),
+          name: typeof o?.name === 'string' ? o.name : undefined,
+          cmdId: typeof o?.cmdId === 'string' ? o.cmdId : undefined,
+        }
+      }).filter((it: { url: string; name?: string; cmdId?: string }) => Boolean(it.url))
+    : []
+  const rawUrls: string[] = rawItems.length > 0
+    ? rawItems.map((it) => it.url)
+    : (Array.isArray(body?.urls)
+      ? body.urls.map((u: unknown) => String(u).trim()).filter(Boolean)
+      : (url ? url.split(/\n+/).map((l: string) => l.trim()).filter(Boolean) : []))
 
   const isPl = (u: string) => /pmvhaven\.com\/playlists\//i.test(u)
   if (rawUrls.length > 30 || (rawUrls.length > 10 && !rawUrls.every(isPl))) {
@@ -325,33 +345,44 @@ watchparty.post('/:id/video', orbitAuth, async (c) => {
     return c.json({ error: 'Queue is full (maximum 50 videos).' }, 400)
   }
 
-  const itemsToProcess = expanded.slice(0, remainingCapacity)
+  const itemsToProcess = expanded.slice(0, remainingCapacity).map((it: PlaylistItem, index: number) => {
+    // Idempotency survives playlist expansion: one parent cmdId fans out to
+    // deterministic child IDs, so retrying the same add cannot duplicate items.
+    const parent = rawItems.length === 1 ? rawItems[0] : rawItems.find((r) => r.url === it.url)
+    const parentCmd = parent?.cmdId || (typeof body?.cmdId === 'string' ? body.cmdId : undefined)
+    return { ...it, cmdId: parentCmd ? `${parentCmd}#${index}` : undefined }
+  })
   takeParseBudget(orbitId, itemsToProcess.length)
 
   const added: Array<{ id: string; name: string; url: string }> = []
   const failed: string[] = []
+  const failedDetails: Array<{ url: string; kind: string; provider?: string; reason?: string; sync: string }> = []
 
   for (let i = 0; i < itemsToProcess.length; i += 5) {
     const chunk = itemsToProcess.slice(i, i + 5)
     const resolved = await Promise.all(
       chunk.map(async (it) => {
         try {
-          const media = await resolveMedia(c.env, orbitId, it.url)
-          return { it, media }
+          const source = await resolveWatchSource(c.env, orbitId, it.url, it.title)
+          return { it, source }
         } catch {
-          return { it, media: null }
+          return { it, source: null }
         }
       })
     )
     let chunkAdded = false
-    for (const { it, media } of resolved) {
-      if (!media) { failed.push(it.url); continue }
+    for (const { it, source } of resolved) {
+      if (!source || (!source.playableUrl && !source.relay)) {
+        failed.push(it.url)
+        failedDetails.push({ url: it.url, kind: source?.kind || 'invalid', provider: source?.provider, reason: source?.reason || PARSE_ERROR, sync: source?.sync || 'none' })
+        continue
+      }
 
       const entryId = crypto.randomUUID().slice(0, 8)
-      let entryUrl = media.url
-      if (media.relay && !entryUrl) entryUrl = `/api/watchparty/${party.id}/stream?item=${entryId}`
+      let entryUrl = source.playableUrl || ''
+      if (source.relay && !entryUrl) entryUrl = `/api/watchparty/${party.id}/stream?item=${entryId}`
 
-      const videoName = it.title || (rawUrls.length === 1 && !isPl(rawUrls[0]) && title ? title : (pageTitleFor(it.url) || fallbackNameFromUrl(it.url)))
+      const videoName = (it.title || source.title || (rawUrls.length === 1 && !isPl(rawUrls[0]) && title ? title : it.url)).slice(0, 60)
 
       const add = queueOps(orbitId, {
         id: entryId,
@@ -359,9 +390,15 @@ watchparty.post('/:id/video', orbitAuth, async (c) => {
         op: 'add',
         name: videoName,
         url: entryUrl,
-        relay: media.relay,
+        relay: source.relay,
+        provider: source.provider,
+        cmdId: (it as any).cmdId,
       })
-      if (!add) { failed.push(it.url); continue }
+      if (!add) {
+        failed.push(it.url)
+        failedDetails.push({ url: it.url, kind: source.kind, provider: source.provider, reason: 'The room refused this update.', sync: source.sync })
+        continue
+      }
 
       const newEntry = party.queue[party.queue.length - 1]
       added.push({ ...newEntry })
@@ -376,11 +413,15 @@ watchparty.post('/:id/video', orbitAuth, async (c) => {
         queue: party.queue,
         current: party.current,
         frame: party.frame,
+        queueRev: party.queueRev,
       })
     }
   }
 
-  if (added.length === 0) return c.json({ error: PARSE_ERROR, failed }, 422)
+  if (added.length === 0) {
+    const first = failedDetails[0]
+    return c.json({ error: first?.reason || PARSE_ERROR, failed, failedDetails, source: first || null }, 422)
+  }
 
   if (!queueOnly && added.length > 0) {
     queueOps(orbitId, { party: party.id, op: 'play', id: added[0].id })
@@ -390,6 +431,7 @@ watchparty.post('/:id/video', orbitAuth, async (c) => {
       queue: party.queue,
       current: party.current,
       frame: party.frame,
+      queueRev: party.queueRev,
     })
   }
 
@@ -398,6 +440,7 @@ watchparty.post('/:id/video', orbitAuth, async (c) => {
     ok: true,
     added,
     failed,
+    failedDetails,
     truncated,
     totalRequested: expanded.length,
   })
@@ -406,6 +449,10 @@ watchparty.post('/:id/video', orbitAuth, async (c) => {
 watchparty.get('/:id', orbitAuth, async (c) => {
   const party = getParty(c.req.param('id') || '')
   if (!party) return c.json({ error: 'Party not found' }, 404)
+  const orbitId = c.get('orbitId')
+  // Private rooms do not leak snapshots by ID. Members read state; everyone
+  // else gets the same 404 as a missing room, with or without an invite.
+  if (party.isPrivate && !party.members.has(orbitId)) return c.json({ error: 'Party not found' }, 404)
   return c.json({
     id: party.id,
     name: party.name,
@@ -417,9 +464,35 @@ watchparty.get('/:id', orbitAuth, async (c) => {
     mediaName: party.mediaName,
     queue: party.queue,
     current: party.current,
+    queueRev: party.queueRev,
+    settingsRev: party.settingsRev,
+    sharedControl: party.sharedControl,
+    requireApproval: party.requireApproval,
     chat: party.chat,
     members: [...party.members.entries()].map(([id, m]) => ({ id, name: m.name, muted: m.muted })),
   })
+})
+
+watchparty.post('/:id/invite', orbitAuth, async (c) => {
+  const orbitId = c.get('orbitId')
+  const token = mintInvite(orbitId, c.req.param('id') || '')
+  if (!token) return c.json({ error: 'Only the host can mint invites.' }, 403)
+  return c.json({ ok: true, invite: token })
+})
+
+watchparty.delete('/:id/invite', orbitAuth, async (c) => {
+  const orbitId = c.get('orbitId')
+  if (!revokeInvite(orbitId, c.req.param('id') || '')) return c.json({ error: 'Only the host can revoke invites.' }, 403)
+  return c.json({ ok: true })
+})
+
+watchparty.post('/:id/join', orbitAuth, async (c) => {
+  const orbitId = c.get('orbitId')
+  const body = await c.req.json().catch(() => null) as any
+  if (!redeemInvite(orbitId, c.req.param('id') || '', body?.invite)) {
+    return c.json({ error: 'Party not found' }, 404)
+  }
+  return c.json({ ok: true })
 })
 
 // Range-passthrough relay for bound (too-big-to-store) party videos.

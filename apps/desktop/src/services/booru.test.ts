@@ -101,20 +101,28 @@ describe('fetchPosts (SPEC §6/§8)', () => {
       width: 1824,
       height: 2432,
       rating: 'explicit',
-      tags: 'gangbang creampie highres',
+      tags: 'gangbang creampie highres proxy',
     }
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve([tbibPost]),
     })
     vi.stubGlobal('fetch', fetchMock)
-    const res = await fetchPosts({ tags: 'gangbang-proxy', limit: 10 })
+    const res = await fetchPosts({ tags: 'gangbang proxy', limit: 10 })
     expect(res.ok).toBe(true)
     expect(res.source).toBe('tbib-direct')
-    expect(fetchMock).toHaveBeenCalledOnce()
+    // The variant ladder is RACED, so a 2-tag query issues more than one
+    // request by design. What matters is that every one of them went through
+    // the same-origin dev proxy — no direct tbib.org, so no CORS.
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(0)
+    for (const call of fetchMock.mock.calls) {
+      expect(String(call[0]).startsWith('/booru/tbib/')).toBe(true)
+      expect(String(call[0])).not.toContain('tbib.org')
+    }
     const url = String(fetchMock.mock.calls[0][0])
-    expect(url.startsWith('/booru/tbib/')).toBe(true)
-    expect(url).not.toContain('tbib.org')
+    // The tag query really is on the wire (this is the "does the tag reach the
+    // provider" half of the proxy assertion).
+    expect(url).toContain('tags=gangbang%20proxy')
     expect(res.posts[0].url).toBe(
       'https://tbib.org/images/10792/ae15a5c325658023a6123e14f6dcac2bd602e240.jpg',
     )
@@ -128,17 +136,23 @@ describe('fetchPosts (SPEC §6/§8)', () => {
       width: 1400,
       height: 1360,
       rating: 'explicit',
-      tags: 'gangbang creampie',
+      tags: 'gangbang creampie fallthrough',
     }
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([xPost]) })
+    // Branch on the SOURCE, not on call order: the variant ladder is raced, so
+    // how many requests tbib sees before xbooru is an implementation detail.
+    // tbib answers nothing usable on every attempt — that is the scenario.
+    const fetchMock = vi.fn(async (url: string) => {
+      if (String(url).startsWith('/booru/tbib/')) {
+        return { ok: true, json: () => Promise.resolve([]) }
+      }
+      return { ok: true, json: () => Promise.resolve([xPost]) }
+    })
     vi.stubGlobal('fetch', fetchMock)
-    const res = await fetchPosts({ tags: 'gangbang-fallthrough', limit: 10 })
+    const res = await fetchPosts({ tags: 'gangbang fallthrough', limit: 10 })
     expect(res.ok).toBe(true)
     expect(res.source).toBe('xbooru-direct')
-    expect(String(fetchMock.mock.calls[1][0]).startsWith('/booru/xbooru/')).toBe(true)
+    const xCalls = fetchMock.mock.calls.filter((c) => String(c[0]).startsWith('/booru/xbooru/'))
+    expect(xCalls.length).toBeGreaterThan(0)
   })
 
   it('browser mode reports offline when all direct sources fail', async () => {
@@ -203,7 +217,7 @@ describe('fetchPosts (SPEC §6/§8)', () => {
       width: 900,
       height: 900,
       rating: 'explicit',
-      tags: 'gangbang',
+      tags: 'gangbang norepeat',
     }
     const fresh = {
       id: 102,
@@ -211,7 +225,7 @@ describe('fetchPosts (SPEC §6/§8)', () => {
       width: 900,
       height: 900,
       rating: 'explicit',
-      tags: 'gangbang',
+      tags: 'gangbang norepeat',
     }
     const fetchMock = vi.fn(async (url: string) => {
       if (String(url).startsWith('/booru/xbooru/')) {
@@ -220,9 +234,9 @@ describe('fetchPosts (SPEC §6/§8)', () => {
       return { ok: true, json: () => Promise.resolve([dupe]) }
     })
     vi.stubGlobal('fetch', fetchMock)
-    const first = await fetchPosts({ tags: 'gangbang-norepeat', limit: 5 })
+    const first = await fetchPosts({ tags: 'gangbang norepeat', limit: 5 })
     expect(first.posts.map((p) => p.id)).toEqual(['101'])
-    const second = await fetchPosts({ tags: 'gangbang-norepeat', limit: 5 })
+    const second = await fetchPosts({ tags: 'gangbang norepeat', limit: 5 })
     expect(second.ok).toBe(true)
     expect(second.source).toBe('xbooru-direct')
     expect(second.posts.map((p) => p.id)).toEqual(['102'])
@@ -236,21 +250,21 @@ describe('fetchPosts (SPEC §6/§8)', () => {
       width: 900,
       height: 900,
       rating: 'explicit',
-      tags: 'gangbang',
+      tags: 'gangbang cool',
     })
     const fetchMock = vi.fn(async (url: string) => {
       if (String(url).startsWith('/booru/tbib/')) throw new Error('mirror down')
       return { ok: true, json: () => Promise.resolve([mk(103)]) }
     })
     vi.stubGlobal('fetch', fetchMock)
-    const r1 = await fetchPosts({ tags: 'gangbang-cool', limit: 5 })
+    const r1 = await fetchPosts({ tags: 'gangbang cool', limit: 5 })
     expect(r1.source).toBe('xbooru-direct')
     fetchMock.mockClear()
     fetchMock.mockImplementation(async (url: string) => {
       if (String(url).startsWith('/booru/tbib/')) throw new Error('mirror down')
       return { ok: true, json: () => Promise.resolve([mk(104)]) }
     })
-    const r2 = await fetchPosts({ tags: 'gangbang-cool', limit: 5 })
+    const r2 = await fetchPosts({ tags: 'gangbang cool', limit: 5 })
     expect(r2.ok).toBe(true)
     // tbib sat out its cooldown — xbooru was attempted first.
     expect(String(fetchMock.mock.calls[0][0]).startsWith('/booru/xbooru/')).toBe(true)

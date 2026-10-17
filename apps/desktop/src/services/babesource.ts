@@ -1,4 +1,5 @@
 import type { BooruPost } from '../game/types'
+import { parseQuery } from '../game/matchRule'
 
 /**
  * Babesource.com adapter (real porn photo galleries: pornstars like
@@ -204,11 +205,10 @@ export function toBabesourcePosts(
 ): BooruPost[] {
   const idMatch = /-(\d+)\.html?(?:[?#]|$)/.exec(galleryUrl)
   const gid = idMatch ? idMatch[1] : String(Math.abs(hashCode(galleryUrl)))
-  const queryTags = query
-    .replace(/_/g, ' ')
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((t) => t.length >= 2)
+  // Normalized query tokens verbatim (see redgifs.ts): splitting the search
+  // string on `_` stamped `shrooms` onto a result the query asked for as
+  // `shrooms_q`, so strict validation threw the provider's own hits away.
+  const queryTags = parseQuery(query).required
   const tags = [...new Set([...queryTags, ...galleryTags])]
   return images.map((img, i) => ({
     id: `bs-${gid}-${i}`,
@@ -260,15 +260,8 @@ export function parseBabesourceCovers(html: unknown, limit = 20): BabesourceImag
 /** Feed posts for search-page covers (no gallery context): stable ids from
  * the image hash dir, tags from the query tokens. Pure. */
 export function toBabesourceCoverPosts(images: BabesourceImage[], query: string): BooruPost[] {
-  const tags = [
-    ...new Set(
-      query
-        .replace(/_/g, ' ')
-        .toLowerCase()
-        .split(/[^a-z0-9]+/)
-        .filter((t) => t.length >= 2),
-    ),
-  ]
+  // Same rule as toBabesourcePosts: stamp the normalized query tokens.
+  const tags = [...new Set(parseQuery(query).required)]
   return images.map((img, i) => {
     const h = /\/galleries\/([0-9a-f]+)\//i.exec(img.preview)?.[1] ?? `c${i}`
     return {

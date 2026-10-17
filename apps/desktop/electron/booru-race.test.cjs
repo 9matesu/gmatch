@@ -32,7 +32,10 @@ const source = (id, ms, posts) => ({
 test('a slow early source does not delay a fast later one', async () => {
   // The whole point. Sequentially this took 300ms + 10ms; the 300ms source is
   // ahead of the good one in every ordering, so only racing gets the fast answer.
-  const good = [{ id: 'p1', url: 'http://x/1.jpg', tags: ['a'], rating: 'e' }]
+  // The fixture must ANSWER the query: the round gates every source's posts on
+  // the full query (./matchRule.cjs), so a post tagged `a` is filtered out and
+  // there would be no winner to race for.
+  const good = [{ id: 'p1', url: 'http://x/1.jpg', tags: ['alpha'], rating: 'e' }]
   const sources = [
     source('slow-1', 300, []),
     source('slow-2', 250, []),
@@ -53,7 +56,7 @@ test('a slow early source does not delay a fast later one', async () => {
 test('an empty answer does not beat a slower good one', async () => {
   // The failure mode of naive racing. A source that answers "nothing here" fast
   // must not win over one that is about to answer with posts.
-  const good = [{ id: 'p1', url: 'http://x/1.jpg', tags: ['a'], rating: 'e' }]
+  const good = [{ id: 'p1', url: 'http://x/1.jpg', tags: ['alpha'], rating: 'e' }]
   const sources = [source('empty-fast', 5, []), source('good-slow', 60, good)]
   const fetchBooru = createFetchBooru({ sources, httpGet: async () => '' })
 
@@ -63,7 +66,7 @@ test('an empty answer does not beat a slower good one', async () => {
 })
 
 test('a throwing source is skipped, not fatal', async () => {
-  const good = [{ id: 'p1', url: 'http://x/1.jpg', tags: ['a'], rating: 'e' }]
+  const good = [{ id: 'p1', url: 'http://x/1.jpg', tags: ['alpha'], rating: 'e' }]
   const sources = [
     { id: 'boom', category: 'hentai', fetch: async () => { throw new Error('HTTP 500') } },
     source('ok', 5, good),

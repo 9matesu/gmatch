@@ -927,7 +927,9 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 3rem 1.5rem;
+  /* Overridable so a caller can drop the 3rem block padding when the empty
+     state sits inside a panel body rather than owning a whole view. */
+  padding: var(--empty-state-padding, 3rem 1.5rem);
   background: var(--color-surface-raised);
   border: 1px solid var(--color-border-glass);
   border-radius: var(--radius-lg);

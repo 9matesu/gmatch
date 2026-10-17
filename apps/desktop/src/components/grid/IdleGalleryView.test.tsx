@@ -457,4 +457,20 @@ describe('IdleGalleryView', () => {
       g.gmatch = prevBridge
     }
   })
+
+  it('never hotlinks the provider for a keep verified local whose bytes are gone', () => {
+    // A keep verified local is supposed to have bytes on disk; a remote
+    // hotlink would hide a broken or evicted vault entry behind a working tile.
+    const gone: GalleryImage = {
+      id: 'local-gone',
+      url: 'https://tbib.org/images/1/2/def.jpg',
+      tags: ['t'],
+      rarityBase: 1,
+      clicks: 0,
+      rarity: 'Common',
+      preview: 'https://preview.example/thumb.jpg',
+      localStatus: 'local',
+    }
+    expect(resolveGalleryTileUrl(gone)).toBe('')
+  })
 })

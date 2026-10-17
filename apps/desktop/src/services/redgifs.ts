@@ -73,6 +73,12 @@ function normTag(t: unknown): string | null {
 }
 
 /** Normalized query tokens (feed-tag style) for niche matching + tagging. */
+/**
+ * Word-ish tokens for niche matching (pickRedgifsNiche /
+ * redgifsNicheMatchesQuery), which compare a query against a niche's NAME
+ * words — 'skylar_vox' must reach the niche "Skylar Vox". That is a different
+ * job from stamping tags on results; see withRedgifsQueryTags for those.
+ */
 export function redgifsQueryTags(query: string): string[] {
   const out: string[] = []
   for (const part of redgifsQuery(query)

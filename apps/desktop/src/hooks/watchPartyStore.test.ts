@@ -17,6 +17,7 @@ import {
   resetWatchParty,
   handleWatchMessage,
   createParty,
+  createPartyFromLocal,
   expandPlaylist,
   loadPartyVideos,
   joinParty,
@@ -37,6 +38,7 @@ beforeEach(() => {
     removeItem: (k: string) => ls.delete(k),
   })
   vi.mocked(sendOrbitWebSocket).mockClear()
+  vi.mocked(orbitFetch).mockClear()
   resetWatchParty()
 })
 afterEach(() => vi.unstubAllGlobals())
@@ -143,9 +145,9 @@ describe('watchPartyStore', () => {
 
   it('controlPlayback sends the frame shape', () => {
     controlPlayback('p9', 'play', 12)
-    expect(sendOrbitWebSocket).toHaveBeenCalledWith({ type: 'watch', party: 'p9', action: 'play', position: 12 })
+    expect(sendOrbitWebSocket).toHaveBeenCalledWith({ type: 'watch', party: 'p9', action: 'play', position: 12, cmdId: expect.any(String) })
     controlPlayback('p9', 'pause', -5)
-    expect(sendOrbitWebSocket).toHaveBeenLastCalledWith({ type: 'watch', party: 'p9', action: 'pause', position: 0 })
+    expect(sendOrbitWebSocket).toHaveBeenLastCalledWith({ type: 'watch', party: 'p9', action: 'pause', position: 0, cmdId: expect.any(String) })
   })
 
   it('leaveParty unsubscribes only when the last party is gone', () => {
@@ -170,15 +172,18 @@ describe('watchPartyStore', () => {
     expect(await joinPartyById(identity, 'gone')).toBe(false)
   })
 
-  it('loadPartyVideos posts urls and reports the failed list', async () => {
+  it('loadPartyVideos posts items with idempotency IDs and reports the failed list', async () => {
     vi.mocked(orbitFetch).mockResolvedValueOnce(
       new Response(JSON.stringify({ ok: true, added: [{ id: 'q1', name: 'a', url: '/api/objects/a' }], failed: ['https://junk/2'] }), { status: 200 }),
     )
     const r = await loadPartyVideos(identity, 'p1', ['https://a', 'https://junk/2'], true)
     const call = vi.mocked(orbitFetch).mock.calls.at(-1)!
     expect(call[0]).toBe('/api/watchparty/p1/video')
-    expect(JSON.parse(String((call[1] as RequestInit).body))).toEqual({ urls: ['https://a', 'https://junk/2'], queueOnly: true })
-    expect(r).toEqual({ ok: true, added: 1, failed: ['https://junk/2'], truncated: false })
+    const body = JSON.parse(String((call[1] as RequestInit).body))
+    expect(body.queueOnly).toBe(true)
+    expect(body.items.map((it: any) => it.url)).toEqual(['https://a', 'https://junk/2'])
+    expect(body.items.every((it: any) => typeof it.cmdId === 'string' && it.cmdId.length > 0)).toBe(true)
+    expect(r).toEqual({ ok: true, added: 1, failed: ['https://junk/2'], failedDetails: [], truncated: false })
   })
 
   it('loadPartyVideos surfaces server errors', async () => {
@@ -222,5 +227,39 @@ describe('watchPartyStore', () => {
     expect(res.playlistTitle).toBe('Client PL')
     expect(res.items[0].url).toBe('https://pmvhaven.com/video/65b4c16b43134d3e15acafbc')
     expect(res.items[1].url).toBe('https://pmvhaven.com/video/6824710fba516ce0d0e63f71')
+  })
+
+  it('drops stale sync/queue revisions but accepts snapshots', () => {
+    joinParty(identity, { id: 'p1', name: 'N', url: 'u' })
+    handleWatchMessage({ type: 'watch.sync', party: 'p1', frame: { url: 'u', action: 'play', position: 8, rate: 1, updatedAt: 100, rev: 5 } })
+    handleWatchMessage({ type: 'watch.sync', party: 'p1', frame: { url: 'u', action: 'pause', position: 1, rate: 1, updatedAt: 101, rev: 4 } })
+    expect(watchPartyStore.getSnapshot().parties[0].frame?.position).toBe(8)
+    handleWatchMessage({ type: 'watch.queue', party: 'p1', queue: [], current: '', queueRev: 2 })
+    handleWatchMessage({ type: 'watch.queue', party: 'p1', queue: [{ id: 'old', name: 'old', url: 'u' }], current: '', queueRev: 1 })
+    expect(watchPartyStore.getSnapshot().parties[0].queue).toEqual([])
+  })
+
+  it('createPartyFromLocal posts the verified entry, then joins', async () => {
+    vi.mocked(orbitFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ party: { id: 'p1', name: 'Night', url: '/api/objects/o1' } }), { status: 201 }),
+    )
+    const entry = { objectId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', name: 'clip.mp4', hash: 'f'.repeat(64), size: 10 }
+    const res = await createPartyFromLocal(identity, entry, 'Night')
+    expect(res).toEqual({ ok: true, partyId: 'p1' })
+    const call = vi.mocked(orbitFetch).mock.calls.at(-1)!
+    expect(call[0]).toBe('/api/watchparty')
+    expect(JSON.parse(String((call[1] as RequestInit).body))).toEqual({ localEntry: entry, name: 'Night' })
+    expect(sendOrbitWebSocket).toHaveBeenCalledWith(expect.objectContaining({ type: 'watch.join', party: 'p1' }))
+  })
+
+  it('redeems a private invite before reading the snapshot', async () => {
+    vi.mocked(orbitFetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'z', name: 'Z', url: '/api/objects/z' }), { status: 200 }))
+    expect(await joinPartyById(identity, 'z', 'invite-token')).toBe(true)
+    const redeem = vi.mocked(orbitFetch).mock.calls[0]!
+    expect(redeem[0]).toBe('/api/watchparty/z/join')
+    expect(JSON.parse(String((redeem[1] as RequestInit).body))).toEqual({ invite: 'invite-token' })
+    expect(sendOrbitWebSocket).toHaveBeenCalledWith(expect.objectContaining({ type: 'watch.join', party: 'z', invite: 'invite-token' }))
   })
 })

@@ -2,7 +2,7 @@ import { generateIdentity } from '../src/identity.cjs'
 import { legalVersionKey } from '../src/legal/documents'
 
 /** Changelog version the specs pretend to have already read. Bump with the app. */
-export const E2E_CHANGELOG_VERSION = '1.5.2'
+export const E2E_CHANGELOG_VERSION = '1.5.5'
 
 /**
  * Discovery tag every seeded spec identity carries, on the server as well as in
@@ -101,7 +101,9 @@ export async function seedApp(
       // lastSeenAt must be load-time or the offline-earnings modal pops on
       // every journey (passive income accrues between seed and page load).
       save.lastSeenAt = Date.now()
-      localStorage.setItem('gmatch_last_seen_changelog', '1.5.2')
+      // The changelog key is NOT written here: it comes from firstRunOverlayKeys
+      // below, so the version has exactly one owner (E2E_CHANGELOG_VERSION).
+      // A stale literal here used to be overwritten by that loop anyway.
       // Onboarding + tour + changelog overlays (see firstRunOverlayKeys).
       for (const [k, v] of overlayKeys) localStorage.setItem(k, v)
     },

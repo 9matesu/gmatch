@@ -2,11 +2,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
-vi.mock('../../hooks/watchPartyStore', () => ({
-  loadPartyVideos: vi.fn(async () => ({ ok: true, added: 3, failed: [] })),
-  queueOp: vi.fn(),
-  moveQueueEntry: vi.fn(),
-}))
+vi.mock('../../hooks/watchPartyStore', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../hooks/watchPartyStore')>()
+  return {
+    ...actual,
+    loadPartyVideos: vi.fn(async () => ({ ok: true, added: 3, failed: [] })),
+    queueOp: vi.fn(),
+    moveQueueEntry: vi.fn(),
+  }
+})
 
 import { loadPartyVideos } from '../../hooks/watchPartyStore'
 import { WatchPartyQueue } from './WatchPartyQueue'
@@ -19,6 +23,7 @@ const party = {
   id: 'p1', name: 'N', url: 'u', frame: null, members: [], chat: [],
   host: 'me', mutedIds: {}, lockVideo: false, isPrivate: false,
   mediaName: '', queue: [{ id: 'q1', name: 'a', url: '/api/objects/a' }, { id: 'q2', name: 'b', url: '/api/objects/b' }], current: 'q1',
+  frameRev: 0, queueRev: 0, settingsRev: 0, ready: {}, sharedControl: false, requireApproval: false,
 } as PartyRuntime
 
 beforeEach(() => {
@@ -83,5 +88,57 @@ describe('WatchPartyQueue', () => {
     fireEvent.change(screen.getByLabelText('Queue video URLs'), { target: { value: 'https://a\nhttps://b\nhttps://c' } })
     fireEvent.click(screen.getByRole('button', { name: /^add$/i }))
     expect(await screen.findByText(/Queue limit \(50\) reached/)).toBeTruthy()
+  })
+
+  it('local entries show readiness counts and a receive control', () => {
+    const localParty = {
+      ...party,
+      members: [{ id: 'me', name: 'Me' }, { id: 'u2', name: 'Bob' }],
+      queue: [
+        { id: 'q1', name: 'clip.mp4', url: '/api/objects/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', hash: 'f'.repeat(64), size: 10, local: true },
+      ],
+      current: 'q1',
+      ready: { q1: ['u2'] },
+    } as PartyRuntime
+    render(<WatchPartyQueue party={localParty} identity={identity} />)
+    expect(screen.getByText('1/2 ready')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /receive local file from peers/i })).toBeTruthy()
+  })
+
+  it('proposed entries show an approve control for the host only', async () => {
+    const proposedParty = {
+      ...party,
+      queue: [{ id: 'q1', name: 'suggestion', url: '/api/objects/s', status: 'proposed' as const }],
+    } as PartyRuntime
+    const { unmount } = render(<WatchPartyQueue party={proposedParty} identity={identity} />)
+    expect(screen.getByText('proposed')).toBeTruthy()
+    const { queueOp } = await import('../../hooks/watchPartyStore')
+    fireEvent.click(screen.getByRole('button', { name: /approve suggestion/i }))
+    expect(vi.mocked(queueOp)).toHaveBeenCalledWith('p1', 'approve', 'q1')
+    unmount()
+  })
+
+  it('non-controllers see no transport or mutation controls', () => {
+    const viewerParty = {
+      ...party,
+      host: 'someone-else',
+      sharedControl: false,
+    } as PartyRuntime
+    render(<WatchPartyQueue party={viewerParty} identity={identity} />)
+    expect(screen.queryAllByRole('button', { name: /play now/i })).toHaveLength(0)
+    expect(screen.queryAllByRole('button', { name: /remove from queue/i })).toHaveLength(0)
+    expect(screen.queryByRole('button', { name: /play next/i })).toBeNull()
+  })
+
+  it('shared control opens mutation controls to members', () => {
+    const sharedParty = {
+      ...party,
+      host: 'someone-else',
+      sharedControl: true,
+      members: [{ id: 'me', name: 'Me' }],
+    } as PartyRuntime
+    render(<WatchPartyQueue party={sharedParty} identity={identity} />)
+    expect(screen.getAllByRole('button', { name: /remove from queue/i })).toHaveLength(2)
+    expect(screen.getByRole('button', { name: /play next/i })).toBeTruthy()
   })
 })

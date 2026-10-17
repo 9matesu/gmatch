@@ -265,7 +265,7 @@ export function useP2P(identity: OrbitIdentity | null) {
       void import('../utils/pendingTransfers').then(({ resumePendingTransfers }) =>
         resumePendingTransfers((id, hash) =>
           import('../utils/p2pSwarm').then(({ requestSwarmObject }) =>
-            requestSwarmObject(id, 5000, hash ?? undefined),
+            requestSwarmObject(id, 5000, { expectedHash: hash ?? undefined }),
           ),
         ),
       ).catch(() => {})

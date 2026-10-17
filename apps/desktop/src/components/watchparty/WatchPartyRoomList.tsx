@@ -6,9 +6,10 @@
 // 2. Open rooms with video miniature/thumbnail, title, media title, and member count badge.
 
 import { useEffect, useState } from 'react'
-import { Plus, Users, Play, Film, History } from 'lucide-react'
+import { Plus, Users, Play, Film, History, Ticket } from 'lucide-react'
 import { orbitFetch } from '../../utils/api'
 import { joinPartyById, rememberedRooms, type RememberedRoom } from '../../hooks/watchPartyStore'
+import { watchInviteFromHash } from './invite'
 import { useObjectImage } from '../../hooks/useObjectImage'
 
 interface IdentityLike {
@@ -89,6 +90,9 @@ export function WatchPartyRoomList({
   const [rooms, setRooms] = useState<RoomItem[]>([])
   const [failed, setFailed] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [joinText, setJoinText] = useState('')
+  const [joinBusy, setJoinBusy] = useState(false)
+  const [joinError, setJoinError] = useState('')
   // Rooms this device remembers but is not currently in. Re-read whenever the
   // list mounts so a room left a moment ago shows up immediately.
   const [recents, setRecents] = useState<RememberedRoom[]>(() => rememberedRooms(joinedIds))
@@ -133,6 +137,48 @@ export function WatchPartyRoomList({
           {kickedNotice}
         </div>
       )}
+
+      {/* Join by room id or invite link */}
+      <form
+        className="mb-4 flex items-center gap-2"
+        onSubmit={(e) => {
+          e.preventDefault()
+          const raw = joinText.trim()
+          if (!raw || joinBusy) return
+          // Accept a bare 8-hex id or a full invite link; the token never
+          // touches storage — it goes straight into the join handshake.
+          const parsed = watchInviteFromHash(raw.includes('?') || raw.includes('#') ? raw : `#/watch?room=${raw}`)
+          if (!parsed) {
+            setJoinError('Enter a room id or paste an invite link.')
+            return
+          }
+          setJoinBusy(true)
+          setJoinError('')
+          void joinPartyById(identity, parsed.room, parsed.invite).then((ok) => {
+            setJoinBusy(false)
+            if (ok) setJoinText('')
+            else setJoinError('Could not join that room. The id may be wrong, the invite expired, or the room closed.')
+          })
+        }}
+      >
+        <Ticket className="w-4 h-4 text-retro-muted shrink-0" />
+        <input
+          type="text"
+          value={joinText}
+          onChange={(e) => setJoinText(e.target.value)}
+          placeholder="Room id or invite link"
+          aria-label="Room id or invite link"
+          className="glass-field min-w-0 flex-1 px-3 py-1.5 text-xs font-mono"
+        />
+        <button
+          type="submit"
+          disabled={!joinText.trim() || joinBusy}
+          className="glass-action px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-40"
+        >
+          {joinBusy ? 'Joining…' : 'Join'}
+        </button>
+      </form>
+      {joinError && <p className="mb-4 text-xs text-retro-error">{joinError}</p>}
 
       {/* Recently watched: rooms this device opened that are not joined right
           now. The server listing hides private rooms, so without this a room
@@ -195,7 +241,7 @@ export function WatchPartyRoomList({
               {/* Top-Right Member Badge */}
               <div className="absolute top-2 right-2 flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-black/80 backdrop-blur-md text-white border border-white/10 shadow-sm z-10">
                 <Users className="w-3 h-3 text-retro-muted" />
-                <span>{r.members}/8</span>
+                <span>{r.members}</span>
               </div>
 
               {/* Hover Play Button Overlay */}
