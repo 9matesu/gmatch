@@ -29,9 +29,13 @@ export const BTN =
 
 export const BTN_SMALL = 'rounded-lg px-2.5 py-1 text-xs'
 
-/** Primary action — the one blue accent, ink label. No glow. */
+/** Primary action — the one blue accent, ink label. No glow.
+ *  The text colour is marked important on purpose: it is the one property
+ *  here that BTN also sets, and Tailwind emits `text-retro-fg` AFTER
+ *  `text-retro-accent-text`, so without the bang the ink label loses to
+ *  BTN's white one and the button renders white-on-white. */
 export const BTN_PRIMARY =
-  'bg-retro-accent text-retro-accent-text hover:bg-retro-accent-hover border-transparent font-bold'
+  'bg-retro-accent text-retro-accent-text! hover:bg-retro-accent-hover border-transparent font-bold'
 
 /** Destructive prestige action. */
 export const BTN_DANGER =

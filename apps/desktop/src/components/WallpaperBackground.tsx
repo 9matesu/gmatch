@@ -14,7 +14,10 @@ export function WallpaperBackground({ wallpaperBg, wallpaperFit = 'cover', wallp
   const isVideo = wallpaperMime.startsWith('video/') || /\.(mp4|webm|ogv|mov)(\?|$)/i.test(wallpaperBg.split('?')[0]) || wallpaperBg.includes('/rg-media');
 
   const imgStyle = {
-    backgroundImage: `url(${wallpaperBg})`,
+    // Quote the URL: unquoted url() drops data: URLs (their payload carries
+    // characters the CSS parser rejects there), which silently blanked every
+    // uploaded data-URL wallpaper while remote URLs kept working.
+    backgroundImage: `url("${wallpaperBg}")`,
     backgroundSize: wallpaperFit === 'contain' ? 'contain' : wallpaperFit === 'repeat' ? 'auto' : 'cover',
     backgroundPosition: 'center',
     backgroundRepeat: wallpaperFit === 'repeat' ? 'repeat' : 'no-repeat',
@@ -34,7 +37,7 @@ export function WallpaperBackground({ wallpaperBg, wallpaperFit = 'cover', wallp
         {wallpaperFit !== 'repeat' && !isVideo && (
           <div
             className="absolute -inset-10 bg-cover bg-center filter blur-3xl opacity-40 scale-110 transform-gpu"
-            style={{ backgroundImage: `url(${wallpaperBg})` }}
+            style={{ backgroundImage: `url("${wallpaperBg}")` }}
           />
         )}
         {isVideo ? (
@@ -49,7 +52,9 @@ export function WallpaperBackground({ wallpaperBg, wallpaperFit = 'cover', wallp
         ) : (
           <div className={`absolute inset-0 ${wallpaperFit === 'repeat' ? '' : 'bg-center'}`} style={imgStyle} />
         )}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/60" />
+        {/* Scrim kept one step darker than the artwork so PLATE glass reads
+            over bright wallpapers. App-wide by nature: every view shares it. */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/65 via-black/45 to-black/75" />
       </div>
 
       {hideUiForWallpaper && (
