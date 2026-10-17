@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { SpeakerHigh, SpeakerSlash, Minus, Square, X, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import { isAudioMuted, setAudioMuted, playPress } from '../../utils/sounds';
+import { NotificationCenter } from '../notifications/NotificationCenter';
 
 export interface NativeHeaderBarProps {
   wsConnected?: boolean;
@@ -72,6 +73,9 @@ export function NativeHeaderBar({
 
         <span className="text-[13px] font-bold tracking-wide text-retro-fg select-none ml-1">gMatch</span>
       </div>
+
+      {/* Center: transient notification island (persistent inbox bell stays separate) */}
+      <NotificationCenter />
 
       {/* Right: mute + window controls (frameless: buttons render
           only when the preload bridge exposes them. Browser/dev = no bridge) */}

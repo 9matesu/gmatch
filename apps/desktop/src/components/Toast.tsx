@@ -1,20 +1,37 @@
 "use client";
 
 import { useState, useEffect, createContext, useContext, useCallback } from 'react';
-import { CheckCircle2, AlertCircle, AlertTriangle, Info } from 'lucide-react';
 
-interface ToastMessage {
+export interface ToastMessage {
   id: string;
   text: string;
   type: 'success' | 'error' | 'info' | 'warning';
   sender?: string;
+  /** Errors persist until dismissed (max 1 sticky at a time). */
+  sticky?: boolean;
+  ts: number;
 }
 
 interface ToastCtx {
   toast: (text: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
+  messages: ToastMessage[];
+  dismiss: (id: string) => void;
+  clearAll: () => void;
+  /** Transient items dropped due to the overflow cap. */
+  overflowCount: number;
 }
 
-const ToastContext = createContext<ToastCtx>({ toast: () => { } });
+const DEDUPE_WINDOW_MS = 5000;
+const MAX_TRANSIENT = 3;
+
+export function durationFor(type: ToastMessage['type'], sticky?: boolean): number | null {
+  if (sticky) return null;
+  if (type === 'error') return null; // errors persist until dismissed
+  if (type === 'warning') return 5000;
+  return 3000;
+}
+
+const ToastContext = createContext<ToastCtx>({ toast: () => { }, messages: [], dismiss: () => { }, clearAll: () => { }, overflowCount: 0 });
 
 export function useToast() {
   return useContext(ToastContext);
@@ -22,77 +39,48 @@ export function useToast() {
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = useState<ToastMessage[]>([]);
+  const [overflowCount, setOverflowCount] = useState(0);
 
   useEffect(() => {
-    const clearOnLogout = () => setMessages([]);
+    const clearOnLogout = () => { setMessages([]); setOverflowCount(0); };
     window.addEventListener('orbit-identity-cleared', clearOnLogout);
     return () => window.removeEventListener('orbit-identity-cleared', clearOnLogout);
   }, []);
 
-  const toast = useCallback((text: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
-    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    setMessages(prev => [...prev, { id, text, type }]);
+  const dismiss = useCallback((id: string) => {
+    setMessages(prev => prev.filter(m => m.id !== id));
   }, []);
 
-  const remove = (id: string) => {
-    setMessages(prev => prev.filter(m => m.id !== id));
-  };
+  const clearAll = useCallback(() => {
+    setMessages([]);
+    setOverflowCount(0);
+  }, []);
+
+  const toast = useCallback((text: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
+    const clean = String(text || '').trim().slice(0, 280);
+    if (!clean) return;
+    const now = Date.now();
+    const sticky = type === 'error';
+    setMessages(prev => {
+      // Dedupe: suppress identical severity+text within the window without
+      // extending the original's lifetime (first timestamp wins).
+      if (prev.some(m => m.type === type && m.text === clean && now - m.ts < DEDUPE_WINDOW_MS)) return prev;
+      const id = now.toString(36) + Math.random().toString(36).slice(2, 6);
+      const next = [...prev, { id, text: clean, type, sticky, ts: now }];
+      // Cap: one sticky error + MAX_TRANSIENT others; extras count as overflow.
+      const stickies = next.filter(m => m.sticky);
+      const rest = next.filter(m => !m.sticky);
+      const keptSticky = stickies.slice(-1);
+      const keptRest = rest.slice(-MAX_TRANSIENT);
+      const dropped = next.length - keptSticky.length - keptRest.length;
+      if (dropped > 0) setOverflowCount(c => c + dropped);
+      return [...keptSticky, ...keptRest];
+    });
+  }, []);
 
   return (
-    <ToastContext.Provider value={{ toast }}>
+    <ToastContext.Provider value={{ toast, messages, dismiss, clearAll, overflowCount }}>
       {children}
-      <div
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        className="fixed bottom-20 md:bottom-5 right-5 z-[var(--z-toast)] flex flex-col gap-2 max-w-sm pointer-events-none"
-      >
-        {messages.map(msg => (
-          <ToastItem key={msg.id} message={msg} onDone={() => remove(msg.id)} />
-        ))}
-      </div>
     </ToastContext.Provider>
-  );
-}
-
-function ToastItem({ message, onDone }: { message: ToastMessage; onDone: () => void }) {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    requestAnimationFrame(() => setVisible(true));
-    const timer = setTimeout(() => {
-      setVisible(false);
-      setTimeout(onDone, 200);
-    }, 4500);
-    return () => clearTimeout(timer);
-  }, [onDone]);
-
-  const IconComp =
-    message.type === 'success'
-      ? CheckCircle2
-      : message.type === 'error'
-      ? AlertCircle
-      : message.type === 'warning'
-      ? AlertTriangle
-      : Info;
-
-  const iconColor =
-    message.type === 'success'
-      ? 'text-emerald-400'
-      : message.type === 'error'
-      ? 'text-red-400'
-      : message.type === 'warning'
-      ? 'text-amber-400'
-      : 'text-retro-body';
-
-  return (
-    <div
-      className={`pointer-events-auto bg-retro-bg/95 border border-border-glass rounded-lg px-3.5 py-2.5 shadow-2xl backdrop-blur-md transition-all duration-150 flex items-start gap-2.5 max-w-sm ${
-        visible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-2 scale-95'
-      }`}
-    >
-      <IconComp className={`w-4 h-4 shrink-0 mt-0.5 ${iconColor}`} />
-      <span className="text-xs text-retro-fg leading-relaxed break-words font-medium">{message.text}</span>
-    </div>
   );
 }
