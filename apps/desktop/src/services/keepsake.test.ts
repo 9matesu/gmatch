@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
-  persistKeepsake, resolveFreshLocalUrl, resolveKeepsakeLocal,
+  persistKeepsake, resolveFreshLocalUrl, resolveKeepsakeLocal, resolveLocalMedia,
   releaseLocalUrl, retainLocalUrl, _resetLocalUrls,
 } from './keepsake';
 
@@ -215,5 +215,86 @@ describe('local blob URL ownership (Phase 9)', () => {
     expect(URL.revokeObjectURL).toHaveBeenCalledWith(b)
     releaseLocalUrl(a)
     expect(vi.mocked(URL.revokeObjectURL)).toHaveBeenCalledTimes(2)
+  })
+});
+
+describe('resolveLocalMedia (honest local states)', () => {
+  // The renderer bridge: the only way a vault probe can answer here (node env).
+  const bridge = (impl: Record<string, unknown>) => vi.stubGlobal('window', { gmatch: impl })
+  const keep = (over: { url?: string; kind?: 'image' | 'video'; localRef?: string } = {}) => ({
+    url: 'https://provider/x.jpg',
+    kind: 'image' as const,
+    ...over,
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    _resetLocalUrls()
+  })
+
+  it('resolves the vault by content ref and hands out a browser-playable loopback URL', async () => {
+    const ref = 'b'.repeat(64)
+    const vaultGet = vi.fn(async (key: string) =>
+      key === `vault://f/${ref}` ? { state: 'local', local: `vault://f/${ref}.jpg` } : { state: 'absent' },
+    )
+    bridge({ vaultGet, vaultHttpUrl: async () => ({ local: `http://127.0.0.1:9/f/${ref}.jpg` }) })
+
+    await expect(resolveLocalMedia(keep({ localRef: ref }))).resolves.toEqual({
+      state: 'local',
+      url: `http://127.0.0.1:9/f/${ref}.jpg`,
+    })
+    // The keep's own identity is tried before the (possibly drifted) source url.
+    expect(vaultGet).toHaveBeenCalledWith(`vault://f/${ref}`)
+  })
+
+  it('resolves a drifted-source keep through its content ref (the viewer bug)', async () => {
+    const ref = 'e'.repeat(64)
+    const vaultGet = vi.fn(async (key: string) =>
+      key === `vault://f/${ref}` ? { state: 'local', local: 'vault://f/legacy.jpg' } : { state: 'absent' },
+    )
+    bridge({ vaultGet, vaultHttpUrl: async () => ({ local: 'http://127.0.0.1:9/f/legacy.jpg' }) })
+
+    await expect(
+      resolveFreshLocalUrl({ url: 'https://old-host/x.jpg', kind: 'image', saveState: 'persisted', localRef: ref }),
+    ).resolves.toBe('http://127.0.0.1:9/f/legacy.jpg')
+  })
+
+  it('falls back to the source url for a legacy row with no ref', async () => {
+    const vaultGet = vi.fn(async (key: string) =>
+      key === 'https://provider/legacy.jpg' ? { state: 'local', local: 'vault://f/legacy.jpg' } : { state: 'absent' },
+    )
+    bridge({ vaultGet, vaultHttpUrl: async () => null })
+
+    await expect(resolveLocalMedia(keep({ url: 'https://provider/legacy.jpg' }))).resolves.toEqual({
+      state: 'local',
+      url: 'vault://f/legacy.jpg',
+    })
+  })
+
+  it('reports bytes that exist but cannot be read as unreadable, never as absent', async () => {
+    bridge({ vaultGet: async () => ({ state: 'unreadable', reason: 'decrypt' }) })
+    await expect(resolveLocalMedia(keep({ localRef: 'c'.repeat(64) }))).resolves.toEqual({
+      state: 'unreadable',
+      reason: 'decrypt',
+    })
+  })
+
+  it('reports a broken bridge as unreadable (ipc), not as a missing file', async () => {
+    bridge({ vaultGet: async () => { throw new Error('no handler') } })
+    await expect(resolveLocalMedia(keep())).resolves.toEqual({ state: 'unreadable', reason: 'ipc' })
+  })
+
+  it('is absent only once the vault and the object store both miss', async () => {
+    bridge({ vaultGet: async () => ({ state: 'absent' }) })
+    await expect(resolveLocalMedia(keep())).resolves.toEqual({ state: 'absent' })
+  })
+
+  it('still resolves bytes for a keep marked failed (saveState is not proof)', async () => {
+    bridge({ vaultGet: async () => ({ state: 'absent' }) })
+    const { getLocalObject } = await import('../utils/p2pSwarm')
+    vi.mocked(getLocalObject).mockResolvedValueOnce(new Blob(['bytes'], { type: 'image/jpeg' }))
+
+    const r = await resolveLocalMedia(keep({ url: 'https://p/failed.jpg' }))
+    expect(r.state).toBe('local')
   })
 });

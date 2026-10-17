@@ -8,8 +8,8 @@ import { redgifsPlayable } from '../../services/redgifs'
 import CachedImg from '../../ui/CachedImg'
 import MediaViewerModal from '../../ui/MediaViewerModal'
 import { EmptyState } from '../EmptyState'
-import { useVaultUrls, useVaultUrl } from '../../services/vault'
-import { resolveKeepsakeLocal, type KeepsakeLocal } from '../../services/keepsake'
+import { useVaultUrls, useVaultUrl, useVaultHttpUrls } from '../../services/vault'
+import { resolveKeepsakeLocal, resolveLocalMedia, retainLocalUrl, releaseLocalUrl, type KeepsakeLocal } from '../../services/keepsake'
 import { SlideshowPlayer, type ResolvedItem } from '../slideshows/SlideshowPlayer'
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer'
 import {
@@ -199,7 +199,8 @@ function useVaultPinProgress(): Record<string, number> {
   return map
 }
 
-/** Re-run the authorized persist pipeline for one keep; store the outcome. */
+/** Re-run the authorized persist pipeline for one keep; store the outcome.
+ *  A failed retry never discards an identity the record already carries. */
 async function retryKeepsake(img: GalleryImage): Promise<void> {
   useGame.setState((s) => ({
     gallery: s.gallery.map((g) => (g.id === img.id ? { ...g, saveState: 'downloading' as const } : g)),
@@ -208,25 +209,52 @@ async function retryKeepsake(img: GalleryImage): Promise<void> {
   const res = await persistKeepsake(img.url, {}, img.kind)
   useGame.setState((s) => ({
     gallery: s.gallery.map((g) =>
-      g.id === img.id ? { ...g, saveState: res.status === 'local' ? 'persisted' : 'failed', localRef: res.ref } : g,
+      g.id === img.id ? { ...g, saveState: res.status === 'local' ? 'persisted' : 'failed', localRef: res.ref ?? g.localRef } : g,
     ),
   }))
 }
 
-/** Local error state: bytes unavailable, record kept, no remote redirect. */
-function KeepsakeErrorState({ state, onRetry }: { state: string; onRetry: () => void }) {
+/** Viewer media resolution: verified local bytes, or a diagnosable non-local
+ *  state. `missing` is only set after a completed local lookup; a read or
+ *  decrypt failure is `error`, never disguised as absence. */
+type ViewerMedia =
+  | { status: 'loading' }
+  | { status: 'local'; url: string; media: 'image' | 'video' }
+  | { status: 'missing' }
+  | { status: 'error'; reason: string }
+
+/** Local error state: bytes unavailable or unreadable, record kept, no remote
+ *  redirect. Loading is its own state: an in-flight lookup must not be shown
+ *  as "unavailable", and an unreadable vault row is never shown as missing. */
+function KeepsakeErrorState({
+  state,
+  reason,
+  onRetry,
+}: {
+  state: string
+  reason?: string
+  onRetry: () => void
+}) {
+  const unreadable = state === 'error'
+  const title =
+    state === 'pending'
+      ? 'Caching the bytes…'
+      : unreadable
+        ? 'Local media could not be read'
+        : 'Media unavailable locally'
+  const detail = unreadable
+    ? `The bytes are on this device but the local vault could not read them (${reason || 'unreadable'}). The record is kept.`
+    : 'The saved bytes could not be found or recovered on this device. The record is kept — retry the download or re-import the media.'
   return (
     <div
       role="alert"
       className="flex max-h-[70vh] min-h-[240px] w-[320px] max-w-full flex-col items-center justify-center gap-2 rounded-lg border border-border-glass bg-black/60 p-6 text-center"
     >
-      <span className="text-xs font-semibold text-retro-fg">Media unavailable locally</span>
-      <span className="text-[11px] leading-relaxed text-retro-muted">
-        {state === 'pending'
-          ? 'Caching the bytes…'
-          : 'The saved bytes could not be found or recovered on this device. The record is kept — retry the download or re-import the media.'}
-      </span>
+      <span className="text-xs font-semibold text-retro-fg">{title}</span>
       {state !== 'pending' && (
+        <span className="text-xs leading-relaxed text-retro-muted">{detail}</span>
+      )}
+      {state !== 'pending' && !unreadable && (
         <button
           type="button"
           onClick={onRetry}
@@ -375,6 +403,37 @@ export default function IdleGalleryView({
     (viewerId && sortedGallery.find((g) => g.id === viewerId)?.url) || null,
   )
 
+  // Resolve tile candidates for the current page, then convert any vault://
+  // references to localhost http via useVaultHttpUrls (single hook call at
+  // gallery level — never inside the .map() loop). Raw vault:// depends on
+  // the Electron custom-scheme handler; localhost http works everywhere and
+  // supports Range requests for <video> seek.
+  //
+  // useVaultHttpUrls is async (useEffect internally), so httpUrlMap starts
+  // empty. While a vault:// reference is unresolved we return the vault://
+  // reference itself (never an empty string, which would trigger a page
+  // reload). The tile renderer decides whether to show a placeholder while
+  // the reference is still pending.
+  const tileUrlById = useMemo(
+    () =>
+      new Map(
+        paginatedGallery.map((img) => [
+          img.id,
+          resolveGalleryTileUrl(img, vaultUrls[img.url || ''] || localUrls[img.url || '']),
+        ]),
+      ),
+    [paginatedGallery, vaultUrls, localUrls],
+  )
+  const vaultTileUrls = [...tileUrlById.values()].filter((u): u is string =>
+    u.startsWith('vault://'),
+  )
+  const httpUrlMap = useVaultHttpUrls(vaultTileUrls)
+  const getTileUrl = (img: GalleryImage): string => {
+    const raw = tileUrlById.get(img.id) || ''
+    if (raw.startsWith('vault://')) return httpUrlMap[raw] || raw
+    return raw
+  }
+
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
@@ -434,11 +493,67 @@ export default function IdleGalleryView({
     return resolveKeepsakeLocal(viewerItem, merged, localUrls)
   }, [viewerItem, vaultUrls, localUrls, viewerVaultUrl])
 
-  // Legacy recovery: a viewer without verified bytes attempts the authorized
-  // persist pipeline once; failure keeps the record and shows the error state.
+  // Async resolution for the open viewer: the page-level maps cover the common
+  // case (a keep already resolved by url), but a keep whose source url drifted
+  // (host / API-base change) or whose bytes are addressable only by content
+  // hash needs a fresh lookup. The viewer must never call bytes "unavailable"
+  // while a resolution attempt is still owed, and a read or decrypt failure is
+  // reported as such, never as a missing file.
+  const [viewerProbe, setViewerProbe] = useState<{ id: string; media: ViewerMedia } | null>(null)
+  useEffect(() => {
+    if (!viewerItem || viewerLocal?.kind === 'local') return
+    const id = viewerItem.id
+    let dead = false
+    let held: string | null = null
+    setViewerProbe({ id, media: { status: 'loading' } })
+    void (async () => {
+      const r = await resolveLocalMedia(viewerItem)
+      if (r.state === 'local') {
+        const blob = r.url.startsWith('blob:')
+        if (dead) {
+          if (blob) releaseLocalUrl(r.url)
+          return
+        }
+        // A mounted <video> keeps streaming: claim the URL so the cap cannot
+        // reap it mid-seek. Released when the viewer switches or unmounts.
+        if (blob) {
+          retainLocalUrl(r.url)
+          held = r.url
+        }
+        setViewerProbe({
+          id,
+          media: { status: 'local', url: r.url, media: viewerItem.kind === 'video' ? 'video' : 'image' },
+        })
+        return
+      }
+      if (dead) return
+      setViewerProbe({
+        id,
+        media: r.state === 'unreadable' ? { status: 'error', reason: r.reason } : { status: 'missing' },
+      })
+    })()
+    return () => {
+      dead = true
+      if (held) releaseLocalUrl(held)
+    }
+  }, [viewerItem, viewerLocal])
+
+  const viewerResolved: ViewerMedia =
+    viewerLocal?.kind === 'local'
+      ? { status: 'local', url: viewerLocal.url, media: viewerLocal.media }
+      : viewerProbe && viewerItem && viewerProbe.id === viewerItem.id
+        ? viewerProbe.media
+        : { status: 'loading' }
+  const viewerLocalUrl = viewerResolved.status === 'local' ? viewerResolved.url : null
+
+  // Legacy recovery: only after the fresh lookup CONFIRMED no local bytes does
+  // a viewer without verified bytes attempt the authorized persist pipeline
+  // once. Failure keeps the record (and any existing localRef); nothing is
+  // silently discarded or re-imported while bytes might still be local.
   const recoveryTried = useRef<Set<string>>(new Set())
   useEffect(() => {
-    if (!viewerItem || !viewerLocal || viewerLocal.kind !== 'missing' || !viewerLocal.legacy) return
+    if (!viewerItem || viewerResolved.status !== 'missing') return
+    if (viewerLocal?.kind !== 'missing' || !viewerLocal.legacy) return
     if (recoveryTried.current.has(viewerItem.id)) return
     recoveryTried.current.add(viewerItem.id)
     const target = viewerItem
@@ -447,11 +562,13 @@ export default function IdleGalleryView({
       const res = await persistKeepsake(target.url, {}, target.kind)
       useGame.setState((s) => ({
         gallery: s.gallery.map((g) =>
-          g.id === target.id ? { ...g, saveState: res.status === 'local' ? 'persisted' : 'failed', localRef: res.ref } : g,
+          g.id === target.id
+            ? { ...g, saveState: res.status === 'local' ? 'persisted' : 'failed', localRef: res.ref ?? g.localRef }
+            : g,
         ),
       }))
     })()
-  }, [viewerItem, viewerLocal])
+  }, [viewerItem, viewerResolved, viewerLocal])
 
   // Forwarding (repost/story/forge) prefers verified local bytes; the remote
   // URL survives only as import provenance for the controlled forge pipeline
@@ -748,7 +865,7 @@ export default function IdleGalleryView({
               const isBackdrop = backgroundUrl === img.url
               const isMotion = img.kind === 'video'
               const isSelected = selectedIds.has(img.id)
-              const tileUrl = resolveGalleryTileUrl(img, vaultUrls[img.url || ''] || localUrls[img.url || ''])
+              const tileUrl = getTileUrl(img)
 
               return (
                 <div
@@ -810,7 +927,10 @@ export default function IdleGalleryView({
                     {isMotion ? (
                       <video
                         className="block h-full w-full object-cover"
-                        src={tileUrl}
+                        // Never assign src="": an unresolved vault:// reference
+                        // (or an empty candidate) omits the attribute entirely,
+                        // so the browser never re-requests the whole page.
+                        src={tileUrl && !tileUrl.startsWith('vault://') ? tileUrl : httpUrlMap[tileUrl] || undefined}
                         poster={img.preview || undefined}
                         muted
                         preload="metadata"
@@ -820,7 +940,7 @@ export default function IdleGalleryView({
                     ) : (
                       <CachedImg
                         className="block h-full w-full object-cover"
-                        src={tileUrl || offlineSvg(img.tags)}
+                        src={tileUrl && !tileUrl.startsWith('vault://') ? tileUrl : httpUrlMap[tileUrl] || offlineSvg(img.tags)}
                         fallbackSrc={offlineSvg(img.tags)}
                         alt={img.tags.slice(0, 3).join(' ') || 'gallery image'}
                         referrerPolicy="no-referrer"
@@ -1058,10 +1178,10 @@ export default function IdleGalleryView({
         <MediaViewerModal onClose={() => setViewerId(null)} label="Keepsake viewer">
           <figure className="relative flex max-h-[80vh] min-h-0 w-auto max-w-full flex-col items-center">
             <div className="relative min-h-0 w-auto max-w-full" data-keepsake-id={viewer.id}>
-              {viewerLocal?.kind === 'local' ? (
-                viewer.kind === 'video' ? (
+              {viewerResolved.status === 'local' ? (
+                viewerResolved.media === 'video' ? (
                   <NativeVideoPlayer
-                    src={viewerLocal.url}
+                    src={viewerResolved.url}
                     poster={viewer.preview || undefined}
                     className="max-h-[70vh] w-auto max-w-full rounded-lg"
                     videoClassName="max-h-[70vh] w-auto max-w-full rounded-lg object-contain"
@@ -1073,7 +1193,7 @@ export default function IdleGalleryView({
                   />
                 ) : (
                   <img
-                    src={viewerLocal.url}
+                    src={viewerResolved.url}
                     alt={viewer.tags.slice(0, 3).join(' ') || 'keepsake'}
                     className="max-h-[70vh] w-auto max-w-full rounded-lg object-contain"
                     referrerPolicy="no-referrer"
@@ -1081,7 +1201,16 @@ export default function IdleGalleryView({
                 )
               ) : (
                 <KeepsakeErrorState
-                  state={viewerLocal?.kind ?? 'missing'}
+                  state={
+                    viewerResolved.status === 'error'
+                      ? 'error'
+                      : viewerResolved.status === 'loading'
+                        ? 'pending'
+                        : viewerLocal?.kind === 'failed'
+                          ? 'failed'
+                          : 'missing'
+                  }
+                  reason={viewerResolved.status === 'error' ? viewerResolved.reason : undefined}
                   onRetry={() => void retryKeepsake(viewer)}
                 />
               )}
@@ -1126,7 +1255,7 @@ export default function IdleGalleryView({
                   type="button"
                   onClick={() =>
                     onRepostImage({
-                      url: viewerLocal?.kind === 'local' ? viewerLocal.url : viewer.url,
+                      url: viewerLocalUrl ?? viewer.url,
                       tags: viewer.tags,
                       name: viewer.tags.slice(0, 3).join(' ') || 'Keepsake',
                       kind: viewer.kind,
@@ -1145,7 +1274,7 @@ export default function IdleGalleryView({
                   type="button"
                   onClick={() =>
                     onAddToStory({
-                      url: viewerLocal?.kind === 'local' ? viewerLocal.url : viewer.url,
+                      url: viewerLocalUrl ?? viewer.url,
                       tags: viewer.tags,
                       name: viewer.tags.slice(0, 3).join(' ') || 'Keepsake',
                       kind: viewer.kind,
@@ -1197,9 +1326,9 @@ export default function IdleGalleryView({
                     }
                   })()
                 }}
-                disabled={viewerLocal?.kind !== 'local'}
+                disabled={!viewerLocalUrl}
                 className="glass-action px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                title={viewerLocal?.kind === 'local' ? 'Download media' : 'Download needs local bytes first'}
+                title={viewerLocalUrl ? 'Download media' : 'Download needs local bytes first'}
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Download</span>
@@ -1236,9 +1365,9 @@ export default function IdleGalleryView({
                     window.open(fresh, '_blank', 'noopener,noreferrer')
                   }
                 }}
-                disabled={viewerLocal?.kind !== 'local'}
+                disabled={!viewerLocalUrl}
                 className="glass-action px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                title={viewerLocal?.kind === 'local' ? 'Open in browser' : 'Open needs local bytes first'}
+                title={viewerLocalUrl ? 'Open in browser' : 'Open needs local bytes first'}
               >
                 <ExternalLink className="w-3.5 h-3.5" />
                 <span>Browser</span>

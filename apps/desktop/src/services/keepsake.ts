@@ -231,39 +231,70 @@ export function _resetLocalUrls(): void {
   claimedLocalUrls.clear()
 }
 
+/** Outcome of resolving one keep's locally held bytes. `absent` means the
+ *  lookup completed and found nothing; `unreadable` means bytes are known to
+ *  be local but could not be read or decrypted. The two are never conflated. */
+export type LocalMedia =
+  | { state: 'local'; url: string }
+  | { state: 'absent' }
+  | { state: 'unreadable'; reason: string }
+
 /**
- * Fresh local resolution at action time (open/download): vault lookup first
- * (by content ref, then by source url for legacy entries), then the durable
- * object store, minting a blob URL only from verified bytes.
- * Never returns the provider URL. Minted blob URLs are registered for
- * ownership (`releaseLocalUrl` / `retainLocalUrl` above).
+ * Fresh local resolution at action time (view/open/download): the vault by
+ * content ref first (the keep's own identity), then by source url (legacy
+ * entries indexed by url), then the durable object store. A vault:// hit is
+ * handed out as a browser-playable loopback URL -- raw vault:// depends on the
+ * Electron custom-scheme handler. Never returns the provider URL. Minted blob
+ * URLs are registered for ownership (`releaseLocalUrl` / `retainLocalUrl`).
+ */
+export async function resolveLocalMedia(
+  img: Pick<GalleryImage, 'url' | 'kind' | 'localRef'>,
+): Promise<LocalMedia> {
+  const key = img.url || ''
+  const byRef = img.localRef ? `vault://f/${img.localRef}` : ''
+  if (!key && !byRef) return { state: 'absent' }
+  let unreadable: string | undefined
+  try {
+    const { vaultProbe, vaultHttpUrl } = await import('./vault')
+    for (const candidate of [byRef, key]) {
+      if (!candidate) continue
+      const hit = await vaultProbe(candidate)
+      if (hit.state === 'unreadable') {
+        unreadable = hit.reason
+        continue
+      }
+      if (hit.state !== 'local') continue
+      const url = hit.local.startsWith('vault://')
+        ? (await vaultHttpUrl(hit.local)) || hit.local
+        : hit.local
+      if (isLocalValue(url, key)) return { state: 'local', url }
+    }
+  } catch { /* vault unavailable: fall through to the object store */ }
+  try {
+    const blob =
+      (img.localRef ? await getLocalObject(img.localRef) : null) ||
+      (key ? await getLocalObject(key) : null)
+    if (blob && blob.size > 0) {
+      const url = URL.createObjectURL(blob)
+      trackLocalUrl(url)
+      return { state: 'local', url }
+    }
+  } catch { /* unresolved */ }
+  return unreadable ? { state: 'unreadable', reason: unreadable } : { state: 'absent' }
+}
+
+/**
+ * Fresh local resolution at action time (open/download): the viewer's resolver,
+ * minus the two cases where handing out a URL would be wrong -- a record with
+ * no source url, and one already known to have failed to persist.
  */
 export async function resolveFreshLocalUrl(
   img: Pick<GalleryImage, 'url' | 'kind' | 'saveState' | 'localRef'>,
 ): Promise<string | null> {
-  const key = img.url || ''
-  if (!key) return null
+  if (!img.url) return null
   if (img.saveState === 'failed') return null
-  // A verified keep points at its content hash. Resolve the vault:// URL by
-  // ref first; fall back to the source url for legacy entries indexed by url.
-  try {
-    const { vaultGet } = await import('./vault')
-    const byRef = img.localRef ? await vaultGet(`vault://f/${img.localRef}`).catch(() => null) : null
-    if (byRef && isLocalValue(byRef, key)) return byRef
-    const byUrl = await vaultGet(key).catch(() => null)
-    if (byUrl && isLocalValue(byUrl, key)) return byUrl
-  } catch { /* fall through to the object store */ }
-  try {
-    const blob =
-      (img.localRef ? await getLocalObject(img.localRef) : null) ||
-      (await getLocalObject(key))
-    if (blob && blob.size > 0) {
-      const url = URL.createObjectURL(blob)
-      trackLocalUrl(url)
-      return url
-    }
-  } catch { /* unresolved */ }
-  return null
+  const r = await resolveLocalMedia(img)
+  return r.state === 'local' ? r.url : null
 }
 
 /**

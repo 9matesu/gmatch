@@ -177,6 +177,21 @@ text overlays kept for caption hunts, §6).
 - Tags tab: owned pills toggle ON/OFF plus SOLO (feed only that one tag).
   Gallery tab: text box filters keepsakes by tag substring.
   Config tab: starter picks recap + extra excludes (add/remove, 100 max).
+- Keepsakes render from locally held bytes only: the Electron media vault on
+  disk, or the IndexedDB object store when there is no bridge. A saved keep is
+  identified by `sha256(bytes)` (`localRef`), images/videos are served over the
+  vault's loopback http URL (Range-capable), and the provider URL is never used
+  as a render source for a verified keep.
+- Vault rows written before content hashes were recorded are keyed by source url
+  (`sha256(url).<ext>` on disk). On the first lookup by content ref the main
+  process reads such a row once, binds `hash = sha256(bytes)` and persists it, so
+  a keep whose source url drifted still finds its own bytes.
+- The keepsake viewer resolves `localRef` → source url → object store and states
+  its outcome: a distinct loading state while the lookup runs, the media when it
+  lands, and "Media unavailable locally" only after that lookup confirms the
+  bytes are gone. Bytes that are on disk but cannot be read/decrypted are
+  reported as a read failure (with the reason), never as a missing file, and the
+  record is neither dropped nor re-imported while local bytes may still exist.
 
 ## 8. Blocklist — client-side only (reject tag if a term matches on a token boundary; case-insensitive)
 

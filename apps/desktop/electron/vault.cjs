@@ -43,6 +43,9 @@ let manifest = {}
 let byHash = new Map()
 /** Test seam: stub the byte fetcher (defaults to imageCache.fetchBinary). */
 let fetcher = null
+/** storeKeys whose bytes could not be read/hashed this session: the lazy
+ *  content-hash backfill must not re-read them on every lookup. */
+const unhashable = new Set()
 
 function hashOf(buf) {
   return nodeCrypto.createHash('sha256').update(buf).digest('hex')
@@ -64,6 +67,7 @@ function manifestPath() {
 function loadManifest() {
   manifest = {}
   byHash = new Map()
+  unhashable.clear()
   try {
     const raw = fs.readFileSync(manifestPath(), 'utf8')
     const d = JSON.parse(raw)
@@ -173,6 +177,38 @@ function indexContent(storeKey, file, hash, mime, bytes, pins) {
   byHash.set(hash, storeKey)
 }
 
+/**
+ * Legacy rows were named sha256(source url) and carry no `hash`, so
+ * `vault://f/<contentHash>` -- the keep's own local identity (sha256 of the
+ * bytes) -- could not resolve them even though the bytes sit on disk. On a
+ * hash miss, read each hash-less entry once, hash its (decrypted) bytes and
+ * bind the hash, then persist. Bounded and one-time: an entry that has given
+ * a hash is never re-read, and bytes that cannot be read or decrypted are
+ * skipped (reported unreadable by `probe`, never as absence).
+ */
+function bindContentHashes(want) {
+  if (!HASH_RE.test(want)) return
+  let changed = false
+  for (const storeKey of Object.keys(manifest)) {
+    const e = manifest[storeKey]
+    if (e.hash || unhashable.has(storeKey)) continue
+    let hash
+    try {
+      // aead.decrypt returns null (not throws) on a bad envelope.
+      const buf = readFileBytes(e)
+      if (!buf) throw new Error('unreadable')
+      hash = hashOf(buf)
+    } catch {
+      unhashable.add(storeKey)
+      continue
+    }
+    e.hash = hash
+    changed = true
+    if (!byHash.has(hash)) byHash.set(hash, storeKey)
+  }
+  if (changed) writeManifest()
+}
+
 function entryFor(ref) {
   if (!ref) return null
   let str = String(ref)
@@ -181,7 +217,12 @@ function entryFor(ref) {
   const direct = manifest[str]
   if (direct) return { storeKey: str, entry: direct }
   if (HASH_RE.test(str)) {
-    const storeKey = byHash.get(str.toLowerCase())
+    const wanted = str.toLowerCase()
+    let storeKey = byHash.get(wanted)
+    if (!storeKey) {
+      bindContentHashes(wanted)
+      storeKey = byHash.get(wanted)
+    }
     if (storeKey) return { storeKey, entry: manifest[storeKey] }
   }
   const byFile = Object.keys(manifest).find((k) => fileOf(manifest[k]) === str)
@@ -232,6 +273,44 @@ function get(ref) {
     return `${SCHEME}://f/${fileOf(hit.entry)}`
   } catch {
     return null
+  }
+}
+
+/**
+ * Honest lookup for callers that must tell "no local bytes" apart from "bytes
+ * are here but could not be read or decrypted" -- and that must not destroy a
+ * record on a transient read failure. Returns
+ * { state: 'absent' } | { state: 'local', local } |
+ * { state: 'unreadable', reason: 'missing-file' | 'decrypt' | 'read' }.
+ */
+function probe(ref) {
+  try {
+    if (!ref || !dir) return { state: 'absent' }
+    const hit = entryFor(ref)
+    if (!hit) return { state: 'absent' }
+    const file = fileFor(fileOf(hit.entry))
+    if (!file) return { state: 'absent' }
+    try {
+      fs.accessSync(file, fs.constants.R_OK)
+    } catch {
+      return { state: 'unreadable', reason: 'missing-file' }
+    }
+    // Encrypted rows: prove the envelope actually decrypts, so a corrupt or
+    // key-mismatched file is diagnosable instead of a silently broken render
+    // (aead.decrypt returns null rather than throwing on a bad envelope).
+    if (hit.entry.enc) {
+      let plain = null
+      try {
+        plain = readFileBytes(hit.entry)
+      } catch {
+        plain = null
+      }
+      if (!plain) return { state: 'unreadable', reason: 'decrypt' }
+    }
+    hit.entry.atime = Date.now()
+    return { state: 'local', local: `${SCHEME}://f/${fileOf(hit.entry)}` }
+  } catch {
+    return { state: 'unreadable', reason: 'read' }
   }
 }
 
@@ -623,6 +702,7 @@ module.exports = {
   init,
   stats,
   get,
+  probe,
   pin,
   pinStream,
   putBytes,

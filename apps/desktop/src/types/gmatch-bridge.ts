@@ -22,7 +22,13 @@ export interface GmatchBridge {
   /** Drops memoized feed lists after tag-intent changes (bytes untouched). */
   clearFeedCache?: () => Promise<{ cleared: number }>
   evictImage?: (url: string) => Promise<{ ok: boolean }>
-  vaultGet?: (url: string) => Promise<{ local: string | null }>
+  /** Lookup only. `state` distinguishes a real miss from bytes that are on
+   *  disk but could not be read or decrypted (`reason` says why). */
+  vaultGet?: (url: string) => Promise<{
+    local?: string | null
+    state?: 'local' | 'absent' | 'unreadable'
+    reason?: string
+  }>
   vaultPin?: (url: string) => Promise<{ local: string | null }>
   vaultUnpin?: (url: string) => Promise<{ ok: boolean }>
   vaultRemove?: (url: string) => Promise<{ ok: boolean }>

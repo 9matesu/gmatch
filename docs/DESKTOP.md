@@ -51,6 +51,7 @@ Help → Troubleshooting → Open log folder):
 | `admin-pin.txt` | host-mode admin PIN | 8 hex, minted per install |
 | `storage.key` | 64-hex blob/PM encryption key | losing it = losing the local world |
 | `orbit.sqlite`, `blobs/` | the host-mode world | server-managed |
+| `media-vault/` | saved keepsake bytes + `manifest.json` | AES-256-GCM when `storage.key` exists; content-addressed |
 | `secure-*.json` | DPAPI-encrypted KV | identity keys etc. |
 
 Feed images are served from the main-process cache over the `gmcache://`
@@ -58,6 +59,28 @@ protocol (`imageCache.cjs`) into `diskImageCache.cjs`: bytes are **encrypted on
 disk** (AES-256-GCM, `userData/imgcache/*.enc`, 500 MB LRU-by-last-use), not
 held in RAM as this doc previously claimed. Nothing sensitive is stored
 unencrypted — but bytes *do* survive a shutdown and are re-used next launch.
+
+Saved keepsakes use a second store, `media-vault/` (`electron/vault.cjs`):
+`manifest.json` maps a store key (source url / `local://<hash>`) to an on-disk
+file, plus mime, bytes, atime, pins and the content hash when it is known. The
+vault is content-addressed (`sha256(bytes)`, the renderer's `localRef`), so
+re-pinning identical content reuses the file, and the renderer reads it back
+over the loopback vault server (`vaultServer.cjs` → `/f/<file>`, Range-capable)
+or the privileged `vault://` scheme.
+
+Two edges matter when debugging a user's "my keepsake is gone":
+
+- **Legacy rows** predate the recorded content hash: they are keyed by source
+  url and named `sha256(url).<ext>` on disk, so `vault://f/<localRef>` used to
+  resolve nothing even though the bytes were there. `vault.get()` now backfills
+  on the first hash miss — it reads each hash-less row once (decrypting if
+  `enc`), binds `hash`, and persists the manifest — so the cost is paid once per
+  file, not per launch. Bytes that cannot be read or decrypted are skipped by
+  the backfill and reported by `vault.probe()` (below).
+- **`vault.probe(ref)`** (the `vault:get` IPC) distinguishes
+  `{ state: 'local' }` / `{ state: 'absent' }` / `{ state: 'unreadable', reason }`
+  (`missing-file` | `decrypt` | `read` | `ipc`) and never drops a row on a
+  transient read failure. `vault.get()` still exists for internal callers.
 
 ## Failure paths (what the user sees when each layer breaks)
 
@@ -73,6 +96,10 @@ unencrypted — but bytes *do* survive a shutdown and are re-used next launch.
   fabricated data.
 - **Server switch saved:** "Saved. Restart now to switch servers." — the app
   never force-quits the user.
+- **Keepsake bytes present but unreadable:** the viewer shows "Local media could
+  not be read (reason)" — never "Media unavailable locally", which is reserved
+  for a completed lookup that found nothing. Source url drift is not a failure:
+  the vault is re-queried by content ref (`sha256(bytes)`) first.
 - **Update:** see below.
 
 ## Self-update (`electron/updater.cjs`, `updater-core.cjs`)

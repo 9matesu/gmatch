@@ -1692,7 +1692,9 @@ app.whenReady().then(async () => {
   ipcMain.handle('cache:clear', () => imageCache.clearCache())
   ipcMain.handle('cache:clear-feed', () => imageCache.clearFeedCache())
   ipcMain.handle('cache:evict', (_event, url) => ({ ok: imageCache.evict(String(url ?? '')) }))
-  ipcMain.handle('vault:get', (_event, url) => ({ local: vault.get(String(url ?? '')) }))
+  // probe (not get) so a row whose bytes cannot be read is reported as
+  // unreadable rather than a miss, and is never dropped from the manifest.
+  ipcMain.handle('vault:get', (_event, url) => vault.probe(String(url ?? '')))
   ipcMain.handle('vault:pin', (_event, url) => vault.pin(String(url ?? '')).then((local) => ({ local })))
   ipcMain.handle('vault:pin-stream', (event, url) => vault.pinStream(String(url ?? ''), {
     onProgress: ({ bytes, total }) => {

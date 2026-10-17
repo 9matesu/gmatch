@@ -52,7 +52,15 @@ export interface LocalObjectMeta {
 }
 
 async function persistToVault(id: string, blob: Blob, meta: LocalObjectMeta = {}): Promise<void> {
-  const buf = await blob.arrayBuffer()
+  // arrayBuffer() is not available on every Blob implementation (e.g. jsdom).
+  // When it is missing, the RAM copy is still registered; disk persistence is
+  // best-effort and must never throw.
+  let buf: ArrayBuffer | null = null
+  try {
+    buf = await blob.arrayBuffer()
+  } catch {
+    /* arrayBuffer unavailable — skip durable write, RAM copy stands */
+  }
   if (!buf || buf.byteLength === 0) return
   // Renderer side: ArrayBuffer crosses IPC cleanly; the main process
   // re-verifies the sha256 before filing it under `id`.

@@ -4,6 +4,7 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const vault = require('./vault.cjs')
+const aeadFile = require('./aeadFile.cjs')
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-test-'))
 vault.init(tmp)
@@ -135,6 +136,85 @@ async function main() {
   const mislabeled = await vault.pin('https://x/mislabeled.mp4')
   assert.ok(mislabeled, '40MB octet-stream mp4 must pin under the video cap')
   assert.strictEqual(vault.get('https://x/mislabeled.mp4'), mislabeled)
+
+  // LEGACY MANIFEST (the shape every pre-content-hash install has on disk):
+  // rows are keyed by source url and the file is named sha256(url).<ext>, with
+  // no `hash`. A keep's local identity is sha256(BYTES), so `vault://f/<localRef>`
+  // resolved nothing even though the bytes were right there, and the keepsake
+  // viewer showed "media unavailable locally" over a file it could read.
+  // The first hash lookup backfills and persists the content hash.
+  const legacyParent = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-legacy-'))
+  const legacyDir = path.join(legacyParent, 'media-vault')
+  fs.mkdirSync(legacyDir, { recursive: true })
+  const fileForUrl = (url) => `${vault._test.hashOf(Buffer.from(url))}.jpg`
+  const legacyUrl = 'https://legacy.example/api/objects/aaa'
+  const legacyBytes = Buffer.from('LEGACY-IMAGE-BYTES', 'utf8')
+  const legacyFile = fileForUrl(legacyUrl)
+  const legacyRef = vault._test.hashOf(legacyBytes)
+  fs.writeFileSync(path.join(legacyDir, legacyFile), legacyBytes)
+
+  const goneUrl = 'https://legacy.example/gone.jpg'
+  const goneFile = fileForUrl(goneUrl)
+
+  // Same key the app derives when storage.key is absent: sha256(userDataPath).
+  const legacyKey = aeadFile.keyFrom(null, legacyParent)
+  const encUrl = 'https://legacy.example/enc.jpg'
+  const encFile = fileForUrl(encUrl)
+  const encBytes = Buffer.from('ENC-IMAGE-BYTES', 'utf8')
+  const encRef = vault._test.hashOf(encBytes)
+  fs.writeFileSync(path.join(legacyDir, encFile), aeadFile.encrypt(encBytes, legacyKey))
+
+  const corruptUrl = 'https://legacy.example/corrupt.jpg'
+  const corruptFile = fileForUrl(corruptUrl)
+  fs.writeFileSync(path.join(legacyDir, corruptFile), Buffer.from('not-an-envelope'))
+
+  fs.writeFileSync(path.join(legacyDir, 'manifest.json'), JSON.stringify({
+    [legacyUrl]: { key: legacyFile, mime: 'image/jpeg', bytes: legacyBytes.length, atime: Date.now(), pins: 1 },
+    [goneUrl]: { key: goneFile, mime: 'image/jpeg', bytes: 12, atime: Date.now(), pins: 1 },
+    [encUrl]: { key: encFile, mime: 'image/jpeg', bytes: encBytes.length, atime: Date.now(), pins: 1, enc: 1 },
+    [corruptUrl]: { key: corruptFile, mime: 'image/jpeg', bytes: 4, atime: Date.now(), pins: 1, enc: 1 },
+  }))
+
+  vault.init(legacyParent)
+  assert.strictEqual(vault.stats().files, 4, 'legacy rows load')
+  assert.strictEqual(vault.stats().objects, 0, 'legacy rows carry no content hash')
+
+  // Legacy url lookup worked all along; the CONTENT REF (the keep's own
+  // identity) is what was broken.
+  assert.strictEqual(vault.get(legacyUrl), `vault://f/${legacyFile}`, 'url lookup still works')
+  assert.strictEqual(
+    vault.get(`vault://f/${legacyRef}`), `vault://f/${legacyFile}`,
+    'content ref now resolves a legacy row (backfilled)',
+  )
+  assert.strictEqual(
+    vault.get(`vault://f/${encRef}`), `vault://f/${encFile}`,
+    'backfill decrypts an encrypted legacy row before hashing it',
+  )
+  assert.strictEqual(vault.stats().objects, 2, 'both readable legacy rows are indexed by content')
+
+  // The backfill is persisted: a later launch must not re-read the files.
+  const persisted = JSON.parse(fs.readFileSync(path.join(legacyDir, 'manifest.json'), 'utf8'))
+  assert.strictEqual(persisted[legacyUrl].hash, legacyRef, 'backfilled hash is written to the manifest')
+  assert.strictEqual(persisted[encUrl].hash, encRef, 'backfilled hash of the encrypted row is written too')
+
+  // probe(): honest states. Bytes that are here but unreadable must never be
+  // reported as absent, and the record must survive the lookup.
+  assert.deepStrictEqual(vault.probe(legacyUrl), { state: 'local', local: `vault://f/${legacyFile}` })
+  assert.deepStrictEqual(
+    vault.probe(goneUrl), { state: 'unreadable', reason: 'missing-file' },
+    'a vanished file is unreadable, not absent',
+  )
+  assert.deepStrictEqual(
+    vault.probe(corruptUrl), { state: 'unreadable', reason: 'decrypt' },
+    'a corrupt envelope is a diagnosable decrypt failure',
+  )
+  assert.ok(vault._test.manifest()[goneUrl], 'an unreadable row is never dropped')
+  assert.ok(vault._test.manifest()[corruptUrl], 'a corrupt row is never dropped')
+  assert.deepStrictEqual(
+    vault.probe(`vault://f/${'d'.repeat(64)}`), { state: 'absent' },
+    'an unknown ref is a real miss',
+  )
+  fs.rmSync(legacyParent, { recursive: true, force: true })
 
   fs.rmSync(tmp, { recursive: true, force: true })
   console.log('vault: all assertions passed')

@@ -75,6 +75,36 @@ export async function vaultGet(url: string): Promise<string | null> {
   return stored[url] ?? null
 }
 
+/**
+ * Honest lookup for callers that must tell "no local bytes" apart from "the
+ * bytes are on disk but could not be read or decrypted". `vaultGet` collapses
+ * both to null; the viewer must not claim a keepsake is gone when it is merely
+ * unreadable. Never throws: a bridge failure is reported, not swallowed.
+ */
+export type VaultProbe =
+  | { state: 'local'; local: string }
+  | { state: 'absent' }
+  | { state: 'unreadable'; reason: string }
+
+export async function vaultProbe(ref: string): Promise<VaultProbe> {
+  if (!ref || !enabled()) return { state: 'absent' }
+  if (vaultBridge()) {
+    try {
+      const res = await window.gmatch?.vaultGet?.(ref)
+      if (!res) return { state: 'absent' }
+      if (res.state === 'unreadable') return { state: 'unreadable', reason: String(res.reason || 'read') }
+      if (res.local) return { state: 'local', local: res.local }
+      return { state: 'absent' }
+    } catch {
+      // The main process refused or the channel broke: that is NOT a confirmed
+      // absence, so callers can show a diagnosable error instead of "gone".
+      return { state: 'unreadable', reason: 'ipc' }
+    }
+  }
+  const hit = getStoredVault()[ref]
+  return hit ? { state: 'local', local: hit } : { state: 'absent' }
+}
+
 /** Get-or-fetch + pin. Fire-and-forget for keeps/cards; resolves vault:// or cached url. */
 export async function vaultPin(url: string): Promise<string | null> {
   if (!url || !enabled()) return null

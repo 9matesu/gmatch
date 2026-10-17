@@ -12,9 +12,15 @@ vi.mock('../../utils/p2pSwarm', async (importOriginal) => {
 })
 
 let vaultMap: Record<string, string> = {}
+let vaultHttpMap: Record<string, string> = {}
 vi.mock('../../services/vault', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../../services/vault')>()
-  return { ...mod, useVaultUrls: () => vaultMap, useVaultUrl: () => null }
+  return {
+    ...mod,
+    useVaultUrls: () => vaultMap,
+    useVaultUrl: () => null,
+    useVaultHttpUrls: () => vaultHttpMap,
+  }
 })
 
 // Ownership spies only: resolution stays real, so the tests assert when the
@@ -41,6 +47,7 @@ describe('IdleGalleryView', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     vaultMap = {}
+    vaultHttpMap = {}
     useGame.setState({
       gallery: [],
       backgroundUrl: null,
@@ -291,24 +298,6 @@ describe('IdleGalleryView', () => {
     expect(screen.getByRole('button', { name: /^Browser$/i })).toBeEnabled()
   })
 
-  it('slideshow renders vault bytes, never the provider URL', async () => {
-    const images = makeGalleryImages(3)
-    vaultMap = {
-      'https://example.com/img-1.jpg': 'vault://f/a1',
-      'https://example.com/img-2.jpg': 'vault://f/a2',
-    }
-    useGame.setState({ gallery: images })
-
-    render(<IdleGalleryView />)
-    await userEvent.click(screen.getByRole('button', { name: /Slideshow/i }))
-
-    expect(screen.getByLabelText(/Close slideshow/i)).toBeInTheDocument()
-    const media = document.querySelector('.slideshow-player img, .slideshow-player video, [role="dialog"] img, [role="dialog"] video')
-      || document.querySelector('img[src^="vault://"], video[src^="vault://"]')
-    expect(media).not.toBeNull()
-    expect(media?.getAttribute('src')).toMatch(/^vault:\/\//)
-  })
-
   it('resolveGalleryTileUrl prefers vault SSD url, then preview, then inferred thumbnail', () => {
     const baseImg: GalleryImage = {
       id: 'test-1',
@@ -472,5 +461,173 @@ describe('IdleGalleryView', () => {
       saveState: 'persisted',
     }
     expect(resolveGalleryTileUrl(gone)).toBe('')
+  })
+
+  it('renders a persisted vault keep from the resolved localhost url, never src=""', async () => {
+    const hash = 'a'.repeat(64)
+    vaultHttpMap = { [`vault://f/${hash}`]: `http://127.0.0.1:9/v/${hash}` }
+    const img: GalleryImage = {
+      id: 'k-vault',
+      url: 'https://example.com/x.jpg',
+      tags: ['t'],
+      rarityBase: 1,
+      clicks: 0,
+      rarity: 'Common',
+      boughtAt: 1,
+      kind: 'image',
+      saveState: 'persisted',
+      localRef: hash,
+    }
+    useGame.setState({ gallery: [img] })
+
+    const { container } = render(<IdleGalleryView />)
+
+    await waitFor(() => {
+      expect(container.querySelector(`img[src="http://127.0.0.1:9/v/${hash}"]`)).not.toBeNull()
+    })
+    // The raw vault:// scheme and the empty string must never reach src.
+    expect(container.querySelector('img[src^="vault://"]')).toBeNull()
+    expect(container.querySelector('img[src=""]')).toBeNull()
+  })
+
+  it('never renders an empty src while a vault reference is unresolved', () => {
+    const hash = 'b'.repeat(64)
+    vaultHttpMap = {}
+    const img: GalleryImage = {
+      id: 'k-pending',
+      url: 'https://example.com/pending.jpg',
+      tags: ['t'],
+      rarityBase: 1,
+      clicks: 0,
+      rarity: 'Common',
+      boughtAt: 1,
+      kind: 'image',
+      saveState: 'persisted',
+      localRef: hash,
+    }
+    useGame.setState({ gallery: [img] })
+
+    const { container } = render(<IdleGalleryView />)
+
+    expect(container.querySelector('img[src=""]')).toBeNull()
+    expect(container.querySelector('video[src=""]')).toBeNull()
+  })
+
+  it('omits the src attribute on a video tile whose vault reference is unresolved', () => {
+    const hash = 'c'.repeat(64)
+    vaultHttpMap = {}
+    const img: GalleryImage = {
+      id: 'k-video-pending',
+      url: 'https://example.com/pending.mp4',
+      tags: ['t'],
+      rarityBase: 1,
+      clicks: 0,
+      rarity: 'Common',
+      boughtAt: 1,
+      kind: 'video',
+      saveState: 'persisted',
+      localRef: hash,
+    }
+    useGame.setState({ gallery: [img] })
+
+    const { container } = render(<IdleGalleryView />)
+
+    const video = container.querySelector('video')
+    expect(video).not.toBeNull()
+    // No src attribute at all (not ""): an empty string would make the browser
+    // re-request the whole page.
+    expect(video!.getAttribute('src')).toBeNull()
+  })
+
+  it('viewer renders keepsake bytes resolved by content ref when the source url drifted', async () => {
+    // The bytes are on disk under the legacy sha256(url) name while the keep
+    // points at sha256(BYTES): page-level url maps cannot resolve it, so the
+    // viewer must attempt a fresh local lookup before declaring anything.
+    const ref = 'a'.repeat(64)
+    const loopback = `http://127.0.0.1:9/f/${ref}.jpg`
+    const g = window as unknown as { gmatch?: unknown }
+    const prevBridge = g.gmatch
+    g.gmatch = {
+      vaultGet: async (key: string) =>
+        key === `vault://f/${ref}` ? { state: 'local', local: `vault://f/${ref}.jpg` } : { state: 'absent' },
+      vaultHttpUrl: async () => ({ local: loopback }),
+    }
+    const img: GalleryImage = {
+      id: 'k-drifted', url: 'https://old-host/gone.jpg', tags: ['t'], rarityBase: 1,
+      clicks: 0, rarity: 'Common', boughtAt: 1, kind: 'image',
+      saveState: 'persisted', localRef: ref,
+    }
+    useGame.setState({ gallery: [img] })
+
+    try {
+      render(<IdleGalleryView />)
+      await userEvent.click(screen.getAllByRole('button', { name: /^View /i })[0])
+
+      await waitFor(() => {
+        expect(document.querySelector(`img[src="${loopback}"]`)).not.toBeNull()
+      })
+      expect(screen.queryByText(/Media unavailable locally/i)).toBeNull()
+      expect(document.querySelector('img[src=""]')).toBeNull()
+    } finally {
+      g.gmatch = prevBridge
+    }
+  })
+
+  it('viewer reports unreadable bytes as a read failure, never as a missing file', async () => {
+    const ref = 'b'.repeat(64)
+    const g = window as unknown as { gmatch?: unknown }
+    const prevBridge = g.gmatch
+    g.gmatch = { vaultGet: async () => ({ state: 'unreadable', reason: 'decrypt' }) }
+    const img: GalleryImage = {
+      id: 'k-unreadable', url: 'https://old-host/enc.jpg', tags: ['t'], rarityBase: 1,
+      clicks: 0, rarity: 'Common', boughtAt: 1, kind: 'image',
+      saveState: 'persisted', localRef: ref,
+    }
+    useGame.setState({ gallery: [img] })
+
+    try {
+      render(<IdleGalleryView />)
+      await userEvent.click(screen.getAllByRole('button', { name: /^View /i })[0])
+
+      await waitFor(() => {
+        expect(screen.getByText(/could not read them \(decrypt\)/i)).toBeInTheDocument()
+      })
+      // The record exists and is diagnosable: not the "gone" message.
+      expect(screen.queryByText(/Media unavailable locally/i)).toBeNull()
+    } finally {
+      g.gmatch = prevBridge
+    }
+  })
+
+  it('viewer shows loading, then the missing state only after the lookup completes', async () => {
+    const ref = 'c'.repeat(64)
+    let release: (v: { state: 'absent' }) => void = () => {}
+    const gate = new Promise<{ state: 'absent' }>((res) => { release = res })
+    const g = window as unknown as { gmatch?: unknown }
+    const prevBridge = g.gmatch
+    g.gmatch = { vaultGet: () => gate }
+    const img: GalleryImage = {
+      id: 'k-slow', url: 'https://old-host/slow.jpg', tags: ['t'], rarityBase: 1,
+      clicks: 0, rarity: 'Common', boughtAt: 1, kind: 'image',
+      saveState: 'persisted', localRef: ref,
+    }
+    useGame.setState({ gallery: [img] })
+
+    try {
+      render(<IdleGalleryView />)
+      await userEvent.click(screen.getAllByRole('button', { name: /^View /i })[0])
+
+      // While the probe is in flight the viewer must not claim the bytes are
+      // gone: it owes the attempt first.
+      expect(screen.getByText(/Caching the bytes/i)).toBeInTheDocument()
+      expect(screen.queryByText(/Media unavailable locally/i)).toBeNull()
+
+      await act(async () => { release({ state: 'absent' }) })
+      await waitFor(() => {
+        expect(screen.getByText(/Media unavailable locally/i)).toBeInTheDocument()
+      })
+    } finally {
+      g.gmatch = prevBridge
+    }
   })
 })
