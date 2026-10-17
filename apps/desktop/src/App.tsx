@@ -5,7 +5,7 @@ import { useSettings } from "./hooks/useSettings";
 import { useIdle } from "./hooks/useIdle";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { getApiBaseUrl, orbitFetch, invalidateCache } from "./utils/api";
+import { getApiBaseUrl, orbitFetch, invalidateCache, subscribeApiBase } from "./utils/api";
 import { countChatUnread } from "./utils/chatUnread";
 import { OrbitPeer, pollOffers } from "./utils/webrtc";
 import { saveObject, getAllObjects, deleteObject } from "./utils/storage";
@@ -2728,6 +2728,15 @@ export default function Home() {
   // Publish loadUsers for the callbacks declared above it (toggleFollowUser).
   useEffect(() => { loadUsersRef.current = loadUsers; }, [loadUsers]);
 
+  // Seamless world switch: the commit already invalidated caches and
+  // re-dialed transports. Re-pull server-owned roster state for the new
+  // world; local-first stores (identity, gallery, IndexedDB) are untouched.
+  // loadUsers carries its own stale-response guard.
+  useEffect(() => subscribeApiBase(() => {
+    invalidateCache();
+    loadUsersRef.current?.();
+  }), []);
+
   // A follow event just landed (live WS broadcast from users.ts). My follower
   // count is a roster field, so refresh it instead of waiting for the 60-120s
   // poll. Also notifies UserProfileModal, which re-reads its own counts.
@@ -4126,6 +4135,7 @@ export default function Home() {
                             setSelectedProfileUser(full || u)
                           }}
                           profilePics={profilePics}
+                          onServerJoined={() => { loadUsersRef.current?.(); }}
                         />
                       ) : (
                         <div className="p-6 text-xs text-retro-muted">Sign in to browse servers.</div>

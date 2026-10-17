@@ -4,7 +4,7 @@ import { OrbitP2PNode } from '@orbit/protocol';
 import { User, OrbitObject } from '@orbit/shared';
 import { saveObject } from '../utils/storage';
 import { OrbitPeerRelay } from '../utils/peer-relay';
-import { getApiWebSocketUrl, orbitFetch } from '../utils/api';
+import { getApiBaseUrl, getApiWebSocketUrl, orbitFetch, subscribeApiBase } from '../utils/api';
 import { mergeRoster } from '../utils/peerRoster';
 import { presenceBucket } from '../utils/compare';
 import { CHAT_WIPE_SECONDS } from '@orbit/shared';
@@ -132,6 +132,12 @@ export function useP2P(identity: OrbitIdentity | null) {
   });
 
   const peerMapRef = useRef<Map<string, User>>(new Map());
+  // Committed API-base generation: bumped on every seamless world switch so
+  // the connection effect below re-runs (cleanup closes the old socket, the
+  // new run dials the new base). The app shell never remounts.
+  const [baseGen, setBaseGen] = useState(0);
+  const lastBaseRef = useRef<string>('');
+  useEffect(() => subscribeApiBase(() => setBaseGen((g) => g + 1)), []);
   const nodeRef = useRef<OrbitP2PNode | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const relayRef = useRef<OrbitPeerRelay | null>(null);
@@ -215,6 +221,15 @@ export function useP2P(identity: OrbitIdentity | null) {
   useEffect(() => {
     if (!identity) return;
     let cancelled = false;
+
+    // World switch (not first mount): the roster belongs to the previous
+    // server. Mark everyone unconfirmed-offline; the new world's roster
+    // refresh re-confirms who is actually there. Memory is preserved.
+    const runBase = getApiBaseUrl();
+    if (lastBaseRef.current && lastBaseRef.current !== runBase) {
+      for (const [id, u] of peerMapRef.current) peerMapRef.current.set(id, { ...u, online: false });
+    }
+    lastBaseRef.current = runBase;
 
     // 1. Initialize PeerJS WebRTC Relay Engine
     const peerRelay = new OrbitPeerRelay(identity.orbitId);
@@ -706,7 +721,7 @@ export function useP2P(identity: OrbitIdentity | null) {
       relayRef.current = null;
       nodeRef.current = null;
     };
-  }, [identity]);
+  }, [identity, baseGen]);
 
   const loadLobbyHistory = useCallback(async () => {
     if (!identity) return

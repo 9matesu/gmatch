@@ -223,10 +223,11 @@ describe('ServersView', () => {
     delete (window as unknown as { gmatch?: unknown }).gmatch
   })
 
-  it('join sets the node URL for the session and asks for restart when packaged', async () => {
+  it('join probes then switches in-app without restart when packaged', async () => {
+    const serverRelaunch = vi.fn().mockResolvedValue(undefined)
     ;(window as unknown as { gmatch?: unknown }).gmatch = {
       serverSet: vi.fn().mockResolvedValue({ ok: true }),
-      serverRelaunch: vi.fn().mockResolvedValue(undefined),
+      serverRelaunch,
       serverState: vi.fn().mockResolvedValue({ packaged: true, mode: 'host', url: 'http://127.0.0.1:8790', lanUrls: [] }),
     }
     mockFetch(async (url) => {
@@ -241,7 +242,38 @@ describe('ServersView', () => {
     fireEvent.click(joinBtn)
     await waitFor(() => expect((window as unknown as { gmatch: { serverSet: ReturnType<typeof vi.fn> } }).gmatch.serverSet)
       .toHaveBeenCalledWith({ mode: 'client', url: 'https://world.test:8790' }))
+    // seamless: persisted for future restarts, but nothing relaunches and the
+    // committed base is stored for the live session.
+    expect(serverRelaunch).not.toHaveBeenCalled()
+    expect(localStorage.getItem('gmatch.api.url')).toBe('https://world.test:8790')
+    // the committed world is unmistakable: current-world strip with Open.
+    expect(await screen.findByLabelText('Current world')).toHaveTextContent('Open World')
+    fireEvent.click(screen.getByRole('button', { name: /^open$/i }))
+    expect(screen.getByLabelText('Current server hub')).toBeInTheDocument()
     delete (window as unknown as { gmatch?: unknown }).gmatch
+  })
+
+  it('add world dialog creates a device-local group and rejects bad codes', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [] })
+      return json({})
+    })
+    const toasts: string[] = []
+    render(<ServersView identity={identity} toast={(m) => toasts.push(m)} />)
+    expect(await screen.findByText('gMatch Central (p2p)')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /add world/i }))
+    expect(screen.getByRole('dialog', { name: /add world/i })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/new group name/i), { target: { value: 'Friday crew' } })
+    fireEvent.click(screen.getByRole('button', { name: /create group/i }))
+    expect(await screen.findByText('Friday crew')).toBeInTheDocument()
+    // join tab with garbage: honest inline failure, nothing committed.
+    fireEvent.click(screen.getByRole('button', { name: /add world/i }))
+    fireEvent.click(screen.getByRole('tab', { name: /join code/i }))
+    fireEvent.change(screen.getByLabelText(/invite code/i), { target: { value: 'not-a-code' } })
+    fireEvent.click(screen.getByRole('button', { name: /^join$/i }))
+    await waitFor(() => expect(toasts.join('|')).toMatch(/not a valid node code/i))
+    expect(localStorage.getItem('gmatch.api.url')).toBeNull()
   })
 
   it('without a configured central, explains instead of crashing', async () => {
@@ -617,17 +649,21 @@ describe('ServersView', () => {
     expect(screen.getByText('gmatch-wcz1.onrender.com')).toBeInTheDocument()
     expect(screen.getByText('gmatch.fly.dev')).toBeInTheDocument()
 
-    // Connect to deprecated server
+    // Legacy row is status-only: restrained label, no primary Connect button.
     const deprecatedRow = screen.getAllByRole('listitem').find((el) => el.textContent?.includes('gMatch Central (deprecated)'))!
-    const connectBtn = within(deprecatedRow).getByRole('button', { name: /connect/i })
-    expect(connectBtn).toHaveClass('glass-action-primary')
+    expect(within(deprecatedRow).getByText('Deprecated')).toBeInTheDocument()
+    expect(within(deprecatedRow).queryByRole('button', { name: /connect/i })).not.toBeInTheDocument()
+
+    // The single legacy connect path lives in the contextual menu.
+    fireEvent.click(within(deprecatedRow).getByRole('button', { name: /more actions/i }))
+    const connectBtn = within(deprecatedRow).getByRole('button', { name: /connect to legacy/i })
 
     fireEvent.click(connectBtn)
     expect(onServerJoined).toHaveBeenCalledWith(expect.objectContaining({ id: 'central-deprecated' }))
     expect(localStorage.getItem('gmatch.api.url')).toBe('https://gmatch.fly.dev')
   })
 
-  it('displays white connect button, transitions feedback to connecting, and dims previous connected badge', async () => {
+  it('shows status-only relay and deprecated rows without primary connect buttons', async () => {
     mockFetch(async (url) => {
       if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
       if (url.includes('/api/servers')) return json({ servers: [] })
@@ -639,9 +675,11 @@ describe('ServersView', () => {
     const p2pRow = screen.getAllByRole('listitem').find((el) => el.textContent?.includes('gMatch Central (p2p)'))!
     const deprecatedRow = screen.getAllByRole('listitem').find((el) => el.textContent?.includes('gMatch Central (deprecated)'))!
 
-    // Initially, P2P is connected and Deprecated has a white Connect button
+    // Relay row is status-only (transport, not a world); legacy is Deprecated.
+    expect(within(p2pRow).getByText('Relay')).toBeInTheDocument()
     expect(within(p2pRow).getByText('Connected')).toBeInTheDocument()
-    const connectBtn = within(deprecatedRow).getByRole('button', { name: /connect/i })
-    expect(connectBtn).toHaveClass('glass-action-primary')
+    expect(within(p2pRow).queryByRole('button', { name: /connect|join/i })).not.toBeInTheDocument()
+    expect(within(deprecatedRow).getByText('Deprecated')).toBeInTheDocument()
+    expect(within(deprecatedRow).queryByRole('button', { name: /connect/i })).not.toBeInTheDocument()
   })
 })

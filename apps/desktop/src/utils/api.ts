@@ -61,6 +61,52 @@ function computeApiBase(): string {
 
 export const API_BASE = computeApiBase();
 
+/**
+ * Live base resolution (world switching). computeApiBase ran once at import,
+ * so a committed switch would stay invisible to every data call. This reads
+ * the same precedence live: stored override (never a courier) → env/preload
+ * → courier fallback. Browser-dev returns '' so traffic rides the dev proxy.
+ */
+export function resolveLiveApiBase(): string {
+  try {
+    const manual = typeof localStorage !== 'undefined' ? localStorage.getItem('gmatch.api.url') : null;
+    if (manual?.trim() && !isCourierApiUrl(manual)) {
+      return manual.trim().replace(/\/+$/, '')
+    }
+  } catch { /* private mode */ }
+  if (
+    typeof window !== 'undefined' &&
+    !(window as unknown as { gmatch?: unknown }).gmatch &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ) {
+    return ''
+  }
+  const envUrl =
+    (import.meta.env.VITE_API_URL as string | undefined) ||
+    (typeof window !== 'undefined' && (window as unknown as { __API_BASE__?: string }).__API_BASE__)
+  if (envUrl) return envUrl.replace(/\/+$/, '')
+  return 'https://gmatch-wcz1.onrender.com'
+}
+
+/** Fired after a client-to-client switch commits, so effects re-subscribe. */
+export const API_BASE_CHANGED_EVENT = 'gmatch-api-base-changed'
+
+export function notifyApiBaseChanged(base: string): void {
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(API_BASE_CHANGED_EVENT, { detail: { base } }))
+    }
+  } catch { /* headless tests */ }
+}
+
+export function subscribeApiBase(listener: (base: string) => void): () => void {
+  const handler = (e: Event) => {
+    try { listener((e as CustomEvent<{ base: string }>).detail?.base || resolveLiveApiBase()) } catch { /* listener fault */ }
+  };
+  window.addEventListener(API_BASE_CHANGED_EVENT, handler)
+  return () => window.removeEventListener(API_BASE_CHANGED_EVENT, handler)
+}
+
 /** Openable share links (P3.5): public HTML pages served by the API host. */
 export const postShareUrl = (id: string) => `${API_BASE || 'https://gmatch-wcz1.onrender.com'}/p/${encodeURIComponent(id)}`
 export const profileShareUrl = (id: string) => `${API_BASE || 'https://gmatch-wcz1.onrender.com'}/u/${encodeURIComponent(id)}`
@@ -89,7 +135,9 @@ function pruneResponseCache() {
 function cacheKey(method: string, endpoint: string, orbitId: string): string {
   // Scope by identity so authenticated GET responses (inbox, cards, profile,
   // lobby, feed) can never leak across accounts in the same browser session.
-  return `${method}:${orbitId}:${endpoint}`
+  // Scope by origin so a committed world switch can never serve the previous
+  // server's cached rows for the same path.
+  return `${method}:${orbitId}:${originOf(resolveEndpoint(endpoint))}${endpoint}`
 }
 
 function cloneResponse(res: Response): Promise<Response> {
@@ -102,7 +150,10 @@ function cloneResponse(res: Response): Promise<Response> {
 }
 
 export function getApiBaseUrl(): string {
-  return API_BASE
+  const live = resolveLiveApiBase()
+  // Prefer the live override when one is committed; otherwise keep the
+  // import-time value (identical in every case resolveLiveApiBase covers).
+  return live || API_BASE
 }
 
 export function getApiWebSocketUrl(path = '/api/ws'): string {
@@ -252,7 +303,11 @@ function randomHex(len: number): string {
 
 function resolveEndpoint(endpoint: string): string {
   if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) return endpoint
-  return `${API_BASE}${endpoint}`
+  const live = resolveLiveApiBase()
+  // Empty live base = browser-dev relative mode: keep the path bare so the
+  // dev proxy (steered by the gmatch_server_url cookie) routes it.
+  if (!live) return endpoint
+  return `${live}${endpoint}`
 }
 
 /** Minimal identity shape `orbitFetch` accepts (encryption keys optional — the sealed path is skipped without them). */

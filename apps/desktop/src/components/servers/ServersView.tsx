@@ -6,23 +6,27 @@
 // Right = public directory browser (search, join, create).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Lock, Globe, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, Share2, ArrowLeft, Plus, Trash2, MoreVertical, ClipboardPaste, ChevronDown, Loader2 } from 'lucide-react'
+import { Lock, Globe, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, Share2, ArrowLeft, Plus, Trash2, MoreVertical, ChevronDown, Loader2 } from 'lucide-react'
 import { generateIdentity } from '@orbit/crypto'
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
 import { orbitFetch, getApiBaseUrl, isCourierApiUrl } from '../../utils/api'
 import { normalizeServerUrl, isCurrentServerUrl } from '../../utils/serverUrl'
 import { joinServer } from '../../utils/join-server'
+import { switchClientWorld } from '../../utils/server-switch'
 import { rememberPendingHost } from '../../utils/server-host-pending'
 import { mergeDirectory, readDirectoryCache, writeDirectoryCache } from './directoryMerge'
+import { createLabel, readLabels, writeLabels, isOwnLabel, type LocalMeshLabel } from './meshLabels'
 import { decodeNodeMask } from '../../utils/nodeMask'
 import { buildNodeCode } from '../../utils/nodeShare'
 import { PromptDialog } from '../PromptDialog'
+import { AddWorldDialog } from './AddWorldDialog'
 import { claimPendingHost } from '../../hooks/usePendingServerHost'
 import { SERVER_MARKER_KEY } from '../../firstRun/onboardingState'
 import { playPress } from '../../utils/sounds'
 import { resolveMediaUrl } from '../../utils/media'
 import { CentralAdminPanel } from './CentralAdminPanel'
 import { fetchPresenceRoster } from '../../services/courierPresence'
+import { subscribeApiBase } from '../../utils/api'
 import type { User } from '@orbit/shared'
 
 export interface DirectoryServer {
@@ -219,6 +223,9 @@ export function ServersView({
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  // Device-local mesh labels: UI grouping only, never a network or authority.
+  const [labels, setLabels] = useState<LocalMeshLabel[]>(() => readLabels())
+  const saveLabels = (next: LocalMeshLabel[]) => { setLabels(next); writeLabels(next) }
   const [expandedServerId, setExpandedServerId] = useState<string | null>(null)
   const [connectingId, setConnectingId] = useState<string | null>(null)
   const [showCentralPopover, setShowCentralPopover] = useState(false)
@@ -253,7 +260,7 @@ export function ServersView({
   // one dialog kind at a time (password during join, or the paste-code modal).
   const pendingAsk = useRef<((v: string | null) => void) | null>(null)
   const [askPasswordFor, setAskPasswordFor] = useState<string | null>(null)
-  const [codeAskOpen, setCodeAskOpen] = useState(false)
+  const [addWorldOpen, setAddWorldOpen] = useState(false)
 
   const isDev = Boolean(import.meta.env.DEV) ||
     (typeof window !== 'undefined' &&
@@ -336,6 +343,10 @@ export function ServersView({
 
 
   const refresh = useCallback(async () => {
+    // Stale-run guard: a world switch mid-refresh must not let the previous
+    // server's dashboard/node overwrite the new world's state.
+    const runBase = getApiBaseUrl()
+    const switchedAway = () => getApiBaseUrl() !== runBase
     // Live probe: P2P courier presence roster
     void fetchPresenceRoster(identity?.orbitId)
       .then((users) => setP2pProbe({ online: true, count: users.length }))
@@ -427,6 +438,7 @@ export function ServersView({
       if (d.ok) {
         dj = (await d.json()) as Dashboard
       }
+      if (switchedAway()) return
 
       // Also query /api/users to populate all server members including offline members
       const uRes = await orbitFetch('/api/users?limit=100', { method: 'GET' }, identity).catch(() => null)
@@ -467,6 +479,7 @@ export function ServersView({
 
     try {
       const n = await orbitFetch('/api/servers/node', { method: 'GET' }, identity)
+      if (switchedAway()) return
       if (n.ok) {
         const nj = (await n.json()) as ServerNode
         if (typeof nj?.name === 'string') {
@@ -511,6 +524,8 @@ export function ServersView({
       setDirError(true)
     }
   }, [identity, central])
+
+  useEffect(() => { refreshRef.current = refresh }, [refresh])
 
   useEffect(() => {
     try {
@@ -573,6 +588,15 @@ export function ServersView({
     return getApiBaseUrl()
   }, [])
 
+  // Bumped on every committed world switch so current-markers recompute
+  // from storage immediately (memos below depend on it).
+  const [apiBaseTick, setApiBaseTick] = useState(0)
+  const refreshRef = useRef<() => Promise<void>>(async () => {})
+  useEffect(() => subscribeApiBase(() => {
+    setApiBaseTick((t) => t + 1)
+    void refreshRef.current()
+  }), [])
+
   const isCurrent = useCallback((s: DirectoryServer) => {
     const base = getEffectiveServerUrl()
     if (s.id === 'central-p2p') {
@@ -584,7 +608,7 @@ export function ServersView({
       return !!base && (isCurrentServerUrl(base, FLY_LEGACY_URL) || base.includes('fly.dev'))
     }
     return isCurrentServerUrl(base, s.endpoint_hint || '')
-  }, [getEffectiveServerUrl])
+  }, [getEffectiveServerUrl, apiBaseTick])
 
   const officialServers: DirectoryServer[] = useMemo(() => {
     const list: DirectoryServer[] = []
@@ -630,7 +654,12 @@ export function ServersView({
       if (aCur !== bCur) return bCur - aCur
       return 0
     })
-  }, [officialServers, visibleServers, query, passwordOnly, isCurrent])
+  }, [officialServers, visibleServers, query, passwordOnly, isCurrent, apiBaseTick])
+
+  const currentWorld = useMemo(
+    () => allVisibleServers.find((s) => s.id !== 'central-p2p' && isCurrent(s)) || null,
+    [allVisibleServers, isCurrent],
+  )
 
   // Total visible rows = official servers + directory rows.
   const visibleRowCount = allVisibleServers.length
@@ -773,6 +802,7 @@ export function ServersView({
     try {
       if (!mine(s)) {
         const out = await joinServer(s, toast, askPassword)
+        if (out === 'connected') onServerJoined?.(s)
         if (out !== 'relaunching') setConnectingId(null)
         return
       }
@@ -886,6 +916,12 @@ export function ServersView({
 
   const join = async (s: DirectoryServer) => {
     if (connectingId) return
+    // The courier row is transport status, not a world — there is no data
+    // base to join (pointing data traffic at it 404s by design).
+    if (s.id === 'central-p2p') {
+      toast('Central relay is transport, not a world. Pick a server below.', 'info')
+      return
+    }
     setConnectingId(s.id)
     try {
       if (
@@ -919,14 +955,19 @@ export function ServersView({
           }
           return
         }
-        const res = await window.gmatch.serverSet({ mode: 'client', url: target })
-        if (!res.ok) {
-          toast(res.error || 'Could not switch servers', 'error')
-          setConnectingId(null)
-          return
+        // Packaged bridge path: probe-then-commit in-app. serverSet persists
+        // the selection for future restarts, but nothing relaunches — the
+        // base-change event re-dials transports and refreshes server state.
+        const out = await switchClientWorld(
+          { name: s.name, endpointHint: target, passwordRequired: s.password_required === 1 },
+          { toast, identity: identity as unknown as { orbitId: string } | null, askPassword },
+        )
+        if (out === 'switched') {
+          toast(`Connected to ${s.name}.`, 'success')
+          onServerJoined?.(s)
+          void refresh()
         }
-        toast(`Switching to ${s.name}. The app restarts.`, 'success')
-        window.gmatch.serverRelaunch?.()
+        setConnectingId(null)
         return
       }
       if (!window.gmatch?.serverSet) {
@@ -1311,12 +1352,12 @@ export function ServersView({
             )}
             <button
               type="button"
-              onClick={() => { playPress(700); setCodeAskOpen(true) }}
-              aria-label="Paste node code"
-              title="Paste node code"
-              className="p-2 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w8 cursor-pointer transition-colors active:scale-[0.98]"
+              onClick={() => { playPress(700); setAddWorldOpen(true) }}
+              aria-label="Add world"
+              title="Add world — new group or join code"
+              className="flex items-center gap-1 px-1.5 py-1 rounded-md text-xs font-bold text-retro-fg hover:bg-glass-w8 transition-colors cursor-pointer"
             >
-              <ClipboardPaste className="w-4 h-4" />
+              <Plus className="w-3 h-3" /> Add world
             </button>
             {identity && (
               <button
@@ -1695,6 +1736,29 @@ export function ServersView({
 
             {/* Scrollable Directory Content */}
             <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar px-3 py-2 space-y-1.5">
+              {/* Current world: unmistakable, with Open = focus existing hub */}
+              {currentWorld ? (
+                <section aria-label="Current world" className="px-3 py-2.5 rounded-lg bg-glass-w8 border border-border-glass flex items-center gap-3">
+                  <span className="w-2 h-2 rounded-full bg-retro-online shrink-0" aria-hidden />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] uppercase tracking-wider text-retro-muted font-semibold">Current world</p>
+                    <h3 className="text-sm font-bold text-retro-fg truncate">{currentWorld.name}</h3>
+                    <p className="text-[11px] text-retro-muted truncate">
+                      {formatServerCounts(currentWorld, true, dash, p2pProbe, legacyProbe)}
+                      {currentWorld.description ? ` · ${currentWorld.description}` : ''}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { playPress(700); setActiveTab('hub'); }}
+                    className="glass-action glass-action-primary h-7 px-3 rounded-md text-xs font-bold cursor-pointer shrink-0"
+                  >
+                    Open
+                  </button>
+                </section>
+              ) : (
+                <p className="px-1 text-[11px] text-retro-muted">Not connected to a listed world — pick one below.</p>
+              )}
               {/* Create-server drawer */}
               {showCreate && (
                 <div className="glass-panel p-3.5 space-y-2 shrink-0 rounded-lg border border-border-glass">
@@ -1810,6 +1874,37 @@ export function ServersView({
                 </div>
               ) : null}
 
+              {/* Local groups: device-local peer labels, subordinate to real worlds */}
+              <section aria-label="Local groups on this device" className="px-1 space-y-1">
+                <h3 className="text-[11px] font-semibold text-retro-muted uppercase tracking-wider">Local groups <span className="normal-case font-normal">· this device only</span></h3>
+                {labels.length === 0 ? (
+                  <p className="text-[11px] text-retro-muted">No local groups. Use + Add world to name one or join with a code.</p>
+                ) : (
+                  <ul className="space-y-0.5">
+                    {labels.map((l) => (
+                      <li key={l.id} className="flex items-center justify-between gap-2 text-xs py-0.5">
+                        <span className="truncate text-retro-fg">{l.name}
+                          <span className="ml-1 font-normal text-retro-muted">· {l.memberOrbitIds.length} peers{l.nodeCodes.length ? ` · ${l.nodeCodes.length} codes` : ''}</span>
+                          {identity && isOwnLabel(l, (identity as { orbitId?: string }).orbitId) && (
+                            <span className="ml-1 text-[10px] text-retro-muted">(this device)</span>
+                          )}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`Forget group ${l.name}`}
+                          title="Forget this group (local only — removes nothing remotely)"
+                          onClick={() => saveLabels(labels.filter((x) => x.id !== l.id))}
+                          className="px-1.5 py-0.5 rounded text-[11px] text-retro-muted hover:text-rose-300 hover:bg-glass-w8 cursor-pointer"
+                        >
+                          Forget
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              <h3 className="text-[11px] font-semibold text-retro-muted uppercase tracking-wider pt-1">Hosted servers <span className="normal-case font-normal">· independently operated</span></h3>
               {/* Directory Content List */}
               <div className="min-h-0 pr-px">
                   {dirError ? (
@@ -1828,7 +1923,21 @@ export function ServersView({
                     </div>
                   ) : (
                     <div className="space-y-1.5">
-                      <ul className="divide-y divide-border-subtle rounded-lg border border-border-glass solid-panel overflow-hidden">
+                      <ul
+                        className="divide-y divide-border-subtle rounded-lg border border-border-glass solid-panel overflow-hidden"
+                        aria-label="Worlds and servers"
+                        onKeyDown={(e) => {
+                          if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+                          const items = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[data-world-row-focus]'))
+                          if (items.length === 0) return
+                          const idx = items.indexOf(document.activeElement as HTMLElement)
+                          e.preventDefault()
+                          const next = e.key === 'ArrowDown'
+                            ? items[idx + 1] ?? items[0]
+                            : items[idx - 1] ?? items[items.length - 1]
+                          next?.focus()
+                        }}
+                      >
                         {allVisibleServers.length === 0 && (
                           <li className="p-6 text-xs text-retro-muted text-center flex flex-col items-center justify-center gap-1.5">
                             <Globe className="w-5 h-5 text-retro-muted/40" />
@@ -1879,6 +1988,7 @@ export function ServersView({
                                 <div
                                   role="button"
                                   tabIndex={0}
+                                  data-world-row-focus
                                   onClick={() => setExpandedServerId(isExpanded ? null : s.id)}
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter' || e.key === ' ') {
@@ -1887,7 +1997,7 @@ export function ServersView({
                                     }
                                   }}
                                   aria-label={s.name}
-                                  className="flex min-w-0 items-center gap-3 flex-1 cursor-pointer select-none group/title"
+                                  className="flex min-w-0 items-center gap-3 flex-1 cursor-pointer select-none group/title rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-retro-accent"
                                 >
                                   <span className="font-mono text-xs text-retro-muted tabular-nums shrink-0 min-w-[56px] text-right font-medium">
                                     {formatServerCounts(s, isCurrentServer, dash, p2pProbe, legacyProbe)}
@@ -1900,6 +2010,16 @@ export function ServersView({
                                     {s.endpoint_hint && (isOfficial || (!/^https?:\/\/\d+\.\d+\.\d+\.\d+/i.test(s.endpoint_hint) && !/^\d+\.\d+\.\d+\.\d+/.test(s.endpoint_hint))) && (
                                       <span className="text-[11px] font-mono text-retro-muted/60 truncate shrink-0">
                                         {formatDomain(s.endpoint_hint)}
+                                      </span>
+                                    )}
+                                    {s.id === 'central-deprecated' && (
+                                      <span className="text-[11px] text-retro-muted shrink-0" title="Deprecated hosted server — probe status only, not a P2P mesh">
+                                        Deprecated
+                                      </span>
+                                    )}
+                                    {s.id === 'central-p2p' && (
+                                      <span className="text-[11px] text-retro-muted shrink-0" title="Relay transport status (presence + mail), not a world">
+                                        Relay
                                       </span>
                                     )}
                                     {s.description && s.description.trim() && s.id !== 'central-p2p' && s.id !== 'central-deprecated' && (
@@ -1936,6 +2056,20 @@ export function ServersView({
                                         }`}
                                       >
                                         Connected
+                                      </span>
+                                    ) : s.id === 'central-deprecated' ? (
+                                      <span
+                                        className="h-6 px-2.5 rounded-md text-xs font-semibold text-amber-300/80 bg-surface-canvas border border-border-subtle flex items-center justify-center cursor-default"
+                                        title="Legacy entry is status-only — expand for details or copy the code"
+                                      >
+                                        Details below
+                                      </span>
+                                    ) : s.id === 'central-p2p' ? (
+                                      <span
+                                        className="h-6 px-2.5 rounded-md text-xs font-semibold text-retro-muted bg-surface-canvas border border-border-subtle flex items-center justify-center cursor-default"
+                                        title="Relay transport status — not a world to join"
+                                      >
+                                        {isCurrentServer ? 'Connected' : (p2pProbe.online ? 'Transport' : 'Unreachable')}
                                       </span>
                                     ) : isMyServer ? (
                                       <button
@@ -2001,6 +2135,18 @@ export function ServersView({
                                                 unregister
                                               </button>
                                             </>
+                                          )}
+                                          {s.id === 'central-deprecated' && !isCurrentServer && (
+                                            <button
+                                              type="button"
+                                              disabled={!!connectingId}
+                                              onClick={() => { void join(s); setOpenMenuId(null); }}
+                                              title="Connect to the legacy hosted server"
+                                              aria-label={`Connect to legacy server ${s.name}`}
+                                              className="w-full px-3 py-1.5 text-xs text-left text-retro-fg hover:bg-glass-w8 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                                            >
+                                              <ArrowLeft className="w-3.5 h-3.5 text-retro-muted" /> Connect (legacy)
+                                            </button>
                                           )}
                                           {s.endpoint_hint && (
                                             <button
@@ -2116,15 +2262,16 @@ export function ServersView({
           onCancel={() => { pendingAsk.current?.(null); pendingAsk.current = null; setAskPasswordFor(null) }}
         />
       )}
-      {codeAskOpen && (
-        <PromptDialog
-          title="Node code"
-          description="Paste the gmatch://node/ code your friend copied from their Servers tab."
-          submitLabel="Connect"
-          onSubmit={(v) => { setCodeAskOpen(false); void joinByCode(v) }}
-          onCancel={() => setCodeAskOpen(false)}
-        />
-      )}
+      <AddWorldDialog
+        open={addWorldOpen}
+        onClose={() => setAddWorldOpen(false)}
+        onCreateLabel={(name) => {
+          const owner = (identity as { orbitId?: string } | null)?.orbitId || 'local-device'
+          saveLabels([...labels, createLabel(name, owner)])
+          toast(`Group "${name}" saved on this device.`, 'success')
+        }}
+        onJoinCode={(code) => { void joinByCode(code) }}
+      />
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-orbit-fade-in">
           <div className="w-full max-w-md bg-surface-raised border border-border-glass rounded-xl p-5 shadow-lg space-y-4">
