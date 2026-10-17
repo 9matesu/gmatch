@@ -19,13 +19,13 @@ describe('AgeGateModal', () => {
       'orbit_onboarding_v2:anonymous',
       JSON.stringify({ version: 1, current: 'server', completed: [] }),
     );
-    render(<AgeGateModal onOpenTos={vi.fn()} />);
+    render(<AgeGateModal />);
     expect(screen.getByText(/Are you 18 or older/i)).toBeInTheDocument();
   });
 
   it('hidden once verified', () => {
     localStorage.setItem('goonMatch_age_verified', 'true');
-    const { container } = render(<AgeGateModal onOpenTos={vi.fn()} />);
+    const { container } = render(<AgeGateModal />);
     expect(container).toBeEmptyDOMElement();
   });
 });

@@ -1,14 +1,10 @@
 "use client";
 
 import { useState } from 'react';
-import { ShieldAlert, CheckCircle2, XCircle, FileText } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, XCircle } from 'lucide-react';
 import { playPress, playWin } from '../../utils/sounds';
 
-export function AgeGateModal({
-  onOpenTos,
-}: {
-  onOpenTos?: () => void;
-}) {
+export function AgeGateModal() {
   // Read synchronously so the gate never flashes the login screen behind it.
   // The age check runs BEFORE onboarding (it is step 1 of the social flow);
   // the goonMatch_age_verified key intentionally survives logout.
@@ -83,18 +79,6 @@ export function AgeGateModal({
             <span>Under 18. Exit</span>
           </button>
         </div>
-
-        {/* Footer info link */}
-        {onOpenTos && (
-          <button
-            type="button"
-            onClick={() => { playPress(700); onOpenTos(); }}
-            className="text-xs text-retro-muted hover:text-retro-fg underline font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
-          >
-            <FileText className="w-3 h-3" />
-            <span>Terms of Service &amp; Privacy Policy</span>
-          </button>
-        )}
       </div>
     </div>
   );

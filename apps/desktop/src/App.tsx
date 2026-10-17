@@ -62,8 +62,6 @@ import { WatchPartyView } from "./components/watchparty/WatchPartyView";
 import { setWatchDisplayName, useWatchParty, restoreRememberedParties } from "./hooks/watchPartyStore";
 import { GameView } from "./components/views/GameView";
 import { AgeGateModal } from "./components/auth/AgeGateModal";
-import { LegalCenter, isLegalAccepted } from "./components/LegalCenter";
-import { legalDocFromHash, isLegalDocId, type LegalDocId } from "./utils/legal-route";
 import { saveUserProfile, deriveProfileTags } from "./utils/profile";
 import { GamesView } from "./components/views/GamesView";
 import { getStoredActiveDeckId, type Deck } from "./components/games/DeckBuilder";
@@ -421,14 +419,6 @@ export default function Home() {
     } catch { return [] }
   })
   const [showMaxGoonerModal, setShowMaxGoonerModal] = useState(false)
-  const [showTosModal, setShowTosModal] = useState(false)
-  const [legalDoc, setLegalDoc] = useState<LegalDocId>(() => {
-    const fromHash = legalDocFromHash(typeof window !== 'undefined' ? window.location.hash : '')
-    return isLegalDocId(fromHash) ? fromHash : 'terms'
-  })
-  // Acceptance gate (legal plan C.2): logged-in + loaded + never accepted the
-  // CURRENT version map => the LegalCenter is the only visible surface.
-  const [legalAccepted, setLegalAccepted] = useState(() => isLegalAccepted())
   const syncedTagsRef = useRef<string[] | null>(null)
   const previousCountRef = useRef<number>(0)
   const mainScrollRef = useRef<HTMLDivElement>(null)
@@ -3763,7 +3753,7 @@ export default function Home() {
               identity={null}
               initialProfile={myProfile}
               ensureIdentity={() => createIdentity()}
-              onOpenTos={() => { setLegalDoc('terms'); setShowTosModal(true) }}
+
               tagSuggestions={myPostTags}
               toast={toast}
               onLogin={async (name, tags, customKey, pfpUrl) => {
@@ -4694,7 +4684,6 @@ export default function Home() {
                 onComplete={() => {
                   toast('Account ready.', 'success');
                 }}
-                onOpenTos={() => { setLegalDoc('terms'); setShowTosModal(true) }}
               />
               <AttachmentUploadModal
                 isOpen={attachmentModal?.isOpen ?? false}
@@ -4860,28 +4849,8 @@ export default function Home() {
         />
       )}
 
-      {/* First-class legal gates: render above the onboarding overlay so the
-          18+ check happens before login and ToS/Privacy stay reachable. */}
       <DominationEffects identity={identity} />
-      <AgeGateModal onOpenTos={() => { setLegalDoc('terms'); setShowTosModal(true) }} />
-      <LegalCenter
-        isOpen={showTosModal}
-        initialDoc={legalDoc}
-        onClose={() => setShowTosModal(false)}
-        onAccept={() => { setLegalAccepted(true); setShowTosModal(false) }}
-      />
-      {/* Versioned acceptance (C.2): once logged in, the CURRENT legal suite
-          must be read + accepted before the app reveals itself. Re-triggers
-          on every version bump (key = full doc@version map). */}
-      {isLoaded && identity && !legalAccepted && isOnboardingComplete(readOnboardingState(identity.orbitId)) && (
-        <LegalCenter
-          isOpen
-          requireAccept
-          initialDoc="terms"
-          onClose={() => { /* acceptance is the only exit */ }}
-          onAccept={() => setLegalAccepted(true)}
-        />
-      )}
+      <AgeGateModal />
 
       <ContextOverlay
         contextMenu={contextMenu}

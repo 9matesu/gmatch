@@ -11,7 +11,6 @@ import {
 import GoonPanel from '../../ui/GoonPanel'
 import ShopPanel from '../../ui/ShopPanel'
 import StatsPanel from '../../ui/StatsPanel'
-import OfflineModal from '../../ui/OfflineModal'
 import { FeedTuneStep } from '../../firstRun/FeedTuneStep'
 import { useToast } from '../Toast'
 import { useGame } from '../../game/store'
@@ -294,7 +293,6 @@ export default function GridWorkspace({
         </div>
       )}
 
-      <OfflineModal />
     </div>
   )
 }

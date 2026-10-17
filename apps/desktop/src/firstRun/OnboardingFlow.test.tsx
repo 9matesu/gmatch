@@ -42,7 +42,6 @@ describe('OnboardingFlow', () => {
         onLogin={onLogin}
         onProfileUpdated={() => {}}
         onComplete={onComplete}
-        onOpenTos={() => {}}
         ensureIdentity={() => null}
       />
     );
@@ -81,7 +80,6 @@ describe('OnboardingFlow', () => {
         onLogin={vi.fn()}
         onProfileUpdated={() => {}}
         onComplete={onComplete}
-        onOpenTos={() => {}}
         ensureIdentity={() => null}
       />
     );

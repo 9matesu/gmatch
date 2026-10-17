@@ -59,31 +59,6 @@ export default function StatsPanel() {
 
   return (
     <aside className={`${PLATE} p-3.5 space-y-3`}>
-      {/* Primary Balance Header. Labelled "Clicker points" and badged "LOCAL",
-          not "Total Points / PTS": this is a purely local idle-game counter
-          that never touches the g$ wallet and hard-resets on prestige. One tab
-          from the real rankings, sharing a label, is what made it read as a bug. */}
-      <div className="flex items-baseline justify-between gap-2 border-b border-border-glass pb-2.5">
-        <div className="flex flex-col">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">
-            Clicker points
-          </span>
-          <div
-            className={`${MONO} text-2xl sm:text-3xl font-extrabold text-retro-fg tracking-tight leading-none mt-1`}
-            data-testid="gc-balance"
-            title="Local idle-game points. Not your g$ wallet, and not synced to the server."
-          >
-            {formatNum(s.points)}
-          </div>
-        </div>
-        <span
-          className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-glass-w8 text-retro-muted border border-border-glass"
-          title="Local only — not synced to the server"
-        >
-          LOCAL
-        </span>
-      </div>
-
       {/* Modern 2x2 Telemetry Grid */}
       <div className="grid grid-cols-2 gap-1.5">
         {/* Passive Income */}

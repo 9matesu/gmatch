@@ -30,7 +30,6 @@ interface Props {
   onCreateAccount: (name: string, tags?: string, pfpUrl?: string) => Promise<void>;
   onProfileUpdated: (profile: Profile) => void;
   onComplete: () => void;
-  onOpenTos: () => void;
   /** createIdentity() from useIdentity — local keypair only, no server call. */
   ensureIdentity: () => OrbitIdentity | null;
   tagSuggestions?: string[];

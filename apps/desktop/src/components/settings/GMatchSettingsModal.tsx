@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import type { AppSettings } from '../../hooks/useSettings';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { playPress, playMsgReceive } from '../../utils/sounds';
+import { LegalCenter } from '../../components/LegalCenter';
 import { vaultStats, vaultClear, vaultBridge } from '../../services/vault';
 
 /** Vault disk usage line (desktop bridge only). */
@@ -45,6 +46,7 @@ import {
   ChevronUp,
   Upload,
   Rss,
+  FileText,
 } from 'lucide-react';
 
 export type SettingsTabId =
@@ -228,6 +230,7 @@ export function GMatchSettingsModal({
   initialTab = 'preferences',
 }: GMatchSettingsModalProps) {
   const [activeTab, setActiveTab] = useState<SettingsTabId>(() => resolveTab(initialTab));
+  const [showLegalCenter, setShowLegalCenter] = useState(false);
   const [wallpaperExpanded, setWallpaperExpanded] = useState(() => initialTab === 'wallpaper');
   const [copiedId, setCopiedId] = useState(false);
   const [customWallpaperInput, setCustomWallpaperInput] = useState(settings.wallpaperUrl || '');
@@ -839,6 +842,23 @@ export function GMatchSettingsModal({
                   </p>
                 </div>
 
+                {/* Legal Terms */}
+                <div className="p-4 bg-glass-w5 border border-border-glass rounded-lg space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => { playPress(700); setShowLegalCenter(true); }}
+                    className="w-full text-left p-3 bg-retro-panel/10 border border-border-glass rounded-lg text-xs font-medium text-retro-fg hover:bg-retro-panel/20 transition-colors cursor-pointer active:scale-[0.98]"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>Legal Terms</span>
+                      <FileText className="w-3.5 h-3.5" />
+                    </div>
+                    <p className="text-[10px] text-retro-muted mt-1">
+                      Terms of Use, Privacy, and related policies. Read-only — no acceptance required here.
+                    </p>
+                  </button>
+                </div>
+
                 {/* Account Management Actions */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
@@ -907,6 +927,15 @@ export function GMatchSettingsModal({
 
             {/* ──────── 4. BLOCKLIST (JSON) ──────── */}
             {activeTab === 'blocklist' && <BlocklistSection toast={toast} />}
+
+            {/* Legal Terms Modal (read-only) */}
+            <LegalCenter
+              isOpen={showLegalCenter}
+              onClose={() => setShowLegalCenter(false)}
+              onAccept={() => setShowLegalCenter(false)}
+              initialDoc="terms"
+              requireAccept={false}
+            />
           </div>
         </div>
       </div>
