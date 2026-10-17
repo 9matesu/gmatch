@@ -319,9 +319,11 @@
   }
 }
 
-/* Glass toolbar: floating controls, dock */
+/* Glass toolbar: floating controls, dock. Chrome painted over the wallpaper
+   stays opaque so text reads over any wallpaper; Panel Opacity only scales
+   panel surfaces (cards, dialogs, sheets over the dark canvas). */
 .glass-toolbar {
-  background: var(--color-glass-strong);
+  background: #18181b;
   border: 1px solid var(--color-border-glass);
   border-radius: var(--radius-lg);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
