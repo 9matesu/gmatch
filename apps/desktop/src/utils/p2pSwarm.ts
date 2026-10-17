@@ -51,45 +51,83 @@ export interface LocalObjectMeta {
   isAvatar?: boolean
 }
 
-function persistToDisk(id: string, blob: Blob, meta: LocalObjectMeta = {}): void {
-  // Fire-and-forget: IndexedDB write so seeded bytes survive reload in the
-  // packaged app (Chromium storage lives under userData). Must await the
-  // ArrayBuffer — storing the Promise itself silently breaks reload reads.
-  // Owner/kind flags are stamped when known so gallery rebuilds can tell a
-  // post/story/chat from card-eligible media (absent = unknown, excluded).
+async function persistToVault(id: string, blob: Blob, meta: LocalObjectMeta = {}): Promise<void> {
+  const buf = await blob.arrayBuffer()
+  if (!buf || buf.byteLength === 0) return
+  // Renderer side: ArrayBuffer crosses IPC cleanly; the main process
+  // re-verifies the sha256 before filing it under `id`.
+  if (typeof window !== 'undefined' && window.gmatch?.vaultPutBytes) {
+    try {
+      await window.gmatch.vaultPutBytes(id, blob.type || 'application/octet-stream', buf)
+      return // durable on disk; nothing more to do
+    } catch {
+      /* fall through to IndexedDB fallback below */
+    }
+  }
+  // Browser dev / no bridge: IndexedDB survives reload but is not the app disk.
   try {
-    void (async () => {
-      try {
-        const buf = await blob.arrayBuffer()
-        if (!buf || buf.byteLength === 0) return
-        const { saveObject } = await import('./storage')
-        await saveObject({
-          id,
-          name: id,
-          mime_type: blob.type || 'application/octet-stream',
-          size_bytes: buf.byteLength,
-          owner_id: meta.ownerId || '',
-          sender_pubkey: '',
-          sender_enc_pubkey: '',
-          created_at: new Date().toISOString(),
-          data: buf,
-          is_public: typeof meta.isPublic === 'boolean' ? (meta.isPublic ? 1 : 0) : null,
-          is_story: typeof meta.isStory === 'boolean' ? (meta.isStory ? 1 : 0) : null,
-          is_chat: typeof meta.isChat === 'boolean' ? (meta.isChat ? 1 : 0) : null,
-          is_avatar: typeof meta.isAvatar === 'boolean' ? (meta.isAvatar ? 1 : 0) : null,
-        }).catch(() => {})
-      } catch {
-        /* storage unavailable (tests/SSR/quota) */
-      }
-    })()
+    const { saveObject } = await import('./storage')
+    await saveObject({
+      id,
+      name: id,
+      mime_type: blob.type || 'application/octet-stream',
+      size_bytes: buf.byteLength,
+      owner_id: meta.ownerId || '',
+      sender_pubkey: '',
+      sender_enc_pubkey: '',
+      created_at: new Date().toISOString(),
+      data: buf,
+      is_public: typeof meta.isPublic === 'boolean' ? (meta.isPublic ? 1 : 0) : null,
+      is_story: typeof meta.isStory === 'boolean' ? (meta.isStory ? 1 : 0) : null,
+      is_chat: typeof meta.isChat === 'boolean' ? (meta.isChat ? 1 : 0) : null,
+      is_avatar: typeof meta.isAvatar === 'boolean' ? (meta.isAvatar ? 1 : 0) : null,
+    }).catch(() => {})
   } catch {
-    /* storage unavailable (tests/SSR) */
+    /* storage unavailable (tests/SSR/quota) */
+  }
+}
+
+/** Read verified bytes from the vault (disk) by content hash, else null. */
+async function readVaultBlob(id: string): Promise<Blob | null> {
+  if (typeof window === 'undefined' || !window.gmatch?.vaultGet) return null
+  try {
+    const res = await window.gmatch.vaultGet(id)
+    if (!res?.local) return null
+    const resp = await fetch(res.local)
+    if (!resp.ok) return null
+    return await resp.blob()
+  } catch {
+    return null
   }
 }
 
 /** Preload persisted swarm bytes into RAM so a restarted seeder can answer
  *  WANTs without first re-viewing each image. Best-effort, capped. */
 export async function hydrateLocalObjects(maxBytes = 256 * 1024 * 1024): Promise<number> {
+  // Vault (disk, content-addressed) is the authoritative durable store; a
+  // restarted seeder re-hydrates its own bytes from there. IndexedDB is the
+  // dev fallback when no Electron bridge exists.
+  if (typeof window !== 'undefined' && window.gmatch?.vaultList) {
+    try {
+      const objects = await window.gmatch.vaultList()
+      let used = 0
+      let count = 0
+      for (const o of objects) {
+        if (used + o.bytes > maxBytes) break
+        if (!localObjects.has(o.ref)) {
+          const blob = await readVaultBlob(o.ref)
+          if (blob) {
+            localObjects.set(o.ref, blob)
+            used += o.bytes
+            count += 1
+          }
+        }
+      }
+      return count
+    } catch {
+      /* fall through to IndexedDB fallback below */
+    }
+  }
   try {
     const { getAllObjects } = await import('./storage')
     const all = await getAllObjects()
@@ -114,7 +152,10 @@ export async function hydrateLocalObjects(maxBytes = 256 * 1024 * 1024): Promise
 export function registerLocalObject(id: string, blob: Blob, meta: LocalObjectMeta = {}): void {
   if (!id || !blob) return
   localObjects.set(id, blob)
-  persistToDisk(id, blob, meta)
+  // Durable bytes go to the encrypted vault first (disk). IndexedDB is the
+  // dev fallback. Fire-and-forget so hot paths (swarm assembly, forge) are
+  // not blocked; the RAM copy is available immediately.
+  void persistToVault(id, blob, meta)
 }
 
 export function hasLocalObject(id: string): boolean {
@@ -125,24 +166,15 @@ export async function getLocalObject(id: string): Promise<Blob | null> {
   if (!id) return null
   if (localObjects.has(id)) return localObjects.get(id)!
 
-  // Fallback: check Electron vault if available
-  if (typeof window !== 'undefined' && window.gmatch?.vaultGet) {
-    try {
-      const res = await window.gmatch.vaultGet(`local://${id}`)
-      if (res?.local) {
-        const resp = await fetch(res.local)
-        if (resp.ok) {
-          const blob = await resp.blob()
-          localObjects.set(id, blob)
-          return blob
-        }
-      }
-    } catch {
-      /* vault read failed */
-    }
+  // Vault (disk, content-addressed): id is the content hash. readVaultBlob
+  // verifies the file exists and decrypts it; fetch rehydrates the blob.
+  const fromVault = await readVaultBlob(id)
+  if (fromVault) {
+    localObjects.set(id, fromVault)
+    return fromVault
   }
 
-  // Fallback: IndexedDB (survives reload)
+  // Fallback: IndexedDB (survives reload; dev-only path)
   try {
     const { getObject } = await import('./storage')
     const stored = await getObject(id)

@@ -34,6 +34,17 @@ export interface GmatchBridge {
   vaultPinStream?: (url: string) => Promise<{
     ok: boolean; key?: string; mime?: string; bytes?: number; hash?: string; reason?: string;
   }>
+  /** Write bytes the renderer already holds to the encrypted vault; the main
+   *  process re-verifies the sha256 before filing them under `hash`. `alias`
+   *  is an optional store key (source url / object id). Returns the ref. */
+  vaultPutBytes?: (
+    hash: string,
+    mime: string,
+    data: ArrayBuffer,
+    alias?: string | null,
+  ) => Promise<{ ok: boolean; ref?: string; file?: string; bytes?: number; reason?: string } | null>
+  /** Distinct stored objects ({ ref, mime, bytes }) for swarm rehydration. */
+  vaultList?: () => Promise<Array<{ ref: string; mime: string; bytes: number }>>
   onVaultPinProgress?: (cb: (p: { url: string; bytes: number; total: number }) => void) => () => void
   customPickFolder?: () => Promise<{ ok: boolean; id?: string; path?: string; error?: string }>
   customListFolder?: (id: string) => Promise<{ ok: boolean; files?: { name: string; url: string }[]; error?: string }>
