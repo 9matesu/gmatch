@@ -873,7 +873,7 @@ export function GMatchFeed({
                 key={post.id}
                 data-post-id={post.id}
                 onContextMenu={(e) => { e.preventDefault(); setOptionsPost(post) }}
-                className={`relative solid-panel border border-border-glass rounded-lg overflow-hidden flex flex-col shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
+                className={`relative bg-retro-panel border border-border-glass rounded-lg overflow-hidden flex flex-col shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
                 {/* Repost Header Banner */}
                 {post.is_reposted && (
@@ -909,11 +909,11 @@ export function GMatchFeed({
                           tabIndex={0}
                           onClick={() => handleNameClick(post.author_id)}
                           onKeyDown={(e) => e.key === 'Enter' && handleNameClick(post.author_id)}
-                          className="text-xs font-semibold text-retro-fg hover:underline cursor-pointer leading-tight truncate min-w-0"
+                          className="text-sm font-semibold text-retro-fg hover:underline cursor-pointer leading-tight truncate min-w-0"
                         >
                           {post.author_name}
                         </span>
-                        <PostTimestamp createdAt={post.created_at} />
+                        <PostTimestamp createdAt={post.created_at} className="text-xs text-retro-body leading-tight" />
                         {post.sync_state && post.sync_state !== 'replicated' && (
                           <span
                             className="inline-flex items-center gap-1 text-[10px] font-mono text-retro-muted"
@@ -929,7 +929,7 @@ export function GMatchFeed({
                         )}
                       </div>
                       {post.location && (
-                        <span className="text-xs text-retro-muted leading-tight block truncate">{post.location}</span>
+                        <span className="text-xs text-retro-body leading-tight block truncate">{post.location}</span>
                       )}
                     </div>
                   </div>
@@ -1173,15 +1173,15 @@ export function GMatchFeed({
                 {/* Action Bar (Like, Comment, Share, Save) */}
                 <div className="px-3 sm:px-4 py-3 flex flex-col gap-2">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1">
                       <button
                         type="button"
                         onClick={() => toggleLike(post)}
                         aria-label="Like post"
-                        className="cursor-pointer transition-transform duration-150 active:scale-[0.92]"
+                        className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-[0.98]"
                       >
                         <Heart
-                          className={`w-4 h-4 transition-colors stroke-[1.75] ${isLiked ? 'text-rose-500 fill-rose-500' : 'text-retro-muted hover:text-retro-fg'
+                          className={`w-5 h-5 transition-colors stroke-[1.75] ${isLiked ? 'text-rose-500 fill-rose-500' : 'text-retro-muted hover:text-retro-fg'
                             }`}
                         />
                       </button>
@@ -1190,18 +1190,18 @@ export function GMatchFeed({
                         type="button"
                         onClick={() => toggleExpand(post)}
                         aria-label="Comment"
-                        className="text-retro-muted hover:text-retro-fg cursor-pointer transition-transform duration-150 active:scale-[0.92]"
+                        className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-[0.98]"
                       >
-                        <MessageCircle className="w-4 h-4 stroke-[1.75]" />
+                        <MessageCircle className="w-5 h-5 stroke-[1.75]" />
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setSharingPost(post)}
                         aria-label="Share post"
-                        className="text-retro-muted hover:text-retro-fg cursor-pointer transition-transform duration-150 active:scale-[0.92]"
+                        className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-[0.98]"
                       >
-                        <Send className="w-4 h-4 stroke-[1.75]" />
+                        <Send className="w-5 h-5 stroke-[1.75]" />
                       </button>
                     </div>
 
@@ -1209,10 +1209,10 @@ export function GMatchFeed({
                       type="button"
                       onClick={() => toggleSave(post)}
                       aria-label="Save post"
-                      className="cursor-pointer transition-transform duration-150 active:scale-[0.92]"
+                      className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-[0.98]"
                     >
                       <Bookmark
-                        className={`w-4 h-4 transition-colors stroke-[1.75] ${isSaved ? 'text-retro-fg fill-retro-fg' : 'text-retro-muted hover:text-retro-fg'
+                        className={`w-5 h-5 transition-colors stroke-[1.75] ${isSaved ? 'text-retro-fg fill-retro-fg' : 'text-retro-muted hover:text-retro-fg'
                           }`}
                       />
                     </button>
@@ -1251,7 +1251,7 @@ export function GMatchFeed({
                   <>
                   {/* Caption & Tags */}
                   {post.caption && (
-                    <div className="text-xs text-retro-fg leading-relaxed">
+                    <div className="text-sm text-retro-fg leading-relaxed">
                       <span
                         className="font-semibold text-retro-fg mr-1.5 cursor-pointer hover:underline"
                         onClick={() => onSelectUser?.(post.author_id)}
@@ -1269,7 +1269,7 @@ export function GMatchFeed({
                         <span
                           key={t}
                           onClick={() => boostTagAffinity([t])}
-                          className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-glass-w12 text-retro-muted hover:text-retro-fg cursor-pointer transition-colors"
+                          className="text-xs font-mono px-1.5 py-0.5 rounded bg-glass-w12 text-retro-body hover:text-retro-fg cursor-pointer transition-colors"
                         >
                           #{t.replace(/^#/, '')}
                         </span>

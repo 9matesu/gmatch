@@ -3911,7 +3911,7 @@ export default function Home() {
                         </div>
                       )}
                       <div className={isVisionJammed ? "blur-md select-none pointer-events-none transition-all duration-300" : ""}>
-                        <div className="w-full max-w-5xl mx-auto px-3 sm:px-4 pt-3 sm:pt-4 flex flex-col gap-4 pb-24 lg:pb-16">
+                        <div className="w-full max-w-6xl mx-auto px-3 sm:px-4 pt-3 sm:pt-4 flex flex-col gap-4 pb-[calc(var(--island-clearance)+1.25rem)]">
                           {/* ── Feed ── */}
                           <section className="module module-primary module-glass overflow-visible order-1">
                             {collapsedModules.feed && (
