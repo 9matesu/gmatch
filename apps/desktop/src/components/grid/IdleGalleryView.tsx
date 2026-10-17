@@ -69,7 +69,7 @@ async function downloadMedia(url: string, filename: string): Promise<boolean> {
 
 function toResolvedItems(images: GalleryImage[]): ResolvedItem[] {
   return images.map((img) => ({
-    object_id: img.localHash || null,
+    object_id: img.localRef || null,
     url: img.url,
     caption: img.tags.slice(0, 5).join(' ') || 'Keepsake',
     mime_type: img.kind === 'video' ? 'video/mp4' : 'image/jpeg',
@@ -94,7 +94,7 @@ function toLocalSlideshowItems(
       continue
     }
     items.push({
-      object_id: img.localHash || null,
+      object_id: img.localRef || null,
       url: r.url,
       caption: img.tags.slice(0, 5).join(' ') || 'Keepsake',
       mime_type: img.kind === 'video' ? 'video/mp4' : 'image/jpeg',
@@ -115,9 +115,11 @@ function toLocalSlideshowItems(
  */
 export function resolveGalleryTileUrl(img: GalleryImage, vaultUrl?: string): string {
   if (vaultUrl) return vaultUrl
-  // A keep verified local with no resolvable bytes shows nothing instead of
-  // hotlinking the provider: an empty tile is honest, a remote one is not.
-  if (img.localStatus === 'local') return ''
+  // A keep verified persisted points at its content hash: render from the
+  // vault, never hotlink the provider. If bytes went missing after the fact,
+  // an empty tile is honest; a remote one is not.
+  if (img.saveState === 'persisted' && img.localRef) return `vault://f/${img.localRef}`
+  if (img.saveState === 'persisted') return ''
   if (img.preview) return img.preview
   const u = String(img.url || '')
   if (u.includes('img.booru.org')) {
@@ -155,9 +157,9 @@ function useKeepsakeLocalUrls(images: GalleryImage[], vaultUrls: Record<string, 
       const next: Record<string, string> = {}
       for (const img of images) {
         const u = img.url || ''
-        if (!u || img.localStatus !== 'local' || vaultUrls[u]) continue
+        if (!u || img.saveState !== 'persisted' || vaultUrls[u]) continue
         try {
-          const blob = (await getLocalObject(u)) || (img.localHash ? await getLocalObject(img.localHash) : null)
+          const blob = (await getLocalObject(img.localRef || u)) || (await getLocalObject(u))
           if (blob) {
             const obj = URL.createObjectURL(blob)
             created.push(obj)
@@ -200,13 +202,13 @@ function useVaultPinProgress(): Record<string, number> {
 /** Re-run the authorized persist pipeline for one keep; store the outcome. */
 async function retryKeepsake(img: GalleryImage): Promise<void> {
   useGame.setState((s) => ({
-    gallery: s.gallery.map((g) => (g.id === img.id ? { ...g, localStatus: 'pending' as const } : g)),
+    gallery: s.gallery.map((g) => (g.id === img.id ? { ...g, saveState: 'downloading' as const } : g)),
   }))
   const { persistKeepsake } = await import('../../services/keepsake')
   const res = await persistKeepsake(img.url, {}, img.kind)
   useGame.setState((s) => ({
     gallery: s.gallery.map((g) =>
-      g.id === img.id ? { ...g, localStatus: res.status, localHash: res.hash } : g,
+      g.id === img.id ? { ...g, saveState: res.status === 'local' ? 'persisted' : 'failed', localRef: res.ref } : g,
     ),
   }))
 }
@@ -445,7 +447,7 @@ export default function IdleGalleryView({
       const res = await persistKeepsake(target.url, {}, target.kind)
       useGame.setState((s) => ({
         gallery: s.gallery.map((g) =>
-          g.id === target.id ? { ...g, localStatus: res.status, localHash: res.hash } : g,
+          g.id === target.id ? { ...g, saveState: res.status === 'local' ? 'persisted' : 'failed', localRef: res.ref } : g,
         ),
       }))
     })()
@@ -830,12 +832,12 @@ export default function IdleGalleryView({
 
                   {/* Phase 5: local-cache status — never imply a keep is saved
                       when its bytes are not locally stored. */}
-                  {img.localStatus === 'pending' && (
+                  {img.saveState === 'downloading' && (
                     <span className="pointer-events-none absolute bottom-1.5 left-1.5 z-20 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-mono text-white/80 backdrop-blur-md">
                       Caching…{pinProgress[img.url] != null ? ` ${pinProgress[img.url]}%` : ''}
                     </span>
                   )}
-                  {img.localStatus === 'failed' && (
+                  {img.saveState === 'failed' && (
                     <button
                       type="button"
                       onClick={async (e) => {

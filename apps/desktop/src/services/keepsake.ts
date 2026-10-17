@@ -7,7 +7,9 @@ import type { GalleryImage } from '../game/types';
 
 export interface KeepsakePersistResult {
   status: 'local' | 'failed';
-  hash?: string;
+  /** sha256 of the stored bytes = the keep's single local identity.
+   *  vault://f/<ref>, object_id of the swarm, vault lookup key. */
+  ref?: string;
   bytes?: number;
   /** Which durable store holds the verified bytes. */
   via?: 'idb' | 'vault-stream';
@@ -112,7 +114,7 @@ export async function persistKeepsake(
     } catch {
       /* vault optional — IndexedDB copy already durable */
     }
-    return { status: 'local', hash, bytes: file.size, via: 'idb' };
+    return { status: 'local', ref: hash, bytes: file.size, via: 'idb' };
   } catch (err) {
     return { status: 'failed', reason: err instanceof Error ? err.message : 'fetch' };
   }
@@ -138,7 +140,7 @@ async function persistKeepsakeStreamed(
   // Read-back: the vault lookup only resolves when the file is on disk.
   const local = await d.vaultReadBack(url).catch(() => null);
   if (!local) return { status: 'failed', reason: 'readback' };
-  return { status: 'local', hash: res.hash, bytes: res.bytes, via: 'vault-stream' };
+  return { status: 'local', ref: res.hash, bytes: res.bytes, via: 'vault-stream' };
 }
 
 /** Loopback http(s): the Electron vault server. The only remote-looking
@@ -230,24 +232,31 @@ export function _resetLocalUrls(): void {
 }
 
 /**
- * Fresh local resolution at action time (open/download): vault lookup first,
- * then the durable object store, minting a blob URL only from verified bytes.
+ * Fresh local resolution at action time (open/download): vault lookup first
+ * (by content ref, then by source url for legacy entries), then the durable
+ * object store, minting a blob URL only from verified bytes.
  * Never returns the provider URL. Minted blob URLs are registered for
  * ownership (`releaseLocalUrl` / `retainLocalUrl` above).
  */
 export async function resolveFreshLocalUrl(
-  img: Pick<GalleryImage, 'url' | 'kind' | 'localStatus' | 'localHash'>,
+  img: Pick<GalleryImage, 'url' | 'kind' | 'saveState' | 'localRef'>,
 ): Promise<string | null> {
   const key = img.url || ''
   if (!key) return null
-  if (img.localStatus === 'failed') return null
+  if (img.saveState === 'failed') return null
+  // A verified keep points at its content hash. Resolve the vault:// URL by
+  // ref first; fall back to the source url for legacy entries indexed by url.
   try {
     const { vaultGet } = await import('./vault')
-    const v = await vaultGet(key).catch(() => null)
-    if (v && isLocalValue(v, key)) return v
+    const byRef = img.localRef ? await vaultGet(`vault://f/${img.localRef}`).catch(() => null) : null
+    if (byRef && isLocalValue(byRef, key)) return byRef
+    const byUrl = await vaultGet(key).catch(() => null)
+    if (byUrl && isLocalValue(byUrl, key)) return byUrl
   } catch { /* fall through to the object store */ }
   try {
-    const blob = (await getLocalObject(key)) || (img.localHash ? await getLocalObject(img.localHash) : null)
+    const blob =
+      (img.localRef ? await getLocalObject(img.localRef) : null) ||
+      (await getLocalObject(key))
     if (blob && blob.size > 0) {
       const url = URL.createObjectURL(blob)
       trackLocalUrl(url)
@@ -269,7 +278,7 @@ export type KeepsakeLocal =
   | { kind: 'missing'; legacy: boolean };
 
 export function resolveKeepsakeLocal(
-  img: Pick<GalleryImage, 'url' | 'kind' | 'localStatus'>,
+  img: Pick<GalleryImage, 'url' | 'kind' | 'saveState'>,
   vaultUrls: Record<string, string>,
   localUrls: Record<string, string>,
 ): KeepsakeLocal {
@@ -277,13 +286,13 @@ export function resolveKeepsakeLocal(
   const key = img.url || '';
   const v = key ? vaultUrls[key] || localUrls[key] : undefined;
   if (isLocalValue(v, key)) return { kind: 'local', url: v, media };
-  switch (img.localStatus) {
-    case 'pending':
+  switch (img.saveState) {
+    case 'downloading':
       return { kind: 'pending' };
     case 'failed':
       return { kind: 'failed' };
-    case 'local':
-      // Claimed local but bytes are gone (evicted vault / cleared store).
+    case 'persisted':
+      // Claimed persisted but bytes are gone (evicted vault / cleared store).
       return { kind: 'missing', legacy: false };
     default:
       // Legacy record: never verified, recovery not yet attempted.

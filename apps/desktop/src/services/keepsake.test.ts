@@ -33,7 +33,7 @@ describe('persistKeepsake (Phase 5)', () => {
     const d = deps();
     const r = await persistKeepsake('https://x/pic.jpg', d);
     expect(r.status).toBe('local');
-    expect(r.hash).toBe('a'.repeat(64));
+    expect(r.ref).toBe('a'.repeat(64));
     expect(r.via).toBe('idb');
     expect(d.storeBytes).toHaveBeenCalledWith('https://x/pic.jpg', expect.any(File));
     expect(d.storeBytes).toHaveBeenCalledWith('a'.repeat(64), expect.any(File));
@@ -71,7 +71,7 @@ describe('persistKeepsake (Phase 5)', () => {
       vaultReadBack: vi.fn(async () => 'vault://f/k.mp4'),
     });
     const r = await persistKeepsake('https://x/clip.mp4', d, 'video');
-    expect(r).toEqual({ status: 'local', hash: 'b'.repeat(64), bytes: 300_000_000, via: 'vault-stream' });
+    expect(r).toEqual({ status: 'local', ref: 'b'.repeat(64), bytes: 300_000_000, via: 'vault-stream' });
     // Whole-file route never ran: no full buffer for a 300MB clip.
     expect(d.fetchFile).not.toHaveBeenCalled();
     expect(d.storeBytes).not.toHaveBeenCalled();
@@ -105,7 +105,7 @@ describe('persistKeepsake (Phase 5)', () => {
 describe('resolveFreshLocalUrl (action-time, never remote)', () => {
   it('returns null for failed keeps and empty urls', async () => {
     expect(await resolveFreshLocalUrl({ url: '', kind: 'image' })).toBeNull()
-    expect(await resolveFreshLocalUrl({ url: 'https://p/x.jpg', kind: 'image', localStatus: 'failed' })).toBeNull()
+    expect(await resolveFreshLocalUrl({ url: 'https://p/x.jpg', kind: 'image', saveState: 'failed' })).toBeNull()
   })
 })
 
@@ -122,11 +122,11 @@ describe('resolveKeepsakeLocal (never remote)', () => {
       .toEqual({ kind: 'local', url: 'blob:local', media: 'image' });
   });
   it('pending / failed pass through', () => {
-    expect(resolveKeepsakeLocal(img({ localStatus: 'pending' }), {}, {})).toEqual({ kind: 'pending' });
-    expect(resolveKeepsakeLocal(img({ localStatus: 'failed' }), {}, {})).toEqual({ kind: 'failed' });
+    expect(resolveKeepsakeLocal(img({ saveState: 'downloading' }), {}, {})).toEqual({ kind: 'pending' });
+    expect(resolveKeepsakeLocal(img({ saveState: 'failed' }), {}, {})).toEqual({ kind: 'failed' });
   });
   it('claimed-local-but-gone is missing (not failed), legacy is missing+recoverable', () => {
-    expect(resolveKeepsakeLocal(img({ localStatus: 'local' }), {}, {}))
+    expect(resolveKeepsakeLocal(img({ saveState: 'persisted' }), {}, {}))
       .toEqual({ kind: 'missing', legacy: false });
     expect(resolveKeepsakeLocal(img(), {}, {})).toEqual({ kind: 'missing', legacy: true });
   });
@@ -136,7 +136,7 @@ describe('resolveKeepsakeLocal (never remote)', () => {
     expect(resolveKeepsakeLocal(img({ url: src }), { [src]: src }, {}))
       .toEqual({ kind: 'missing', legacy: true });
     // A non-loopback remote value is equally rejected.
-    expect(resolveKeepsakeLocal(img({ url: src, localStatus: 'local' }), { [src]: 'https://cdn.other/y.jpg' }, {}))
+    expect(resolveKeepsakeLocal(img({ url: src, saveState: 'persisted' }), { [src]: 'https://cdn.other/y.jpg' }, {}))
       .toEqual({ kind: 'missing', legacy: false });
     // Loopback http (Electron vault server) IS local bytes.
     expect(resolveKeepsakeLocal(img({ url: src }), { [src]: 'http://127.0.0.1:9/v/x' }, {}))
@@ -150,7 +150,7 @@ describe('local blob URL ownership (Phase 9)', () => {
 
   /** Mint a URL through the real resolver: the only way URLs enter the registry. */
   const mint = async (): Promise<string> => {
-    const url = await resolveFreshLocalUrl({ url: 'https://p/x.jpg', kind: 'image', localStatus: 'local' })
+    const url = await resolveFreshLocalUrl({ url: 'https://p/x.jpg', kind: 'image', saveState: 'persisted' })
     if (!url) throw new Error('expected a minted local URL')
     return url
   }

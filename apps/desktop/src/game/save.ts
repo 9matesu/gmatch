@@ -100,7 +100,7 @@ export function deserialize(raw: string | null | undefined): SaveData | null {
     shards: num(d.shards, 0),
     prestigeCount: num(d.prestigeCount, 0),
     tags: arr<OwnedTag>(d.tags),
-    gallery: arr<GalleryImage>(d.gallery),
+    gallery: arr<GalleryImage>(d.gallery).map(migrateGalleryImage),
     caps: arr<ActiveCap>(d.caps),
     capsUsed: arr<CapId>(d.capsUsed),
     achievements: arr<string>(d.achievements),
@@ -122,7 +122,26 @@ export function deserialize(raw: string | null | undefined): SaveData | null {
   }
 }
 
-/** Tolerant loader: keeps well-formed sources, drops anything else. */
+/**
+ * One-time migration: old saves carried `localStatus`/`localHash` (three
+ * fields for one idea). Unify on `localRef` (= sha256 of the bytes) +
+ * `saveState`. `localStatus:'local'` means verified bytes => 'persisted' with
+ * localRef = the content hash. Bytes already on disk under the hash-derived
+ * name are readable by the vault (legacy plaintext rows keep working).
+ */
+function migrateGalleryImage(g: Partial<GalleryImage>): GalleryImage {
+  const out = { ...g } as GalleryImage
+  const st = out.saveState ?? (out as any).localStatus
+  const hash = out.localRef ?? (out as any).localHash
+  if (st === 'local') out.saveState = 'persisted'
+  else if (st === 'pending') out.saveState = 'downloading'
+  else if (st === 'failed') out.saveState = 'failed'
+  if (hash && typeof hash === 'string') out.localRef = hash
+  delete (out as any).localStatus
+  delete (out as any).localHash
+  return out as GalleryImage
+}
+
 function sanitizeCustomSources(v: unknown): CustomSource[] {
   if (!Array.isArray(v)) return []
   const out: CustomSource[] = []

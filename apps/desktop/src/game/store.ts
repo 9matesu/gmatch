@@ -453,9 +453,10 @@ function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: 
     boughtAt: now,
     kind: post.kind,
     preview: post.preview,
-    // Phase 5 local-first: bytes are cached asynchronously; the keep is only
-    // 'local' after fetch+store+read-back verify (kickKeepsakePersist below).
-    localStatus: post.url ? 'pending' : 'failed',
+    // Local-first: bytes are captured asynchronously; the keep is only
+    // 'persisted' after fetch+store+read-back+hash verify. The source url is
+    // kept so a failed keep stays retryable; nothing points at a live URL.
+    saveState: post.url ? 'downloading' : 'failed',
   }
   // Novelty drop (non-blocking): one suggested tag + one anti-tag from the foe.
   const ownedNames = new Set(s.tags.map((t) => t.name.toLowerCase()))
@@ -496,7 +497,7 @@ function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: 
   }
 }
 
-/** Persist a keep's bytes, then reconcile its local status in the gallery. */
+/** Persist a keep's bytes, then reconcile its local state in the gallery. */
 function kickKeepsakePersist(img: GalleryImage) {
   if (!img.url) return
   void import('../services/keepsake')
@@ -505,7 +506,7 @@ function kickKeepsakePersist(img: GalleryImage) {
       useGame.setState((s) => ({
         gallery: s.gallery.map((g) =>
           g.id === img.id
-            ? { ...g, localStatus: res.status, localHash: res.hash }
+            ? { ...g, saveState: res.status === 'local' ? 'persisted' : 'failed', localRef: res.ref }
             : g,
         ),
       }))
@@ -513,7 +514,7 @@ function kickKeepsakePersist(img: GalleryImage) {
     .catch(() => {
       useGame.setState((s) => ({
         gallery: s.gallery.map((g) =>
-          g.id === img.id ? { ...g, localStatus: 'failed' as const } : g,
+          g.id === img.id ? { ...g, saveState: 'failed' as const } : g,
         ),
       }))
     })

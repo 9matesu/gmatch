@@ -23,13 +23,16 @@ export interface GalleryImage {
   rarityBase: number
   clicks: number
   rarity: Rarity
-  /** Phase 5 local-first: whether the keep's bytes are cached locally.
-   *  'pending' while the fetch/store runs, 'local' only after the stored
-   *  object is read back and verified, 'failed' when caching did not happen
-   *  (the source url is kept for a retry). Absent on legacy keepsakes. */
-  localStatus?: 'pending' | 'local' | 'failed'
-  /** Content hash of the cached bytes (verification + swarm alias). */
-  localHash?: string
+  /** sha256 dos bytes locais. E' ao mesmo tempo a identidade e a referencia
+   *  do keep: vault://f/<localRef>, object_id do enxame, chave de lookup no
+   *  vault. Um keep "saved" APONTA para bytes no disco; nunca ha um
+   *  segundo campo a dizer a mesma coisa. Ausente = so temos o URL remoto. */
+  localRef?: string
+  /** Estado de escrita do keep. 'downloading' enquanto a captura de bytes
+   *  corre, 'persisted' so depois do fetch+store+read-back+hash verificado,
+   *  'failed' quando a captura nao aconteceu (o source url e' mantido para
+   *  retry). Ausente em keeps de legado (nao verificados). */
+  saveState?: 'downloading' | 'persisted' | 'failed'
   boughtAt?: number
   /** 'video' for mp4/webm posts (redgifs), so cells render <video>. */
   kind?: 'image' | 'video'

@@ -271,11 +271,11 @@ describe('IdleGalleryView', () => {
     const images = [
       {
         id: 'k-local', url: 'https://provider/x.jpg', tags: ['e2e'], rarityBase: 1,
-        clicks: 1, rarity: 'Common', boughtAt: 1, kind: 'image', localStatus: 'local',
+        clicks: 1, rarity: 'Common', boughtAt: 1, kind: 'image', saveState: 'persisted',
       },
       {
         id: 'k-failed', url: 'https://provider/y.jpg', tags: ['e2e'], rarityBase: 1,
-        clicks: 1, rarity: 'Common', boughtAt: 2, kind: 'image', localStatus: 'failed',
+        clicks: 1, rarity: 'Common', boughtAt: 2, kind: 'image', saveState: 'failed',
       },
     ] as GalleryImage[]
     useGame.setState({ gallery: images })
@@ -351,7 +351,7 @@ describe('IdleGalleryView', () => {
       rarity: 'Common',
       boughtAt: 1,
       kind: 'video',
-      localStatus: 'pending',
+      saveState: 'downloading',
     }
     useGame.setState({ gallery: [img] })
 
@@ -382,7 +382,7 @@ describe('IdleGalleryView', () => {
     const { releaseLocalUrl } = await import('../../services/keepsake')
     vi.mocked(releaseLocalUrl).mockClear()
     useGame.setState({
-      gallery: makeGalleryImages(2).map((img) => ({ ...img, localStatus: 'local' as const })),
+      gallery: makeGalleryImages(2).map((img) => ({ ...img, saveState: 'persisted' as const })),
     })
     const fetchMock = vi.fn<() => Promise<{ ok: boolean; blob?: () => Promise<Blob> }>>(
       async () => ({ ok: true, blob: async () => blob }),
@@ -413,7 +413,7 @@ describe('IdleGalleryView', () => {
     vi.mocked(retainLocalUrl).mockClear()
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
     useGame.setState({
-      gallery: makeGalleryImages(1).map((img) => ({ ...img, localStatus: 'local' as const })),
+      gallery: makeGalleryImages(1).map((img) => ({ ...img, saveState: 'persisted' as const })),
     })
 
     render(<IdleGalleryView />)
@@ -441,7 +441,7 @@ describe('IdleGalleryView', () => {
     const prevBridge = g.gmatch
     g.gmatch = { vaultHttpUrl: async () => ({ local: 'http://127.0.0.1:9/v/x' }) }
     useGame.setState({
-      gallery: makeGalleryImages(1).map((img) => ({ ...img, localStatus: 'local' as const })),
+      gallery: makeGalleryImages(1).map((img) => ({ ...img, saveState: 'persisted' as const })),
     })
 
     try {
@@ -469,7 +469,7 @@ describe('IdleGalleryView', () => {
       clicks: 0,
       rarity: 'Common',
       preview: 'https://preview.example/thumb.jpg',
-      localStatus: 'local',
+      saveState: 'persisted',
     }
     expect(resolveGalleryTileUrl(gone)).toBe('')
   })

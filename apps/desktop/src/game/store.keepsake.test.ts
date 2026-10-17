@@ -8,7 +8,7 @@ vi.mock('../services/booru', () => ({
   matchesQuery: () => true,
 }))
 vi.mock('../services/keepsake', () => ({
-  persistKeepsake: vi.fn(async () => ({ status: 'local', hash: 'c'.repeat(64) })),
+  persistKeepsake: vi.fn(async () => ({ status: 'local', ref: 'c'.repeat(64) })),
 }))
 
 const mem = new Map<string, string>()
@@ -37,7 +37,7 @@ describe('clicker keep persists bytes before "saved" (Phase 5)', () => {
     })
     useGame.getState().clickImage()
     const keep = useGame.getState().gallery.at(-1)!
-    expect(keep.localStatus).toBe('pending')
+    expect(keep.saveState).toBe('downloading')
     await vi.waitFor(() => {
       const calls = vi.mocked(persistKeepsake).mock.calls as unknown[][]
       expect(calls.length).toBeGreaterThan(0)
@@ -47,7 +47,7 @@ describe('clicker keep persists bytes before "saved" (Phase 5)', () => {
     })
     // Wait for the dynamic import + status reconciliation.
     await vi.waitFor(() => {
-      expect(useGame.getState().gallery.find((g) => g.id === keep.id)?.localStatus).toBe('local')
+      expect(useGame.getState().gallery.find((g) => g.id === keep.id)?.saveState).toBe('persisted')
     })
   })
 
@@ -63,7 +63,7 @@ describe('clicker keep persists bytes before "saved" (Phase 5)', () => {
     const keep = useGame.getState().gallery.at(-1)!
     await vi.waitFor(() => {
       const g = useGame.getState().gallery.find((x) => x.id === keep.id)
-      expect(g?.localStatus).toBe('failed')
+      expect(g?.saveState).toBe('failed')
     })
     expect(useGame.getState().gallery.find((x) => x.id === keep.id)?.url).toBe('https://x/k2.jpg')
   })
