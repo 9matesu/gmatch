@@ -1,33 +1,31 @@
 "use client";
 
+/**
+ * Single entry point for server actions: join an existing server with an
+ * invitation code, or host one on this machine. Two steps, one primary action
+ * each — a chooser, then the chosen form — inside the existing `Modal`. The
+ * host form is owned by ServersView (its state and restart flow live there) and
+ * handed in as `hostForm`, so there is one dialog and one modal implementation.
+ * Device-local groups are a separate, secondary flow (GroupsDialog): a label is
+ * not a server and must never be offered as one.
+ */
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import { Modal } from '../Modal';
 
-/**
- * Single entry point for world actions: name a device-local group, join with an
- * invite code, or host a server on this machine. The host form is owned by
- * ServersView (its state and restart flow live there) and is handed in as
- * `hostForm`, so there is one dialog and one modal implementation.
- */
 export function AddWorldDialog({
   open,
   onClose,
-  onCreateLabel,
   onJoinCode,
   hostForm,
-  initialTab = 'group',
 }: {
   open: boolean
   onClose: () => void
-  onCreateLabel: (name: string) => void
   onJoinCode: (code: string) => Promise<boolean>
   hostForm?: ReactNode
-  /** Which method the caller's entry point implies (the empty state points at hosting). */
-  initialTab?: 'group' | 'join' | 'host'
 }) {
-  const [tab, setTab] = useState<'group' | 'join' | 'host'>('group')
-  const [labelName, setLabelName] = useState('')
+  const [step, setStep] = useState<'choose' | 'join' | 'host'>('choose')
   const [code, setCode] = useState('')
   const [joinError, setJoinError] = useState('')
   const [joining, setJoining] = useState(false)
@@ -35,81 +33,63 @@ export function AddWorldDialog({
 
   useEffect(() => {
     if (!open) return
-    setTab(initialTab)
-    setLabelName('')
+    setStep('choose')
     setCode('')
     setJoinError('')
     setJoining(false)
-    // After Modal's own first-focus pass: land the caret in the useful field.
+  }, [open])
+
+  // After Modal's own first-focus pass: land the caret in the useful field.
+  useEffect(() => {
+    if (!open || step !== 'join') return
     const t = setTimeout(() => firstRef.current?.focus(), 30)
     return () => clearTimeout(t)
-  }, [open, initialTab])
+  }, [open, step])
 
   if (!open) return null
 
-  const tabs: Array<{ id: 'group' | 'join' | 'host'; label: string }> = [
-    { id: 'group', label: 'New group' },
-    { id: 'join', label: 'Join code' },
-    ...(hostForm ? [{ id: 'host' as const, label: 'Host a server' }] : []),
-  ]
+  const back = (
+    <button
+      type="button"
+      onClick={() => setStep('choose')}
+      className="flex items-center gap-1 text-xs text-retro-muted hover:text-retro-fg cursor-pointer transition-colors"
+    >
+      <ArrowLeft className="w-3 h-3" /> All options
+    </button>
+  )
 
   return (
-    <Modal title="Add world" onClose={onClose} maxWidth="max-w-md">
-      <div className="flex gap-1" role="tablist" aria-label="Add world method">
-        {tabs.map((t) => (
+    <Modal title="Add server" onClose={onClose} maxWidth="max-w-md">
+      {step === 'choose' && (
+        <div className="space-y-1.5">
           <button
-            key={t.id}
             type="button"
-            role="tab"
-            aria-selected={tab === t.id}
-            onClick={() => setTab(t.id)}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer transition-colors duration-150 ${
-              tab === t.id ? 'bg-glass-w12 text-retro-fg' : 'text-retro-muted hover:text-retro-fg'
-            }`}
+            onClick={() => setStep('join')}
+            className="w-full rounded-lg border border-border-glass bg-glass-w5 hover:bg-glass-w10 px-3 py-2.5 text-left cursor-pointer transition-colors duration-150"
           >
-            {t.label}
+            <span className="block text-xs font-bold text-retro-fg">Join with code</span>
+            <span className="mt-0.5 block text-[10px] text-retro-muted">
+              Paste the code the host sent you.
+            </span>
           </button>
-        ))}
-      </div>
-
-      {tab === 'group' && (
-        <form
-          className="pt-3 space-y-2"
-          onSubmit={(e) => { e.preventDefault(); if (labelName.trim()) { onCreateLabel(labelName.trim()); onClose() } }}
-        >
-          <label className="block text-xs text-retro-muted">
-            Group name
-            <input
-              ref={firstRef}
-              aria-label="New group name"
-              value={labelName}
-              onChange={(e) => setLabelName(e.target.value)}
-              placeholder="e.g. Friday crew"
-              maxLength={40}
-              className="glass-field mt-1 w-full px-2.5 py-1.5 text-xs"
-            />
-          </label>
-          <p className="text-[10px] text-retro-muted">
-            A label on this device for grouping known peers. Not a network, and visible to nobody else.
-          </p>
-          <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose} className="glass-action px-3 py-1.5 rounded-lg text-xs text-retro-muted cursor-pointer">
-              Cancel
-            </button>
+          {hostForm && (
             <button
-              type="submit"
-              disabled={!labelName.trim()}
-              className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50"
+              type="button"
+              onClick={() => setStep('host')}
+              className="w-full rounded-lg border border-border-glass bg-glass-w5 hover:bg-glass-w10 px-3 py-2.5 text-left cursor-pointer transition-colors duration-150"
             >
-              Create group
+              <span className="block text-xs font-bold text-retro-fg">Host a server</span>
+              <span className="mt-0.5 block text-[10px] text-retro-muted">
+                Run a world on this computer and share its code.
+              </span>
             </button>
-          </div>
-        </form>
+          )}
+        </div>
       )}
 
-      {tab === 'join' && (
+      {step === 'join' && (
         <form
-          className="pt-3 space-y-2"
+          className="space-y-2"
           onSubmit={async (e) => {
             e.preventDefault()
             const entered = code.trim()
@@ -124,6 +104,7 @@ export function AddWorldDialog({
             else setJoinError('That does not look like a node code. Paste the whole gmatch://node/… string.')
           }}
         >
+          {back}
           <label className="block text-xs text-retro-muted">
             Invite code
             <input
@@ -133,7 +114,7 @@ export function AddWorldDialog({
               onChange={(e) => { setCode(e.target.value); setJoinError('') }}
               placeholder="gmatch://node/…"
               aria-invalid={joinError ? true : undefined}
-              className="glass-field mt-1 w-full px-2.5 py-1.5 text-xs font-mono"
+              className="glass-field mt-1 w-full px-2.5 py-1.5 text-xs"
             />
           </label>
           {joinError ? (
@@ -158,7 +139,12 @@ export function AddWorldDialog({
         </form>
       )}
 
-      {tab === 'host' && hostForm && <div className="pt-3">{hostForm}</div>}
+      {step === 'host' && hostForm && (
+        <div className="space-y-2">
+          {back}
+          {hostForm}
+        </div>
+      )}
     </Modal>
   )
 }

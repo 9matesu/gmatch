@@ -1,44 +1,40 @@
 "use client";
 
-// One presentational row for every entry in the Browser (Destinations, Hosted
-// servers, the legacy/relay status rows), so the anatomy — identity first,
-// infrastructure second — cannot drift between sections. Behaviour stays in
-// ServersView: this file owns layout, the status vocabulary (Current /
-// Connecting / Relay / Deprecated / unavailable) and the two format helpers the
-// row needs. Rows carry exactly one action plus the contextual menu.
-import { ChevronDown, Loader2, Lock, MoreVertical } from 'lucide-react'
+// One row for every server in the Browser: the node running on this machine,
+// directory destinations, and the legacy Fly.dev entry. Identity leads,
+// infrastructure is a second line, and a row carries exactly one action
+// (join / switch — clicking the row) plus its contextual menu. Behaviour stays
+// in ServersView: this file owns layout, the vocabulary (P2P / Legacy, Current
+// / Connecting / Unavailable) and the two format helpers the row needs. A row
+// never claims reachability it has not measured.
+import { Loader2, Lock, MoreVertical } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { DirectoryServer } from './directoryMerge'
-import { BTN, BTN_SMALL, MONO } from '../../ui/styles'
+import { MONO } from '../../ui/styles'
 
 export interface WorldRowState {
-  /** Status vocabulary: Current · Connecting · Relay · Deprecated · Unavailable. */
-  label?: string
-  tone?: 'online' | 'muted' | 'warning'
+  /** At most one quiet type label, and only when it helps: a world running on
+   *  this machine (P2P) or the legacy Fly.dev world. Everything else is hosted,
+   *  which is the norm and needs no label. */
+  kind?: 'P2P' | 'Legacy'
+  /** Status word for the row. Omitted when the row is simply selectable. */
+  status?: 'Current' | 'Connecting' | 'Unavailable'
   /** Right-aligned figure, only when real numbers back it (never a placeholder). */
   counts?: string | null
-  /** Secondary line: domain · listed 2h ago · description. Hidden when empty. */
+  /** Secondary line: description · domain · listed 2h ago. Hidden when empty. */
   meta?: string
-  /** null = status-only row with no primary action. */
-  primary: string | null
-  primaryDisabled?: boolean
-  primaryHint?: string
-  /** Leading relay glyph for "switch to my own server" rows. */
-  primaryIcon?: ReactNode
-  /** Read-only state chip for status-only rows (Transport, Unreachable...). */
-  status?: string | null
 }
 
-const DOT: Record<NonNullable<WorldRowState['tone']>, string> = {
-  online: 'bg-retro-online',
-  muted: 'bg-retro-muted/40',
-  warning: 'bg-retro-warning',
+const DOT: Record<NonNullable<WorldRowState['status']>, string> = {
+  Current: 'bg-retro-online',
+  Connecting: 'bg-retro-warning',
+  Unavailable: 'bg-retro-muted/40',
 }
 
-const LABEL: Record<NonNullable<WorldRowState['tone']>, string> = {
-  online: 'text-retro-online',
-  muted: 'text-retro-muted',
-  warning: 'text-retro-warning',
+const STATUS_TONE: Record<NonNullable<WorldRowState['status']>, string> = {
+  Current: 'text-retro-online',
+  Connecting: 'text-retro-warning',
+  Unavailable: 'text-retro-muted',
 }
 
 export function formatDomain(hint?: string | null): string {
@@ -67,122 +63,129 @@ export function formatRelativeTime(iso?: string | null): string {
   return `${Math.floor(hours / 24)}d ago`
 }
 
+/**
+ * The row's only click target joins or switches; the active row is inert
+ * (clicking it must not reconnect). Everything else lives behind the menu.
+ */
 export function WorldRow({
   server,
   state,
-  expanded,
-  onToggleDetails,
   menuOpen,
   onMenuToggle,
-  onPrimary,
+  onJoin,
+  joinDisabled,
   menuItems,
-  details,
 }: {
   server: DirectoryServer
   state: WorldRowState
-  expanded: boolean
-  onToggleDetails: () => void
   menuOpen: boolean
   onMenuToggle: () => void
-  onPrimary?: () => void
+  onJoin?: () => void
+  joinDisabled?: boolean
   menuItems: ReactNode
-  details?: ReactNode
 }) {
-  const tone = state.tone ?? 'muted'
+  const status = state.status
+  const current = status === 'Current'
+  const body = (
+    <>
+      <span
+        className={`h-2 w-2 shrink-0 rounded-full ${status ? DOT[status] : 'bg-retro-muted/40'}`}
+        aria-hidden
+      />
+      <span className="min-w-0 flex-1">
+        <span className="flex min-w-0 items-baseline gap-2">
+          <span className="truncate text-sm font-semibold text-retro-fg group-hover:text-retro-accent transition-colors duration-150">
+            {server.name}
+          </span>
+          {state.kind && (
+            <span className="shrink-0 text-[10px] uppercase tracking-wider text-retro-muted">{state.kind}</span>
+          )}
+          {status && (
+            <span
+              data-testid={status === 'Connecting' ? `connecting-${server.id}` : undefined}
+              className={`flex shrink-0 items-center gap-1 text-[10px] uppercase tracking-wider ${STATUS_TONE[status]}`}
+            >
+              {status === 'Connecting' && <Loader2 className="w-3 h-3 animate-spin" aria-hidden />}
+              {status}
+            </span>
+          )}
+          {!!server.password_required && (
+            <Lock className="w-3 h-3 shrink-0 text-retro-muted" aria-label="password required" />
+          )}
+          {!!server.is_private && (
+            <span className="shrink-0 text-[10px] uppercase tracking-wider text-retro-muted">private</span>
+          )}
+        </span>
+        {state.meta ? (
+          <span className="mt-0.5 block truncate text-[10px] text-retro-muted">{state.meta}</span>
+        ) : null}
+      </span>
+    </>
+  )
+
   return (
-    <li className="group flex flex-col" aria-busy={state.label === 'Connecting' || undefined}>
-      <div className="flex items-center gap-3 px-3 py-2.5">
+    <li
+      className={`group flex items-center gap-3 px-3 py-2.5 transition-colors duration-150 ${
+        current ? 'bg-glass-w8' : 'hover:bg-glass-w5'
+      }`}
+      aria-current={current || undefined}
+      aria-busy={status === 'Connecting' || undefined}
+    >
+      {current ? (
+        <span
+          data-world-row-focus
+          tabIndex={-1}
+          aria-label={`${server.name}, current server`}
+          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md focus-visible:outline-none"
+        >
+          {body}
+        </span>
+      ) : (
         <button
           type="button"
           data-world-row-focus
-          aria-expanded={expanded}
-          aria-label={`${expanded ? 'Hide' : 'Show'} details for ${server.name}`}
-          onClick={onToggleDetails}
-          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-retro-accent"
+          onClick={onJoin}
+          disabled={joinDisabled}
+          aria-label={`Connect to ${server.name}`}
+          className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-retro-accent disabled:opacity-70 ${
+            status === 'Connecting' ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed'
+          }`}
         >
-          <span className={`w-2 h-2 rounded-full shrink-0 ${DOT[tone]}`} aria-hidden />
-          <span className="min-w-0 flex-1">
-            <span className="flex items-baseline gap-2 min-w-0">
-              <span className="truncate text-sm font-semibold text-retro-fg group-hover:text-retro-accent transition-colors duration-150">
-                {server.name}
-              </span>
-              {state.label && (
-                <span className={`shrink-0 text-[10px] uppercase tracking-wider ${LABEL[tone]}`}>
-                  {state.label}
-                </span>
-              )}
-              {!!server.password_required && (
-                <Lock className="w-3 h-3 shrink-0 text-retro-muted" aria-label="password required" />
-              )}
-              {!!server.is_private && (
-                <span className="shrink-0 text-[10px] font-mono uppercase tracking-wider text-retro-muted">private</span>
-              )}
-            </span>
-            {state.meta ? (
-              <span className="mt-0.5 block truncate text-[10px] text-retro-muted">{state.meta}</span>
-            ) : null}
-          </span>
-          <ChevronDown
-            aria-hidden
-            className={`w-3.5 h-3.5 shrink-0 text-retro-muted transition-transform duration-150 ${expanded ? 'rotate-180 text-retro-fg' : ''}`}
-          />
+          {body}
         </button>
+      )}
 
-        <div className="flex shrink-0 items-center gap-2">
-          {state.counts ? (
-            <span className={`hidden sm:inline text-[10px] ${MONO} text-retro-muted`}>{state.counts}</span>
-          ) : null}
+      <div className="flex shrink-0 items-center gap-2">
+        {/* Fixed slot so the ⋯ column lines up down the list, whether or not a
+            row has a figure the server actually reported. */}
+        <span className={`hidden sm:inline-block w-16 text-right text-[10px] ${MONO} text-retro-muted`}>
+          {state.counts ?? ''}
+        </span>
 
-          {state.label === 'Connecting' ? (
-            <span
-              data-testid={`connecting-${server.id}`}
-              role="status"
-              className={`h-7 px-2.5 ${MONO} rounded-lg border border-border-glass bg-glass-w8 flex items-center gap-1.5 text-xs text-retro-fg cursor-wait`}
+        <div className="relative">
+          <button
+            type="button"
+            data-menu-trigger
+            onClick={onMenuToggle}
+            aria-label={`More actions for ${server.name}`}
+            title="More actions"
+            className="h-7 w-7 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w10 flex items-center justify-center cursor-pointer transition-colors duration-150"
+          >
+            <MoreVertical className="w-3.5 h-3.5" />
+          </button>
+
+          {menuOpen && (
+            <div
+              data-menu-content
+              role="menu"
+              aria-label={`Actions for ${server.name}`}
+              className="absolute right-0 top-full mt-1 w-52 bg-surface-raised border border-border-glass rounded-lg py-1 shadow-lg z-[var(--z-dropdown)] space-y-0.5 animate-orbit-fade-in"
             >
-              <Loader2 className="w-3 h-3 animate-spin text-retro-muted" aria-hidden /> Connecting
-            </span>
-          ) : state.status ? (
-            <span className={`hidden sm:inline text-[10px] ${MONO} text-retro-muted`}>{state.status}</span>
-          ) : state.primary ? (
-            <button
-              type="button"
-              disabled={state.primaryDisabled}
-              title={state.primaryHint}
-              onClick={onPrimary}
-              className={`${BTN} ${BTN_SMALL} h-7 min-w-[68px] justify-center inline-flex items-center gap-1.5`}
-            >
-              {state.primaryIcon}
-              {state.primary}
-            </button>
-          ) : null}
-
-          <div className="relative">
-            <button
-              type="button"
-              data-menu-trigger
-              onClick={onMenuToggle}
-              aria-label={`More actions for ${server.name}`}
-              title="More actions"
-              className="h-7 w-7 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w10 flex items-center justify-center cursor-pointer transition-colors duration-150"
-            >
-              <MoreVertical className="w-3.5 h-3.5" />
-            </button>
-
-            {menuOpen && (
-              <div
-                data-menu-content
-                role="menu"
-                aria-label={`Actions for ${server.name}`}
-                className="absolute right-0 top-full mt-1 w-52 bg-surface-raised border border-border-glass rounded-lg py-1 shadow-lg z-[var(--z-dropdown)] space-y-0.5 animate-orbit-fade-in"
-              >
-                {menuItems}
-              </div>
-            )}
-          </div>
+              {menuItems}
+            </div>
+          )}
         </div>
       </div>
-
-      {expanded && details}
     </li>
   )
 }

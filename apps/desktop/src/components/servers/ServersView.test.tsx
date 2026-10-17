@@ -36,11 +36,19 @@ function stubLocalStorage(initial: Record<string, string> = {}) {
   } as Storage)
 }
 
-/** Add world is the single door; hosting lives on its third segment. */
+/** Add server is the single door; hosting is one step inside it. */
 async function openHostForm() {
-  fireEvent.click(await screen.findByRole('button', { name: /add world/i }))
-  fireEvent.click(screen.getByRole('tab', { name: /host a server/i }))
+  fireEvent.click(screen.getAllByRole('button', { name: /add server/i })[0])
+  fireEvent.click(await screen.findByRole('button', { name: /host a server/i }))
 }
+
+async function openJoinForm() {
+  fireEvent.click(screen.getAllByRole('button', { name: /add server/i })[0])
+  fireEvent.click(await screen.findByRole('button', { name: /join with code/i }))
+}
+
+/** The row's own click target (the ⋯ button is a sibling, never nested). */
+const rowOf = (text: string) => screen.getAllByRole('listitem').find((el) => el.textContent?.includes(text))!
 
 import { _resetResponseCache } from '../../utils/api'
 
@@ -58,7 +66,7 @@ afterEach(() => {
 })
 
 describe('ServersView', () => {
-  it('lists public servers with plain counts and password lock marker', async () => {
+  it('renders a single server list: name, quiet meta, lock marker, no address', async () => {
     mockFetch(async (url) => {
       if (url.includes('/api/servers/dashboard')) return json({ name: 'central', users: [{ id: 'abcdef12', display_name: 'Alice', online: true }], posts_24h: 3, members_total: 9 })
       if (url.includes('/api/servers')) return json({ servers: [
@@ -68,45 +76,394 @@ describe('ServersView', () => {
     })
     render(<ServersView identity={identity} toast={() => {}} />)
     await waitFor(() => expect(screen.getByText('Friend World')).toBeInTheDocument())
-    // create-node cycle: the row shows the shareable HANDLE, never an address
-    // or the admin's name.
+
+    // one page, one list, one title: no sections, no counts line, no anchor card
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Servers')
+    expect(screen.queryByRole('heading', { name: /destinations/i })).toBeNull()
+    expect(screen.queryByRole('heading', { name: /hosted servers/i })).toBeNull()
+    expect(screen.queryByLabelText('Current world')).toBeNull()
+    expect(screen.getByRole('list', { name: 'Servers' })).toBeInTheDocument()
+
+    // privacy: no raw address, no admin name, ever
     expect(screen.queryByText('by Alice')).not.toBeInTheDocument()
     expect(screen.queryByText(/192\.168/)).not.toBeInTheDocument()
-    // copy action lives behind the row overflow menu: open it first.
+    expect(screen.queryByText(/192\.168/)).not.toBeInTheDocument()
+
+    // the description is the secondary line; the copy action lives in the menu
+    expect(screen.getByText(/chill/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /more actions for friend world/i }))
     expect(screen.getByTitle('Copy node code')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /more actions for friend world/i }))
-    expect(screen.getByText(/chill/)).toBeInTheDocument()
+
     // password_required => visible lock marker
     expect(screen.getByLabelText('password required')).toBeInTheDocument()
-    // browse view keeps no presence chrome: no Manage Hub, no Online pills.
+    // browse keeps no presence chrome: no Manage Hub, no Online pills.
     expect(screen.queryByRole('button', { name: /manage hub/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /online \(/i })).toBeNull()
-    // dashboard userlist lives on the hub: open it to find Alice.
-    fireEvent.click(screen.getByRole('button', { name: /^open$/i }))
-    expect(await screen.findByText('Alice')).toBeInTheDocument()
-    // hero is ONE row: counts live under the name, not in a duplicate header
-    expect(await screen.findByText('9 members · 3 posts/24h')).toBeInTheDocument()
-    // the page header names the panel, never the world, so the hero is the only
-    // place the server's name appears.
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Hub')
-    expect(screen.queryByText('This server')).not.toBeInTheDocument()
   })
 
-  it('renders the directory as a gallery-style browser list with count', async () => {
+  it('keeps one row per server and never duplicates the same address', async () => {
+    const ownId = (identity as unknown as { orbitId: string }).orbitId
+    stubLocalStorage({ 'gmatch.central.url': 'https://central.test', 'gmatch.api.url': 'https://world.test:8790' })
     mockFetch(async (url) => {
-      if (url.includes('/api/servers/dashboard')) return json({ name: 'central', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'My Realm', users: [], posts_24h: 0, members_total: 2 })
+      if (url.includes('/api/servers/node')) return json({ name: 'My Realm', description: '', isAdmin: true })
       if (url.includes('/api/servers')) return json({ servers: [
-        { id: 's1', name: 'Alpha Node', description: 'desc1', owner_id: 'o1', password_required: 0, endpoint_hint: '1.2.3.4:8790' },
-        { id: 's2', name: 'Beta Node', description: 'desc2', owner_id: 'o2', password_required: 1, endpoint_hint: '5.6.7.8:8790' },
+        // the node on this machine, listed twice under two directory ids
+        { id: 'reg1', name: 'My Realm', owner_id: ownId, password_required: 0, endpoint_hint: 'https://world.test:8790', last_seen: '2026-01-01' },
+        { id: 'reg2', name: 'My Realm', owner_id: ownId, password_required: 0, endpoint_hint: 'http://world.test:8790/', last_seen: '2026-01-02' },
+        // a different server that happens to share the display name
+        { id: 'other', name: 'My Realm', owner_id: 'someone', password_required: 0, endpoint_hint: 'https://other.test:8790', last_seen: '2026-01-01' },
       ] })
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await waitFor(() => expect(screen.getByText('Alpha Node')).toBeInTheDocument())
-    // count includes the two official servers (p2p and deprecated) on top of the 2 directory rows
-    expect(screen.getByText(/4 destinations/i)).toBeInTheDocument()
-    expect(screen.getAllByRole('listitem').length).toBe(4)
+    await screen.findByText(/other\.test:8790/)
+    const rows = screen.getAllByRole('listitem')
+    // current node (2 records collapsed) + the namesake on another address + legacy
+    expect(rows).toHaveLength(3)
+    expect(screen.getAllByText('My Realm')).toHaveLength(2)
+  })
+
+  it('makes the active server one inert current row, never a separate card', async () => {
+    const serverSet = vi.fn().mockResolvedValue({ ok: true })
+    ;(window as unknown as { gmatch?: unknown }).gmatch = {
+      serverSet, serverRelaunch: vi.fn(),
+      serverState: vi.fn().mockResolvedValue({ packaged: true, mode: 'client', url: 'https://world.test:8790', lanUrls: [] }),
+    }
+    stubLocalStorage({ 'gmatch.central.url': 'https://central.test', 'gmatch.api.url': 'https://world.test:8790' })
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'Open World', users: [{ id: 'u1', display_name: 'Ann', online: true }], posts_24h: 0, members_total: 4 })
+      if (url.includes('/api/servers/node')) return json({ name: 'Open World', description: '', isAdmin: true })
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 'ccc', name: 'Open World', description: '', owner_id: 'owner2', password_required: 0, endpoint_hint: 'https://world.test:8790', last_seen: 'x' },
+        { id: 'ddd', name: 'Elsewhere', description: '', owner_id: 'owner3', password_required: 0, endpoint_hint: 'https://elsewhere.test:8790', last_seen: 'x' },
+      ] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    const active = await screen.findByLabelText('Open World, current server')
+    const activeRow = active.closest('li')!
+    expect(within(activeRow).getByText('Current')).toBeInTheDocument()
+    expect(activeRow).toHaveAttribute('aria-current', 'true')
+    expect(within(activeRow).getByText('1 / 4')).toBeInTheDocument()
+
+    // clicking the active row must not reconnect...
+    fireEvent.click(active)
+    expect(serverSet).not.toHaveBeenCalled()
+    // ...and the active server lives once, in its normal position
+    expect(screen.getAllByText('Open World')).toHaveLength(1)
+
+    // the drill-in to the node dashboard is a secondary action
+    fireEvent.click(within(activeRow).getByRole('button', { name: /more actions/i }))
+    fireEvent.click(await within(activeRow).findByText('Open dashboard'))
+    expect(await screen.findByLabelText('Current server hub')).toBeInTheDocument()
+    expect(await screen.findByText('Ann')).toBeInTheDocument()
+    expect(await screen.findByText('4 members · 0 posts/24h')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Hub')
+    delete (window as unknown as { gmatch?: unknown }).gmatch
+  })
+
+  it('does not present relay-only infrastructure as a server', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await screen.findByText('gMatch Fly.dev')
+    // the courier is a directory, not a destination: no row, no transport chip
+    expect(screen.queryByText(/gMatch Central \(p2p\)/i)).toBeNull()
+    expect(screen.queryByText('Relay')).toBeNull()
+    expect(screen.queryByText(/relay transport/i)).toBeNull()
+  })
+
+  it('keeps the legacy Fly.dev world with a restrained label and a menu-only connect', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [] })
+      return json({})
+    })
+    const onServerJoined = vi.fn()
+    render(<ServersView identity={identity} toast={() => {}} onServerJoined={onServerJoined} />)
+    await screen.findByText('gMatch Fly.dev')
+
+    const legacyRow = rowOf('gMatch Fly.dev')
+    expect(within(legacyRow).getByText('Legacy')).toBeInTheDocument()
+    expect(within(legacyRow).getByText(/gmatch\.fly\.dev/)).toBeInTheDocument()
+    // the row is a destination, and it is the only place the old connect lives
+    expect(within(legacyRow).getByRole('button', { name: /connect to gmatch fly\.dev/i })).toBeInTheDocument()
+    fireEvent.click(within(legacyRow).getByRole('button', { name: /more actions/i }))
+    fireEvent.click(await within(legacyRow).findByText('Connect to legacy server'))
+    expect(onServerJoined).toHaveBeenCalledWith(expect.objectContaining({ id: 'central-deprecated' }))
+    expect(localStorage.getItem('gmatch.api.url')).toBe('https://gmatch.fly.dev')
+  })
+
+  it('shows an unavailable destination as unavailable, not as ready to connect', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/fly-api')) return json({}, 503)
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await screen.findByText('gMatch Fly.dev')
+    const legacyRow = rowOf('gMatch Fly.dev')
+    expect(within(legacyRow).getByText('Unavailable')).toBeInTheDocument()
+    expect(within(legacyRow).getByRole('button', { name: /connect to gmatch fly\.dev/i })).toBeDisabled()
+  })
+
+  it('a listed server with no address is not offered as ready to connect', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 'ghost', name: 'Ghost Node', description: '', owner_id: 'o1', password_required: 0, last_seen: 'x' },
+      ] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await screen.findByText('Ghost Node')
+    const ghost = rowOf('Ghost Node')
+    expect(within(ghost).getByText('Unavailable')).toBeInTheDocument()
+    expect(within(ghost).getByRole('button', { name: /connect to ghost node/i })).toBeDisabled()
+  })
+
+  it('never fabricates a count for a server nothing has measured', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/fly-api')) return json({}, 503)
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await screen.findByText('gMatch Fly.dev')
+    // the legacy entry stays visible and reports its real state...
+    const legacyRow = rowOf('gMatch Fly.dev')
+    expect(within(legacyRow).getByText('Unavailable')).toBeInTheDocument()
+    // ...and no row invents a member figure out of nothing
+    expect(screen.queryByText(/\d+ \/ \d+/)).toBeNull()
+    // one header action, and no second "Add server" entry point outside it
+    expect(screen.getAllByRole('button', { name: /add server/i })).toHaveLength(1)
+  })
+
+  it('joins a server from the row and commits it as current without a restart', async () => {
+    const serverRelaunch = vi.fn().mockResolvedValue(undefined)
+    ;(window as unknown as { gmatch?: unknown }).gmatch = {
+      serverSet: vi.fn().mockResolvedValue({ ok: true }),
+      serverRelaunch,
+      serverState: vi.fn().mockResolvedValue({ packaged: true, mode: 'host', url: 'http://127.0.0.1:8790', lanUrls: [] }),
+    }
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 'ccc', name: 'Open World', description: '', owner_id: 'owner2', password_required: 0, endpoint_hint: 'https://world.test:8790', last_seen: 'x' },
+      ] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: /connect to open world/i }))
+    await waitFor(() => expect((window as unknown as { gmatch: { serverSet: ReturnType<typeof vi.fn> } }).gmatch.serverSet)
+      .toHaveBeenCalledWith({ mode: 'client', url: 'https://world.test:8790' }))
+    // seamless: persisted for future restarts, but nothing relaunches
+    expect(serverRelaunch).not.toHaveBeenCalled()
+    expect(localStorage.getItem('gmatch.api.url')).toBe('https://world.test:8790')
+    // the committed mark follows committed state, and the row goes inert
+    expect(await screen.findByLabelText('Open World, current server')).toBeInTheDocument()
+    delete (window as unknown as { gmatch?: unknown }).gmatch
+  })
+
+  it('password-protected server prompts from the row and stores the join handoff', async () => {
+    const KEY = ['gmatch', 'server', 'join'].join('.')
+    stubLocalStorage({ 'gmatch.central.url': 'https://central.test' })
+    ;(window as unknown as { gmatch: unknown }).gmatch = {
+      serverSet: vi.fn().mockResolvedValue({ ok: true }),
+      serverRelaunch: vi.fn().mockResolvedValue(undefined),
+      serverState: vi.fn().mockResolvedValue({ packaged: true, mode: 'host', url: 'http://127.0.0.1:8790', lanUrls: [] }),
+    }
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 'ddd', name: 'Locked World', description: '', owner_id: 'owner3', password_required: 1, endpoint_hint: 'https://locked.test:8790', last_seen: 'x' },
+      ] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: /connect to locked world/i }))
+    // Join passwords go through the in-app PromptDialog (Electron has no
+    // window.prompt): type it and submit.
+    const pwInput = await screen.findByRole('textbox', { name: 'Server password' })
+    fireEvent.change(pwInput, { target: { value: 's3cret' } })
+    fireEvent.keyDown(pwInput, { key: 'Enter' })
+    await waitFor(() => expect((window as unknown as { gmatch: { serverSet: ReturnType<typeof vi.fn> } }).gmatch.serverSet)
+      .toHaveBeenCalledWith({ mode: 'client', url: 'https://locked.test:8790' }))
+    // one-shot handoff persisted locally for the post-restart verify
+    const raw = localStorage.getItem(KEY)
+    expect(raw).toBeTruthy()
+    expect(JSON.parse(raw!).password).toBe('s3cret')
+    delete (window as unknown as { gmatch?: unknown }).gmatch
+    vi.restoreAllMocks()
+  })
+
+  it('repeated clicks while a switch is in flight cannot start a second one', async () => {
+    let resolveSet: ((v: { ok: boolean }) => void) | undefined
+    const serverSet = vi.fn(() => new Promise<{ ok: boolean }>((resolve) => { resolveSet = resolve }))
+    ;(window as unknown as { gmatch?: unknown }).gmatch = {
+      serverSet, serverRelaunch: vi.fn(),
+      serverState: vi.fn().mockResolvedValue({ packaged: true, mode: 'host', url: 'http://127.0.0.1:8790', lanUrls: [] }),
+    }
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 'ccc', name: 'Open World', description: '', owner_id: 'owner2', password_required: 0, endpoint_hint: 'https://world.test:8790', last_seen: 'x' },
+      ] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    const join = await screen.findByRole('button', { name: /connect to open world/i })
+    fireEvent.click(join)
+    await screen.findByTestId('connecting-ccc')
+    fireEvent.click(join)
+    expect(serverSet).toHaveBeenCalledTimes(1)
+    resolveSet?.({ ok: true })
+    delete (window as unknown as { gmatch?: unknown }).gmatch
+  })
+
+  it('anonymous browser fetches the directory only, never dashboard/node', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 's1', name: 'Alpha Node', description: '', owner_id: 'o1', password_required: 0, endpoint_hint: '' },
+      ] })
+      return json({})
+    })
+    render(<ServersView identity={null as never} toast={() => {}} />)
+    await screen.findByText('Alpha Node')
+    expect(screen.getByText(/no account yet/i)).toBeInTheDocument()
+    expect(calls.some((c) => c.url.includes('/api/servers/dashboard'))).toBe(false)
+    expect(calls.some((c) => c.url.includes('/api/servers/node'))).toBe(false)
+  })
+
+  it('search matches name and tags, and offers a way back from no matches', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 's1', name: 'Chill Zone', description: '', owner_id: 'o1', password_required: 0, tags: ['chill', 'movies'] },
+        { id: 's2', name: 'Other Realm', description: '', owner_id: 'o2', password_required: 0, tags: ['gaming'] },
+      ] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await screen.findByText('Chill Zone')
+    // one quiet search field in the header; no sort toolbar, no lock filter
+    expect(screen.getByLabelText('Search servers')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Sort servers')).toBeNull()
+    expect(screen.queryByRole('button', { name: /password only/i })).toBeNull()
+
+    fireEvent.change(screen.getByLabelText('Search servers'), { target: { value: 'chill' } })
+    expect(await screen.findByText('Chill Zone')).toBeInTheDocument()
+    expect(screen.queryByText('Other Realm')).toBeNull()
+
+    fireEvent.change(screen.getByLabelText('Search servers'), { target: { value: 'zzz' } })
+    expect(await screen.findByText(/no servers match/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /show all servers/i }))
+    expect(await screen.findByText('Chill Zone')).toBeInTheDocument()
+    expect(screen.getByLabelText('Search servers')).toHaveValue('')
+  })
+
+  it('search filters the node on this machine too, so nothing matching is honest', async () => {
+    ;(window as unknown as { gmatch?: unknown }).gmatch = {
+      serverSet: vi.fn(), serverRelaunch: vi.fn(),
+      serverState: vi.fn().mockResolvedValue({ packaged: true, mode: 'host', url: 'http://127.0.0.1:8790', lanUrls: [] }),
+    }
+    stubLocalStorage({ 'gmatch.central.url': 'https://central.test', 'gmatch.api.url': 'http://127.0.0.1:8790' })
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'This Machine', users: [], posts_24h: 0, members_total: 2 })
+      if (url.includes('/api/servers')) return json({ servers: [] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await screen.findByText('This Machine')
+
+    fireEvent.change(screen.getByLabelText('Search servers'), { target: { value: 'machine' } })
+    expect(await screen.findByText('This Machine')).toBeInTheDocument()
+
+    // a query nothing matches empties the list instead of leaving a stale row
+    fireEvent.change(screen.getByLabelText('Search servers'), { target: { value: 'zzz' } })
+    expect(await screen.findByText(/no servers match/i)).toBeInTheDocument()
+    expect(screen.queryByText('This Machine')).toBeNull()
+    delete (window as unknown as { gmatch?: unknown }).gmatch
+  })
+
+  it('without a configured central, explains instead of crashing', async () => {
+    stubLocalStorage({ 'gmatch.central.url': 'none' })
+    mockFetch(async () => json({ servers: [] }))
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await waitFor(() => expect(screen.getByText(/no central/i)).toBeInTheDocument())
+  })
+
+  it('keeps known servers and offers a retry when the directory is unreachable', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      return json({}, 500)
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await waitFor(() => expect(screen.getByText(/directory unreachable/i)).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument()
+    // the list still renders what it knows instead of a blank page
+    expect(screen.getByText('gMatch Fly.dev')).toBeInTheDocument()
+  })
+
+  it('central admin door lives behind the directory menu', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'hub', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers/node')) return json({ name: 'hub', description: '', isAdmin: false })
+      if (url.includes('/api/servers')) return json({ servers: [] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await screen.findByText('gMatch Fly.dev')
+    // The button no longer pre-gates on node.isAdmin: the user's .exe is the
+    // central admin. CentralAdminPanel itself refuses until the PIN unlocks.
+    fireEvent.click(screen.getByRole('button', { name: /directory options/i }))
+    expect(screen.getByRole('button', { name: /central admin/i })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Central admin login')).not.toBeInTheDocument()
+  })
+
+  it('add server: rejects a bad invite code next to its field and preserves it', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await screen.findByText('gMatch Fly.dev')
+    await openJoinForm()
+    expect(screen.getByRole('dialog', { name: /add server/i })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/invite code/i), { target: { value: 'not-a-code' } })
+    fireEvent.click(screen.getByRole('button', { name: /^join$/i }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/node code/i)
+    expect(screen.getByRole('dialog', { name: /add server/i })).toBeInTheDocument()
+    expect(screen.getByLabelText(/invite code/i)).toHaveValue('not-a-code')
+    expect(localStorage.getItem('gmatch.api.url')).toBeNull()
+  })
+
+  it('local groups stay out of the list and behind their own secondary door', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await screen.findByText('gMatch Fly.dev')
+    // a label is never a server and adds no list row
+    expect(screen.getAllByRole('listitem')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: /local groups/i }))
+    expect(screen.getByRole('dialog', { name: /local groups/i })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/new group name/i), { target: { value: 'Friday crew' } })
+    fireEvent.click(screen.getByRole('button', { name: /^create$/i }))
+    expect(await screen.findByText('Friday crew')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /forget group friday crew/i }))
+    await waitFor(() => expect(screen.queryByText('Friday crew')).toBeNull())
+    // still exactly one server row: the group never became a destination
+    expect(screen.getAllByRole('listitem')).toHaveLength(1)
   })
 
   it('register form posts name and shows created server', async () => {
@@ -232,174 +589,6 @@ describe('ServersView', () => {
     delete (window as unknown as { gmatch?: unknown }).gmatch
   })
 
-  it('join probes then switches in-app without restart when packaged', async () => {
-    const serverRelaunch = vi.fn().mockResolvedValue(undefined)
-    ;(window as unknown as { gmatch?: unknown }).gmatch = {
-      serverSet: vi.fn().mockResolvedValue({ ok: true }),
-      serverRelaunch,
-      serverState: vi.fn().mockResolvedValue({ packaged: true, mode: 'host', url: 'http://127.0.0.1:8790', lanUrls: [] }),
-    }
-    mockFetch(async (url) => {
-      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
-      if (url.includes('/api/servers')) return json({ servers: [
-        { id: 'ccc', name: 'Open World', description: '', owner_id: 'owner2', password_required: 0, endpoint_hint: 'https://world.test:8790', last_seen: 'x' },
-      ] })
-      return json({})
-    })
-    render(<ServersView identity={identity} toast={() => {}} />)
-    const joinBtn = await screen.findByRole('button', { name: /join/i })
-    fireEvent.click(joinBtn)
-    await waitFor(() => expect((window as unknown as { gmatch: { serverSet: ReturnType<typeof vi.fn> } }).gmatch.serverSet)
-      .toHaveBeenCalledWith({ mode: 'client', url: 'https://world.test:8790' }))
-    // seamless: persisted for future restarts, but nothing relaunches and the
-    // committed base is stored for the live session.
-    expect(serverRelaunch).not.toHaveBeenCalled()
-    expect(localStorage.getItem('gmatch.api.url')).toBe('https://world.test:8790')
-    // the committed world is unmistakable: current-world strip with Open.
-    expect(await screen.findByLabelText('Current world')).toHaveTextContent('Open World')
-    fireEvent.click(screen.getByRole('button', { name: /^open$/i }))
-    expect(screen.getByLabelText('Current server hub')).toBeInTheDocument()
-    delete (window as unknown as { gmatch?: unknown }).gmatch
-  })
-
-  it('add world dialog creates a device-local group and rejects bad codes', async () => {
-    mockFetch(async (url) => {
-      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
-      if (url.includes('/api/servers')) return json({ servers: [] })
-      return json({})
-    })
-    const toasts: string[] = []
-    render(<ServersView identity={identity} toast={(m) => toasts.push(m)} />)
-    expect(await screen.findByText('gMatch Central (p2p)')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /add world/i }))
-    expect(screen.getByRole('dialog', { name: /add world/i })).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText(/new group name/i), { target: { value: 'Friday crew' } })
-    fireEvent.click(screen.getByRole('button', { name: /create group/i }))
-    expect(await screen.findByText('Friday crew')).toBeInTheDocument()
-    // join tab with garbage: the error belongs next to the field, the typed
-    // value survives, and nothing is committed.
-    fireEvent.click(screen.getByRole('button', { name: /add world/i }))
-    fireEvent.click(screen.getByRole('tab', { name: /join code/i }))
-    fireEvent.change(screen.getByLabelText(/invite code/i), { target: { value: 'not-a-code' } })
-    fireEvent.click(screen.getByRole('button', { name: /^join$/i }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(/node code/i)
-    expect(screen.getByRole('dialog', { name: /add world/i })).toBeInTheDocument()
-    expect(screen.getByLabelText(/invite code/i)).toHaveValue('not-a-code')
-    expect(localStorage.getItem('gmatch.api.url')).toBeNull()
-  })
-
-  it('without a configured central, explains instead of crashing', async () => {
-    stubLocalStorage({ 'gmatch.central.url': 'none' })
-    mockFetch(async () => json({ servers: [] }))
-    render(<ServersView identity={identity} toast={() => {}} />)
-    await waitFor(() => expect(screen.getByText(/no central/i)).toBeInTheDocument())
-  })
-
-  it('password-protected server prompts and stores the join handoff', async () => {
-    const KEY = ['gmatch', 'server', 'join'].join('.')
-    stubLocalStorage({ 'gmatch.central.url': 'https://central.test' })
-    ;(window as unknown as { gmatch: unknown }).gmatch = {
-      serverSet: vi.fn().mockResolvedValue({ ok: true }),
-      serverRelaunch: vi.fn().mockResolvedValue(undefined),
-      serverState: vi.fn().mockResolvedValue({ packaged: true, mode: 'host', url: 'http://127.0.0.1:8790', lanUrls: [] }),
-    }
-    mockFetch(async (url) => {
-      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
-      if (url.includes('/api/servers')) return json({ servers: [
-        { id: 'ddd', name: 'Locked World', description: '', owner_id: 'owner3', password_required: 1, endpoint_hint: 'https://locked.test:8790', last_seen: 'x' },
-      ] })
-      return json({})
-    })
-    render(<ServersView identity={identity} toast={() => {}} />)
-    const joinBtn = await screen.findByRole('button', { name: /join/i })
-    fireEvent.click(joinBtn)
-    // Join passwords now go through the in-app PromptDialog (Electron has no
-    // window.prompt): type it and submit.
-    const pwInput = await screen.findByRole('textbox', { name: 'Server password' })
-    fireEvent.change(pwInput, { target: { value: 's3cret' } })
-    fireEvent.keyDown(pwInput, { key: 'Enter' })
-    await waitFor(() => expect((window as unknown as { gmatch: { serverSet: ReturnType<typeof vi.fn> } }).gmatch.serverSet)
-      .toHaveBeenCalledWith({ mode: 'client', url: 'https://locked.test:8790' }))
-    // one-shot handoff persisted locally for the post-restart verify
-    const raw = localStorage.getItem(KEY)
-    expect(raw).toBeTruthy()
-    expect(JSON.parse(raw!).password).toBe('s3cret')
-    delete (window as unknown as { gmatch?: unknown }).gmatch
-    vi.restoreAllMocks()
-  })
-
-  it('renders online and offline members in stacked sections and clicking user card opens profile', async () => {
-    const orbitApi = await import('../../utils/api')
-    const spy = vi.spyOn(orbitApi, 'orbitFetch').mockImplementation(async (endpoint: string) => {
-      if (String(endpoint).includes('/api/servers/dashboard')) {
-        return json({
-          name: 'hub',
-          users: [
-            { id: 'usr_on', display_name: 'BobOnline', online: true, last_seen: new Date().toISOString() },
-            { id: 'usr_off', display_name: 'CarolRecent', online: false, last_seen: new Date(Date.now() - 3600000).toISOString() },
-          ],
-          posts_24h: 5,
-          members_total: 12,
-        })
-      }
-      if (String(endpoint).includes('/api/servers')) return json({ servers: [] })
-      return json({})
-    })
-    const onSelectUser = vi.fn()
-    render(<ServersView identity={identity} toast={() => {}} onSelectUser={onSelectUser} />)
-
-    // Browse view keeps no presence chrome: no Manage Hub, no Online pills.
-    // Count is 2: no directory rows, but the 2 official central servers show.
-    expect(await screen.findByText(/2 destinations/i)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /manage hub/i })).toBeNull()
-    expect(screen.queryByRole('button', { name: /online \(/i })).toBeNull()
-
-    // Hub members section owns presence: switch to the hub tab first.
-    fireEvent.click(screen.getByRole('button', { name: /^open$/i }))
-    // Stacked sections: BobOnline is in Online section, CarolRecent is in Offline section
-    expect(await screen.findByText('BobOnline', {}, { timeout: 3000 })).toBeInTheDocument()
-    expect(screen.getByText('CarolRecent')).toBeInTheDocument()
-    expect(screen.getByText(/Online \(1\)/i)).toBeInTheDocument()
-    expect(screen.getByText(/Offline \(1\)/i)).toBeInTheDocument()
-
-    // Click Bob's card: triggers onSelectUser
-    fireEvent.click(screen.getByText('BobOnline'))
-    expect(onSelectUser).toHaveBeenCalledWith(expect.objectContaining({ display_name: 'BobOnline' }))
-    spy.mockRestore()
-  })
-
-  it('central admin door renders in client mode too (panel self-gates)', async () => {
-    mockFetch(async (url) => {
-      if (url.includes('/api/servers/dashboard')) return json({ name: 'hub', users: [], posts_24h: 0, members_total: 0 })
-      if (url.includes('/api/servers/node')) return json({ name: 'hub', description: '', isAdmin: false })
-      if (url.includes('/api/servers')) return json({ servers: [] })
-      return json({})
-    })
-    render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText(/2 destinations/i)
-    // The button no longer pre-gates on node.isAdmin: the user's .exe is the
-    // central admin. CentralAdminPanel itself refuses until the PIN unlocks.
-    // It lives with the directory address, one click deep.
-    fireEvent.click(screen.getByRole('button', { name: /directory options/i }))
-    expect(screen.getByRole('button', { name: /central admin/i })).toBeInTheDocument()
-    expect(screen.queryByLabelText('Central admin login')).not.toBeInTheDocument()
-  })
-
-  it('anonymous browser fetches directory only, never dashboard/node', async () => {
-    mockFetch(async (url) => {
-      if (url.includes('/api/servers')) return json({ servers: [
-        { id: 's1', name: 'Alpha Node', description: '', owner_id: 'o1', password_required: 0, endpoint_hint: '' },
-      ] })
-      return json({})
-    })
-    render(<ServersView identity={null as never} toast={() => {}} />)
-    await screen.findByText('Alpha Node')
-    // anonymous browser lists the 2 official servers: 1 directory + 2 official = 3
-    expect(screen.getByText(/3 destinations/i)).toBeInTheDocument()
-    expect(calls.some((c) => c.url.includes('/api/servers/dashboard'))).toBe(false)
-    expect(calls.some((c) => c.url.includes('/api/servers/node'))).toBe(false)
-  })
-
   it('create drawer previews the node handle before creating and offers a private toggle', async () => {
     ;(window as unknown as { gmatch?: unknown }).gmatch = {
       serverState: async () => ({ packaged: true, mode: 'client', url: 'https://central.test', lanUrls: ['http://192.168.0.42:8790'], adminPin: 'abcd1234' }),
@@ -469,7 +658,7 @@ describe('ServersView', () => {
     expect(localStorage.getItem('gmatch.server.directoryId')).toBeNull()
   })
 
-  it('my directory row gets rename / make private / switch controls', async () => {
+  it('my own server row offers privacy and unregister, with no duplicate actions', async () => {
     const ownId = (identity as unknown as { orbitId: string }).orbitId
     mockFetch(async (url) => {
       if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
@@ -477,20 +666,22 @@ describe('ServersView', () => {
       return json({ servers: [{ id: 'bbb', name: 'My Realm', owner_id: ownId, password_required: 0, is_private: 0, endpoint_hint: 'my.host:8790' }] })
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    // owner row stays compact: Switch inline, the rest behind the overflow menu.
-    expect(await screen.findByRole('button', { name: /switch/i })).toBeInTheDocument()
-    const myRow = screen.getAllByRole('listitem').find((el) => el.textContent?.includes('My Realm'))!
-    expect(within(myRow).getAllByRole('button').length).toBeGreaterThanOrEqual(2)
-    fireEvent.click(screen.getByRole('button', { name: /more actions for my realm/i }))
-    expect(await screen.findByText('Make private')).toBeInTheDocument()
-    expect(screen.getByText('unregister')).toBeInTheDocument()
-    // node-level settings live in the Hub editor of the connected server,
-    // so a non-connected row offers no rename item.
-    expect(screen.queryByText('Server settings')).not.toBeInTheDocument()
+    const myRow = await screen.findByText('My Realm')
+    expect(myRow).toBeInTheDocument()
+    const li = myRow.closest('li')!
+    // the row itself is the action; nothing is duplicated beside it
+    expect(within(li).getAllByRole('button')).toHaveLength(2)
+    fireEvent.click(within(li).getByRole('button', { name: /more actions/i }))
+    expect(await within(li).findByText('Make private')).toBeInTheDocument()
+    expect(within(li).getByText('unregister')).toBeInTheDocument()
+    // node-level settings live in the Hub of the connected server, so a
+    // non-connected row offers no rename item.
+    expect(within(li).queryByText('Server settings')).toBeNull()
   })
 
   it('hub settings editor saves name and description to node + directory', async () => {
     const did = 'd'.repeat(64)
+    stubLocalStorage({ 'gmatch.central.url': 'https://central.test', 'gmatch.api.url': 'http://my.host:8790' })
     mockFetch(async (url, init) => {
       if (url.includes('/api/servers/dashboard')) return json({ name: 'My Realm', users: [], posts_24h: 0, members_total: 1 })
       if (url.includes('/api/servers/node')) {
@@ -504,9 +695,10 @@ describe('ServersView', () => {
       return json({ servers: [] })
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    fireEvent.click(await screen.findByRole('button', { name: /^open$/i }))
-    fireEvent.click(await screen.findByRole('button', { name: /settings/i }))
-    expect(screen.getByLabelText('Current server tags')).toBeInTheDocument()
+    const activeRow = (await screen.findByLabelText('My Realm, current server')).closest('li')!
+    fireEvent.click(within(activeRow).getByRole('button', { name: /more actions/i }))
+    fireEvent.click(await within(activeRow).findByText('Server settings'))
+    expect(await screen.findByLabelText('Current server tags')).toBeInTheDocument()
     expect(screen.getByLabelText('New server join password')).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('Current server name'), { target: { value: 'Renamed Realm' } })
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
@@ -540,164 +732,47 @@ describe('ServersView', () => {
     expect(screen.queryByTestId('admin-pin-banner')).toBeNull()
     unmount()
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText(/2 destinations/i)
+    await screen.findByText('gMatch Fly.dev')
     expect(screen.queryByTestId('admin-pin-banner')).toBeNull()
     spy.mockRestore()
     delete (window as unknown as { gmatch?: unknown }).gmatch
   })
 
-  it('keeps one quiet filter row with the directory, and offers a way back from an empty search', async () => {
-    mockFetch(async (url) => {
-      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
-      if (url.includes('/api/servers')) return json({ servers: [
-        { id: 's1', name: 'Alpha Node', description: '', owner_id: 'o1', password_required: 0, endpoint_hint: '' },
-      ] })
-      return json({})
+  it('renders online and offline members on the hub and opens a profile from a member', async () => {
+    const orbitApi = await import('../../utils/api')
+    const spy = vi.spyOn(orbitApi, 'orbitFetch').mockImplementation(async (endpoint: string) => {
+      if (String(endpoint).includes('/api/servers/dashboard')) {
+        return json({
+          name: 'hub',
+          users: [
+            { id: 'usr_on', display_name: 'BobOnline', online: true, last_seen: new Date().toISOString() },
+            { id: 'usr_off', display_name: 'CarolRecent', online: false, last_seen: new Date(Date.now() - 3600000).toISOString() },
+          ],
+          posts_24h: 5,
+          members_total: 12,
+        })
+      }
+      return json({ servers: [] })
     })
-    const { unmount } = render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('Alpha Node')
-    // Part of the page now: no collapsed state to remember across a reload.
-    expect(screen.getByLabelText('Search servers')).toBeInTheDocument()
-    expect(screen.getByLabelText('Sort servers')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /password only/i })).toBeInTheDocument()
+    stubLocalStorage({ 'gmatch.central.url': 'https://central.test', 'gmatch.api.url': 'http://127.0.0.1:8790' })
+    const onSelectUser = vi.fn()
+    render(<ServersView identity={identity} toast={() => {}} onSelectUser={onSelectUser} />)
 
-    // A search that matches nothing says so, and gives one way back.
-    fireEvent.change(screen.getByLabelText('Search servers'), { target: { value: 'zzz' } })
-    expect(await screen.findByText(/no worlds match/i)).toBeInTheDocument()
-    expect(screen.queryByText('Alpha Node')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: /clear filters/i }))
-    expect(await screen.findByText('Alpha Node')).toBeInTheDocument()
-    expect(screen.getByLabelText('Search servers')).toHaveValue('')
+    // browse keeps no presence chrome: no Manage Hub, no Online pills.
+    expect(screen.queryByRole('button', { name: /manage hub/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /online \(/i })).toBeNull()
 
-    unmount()
-    render(<ServersView identity={identity} toast={() => {}} />)
-    expect(await screen.findByText(/3 destinations/i)).toBeInTheDocument()
-    expect(screen.getByLabelText('Search servers')).toBeInTheDocument()
-  })
+    const activeRow = (await screen.findByLabelText('hub, current server')).closest('li')!
+    fireEvent.click(within(activeRow).getByRole('button', { name: /more actions/i }))
+    fireEvent.click(await within(activeRow).findByText('Open dashboard'))
+    // Stacked sections: BobOnline is in Online, CarolRecent in Offline.
+    expect(await screen.findByText('BobOnline', {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(screen.getByText('CarolRecent')).toBeInTheDocument()
+    expect(screen.getByText(/Online \(1\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/Offline \(1\)/i)).toBeInTheDocument()
 
-  it('browse count includes the official central servers', async () => {
-    mockFetch(async (url) => {
-      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
-      if (url.includes('/api/servers')) return json({ servers: [
-        { id: 's1', name: 'Alpha Node', description: '', owner_id: 'o1', password_required: 0, endpoint_hint: '' },
-      ] })
-      return json({})
-    })
-    render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('Alpha Node')
-    // 1 directory row + 2 official central rows = 3 visible rows
-    expect(screen.getByText(/3 destinations/i)).toBeInTheDocument()
-    // Two categories, both real endpoints: worlds to enter, servers that host.
-    expect(screen.getByRole('heading', { name: /destinations/i })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /hosted servers/i })).toBeInTheDocument()
-  })
-
-  it('expandable browser row shows tags and server info', async () => {
-    mockFetch(async (url) => {
-      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
-      if (url.includes('/api/servers')) return json({ servers: [
-        { id: 's1', name: 'Chill Zone', description: 'a cool place to hang', owner_id: 'o1', password_required: 1, tags: ['chill', 'movies'], endpoint_hint: '', online_count: 3, user_count: 10, last_seen: new Date().toISOString() },
-        { id: 's2', name: 'No Tags', description: '', owner_id: 'o2', password_required: 0, endpoint_hint: '' },
-      ] })
-      return json({})
-    })
-    render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('Chill Zone')
-    expect(screen.queryByTestId('server-details-s1')).not.toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: /show details for chill zone/i }))
-    await waitFor(() => expect(screen.getByTestId('server-details-s1')).toBeInTheDocument())
-
-    const details = screen.getByTestId('server-details-s1')
-    expect(details.textContent).toMatch(/a cool place to hang/)
-    expect(details.textContent).toMatch(/password protected/)
-    expect(details.textContent).toMatch(/online: 3/)
-    expect(details.textContent).toMatch(/members: 10/)
-    expect(within(details).getByRole('button', { name: '#chill' })).toBeInTheDocument()
-
-    // Clicking a tag sets it as the search filter
-    fireEvent.click(within(details).getByRole('button', { name: '#chill' }))
-    expect(screen.getByLabelText('Search servers')).toHaveValue('chill')
-  })
-
-  it('search query matches server tags', async () => {
-    mockFetch(async (url) => {
-      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
-      if (url.includes('/api/servers')) return json({ servers: [
-        { id: 's1', name: 'Chill Zone', description: '', owner_id: 'o1', password_required: 0, tags: ['chill', 'movies'], endpoint_hint: '' },
-        { id: 's2', name: 'Other Realm', description: '', owner_id: 'o2', password_required: 0, tags: ['gaming'], endpoint_hint: '' },
-      ] })
-      return json({})
-    })
-    render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('Chill Zone')
-    fireEvent.change(screen.getByLabelText('Search servers'), { target: { value: 'chill' } })
-    expect(await screen.findByText('Chill Zone')).toBeInTheDocument()
-    expect(screen.queryByText('Other Realm')).toBeNull()
-  })
-
-  it('allows clicking on the server name to expand details', async () => {
-    mockFetch(async (url) => {
-      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
-      if (url.includes('/api/servers')) return json({ servers: [
-        { id: 's1', name: 'Chill Zone', description: 'a cool place to hang', owner_id: 'o1', password_required: 0, tags: ['chill'], endpoint_hint: '' },
-      ] })
-      return json({})
-    })
-    render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('Chill Zone')
-    expect(screen.queryByTestId('server-details-s1')).not.toBeInTheDocument()
-
-    // Click on the server name/title block instead of the chevron
-    fireEvent.click(screen.getByText('Chill Zone'))
-    await waitFor(() => expect(screen.getByTestId('server-details-s1')).toBeInTheDocument())
-    expect(screen.getByTestId('server-details-s1')).toHaveTextContent('a cool place to hang')
-  })
-
-  it('renders both P2P and deprecated central servers and connects to them', async () => {
-    mockFetch(async (url) => {
-      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
-      if (url.includes('/api/servers')) return json({ servers: [] })
-      return json({})
-    })
-    const onServerJoined = vi.fn()
-    render(<ServersView identity={identity} toast={() => {}} onServerJoined={onServerJoined} />)
-    expect(await screen.findByText('gMatch Central (p2p)')).toBeInTheDocument()
-    expect(screen.getByText('gMatch Central (deprecated)')).toBeInTheDocument()
-    expect(screen.getByText(/gmatch-wcz1\.onrender\.com/)).toBeInTheDocument()
-    expect(screen.getByText(/gmatch\.fly\.dev/)).toBeInTheDocument()
-
-    // Legacy row is status-only: restrained label, no primary Connect button.
-    const deprecatedRow = screen.getAllByRole('listitem').find((el) => el.textContent?.includes('gMatch Central (deprecated)'))!
-    expect(within(deprecatedRow).getByText('Deprecated')).toBeInTheDocument()
-    expect(within(deprecatedRow).queryByRole('button', { name: /connect/i })).not.toBeInTheDocument()
-
-    // The single legacy connect path lives in the contextual menu.
-    fireEvent.click(within(deprecatedRow).getByRole('button', { name: /more actions/i }))
-    const connectBtn = within(deprecatedRow).getByRole('button', { name: /connect to legacy/i })
-
-    fireEvent.click(connectBtn)
-    expect(onServerJoined).toHaveBeenCalledWith(expect.objectContaining({ id: 'central-deprecated' }))
-    expect(localStorage.getItem('gmatch.api.url')).toBe('https://gmatch.fly.dev')
-  })
-
-  it('shows status-only relay and deprecated rows without primary connect buttons', async () => {
-    mockFetch(async (url) => {
-      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
-      if (url.includes('/api/servers')) return json({ servers: [] })
-      return json({})
-    })
-    render(<ServersView identity={identity} toast={() => {}} />)
-    expect(await screen.findByText('gMatch Central (p2p)')).toBeInTheDocument()
-
-    const p2pRow = screen.getAllByRole('listitem').find((el) => el.textContent?.includes('gMatch Central (p2p)'))!
-    const deprecatedRow = screen.getAllByRole('listitem').find((el) => el.textContent?.includes('gMatch Central (deprecated)'))!
-
-    // Relay row is status-only (transport, not a world); legacy is Deprecated.
-    expect(within(p2pRow).getByText('Relay')).toBeInTheDocument()
-    expect(within(p2pRow).getByText('Connected')).toBeInTheDocument()
-    expect(within(p2pRow).queryByRole('button', { name: /connect|join/i })).not.toBeInTheDocument()
-    expect(within(deprecatedRow).getByText('Deprecated')).toBeInTheDocument()
-    expect(within(deprecatedRow).queryByRole('button', { name: /connect/i })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('BobOnline'))
+    expect(onSelectUser).toHaveBeenCalledWith(expect.objectContaining({ display_name: 'BobOnline' }))
+    spy.mockRestore()
   })
 })

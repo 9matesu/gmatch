@@ -1,13 +1,14 @@
 "use client";
 
 // Servers view (plan T3/T4, docs/ADR-002-servers.md). A "server" is a full
-// gMatch node; the CENTRAL node only keeps a public directory of metadata.
-// 2-column coupled layout: Left = current node dashboard (24h users, rooms, stats);
-// Right = public directory browser (search, join, create).
+// gMatch node; the CENTRAL node only keeps a public directory of metadata. One
+// page, one list, one row per server: the node on this machine, directory
+// destinations and the legacy Fly.dev world all share the same row. A courier
+// that hosts no world is infrastructure, not a destination, so it is not a row.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { Lock, Globe, ShieldCheck, RefreshCw, Pencil, Check, X, Search, ArrowDownUp, Share2, ArrowLeft, Plus, Trash2, MoreVertical } from 'lucide-react'
+import { Lock, Globe, ShieldCheck, RefreshCw, Pencil, Check, X, Search, Share2, ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import { generateIdentity } from '@orbit/crypto'
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
 import { orbitFetch, getApiBaseUrl, isCourierApiUrl } from '../../utils/api'
@@ -15,13 +16,14 @@ import { normalizeServerUrl, isCurrentServerUrl } from '../../utils/serverUrl'
 import { joinServer } from '../../utils/join-server'
 import { switchClientWorld } from '../../utils/server-switch'
 import { rememberPendingHost } from '../../utils/server-host-pending'
-import { mergeDirectory, readDirectoryCache, writeDirectoryCache } from './directoryMerge'
-import { createLabel, readLabels, writeLabels, isOwnLabel, type LocalMeshLabel } from './meshLabels'
+import { mergeDirectory, dedupeServers, serverKey, readDirectoryCache, writeDirectoryCache } from './directoryMerge'
+import { readLabels, writeLabels, type LocalMeshLabel } from './meshLabels'
 import { decodeNodeMask } from '../../utils/nodeMask'
 import { buildNodeCode } from '../../utils/nodeShare'
 import { PromptDialog } from '../PromptDialog'
 import { Modal } from '../Modal'
 import { AddWorldDialog } from './AddWorldDialog'
+import { GroupsDialog } from './GroupsDialog'
 import { WorldRow, WorldMenuItem, formatDomain, formatRelativeTime } from './WorldRow'
 import type { WorldRowState } from './WorldRow'
 import { claimPendingHost } from '../../hooks/usePendingServerHost'
@@ -29,7 +31,6 @@ import { SERVER_MARKER_KEY } from '../../firstRun/onboardingState'
 import { playPress } from '../../utils/sounds'
 import { resolveMediaUrl } from '../../utils/media'
 import { CentralAdminPanel } from './CentralAdminPanel'
-import { fetchPresenceRoster } from '../../services/courierPresence'
 import { subscribeApiBase } from '../../utils/api'
 import type { User } from '@orbit/shared'
 
@@ -101,6 +102,22 @@ export function parseServerTags(input: string): string[] {
 }
 
 /**
+ * True when an endpoint hint points back at this machine. Parsed by hand on
+ * purpose: `new URL('192.168.0.9:8790')` has no scheme, so the parser silently
+ * falls back to localhost and would label a LAN address as loopback.
+ */
+function isLocalHint(hint?: string | null): boolean {
+  if (!hint?.trim()) return false
+  const host = hint.trim()
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
+    .split('/')[0]
+    .replace(/^\[|\]$/g, '')
+    .split(':')[0]
+    .toLowerCase()
+  return host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === '0.0.0.0'
+}
+
+/**
  * Live counts for a row — or null when nothing real backs a number. The old
  * version printed "— / —" and "0 / N", which read as facts about a world
  * nobody had measured.
@@ -109,7 +126,6 @@ function rowCounts(
   s: DirectoryServer,
   isCurrentServer: boolean,
   dash: Dashboard | null,
-  p2pProbe: { online: boolean; count: number | null },
   legacyProbe: { online: boolean; count: number | null; total?: number | null },
 ): string | null {
   if (isCurrentServer && dash) {
@@ -120,15 +136,6 @@ function rowCounts(
       ? dash.members_total
       : (Array.isArray(dash.users) ? dash.users.length : 0)
     return `${online} / ${total}`
-  }
-
-  if (s.id === 'central-p2p') {
-    if (!p2pProbe.online) return null
-    if (typeof p2pProbe.count === 'number' && typeof s.user_count === 'number') {
-      return `${p2pProbe.count} / ${s.user_count}`
-    }
-    if (typeof p2pProbe.count === 'number') return `${p2pProbe.count} online`
-    return null
   }
 
   if (s.id === 'central-deprecated') {
@@ -181,8 +188,6 @@ export function ServersView({
   const [setupError, setSetupError] = useState('')
   const [showAdmin, setShowAdmin] = useState(false)
   const [query, setQuery] = useState('')
-  const [sort, setSort] = useState<'recent' | 'name' | 'online'>('recent')
-  const [passwordOnly, setPasswordOnly] = useState(false)
   const [editingServer, setEditingServer] = useState(false)
   const [serverName, setServerName] = useState('gmatch')
   const [serverDescription, setServerDescription] = useState('')
@@ -201,17 +206,16 @@ export function ServersView({
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  const [showAnchorMenu, setShowAnchorMenu] = useState(false)
   // Device-local mesh labels: UI grouping only, never a network or authority.
   const [labels, setLabels] = useState<LocalMeshLabel[]>(() => readLabels())
   const saveLabels = (next: LocalMeshLabel[]) => { setLabels(next); writeLabels(next) }
-  const [expandedServerId, setExpandedServerId] = useState<string | null>(null)
+  const [groupsOpen, setGroupsOpen] = useState(false)
   const [connectingId, setConnectingId] = useState<string | null>(null)
   const [showCentralPopover, setShowCentralPopover] = useState(false)
 
   useEffect(() => {
-    if (!openMenuId && !showCentralPopover && !showAnchorMenu) return
-    const closeMenus = () => { setOpenMenuId(null); setShowCentralPopover(false); setShowAnchorMenu(false) }
+    if (!openMenuId && !showCentralPopover) return
+    const closeMenus = () => { setOpenMenuId(null); setShowCentralPopover(false) }
     const handleOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null
       if (target && !target.closest('[data-menu-trigger]') && !target.closest('[data-menu-content]')) {
@@ -225,14 +229,13 @@ export function ServersView({
       window.removeEventListener('mousedown', handleOutside)
       window.removeEventListener('keydown', handleKey)
     }
-  }, [openMenuId, showCentralPopover, showAnchorMenu])
+  }, [openMenuId, showCentralPopover])
 
   // Join prompts (Electron has no window.prompt): one pending resolver ref,
   // one dialog kind at a time (password during join, or the paste-code modal).
   const pendingAsk = useRef<((v: string | null) => void) | null>(null)
   const [askPasswordFor, setAskPasswordFor] = useState<string | null>(null)
   const [addWorldOpen, setAddWorldOpen] = useState(false)
-  const [addWorldTab, setAddWorldTab] = useState<'group' | 'join' | 'host'>('group')
 
   const isDev = Boolean(import.meta.env.DEV) ||
     (typeof window !== 'undefined' &&
@@ -243,24 +246,11 @@ export function ServersView({
   const RENDER_COURIER_URL = 'https://gmatch-wcz1.onrender.com'
   const FLY_LEGACY_URL = 'https://gmatch.fly.dev'
 
-  const [p2pProbe, setP2pProbe] = useState<{ online: boolean; count: number | null }>({ online: true, count: null })
   const [legacyProbe, setLegacyProbe] = useState<{ online: boolean; count: number | null; total: number | null }>({ online: false, count: null, total: null })
-
-  const p2pServer: DirectoryServer = useMemo(() => ({
-    id: 'central-p2p',
-    name: 'gMatch Central (p2p)',
-    description: '',
-    owner_id: 'central-p2p',
-    endpoint_hint: RENDER_COURIER_URL,
-    password_required: 0,
-    is_private: 0,
-    online_count: p2pProbe.count,
-    last_seen: p2pProbe.online ? new Date().toISOString() : undefined,
-  }), [p2pProbe])
 
   const legacyServer: DirectoryServer = useMemo(() => ({
     id: 'central-deprecated',
-    name: 'gMatch Central (deprecated)',
+    name: 'gMatch Fly.dev',
     description: '',
     owner_id: 'central-deprecated',
     endpoint_hint: FLY_LEGACY_URL,
@@ -297,32 +287,11 @@ export function ServersView({
     } catch { /* private mode */ }
   }, [])
 
-  const localDevServer: DirectoryServer | null = useMemo(() => {
-    if (!isLocalHost(central)) return null
-    return {
-      id: 'central-local',
-      name: 'Central Node (Local)',
-      description: 'Local dev node (127.0.0.1:8790)',
-      owner_id: 'central-local',
-      endpoint_hint: central,
-      password_required: 0,
-      is_private: 0,
-      user_count: dash?.active_24h_count ?? dash?.members_total ?? null,
-      online_count: dash?.online_count ?? (dash?.users ? dash.users.filter((u) => u.online).length : null),
-      last_seen: new Date().toISOString(),
-    }
-  }, [central, dash])
-
-
   const refresh = useCallback(async () => {
     // Stale-run guard: a world switch mid-refresh must not let the previous
     // server's dashboard/node overwrite the new world's state.
     const runBase = getApiBaseUrl()
     const switchedAway = () => getApiBaseUrl() !== runBase
-    // Live probe: P2P courier presence roster
-    void fetchPresenceRoster(identity?.orbitId)
-      .then((users) => setP2pProbe({ online: true, count: users.length }))
-      .catch(() => setP2pProbe({ online: false, count: null }))
 
     // Live probe: Legacy Fly server (Electron IPC -> Vite dev proxy -> direct fetch)
     const probeFly = async () => {
@@ -571,11 +540,6 @@ export function ServersView({
 
   const isCurrent = useCallback((s: DirectoryServer) => {
     const base = getEffectiveServerUrl()
-    if (s.id === 'central-p2p') {
-      if (isCurrentServerUrl(base, RENDER_COURIER_URL) || base.includes('onrender.com')) return true
-      if (!base || base === '/') return true
-      return false
-    }
     if (s.id === 'central-deprecated') {
       return !!base && (isCurrentServerUrl(base, FLY_LEGACY_URL) || base.includes('fly.dev'))
     }
@@ -584,54 +548,84 @@ export function ServersView({
 
   const mine = (s: DirectoryServer) => !!identity && s.owner_id === (identity as unknown as { orbitId: string }).orbitId
 
-  const officialServers: DirectoryServer[] = useMemo(() => {
-    const list: DirectoryServer[] = []
-    if (localDevServer) list.push(localDevServer)
-    list.push(p2pServer)
-    list.push(legacyServer)
-    return list
-  }, [localDevServer, p2pServer, legacyServer])
+  /** Address of the node this client is talking to. Browser dev rides the Vite
+   *  proxy, so the proxy's target (the configured node) is the honest answer;
+   *  a courier is never a server we own. */
+  const nodeUrl = useMemo(() => {
+    const base = getEffectiveServerUrl()
+    if (base && !isCourierApiUrl(base)) return base
+    if (isDev && isLocalHost(central)) return central
+    return ''
+  }, [getEffectiveServerUrl, apiBaseTick, central])
+
+  const isOwnNode = (s: DirectoryServer) => s.id.startsWith('self:')
+
+  /**
+   * A node that hosts a world IS a server, whoever runs it — including the one
+   * on this machine. It appears once, in its normal position in the list, keyed
+   * by its address so it collapses with its own directory record instead of
+   * being repeated as a separate current-world card.
+   */
+  const ownServer: DirectoryServer | null = useMemo(() => {
+    if (!identity || !nodeUrl) return null
+    const dashUsers = Array.isArray(dash?.users) ? dash.users : []
+    return {
+      id: `self:${nodeUrl.replace(/^https?:\/\//i, '').replace(/\/+$/, '').toLowerCase()}`,
+      name: (serverName || node?.name || dash?.name || '').trim() || 'This computer',
+      description: node?.description || serverDescription || '',
+      owner_id: (identity as unknown as { orbitId?: string }).orbitId || '',
+      password_required: 0,
+      is_private: 0,
+      endpoint_hint: nodeUrl,
+      online_count: typeof dash?.online_count === 'number' ? dash.online_count : dashUsers.filter((u) => u.online).length,
+      user_count: typeof dash?.members_total === 'number' ? dash.members_total : dashUsers.length,
+      last_seen: new Date().toISOString(),
+    }
+  }, [identity, nodeUrl, serverName, node, dash, serverDescription])
 
   const visibleServers = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const centralNorm = (central || '').trim().replace(/\/+$/, '').toLowerCase()
     const p2pNorm = RENDER_COURIER_URL.trim().replace(/\/+$/, '').toLowerCase()
     const flyNorm = FLY_LEGACY_URL.trim().replace(/\/+$/, '').toLowerCase()
-    return servers
-      .filter((s) => {
-        if (s.id === 'central-node' || s.id === 'central-p2p' || s.id === 'central-deprecated' || s.id === 'central-local') return false
-        if (s.name.trim().toLowerCase() === 'gmatch') return false
-        if (s.endpoint_hint?.includes('127.0.0.1:8790') || s.endpoint_hint?.includes('localhost:8790')) return false
-        const hintNorm = s.endpoint_hint ? normalizeServerUrl(s.endpoint_hint)?.toLowerCase() : ''
-        if (hintNorm && (hintNorm === centralNorm || hintNorm === p2pNorm || hintNorm === flyNorm)) return false
-        return true
-      })
-      .filter((s) => !passwordOnly || s.password_required)
-      .filter((s) => !q || `${s.name} ${s.description ?? ''} ${s.endpoint_hint ?? ''} ${(s.tags ?? []).join(' ')}`.toLowerCase().includes(q))
-      .sort((a, b) => {
-        if (sort === 'name') return a.name.localeCompare(b.name)
-        if (sort === 'online') return (b.online_count ?? -1) - (a.online_count ?? -1)
-        return String(b.last_seen ?? '').localeCompare(String(a.last_seen ?? ''))
-      })
-  }, [servers, query, sort, passwordOnly, central])
+    return servers.filter((s) => {
+      if (s.id === 'central-node' || s.id === 'central-p2p' || s.id === 'central-deprecated' || s.id === 'central-local') return false
+      if (s.name.trim().toLowerCase() === 'gmatch') return false
+      const hintNorm = s.endpoint_hint ? (normalizeServerUrl(s.endpoint_hint)?.toLowerCase() || '') : ''
+      // The courier and the legacy Fly.dev world are drawn from their own rows;
+      // a stale directory mirror of either is never a second destination.
+      if (hintNorm && (hintNorm === p2pNorm || hintNorm === flyNorm)) return false
+      // A localhost row is a real destination only for the node on THIS machine;
+      // someone else's localhost is not joinable from here.
+      if (!mine(s) && isLocalHint(s.endpoint_hint)) return false
+      if (!q) return true
+      return `${s.name} ${s.description ?? ''} ${s.endpoint_hint ?? ''} ${(s.tags ?? []).join(' ')}`.toLowerCase().includes(q)
+    })
+  }, [servers, query, apiBaseTick, identity])
 
-  // The browser has two categories, both rendered by the same row: Destinations
-  // (worlds you can enter) and Hosted servers (this machine's own node plus the
-  // official relay/legacy/dev entries). Local groups stay separately, below.
-  const { destinationRows, hostedRows } = useMemo(() => {
+  // ONE list. The node on this machine, the directory's destinations and the
+  // legacy Fly.dev world share the same row, deduped by address. The committed
+  // server sorts first.
+  const serverRows: DirectoryServer[] = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const filteredOfficial = officialServers
-      .filter((s) => !passwordOnly || s.password_required)
-      .filter((s) => !q || `${s.name} ${s.description ?? ''} ${s.endpoint_hint ?? ''} ${(s.tags ?? []).join(' ')}`.toLowerCase().includes(q))
-    const mineRows = visibleServers.filter((s) => mine(s))
-    return {
-      destinationRows: visibleServers.filter((s) => !mine(s)),
-      hostedRows: [...filteredOfficial, ...mineRows],
-    }
-  }, [officialServers, visibleServers, query, passwordOnly, apiBaseTick])
-
-  // Total visible rows = official servers + directory rows.
-  const visibleRowCount = destinationRows.length + hostedRows.length
+    const matches = (s: DirectoryServer) =>
+      !q || `${s.name} ${s.description ?? ''}`.toLowerCase().includes(q)
+    const listed = dedupeServers([
+      ...visibleServers,
+      ...(matches(legacyServer) ? [legacyServer] : []),
+    ])
+    // The node on this machine IS a server even when the directory does not
+    // list it. Its own directory record wins when there is one (that is the
+    // name it registered under); the synthetic row is only the fallback.
+    const ownListed = !!ownServer && matches(ownServer)
+      && !listed.some((s) => serverKey(s) === serverKey(ownServer))
+    const rows = ownListed ? [...listed, ownServer!] : listed
+    return rows.sort((a, b) => {
+      const ac = isCurrent(a) ? 0 : 1
+      const bc = isCurrent(b) ? 0 : 1
+      if (ac !== bc) return ac - bc
+      return (b.online_count ?? -1) - (a.online_count ?? -1) || a.name.localeCompare(b.name)
+    })
+  }, [ownServer, visibleServers, legacyServer, query, apiBaseTick])
 
   const currentServerTitle = useMemo(() => {
     const apiBase = getEffectiveServerUrl()
@@ -639,92 +633,59 @@ export function ServersView({
       return 'gMatch Central (p2p)'
     }
     if (isCurrentServerUrl(apiBase, FLY_LEGACY_URL) || apiBase.includes('fly.dev')) {
-      return 'gMatch Central (deprecated)'
-    }
-    if (localDevServer && isCurrentServerUrl(apiBase, localDevServer.endpoint_hint || '')) {
-      return localDevServer.name
+      return 'gMatch Fly.dev'
     }
     const matched = servers.find((s) => isCurrentServerUrl(apiBase, s.endpoint_hint || ''))
     if (matched?.name) return matched.name
     return serverName || 'Hub'
-  }, [servers, serverName, localDevServer, getEffectiveServerUrl])
+  }, [servers, serverName, getEffectiveServerUrl])
 
-  // The anchor of the page: what you are inside right now, taken from committed
-  // state (dashboard/node + bridge state). It never depends on the last row
-  // clicked, and never on the filtered list — a search must not make your own
-  // world disappear from the page.
-  const anchor = useMemo(() => {
-    const base = getEffectiveServerUrl()
-    const dashUsers = Array.isArray(dash?.users) ? dash!.users : []
-    const online = dash
-      ? (typeof dash.online_count === 'number' ? dash.online_count : dashUsers.filter((u) => u.online).length)
-      : null
-    const total = dash
-      ? (typeof dash.members_total === 'number' ? dash.members_total : dashUsers.length)
-      : null
-    const name = (base ? currentServerTitle : (dash?.name || node?.name || serverName || '')).trim()
-    return {
-      name,
-      online,
-      total,
-      address: formatDomain(base),
-    }
-  }, [dash, node, serverName, currentServerTitle, getEffectiveServerUrl, apiBaseTick])
+  /** One quiet type label, and only when it helps: a world running on this
+   *  machine, or the legacy Fly.dev world. Everything else is just hosted. */
+  const kindFor = (s: DirectoryServer): WorldRowState['kind'] => {
+    if (s.id === 'central-deprecated') return 'Legacy'
+    if (isOwnNode(s)) return 'P2P'
+    return undefined
+  }
 
-  /** Secondary line: what a row is, plus what the directory actually told us. */
-  const metaFor = (s: DirectoryServer): string => {
+  /** Secondary line: what a row is, plus what the directory actually told us.
+   *  Never an address, a transport, or a diagnostic. */
+  const metaFor = (s: DirectoryServer, isCurrentServer: boolean): string => {
     const bits: string[] = []
-    const domain = formatDomain(s.endpoint_hint)
-    if (domain) bits.push(domain)
-    if (s.id === 'central-p2p') bits.push('relay transport, not a world')
-    else if (s.id === 'central-deprecated') bits.push('legacy hosted server')
-    else if (s.id === 'central-local') bits.push('this computer')
-    else {
-      if (s.description?.trim()) bits.push(s.description.trim())
-      else if (s.is_private) bits.push('private, join by code')
-      if (s.last_seen) bits.push(`listed ${formatRelativeTime(s.last_seen)}`)
-      else if (!s.endpoint_hint) bits.push('no address published yet')
+    const desc = (s.description || '').trim()
+    if (isOwnNode(s)) bits.push(serverMode === 'host' ? 'hosted on this computer' : 'this computer')
+    else if (s.is_private && !desc) bits.push('private, join by code')
+    if (desc) bits.push(desc.length > 72 ? `${desc.slice(0, 71)}…` : desc)
+    else if (!isOwnNode(s)) {
+      const domain = formatDomain(s.endpoint_hint)
+      if (domain) bits.push(domain)
+    }
+    if (!isCurrentServer && !isOwnNode(s) && s.id !== 'central-deprecated' && s.last_seen) {
+      bits.push(`listed ${formatRelativeTime(s.last_seen)}`)
     }
     return bits.join(' · ')
   }
 
   /**
    * The one place that names a row's state. Status vocabulary: Current ·
-   * Connecting · Relay · Deprecated · Unavailable — and a row never claims
-   * reachability it has not measured (visibility in the directory is not a
-   * connection).
+   * Connecting · Unavailable — and a row never claims reachability it has not
+   * measured (visibility in the directory is not a connection).
    */
   const rowStateFor = (
     s: DirectoryServer,
-    opts: { connecting: boolean; isMine: boolean },
+    opts: { connecting: boolean },
   ): WorldRowState => {
     const isCurrentServer = isCurrent(s)
     const base: WorldRowState = {
-      counts: rowCounts(s, isCurrentServer, dash, p2pProbe, legacyProbe),
-      meta: metaFor(s),
-      primary: null,
-      tone: 'muted',
+      counts: rowCounts(s, isCurrentServer, dash, legacyProbe),
+      meta: metaFor(s, isCurrentServer),
+      kind: kindFor(s),
     }
-    if (opts.connecting) return { ...base, label: 'Connecting' }
-    if (s.id === 'central-p2p') {
-      return {
-        ...base,
-        label: 'Relay',
-        status: p2pProbe.online ? (isCurrentServer ? 'Connected' : 'Transport') : 'Unreachable',
-      }
-    }
-    if (s.id === 'central-deprecated') {
-      return {
-        ...base,
-        label: 'Deprecated',
-        tone: legacyProbe.online ? 'muted' : 'warning',
-        status: legacyProbe.online ? null : 'Unavailable',
-      }
-    }
-    if (isCurrentServer) return { ...base, label: 'Current', tone: 'online' }
-    if (!s.endpoint_hint) return { ...base, label: 'Unavailable' }
-    if (opts.isMine) return { ...base, primary: 'Switch', primaryIcon: <ArrowLeft className="w-3 h-3" /> }
-    return { ...base, primary: 'Join' }
+    if (opts.connecting) return { ...base, status: 'Connecting' }
+    if (isCurrentServer) return { ...base, status: 'Current' }
+    if (s.id === 'central-deprecated') return legacyProbe.online ? base : { ...base, status: 'Unavailable' }
+    if (!s.endpoint_hint) return { ...base, status: 'Unavailable' }
+    return base
   }
 
   const closeCreateForm = () => {
@@ -1252,45 +1213,76 @@ export function ServersView({
   }
 
   /**
-   * One row for both sections, so anatomy and states cannot drift. The row owns
-   * layout and the disclosure; the primary action and the contextual menu live
-   * here because they need this view's handlers.
+   * One row for every server, so anatomy and states cannot drift. The row owns
+   * layout; the menu lives here because it needs this view's handlers. Clicking
+   * a row joins/switches; the active row is inert and never reconnects.
    */
   const renderRow = (s: DirectoryServer) => {
     const isMenuOpen = openMenuId === s.id
     const isMyServer = mine(s)
     const isCurrentServer = isCurrent(s)
-    const isExpanded = expandedServerId === s.id
-    const code = s.endpoint_hint ? buildNodeCode(s.endpoint_hint, s.name) : ''
+    const isOwn = isOwnNode(s)
+    const state = rowStateFor(s, { connecting: connectingId === s.id })
 
     return (
       <WorldRow
         key={s.id}
         server={s}
-        state={rowStateFor(s, { connecting: connectingId === s.id, isMine: isMyServer })}
-        expanded={isExpanded}
-        onToggleDetails={() => setExpandedServerId(isExpanded ? null : s.id)}
+        state={state}
         menuOpen={isMenuOpen}
         onMenuToggle={() => setOpenMenuId((cur) => (cur === s.id ? null : s.id))}
-        onPrimary={() => { playPress(620); if (isMyServer) void switchTo(s); else void join(s) }}
+        // Unavailable is a measured state, and a row in it is not offered as
+        // ready to connect. Whatever path remains lives in the row menu.
+        joinDisabled={!!connectingId || state.status === 'Unavailable'}
+        onJoin={() => { playPress(620); if (isMyServer || isOwn) void switchTo(s); else void join(s) }}
         menuItems={
           <>
-            {isMyServer && isCurrentServer && (
+            {isCurrentServer && identity && (
+              <WorldMenuItem
+                icon={<Globe className="w-3 h-3" />}
+                label="Open dashboard"
+                title="Members, invites and settings"
+                onClick={() => { playPress(700); setOpenMenuId(null); setActiveTab('hub') }}
+              />
+            )}
+            {isCurrentServer && node?.isAdmin && (
               <WorldMenuItem
                 icon={<Pencil className="w-3 h-3" />}
                 label="Server settings"
                 title="Server settings"
-                onClick={() => { openEditor(); setOpenMenuId(null) }}
+                onClick={() => { openEditor(); setOpenMenuId(null); setActiveTab('hub') }}
               />
             )}
-            {isMyServer && (
+            {isCurrentServer && serverMode === 'host' && (
+              <WorldMenuItem
+                icon={<Share2 className="w-3 h-3" />}
+                label="Copy share code"
+                title="Copy node code"
+                onClick={() => {
+                  setOpenMenuId(null)
+                  playPress(820)
+                  void window.gmatch?.serverState?.()
+                    .then((st) => void shareServer(st?.lanUrls?.[0] || '', serverName))
+                    .catch(() => void shareServer('', serverName))
+                }}
+              />
+            )}
+            {!isCurrentServer && s.endpoint_hint && (
+              <WorldMenuItem
+                icon={<Share2 className="w-3 h-3" />}
+                label="Copy server code"
+                title="Copy node code"
+                onClick={() => { playPress(820); void shareServer(s.endpoint_hint || '', s.name); setOpenMenuId(null) }}
+              />
+            )}
+            {isMyServer && !isCurrentServer && (
               <WorldMenuItem
                 icon={<Lock className="w-3 h-3" />}
                 label={s.is_private ? 'Make public' : 'Make private'}
                 onClick={() => { playPress(740); void setPrivate(s, !s.is_private); setOpenMenuId(null) }}
               />
             )}
-            {isMyServer && (
+            {isMyServer && !isCurrentServer && (
               <WorldMenuItem
                 icon={<Trash2 className="w-3 h-3" />}
                 label="unregister"
@@ -1305,15 +1297,7 @@ export function ServersView({
                 onClick={() => { playPress(620); void join(s); setOpenMenuId(null) }}
               />
             )}
-            {s.endpoint_hint && (
-              <WorldMenuItem
-                icon={<Share2 className="w-3 h-3" />}
-                label="Copy Server Code"
-                title="Copy node code"
-                onClick={() => { playPress(820); void shareServer(s.endpoint_hint || '', s.name); setOpenMenuId(null) }}
-              />
-            )}
-            {s.id !== 'central-node' && (
+            {!isCurrentServer && !isMyServer && s.id !== 'central-deprecated' && (
               <WorldMenuItem
                 icon={<Trash2 className="w-3 h-3" />}
                 label="Delete / Forget"
@@ -1323,61 +1307,11 @@ export function ServersView({
             )}
           </>
         }
-        details={
-          isExpanded ? (
-            <div
-              data-testid={`server-details-${s.id}`}
-              className="px-4 py-3 bg-surface-interactive/30 border-t border-border-subtle text-xs space-y-2.5 animate-orbit-fade-in"
-            >
-              {s.description && (
-                <p className="text-retro-fg leading-relaxed whitespace-pre-wrap">{s.description}</p>
-              )}
-
-              {Array.isArray(s.tags) && s.tags.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1">
-                  <span className="text-[10px] text-retro-muted font-mono uppercase tracking-wider mr-1">Tags:</span>
-                  {s.tags.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => setQuery(tag)}
-                      className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-surface-interactive hover:bg-surface-elevated text-retro-fg border border-border-subtle cursor-pointer transition-colors"
-                      title={`Filter by tag "${tag}"`}
-                    >
-                      #{tag}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex flex-wrap items-center gap-4 text-[10px] text-retro-muted font-mono pt-1 border-t border-border-subtle/50">
-                <span>last seen: {formatRelativeTime(s.last_seen)}</span>
-                {typeof s.online_count === 'number' && <span>online: {s.online_count}</span>}
-                {typeof s.user_count === 'number' && <span>members: {s.user_count}</span>}
-                {s.password_required ? <span className="text-amber-300">password protected</span> : <span>public access</span>}
-                {code && (
-                  <span className="flex items-center gap-1.5 ml-auto">
-                    <span className="truncate max-w-[120px]">{code.slice(0, 20)}…</span>
-                    <button
-                      type="button"
-                      title="Copy node code"
-                      aria-label={`Copy code for ${s.name}`}
-                      onClick={() => { playPress(820); void shareServer(s.endpoint_hint || '', s.name) }}
-                      className="text-retro-fg hover:text-retro-accent cursor-pointer underline"
-                    >
-                      copy
-                    </button>
-                  </span>
-                )}
-              </div>
-            </div>
-          ) : null
-        }
       />
     )
   }
 
-  /** The host form — handed to the Add world dialog so hosting has one door. */
+  /** The host form — handed to the Add server dialog so hosting has one door. */
   const hostForm = identity ? (
     <div className="space-y-2">
       <p className="text-xs text-retro-muted">
@@ -1467,23 +1401,43 @@ export function ServersView({
         </div>
       )}
 
-      {/* Unified dashboard — Discord-style framed container, narrow column */}
-      <div className="glass-card flex flex-col h-full min-h-0 flex-1 w-full max-w-[680px] overflow-hidden rounded-lg border border-border-glass bg-surface-canvas/60 backdrop-blur-md">
-        {/* Page header — identity first, infrastructure behind one menu, and a
-            single primary action. */}
-        <div className="glass-toolbar border-0 border-b border-border-glass rounded-none px-4 py-2.5 flex items-center justify-between gap-3 shrink-0">
-          <div className="min-w-0">
+      {/* One narrow column on the page background: no card wrapping the list. */}
+      <div className="flex flex-col h-full min-h-0 flex-1 w-full max-w-[720px] overflow-hidden">
+        {/* One page header: one title, one primary action, a quiet search. */}
+        <div className="glass-toolbar border-0 border-b border-border-glass rounded-none px-4 py-2.5 flex items-center gap-2 shrink-0">
+          <div className="min-w-0 shrink-0">
             <h1 className="text-sm font-bold text-retro-fg leading-tight truncate">
-              {activeTab === 'hub' ? 'Hub' : 'Worlds'}
+              {activeTab === 'hub' ? 'Hub' : 'Servers'}
             </h1>
-            <p className="text-[10px] text-retro-muted truncate">
-              {activeTab === 'hub'
-                ? 'Members, invites and settings'
-                : `${visibleRowCount} ${visibleRowCount === 1 ? 'destination' : 'destinations'}${anchor.name && identity ? ` · inside ${anchor.name}` : ''}`}
-            </p>
+            {activeTab === 'hub' && (
+              <p className="text-[10px] text-retro-muted truncate">Members, invites and settings</p>
+            )}
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
+          {activeTab === 'browse' && (
+            <div className="glass-field ml-1 flex min-w-0 max-w-[13rem] flex-1 items-center gap-1 px-2 h-7 text-xs">
+              <Search className="w-3 h-3 text-retro-muted shrink-0" />
+              <input
+                aria-label="Search servers"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search servers…"
+                className="w-full bg-transparent text-retro-fg outline-none placeholder:text-retro-muted text-xs"
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery('')}
+                  aria-label="Clear search"
+                  className="text-retro-muted hover:text-retro-fg cursor-pointer shrink-0"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="ml-auto flex items-center gap-1.5 shrink-0">
             {/* Directory: the central address, the dev switch and the admin door
                 live together, out of the way of the everyday action. */}
             <div className="relative">
@@ -1534,6 +1488,7 @@ export function ServersView({
                       Save
                     </button>
                   </div>
+                  {setupError && <p role="alert" className="text-[10px] text-retro-error">{setupError}</p>}
                   {isDev && (
                     <div className="pt-1 border-t border-border-subtle flex items-center justify-between">
                       <span className="text-[10px] text-retro-muted font-mono">Dev switch:</span>
@@ -1601,12 +1556,12 @@ export function ServersView({
 
             <button
               type="button"
-              onClick={() => { playPress(880); setAddWorldTab('group'); setAddWorldOpen(true) }}
-              aria-label="Add world"
-              title="Add a group, join with a code, or host on this computer"
+              onClick={() => { playPress(880); setAddWorldOpen(true) }}
+              aria-label="Add server"
+              title="Join with a code, or host a server on this computer"
               className="glass-action glass-action-primary flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer"
             >
-              <Plus className="w-3 h-3" /> Add world
+              <Plus className="w-3 h-3" /> Add server
             </button>
           </div>
         </div>
@@ -1906,186 +1861,19 @@ export function ServersView({
               </div>
             )}
 
-            {/* Filter row: one quiet line, always visible. */}
-            <div className="glass-header px-3 py-1.5 flex items-center gap-2 shrink-0">
-              <div className="glass-field w-36 sm:w-56 flex items-center gap-1 px-2 h-7 text-xs shrink-0">
-                <Search className="w-3 h-3 text-retro-muted shrink-0" />
-                <input
-                  aria-label="Search servers"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search worlds…"
-                  className="w-full bg-transparent text-retro-fg outline-none placeholder:text-retro-muted text-xs"
-                />
+            {!central && (
+              <div className="px-3 py-1.5 border-b border-border-subtle text-[10px] text-retro-muted shrink-0">
+                No central node is configured, so there is no public directory to discover servers on. Add its address under the directory menu.
               </div>
-              <div className="ml-auto flex items-center gap-1.5 shrink-0">
-                <label className="flex items-center gap-1 text-xs text-retro-muted">
-                  <ArrowDownUp className="w-3 h-3" />
-                  <select
-                    aria-label="Sort servers"
-                    value={sort}
-                    onChange={(e) => setSort(e.target.value as 'recent' | 'name' | 'online')}
-                    className="glass-field px-1 h-7 text-xs font-medium"
-                  >
-                    <option value="recent">Recent</option>
-                    <option value="name">Name</option>
-                    <option value="online">Online</option>
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setPasswordOnly((v) => !v)}
-                  aria-pressed={passwordOnly}
-                  aria-label="Password only"
-                  title="Password only"
-                  className={`h-7 w-7 rounded-md cursor-pointer flex items-center justify-center transition-colors shrink-0 ${passwordOnly ? 'glass-nav-active text-amber-200' : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8'}`}
-                >
-                  <Lock className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
+            )}
 
-            {/* Scrollable content */}
-            <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar px-3 py-2 space-y-2.5">
-              {/* The current world — the page's anchor. Read from committed
-                  state, so a search can never make your own world disappear. */}
-              <section
-                aria-label="Current world"
-                className="px-3 py-2.5 rounded-lg bg-glass-w8 border border-border-glass flex items-center gap-3"
-              >
-                <span
-                  className={`w-2 h-2 rounded-full shrink-0 ${anchor.name ? 'bg-retro-online' : 'bg-retro-muted/40'}`}
-                  aria-hidden
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] uppercase tracking-wider text-retro-muted font-semibold">
-                    {serverMode === 'host' ? 'Current world · hosting here' : 'Current world'}
-                  </p>
-                  <h2 className="text-sm font-bold text-retro-fg truncate">
-                    {anchor.name || 'No world yet'}
-                  </h2>
-                  <p className="text-[10px] text-retro-muted truncate">
-                    {anchor.name
-                      ? [
-                          anchor.address,
-                          typeof anchor.online === 'number' && typeof anchor.total === 'number'
-                            ? `${anchor.online} / ${anchor.total}`
-                            : null,
-                        ].filter(Boolean).join(' · ') || 'Connected'
-                      : 'Pick a world below, or host one on this computer.'}
-                  </p>
-                </div>
-
-                {anchor.name && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => { playPress(700); setActiveTab('hub'); }}
-                      className="glass-action glass-action-primary h-7 px-3 rounded-md text-xs font-bold cursor-pointer shrink-0"
-                    >
-                      Open
-                    </button>
-
-                    <div className="relative shrink-0">
-                      <button
-                        type="button"
-                        data-menu-trigger
-                        onClick={() => setShowAnchorMenu((v) => !v)}
-                        aria-label="More actions for the current world"
-                        title="More actions"
-                        className="h-7 w-7 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w10 flex items-center justify-center cursor-pointer transition-colors"
-                      >
-                        <MoreVertical className="w-3.5 h-3.5" />
-                      </button>
-                      {showAnchorMenu && (
-                        <div
-                          data-menu-content
-                          role="menu"
-                          aria-label="Actions for the current world"
-                          className="absolute right-0 top-full mt-1 w-52 bg-surface-raised border border-border-glass rounded-lg py-1 shadow-lg z-[var(--z-dropdown)] space-y-0.5 animate-orbit-fade-in"
-                        >
-                          {serverMode === 'host' && (
-                            <WorldMenuItem
-                              icon={<Share2 className="w-3 h-3" />}
-                              label="Copy share code"
-                              title="Copy node code"
-                              onClick={() => {
-                                setShowAnchorMenu(false)
-                                playPress(820)
-                                void window.gmatch?.serverState?.()
-                                  .then((st) => void shareServer(st?.lanUrls?.[0] || '', serverName))
-                                  .catch(() => void shareServer('', serverName))
-                              }}
-                            />
-                          )}
-                          {node?.isAdmin && (
-                            <WorldMenuItem
-                              icon={<Pencil className="w-3 h-3" />}
-                              label="Server settings"
-                              onClick={() => { setShowAnchorMenu(false); playPress(700); setActiveTab('hub') }}
-                            />
-                          )}
-                          {serverMode === 'client' && (
-                            <WorldMenuItem
-                              icon={<ArrowLeft className="w-3 h-3" />}
-                              label="Leave this world"
-                              danger
-                              onClick={() => { setShowAnchorMenu(false); playPress(620); void leave() }}
-                            />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </section>
-
-              {/* Directory Setup / Not configured notice */}
-              {!central || setupUrl ? (
-                <div className="glass-inset p-4 space-y-2">
-                  <p className="text-xs text-retro-muted">
-                    No central node is configured, so there is no public server
-                    network to discover or list yours on. Creating a server still
-                    works: it is hosted right here on this computer &mdash; add a
-                    central address below to also list it for explorers.
-                  </p>
-                  <label className="block text-xs text-retro-muted">
-                    Central node URL
-                    <input
-                      aria-label="Central node URL"
-                      value={setupUrl}
-                      onChange={(e) => setSetupUrl(e.target.value)}
-                      placeholder="https://central.example"
-                      maxLength={120}
-                      className="glass-field mt-1 w-full px-2.5 py-1.5 text-xs font-mono"
-                    />
-                  </label>
-                  {setupError && <p role="alert" className="text-xs text-rose-400">{setupError}</p>}
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => saveCentral()}
-                      disabled={!setupUrl.trim()}
-                      className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer"
-                    >
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setSetupUrl(''); setSetupError('') }}
-                      className="glass-action px-3 py-1.5 rounded-lg text-xs text-retro-muted cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-
-              {/* A failed directory request never erases worlds we already know. */}
-              {dirError && destinationRows.length > 0 && (
-                <div role="status" className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border-glass bg-glass-w5 text-[10px] text-retro-muted">
+            {/* ONE list: every server this client knows, the current one first. */}
+            <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar px-4 py-2">
+              {/* A failed directory request never erases servers we already know. */}
+              {dirError && serverRows.length > 0 && (
+                <div role="status" className="mb-2 flex items-center gap-2 px-3 py-2 rounded-lg border border-border-glass bg-glass-w5 text-[10px] text-retro-muted">
                   <span className="min-w-0 flex-1 truncate">
-                    Directory unreachable. Showing the last known worlds.
+                    Directory unreachable. Showing the last known servers.
                   </span>
                   <button
                     type="button"
@@ -2097,127 +1885,50 @@ export function ServersView({
                 </div>
               )}
 
-              {/* Destinations — the worlds you can enter. */}
-              <section aria-label="Destinations" className="space-y-1">
-                <h3 className="px-1 text-[10px] font-semibold text-retro-muted uppercase tracking-wider">
-                  Destinations{' '}
-                  {destinationRows.length > 1 && <span className="font-mono font-normal">{destinationRows.length}</span>}
-                </h3>
-                <ul
-                  className="rounded-lg border border-border-glass divide-y divide-border-subtle overflow-hidden"
-                  aria-label="Destinations"
-                  onKeyDown={onRowListKeyDown}
-                >
-                  {destinationRows.length === 0 ? (
-                    <li className="px-4 py-6 text-xs text-retro-muted text-center flex flex-col items-center justify-center gap-1.5">
-                      {dirError ? (
-                        <>
-                          <Globe className="w-5 h-5 text-retro-muted/40" />
-                          <p className="font-semibold text-retro-fg">Directory unavailable</p>
-                          <p className="max-w-sm text-[10px]">
-                            Could not reach <span className="font-mono">{central || 'the directory'}</span> and nothing is cached for this session.
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => void refresh()}
-                            className="glass-action mt-1 h-7 px-2.5 rounded-md text-xs font-bold flex items-center gap-1 cursor-pointer"
-                          >
-                            <RefreshCw className="w-3 h-3" /> Retry
-                          </button>
-                        </>
-                      ) : servers.length === 0 && !query && !passwordOnly ? (
-                        <>
-                          <Globe className="w-5 h-5 text-retro-muted/40" />
-                          <p className="font-semibold text-retro-fg">No public worlds yet</p>
-                          <p className="max-w-sm text-[10px]">A world appears here while its host is running gMatch.</p>
-                          <button
-                            type="button"
-                            onClick={() => { playPress(880); setAddWorldTab('host'); setAddWorldOpen(true) }}
-                            className="glass-action glass-action-primary mt-1 h-7 px-2.5 rounded-md text-xs font-bold flex items-center gap-1 cursor-pointer"
-                          >
-                            <Plus className="w-3 h-3" /> Host a server
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <Search className="w-5 h-5 text-retro-muted/40" />
-                          <p className="font-semibold text-retro-fg">No worlds match</p>
-                          <p className="max-w-sm text-[10px]">
-                            {query ? `Nothing matches “${query}”` : 'No world matches the current filters'}
-                            {passwordOnly ? ' with a password' : ''}.
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => { setQuery(''); setPasswordOnly(false) }}
-                            className="glass-action mt-1 h-7 px-2.5 rounded-md text-xs font-bold cursor-pointer"
-                          >
-                            Clear filters
-                          </button>
-                        </>
-                      )}
-                    </li>
-                  ) : (
-                    destinationRows.map((s) => renderRow(s))
-                  )}
-                </ul>
-              </section>
-
-              {/* Local groups — labels that exist only on this device, so they
-                  stay subordinate to real destinations. */}
-              <section aria-label="Local groups on this device" className="space-y-1">
-                <h3 className="px-1 text-[10px] font-semibold text-retro-muted uppercase tracking-wider">
-                  Local groups <span className="normal-case font-normal">· this device only</span>
-                </h3>
-                {labels.length === 0 ? (
-                  <p className="px-1 text-[10px] text-retro-muted">
-                    None yet. A group is a local label for peers you keep track of. It adds no network.
+              {serverRows.length === 0 && (
+                <div className="px-4 py-10 text-center flex flex-col items-center gap-1.5">
+                  <p className="text-sm font-semibold text-retro-fg">
+                    {dirError ? 'Directory unavailable' : query ? 'No servers match' : 'No servers yet'}
                   </p>
-                ) : (
-                  <ul className="rounded-lg border border-border-glass divide-y divide-border-subtle overflow-hidden">
-                    {labels.map((l) => (
-                      <li key={l.id} className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
-                        <span className="truncate text-retro-fg">
-                          {l.name}
-                          <span className="ml-1 font-normal text-retro-muted">· {l.memberOrbitIds.length} peers{l.nodeCodes.length ? ` · ${l.nodeCodes.length} codes` : ''}</span>
-                          {identity && isOwnLabel(l, (identity as { orbitId?: string }).orbitId) && (
-                            <span className="ml-1 text-[10px] text-retro-muted">(this device)</span>
-                          )}
-                        </span>
-                        <button
-                          type="button"
-                          aria-label={`Forget group ${l.name}`}
-                          title="Forget this group (local only, removes nothing remotely)"
-                          onClick={() => saveLabels(labels.filter((x) => x.id !== l.id))}
-                          className="px-1.5 py-0.5 rounded text-[10px] text-retro-muted hover:text-retro-error hover:bg-glass-w8 cursor-pointer transition-colors"
-                        >
-                          Forget
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
+                  <p className="max-w-sm text-[10px] text-retro-muted">
+                    {dirError
+                      ? `Could not reach ${central || 'the directory'} and nothing is cached for this session.`
+                      : query
+                        ? <>Nothing matches &ldquo;{query}&rdquo;.</>
+                        : 'Join one with a code, or host your own on this computer.'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (dirError) void refresh()
+                      else if (query) setQuery('')
+                      else { playPress(880); setAddWorldOpen(true) }
+                    }}
+                    className="glass-action glass-action-primary mt-1 h-7 px-2.5 rounded-md text-xs font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    {dirError ? <RefreshCw className="w-3 h-3" /> : !query ? <Plus className="w-3 h-3" /> : null}
+                    {dirError ? 'Retry' : query ? 'Show all servers' : 'Add server'}
+                  </button>
+                </div>
+              )}
 
-              {/* Hosted servers — this machine's node plus the official entries
-                  (relay, legacy). Separate from local groups: these are real
-                  endpoints, and their labels say what they are. */}
-              <section aria-label="Hosted servers" className="space-y-1">
-                <h3 className="px-1 text-[10px] font-semibold text-retro-muted uppercase tracking-wider">
-                  Hosted servers <span className="normal-case font-normal">· independently operated</span>
-                </h3>
-                <ul
-                  className="rounded-lg border border-border-glass divide-y divide-border-subtle overflow-hidden"
-                  aria-label="Hosted servers"
-                  onKeyDown={onRowListKeyDown}
-                >
-                  {hostedRows.map((s) => renderRow(s))}
+              {serverRows.length > 0 && (
+                <ul className="divide-y divide-border-subtle" aria-label="Servers" onKeyDown={onRowListKeyDown}>
+                  {serverRows.map((s) => renderRow(s))}
                 </ul>
-              </section>
+              )}
 
-              <div className="flex items-center justify-between text-[10px] text-retro-muted shrink-0 pt-1">
-                <span className="flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-retro-muted" /> Private: directory mirrors only metadata. Never private content.
-                </span>
+              {/* Device-local labels are not servers and never join the list;
+                  they stay behind one quiet, secondary door. */}
+              <div className="mt-3 border-t border-border-subtle pt-2 pb-1">
+                <button
+                  type="button"
+                  onClick={() => { playPress(700); setGroupsOpen(true) }}
+                  className="text-[10px] text-retro-muted hover:text-retro-fg cursor-pointer transition-colors"
+                >
+                  Local groups{labels.length ? ` (${labels.length})` : ''}
+                </button>
+                <span className="ml-1.5 text-[10px] text-retro-muted/70">· device-only labels, not servers</span>
               </div>
             </div>
 
@@ -2236,14 +1947,15 @@ export function ServersView({
       <AddWorldDialog
         open={addWorldOpen}
         onClose={() => setAddWorldOpen(false)}
-        onCreateLabel={(name) => {
-          const owner = (identity as { orbitId?: string } | null)?.orbitId || 'local-device'
-          saveLabels([...labels, createLabel(name, owner)])
-          toast(`Group "${name}" saved on this device.`, 'success')
-        }}
         onJoinCode={(code) => joinByCode(code)}
         hostForm={hostForm}
-        initialTab={addWorldTab}
+      />
+      <GroupsDialog
+        open={groupsOpen}
+        labels={labels}
+        ownerId={(identity as { orbitId?: string } | null)?.orbitId}
+        onClose={() => setGroupsOpen(false)}
+        onSave={(next) => saveLabels(next)}
       />
       {deleteTarget && (
         <Modal title="Delete server" onClose={closeDeleteDialog} maxWidth="max-w-md">
