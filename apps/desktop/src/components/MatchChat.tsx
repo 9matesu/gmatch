@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ChatMessage } from '@orbit/shared'
 import { playChatMessage, resetChatSfx } from '../utils/sounds'
 import { MessageSquare, ChevronUp, ChevronDown, Send } from 'lucide-react';
+import { formatAbsoluteTime } from '../utils/timeAgo'
 import { Linkify } from './Linkify';
 
 interface Props {
@@ -102,7 +103,7 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
                       )}
                       <div className="break-words whitespace-pre-wrap leading-relaxed select-text cursor-text"><Linkify text={m.body} /></div>
                       <time className={`mt-1 block text-[10px] select-none ${mine ? 'text-retro-muted text-right' : 'text-retro-muted'}`} dateTime={m.created_at}>
-                        {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {formatAbsoluteTime(m.created_at, { hour: '2-digit', minute: '2-digit' })}
                       </time>
                     </div>
                   </div>

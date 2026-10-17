@@ -69,3 +69,64 @@ describe('ProfileEditorModal tags', () => {
     expect(screen.getByText('#solo')).toBeInTheDocument();
   });
 });
+
+describe('ProfileEditorModal save contract', () => {
+  const fill = async () => {
+    await userEvent.type(screen.getByPlaceholderText(/pornified bio/i), 'my new bio');
+    await userEvent.type(screen.getByPlaceholderText(/pmvhaven/i), 'https://example.test/me');
+  };
+
+  it('persists bio and website through saveUserProfile', async () => {
+    const onProfileUpdated = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <ProfileEditorModal
+        identity={identity}
+        initialName="Me"
+        onClose={onClose}
+        onProfileUpdated={onProfileUpdated}
+      />,
+    );
+    await fill();
+    await userEvent.click(screen.getByRole('button', { name: /^done$/i }));
+
+    await waitFor(() => expect(saveUserProfile).toHaveBeenCalledTimes(1));
+    const patch = vi.mocked(saveUserProfile).mock.calls[0][1] as { bio?: string; website?: string };
+    expect(patch.bio).toBe('my new bio');
+    expect(patch.website).toBe('https://example.test/me');
+    expect(onProfileUpdated).toHaveBeenCalledWith(
+      expect.objectContaining({ bio: 'my new bio', website: 'https://example.test/me' }),
+    );
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('keeps the sheet open and reports why when the server refuses', async () => {
+    const toast = vi.fn();
+    const onClose = vi.fn();
+    vi.mocked(saveUserProfile).mockResolvedValue({ ok: false, status: 403, error: 'tags cannot contain <' });
+    render(
+      <ProfileEditorModal identity={identity} initialName="Me" onClose={onClose} toast={toast} />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /^done$/i }));
+
+    await waitFor(() => expect(toast).toHaveBeenCalledWith('tags cannot contain <', 'error'));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /^done$/i })).toBeInTheDocument();
+  });
+
+  it('never claims success with no signing key', async () => {
+    // Regression: an unauthenticated sheet toasted 'Profile updated' and closed,
+    // so the edit looked saved until the next restart.
+    const toast = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <ProfileEditorModal identity={null} initialName="Me" onClose={onClose} toast={toast} />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /^done$/i }));
+
+    await waitFor(() => expect(toast).toHaveBeenCalled());
+    expect(saveUserProfile).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(String(vi.mocked(toast).mock.calls[0][1])).toBe('error');
+  });
+});

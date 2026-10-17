@@ -567,22 +567,18 @@ export function NativeVideoPlayer({
 
       {controls && (
         <div
-          className={`absolute top-0 inset-x-0 p-3 flex items-center justify-between z-20 pointer-events-none transition-opacity duration-300 bg-gradient-to-b from-black/80 via-black/30 to-transparent ${
+          className={`absolute top-0 inset-x-0 p-3 flex items-center justify-end z-20 pointer-events-none transition-opacity duration-300 bg-gradient-to-b from-black/80 via-black/30 to-transparent ${
             alwaysShowControls || showControls ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
           }`}
         >
+          {/* No quality badge here: the timeline's author overlay owns the top
+              strip, and a permanent "HD Video" label on every clip was noise. */}
           <div className="flex items-center gap-1.5 pointer-events-auto">
-            <span className="px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-xs border border-white/10 text-[10px] font-bold uppercase tracking-wider text-zinc-300">
-              HD Video
-            </span>
             {playbackRate !== 1 && (
               <span className="px-1.5 py-0.5 rounded-md bg-retro-accent/20 border border-retro-accent/40 text-[10px] font-bold text-retro-accent">
                 {playbackRate}x
               </span>
             )}
-          </div>
-
-          <div className="flex items-center gap-1.5 pointer-events-auto">
             {onExpand && (
               <button
                 type="button"

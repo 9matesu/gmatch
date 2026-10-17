@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Heart, Flag } from 'lucide-react';
 import { playMsgReceive } from '../../utils/sounds';
 import { resolveMediaUrl } from '../../utils/media';
-import { timeAgo } from '../../utils/timeAgo';
+import { formatAbsoluteTime, timeAgo } from '../../utils/timeAgo';
 import { Linkify } from '../Linkify';
 import type { FeedPost, PostComment } from './GMatchFeed';
 
@@ -74,7 +74,7 @@ export function PostComments({
               )}
 
               <span className="text-[10px] text-retro-muted font-medium block mt-1">
-                {post.created_at ? new Date(post.created_at).toLocaleDateString() : 'Recent'}
+                {formatAbsoluteTime(post.created_at, { dateStyle: 'short' }) || 'Recent'}
               </span>
             </div>
           </div>

@@ -18,6 +18,7 @@ import {
 import { groupNotifications, groupTitle, groupItemIds, groupTarget, type NotifItem } from "../utils/groupNotifications";
 import { playPress } from "../utils/sounds";
 import { resolveMediaUrl } from "../utils/media";
+import { formatAbsoluteTime } from "../utils/timeAgo";
 
 export interface NotificationItem {
   id: string;
@@ -309,7 +310,7 @@ export function NotificationsPanel({
                     className="mt-1 block text-[10px] text-retro-muted"
                     dateTime={n.created_at}
                   >
-                    {new Date(n.created_at).toLocaleString([], {
+                    {formatAbsoluteTime(n.created_at, {
                       dateStyle: "short",
                       timeStyle: "short",
                     })}

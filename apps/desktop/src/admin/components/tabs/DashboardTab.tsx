@@ -19,6 +19,7 @@ import {
   BarChart2,
 } from "lucide-react";
 import { cn } from "../../../lib/utils";
+import { formatAbsoluteTime } from "../../../utils/timeAgo";
 import { AdminMediaThumbnail } from "../AdminMediaThumbnail";
 import type { DashboardStats, AdminPost, AdminMatch } from "../../../utils/adminTypes";
 import type { OrbitIdentity } from "@orbit/crypto";
@@ -345,7 +346,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold text-retro-fg truncate">{post.post_caption || "Public Post"}</p>
                     <p className="text-[10px] text-retro-muted truncate">
-                      By {post.author_name || "Unknown"} · {new Date(post.created_at).toLocaleDateString()}
+                      By {post.author_name || "Unknown"} · {formatAbsoluteTime(post.created_at, { dateStyle: 'short' })}
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 text-[10px]">

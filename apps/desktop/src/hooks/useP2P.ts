@@ -13,6 +13,7 @@ import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, announcePee
 import { broadcastPresence, fetchPresenceRoster } from '../services/courierPresence';
 import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh } from '../utils/courierSignaling';
 import { resolveDisplayName } from '../utils/displayName';
+import { parseApiTimestamp } from '../utils/timeAgo';
 
 const CHAT_WIPE_MS = CHAT_WIPE_SECONDS * 1000;
 const DIRECT_WEBRTC_FANOUT_LIMIT = 3;
@@ -536,7 +537,7 @@ export function useP2P(identity: OrbitIdentity | null) {
                   senderId: m.sender_id,
                    senderName: m.sender_name?.trim() || 'Unknown User',
                   text: m.body,
-                  timestamp: Date.parse(m.created_at) || Date.now(),
+                  timestamp: parseApiTimestamp(m.created_at)?.getTime() || Date.now(),
                   channel: chan,
                 }].sort((a, b) => a.timestamp - b.timestamp);
               });
@@ -737,7 +738,7 @@ export function useP2P(identity: OrbitIdentity | null) {
           senderId: m.sender_id,
           senderName: m.sender_name?.trim() || 'Unknown User',
           text: m.body,
-          timestamp: Date.parse(m.created_at) || Date.now(),
+          timestamp: parseApiTimestamp(m.created_at)?.getTime() || Date.now(),
           channel: m.channel || 'global_lobby',
         }))
       setChatMessages((prev) => {

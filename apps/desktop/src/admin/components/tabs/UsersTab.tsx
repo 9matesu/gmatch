@@ -19,6 +19,7 @@ import {
 import { cn } from "../../../lib/utils";
 import { AdminMediaThumbnail } from "../AdminMediaThumbnail";
 import { resolveMediaUrl } from "../../../utils/media";
+import { formatAbsoluteTime } from "../../../utils/timeAgo";
 import type { AdminUser, AdminCard, TableParams, OrbitIdentity } from "../../../utils/adminTypes";
 
 interface UsersTabProps {
@@ -440,7 +441,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                   header: "Last Seen",
                   cell: (_, row) => (
                     <span className="text-[10px] text-retro-muted font-mono">
-                      {row.last_seen ? new Date(row.last_seen).toLocaleDateString() : "Never"}
+                      {row.last_seen ? formatAbsoluteTime(row.last_seen, { dateStyle: "short" }) : "Never"}
                     </span>
                   ),
                 },
@@ -612,7 +613,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                                   </div>
                                   <div>
                                     <span className="text-retro-muted block text-[10px]">Created At</span>
-                                    <span className="text-retro-fg font-mono text-[10px]">{new Date(card.created_at).toLocaleString()}</span>
+                                    <span className="text-retro-fg font-mono text-[10px]">{formatAbsoluteTime(card.created_at)}</span>
                                   </div>
                                 </div>
                               </div>
@@ -740,7 +741,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                         <div className="flex items-center gap-2">
                           <Badge variant="neutral" size="sm">{l.kind}</Badge>
                           <span className="text-xs font-bold text-retro-fg">{l.display_name || l.user_id.slice(0, 8)}</span>
-                          <span className="text-[10px] text-retro-muted">{new Date(l.created_at).toLocaleString()}</span>
+                          <span className="text-[10px] text-retro-muted">{formatAbsoluteTime(l.created_at)}</span>
                         </div>
                       </div>
                       <div className="text-right">

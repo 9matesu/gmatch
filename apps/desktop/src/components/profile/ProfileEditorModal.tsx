@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { playPress } from '../../utils/sounds';
-import { X, Camera, Globe, Lock, Plus } from 'lucide-react';
+import { X, Camera, Globe, Plus } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { MAX_TAGS } from '@orbit/shared';
 import { saveUserProfile, addRemovedProfileTag, clearRemovedProfileTag } from '../../utils/profile';
@@ -37,7 +37,6 @@ export function ProfileEditorModal({
   const [pfpUrl, setPfpUrl] = useState(initialPfp);
   const [tags, setTags] = useState<string[]>(() => [...initialTags]);
   const [tagDraft, setTagDraft] = useState('');
-  const [isPrivate, setIsPrivate] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showPicModal, setShowPicModal] = useState(false);
 
@@ -122,6 +121,11 @@ export function ProfileEditorModal({
         try {
           localStorage.setItem('orbit_tags', JSON.stringify([...tags]));
         } catch { /* private mode */ }
+      } else {
+        // A save with no local key cannot be signed, so nothing reaches the
+        // server. The old code toasted 'Profile updated' anyway and closed the
+        // sheet, so the edit looked saved until the next restart. Fail loud.
+        throw new Error('Not signed in, so the profile change was not saved.');
       }
 
       playPress(800);
@@ -293,23 +297,6 @@ export function ProfileEditorModal({
               </div>
             </div>
 
-            <div className="pt-2 border-t border-border-glass">
-              <label className="flex items-center justify-between p-3 rounded-lg bg-surface-interactive border border-border-glass cursor-pointer select-none">
-                <div className="flex items-center gap-2.5">
-                  <Lock className="w-4 h-4 text-retro-muted" />
-                  <div>
-                    <span className="text-xs font-medium text-retro-body block">Private account [WIP]</span>
-                    <span className="text-xs text-retro-muted">Only approved followers can view your feed</span>
-                  </div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={isPrivate}
-                  onChange={(e) => setIsPrivate(e.target.checked)}
-                  className="w-4 h-4 accent-retro-accent rounded cursor-pointer"
-                />
-              </label>
-            </div>
           </div>
         </form>
       </div>

@@ -8,7 +8,9 @@
  * rarity badges (see HP_FILL / FLOAT_GC / RARITY below).
  */
 
-/** Monospace + tabular figures for every number readout (theme token = one mono). */
+/** Tabular figures for every number readout. Mono was retired 2026-10-17 (user
+ * directive): the theme token resolves to the sans stack, so this class only
+ * buys the digit alignment. See docs/DESIGN.md "Type scale". */
 export const MONO = 'font-mono tabular-nums'
 
 /** Small uppercase-muted helper text (was .muted). */

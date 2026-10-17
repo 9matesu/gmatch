@@ -19,6 +19,29 @@ export function parseApiTimestamp(value: string | null | undefined): Date | null
 }
 
 /**
+ * Absolute wall-clock stamp in the VIEWER's own timezone.
+ *
+ * The bug this closes: `new Date(sqliteString).toLocaleString()` reads the
+ * zone-less UTC string as local, so the same instant rendered differently
+ * depending on where the reader's device sits (a 10:00Z post showed as 07:00 to
+ * a UTC-3 viewer). Routing through parseApiTimestamp pins the instant to UTC and
+ * lets the formatter convert it into the device's timezone — which is the only
+ * timezone the user actually wants to read.
+ *
+ * `options` defaults to short date + short time; callers with a narrow column
+ * pass their own (e.g. `{ hour: '2-digit', minute: '2-digit' }`). Returns ''
+ * for junk so call sites keep owning their own fallback copy.
+ */
+export function formatAbsoluteTime(
+  value: string | null | undefined,
+  options: Intl.DateTimeFormatOptions = { dateStyle: 'short', timeStyle: 'short' },
+): string {
+  const d = parseApiTimestamp(value)
+  if (!d) return ''
+  return d.toLocaleString(undefined, options)
+}
+
+/**
  * Compact relative time ("just now", "4m", "3h", "2d", "5w", then a date).
  * `now` is injectable so callers rendering live lists can re-render on a timer.
  */

@@ -43,6 +43,7 @@ import { SendCardModal } from "./components/cards/SendCardModal";
 import { MIN_GAME_CARDS, generateFallbackName, type User, type OrbitObject } from "@orbit/shared";
 import { applyCanonicalCard } from "./game/galleryMapping";
 import { areItemsStructurallyEqual, areUsersStructurallyEqual, areAnnouncementsStructurallyEqual } from "./utils/compare";
+import { parseApiTimestamp } from "./utils/timeAgo";
 import { OnboardingFlow } from "./firstRun/OnboardingFlow";
 import { isOnboardingComplete, readOnboardingState } from "./firstRun/onboardingState";
 import { TourDock } from "./components/tour/TourDock";
@@ -1889,7 +1890,7 @@ export default function Home() {
               roster: nameRoster,
             }),
             text: m.body,
-            timestamp: new Date(m.created_at).getTime() || Date.now(),
+            timestamp: parseApiTimestamp(m.created_at)?.getTime() || Date.now(),
             replyToId: m.reply_to || undefined,
             attachmentId: m.attachment_id || undefined,
             attachmentUrl: m.attachment_id ? `/api/objects/${m.attachment_id}` : undefined,
@@ -2014,7 +2015,7 @@ export default function Home() {
               roster: nameRoster,
             }),
             text: typeof detail.body === 'string' ? detail.body : '',
-            timestamp: new Date(String(detail.created_at || Date.now())).getTime() || Date.now(),
+            timestamp: parseApiTimestamp(typeof detail.created_at === 'string' ? detail.created_at : null)?.getTime() || Date.now(),
             replyToId: typeof detail.reply_to === 'string' ? detail.reply_to : undefined,
             attachmentId,
             attachmentUrl: attachmentId ? `/api/objects/${attachmentId}` : undefined,
@@ -2101,7 +2102,7 @@ export default function Home() {
           roster: nameRoster,
         }),
         text: typeof detail.body === 'string' ? detail.body : '',
-        timestamp: new Date(String(detail.created_at || Date.now())).getTime() || Date.now(),
+        timestamp: parseApiTimestamp(typeof detail.created_at === 'string' ? detail.created_at : null)?.getTime() || Date.now(),
         replyToId: typeof detail.reply_to === 'string' ? detail.reply_to : undefined,
         attachmentId,
         attachmentUrl: attachmentId ? `/api/objects/${attachmentId}` : undefined,
@@ -2212,7 +2213,7 @@ export default function Home() {
           roster: nameRoster,
         }),
         text: m.body,
-        timestamp: new Date(m.created_at).getTime() || Date.now(),
+        timestamp: parseApiTimestamp(m.created_at)?.getTime() || Date.now(),
         replyToId: m.reply_to || undefined,
         attachmentId: m.attachment_id || undefined,
         attachmentUrl: m.attachment_id ? `/api/objects/${m.attachment_id}` : undefined,
@@ -2285,7 +2286,7 @@ export default function Home() {
               roster: nameRoster,
             }),
             text: m.body,
-            timestamp: new Date(m.created_at).getTime() || Date.now(),
+            timestamp: parseApiTimestamp(m.created_at)?.getTime() || Date.now(),
             replyToId: m.reply_to || undefined,
             attachmentId: m.attachment_id || undefined,
             attachmentUrl: m.attachment_id ? `/api/objects/${m.attachment_id}` : undefined,

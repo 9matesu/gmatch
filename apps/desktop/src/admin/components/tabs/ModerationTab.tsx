@@ -8,6 +8,7 @@ import { Flag, MessageSquare, Ban, ChevronDown, ChevronUp, Maximize2, CheckCircl
 import { cn } from "../../../lib/utils";
 import { AdminMediaThumbnail } from "../AdminMediaThumbnail";
 import { resolveMediaUrl } from "../../../utils/media";
+import { formatAbsoluteTime } from "../../../utils/timeAgo";
 import type { AdminReport, AdminLobbyComment, AdminChatMessage, AdminUser, TableParams, OrbitIdentity } from "../../../utils/adminTypes";
 
 interface ModerationTabProps {
@@ -205,7 +206,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
             </div>
             <p className="text-xs text-retro-fg font-medium mt-1 truncate">{report.preview || report.reason || "Reported Item"}</p>
             <p className="text-[10px] text-retro-muted mt-0.5">
-              Reported by {report.reporter_name || report.reporter_id.slice(0, 8)} · {new Date(report.created_at).toLocaleString()}
+              Reported by {report.reporter_name || report.reporter_id.slice(0, 8)} · {formatAbsoluteTime(report.created_at)}
               {report.reason && ` · Reason: ${report.reason}`}
             </p>
           </div>
@@ -423,7 +424,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-retro-fg">{c.user_name || c.user_id.slice(0, 8)}</span>
-                          <span className="text-[10px] text-retro-muted">{new Date(c.created_at).toLocaleString()}</span>
+                          <span className="text-[10px] text-retro-muted">{formatAbsoluteTime(c.created_at)}</span>
                           {c.hidden_at && <Badge variant="warning" size="sm">Hidden</Badge>}
                         </div>
                         <p className="text-xs text-retro-body mt-1">{c.body}</p>
@@ -469,7 +470,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                         <div className="flex items-center gap-2">
                           <Badge variant="neutral" size="sm">#{m.channel || "lobby"}</Badge>
                           <span className="text-xs font-bold text-retro-fg">{m.sender_name || m.sender_id.slice(0, 8)}</span>
-                          <span className="text-[10px] text-retro-muted">{new Date(m.created_at).toLocaleString()}</span>
+                          <span className="text-[10px] text-retro-muted">{formatAbsoluteTime(m.created_at)}</span>
                         </div>
                         <p className="text-xs text-retro-body mt-1">{m.body}</p>
                       </div>
@@ -516,7 +517,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                       </p>
                       {user.ban_created_at && (
                         <p className="text-[10px] text-retro-muted mt-0.5">
-                          Banned on {new Date(user.ban_created_at).toLocaleString()}
+                          Banned on {formatAbsoluteTime(user.ban_created_at)}
                         </p>
                       )}
                     </div>

@@ -29,6 +29,7 @@ import { isDefaultPeerName } from '@orbit/shared';
 import { ActionModal } from './ActionModal';
 import { HacksPanel } from './HacksPanel';
 import { resolveMediaUrl } from '../../utils/media';
+import { formatAbsoluteTime } from '../../utils/timeAgo';
 import type { ActiveHackSession } from '../home/CommandIsland';
 
 type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
@@ -881,7 +882,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     </div>
                     <div className="text-xs text-retro-muted truncate">
                       {historyPane === 'outgoing' ? `to ${other || 'unknown'}` : `from ${other || 'unknown'}`}
-                      {' · '}{new Date(action.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {' · '}{formatAbsoluteTime(action.created_at, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </div>
                   </div>
                   <span

@@ -509,11 +509,11 @@ export function GMatchFeed({
     [displayPosts.length, users, identity?.orbitId, myProfileTags, followingIds],
   );
 
-  // First-like flash: session-local celebration when MY post crosses 0 -> 1
+  // First-like chime: session-local celebration when MY post crosses 0 -> 1
   // likes after mount. Pre-liked posts at mount are seeded into the baseline
-  // ref so reloads don't re-celebrate old news.
+  // ref so reloads don't re-celebrate old news. The chime is the whole
+  // celebration: the old "First like" badge printed a label over the media.
   const firstLikedBaseline = useRef<Set<string> | null>(null)
-  const [firstLikeId, setFirstLikeId] = useState<string | null>(null)
   useEffect(() => {
     if (!identity?.orbitId) return
     if (firstLikedBaseline.current === null) {
@@ -529,9 +529,6 @@ export function GMatchFeed({
       if (firstLikeCrossed(prev, next) && !firstLikedBaseline.current.has(p.id)) {
         firstLikedBaseline.current.add(p.id)
         playLikeOnce()
-        setFirstLikeId(p.id)
-        const timer = setTimeout(() => setFirstLikeId(null), 1500)
-        return () => clearTimeout(timer)
       }
     }
   }, [posts, likeCounts, identity?.orbitId])
@@ -875,74 +872,14 @@ export function GMatchFeed({
                 onContextMenu={(e) => { e.preventDefault(); setOptionsPost(post) }}
                 className={`relative bg-retro-panel border border-border-glass rounded-lg overflow-hidden flex flex-col shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
-                {/* Repost Header Banner */}
+                {/* Repost attribution: a quiet line, not a filled band, so the
+                    post reads as one media-first tile, Instagram-style. */}
                 {post.is_reposted && (
-                  <div className="bg-retro-bg border-b border-border-glass px-4 py-2 flex items-center gap-1.5 text-xs text-retro-muted">
+                  <div className="flex items-center gap-1.5 px-3 pt-2.5 text-xs text-retro-muted">
                     <Repeat className="w-3.5 h-3.5 text-retro-fg" />
                     <span>Reposted by <strong className="text-retro-fg font-medium">@{post.reposted_by || 'Peer'}</strong></span>
                   </div>
                 )}
-
-                {/* Post Header */}
-                <div className="flex items-center justify-between px-3 sm:px-4 py-3">
-                  <div
-                    className="flex items-center gap-2.5"
-                    onContextMenu={(e) => onUserContext?.(e, post.author_id, post.author_name)}
-                  >
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => handleAvatarClick(post.author_id)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleAvatarClick(post.author_id)}
-                      title={authorHasStory ? 'Watch story' : 'View profile'}
-                      aria-label={authorHasStory ? `Watch story of ${post.author_name}` : `View profile of ${post.author_name}`}
-                      className={`relative w-8 h-8 rounded-full p-[1.5px] flex-shrink-0 cursor-pointer ${authorHasStory ? 'bg-gradient-to-tr from-zinc-300 to-zinc-600' : 'bg-glass-w12 border border-border-glass'}`}
-                    >
-                      <div className="relative w-full h-full rounded-full bg-retro-panel overflow-hidden flex items-center justify-center text-xs font-semibold text-retro-fg">
-                        <Avatar id={post.author_id} size={32} imageUrl={profilePics[post.author_id] || post.author_avatar} fill={true} />
-                      </div>
-                    </div>
-                    <div className="flex flex-col justify-center min-w-0 self-center leading-tight">
-                      <div className="flex items-baseline gap-1.5 min-w-0">
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => handleNameClick(post.author_id)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleNameClick(post.author_id)}
-                          className="text-sm font-semibold text-retro-fg hover:underline cursor-pointer leading-tight truncate min-w-0"
-                        >
-                          {post.author_name}
-                        </span>
-                        <PostTimestamp createdAt={post.created_at} className="text-xs text-retro-body leading-tight" />
-                        {post.sync_state && post.sync_state !== 'replicated' && (
-                          <span
-                            className="inline-flex items-center gap-1 text-[10px] font-mono text-retro-muted"
-                            title={
-                              post.sync_state === 'local'
-                                ? 'Saved on this device. Will upload when online.'
-                                : 'Uploading to the network…'
-                            }
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400/80" aria-hidden="true" />
-                            {post.sync_state === 'local' ? 'Saved locally' : 'Syncing…'}
-                          </span>
-                        )}
-                      </div>
-                      {post.location && (
-                        <span className="text-xs text-retro-body leading-tight block truncate">{post.location}</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setOptionsPost(post)}
-                    className="text-retro-muted hover:text-retro-fg p-1.5 rounded-md cursor-pointer hover:bg-glass-w12 transition-colors"
-                    aria-label="Post options"
-                  >
-                    <MoreHorizontal className="w-4 h-4" />
-                  </button>
-                </div>
 
                 {/* Post Media with Click to Lightbox & Double Tap Like */}
                 {(() => {
@@ -953,28 +890,34 @@ export function GMatchFeed({
 
                   return (
                     <div
-                      className={`group/post relative w-full bg-surface-canvas flex items-center justify-center overflow-hidden rounded-none transition-[max-height] duration-300 ease-out motion-reduce:transition-none ${isCurrentVideo ? '' : 'cursor-pointer'}`}
+                      className="group/post relative w-full bg-surface-canvas flex items-center justify-center overflow-hidden rounded-none transition-[max-height] duration-300 ease-out motion-reduce:transition-none"
                       data-expanded={expanded}
-                      role="button"
-                      tabIndex={0}
-                      aria-expanded={expanded}
-                      aria-label={expanded ? 'Post image, expanded' : 'Expand post'}
-                      onClick={() => {
-                        if (!isCurrentVideo) {
-                          toggleExpand(post);
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if ((e.key === 'Enter' || e.key === ' ') && !isCurrentVideo) {
-                          e.preventDefault();
-                          toggleExpand(post);
-                        }
-                      }}
-                      onDoubleClick={(e) => {
-                        e.stopPropagation();
-                        handleDoubleTap(post);
-                      }}
                     >
+                      {/* The expand surface is the MEDIA ONLY: the author
+                          overlay below is a sibling, so its controls can never
+                          bubble into "expand the post". */}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={expanded}
+                        aria-label={expanded ? 'Post image, expanded' : 'Expand post'}
+                        className={`w-full ${isCurrentVideo ? '' : 'cursor-pointer'}`}
+                        onClick={() => {
+                          if (!isCurrentVideo) {
+                            toggleExpand(post);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if ((e.key === 'Enter' || e.key === ' ') && !isCurrentVideo) {
+                            e.preventDefault();
+                            toggleExpand(post);
+                          }
+                        }}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          handleDoubleTap(post);
+                        }}
+                      >
                       {/* Zoom applies on the media node only (controls stay put);
                           transform never affects layout, so zoom can't move
                           the reader's scroll position. */}
@@ -1095,7 +1038,82 @@ export function GMatchFeed({
                           onError={() => markPostUnavailable(post.id)}
                         />
                       )}
+                        </div>
                       </div>
+
+                      {/* Author identity rides ON the media over a top scrim:
+                          the card has no header bar of its own, so the
+                          identity is the first thing you read over the
+                          picture. The scrim is pointer-events-none so a click
+                          anywhere else still expands the post; the controls opt
+                          back in. The right padding reserves the strip the
+                          video player's own top-right control occupies. */}
+                      {!expanded && (
+                        <div
+                          data-testid="post-author-overlay"
+                          className="pointer-events-none absolute inset-x-0 top-0 z-30 bg-gradient-to-b from-black/75 via-black/35 to-transparent pl-3 pr-12 pt-3 pb-8"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div
+                              className="pointer-events-auto flex min-w-0 items-center gap-2.5"
+                              onContextMenu={(e) => onUserContext?.(e, post.author_id, post.author_name)}
+                            >
+                              <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={(e) => { e.stopPropagation(); handleAvatarClick(post.author_id); }}
+                                onKeyDown={(e) => e.key === 'Enter' && handleAvatarClick(post.author_id)}
+                                title={authorHasStory ? 'Watch story' : 'View profile'}
+                                aria-label={authorHasStory ? `Watch story of ${post.author_name}` : `View profile of ${post.author_name}`}
+                                className={`relative w-8 h-8 rounded-full p-[1.5px] flex-shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${authorHasStory ? 'bg-gradient-to-tr from-zinc-300 to-zinc-600' : 'bg-glass-w12 border border-border-glass'}`}
+                              >
+                                <div className="relative w-full h-full rounded-full bg-retro-panel overflow-hidden flex items-center justify-center text-xs font-semibold text-retro-fg">
+                                  <Avatar id={post.author_id} size={32} imageUrl={profilePics[post.author_id] || post.author_avatar} fill={true} />
+                                </div>
+                              </div>
+                              <div className="flex flex-col justify-center min-w-0 self-center leading-tight">
+                                <div className="flex items-baseline gap-1.5 min-w-0">
+                                  <span
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={(e) => { e.stopPropagation(); handleNameClick(post.author_id); }}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleNameClick(post.author_id)}
+                                    className="text-sm font-semibold text-white hover:underline cursor-pointer leading-tight truncate min-w-0 [text-shadow:0_1px_4px_rgba(0,0,0,0.75)] focus-visible:outline-2 focus-visible:outline-white"
+                                  >
+                                    {post.author_name}
+                                  </span>
+                                  <PostTimestamp createdAt={post.created_at} className="text-xs text-white/75 leading-tight [text-shadow:0_1px_4px_rgba(0,0,0,0.75)]" />
+                                  {post.sync_state && post.sync_state !== 'replicated' && (
+                                    <span
+                                      className="inline-flex items-center gap-1 text-[10px] text-white/75 [text-shadow:0_1px_4px_rgba(0,0,0,0.75)]"
+                                      title={
+                                        post.sync_state === 'local'
+                                          ? 'Saved on this device. Will upload when online.'
+                                          : 'Uploading to the network…'
+                                      }
+                                    >
+                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400/90" aria-hidden="true" />
+                                      {post.sync_state === 'local' ? 'Saved locally' : 'Syncing…'}
+                                    </span>
+                                  )}
+                                </div>
+                                {post.location && (
+                                  <span className="text-xs text-white/75 leading-tight block truncate [text-shadow:0_1px_4px_rgba(0,0,0,0.75)]">{post.location}</span>
+                                )}
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setOptionsPost(post); }}
+                              className="pointer-events-auto shrink-0 text-white/80 hover:text-white p-1.5 rounded-md cursor-pointer hover:bg-black/40 transition-colors focus-visible:outline-2 focus-visible:outline-white"
+                              aria-label="Post options"
+                            >
+                              <MoreHorizontal className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Zoom + collapse overlays (expanded only) */}
                       {expanded && (
@@ -1161,17 +1179,13 @@ export function GMatchFeed({
                           <Heart className="w-20 h-20 text-white fill-white opacity-90" />
                         </div>
                       )}
-                      {firstLikeId === post.id && (
-                        <span className="absolute left-2 top-2 z-20 text-[10px] font-bold text-retro-fg bg-retro-panel border border-border-glass rounded-md px-1.5 py-0.5 animate-orbit-pop">
-                          First like
-                        </span>
-                      )}
                     </div>
                   );
                 })()}
 
-                {/* Action Bar (Like, Comment, Share, Save) */}
-                <div className="px-3 sm:px-4 py-3 flex flex-col gap-2">
+                {/* Action row: no fill, no separator — it sits directly under
+                    the media so the whole tile reads as one object. */}
+                <div className="px-3 sm:px-4 pt-2.5 pb-3 flex flex-col gap-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1">
                       <button
@@ -1234,7 +1248,7 @@ export function GMatchFeed({
                   </button>
 
                   {expanded ? (
-                    <div className="motion-safe:animate-orbit-fade-in border-t border-border-glass">
+                    <div className="motion-safe:animate-orbit-fade-in">
                       <PostComments
                         key={post.id}
                         post={post}

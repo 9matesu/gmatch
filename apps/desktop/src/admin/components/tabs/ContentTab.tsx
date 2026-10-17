@@ -11,6 +11,7 @@ import {
   Plus,
 } from "lucide-react";
 import { cn } from "../../../lib/utils";
+import { formatAbsoluteTime } from "../../../utils/timeAgo";
 import { AdminMediaThumbnail } from "../AdminMediaThumbnail";
 import type {
   AdminPost,
@@ -307,7 +308,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-bold text-retro-fg">{post.author_name || "Unknown Author"}</span>
                               {isHidden && <Badge variant="warning" size="sm">Hidden</Badge>}
-                              <span className="text-[10px] text-retro-muted">{new Date(post.created_at).toLocaleString()}</span>
+                              <span className="text-[10px] text-retro-muted">{formatAbsoluteTime(post.created_at)}</span>
                             </div>
                             <p className="text-xs text-retro-body mt-1 truncate">{post.post_caption || "No caption"}</p>
                             <div className="flex items-center gap-2 mt-1 text-[10px] text-retro-muted">
@@ -361,7 +362,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-retro-fg">{img.user_name || img.user_id.slice(0, 10)}</span>
-                          <span className="text-[10px] text-retro-muted">{new Date(img.created_at).toLocaleString()}</span>
+                          <span className="text-[10px] text-retro-muted">{formatAbsoluteTime(img.created_at)}</span>
                         </div>
                         <p className="text-[10px] text-retro-muted mt-0.5 font-mono">{img.id}</p>
                       </div>
@@ -433,7 +434,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                           <Badge variant="info" size="sm">LIVE</Badge>
                         </div>
                         <p className="text-[10px] text-retro-muted mt-1">
-                          Phase: {m.phase || m.status} · Round {m.round_seq || 1} · Created {new Date(m.created_at).toLocaleTimeString()}
+                          Phase: {m.phase || m.status} · Round {m.round_seq || 1} · Created {formatAbsoluteTime(m.created_at, { timeStyle: 'short' })}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -466,7 +467,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                           <StatusBadge status={m.result} mapping={{ winner_a: "success", winner_b: "success", draw: "info", forfeit_a: "warning", forfeit_b: "warning", no_match: "neutral", admin_cancelled: "danger" }} />
                         </div>
                         <p className="text-[10px] text-retro-muted mt-0.5">
-                          Score: {m.score_a} - {m.score_b} · Ended: {new Date(m.ended_at).toLocaleString()}
+                          Score: {m.score_a} - {m.score_b} · Ended: {formatAbsoluteTime(m.ended_at)}
                         </p>
                       </div>
                     </div>
@@ -610,7 +611,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                         {ann.is_active ? <Badge variant="success" size="sm">Active</Badge> : <Badge variant="neutral" size="sm">Inactive</Badge>}
                       </div>
                       <p className="text-[10px] text-retro-muted mt-0.5">
-                        By {ann.created_by_name || "Admin"} · {new Date(ann.created_at).toLocaleString()}
+                        By {ann.created_by_name || "Admin"} · {formatAbsoluteTime(ann.created_at)}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -655,7 +656,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                         <StatusBadge status={rec.status} mapping={{ pending: "pending", reviewed: "info", resolved: "success" }} size="sm" />
                       </div>
                       <p className="text-[10px] text-retro-muted mt-0.5">
-                        From {rec.user_name || rec.user_id.slice(0, 8)} · {new Date(rec.created_at).toLocaleString()}
+                        From {rec.user_name || rec.user_id.slice(0, 8)} · {formatAbsoluteTime(rec.created_at)}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">

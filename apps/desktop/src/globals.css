@@ -96,7 +96,10 @@
   --font-sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-heading: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-roboto: Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  /* Mono retired (user directive 2026-10-17): `font-mono` now resolves to the
+     sans face everywhere, so no chrome ships a monospace family. Numeric
+     readouts stay aligned through `tabular-nums` (see ui/styles.ts MONO). */
+  --font-mono: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
   /* Radius scale (Concentric geometry) */
   --radius: 6px;

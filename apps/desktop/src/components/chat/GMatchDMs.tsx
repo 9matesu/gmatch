@@ -31,6 +31,7 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import type { User } from '@orbit/shared';
 import type { ChatMessage } from '../../hooks/useP2P';
 import { orbitFetch } from '../../utils/api';
+import { formatAbsoluteTime } from '../../utils/timeAgo';
 import { ObjectImage } from '../ObjectImage';
 import { DropZone, readClipboard } from '../DropZone';
 import { ChatPlayerList } from './ChatPlayerList';
@@ -879,7 +880,7 @@ export function GMatchDMs({
                           <span className="w-2 h-2 rounded-full bg-retro-accent shrink-0" />
                         ) : (
                           <span className="text-[10px] text-retro-muted shrink-0 tabular-nums">
-                            {thread.last_created_at ? new Date(thread.last_created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                            {thread.last_created_at ? formatAbsoluteTime(thread.last_created_at, { hour: '2-digit', minute: '2-digit' }) : ''}
                           </span>
                         )}
                       </div>

@@ -31,7 +31,8 @@ allowed per file if a dense admin table washes out — flagged in code, never fo
 caption `text-[10px]` (meta/counters/uppercase labels) · body `text-xs` ·
 field `text-[13px]` (inputs) · sub `text-sm` (modal titles) · title `text-lg` ·
 display `text-xl`/`text-2xl` (hero/rank-up only).
-Numbers: `MONO` (JetBrains Mono + tabular-nums). `font-black` only on display.
+Numbers: `MONO` (sans + tabular-nums — mono was retired 2026-10-17, no surface
+ships a monospace family). `font-black` only on display.
 tracking: `tracking-wider` on uppercase micro-labels, else default.
 
 ## Radius (4 steps)
@@ -79,6 +80,15 @@ chrome (❤️⚡★✕→Heart/Zap/Star/X). User-typed content may still contai
 Sanctioned disclosure glyphs (user directive 2026-09-11): ⌃ ⌄ on the messages
 rail handle and the chat panel close control — functional toggles, not
 decoration. The Unicode sweep skips exactly these two.
+
+## Post anatomy (feed card)
+One media-first tile. The author identity (avatar, name, timestamp, `⋯`) rides
+INSIDE the media as a top overlay over a `bg-gradient-to-b from-black/75` scrim:
+no header bar, no separator rule, no quality badge on the video. Actions
+(like/comment/share/save) sit BELOW the media with no fill or border. The scrim
+is `pointer-events-none` and its controls opt back in, so the media keeps its own
+click-to-expand surface; it reserves `pr-12` for the video player's top-right
+control, which shares the strip.
 
 ## Compaction
 "nem tudo é botão": drop a description when it restates its sibling label (keep

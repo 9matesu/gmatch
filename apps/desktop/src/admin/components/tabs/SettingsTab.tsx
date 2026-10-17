@@ -12,6 +12,7 @@ import {
   BarChart2,
 } from "lucide-react";
 import { cn } from "../../../lib/utils";
+import { formatAbsoluteTime } from "../../../utils/timeAgo";
 import type { OrbitIdentity } from "@orbit/crypto";
 import type { AdminAuditEntry, AdminDailyStat } from "../../../utils/adminTypes";
 
@@ -296,7 +297,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
                         <div className="flex items-center gap-2">
                           <Badge variant="info" size="sm">{entry.action}</Badge>
                           <span className="text-xs font-bold text-retro-fg">{entry.admin_name || entry.admin_id.slice(0, 8)}</span>
-                          <span className="text-[10px] text-retro-muted">{new Date(entry.created_at).toLocaleString()}</span>
+                          <span className="text-[10px] text-retro-muted">{formatAbsoluteTime(entry.created_at)}</span>
                         </div>
                         <p className="text-xs text-retro-body mt-1">
                           Target: <span className="font-mono text-retro-fg">{entry.target_type}:{entry.target_id}</span>

@@ -21,7 +21,8 @@ describe('NativeVideoPlayer', () => {
     expect(video).toBeInTheDocument();
     expect(video).toHaveAttribute('src', 'https://example.com/test.mp4');
     expect(screen.getByLabelText(/play video/i)).toBeInTheDocument();
-    expect(screen.getByText('HD Video')).toBeInTheDocument();
+    // No quality badge: the timeline's author overlay owns the top strip.
+    expect(screen.queryByText(/hd video/i)).toBeNull();
   });
 
   it('toggles play when play button is clicked', async () => {

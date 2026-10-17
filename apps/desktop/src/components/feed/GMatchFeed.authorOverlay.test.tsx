@@ -57,36 +57,38 @@ describe('GMatchFeed author header', () => {
       />,
     );
 
-  it('renders the author header BEFORE the media (separate row, not overlaid)', () => {
+  it('rides the author identity ON the media, over a top scrim', () => {
     const { container } = renderFeed([imagePost]);
     const card = container.querySelector('article') as HTMLElement;
     expect(card).toBeTruthy();
 
-    // The author header is the first block child (after an optional repost
-    // banner): avatar + name row, then the media wrapper.
-    const header = card.querySelector('.flex.items-center.justify-between') as HTMLElement;
-    expect(header).toBeTruthy();
-    expect(header.textContent).toContain('Alice Wonder');
-    expect(header.querySelector('[title="View profile"]')).toBeTruthy();
+    // No separate header row above the picture: the identity is an overlay.
+    const overlay = card.querySelector('[data-testid="post-author-overlay"]') as HTMLElement;
+    expect(overlay).toBeTruthy();
+    expect(overlay.className).toMatch('absolute');
+    expect(overlay.className).toMatch('top-0');
+    expect(overlay.className).toMatch('bg-gradient-to-b');
+    expect(overlay.textContent).toContain('Alice Wonder');
+    expect(overlay.querySelector('[title="View profile"]')).toBeTruthy();
 
-    // Media comes after the header: the clickable media node carries
-    // role="button".
+    // The overlay lives INSIDE the media node so it paints over the picture,
+    // and the media keeps its own click surface (role="button").
+    const mediaBox = card.querySelector('.group\\/post') as HTMLElement;
+    expect(mediaBox.contains(overlay)).toBe(true);
     const media = card.querySelector('div[role="button"]') as HTMLElement;
     expect(media).toBeTruthy();
+    expect(overlay.contains(media)).toBe(false);
   });
 
-  it('video cards use the same author header row, no top overlay on the player', () => {
+  it('uses the same overlay on video cards, with no quality badge', () => {
     const { container } = renderFeed([videoPost]);
     const card = container.querySelector('article') as HTMLElement;
     expect(card.querySelector('video')).toBeTruthy();
 
-    const header = card.querySelector('.flex.items-center.justify-between') as HTMLElement;
-    expect(header).toBeTruthy();
-    expect(header.textContent).toContain('Alice Wonder');
-
-    // No author name inside the media wrapper (top-0 overlay).
-    const media = card.querySelector('div[role="button"]') as HTMLElement;
-    expect(media.querySelector('div.absolute.top-0')).toBeNull();
+    const overlay = card.querySelector('[data-testid="post-author-overlay"]') as HTMLElement;
+    expect(overlay).toBeTruthy();
+    expect(overlay.textContent).toContain('Alice Wonder');
+    expect(card.textContent).not.toContain('HD Video');
   });
 
   it('clicking the author avatar calls onSelectUser', () => {
@@ -112,16 +114,16 @@ describe('GMatchFeed author header', () => {
     expect(screen.queryByPlaceholderText(/add a comment\.\.\./i)).toBeNull();
   });
 
-  it('clicking the media does NOT open a comment lightbox', () => {
+  it('clicking the media expands inline instead of opening a lightbox', () => {
     const { container } = renderFeed([imagePost]);
     const card = container.querySelector('article') as HTMLElement;
     const mediaBox = card.querySelector('div[role="button"]') as HTMLElement;
 
-    expect(screen.queryByPlaceholderText(/add a comment\.\.\./i)).toBeNull();
-
     fireEvent.click(mediaBox);
 
-    // Inline expansion replaces the lightbox: no comment surface appears.
-    expect(screen.queryByPlaceholderText(/add a comment\.\.\./i)).toBeNull();
+    // Inline expansion replaces the lightbox: the media node flips to
+    // expanded and no modal dialog is mounted.
+    expect(card.querySelector('[data-expanded="true"]')).toBeTruthy();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });

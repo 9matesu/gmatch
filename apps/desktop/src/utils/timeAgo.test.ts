@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseApiTimestamp, timeAgo } from './timeAgo'
+import { formatAbsoluteTime, parseApiTimestamp, timeAgo } from './timeAgo'
 
 describe('parseApiTimestamp', () => {
   it('reads SQLite CURRENT_TIMESTAMP as UTC, not local time', () => {
@@ -20,6 +20,36 @@ describe('parseApiTimestamp', () => {
     expect(parseApiTimestamp(null)).toBeNull()
     expect(parseApiTimestamp('Just now')).toBeNull()
     expect(parseApiTimestamp('not a date')).toBeNull()
+  })
+})
+
+describe('formatAbsoluteTime', () => {
+  it('renders the exact UTC instant in the viewer\'s own timezone', () => {
+    // Same instant as the SQLite string, formatted the way the user's device
+    // would format it. Machine-TZ independent: we compare against Intl, not a
+    // hardcoded offset. A raw `new Date(string)` would read it as LOCAL and
+    // disagree with this by the device offset.
+    const expected = new Date('2026-09-28T12:34:56Z').toLocaleString(undefined, {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    })
+    expect(formatAbsoluteTime('2026-09-28 12:34:56')).toBe(expected)
+  })
+
+  it('honours caller options and ISO input with an explicit offset', () => {
+    const opts = { hour: '2-digit', minute: '2-digit' } as const
+    expect(formatAbsoluteTime('2026-09-28T12:34:56.000Z', opts)).toBe(
+      new Date('2026-09-28T12:34:56Z').toLocaleString(undefined, opts),
+    )
+    expect(formatAbsoluteTime('2026-09-28T09:34:56-03:00', opts)).toBe(
+      new Date('2026-09-28T12:34:56Z').toLocaleString(undefined, opts),
+    )
+  })
+
+  it('returns an empty string for junk so callers keep their own fallback', () => {
+    expect(formatAbsoluteTime(null)).toBe('')
+    expect(formatAbsoluteTime('')).toBe('')
+    expect(formatAbsoluteTime('nonsense')).toBe('')
   })
 })
 
