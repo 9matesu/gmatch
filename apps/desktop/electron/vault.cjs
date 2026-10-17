@@ -1,33 +1,60 @@
-// gMatch local media vault (main process) — OPT-IN persistent storage for
-// gallery keeps + card media. OFF by default (Settings → local vault); the
-// renderer only calls pin/get when the player opted in, so without opt-in
-// nothing touches disk and the F1 memory-only guarantee stands.
-// Layout: <userData>/media-vault/<sha256(url).ext> + manifest.json
-// {url: {key, mime, bytes, atime, pins}}. Quota 3GB, LRU; pinned entries
-// (gallery keeps, cards) survive eviction until unpinned/removed.
+// gMatch local media vault (main process) -- the app's on-disk media store.
+//
+// CONTENT-ADDRESSED: a file is named by the sha256 of its bytes, so identical
+// bytes are stored once, a record's local reference (localRef) IS its content
+// hash, and the P2P swarm object id needs no separate mapping. Every media byte
+// the app receives (gallery keeps, card media, swarm objects, uploads) is
+// written here; the renderer falls back to IndexedDB only when no Electron
+// bridge exists (browser dev).
+//
+// ENCRYPTED: AES-256-GCM with the same storage key as the picture LRU
+// (electron/aeadFile.cjs). Adult media never lands on disk in the clear.
+//
+// Layout: <userData>/media-vault/<sha256> + manifest.json
+//   manifest: storeKey -> { file, mime, bytes, atime, pins, hash, enc }
+//   `storeKey` is how a caller names the object (source url, object id, or
+//   `local://<hash>` for an anonymous put). `hash` is the content identity and
+//   the on-disk file name. Legacy entries (older builds) used the url-derived
+//   `<sha256(url)>.<ext>` as file name, carried no `hash`, and were plaintext
+//   (`enc` absent); they are read as-is and never re-keyed.
+// Quota 3GB, LRU over unpinned entries; pinned entries (gallery keeps, cards)
+// survive eviction until unpinned/removed. A file is deleted only when no
+// manifest entry still references it (content dedupe).
 const fs = require('fs')
 const path = require('path')
 const nodeCrypto = require('crypto')
+const aead = require('./aeadFile.cjs')
 const imageCache = require('./imageCache.cjs')
 
 const SCHEME = 'vault'
 const QUOTA_BYTES = 3 * 1024 * 1024 * 1024
+const HASH_RE = /^[0-9a-f]{64}$/i
+
+/** Store key for a by-hash put with no caller-provided name. */
+function localKey(hash) {
+  return `local://${hash}`
+}
 
 let dir = null
-/** url -> { key, mime, bytes, atime, pins } */
+let encKey = null
+/** storeKey -> entry */
 let manifest = {}
+/** content hash -> storeKey (dedupe + lookup by content) */
+let byHash = new Map()
 /** Test seam: stub the byte fetcher (defaults to imageCache.fetchBinary). */
 let fetcher = null
 
-function extOf(url) {
-  const m = /\.(jpe?g|png|gif|webp|avif|bmp|mp4|webm|mov)(?:[?#]|$)/i.exec(String(url || ''))
-  const ext = m ? m[1].toLowerCase().replace('jpeg', 'jpg') : 'img'
-  return ext
+function hashOf(buf) {
+  return nodeCrypto.createHash('sha256').update(buf).digest('hex')
 }
 
-function keyFor(url) {
-  const h = nodeCrypto.createHash('sha256').update(String(url)).digest('hex')
-  return `${h}.${extOf(url)}`
+/** On-disk file name of an entry (legacy rows carry `key` instead of `file`). */
+function fileOf(entry) {
+  return (entry && (entry.file || entry.key)) || null
+}
+
+function fileFor(file) {
+  return dir && file ? path.join(dir, file) : null
 }
 
 function manifestPath() {
@@ -36,19 +63,30 @@ function manifestPath() {
 
 function loadManifest() {
   manifest = {}
+  byHash = new Map()
   try {
     const raw = fs.readFileSync(manifestPath(), 'utf8')
     const d = JSON.parse(raw)
     if (d && typeof d === 'object') {
-      for (const [url, e] of Object.entries(d)) {
-        if (e && typeof e.key === 'string' && typeof e.bytes === 'number') {
-          manifest[url] = { key: e.key, mime: String(e.mime || ''), bytes: e.bytes, atime: Number(e.atime) || 0, pins: Number(e.pins) || 0 }
-          if (typeof e.hash === 'string' && /^[0-9a-f]{64}$/i.test(e.hash)) manifest[url].hash = e.hash.toLowerCase()
+      for (const [storeKey, e] of Object.entries(d)) {
+        if (!e || typeof e !== 'object') continue
+        const file = fileOf(e)
+        if (typeof file !== 'string' || typeof e.bytes !== 'number') continue
+        const entry = {
+          file,
+          mime: String(e.mime || ''),
+          bytes: e.bytes,
+          atime: Number(e.atime) || 0,
+          pins: Number(e.pins) || 0,
         }
+        if (typeof e.hash === 'string' && HASH_RE.test(e.hash)) entry.hash = e.hash.toLowerCase()
+        if (e.enc) entry.enc = 1
+        manifest[storeKey] = entry
+        if (entry.hash) byHash.set(entry.hash, storeKey)
       }
     }
   } catch {
-    /* missing/corrupt — start empty */
+    /* missing/corrupt -- start empty */
   }
 }
 
@@ -56,7 +94,7 @@ function writeManifest() {
   try {
     if (manifestPath()) fs.writeFileSync(manifestPath(), JSON.stringify(manifest))
   } catch {
-    /* disk hiccup — memory still authoritative this session */
+    /* disk hiccup -- memory still authoritative this session */
   }
 }
 
@@ -66,19 +104,30 @@ function totalBytes() {
   return n
 }
 
-function fileFor(key) {
-  return dir ? path.join(dir, key) : null
+/** Other manifest entries pointing at the same file (content dedupe). */
+function referencedByOthers(file, exceptStoreKey) {
+  return Object.keys(manifest).some(
+    (k) => k !== exceptStoreKey && fileOf(manifest[k]) === file,
+  )
 }
 
-function dropEntry(url) {
-  const e = manifest[url]
+function dropEntry(storeKey) {
+  const e = manifest[storeKey]
   if (!e) return false
-  try {
-    if (e.key && !e.key.includes('..')) fs.rmSync(fileFor(e.key), { force: true })
-  } catch {
-    /* already gone */
+  const file = fileOf(e)
+  delete manifest[storeKey]
+  if (e.hash && byHash.get(e.hash) === storeKey) {
+    const alt = Object.keys(manifest).find((k) => fileOf(manifest[k]) === file)
+    if (alt) byHash.set(e.hash, alt)
+    else byHash.delete(e.hash)
   }
-  delete manifest[url]
+  if (file && !referencedByOthers(file, storeKey)) {
+    try {
+      fs.rmSync(fileFor(file), { force: true })
+    } catch {
+      /* already gone */
+    }
+  }
   return true
 }
 
@@ -88,65 +137,108 @@ function makeRoom(need) {
   const cands = Object.entries(manifest)
     .filter(([, e]) => (e.pins || 0) <= 0)
     .sort((a, b) => a[1].atime - b[1].atime)
-  for (const [url] of cands) {
-    dropEntry(url)
+  for (const [storeKey] of cands) {
+    dropEntry(storeKey)
     if (totalBytes() + need <= QUOTA_BYTES) return true
   }
   return totalBytes() + need <= QUOTA_BYTES
 }
 
-function init(userDataPath) {
+function readFileBytes(entry) {
+  const buf = fs.readFileSync(fileFor(fileOf(entry)))
+  if (!entry.enc) return buf
+  return aead.decrypt(buf, encKey)
+}
+
+function writeFileBytes(file, buf) {
+  const out = encKey ? aead.encrypt(buf, encKey) : buf
+  fs.writeFileSync(fileFor(file), out)
+}
+
+/** Index (or re-index) bytes already on disk under a content hash. */
+function indexContent(storeKey, file, hash, mime, bytes, pins) {
+  const prev = manifest[storeKey]
+  manifest[storeKey] = {
+    file,
+    mime: String(mime || ''),
+    bytes,
+    atime: Date.now(),
+    pins: pins || (prev && prev.pins) || 1,
+    hash,
+    enc: encKey ? 1 : 0,
+  }
+  if (prev && prev.hash && prev.hash !== hash && byHash.get(prev.hash) === storeKey) {
+    byHash.delete(prev.hash)
+  }
+  byHash.set(hash, storeKey)
+}
+
+function entryFor(ref) {
+  if (!ref) return null
+  let str = String(ref)
+  if (str.startsWith(`${SCHEME}://f/`)) str = str.split('/').pop() || ''
+  if (!str || str.includes('..')) return null
+  const direct = manifest[str]
+  if (direct) return { storeKey: str, entry: direct }
+  if (HASH_RE.test(str)) {
+    const storeKey = byHash.get(str.toLowerCase())
+    if (storeKey) return { storeKey, entry: manifest[storeKey] }
+  }
+  const byFile = Object.keys(manifest).find((k) => fileOf(manifest[k]) === str)
+  if (byFile) return { storeKey: byFile, entry: manifest[byFile] }
+  return null
+}
+
+function init(userDataPath, storageKeyHex) {
   dir = path.join(String(userDataPath), 'media-vault')
   try {
     fs.mkdirSync(dir, { recursive: true })
   } catch {
     dir = null
   }
+  encKey = aead.keyFrom(storageKeyHex, userDataPath)
   loadManifest()
 }
 
 function stats() {
-  return { files: Object.keys(manifest).length, bytes: totalBytes(), quota: QUOTA_BYTES, dir: Boolean(dir) }
+  return {
+    files: Object.keys(manifest).length,
+    objects: byHash.size,
+    bytes: totalBytes(),
+    quota: QUOTA_BYTES,
+    dir: Boolean(dir),
+    encrypted: Boolean(encKey),
+  }
 }
 
 /**
  * Lookup only: vault:// URL when the bytes are already local, else null.
- * Renderers use this per mount — never downloads, so mere browsing can't
- * fill the disk.
+ * Accepts a store key (source url / object id), a content hash, or a
+ * vault://f/<file> URL. Renderers use this per mount -- never downloads, so
+ * mere browsing can't fill the disk.
  */
-function get(url) {
+function get(ref) {
   try {
-    if (!url || !dir) return null
-    const str = String(url)
-    if (str.startsWith(`${SCHEME}://f/`)) {
-      const k = str.split('/').pop()
-      if (k) {
-        try {
-          fs.accessSync(fileFor(k), fs.constants.R_OK)
-          return str
-        } catch {
-          return null
-        }
-      }
-    }
-    const e = manifest[str]
-    if (!e) return null
+    if (!ref || !dir) return null
+    const hit = entryFor(ref)
+    if (!hit) return null
     try {
-      fs.accessSync(fileFor(e.key), fs.constants.R_OK)
+      fs.accessSync(fileFor(fileOf(hit.entry)), fs.constants.R_OK)
     } catch {
-      delete manifest[str]
+      dropEntry(hit.storeKey)
       return null
     }
-    e.atime = Date.now()
-    return `${SCHEME}://f/${e.key}`
+    hit.entry.atime = Date.now()
+    return `${SCHEME}://f/${fileOf(hit.entry)}`
   } catch {
     return null
   }
 }
 
 /**
- * Get-or-fetch + pin. Used for gallery keeps + card media only (opt-in).
- * Returns the vault:// URL or null (caller falls back to remote).
+ * Fetch + pin one URL's bytes. Returns the vault:// URL or null (caller falls
+ * back to remote). The bytes are content-addressed, so a re-pin of identical
+ * content reuses the file instead of writing a second copy.
  */
 async function pin(url) {
   try {
@@ -156,15 +248,16 @@ async function pin(url) {
       const hit = get(str)
       if (hit) return hit
     }
-    const hit = get(str)
-    if (hit) {
-      if (manifest[str]) {
-        manifest[str].pins = (manifest[str].pins || 0) + 1
+    const existing = get(str)
+    if (existing) {
+      const e = manifest[str]
+      if (e) {
+        e.pins = (e.pins || 0) + 1
         writeManifest()
       }
-      return hit
+      return existing
     }
-    // idle-file:// (player-owned idle folders) is not http(s) — the byte
+    // idle-file:// (player-owned idle folders) is not http(s) -- the byte
     // fetcher rejects any other scheme, so those keeps never reached disk
     // and only reappeared while the clicker held the folder grant open.
     // Read the granted path directly instead of routing through the fetcher.
@@ -192,8 +285,9 @@ async function pin(url) {
       const fetch = fetcher || imageCache.fetchBinary
       try {
         fetched = await fetch(str)
-      } catch (err) {
-        // Fallback for boorus: try alternate extensions
+      } catch {
+        // The booru hosts sometimes 404 a URL whose extension is wrong or
+        // rotated: retry the same path with each common image extension.
         if (/\.(jpe?g|png|gif|webp)$/i.test(str)) {
           const exts = ['jpg', 'png', 'gif', 'jpeg']
           for (const ext of exts) {
@@ -212,15 +306,15 @@ async function pin(url) {
     const cap = imageCache.capFor(mime, str)
     if (buf.length > cap) return null
     if (!makeRoom(buf.length)) return null
-    const key = keyFor(str)
+    const hash = hashOf(buf)
     try {
-      fs.writeFileSync(fileFor(key), buf)
+      if (!fs.existsSync(fileFor(hash))) writeFileBytes(hash, buf)
     } catch {
       return null
     }
-    manifest[str] = { key, mime: String(mime || ''), bytes: buf.length, atime: Date.now(), pins: 1 }
+    indexContent(str, hash, hash, mime, buf.length, 1)
     writeManifest()
-    return `${SCHEME}://f/${key}`
+    return `${SCHEME}://f/${hash}`
   } catch {
     return null
   }
@@ -228,12 +322,11 @@ async function pin(url) {
 
 /**
  * Streaming pin for large media (keepsake MP4s of any size). Downloads the
- * response body in chunks straight to a temp file — the whole file is NEVER
- * buffered in memory — while hashing incrementally (single pass). There is
- * NO per-file byte cap: the only limits are the vault quota (disk space,
- * genuine constraint) and free disk space. Incomplete/failed writes are
- * deleted, never renamed into place, so a partial file can never read as
- * complete. Returns { ok, key, mime, bytes, hash } or { ok:false, reason }.
+ * response body in chunks straight to a temp file -- the whole file is NEVER
+ * buffered in memory -- while hashing and encrypting incrementally (single
+ * pass). There is NO per-file byte cap: the vault quota is the only limit.
+ * Incomplete/failed writes are deleted, never renamed into place. Returns
+ * { ok, key, mime, bytes, hash } or { ok:false, reason }.
  */
 async function pinStream(url, { onProgress } = {}) {
   const fail = (reason) => ({ ok: false, reason })
@@ -247,9 +340,9 @@ async function pinStream(url, { onProgress } = {}) {
       return fail('bad-url')
     }
     if (u.protocol !== 'https:' && u.protocol !== 'http:') return fail('bad-scheme')
-    const key = keyFor(str)
-    const dest = fileFor(key)
-    const tmp = `${dest}.part-${Date.now()}`
+    // Temp name is opaque: the real file is named by its content hash, which
+    // is only known once the stream ends.
+    const tmp = fileFor(`${nodeCrypto.randomBytes(8).toString('hex')}.part-${Date.now()}`)
     let res
     try {
       res = await fetch(str, { redirect: 'follow' })
@@ -286,13 +379,19 @@ async function pinStream(url, { onProgress } = {}) {
         return fail('disk-full')
       }
     } catch {
-      /* statfs unavailable — quota still enforced below */
+      /* statfs unavailable -- quota still enforced below */
     }
     const hash = nodeCrypto.createHash('sha256')
+    const iv = nodeCrypto.randomBytes(aead.IV_BYTES)
+    const cipher = encKey ? nodeCrypto.createCipheriv(aead.ALGO, encKey, iv) : null
     let bytes = 0
     let lastEmit = 0
     const out = fs.createWriteStream(tmp)
     try {
+      if (cipher) {
+        out.write(iv)
+        out.write(Buffer.alloc(aead.TAG_BYTES)) // tag placeholder, patched below
+      }
       const reader = res.body.getReader()
       for (;;) {
         const { done, value } = await reader.read()
@@ -306,12 +405,22 @@ async function pinStream(url, { onProgress } = {}) {
         }
         hash.update(value)
         bytes += value.length
-        const okWrite = out.write(value)
-        if (!okWrite) await new Promise((resolve) => out.once('drain', resolve))
+        const chunk = cipher ? cipher.update(value) : value
+        if (chunk.length > 0) {
+          const okWrite = out.write(chunk)
+          if (!okWrite) await new Promise((resolve) => out.once('drain', resolve))
+        }
         const now = Date.now()
         if (onProgress && now - lastEmit > 250) {
           lastEmit = now
           try { onProgress({ bytes, total }) } catch {}
+        }
+      }
+      if (cipher) {
+        const tail = cipher.final()
+        if (tail.length > 0) {
+          const okWrite = out.write(tail)
+          if (!okWrite) await new Promise((resolve) => out.once('drain', resolve))
         }
       }
       await new Promise((resolve, reject) => {
@@ -328,8 +437,24 @@ async function pinStream(url, { onProgress } = {}) {
       try { fs.rmSync(tmp, { force: true }) } catch {}
       return fail('empty')
     }
+    if (cipher) {
+      // Patch the GCM tag into its reserved slot (offset 12).
+      try {
+        const fd = fs.openSync(tmp, 'r+')
+        fs.writeSync(fd, cipher.getAuthTag(), 0, aead.TAG_BYTES, aead.IV_BYTES)
+        fs.closeSync(fd)
+      } catch {
+        try { fs.rmSync(tmp, { force: true }) } catch {}
+        return fail('write')
+      }
+    }
+    const contentHash = hash.digest('hex')
     try {
-      fs.renameSync(tmp, dest)
+      if (fs.existsSync(fileFor(contentHash))) {
+        fs.rmSync(tmp, { force: true }) // identical bytes already stored
+      } else {
+        fs.renameSync(tmp, fileFor(contentHash))
+      }
     } catch {
       try { fs.rmSync(tmp, { force: true }) } catch {}
       return fail('write')
@@ -337,26 +462,66 @@ async function pinStream(url, { onProgress } = {}) {
     if (onProgress) {
       try { onProgress({ bytes, total: total || bytes }) } catch {}
     }
-    manifest[str] = {
-      key,
-      mime: String(mime || ''),
-      bytes,
-      hash: hash.digest('hex'),
-      atime: Date.now(),
-      pins: (manifest[str] && manifest[str].pins) || 1,
-    }
+    indexContent(str, contentHash, contentHash, mime, bytes, (manifest[str] && manifest[str].pins) || 1)
     writeManifest()
-    return { ok: true, key, mime: String(mime || ''), bytes, hash: manifest[str].hash }
+    return { ok: true, key: contentHash, mime: String(mime || ''), bytes, hash: contentHash }
   } catch {
     return fail('error')
   }
 }
 
-function unpin(url) {
+/**
+ * Write bytes the caller already holds (a verified swarm chunk assembly, a
+ * forged upload) straight to the encrypted content-addressed store. The hash
+ * is re-verified against the bytes: a caller cannot file content under a
+ * different identity. `alias` is an optional store key (source url / object
+ * id) so the object stays addressable by that name too.
+ */
+function putBytes(hash, mime, data, alias) {
   try {
-    const e = manifest[String(url)]
-    if (!e) return false
-    e.pins = Math.max(0, (e.pins || 0) - 1)
+    if (!dir || !data) return { ok: false, reason: 'no-vault' }
+    const buf = Buffer.isBuffer(data) ? data : Buffer.from(data)
+    if (!buf.length) return { ok: false, reason: 'empty' }
+    const want = String(hash || '').toLowerCase()
+    if (!HASH_RE.test(want)) return { ok: false, reason: 'bad-hash' }
+    if (hashOf(buf) !== want) return { ok: false, reason: 'hash-mismatch' }
+    if (!fs.existsSync(fileFor(want))) {
+      if (!makeRoom(buf.length)) return { ok: false, reason: 'quota' }
+      try {
+        writeFileBytes(want, buf)
+      } catch {
+        return { ok: false, reason: 'write' }
+      }
+    }
+    const storeKey = alias ? String(alias) : localKey(want)
+    indexContent(storeKey, want, want, mime, buf.length, (manifest[storeKey] && manifest[storeKey].pins) || 1)
+    writeManifest()
+    return { ok: true, ref: want, file: want, bytes: buf.length }
+  } catch {
+    return { ok: false, reason: 'error' }
+  }
+}
+
+/** Distinct stored objects ({ ref, mime, bytes }) for swarm rehydration. */
+function list() {
+  try {
+    const out = []
+    for (const storeKey of Object.keys(manifest)) {
+      const e = manifest[storeKey]
+      if (!e.hash || byHash.get(e.hash) !== storeKey) continue
+      out.push({ ref: e.hash, mime: e.mime, bytes: e.bytes })
+    }
+    return out
+  } catch {
+    return []
+  }
+}
+
+function unpin(ref) {
+  try {
+    const hit = entryFor(ref)
+    if (!hit) return false
+    hit.entry.pins = Math.max(0, (hit.entry.pins || 0) - 1)
     writeManifest()
     return true
   } catch {
@@ -365,9 +530,11 @@ function unpin(url) {
 }
 
 /** Delete bytes immediately regardless of pins (user asked it gone). */
-function remove(url) {
+function remove(ref) {
   try {
-    const ok = dropEntry(String(url))
+    const hit = entryFor(ref)
+    if (!hit) return false
+    const ok = dropEntry(hit.storeKey)
     if (ok) writeManifest()
     return ok
   } catch {
@@ -375,7 +542,7 @@ function remove(url) {
   }
 }
 
-/** Wipe the whole vault (opt-out). */
+/** Wipe the whole vault. */
 function clear() {
   try {
     if (dir) fs.rmSync(dir, { recursive: true, force: true })
@@ -383,6 +550,7 @@ function clear() {
     /* already clean */
   }
   manifest = {}
+  byHash = new Map()
   try {
     if (dir) fs.mkdirSync(dir, { recursive: true })
   } catch {
@@ -393,8 +561,9 @@ function clear() {
 }
 
 /**
- * protocol.handle('vault') — serves vault files by basename key.
- * Unknown/evicted key → 404 (renderer falls back to remote).
+ * protocol.handle('vault') -- serves vault files by basename (the content
+ * hash). Unknown/evicted key -> 404 (renderer falls back to remote). Bytes are
+ * decrypted before the Range slice so seeking works on plaintext offsets.
  */
 async function serveVault(request) {
   try {
@@ -410,14 +579,16 @@ async function serveVault(request) {
     const u = new URL(request.url)
     const key = path.basename(u.pathname || u.host || '')
     if (!key || key.includes('..')) return new Response('bad file', { status: 400 })
-    const entry = Object.values(manifest).find((e) => e.key === key)
-    if (!entry || !dir) return new Response('miss', { status: 404 })
+    const storeKey = Object.keys(manifest).find((k) => fileOf(manifest[k]) === key)
+    if (!storeKey || !dir) return new Response('miss', { status: 404 })
+    const entry = manifest[storeKey]
     let buf
     try {
-      buf = await fs.promises.readFile(fileFor(key))
+      buf = readFileBytes(entry)
     } catch {
       return new Response('miss', { status: 404 })
     }
+    if (!buf) return new Response('miss', { status: 404 })
     // Range support: a 100MB+ mp4 must seek; answering the whole file with
     // 200 forces the browser to re-download everything on every jump.
     const base = {
@@ -454,10 +625,22 @@ module.exports = {
   get,
   pin,
   pinStream,
+  putBytes,
+  list,
   unpin,
   remove,
   clear,
   serveVault,
   // Test seam.
-  _test: { keyFor, extOf, makeRoom: (need) => makeRoom(need), manifest: () => manifest, setFetcher: (fn) => { fetcher = fn } },
+  _test: {
+    hashOf,
+    fileOf,
+    makeRoom: (need) => makeRoom(need),
+    manifest: () => manifest,
+    localKey,
+    setDir: (d) => { dir = d },
+    setFetcher: (fn) => {
+      fetcher = fn
+    },
+  },
 }

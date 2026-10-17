@@ -46,7 +46,7 @@ async function main() {
   assert.ok(vault.get('https://x/a.jpg'), 'bytes survive unpin')
   assert.strictEqual(vault.remove('https://x/a.jpg'), true)
   assert.strictEqual(vault.get('https://x/a.jpg'), null, 'gone after remove')
-  assert.ok(!fs.existsSync(path.join(tmp, local.split('/').pop())), 'file deleted')
+  assert.ok(!fs.existsSync(path.join(tmp, 'media-vault', local.split('/').pop())), 'file deleted')
 
   // quota: shrink via manifest pressure — pins protect keeps
   await vault.pin('https://x/b.png') // pins=1
@@ -67,8 +67,21 @@ async function main() {
   assert.deepStrictEqual([vault.stats().files, vault.stats().bytes], [0, 0])
   assert.strictEqual(vault.get('https://x/b.png'), null)
 
-  // key shape: sha256 + preserved ext
-  assert.match(vault._test.keyFor('https://x/a.jpg'), /^[0-9a-f]{64}\.jpg$/)
+  // content addressing: the file name IS the sha256 of the bytes, the bytes
+  // are encrypted at rest, and a caller cannot file content under a foreign
+  // hash. localRef (the record's single local identity) is that hash.
+  const crypto = require('crypto')
+  const aBytes = Buffer.from('AAA', 'utf8')
+  const aHash = crypto.createHash('sha256').update(aBytes).digest('hex')
+  const rePinned = await vault.pin('https://x/a.jpg')
+  assert.strictEqual(rePinned, `vault://f/${aHash}`, 'file name is the content hash')
+  assert.strictEqual(vault.get(aHash), `vault://f/${aHash}`, 'resolvable by content ref')
+  const rawOnDisk = fs.readFileSync(path.join(tmp, 'media-vault', aHash))
+  assert.ok(!rawOnDisk.includes(aBytes), 'bytes are encrypted on disk')
+  assert.strictEqual(vault.putBytes('f'.repeat(64), 'image/jpeg', aBytes).ok, false, 'hash mismatch refused')
+  assert.strictEqual(vault.putBytes(aHash, 'image/jpeg', aBytes).ok, true, 'verified put accepted')
+  assert.strictEqual(vault.get(`local://${aHash}`), `vault://f/${aHash}`, 'anonymous put addressable by ref')
+  assert.ok(vault.list().map((o) => o.ref).includes(aHash), 'list exposes the stored object')
 
   // parsed big video: >25MB (the IMAGE cap) pins under the VIDEO cap, and
   // serveVault answers Range with 206 + Content-Range (seekable mp4).

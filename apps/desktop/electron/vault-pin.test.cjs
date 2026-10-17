@@ -68,6 +68,11 @@ async function testVault() {
     const wantHash = nodeCrypto.createHash('sha256').update(big).digest('hex')
     const streamUrl = 'https://cdn.example.com/clip.mp4'
     const origFetch = global.fetch
+    // The vault's byte fetcher is imageCache.fetchBinary (real net stack);
+    // tests replace it with a stub so nothing leaves the process.
+    const imageCache = require('./imageCache.cjs')
+    const origFetcher = imageCache.fetchBinary
+    imageCache.fetchBinary = async () => { throw new Error('no network in tests') }
     global.fetch = mediaResponse(big, 'video/mp4')
     try {
       const seen = []
@@ -85,6 +90,7 @@ async function testVault() {
       assert.strictEqual(leftovers.length, 0, 'no partial files remain')
     } finally {
       global.fetch = origFetch
+      imageCache.fetchBinary = origFetcher
     }
 
     // pinStream: non-media content-type is refused, nothing stored.
@@ -106,6 +112,7 @@ async function testVault() {
     // instead of refusing, and a pinned keep is never evicted.
     const QUOTA = 3 * 1024 * 1024 * 1024
     const manifest = vault._test.manifest()
+    imageCache.fetchBinary = async () => { throw new Error('no network in tests') }
     manifest['https://old.example.com/huge.png'] = {
       key: 'old-huge.png', mime: 'image/png', bytes: QUOTA, atime: 1, pins: 0,
     }

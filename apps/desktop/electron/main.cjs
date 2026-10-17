@@ -1658,7 +1658,9 @@ app.whenReady().then(async () => {
   let diskKey = null
   try { diskKey = fs.readFileSync(storageKeyPath, 'utf8').trim() } catch {}
   imageCache.init(app.getPath('userData'), UA, diskKey)
-  vault.init(app.getPath('userData'))
+  // Same storage key as the picture LRU: the vault holds adult media and must
+  // never write it to disk in the clear.
+  vault.init(app.getPath('userData'), diskKey)
   vaultServer.start(app.getPath('userData')).catch(() => {
     /* best effort */
   })
@@ -1699,6 +1701,12 @@ app.whenReady().then(async () => {
   }))
   ipcMain.handle('vault:unpin', (_event, url) => ({ ok: vault.unpin(String(url ?? '')) }))
   ipcMain.handle('vault:remove', (_event, url) => ({ ok: vault.remove(String(url ?? '')) }))
+  // Disco-first: bytes the renderer already holds (verified swarm assembly,
+  // forged upload) are written straight to the encrypted store, re-checked
+  // against their content hash in the main process.
+  ipcMain.handle('vault:put-bytes', (_event, hash, mime, data, alias) =>
+    vault.putBytes(String(hash ?? ''), String(mime ?? ''), data, alias == null ? null : String(alias)))
+  ipcMain.handle('vault:list', () => vault.list())
   ipcMain.handle('vault:stats', () => vault.stats())
   ipcMain.handle('vault:clear', () => vault.clear())
   ipcMain.handle('vault:http-url', (_event, url) => ({ local: vaultServer.httpUrl(String(url ?? '')) }))

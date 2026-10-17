@@ -3,9 +3,8 @@
 // Files stored at userData/imgcache/<key>.enc.
 const fs = require('fs')
 const path = require('path')
-const crypto = require('crypto')
+const aead = require('./aeadFile.cjs')
 
-const ALGO = 'aes-256-gcm'
 const MAX_DEFAULT = 500 * 1024 * 1024 // 500 MB disk ceiling
 
 let maxBytes = MAX_DEFAULT
@@ -17,12 +16,7 @@ let total = 0
 function init(userDataPath, storageKeyHex) {
   dbPath = path.join(userDataPath, 'imgcache')
   try { fs.mkdirSync(dbPath, { recursive: true }) } catch {}
-  if (storageKeyHex && typeof storageKeyHex === 'string' && storageKeyHex.length >= 64) {
-    encKey = Buffer.from(storageKeyHex.slice(0, 64), 'hex')
-  } else {
-    // Fallback key: derived from machine/user path if no key provided
-    encKey = crypto.createHash('sha256').update(String(userDataPath)).digest()
-  }
+  encKey = aead.keyFrom(storageKeyHex, userDataPath)
   index.clear()
   total = 0
   try {
@@ -39,21 +33,11 @@ function init(userDataPath, storageKeyHex) {
 }
 
 function encrypt(buf) {
-  const iv = crypto.randomBytes(12)
-  const cipher = crypto.createCipheriv(ALGO, encKey, iv)
-  const enc = Buffer.concat([cipher.update(buf), cipher.final()])
-  const tag = cipher.getAuthTag()
-  return Buffer.concat([iv, tag, enc])
+  return aead.encrypt(buf, encKey)
 }
 
 function decrypt(raw) {
-  if (raw.length < 28) return null
-  const iv = raw.subarray(0, 12)
-  const tag = raw.subarray(12, 28)
-  const enc = raw.subarray(28)
-  const decipher = crypto.createDecipheriv(ALGO, encKey, iv)
-  decipher.setAuthTag(tag)
-  return Buffer.concat([decipher.update(enc), decipher.final()])
+  return aead.decrypt(raw, encKey)
 }
 
 function evict() {

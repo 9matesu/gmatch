@@ -12,7 +12,8 @@ contextBridge.exposeInMainWorld('gmatch', {
   clearCache: () => ipcRenderer.invoke('cache:clear'),
   clearFeedCache: () => ipcRenderer.invoke('cache:clear-feed'),
   evictImage: (url) => ipcRenderer.invoke('cache:evict', url),
-  // Opt-in local media vault (gallery keeps + card bytes on disk).
+  // Local media vault: the app's on-disk, encrypted, content-addressed store
+  // for every received media byte (gallery keeps, cards, swarm, uploads).
   vaultGet: (url) => ipcRenderer.invoke('vault:get', url),
   vaultPin: (url) => ipcRenderer.invoke('vault:pin', url),
   vaultPinStream: (url) => ipcRenderer.invoke('vault:pin-stream', url),
@@ -23,6 +24,8 @@ contextBridge.exposeInMainWorld('gmatch', {
   },
   vaultUnpin: (url) => ipcRenderer.invoke('vault:unpin', url),
   vaultRemove: (url) => ipcRenderer.invoke('vault:remove', url),
+  vaultPutBytes: (hash, mime, data, alias) => ipcRenderer.invoke('vault:put-bytes', hash, mime, data, alias),
+  vaultList: () => ipcRenderer.invoke('vault:list'),
   vaultStats: () => ipcRenderer.invoke('vault:stats'),
   vaultClear: () => ipcRenderer.invoke('vault:clear'),
   vaultHttpUrl: (url) => ipcRenderer.invoke('vault:http-url', url),
