@@ -1,5 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
-import { persistKeepsake, resolveFreshLocalUrl, resolveKeepsakeLocal } from './keepsake';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import {
+  persistKeepsake, resolveFreshLocalUrl, resolveKeepsakeLocal,
+  releaseLocalUrl, retainLocalUrl, _resetLocalUrls,
+} from './keepsake';
+
+vi.mock('../utils/p2pSwarm', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('../utils/p2pSwarm')>()
+  return { ...mod, getLocalObject: vi.fn(async () => null) }
+})
+vi.mock('./vault', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('./vault')>()
+  return { ...mod, vaultGet: vi.fn(async () => null) }
+})
 
 const imgFile = () => new File(['image-bytes'], 'x.jpg', { type: 'image/jpeg' });
 
@@ -130,4 +142,78 @@ describe('resolveKeepsakeLocal (never remote)', () => {
     expect(resolveKeepsakeLocal(img({ url: src }), { [src]: 'http://127.0.0.1:9/v/x' }, {}))
       .toEqual({ kind: 'local', url: 'http://127.0.0.1:9/v/x', media: 'image' });
   });
+});
+
+describe('local blob URL ownership (Phase 9)', () => {
+  const blob = new Blob(['local-bytes'], { type: 'image/jpeg' })
+  let mintSeq = 0
+
+  /** Mint a URL through the real resolver: the only way URLs enter the registry. */
+  const mint = async (): Promise<string> => {
+    const url = await resolveFreshLocalUrl({ url: 'https://p/x.jpg', kind: 'image', localStatus: 'local' })
+    if (!url) throw new Error('expected a minted local URL')
+    return url
+  }
+
+  beforeEach(async () => {
+    _resetLocalUrls()
+    mintSeq = 0
+    URL.createObjectURL = vi.fn(() => `blob:mint-${++mintSeq}`)
+    URL.revokeObjectURL = vi.fn()
+    const { getLocalObject } = await import('../utils/p2pSwarm')
+    vi.mocked(getLocalObject).mockResolvedValue(blob)
+  })
+
+  afterEach(() => {
+    _resetLocalUrls()
+    vi.restoreAllMocks()
+  })
+
+  it('releaseLocalUrl revokes the minted URL and forgets it (idempotent)', async () => {
+    const url = await mint()
+    releaseLocalUrl(url)
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(url)
+    releaseLocalUrl(url)
+    expect(vi.mocked(URL.revokeObjectURL)).toHaveBeenCalledTimes(1)
+  })
+
+  it('releasing an unknown or empty URL never revokes (ownership is strict)', () => {
+    releaseLocalUrl('blob:never-minted')
+    releaseLocalUrl('')
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled()
+  })
+
+  it('reaps the oldest unclaimed URL once the cap is exceeded', async () => {
+    const urls = [await mint(), await mint(), await mint(), await mint(), await mint()]
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(urls[0])
+    // The URL just handed to the caller is never reaped.
+    expect(URL.revokeObjectURL).not.toHaveBeenCalledWith(urls[4])
+  })
+
+  it('never reaps a URL claimed by a new tab, even past the cap', async () => {
+    const claimed = await mint()
+    retainLocalUrl(claimed)
+    const rest = [await mint(), await mint(), await mint(), await mint()]
+    expect(URL.revokeObjectURL).not.toHaveBeenCalledWith(claimed)
+    // The cap still reaps an unclaimed neighbour rather than a live consumer.
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(rest[0])
+  })
+
+  it('yields when every live URL is claimed (never breaks a live consumer)', async () => {
+    for (let i = 0; i < 4; i += 1) retainLocalUrl(await mint())
+    const fresh = await mint()
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled()
+    releaseLocalUrl(fresh)
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(fresh)
+  })
+
+  it('_resetLocalUrls revokes the whole registry (test seam)', async () => {
+    const a = await mint()
+    const b = await mint()
+    _resetLocalUrls()
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(a)
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(b)
+    releaseLocalUrl(a)
+    expect(vi.mocked(URL.revokeObjectURL)).toHaveBeenCalledTimes(2)
+  })
 });

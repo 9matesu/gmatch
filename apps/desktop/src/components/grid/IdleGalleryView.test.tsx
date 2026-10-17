@@ -17,6 +17,13 @@ vi.mock('../../services/vault', async (importOriginal) => {
   return { ...mod, useVaultUrls: () => vaultMap, useVaultUrl: () => null }
 })
 
+// Ownership spies only: resolution stays real, so the tests assert when the
+// component claims/releases a minted URL (the semantics live in keepsake.test).
+vi.mock('../../services/keepsake', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('../../services/keepsake')>()
+  return { ...mod, releaseLocalUrl: vi.fn(), retainLocalUrl: vi.fn() }
+})
+
 function makeGalleryImages(count: number): GalleryImage[] {
   return Array.from({ length: count }, (_, i) => ({
     id: `img-${i + 1}`,
@@ -361,6 +368,91 @@ describe('IdleGalleryView', () => {
       // Mid-stream progress from the main process drives the badge.
       await act(async () => { emit?.({ url: img.url, bytes: 512, total: 1024 }) })
       expect(screen.getByText(/Caching… 50%/)).toBeInTheDocument()
+    } finally {
+      g.gmatch = prevBridge
+    }
+  })
+
+  it('releases each freshly minted local URL after a batch download (success and failure)', async () => {
+    const blob = new Blob(['local-bytes'], { type: 'image/jpeg' })
+    URL.createObjectURL = vi.fn(() => 'blob:fresh')
+    URL.revokeObjectURL = vi.fn()
+    const { getLocalObject } = await import('../../utils/p2pSwarm')
+    vi.mocked(getLocalObject).mockImplementation(async () => blob)
+    const { releaseLocalUrl } = await import('../../services/keepsake')
+    vi.mocked(releaseLocalUrl).mockClear()
+    useGame.setState({
+      gallery: makeGalleryImages(2).map((img) => ({ ...img, localStatus: 'local' as const })),
+    })
+    const fetchMock = vi.fn<() => Promise<{ ok: boolean; blob?: () => Promise<Blob> }>>(
+      async () => ({ ok: true, blob: async () => blob }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<IdleGalleryView />)
+    await userEvent.click(screen.getByRole('button', { name: /Select all on page/i }))
+    await userEvent.click(screen.getByRole('button', { name: /Download Selected/i }))
+    await waitFor(() => expect(vi.mocked(releaseLocalUrl)).toHaveBeenCalledTimes(2))
+
+    // Source refuses: the URL is still released, so nothing is leaked.
+    fetchMock.mockImplementation(async () => ({ ok: false }))
+    vi.mocked(releaseLocalUrl).mockClear()
+    await userEvent.click(screen.getByRole('button', { name: /Download Selected/i }))
+    await waitFor(() => expect(vi.mocked(releaseLocalUrl)).toHaveBeenCalledTimes(2))
+    vi.unstubAllGlobals()
+  })
+
+  it('claims the blob URL when a keepsake opens in a new tab (never releases it)', async () => {
+    const blob = new Blob(['local-bytes'], { type: 'image/jpeg' })
+    URL.createObjectURL = vi.fn(() => 'blob:fresh')
+    URL.revokeObjectURL = vi.fn()
+    const { getLocalObject } = await import('../../utils/p2pSwarm')
+    vi.mocked(getLocalObject).mockImplementation(async () => blob)
+    const { releaseLocalUrl, retainLocalUrl } = await import('../../services/keepsake')
+    vi.mocked(releaseLocalUrl).mockClear()
+    vi.mocked(retainLocalUrl).mockClear()
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+    useGame.setState({
+      gallery: makeGalleryImages(1).map((img) => ({ ...img, localStatus: 'local' as const })),
+    })
+
+    render(<IdleGalleryView />)
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('gmatch:open-keepsake', { detail: { keepsakeId: 'img-1' } }))
+    })
+
+    await waitFor(() => expect(vi.mocked(retainLocalUrl)).toHaveBeenCalledWith('blob:fresh'))
+    // The tab keeps requesting the URL: no premature revoke.
+    expect(vi.mocked(releaseLocalUrl)).not.toHaveBeenCalled()
+    expect(openSpy).toHaveBeenCalledWith('blob:fresh', '_blank', 'noopener,noreferrer')
+  })
+
+  it('viewer Browser prefers the vault loopback URL and releases the orphaned blob', async () => {
+    const blob = new Blob(['local-bytes'], { type: 'image/jpeg' })
+    URL.createObjectURL = vi.fn(() => 'blob:fresh')
+    URL.revokeObjectURL = vi.fn()
+    const { getLocalObject } = await import('../../utils/p2pSwarm')
+    vi.mocked(getLocalObject).mockImplementation(async () => blob)
+    const { releaseLocalUrl, retainLocalUrl } = await import('../../services/keepsake')
+    vi.mocked(releaseLocalUrl).mockClear()
+    vi.mocked(retainLocalUrl).mockClear()
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+    const g = window as unknown as { gmatch?: unknown }
+    const prevBridge = g.gmatch
+    g.gmatch = { vaultHttpUrl: async () => ({ local: 'http://127.0.0.1:9/v/x' }) }
+    useGame.setState({
+      gallery: makeGalleryImages(1).map((img) => ({ ...img, localStatus: 'local' as const })),
+    })
+
+    try {
+      render(<IdleGalleryView />)
+      await userEvent.click(screen.getAllByRole('button', { name: /^View /i })[0])
+      await userEvent.click(screen.getByRole('button', { name: /^Browser$/i }))
+
+      await waitFor(() => expect(openSpy).toHaveBeenCalledWith('http://127.0.0.1:9/v/x', '_blank', 'noopener,noreferrer'))
+      // The minted blob lost to the loopback URL: released, not leaked.
+      expect(vi.mocked(releaseLocalUrl)).toHaveBeenCalledWith('blob:fresh')
+      expect(vi.mocked(retainLocalUrl)).not.toHaveBeenCalled()
     } finally {
       g.gmatch = prevBridge
     }

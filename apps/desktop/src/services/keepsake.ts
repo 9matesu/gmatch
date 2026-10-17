@@ -165,10 +165,75 @@ function isLocalValue(v: string | undefined, sourceKey: string): v is string {
 }
 
 /**
+ * Blob-URL ownership for `resolveFreshLocalUrl`.
+ *
+ * A minted `blob:` URL lives as long as the document that created it, and
+ * nothing tells us when a consumer is done with it. Two explicit contracts,
+ * no timers (a timer would break video range requests mid-seek):
+ *
+ * - synchronous consumers (downloads) release the URL when they finish, via
+ *   `releaseLocalUrl` in a `finally` (success AND failure);
+ * - a URL handed to a context we cannot observe (a new tab) is claimed with
+ *   `retainLocalUrl`. The cap below NEVER reaps a claimed URL, because the
+ *   consuming tab keeps requesting it. Claimed URLs are therefore bounded by
+ *   the creating document's lifetime (the gallery view), not by the cap.
+ *
+ * The cap exists to reap URLs nobody claimed, which is the leak: a minted URL
+ * whose synchronous consumer already returned and never released it.
+ */
+const MAX_LIVE_LOCAL_URLS = 4
+const liveLocalUrls: string[] = []
+const claimedLocalUrls = new Set<string>()
+
+function trackLocalUrl(url: string): void {
+  liveLocalUrls.push(url)
+  while (liveLocalUrls.length > MAX_LIVE_LOCAL_URLS) {
+    // Never reap the URL being handed to the caller right now, and never a
+    // claimed one: both are still in use.
+    const i = liveLocalUrls.findIndex((u) => u !== url && !claimedLocalUrls.has(u))
+    if (i < 0) break
+    const [victim] = liveLocalUrls.splice(i, 1)
+    try { URL.revokeObjectURL(victim) } catch { /* already gone */ }
+  }
+}
+
+/**
+ * Claim a minted URL for a context we cannot observe (new tab): the cap will
+ * not revoke it, and no caller releases it. Idempotent; ignores empty values.
+ */
+export function retainLocalUrl(url: string): void {
+  if (url) claimedLocalUrls.add(url)
+}
+
+/**
+ * A synchronous consumer is done with the URL: revoke it now. Only revokes
+ * URLs this module minted (ownership), so an unknown or provider URL passed
+ * by mistake is untouched, and a second release is a no-op. Never throws.
+ */
+export function releaseLocalUrl(url: string): void {
+  if (!url) return
+  const i = liveLocalUrls.indexOf(url)
+  const known = i >= 0 || claimedLocalUrls.has(url)
+  if (i >= 0) liveLocalUrls.splice(i, 1)
+  claimedLocalUrls.delete(url)
+  if (!known) return
+  try { URL.revokeObjectURL(url) } catch { /* already revoked */ }
+}
+
+/** Test seam: revoke everything held and forget the registry. */
+export function _resetLocalUrls(): void {
+  for (const u of liveLocalUrls) {
+    try { URL.revokeObjectURL(u) } catch { /* already gone */ }
+  }
+  liveLocalUrls.length = 0
+  claimedLocalUrls.clear()
+}
+
+/**
  * Fresh local resolution at action time (open/download): vault lookup first,
  * then the durable object store, minting a blob URL only from verified bytes.
- * Never returns the provider URL. Blob URLs are session-scoped; callers that
- * hand them to a new tab keep them alive (same rule as CardZoomModal).
+ * Never returns the provider URL. Minted blob URLs are registered for
+ * ownership (`releaseLocalUrl` / `retainLocalUrl` above).
  */
 export async function resolveFreshLocalUrl(
   img: Pick<GalleryImage, 'url' | 'kind' | 'localStatus' | 'localHash'>,
@@ -183,7 +248,11 @@ export async function resolveFreshLocalUrl(
   } catch { /* fall through to the object store */ }
   try {
     const blob = (await getLocalObject(key)) || (img.localHash ? await getLocalObject(img.localHash) : null)
-    if (blob && blob.size > 0) return URL.createObjectURL(blob)
+    if (blob && blob.size > 0) {
+      const url = URL.createObjectURL(blob)
+      trackLocalUrl(url)
+      return url
+    }
   } catch { /* unresolved */ }
   return null
 }

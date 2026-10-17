@@ -380,13 +380,18 @@ export default function IdleGalleryView({
     if (selectedIds.size === 0) return
     const targets = gallery.filter((img) => selectedIds.has(img.id))
     let skipped = 0
-    const { resolveFreshLocalUrl } = await import('../../services/keepsake')
+    const { resolveFreshLocalUrl, releaseLocalUrl } = await import('../../services/keepsake')
     for (const img of targets) {
       const ext = img.kind === 'video' ? 'mp4' : 'jpg'
       const name = `gallery-${img.id.slice(0, 8)}.${ext}`
       const fresh = await resolveFreshLocalUrl(img)
-      const ok = fresh ? await downloadMedia(fresh, name) : false
-      if (!ok) skipped += 1
+      try {
+        const ok = fresh ? await downloadMedia(fresh, name) : false
+        if (!ok) skipped += 1
+      } finally {
+        // The download consumed the bytes: release even when it failed.
+        if (fresh) releaseLocalUrl(fresh)
+      }
     }
     setBatchNotice(
       skipped > 0
@@ -459,9 +464,14 @@ export default function IdleGalleryView({
       const img = useGame.getState().gallery.find((g) => g.id === id)
       if (!img) return
       void (async () => {
-        const { resolveFreshLocalUrl } = await import('../../services/keepsake')
+        const { resolveFreshLocalUrl, retainLocalUrl } = await import('../../services/keepsake')
         const url = await resolveFreshLocalUrl(img)
-        if (url) window.open(url, '_blank', 'noopener,noreferrer')
+        if (url) {
+          // The new tab owns it now: claim it so the cap never reaps it while
+          // the tab is still fetching/seeking.
+          retainLocalUrl(url)
+          window.open(url, '_blank', 'noopener,noreferrer')
+        }
       })()
     }
     window.addEventListener('gmatch:open-keepsake', onOpen)
@@ -1167,11 +1177,16 @@ export default function IdleGalleryView({
                   // Local-only: download from freshly verified bytes.
                   if (!viewer) return
                   void (async () => {
-                    const { resolveFreshLocalUrl } = await import('../../services/keepsake')
+                    const { resolveFreshLocalUrl, releaseLocalUrl } = await import('../../services/keepsake')
                     const fresh = await resolveFreshLocalUrl(viewer)
                     if (!fresh) return
                     const ext = viewer.kind === 'video' ? 'mp4' : 'jpg'
-                    void downloadMedia(fresh, `keepsake-${viewer.id.slice(0, 8)}.${ext}`)
+                    try {
+                      await downloadMedia(fresh, `keepsake-${viewer.id.slice(0, 8)}.${ext}`)
+                    } finally {
+                      // Consumer is done either way: nothing else needs the URL.
+                      releaseLocalUrl(fresh)
+                    }
                   })()
                 }}
                 disabled={viewerLocal?.kind !== 'local'}
@@ -1188,7 +1203,7 @@ export default function IdleGalleryView({
                   // verified blob URL in dev. Never the provider URL.
                   // Re-resolved fresh at click time (not from background maps).
                   if (!viewer) return
-                  const { resolveFreshLocalUrl } = await import('../../services/keepsake')
+                  const { resolveFreshLocalUrl, releaseLocalUrl, retainLocalUrl } = await import('../../services/keepsake')
                   const fresh = await resolveFreshLocalUrl(viewer)
                   if (!fresh) return
                   const bridge = (window as unknown as { gmatch?: { openExternal?: (u: string) => void; vaultHttpUrl?: (u: string) => Promise<{ local: string | null }> } }).gmatch
@@ -1196,6 +1211,9 @@ export default function IdleGalleryView({
                     const res = await bridge.vaultHttpUrl(viewer.url).catch(() => null)
                     const dest = res?.local
                     if (dest && /^https?:\/\//.test(dest)) {
+                      // The vault loopback URL wins: the minted blob (if any)
+                      // is unused, so release it instead of leaking it.
+                      if (fresh.startsWith('blob:')) releaseLocalUrl(fresh)
                       if (bridge.openExternal) {
                         void bridge.openExternal(dest)
                       } else {
@@ -1204,8 +1222,9 @@ export default function IdleGalleryView({
                       return
                     }
                   }
-                  // Verified blob URL (dev / IDB bytes).
+                  // Verified blob URL (dev / IDB bytes): the tab keeps using it.
                   if (fresh.startsWith('blob:')) {
+                    retainLocalUrl(fresh)
                     window.open(fresh, '_blank', 'noopener,noreferrer')
                   }
                 }}
