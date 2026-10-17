@@ -42,6 +42,9 @@ display `text-xl`/`text-2xl` (hero/rank-up only).
 Numbers: `MONO` (sans + tabular-nums — mono was retired 2026-10-17, no surface
 ships a monospace family). `font-black` only on display.
 tracking: `tracking-wider` on uppercase micro-labels, else default.
+The timeline (feed) speaks exactly two steps: body `text-xs` for the caption and
+the author name, caption `text-[10px]` for meta. `text-sm` is modal titles — it
+never appears on the timeline (sponsored-ad hero keeps its display size).
 
 ## Radius (4 steps)
 `rounded-md` chips/icon-buttons · `rounded-lg` cards/buttons/inputs ·

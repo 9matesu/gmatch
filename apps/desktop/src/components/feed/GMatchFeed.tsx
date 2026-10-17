@@ -1078,7 +1078,7 @@ export function GMatchFeed({
                                     tabIndex={0}
                                     onClick={(e) => { e.stopPropagation(); handleNameClick(post.author_id); }}
                                     onKeyDown={(e) => e.key === 'Enter' && handleNameClick(post.author_id)}
-                                    className="text-sm font-semibold text-white hover:underline cursor-pointer leading-tight truncate min-w-0 [text-shadow:0_1px_4px_rgba(0,0,0,0.75)] focus-visible:outline-2 focus-visible:outline-white"
+                                    className="text-xs font-semibold text-white hover:underline cursor-pointer leading-tight truncate min-w-0 [text-shadow:0_1px_4px_rgba(0,0,0,0.75)] focus-visible:outline-2 focus-visible:outline-white"
                                   >
                                     {post.author_name}
                                   </span>
@@ -1265,7 +1265,7 @@ export function GMatchFeed({
                   <>
                   {/* Caption & Tags */}
                   {post.caption && (
-                    <div className="text-sm text-retro-fg leading-relaxed">
+                    <div className="text-xs text-retro-fg leading-relaxed">
                       <span
                         className="font-semibold text-retro-fg mr-1.5 cursor-pointer hover:underline"
                         onClick={() => onSelectUser?.(post.author_id)}
@@ -1335,7 +1335,7 @@ export function GMatchFeed({
           {displayPosts.length === 0 && (
             <div className="solid-panel border border-border-glass rounded-lg p-8 text-center space-y-4 shadow-xs my-4 max-w-md mx-auto">
               <div>
-                <h4 className="text-sm font-semibold text-retro-fg">Empty in here? Start posting and get things moving.</h4>
+                <h4 className="text-xs font-semibold text-retro-fg">Empty in here? Start posting and get things moving.</h4>
                 <p className="text-xs text-retro-muted mt-1 leading-relaxed">
                   One upload, three tags. Posts are what grow followers.
                 </p>
