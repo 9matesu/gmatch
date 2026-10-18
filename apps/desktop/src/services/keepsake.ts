@@ -240,6 +240,27 @@ export type LocalMedia =
   | { state: 'unreadable'; reason: string }
 
 /**
+ * Source urls / content refs whose durable local lookup COMPLETED this session
+ * (hit or miss). A tile uses this to tell "still resolving" apart from
+ * "verified absent": without it a keep that claims `persisted` but lost its
+ * bytes renders a silent placeholder instead of a retry the player can act on.
+ */
+const localLookupChecked = new Set<string>()
+
+export function markLocalLookupSettled(key: string | undefined | null): void {
+  if (key) localLookupChecked.add(key)
+}
+
+export function keepsakeLocalSettled(key: string | undefined | null): boolean {
+  return !!key && localLookupChecked.has(key)
+}
+
+/** Test seam. */
+export function _resetLocalLookups(): void {
+  localLookupChecked.clear()
+}
+
+/**
  * Fresh local resolution at action time (view/open/download): the vault by
  * content ref first (the keep's own identity), then by source url (legacy
  * entries indexed by url), then the durable object store. A vault:// hit is
@@ -253,6 +274,10 @@ export async function resolveLocalMedia(
   const key = img.url || ''
   const byRef = img.localRef ? `vault://f/${img.localRef}` : ''
   if (!key && !byRef) return { state: 'absent' }
+  const settle = () => {
+    markLocalLookupSettled(key)
+    markLocalLookupSettled(img.localRef)
+  }
   let unreadable: string | undefined
   try {
     const { vaultProbe, vaultHttpUrl } = await import('./vault')
@@ -267,7 +292,7 @@ export async function resolveLocalMedia(
       const url = hit.local.startsWith('vault://')
         ? (await vaultHttpUrl(hit.local)) || hit.local
         : hit.local
-      if (isLocalValue(url, key)) return { state: 'local', url }
+      if (isLocalValue(url, key)) { settle(); return { state: 'local', url } }
     }
   } catch { /* vault unavailable: fall through to the object store */ }
   try {
@@ -277,9 +302,11 @@ export async function resolveLocalMedia(
     if (blob && blob.size > 0) {
       const url = URL.createObjectURL(blob)
       trackLocalUrl(url)
+      settle()
       return { state: 'local', url }
     }
   } catch { /* unresolved */ }
+  settle()
   return unreadable ? { state: 'unreadable', reason: unreadable } : { state: 'absent' }
 }
 

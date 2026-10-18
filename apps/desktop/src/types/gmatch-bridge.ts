@@ -28,6 +28,9 @@ export interface GmatchBridge {
     local?: string | null
     state?: 'local' | 'absent' | 'unreadable'
     reason?: string
+    /** Stored mime for the row (extensionless rows rely on this to pick the
+     *  Range-capable stream instead of a raw vault:// URL). */
+    mime?: string
   }>
   vaultPin?: (url: string) => Promise<{ local: string | null }>
   vaultUnpin?: (url: string) => Promise<{ ok: boolean }>

@@ -67,7 +67,18 @@ function bridge(): SecureBridge | null {
 /** Secure-mode RAM mirror: key -> value (null = absent). */
 const mirror = new Map<string, string | null>()
 let secureMode = false
+let encryptionAvailable: boolean | null = null
 let initPromise: Promise<void> | null = null
+
+/**
+ * Whether the main-process store can actually ENCRYPT (Electron
+ * safeStorage/DPAPI). `false` means the KV is holding plaintext envelopes —
+ * the settings security warning reads this. Never a reason to read
+ * localStorage instead of the KV (see doInit).
+ */
+export function secureEncryptionAvailable(): boolean | null {
+  return encryptionAvailable
+}
 
 /**
  * One-time boot migration+load (Electron): plaintext in localStorage moves
@@ -88,7 +99,14 @@ async function doInit(): Promise<void> {
   } catch {
     available = false
   }
-  if (!available) return // DPAPI unavailable: keep working on localStorage
+  // The KV is used whenever the bridge exists — even when safeStorage reports
+  // encryption unavailable. Flapping availability used to strand the player:
+  // the boot where encryption WAS available migrated `orbit_identity` into the
+  // KV and purged the plaintext copy, then the next boot saw `available=false`
+  // and read localStorage, which no longer held anything → a permanent,
+  // unexplained logout. The main store still answers while unencrypted (plain
+  // envelopes), so read through it and surface the degradation instead.
+  encryptionAvailable = available
   secureMode = true
   for (const key of SECURE_KEYS) {
     let kvVal: string | null = null
@@ -249,6 +267,7 @@ export const _test = {
     mirror.clear()
     pending.clear()
     secureMode = false
+    encryptionAvailable = null
     initPromise = null
   },
 }

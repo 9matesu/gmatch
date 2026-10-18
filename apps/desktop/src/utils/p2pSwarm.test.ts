@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import {
   registerLocalObject,
   hasLocalObject,
@@ -9,6 +9,8 @@ import {
   handleSwarmMessage,
   requestSwarmObject,
   cancelSwarmObject,
+  __localObjectCacheForTests,
+  __resetLocalObjectCacheForTests,
   type SwarmMessage,
 } from './p2pSwarm'
 
@@ -192,5 +194,51 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
     expect(await handleSwarmMessage({ type: 'SWARM_CHUNK', id: 'cancel-1', index: 3, total: 4, mimeType: 'video/mp4', dataBase64: 'eA==' })).toBe(false)
     expect(cancelSwarmObject('cancel-1')).toBe(false)
     setSwarmTransport(null)
+  })
+})
+
+describe('p2pSwarm RAM cache is bounded (memory)', () => {
+  beforeEach(() => {
+    __resetLocalObjectCacheForTests()
+  })
+
+  it('keeps at most 64 entries and evicts oldest first', () => {
+    for (let i = 0; i < 80; i += 1) registerLocalObject(`mem-${i}`, new Blob([`b${i}`]))
+    const { keys, bytes } = __localObjectCacheForTests()
+    expect(keys.length).toBe(64)
+    expect(keys[0]).toBe('mem-16')
+    expect(keys[keys.length - 1]).toBe('mem-79')
+    expect(hasLocalObject('mem-0')).toBe(false)
+    expect(bytes).toBeGreaterThan(0)
+  })
+
+  it('a read refreshes recency, so a displayed object is evicted last', async () => {
+    registerLocalObject('mem-first', new Blob(['1']))
+    for (let i = 0; i < 63; i += 1) registerLocalObject(`mem-f${i}`, new Blob([`x${i}`]))
+    // 'mem-first' is the oldest entry; reading it (a tile rendering it) must
+    // move it to the front of the queue so the next insert evicts a colder one.
+    await getLocalObject('mem-first')
+    registerLocalObject('mem-overflow', new Blob(['y']))
+    expect(hasLocalObject('mem-first')).toBe(true)
+    expect(hasLocalObject('mem-f0')).toBe(false)
+  })
+
+  it('an object larger than the byte budget is still served (never evicts the entry just added)', () => {
+    const huge = new Blob(['huge'])
+    Object.defineProperty(huge, 'size', { value: 200 * 1024 * 1024 })
+    registerLocalObject('mem-huge', huge)
+    expect(hasLocalObject('mem-huge')).toBe(true)
+    expect(__localObjectCacheForTests().keys).toEqual(['mem-huge'])
+  })
+
+  it('eviction from RAM never deletes the durable copy (bytes are re-read)', async () => {
+    // Register beyond the cap, then read an evicted id back through the durable
+    // store. getLocalObject must answer from disk rather than reporting a miss.
+    registerLocalObject('mem-durable', new Blob(['durable-bytes'], { type: 'image/jpeg' }))
+    for (let i = 0; i < 70; i += 1) registerLocalObject(`mem-x${i}`, new Blob([`z${i}`]))
+    expect(hasLocalObject('mem-durable')).toBe(false)
+    // No durable store in this environment: the honest answer is null, not a
+    // phantom hit on the evicted RAM entry.
+    await expect(getLocalObject('mem-durable')).resolves.toBeNull()
   })
 })

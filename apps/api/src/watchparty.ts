@@ -31,6 +31,9 @@ export interface QueueEntry {
   size?: number
   /** True for consent-shared local files (bytes live on the swarm, not the server). */
   local?: boolean
+  /** Poster still for a shared local video: a register-only object URL the
+   *  room resolves peer-to-peer (same swarm path as the media itself). */
+  thumb?: string
   /** Provider label from source resolution (x, redgifs, pmvhaven, booru, page…). */
   provider?: string
   /**
@@ -237,10 +240,23 @@ function sanitizeQueueEntry(raw: any): QueueEntry | null {
     hash,
     size: Number.isFinite(size) && size > 0 ? Math.floor(size) : undefined,
     local: raw.local === true ? true : undefined,
+    // A poster is a swarm object URL, never a local path: peers fetch the
+    // still over the same P2P path as the video. Anything else is dropped.
+    thumb: sanitizeThumb(raw.thumb),
     status,
     provider: typeof raw.provider === 'string' && raw.provider.trim() ? raw.provider.trim().slice(0, 24) : undefined,
   }
   return entry
+}
+
+/** Poster URLs must be swarm object routes or plain http(s) — never file/vault paths. */
+function sanitizeThumb(raw: any): string | undefined {
+  if (typeof raw !== 'string') return undefined
+  const url = raw.trim().slice(0, 512)
+  if (!url) return undefined
+  if (/^\/api\/objects\/[A-Za-z0-9._-]+$/.test(url)) return url
+  if (/^https?:\/\//i.test(url)) return url
+  return undefined
 }
 
 /** Bounded idempotency registry for repeated client commands. */
@@ -453,6 +469,13 @@ function removeMember(party: Party, userId: string, forceClose: boolean): { room
   if (party.members.size === 0) {
     // Rooms are persistent: do NOT delete when empty so peers can re-enter anytime.
     party.emptySince = Date.now()
+    // ...but the CROWN must not outlive its member. Without this stamp the
+    // empty-room return skipped `hostLeftAt`, so the departed host kept
+    // controlsParty() indefinitely: the next person into the still-open room
+    // could not play, pause, queue or advance anything, which reads as "the
+    // room closed when the host left". Explicit closure stays
+    // `disbandWatch` (host-authorized, separate path).
+    if (party.hostId === userId) party.hostLeftAt = Date.now()
     // The 30s snapshot is unconditional, so this flag does not schedule anything
     // (it only marks the state as worth persisting and keeps it from latching).
     // An earlier comment here claimed an immediate flush that never existed.
@@ -665,6 +688,7 @@ export function queueOps(userId: string, msg: any): { room: string; payload: any
       hash,
       size: Number.isFinite(size) && size > 0 ? Math.floor(size) : undefined,
       local: msg.local === true ? true : undefined,
+      thumb: sanitizeThumb(msg.thumb),
       provider: typeof msg.provider === 'string' && msg.provider.trim() ? msg.provider.trim().slice(0, 24) : undefined,
     }
     // No silent duplicates: the same file queued twice is one entry. Identity

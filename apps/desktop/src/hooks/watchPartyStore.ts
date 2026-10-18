@@ -26,6 +26,8 @@ export interface QueueEntry {
   hash?: string
   size?: number
   local?: boolean
+  /** Poster still for a shared local video (swarm object URL). */
+  thumb?: string
   status?: 'queued' | 'proposed' | 'unavailable'
   provider?: string
 }

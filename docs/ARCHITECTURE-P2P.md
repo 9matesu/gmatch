@@ -210,6 +210,15 @@ pieces, no protocol change:
 - The tray renders the localStorage boot mirror while the network revalidates
   (stale-first), instead of blanking itself for the whole first fetch.
 
+### Bounded swarm RAM cache (2026-10-17)
+
+`localObjects` in `utils/p2pSwarm.ts` — the in-heap copy of swarm bytes — is now
+an LRU bounded to 64 objects / 96MB (a read refreshes recency). It used to be an
+unbounded `Map`, so every object the app had ever seen stayed resident: the
+"memory usage" symptom. Nothing durable is affected — bytes live in the vault
+(disk) or IndexedDB, so an eviction costs one re-read — and boot hydration
+(`hydrateLocalObjects`) fills to the same budget instead of 256MB.
+
 ---
 
 ## 5. Honest Boundaries & Fallback Behavior
@@ -246,8 +255,56 @@ the public listing hides private rooms.
 - Because rooms are immortal, the server cap (`MAX_PARTIES`, 25) is the only
   reclaim path, and it now evicts **oldest-created-first** so a long-lived room
   you use daily is not the first casualty. A room with nobody in it stops
-  holding its media blob after `EMPTY_MEDIA_LEASE_MS` (6h) — the room survives,
+  holding its media blob after `EMPTY_MEDIA_LEASE_MS` (6h) - the room survives,
   the bytes do not.
+
+#### Leaving is not closing (2026-10-17)
+
+Two different acts, two different code paths:
+
+- **Leave** (`leaveParty` → `watch.leave` → `removeMember`) is participant-only.
+  The room, its queue, its chat and its remembered id all survive; the client
+  keeps the id precisely because that is the only route back into a *private*
+  room.
+- **Close** (`disbandParty` → `watch.disband` → `disbandWatch`) is authorized:
+  the server requires `party.hostId === userId` and the room is dropped for
+  everyone (`watch.gone`).
+
+The emptied-room branch of `removeMember` used to return before touching the
+host seat, so a host who left a room as its last member kept `controlsParty()`
+forever: the next person in (the room is still open) could not play, pause, seek
+or advance anything, which reads as "leaving closed the room". It now stamps
+`hostLeftAt` like the non-empty branch, so the crown is released after
+`HOST_SEAT_GRACE_MS` (8s) and the first member to join controls the room. There
+is **no automatic ownership transfer** beyond that first-member promotion: a
+room whose owner has gone is a room anyone can take over, and that limitation is
+documented rather than papered over.
+
+#### Shared local media: transfer first, then play (2026-10-17)
+
+A consent-shared file never has a local path or blob URL in the queue — the
+entry carries `/api/objects/<id>` (register-only row) plus `hash`, and peers
+retrieve the bytes over the swarm.
+
+- **The player now starts that retrieval.** `useObjectImage`'s swarm window is
+  5s (right for a clip, hopeless for a movie) and nothing else triggered a
+  fetch, so a peer's viewport sat black while the bytes were one request away.
+  When the entry about to play is a shared local file, `WatchPartySlot` starts
+  `useLocalEntryTransfer` (integrity-checked, cancellable, progress) and shows
+  the reason — waiting / receiving N% / failed with a retry — instead of a dead
+  player. A verified transfer re-issues the `PEER_ONLINE_EVENT` retry wave so
+  the already-failed tile re-resolves.
+- **Posters are generated and distributed.** `makeVideoPoster` grabs a frame
+  (~1s in, ≤1280px JPEG) at share time; it is forged as an ordinary swarm object
+  and queued as `thumb`. The server whitelists only `/api/objects/…` or plain
+  http(s) there — a sender's local path is dropped, the entry still plays — and
+  peers resolve the poster over the same swarm path (`NativeVideoPlayer`
+  `poster`). Generation is best-effort: no canvas/decode ⇒ no poster, never a
+  failed share.
+- **Quality is honest.** The watch path does not transcode: the server streams
+  the stored bytes (or relays the upstream URL) and the only bitrate logic picks
+  the *highest* variant of an upstream post. There is no rendition ladder to
+  fall back to, and none is claimed.
 
 ---
 
@@ -255,22 +312,22 @@ the public listing hides private rooms.
 
 Four distinct outcomes, never conflated in the UI or in claims:
 
-1. **Local durability** � the post (an `Objects` row) and its media bytes live
+1. **Local durability** � the post (an `Objects` row) and its media bytes live
    on this machine. Media: IndexedDB `orbit-gallery` seed (survives restart) +
    optional `media-vault/`; metadata: a persisted publish outbox
    (`gmatch_post_outbox_v1`) commits locally *before* any network call, so a
    server timeout never loses the post. Replication state is shown as
    `local` ? `pending` ? `replicated` on the optimistic tile. This is the only
    level the app guarantees without any peer or server.
-2. **Direct peer-to-peer delivery** � another *connected* peer received the
+2. **Direct peer-to-peer delivery** � another *connected* peer received the
    bytes over the WebRTC/BroadcastChannel swarm. Not proof of durability on
    their side; not universal. A disconnected peer cannot receive until it
    reconnects.
-3. **Hosted rendezvous / courier** � the blind courier carries sealed
+3. **Hosted rendezvous / courier** � the blind courier carries sealed
    envelopes and metadata (mail, gossip relay) but stores no content. It is
    never the authority for locally persisted content; it makes delivery
    *possible* between nodes, not *durable*.
-4. **Multi-peer replication** � the object has been verified present on =1
+4. **Multi-peer replication** � the object has been verified present on =1
    other node's durable store. Bytes are only accepted after SHA-256
    verification against the object's `content_hash` (`sha256HexBlob` in
    `utils/p2pSwarm.ts`); a peer's chunk stream or URL is never proof.

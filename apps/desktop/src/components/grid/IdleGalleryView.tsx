@@ -8,8 +8,8 @@ import { redgifsPlayable } from '../../services/redgifs'
 import CachedImg from '../../ui/CachedImg'
 import MediaViewerModal from '../../ui/MediaViewerModal'
 import { EmptyState } from '../EmptyState'
-import { useVaultUrls, useVaultUrl, useVaultHttpUrls } from '../../services/vault'
-import { resolveKeepsakeLocal, resolveLocalMedia, retainLocalUrl, releaseLocalUrl, type KeepsakeLocal } from '../../services/keepsake'
+import { useVaultUrls, useVaultUrl, useVaultHttpUrls, vaultLookupSettled, vaultForgetFailure } from '../../services/vault'
+import { resolveKeepsakeLocal, resolveLocalMedia, retainLocalUrl, releaseLocalUrl, markLocalLookupSettled, keepsakeLocalSettled, type KeepsakeLocal } from '../../services/keepsake'
 import { SlideshowPlayer, type ResolvedItem } from '../slideshows/SlideshowPlayer'
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer'
 import {
@@ -143,37 +143,72 @@ export function resolveGalleryTileUrl(img: GalleryImage, vaultUrl?: string): str
  * Phase 5: resolve keepsakes to locally stored BYTES (swarm IndexedDB), keyed
  * by source url. Vault (Electron) is preferred where present; this covers the
  * dev/browser case and keeps the gallery off third-party URLs once cached.
- * Only entries already verified 'local' are resolved; blob URLs are revoked
- * on change/unmount.
+ * Only entries already verified 'local' are resolved.
+ *
+ * URL ownership: minted blob URLs are RECONCILED, not merge-then-revoke-all.
+ * The previous version revoked every URL it had created whenever the page key
+ * changed while keeping the old entries in the map, so `<img>` was handed
+ * already-revoked blob URLs (blank tiles) and paging made it worse. A URL is
+ * now revoked only when its keep leaves the page or the whole view unmounts.
+ * Each attempted url is marked settled so a tile can tell "still resolving"
+ * from "we looked and the bytes are not here".
  */
 function useKeepsakeLocalUrls(images: GalleryImage[], vaultUrls: Record<string, string>): Record<string, string> {
   const [map, setMap] = useState<Record<string, string>>({})
+  const live = useRef(new Map<string, string>()) // source url -> object URL
+  const [nonce, setNonce] = useState(0)
   const key = images.map((i) => i.url || '').filter(Boolean).join('|')
+  // A retry can store bytes with no vault event behind it (browser/dev stores
+  // in IndexedDB only), so the tile must be told to look again instead of
+  // staying "missing" until the page happens to change.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const bump = () => setNonce((n) => n + 1)
+    window.addEventListener('orbit-keepsake-updated', bump)
+    return () => window.removeEventListener('orbit-keepsake-updated', bump)
+  }, [])
   useEffect(() => {
     let dead = false
-    const created: string[] = []
     void (async () => {
       const { getLocalObject } = await import('../../utils/p2pSwarm')
-      const next: Record<string, string> = {}
+      const next = new Map<string, string>()
       for (const img of images) {
         const u = img.url || ''
-        if (!u || img.saveState !== 'persisted' || vaultUrls[u]) continue
+        if (!u) continue
+        if (vaultUrls[u]) continue // vault owns this one
+        const existing = live.current.get(u)
+        if (existing) { next.set(u, existing); continue }
+        if (img.saveState !== 'persisted') continue
         try {
           const blob = (await getLocalObject(img.localRef || u)) || (await getLocalObject(u))
-          if (blob) {
-            const obj = URL.createObjectURL(blob)
-            created.push(obj)
-            next[u] = obj
-          }
+          if (blob) next.set(u, URL.createObjectURL(blob))
         } catch { /* unresolved stays unresolved */ }
+        // The object store answered (hit or miss): the tile may now report an
+        // honest status instead of waiting forever.
+        markLocalLookupSettled(u)
+        if (img.localRef) markLocalLookupSettled(img.localRef)
       }
-      if (!dead && Object.keys(next).length) setMap((prev) => ({ ...prev, ...next }))
+      if (dead) {
+        // Superseded mid-flight: revoke only what this run minted and nothing
+        // the live map still owns.
+        for (const [u, o] of next) if (!live.current.has(u)) { try { URL.revokeObjectURL(o) } catch { /* gone */ } }
+        return
+      }
+      for (const [u, o] of live.current) {
+        if (!next.has(u)) { try { URL.revokeObjectURL(o) } catch { /* gone */ } }
+      }
+      live.current = next
+      setMap(Object.fromEntries(next))
     })()
+    return () => { dead = true }
+  }, [key, JSON.stringify(vaultUrls), nonce])
+  // Unmount: release everything this view minted.
+  useEffect(() => {
     return () => {
-      dead = true
-      for (const o of created) URL.revokeObjectURL(o)
+      for (const o of live.current.values()) { try { URL.revokeObjectURL(o) } catch { /* gone */ } }
+      live.current = new Map()
     }
-  }, [key, JSON.stringify(vaultUrls)])
+  }, [])
   return map
 }
 
@@ -199,19 +234,37 @@ function useVaultPinProgress(): Record<string, number> {
   return map
 }
 
+/** In-flight retries keyed by keep id: the tile badge and the viewer's retry
+ *  button call the same pipeline, and clicking both must not start two
+ *  downloads for the same bytes. */
+const retryingKeepsakes = new Set<string>()
+
 /** Re-run the authorized persist pipeline for one keep; store the outcome.
  *  A failed retry never discards an identity the record already carries. */
 async function retryKeepsake(img: GalleryImage): Promise<void> {
+  if (retryingKeepsakes.has(img.id)) return
+  retryingKeepsakes.add(img.id)
   useGame.setState((s) => ({
     gallery: s.gallery.map((g) => (g.id === img.id ? { ...g, saveState: 'downloading' as const } : g)),
   }))
-  const { persistKeepsake } = await import('../../services/keepsake')
-  const res = await persistKeepsake(img.url, {}, img.kind)
-  useGame.setState((s) => ({
-    gallery: s.gallery.map((g) =>
-      g.id === img.id ? { ...g, saveState: res.status === 'local' ? 'persisted' : 'failed', localRef: res.ref ?? g.localRef } : g,
-    ),
-  }))
+  try {
+    // An explicit retry must really hit the vault again (the session's negative
+    // pin cache otherwise answers "null" without trying) and must wake the
+    // tile's object-store resolution once the bytes land.
+    vaultForgetFailure(img.url)
+    const { persistKeepsake } = await import('../../services/keepsake')
+    const res = await persistKeepsake(img.url, {}, img.kind)
+    useGame.setState((s) => ({
+      gallery: s.gallery.map((g) =>
+        g.id === img.id ? { ...g, saveState: res.status === 'local' ? 'persisted' : 'failed', localRef: res.ref ?? g.localRef } : g,
+      ),
+    }))
+    if (res.status === 'local' && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('orbit-keepsake-updated', { detail: { id: img.id, url: img.url } }))
+    }
+  } finally {
+    retryingKeepsakes.delete(img.id)
+  }
 }
 
 /** Viewer media resolution: verified local bytes, or a diagnosable non-local
@@ -866,6 +919,16 @@ export default function IdleGalleryView({
               const isMotion = img.kind === 'video'
               const isSelected = selectedIds.has(img.id)
               const tileUrl = getTileUrl(img)
+              // A record that CLAIMS persisted bytes but whose lookup finished
+              // with nothing (evicted vault / cleared object store / unreadable
+              // row) must say so and offer a retry — the tile used to render a
+              // silent placeholder while the viewer said "unavailable".
+              const missingLocal =
+                img.saveState === 'persisted' &&
+                !vaultUrls[img.url || ''] &&
+                !localUrls[img.url || ''] &&
+                vaultLookupSettled(img.url || '') &&
+                keepsakeLocalSettled(img.localRef || img.url)
 
               return (
                 <div
@@ -968,6 +1031,19 @@ export default function IdleGalleryView({
                       className="absolute bottom-1.5 left-1.5 z-20 rounded-md border border-rose-500/40 bg-black/75 px-1.5 py-0.5 text-[10px] font-mono text-rose-300 backdrop-blur-md cursor-pointer hover:bg-black/90"
                     >
                       Not cached · Retry
+                    </button>
+                  )}
+                  {missingLocal && img.saveState !== 'failed' && (
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        await retryKeepsake(img)
+                      }}
+                      title="This keep was saved but its local bytes are no longer readable. Retry to fetch them again."
+                      className="absolute bottom-1.5 left-1.5 z-20 rounded-md border border-amber-500/40 bg-black/75 px-1.5 py-0.5 text-[10px] font-mono text-amber-300 backdrop-blur-md cursor-pointer hover:bg-black/90"
+                    >
+                      Missing locally · Retry
                     </button>
                   )}
 

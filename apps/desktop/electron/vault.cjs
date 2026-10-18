@@ -266,7 +266,11 @@ function get(ref) {
     try {
       fs.accessSync(fileFor(fileOf(hit.entry)), fs.constants.R_OK)
     } catch {
-      dropEntry(hit.storeKey)
+      // NEVER drop here. A locked/transiently unreadable file (AV scan, a
+      // concurrent write, a permission blip) used to delete the manifest entry
+      // AND the blob, so media that was cached a second earlier vanished for
+      // good. `probe` reports the same row as unreadable; this path just misses
+      // it for now and `pin` can re-fetch it later.
       return null
     }
     hit.entry.atime = Date.now()
@@ -280,7 +284,7 @@ function get(ref) {
  * Honest lookup for callers that must tell "no local bytes" apart from "bytes
  * are here but could not be read or decrypted" -- and that must not destroy a
  * record on a transient read failure. Returns
- * { state: 'absent' } | { state: 'local', local } |
+ * { state: 'absent' } | { state: 'local', local, mime } |
  * { state: 'unreadable', reason: 'missing-file' | 'decrypt' | 'read' }.
  */
 function probe(ref) {
@@ -308,7 +312,7 @@ function probe(ref) {
       if (!plain) return { state: 'unreadable', reason: 'decrypt' }
     }
     hit.entry.atime = Date.now()
-    return { state: 'local', local: `${SCHEME}://f/${fileOf(hit.entry)}` }
+    return { state: 'local', local: `${SCHEME}://f/${fileOf(hit.entry)}`, mime: hit.entry.mime || '' }
   } catch {
     return { state: 'unreadable', reason: 'read' }
   }

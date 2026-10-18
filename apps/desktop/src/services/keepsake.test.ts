@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
   persistKeepsake, resolveFreshLocalUrl, resolveKeepsakeLocal, resolveLocalMedia,
-  releaseLocalUrl, retainLocalUrl, _resetLocalUrls,
+  releaseLocalUrl, retainLocalUrl, _resetLocalUrls, _resetLocalLookups, keepsakeLocalSettled,
 } from './keepsake';
 
 vi.mock('../utils/p2pSwarm', async (importOriginal) => {
@@ -296,5 +296,47 @@ describe('resolveLocalMedia (honest local states)', () => {
 
     const r = await resolveLocalMedia(keep({ url: 'https://p/failed.jpg' }))
     expect(r.state).toBe('local')
+  })
+});
+
+describe('local lookup settlement (tile status)', () => {
+  const bridge = (impl: Record<string, unknown>) => vi.stubGlobal('window', { gmatch: impl })
+  const keep = (over: Record<string, unknown> = {}) => ({
+    url: 'https://provider/x.jpg',
+    kind: 'image' as const,
+    ...over,
+  })
+
+  beforeEach(() => {
+    _resetLocalLookups()
+    _resetLocalUrls()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('marks a completed miss as settled for both the source url and the content ref', async () => {
+    bridge({ vaultGet: async () => ({ state: 'absent' }) })
+    const ref = 'f'.repeat(64)
+    expect(keepsakeLocalSettled('https://provider/x.jpg')).toBe(false)
+    await resolveLocalMedia(keep({ localRef: ref }))
+    // "still resolving" and "we looked and found nothing" are different states:
+    // the tile may now say the bytes are gone instead of showing a placeholder.
+    expect(keepsakeLocalSettled('https://provider/x.jpg')).toBe(true)
+    expect(keepsakeLocalSettled(ref)).toBe(true)
+  })
+
+  it('marks unreadable bytes as settled too (the row exists, the bytes do not answer)', async () => {
+    bridge({ vaultGet: async () => ({ state: 'unreadable', reason: 'decrypt' }) })
+    await resolveLocalMedia(keep())
+    expect(keepsakeLocalSettled('https://provider/x.jpg')).toBe(true)
+  })
+
+  it('_resetLocalLookups clears settlement (test seam)', async () => {
+    bridge({ vaultGet: async () => ({ state: 'absent' }) })
+    await resolveLocalMedia(keep())
+    _resetLocalLookups()
+    expect(keepsakeLocalSettled('https://provider/x.jpg')).toBe(false)
   })
 });

@@ -55,13 +55,45 @@ const sessionPinned = new Set<string>()
 // ponytail: session-scoped negative cache; add a TTL if a flaky host matters.
 const sessionFailed = new Set<string>()
 
+const VIDEO_LOCAL_RE = /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i
+
+/**
+ * Refs whose vault lookup has COMPLETED this session (hit or miss). The gallery
+ * tile needs this to tell "still resolving" from "we looked and the bytes are
+ * gone": without it, a keep that claims `persisted` but was evicted renders a
+ * silent placeholder instead of a status the player can act on.
+ */
+const checkedVaultRefs = new Set<string>()
+
+export function vaultLookupSettled(ref: string): boolean {
+  return checkedVaultRefs.has(ref)
+}
+
+export function _resetVaultLookups(): void {
+  checkedVaultRefs.clear()
+}
+
+/**
+ * A stored row's bytes are playable in a <video> when the caller knows the
+ * source is a video OR the vault row says the mime is `video/*`. Rows are named
+ * by bare content hash, so the extension test alone used to miss every
+ * extensionless video and hand `<video>` a raw `vault://` URL with no Range.
+ */
+function looksLikeVideo(sourceUrl: string, local: string, mime?: string | null): boolean {
+  if (mime && mime.toLowerCase().startsWith('video/')) return true
+  return VIDEO_LOCAL_RE.test(sourceUrl) || VIDEO_LOCAL_RE.test(local)
+}
+
 export async function vaultGet(url: string): Promise<string | null> {
   if (!url || !enabled()) return null
   if (vaultBridge()) {
     try {
       const res = await window.gmatch?.vaultGet?.(url)
+      // The lookup completed (hit, absent or unreadable) — record that before
+      // any early return so callers can report an honest status.
+      checkedVaultRefs.add(url)
       if (res?.local) {
-        if (/\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(url) || /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(res.local)) {
+        if (looksLikeVideo(url, res.local, res.mime)) {
           const http = await vaultHttpUrl(res.local)
           if (http) return http
         }
@@ -72,6 +104,7 @@ export async function vaultGet(url: string): Promise<string | null> {
     }
   }
   const stored = getStoredVault()
+  checkedVaultRefs.add(url)
   return stored[url] ?? null
 }
 
@@ -82,7 +115,7 @@ export async function vaultGet(url: string): Promise<string | null> {
  * unreadable. Never throws: a bridge failure is reported, not swallowed.
  */
 export type VaultProbe =
-  | { state: 'local'; local: string }
+  | { state: 'local'; local: string; mime?: string }
   | { state: 'absent' }
   | { state: 'unreadable'; reason: string }
 
@@ -93,7 +126,7 @@ export async function vaultProbe(ref: string): Promise<VaultProbe> {
       const res = await window.gmatch?.vaultGet?.(ref)
       if (!res) return { state: 'absent' }
       if (res.state === 'unreadable') return { state: 'unreadable', reason: String(res.reason || 'read') }
-      if (res.local) return { state: 'local', local: res.local }
+      if (res.local) return { state: 'local', local: res.local, mime: res.mime ? String(res.mime) : undefined }
       return { state: 'absent' }
     } catch {
       // The main process refused or the channel broke: that is NOT a confirmed
@@ -133,6 +166,16 @@ export async function vaultPin(url: string): Promise<string | null> {
     sessionFailed.add(url)
     return null
   }
+}
+
+/**
+ * Drop the session's negative pin cache for a url. The negative cache exists so
+ * the background backfill cannot storm a host that refuses us; it must never
+ * veto an explicit Retry from the gallery, which is the one place the player
+ * asks for exactly that fetch.
+ */
+export function vaultForgetFailure(url: string): void {
+  if (url) sessionFailed.delete(url)
 }
 
 export function vaultUnpin(url: string): void {

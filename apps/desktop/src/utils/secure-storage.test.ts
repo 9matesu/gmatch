@@ -154,3 +154,32 @@ describe('secure-storage (browser fallback)', () => {
     expect(localStorage.getItem('orbit_identity')).toBeNull()
   })
 })
+
+describe('secure-storage (encryption availability flap)', () => {
+  it('reads the KV even when safeStorage reports unavailable', async () => {
+    // Boot 1 migrated the identity into the KV and purged the plaintext copy.
+    const identity = JSON.stringify({ orbitId: 'abc', privateKeyHex: 'deadbeef' })
+    const { store, bridge } = mockBridge()
+    store.set('orbit_identity', identity)
+
+    // Boot 2: DPAPI says it cannot encrypt (the flap). Reading localStorage
+    // instead — already purged — used to look like a permanent logout.
+    bridge.secureAvailable.mockResolvedValue(false)
+    _test.reset()
+    await initSecureStorage()
+
+    expect(getSecureItem('orbit_identity')).toBe(identity)
+    expect(localStorage.getItem('orbit_identity')).toBeNull()
+  })
+
+  it('still writes through the KV when encryption is unavailable (never plaintext localStorage)', async () => {
+    const { store, bridge } = mockBridge()
+    bridge.secureAvailable.mockResolvedValue(false)
+    _test.reset()
+    await initSecureStorage()
+
+    setSecureItem('orbit_identity', 'V')
+    expect(localStorage.getItem('orbit_identity')).toBeNull()
+    await vi.waitFor(() => expect(store.get('orbit_identity')).toBe('V'))
+  })
+})

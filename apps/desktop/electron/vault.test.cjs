@@ -199,7 +199,10 @@ async function main() {
 
   // probe(): honest states. Bytes that are here but unreadable must never be
   // reported as absent, and the record must survive the lookup.
-  assert.deepStrictEqual(vault.probe(legacyUrl), { state: 'local', local: `vault://f/${legacyFile}` })
+  assert.deepStrictEqual(
+    vault.probe(legacyUrl),
+    { state: 'local', local: `vault://f/${legacyFile}`, mime: 'image/jpeg' },
+  )
   assert.deepStrictEqual(
     vault.probe(goneUrl), { state: 'unreadable', reason: 'missing-file' },
     'a vanished file is unreadable, not absent',
@@ -210,6 +213,12 @@ async function main() {
   )
   assert.ok(vault._test.manifest()[goneUrl], 'an unreadable row is never dropped')
   assert.ok(vault._test.manifest()[corruptUrl], 'a corrupt row is never dropped')
+  // get() used to dropEntry() on a failed fs.accessSync: a transient lock (AV
+  // scan, a concurrent write) deleted the manifest row AND the blob, so media
+  // that was cached a second earlier vanished for good. A miss is a miss.
+  assert.strictEqual(vault.get(goneUrl), null, 'an unreadable row is a miss for get()')
+  assert.ok(vault._test.manifest()[goneUrl], 'get() no longer drops an unreadable row')
+  assert.strictEqual(vault.stats().files, 4, 'file count unchanged after a failed lookup')
   assert.deepStrictEqual(
     vault.probe(`vault://f/${'d'.repeat(64)}`), { state: 'absent' },
     'an unknown ref is a real miss',

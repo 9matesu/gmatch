@@ -141,6 +141,13 @@ text overlays kept for caption hunts, §6).
   5-up/5-down window (past 5 + queue 5 + video posters, images AND videos) is
   prefetched so skip/back is instant; cache stats + Clear live in the left
   stats panel.
+- **Renderer swarm RAM cache is bounded (2026-10-17):** `utils/p2pSwarm.ts`
+  keeps at most 64 objects / 96MB of blob bytes in the JS heap (LRU, reads
+  refresh recency). It used to be an unbounded `Map`, so every object seen
+  (feed, stories, avatars, gallery, own uploads) stayed resident for the life of
+  the process — the "app eats RAM" symptom. Durable bytes are unchanged (vault on
+  disk / IndexedDB), so an eviction costs exactly one re-read and never data;
+  boot hydration honours the same budget.
 
 ### 6b. Feed/market queries (user spec: player picks, no hardcodes)
 
@@ -174,6 +181,13 @@ text overlays kept for caption hunts, §6).
   header (blurs images until hover) — default ON.
 - Toasts for purchases/unlocks live in the header 🔔 tab (capped at 50, no
   floating overlay spam); offline-earnings modal on load.
+- Publishing a post shows it immediately: the upload response (its bytes are
+  already durable locally) becomes an optimistic feed tile, and the node is
+  re-read through a cache-bypassing refresh until it lists the row
+  (`utils/feedPublish.ts`, bounded retries). Dedupe is by post id, so the tile
+  never doubles; a post the node never lists stays visible as locally durable
+  instead of vanishing, and a failed upload inserts nothing (the modal reports
+  the reason and stays open).
 - Tags tab: owned pills toggle ON/OFF plus SOLO (feed only that one tag).
   Gallery tab: text box filters keepsakes by tag substring.
   Config tab: starter picks recap + extra excludes (add/remove, 100 max).

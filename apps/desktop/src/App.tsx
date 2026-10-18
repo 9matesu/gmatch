@@ -30,7 +30,7 @@ import { outboxStatesByGroup } from "./services/postOutbox";
 import { buildMirrorRow } from "./utils/galleryMirror";
 import { collectConfigBundle, applyConfigBundle, applyStashFromBundle, parseConfigBundle, configDownloadFilename, bundleToString } from "./utils/configBackup";
 import { runMigrations } from "./utils/migration";
-import { useGame as useIdleGame } from "./game/store";
+import { useGame as useIdleGame, syncIdleSaveSlotToIdentity } from "./game/store";
 import { mapLimit } from "./services/booru";
 import { vaultPin, vaultHttpUrl } from "./services/vault";
 import { devFetchable } from "./services/imageCache";
@@ -52,6 +52,7 @@ import { DEFAULT_FEED_SORT, isFeedSort, type FeedSort } from "./components/feed/
 import { TOUR_STEPS } from "./firstRun/tourState";
 import { useTourGuide } from "./components/tour/useTourGuide";
 import { GMatchFeed, type FeedPost } from "./components/feed/GMatchFeed";
+import { reconcilePublishedPost } from "./utils/feedPublish";
 import { GMatchDMs } from "./components/chat/GMatchDMs";
 import type { GroupMember } from "./components/chat/GroupMembersPopover";
 import { AttachmentUploadModal } from "./components/AttachmentUploadModal";
@@ -195,6 +196,14 @@ export default function Home() {
       window.removeEventListener('beforeunload', save);
     };
   }, []);
+  // The idle save slot is identity-scoped (`gmatch.save.v1:<orbitId>`). Without
+  // this, logging in mid-session kept the pre-login run in memory and the next
+  // autosave silently wrote it into (or out of) another wallet's slot, which
+  // read as "my keepsakes are gone". Re-key once the stored identity is known.
+  useEffect(() => {
+    if (!isLoaded) return;
+    syncIdleSaveSlotToIdentity();
+  }, [isLoaded, identity?.orbitId]);
   const { peers, p2pItems, sendP2PItem, sendChatMessage, chatMessages, isWsConnected } = useP2P(identity);
   const { settings, update: updateSettings } = useSettings();
   useEffect(() => { setWatchDisplayName(myProfile.displayName || '') }, [myProfile.displayName]);
@@ -1164,6 +1173,10 @@ export default function Home() {
   const [archivedPostIds, setArchivedPostIds] = useState<Set<string>>(() => new Set())
   const [deletedPostIds, setDeletedPostIds] = useState<Set<string>>(() => new Set())
   const [serverPosts, setServerPosts] = useState<FeedPost[]>([])
+  // Posts the player just published, shown before the node has indexed them.
+  // The upload response is the truth (the bytes are already durable locally);
+  // waiting for the next feed read is what made a successful post look lost.
+  const [optimisticPosts, setOptimisticPosts] = useState<FeedPost[]>([])
   const [hasMoreFeed, setHasMoreFeed] = useState(true)
   const [followingIds, setFollowingIds] = useState<string[]>([])
   const [pmMessagesByPeer, setPmMessagesByPeer] = useState<Record<string, ChatMessage[]>>({})
@@ -1219,8 +1232,17 @@ export default function Home() {
         });
       });
 
-    return [...serverVisible, ...repostedPosts, ...localPublicPosts];
-  }, [items, profilePics, identity, myProfile, repostedPosts, archivedPostIds, deletedPostIds, serverPosts, normalizeFeedPost, users]);
+    // A just-uploaded post outranks the server snapshot until the node indexes
+    // it. Deduped by id, so the tile never appears twice once the row lands.
+    const optimisticVisible = optimisticPosts.filter(
+      (p) =>
+        !deletedPostIds.has(p.id) &&
+        !seenServerIds.has(p.id) &&
+        !localPublicPosts.some((l) => l.id === p.id),
+    );
+
+    return [...optimisticVisible, ...serverVisible, ...repostedPosts, ...localPublicPosts];
+  }, [items, profilePics, identity, myProfile, repostedPosts, archivedPostIds, deletedPostIds, serverPosts, normalizeFeedPost, users, optimisticPosts]);
 
   // ─── Public posts feed (server) ───
   const [isLoadingMoreFeed, setIsLoadingMoreFeed] = useState(false)
@@ -1256,15 +1278,16 @@ export default function Home() {
     return () => { cancelled = true }
   }, [selectedProfileUser, identity, feedPosts])
 
-  const loadServerFeed = useCallback(() => {
-    if (!identity) return Promise.resolve()
+  const loadServerFeed = useCallback((): Promise<FeedPost[]> => {
+    if (!identity) return Promise.resolve([])
     setHasMoreFeed(true)
     return orbitFetch(`/api/posts?limit=50&sort=${feedSort}`, {}, identity)
-      .then(async (res) => {
-        if (!res.ok) return
+      .then(async (res): Promise<FeedPost[]> => {
+        if (!res.ok) return []
         const data = await res.json()
+        const posts: FeedPost[] = Array.isArray(data?.posts) ? (data.posts as FeedPost[]) : []
         if (Array.isArray(data?.posts)) {
-          setServerPosts(data.posts as FeedPost[])
+          setServerPosts(posts)
           setHasMoreFeed(data.posts.length >= 50)
           setProfilePics((prev) => {
             let changed = false
@@ -1278,8 +1301,9 @@ export default function Home() {
             return changed ? next : prev
           })
         }
+        return posts
       })
-      .catch(() => { })
+      .catch(() => [])
   }, [identity, feedSort])
 
   // Retrieve-by-force: drop cached/inflight feed responses, then reload. A
@@ -1289,6 +1313,28 @@ export default function Home() {
     invalidateCache('/api/posts')
     return loadServerFeed()
   }, [loadServerFeed])
+
+  /**
+   * A publish just succeeded. Show it immediately and reconcile with the node
+   * in the background. The old path was `loadServerFeed()` with no cache
+   * invalidation and no optimistic row: the 3s GET cache returned the
+   * pre-upload snapshot, and the row was indexed a moment later, so a
+   * successful upload looked like a post that never appeared.
+   */
+  const handlePostCreated = useCallback((created: unknown) => {
+    const post = created && typeof created === 'object' ? (created as FeedPost) : null
+    const id = post?.id ? String(post.id) : ''
+    if (post) {
+      setOptimisticPosts((prev) => [post, ...prev.filter((p) => p.id !== post.id)].slice(0, 12))
+    }
+    void (async () => {
+      const visible = await reconcilePublishedPost({ id, refresh: forceRefreshFeed })
+      // The node agrees: the optimistic copy is redundant. Not visible after the
+      // bounded retries: keep it — the bytes are durable locally and the row is
+      // only pending indexation, not lost.
+      if (visible && id) setOptimisticPosts((prev) => prev.filter((p) => p.id !== id))
+    })()
+  }, [forceRefreshFeed])
 
   // Which node this feed reads — surfaced in the empty state so a pin to the
   // wrong (e.g. fresh/empty local) node is visible instead of mysterious.
@@ -4647,6 +4693,7 @@ export default function Home() {
                 loadGallery={loadGallery}
                 loadStories={loadStories}
                 loadServerFeed={loadServerFeed}
+                onPostCreated={handlePostCreated}
                 handleAddStory={handleAddStory}
                 toggleFollowUser={toggleFollowUser}
                 toast={toast}

@@ -84,6 +84,8 @@ export interface GlobalModalsProps {
   loadGallery: () => any;
   loadStories: () => any;
   loadServerFeed: () => any;
+  /** Called with the post the upload returned: show it now, reconcile after. */
+  onPostCreated?: (created: any) => void;
   handleAddStory: (file: File) => Promise<void>;
 
   toggleFollowUser: (userId: string) => Promise<void>;
@@ -233,8 +235,9 @@ export function GlobalModals(props: GlobalModalsProps) {
             setShowCreatePostModal(false);
             setCreatePostInitialData?.(null);
           }}
-          onPostCreated={() => {
-            loadServerFeed();
+          onPostCreated={(newPost: any) => {
+            if (props.onPostCreated) props.onPostCreated(newPost);
+            else loadServerFeed();
             setShowCreatePostModal(false);
             setCreatePostInitialData?.(null);
           }}
