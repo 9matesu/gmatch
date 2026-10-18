@@ -84,6 +84,9 @@ export interface GmatchBridge {
   /** Native OS toast (main-process Electron Notification). Best-effort: the
    *  in-app overlay always renders even when this is absent or fails. */
   nativeNotify?: (title: string, body: string) => Promise<{ ok: boolean; reason?: string }>
+  /** Dedicated player window for popup_video (sandboxed, muted, auto-close).
+   *  Resolves when the window closes (ok) or fails to open (!ok). */
+  domVideoOpen?: (url: string, durationMs?: number) => Promise<{ ok: boolean; reason?: string }>
   blocklistGet?: () => Promise<{ current: BlocklistData; defaults: BlocklistData; isCustom?: boolean }>
   blocklistSet?: (data: BlocklistData | string) => Promise<{ ok: boolean; data?: BlocklistData; error?: string }>
   blocklistReset?: () => Promise<{ ok: boolean; data?: BlocklistData; error?: string }>

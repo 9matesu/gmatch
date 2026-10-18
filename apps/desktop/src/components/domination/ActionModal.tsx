@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from 'react';
-import { X, Send, Loader2, Sparkles, Layers, Sliders, Palette } from 'lucide-react';
+import { X, Send, Loader2, Sparkles, Layers, Sliders, Palette, ImagePlus } from 'lucide-react';
+import { DOM_LIMITS, validateDomPayload } from '../../utils/dominationMesh';
 
 interface ActionModalProps {
   action: string;
@@ -26,6 +27,7 @@ export function ActionModal({
   price,
 }: ActionModalProps) {
   const [url, setUrl] = useState('');
+  const [inlineName, setInlineName] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [duration, setDuration] = useState(10);
   const [intensity, setIntensity] = useState(8);
@@ -49,14 +51,16 @@ export function ActionModal({
       case 'game_bg':
       case 'popup_video': {
         const trimmed = url.trim();
-        if (!trimmed) { setFormError('Paste an image or video URL first.'); return; }
-        let ok = false;
-        try {
-          const u = new URL(trimmed);
-          ok = u.protocol === 'http:' || u.protocol === 'https:';
-        } catch { ok = false; }
-        if (!ok) { setFormError('That is not a valid http(s) URL.'); return; }
-        payload = { url: trimmed, duration: duration * 1000 };
+        if (!trimmed) {
+          setFormError(action === 'popup_video' ? 'Paste a video URL first.' : 'Pick an image or paste a URL first.');
+          return;
+        }
+        // Same schema the receiver enforces — fail loud here, never seal
+        // something that would be dropped on their side. An inline data:image
+        // (from the picker) crosses peers with no shared server.
+        const checked = validateDomPayload(action, { url: trimmed, duration: duration * 1000 });
+        if (!checked.ok) { setFormError(checked.reason); return; }
+        payload = checked.payload;
         break;
       }
       case 'message':
@@ -129,10 +133,50 @@ export function ActionModal({
                 type="url"
                 placeholder={action === 'popup_video' ? 'https://example.com/video.mp4' : 'https://example.com/image.jpg'}
                 value={url}
-                onChange={(e) => { setUrl(e.target.value); setFormError(null); }}
+                onChange={(e) => { setUrl(e.target.value); setInlineName(null); setFormError(null); }}
                 className={field}
               />
-              <p className="text-[10px] text-retro-muted">Paste a direct media link. Their client loads it straight.</p>
+              {action !== 'popup_video' && (
+                <div className="space-y-1">
+                  <label className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border-glass text-[10px] font-semibold text-retro-muted hover:text-retro-fg hover:bg-glass-w10 cursor-pointer transition-colors">
+                    <ImagePlus className="w-3 h-3" />
+                    {inlineName ? 'Replace image' : 'Pick an image from this device'}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = '';
+                        setFormError(null);
+                        if (!file) return;
+                        if (file.size > DOM_LIMITS.inlineImageMaxBytes) {
+                          setInlineName(null);
+                          setFormError(`That image is ${(file.size / 1048576).toFixed(1)} MB — the inline limit is 4 MB. Pick a smaller one or paste a link.`);
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          setUrl(String(reader.result || ''));
+                          setInlineName(file.name);
+                        };
+                        reader.onerror = () => setFormError('Could not read that file.');
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                  </label>
+                  {inlineName && (
+                    <p className="text-[10px] text-retro-muted">
+                      Inline: {inlineName} — the image rides sealed in the request, so it reaches them with no shared server.
+                    </p>
+                  )}
+                </div>
+              )}
+              <p className="text-[10px] text-retro-muted">
+                {action === 'popup_video'
+                  ? 'Paste a direct https media link. Their client loads it straight.'
+                  : 'Paste a direct https link, or pick a local image (rides sealed to them, up to 4 MB).'}
+              </p>
             </div>
           )}
 

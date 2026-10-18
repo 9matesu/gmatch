@@ -49,6 +49,10 @@ export const DOM_LIMITS = {
   requestTtl: { default: 10 * 60_000, max: 24 * 60 * 60_000 },
   /** Inline sealed media cap (camera frames). Bigger media does not ride. */
   photoMaxBytes: 8 * 1024 * 1024,
+  /** Inline image cap for wallpaper/game_bg data URLs: the whole sealed
+   *  envelope rides the courier mail PUT, so it stays well inside realistic
+   *  body limits (a 1080p JPEG at q80 is 0.3-0.8MB). */
+  inlineImageMaxBytes: 4 * 1024 * 1024,
   /** Receiver-side per-sender+action spacing (mirrors the server cooldown). */
   rateIntervalMs: 30_000,
   /** Bounded idempotency memory + pending camera queue. */
@@ -102,13 +106,22 @@ function clampDuration(v: unknown, fallback: number): number {
   return clampNumber(v, DOM_LIMITS.duration.min, DOM_LIMITS.duration.max, fallback);
 }
 
-/** A https URL only — no file:, no data:, no protocol-relative tricks. The
- *  receiver will fetch this from its own machine, so arbitrary schemes are
- *  refused, not sanitized. */
-function validEffectUrl(v: unknown): string | null {
+const INLINE_IMAGE_RE = /^data:image\/(png|jpeg|webp);base64,/;
+
+/** A reachable https URL, or (for effects that may inline their media) a
+ *  data: image under the byte cap — that is how wallpaper/game_bg cross peers
+ *  with no shared server: the bytes ride inside the sealed envelope. Video
+ *  never inlines (too big), so popup_video stays https-only. */
+function validEffectUrl(v: unknown, allowInlineImage: boolean): string | null {
   if (typeof v !== 'string') return null;
   const s = v.trim();
-  if (!s || s.length > DOM_LIMITS.urlMaxLen) return null;
+  if (!s) return null;
+  if (allowInlineImage && INLINE_IMAGE_RE.test(s)) {
+    // ~4/3 of the byte cap survives base64; reject before sealing.
+    if (s.length > Math.ceil((DOM_LIMITS.inlineImageMaxBytes * 4) / 3) + 128) return null;
+    return s;
+  }
+  if (s.length > DOM_LIMITS.urlMaxLen) return null;
   if (!/^https:\/\//i.test(s)) return null;
   return s;
 }
@@ -127,9 +140,15 @@ export function validateDomPayload(action: string, raw: unknown): ValidatedPaylo
 
   switch (action) {
     case 'wallpaper':
-    case 'game_bg':
+    case 'game_bg': {
+      const url = validEffectUrl(src.url, true);
+      if (!url) return { ok: false, reason: 'media must be an https url or an inline image under 4 MB' };
+      out.url = url;
+      out.duration = clampDuration(src.duration, DOM_LIMITS.duration.default);
+      return { ok: true, payload: out };
+    }
     case 'popup_video': {
-      const url = validEffectUrl(src.url);
+      const url = validEffectUrl(src.url, false);
       if (!url) return { ok: false, reason: 'media url must be https and under 2 KiB' };
       out.url = url;
       out.duration = clampDuration(src.duration, DOM_LIMITS.duration.default);

@@ -1,7 +1,7 @@
 // gMatch Electron main process.
 // All booru HTTP happens HERE (renderer never touches the network directly).
 // Endpoints per docs/SPEC.md §6. 10s timeout, browser UA, round-robin health.
-const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage, session, shell, Notification } = require('electron')
+const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage, session, shell, Notification, screen } = require('electron')
 const https = require('https')
 const fs = require('node:fs')
 const path = require('node:path')
@@ -11,6 +11,7 @@ const vault = require('./vault.cjs')
 const vaultServer = require('./vaultServer.cjs')
 const customFolders = require('./customFolders.cjs')
 const wallpaperWin = require('./wallpaperWin.cjs')
+const domVideo = require('./dom-video-core.cjs')
 const { sanitizeBounds } = require('./window-bounds-core.cjs')
 const { dapiSource, booruOrgSource, gateBooruOrgEntry } = require('./booru-sources-core.cjs')
 const { loadRegistry: loadBooruRegistry, refererFor: booruRefererFor } = require('./booru-registry.cjs')
@@ -1781,6 +1782,8 @@ app.whenReady().then(async () => {
   for (const evt of ['before-quit', 'will-quit']) {
     app.on(evt, () => { if (wallpaperWin.hasPendingSwap()) void wallpaperWin.restoreWallpaper() })
   }
+  // A stray domination video window must not outlive the app either.
+  app.on('before-quit', () => { if (domVideoWin) { try { domVideoWin.destroy() } catch { /* gone */ } domVideoWin = null } })
   // Camera stays denied by default; the renderer consumes a one-shot grant
   // only AFTER the victim clicks "Allow once" on the in-app prompt.
   ipcMain.handle('camera:grant-once', () => { cameraGrantOnce = true; return { ok: true } })
@@ -1800,6 +1803,41 @@ app.whenReady().then(async () => {
     } catch (err) {
       return { ok: false, reason: err?.message || String(err) }
     }
+  })
+  // Dedicated player window for consented popup_video effects: a real OS
+  // window (works while gMatch is minimized), sandboxed, muted, auto-closing
+  // at the effect duration. The window lifecycle IS the execution outcome the
+  // renderer reports back. URL is https-validated here on the privileged side.
+  let domVideoWin = null
+  ipcMain.handle('dom-video:open', (_event, url, durationMs) => {
+    return new Promise((resolve) => {
+      const valid = domVideo.validVideoUrl(url)
+      if (!valid) return resolve({ ok: false, reason: 'invalid-url' })
+      let settled = false
+      const finish = (ok, reason) => { if (!settled) { settled = true; resolve({ ok, reason }) } }
+      try {
+        if (domVideoWin) { try { domVideoWin.destroy() } catch { /* already gone */ } domVideoWin = null }
+        const geo = domVideo.windowGeometry(screen.getPrimaryDisplay()?.workArea)
+        domVideoWin = new BrowserWindow({
+          ...geo,
+          title: 'gMatch',
+          backgroundColor: '#000000',
+          autoHideMenuBar: true,
+          webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+        })
+        let timer = null
+        domVideoWin.on('closed', () => {
+          domVideoWin = null
+          if (timer) clearTimeout(timer)
+          finish(true)
+        })
+        domVideoWin.webContents.on('did-fail-load', () => { try { domVideoWin?.close() } catch { /* gone */ } })
+        timer = setTimeout(() => { try { domVideoWin?.close() } catch { /* gone */ } }, domVideo.clampDurationMs(durationMs))
+        domVideoWin.loadURL(domVideo.playerPageUrl(valid)).catch(() => { try { domVideoWin?.close() } catch { /* gone */ } })
+      } catch (err) {
+        finish(false, err?.message || 'error')
+      }
+    })
   })
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
     if (permission === 'media' && cameraGrantOnce) {

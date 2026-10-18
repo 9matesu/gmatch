@@ -73,6 +73,19 @@ describe('validateDomPayload', () => {
   it('fails for unknown actions', () => {
     expect(validateDomPayload('nuke', {}).ok).toBe(false);
   });
+
+  it('accepts a small inline data:image for wallpaper/game_bg, nowhere else', () => {
+    const data = 'data:image/jpeg;base64,' + 'A'.repeat(1024);
+    expect(validateDomPayload('wallpaper', { url: data }).ok).toBe(true);
+    expect(validateDomPayload('game_bg', { url: data }).ok).toBe(true);
+    // Video never inlines — too big for the sealed envelope.
+    expect(validateDomPayload('popup_video', { url: data }).ok).toBe(false);
+    // Oversized inline image is refused before sealing.
+    const huge = 'data:image/png;base64,' + 'A'.repeat(DOM_LIMITS.inlineImageMaxBytes * 2);
+    expect(validateDomPayload('wallpaper', { url: huge }).ok).toBe(false);
+    // Non-image data: schemes stay refused.
+    expect(validateDomPayload('wallpaper', { url: 'data:text/html;base64,PGI+' }).ok).toBe(false);
+  });
 });
 
 describe('decodeDomBody hardening', () => {

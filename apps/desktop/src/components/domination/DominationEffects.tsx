@@ -250,9 +250,15 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
       const { action, payload, from } = detail;
       // The mesh request id (mesh path) or the server actionId (relay path).
       const requestId = (payload?.meshId as string | undefined) || payload?.actionId;
+      // Track whether something actually rendered, so the sender's history
+      // shows delivered truth instead of a fabricated status. `reported`
+      // marks cases that own their receipt (wallpaper OS swap, video window).
+      let applied = false;
+      let reported = false;
       // Execution truth: the sender's outbox distinguishes delivered from
       // executed, so every path below reports what actually happened.
       const reportExecuted = (ok: boolean) => {
+        reported = true;
         if (!requestId) return;
         if (payload?.meshId) {
           window.dispatchEvent(new CustomEvent('gmatch:domination-executed', { detail: { id: payload.meshId, ok } }));
@@ -269,14 +275,13 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
         return;
       }
       const p = checked.payload as Record<string, unknown>;
-      // Track whether something actually rendered, so the sender's history
-      // shows delivered truth instead of a fabricated status.
-      let applied = false;
-
       switch (action) {
         case 'wallpaper':
           if (settings.allowDesktopBackgroundChange && typeof p.url === 'string') {
             applied = true;
+            // The OS-swap effect below owns this receipt: it folds the real
+            // OS outcome in and can genuinely fail.
+            reported = true;
             addEffect({
               id: (requestId as string) || crypto.randomUUID(),
               type: 'wallpaper',
@@ -305,14 +310,35 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
 
         case 'popup_video':
           if (settings.allowPopupVideo && typeof p.url === 'string') {
-            applied = true;
-            setVideoUnmuted(false);
-            addEffect({
-              id: (requestId as string) || crypto.randomUUID(),
-              type: 'popup_video',
-              data: { url: p.url, autoPlay: true, muted: true },
-              duration: p.duration as number | undefined,
-            });
+            const dur = p.duration as number | undefined;
+            if (window.gmatch?.domVideoOpen) {
+              // Real OS window path: the window lifecycle is the execution —
+              // open failure or a player error reports failed, close reports
+              // completed. No in-app modal on top of it.
+              reported = true;
+              const actionId = payload?.actionId as string | undefined;
+              void window.gmatch.domVideoOpen(p.url, dur).then((out) => {
+                const ok = out?.ok === true;
+                reportExecuted(ok);
+                if (actionId && identity) {
+                  void orbitFetch(`/api/domination/ack/${actionId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ok }),
+                  }, identity).catch(() => { });
+                }
+              });
+            } else {
+              // Browser dev / no bridge: the in-app modal is the effect.
+              applied = true;
+              setVideoUnmuted(false);
+              addEffect({
+                id: (requestId as string) || crypto.randomUUID(),
+                type: 'popup_video',
+                data: { url: p.url, autoPlay: true, muted: true },
+                duration: dur,
+              });
+            }
           }
           break;
 
@@ -377,14 +403,14 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
           break;
       }
 
-      if (applied) {
+      if (applied && !reported) {
         // Non-wallpaper effects executed the moment they rendered. Wallpaper
         // reports from the OS-swap effect below (it can genuinely fail).
         if (action !== 'wallpaper') reportExecuted(true);
         if (payload?.actionId && identity && action !== 'wallpaper') {
           void orbitFetch(`/api/domination/ack/${payload.actionId}`, { method: 'POST' }, identity).catch(() => { });
         }
-      } else if (requestId && action !== 'camera') {
+      } else if (requestId && !reported && action !== 'camera') {
         // Camera is intentionally not reported here: rendering the approval
         // ask is not an outcome — captureAndSend / decline report it.
         reportExecuted(false);

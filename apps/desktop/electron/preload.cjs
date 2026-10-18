@@ -67,6 +67,9 @@ contextBridge.exposeInMainWorld('gmatch', {
   // Native OS toast for consented domination message/banner effects
   // (main-process Electron Notification; works minimized). Best-effort.
   nativeNotify: (title, body) => ipcRenderer.invoke('notify:native', title, body),
+  // Dedicated player window for consented popup_video effects. Resolves on
+  // close (ok) / open failure (!ok); the renderer reports the outcome.
+  domVideoOpen: (url, durationMs) => ipcRenderer.invoke('dom-video:open', url, durationMs),
   blocklistGet: () => ipcRenderer.invoke('blocklist:get'),
   blocklistSet: (data) => ipcRenderer.invoke('blocklist:set', data),
   blocklistReset: () => ipcRenderer.invoke('blocklist:reset'),
