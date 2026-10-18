@@ -83,6 +83,9 @@ export interface CommandIslandProps {
   onLogout?: () => void;
   onOpenProfile?: () => void;
   onOpenAdmin?: () => void;
+  /** Host mode or a node administered by this identity. The button is hidden
+   *  otherwise; the PIN verify inside the panel remains the real gate. */
+  showAdmin?: boolean;
   onOpenCreateCard?: () => void;
   settingsOpen?: boolean;
   /** Active Clicker layout; the pill only renders when this prop pair is given. */
@@ -117,6 +120,7 @@ export function CommandIsland({
   onLogout,
   onOpenProfile,
   onOpenAdmin,
+  showAdmin,
   onOpenCreateCard,
   gridSize: _gridSize,
   onGridSizeChange: _onGridSizeChange,
@@ -508,21 +512,24 @@ export function CommandIsland({
               <span className="text-xs hidden xl:inline">Help</span>
             </button>
 
-            {/* Admin */}
-            <button
-              type="button"
-              onClick={() => {
-                playPress(840);
-                onOpenAdmin?.();
-              }}
-              aria-label="Admin"
-              aria-current={undefined}
-              title="Admin Control Panel"
-              className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98] transition-all"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 shrink-0" weight="regular" />
-              <span className="text-xs hidden xl:inline">Admin</span>
-            </button>
+            {/* Admin: host mode or a node that says this identity administers
+                it. The PIN verify inside the panel is the real boundary — this
+                only keeps dead navigation away from non-admins. */}
+            {showAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  playPress(840);
+                  onOpenAdmin?.();
+                }}
+                aria-label="Admin"
+                title="Admin Control Panel"
+                className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98] transition-all"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 shrink-0" weight="regular" />
+                <span className="text-xs hidden xl:inline">Admin</span>
+              </button>
+            )}
 
             {/* Logout (conditional on onLogout) */}
             {onLogout && (

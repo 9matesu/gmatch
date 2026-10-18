@@ -919,6 +919,25 @@ export default function Home() {
   }, []);
   const [,setAnnouncements] = useState<{ id: string; message: string; created_at: string; created_by_name: string | null }[]>([])
   const [showPasskeys,] = useState(false);
+  // Host mode at the SHELL level (ServersView keeps its own copy): the Admin
+  // entry shows only when this machine hosts the node or the node says this
+  // identity administers it. The PIN verify inside the panel is the boundary.
+  const [shellServerMode, setShellServerMode] = useState<'host' | 'client' | null>(null);
+  useEffect(() => {
+    if (!identity) { setShellServerMode(null); return; }
+    let dead = false;
+    void orbitFetch('/api/servers/node', { method: 'GET' }, identity)
+      .then(async (res) => {
+        if (!res.ok || dead) return;
+        const nj = await res.json().catch(() => null) as { is_admin?: boolean; mode?: 'host' | 'client' } | null;
+        if (dead || !nj) return;
+        // Prefer the node's own admission; fall back to its reported mode.
+        if (nj.is_admin || nj.mode === 'host') setShellServerMode('host');
+        else if (nj.mode === 'client') setShellServerMode('client');
+      }).catch(() => { /* offline: entry stays hidden; nothing breaks */ });
+    return () => { dead = true; };
+  }, [identity]);
+
   // First login: open the Help modal exactly once per identity — the tour's
   // replacement as first-run guidance. Returning users are never interrupted.
   useEffect(() => {
@@ -4740,6 +4759,7 @@ export default function Home() {
             <CommandIsland
               mainView={mainView}
               setMainView={handleSetMainView}
+              showAdmin={shellServerMode === 'host' || myProfile.isAdmin}
               balance={myUser?.balance ?? 0}
               wsConnected={isWsConnected}
               unreadMessagesCount={chatUnreadCount}
