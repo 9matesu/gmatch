@@ -13,6 +13,7 @@ import {
   MessageCircle,
   Send,
   Bookmark,
+  FolderPlus,
   MoreHorizontal,
   Sparkles,
   Repeat,
@@ -44,6 +45,7 @@ import CachedImg from '../../ui/CachedImg';
 import { LazyVideo } from '../LazyVideo';
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
 import { isMediaVideo, isVideoPost, resolveMediaUrl } from '../../utils/media';
+import { vaultPin, vaultBridge } from '../../services/vault';
 
 /** Sibling item MIME types for render-time video detection (see isVideoPost). */
 function siblingMimesFor(post: FeedPost): string[] {
@@ -563,6 +565,30 @@ export function GMatchFeed({
     }, 700);
   };
 
+  /** B6: one-click Vault save of the post's media bytes. The bridge fetches,
+   *  hashes and stores them (dedup by content hash); null = unreachable or
+   *  browser dev (where the button is hidden anyway). */
+  const vaultSavedRef = useRef<Set<string>>(new Set());
+  const [vaultSaved, setVaultSaved] = useState<Set<string>>(new Set());
+  const savePostToVault = async (post: FeedPost) => {
+    const url = post.url;
+    if (!url || vaultSavedRef.current.has(url)) return;
+    vaultSavedRef.current.add(url); // in-flight + done guard
+    try {
+      const local = await vaultPin(url);
+      if (local) {
+        setVaultSaved((prev) => new Set(prev).add(url));
+        toast?.('Media saved to your Vault — it opens even offline.', 'success');
+      } else {
+        vaultSavedRef.current.delete(url);
+        toast?.('Could not save to the Vault: the media was unreachable.', 'error');
+      }
+    } catch {
+      vaultSavedRef.current.delete(url);
+      toast?.('Could not save to the Vault.', 'error');
+    }
+  };
+
   const toggleSave = (post: FeedPost) => {
     playPress(740);
     setSavedPosts((prev) => {
@@ -763,6 +789,36 @@ export function GMatchFeed({
       {/* Selective status pills: only empty/conflict states, never a
           healthy timeline (see FeedStatusPills). */}
       <FeedStatusPills postCount={displayPosts.length} />
+
+      {/* ONE quiet sync label (replaces the per-post chips): reflects real
+          background publish work — active uploads / posts saved locally only.
+          Non-blocking, no layout shift beyond this single row. */}
+      {(() => {
+        const pending = posts.filter((p) => p.sync_state === 'pending').length;
+        const localOnly = posts.filter((p) => p.sync_state === 'local').length;
+        if (!pending && !localOnly) return null;
+        return (
+          <div
+            role="status"
+            className="w-full py-1 px-3 flex items-center gap-1.5 text-[10px] font-mono text-retro-muted border-b border-border-glass bg-glass-w4 select-none"
+          >
+            {pending > 0 ? (
+              <>
+                <Loader2 className="w-3 h-3 animate-spin shrink-0" aria-hidden="true" />
+                <span>Syncing {pending} post{pending === 1 ? '' : 's'} to the network…</span>
+              </>
+            ) : (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400/90 shrink-0" aria-hidden="true" />
+                <span>
+                  {localOnly} post{localOnly === 1 ? '' : 's'} saved on this device — they upload when the network is back.
+                </span>
+              </>
+            )}
+          </div>
+        );
+      })()}
+
 
       {/* Discreet grey loading label when stories/content are loading */}
       {storiesLoading && (
@@ -1083,19 +1139,7 @@ export function GMatchFeed({
                                     {post.author_name}
                                   </span>
                                   <PostTimestamp createdAt={post.created_at} className="text-xs text-white/75 leading-tight [text-shadow:0_1px_4px_rgba(0,0,0,0.75)]" />
-                                  {post.sync_state && post.sync_state !== 'replicated' && (
-                                    <span
-                                      className="inline-flex items-center gap-1 text-[10px] text-white/75 [text-shadow:0_1px_4px_rgba(0,0,0,0.75)]"
-                                      title={
-                                        post.sync_state === 'local'
-                                          ? 'Saved on this device. Will upload when online.'
-                                          : 'Uploading to the network…'
-                                      }
-                                    >
-                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400/90" aria-hidden="true" />
-                                      {post.sync_state === 'local' ? 'Saved locally' : 'Syncing…'}
-                                    </span>
-                                  )}
+                                  {/* Sync state moved to the one feed-top label (B4): no per-post chips. */}
                                 </div>
                                 {post.location && (
                                   <span className="text-xs text-white/75 leading-tight block truncate [text-shadow:0_1px_4px_rgba(0,0,0,0.75)]">{post.location}</span>
@@ -1230,6 +1274,24 @@ export function GMatchFeed({
                           }`}
                       />
                     </button>
+
+                    {/* Save media bytes to the local Vault (desktop only):
+                        one click, no modal, deduped by the vault's content
+                        hash. Hidden in browser dev where the bridge is absent
+                        — it would never be functional there. */}
+                    {vaultBridge() && post.url && (
+                      <button
+                        type="button"
+                        onClick={() => void savePostToVault(post)}
+                        aria-label="Save to Vault"
+                        title="Save the media to your Vault (offline copy)"
+                        className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-[0.98]"
+                      >
+                        <FolderPlus
+                          className={`w-5 h-5 stroke-[1.75] transition-colors ${vaultSaved.has(post.url) ? 'text-emerald-400' : 'text-retro-muted hover:text-retro-fg'}`}
+                        />
+                      </button>
+                    )}
                   </div>
 
                   {/* Likes: "Liked by Ana, Bo and 12 others" (falls back to
@@ -1256,6 +1318,7 @@ export function GMatchFeed({
                         commentsLoading={commentsLoadingId === post.id}
                         authorAvatar={authorAvatarUrl}
                         onAuthorClick={() => handleAvatarClick(post.author_id)}
+                        onCommentAuthorClick={(authorId) => handleAvatarClick(authorId)}
                         onAddComment={handleAddComment}
                         onToggleCommentLike={handleToggleCommentLike}
                         onReportComment={onReportComment}

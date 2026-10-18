@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from 'react'
-import { wipeAllTourStates } from '../firstRun/tourState'
 import {
   HelpCircle,
   X,
@@ -146,7 +145,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-label="Help"
-        className="bg-surface-raised border border-border-glass rounded-xl max-w-4xl w-full h-[85vh] max-h-[640px] flex flex-col shadow-2xl overflow-hidden text-retro-fg"
+        className="bg-surface-raised border border-border-glass rounded-xl max-w-4xl w-full h-[80vh] max-h-[620px] flex flex-col shadow-2xl overflow-hidden text-retro-fg my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -315,17 +314,6 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                     If an action fails or a peer appears offline, diagnostic events are logged locally to help identify network and storage issues.
                   </p>
                   <div className="flex items-center gap-3 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        wipeAllTourStates()
-                        window.dispatchEvent(new CustomEvent('orbit_tour_reset'))
-                        onClose()
-                      }}
-                      className="text-xs text-retro-muted hover:text-retro-fg underline underline-offset-2 cursor-pointer"
-                    >
-                      Redo the guided tour
-                    </button>
                     {window.gmatch?.openLogFolder && (
                       <button
                         type="button"

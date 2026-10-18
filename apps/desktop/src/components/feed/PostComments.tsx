@@ -19,6 +19,7 @@ export function PostComments({
   commentsLoading = false,
   authorAvatar = '',
   onAuthorClick,
+  onCommentAuthorClick,
   onAddComment,
   onToggleCommentLike,
   onReportComment,
@@ -28,6 +29,8 @@ export function PostComments({
   commentsLoading?: boolean;
   authorAvatar?: string;
   onAuthorClick?: () => void;
+  /** Open the commenter's profile (per-comment, not the post author). */
+  onCommentAuthorClick?: (authorId: string) => void;
   onAddComment?: (postId: string, text: string) => void;
   onToggleCommentLike?: (postId: string, commentId: string) => void;
   onReportComment?: (commentId: string) => void;
@@ -95,7 +98,23 @@ export function PostComments({
               </div>
               <div>
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-xs font-bold text-retro-fg">{c.author_name}</span>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      if (!onCommentAuthorClick) return;
+                      e.stopPropagation();
+                      onCommentAuthorClick(c.author_id);
+                    }}
+                    onKeyDown={(e) => {
+                      if (!onCommentAuthorClick || e.key !== 'Enter') return;
+                      e.stopPropagation();
+                      onCommentAuthorClick(c.author_id);
+                    }}
+                    className={`text-xs font-bold text-retro-fg ${onCommentAuthorClick ? 'hover:underline cursor-pointer' : ''}`}
+                  >
+                    {c.author_name}
+                  </span>
                   <span className="text-[10px] text-retro-muted">{timeAgo(c.created_at)}</span>
                   {c.pending && <span className="text-[10px] text-retro-muted italic">sending…</span>}
                 </div>

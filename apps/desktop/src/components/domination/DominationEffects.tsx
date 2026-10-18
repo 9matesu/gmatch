@@ -52,7 +52,7 @@ interface ActiveEffect {
 export function DominationEffects({ identity }: { identity: OrbitIdentity | null }) {
   const { settings, update } = useSettings();
   const [activeEffects, setActiveEffects] = useState<ActiveEffect[]>([]);
-  const [cameraAsk, setCameraAsk] = useState<{ from: string; payload: any } | null>(null);
+  const [cameraAsk, setCameraAsk] = useState<{ from: string; senderName?: string; payload: any } | null>(null);
   const [videoUnmuted, setVideoUnmuted] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const settingsRef = useRef(settings);
@@ -393,6 +393,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
             // routing, not effect content, and must survive the schema strip.
             setCameraAsk({
               from,
+              senderName: (payload?.senderName as string | undefined) || undefined,
               payload: {
                 ...p,
                 meshId: payload?.meshId as string | undefined,
@@ -596,7 +597,9 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
               <Camera className="w-6 h-6 text-retro-fg" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-retro-fg">{cameraAsk.from} is asking for a photo</h3>
+              <h3 className="text-sm font-bold text-retro-fg">
+                {cameraAsk.senderName || 'Someone'} is asking for a photo
+              </h3>
               <p className="text-xs text-retro-muted mt-1 leading-relaxed">
                 Your camera turns on for one frame, and the photo goes to them. Nothing is captured unless you allow it.
               </p>

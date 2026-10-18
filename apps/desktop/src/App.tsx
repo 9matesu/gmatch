@@ -46,11 +46,7 @@ import { areItemsStructurallyEqual, areUsersStructurallyEqual, areAnnouncementsS
 import { parseApiTimestamp } from "./utils/timeAgo";
 import { OnboardingFlow } from "./firstRun/OnboardingFlow";
 import { isOnboardingComplete, readOnboardingState } from "./firstRun/onboardingState";
-import { TourDock } from "./components/tour/TourDock";
-import { TourDeck } from "./components/tour/TourDeck";
 import { DEFAULT_FEED_SORT, isFeedSort, type FeedSort } from "./components/feed/feedSort";
-import { TOUR_STEPS } from "./firstRun/tourState";
-import { useTourGuide } from "./components/tour/useTourGuide";
 import { GMatchFeed, type FeedPost } from "./components/feed/GMatchFeed";
 import { GMatchDMs } from "./components/chat/GMatchDMs";
 import type { GroupMember } from "./components/chat/GroupMembersPopover";
@@ -450,21 +446,8 @@ export default function Home() {
     if (window.location.hash !== want) window.history.pushState(null, '', want);
   }, [mainView]);
 
-  // Guided tour: resumable per identity, skippable, teleports only on user click.
-  // Deck + dock share this hook so cards jump to their section in sync.
-  const tourIdentityId = identity?.orbitId ?? null;
-  const {
-    tourState,
-    advance: advanceTour,
-    goToStepId: goToTourStep,
-    skip: skipTour,
-  } = useTourGuide({
-    identityId: tourIdentityId,
-    navigateToView: handleSetMainView,
-    // 'cards' is a stale GamesNavTab value no step uses; the real subtabs
-    // are duel|babecock|ranks|idle.
-    setGamesTab: (tab) => { if (tab !== 'cards') setGamesSubTab(tab); },
-  });
+  // Guided tour removed: first login now opens the Help modal once per
+  // identity (see the effect near showHelpModal).
 
   // Browser back/forward -> view. pushState entries surface via popstate;
   // manual hash edits via hashchange. Listen to both.
@@ -912,8 +895,7 @@ export default function Home() {
   }
 
   const [showHelpModal, setShowHelpModal] = useState(false);
-  const [showPointsHelpModal, setShowPointsHelpModal] = useState(false);
-  const [showFlashModal, setShowFlashModal] = useState(false);
+  const [showPointsHelpModal, setShowPointsHelpModal] = useState(false);  const [showFlashModal, setShowFlashModal] = useState(false);
   const [showChangelogModal, setShowChangelogModal] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     try {
@@ -937,6 +919,18 @@ export default function Home() {
   }, []);
   const [,setAnnouncements] = useState<{ id: string; message: string; created_at: string; created_by_name: string | null }[]>([])
   const [showPasskeys,] = useState(false);
+  // First login: open the Help modal exactly once per identity — the tour's
+  // replacement as first-run guidance. Returning users are never interrupted.
+  useEffect(() => {
+    if (!identity || !isLoaded) return;
+    if (!isOnboardingComplete(readOnboardingState(identity.orbitId))) return;
+    const key = `gmatch_help_seen_${identity.orbitId}`;
+    try {
+      if (localStorage.getItem(key) === '1') return;
+      localStorage.setItem(key, '1');
+    } catch { return; }
+    setShowHelpModal(true);
+  }, [identity, isLoaded]);
   const [identityModalMode, setIdentityModalMode] = useState<'export' | 'login' | 'logout' | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showThemeDrawer, setShowThemeDrawer] = useState(false);
@@ -3736,15 +3730,7 @@ export default function Home() {
       {/* OfflineWarningBanner removed: the 3-day account-deletion policy it
           warned about no longer exists (data-integrity milestone). */}
 
-      {identity && tourState.status === 'active' && tourState.index > 0 && isOnboardingComplete(readOnboardingState(identity.orbitId)) && (
-        <TourDock
-          steps={TOUR_STEPS}
-          state={tourState}
-          onNext={() => advanceTour(1)}
-          onBack={() => advanceTour(-1)}
-          onSkip={skipTour}
-        />
-      )}
+      {/* Guided tour removed: first login opens the Help modal once. */}
 
       <div className={hideUiForWallpaper ? "opacity-0 pointer-events-none transition-opacity duration-150 w-full h-full min-h-0 flex flex-col items-center" : spaceUiDimmed ? "opacity-[0.15] pointer-events-none transition-opacity duration-150 w-full h-full min-h-0 flex flex-col items-center" : "transition-opacity duration-150 w-full h-full min-h-0 flex flex-col items-center"}>
         {!identity ? (
@@ -3811,7 +3797,8 @@ export default function Home() {
                     },
                   );
                 }
-                toast('You are in.', 'success');
+                // First login is silent: the shell appearing IS the feedback
+                // (tonal toasts during first login were noise, B2).
                 loadUsers();
                 loadGallery();
               }}
@@ -3819,7 +3806,7 @@ export default function Home() {
                 setMyProfile((prev) => ({ ...prev, displayName: profile.displayName, tags: profile.tags, pfpUrl: profile.pfpUrl || prev.pfpUrl }));
               }}
               onComplete={() => {
-                toast('Account ready.', 'success');
+                // Silent: first-login feedback is the app itself, not a toast.
               }}
             />
           </ErrorBoundary>
@@ -3887,13 +3874,7 @@ export default function Home() {
                   )}
 
                   {/* gMatch Main Feed View */}
-                  {mainView === 'feed' && identity && tourState.status === 'active' && tourState.index === 0 && isOnboardingComplete(readOnboardingState(identity.orbitId)) && (
-                    <TourDeck
-                      steps={TOUR_STEPS}
-                      onOpen={(step) => goToTourStep(step.id)}
-                      onDismiss={skipTour}
-                    />
-                  )}
+                  {/* Guided tour removed: Help modal covers first-login guidance. */}
                   {mainView === 'feed' && (
                     <div className={isVisionJammed ? "relative" : ""}>
                       {isVisionJammed && (
@@ -4682,7 +4663,7 @@ export default function Home() {
                   setMyProfile((prev) => ({ ...prev, displayName: profile.displayName, tags: profile.tags, pfpUrl: profile.pfpUrl || prev.pfpUrl }));
                 }}
                 onComplete={() => {
-                  toast('Account ready.', 'success');
+                  // Silent: see the guest-branch note above.
                 }}
               />
               <AttachmentUploadModal
