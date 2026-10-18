@@ -64,6 +64,9 @@ contextBridge.exposeInMainWorld('gmatch', {
   wallpaperRestore: () => ipcRenderer.invoke('wallpaper:restore'),
   wallpaperCleanupFiles: () => ipcRenderer.invoke('wallpaper:cleanup-files'),
   grantCameraOnce: () => ipcRenderer.invoke('camera:grant-once'),
+  // Native OS toast for consented domination message/banner effects
+  // (main-process Electron Notification; works minimized). Best-effort.
+  nativeNotify: (title, body) => ipcRenderer.invoke('notify:native', title, body),
   blocklistGet: () => ipcRenderer.invoke('blocklist:get'),
   blocklistSet: (data) => ipcRenderer.invoke('blocklist:set', data),
   blocklistReset: () => ipcRenderer.invoke('blocklist:reset'),

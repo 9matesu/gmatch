@@ -72,6 +72,7 @@ interface DominationTarget {
  * preset tap can never silently drop keys (PUT replaces the whole map). */
 export const CONSENT_KEYS = [
   'allowDesktopBackgroundChange',
+  'allowDesktopWallpaperOS',
   'allowGameBackgroundChange',
   'allowPopupVideo',
   'allowPopupMessage',
@@ -88,12 +89,12 @@ const ACTION_LABELS: Record<string, {
   description: string;
   consent: string;
 }> = {
-  wallpaper: { label: 'Wallpaper', icon: Paintbrush, description: 'Swaps their desktop background for a while.', consent: 'allowDesktopBackgroundChange' },
+  wallpaper: { label: 'Wallpaper', icon: Paintbrush, description: 'Swaps their background for a while (OS tier if they allow it).', consent: 'allowDesktopBackgroundChange' },
   game_bg: { label: 'Game background', icon: Gamepad2, description: 'Covers the app behind them with your image or clip.', consent: 'allowGameBackgroundChange' },
-  popup_video: { label: 'Video popup', icon: Volume2, description: 'Full-screen clip on their side. Always starts muted.', consent: 'allowPopupVideo' },
-  message: { label: 'Message', icon: AlertTriangle, description: 'A short note pops on their screen.', consent: 'allowPopupMessage' },
-  text_overlay: { label: 'Banner text', icon: Layers, description: 'Large text sitting over their screen.', consent: 'allowTextOverlay' },
-  blur: { label: 'Blur', icon: Eye, description: 'Blurs their whole view until they dismiss it.', consent: 'allowBlurEverything' },
+  popup_video: { label: 'Video popup', icon: Volume2, description: 'Muted clip in their app. Dismissible.', consent: 'allowPopupVideo' },
+  message: { label: 'Message', icon: AlertTriangle, description: 'A short note pops in their app (plus an OS toast).', consent: 'allowPopupMessage' },
+  text_overlay: { label: 'Banner text', icon: Layers, description: 'Large text sitting over their app.', consent: 'allowTextOverlay' },
+  blur: { label: 'Blur', icon: Eye, description: 'Blurs their gMatch view until they dismiss it. Never other apps.', consent: 'allowBlurEverything' },
   camera: { label: 'Photo request', icon: Camera, description: 'Asks their camera for one photo. They approve every request.', consent: 'allowRemoteCamera' },
 };
 
@@ -102,6 +103,9 @@ const ACTION_ORDER = Object.keys(ACTION_LABELS);
 /** In-panel subtab ids: Send | My consent | History | Hacks. */
 export const DOMINATION_SUBTABS = ['send', 'consent', 'history', 'hacks'] as const;
 export type DominationSubtab = (typeof DOMINATION_SUBTABS)[number];
+
+/** Local persistence for mesh outbox rows (sealed sends skip the server). */
+const MESH_OUTBOX_KEY = 'gmatch.domination.meshOutbox.v1';
 
 export const INTENSITY_PRESETS: Record<string, Record<string, boolean>> = {
   mild: {
@@ -137,12 +141,13 @@ export const INTENSITY_PRESETS: Record<string, Record<string, boolean>> = {
 };
 
 const CONSENT_ROWS: Array<{ key: string; label: string; desc: string }> = [
-  { key: 'allowDesktopBackgroundChange', label: 'Wallpaper', desc: 'Others may replace your desktop background.' },
+  { key: 'allowDesktopBackgroundChange', label: 'Wallpaper', desc: 'Others may replace your gMatch background.' },
+  { key: 'allowDesktopWallpaperOS', label: 'OS wallpaper (high impact)', desc: 'A wallpaper effect may also change your REAL Windows desktop wallpaper for a while, then restore it. Needs Wallpaper on, off by default.' },
   { key: 'allowGameBackgroundChange', label: 'Game background', desc: 'Others may cover the app behind you.' },
-  { key: 'allowPopupVideo', label: 'Video popup', desc: 'Full-screen clip (muted, dismissible) may appear.' },
-  { key: 'allowPopupMessage', label: 'Message', desc: 'A short note may pop on your screen.' },
-  { key: 'allowTextOverlay', label: 'Banner text', desc: 'Large text may sit over your screen.' },
-  { key: 'allowBlurEverything', label: 'Blur', desc: 'Your whole view may blur for a moment.' },
+  { key: 'allowPopupVideo', label: 'Video popup', desc: 'A muted, dismissible clip may appear in the app.' },
+  { key: 'allowPopupMessage', label: 'Message', desc: 'A short note may pop in the app and as an OS toast.' },
+  { key: 'allowTextOverlay', label: 'Banner text', desc: 'Large text may sit over your app (plus an OS toast).' },
+  { key: 'allowBlurEverything', label: 'Blur', desc: 'The gMatch window may blur for a moment. Never other apps or your desktop.' },
   { key: 'allowRemoteCamera', label: 'Camera request', desc: 'Others may ask for one photo. You approve every request.' },
   { key: 'allowPublicCamera', label: 'Public photos', desc: 'Camera photos may be posted publicly. Off: they go only to the sender.' },
   { key: 'allowHacks', label: 'Hacks', desc: 'Purchased hacks (screen lock, vision jam) may land on you.' },
@@ -199,8 +204,14 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
   const [outgoing, setOutgoing] = useState<any[]>([]);
   // Mesh outbox (Fase 5/6): sealed sends never touch the server, so their
   // entries live here — merged into the Outbox list below, flipped by the
-  // receipt event the courier hook dispatches (landed | declined).
-  const [meshOutgoing, setMeshOutgoing] = useState<any[]>([]);
+  // receipt event the courier hook dispatches (landed | declined | completed
+  // | failed | expired). Persisted (capped) so a restart keeps the history.
+  const [meshOutgoing, setMeshOutgoing] = useState<any[]>(() => {
+    try { return JSON.parse(localStorage.getItem(MESH_OUTBOX_KEY) || '[]') as any[]; } catch { return []; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(MESH_OUTBOX_KEY, JSON.stringify(meshOutgoing.slice(0, 100))); } catch { /* private mode */ }
+  }, [meshOutgoing]);
   useEffect(() => {
     const onReceipt = (e: Event) => {
       const detail = (e as CustomEvent<{ id?: string; status?: string }>).detail;
@@ -887,9 +898,9 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                   </div>
                   <span
                     className={`shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded border ${
-                      st === 'executed'
+                      st === 'executed' || st === 'completed'
                         ? 'text-emerald-400 border-emerald-500/30'
-                        : st === 'sent'
+                        : st === 'sent' || st === 'landed'
                           ? 'text-retro-muted border-border-glass'
                           : st === 'expired'
                             ? 'text-amber-400 border-amber-500/30'
@@ -897,12 +908,22 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     }`}
                     title={
                       st === 'sent' ? 'Accepted by the server, waiting for their screen to confirm'
-                        : st === 'executed' ? 'Confirmed on their screen'
-                          : st === 'expired' ? 'Their client never confirmed it rendered (app closed or camera blocked). Their consent cut stayed paid.'
-                            : st
+                        : st === 'landed' ? 'Reached their screen (consented); execution still pending'
+                          : st === 'executed' || st === 'completed' ? 'Confirmed executed on their device'
+                            : st === 'failed' ? 'Their client tried and the effect failed (OS refused, media unreachable, or capture declined)'
+                              : st === 'expired' ? 'Their client never confirmed it rendered (app closed or camera blocked). Their consent cut stayed paid.'
+                                : st
                     }
                   >
-                    {st === 'executed' ? 'landed' : st === 'sent' ? (historyPane === 'outgoing' ? 'awaiting' : 'received') : st === 'expired' ? (historyPane === 'outgoing' ? 'fizzled' : 'skipped') : st}
+                    {st === 'executed' || st === 'completed'
+                      ? 'landed'
+                      : st === 'landed'
+                        ? 'delivered'
+                        : st === 'sent'
+                          ? (historyPane === 'outgoing' ? 'awaiting' : 'received')
+                          : st === 'expired'
+                            ? (historyPane === 'outgoing' ? 'fizzled' : 'skipped')
+                            : st}
                   </span>
                 </div>
               );

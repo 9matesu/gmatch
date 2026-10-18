@@ -7,6 +7,7 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import { useSettings } from '../../hooks/useSettings';
 import { logger } from '../../utils/logger';
 import { useGame } from '../../game/store';
+import { validateDomPayload } from '../../utils/dominationMesh';
 
 interface DominationEvent {
   type: 'domination';
@@ -24,6 +25,10 @@ interface DominationEvent {
     actionId?: string;
     intensityPreset?: string;
     isPublic?: boolean;
+    /** Mesh request id (mesh path) — the execution receipt keys on it. */
+    meshId?: string;
+    /** Sealed sender display name (mesh path). */
+    senderName?: string;
     /** g$ the victim just earned from the consent cut (server-paid). */
     victimReward?: number;
   };
@@ -94,27 +99,66 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
   }, [clearAll, update]);
 
   // OS-level wallpaper swap (Windows). Applies for the effect duration, then
-  // restores the previous wallpaper. No-ops in the browser.
+  // restores the previous wallpaper. No-ops in the browser. The OS swap is a
+  // HIGH-IMPACT tier with its own consent (allowDesktopWallpaperOS) — the
+  // in-app swap alone does not unlock it. The execution outcome reported to
+  // the sender is the OS result when the tier is on: a consented-but-failed
+  // swap reports failed, never a fabricated success.
   useEffect(() => {
     const wp = activeEffects.find(e => e.type === 'wallpaper');
     if (!wp || !wp.data?.url) return;
     let cancelled = false;
     let restoreTimer = 0;
+    let reported = false;
+    const report = (ok: boolean) => {
+      if (reported) return;
+      reported = true;
+      if (wp.id.startsWith('dom-')) {
+        // Mesh path: the manager seals completed/failed to the sender.
+        window.dispatchEvent(new CustomEvent('gmatch:domination-executed', { detail: { id: wp.id, ok } }));
+      } else if (identity) {
+        // Server path: the ack records executed vs failed in the ledger.
+        void orbitFetch(`/api/domination/ack/${wp.id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ok }),
+        }, identity).catch(() => { });
+      }
+    };
     void (async () => {
       try {
+        const bridge = window.gmatch?.wallpaperSetData;
+        const osTier = Boolean(settingsRef.current.allowDesktopWallpaperOS) && Boolean(bridge);
         const res = await fetch(wp.data.url, { referrerPolicy: 'no-referrer' });
-        if (!res.ok) return;
+        if (!res.ok) {
+          report(!osTier); // in-app swap may still render via the URL
+          return;
+        }
         const blob = await res.blob();
-        if (!blob.type.startsWith('image/')) return;
+        if (!blob.type.startsWith('image/') || blob.size > 25 * 1024 * 1024) {
+          report(!osTier);
+          return;
+        }
+        if (cancelled) { report(true); return; }
         const buf = await blob.arrayBuffer();
-        const out = await window.gmatch?.wallpaperSetData?.(buf, blob.type);
-        if (cancelled || !out?.ok) return;
+        if (!osTier || !bridge) {
+          report(true); // in-app wallpaper executed; OS tier not consented
+          return;
+        }
+        const out = await bridge(buf, blob.type);
+        if (cancelled) {
+          if (out?.ok) void window.gmatch?.wallpaperRestore?.();
+          report(true); // the in-app effect did render
+          return;
+        }
+        report(Boolean(out?.ok));
+        if (!out?.ok) return;
         const ms = Number(wp.duration) || 60_000;
         restoreTimer = window.setTimeout(() => {
           void window.gmatch?.wallpaperRestore?.();
         }, ms);
       } catch {
-        /* desktop swap is best-effort; the in-app wallpaper still applied */
+        report(false); // fetch blew up: no in-app wallpaper, no OS swap
       }
     })();
     return () => {
@@ -124,8 +168,10 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
   }, [activeEffects]);
 
   async function captureAndSend(from: string, payload: any) {
-    if (!navigator.mediaDevices?.getUserMedia) return;
+    const meshId = typeof payload?.meshId === 'string' ? payload.meshId : undefined;
+    const actionId = typeof payload?.actionId === 'string' ? payload.actionId : undefined;
     try {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error('no camera API');
       // Consume the one-shot desktop permission before prompting the camera.
       await window.gmatch?.grantCameraOnce?.();
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -143,13 +189,21 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
       stream.getTracks().forEach(t => t.stop());
-      if (!ctx || !identity) return;
+      if (!ctx || !identity) throw new Error('capture unavailable');
       ctx.drawImage(video, 0, 0);
-      const dataUrl = canvas.toDataURL('image/jpeg', payload.quality || 0.8);
+      const dataUrl = canvas.toDataURL('image/jpeg', payload?.quality || 0.8);
 
       const isPublicConsent = Boolean(settingsRef.current.allowPublicCamera);
-      const isPublicRequested = payload.isPublic !== undefined ? Boolean(payload.isPublic) : true;
+      const isPublicRequested = payload?.isPublic !== undefined ? Boolean(payload.isPublic) : true;
       const makePublic = isPublicConsent && isPublicRequested;
+
+      if (meshId) {
+        // Mesh path: the frame itself is the delivery — sealed straight back
+        // to the requester (no server media store, works between couriers).
+        // The completed receipt fires only after this seal succeeds.
+        window.dispatchEvent(new CustomEvent('gmatch:domination-photo-captured', { detail: { id: meshId, dataUrl } }));
+        return;
+      }
 
       const blob = await fetch(dataUrl).then((r) => r.blob());
       const file = new File([blob], `domination-${Date.now()}.jpg`, { type: 'image/jpeg' });
@@ -160,11 +214,16 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
         recipients: !makePublic ? from : undefined,
       });
       // A delivered photo IS the receipt for a camera action.
-      if (payload.actionId) {
-        void orbitFetch(`/api/domination/ack/${payload.actionId}`, { method: 'POST' }, identity).catch(() => { });
+      if (actionId) {
+        void orbitFetch(`/api/domination/ack/${actionId}`, { method: 'POST' }, identity).catch(() => { });
       }
     } catch (e) {
       logger.error('Camera capture declined or failed:', e);
+      if (meshId) {
+        // The sender must not see "completed" for an approved-but-undelivered
+        // photo: report the failure through the execution channel.
+        window.dispatchEvent(new CustomEvent('gmatch:domination-executed', { detail: { id: meshId, ok: false } }));
+      }
     }
   }
 
@@ -189,77 +248,103 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
       if ((settingsRef.current.dominationInboundMutedUntil || 0) > Date.now()) return;
 
       const { action, payload, from } = detail;
+      // The mesh request id (mesh path) or the server actionId (relay path).
+      const requestId = (payload?.meshId as string | undefined) || payload?.actionId;
+      // Execution truth: the sender's outbox distinguishes delivered from
+      // executed, so every path below reports what actually happened.
+      const reportExecuted = (ok: boolean) => {
+        if (!requestId) return;
+        if (payload?.meshId) {
+          window.dispatchEvent(new CustomEvent('gmatch:domination-executed', { detail: { id: payload.meshId, ok } }));
+        }
+        // Server path: the ack POST below marks executed; failures stay honest
+        // by NOT acking (the server route also accepts an explicit failure).
+      };
+      // Defense in depth: the mesh manager already clamps, but the server
+      // relay path delivers raw sender payloads — validate here for both.
+      const checked = validateDomPayload(action, payload);
+      if (!checked.ok) {
+        logger.warn(`Domination ${action} rejected: ${checked.reason}`);
+        reportExecuted(false);
+        return;
+      }
+      const p = checked.payload as Record<string, unknown>;
       // Track whether something actually rendered, so the sender's history
       // shows delivered truth instead of a fabricated status.
       let applied = false;
 
       switch (action) {
         case 'wallpaper':
-          if (settings.allowDesktopBackgroundChange && payload.url) {
+          if (settings.allowDesktopBackgroundChange && typeof p.url === 'string') {
             applied = true;
             addEffect({
-              id: payload.actionId || crypto.randomUUID(),
+              id: (requestId as string) || crypto.randomUUID(),
               type: 'wallpaper',
-              data: { url: payload.url },
-              duration: payload.duration,
+              data: { url: p.url },
+              duration: p.duration as number | undefined,
             });
-            update('wallpaperUrl', payload.url);
+            update('wallpaperUrl', p.url);
             update('wallpaperPreset', 'domination');
-            update('wallpaperMime', /\.(mp4|webm|ogv|mov)(\?|$)/i.test(payload.url.split('?')[0]) ? 'video/mp4' : 'image/jpeg');
+            update('wallpaperMime', /\.(mp4|webm|ogv|mov)(\?|$)/i.test(String(p.url).split('?')[0]) ? 'video/mp4' : 'image/jpeg');
+            // The OS swap (and its execution report) happens in the dedicated
+            // effect below — it is the part that can genuinely fail.
           }
           break;
 
         case 'game_bg':
-          if (settings.allowGameBackgroundChange && payload.url) {
+          if (settings.allowGameBackgroundChange && typeof p.url === 'string') {
             applied = true;
             addEffect({
-              id: payload.actionId || crypto.randomUUID(),
+              id: (requestId as string) || crypto.randomUUID(),
               type: 'game_bg',
-              data: { url: payload.url },
-              duration: payload.duration,
+              data: { url: p.url },
+              duration: p.duration as number | undefined,
             });
           }
           break;
 
         case 'popup_video':
-          if (settings.allowPopupVideo && payload.url) {
+          if (settings.allowPopupVideo && typeof p.url === 'string') {
             applied = true;
             setVideoUnmuted(false);
             addEffect({
-              id: payload.actionId || crypto.randomUUID(),
+              id: (requestId as string) || crypto.randomUUID(),
               type: 'popup_video',
-              data: { url: payload.url, autoPlay: true, muted: true },
-              duration: payload.duration,
+              data: { url: p.url, autoPlay: true, muted: true },
+              duration: p.duration as number | undefined,
             });
           }
           break;
 
         case 'message':
-          if (settings.allowPopupMessage && payload.text) {
+          if (settings.allowPopupMessage && typeof p.text === 'string') {
             applied = true;
             addEffect({
-              id: payload.actionId || crypto.randomUUID(),
+              id: (requestId as string) || crypto.randomUUID(),
               type: 'message',
-              data: { text: payload.text },
-              duration: payload.duration || 10000,
+              data: { text: p.text },
+              duration: (p.duration as number) || 10000,
             });
+            // Native toast (works while minimized, Windows Action Center).
+            void window.gmatch?.nativeNotify?.('gMatch message', p.text);
           }
           break;
 
         case 'text_overlay':
-          if (settings.allowTextOverlay && payload.text) {
+          if (settings.allowTextOverlay && typeof p.text === 'string') {
             applied = true;
             addEffect({
-              id: payload.actionId || crypto.randomUUID(),
+              id: (requestId as string) || crypto.randomUUID(),
               type: 'text_overlay',
               data: {
-                text: payload.text,
-                position: payload.position || 'center',
-                size: payload.size || 'large',
-                color: payload.color || '#9FE3FF',
+                text: p.text,
+                position: (p.position as string) || 'center',
+                size: (p.size as string) || 'large',
+                color: (p.color as string) || '#9FE3FF',
               },
-              duration: payload.duration,
+              duration: p.duration as number | undefined,
             });
+            void window.gmatch?.nativeNotify?.('gMatch banner', p.text);
           }
           break;
 
@@ -267,10 +352,10 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
           if (settings.allowBlurEverything) {
             applied = true;
             addEffect({
-              id: payload.actionId || crypto.randomUUID(),
+              id: (requestId as string) || crypto.randomUUID(),
               type: 'blur',
-              data: { intensity: payload.intensity || 8 },
-              duration: payload.duration,
+              data: { intensity: (p.intensity as number) || 8 },
+              duration: p.duration as number | undefined,
             });
           }
           break;
@@ -278,17 +363,42 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
         case 'camera':
           // Every capture needs a fresh in-app approval, no silent prompts.
           if (settings.allowRemoteCamera && settings.cameraPermissionMode !== 'deny') {
-            setCameraAsk({ from, payload });
+            // The envelope ids ride OUTSIDE the validated payload — they are
+            // routing, not effect content, and must survive the schema strip.
+            setCameraAsk({
+              from,
+              payload: {
+                ...p,
+                meshId: payload?.meshId as string | undefined,
+                actionId: payload?.actionId as string | undefined,
+              },
+            });
           }
           break;
       }
 
-      if (applied && payload.actionId && identity) {
-        // Tell the relay it really rendered (sender sees executed vs sent).
-        void orbitFetch(`/api/domination/ack/${payload.actionId}`, { method: 'POST' }, identity).catch(() => { });
+      if (applied) {
+        // Non-wallpaper effects executed the moment they rendered. Wallpaper
+        // reports from the OS-swap effect below (it can genuinely fail).
+        if (action !== 'wallpaper') reportExecuted(true);
+        if (payload?.actionId && identity && action !== 'wallpaper') {
+          void orbitFetch(`/api/domination/ack/${payload.actionId}`, { method: 'POST' }, identity).catch(() => { });
+        }
+      } else if (requestId && action !== 'camera') {
+        // Camera is intentionally not reported here: rendering the approval
+        // ask is not an outcome — captureAndSend / decline report it.
+        reportExecuted(false);
+        if (payload?.actionId && identity) {
+          // Server path failure: record it instead of leaving a 'sent' row.
+          void orbitFetch(`/api/domination/ack/${payload.actionId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ok: false }),
+          }, identity).catch(() => { });
+        }
       }
 
-      if (typeof payload.victimReward === 'number' && payload.victimReward > 0) {
+      if (typeof payload?.victimReward === 'number' && payload.victimReward > 0) {
         useGame.getState().notify(`Effect from a player. You earned +${payload.victimReward} g$ for putting up with it`);
       }
     };
@@ -471,7 +581,16 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
                 onClick={() => {
                   const ask = cameraAsk;
                   setCameraAsk(null);
-                  if (ask) meshCameraDecision(false, ask.payload?.meshId);
+                  if (!ask) return;
+                  // Decline IS an outcome for both transports.
+                  meshCameraDecision(false, ask.payload?.meshId);
+                  if (ask.payload?.actionId && identity) {
+                    void orbitFetch(`/api/domination/ack/${ask.payload.actionId}`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ ok: false }),
+                    }, identity).catch(() => { });
+                  }
                 }}
                 className="flex-1 px-4 py-2 rounded-lg border border-border-glass text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer"
               >
@@ -483,7 +602,8 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
                   const ask = cameraAsk;
                   setCameraAsk(null);
                   if (ask) {
-                    meshCameraDecision(true, ask.payload?.meshId);
+                    // Approval alone is not success: the receipt fires when
+                    // the frame is delivered (or fails) inside captureAndSend.
                     void captureAndSend(ask.from, ask.payload);
                   }
                 }}

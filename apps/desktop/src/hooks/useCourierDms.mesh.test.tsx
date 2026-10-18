@@ -141,7 +141,7 @@ describe('useCourierDms mesh domination (Fase 5/6 slice 3)', () => {
     expect(decodeDomBody(opened.body)).toEqual({ t: 'dom_receipt', id: 'dom-in-2', status: 'declined' })
   })
 
-  it('mesh camera decision approved seals a landed receipt for the request id', async () => {
+  it('mesh camera approval alone seals nothing; the delivered frame seals dom_photo + completed', async () => {
     const box: { value: unknown[] } = { value: [] }
     box.value.push(seal1to1(
       JSON.stringify({ t: 'dom_request', id: 'dom-cam-9', action: 'camera' }),
@@ -161,14 +161,75 @@ describe('useCourierDms mesh domination (Fase 5/6 slice 3)', () => {
     // Live approval pending: no receipt yet.
     await new Promise((r) => setTimeout(r, 50))
     expect(box.value).toHaveLength(1)
+    // Approval alone is NOT success: nothing is sealed until the frame is.
     act(() => {
       window.dispatchEvent(new CustomEvent('gmatch:domination-camera-decision', {
         detail: { id: 'dom-cam-9', approved: true },
       }))
     })
+    await new Promise((r) => setTimeout(r, 50))
+    expect(box.value).toHaveLength(1)
+    // The delivered frame is the receipt: dom_photo to the requester, then a
+    // completed receipt — never a fabricated success for a bare approval.
+    act(() => {
+      window.dispatchEvent(new CustomEvent('gmatch:domination-photo-captured', {
+        detail: { id: 'dom-cam-9', dataUrl: 'data:image/jpeg;base64,ZnJhbWU=' },
+      }))
+    })
+    await waitFor(() => expect(box.value.length).toBeGreaterThanOrEqual(3))
+    const openedBodies = box.value.slice(1).map((env) => decodeDomBody(open1to1(env as never, bob.encryptionPrivHex).body))
+    expect(openedBodies).toContainEqual({ t: 'dom_photo', id: 'dom-cam-9', data: 'data:image/jpeg;base64,ZnJhbWU=' })
+    expect(openedBodies).toContainEqual({ t: 'dom_receipt', id: 'dom-cam-9', status: 'completed' })
+  })
+
+  it('a failed capture seals a failed receipt, not success', async () => {
+    const box: { value: unknown[] } = { value: [] }
+    box.value.push(seal1to1(
+      JSON.stringify({ t: 'dom_request', id: 'dom-cam-10', action: 'camera' }),
+      'mail', bob, alice,
+    ))
+    renderHook(
+      () => useCourierDms(alice, {
+        fetchImpl: mockFetch(box),
+        webSocketFactory: () => new FakeSocket(),
+        dominationConsent: (a) => a === 'camera',
+      }),
+      { wrapper },
+    )
+    await new Promise((r) => setTimeout(r, 50))
+    expect(box.value).toHaveLength(1)
+    act(() => {
+      window.dispatchEvent(new CustomEvent('gmatch:domination-executed', {
+        detail: { id: 'dom-cam-10', ok: false },
+      }))
+    })
     await waitFor(() => expect(box.value.length).toBeGreaterThan(1))
-    const receiptEnv = box.value[box.value.length - 1] as never
-    const opened = open1to1(receiptEnv, bob.encryptionPrivHex)
-    expect(decodeDomBody(opened.body)).toEqual({ t: 'dom_receipt', id: 'dom-cam-9', status: 'landed' })
+    const opened = open1to1(box.value[box.value.length - 1] as never, bob.encryptionPrivHex)
+    expect(decodeDomBody(opened.body)).toEqual({ t: 'dom_receipt', id: 'dom-cam-10', status: 'failed' })
+  })
+
+  it('execution truth: a consented effect reports completed after the renderer executed it', async () => {
+    const box: { value: unknown[] } = { value: [] }
+    box.value.push(seal1to1(
+      JSON.stringify({ t: 'dom_request', id: 'dom-exec-1', action: 'message', payload: { text: 'boo' } }),
+      'mail', bob, alice,
+    ))
+    renderHook(
+      () => useCourierDms(alice, {
+        fetchImpl: mockFetch(box),
+        webSocketFactory: () => new FakeSocket(),
+        dominationConsent: (a) => a === 'message',
+      }),
+      { wrapper },
+    )
+    await waitFor(() => expect(box.value.length).toBeGreaterThan(1)) // landed
+    act(() => {
+      window.dispatchEvent(new CustomEvent('gmatch:domination-executed', {
+        detail: { id: 'dom-exec-1', ok: true },
+      }))
+    })
+    await waitFor(() => expect(box.value.length).toBeGreaterThan(2))
+    const opened = open1to1(box.value[box.value.length - 1] as never, bob.encryptionPrivHex)
+    expect(decodeDomBody(opened.body)).toEqual({ t: 'dom_receipt', id: 'dom-exec-1', status: 'completed' })
   })
 })

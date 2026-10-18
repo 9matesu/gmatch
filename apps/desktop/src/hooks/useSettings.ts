@@ -38,6 +38,9 @@ export interface AppSettings {
   // PC Domination (opt-in remote effects)
   pcDominationEnabled: boolean
   allowDesktopBackgroundChange: boolean
+  /** HIGH-IMPACT tier: lets a consented wallpaper effect change the real OS
+   *  desktop wallpaper (Windows). The in-app swap does not unlock it. */
+  allowDesktopWallpaperOS: boolean
   allowGameBackgroundChange: boolean
   allowPopupVideo: boolean
   allowPopupMessage: boolean
@@ -93,6 +96,7 @@ const DEFAULTS: AppSettings = {
   animatedChrome: false,
   pcDominationEnabled: false,
   allowDesktopBackgroundChange: true,
+  allowDesktopWallpaperOS: false,
   allowGameBackgroundChange: true,
   allowPopupVideo: true,
   allowPopupMessage: true,

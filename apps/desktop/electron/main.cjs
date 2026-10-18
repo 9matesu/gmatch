@@ -1,7 +1,7 @@
 // gMatch Electron main process.
 // All booru HTTP happens HERE (renderer never touches the network directly).
 // Endpoints per docs/SPEC.md §6. 10s timeout, browser UA, round-robin health.
-const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage, session, shell } = require('electron')
+const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage, session, shell, Notification } = require('electron')
 const https = require('https')
 const fs = require('node:fs')
 const path = require('node:path')
@@ -18,6 +18,9 @@ const { loadRegistry: loadBooruRegistry, refererFor: booruRefererFor } = require
 // Background video & screen sharing fix: keep video playback running and prevent black screen when alt-tabbed / occluded.
 app.commandLine.appendSwitch('disable-background-timer-throttling')
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
+// Windows toasts (domination message/banner) need a stable App User Model ID;
+// without one the OS silently drops Notification.show() on some installs.
+if (process.platform === 'win32') app.setAppUserModelId('com.gmatch.desktop')
 app.commandLine.appendSwitch('disable-renderer-backgrounding')
 
 // A portable exe can run twice from one double-click (and did: two sidecars
@@ -1781,6 +1784,23 @@ app.whenReady().then(async () => {
   // Camera stays denied by default; the renderer consumes a one-shot grant
   // only AFTER the victim clicks "Allow once" on the in-app prompt.
   ipcMain.handle('camera:grant-once', () => { cameraGrantOnce = true; return { ok: true } })
+  // Native OS notification for consented domination message/banner effects.
+  // Works while the window is minimized or unfocused (Windows Action Center);
+  // best-effort — the in-app overlay always renders regardless. Title/body
+  // are plain strings and Chromium escapes them; no shell, no URL, no exec.
+  ipcMain.handle('notify:native', (_event, title, body) => {
+    try {
+      const t = String(title || 'gMatch').slice(0, 120)
+      const b = String(body || '').slice(0, 280)
+      if (!Notification.isSupported()) return { ok: false, reason: 'unsupported' }
+      const n = new Notification({ title: t, body: b, silent: false })
+      n.on('failed', (_e, error) => { console.warn('[domination] native notification failed:', error) })
+      n.show()
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, reason: err?.message || String(err) }
+    }
+  })
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
     if (permission === 'media' && cameraGrantOnce) {
       cameraGrantOnce = false

@@ -69,11 +69,19 @@ describe('DominationMeshManager', () => {
 
   it('duplicate request id executes once (idempotency)', async () => {
     const { mgr, effects, mail } = setup({ message: true });
-    const body = JSON.stringify({ t: 'dom_request', id: 'dom-9', action: 'message' });
+    const body = JSON.stringify({ t: 'dom_request', id: 'dom-9', action: 'message', payload: { text: 'boo' } });
     mgr.handleOpened(opened(body), env);
     mgr.handleOpened(opened(body), env);
     expect(effects.length).toBe(1);
     expect(mail.send).toHaveBeenCalledTimes(1);
+  });
+
+  it('payload-less message is refused (failed receipt), never silently rendered', async () => {
+    const { mgr, effects, sent } = setup({ message: true });
+    const body = JSON.stringify({ t: 'dom_request', id: 'dom-11', action: 'message' });
+    mgr.handleOpened(opened(body), env);
+    expect(effects).toEqual([]);
+    expect(JSON.parse(sent[0].body)).toEqual({ t: 'dom_receipt', id: 'dom-11', status: 'failed' });
   });
 
   it('foreign bodies are not consumed', () => {
@@ -89,13 +97,20 @@ describe('DominationMeshManager', () => {
     expect(statuses).toEqual([{ id: 'dom-3', status: 'landed' }]);
   });
 
-  it('camera waits for live approval: no auto receipt, land()/decline() seal it', async () => {
+  it('camera waits for live approval: approval alone seals nothing; the frame seals dom_photo + completed', async () => {
     const { mgr, effects, sent } = setup({ camera: true });
     const body = JSON.stringify({ t: 'dom_request', id: 'dom-10', action: 'camera' });
     expect(mgr.handleOpened(opened(body), env)).toBe(true);
     expect(effects).toEqual([{ action: 'camera', from: 'peer-1' }]);
     expect(sent.length).toBe(0);
+    // Approval keeps the return address but seals NOTHING yet — success is
+    // the delivered frame, not the consent.
     await mgr.land('dom-10');
-    expect(JSON.parse(sent[0].body)).toEqual({ t: 'dom_receipt', id: 'dom-10', status: 'landed' });
+    expect(sent.length).toBe(0);
+    const delivered = await mgr.completeWithPhoto('dom-10', 'data:image/jpeg;base64,Zg==', 'Vic');
+    expect(delivered).toBe(true);
+    const bodies = sent.map((s) => JSON.parse(s.body));
+    expect(bodies).toContainEqual({ t: 'dom_photo', id: 'dom-10', data: 'data:image/jpeg;base64,Zg==', n: 'Vic' });
+    expect(bodies.at(-1)).toEqual({ t: 'dom_receipt', id: 'dom-10', status: 'completed' });
   });
 });

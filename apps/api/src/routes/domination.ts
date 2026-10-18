@@ -283,19 +283,26 @@ domination.get('/targets', async (c) => {
 
 /**
  * POST /api/domination/ack/:actionId - the VICTIM confirms an inbound effect
- * actually rendered. Until then the sender only sees "sent" (delivered to the
- * relay), never a fabricated "executed". Best-effort on the victim side.
+ * actually rendered (body omitted or {ok:true} -> 'executed') or failed to
+ * ({ok:false} -> 'failed'). Until then the sender only sees "sent" (delivered
+ * to the relay), never a fabricated "executed". Best-effort on the victim side.
  */
 domination.post('/ack/:actionId', async (c) => {
   const userId = c.get('orbitId')
   const id = c.req.param('actionId')
+  let ok = true
+  try {
+    const body = await c.req.json()
+    if (body && typeof body === 'object' && body.ok === false) ok = false
+  } catch { /* bodyless ack = rendered */ }
   const row = await c.env.DB.prepare('SELECT victim_id, status FROM DominationActions WHERE id = ?')
     .bind(id).first<{ victim_id: string; status: string }>()
   if (!row) return c.json({ error: 'Action not found' }, 404)
   if (row.victim_id !== userId) return c.json({ error: 'Forbidden' }, 403)
   if (row.status !== 'sent') return c.json({ ok: true, already: true })
-  await c.env.DB.prepare("UPDATE DominationActions SET status = 'executed', executed_at = ? WHERE id = ?")
-    .bind(new Date().toISOString(), id).run()
+  const next = ok ? 'executed' : 'failed'
+  await c.env.DB.prepare('UPDATE DominationActions SET status = ?, executed_at = ? WHERE id = ?')
+    .bind(next, new Date().toISOString(), id).run()
   return c.json({ ok: true })
 })
 

@@ -25,8 +25,10 @@ export interface CourierDeps {
   dominationConsent?: (action: string) => boolean
   /** A consented mesh domination action arrived — render the effect. */
   onDomEffect?: (action: string, fromOrbitId: string, senderName?: string) => void
-  /** A mesh receipt arrived for our outbox (landed | declined). */
-  onDomReceipt?: (requestId: string, status: 'landed' | 'declined') => void
+  /** A mesh receipt arrived for our outbox (landed | declined | completed | failed | expired). */
+  onDomReceipt?: (requestId: string, status: 'landed' | 'declined' | 'completed' | 'failed' | 'expired') => void
+  /** The captured frame for one of our camera requests arrived, sealed. */
+  onIncomingPhoto?: (requestId: string, fromOrbitId: string, dataUrl: string, senderName?: string) => void
 }
 
 /**
@@ -127,6 +129,12 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
       onOutboxStatus: (id, status) => {
         depsRef.current.onDomReceipt?.(id, status);
         window.dispatchEvent(new CustomEvent('gmatch:domination-receipt', { detail: { id, status } }));
+      },
+      onIncomingPhoto: (requestId, from, dataUrl, senderName) => {
+        depsRef.current.onIncomingPhoto?.(requestId, from, dataUrl, senderName);
+        window.dispatchEvent(new CustomEvent('gmatch:domination-photo', {
+          detail: { id: requestId, from, dataUrl, senderName },
+        }));
       },
       onIncomingEffect: (action, from, extra) => {
         const detail = {
@@ -229,7 +237,10 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
   }, [])
 
   // Mesh camera verdicts (Fase 5/6): the receiver approved/denied a pending
-  // request in DominationEffects — seal the receipt back (landed | declined).
+  // request in DominationEffects. Denial seals a declined receipt; approval
+  // only hands the turn to the capture — the receipt fires when the frame is
+  // actually delivered (completeWithPhoto) or fails (reportExecution), so the
+  // sender's outbox never shows success for an approved-but-undelivered photo.
   useEffect(() => {
     const onCameraDecision = (e: Event) => {
       const d = (e as CustomEvent<{ id?: string; approved?: boolean }>).detail;
@@ -237,8 +248,27 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
       if (d.approved) void domMgrRef.current.land(d.id);
       else void domMgrRef.current.decline(d.id);
     };
+    // Execution truth (hardening wave): the renderer reports what actually
+    // happened to a consented effect; the manager seals completed/failed back.
+    const onExecuted = (e: Event) => {
+      const d = (e as CustomEvent<{ id?: string; ok?: boolean }>).detail;
+      if (!d?.id || !domMgrRef.current) return;
+      void domMgrRef.current.reportExecution(d.id, d.ok === true);
+    };
+    // The captured frame: seal it to the requester, then report completed.
+    const onPhotoCaptured = (e: Event) => {
+      const d = (e as CustomEvent<{ id?: string; dataUrl?: string }>).detail;
+      if (!d?.id || !d.dataUrl || !domMgrRef.current) return;
+      void domMgrRef.current.completeWithPhoto(d.id, d.dataUrl, ownDisplayName() || undefined);
+    };
     window.addEventListener('gmatch:domination-camera-decision', onCameraDecision);
-    return () => window.removeEventListener('gmatch:domination-camera-decision', onCameraDecision);
+    window.addEventListener('gmatch:domination-executed', onExecuted);
+    window.addEventListener('gmatch:domination-photo-captured', onPhotoCaptured);
+    return () => {
+      window.removeEventListener('gmatch:domination-camera-decision', onCameraDecision);
+      window.removeEventListener('gmatch:domination-executed', onExecuted);
+      window.removeEventListener('gmatch:domination-photo-captured', onPhotoCaptured);
+    };
   }, [])
 
   const createRoom = useCallback((name: string): Room | null => roomsRef.current?.createRoom(name) ?? null, [])
