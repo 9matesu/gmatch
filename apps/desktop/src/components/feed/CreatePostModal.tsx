@@ -10,11 +10,13 @@ import {
   Tag,
   UploadCloud,
   Camera,
-  Link as LinkIcon,
+  FolderOpen,
   ChevronLeft,
   ChevronRight,
   Trash2,
 } from 'lucide-react';
+import { useMediaPicker } from '../media/MediaPickerModal';
+import { selectionToFile, type MediaSelection } from '../media/picker';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { orbitFetch } from '../../utils/api';
 import { mediaUrlToCachedFile } from '../../utils/cacheMedia';
@@ -59,11 +61,9 @@ export function CreatePostModal({
   initialCaption?: string;
   mode?: 'post' | 'story';
 }) {
-  const [activeTab, setActiveTab] = useState<'upload' | 'camera' | 'url'>('upload');
+  const [activeTab, setActiveTab] = useState<'upload' | 'camera' | 'pick'>('upload');
   const [mediaList, setMediaList] = useState<PostMediaItem[]>(() => initialMedia || []);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
-  const [urlInput, setUrlInput] = useState('');
-  const [resolvingUrl, setResolvingUrl] = useState(false);
   const [caption, setCaption] = useState(initialCaption || '');
   const [location, setLocation] = useState('');
   const [tags, setTags] = useState(initialTags || '');
@@ -166,7 +166,7 @@ function extForMime(mime: string): string {
   return 'jpg';
 }
 
-  const handleFilesSelected = async (files: FileList | null) => {
+  const handleFilesSelected = async (files: FileList | File[] | null) => {
     if (!files || files.length === 0) return;
     const room = MAX_MEDIA - mediaList.length;
     if (room <= 0) {
@@ -202,8 +202,9 @@ function extForMime(mime: string): string {
     playPress(800);
   };
 
-  const handleAddUrl = async () => {
-    const raw = urlInput.trim();
+  /** Attach a URL picked or pasted as text: resolves page links (X posts)
+   *  to direct media, otherwise attaches the link itself. */
+  const takeUrl = async (raw: string) => {
     if (!raw) return;
     if (!/^https?:\/\//i.test(raw)) {
       toast?.('Paste a full https:// link', 'warning');
@@ -213,32 +214,26 @@ function extForMime(mime: string): string {
     // direct file for an honest preview now; the server re-resolves at
     // share time as a second chance.
     if (isTwitterUrl(raw)) {
-      setResolvingUrl(true);
-      try {
-        const directs = await resolveTwitterMediaAll(raw);
-        if (directs && directs.length > 0) {
-          const ts = Date.now();
-          setMediaList((prev) => [
-            ...prev,
-            ...directs.map((url, idx) => ({
-              id: `url_${ts}_${idx}`,
-              previewUrl: url,
-              originalUrl: raw,
-              isExternalUrl: true,
-            })),
-          ]);
-          toast?.(directs.length > 1 ? `Attached ${directs.length} items from post link` : 'Attached media from post link', 'success');
-        } else {
-          setMediaList((prev) => [
-            ...prev,
-            { id: 'url_' + Date.now(), previewUrl: raw, isExternalUrl: true, isVideoPage: true, resolveNote: 'Preview not ready. It attaches on share.' },
-          ]);
-          toast?.('Kept the link. Media attaches when you share.', 'info');
-        }
-      } finally {
-        setResolvingUrl(false);
+      const directs = await resolveTwitterMediaAll(raw).catch(() => null);
+      if (directs && directs.length > 0) {
+        const ts = Date.now();
+        setMediaList((prev) => [
+          ...prev,
+          ...directs.map((url, idx) => ({
+            id: `url_${ts}_${idx}`,
+            previewUrl: url,
+            originalUrl: raw,
+            isExternalUrl: true,
+          })),
+        ]);
+        toast?.(directs.length > 1 ? `Attached ${directs.length} items from post link` : 'Attached media from post link', 'success');
+      } else {
+        setMediaList((prev) => [
+          ...prev,
+          { id: 'url_' + Date.now(), previewUrl: raw, isExternalUrl: true, isVideoPage: true, resolveNote: 'Preview not ready. It attaches on share.' },
+        ]);
+        toast?.('Kept the link. Media attaches when you share.', 'info');
       }
-      setUrlInput('');
       playPress(840);
       return;
     }
@@ -249,8 +244,29 @@ function extForMime(mime: string): string {
       isVideoPage: isVideoPageUrl(raw) || undefined,
     };
     setMediaList((prev) => [...prev, newItem]);
-    setUrlInput('');
     playPress(840);
+  };
+
+  // B7: the shared picker replaces the old paste-URL tab. Keepsake URLs
+  // (idle-file:/vault/loopback schemes) point at THIS machine's bytes, so
+  // they are fetched to a real File and ride the normal upload path.
+  const { open: openMediaPicker, picker: mediaPickerEl } = useMediaPicker({
+    accept: ['image', 'video'],
+    sources: ['browse', 'upload', 'url'],
+    title: mode === 'story' ? 'Pick story media' : 'Pick post media',
+  });
+  const takePickerSelection = async (sel: MediaSelection) => {
+    if (sel.kind === 'file') {
+      await handleFilesSelected([sel.file]);
+      return;
+    }
+    if (/^https?:/i.test(sel.url) && !/^https?:\/\/(127\.0\.0\.1|localhost)(:|\/)/i.test(sel.url)) {
+      await takeUrl(sel.url);
+      return;
+    }
+    const file = await selectionToFile(sel, 'keepsake');
+    if (file) await handleFilesSelected([file]);
+    else toast?.('That media could not be read from this device — paste a public link instead.', 'warning');
   };
 
   const removeMedia = (idx: number) => {
@@ -520,14 +536,14 @@ function extForMime(mime: string): string {
 
           <button
             type="button"
-            onClick={() => { playPress(750); setActiveTab('url'); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all duration-150 cursor-pointer font-medium ${activeTab === 'url'
+            onClick={() => { playPress(750); setActiveTab('pick'); }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all duration-150 cursor-pointer font-medium ${activeTab === 'pick'
               ? 'bg-glass-w12 text-retro-fg'
               : 'text-retro-muted hover:text-retro-fg'
               }`}
           >
-            <LinkIcon className="w-4 h-4" />
-            <span>Paste URL / GIF</span>
+            <FolderOpen className="w-4 h-4" />
+            <span>Pick media</span>
           </button>
         </div>
 
@@ -575,22 +591,16 @@ function extForMime(mime: string): string {
             </div>
           )}
 
-          {activeTab === 'url' && (
-            <div className="bg-surface-interactive border border-border-glass p-3 rounded-xl flex gap-2">
-              <input
-                type="url"
-                value={urlInput}
-                onChange={(e) => setUrlInput(e.target.value)}
-                placeholder="Paste image, GIF, MP4, post, or video page URL"
-                className="flex-1 px-3 py-2 bg-surface-raised border border-border-glass rounded-xl text-xs outline-none focus:border-retro-accent"
-              />
+          {activeTab === 'pick' && (
+            <div className="space-y-2">
               <button
                 type="button"
-                onClick={() => void handleAddUrl()}
-                disabled={resolvingUrl}
-                className="px-4 py-2 chrome-accent text-black rounded-xl text-xs font-bold cursor-pointer transition-colors disabled:opacity-40"
+                onClick={() => void openMediaPicker().then((sel) => { if (sel) void takePickerSelection(sel); })}
+                className="w-full border-2 border-dashed border-border-glass hover:border-retro-accent rounded-xl bg-surface-interactive hover:bg-glass-w10 p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all text-center group"
               >
-                {resolvingUrl ? '…' : 'Add'}
+                <FolderOpen className="w-7 h-7 text-retro-muted group-hover:text-retro-accent transition-colors" />
+                <p className="text-xs font-bold text-retro-body">From your media, this device, or a link</p>
+                <span className="text-[10px] text-retro-muted">Previewed before it attaches. {mediaList.length}/{MAX_MEDIA} added</span>
               </button>
             </div>
           )}
@@ -768,6 +778,7 @@ function extForMime(mime: string): string {
         </div>
       </div>
       {cropper}
+      {mediaPickerEl}
     </div>
   );
 }

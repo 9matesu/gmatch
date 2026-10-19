@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Camera, UploadCloud, Link as LinkIcon, X, Check } from 'lucide-react';
+import { Camera, FolderOpen, X, Check } from 'lucide-react';
 import { CameraCapture } from '../CameraCapture';
 import { DropZone } from '../DropZone';
+import { useMediaPicker } from '../media/MediaPickerModal';
 import { useCropper } from '../../hooks/useCropper';
 import { isCropableImage } from '../CropModal';
 import { fileToThumbDataUrl } from '../../utils/profile';
@@ -25,18 +26,30 @@ export function ProfilePicModal({
   onSave,
   toast,
 }: ProfilePicModalProps) {
-  const [tab, setTab] = useState<'upload' | 'url' | 'camera'>('upload');
+  const [tab, setTab] = useState<'pick' | 'camera'>('pick');
   const [preview, setPreview] = useState<string>(currentPfp);
-  const [urlInput, setUrlInput] = useState('');
   const [rawFile, setRawFile] = useState<File | null>(null);
   const { crop, cropper } = useCropper();
+  // B7: the shared picker replaces the bespoke upload/URL tabs. Camera stays:
+  // it is a capture surface, not a media source.
+  const { open: openMediaPicker, picker: mediaPickerEl } = useMediaPicker({
+    accept: ['image'],
+    sources: ['browse', 'upload', 'url'],
+    title: 'Pick a profile photo',
+  });
+
+  const pickMedia = async () => {
+    const sel = await openMediaPicker();
+    if (!sel) return;
+    if (sel.kind === 'file') void handleFiles([sel.file]);
+    else handleUrlChange(sel.url);
+  };
 
   useEffect(() => {
     if (isOpen) {
       setPreview(currentPfp);
-      setUrlInput('');
       setRawFile(null);
-      setTab('upload');
+      setTab('pick');
     }
   }, [isOpen, currentPfp]);
 
@@ -71,7 +84,6 @@ export function ProfilePicModal({
   };
 
   const handleUrlChange = (val: string) => {
-    setUrlInput(val);
     if (val.trim()) {
       setPreview(val.trim());
       setRawFile(null);
@@ -89,7 +101,7 @@ export function ProfilePicModal({
     }
     setRawFile(target);
     setPreview(previewOut);
-    setTab('upload');
+    setTab('pick');
     playPress(800);
   };
 
@@ -129,8 +141,7 @@ export function ProfilePicModal({
   };
 
   const tabs = [
-    { id: 'upload', label: 'Upload', icon: UploadCloud },
-    { id: 'url', label: 'URL', icon: LinkIcon },
+    { id: 'pick', label: 'Pick media', icon: FolderOpen },
     { id: 'camera', label: 'Camera', icon: Camera },
   ];
 
@@ -153,6 +164,8 @@ export function ProfilePicModal({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {mediaPickerEl}
 
         {/* Content */}
         <div className="p-5 space-y-4 overflow-y-auto flex-1 styled-scrollbar">
@@ -204,44 +217,22 @@ export function ProfilePicModal({
           </div>
 
           {/* Tab Body */}
-          {tab === 'upload' && (
-            <DropZone
-              onFiles={handleFiles}
-              compact={false}
-              accept="image/jpeg, image/png, image/webp, image/gif, image/*"
-              multiple={false}
-            >
-              <div className="space-y-1 text-center py-4">
-                <p className="text-xs text-retro-body font-medium">Drop image here</p>
-                <p className="text-xs text-retro-muted">JPG, PNG, WebP, GIF</p>
-              </div>
-            </DropZone>
-          )}
-
-          {tab === 'url' && (
-            <div className="space-y-3">
-              <label className="text-xs font-medium text-retro-body block">Image URL</label>
-              <div className="flex items-center gap-2 bg-surface-interactive border border-border-glass rounded-lg px-3 py-2">
-                <LinkIcon className="w-4 h-4 text-retro-muted shrink-0" />
-                <input
-                  type="url"
-                  value={urlInput}
-                  onChange={(e) => handleUrlChange(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleUrlChange(urlInput);
-                    }
-                  }}
-                  placeholder="https://example.com/photo.gif"
-                  className="w-full bg-transparent focus:outline-none text-sm text-retro-fg font-mono placeholder:text-retro-muted"
-                />
-              </div>
+          {tab === 'pick' && (
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => void pickMedia()}
+                className="w-full border-2 border-dashed border-border-glass hover:border-retro-accent rounded-xl bg-surface-interactive hover:bg-glass-w10 p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all text-center group"
+              >
+                <FolderOpen className="w-7 h-7 text-retro-muted group-hover:text-retro-accent transition-colors" />
+                <p className="text-xs font-bold text-retro-body">Choose from your media, upload, or paste a URL</p>
+                <span className="text-[10px] text-retro-muted">JPG, PNG, WebP, GIF — one pick, previewed before it lands</span>
+              </button>
             </div>
           )}
 
           {tab === 'camera' && (
-            <CameraCapture onCapture={handleCameraCapture} onCancel={() => setTab('upload')} />
+            <CameraCapture onCapture={handleCameraCapture} onCancel={() => setTab('pick')} />
           )}
         </div>
 

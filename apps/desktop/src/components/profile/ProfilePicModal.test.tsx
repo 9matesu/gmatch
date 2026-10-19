@@ -78,16 +78,20 @@ describe('ProfilePicModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('allows entering an image URL and applying', async () => {
+  it('applies a URL picked through the shared media picker', async () => {
     const onSave = vi.fn();
     const onClose = vi.fn();
     render(
       <ProfilePicModal isOpen={true} currentPfp="" onClose={onClose} onSave={onSave} />
     );
-    // Switch to URL tab
-    await userEvent.click(screen.getByRole('button', { name: 'URL' }));
-    const urlInput = screen.getByPlaceholderText('https://example.com/photo.gif');
+    // The pick tab hosts the shared picker (B7): open it, use the URL pane.
+    await userEvent.click(screen.getByRole('button', { name: /choose from your media/i }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Paste URL' }));
+    const urlInput = screen.getByPlaceholderText('https://…');
     await userEvent.type(urlInput, 'https://example.com/avatar.jpg');
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Use this media' }));
+    // Back in the profile modal: the picked URL is the preview; apply it.
     await userEvent.click(screen.getByRole('button', { name: 'Apply' }));
     expect(onSave).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();

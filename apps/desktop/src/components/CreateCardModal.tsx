@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { ImagePlus, Loader2, Plus, Sparkles, Tag, X } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { DropZone, DND_KEEPSAKE } from './DropZone';
+import { useMediaPicker } from './media/MediaPickerModal';
+import { selectionToFile, type MediaSelection } from './media/picker';
 import { mediaUrlToCachedFile } from '../utils/cacheMedia';
 import { forgeMediaLocally } from '../services/mediaForge';
 import { createCardFromMedia, type CanonicalCard, type CardCreationMetadata } from '../utils/cardCollection';
@@ -120,6 +122,29 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
     }
     setUrl('')
     setError(null)
+  };
+
+  // B7: shared picker entry alongside drag-drop. Same routing as the keepsake
+  // drop: local/loopback bytes become a File (the server can't fetch them),
+  // public URLs stay live links.
+  const { open: openMediaPicker, picker: mediaPickerEl } = useMediaPicker({
+    accept: ['image', 'video'],
+    sources: ['browse', 'upload', 'url'],
+    title: 'Pick card media',
+  });
+  const takePickerSelection = async (sel: MediaSelection) => {
+    setError(null);
+    if (sel.kind === 'file') {
+      await handleFiles([sel.file]);
+      return;
+    }
+    if (/^https?:/i.test(sel.url) && !/^https?:\/\/(127\.0\.0\.1|localhost)(:|\/)/i.test(sel.url)) {
+      handlePasteUrl(sel.url);
+      return;
+    }
+    const file = await selectionToFile(sel, 'keepsake');
+    if (file) await handleFiles([file]);
+    else setError('That media could not be read from this device — paste a public link instead.');
   };
 
   // Drag a keepsake from the idle Gallery panel straight into the forge.
@@ -258,6 +283,15 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
               </div>
             </DropZone>
 
+            <button
+              type="button"
+              onClick={() => void openMediaPicker().then((sel) => { if (sel) void takePickerSelection(sel); })}
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-border-glass text-xs font-semibold text-retro-muted hover:text-retro-fg hover:border-retro-accent hover:bg-glass-w8 cursor-pointer transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Pick from your media, this device, or a link
+            </button>
+
             <div className="grid sm:grid-cols-2 gap-3">
               <label className="space-y-1.5 sm:col-span-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">Card name *</span>
@@ -287,6 +321,7 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
         </div>
       </div>
       {cropper}
+      {mediaPickerEl}
     </div>
   );
 }

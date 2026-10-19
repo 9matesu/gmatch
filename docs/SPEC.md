@@ -28,6 +28,13 @@ trades — two separate economies, no bridge between them.
   Single onboarding: `firstRun/OnboardingFlow` includes the feed-tune step
   (pick exactly 4 starter tags + excludes). Excludes editor lives in the
   settings modal's Feed tab.
+- Single media picker (2026-10-18): every media entry point (create post /
+  story, profile photo, card forge, Domination wallpaper/game_bg/popup_video)
+  opens the shared `MediaPickerModal` (`src/components/media/`) — Browse
+  (idle keepsakes, tag-filterable), Upload (drop/paste), URL (preview +
+  validate). Contract in `picker.ts` (`MediaSelection`, `selectionToFile`):
+  keepsake/loopback URLs are fetched to real Files before upload, popup_video
+  stays URL-only (a local File has no URL a remote peer could open).
 - Two booru clients by design: idle feed via Electron IPC
   (`apps/desktop/src/services/booru.ts`, SPEC §6) and social feed via the
   server proxy (`apps/api/src/routes/booru.ts`) — different trust domains.

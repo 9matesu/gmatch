@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from 'react';
-import { X, Send, Loader2, Sparkles, Layers, Sliders, Palette, ImagePlus } from 'lucide-react';
+import { X, Send, Loader2, Sparkles, Layers, Sliders, Palette, FolderOpen } from 'lucide-react';
 import { DOM_LIMITS, validateDomPayload } from '../../utils/dominationMesh';
+import { selectionToFile } from '../media/picker';
+import { useMediaPicker } from '../media/MediaPickerModal';
 
 interface ActionModalProps {
   action: string;
@@ -36,6 +38,56 @@ export function ActionModal({
   const [color, setColor] = useState('#9FE3FF');
   const [isPublicCamera, setIsPublicCamera] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // B7: the shared picker replaces the raw URL box + device-file label.
+  // popup_video stays URL-only — a picked local File has no URL a remote
+  // peer could open; wallpaper/game_bg carry real bytes inline (≤4 MB).
+  const { open: openMediaPicker, picker: mediaPickerEl } = useMediaPicker({
+    accept: action === 'popup_video' ? ['video'] : ['image'],
+    sources: action === 'popup_video' ? ['url'] : ['browse', 'upload', 'url'],
+    title: action === 'popup_video' ? 'Pick a video URL' : 'Pick an image',
+  });
+
+  const takeSelection = async (sel: import('../media/picker').MediaSelection) => {
+    setFormError(null);
+    if (sel.kind === 'file') {
+      if (sel.file.size > DOM_LIMITS.inlineImageMaxBytes) {
+        setFormError(`That image is ${(sel.file.size / 1048576).toFixed(1)} MB — the inline limit is 4 MB. Pick a smaller one or paste a link.`);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setUrl(String(reader.result || ''));
+        setInlineName(sel.file.name);
+      };
+      reader.onerror = () => setFormError('Could not read that file.');
+      reader.readAsDataURL(sel.file);
+      return;
+    }
+    // URL selection. A keepsake URL (idle-file:/blob:/vault schemes) points at
+    // THIS machine's bytes — fetch them now and ride inline, like a file.
+    if (!/^https?:/i.test(sel.url)) {
+      const file = await selectionToFile(sel, 'keepsake');
+      if (!file) {
+        setFormError('That media could not be read from this device. Paste a public link instead.');
+        return;
+      }
+      if (file.size > DOM_LIMITS.inlineImageMaxBytes) {
+        setFormError(`That image is ${(file.size / 1048576).toFixed(1)} MB — the inline limit is 4 MB. Pick a smaller one or paste a link.`);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setUrl(String(reader.result || ''));
+        setInlineName(file.name);
+      };
+      reader.onerror = () => setFormError('Could not read that file.');
+      reader.readAsDataURL(file);
+      return;
+    }
+    setUrl(sel.url);
+    setInlineName(null);
+  };
 
   if (!isOpen) return null;
 
@@ -127,55 +179,37 @@ export function ActionModal({
           {needsUrl && (
             <div className="space-y-1.5">
               <label className="block text-xs font-medium text-retro-fg">
-                {action === 'popup_video' ? 'Video URL (mp4/webm)' : 'Image URL'}
+                {action === 'popup_video' ? 'Video (mp4/webm)' : 'Image'}
               </label>
-              <input
-                type="url"
-                placeholder={action === 'popup_video' ? 'https://example.com/video.mp4' : 'https://example.com/image.jpg'}
-                value={url}
-                onChange={(e) => { setUrl(e.target.value); setInlineName(null); setFormError(null); }}
-                className={field}
-              />
-              {action !== 'popup_video' && (
-                <div className="space-y-1">
-                  <label className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border-glass text-[10px] font-semibold text-retro-muted hover:text-retro-fg hover:bg-glass-w10 cursor-pointer transition-colors">
-                    <ImagePlus className="w-3 h-3" />
-                    {inlineName ? 'Replace image' : 'Pick an image from this device'}
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        e.target.value = '';
-                        setFormError(null);
-                        if (!file) return;
-                        if (file.size > DOM_LIMITS.inlineImageMaxBytes) {
-                          setInlineName(null);
-                          setFormError(`That image is ${(file.size / 1048576).toFixed(1)} MB — the inline limit is 4 MB. Pick a smaller one or paste a link.`);
-                          return;
-                        }
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                          setUrl(String(reader.result || ''));
-                          setInlineName(file.name);
-                        };
-                        reader.onerror = () => setFormError('Could not read that file.');
-                        reader.readAsDataURL(file);
-                      }}
-                    />
-                  </label>
-                  {inlineName && (
-                    <p className="text-[10px] text-retro-muted">
-                      Inline: {inlineName} — the image rides sealed in the request, so it reaches them with no shared server.
-                    </p>
-                  )}
-                </div>
+              <button
+                type="button"
+                onClick={() => void openMediaPicker().then((sel) => { if (sel) void takeSelection(sel); })}
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded-md border text-left transition-colors cursor-pointer ${
+                  formError ? 'border-retro-error' : 'border-border-glass hover:border-retro-accent'
+                } bg-surface-interactive`}
+              >
+                <FolderOpen className="w-3.5 h-3.5 text-retro-muted shrink-0" />
+                <span className="text-[11px] text-retro-fg truncate">
+                  {inlineName
+                    ? `Inline: ${inlineName}`
+                    : url
+                      ? url.startsWith('data:')
+                        ? 'Picked media (inline)'
+                        : url
+                      : action === 'popup_video'
+                        ? 'Paste a video URL — picked with preview'
+                        : 'From your media, this device, or a link'}
+                </span>
+              </button>
+              {inlineName && (
+                <p className="text-[10px] text-retro-muted">
+                  Inline: {inlineName} — the image rides sealed in the request, so it reaches them with no shared server.
+                </p>
               )}
               <p className="text-[10px] text-retro-muted">
                 {action === 'popup_video'
                   ? 'Paste a direct https media link. Their client loads it straight.'
-                  : 'Paste a direct https link, or pick a local image (rides sealed to them, up to 4 MB).'}
+                  : 'From your media, this device, or a direct https link (picked images ride sealed to them, up to 4 MB).'}
               </p>
             </div>
           )}
@@ -324,6 +358,7 @@ export function ActionModal({
             </div>
           </div>
         </form>
+        {mediaPickerEl}
       </div>
     </div>
   );
