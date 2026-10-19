@@ -33,6 +33,10 @@ export interface ChatMessage {
   readByRecipient?: boolean;
   /** Blind-courier DM lifecycle (absent on legacy server-inbox messages). */
   courierStatus?: 'sending' | 'sent' | 'delivered' | 'failed';
+  /** Deletion tombstone, ms. The bubble renders "Message deleted". */
+  deletedAt?: number;
+  /** emoji -> actor orbit ids (sealed courier reactions). */
+  reactions?: Record<string, string[]>;
 }
 
 export interface P2PSwarmMessage {

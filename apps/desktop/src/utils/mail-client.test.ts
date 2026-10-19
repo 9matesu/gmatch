@@ -108,11 +108,13 @@ describe('MailClient (blind courier)', () => {
     const { seal1to1 } = await import('@orbit/protocol')
     // Eve mails the WRONG token slot (pretend collision): bob lists but cannot open.
     const foreign = seal1to1('not for you', 'mail', eve, other)
-    const withForeignEnv = okJson({ envelopes: [foreign] })
 
     const fetchImpl = makeFetch(async (url) => {
       if (url.includes('/ack')) throw new Error('ack must not be called')
-      return url.endsWith(`/api/mail/${BOB_TOKEN}`) ? withForeignEnv : okJson({ envelopes: [] })
+      // A fresh Response per call: the fixture used to hand back ONE object,
+      // and a queued second pass (a notice can land during a drain) then read
+      // the same body twice.
+      return url.endsWith(`/api/mail/${BOB_TOKEN}`) ? okJson({ envelopes: [foreign] }) : okJson({ envelopes: [] })
     })
     const { c, sockets } = client({ fetchImpl })
     c.start()
@@ -154,6 +156,69 @@ describe('MailClient (blind courier)', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('opens its watch socket on the page origin when the API base is relative (browser dev)', () => {
+    // Regression: the mail watch socket was built from the base alone, so a
+    // relative base (browser dev — it rides the vite proxy) asked for
+    // `ws:///api/mail/ws`. That is not a valid URL, the constructor throws, and
+    // every push (inbound DM, delivery ack, read receipt) was lost — messages
+    // only appeared when something happened to pull by hand.
+    const urls: string[] = []
+    const c = new MailClient({
+      apiBase: '',
+      identity: bob,
+      onMail: vi.fn(),
+      webSocketFactory: (url: string) => {
+        urls.push(url)
+        return new FakeSocket()
+      },
+    } as any)
+    c.start()
+    expect(urls).toHaveLength(1)
+    expect(urls[0]).toBe(`ws://${window.location.host}/api/mail/ws`)
+    expect(() => new URL(urls[0])).not.toThrow()
+    c.stop()
+  })
+
+  it('a mail notice that lands during an in-flight pull still gets its own pass', async () => {
+    // The delivery race: a notice is sent AFTER the envelope is stored, so the
+    // box listing that was already running does not contain it. Sharing that
+    // in-flight pull (the old behaviour) meant the notice was absorbed and the
+    // message stayed on the courier.
+    const { seal1to1 } = await import('@orbit/protocol')
+    const env = seal1to1('late arrival', 'mail', alice, bob)
+
+    let release!: () => void
+    const gate = new Promise<void>((r) => { release = r })
+    let listings = 0
+    let box: unknown[] = []
+    const fetchImpl = makeFetch(async (url, init) => {
+      if (url.endsWith('/ack')) {
+        const ack = JSON.parse(String(init!.body))
+        box = box.filter((e) => !ack.ids.includes((e as { id: string }).id))
+        return okJson({ ok: true })
+      }
+      listings += 1
+      if (listings === 1) await gate // first listing: envelope not stored yet
+      return okJson({ envelopes: box })
+    })
+
+    const onMail = vi.fn()
+    const { c, sockets } = client({ fetchImpl, onMail })
+    c.start()
+    sockets[0].emitOpen() // onopen pull opens the (empty) box and blocks
+    await new Promise((r) => setTimeout(r, 0))
+
+    // The envelope is written, then the push arrives, while that pull is still
+    // in flight.
+    box = [env]
+    sockets[0].emit(JSON.stringify({ type: 'mail', to: BOB_TOKEN, id: env.id }))
+    release()
+    await vi.waitFor(() => expect(onMail).toHaveBeenCalledTimes(1))
+    expect(onMail.mock.calls[0][0].body).toBe('late arrival')
+    expect(listings).toBeGreaterThan(1)
+    c.stop()
   })
 
   it('ackBody signs exactly the contract the courier verifies', async () => {

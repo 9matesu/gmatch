@@ -4,6 +4,8 @@ interface InboundMessageLike {
   ts: number;
   senderOrbitId?: string;
   own?: boolean;
+  /** Deletion tombstone: the row survives, the message does not count. */
+  deletedTs?: number;
 }
 
 /**
@@ -24,6 +26,7 @@ export function countThreadUnread(
     if (!m || typeof m.ts !== 'number' || !Number.isFinite(m.ts)) continue;
     if (m.ts <= seen) continue;
     if (m.own) continue;
+    if (m.deletedTs) continue;
     if (selfId && m.senderOrbitId === selfId) continue;
     n += 1;
   }

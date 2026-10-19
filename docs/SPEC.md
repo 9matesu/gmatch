@@ -385,3 +385,83 @@ ADR-002 (`docs/ADR-002-servers.md`) é canônico; resumo de operação:
   (SystemMeta, Sessions, ServerDirectory…) são excluídas por design.
 - **Central** (`VITE_CENTRAL_URL` / Settings→Server): diretório + nada mais;
   o central não consegue ler conteúdo de nenhum servidor federado.
+
+## 14. Chat (`#/messages`) — reconstruction
+
+`apps/desktop/src/components/chat/`, `hooks/useCourierDms.ts`, `utils/mail-dm.ts`.
+
+Direct messages are the **courier lane**: sealed envelopes (`Envelope v2`)
+addressed by delivery tokens, finally decrypted by the recipient's X25519 key.
+No node route is involved — `/api/pm` is retired and 404s on every node, so it
+was never a real path. Server-hosted lanes (lobby, queue, group chat, game
+invites) sit behind an explicit capability probe and show the reason when the
+node does not host them.
+
+**Event kinds** — sealed into the mail body, one decoder (`decodeBody`), no
+server change. An older client gets an unopenable body kind and ignores it, so
+the wire stays compatible: `dm` (send), `dm_ack` (delivery), `dm_read` (read
+watermark), `dm_edit` (author-only, last-write-wins on `ts`), `dm_del`
+(delete-for-everyone), `dm_react` (per-actor aggregation), `dm_typing`
+(transient, never persisted).
+
+**Delivery ladder** — only what the peer actually proved: `sending` →
+`delivered` on a real `dm_ack` → `Seen` only from a real `dm_read` watermark
+(`readTs >= msg.ts`). Nothing is fabricated: no optimistic "delivered", no
+presence invented, no server acknowledgement on the blind courier. A failed
+seal renders "not delivered".
+
+**Tombstones:** `dm_del` never hard-deletes — a stub row with `deletedAt`
+stays, so a replayed envelope cannot resurrect removed content. Edits are
+author-only and last-write-wins; inbound reaction/edit/delete events are
+attributed to the thread peer and can never touch rows we authored.
+
+**Typing:** never persisted. First ping immediate, then throttled to 3s; a ping
+is fresh for 8s and a future timestamp is treated as stale.
+
+**Mail drain (delivery reliability).** The courier pushes a notice only *after*
+the envelope is stored, so a box listing already in flight could not contain it.
+`MailClient.pull()` coalesces concurrent drains but now **queues one extra pass**
+when a notice lands during a drain, instead of absorbing it. That race is why a
+DM could sit on the courier until something else happened to pull. Separately,
+`MailClient.wsUrl()` built its socket from the (relative) dev API base alone —
+`ws:///api/mail/ws`, an invalid URL — so browser-dev mail push never connected
+at all; a relative base now rides the page origin via the shared `wsUrlForBase`
+(`utils/api.ts`), the same rule the P2P swarm socket uses.
+
+**Read receipts** are view-gated: "Seen" is stamped only while the conversation
+is open in the messages/rooms view AND the document is visible. It is never
+claimed by the message loader, which also runs when boot restores a conversation
+the player never opened.
+
+**Profile modal:** wide two-column grid — left pane the user's posts, right pane
+the selected post, each independently scrollable; a post opens on the right
+without closing the modal. Layered Escape (picture → card → post → modal) with
+focus restored to the trigger.
+
+**Invites** remain server-authoritative (the existing invite protocol — no
+sealed-invite variant, and no invite-as-text-message). Because `detectMailMode`
+cannot tell a full node from a blind courier (both answer "courier"), the node
+is probed separately: an unauthenticated `GET /api/lobby/invites` returning 404
+means blind (`utils/nodeCapabilities.ts`, cached per node). The invite action is
+then disabled with the reason instead of failing as a 404 toast, and the
+lobby/queue/group composer is replaced by a notice. Courier DMs and sealed rooms
+are exempt — they never touch the node.
+
+**Last conversation** is restored on boot (`gmatch_last_dm_peer_v1`);
+**search** covers local DMs and rooms only, via a bounded lazy index (5000
+messages / 50 results) that reports `truncated` honestly.
+
+**Limitations (documented, not hidden):** sealed group rooms stay **text-only**
+— reply/edit/delete/reactions/typing need a per-room sealed event path that does
+not exist yet; server group history is unindexed; lobby, queue, group chat and
+game invites require a node that hosts them; swarm byte transfer remains
+unverified (§10d).
+
+**Tests:** `e2e/chat-two-peer.spec.ts` drives two independent browser contexts
+(separate identities, keys, mail sockets) through the real envelope path:
+send → Delivered-without-Seen → unread badge → Seen on open → typing → reply
+quote → author-only edit → cross-peer reaction → delete-for-everyone tombstone →
+reload persistence, plus an honest "not delivered" state when sealing fails.
+`e2e/chat-node-capability.spec.ts` route-mocks the 404 probe (clearly labelled:
+the E2E node is a full node) and asserts the disabled invite with its reason,
+the lobby composer notice, and the still-working DM lane on the same client.

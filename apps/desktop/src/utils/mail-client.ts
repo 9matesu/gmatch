@@ -10,6 +10,7 @@ import {
   type OpenedEnvelope,
 } from '@orbit/protocol'
 import { watchedTokens, isEpoch, type EpochState } from './handleRotation'
+import { wsUrlForBase } from './api'
 
 /**
  * Blind-courier mail client (plan Phase 3.1).
@@ -85,6 +86,7 @@ export class MailClient {
   private closed = false
   private started = false
   private pulling: Promise<OpenedEnvelope[]> | null = null
+  private pullQueued = false
 
   constructor(private readonly deps: MailClientDeps) {
     this.token = deliveryToken(deps.identity.publicKeyHex)
@@ -126,10 +128,9 @@ export class MailClient {
   }
 
   private wsUrl(): string {
-    const base = (this.deps.apiBase?.trim() || 'https://gmatch-wcz1.onrender.com').replace(/\/+$/, '')
-    const scheme = base.startsWith('https') ? 'wss' : 'ws'
-    const hostAndPath = base.includes('://') ? base.slice(base.indexOf('://') + 3) : base.replace(/^\/+/, '')
-    return `${scheme}://${hostAndPath}/api/mail/ws`
+    // Shared with the swarm socket (utils/api.ts): a relative base rides the
+    // page's own origin (dev proxy) instead of producing an invalid `ws:///…`.
+    return wsUrlForBase(this.deps.apiBase, '/api/mail/ws')
   }
 
   private connect(): void {
@@ -196,13 +197,34 @@ export class MailClient {
     return env
   }
 
-  /** Fetch + open + ack our box. Concurrent calls share one pull. */
+  /** Fetch + open + ack our box.
+   *
+   * Concurrent calls share one drain, BUT a call that lands while a drain is
+   * running queues one more pass instead of being absorbed by it. A notice
+   * usually arrives just after the box was listed (the envelope is written
+   * first, then pushed), so absorbing it dropped the message on the floor: it
+   * sat on the courier until something else happened to pull, which is the
+   * "sometimes a DM simply never arrives" report. */
   pull(): Promise<OpenedEnvelope[]> {
-    if (this.pulling) return this.pulling
-    this.pulling = this.doPull().finally(() => {
-      this.pulling = null
-    })
+    if (this.pulling) {
+      this.pullQueued = true
+      return this.pulling
+    }
+    this.pulling = this.drain()
     return this.pulling
+  }
+
+  private async drain(): Promise<OpenedEnvelope[]> {
+    const received: OpenedEnvelope[] = []
+    try {
+      do {
+        this.pullQueued = false
+        received.push(...(await this.doPull()))
+      } while (this.pullQueued)
+    } finally {
+      this.pulling = null
+    }
+    return received
   }
 
   private async doPull(): Promise<OpenedEnvelope[]> {

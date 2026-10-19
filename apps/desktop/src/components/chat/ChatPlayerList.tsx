@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Users, X } from 'lucide-react';
+import { Search, Users, X, MessageSquare, Swords } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { User } from '@orbit/shared';
 import { playPress } from '../../utils/sounds';
@@ -23,6 +23,13 @@ export interface ChatPlayerListProps {
   users?: User[];
   profilePics?: Record<string, string>;
   onOpenProfile?: (userId: string, user?: User) => void;
+  /** Start (or reopen) a DM with this player. */
+  onMessagePlayer?: (peer: { orbitId: string; name?: string; pfp?: string }) => void;
+  /** Send a game invite through the existing server-authoritative protocol. */
+  onInvitePlayer?: (userId: string) => void;
+  /** Why invites are unavailable on this node. Never null on a blind courier,
+   *  so the button explains itself instead of 404-ing. */
+  inviteUnavailableReason?: string | null;
 }
 
 function formatRelativeTime(iso?: string | null): string {
@@ -48,6 +55,9 @@ export function ChatPlayerList({
   users = [],
   profilePics = {},
   onOpenProfile,
+  onMessagePlayer,
+  onInvitePlayer,
+  inviteUnavailableReason = null,
 }: ChatPlayerListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   // Presence now lives in one app-wide store fed by one ref-counted poll, so
@@ -265,51 +275,91 @@ export function ChatPlayerList({
             const pfp = player.pfp_url || profilePics[player.id];
 
             return (
-              <button
+              <div
                 key={player.id}
-                type="button"
-                onClick={() => handlePlayerClick(player)}
-                title={`View ${displayName}'s profile`}
-                className="w-full flex items-center gap-2.5 p-2 rounded-lg text-left hover:bg-glass-w8 active:bg-glass-w12 transition-colors cursor-pointer group"
+                data-testid="chat-player-row"
+                className="group flex items-center gap-2.5 p-2 rounded-lg hover:bg-glass-w8 active:bg-glass-w12 transition-colors"
               >
-                {/* Avatar with Status Indicator Dot */}
-                <div className="relative shrink-0">
-                  <Avatar
-                    id={player.id}
-                    size={32}
-                    imageUrl={pfp}
-                  />
-                  <span
-                    className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-surface-raised ${
-                      player.online
-                        ? 'bg-retro-online'
-                        : 'bg-retro-muted/60'
-                    }`}
-                    aria-label={player.online ? 'Online' : 'Offline'}
-                  />
-                </div>
-
-                {/* Player details */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 justify-between">
-                    <span className="text-xs font-medium text-retro-body group-hover:text-retro-fg truncate">
-                      {displayName}
-                    </span>
-                    {isSelf && (
-                      <span className="text-[10px] font-semibold text-retro-accent shrink-0 px-1 py-0.2 rounded bg-glass-w8">
-                        You
-                      </span>
-                    )}
+                <button
+                  type="button"
+                  onClick={() => handlePlayerClick(player)}
+                  title={`View ${displayName}'s profile`}
+                  className="flex items-center gap-2.5 flex-1 min-w-0 text-left cursor-pointer"
+                >
+                  {/* Avatar with Status Indicator Dot */}
+                  <div className="relative shrink-0">
+                    <Avatar
+                      id={player.id}
+                      size={32}
+                      imageUrl={pfp}
+                    />
+                    <span
+                      className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-surface-raised ${
+                        player.online
+                          ? 'bg-retro-online'
+                          : 'bg-retro-muted/60'
+                      }`}
+                      aria-label={player.online ? 'Online' : 'Offline'}
+                    />
                   </div>
-                  <span className="block text-[10px] text-retro-muted truncate">
-                    {player.online ? (
-                      <span className="text-retro-online font-medium">Active now</span>
-                    ) : (
-                      <span>Seen {formatRelativeTime(player.last_seen)}</span>
-                    )}
-                  </span>
-                </div>
-              </button>
+
+                  {/* Player details */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 justify-between">
+                      <span className="text-xs font-medium text-retro-body group-hover:text-retro-fg truncate">
+                        {displayName}
+                      </span>
+                      {isSelf && (
+                        <span className="text-[10px] font-semibold text-retro-accent shrink-0 px-1 py-0.2 rounded bg-glass-w8">
+                          You
+                        </span>
+                      )}
+                    </div>
+                    <span className="block text-[10px] text-retro-muted truncate">
+                      {player.online ? (
+                        <span className="text-retro-online font-medium">Active now</span>
+                      ) : (
+                        <span>Seen {formatRelativeTime(player.last_seen)}</span>
+                      )}
+                    </span>
+                  </div>
+                </button>
+
+                {/* Row actions. Always visible on touch (no hover), revealed on
+                    hover/focus for pointer devices. Each has its own label. */}
+                {!isSelf && (
+                  <div className="flex items-center gap-0.5 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      title={`Message ${displayName}`}
+                      aria-label={`Message ${displayName}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        playPress(800);
+                        onMessagePlayer?.({ orbitId: player.id, name: player.display_name, pfp });
+                      }}
+                      className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w12 cursor-pointer"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      title={inviteUnavailableReason || `Invite ${displayName} to a game`}
+                      aria-label={`Invite ${displayName} to a game`}
+                      aria-disabled={!onInvitePlayer || !!inviteUnavailableReason}
+                      disabled={!onInvitePlayer || !!inviteUnavailableReason}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        playPress(820);
+                        onInvitePlayer?.(player.id);
+                      }}
+                      className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w12 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                    >
+                      <Swords className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
             );
           })
         )}

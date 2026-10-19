@@ -8,6 +8,7 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject, User } from '@orbit/shared';
 import type { useLobby } from '../../hooks/useLobby';
 import { GamesHub } from '../games/GamesHub';
+import type { ChatPeer } from '../chat/chatPeer';
 import { LobbyPanel } from '../LobbyPanel';
 import CustomSourcesModal from '../grid/CustomSourcesModal';
 import type { MainViewType } from '../home/CommandIsland';
@@ -58,7 +59,7 @@ export function GamesView({
   setSelectedProfileUser: (user: User) => void;
   setLobbyLightboxUrl: (url: string | null) => void;
   setExpandedItemId: (id: string | null) => void;
-  setPmPeer: React.Dispatch<React.SetStateAction<User | null>>;
+  setPmPeer: (peer: ChatPeer | null) => void;
   setDmMinimized: (v: boolean) => void;
   setMainView: React.Dispatch<React.SetStateAction<MainViewType>>;
   setSpectateViewerItems: (items: OrbitObject[] | null) => void;
@@ -117,7 +118,7 @@ export function GamesView({
           onExpandItem={(id) => setExpandedItemId(id)}
           onOpenProfile={(user) => setSelectedProfileUser(user)}
           onOpenCardChat={() => {
-            setPmPeer({ id: 'card_queue', display_name: 'Card Game Queue' } as any)
+            setPmPeer({ id: 'card_queue', name: 'Card Game Queue' })
             setDmMinimized(false)
             setMainView('messages')
           }}

@@ -83,6 +83,9 @@ export function UserProfileModal({
 }: UserProfileModalProps) {
   const [showPic, setShowPic] = useState(false);
   const [copied, setCopied] = useState(false);
+  /** Which profile post is open in the right-hand pane. Kept here (not in the
+   *  lightbox hook) so the empty state and the pane share one source. */
+  const [activePostId, setActivePostId] = useState<string | null>(null);
   const [selectedCardImage, setSelectedCardImage] = useState<string | null>(null);
   const [followersCount, setFollowersCount] = useState<number | null>(null);
   const [followingCount, setFollowingCount] = useState<number | null>(null);
@@ -221,6 +224,26 @@ export function UserProfileModal({
     }
   };
 
+  // Escape walks back one layer at a time (picture -> card -> post -> modal)
+  // and focus returns to whatever opened the modal. Neither existed before, so
+  // a keyboard user was trapped in the overlay.
+  useEffect(() => {
+    const previous = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null
+    return () => { previous?.focus?.() }
+  }, [])
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (showPic) { setShowPic(false); return }
+      if (selectedCardImage) { setSelectedCardImage(null); return }
+      if (activePostId) { setActivePostId(null); return }
+      onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose, showPic, selectedCardImage, activePostId])
+
   return (
     <>
       <div
@@ -231,7 +254,10 @@ export function UserProfileModal({
         onClick={onClose}
       >
         <div
-          className="bg-retro-panel border border-border-glass w-full max-w-lg overflow-hidden shadow-2xl rounded-t-2xl sm:rounded-xl animate-orbit-pop text-retro-fg max-h-[calc(100dvh-var(--island-clearance))] sm:max-h-[calc(100vh-var(--island-clearance)-2rem)] flex flex-col"
+          className="bg-retro-panel border border-border-glass w-full max-w-4xl overflow-hidden shadow-2xl rounded-t-2xl sm:rounded-xl animate-orbit-pop text-retro-fg max-h-[calc(100dvh-var(--island-clearance))] sm:max-h-[calc(100vh-var(--island-clearance)-2rem)] flex flex-col"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${displayName} profile`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -253,8 +279,13 @@ export function UserProfileModal({
             </button>
           </div>
 
-          {/* Content */}
-          <div className="p-4 sm:p-5 space-y-4 overflow-y-auto styled-scrollbar">
+          {/* Two panes: identity/actions on the left, the opened post on the
+              right. The post used to render inline in the flow, so opening one
+              pushed everything down and a feed refresh could scroll it away.
+              On narrow screens the panes stack (post below the grid). */}
+          <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden styled-scrollbar">
+            <div className="md:h-full md:grid md:grid-cols-[minmax(0,21rem)_minmax(0,1fr)]">
+              <div data-testid="profile-pane" className="p-4 sm:p-5 space-y-4 md:h-full md:overflow-y-auto styled-scrollbar">
             {/* Avatar & Stats */}
             <div className="flex items-center gap-4 sm:gap-6">
               <div className="relative shrink-0">
@@ -453,15 +484,18 @@ export function UserProfileModal({
                   <span>Posts ({userPosts.length})</span>
                 </span>
                 <div className="grid grid-cols-3 gap-1.5">
-                  {userPosts.map((post) => (
+                  {userPosts.map((post, postIndex) => (
                     <button
                       key={post.id}
                       type="button"
+                      aria-pressed={activePostId === post.id}
+                      aria-label={`Open post ${postIndex + 1}`}
                       onClick={() => {
                         playPress(700);
+                        setActivePostId(post.id);
                         openPost(post);
                       }}
-                      className="aspect-square bg-surface-interactive rounded-lg overflow-hidden border border-border-glass cursor-pointer group hover:opacity-90 transition-opacity"
+                      className={`aspect-square bg-surface-interactive rounded-lg overflow-hidden border cursor-pointer group hover:opacity-90 transition-opacity ${activePostId === post.id ? 'border-retro-accent/70' : 'border-border-glass'}`}
                     >
                       <ObjectImage
                         contentUrl={post.url}
@@ -476,9 +510,6 @@ export function UserProfileModal({
                 </div>
               </div>
             )}
-
-            {/* Inline expansion for the clicked grid post (no modal) */}
-            {expandedNode}
 
             {/* Cards Gallery */}
             {userCards.length > 0 && (
@@ -510,6 +541,23 @@ export function UserProfileModal({
                 </div>
               </div>
             )}
+              </div>
+
+              {/* Right pane: the post opened from the grid, kept mounted while
+                  presence and feed updates land. */}
+              <div data-testid="profile-post-pane" className="border-t md:border-t-0 md:border-l border-border-glass px-4 py-3 sm:p-4 md:h-full md:overflow-y-auto styled-scrollbar">
+                {activePostId ? (
+                  expandedNode
+                ) : (
+                  <div className="h-full min-h-[12rem] flex flex-col items-center justify-center text-center gap-2 text-retro-muted select-none">
+                    <Grid className="w-5 h-5" />
+                    <p className="text-xs">
+                      {userPosts.length > 0 ? 'Select a post to open it here.' : 'No posts yet.'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

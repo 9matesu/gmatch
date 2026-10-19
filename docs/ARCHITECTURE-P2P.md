@@ -157,6 +157,41 @@ type CourierSignalPayload =
 - Peer connections configure STUN and TURN relays provided by the environment (`defaultIceConfig(readTurnEnv())`).
 - Private LAN IP candidates are stripped/sanitized before dispatch over the courier (`sanitizeCandidate`) to prevent internal network leakage.
 
+### Direct messages ride the same sealed path (no DM route)
+
+There is no direct-message route. `/api/pm` is retired and 404s on every node —
+its client-side edit/delete/report calls used to fail silently. Chat DMs are
+ordinary sealed envelopes on the blind courier, distinguished only by the
+decrypted body kind (`utils/mail-dm.ts`, one decoder):
+
+| kind | meaning | auth/rule |
+|---|---|---|
+| `dm` | message (text + optional attachment id) | signed, sealed to the recipient's `encryptionPubHex` |
+| `dm_ack` | delivery acknowledgement | flips the sender's row to `delivered` |
+| `dm_read` | read watermark (`ts`) | flips to `Seen` only when `readTs >= msg.ts`, view-gated on the reader's side |
+| `dm_edit` | correction | author-only, last-write-wins on `ts` |
+| `dm_del` | delete-for-everyone | leaves a local tombstone; a replay cannot resurrect it |
+| `dm_react` | emoji reaction | aggregated per actor; attributed to the thread peer |
+| `dm_typing` | transient ping | never persisted; throttled 3s, fresh for 8s |
+
+Unknown kinds are ignored by older clients (the body fails to decode), so the
+courier needed no change and the store is still the only source of history.
+
+**Drain correctness.** A notice is emitted only after the envelope is written,
+so a box listing that was already running cannot contain it. `MailClient.pull()`
+coalesces concurrent drains and queues one further pass whenever a notice
+arrives mid-drain; absorbing it (the previous behaviour) left a message on the
+courier until something unrelated pulled. The watch socket is built by
+`wsUrlForBase` (`utils/api.ts`) so a relative API base (browser dev, riding the
+Vite proxy) resolves to the page origin instead of the invalid `ws:///api/mail/ws`.
+
+**Node-hosted lanes are probed, not assumed.** `detectMailMode` reports "courier"
+for both a full node and the blind courier, so it cannot gate gameplay. The UI
+probes an unauthenticated `GET /api/lobby/invites`: 404 means the node does not
+host stateful routes, and lobby/queue/group chat and game invites say so instead
+of failing as 404s. Courier DMs and sealed rooms never touch the node and are
+exempt.
+
 ---
 
 ## 4. P2P Swarm & Content Sharing Protocol

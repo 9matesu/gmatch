@@ -132,4 +132,64 @@ describe('useCourierDms', () => {
       expect(r2.result.current.threadFor(bob.orbitId)?.find((m) => m.id === sent.id)?.status).toBe('delivered')
     })
   })
+
+  it('edit / delete / reaction / receipt all round-trip through the sealed mail path', async () => {
+    const box: { value: unknown[] } = { value: [] }
+    const acks: unknown[] = []
+    const r = renderHook(
+      () => useCourierDms(alice, { fetchImpl: mockFetch(box, acks), webSocketFactory: () => new FakeSocket() }),
+      { wrapper },
+    )
+    await waitFor(() => expect(r.result.current.courierActive).toBe(true))
+    r.result.current.registerPeerKeys(bob.orbitId, bob.publicKeyHex, bob.encryptionPubHex)
+
+    const sent = (await r.result.current.send(bob.orbitId, 'first draft'))!
+    expect(await r.result.current.edit(bob.orbitId, sent.id, 'corrected')).toBe(true)
+    await waitFor(() => {
+      const m = r.result.current.threadFor(bob.orbitId)?.find((x) => x.id === sent.id)
+      expect(m?.text).toBe('corrected')
+      expect(m?.editedTs).toBeTruthy()
+    })
+
+    expect(await r.result.current.react(bob.orbitId, sent.id, '🔥', true)).toBe(true)
+    await waitFor(() => {
+      expect(r.result.current.threadFor(bob.orbitId)?.find((x) => x.id === sent.id)?.reactions).toEqual({ '🔥': [alice.orbitId] })
+    })
+
+    // Bob reads up to that stamp -> the sender's copy records the watermark.
+    box.value.push(seal1to1(JSON.stringify({ t: 'dm_read', id: sent.id, upTo: sent.ts }), 'mail', bob, alice))
+    await r.result.current.pull()
+    await waitFor(() => {
+      expect(r.result.current.threadFor(bob.orbitId)?.find((x) => x.id === sent.id)?.readTs).toBe(sent.ts)
+    })
+
+    expect(await r.result.current.remove(bob.orbitId, sent.id)).toBe(true)
+    await waitFor(() => {
+      const m = r.result.current.threadFor(bob.orbitId)?.find((x) => x.id === sent.id)
+      expect(m?.deletedTs).toBeTruthy()
+      expect(m?.text).toBe('')
+    })
+  })
+
+  it('peer typing pings surface, expire, and are cleared by the next message', async () => {
+    const box: { value: unknown[] } = { value: [] }
+    const r = renderHook(
+      () => useCourierDms(bob, { fetchImpl: mockFetch(box), webSocketFactory: () => new FakeSocket() }),
+      { wrapper },
+    )
+    await waitFor(() => expect(r.result.current.courierActive).toBe(true))
+
+    box.value.push(seal1to1(JSON.stringify({ t: 'dm_typing', at: Date.now() }), 'mail', alice, bob))
+    await r.result.current.pull()
+    await waitFor(() => expect(r.result.current.isTyping(alice.orbitId)).toBe(true))
+
+    box.value.push(seal1to1(
+      encodeDmBody({ id: 'after-typing', peerId: bob.orbitId, own: true, text: 'sent it', ts: Date.now(), status: 'sent' }),
+      'mail', alice, bob,
+    ))
+    await r.result.current.pull()
+    await waitFor(() => expect(r.result.current.isTyping(alice.orbitId)).toBe(false))
+    // Typing never becomes chat history.
+    expect(r.result.current.threadFor(alice.orbitId)?.some((m) => m.text === '')).toBe(false)
+  })
 })

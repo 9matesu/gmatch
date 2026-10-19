@@ -6,7 +6,9 @@ import { useIdle } from "./hooks/useIdle";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { getApiBaseUrl, orbitFetch, invalidateCache, subscribeApiBase } from "./utils/api";
-import { countChatUnread } from "./utils/chatUnread";
+import { courierThreadToChatMessages, chatRowEqual } from "./utils/courierChat";
+import { countChatUnread, countThreadUnread } from "./utils/chatUnread";
+import { countMentions, createMentionMatcher } from "./utils/mentions";
 import { OrbitPeer, pollOffers } from "./utils/webrtc";
 import { saveObject, getAllObjects, deleteObject } from "./utils/storage";
 import type { SendPanelHandle } from "./components/SendPanel";
@@ -54,6 +56,7 @@ import { useTourGuide } from "./components/tour/useTourGuide";
 import { GMatchFeed, type FeedPost } from "./components/feed/GMatchFeed";
 import { reconcilePublishedPost } from "./utils/feedPublish";
 import { GMatchDMs } from "./components/chat/GMatchDMs";
+import { toChatPeer, type ChatPeer } from "./components/chat/chatPeer";
 import type { GroupMember } from "./components/chat/GroupMembersPopover";
 import { AttachmentUploadModal } from "./components/AttachmentUploadModal";
 import { ProfileView } from "./components/views/ProfileView";
@@ -96,6 +99,8 @@ import { isKnownSiteCourier, cachedMailMode, detectMailMode } from "./utils/mail
 import { useCourierDms } from './hooks/useCourierDms';
 import { useServerHeartbeat } from './hooks/useServerHeartbeat';
 import { usePresencePoll } from './hooks/usePresencePoll';
+import { ingestSnapshot } from './game/presenceStore';
+import { hasStatefulRoutes } from './utils/nodeCapabilities';
 import { usePendingJoinVerify } from './hooks/usePendingJoinVerify';
 import { usePendingServerHost } from './hooks/usePendingServerHost';
 import { dataUrlToBlob, localObjectBlobUrl } from "./utils/mediaData";
@@ -1066,7 +1071,9 @@ export default function Home() {
   const [lobbyLightboxUrl, setLobbyLightboxUrl] = useState<string | null>(null)
   const [selectedProfileUser, setSelectedProfileUser] = useState<User | null>(null)
   const [selectedProfilePosts, setSelectedProfilePosts] = useState<FeedPost[]>([])
-  const [pmPeer, setPmPeer] = useState<User | null>(null)
+  const [pmPeer, setPmPeer] = useState<ChatPeer | null>(null)
+  /** Normalized partner id; '' when no conversation is open. */
+  const pmPeerId = pmPeer?.id ?? ''
   // Open the Instagram-style profile popup for a user id (resolved from the
   // online roster when possible, otherwise a minimal fallback object).
   const openProfileById = useCallback((id: string) => {
@@ -1698,6 +1705,37 @@ export default function Home() {
   // fell back to whatever record the opener had. The hook is reference
   // counted, so a surface may also mount it without adding a second poll.
   usePresencePoll(identity ?? null);
+  // Mesh reachability feeds the SAME presence store. A blind courier keeps no
+  // roster, so "online" for a peer we hold a live channel to has to come from
+  // the transport. Ingested as a fresh sighting; it decays by the store's own
+  // 60s rule once the peer goes quiet.
+  const peerPresenceKey = peers.map((p) => p.id).filter(Boolean).join(',')
+  useEffect(() => {
+    if (!peerPresenceKey) return
+    const seenAt = new Date().toISOString()
+    ingestSnapshot(
+      peers.filter((p) => p.id).map((p) => ({
+        id: p.id,
+        display_name: p.display_name,
+        online: true,
+        last_seen: seenAt,
+      })),
+    )
+    // Intentional: keyed on the reachable id set, not the array identity.
+  }, [peerPresenceKey])
+
+  // A blind courier 404s every stateful route, so a game invite cannot be
+  // minted there. Probe once: the action is disabled with the reason instead
+  // of letting the click fail as a bare 404 toast.
+  const [statefulNode, setStatefulNode] = useState<boolean | null>(null)
+  useEffect(() => {
+    let alive = true
+    void hasStatefulRoutes(getApiBaseUrl()).then((v) => { if (alive) setStatefulNode(v) })
+    return () => { alive = false }
+  }, [])
+  const inviteUnavailableReason = statefulNode === false
+    ? 'This node only relays sealed mail — game invites need a node that hosts matches.'
+    : null
   usePendingJoinVerify(identity, toast);
   usePendingServerHost(identity ?? null, toast);
   // Global update toasts: the portable self-update runs whether or not the
@@ -1738,6 +1776,12 @@ export default function Home() {
   const courierPull = courier.pull
   const courierThreadFor = courier.threadFor
   const courierSend = courier.send
+  const courierMarkRead = courier.markRead
+  const courierEdit = courier.edit
+  const courierRemove = courier.remove
+  const courierReact = courier.react
+  const courierType = courier.type
+  const courierIsTyping = courier.isTyping
   const meshSend = courier.meshSend
   const meshPeerKnown = courier.meshPeerKnown
   useEffect(() => {
@@ -1841,6 +1885,29 @@ export default function Home() {
     serverUnread: pmUnreadCount,
   }), [courier.threads, courier.rooms, courier.roomMessages, roomTick, dmSeen, roomSeen, pmUnreadCount, identity?.orbitId])
 
+  // Per-conversation unread + mention counts. ONE source: the courier threads
+  // and the shared `dmSeen` stamp. The chat component used to keep its own
+  // `orbit_read_dms` set, so a thread marked read once never went unread again.
+  const dmUnreadByPeer = useMemo(() => {
+    const out: Record<string, number> = {}
+    for (const [peerId, thread] of Object.entries(courier.threads)) {
+      const n = countThreadUnread(thread, dmSeen[peerId], identity?.orbitId)
+      if (n > 0) out[peerId] = n
+    }
+    return out
+  }, [courier.threads, dmSeen, identity?.orbitId])
+
+  const dmMentionByPeer = useMemo(() => {
+    if (!identity) return {} as Record<string, number>
+    const matcher = createMentionMatcher({ displayName: myProfile.displayName, orbitId: identity.orbitId })
+    const out: Record<string, number> = {}
+    for (const [peerId, thread] of Object.entries(courier.threads)) {
+      const n = countMentions(thread, matcher, dmSeen[peerId] ?? 0)
+      if (n > 0) out[peerId] = n
+    }
+    return out
+  }, [courier.threads, dmSeen, identity, myProfile.displayName])
+
 
 
   const loadPmUnreadCount = useCallback(() => {
@@ -1882,34 +1949,30 @@ export default function Home() {
   const loadPmMessages = useCallback((peerId: string) => {
     if (!identity) return Promise.resolve()
     // Courier mode: the thread lives in our local store; a "load" is a pull.
-    if (courier.courierActive) {
+    if (courierActive) {
       return (async () => {
-        await courier.pull()
+        await courierPull()
         stampDmSeen(peerId)
-        const msgs = (courier.threadFor(peerId) || []).map((m) => ({
-          id: m.id,
-          senderId: m.own ? identity.orbitId : peerId,
-          // `m.senderName` is the name sealed into the DM body, so a peer who
-          // is not in the capped /api/users page still renders by name.
-          senderName: resolveDisplayName({
-            selfId: identity.orbitId,
-            senderId: m.own ? identity.orbitId : peerId,
-            payloadName: m.own ? undefined : m.senderName,
-            roster: nameRoster,
-          }),
-          text: m.text,
-          timestamp: m.ts,
-          readByRecipient: m.status === 'delivered',
-          courierStatus: m.status,
-          attachmentId: m.attachmentId,
-          attachmentUrl: m.attachmentId ? `/api/objects/${m.attachmentId}` : undefined,
-        }))
-        setPmMessagesByPeer((prev) => ({ ...prev, [peerId]: msgs }))
+        const thread = courierThreadFor(peerId) || []
+        // `m.senderName` is the name sealed into the DM body, so a peer who is
+        // not in the capped /api/users page still renders by name.
+        const msgs = courierThreadToChatMessages({
+          thread,
+          peerId,
+          selfId: identity.orbitId,
+          resolveName: (payloadName, senderId) =>
+            resolveDisplayName({ selfId: identity.orbitId, senderId, payloadName, roster: nameRoster }),
+        })
+        setPmMessagesByPeer((prev) => {
+          const before = prev[peerId]
+          if (before && before.length === msgs.length && before.every((m, i) => chatRowEqual(m, msgs[i]))) return prev
+          return { ...prev, [peerId]: msgs }
+        })
       })()
     }
     if (peerId !== 'global_lobby' && peerId !== 'card_queue') {
       // Server /api/pm/read is retired; unread state tracked locally
-      loadPmUnreadCount();
+      void loadPmUnreadCount();
     }
     return orbitFetch(`/api/pm?peer=${encodeURIComponent(peerId)}&_t=${Date.now()}`, {}, identity)
       .then(async (res) => {
@@ -1945,20 +2008,100 @@ export default function Home() {
         }
       })
       .catch(() => { })
-  }, [identity, users, myProfile.displayName, loadPmUnreadCount, courierActive, courierPull, courierThreadFor, stampDmSeen])
+  }, [identity, users, myProfile.displayName, loadPmUnreadCount, courierActive, courierPull, courierThreadFor, courierMarkRead, stampDmSeen])
+
+  // Courier threads ARE the local source of truth. Mirror the open thread into
+  // the chat shape whenever the store changes — send, inbound, edit, delete,
+  // reaction, read watermark — so the bubble reflects the actual record instead
+  // of waiting for a manual reload.
+  useEffect(() => {
+    if (!courierActive || !identity || !pmPeerId) return
+    if (pmPeerId === 'global_lobby' || pmPeerId === 'card_queue') return
+    const thread = courierThreadFor(pmPeerId)
+    if (!thread) return
+    const msgs = courierThreadToChatMessages({
+      thread,
+      peerId: pmPeerId,
+      selfId: identity.orbitId,
+      resolveName: (payloadName, senderId) =>
+        resolveDisplayName({ selfId: identity.orbitId, senderId, payloadName, roster: nameRoster }),
+    })
+    setPmMessagesByPeer((prev) => {
+      const before = prev[pmPeerId]
+      if (before && before.length === msgs.length && before.every((m, i) => chatRowEqual(m, msgs[i]))) return prev
+      return { ...prev, [pmPeerId]: msgs }
+    })
+  }, [courier.threads, courierActive, identity, pmPeerId, courierThreadFor, nameRoster])
+
+  /** Newest inbound (not deleted) message in the open conversation. */
+  const pmLastInboundTs = useMemo(() => {
+    if (!courierActive || !pmPeerId) return 0
+    const thread = courierThreadFor(pmPeerId) || []
+    for (let i = thread.length - 1; i >= 0; i -= 1) {
+      const m = thread[i]
+      if (!m.own && !m.deletedTs) return m.ts
+    }
+    return 0
+  }, [courier.threads, courierActive, pmPeerId, courierThreadFor])
+
+  // Read watermark — only while the conversation is actually in front of the
+  // player, in the chat view, on a visible document. It was stamped inside the
+  // loader, which also runs when the conversation is restored at boot: the peer
+  // was told "Seen" for a thread nobody had looked at.
+  useEffect(() => {
+    if (!courierActive || !identity || !pmPeerId) return
+    if (pmPeerId === 'global_lobby' || pmPeerId === 'card_queue') return
+    if (pmLastInboundTs <= 0) return
+    if (!(mainView === 'messages' || mainView === 'rooms' || chatOpen)) return
+    const commit = () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+      courierMarkRead(pmPeerId, pmLastInboundTs)
+      stampDmSeen(pmPeerId)
+    }
+    commit()
+    document.addEventListener('visibilitychange', commit)
+    return () => document.removeEventListener('visibilitychange', commit)
+  }, [courierActive, identity, pmPeerId, pmLastInboundTs, mainView, chatOpen, courierMarkRead, stampDmSeen])
+
+  // Reopen the last conversation on boot. The chat used to drop back to the
+  // empty thread list every launch, which reads as "my history is gone" even
+  // though the local threads were intact.
+  useEffect(() => {
+    try {
+      if (pmPeer && pmPeer.id !== 'global_lobby' && pmPeer.id !== 'card_queue') {
+        localStorage.setItem('gmatch_last_dm_peer_v1', JSON.stringify(pmPeer))
+      }
+      // Closing a conversation deliberately does NOT clear the mirror: the
+      // point is to reopen where the player was, and boot runs this before the
+      // restore effect (clearing here would erase the pointer first).
+    } catch { /* private mode: remembering is a nicety */ }
+  }, [pmPeer])
+
+  const restoredPeerRef = useRef(false)
+  useEffect(() => {
+    if (restoredPeerRef.current || !identity || pmPeer) return
+    restoredPeerRef.current = true
+    try {
+      const raw = localStorage.getItem('gmatch_last_dm_peer_v1')
+      if (!raw) return
+      const peer = toChatPeer(JSON.parse(raw) as { id?: string; name?: string; pfp?: string })
+      if (!peer) return
+      setPmPeer(peer)
+      void loadPmMessages(peer.id)
+    } catch { /* corrupt mirror: start on the thread list */ }
+  }, [identity, pmPeer, loadPmMessages])
 
   const sendPm = useCallback(async (peerId: string, text: string, replyToId?: string, attachment?: { id: string; url: string }): Promise<boolean> => {
     if (!identity) return false
     if (!text.trim() && !attachment) return false
     // Blind-courier mode (official SITE): sealed envelope to the peer's box,
     // never a server inbox. Attachments ride the sealed body as object refs.
-    if (courier.courierActive) {
-      if (replyToId) {
-        toast('Replies need a direct connection. Send text for now.', 'warning')
-      }
+    if (courierActive) {
       // Attachments ride the sealed body as a private object id (the upload
       // already added the peer to Recipients, so they can fetch the bytes).
-      let msg = await courier.send(peerId, text.trim(), attachment?.id)
+      // Replies ride it too — the reference survives persistence, so a reply
+      // to a message from three days ago still resolves.
+      let msg = await courierSend(peerId, text.trim(), attachment?.id, replyToId ? { replyToId } : undefined)
       if (msg && msg.status === 'failed') {
         // Roster is capped — the peer's keys may simply never have been
         // cached. Resolve them from the public profile and retry once.
@@ -1968,7 +2111,7 @@ export default function Home() {
             const pu = ((await pres.json()) as { user?: { public_key?: string; encryption_pub_key?: string } }).user
             if (pu?.public_key) {
               registerCourierKeys(peerId, pu.public_key, pu.encryption_pub_key || '')
-              msg = await courier.send(peerId, text.trim(), attachment?.id)
+              msg = await courierSend(peerId, text.trim(), attachment?.id, replyToId ? { replyToId } : undefined)
             }
           }
         } catch { /* offline: keep the failed state below */ }
@@ -2203,22 +2346,69 @@ export default function Home() {
     } catch { }
   }, [identity, toast])
 
+  /** Delete from this device. Courier rows become tombstones so a re-pulled
+   *  envelope cannot bring the message back; the old /api/pm DELETE route no
+   *  longer exists on any node, so calling it was a silent no-op. */
   const deletePmMessage = useCallback(async (messageId: string, peerId: string) => {
     if (!identity) return
-    try {
-      await orbitFetch(`/api/pm/${messageId}`, { method: 'DELETE' }, identity)
-      loadPmMessages(peerId)
+    if (courierActive) {
+      await courierRemove(peerId, messageId, { forEveryone: false })
+      await loadPmMessages(peerId)
       loadPmThreads()
-      loadPmUnreadCount()
-    } catch { }
-  }, [identity, loadPmMessages, loadPmThreads, loadPmUnreadCount])
+      return
+    }
+    setPmMessagesByPeer((prev) => ({
+      ...prev,
+      [peerId]: (prev[peerId] || []).filter((m) => m.id !== messageId),
+    }))
+  }, [identity, courierActive, courierRemove, loadPmMessages, loadPmThreads])
+
+  /** Sealed delete for everyone. False => the local delete stands, the peer was
+   *  not told (the caller must not claim otherwise). */
+  const deletePmForEveryone = useCallback(async (peerId: string, messageId: string) => {
+    if (!courierActive) return false
+    const ok = await courierRemove(peerId, messageId)
+    await loadPmMessages(peerId)
+    loadPmThreads()
+    return ok
+  }, [courierActive, courierRemove, loadPmMessages, loadPmThreads])
+
+  const editPmMessage = useCallback(async (peerId: string, messageId: string, text: string) => {
+    if (!courierActive) return false
+    const ok = await courierEdit(peerId, messageId, text)
+    await loadPmMessages(peerId)
+    loadPmThreads()
+    return ok
+  }, [courierActive, courierEdit, loadPmMessages, loadPmThreads])
+
+  const reactPmMessage = useCallback((peerId: string, messageId: string, emoji: string, on: boolean) => {
+    if (!courierActive) return
+    void courierReact(peerId, messageId, emoji, on).then((ok) => {
+      if (!ok) toast('Reaction not delivered — the peer could not be reached.', 'warning')
+      void loadPmMessages(peerId)
+    })
+  }, [courierActive, courierReact, loadPmMessages, toast])
+
+  /** Local, throttled typing ping for the sealed lane only. */
+  const notifyPmTyping = useCallback((peerId: string) => {
+    if (!courierActive) return
+    if (peerId === 'global_lobby' || peerId === 'card_queue') return
+    courierType(peerId)
+  }, [courierActive, courierType])
 
   const deleteThread = useCallback(async (peerId: string) => {
     if (!identity) return
     const base = getApiBaseUrl()
     const isCourier = courierActive || isKnownSiteCourier(base) || cachedMailMode(base) === 'courier'
     try {
-      if (!isCourier) {
+      if (isCourier) {
+        // Delete for me: tombstone every row so a later pull cannot restore a
+        // conversation the player cleared. The peer keeps their own copy.
+        for (const m of courierThreadFor(peerId) || []) {
+          await courierRemove(peerId, m.id, { forEveryone: false })
+        }
+        stampDmSeen(peerId)
+      } else {
         await orbitFetch(`/api/pm/threads/${peerId}`, { method: 'DELETE' }, identity)
       }
       setPmPeer(null)
@@ -2230,7 +2420,7 @@ export default function Home() {
       loadPmThreads()
       loadPmUnreadCount()
     } catch { }
-  }, [identity, loadPmThreads, loadPmUnreadCount, courierActive])
+  }, [identity, courierActive, courierThreadFor, courierRemove, stampDmSeen, loadPmThreads, loadPmUnreadCount])
 
   const loadPmHistory = useCallback(async (peerId: string, beforeTimestamp: string): Promise<boolean> => {
     if (!identity) return false
@@ -4006,7 +4196,7 @@ export default function Home() {
                                 users={users}
                                 onStartPm={(user) => {
                                   const target = users.find((u) => u.id === user.id || (u as any).orbitId === user.id);
-                                  setPmPeer(target || ({ id: user.id, display_name: user.display_name } as User));
+                                  setPmPeer(toChatPeer(target) || toChatPeer(user));
                                   handleSetMainView('messages');
                                 }}
                                 onOpenGameAd={(mode) => {
@@ -4189,8 +4379,8 @@ export default function Home() {
                         <GMatchDMs
                           identity={identity}
                           chatMessages={chatMessages}
-                          pmMessages={pmPeer ? pmMessagesByPeer[pmPeer.id || (pmPeer as { orbitId?: string }).orbitId || ''] || [] : []}
-                          activePmPeer={pmPeer ? { orbitId: pmPeer.id || (pmPeer as { orbitId?: string }).orbitId || '', name: pmPeer.display_name || 'User' } : null}
+                          pmMessages={pmPeer ? pmMessagesByPeer[pmPeerId] || [] : []}
+                          activePmPeer={pmPeer ? { orbitId: pmPeerId, name: pmPeer.name || 'User' } : null}
                           // No `|| 'User'` fallback: a placeholder name is not a
                           // name, and resolveDisplayName treats it as such and
                           // falls through to the real sources.
@@ -4218,7 +4408,7 @@ export default function Home() {
                           onSelectPeer={(p) => {
                             if (p) {
                               const found = users.find((u) => u.id === p.orbitId || (u as { orbitId?: string }).orbitId === p.orbitId)
-                              setPmPeer((found || { id: p.orbitId, display_name: p.name }) as never)
+                              setPmPeer(toChatPeer(found) || toChatPeer({ orbitId: p.orbitId, name: p.name }))
                               if (p.orbitId !== 'global_lobby' && p.orbitId !== 'card_queue') loadPmMessages(p.orbitId)
                             } else {
                               setPmPeer(null)
@@ -4227,6 +4417,34 @@ export default function Home() {
                           onReportMessage={reportPmMessage}
                           onReportUser={reportPmUser}
                           onDeleteMessage={(messageId, peerId) => { if (peerId) void deletePmMessage(messageId, peerId) }}
+                          onDeleteForEveryone={deletePmForEveryone}
+                          onEditMessage={editPmMessage}
+                          onReactMessage={reactPmMessage}
+                          onTyping={notifyPmTyping}
+                          peerTyping={!!pmPeerId && courierIsTyping(pmPeerId)}
+                          seenByPeer={dmSeen}
+                          unreadByPeer={dmUnreadByPeer}
+                          mentionByPeer={dmMentionByPeer}
+                          inviteUnavailableReason={inviteUnavailableReason}
+                          serverLaneReason={statefulNode === false
+                            ? 'This node only relays sealed mail — lobby, queue and group chat need a node that hosts them. Direct messages and sealed rooms still work.'
+                            : null}
+                          onInviteToGame={(userId) => {
+                            void (async () => {
+                              const result = await sendInvite(userId)
+                              if (result.ok) {
+                                toast('Game invite sent', 'success')
+                                return
+                              }
+                              const raw = result.error || 'Could not send the invite'
+                              toast(
+                                /404|not found/i.test(raw)
+                                  ? 'This node does not host matches — the invite was not delivered.'
+                                  : raw,
+                                'error',
+                              )
+                            })()
+                          }}
                           onCreateGroup={createGroup}
                           onOpenAttachment={openAttachmentModal}
                           onSendGroupMessage={(groupId, text, replyToId, attachment) => { void sendGroupMessage(groupId, text, replyToId, attachment) }}
@@ -4413,12 +4631,12 @@ export default function Home() {
                       openRoomChat(null)
                       setActiveGroupId(null)
                       if (row.kind === 'lobby' || row.kind === 'queue') {
-                        setPmPeer(row.kind === 'lobby'
-                          ? ({ id: 'global_lobby', display_name: 'Lobby Lounge (Everyone)' } as never)
-                          : ({ id: 'card_queue', display_name: 'Card Game Queue' } as never))
+                        setPmPeer(toChatPeer(row.kind === 'lobby'
+                          ? { id: 'global_lobby', name: 'Lobby Lounge (Everyone)' }
+                          : { id: 'card_queue', name: 'Card Game Queue' }))
                       } else {
                         const found = users.find((u) => u.id === row.id || (u as { orbitId?: string }).orbitId === row.id)
-                        setPmPeer((found || { id: row.id, display_name: row.name }) as never)
+                        setPmPeer(toChatPeer(found) || toChatPeer({ id: row.id, name: row.name }))
                         loadPmMessages(row.id)
                       }
                       open()
@@ -4539,8 +4757,8 @@ export default function Home() {
                       setSendCardTarget({ id: userId, name: target?.display_name || nameFor(userId) || UNKNOWN_NAME });
                     }}
                     onStartPm={selectedProfileUser.id === identity?.orbitId ? undefined : (u) => {
-                      const targetUser = users.find((usr) => usr.id === u.id) || ({ id: u.id, display_name: u.display_name } as User);
-                      setPmPeer(targetUser);
+                      const targetUser = users.find((usr) => usr.id === u.id) || u;
+                      setPmPeer(toChatPeer(targetUser));
                       handleSetMainView('messages');
                     }}
                     onInviteToGame={selectedProfileUser.id === identity?.orbitId ? undefined : (userId) => {
@@ -4611,10 +4829,10 @@ export default function Home() {
                     <span className="w-8 h-8 rounded-full bg-glass-w20 p-[2px] shrink-0">
                       <span className="w-full h-full rounded-full bg-black overflow-hidden flex items-center justify-center text-xs font-bold text-white">
                         {pmPeer ? (
-                          profilePics[pmPeer.id || (pmPeer as any).orbitId || ''] ? (
-                            <img src={resolveMediaUrl(profilePics[pmPeer.id || (pmPeer as any).orbitId || ''])} alt="" className="w-full h-full object-cover" />
+                          profilePics[pmPeerId] ? (
+                            <img src={resolveMediaUrl(profilePics[pmPeerId])} alt="" className="w-full h-full object-cover" />
                           ) : (
-                            (pmPeer.display_name || 'P').charAt(0).toUpperCase()
+                            (pmPeer.name || 'P').charAt(0).toUpperCase()
                           )
                         ) : (
                           'D'
@@ -4623,7 +4841,7 @@ export default function Home() {
                     </span>
                     <span className="flex flex-col items-start leading-tight">
                       <span className="text-xs font-bold">
-                        {pmPeer ? pmPeer.display_name || 'Direct Message' : 'Direct Messages'}
+                        {pmPeer ? pmPeer.name || 'Direct Message' : 'Direct Messages'}
                       </span>
                       <span className="text-[10px] text-retro-muted">Tap to reopen</span>
                     </span>
@@ -4912,7 +5130,7 @@ export default function Home() {
           navigator.clipboard.writeText(id)
           toast('GMatch ID copied', 'info')
         }}
-        onSendPm={(user) => setPmPeer(user)}
+        onSendPm={(user) => setPmPeer(toChatPeer(user))}
         onBlockUser={blockUser}
         onOpenLightbox={(id) => setExpandedItemId(id)}
         onDownloadItem={async (item) => {

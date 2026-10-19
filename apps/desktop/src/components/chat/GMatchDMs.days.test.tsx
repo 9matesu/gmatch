@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { GMatchDMs } from './GMatchDMs'
 import type { ChatMessage } from '../../hooks/useP2P'
@@ -46,9 +46,19 @@ const msg = (id: string, timestamp: number, senderId = 'peer'): ChatMessage => (
   timestamp,
 })
 
+// Pinned noon, not "now": the labels are about calendar days, and a relative
+// fixture run at 00:05 puts "now - 3h" on yesterday, which made these assert
+// the clock rather than the logic.
+const FIXED_NOW = new Date(2026, 5, 15, 12, 0, 0)
+
 describe('chat day separators', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.useFakeTimers()
+    vi.setSystemTime(FIXED_NOW)
+  })
+
+  afterEach(() => {
     vi.useRealTimers()
   })
 
