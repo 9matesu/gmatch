@@ -395,7 +395,23 @@ export function useP2P(identity: OrbitIdentity | null) {
 
     // 3. Setup WebSocket relay via the API worker
     const API_WS = getApiWebSocketUrl('/api/ws');
-    const courierOnlyWs = /gmatch-wcz1\.onrender\.com/i.test(API_WS);
+    let courierOnlyWs = /gmatch-wcz1\.onrender\.com/i.test(API_WS);
+    // Hostname alone misses every OTHER blind courier (a friend's node set
+    // to SITE_SERVICES=mail,turn and joined via a server URL would get no
+    // presence at all). The node self-declares: /api/health answers
+    // mode:'courier' exactly when the legacy swarm WS is retired. On the
+    // flip side a full node stays 'legacy' and keeps /api/users/online —
+    // so this changes nothing for regular hosts.
+    void fetch(`${getApiBaseUrl()}/api/health`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((h: { mode?: string } | null) => {
+        if (h?.mode !== 'courier' || courierOnlyWs) return;
+        courierOnlyWs = true;
+        // First beacon + roster pull now, not at the next 60s tick.
+        sendHeartbeat();
+        pullRoster();
+      })
+      .catch(() => { /* offline: legacy behaviour stands */ });
 
     // The WS relay only serves authenticated identities: fetch a one-time
     // ws-ticket and present it right after the socket opens. Heartbeat and any

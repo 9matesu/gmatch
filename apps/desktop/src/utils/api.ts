@@ -21,6 +21,18 @@ export function isCourierApiUrl(url: string | null | undefined): boolean {
 }
 
 function computeApiBase(): string {
+  // A manual override is explicit intent — it wins everywhere, including
+  // browser dev on localhost (that is how the courier E2E points two
+  // instances at a sidecar the vite proxy would otherwise own, and how a
+  // dev session pins a specific node). Stale courier values are still
+  // ignored: they would 404 every data route and shadow the real node.
+  try {
+    const manual = typeof localStorage !== 'undefined' ? localStorage.getItem('gmatch.api.url') : null;
+    if (manual?.trim() && !isCourierApiUrl(manual)) {
+      return manual.trim().replace(/\/+$/, '')
+    }
+  } catch { /* private mode */ }
+
   // In browser dev mode (e.g. http://localhost:5173 without Electron bridge), use relative ''
   // so requests hit the Vite dev proxy (which routes dynamically via gmatch_server_url cookie),
   // eliminating CORS blocks for both central and legacy nodes.
@@ -35,15 +47,6 @@ function computeApiBase(): string {
   // Desktop merge (D3): VITE_API_URL, or the Electron preload's __API_BASE__
   // (local sidecar). Default: central node; local sidecar is opt-in via the
   // server-mode switch in Settings.
-  try {
-    const manual = typeof localStorage !== 'undefined' ? localStorage.getItem('gmatch.api.url') : null;
-    // A courier left over in the key (older builds auto-joined "central p2p")
-    // would 404 every data route and shadow the real sidecar — ignore it.
-    if (manual?.trim() && !isCourierApiUrl(manual)) {
-      return manual.trim().replace(/\/+$/, '')
-    }
-  } catch { /* private mode */ }
-
   const envUrl =
     (import.meta.env.VITE_API_URL as string | undefined) ||
     (typeof window !== 'undefined' && (window as unknown as { __API_BASE__?: string }).__API_BASE__)

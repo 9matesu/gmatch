@@ -2,7 +2,7 @@ import { generateIdentity } from '../src/identity.cjs'
 import { legalVersionKey } from '../src/legal/documents'
 
 /** Changelog version the specs pretend to have already read. Bump with the app. */
-export const E2E_CHANGELOG_VERSION = '1.5.5'
+export const E2E_CHANGELOG_VERSION = '1.6.0'
 
 /**
  * Discovery tag every seeded spec identity carries, on the server as well as in

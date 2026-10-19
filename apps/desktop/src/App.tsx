@@ -91,6 +91,7 @@ import { isKnownSiteCourier, cachedMailMode, detectMailMode } from "./utils/mail
 import { useCourierDms } from './hooks/useCourierDms';
 import { useServerHeartbeat } from './hooks/useServerHeartbeat';
 import { usePresencePoll } from './hooks/usePresencePoll';
+import { usePresence } from './game/presenceStore';
 import { usePendingJoinVerify } from './hooks/usePendingJoinVerify';
 import { usePendingServerHost } from './hooks/usePendingServerHost';
 import { dataUrlToBlob, localObjectBlobUrl } from "./utils/mediaData";
@@ -1709,12 +1710,28 @@ export default function Home() {
   const meshPeerKnown = courier.meshPeerKnown
   useEffect(() => {
     if (!courierActive) return
+    // Courier nodes serve no directory (`/api/users` 404s at the blind
+    // courier): the PRESENCE ROSTER is the key source out here. Beacons
+    // carry each peer's Ed25519 + X25519 keys and are signature-verified
+    // before entering the roster — exactly what first-contact sealing
+    // needs. TOFU from inbound mail covers the reply direction; this
+    // covers the first outbound DM/effect to a peer never written before.
     for (const u of users) {
       if (u.publicKey && u.encryptionPubKey) {
         registerCourierKeys(u.id, u.publicKey, u.encryptionPubKey)
       }
     }
-  }, [users, courierActive, registerCourierKeys])
+    for (const p of peers) {
+      if (p.publicKey && p.encryptionPubKey) {
+        registerCourierKeys(p.id, p.publicKey, p.encryptionPubKey)
+      }
+    }
+    // The chat player list reads the shared presence store, whose poller
+    // hits `/api/servers/dashboard` — another route the courier 404s.
+    // The roster IS the courier-mode presence feed: ingest it so peers
+    // are visible and PM-able at all out here.
+    if (peers.length > 0) usePresence.getState().ingest(peers)
+  }, [users, peers, courierActive, registerCourierKeys])
 
   // Courier mode owns the thread list locally (sealed E2EE store; the server
   // is blind by design, /api/pm/threads is dead). Legacy nodes keep the fetch.
