@@ -7,7 +7,7 @@ export interface ChangelogModalProps {
   onClose: () => void
 }
 
-export const CURRENT_CHANGELOG_VERSION = '1.5.6'
+export const CURRENT_CHANGELOG_VERSION = '1.6.0'
 
 /**
  * One entry per change, in the reader's words.
@@ -23,12 +23,12 @@ export const CURRENT_CHANGELOG_VERSION = '1.5.6'
  * list.
  */
 const CHANGES: string[] = [
-  'Servers: the browser is now one list with one row per server and a single "Add server" button. The official world is named gMatch Central.',
-  'Feed: media-first post cards, the author overlay sits on the image, timestamps render as absolute dates in your own timezone.',
-  'Timeline: post text standardized to one body size so the feed reads consistently.',
-  'Look: one panel colour and one opacity knob. Panel Opacity and Glass blur now reach every panel, and chrome stays readable over bright wallpapers.',
-  'Clicker: the local points balance is hidden and the "Welcome back" collection prompt is gone. The economy itself is unchanged.',
-  'Legal: no forced terms popup on new accounts. The full legal documents are always available under Settings, Account & Security.',
+  'Media: one picker everywhere — your keepsakes, a file drop, or a pasted link, all previewed before anything attaches. Saved keepsakes come from your own machine, not a re-download.',
+  'Posts: a new Vault button pins the real media to your encrypted local vault in one click, and one quiet banner shows sync progress instead of chips on every post.',
+  'Comments: commenter names are now clickable and open that profile.',
+  'Domination: video popups open in their own window, images ride sealed peer-to-peer, and every effect now reports honest success or failure. Prompts show who is asking, not a string of characters.',
+  'First login: no guided tour and no toast fanfare — the Help guide opens once, and the app itself is the welcome.',
+  'Admin: the Admin button only shows up when you actually host the node or administer it.',
 ]
 
 export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {

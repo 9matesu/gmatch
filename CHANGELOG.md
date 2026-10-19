@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.6.0
+
+- Domination: honest execution end to end — every effect now reports what
+  actually happened (landed → completed / failed / declined / expired), with
+  payload schemas and clamps enforced on both peers, expiry on sealed
+  requests, spacing on bursts, and bounded memory. Wallpaper consent moved to
+  the OS tier (`allowDesktopWallpaperOS`); native Windows toasts announce
+  effects while the app is minimized.
+- Domination camera: the approval prompt names who is asking (never a raw id),
+  approval no longer implies success — the frame rides sealed (`dom_photo`)
+  and the receipt reflects the real capture outcome.
+- Domination media: video popups open as a real OS window (own process,
+  frameless, closes with the effect); wallpaper/game-background images up to
+  4 MB ride sealed in the request itself, so they cross peers with no shared
+  server. The server ack path accepts `ok:false` and records the failure.
+- Media picker: ONE shared picker everywhere — the post/story composer, the
+  profile photo, the card forge and Domination effects all open the same
+  dialog: Browse (your keepsakes, tag-filtered), Upload (drop, click or
+  paste from the clipboard), or Paste URL (previewed and validated before it
+  attaches). Persisted keepsakes resolve to the local bytes — never a
+  hotlink back to the provider — and fetched media is bounded (error pages
+  refused, oversized downloads abandoned mid-stream).
+- Feed: the per-post sync chips ("Saved locally" / "Syncing…") are replaced
+  by one quiet banner at the top of the feed showing real background sync
+  state. Commenter names are clickable and open that profile; the latest
+  reply still previews on the card.
+- Posts: every media post carries a "Save to Vault" button (desktop) — one
+  click pins the actual bytes to the encrypted local vault, deduped by
+  content hash, with success/failure feedback.
+- First login: the guided tour is gone; the Help guide opens exactly once
+  per account, and the shell no longer fires "You are in." / "Account
+  ready." toasts — the app itself is the welcome. Returning users are never
+  interrupted. `?` and `Ctrl+H` still open Help anytime.
+- Admin: the Admin button only appears when this machine hosts the node or
+  the node says this identity administers it — no more dead navigation for
+  everyone else. The PIN verify (scrypt, lockout, device-local PIN file)
+  remains the real boundary.
+
 ## 1.5.6
 
 - Servers: the browser rebuilt as one page, one list, one row per server
