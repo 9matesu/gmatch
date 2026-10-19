@@ -62,6 +62,77 @@ describe('selectionToFile', () => {
     vi.unstubAllGlobals();
   });
 
+  it('appends an extension when the selection name has none', async () => {
+    const blob = new Blob(['bytes'], { type: 'image/jpeg' });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(blob, { status: 200 })));
+    const out = await selectionToFile({ kind: 'url', url: 'https://x.com/a.jpg', name: 'beach', source: 'browse' });
+    expect(out?.name).toBe('beach.jpeg'); // extension from the served MIME (jpeg, not normalized)
+    vi.unstubAllGlobals();
+  });
+
+  it('refuses HTML error/hotlink pages even when the response is 200', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>hotlink wall</html>', {
+      status: 200,
+      headers: { 'content-type': 'text/html' },
+    })));
+    const out = await selectionToFile({ kind: 'url', url: 'https://x.com/a.png', source: 'url' });
+    expect(out).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it('abandons oversized downloads mid-stream when maxBytes is set', async () => {
+    const big = new Blob([new Uint8Array(1024)], { type: 'image/png' });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(big, {
+      status: 200,
+      headers: { 'content-type': 'image/png' },
+    })));
+    const out = await selectionToFile(
+      { kind: 'url', url: 'https://x.com/big.png', source: 'browse' },
+      'media',
+      { maxBytes: 100 },
+    );
+    expect(out).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps downloads within the byte cap intact', async () => {
+    const small = new Blob([new Uint8Array(50)], { type: 'image/png' });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(small, {
+      status: 200,
+      headers: { 'content-type': 'image/png' },
+    })));
+    const out = await selectionToFile(
+      { kind: 'url', url: 'https://x.com/ok.png', source: 'browse' },
+      'media',
+      { maxBytes: 100 },
+    );
+    expect(out?.size).toBe(50);
+    expect(out?.type).toBe('image/png');
+    vi.unstubAllGlobals();
+  });
+
+  it('pre-rejects a declared Content-Length over the cap', async () => {
+    const blob = new Blob([new Uint8Array(10)], { type: 'image/png' });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(blob, {
+      status: 200,
+      headers: { 'content-type': 'image/png', 'content-length': '99999' },
+    })));
+    const out = await selectionToFile(
+      { kind: 'url', url: 'https://x.com/big.png', source: 'browse' },
+      'media',
+      { maxBytes: 100 },
+    );
+    expect(out).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it('returns null (never throws) when the network itself fails', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('offline'); }));
+    const out = await selectionToFile({ kind: 'url', url: 'https://x.com/gone.png', source: 'url' });
+    expect(out).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
   it('returns null (never throws) for unreachable URLs', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 404 })));
     const out = await selectionToFile({ kind: 'url', url: 'https://x.com/gone.png', source: 'url' });

@@ -66,8 +66,10 @@ export function ActionModal({
     }
     // URL selection. A keepsake URL (idle-file:/blob:/vault schemes) points at
     // THIS machine's bytes — fetch them now and ride inline, like a file.
+    // The read is capped at the inline limit so an oversized keep is
+    // abandoned mid-stream, not buffered to 400 MB and then refused.
     if (!/^https?:/i.test(sel.url)) {
-      const file = await selectionToFile(sel, 'keepsake');
+      const file = await selectionToFile(sel, 'keepsake', { maxBytes: DOM_LIMITS.inlineImageMaxBytes });
       if (!file) {
         setFormError('That media could not be read from this device. Paste a public link instead.');
         return;

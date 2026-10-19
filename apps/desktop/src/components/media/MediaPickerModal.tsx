@@ -5,17 +5,21 @@
  * Upload (click, drag-drop, clipboard paste) / URL (paste, preview,
  * validate) — every entry point renders this instead of growing its own
  * input maze. Contract + helpers: ./picker.ts. No new cache: keepsakes
- * render from bytes the vault/gallery already holds.
+ * render from bytes the vault/gallery already holds, through the SAME
+ * resolution pipeline as the gallery (resolveGalleryTileUrl + vault/IDB
+ * maps) — a persisted keep is never hotlinked back to its provider.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { FolderOpen, Image as ImageIcon, LinkIcon, UploadCloud, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FolderOpen, Image as ImageIcon, LinkIcon, Loader2, UploadCloud, X } from 'lucide-react';
 import { useGame } from '../../game/store';
 import type { GalleryImage } from '../../game/types';
+import { useVaultHttpUrls, useVaultUrls } from '../../services/vault';
+import { releaseLocalUrl, resolveFreshLocalUrl } from '../../services/keepsake';
+import { resolveGalleryTileUrl, useKeepsakeLocalUrls } from '../grid/IdleGalleryView';
 import {
   fileAccepted,
   plausibleMediaUrl,
-  urlLooksLikeVideo,
   type MediaPickerOptions,
   type MediaSelection,
 } from './picker';
@@ -25,10 +29,6 @@ type Pane = 'browse' | 'upload' | 'url';
 type Pending =
   | { kind: 'url'; url: string; name?: string; source: MediaSelection['source'] }
   | { kind: 'file'; file: File; previewUrl: string; source: MediaSelection['source'] };
-
-function keepIsVideo(url: string): boolean {
-  return urlLooksLikeVideo(url);
-}
 
 /** Small preview surface shared by all panes: img for stills, video for mp4/webm. */
 function Preview({ url, isVideo }: { url: string; isVideo: boolean }) {
@@ -57,8 +57,11 @@ export function MediaPickerModal({
   const [tagFilter, setTagFilter] = useState('');
   const [urlInput, setUrlInput] = useState('');
   const [dragOver, setDragOver] = useState(false);
+  const [busyKeepId, setBusyKeepId] = useState<string | null>(null);
+  const [selectedKeepId, setSelectedKeepId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // Object URL for the current upload preview; revoked on replace/close.
+  // Object URL for the current upload preview; revoked on replace/close —
+  // EXCEPT after a confirm, when ownership transfers to the caller.
   const objectUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -84,6 +87,7 @@ export function MediaPickerModal({
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
       const previewUrl = URL.createObjectURL(file);
       objectUrlRef.current = previewUrl;
+      setSelectedKeepId(null);
       setPending({ kind: 'file', file, previewUrl, source });
     },
     [accept],
@@ -110,24 +114,102 @@ export function MediaPickerModal({
       setError('That is not a usable http(s)/data URL.');
       return;
     }
-    if (accept.includes('image') && !accept.includes('video') && urlLooksLikeVideo(url)) {
+    if (accept.includes('image') && !accept.includes('video') && /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(url)) {
       setError('This caller takes images only — that link looks like a video.');
       return;
     }
     setError(null);
+    setSelectedKeepId(null);
     setPending({ kind: 'url', url, source: 'url' });
   };
 
-  const filteredGallery = gallery
-    // Respect the caller's accepted kinds: video-looking keepsakes only show
-    // when the caller actually takes video.
-    .filter((g) => (accept.includes('video') ? true : !keepIsVideo(g.url)))
+  // --- Browse pane: the gallery's own keepsake resolution pipeline. -------
+  // Hooks stay unconditional; empty inputs make them no-ops when the browse
+  // pane is not among the sources.
+  const browseGallery = sources.includes('browse') ? gallery : [];
+  const vaultUrls = useVaultUrls(browseGallery.map((g) => g.url));
+  const localUrls = useKeepsakeLocalUrls(browseGallery, vaultUrls);
+
+  const tileUrlById = useMemo(
+    () =>
+      new Map(
+        browseGallery.map((img) => [
+          img.id,
+          resolveGalleryTileUrl(img, vaultUrls[img.url || ''] || localUrls[img.url || '']),
+        ]),
+      ),
+    [browseGallery, vaultUrls, localUrls],
+  );
+  const vaultTileUrls = [...tileUrlById.values()].filter((u): u is string => u.startsWith('vault://'));
+  const httpUrlMap = useVaultHttpUrls(vaultTileUrls);
+  const tileUrl = (img: GalleryImage): string => {
+    const raw = tileUrlById.get(img.id) || '';
+    if (raw.startsWith('vault://')) return httpUrlMap[raw] || raw;
+    return raw;
+  };
+
+  /**
+   * Select a keepsake: resolve its LOCAL bytes (vault, else the swarm object
+   * store), never its provider URL — an offline or evicted keep says so
+   * instead of pretending a hotlink will work. The resolver's URL is
+   * released once the bytes are in a File; the vault record is untouched
+   * (re-persisting stays the caller's flow, deduped by content hash).
+   */
+  const pickKeep = async (img: GalleryImage) => {
+    if (busyKeepId) return;
+    setBusyKeepId(img.id);
+    setError(null);
+    let fresh: string | null = null;
+    try {
+      fresh = await resolveFreshLocalUrl(img);
+      if (!fresh) {
+        setError('No local copy of this keepsake on this device yet — open it in the Gallery first so the bytes are fetched.');
+        return;
+      }
+      const res = await fetch(fresh);
+      if (!res.ok) {
+        setError('The local copy of that keepsake could not be read. Open it in the Gallery to repair it first.');
+        return;
+      }
+      const blob = await res.blob();
+      if (!blob.size) {
+        setError('The local copy of that keepsake is empty. Open it in the Gallery to repair it first.');
+        return;
+      }
+      const mime = blob.type || 'application/octet-stream';
+      const ext = (mime.split('/')[1] || 'jpg').split('+')[0] || 'jpg';
+      const file = new File([blob], `keep-${img.id.slice(0, 8)}.${ext}`, { type: mime });
+      if (!fileAccepted(file, accept)) {
+        setError(`That keepsake doesn't fit this picker (${accept.join(' or ')} only).`);
+        return;
+      }
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+      const previewUrl = URL.createObjectURL(blob);
+      objectUrlRef.current = previewUrl;
+      setSelectedKeepId(img.id);
+      setPending({ kind: 'file', file, previewUrl, source: 'browse' });
+    } catch {
+      setError('The local copy of that keepsake could not be read. Open it in the Gallery to repair it first.');
+    } finally {
+      // The picker consumed the bytes; the resolver's URL is no longer ours.
+      if (fresh) releaseLocalUrl(fresh);
+      setBusyKeepId(null);
+    }
+  };
+
+  const filteredGallery = browseGallery
+    // Respect the caller's accepted kinds: video keepsakes only show when the
+    // caller actually takes video (kind comes from the captured post).
+    .filter((g) => (accept.includes('video') ? true : g.kind !== 'video'))
     .filter((g) =>
       tagFilter.trim() ? g.tags.some((t) => t.toLowerCase().includes(tagFilter.trim().toLowerCase())) : true,
     );
 
   const confirm = () => {
     if (!pending) return;
+    // The caller now owns the preview URL — the unmount cleanup must not
+    // revoke what was just handed over.
+    if (pending.kind === 'file') objectUrlRef.current = null;
     onPick(pending);
   };
 
@@ -187,7 +269,7 @@ export function MediaPickerModal({
           )}
 
           {pane === 'browse' && (
-            gallery.length === 0 ? (
+            browseGallery.length === 0 ? (
               <p className="text-xs text-retro-muted py-6 text-center">
                 Your gallery is empty — upload a file or paste a URL instead.
               </p>
@@ -202,26 +284,38 @@ export function MediaPickerModal({
                 />
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                   {filteredGallery.map((g: GalleryImage) => {
-                    const video = keepIsVideo(g.url);
-                    const selected = pending?.kind === 'url' && pending.url === g.url;
+                    const video = g.kind === 'video';
+                    const selected = selectedKeepId === g.id && pending?.kind === 'file' && pending.source === 'browse';
+                    const src = tileUrl(g);
+                    const raw = tileUrlById.get(g.id) || '';
+                    // No local bytes and no preview: an empty tile is honest.
+                    const unresolvable = !src;
                     return (
                       <button
                         key={g.id}
                         type="button"
-                        onClick={() => {
-                          setError(null);
-                          setPending({ kind: 'url', url: g.url, name: g.tags?.[0] ? `${g.tags[0]}` : undefined, source: 'browse' });
-                        }}
-                        className={`relative aspect-square rounded-lg overflow-hidden border transition-all cursor-pointer bg-glass-w8 ${
-                          selected ? 'border-retro-accent ring-1 ring-retro-accent' : 'border-border-glass hover:border-retro-accent/60'
+                        onClick={() => void pickKeep(g)}
+                        className={`relative aspect-square rounded-lg overflow-hidden border transition-all bg-glass-w8 ${
+                          unresolvable
+                            ? 'border-border-glass opacity-50 cursor-not-allowed'
+                            : busyKeepId === g.id
+                              ? 'border-retro-accent cursor-progress'
+                              : 'border-border-glass hover:border-retro-accent/60 cursor-pointer'
                         }`}
-                        title={g.tags?.join(', ')}
+                        title={unresolvable ? 'No local copy yet' : g.tags?.join(', ')}
+                        disabled={unresolvable || busyKeepId === g.id}
                       >
-                        {video ? (
-                          <video src={g.url} muted preload="metadata" className="w-full h-full object-cover" />
+                        {busyKeepId === g.id ? (
+                          <span className="absolute inset-0 flex items-center justify-center">
+                            <Loader2 className="w-5 h-5 animate-spin text-retro-accent" />
+                          </span>
+                        ) : unresolvable ? (
+                          <span className="absolute inset-0 flex items-center justify-center text-[10px] text-retro-muted">No local copy</span>
+                        ) : video ? (
+                          <video src={src} muted preload="metadata" className="w-full h-full object-cover" />
                         ) : (
                           <img
-                            src={g.url}
+                            src={src}
                             alt={g.tags?.[0] || 'keepsake'}
                             loading="lazy"
                             className="w-full h-full object-cover"
@@ -234,6 +328,9 @@ export function MediaPickerModal({
                           <span className="absolute inset-0 bg-retro-accent/20 flex items-center justify-center">
                             <ImageIcon className="w-5 h-5 text-white drop-shadow" />
                           </span>
+                        )}
+                        {raw.startsWith('vault://') && !httpUrlMap[raw] && !unresolvable && (
+                          <span className="absolute inset-x-0 bottom-0 py-0.5 text-center text-[9px] bg-black/50 text-white/80">…</span>
                         )}
                       </button>
                     );
@@ -310,12 +407,15 @@ export function MediaPickerModal({
           {pending && (
             <div className="space-y-2 pt-1">
               <div className="flex justify-center border border-border-glass rounded-xl bg-glass-w4 p-2">
-                <Preview url={pending.kind === 'file' ? pending.previewUrl : pending.url} isVideo={pending.kind === 'file' ? fileAccepted(pending.file, ['video']) && !fileAccepted(pending.file, ['image']) : keepIsVideo(pending.url)} />
+                <Preview url={pending.kind === 'file' ? pending.previewUrl : pending.url} isVideo={pending.kind === 'file' ? fileAccepted(pending.file, ['video']) && !fileAccepted(pending.file, ['image']) : /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(pending.url)} />
               </div>
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setPending(null)}
+                  onClick={() => {
+                    setSelectedKeepId(null);
+                    setPending(null);
+                  }}
                   className="px-3 py-1.5 rounded-lg text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 cursor-pointer"
                 >
                   Clear
@@ -339,33 +439,42 @@ export function MediaPickerModal({
 /**
  * Promise-based handle: `const sel = await open(); if (!sel) return;`
  * Render `picker` once next to the caller's other modals.
+ *
+ * Lifecycle: a pending promise is always settled — a newer open() supersedes
+ * it with null, and unmount settles it too, so no caller ever awaits forever.
  */
 export function useMediaPicker(options: MediaPickerOptions) {
-  type Resolver = ((sel: MediaSelection | null) => void) | null;
-  const [resolveRef, setResolveRef] = useState<Resolver>(null);
+  const [open_, setOpen_] = useState(false);
+  const resolverRef = useRef<((sel: MediaSelection | null) => void) | null>(null);
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
+  const settle = useCallback((sel: MediaSelection | null) => {
+    resolverRef.current?.(sel);
+    resolverRef.current = null;
+    setOpen_(false);
+  }, []);
+
   const open = useCallback(() => {
-    return new Promise<MediaSelection | null>((resolve) => setResolveRef(() => resolve));
-  }, []);
-
-  const close = useCallback(() => {
-    setResolveRef((resolve: Resolver) => {
-      resolve?.(null);
-      return null;
+    return new Promise<MediaSelection | null>((resolve) => {
+      // A second invocation while the picker is open cancels the first
+      // request — two callers can never race over one selection.
+      resolverRef.current?.(null);
+      resolverRef.current = resolve;
+      setOpen_(true);
     });
   }, []);
 
-  const finish = useCallback((sel: MediaSelection) => {
-    setResolveRef((resolve: Resolver) => {
-      resolve?.(sel);
-      return null;
-    });
+  // Unmount (the whole caller closed) still settles a pending promise.
+  useEffect(() => {
+    return () => {
+      resolverRef.current?.(null);
+      resolverRef.current = null;
+    };
   }, []);
 
-  const picker = resolveRef ? (
-    <MediaPickerModal options={optionsRef.current} onPick={finish} onClose={close} />
+  const picker = open_ ? (
+    <MediaPickerModal options={optionsRef.current} onPick={settle} onClose={() => settle(null)} />
   ) : null;
 
   return { open, picker };

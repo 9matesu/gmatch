@@ -70,14 +70,17 @@ describe('chat day separators', () => {
   })
 
   it('inserts exactly one separator for a same-day conversation', () => {
-    const now = new Date()
+    // Anchored at noon of the current day: every stamp stays on the same
+    // calendar day as `now` no matter what time the suite runs (raw
+    // `now - 3h` crossed midnight and mislabelled the day 'Yesterday').
+    const noon = new Date().setHours(12, 0, 0, 0)
     render(
       <GMatchDMs
         {...baseProps({
           pmMessages: [
-            msg('a', now.getTime() - 3 * 3600_000),
-            msg('b', now.getTime() - 2 * 3600_000),
-            msg('c', now.getTime() - 3600_000),
+            msg('a', noon - 3 * 3600_000),
+            msg('b', noon - 2 * 3600_000),
+            msg('c', noon - 1 * 3600_000),
           ],
         })}
       />,

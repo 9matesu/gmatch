@@ -58,21 +58,61 @@ export function urlLooksLikeVideo(url: string): boolean {
 /**
  * Convert any selection into a File for callers that need real bytes
  * (forge, server upload). 'file' selections pass through; URL selections
- * are fetched. Returns null when the bytes are unreachable — never throws.
- * This is the same keep→File conversion CreateCardModal already used for
- * drags, extracted so every entry point shares one implementation.
+ * are fetched. Returns null when the bytes are unreachable or not media —
+ * never throws.
+ *
+ * Validation happens on the RESPONSE, not the URL: a hotlink-protection or
+ * error page (text/html) is refused even though the URL looked right, and
+ * with `maxBytes` the body is read incrementally and abandoned the moment
+ * it exceeds the cap (Content-Length is pre-checked when declared). This is
+ * the keep→File conversion CreateCardModal used for drags, shared by every
+ * entry point.
  */
-export async function selectionToFile(sel: MediaSelection, fallbackName = 'media'): Promise<File | null> {
+export async function selectionToFile(
+  sel: MediaSelection,
+  fallbackName = 'media',
+  opts?: { maxBytes?: number },
+): Promise<File | null> {
   if (sel.kind === 'file') return sel.file;
   try {
     const res = await fetch(sel.url);
     if (!res.ok) return null;
-    const blob = await res.blob();
-    if (!blob.size) return null;
-    const ext = (blob.type.split('/')[1] || 'jpg').split('+')[0];
-    const name = sel.name || `${fallbackName}-${Date.now()}.${ext}`;
-    return new File([blob], name, { type: blob.type || 'application/octet-stream' });
+    const declared = (res.headers.get('content-type') || '').toLowerCase();
+    // A URL is not a promise of media: error pages and hotlink walls come
+    // back 200 with text/html. Refuse them before building a File.
+    if (declared.startsWith('text/html')) return null;
+    const blob = await readBounded(res, opts?.maxBytes);
+    if (!blob || !blob.size) return null;
+    const mime = blob.type || declared || '';
+    const ext = (mime.split('/')[1] || 'jpg').split('+')[0] || 'jpg';
+    // A selected keepsake may carry a tag-derived name with no extension;
+    // never hand callers a nameless-blob File.
+    const hasExt = /\.[a-z0-9]{1,5}$/i.test(sel.name || '');
+    const name = sel.name ? (hasExt ? sel.name : `${sel.name}.${ext}`) : `${fallbackName}-${Date.now()}.${ext}`;
+    return new File([blob], name, { type: mime || 'application/octet-stream' });
   } catch {
     return null;
   }
+}
+
+/** Read the response body, abandoning it as soon as it exceeds maxBytes. */
+async function readBounded(res: Response, maxBytes?: number): Promise<Blob | null> {
+  if (!maxBytes) return res.blob();
+  const declaredLength = Number(res.headers.get('content-length') || 0);
+  if (declaredLength && declaredLength > maxBytes) return null;
+  const reader = res.body?.getReader();
+  if (!reader) return res.blob(); // no stream available: caller-side checks still apply
+  const chunks: BlobPart[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      try { await reader.cancel(); } catch { /* already gone */ }
+      return null;
+    }
+    chunks.push(value);
+  }
+  return new Blob(chunks, { type: res.headers.get('content-type') || '' });
 }

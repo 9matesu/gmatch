@@ -90,6 +90,42 @@ describe('useMediaPicker', () => {
     expect(screen.queryByPlaceholderText('https://…')).toBeNull();
   });
 
+  it('settles the first request with null when a second open() supersedes it', async () => {
+    function Host({ onResult }: { onResult: (sel: unknown) => void }) {
+      const { open, picker } = useMediaPicker({ sources: ['url'] });
+      return (
+        <>
+          <button type="button" onClick={() => void open().then(onResult)}>open</button>
+          {picker}
+        </>
+      );
+    }
+    const results: unknown[] = [];
+    render(<Host onResult={(r) => results.push(r)} />);
+    fireEvent.click(screen.getByText('open'));
+    fireEvent.click(screen.getByText('open')); // second invocation while open
+    await waitFor(() => expect(results).toEqual([null]));
+    // The picker is still usable for the second request.
+    expect(screen.getByPlaceholderText('https://…')).toBeTruthy();
+  });
+
+  it('settles a pending request with null when the host unmounts', async () => {
+    function Host({ onResult }: { onResult: (sel: unknown) => void }) {
+      const { open, picker } = useMediaPicker({});
+      return (
+        <>
+          <button type="button" onClick={() => void open().then(onResult)}>open</button>
+          {picker}
+        </>
+      );
+    }
+    const onResult = vi.fn();
+    const { unmount } = render(<Host onResult={onResult} />);
+    fireEvent.click(screen.getByText('open'));
+    unmount();
+    await waitFor(() => expect(onResult).toHaveBeenCalledWith(null));
+  });
+
   it('resolves null when closed without a pick', async () => {
     function Host({ onResult }: { onResult: (sel: unknown) => void }) {
       const { open, picker } = useMediaPicker({});
@@ -105,5 +141,33 @@ describe('useMediaPicker', () => {
     fireEvent.click(screen.getByText('open'));
     fireEvent.click(await waitFor(() => screen.getByRole('button', { name: 'Close media picker' })));
     await waitFor(() => expect(onResult).toHaveBeenCalledWith(null));
+  });
+
+  it('transfers preview-URL ownership on pick, revokes only when closed unpicked', async () => {
+    const revoke = vi.fn();
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revoke });
+
+    // Confirm: the URL handed to the caller survives the modal unmount.
+    const onPick = vi.fn();
+    const first = render(
+      <MediaPickerModal options={{ sources: ['upload'] }} onPick={onPick} onClose={vi.fn()} />,
+    );
+    fireEvent.change(document.querySelector('input[type="file"]') as HTMLInputElement, { target: { files: [png] } });
+    fireEvent.click(screen.getByText('Use this media'));
+    first.unmount();
+    expect(revoke).not.toHaveBeenCalledWith('blob:mock');
+
+    // Close without a pick: the preview URL is cleaned up on unmount
+    // (in the hook flow, onClose triggers exactly that unmount).
+    revoke.mockClear();
+    const onClose = vi.fn();
+    const second = render(
+      <MediaPickerModal options={{ sources: ['upload'] }} onPick={vi.fn()} onClose={onClose} />,
+    );
+    fireEvent.change(document.querySelector('input[type="file"]') as HTMLInputElement, { target: { files: [png] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Close media picker' }));
+    expect(onClose).toHaveBeenCalled();
+    second.unmount();
+    expect(revoke).toHaveBeenCalledWith('blob:mock');
   });
 });

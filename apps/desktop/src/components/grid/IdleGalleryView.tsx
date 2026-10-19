@@ -144,9 +144,10 @@ export function resolveGalleryTileUrl(img: GalleryImage, vaultUrl?: string): str
  * by source url. Vault (Electron) is preferred where present; this covers the
  * dev/browser case and keeps the gallery off third-party URLs once cached.
  * Only entries already verified 'local' are resolved; blob URLs are revoked
- * on change/unmount.
+ * on change/unmount. Exported for the shared MediaPickerModal (B7), which
+ * must render the same honest tiles the gallery does.
  */
-function useKeepsakeLocalUrls(images: GalleryImage[], vaultUrls: Record<string, string>): Record<string, string> {
+export function useKeepsakeLocalUrls(images: GalleryImage[], vaultUrls: Record<string, string>): Record<string, string> {
   const [map, setMap] = useState<Record<string, string>>({})
   const key = images.map((i) => i.url || '').filter(Boolean).join('|')
   useEffect(() => {
