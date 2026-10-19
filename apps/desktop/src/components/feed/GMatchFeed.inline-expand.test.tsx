@@ -24,7 +24,7 @@ vi.mock('../../services/imageCache', () => ({
 const mockIdentity = { orbitId: 'me', sign: vi.fn() } as any;
 const mockUsers = [{ id: 'alice', display_name: 'Alice', online: true }];
 
-function post(id: string, caption: string) {
+function post(id: string, caption: string, comments?: any[]) {
   return {
     id,
     author_id: 'alice',
@@ -35,14 +35,18 @@ function post(id: string, caption: string) {
     tags: [],
     like_count: 0,
     comment_count: 0,
+    ...(comments ? { comments } : {}),
   } as any;
 }
 
-function renderTwo(onPersistComment?: (postId: string, text: string) => Promise<any>) {
+function renderTwo(
+  onPersistComment?: (postId: string, text: string, parentCommentId?: string | null) => Promise<any>,
+  commentsById?: Record<string, any[]>,
+) {
   return render(
     <GMatchFeed
       identity={mockIdentity}
-      posts={[post('p1', 'first'), post('p2', 'second')]}
+      posts={[post('p1', 'first', commentsById?.p1), post('p2', 'second', commentsById?.p2)]}
       stories={[]}
       users={mockUsers}
       feedSort="latest"
@@ -107,8 +111,36 @@ describe('inline post expansion', () => {
     const input = screen.getByPlaceholderText('Add a comment...');
     fireEvent.change(input, { target: { value: 'nice' } });
     fireEvent.click(screen.getByRole('button', { name: 'Post' }));
-    expect(onPersistComment).toHaveBeenCalledWith('p1', 'nice');
+    // Third argument is the reply target: `null` for a top-level comment.
+    expect(onPersistComment).toHaveBeenCalledWith('p1', 'nice', null);
     await waitFor(() => expect(screen.getByText('nice')).toBeInTheDocument());
+  });
+
+  it('replying sends the parent comment id and nests the reply', async () => {
+    const onPersistComment = vi.fn(async (_postId: string, text: string, parentCommentId?: string | null) => ({
+      id: 'r1',
+      author_id: 'me',
+      author_name: 'You',
+      text,
+      created_at: new Date().toISOString(),
+      like_count: 0,
+      parent_comment_id: parentCommentId ?? null,
+    }));
+    renderTwo(onPersistComment, {
+      p1: [
+        {
+          id: 'c1', author_id: 'bob', author_name: 'Bob', text: 'first',
+          created_at: new Date().toISOString(), like_count: 0,
+        },
+      ],
+    });
+    fireEvent.click(expanders()[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Reply to comment by Bob' }));
+    // The composer targets the reply (placeholder + submit label change).
+    fireEvent.change(screen.getByPlaceholderText('Reply to Bob…'), { target: { value: 'agreed' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Reply' }));
+    expect(onPersistComment).toHaveBeenCalledWith('p1', 'agreed', 'c1');
+    await waitFor(() => expect(screen.getByText('agreed')).toBeInTheDocument());
   });
 
   it('deep link #/feed?post= expands the target inline', async () => {

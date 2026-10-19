@@ -442,6 +442,15 @@ export function useLobby({
 
     const unsubscribe = subscribeOrbitWebSocket(identity, (msg) => {
           try {
+            if (msg.type === '__ws_reconnected') {
+              // The socket was down, so anything pushed while it was away — a
+              // notification, an invite, a fresh follower — never arrived. One
+              // catch-up read per reconnect (no interval, no polling loop):
+              // lobby state forced, plus the notification/invite list.
+              void refreshNotifications()
+              scheduleRefresh(true)
+              return
+            }
             if (msg.type === 'flash') {
               if (msg.action === 'new' && msg.flash && typeof msg.flash === 'object') {
                 setFlash((prev) => (prev && prev.id === msg.flash.id ? prev : msg.flash as FlashEvent))

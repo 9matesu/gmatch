@@ -207,22 +207,36 @@ export function handleIncoming(conn: WsConn, data: string): void {
   // Local-first timeline media: bytes stay on the poster's disk
   // (IndexedDB in the packaged app) and are retransmitted peer-to-peer on
   // demand. The WS relay is the guaranteed fallback when direct WebRTC is
-  // unavailable, so SWARM_FRAME envelopes ride the global room. Only the
-  // three swarm shapes relay; anything else with a `type` key stays dropped
-  // (audit A2: feed/lobby/user_banned... forgery guard).
+  // unavailable, so SWARM_FRAME envelopes ride the global room. Only explicit
+  // client-to-client shapes relay; anything else with a `type` key stays
+  // dropped (audit A2: feed/lobby/user_banned... forgery guard).
+  //
+  // Announcements (IMAGE_ANNOUNCE et al) used to be sent as BARE frames, which
+  // this guard refused — so peer posts only ever reached peers over a direct
+  // WebRTC channel and vanished on every other path. They now ride the same
+  // SWARM_FRAME envelope, and the relay stamps `relayedBy` with the identity
+  // the socket PROVED at auth, so a receiver can tell a real sender from a
+  // forged `user.id` in the payload.
   if (msg.type === 'SWARM_FRAME' && msg.swarm && typeof msg.swarm === 'object') {
     const inner = msg.swarm as { type?: unknown; dataBase64?: unknown }
-    if (inner.type === 'SWARM_WANT' || inner.type === 'SWARM_HAVE') {
-      for (const c of conns) {
-        if (c !== conn && c.authed && c.rooms.has('global')) c.send(data)
-      }
-      return
-    }
-    if (inner.type === 'SWARM_CHUNK' && typeof inner.dataBase64 === 'string' && inner.dataBase64.length <= 128 * 1024) {
-      for (const c of conns) {
-        if (c !== conn && c.authed && c.rooms.has('global')) c.send(data)
-      }
-      return
+    const relayable =
+      inner.type === 'SWARM_WANT' ||
+      inner.type === 'SWARM_HAVE' ||
+      (inner.type === 'SWARM_CHUNK' &&
+        typeof inner.dataBase64 === 'string' &&
+        inner.dataBase64.length <= 128 * 1024) ||
+      // Announce shapes: an object's metadata + its provider link, never bytes.
+      inner.type === 'IMAGE_ANNOUNCE' ||
+      inner.type === 'MESSAGE' ||
+      inner.type === 'STORY_ANNOUNCE' ||
+      inner.type === 'CHAT' ||
+      inner.type === 'PRESENCE'
+    if (!relayable) return
+    const relayed = conn.userId
+      ? JSON.stringify({ type: 'SWARM_FRAME', swarm: msg.swarm, relayedBy: conn.userId })
+      : data
+    for (const c of conns) {
+      if (c !== conn && c.authed && c.rooms.has('global')) c.send(relayed)
     }
     return
   }

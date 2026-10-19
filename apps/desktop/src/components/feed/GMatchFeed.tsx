@@ -73,6 +73,8 @@ export interface PostComment {
   created_at: string;
   like_count: number;
   is_liked?: boolean;
+  /** Set when this comment is a reply to another comment on the same post. */
+  parent_comment_id?: string | null;
   /** Optimistic row not yet confirmed by the server. */
   pending?: boolean;
 }
@@ -165,11 +167,10 @@ export function GMatchFeed({
   feedCols = '1',
   onFeedColsChange,
   toast,
-  unreadCount = 0,
-  onRefreshNotifications,
-  onOpenNotifications,
   onUserContext,
   onForceRefresh,
+  feedStatus = 'ready',
+  onResolveMissingPost,
   apiNodeLabel,
 }: {
   identity: OrbitIdentity | null;
@@ -195,7 +196,7 @@ export function GMatchFeed({
   onStartPm?: (user: { id: string; display_name?: string }) => void;
   onPersistLike?: (postId: string, liked: boolean) => Promise<number | undefined>;
   onPersistSave?: (postId: string, saved: boolean) => void;
-  onPersistComment?: (postId: string, text: string) => Promise<PostComment | null>;
+  onPersistComment?: (postId: string, text: string, parentCommentId?: string | null) => Promise<PostComment | null>;
   onPersistReport?: (postId: string, reason: string) => void;
   onReportComment?: (commentId: string) => void;
   onPublishPost?: (mediaUrls: string[], caption: string, tags: string[]) => Promise<boolean>;
@@ -211,13 +212,18 @@ export function GMatchFeed({
   feedCols?: '1' | '2' | '3' | '4' | '5';
   onFeedColsChange?: (cols: '1' | '2' | '3' | '4' | '5') => void;
   toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
-  unreadCount?: number;
-  onRefreshNotifications?: () => void;
-  onOpenNotifications?: () => void;
   onOpenNetwork?: (userId: string) => void;
   onUserContext?: (e: React.MouseEvent, userId: string, displayName: string) => void;
   /** Retrieve-by-force: drops cached/inflight feed responses, then reloads. */
   onForceRefresh?: () => void;
+  /** Initial load vs refresh vs blind-courier node vs read error. */
+  feedStatus?: 'idle' | 'loading' | 'ready' | 'offline' | 'error';
+  /**
+   * Ask the owner of the feed for a single post by id when a deep link names
+   * one the snapshot does not carry. Resolves true when the post is (or just
+   * became) part of `posts`.
+   */
+  onResolveMissingPost?: (postId: string) => Promise<boolean>;
   /** Human label for the node this feed reads (e.g. central host or LAN IP). */
   apiNodeLabel?: string;
 }) {
@@ -226,11 +232,25 @@ export function GMatchFeed({
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
   // Mutation governor owns no state itself — it only sequences persist calls
   // against the maps above (generation per post, rollback on failure).
+  //
+  // A counted value that came from the user's own like action is the only kind
+  // allowed to outrank the post itself while the write is in flight. The post's
+  // count at the moment of the action is remembered so the override can be
+  // retired the instant the post moves: the feed can render a tile from a
+  // local/P2P mirror BEFORE the server row lands (mirror rows carry no count,
+  // so they read 0), and locking the first value ever seen is what made a liked
+  // post keep reading "0 likes" until a full remount.
   const likeGov = useRef<LikeGovernor | null>(null);
+  const governedLikeCounts = useRef<Map<string, { override: number; postAt: number | undefined }>>(new Map());
+  /** The like_count each post carried the last time the list was seeded. */
+  const postedLikeCounts = useRef<Map<string, number>>(new Map());
   if (!likeGov.current) {
     likeGov.current = createLikeGovernor({
       setLiked: (id, v) => setLikedPosts((prev) => ({ ...prev, [id]: v })),
-      setCount: (id, n) => setLikeCounts((counts) => ({ ...counts, [id]: n })),
+      setCount: (id, n) => {
+        governedLikeCounts.current.set(id, { override: n, postAt: postedLikeCounts.current.get(id) });
+        setLikeCounts((counts) => ({ ...counts, [id]: n }));
+      },
     });
   }
   const [doubleTapAnimationId, setDoubleTapAnimationId] = useState<string | null>(null);
@@ -275,9 +295,12 @@ export function GMatchFeed({
   // card element (no remount, reader position preserved). Zoom is a bounded
   // scale cycle on the same media node, reset on every expand/collapse.
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
+  /** Comment to spotlight after a notification deep link lands on the post. */
+  const [focusCommentId, setFocusCommentId] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
   const toggleExpand = useCallback((post: FeedPost) => {
     playPress(700);
+    setFocusCommentId(null);
     setExpandedPostId((prev) => (prev === post.id ? null : post.id));
     setZoomLevel(1);
   }, []);
@@ -321,35 +344,74 @@ export function GMatchFeed({
   // Share Modal State
   const [sharingPost, setSharingPost] = useState<FeedPost | null>(null);
 
-  // Deep link: #/feed?post=<id> (from share/permalink, or a notification deep
-  // link) expands the post inline once it is loaded. One-shot — later
-  // list changes don't reopen it. The custom event covers the case where the
-  // hash is already correct and only the intent is new.
-  const deepLinkDoneRef = useRef(false);
-  const openFromDeepLink = useCallback((postId: string) => {
+  // Deep link: #/feed?post=<id> (share/permalink, or a notification target)
+  // expands the post inline. The id is remembered so a *different* id can open
+  // later, and a hashchange is honoured after the feed already loaded — the
+  // hash-only navigation used to be ignored entirely, which is why a permalink
+  // only worked when the app happened to reload from scratch.
+  const deepLinkDoneRef = useRef<string | null>(null);
+  /** Id the current hash names but the list does not carry (yet). */
+  const pendingDeepLinkRef = useRef<{ postId: string; commentId: string | null } | null>(null);
+
+  const openFromDeepLink = useCallback((postId: string, commentId: string | null) => {
     const target = posts.find((p) => p.id === postId);
-    if (target) openInline(target, true);
+    if (!target) return false;
+    deepLinkDoneRef.current = postId;
+    pendingDeepLinkRef.current = null;
+    // A reply/mention/like notification names the exact comment; the post is
+    // only the container. PostComments spotlights it once the list loads.
+    setFocusCommentId(commentId);
+    openInline(target, true);
+    return true;
   }, [posts, openInline]);
+
+  const requestDeepLink = useCallback((postId: string, commentId: string | null) => {
+    if (openFromDeepLink(postId, commentId)) return;
+    // Not in the snapshot: ask the feed owner for a targeted read, once.
+    if (pendingDeepLinkRef.current?.postId === postId) return;
+    pendingDeepLinkRef.current = { postId, commentId };
+    void onResolveMissingPost?.(postId);
+  }, [openFromDeepLink, onResolveMissingPost]);
+
+  const readDeepLinkHash = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const postId = /post=([^&#]+)/.exec(window.location.hash)?.[1];
+    if (!postId) return;
+    const decodedPost = decodeURIComponent(postId);
+    if (deepLinkDoneRef.current === decodedPost) return;
+    const commentId = /comment=([^&#]+)/.exec(window.location.hash)?.[1];
+    requestDeepLink(decodedPost, commentId ? decodeURIComponent(commentId) : null);
+  }, [requestDeepLink]);
+
   useEffect(() => {
-    if (deepLinkDoneRef.current || posts.length === 0) return;
-    const m = /post=([\w-]+)/.exec(window.location.hash);
-    if (!m) return;
-    const target = posts.find((p) => p.id === m[1]);
-    if (target) {
-      deepLinkDoneRef.current = true;
-      openInline(target, true);
-    }
-  }, [posts, openInline]);
+    readDeepLinkHash();
+    // The hash can change without a remount (the app is not a router): a
+    // permalink clicked inside the running app only fires hashchange.
+    window.addEventListener('hashchange', readDeepLinkHash);
+    return () => window.removeEventListener('hashchange', readDeepLinkHash);
+  }, [readDeepLinkHash]);
+
+  // A pending deep link opens as soon as the post reaches the list — targeted
+  // read, background sync, or a peer announcement.
+  useEffect(() => {
+    const pending = pendingDeepLinkRef.current;
+    if (!pending) return;
+    openFromDeepLink(pending.postId, pending.commentId);
+  }, [posts, openFromDeepLink]);
+
   useEffect(() => {
     const onOpen = (e: Event) => {
-      const postId = (e as CustomEvent<{ postId?: string }>).detail?.postId;
+      const detail = (e as CustomEvent<{ postId?: string; commentId?: string }>).detail;
+      const postId = detail?.postId;
       if (!postId) return;
-      deepLinkDoneRef.current = false;
-      openFromDeepLink(postId);
+      // The hash may be unchanged; the intent is new, so allow a re-open.
+      deepLinkDoneRef.current = null;
+      pendingDeepLinkRef.current = null;
+      requestDeepLink(postId, detail?.commentId ?? null);
     };
     window.addEventListener('gmatch-open-post', onOpen);
     return () => window.removeEventListener('gmatch-open-post', onOpen);
-  }, [openFromDeepLink]);
+  }, [requestDeepLink]);
 
   // Post Options Modal State
   const [optionsPost, setOptionsPost] = useState<FeedPost | null>(null);
@@ -387,7 +449,21 @@ export function GMatchFeed({
     });
 
     setLikedPosts((prev) => ({ ...initialLikes, ...prev }));
-    setLikeCounts((prev) => ({ ...initialCounts, ...prev }));
+    // The displayed count follows the POST. Only a value produced by the
+    // user's own like action outranks it, and only until the post moves.
+    // Retirement happens out here: a state updater must stay pure, and
+    // StrictMode invokes updaters twice.
+    for (const [id, g] of Array.from(governedLikeCounts.current)) {
+      const postCount = initialCounts[id];
+      if (postCount === undefined) continue; // not in the list right now
+      if (postCount === g.override || postCount !== g.postAt) {
+        governedLikeCounts.current.delete(id); // post agrees, or has moved on
+      }
+    }
+    for (const p of posts) postedLikeCounts.current.set(p.id, p.like_count ?? 0);
+    const counts: Record<string, number> = { ...initialCounts };
+    for (const [id, g] of governedLikeCounts.current) counts[id] = g.override;
+    setLikeCounts(counts);
     setSavedPosts((prev) => ({ ...initialSaves, ...prev }));
     setCommentsMap((prev) => ({ ...initialComments, ...prev }));
   }, [posts]);
@@ -509,29 +585,66 @@ export function GMatchFeed({
     [displayPosts.length, users, identity?.orbitId, myProfileTags, followingIds],
   );
 
+  // The empty state is four different situations, not one. Collapsing them made
+  // a blind courier (no feed route) look like a genuinely quiet timeline, and a
+  // failed read look like "nobody posted".
+  const emptyCopy = useMemo(() => {
+    switch (feedStatus) {
+      case 'loading':
+      case 'idle':
+        return {
+          title: 'Loading the feed…',
+          body: `Reading the first page from ${apiNodeLabel || 'this node'}.`,
+        };
+      case 'offline':
+        return {
+          title: 'This node hosts no feed.',
+          body: 'It relays messages only. Your own uploads and posts received from peers still appear here.',
+        };
+      case 'error':
+        return {
+          title: 'Could not read the feed.',
+          body: `The request to ${apiNodeLabel || 'this node'} failed. Nothing was lost — retry, or keep reading what is already local.`,
+        };
+      default:
+        return {
+          title: 'Empty in here? Start posting and get things moving.',
+          body: 'One upload, three tags. Posts are what grow followers.',
+        };
+    }
+  }, [feedStatus, apiNodeLabel]);
+
   // First-like chime: session-local celebration when MY post crosses 0 -> 1
   // likes after mount. Pre-liked posts at mount are seeded into the baseline
   // ref so reloads don't re-celebrate old news. The chime is the whole
   // celebration: the old "First like" badge printed a label over the media.
+  //
+  // The crossing is read from the POST's own count, tracked here. It used to be
+  // read from `likeCounts`, which lagged the post on purpose — but that same lag
+  // is what froze a stale count on screen, and the display now follows the post.
   const firstLikedBaseline = useRef<Set<string> | null>(null)
+  const lastPostedLikeCounts = useRef<Map<string, number>>(new Map())
   useEffect(() => {
     if (!identity?.orbitId) return
     if (firstLikedBaseline.current === null) {
       firstLikedBaseline.current = new Set(
         posts.filter((p) => p.author_id === identity.orbitId && (p.like_count ?? 0) > 0).map((p) => p.id),
       )
+      for (const p of posts) lastPostedLikeCounts.current.set(p.id, p.like_count ?? 0)
       return
     }
     for (const p of posts) {
       if (p.author_id !== identity.orbitId) continue
-      const prev = p.like_count ?? 0
-      const next = likeCounts[p.id] ?? prev
+      const prev = lastPostedLikeCounts.current.get(p.id)
+      const next = p.like_count ?? 0
+      lastPostedLikeCounts.current.set(p.id, next)
+      if (prev === undefined) continue
       if (firstLikeCrossed(prev, next) && !firstLikedBaseline.current.has(p.id)) {
         firstLikedBaseline.current.add(p.id)
         playLikeOnce()
       }
     }
-  }, [posts, likeCounts, identity?.orbitId])
+  }, [posts, identity?.orbitId])
 
   const toggleLike = useCallback((post: FeedPost) => {
     playPress(820);
@@ -574,7 +687,7 @@ export function GMatchFeed({
     });
   };
 
-  const handleAddComment = (postId: string, textToAdd?: string) => {
+  const handleAddComment = (postId: string, textToAdd?: string, parentCommentId?: string | null) => {
     const text = (textToAdd || '').trim();
     if (!text) return;
     playMsgReceive();
@@ -600,6 +713,7 @@ export function GMatchFeed({
       // to server rows formatted as "2026-09-28 12:34:56".
       created_at: new Date().toISOString(),
       like_count: 0,
+      ...(parentCommentId ? { parent_comment_id: parentCommentId } : {}),
       pending: true,
     };
     setCommentsMap((prev) => ({ ...prev, [postId]: [...(prev[postId] || []), draft] }));
@@ -612,7 +726,7 @@ export function GMatchFeed({
       toast?.(message, 'error');
     };
 
-    const persist = onPersistComment?.(postId, text);
+    const persist = onPersistComment?.(postId, text, parentCommentId ?? null);
     if (!persist) {
       // No persist handler wired: nothing to confirm against, so keep the row
       // rather than silently deleting the user's comment.
@@ -707,16 +821,11 @@ export function GMatchFeed({
 
   return (
     <div className="w-full flex flex-col font-sans select-none pb-12 text-retro-fg">
-      {/* Feed Top Header — the only bar: sort tabs, grid 1-5, search, alerts.
-          Sits ABOVE the stories tray so the tab leads with its controls. */}
+      {/* Feed Top Header — sort tabs, grid 1-5, search. Notifications live in
+          the single header centre, so this bar carries no bell. */}
       <FeedHeader
-        unreadCount={unreadCount}
         onRefresh={onForceRefresh ? () => { onForceRefresh(); } : undefined}
         onOpenSearch={() => setShowExploreSearch(true)}
-        onOpenNotifications={() => {
-          if (onOpenNotifications) onOpenNotifications();
-          onRefreshNotifications?.();
-        }}
         sortTabs={
           <div className="flex items-center gap-1 text-xs">
             {(['latest', 'trending'] as const).map((mode) => (
@@ -1192,6 +1301,7 @@ export function GMatchFeed({
                         type="button"
                         onClick={() => toggleLike(post)}
                         aria-label="Like post"
+                        aria-pressed={isLiked}
                         className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-[0.98]"
                       >
                         <Heart
@@ -1259,6 +1369,7 @@ export function GMatchFeed({
                         onAddComment={handleAddComment}
                         onToggleCommentLike={handleToggleCommentLike}
                         onReportComment={onReportComment}
+                        focusCommentId={focusCommentId}
                       />
                     </div>
                   ) : (
@@ -1335,9 +1446,9 @@ export function GMatchFeed({
           {displayPosts.length === 0 && (
             <div className="solid-panel border border-border-glass rounded-lg p-8 text-center space-y-4 shadow-xs my-4 max-w-md mx-auto">
               <div>
-                <h4 className="text-xs font-semibold text-retro-fg">Empty in here? Start posting and get things moving.</h4>
+                <h4 className="text-xs font-semibold text-retro-fg">{emptyCopy.title}</h4>
                 <p className="text-xs text-retro-muted mt-1 leading-relaxed">
-                  One upload, three tags. Posts are what grow followers.
+                  {emptyCopy.body}
                 </p>
                 <p className="text-[10px] font-mono text-retro-muted mt-1">
                   Reading from {apiNodeLabel || 'this node'} · {displayPosts.length} posts

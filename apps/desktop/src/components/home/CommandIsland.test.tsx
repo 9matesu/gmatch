@@ -50,17 +50,19 @@ describe('CommandIsland navigation coverage', () => {
     expect(screen.getByText('Domination')).toBeInTheDocument()
   })
 
-  it('Clicker button appears on the pill and does not duplicate the notification button', async () => {
+  it('Clicker button appears on the pill and the island carries no notification entry point', async () => {
     const setMainView = vi.fn();
-    render(<CommandIsland mainView="grid" setMainView={setMainView} unreadNotificationsCount={2} />);
+    render(<CommandIsland mainView="grid" setMainView={setMainView} />);
     const clickerButton = screen.getByRole('button', { name: 'Clicker' });
     expect(clickerButton).toBeInTheDocument();
     fireEvent.click(clickerButton);
     expect(setMainView).toHaveBeenCalledWith('grid');
 
-    // Ensure only one Alerts/Notifications button exists
-    const notifButtons = screen.getAllByRole('button', { name: /notifications/i });
-    expect(notifButtons.length).toBe(1);
+    // Notifications live in the single header centre now: the footer island
+    // must not mount a second bell, and the E2E hook (the toggle attribute)
+    // must appear exactly once in the app — never here.
+    expect(screen.queryByRole('button', { name: /notifications|alerts/i })).not.toBeInTheDocument();
+    expect(document.querySelector('[data-notifications-toggle="true"]')).toBeNull();
   });
 })
 
@@ -72,19 +74,17 @@ describe('CommandIsland grid size control (T-W3)', () => {
 })
 
 describe('CommandIsland count badges', () => {
-  it('shows numbered circles for chat, notifications, and Arena players', async () => {
+  it('shows numbered circles for chat and Arena players', async () => {
     const setMainView = vi.fn();
     render(
       <CommandIsland
         mainView="feed"
         setMainView={setMainView}
         unreadMessagesCount={3}
-        unreadNotificationsCount={5}
         gamesOnlineCount={12}
       />,
     );
     expect(screen.getByRole('status', { name: '3 unread' })).toHaveTextContent('3');
-    expect(screen.getByRole('status', { name: '5 unread' })).toHaveTextContent('5');
     expect(screen.getByRole('status', { name: '12 in lobby' })).toHaveTextContent('12');
   });
 

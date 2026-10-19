@@ -288,6 +288,7 @@ posts.get('/:id', async (c) => {
       like_count: Number(c.like_count || 0),
       is_liked: Number(c.is_liked || 0) > 0,
       created_at: c.created_at,
+      parent_comment_id: c.parent_comment_id || null,
     })),
   }
   // Same "Liked by" summary as the feed.
@@ -398,7 +399,7 @@ posts.get('/:id/comments', async (c) => {
   if (!obj) return c.json({ error: 'Post not found' }, 404)
 
   const rows = await db.prepare(`
-    SELECT c.id, c.author_id, c.body, c.like_count, c.created_at,
+    SELECT c.id, c.author_id, c.body, c.like_count, c.created_at, c.parent_comment_id,
            u.display_name as author_name, u.pfp_url as author_pfp,
            (SELECT COUNT(*) FROM CommentLikes cl WHERE cl.comment_id = c.id AND cl.user_id = ?) as is_liked
     FROM Comments c
@@ -416,20 +417,27 @@ posts.get('/:id/comments', async (c) => {
     like_count: Number(c.like_count || 0),
     is_liked: Number(c.is_liked || 0) > 0,
     created_at: c.created_at,
+    // The column has existed since migration 016 but was never read, so the
+    // client could not tell a reply from a top-level comment.
+    parent_comment_id: c.parent_comment_id || null,
   })))
 })
 
-// Add a comment
+// Add a comment, or a reply when `parent_comment_id` is supplied.
 posts.post('/:id/comments', async (c) => {
   const db = c.env.DB
   const orbitId = c.get('orbitId')
   const id = c.req.param('id')
 
   let body = ''
+  let parentCommentId: string | null = null
   try {
     const json = await c.req.json()
     if (typeof json?.body === 'string') body = json.body
     else if (typeof json?.text === 'string') body = json.text
+    if (typeof json?.parent_comment_id === 'string' && json.parent_comment_id.trim()) {
+      parentCommentId = json.parent_comment_id.trim()
+    }
   } catch {}
   const clean = body.trim().slice(0, 500)
   if (!clean) return c.json({ error: 'Comment body is required' }, 400)
@@ -439,19 +447,68 @@ posts.post('/:id/comments', async (c) => {
   const obj = await db.prepare('SELECT id, owner_id FROM Objects WHERE id = ? AND is_public = 1 AND hidden_at IS NULL').bind(id).first<{ id: string; owner_id: string | null }>()
   if (!obj) return c.json({ error: 'Post not found' }, 404)
 
+  // A reply must point at a live comment on THIS post; anything else is a
+  // top-level comment rather than a notification aimed at a stranger.
+  let parentAuthorId: string | null = null
+  if (parentCommentId) {
+    const parent = await db
+      .prepare('SELECT id, author_id FROM Comments WHERE id = ? AND object_id = ? AND hidden_at IS NULL')
+      .bind(parentCommentId, id)
+      .first<{ id: string; author_id: string }>()
+    if (!parent) parentCommentId = null
+    else parentAuthorId = parent.author_id
+  }
+
   const commentId = crypto.randomUUID()
-  await db.prepare('INSERT INTO Comments (id, object_id, author_id, body) VALUES (?, ?, ?, ?)').bind(commentId, id, orbitId, clean).run()
+  await db.prepare('INSERT INTO Comments (id, object_id, author_id, parent_comment_id, body) VALUES (?, ?, ?, ?, ?)').bind(commentId, id, orbitId, parentCommentId, clean).run()
   await db.prepare('UPDATE Objects SET comment_count = comment_count + 1 WHERE id = ?').bind(id).run()
 
   try {
+    const commenter = await db.prepare('SELECT display_name FROM Users WHERE id = ?').bind(orbitId).first<{ display_name: string | null }>()
+    const name = commenter?.display_name?.trim() || 'Someone'
+    const { createNotification, findMentionedUserIds } = await import('../notifications')
+    const { broadcastToUser } = await import('../ws-bus')
+
+    // One notification per recipient, so a comment that both replies to the
+    // post owner and names them does not double up. The reply notice is the
+    // more specific one and wins.
+    const sends: Array<{ userId: string; type: 'reply' | 'comment' | 'mention'; title: string; data: Record<string, unknown> }> = []
+    const has = (uid: string) => sends.some((s) => s.userId === uid)
+
+    if (parentAuthorId && parentAuthorId !== orbitId) {
+      sends.push({
+        userId: parentAuthorId,
+        type: 'reply',
+        title: `${name} replied to your comment`,
+        data: { post_id: id, comment_id: commentId, parent_comment_id: parentCommentId, actor_id: orbitId, actor_name: name },
+      })
+    }
     const postOwner = obj.owner_id
-    if (postOwner && postOwner !== orbitId) {
-      const commenter = await db.prepare('SELECT display_name FROM Users WHERE id = ?').bind(orbitId).first<{ display_name: string | null }>()
-      const name = commenter?.display_name?.trim() || 'Someone'
-      const { createNotification } = await import('../notifications')
-      const { broadcastToUser } = await import('../ws-bus')
-      const notif = await createNotification(db, postOwner, 'comment', `${name} commented: "${clean.slice(0, 60)}"`, null, { post_id: id, comment_id: commentId, actor_id: orbitId, actor_name: name })
-      if (notif) broadcastToUser(postOwner, { type: 'notification', action: 'new', notification: notif })
+    if (postOwner && postOwner !== orbitId && !has(postOwner)) {
+      sends.push({
+        userId: postOwner,
+        type: 'comment',
+        title: `${name} commented: "${clean.slice(0, 60)}"`,
+        data: { post_id: id, comment_id: commentId, actor_id: orbitId, actor_name: name },
+      })
+    }
+    // Mentions are resolved against real Users rows; a plain "@word" that names
+    // nobody notifies nobody. Never notify yourself.
+    for (const mentionedId of await findMentionedUserIds(db, clean, [orbitId])) {
+      if (has(mentionedId)) continue
+      sends.push({
+        userId: mentionedId,
+        type: 'mention',
+        title: `${name} mentioned you`,
+        data: { post_id: id, comment_id: commentId, actor_id: orbitId, actor_name: name, target_user_id: mentionedId },
+      })
+    }
+
+    for (const send of sends) {
+      const notif = await createNotification(db, send.userId, send.type, send.title, null, send.data)
+      // null = nothing new (duplicate event) OR a write failure; either way
+      // there is nothing to push.
+      if (notif) broadcastToUser(send.userId, { type: 'notification', action: 'new', notification: notif })
     }
   } catch {}
 
@@ -468,6 +525,7 @@ posts.post('/:id/comments', async (c) => {
   return c.json({
     id: commentId,
     ok: true,
+    parent_comment_id: parentCommentId,
     ...(created
       ? {
           author_id: String(created.author_id || ''),
@@ -488,12 +546,31 @@ posts.post('/:id/comments/:commentId/like', async (c) => {
   const orbitId = c.get('orbitId')
   const commentId = c.req.param('commentId')
 
-  const comment = await db.prepare('SELECT id FROM Comments WHERE id = ? AND hidden_at IS NULL').bind(commentId).first()
+  // author_id must be selected: the notification below reads it, and selecting
+  // only `id` is exactly how the post-like guard went permanently false.
+  const comment = await db.prepare('SELECT id, author_id, object_id FROM Comments WHERE id = ? AND hidden_at IS NULL').bind(commentId).first<{ id: string; author_id: string; object_id: string }>()
   if (!comment) return c.json({ error: 'Comment not found' }, 404)
 
   const res = await db.prepare('INSERT OR IGNORE INTO CommentLikes (comment_id, user_id) VALUES (?, ?)').bind(commentId, orbitId).run()
   if (Number(res.meta?.changes || 0) > 0) {
     await db.prepare('UPDATE Comments SET like_count = like_count + 1 WHERE id = ?').bind(commentId).run()
+    try {
+      // Only the first like notifies; INSERT OR IGNORE above already makes the
+      // counter idempotent, and the event key makes the row idempotent too.
+      if (comment.author_id && comment.author_id !== orbitId) {
+        const liker = await db.prepare('SELECT display_name FROM Users WHERE id = ?').bind(orbitId).first<{ display_name: string | null }>()
+        const name = liker?.display_name?.trim() || 'Someone'
+        const { createNotification } = await import('../notifications')
+        const { broadcastToUser } = await import('../ws-bus')
+        const notif = await createNotification(db, comment.author_id, 'comment_like', `${name} liked your comment`, null, {
+          post_id: comment.object_id,
+          comment_id: commentId,
+          actor_id: orbitId,
+          actor_name: name,
+        })
+        if (notif) broadcastToUser(comment.author_id, { type: 'notification', action: 'new', notification: notif })
+      }
+    } catch {}
   }
   const row = await db.prepare('SELECT like_count FROM Comments WHERE id = ?').bind(commentId).first<{ like_count: number }>()
   return c.json({ liked: true, like_count: Number(row?.like_count || 0) })

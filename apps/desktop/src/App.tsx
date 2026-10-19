@@ -9,6 +9,9 @@ import { getApiBaseUrl, orbitFetch, invalidateCache, subscribeApiBase } from "./
 import { courierThreadToChatMessages, chatRowEqual } from "./utils/courierChat";
 import { countChatUnread, countThreadUnread } from "./utils/chatUnread";
 import { countMentions, createMentionMatcher } from "./utils/mentions";
+import { loadSeen, saveSeen, readScopedJson, writeScopedJson } from "./utils/scopedSeen";
+import { useNotificationCenter } from "./hooks/useNotificationCenter";
+import type { AppNotification, NotificationTarget } from "./utils/notifications";
 import { OrbitPeer, pollOffers } from "./utils/webrtc";
 import { saveObject, getAllObjects, deleteObject } from "./utils/storage";
 import type { SendPanelHandle } from "./components/SendPanel";
@@ -55,6 +58,8 @@ import { TOUR_STEPS } from "./firstRun/tourState";
 import { useTourGuide } from "./components/tour/useTourGuide";
 import { GMatchFeed, type FeedPost } from "./components/feed/GMatchFeed";
 import { reconcilePublishedPost } from "./utils/feedPublish";
+import { mergeRecentPushes, rememberPushed, type PushedEntry } from "./utils/feedMerge";
+import { PEER_ONLINE_EVENT } from "./utils/p2pSwarm";
 import { GMatchDMs } from "./components/chat/GMatchDMs";
 import { toChatPeer, type ChatPeer } from "./components/chat/chatPeer";
 import type { GroupMember } from "./components/chat/GroupMembersPopover";
@@ -92,7 +97,6 @@ import { CardDetailView } from "./components/CardDetailView";
 import GridWorkspace from "./components/grid/GridWorkspace";
 import AdminApp from "./admin/AdminApp";
 import { StoreView } from "./components/views/StoreView";
-import { NotificationsPanel } from "./components/NotificationsPanel";
 import { logger } from './utils/logger';
 import { useNotifications } from './hooks/useNotifications';
 import { isKnownSiteCourier, cachedMailMode, detectMailMode } from "./utils/mail-mode";
@@ -104,6 +108,7 @@ import { hasStatefulRoutes } from './utils/nodeCapabilities';
 import { usePendingJoinVerify } from './hooks/usePendingJoinVerify';
 import { usePendingServerHost } from './hooks/usePendingServerHost';
 import { dataUrlToBlob, localObjectBlobUrl } from "./utils/mediaData";
+import { recoverDescriptorRow } from "./utils/objectDescriptor";
 import { mediaUrlToCachedFile } from "./utils/cacheMedia";
 import { fresherPresence } from './utils/presence';
 import { resolveDisplayName, toNameRoster } from './utils/displayName';
@@ -118,12 +123,13 @@ const STORY_PREFETCH_COUNT = 8;
 const STORY_PREFETCH_CONCURRENCY = 3;
 const MAX_PROFILE_PICS_IN_MEMORY = 120;
 
-const isDesktopViewport = () =>
-  typeof window !== 'undefined' &&
-  typeof window.matchMedia === 'function' &&
-  window.matchMedia('(min-width: 768px)').matches
-
 const desktopChatOnLoad = () => false;
+
+/** Per-identity seen stamps (see utils/scopedSeen — the `:<orbitId>` suffix). */
+const DM_SEEN_KEY = 'gmatch_dm_seen_v1';
+const ROOM_SEEN_KEY = 'gmatch_room_seen_v1';
+/** Which conversation to restore on boot (also identity-scoped). */
+const LAST_DM_PEER_KEY = 'gmatch_last_dm_peer_v1';
 
 export default function Home() {
   useEffect(() => {
@@ -338,24 +344,29 @@ export default function Home() {
   // Unified rooms chat: the active sealed room (dock preview + full page both
   // drive this), plus a per-room last-opened stamp for the unread cue.
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null)
-  const [roomSeen, setRoomSeen] = useState<Record<string, number>>(() => {
-    try { return JSON.parse(localStorage.getItem('gmatch_room_seen_v1') || '{}') } catch { return {} }
-  })
+  const [roomSeen, setRoomSeen] = useState<Record<string, number>>(() => loadSeen(ROOM_SEEN_KEY, null))
   // Courier DM threads: per-peer last-opened stamp for the unread cue.
   // (Server /api/pm unread endpoints are dead by directive — sealed local
   // DMs can only be counted client-side, same as rooms above.)
-  const [dmSeen, setDmSeen] = useState<Record<string, number>>(() => {
-    try { return JSON.parse(localStorage.getItem('gmatch_dm_seen_v1') || '{}') } catch { return {} }
-  })
+  //
+  // Scoped per identity: the shared unscoped key let a second account inherit
+  // the first account's read watermarks (its threads showed as already-read)
+  // and reopen the other account's conversation. Legacy values migrate once.
+  const [dmSeen, setDmSeen] = useState<Record<string, number>>(() => loadSeen(DM_SEEN_KEY, null))
+  const seenScope = identity?.orbitId ?? null
+  const seenScopeRef = useRef<string | null>(null)
+  useEffect(() => {
+    seenScopeRef.current = seenScope
+    setDmSeen(loadSeen(DM_SEEN_KEY, seenScope))
+    setRoomSeen(loadSeen(ROOM_SEEN_KEY, seenScope))
+  }, [seenScope])
   const stampDmSeen = useCallback((peerId: string) => {
     setDmSeen((prev) => {
       const next = { ...prev, [peerId]: Date.now() };
-      try { localStorage.setItem('gmatch_dm_seen_v1', JSON.stringify(next)) } catch { }
+      saveSeen(DM_SEEN_KEY, seenScopeRef.current, next)
       return next;
     });
   }, [])
-  // UI-3: resizable messages sidebar (width persisted; smooth only when not dragging)
-  const [notifOpen, setNotifOpen] = useState(false);
   const [gamesSubTab, setGamesSubTab] = useState<'duel' | 'babecock' | 'ranks' | 'idle'>(() => {
     if (typeof window !== 'undefined' && viewFromHash(window.location.hash) === 'games') return 'duel'
     return 'idle'
@@ -510,13 +521,6 @@ export default function Home() {
       await lobby.refreshNotifications();
     }
   }, [identity, lobby]);
-
-  // Notifications are their own modal, opened from any bell (sidebar/feed
-  // header) — no longer a tab inside the messages dock.
-  const openNotifications = useCallback(() => {
-    setNotifOpen(true);
-    lobby.markNotificationsRead();
-  }, [lobby]);
 
   const [userDecks, setUserDecks] = useState<Deck[]>([]);
   const [activeDeckId, setActiveDeckId] = useState<string | null>(() => getStoredActiveDeckId());
@@ -1081,27 +1085,42 @@ export default function Home() {
     if (target) setSelectedProfileUser(target)
   }, [users])
 
-  // Notification deep link: prefer the post a group folds around, via the
-  // feed's existing `#/feed?post=<id>` permalink (GMatchFeed opens the
-  // lightbox from it), else the actor's profile. Rows were inert before, so a
-  // "liked your post" bell gave you nowhere to go.
-  const handleOpenNotificationTarget = useCallback((target: { postId?: string; userId?: string }) => {
+  // Notification deep link. Every target names the exact destination:
+  //  - a feed post (and, when the row names one, the comment inside it) via the
+  //    feed's existing `#/feed?post=<id>` permalink;
+  //  - the actor's profile when there is no subject (a follow);
+  //  - a courier conversation / sealed room, handled by `openLocalNotification`.
+  // A target that no longer resolves (post deleted, user gone) degrades to
+  // "open the feed" / "open the profile list" rather than navigating nowhere.
+  const handleOpenNotificationTarget = useCallback((target: NotificationTarget) => {
     if (target.postId) {
-      setNotifOpen(false);
       setMainView('feed');
-      const want = `#/feed?post=${encodeURIComponent(target.postId)}`;
-      if (window.location.hash === want) {
-        // Same hash: force the lightbox to re-open.
-        window.dispatchEvent(new CustomEvent('gmatch-open-post', { detail: { postId: target.postId } }));
-      } else {
+      // The comment travels in the permalink too, so a remount (cross-view
+      // navigation) still lands on the exact reply, not just the photo.
+      const want = `#/feed?post=${encodeURIComponent(target.postId)}${
+        target.commentId ? `&comment=${encodeURIComponent(target.commentId)}` : ''
+      }`;
+      if (window.location.hash !== want) {
         window.history.pushState(null, '', want);
         window.dispatchEvent(new HashChangeEvent('hashchange'));
       }
+      // Always dispatch: the event carries the comment id and re-opens the
+      // inline expansion when the hash was already correct.
+      window.dispatchEvent(new CustomEvent('gmatch-open-post', {
+        detail: { postId: target.postId, ...(target.commentId ? { commentId: target.commentId } : {}) },
+      }));
+      return;
+    }
+    if (target.conversationId) {
+      // A legacy `pm` row from a node that still hosts PMs. The courier lane is
+      // the only DM surface, so land on the messages view (where the real
+      // conversation lives, if one exists) rather than doing nothing.
+      setMainView('messages');
       return;
     }
     if (target.userId) {
       openProfileById(target.userId);
-      setNotifOpen(false);
+      return;
     }
   }, [openProfileById])
 
@@ -1184,6 +1203,23 @@ export default function Home() {
   // The upload response is the truth (the bytes are already durable locally);
   // waiting for the next feed read is what made a successful post look lost.
   const [optimisticPosts, setOptimisticPosts] = useState<FeedPost[]>([])
+  /**
+   * A permalink (`#/feed?post=`) or notification target can name a post that
+   * the 50-row snapshot does not carry (old, unranked, archived out of the
+   * window). The targeted single-post read lands here so the deep link still
+   * resolves; an entry is retired as soon as the snapshot lists it.
+   */
+  const [pinnedPosts, setPinnedPosts] = useState<FeedPost[]>([])
+  /**
+   * Initial load vs background refresh vs "this node hosts no feed" (a blind
+   * courier 404s every stateful route) vs a recoverable read error. Without
+   * this split an empty list was indistinguishable from a failed read.
+   */
+  const [feedStatus, setFeedStatus] = useState<'idle' | 'loading' | 'ready' | 'offline' | 'error'>('idle')
+  /** Monotonic request id: a slow older snapshot must never clobber a newer one. */
+  const feedRequestSeqRef = useRef(0)
+  /** Posts pushed over WS while a snapshot request was already in flight. */
+  const feedPushedRef = useRef<Map<string, PushedEntry<FeedPost>>>(new Map())
   const [hasMoreFeed, setHasMoreFeed] = useState(true)
   const [followingIds, setFollowingIds] = useState<string[]>([])
   const [pmMessagesByPeer, setPmMessagesByPeer] = useState<Record<string, ChatMessage[]>>({})
@@ -1212,14 +1248,23 @@ export default function Home() {
       .filter((obj) => ((obj as any).is_public === 1 || (obj as any).is_public === true) && !deletedPostIds.has(obj.id) && !seenServerIds.has(obj.id))
       .map((obj) => {
         const isSelf = obj.owner_id === identity?.orbitId;
-        const authorUser = !isSelf && obj.owner_id ? users.find((u) => u.id === obj.owner_id || (u as any).orbitId === obj.owner_id) : null;
+        // An unverified owner claim is a relay, not a proof: it may not borrow
+        // another user's directory name or avatar.
+        const unverified = (obj as any).owner_verified === false;
+        const authorUser = !isSelf && !unverified && obj.owner_id
+          ? users.find((u) => u.id === obj.owner_id || (u as any).orbitId === obj.owner_id)
+          : null;
         const authorName = isSelf
           ? (myProfile.displayName || 'You')
           : (authorUser?.display_name || (obj as any).author_name || (obj as any).sender_name || 'Player');
         const authorAvatar = isSelf
           ? (profilePics[identity?.orbitId || ''] || null)
-          : (authorUser?.pfp_url || (obj.owner_id ? profilePics[obj.owner_id] : null) || null);
-        const localUrl = obj.content_url || (obj as any).data || (obj as any).url || `/api/objects/${obj.id}`;
+          : (authorUser?.pfp_url || (!unverified && obj.owner_id ? profilePics[obj.owner_id] : null) || null);
+        // `data` may be a legacy data-URL string; an ArrayBuffer here is raw
+        // media, not a URL, and must never be coerced into one.
+        const rawData = (obj as any).data;
+        const legacyDataUrl = typeof rawData === 'string' && rawData.length > 0 ? rawData : '';
+        const localUrl = obj.content_url || (obj as any).source_url || legacyDataUrl || (obj as any).url || `/api/objects/${obj.id}`;
         return ({
           id: obj.id,
           author_id: obj.owner_id || identity?.orbitId || 'peer',
@@ -1248,8 +1293,17 @@ export default function Home() {
         !localPublicPosts.some((l) => l.id === p.id),
     );
 
-    return [...optimisticVisible, ...serverVisible, ...repostedPosts, ...localPublicPosts];
-  }, [items, profilePics, identity, myProfile, repostedPosts, archivedPostIds, deletedPostIds, serverPosts, normalizeFeedPost, users, optimisticPosts]);
+    // A deep-linked post the snapshot does not carry yet. Same dedupe rule: it
+    // disappears the moment the snapshot (or the local/P2P list) has it.
+    const pinnedVisible = pinnedPosts.filter(
+      (p) => !deletedPostIds.has(p.id) && !seenServerIds.has(p.id),
+    );
+
+    return [...optimisticVisible, ...pinnedVisible, ...serverVisible, ...repostedPosts, ...localPublicPosts];
+  }, [items, profilePics, identity, myProfile, repostedPosts, archivedPostIds, deletedPostIds, serverPosts, normalizeFeedPost, users, optimisticPosts, pinnedPosts]);
+
+  const feedPostsRef = useRef<FeedPost[]>(feedPosts)
+  useEffect(() => { feedPostsRef.current = feedPosts }, [feedPosts])
 
   // ─── Public posts feed (server) ───
   const [isLoadingMoreFeed, setIsLoadingMoreFeed] = useState(false)
@@ -1287,31 +1341,67 @@ export default function Home() {
 
   const loadServerFeed = useCallback((): Promise<FeedPost[]> => {
     if (!identity) return Promise.resolve([])
+    // Every trigger shares one ordering: a response that is no longer the
+    // newest request is discarded instead of replacing fresher state.
+    const seq = ++feedRequestSeqRef.current
+    setFeedStatus((prev) => (prev === 'idle' ? 'loading' : prev))
     setHasMoreFeed(true)
     return orbitFetch(`/api/posts?limit=50&sort=${feedSort}`, {}, identity)
       .then(async (res): Promise<FeedPost[]> => {
-        if (!res.ok) return []
-        const data = await res.json()
-        const posts: FeedPost[] = Array.isArray(data?.posts) ? (data.posts as FeedPost[]) : []
-        if (Array.isArray(data?.posts)) {
-          setServerPosts(posts)
-          setHasMoreFeed(data.posts.length >= 50)
-          setProfilePics((prev) => {
-            let changed = false
-            const next = { ...prev }
-            for (const p of data.posts as FeedPost[]) {
-              if (p.author_id && p.author_avatar && next[p.author_id] !== p.author_avatar) {
-                next[p.author_id] = p.author_avatar
-                changed = true
-              }
+        if (seq !== feedRequestSeqRef.current) return []
+        // A blind courier answers 404 for every stateful route: this node hosts
+        // no feed. That is a state, not a failure the user should retry.
+        if (res.status === 404) { setFeedStatus('offline'); return [] }
+        if (!res.ok) { setFeedStatus('error'); return [] }
+        const data = await res.json().catch(() => null)
+        if (seq !== feedRequestSeqRef.current) return []
+        if (!Array.isArray(data?.posts)) { setFeedStatus('error'); return [] }
+        const posts = data.posts as FeedPost[]
+        setServerPosts(mergeRecentPushes(posts, feedPushedRef.current))
+        setFeedStatus('ready')
+        setHasMoreFeed(posts.length >= 50)
+        setProfilePics((prev) => {
+          let changed = false
+          const next = { ...prev }
+          for (const p of posts) {
+            if (p.author_id && p.author_avatar && next[p.author_id] !== p.author_avatar) {
+              next[p.author_id] = p.author_avatar
+              changed = true
             }
-            return changed ? next : prev
-          })
-        }
+          }
+          return changed ? next : prev
+        })
         return posts
       })
-      .catch(() => [])
+      .catch(() => {
+        if (seq === feedRequestSeqRef.current) {
+          // Keep a working feed on screen when only a background refresh fails.
+          setFeedStatus((prev) => (prev === 'ready' ? 'ready' : 'error'))
+        }
+        return []
+      })
   }, [identity, feedSort])
+
+  /**
+   * Targeted read for a deep link whose post is not in the current snapshot
+   * (permalink, notification target, notification for an old reply). One
+   * signed request, validated against the id we asked for; a node that does
+   * not host the route (blind courier, P2P-only post) simply 404s and the
+   * deep link keeps the local/P2P copy as its fallback.
+   */
+  const resolvePostById = useCallback(async (postId: string): Promise<boolean> => {
+    if (!identity || !postId) return false
+    if (feedPostsRef.current.some((p) => p.id === postId)) return true
+    const res = await orbitFetch(`/api/posts/${encodeURIComponent(postId)}`, {}, identity).catch(() => null)
+    if (!res || !res.ok) return false
+    const data = await res.json().catch(() => null)
+    const raw = data && typeof data === 'object' ? ((data as any).post ?? data) : null
+    // Never pin an answer to a different id than the one requested.
+    if (!raw || typeof raw !== 'object' || String(raw.id || '') !== postId) return false
+    const post = normalizeFeedPost(raw as FeedPost)
+    setPinnedPosts((prev) => [post, ...prev.filter((p) => p.id !== post.id)].slice(0, 8))
+    return true
+  }, [identity, normalizeFeedPost])
 
   // Retrieve-by-force: drop cached/inflight feed responses, then reload. A
   // plain reload inside the 3s GET cache (or a stuck inflight request) would
@@ -1320,6 +1410,26 @@ export default function Home() {
     invalidateCache('/api/posts')
     return loadServerFeed()
   }, [loadServerFeed])
+
+  /**
+   * A peer coming online is the only signal this client gets that (a) a full
+   * node may now list posts written while we were alone, and (b) P2P bytes that
+   * failed earlier can be retried. One bounded, event-driven reconcile — never
+   * a poll: at most one refresh per 15s, and none while the window is hidden.
+   */
+  useEffect(() => {
+    if (!identity || typeof window === 'undefined') return
+    let last = 0
+    const onPeerOnline = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      const now = Date.now()
+      if (now - last < 15_000) return
+      last = now
+      void forceRefreshFeed()
+    }
+    window.addEventListener(PEER_ONLINE_EVENT, onPeerOnline)
+    return () => window.removeEventListener(PEER_ONLINE_EVENT, onPeerOnline)
+  }, [identity, forceRefreshFeed])
 
   /**
    * A publish just succeeded. Show it immediately and reconcile with the node
@@ -1366,6 +1476,10 @@ export default function Home() {
         if (res && res.ok) {
           const data = await res.json().catch(() => null)
           if (Array.isArray(data?.posts) && data.posts.length > 0) {
+            // Appending supersedes any snapshot request still on the wire: a
+            // refresh that started before these rows existed must not land and
+            // unmount what the reader already scrolled to.
+            feedRequestSeqRef.current++
             setServerPosts((prev) => {
               const seen = new Set(prev.map((p) => p.id))
               const added = (data.posts as FeedPost[]).filter((p) => !seen.has(p.id))
@@ -1376,11 +1490,14 @@ export default function Home() {
             return
           }
           setHasMoreFeed(false)
+        } else {
+          // A failed page must not leave the sentinel armed: that turns into an
+          // infinite retry loop on a node that does not serve the feed.
+          setHasMoreFeed(false)
         }
       }
-
     } catch {
-      // silently ignore
+      setHasMoreFeed(false)
     } finally {
       setIsLoadingMoreFeed(false)
     }
@@ -1453,13 +1570,13 @@ export default function Home() {
     orbitFetch(`/api/posts/${postId}/save`, { method: saved ? 'POST' : 'DELETE' }, identity).catch(() => { })
   }, [identity])
 
-  const persistComment = useCallback(async (postId: string, text: string) => {
+  const persistComment = useCallback(async (postId: string, text: string, parentCommentId?: string | null) => {
     if (!identity) return null
     try {
       const res = await orbitFetch(`/api/posts/${postId}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body: text }),
+        body: JSON.stringify({ body: text, ...(parentCommentId ? { parent_comment_id: parentCommentId } : {}) }),
       }, identity)
       // Returns null on failure, which the caller surfaces as "not saved" and
       // rolls its optimistic row back — previously the row survived forever.
@@ -1480,6 +1597,10 @@ export default function Home() {
         created_at: typeof data?.created_at === 'string' ? data.created_at : new Date().toISOString(),
         like_count: 0,
         is_liked: false,
+        // The server validates the parent (it must be a live comment on THIS
+        // post) and echoes back null when it refused, so the nested render
+        // matches what was actually stored.
+        ...(data?.parent_comment_id ? { parent_comment_id: String(data.parent_comment_id) } : {}),
       }
     } catch {
       return null
@@ -1759,6 +1880,19 @@ export default function Home() {
       if (settings.chatNotificationSfx) playMsgReceive()
       const name = usersRef.current.find((u) => u.id === msg.peerId)?.display_name || 'Someone'
       toast(`${name} sent you a message`, 'info')
+      // Hidden window: the in-app toast is invisible, so surface an OS
+      // notification instead. Sender name ONLY — the body of a sealed DM must
+      // never land on a lock screen (privacy posture, SPEC §10d).
+      if (typeof document !== 'undefined' && document.hidden) {
+        void notifications.showBrowserNotification({
+          type: 'pm',
+          title: `New message from ${name}`,
+          body: '',
+          tag: `dm-${msg.peerId}`,
+          requireInteraction: false,
+          sound: 'message',
+        })
+      }
     },
     onRoomMessage: (msg, room) => {
       setRoomTick((t) => t + 1)
@@ -1766,6 +1900,17 @@ export default function Home() {
       if (settings.chatNotificationSfx) playMsgReceive()
       const name = usersRef.current.find((u) => u.id === msg.senderOrbitId)?.display_name || 'Someone'
       toast(`${name} → ${room.name}`, 'info')
+      // Same reasoning as DMs: one notification per room (tag), name only.
+      if (typeof document !== 'undefined' && document.hidden) {
+        void notifications.showBrowserNotification({
+          type: 'pm',
+          title: `New message in ${room.name}`,
+          body: '',
+          tag: `room-${room.id}`,
+          requireInteraction: false,
+          sound: 'message',
+        })
+      }
     },
   })
   // Keep the courier's TOFU key registry stocked from the user directory.
@@ -1859,7 +2004,7 @@ export default function Home() {
     if (roomId) {
       setRoomSeen((prev) => {
         const next = { ...prev, [roomId]: Date.now() }
-        try { localStorage.setItem('gmatch_room_seen_v1', JSON.stringify(next)) } catch { }
+        saveSeen(ROOM_SEEN_KEY, seenScopeRef.current, next)
         return next
       })
     }
@@ -1908,6 +2053,96 @@ export default function Home() {
     return out
   }, [courier.threads, dmSeen, identity, myProfile.displayName])
 
+  // ─── Notification centre: ONE owner of the unread badge ───
+  // Merges the server's persistent rows (likes/comments/replies/mentions/
+  // follows/card/match) with rows derived from the sealed courier lanes (DMs,
+  // rooms). The badge is derived from the merged items, so it can never
+  // disagree with the list behind it — the defect the WS frame path had, where
+  // the list grew but `unreadCount` did not.
+  //
+  // Both callbacks are stable so the derive memo (which walks every thread and
+  // room) is not thrown away on every unrelated re-render.
+  const resolveNotifyName = useCallback(
+    (peerId: string, payloadName?: string) => {
+      const resolved = resolveDisplayName({
+        selfId: identity?.orbitId ?? null,
+        senderId: peerId,
+        payloadName,
+        roster: nameRoster,
+      })
+      // "Unknown User" carries no information; the readable handle names the
+      // conversation the player is about to open without exposing a raw id.
+      return resolved === UNKNOWN_NAME ? generateFallbackName(peerId) : resolved
+    },
+    [identity?.orbitId, nameRoster],
+  )
+  const notificationCenter = useNotificationCenter({
+    rows: lobby.notifications,
+    threads: courier.threads,
+    dmSeen,
+    rooms: courier.rooms,
+    // Stable references (the derive memo walks every thread and room, so an
+    // inline closure here would invalidate it on every unrelated re-render):
+    // `courier.roomMessages` is a `useCallback([])`, `resolveNotifyName` is
+    // memoized above.
+    roomMessages: courier.roomMessages,
+    roomSeen,
+    selfId: identity?.orbitId ?? null,
+    selfName: myProfile.displayName,
+    resolveName: resolveNotifyName,
+    version: roomTick,
+  })
+
+  // Tapping a courier row marks that conversation read — the SAME stamp the
+  // chat badge reads, so opening a notification and opening the chat agree.
+  const openLocalNotification = useCallback((item: AppNotification) => {
+    if (item.type === 'room' && item.target.roomId) {
+      const room = courier.rooms.find((r) => r.id === item.target.roomId)
+      if (!room) {
+        // Room is gone (the client only remembers what it joined): say so
+        // instead of navigating into an empty view.
+        toast('That room is no longer available.', 'warning')
+        return
+      }
+      openRoomChat(room.id)
+      handleSetMainView('rooms')
+      return
+    }
+    const peerId = item.target.conversationId
+    if (!peerId) return
+    stampDmSeen(peerId)
+    const known = users.find((u) => u.id === peerId || (u as { orbitId?: string }).orbitId === peerId)
+    setPmPeer(toChatPeer(known) || toChatPeer({ orbitId: peerId, name: item.actorName || generateFallbackName(peerId) }))
+    handleSetMainView('messages')
+  }, [courier.rooms, openRoomChat, stampDmSeen, users, toast])
+
+  // Mark the courier lanes read for the row(s) tapped.
+  const markLocalNotificationsRead = useCallback((keys: string[]) => {
+    const now = Date.now()
+    setDmSeen((prev) => {
+      const next = { ...prev }
+      let changed = false
+      for (const key of keys) {
+        if (!key.startsWith('dm:')) continue
+        next[key.slice(3)] = now
+        changed = true
+      }
+      if (changed) saveSeen(DM_SEEN_KEY, seenScopeRef.current, next)
+      return changed ? next : prev
+    })
+    setRoomSeen((prev) => {
+      const next = { ...prev }
+      let changed = false
+      for (const key of keys) {
+        if (!key.startsWith('room:')) continue
+        next[key.slice(5)] = now
+        changed = true
+      }
+      if (changed) saveSeen(ROOM_SEEN_KEY, seenScopeRef.current, next)
+      return changed ? next : prev
+    })
+  }, [])
+
 
 
   const loadPmUnreadCount = useCallback(() => {
@@ -1934,13 +2169,13 @@ export default function Home() {
     setRoomSeen((prev) => {
       const next = { ...prev };
       for (const r of courier.rooms) next[r.id] = now;
-      try { localStorage.setItem('gmatch_room_seen_v1', JSON.stringify(next)); } catch { }
+      saveSeen(ROOM_SEEN_KEY, seenScopeRef.current, next);
       return next;
     });
     setDmSeen((prev) => {
       const next = { ...prev };
       for (const peerId of Object.keys(courier.threads)) next[peerId] = now;
-      try { localStorage.setItem('gmatch_dm_seen_v1', JSON.stringify(next)); } catch { }
+      saveSeen(DM_SEEN_KEY, seenScopeRef.current, next);
       return next;
     });
     setPmUnreadCount(0);
@@ -2069,26 +2304,30 @@ export default function Home() {
   useEffect(() => {
     try {
       if (pmPeer && pmPeer.id !== 'global_lobby' && pmPeer.id !== 'card_queue') {
-        localStorage.setItem('gmatch_last_dm_peer_v1', JSON.stringify(pmPeer))
+        // Identity-scoped: the other account on this install must not reopen
+        // this conversation on its next boot.
+        writeScopedJson(LAST_DM_PEER_KEY, identity?.orbitId ?? null, pmPeer)
       }
       // Closing a conversation deliberately does NOT clear the mirror: the
       // point is to reopen where the player was, and boot runs this before the
       // restore effect (clearing here would erase the pointer first).
     } catch { /* private mode: remembering is a nicety */ }
-  }, [pmPeer])
+  }, [pmPeer, identity?.orbitId])
 
   const restoredPeerRef = useRef(false)
   useEffect(() => {
     if (restoredPeerRef.current || !identity || pmPeer) return
     restoredPeerRef.current = true
-    try {
-      const raw = localStorage.getItem('gmatch_last_dm_peer_v1')
-      if (!raw) return
-      const peer = toChatPeer(JSON.parse(raw) as { id?: string; name?: string; pfp?: string })
-      if (!peer) return
-      setPmPeer(peer)
-      void loadPmMessages(peer.id)
-    } catch { /* corrupt mirror: start on the thread list */ }
+    const stored = readScopedJson<{ id?: string; name?: string; pfp?: string } | null>(
+      LAST_DM_PEER_KEY,
+      identity.orbitId,
+      null,
+    )
+    if (!stored) return
+    const peer = toChatPeer(stored)
+    if (!peer) return
+    setPmPeer(peer)
+    void loadPmMessages(peer.id)
   }, [identity, pmPeer, loadPmMessages])
 
   const sendPm = useCallback(async (peerId: string, text: string, replyToId?: string, attachment?: { id: string; url: string }): Promise<boolean> => {
@@ -3033,6 +3272,9 @@ export default function Home() {
     const onFeedNew = (e: Event) => {
       const post = (e as CustomEvent).detail as FeedPost;
       if (!post || !post.id) return;
+      // A snapshot request may already be on the wire; remember the push so its
+      // (older) response cannot swallow the post.
+      rememberPushed(feedPushedRef.current, post);
       setServerPosts((prev) => {
         const seen = new Set(prev.map((p) => p.id));
         if (seen.has(post.id)) return prev;
@@ -3107,7 +3349,15 @@ export default function Home() {
           void deleteObject(dbObj.id);
           continue;
         }
-        const contentUrl = localObjectBlobUrl(dbObj.id, dbObj.data, dbObj.mime_type)
+        // A row whose `data` is a URL is a DESCRIPTOR, not media: legacy builds
+        // wrote the provider link into the bytes field. Recover it idempotently
+        // (nothing deleted, the bytes field is left alone) and render from the
+        // link instead of minting a blob of the URL text.
+        const recovered = recoverDescriptorRow(dbObj)
+        const contentUrl = recovered.descriptorOnly
+          ? (recovered.sourceUrl || `/api/objects/${dbObj.id}`)
+          : localObjectBlobUrl(dbObj.id, dbObj.data, dbObj.mime_type)
+        if (recovered.changed) void saveObject(recovered.row).catch(() => { })
         const prev = itemMap.get(dbObj.id)
         itemMap.set(dbObj.id, buildMirrorRow(dbObj, prev, contentUrl,
           dbObj.owner_id === identity.orbitId
@@ -3449,6 +3699,18 @@ export default function Home() {
       .catch(() => { })
   }, [identity])
 
+  // Identity-scoped caches drop their contents when the identity changes: a
+  // snapshot read for account A must never render under account B, and any
+  // request still on the wire is superseded.
+  useEffect(() => {
+    feedRequestSeqRef.current++
+    feedPushedRef.current.clear()
+    setServerPosts([])
+    setPinnedPosts([])
+    setOptimisticPosts([])
+    setFeedStatus('idle')
+  }, [identity?.orbitId])
+
   // Initial mount effect - show skeletons only once
   useEffect(() => {
     if (!identity) return
@@ -3464,8 +3726,6 @@ export default function Home() {
               loadCards().catch(() => { }),
               loadStories().catch(() => { }),
               fetchAnnouncements().catch(() => { }),
-              loadServerFeed().catch(() => { }),
-              loadFollowing().catch(() => { }),
             ])
             return
           } catch {
@@ -3475,6 +3735,20 @@ export default function Home() {
       })()
     return () => { cancelled = true }
   }, [identity, loadUsers, loadGallery, loadCards, loadStories, fetchAnnouncements]);
+
+  // The feed is keyed on identity AND sort, and owns its own effect. It used to
+  // be one entry in the mount effect above, whose dependency array omitted it —
+  // so switching Latest/Trending kept reading the previous snapshot until an
+  // unrelated visibilitychange happened to refresh it.
+  useEffect(() => {
+    if (!identity) return
+    void loadServerFeed()
+  }, [identity, feedSort, loadServerFeed]);
+
+  useEffect(() => {
+    if (!identity) return
+    void loadFollowing()
+  }, [identity, loadFollowing]);
 
   // Open shared-image links (`/?view=<id>`) in the lightbox once items load
   useEffect(() => {
@@ -4062,28 +4336,25 @@ export default function Home() {
         ) : (
           <ErrorBoundary>
             <div className="app-glass relative z-10 w-full h-full min-h-0 bg-transparent text-retro-fg shadow-2xl flex flex-col overflow-hidden">
-              <NativeHeaderBar />
+              <NativeHeaderBar
+                notifications={{
+                  notifications: lobby.notifications,
+                  invites: lobby.invites,
+                  localItems: notificationCenter.localItems,
+                  unreadCount: notificationCenter.unreadCount,
+                  unreadByType: notificationCenter.unreadByType,
+                  latestTitle: notificationCenter.latest?.title,
+                  onMarkAllRead: () => { void lobby.markNotificationsRead(); },
+                  onMarkRead: (ids) => { void lobby.markNotificationsRead(ids); },
+                  onOpenTarget: handleOpenNotificationTarget,
+                  onOpenLocalTarget: openLocalNotification,
+                  onMarkLocalRead: markLocalNotificationsRead,
+                  onRespondInvite: (id, accept) => { void lobby.respondToInvite(id, accept); },
+                  onRespondBabecock: handleRespondBabecock,
+                  onOpenBabecock: () => { setGamesSubTab('babecock'); setMainView('games'); },
+                }}
+              />
               <div className="flex-1 min-w-0 min-h-0 flex flex-row overflow-hidden relative">
-
-                {/* Notifications dock: LEFT side panel sibling (mirrors chat) */}
-                <MessagesRail open={notifOpen} side="left" widthClass="w-[min(420px,32vw)]">
-                  <div className="solid-panel w-full h-full min-h-0 flex flex-col overflow-hidden rounded-xl">
-                    <NotificationsPanel
-                      embedded
-                      notifications={lobby.notifications}
-                      unreadCount={lobby.unreadCount}
-                      unreadByType={lobby.unreadByType}
-                      invites={lobby.invites}
-                      onMarkAllRead={() => lobby.markNotificationsRead()}
-                      onMarkRead={(ids) => { void lobby.markNotificationsRead(ids); }}
-                      onOpenTarget={handleOpenNotificationTarget}
-                      onRespondInvite={(id, accept) => lobby.respondToInvite(id, accept)}
-                      onRespondBabecock={handleRespondBabecock}
-                      onOpenBabecock={() => { setNotifOpen(false); setGamesSubTab('babecock'); setMainView('games'); }}
-                      onClose={() => setNotifOpen(false)}
-                    />
-                  </div>
-                  </MessagesRail>
 
                   <div ref={mainScrollRef} className="mobile-app-scroll flex-1 min-w-0 min-h-0 w-full flex flex-col relative z-10 overflow-y-auto styled-scrollbar pb-24">
                     <h1 className="sr-only">{`gMatch - ${typeof mainView === 'string' ? mainView.charAt(0).toUpperCase() + mainView.slice(1) : 'Home'}`}</h1>
@@ -4216,11 +4487,10 @@ export default function Home() {
                                 onReportComment={(commentId) => reportTarget('post_comment', commentId)}
                                 onPublishPost={publishPost}
                                 onForceRefresh={forceRefreshFeed}
+                                feedStatus={feedStatus}
+                                onResolveMissingPost={resolvePostById}
                                 apiNodeLabel={apiNodeLabel}
                                 onDeletePostApi={deletePostOnServer}
-                                unreadCount={lobby.unreadCount}
-                                onRefreshNotifications={() => lobby.refreshNotifications()}
-                                onOpenNotifications={openNotifications}
                                 onOpenNetwork={(userId) => openUserNetwork(userId)}
                                 onUserContext={(e, userId, displayName) => {
                                   const u = users.find((x) => x.id === userId)
@@ -4263,8 +4533,10 @@ export default function Home() {
                                 hasMore={hasMoreFeed}
                                 feedSort={feedSort}
                                 onFeedSortChange={(mode) => {
+                                  // The feed effect is keyed on `feedSort`; loading
+                                  // from here would close over the OLD sort and
+                                  // re-fetch the previous ranking.
                                   setFeedSort(mode);
-                                  loadServerFeed();
                                 }}
                                 feedCols={settings.feedCols}
                                 onFeedColsChange={(cols) => updateSettings('feedCols', cols)}
@@ -4712,28 +4984,8 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* Notifications modal (sidebar/header bell) */}
-                {notifOpen && !isDesktopViewport() && (
-                  <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4" role="dialog" aria-label="Notifications">
-                    <div className="absolute inset-0 bg-black/70" onClick={() => setNotifOpen(false)} />
-                    <div className="relative w-full max-w-md h-[70vh] solid-panel rounded-xl overflow-hidden flex flex-col">
-                      <NotificationsPanel
-                        embedded
-                        notifications={lobby.notifications}
-                        unreadCount={lobby.unreadCount}
-                        unreadByType={lobby.unreadByType}
-                        invites={lobby.invites}
-                        onMarkAllRead={() => lobby.markNotificationsRead()}
-                        onMarkRead={(ids) => { void lobby.markNotificationsRead(ids); }}
-                        onOpenTarget={handleOpenNotificationTarget}
-                        onRespondInvite={(id, accept) => lobby.respondToInvite(id, accept)}
-                        onRespondBabecock={handleRespondBabecock}
-                        onOpenBabecock={() => { setNotifOpen(false); setGamesSubTab('babecock'); setMainView('games'); }}
-                        onClose={() => setNotifOpen(false)}
-                      />
-                    </div>
-                  </div>
-                )}
+                {/* Notifications live in the header centre now — the mobile
+                    duplicate modal was removed with the footer bell. */}
 
                 {/* Root-Level User Profile Modal */}
                 {selectedProfileUser && (
@@ -5013,8 +5265,8 @@ export default function Home() {
             {settings.watchPartyEnabled && identity && (
               <div className={mainView === 'watch'
                 ? (watchRoomOpen
-                    ? `absolute inset-0 ${notifOpen ? 'md:left-[min(420px,32vw)]' : 'left-0'} ${chatOpen ? 'md:right-[min(720px,40vw)]' : 'right-0'} z-20 flex flex-col min-h-0 overflow-hidden`
-                    : `absolute top-9 bottom-[var(--island-clearance)] ${notifOpen ? 'md:left-[min(420px,32vw)]' : 'left-0'} ${chatOpen ? 'md:right-[min(720px,40vw)]' : 'right-0'} z-20 flex flex-col min-h-0 overflow-hidden`)
+                    ? `absolute inset-0 left-0 ${chatOpen ? 'md:right-[min(720px,40vw)]' : 'right-0'} z-20 flex flex-col min-h-0 overflow-hidden`
+                    : `absolute top-9 bottom-[var(--island-clearance)] left-0 ${chatOpen ? 'md:right-[min(720px,40vw)]' : 'right-0'} z-20 flex flex-col min-h-0 overflow-hidden`)
                 : 'hidden'}>
                 <WatchPartyView identity={identity} profilePics={profilePics} />
               </div>
@@ -5027,7 +5279,6 @@ export default function Home() {
               balance={myUser?.balance ?? 0}
               wsConnected={isWsConnected}
               unreadMessagesCount={chatUnreadCount}
-              unreadNotificationsCount={lobby.unreadCount}
               gamesOnlineCount={gamesOnlineCount}
               watchWatchingCount={watchWatchingCount}
               feedNewPostsCount={feedNewPostsCount}
@@ -5039,14 +5290,6 @@ export default function Home() {
               onOpenHelp={() => { setChatOpen(false); setShowHelpModal(true); }}
               settingsOpen={showSettingsModal}
               onOpenStore={() => handleSetMainView('store')}
-              onOpenNotifications={() => {
-                setNotifOpen((v) => {
-                  const next = !v;
-                  if (next) lobby.markNotificationsRead();
-                  return next;
-                });
-              }}
-              notificationsOpen={notifOpen}
               onToggleMessages={() => {
                 playPress(860);
                 setChatOpen(false);

@@ -192,6 +192,39 @@ host stateful routes, and lobby/queue/group chat and game invites say so instead
 of failing as 404s. Courier DMs and sealed rooms never touch the node and are
 exempt.
 
+### Persistence, unread state and the notification centre (2026-10-18)
+
+The blind courier stores no per-user state, so **the message store is the only
+source of truth** and everything the UI shows about unread messages is derived
+from it:
+
+- Threads and rooms are durable locally (DPAPI-scoped per identity). Message
+  identity is the envelope id, so a replayed envelope, a retry, or an
+  out-of-order arrival cannot duplicate or reorder a row.
+- Read state (`dmSeen`/`roomSeen`, last-conversation pointer) is **identity
+  scoped** (`utils/scopedSeen.ts`); it used to be plain localStorage, so a
+  second identity inherited the first one's stamps. A one-time migration keeps
+  existing read state.
+- The unread badge in the chat view and the DM/room rows in the header
+  notification centre are computed from the **same** stamps
+  (`countThreadUnread` / `countMentions`) at render time — there is no second
+  counter to drift, and a delivered-but-unread message is never reported as
+  read.
+- A read receipt is emitted only by a real user action: opening the
+  conversation (view-gated on document visibility) or tapping its notification
+  row. Neither the message loader nor expanding the notification centre marks
+  anything read.
+- If the control socket drops, frames pushed meanwhile were never received.
+  `orbitWebSocket` emits `__ws_reconnected` and `useLobby` answers with **one**
+  forced read of the lobby + notification/invite lists — a catch-up, not a
+  polling loop.
+
+The courier's store is not durable for a recipient that is offline with nobody
+seeding to it: no relay keeps a DM for later, and the app does not claim
+otherwise. Server-side engagement rows (`Notifications`) are a separate,
+node-hosted system that does survive an offline client — the two are merged for
+display only (SPEC §15) and never written into each other.
+
 ---
 
 ## 4. P2P Swarm & Content Sharing Protocol
@@ -220,8 +253,74 @@ type SwarmMessage =
 - **Request Cycle:** When a peer sees an image announcement or post referencing `objectId`, it broadcasts `SWARM_WANT` with the ID across:
   1. Active WebRTC mesh data channels (`broadcastMeshFrame`).
   2. Local tab cross-process `BroadcastChannel('orbit_p2p_swarm')`.
+  3. The node's WS relay, wrapped as `{ type: 'SWARM_FRAME', swarm }` — the
+     guaranteed fallback when no direct channel exists.
 - **Response Cycle:** Any peer holding the object slices the binary buffer into 64KB chunks and sends sequential `SWARM_CHUNK` frames.
 - **Reassembly:** The requesting peer tracks received chunk indices in memory. Once all chunks are present, it assembles the final `Blob`, verifies the SHA-256 digest against `objectId`, and commits it to local IndexedDB.
+
+### SWARM_HAVE: advertise, don't broadcast the world (2026-10-19)
+
+`SWARM_HAVE` used to be a no-op on receipt, so a peer that failed a fetch had
+no way to learn that someone nearby held the bytes. It is now a deliberate
+two-sided protocol:
+
+- **Sending.** `announceHeldObjects()` advertises at most `SWARM_HAVE_LIMIT`
+  (64) ids this session holds, most recent first. It fires after boot hydration
+  and on `PEER_ONLINE_EVENT`, throttled to one advertisement per 10s so a
+  flapping roster cannot become a HAVE storm.
+- **Receiving.** A HAVE is an advertisement, not a mandate: the receiver asks
+  only for ids it *already wants* (`wantSwarmObject`, populated by fetches that
+  timed out and by tiles asking to be retried) and never for one it holds or
+  has in flight. The wave is capped at 3 concurrent `SWARM_WANT`s and every
+  request keeps its own timeout, so one slow id neither blocks the others nor
+  fails them: each settles independently, and a failure stays *wanted* for the
+  next advertisement instead of being forgotten.
+
+Nothing is downloaded speculatively, so a peer advertising its whole library
+costs a handful of round trips, not a library transfer.
+
+### A descriptor is not bytes (2026-10-19)
+
+An announcement carries an object's **provider link**, not its content. Older
+builds encoded that link into the object's `data` field, so IndexedDB held a
+row claiming to be media bytes while actually holding the URL text. Everything
+downstream then treated the row as media: a blob URL of the URL string, a hash
+that could never match the object id, a tile stuck on "Loading media…".
+
+- **On write** (`utils/objectDescriptor.ts`, used by both the announce and the
+  receive path of `useP2P`): the link is stored as `source_url`, `data` stays
+  empty, and **real bytes are never overwritten by the link that points at
+  them** — publishing or receiving an announcement for an object already held
+  on disk leaves those bytes alone.
+- **On read** (`App` gallery rebuild, `recoverDescriptorRow`): a row whose
+  `data` decodes to a single short http(s)/`gmcache://`/`/api/objects/` URL is
+  recognised as a descriptor. Detection is strict UTF-8 over a ≤4KB payload
+  that must be exactly one URL, so real media can never be mistaken for a link.
+  The recovery is **idempotent and non-destructive**: the row keeps its id and
+  bytes, gains the `source_url` it was already carrying, and never
+  re-imports. The gallery then renders it from that link instead of minting a
+  blob of URL text.
+- **Flags** are normalised by one function (`mediaFlag`: `1` / `0` / `null`).
+  The two write paths used to drift — one mapped explicit `false` to `0`, the
+  other wrote `null`, losing "explicitly private" — and an unknown flag is
+  always `null`, never a guess.
+
+### Who owns a relayed object (2026-10-19)
+
+The relay socket proves its own sender at auth (a ticket), but the payload's
+`user.id` and `owner_id` are just client-supplied text. So:
+
+- The node stamps `relayedBy` with the authenticated identity on every
+  client-to-client frame it forwards. A bare frame with a `type` key is still
+  dropped (audit A2: a forged `feed`/`user_banned` must never shadow a
+  server-published event) — only the explicit client-to-client allowlist
+  relays, and always inside the `SWARM_FRAME` envelope.
+- A receiver verifies the claim with `resolveClaimedOwner`: an `owner_id` equal
+  to the proven sender is verified, an unattributed object belongs to the
+  sender, and a claim that contradicts the sender is stored
+  `owner_verified: false` and may never borrow that user's directory name or
+  avatar. Relaying for someone else stays possible and visible; impersonating
+  them does not.
 
 ### Local-First Seeding Lifecycle
 

@@ -148,6 +148,13 @@ text overlays kept for caption hunts, §6).
   the process — the "app eats RAM" symptom. Durable bytes are unchanged (vault on
   disk / IndexedDB), so an eviction costs exactly one re-read and never data;
   boot hydration honours the same budget.
+- **Descriptor rows never masquerade as media (2026-10-19).** An announcement's
+  provider link lives in `source_url`, never in the `data` bytes field, and
+  neither publishing nor receiving one overwrites bytes already held. Legacy rows
+  that did store the URL as bytes are detected (`utils/objectDescriptor.ts`:
+  strict UTF-8, ≤4KB, exactly one http(s)/`gmcache://`/`/api/objects/` URL) and
+  recovered idempotently as they are read — bytes are kept, nothing is deleted or
+  re-imported, and the row stops being served as media.
 
 ### 6b. Feed/market queries (user spec: player picks, no hardcodes)
 
@@ -188,6 +195,21 @@ text overlays kept for caption hunts, §6).
   never doubles; a post the node never lists stays visible as locally durable
   instead of vanishing, and a failed upload inserts nothing (the modal reports
   the reason and stays open).
+- **Reading the timeline is a stated state, not a guess (2026-10-19).** The feed
+  carries an explicit status (`idle|loading|ready|offline|error`), so an empty
+  list says which one it is instead of implying "nothing here". The snapshot read
+  is generation-guarded (a slow earlier reply can never overwrite a newer one), a
+  post pushed over the socket survives an in-flight snapshot
+  (`utils/feedMerge.ts`, 2 min TTL) and retires the moment the snapshot lists it,
+  and the feed re-reads itself once (bounded, ≥15s apart) when a peer comes
+  online. A deep link (`#/feed?post=<id>`) is keyed by id, so a second visit —
+  including a hash-only navigation — re-arms instead of being consumed once, and
+  a post the snapshot does not carry is fetched by one targeted signed read and
+  pinned, never fabricated.
+- **A tile shows the post's own count.** The like count follows the post: a tile
+  first rendered from a local/P2P mirror (which carries no count) updates when the
+  server row lands, instead of freezing the first value it ever saw. Only the
+  user's own in-flight like outranks the post, and only until the post catches up.
 - Tags tab: owned pills toggle ON/OFF plus SOLO (feed only that one tag).
   Gallery tab: text box filters keepsakes by tag substring.
   Config tab: starter picks recap + extra excludes (add/remove, 100 max).
@@ -314,6 +336,25 @@ offline earnings). Each +5% click power. Persist across prestige.
 - **Swarm Media Distribution:** Media divided into 64KB chunks (`SWARM_WANT`, `SWARM_CHUNK`)
   over direct WebRTC DataChannels (`gmatch-mesh`). All received/created media stored in local
   IndexedDB and automatically seeded on boot (`hydrateLocalObjects`).
+- **Announcements ride the relay too (2026-10-19):** peer announcements
+  (`IMAGE_ANNOUNCE`, `MESSAGE`, `STORY_ANNOUNCE`, `CHAT`, `PRESENCE`) are wrapped in
+  the `SWARM_FRAME` envelope, which the node relays to the global room with a
+  `relayedBy` stamp carrying the identity the socket proved at auth. Sent bare they
+  were refused, so a peer post was discoverable only over a direct WebRTC channel.
+  Frames that merely *look* like a server event (`feed`, `user_banned`) are still
+  dropped (audit A2).
+- **`SWARM_HAVE` is real:** held ids are advertised (≤64, most recent first,
+  throttled to 10s, fired on peer-online and after boot hydration) and answered only
+  for ids this session already wants (a timed-out fetch / a failed tile), never for
+  one it holds or has in flight, ≤3 at a time, each with its own timeout. A failure
+  stays *wanted* for the next advertisement — an advertisement is not a mandate to
+  download a library.
+- **Descriptor vs bytes:** `data` is media, nothing else. An announcement's link is
+  stored as `source_url`; publishing or receiving one never overwrites bytes already
+  held. Legacy rows that wrote the URL into `data` are recovered idempotently on read
+  (nothing deleted, nothing re-imported) and render from the link. An `owner_id` that
+  contradicts the proven `relayedBy` sender is stored `owner_verified: false` and
+  never borrows that user's directory name or avatar.
 - Full specification documented in `docs/ARCHITECTURE-P2P.md`.
 
 ## 11. Save
@@ -433,6 +474,20 @@ is open in the messages/rooms view AND the document is visible. It is never
 claimed by the message loader, which also runs when boot restores a conversation
 the player never opened.
 
+**Unread state is identity-scoped (2026-10-18).** `dmSeen`, `roomSeen` and the
+last-conversation pointer used to live in plain, unscoped localStorage while the
+threads and rooms themselves are DPAPI-scoped per identity. Switching identity
+therefore inherited the previous user's read stamps, which could hide brand-new
+messages. They now go through `utils/scopedSeen.ts` (`scopedKey(key, orbitId)`),
+with a one-time migration of the legacy value so an upgrade never loses read
+state.
+
+**The unread badge is derived, never stored twice.** Per-thread and per-room
+unread comes from the message store itself (`countThreadUnread` / `countMentions`
+against the seen stamps), and the notification centre reads the *same* stamps
+(§15). There is no second "unread" scalar to drift out of sync with the list,
+and a message that is merely delivered is never shown as read.
+
 **Profile modal:** wide two-column grid — left pane the user's posts, right pane
 the selected post, each independently scrollable; a post opens on the right
 without closing the modal. Layered Escape (picture → card → post → modal) with
@@ -465,3 +520,105 @@ reload persistence, plus an honest "not delivered" state when sealing fails.
 `e2e/chat-node-capability.spec.ts` route-mocks the 404 probe (clearly labelled:
 the E2E node is a full node) and asserts the disabled invite with its reason,
 the lobby composer notice, and the still-working DM lane on the same client.
+
+## 15. Notifications — one header centre (2026-10-18)
+
+`components/notifications/NotificationCenter.tsx` is the **only** notification
+entry point. It is mounted by `NativeHeaderBar` (so it exists on every viewport
+and every view) and absorbed the four bells that used to compete with it: the
+header island's, `CommandIsland`'s footer entry, the `FeedHeader` pill, and the
+duplicate mobile modal. There is no separate notifications page, and the
+left-rail dock is gone. The trigger keeps
+`data-notifications-toggle="true"` — the E2E hook
+(`e2e/engagement-social.spec.ts`) and its "Mark all read" expectation still hold.
+
+### Two sources, one list
+
+1. **Server rows** — the persistent `Notifications` table (`GET /api/notifications`,
+   pushed over WS as `type: 'notification'`). Authoritative for anything that
+   happened while this client had no local copy: likes, comments, replies,
+   mentions, comment likes, follows, match invites/results, babecock, card
+   events, system.
+2. **Derived local rows** — the sealed courier lanes (DMs, rooms). The courier is
+   blind and `/api/pm` is retired, so no server can know an unread DM exists.
+   The row is derived from the **message store itself** via the same seen stamps
+   the chat badge uses (`utils/notifications.ts` `deriveConversationNotifications`,
+   hook `hooks/useNotificationCenter.ts`). Reading the row is the same action as
+   opening the conversation, and it emits a real `dm_read` receipt — so the
+   notification is never a second, drift-prone copy of the message state.
+
+`mergeNotifications` folds both into `AppNotification`s keyed by
+`notificationKey`; the unread badge and the per-type breakdown are computed
+**from the merged items**, never from a separate counter (`unreadCountOf`,
+`unreadByTypeOf`). Server list cap = the badge cap (50).
+
+### Rules honoured
+
+- **Never notify yourself.** Every server call site checks the actor against the
+  recipient (comment/reply/mention/comment-like/like); mentions resolve against
+  real `Users` rows, so a plain `@word` that names nobody notifies nobody.
+- **No repeat rows.** `createNotification` (`apps/api/src/notifications.ts`)
+  derives an event key from type + identifying `data` fields and compares it
+  against recent rows; a duplicate returns `null`, which every caller already
+  reads as "do not broadcast". The window is **bounded (5 min)** on purpose: a
+  retry/double-tap/replayed frame lands in seconds, while a genuinely new later
+  event (like → unlike → like again, unfollow → re-follow) must still notify.
+  No migration, no new column.
+- **Edits don't renotify.** Edits never create a notification, so there is
+  nothing to suppress.
+- **Canonical targets, graceful fallback.** Rows carry `{ postId?, commentId?,
+  conversationId?, userId?, inviteId?, matchId? }`; `handleOpenNotificationTarget`
+  navigates to `#/feed?post=<id>&comment=<id>`, opens the profile, or hands the
+  row to the local (courier) handler. A comment deep link scrolls the comment
+  into view and spotlights it once the list loads; a delete that removes the
+  post/comment degrades to the post, then to the feed, never to nowhere.
+- **Replies are real.** `Comments.parent_comment_id` (dead since migration 016)
+  is now written, validated (the parent must be a live comment on this post),
+  read back, and rendered nested; a reply notifies the parent's author with that
+  id in `data`, so the notification lands on the exact comment.
+- **Explicit reads only.** Opening the centre does not mark anything read.
+  Tapping a row marks that row (and, for courier rows, emits the read receipt);
+  "Mark all read" marks all. This avoids claiming a read that did not happen and
+  avoids a server round-trip per dropdown open. "Mark all read" clears the
+  server rows only: a courier row is a real unread **message**, so it is cleared
+  by opening the conversation, never dismissed like an alert.
+- **Backgrounded window.** A courier DM/room message that arrives while
+  `document.hidden` raises an OS notification with the **sender name only** (no
+  message body — a sealed DM must not land on a lock screen), tagged per
+  peer/room so repeats collapse. Reconnect catch-up is one forced read
+  (`__ws_reconnected` in `useLobby`), not a polling loop.
+
+### Limitations (honest, not hidden)
+
+- Server rows are pruned after **48h** by the maintenance sweep and the API
+  returns at most **50** (`cleanup.ts`). Notification history is therefore a
+  recent window, not an archive.
+- An event that happened while this client was offline is recoverable **only if
+  a server-side row exists** (likes, comments, replies, mentions, follows, card
+  and match events). Courier DMs have no durable relay, so a DM that a peer
+  never delivered is simply not there — the UI never claims guaranteed offline
+  delivery, and the two systems stay consistent by deriving local rows rather
+  than by syncing anything.
+- Not built (features do not exist, so nothing is fabricated): friend requests,
+  post emoji reactions (posts have `like` only), watch-party invites, and
+  office-side `system` events.
+- DM display names are self-declared labels (the payload name wins over the
+  directory); identity is signature-verified, so a notification never authorizes
+  on a name.
+- **The name fallback is a readable handle, never a raw id (2026-10-19).** When a
+  DM/room row has no payload name, no directory entry and no cached peer name,
+  the row shows `generateFallbackName(peerId)` (`User_abc123` — the same handle
+  `courierPresence`, the lobby and the gallery owner label already use) instead
+  of a truncated hash fragment (`peerId.slice(0, 10)`), which named nobody and
+  disagreed with every other surface. The canonical `actorId` still carries the
+  full id for routing, dedupe and authorization; only the display label changed.
+- `MAX_PER_THREAD = 2000` truncates DM history, and multi-machine swarm delivery
+  remains unverified (§10d).
+
+**Tests:** `utils/notifications.test.ts` (merge/derive/counts),
+`utils/scopedSeen.test.ts` (scoping + legacy migration),
+`components/notifications/NotificationCenter.test.tsx` (single toggle hook,
+badge, inbox affordance, courier rows), and the API suite
+`routes/posts-notifications.test.ts` (comment/reply/mention/comment-like
+coverage, self-notification guards, cross-post parent rejection, bounded
+idempotency).

@@ -217,6 +217,8 @@ export async function hydrateLocalObjects(maxBytes = RAM_LIMIT_BYTES): Promise<n
 export function registerLocalObject(id: string, blob: Blob, meta: LocalObjectMeta = {}): void {
   if (!id || !blob) return
   rememberLocalObject(id, blob)
+  // We hold it now, so it stops being "wanted".
+  wantedObjects.delete(id)
   // Durable bytes go to the encrypted vault first (disk). IndexedDB is the
   // dev fallback. Fire-and-forget so hot paths (swarm assembly, forge) are
   // not blocked; the RAM copy is available immediately.
@@ -281,6 +283,92 @@ interface PendingFetch {
   onProgress?: (received: number, total: number) => void
 }
 const pendingFetches = new Map<string, PendingFetch>()
+
+// ---- SWARM_HAVE: what a peer holds, and what we still need ---------------
+// A HAVE is an advertisement, not a mandate: downloading everything a peer
+// lists would pull the whole world. We only ask for ids this session already
+// wants (a fetch that timed out, or a tile that failed and asked to be
+// retried), we never re-ask for one we hold or have in flight, and the wave is
+// capped so one peer's announcement can't become a download stampede.
+const wantedObjects = new Set<string>()
+const MAX_WANTED_IDS = 128
+const MAX_HAVE_CONCURRENCY = 3
+let haveFetchActive = 0
+/** Bound on ids per HAVE broadcast / request wave. */
+export const SWARM_HAVE_LIMIT = 64
+
+/** Remember that this session still needs `id` (bounded, oldest dropped). */
+export function wantSwarmObject(id: string): void {
+  if (!id || typeof id !== 'string') return
+  if (localObjects.has(id) || pendingFetches.has(id)) return
+  if (wantedObjects.size >= MAX_WANTED_IDS) {
+    const oldest = wantedObjects.values().next().value as string | undefined
+    if (oldest !== undefined) wantedObjects.delete(oldest)
+  }
+  wantedObjects.add(id)
+}
+
+/** Ids this session asked for and did not get (for a later HAVE). */
+export function wantedSwarmObjectIds(): string[] {
+  return [...wantedObjects]
+}
+
+/** Test seam: forget the want registry (durability is untouched). */
+export function __resetWantedObjectsForTests(): void {
+  wantedObjects.clear()
+  haveFetchActive = 0
+}
+
+/** Ids whose bytes this session currently holds, most recent first. */
+export function heldSwarmObjectIds(limit = SWARM_HAVE_LIMIT): string[] {
+  const keys = [...localObjects.keys()]
+  const recent = keys.reverse()
+  return recent.slice(0, Math.max(0, limit))
+}
+
+/**
+ * Tell the swarm which objects we can serve. Called when a peer comes online
+ * (and after boot hydration), so a peer that failed a fetch learns it can ask
+ * us instead of waiting for a broadcast it never saw.
+ */
+export function announceHeldObjects(limit = SWARM_HAVE_LIMIT): number {
+  if (!swarmSend) return 0
+  const ids = heldSwarmObjectIds(limit)
+  if (ids.length === 0) return 0
+  try {
+    swarmSend({ type: 'SWARM_HAVE', ids })
+    return ids.length
+  } catch {
+    return 0
+  }
+}
+
+/**
+ * Answer a peer's HAVE: fetch only what we already want, bounded and with
+ * per-id settlement (one slow id never blocks the rest, and a failure stays
+ * wanted for the next announcement).
+ */
+function fetchWantedFromHave(ids: unknown[]): void {
+  if (!swarmSend) return
+  for (const raw of ids) {
+    if (typeof raw !== 'string' || !raw) continue
+    if (localObjects.has(raw)) {
+      wantedObjects.delete(raw)
+      continue
+    }
+    if (pendingFetches.has(raw) || !wantedObjects.has(raw)) continue
+    if (haveFetchActive >= MAX_HAVE_CONCURRENCY) break
+    haveFetchActive++
+    void requestSwarmObject(raw)
+      .then(() => wantedObjects.delete(raw))
+      .catch(() => {
+        /* still wanted: the next HAVE re-tries */
+      })
+      .finally(() => {
+        haveFetchActive--
+      })
+  }
+}
 
 function decodeChunk(dataBase64: string): Uint8Array {
   const binaryStr = atob(dataBase64)
@@ -358,7 +446,10 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
     if (req.chunks.size === req.total) void finishFetch(msg.id, req)
     return true
   }
-  if (msg.type === 'SWARM_HAVE') return true
+  if (msg.type === 'SWARM_HAVE') {
+    fetchWantedFromHave(Array.isArray(msg.ids) ? msg.ids : [])
+    return true
+  }
   return false
 }
 
@@ -402,6 +493,9 @@ export function requestSwarmObject(id: string, timeoutMs = 15000, opts: SwarmFet
   return new Promise<Blob>((resolve, reject) => {
     const timer = setTimeout(() => {
       pendingFetches.delete(id)
+      // Nobody answered: keep the id on the want list so the next SWARM_HAVE
+      // from a peer that holds it can serve us without a fresh request.
+      wantSwarmObject(id)
       reject(new Error(`Timed out waiting for swarm object ${id}`))
     }, timeoutMs)
     pendingFetches.set(id, { resolve, reject, timer, chunks: new Map(), total: 0, mimeType: '', expectedHash: opts.expectedHash, onProgress: opts.onProgress })
