@@ -57,6 +57,18 @@ function isSafeInt(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value)
 }
 
+/** Highest-sequence entry per actor. Heads must never be pruned or evicted:
+ *  the next chained write references them, and losing one forks the actor. */
+function actorHeads(all: LoggedOperation[]): Map<string, LoggedOperation> {
+  const heads = new Map<string, LoggedOperation>()
+  for (const entry of all) {
+    if (!isValidLogEntryShape(entry)) continue
+    const current = heads.get(entry.actorId)
+    if (!current || entry.actorSequence > current.actorSequence) heads.set(entry.actorId, entry)
+  }
+  return heads
+}
+
 function serializeSize(value: unknown): number {
   return new TextEncoder().encode(JSON.stringify(value)).byteLength
 }
@@ -103,11 +115,13 @@ export class SocialOperationLog {
       updatedAt: now,
     }
     if (!isValidLogEntryShape(entry)) throw new Error('invalid log entry')
-    // Capacity: evict oldest delivered first; never evict undelivered work.
+    // Capacity: evict oldest delivered first; never evict undelivered work or
+    // an actor's chain head (losing the head forks that actor's history).
     const all = await this.backend.getAll()
     if (all.length >= MAX_LOG_ENTRIES) {
+      const protectedIds = new Set([...actorHeads(all).values()].map((head) => head.operationId))
       const evictable = all
-        .filter((candidate) => candidate.status === 'delivered')
+        .filter((candidate) => candidate.status === 'delivered' && !protectedIds.has(candidate.operationId))
         .sort((a, b) => a.updatedAt - b.updatedAt)
       let room = all.length
       const limit = MAX_LOG_ENTRIES - 1
@@ -150,12 +164,38 @@ export class SocialOperationLog {
       .sort((a, b) => a.createdAt - b.createdAt || (a.operationId < b.operationId ? -1 : 1))
   }
 
-  /** Drop delivered entries past the grace window; undelivered are never dropped. */
+  /** One actor's entries, highest sequence first (chain head first). */
+  async listOperationsByActor(actorId: string): Promise<LoggedOperation[]> {
+    const all = await this.backend.getAll()
+    return all
+      .filter((entry) => isValidLogEntryShape(entry) && entry.actorId === actorId)
+      .sort((a, b) => b.actorSequence - a.actorSequence)
+  }
+
+  /**
+   * The next (actorSequence, previousOperationId) slot for a new chained
+   * write. Reads the actor's retained head; sequence gaps from pruning are
+   * fine, but two retained entries at the same max sequence is a fork and
+   * refuses to chain further writes onto it.
+   */
+  async nextActorSlot(actorId: string): Promise<{ actorSequence: number; previousOperationId: string | null }> {
+    const ops = await this.listOperationsByActor(actorId)
+    if (ops.length === 0) return { actorSequence: 1, previousOperationId: null }
+    const head = ops[0]
+    if (ops.filter((entry) => entry.actorSequence === head.actorSequence).length > 1) {
+      throw new Error(`operation log contains a sequence fork for actor ${actorId}`)
+    }
+    return { actorSequence: head.actorSequence + 1, previousOperationId: head.operationId }
+  }
+
+  /** Drop delivered entries past the grace window; undelivered entries and
+   *  actor chain heads are never dropped (a missing head forks the actor). */
   async prune(now = Date.now()): Promise<number> {
     const all = await this.backend.getAll()
+    const protectedIds = new Set([...actorHeads(all).values()].map((head) => head.operationId))
     let removed = 0
     for (const entry of all) {
-      if (entry.status === 'delivered' && now - entry.updatedAt > DELIVERED_GRACE_MS) {
+      if (entry.status === 'delivered' && now - entry.updatedAt > DELIVERED_GRACE_MS && !protectedIds.has(entry.operationId)) {
         await this.backend.delete(entry.operationId)
         removed += 1
       }

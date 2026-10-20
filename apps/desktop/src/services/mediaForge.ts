@@ -3,6 +3,7 @@ import { buildMagnetUri } from '../utils/magnet'
 import { registerLocalObject } from '../utils/p2pSwarm'
 import { resolveVideoMime, sniffFileHead } from '../utils/media'
 import { enqueueOutbox, flushPostOutbox } from './postOutbox'
+import { shouldEmitSocialOperation } from './socialPublish'
 
 export interface ForgedMedia {
   id: string
@@ -11,6 +12,10 @@ export interface ForgedMedia {
   sizeBytes: number
   localUrl: string
   magnetUri: string
+  /** Present when a signed v1 social operation was durably committed for this
+   *  forge (public durable posts). Absent = not eligible or the commit failed;
+   *  the legacy outbox remains the product delivery path either way. */
+  socialOperationId?: string
 }
 
 export async function hashFileSha256(file: File | Blob): Promise<string> {
@@ -84,6 +89,7 @@ export async function forgeMediaLocally(
   if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
     localUrl = URL.createObjectURL(file)
   }
+  let socialOperationId: string | undefined
 
   // 3. Register metadata ONLY with the backend — ZERO BINARY BYTES SENT TO FLY.IO
   const payload = {
@@ -127,6 +133,28 @@ export async function forgeMediaLocally(
     // flushPostOutbox (this call, plus boot/reconnect), never blocking publish.
     enqueueOutbox({ objectId, postGroup: options.postGroup ?? null, registerBody: payload, gossipInput })
     void flushPostOutbox(identity).catch(() => { })
+
+    // Experimental v1 protocol bookkeeping (roadmap L1/L4): public durable
+    // feed posts also commit a SIGNED post.create operation to the durable
+    // operation log. Additive only — a failure here never breaks the share,
+    // the field's absence on ForgedMedia is the honest signal.
+    if (shouldEmitSocialOperation(options)) {
+      try {
+        const { publishSignedPostOperation } = await import('./socialPublish')
+        const { SocialOperationLog, createIndexedDbOperationLogBackend } = await import('./socialOperationLog')
+        const operation = await publishSignedPostOperation(identity, {
+          objectId,
+          contentCid: contentHash,
+          mimeType,
+          sizeBytes: file.size,
+          caption: options.postCaption || options.caption,
+          tags: options.tags,
+        }, new SocialOperationLog(createIndexedDbOperationLogBackend()))
+        socialOperationId = operation.operationId
+      } catch (error) {
+        console.warn('[socialPublish] v1 operation commit skipped:', error instanceof Error ? error.message : error)
+      }
+    }
   } else {
   const res = await orbitFetch('/api/objects/register', {
     method: 'POST',
@@ -160,5 +188,6 @@ export async function forgeMediaLocally(
     sizeBytes: file.size,
     localUrl,
     magnetUri,
+    socialOperationId,
   }
 }

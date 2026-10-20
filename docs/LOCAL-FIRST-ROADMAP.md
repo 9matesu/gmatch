@@ -77,15 +77,21 @@ rules are fixed.
 
 **Purpose:** make a local mutation survive process exit before any network call.
 
-Progress: slices 1–2 exist — `apps/desktop/src/services/socialOperationLog.ts`
+Progress: slices 1–3 exist — `apps/desktop/src/services/socialOperationLog.ts`
 (IndexedDB-backed, injectable backend, immutable idempotent appends, monotonic
-status, bounded size with delivered-first eviction, oldest-first pending
-replay, surfaced storage failures) plus `flushPendingOperations`, the replay
-driver whose reopen-based tests cover every crash boundary (before append,
-after append, mid-send, and remote-ack-before-status-update, absorbed by
-operationId idempotence). 13 node tests pass. Not yet wired into any publish
-path, and the legacy `localStorage` outbox migration plus real
-IndexedDB process-restart evidence are still open.
+status, bounded size with delivered-first eviction that never evicts an actor
+chain head, oldest-first pending replay, surfaced storage failures) plus
+`flushPendingOperations`, the replay driver whose reopen-based tests cover
+every crash boundary (before append, after append, mid-send, and
+remote-ack-before-status-update, absorbed by operationId idempotence), plus
+the publish wiring: every public durable feed post now also commits a signed,
+self-authorized, sequence-chained `post.create` operation
+(`apps/desktop/src/services/socialPublish.ts`, gated in `mediaForge`).
+History validation is gap-tolerant (pruning-safe) but fork- and
+wrong-predecessor-strict. 22 service tests pass. Still open: the legacy
+`localStorage` outbox remains the product delivery path until the v1 proposal
+is accepted; real IndexedDB process-restart evidence and a peer transport for
+operations (L4) are required before the log can claim replication.
 
 - [ ] Replace social mutation durability based on `localStorage` with an
   IndexedDB/Electron durable operation store. Keep old keys readable and
@@ -330,6 +336,11 @@ UI or documentation.
   the protocol package (37 tests) and the API workspace (6 tests), including a
   check that the social-operation and legacy gossip signature domains never
   cross-verify. Full-suite and all-workspace typechecks pass.
+- Public durable feed publishes now commit a signed v1 `post.create` operation
+  to the durable operation log (`f99661e` protocol-side gap-tolerant
+  authorization + manifest hashing; desktop wiring in socialPublish/mediaForge).
+  Authorizer semantics: partial histories are legal, forks and wrong
+  predecessor bindings are rejected, actor chain heads are never pruned.
 - The focused API gossip suite passed (8 tests); workspace typecheck passed;
   lint passed with 0 errors / 47 existing warnings; desktop build passed with
   existing chunk warnings.
