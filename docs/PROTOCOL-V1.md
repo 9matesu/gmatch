@@ -277,6 +277,17 @@ Fixtures must be language-independent bytes/hex and pass in both the desktop
 and API workspaces. Use fixed known test keys; never put real user keys in
 fixtures.
 
+Status: the fixed vectors now live in
+`packages/shared/src/social-vectors.ts` (identity/signature, SHA-256 digests,
+full signed operation, AEAD content context, recipient-bound DEK wrap) and are
+verified by suites in **both** the `@orbit/protocol` package
+(`src/social-vectors.test.ts`) and the API workspace
+(`src/social-vectors.test.ts`), which also proves the social-operation and
+legacy gossip signature domains never cross-verify. Remaining for full L0
+sign-off: the actor-sequence duplicate/gap/equivocation vectors are covered in
+the protocol suite rather than the shared fixture file, and ciphertext-CID
+plus empty/oversized CID edge vectors still need to be added.
+
 ## Implementation gates
 
 1. Resolve the open decisions above in a reviewed protocol change. Update L0 in

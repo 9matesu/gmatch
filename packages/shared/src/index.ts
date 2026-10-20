@@ -1,5 +1,7 @@
 import blocklistData from '../../../shared/blocklist.json'
 
+export * from './social-vectors';
+
 export type OrbitId = string;
 
 export type LikeDecision = 'like' | 'reject' | 'pass';

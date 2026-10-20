@@ -305,6 +305,11 @@ UI or documentation.
   the legacy DM envelope; the legacy static wrap stays read-only for existing
   data. Identity-to-encryption-key binding records and key rotation/revocation
   remain open.
+- Cross-workspace L0 conformance vectors are checked in at
+  `packages/shared/src/social-vectors.ts` and verified by test suites in both
+  the protocol package (37 tests) and the API workspace (6 tests), including a
+  check that the social-operation and legacy gossip signature domains never
+  cross-verify. Full-suite and all-workspace typechecks pass.
 - The focused API gossip suite passed (8 tests); workspace typecheck passed;
   lint passed with 0 errors / 47 existing warnings; desktop build passed with
   existing chunk warnings.
