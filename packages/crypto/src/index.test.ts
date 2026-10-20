@@ -15,6 +15,7 @@ import {
   signContentManifest,
   verifyContentManifest,
   bytesToHex,
+  computeObjectHash,
 } from './index';
 
 describe('Crypto Identity & Encryption', () => {
@@ -61,6 +62,13 @@ describe('Crypto Identity & Encryption', () => {
     expect(bytesToHex(signature)).toBe('abe93333b41bfde024bb2ec60ccc8a9ae78d50f4ed2a57e60b063559526dc2ec2603518ba8a576ae7f940b1f9a72815cbe42a143d0993aec407aaeaad54d6c0b');
     expect(verifySignature(signature, message, identity.publicKeyHex)).toBe(true);
     expect(verifySignature(signature, new TextEncoder().encode('gmatch-social|1|test|{"x":1}'), identity.publicKeyHex)).toBe(false);
+  });
+
+  it('matches standard SHA-256 object digest vectors', () => {
+    expect(computeObjectHash(new Uint8Array()).sha256Hex)
+      .toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+    expect(computeObjectHash(new TextEncoder().encode('abc')).sha256Hex)
+      .toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
   });
 
   it('should encrypt and decrypt payloads with X25519 shared secret', () => {
