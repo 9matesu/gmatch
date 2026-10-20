@@ -29,4 +29,12 @@ export function mount(): void {
       </div>
     </StrictMode>,
   )
+  window.gmatch?.bootMark?.('renderer:mounted')
+  // Two frames on purpose: the first commits the tree, the second runs after
+  // that frame has painted. A single rAF measures before the paint, not after.
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => window.gmatch?.bootMark?.('renderer:first-paint')),
+    )
+  }
 }

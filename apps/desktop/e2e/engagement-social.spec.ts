@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { seedApp } from './helpers'
+import { seedApp, firstRunOverlayKeys } from './helpers'
 import { generateIdentity } from '../src/identity.cjs'
 import { legalVersionKey } from '../src/legal/documents'
 
@@ -28,17 +28,18 @@ async function newPeer(browser: import('@playwright/test').Browser, name: string
   const ctx = await browser.newContext({ serviceWorkers: 'block' })
   const page = await ctx.newPage()
   await page.addInitScript(
-    ([i, n, legalKey]: [Record<string, unknown>, string, string]) => {
+    ([i, n, legalKey, overlayKeys]: [Record<string, unknown>, string, string, [string, string][]]) => {
       localStorage.setItem('orbit_identity', JSON.stringify(i))
       localStorage.setItem('goonMatch_age_verified', 'true')
       localStorage.setItem('orbit_legal_accepted', legalKey)
       localStorage.setItem('orbit_display_name', n)
       localStorage.setItem('orbit_tags', JSON.stringify(['e2e']))
-      // Suppress the "What's New" modal, same as seedApp: it is a
-      // pointer-events-blocking overlay over the feed.
-      localStorage.setItem('gmatch_last_seen_changelog', '1.5.1')
+      // Dismiss every first-run overlay (changelog, tour, onboarding) through
+      // the shared key list: a hardcoded changelog version goes stale on every
+      // release and the "What's New" modal then silently swallows every click.
+      for (const [k, v] of overlayKeys) localStorage.setItem(k, v)
     },
-    [id, name, legalVersionKey()],
+    [id, name, legalVersionKey(), firstRunOverlayKeys(id.orbitId)],
   )
   return { ctx, page, id }
 }
@@ -94,13 +95,22 @@ async function postIdFor(page: Page, caption: string): Promise<string> {
   }, caption)
 }
 
-/** Open a post's lightbox deterministically via the app's own permalink. */
+/**
+ * Open a post deterministically via the app's own permalink and like it there.
+ *
+ * The feed expands a permalinked post **inline** (the modal post lightbox was
+ * removed with the inline-expansion rework), so the assertion is the expanded
+ * thread composer inside that post's card — not a `dialog`, which no longer
+ * exists anywhere in the feed.
+ */
 async function likePostFromPeer(peerPage: Page, postId: string) {
   await peerPage.goto(`/#/feed?post=${encodeURIComponent(postId)}`)
-  const lightbox = peerPage.getByRole('dialog', { name: 'Post' })
-  await expect(lightbox).toBeVisible({ timeout: 30_000 })
-  await lightbox.getByRole('button', { name: 'Like post' }).click()
-  await expect(lightbox.getByRole('button', { name: 'Unlike post' })).toBeVisible({ timeout: 20_000 })
+  const article = peerPage.locator(`[data-post-id="${postId}"]`)
+  await expect(article.getByPlaceholder('Add a comment...')).toBeVisible({ timeout: 30_000 })
+  const like = article.getByRole('button', { name: 'Like post' })
+  await expect(like).toHaveAttribute('aria-pressed', 'false')
+  await like.click()
+  await expect(like).toHaveAttribute('aria-pressed', 'true', { timeout: 20_000 })
 }
 
 /**

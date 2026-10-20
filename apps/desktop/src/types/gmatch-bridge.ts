@@ -28,6 +28,9 @@ export interface GmatchBridge {
     local?: string | null
     state?: 'local' | 'absent' | 'unreadable'
     reason?: string
+    /** Stored mime for the row (extensionless rows rely on this to pick the
+     *  Range-capable stream instead of a raw vault:// URL). */
+    mime?: string
   }>
   vaultPin?: (url: string) => Promise<{ local: string | null }>
   vaultUnpin?: (url: string) => Promise<{ ok: boolean }>
@@ -92,6 +95,8 @@ export interface GmatchBridge {
   blocklistReset?: () => Promise<{ ok: boolean; data?: BlocklistData; error?: string }>
   /** Fire-and-forget renderer log line; main appends it to userData/main.log. */
   logError?: (scope: string, msg: string) => void
+  /** Startup timeline milestone (main logs it with the boot phases). */
+  bootMark?: (label: string) => void
   /** Opens the userData folder (main.log, saves) in the OS file manager. */
   openLogFolder?: () => Promise<string>
   // P2P mesh (Slice 3): sealed Envelope-v2 objects only. `transport` is the

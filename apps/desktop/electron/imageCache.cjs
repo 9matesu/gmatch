@@ -63,10 +63,20 @@ function normalizeQuery(q) {
     .toLowerCase()
 }
 
-/** Destroy legacy on-disk caches (pre-memory builds). */
+/**
+ * Destroy legacy on-disk caches (pre-1.1 builds).
+ *
+ * One-time per install, not once per boot. A recursive remove of a path that
+ * no longer exists is cheap, but a pre-1.1 install can leave hundreds of MB
+ * behind, and paying that on every launch is disk work nobody asked for. The
+ * marker makes it the migration it was always documented to be.
+ */
 function destroyDiskCaches(userDataPath) {
+  const marker = path.join(userDataPath, '.legacy-cache-purged')
+  try { if (fs.existsSync(marker)) return } catch { /* fall through and try */ }
   try { fs.rmSync(path.join(userDataPath, 'image-cache'), { recursive: true, force: true }) } catch { /* already clean */ }
   try { fs.rmSync(path.join(userDataPath, 'feed-cache.json'), { force: true }) } catch { /* already clean */ }
+  try { fs.writeFileSync(marker, new Date().toISOString()) } catch { /* retry next boot */ }
 }
 
 function init(userDataPath, userAgent, storageKeyHex) {

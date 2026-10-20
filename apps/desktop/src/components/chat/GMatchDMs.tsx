@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, Fragment } from 'react';
 import { playPress } from '../../utils/sounds';
 import { resolveMediaUrl } from '../../utils/media';
 import { GroupMembersPopover, type GroupMember } from './GroupMembersPopover';
@@ -23,6 +23,8 @@ import {
   ImagePlus,
   Edit2,
   CheckCheck,
+  Check,
+  SmilePlus,
   Trash,
   Lock,
   LogOut,
@@ -39,6 +41,7 @@ import { Linkify } from '../Linkify';
 import { chatDisplayName } from './chatDisplayName';
 import { nameFor, nameRoster as nameRosterFromDirectory, rememberName } from '../../game/nameDirectory';
 import { groupMessagesByDay } from '../../utils/chatDays';
+import { searchThread } from '../../utils/dmSearch';
 import { UNKNOWN_NAME } from '../../utils/displayName';
 
 export interface PeerInfo {
@@ -109,6 +112,17 @@ export function GMatchDMs({
   onReportUser,
   onDeleteMessage,
   onDeleteThread,
+  onEditMessage,
+  onReactMessage,
+  onDeleteForEveryone,
+  onInviteToGame,
+  inviteUnavailableReason = null,
+  serverLaneReason = null,
+  onTyping,
+  peerTyping = false,
+  seenByPeer,
+  unreadByPeer,
+  mentionByPeer,
   onCreateGroup,
   onOpenAttachment,
   onSendGroupMessage,
@@ -166,6 +180,32 @@ export function GMatchDMs({
   onReportUser?: (userId: string) => void;
   onDeleteMessage?: (messageId: string, peerId: string) => void;
   onDeleteThread?: (peerId: string) => Promise<void>;
+  /** Courier-lane edit. Resolves false when the peer could not be reached, so
+   *  the UI can say the correction stayed local instead of implying delivery. */
+  onEditMessage?: (peerId: string, messageId: string, text: string) => Promise<boolean>;
+  /** Toggle one emoji reaction on a message. */
+  onReactMessage?: (peerId: string, messageId: string, emoji: string, on: boolean) => void;
+  /** Sealed delete for everyone. False => local delete happened, peer not told. */
+  onDeleteForEveryone?: (peerId: string, messageId: string) => Promise<boolean>;
+  /** Game invite from the directory. Server-authoritative; disabled (with a
+   *  reason) on nodes that only relay sealed mail. */
+  onInviteToGame?: (userId: string) => void;
+  /** Why invites are unavailable on this node. Never null on a blind courier,
+   *  so the button explains itself instead of 404-ing. */
+  inviteUnavailableReason?: string | null;
+  /** Non-null when this node does not host the server lanes (lobby/queue/
+   *  groups). The composer explains it instead of failing the send. */
+  serverLaneReason?: string | null;
+  /** Called while the viewer types; the transport throttles the sealed ping. */
+  onTyping?: (peerId: string) => void;
+  /** True while the peer has a fresh typing ping for THIS conversation. */
+  peerTyping?: boolean;
+  /** peerId -> last seen stamp (new-message boundary). */
+  seenByPeer?: Record<string, number>;
+  /** peerId -> unread inbound messages past the seen stamp. */
+  unreadByPeer?: Record<string, number>;
+  /** peerId -> unread messages that mention the viewer. */
+  mentionByPeer?: Record<string, number>;
   onCreateGroup?: (name: string, memberIds: string[]) => Promise<string | null>;
   onSendGroupMessage?: (groupId: string, text: string, replyToId?: string, attachment?: { id: string; url: string; isVideo?: boolean }) => void;
   onLeaveGroup?: (groupId: string) => void;
@@ -192,15 +232,15 @@ export function GMatchDMs({
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
     }
   }, [inputText]);
-  const [readPeerIds, setReadPeerIds] = useState<Set<string>>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('orbit_read_dms');
-        if (stored) return new Set(JSON.parse(stored));
-      } catch {}
-    }
-    return new Set<string>();
-  });
+  const [conversationSearch, setConversationSearch] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  /**
+   * Seen stamp captured when a conversation is opened. Without the snapshot
+   * the "New messages" divider vanished the instant App marked the thread
+   * read, which is exactly when the player needs it.
+   */
+  const [boundaryAt, setBoundaryAt] = useState<Record<string, number>>({});
+  const [highlightedMessage, setHighlightedMessage] = useState<string | null>(null);
   const [listMode, setListMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
@@ -230,6 +270,16 @@ export function GMatchDMs({
 
   const isLobbyGroup = openTarget === 'lobby';
   const isQueueGroup = openTarget === 'queue';
+  /**
+   * Lobby, queue and server groups are hosted by the node. A blind courier
+   * relays sealed mail only, so on that node those lanes cannot receive a
+   * message at all — the composer says why instead of letting the send fail.
+   * Courier DMs and sealed rooms are unaffected (they never touch the node).
+   */
+  const laneUnavailableReason =
+    serverLaneReason && (isLobbyGroup || isQueueGroup || openTarget === 'group')
+      ? serverLaneReason
+      : null;
   const activeRoom = showRooms ? (rooms.find((r) => r.id === activeRoomId) || null) : null;
   const roomUnread = (r: RoomInfo): boolean => {
     const last = (getRoomMessages?.(r.id) || []).slice(-1)[0];
@@ -241,20 +291,14 @@ export function GMatchDMs({
     [showRooms, activeRoomId, getRoomMessages, rooms]
   );
 
-  // Mark current peer as read when opened
+  // Latch the seen stamp for the conversation being opened. Kept in sync with
+  // the shared unread source (App's dmSeen) instead of a second per-peer
+  // "read" set, which is how new messages stopped re-marking a thread unread.
   useEffect(() => {
-    if (activePmPeer?.orbitId) {
-      setReadPeerIds((prev) => {
-        if (prev.has(activePmPeer.orbitId)) return prev;
-        const next = new Set(prev);
-        next.add(activePmPeer.orbitId);
-        try {
-          localStorage.setItem('orbit_read_dms', JSON.stringify(Array.from(next)));
-        } catch {}
-        return next;
-      });
-    }
-  }, [activePmPeer]);
+    const peerId = activePmPeer?.orbitId;
+    if (!peerId || peerId === 'global_lobby' || peerId === 'card_queue') return;
+    setBoundaryAt((prev) => (peerId in prev ? prev : { ...prev, [peerId]: seenByPeer?.[peerId] ?? 0 }));
+  }, [activePmPeer?.orbitId, seenByPeer]);
 
   const lobbyMessages = useMemo(
     () => chatMessages.filter((m) => !m.channel || m.channel === 'global_lobby'),
@@ -374,34 +418,23 @@ export function GMatchDMs({
   };
 
   const handleEditMessage = async (msg: ChatMessage) => {
-    if (!identity || !activePmPeer) return;
     const newText = editingMessage?.text?.trim();
-    if (!newText) { setEditingMessage(null); return; }
-    try {
-      const res = await orbitFetch(`/api/pm/${msg.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body: newText }),
-      }, identity);
-      if (res.ok) {
-        await res.json();
-        // Message updated via WS push
-      }
-    } catch {}
+    const peerId = activePmPeer?.orbitId;
     setEditingMessage(null);
+    if (!newText || !peerId || !onEditMessage) return;
+    // The old path PATCHed /api/pm/:id — a route this codebase deleted, so the
+    // call 404'd inside an empty catch and the bubble never changed. The edit
+    // now travels as a sealed event and reports a real failure here.
+    const ok = await onEditMessage(peerId, msg.id, newText);
+    if (!ok) showPasteNotice('Could not reach the peer — the edit stayed on this device.');
   };
 
   const handleDeleteForEveryone = async (msg: ChatMessage) => {
-    if (!identity || !activePmPeer) return;
-    try {
-      const res = await orbitFetch(`/api/pm/${msg.id}/everyone`, {
-        method: 'DELETE',
-      }, identity);
-      if (res.ok) {
-        // Message deleted via WS push
-      }
-    } catch {}
     setActionFor(null);
+    const peerId = activePmPeer?.orbitId;
+    if (!peerId || !onDeleteForEveryone) return;
+    const ok = await onDeleteForEveryone(peerId, msg.id);
+    if (!ok) showPasteNotice('Deleted here, but the peer could not be notified.');
   };
 
   const handleDeleteThread = async (peerId: string) => {
@@ -453,6 +486,9 @@ export function GMatchDMs({
     peerMap.set(p.orbitId, p);
   }
 
+  const displayNameFor = (id: string, fallback?: string | null) =>
+    chatDisplayName({ id, payloadName: fallback, roster: peerMap, selfId: identity?.orbitId, selfName: myDisplayName });
+
   const threadMap = new Map<string, ThreadItem>();
   for (const t of threads) {
     if (t.peer_id && t.peer_id !== identity?.orbitId && t.peer_id !== 'global_lobby' && t.peer_id !== 'card_queue') {
@@ -473,16 +509,33 @@ export function GMatchDMs({
   const activeThreads = Array.from(threadMap.values());
 
   const isSearching = searchQuery.trim().length > 0;
-  const searchResults = isSearching
-    ? peers.filter(
-        (p) =>
-          p.orbitId !== identity?.orbitId &&
-          (p.name || '').toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : [];
-
-  const displayNameFor = (id: string, fallback?: string | null) =>
-    chatDisplayName({ id, payloadName: fallback, roster: peerMap, selfId: identity?.orbitId, selfName: myDisplayName });
+  /**
+   * Sidebar search covers PEOPLE and CONVERSATIONS. It used to filter only the
+   * capped online roster by name, so an offline partner with a long thread was
+   * unfindable — the exact conversation a player comes back for. Existing
+   * threads also match on their last message.
+   */
+  const searchResults = useMemo<PeerInfo[]>(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    const out: PeerInfo[] = [];
+    const seen = new Set<string>();
+    for (const p of peers) {
+      if (p.orbitId === identity?.orbitId) continue;
+      if (!(p.name || '').toLowerCase().includes(q)) continue;
+      seen.add(p.orbitId);
+      out.push(p);
+    }
+    for (const t of activeThreads) {
+      if (seen.has(t.peer_id)) continue;
+      const name = displayNameFor(t.peer_id, t.peer_name) || '';
+      const body = t.last_body || '';
+      if (!name.toLowerCase().includes(q) && !body.toLowerCase().includes(q)) continue;
+      seen.add(t.peer_id);
+      out.push({ orbitId: t.peer_id, name });
+    }
+    return out;
+  }, [searchQuery, peers, activeThreads, identity?.orbitId, displayNameFor]);
 
   const rawDisplayedMessages: ChatMessage[] =
     openTarget === 'room'
@@ -495,6 +548,40 @@ export function GMatchDMs({
       ? queueMessages
       : pmMessages;
   const displayedMessages: ChatMessage[] = rawDisplayedMessages;
+
+  /** Local-only search over the open conversation (bytes already on device). */
+  const conversationHits = useMemo(() => {
+    if (!searchOpen || conversationSearch.trim().length < 2) return [];
+    return searchThread(
+      displayedMessages.map((m) => ({
+        id: m.id,
+        text: m.text || '',
+        ts: m.timestamp,
+        ...(m.deletedAt ? { deletedTs: m.deletedAt } : {}),
+      })),
+      conversationSearch,
+    );
+  }, [searchOpen, conversationSearch, displayedMessages]);
+
+  const jumpToMessage = useCallback((messageId: string) => {
+    const el = typeof document !== 'undefined' ? document.getElementById(`chat-msg-${messageId}`) : null;
+    el?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    setHighlightedMessage(messageId);
+    window.setTimeout(() => setHighlightedMessage((cur) => (cur === messageId ? null : cur)), 1600);
+  }, []);
+
+  /**
+   * First inbound message past the latched seen stamp. `-1` means this
+   * conversation had no seen stamp when opened, so nothing is "new" — showing
+   * the divider at the top of an old thread would be a lie.
+   */
+  const newBoundaryIndex = useMemo(() => {
+    const peerId = activePmPeer?.orbitId;
+    if (openTarget !== 'peer' || !peerId) return -1;
+    const seenAt = boundaryAt[peerId] ?? 0;
+    if (!seenAt) return -1;
+    return displayedMessages.findIndex((m) => m.senderId !== identity?.orbitId && m.timestamp > seenAt);
+  }, [openTarget, activePmPeer?.orbitId, boundaryAt, displayedMessages, identity?.orbitId]);
 
   // Learn names from the traffic. Every surface the hub renders funnels
   // through this one array, so a single effect here picks up a name from a
@@ -841,8 +928,12 @@ export function GMatchDMs({
               const isSelected = openTarget === 'peer' && activePmPeer?.orbitId === peerId;
               const pfp = profilePics[peerId];
               const name = displayNameFor(peerId, thread.peer_name);
-              const isFromOther = thread.last_sender_id && thread.last_sender_id !== identity?.orbitId;
-              const isUnread = isFromOther && !readPeerIds.has(peerId) && !isSelected;
+              // ONE unread source (App's dmSeen + countThreadUnread). The old
+              // per-peer `orbit_read_dms` set marked a thread read forever, so
+              // the next inbound message never re-marked it.
+              const unread = unreadByPeer?.[peerId] ?? 0;
+              const mentions = mentionByPeer?.[peerId] ?? 0;
+              const isUnread = unread > 0 && !isSelected;
               const showThreadActions = deleteThreadPeerId === peerId;
 
               const handleThreadContextMenu = (e: React.MouseEvent) => {
@@ -876,8 +967,20 @@ export function GMatchDMs({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1">
                         <span className={`text-xs truncate ${isUnread ? 'font-semibold text-retro-fg' : 'font-medium text-retro-body'}`}>{name}</span>
-                        {isUnread ? (
-                          <span className="w-2 h-2 rounded-full bg-retro-accent shrink-0" />
+                        {mentions > 0 ? (
+                          <span
+                            title={`${mentions} mention${mentions === 1 ? '' : 's'}`}
+                            className="shrink-0 min-w-[16px] h-4 px-1 rounded-full bg-retro-accent text-black text-[10px] font-semibold flex items-center justify-center tabular-nums"
+                          >
+                            @{mentions}
+                          </span>
+                        ) : unread > 0 ? (
+                          <span
+                            title={`${unread} unread`}
+                            className="shrink-0 min-w-[16px] h-4 px-1 rounded-full bg-retro-accent/90 text-black text-[10px] font-semibold flex items-center justify-center tabular-nums"
+                          >
+                            {unread > 99 ? '99+' : unread}
+                          </span>
                         ) : (
                           <span className="text-[10px] text-retro-muted shrink-0 tabular-nums">
                             {thread.last_created_at ? formatAbsoluteTime(thread.last_created_at, { hour: '2-digit', minute: '2-digit' }) : ''}
@@ -938,11 +1041,33 @@ export function GMatchDMs({
 
                 <div className="min-w-0">
                   <h3 className="text-xs font-medium text-retro-fg truncate">{headerTitle}</h3>
-                  <span className="text-[10px] text-retro-muted block">{headerSubtitle}</span>
+                  {peerTyping && openTarget === 'peer' ? (
+                    <span className="text-[10px] text-retro-accent block" role="status" aria-live="polite">
+                      typing…
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-retro-muted block">{headerSubtitle}</span>
+                  )}
                 </div>
               </div>
 
               <div className="flex items-center gap-2 text-retro-muted shrink-0">
+                {openTarget === 'peer' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playPress(700);
+                      setSearchOpen((v) => !v);
+                      setConversationSearch('');
+                    }}
+                    title="Search this conversation"
+                    aria-label="Search this conversation"
+                    aria-expanded={searchOpen}
+                    className={`p-1.5 rounded-md transition-colors cursor-pointer ${searchOpen ? 'text-retro-accent bg-glass-w10' : 'text-retro-muted hover:text-retro-fg'}`}
+                  >
+                    <Search className="w-4 h-4" />
+                  </button>
+                )}
                 {openTarget === 'room' && activeRoom && identity && activeRoom.ownerId !== identity.orbitId && onLeaveRoom && (
                   <button
                     type="button"
@@ -997,6 +1122,41 @@ export function GMatchDMs({
                 </button>
               </div>
              </div>
+
+             {searchOpen && openTarget === 'peer' && (
+               <div className="border-b border-border-glass bg-glass-w5 px-3 py-2 shrink-0 space-y-1">
+                 <input
+                   autoFocus
+                   value={conversationSearch}
+                   onChange={(e) => setConversationSearch(e.target.value)}
+                   onKeyDown={(e) => { if (e.key === 'Escape') { setSearchOpen(false); setConversationSearch(''); } }}
+                   placeholder="Search this conversation…"
+                   aria-label="Search this conversation"
+                   className="w-full bg-glass-w10 border border-border-glass rounded-md px-3 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent/50"
+                 />
+                 {conversationSearch.trim().length >= 2 && (
+                   <div className="max-h-44 overflow-y-auto styled-scrollbar" role="listbox" aria-label="Conversation search results">
+                     {conversationHits.length === 0 ? (
+                       <p className="text-[10px] text-retro-muted py-2">No matches in this conversation.</p>
+                     ) : (
+                       conversationHits.map((hit) => (
+                         <button
+                           key={hit.messageId}
+                           type="button"
+                           role="option"
+                           aria-selected={false}
+                           onClick={() => jumpToMessage(hit.messageId)}
+                           className="w-full text-left px-2 py-1.5 rounded hover:bg-glass-w8 cursor-pointer"
+                         >
+                           <span className="block text-[10px] text-retro-muted">{new Date(hit.ts).toLocaleString()}</span>
+                           <span className="block text-xs text-retro-body truncate">{hit.text}</span>
+                         </button>
+                       ))
+                     )}
+                   </div>
+                 )}
+               </div>
+             )}
 
              {canShowMembers && showMembers && (
                <div className="border-b border-border-glass max-h-72 overflow-y-auto styled-scrollbar bg-glass-w8 shrink-0">
@@ -1068,7 +1228,17 @@ export function GMatchDMs({
                   const isOwn = identity && first.senderId === identity.orbitId;
                   const senderName = isOwn ? (myDisplayName || 'You') : displayNameFor(first.senderId, first.senderName);
                   const pfp = profilePics[first.senderId];
+                  const boundaryId = newBoundaryIndex >= 0 ? displayedMessages[newBoundaryIndex]?.id : undefined;
+                  const showBoundary = !!boundaryId && block.some((m) => m.id === boundaryId);
                   return (
+                    <Fragment key={row.key}>
+                    {showBoundary && (
+                      <div className="flex items-center gap-2 py-1 select-none" role="separator" aria-label="New messages">
+                        <span className="h-px flex-1 bg-retro-accent/40" />
+                        <span className="text-[10px] uppercase tracking-wider text-retro-accent">New messages</span>
+                        <span className="h-px flex-1 bg-retro-accent/40" />
+                      </div>
+                    )}
                     <div key={row.key} className={`flex items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
                       {!isOwn && (
                         <div
@@ -1092,9 +1262,9 @@ export function GMatchDMs({
                         {block.map((msg) => {
                           const replyTarget = findMessage(msg.replyToId);
                           const isLast = msg.id === block[block.length - 1].id;
-                          const showActions = actionFor === msg.id;
+                          const showActions = actionFor === msg.id && !msg.deletedAt;
                           return (
-                            <div key={msg.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-full`}>
+                            <div key={msg.id} data-message-row={msg.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-full`}>
                               {replyTarget && (
                                 <div className="text-[10px] text-retro-muted px-2.5 py-1 mb-0.5 bg-glass-w5 rounded-md border-l-2 border-retro-accent/50 truncate max-w-full w-fit">
                                   <CornerUpLeft className="w-3 h-3 inline mr-1" />
@@ -1102,11 +1272,23 @@ export function GMatchDMs({
                                 </div>
                               )}
                               <div
+                                id={`chat-msg-${msg.id}`}
+                                data-message-id={msg.id}
                                 onClick={() => setActionFor(showActions ? null : msg.id)}
                                 className={`w-fit max-w-full px-3 py-2 rounded-lg text-xs leading-relaxed select-text cursor-pointer break-words whitespace-pre-wrap ${block.length > 1 ? 'mt-0.5' : ''} ${
-                                  isOwn ? 'bg-retro-accent/25 border border-retro-accent/30 text-retro-fg rounded-br-sm backdrop-blur-sm' : 'bg-glass-w10 border border-border-glass text-retro-body rounded-bl-sm backdrop-blur-sm'
+                                  highlightedMessage === msg.id ? 'ring-2 ring-retro-accent/70' : ''
+                                } ${
+                                  msg.deletedAt
+                                    ? 'bg-glass-w5 border border-dashed border-border-glass text-retro-muted italic rounded-br-sm'
+                                    : isOwn
+                                      ? 'bg-retro-accent/25 border border-retro-accent/30 text-retro-fg rounded-br-sm backdrop-blur-sm'
+                                      : 'bg-glass-w10 border border-border-glass text-retro-body rounded-bl-sm backdrop-blur-sm'
                                 }`}
                               >
+                                {msg.deletedAt ? (
+                                  <span>Message deleted</span>
+                                ) : (
+                                <>
                                 {msg.attachmentUrl && (
                                   <button
                                     type="button"
@@ -1142,22 +1324,58 @@ export function GMatchDMs({
                                 ) : (
                                   <Linkify text={msg.text} />
                                 )}
+                                </>
+                                )}
                               </div>
-                              {isLast && (
+                              {(isLast || (isOwn && (msg.courierStatus === 'failed' || msg.courierStatus === 'sending'))) && (
                                 <div className={`mt-0.5 flex items-center gap-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                                  <time className="text-[10px] text-retro-muted select-none" dateTime={new Date(msg.timestamp).toISOString()}>
-                                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                  </time>
-                                  {isOwn && msg.readByRecipient && (
-                                    <span title="Seen"><CheckCheck className="w-3 h-3 text-retro-accent" /></span>
+                                  {/* The clock labels the block; the delivery state
+                                      belongs to the message. Gating both on isLast
+                                      hid a failed message that was followed by
+                                      another one — it read as if it had landed. */}
+                                  {isLast && (
+                                    <time className="text-[10px] text-retro-muted select-none" dateTime={new Date(msg.timestamp).toISOString()}>
+                                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </time>
                                   )}
+                                  {isOwn && msg.courierStatus === 'failed' && (
+                                    <span title="Not delivered" className="text-[10px] text-rose-400">not delivered</span>
+                                  )}
+                                  {isOwn && msg.courierStatus === 'sending' && (
+                                    <span title="Sending"><Clock3 className="w-3 h-3 text-retro-muted" /></span>
+                                  )}
+                                  {/* "Seen" only from a real read watermark; a
+                                      delivery ack is "Delivered", never "Seen". */}
+                                  {isOwn && msg.readByRecipient ? (
+                                    <span title="Seen"><CheckCheck className="w-3 h-3 text-retro-accent" /></span>
+                                  ) : isOwn && msg.courierStatus === 'delivered' ? (
+                                    <span title="Delivered"><Check className="w-3 h-3 text-retro-muted" /></span>
+                                  ) : null}
                                   {msg.editedAt && (
                                     <span className="text-[10px] text-retro-muted">Edited</span>
                                   )}
                                 </div>
                               )}
+                              {openTarget === 'peer' && msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                                <div className={`mt-1 flex flex-wrap gap-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                                  {Object.entries(msg.reactions).map(([emoji, actors]) => {
+                                    const mine = !!identity && actors.includes(identity.orbitId);
+                                    return (
+                                      <button
+                                        key={emoji}
+                                        type="button"
+                                        onClick={() => onReactMessage?.(activePmPeer?.orbitId || '', msg.id, emoji, !mine)}
+                                        title={`${actors.length} reaction${actors.length === 1 ? '' : 's'}`}
+                                        aria-pressed={mine}
+                                        className={`px-1.5 py-0.5 rounded-full border text-[10px] cursor-pointer transition-colors ${mine ? 'border-retro-accent/60 bg-retro-accent/15 text-retro-fg' : 'border-border-glass bg-glass-w8 text-retro-muted hover:bg-glass-w12'}`}
+                                      >
+                                        {emoji} {actors.length}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
                               {showActions && (() => {
-                                const ageMs = Date.now() - msg.timestamp;
                                 // Room messages live in the sealed local store:
                                 // edit/delete/report endpoints don't exist for
                                 // them; only Copy applies.
@@ -1171,10 +1389,34 @@ export function GMatchDMs({
                                     </div>
                                   );
                                 }
-                                const canEdit = isOwn && ageMs < 15 * 60 * 1000;
-                                const canDeleteEveryone = isOwn && ageMs < 10 * 60 * 1000;
+                                // Ownership, not a client-side age guess: the
+                                // courier has no server policy to enforce, and
+                                // the old 15/10-minute windows silently removed
+                                // Edit/Delete from messages the player owned.
+                                const canEdit = isOwn;
+                                const canDeleteEveryone = isOwn;
                                 return (
                                 <div className={`flex flex-wrap items-center gap-1 mt-1 ${isOwn ? 'justify-end' : ''}`}>
+                                  {openTarget === 'peer' && (
+                                    <div className="flex items-center gap-0.5 mr-1">
+                                      {['🔥', '💦', '😈', '❤️'].map((emoji) => {
+                                        const mine = !!identity && (msg.reactions?.[emoji] || []).includes(identity.orbitId);
+                                        return (
+                                          <button
+                                            key={emoji}
+                                            type="button"
+                                            title={mine ? `Remove ${emoji}` : `React with ${emoji}`}
+                                            aria-label={mine ? `Remove reaction ${emoji}` : `React with ${emoji}`}
+                                            aria-pressed={mine}
+                                            onClick={() => { onReactMessage?.(activePmPeer?.orbitId || '', msg.id, emoji, !mine); setActionFor(null); }}
+                                            className={`w-6 h-6 rounded-md text-xs cursor-pointer transition-colors ${mine ? 'bg-retro-accent/25 text-retro-fg' : 'bg-glass-w8 border border-border-glass text-retro-muted hover:bg-glass-w12'}`}
+                                          >
+                                            {emoji}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
                                   <button type="button" onClick={() => { setReplyingTo(msg); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Reply className="w-3 h-3" /> Reply</button>
                                   <button type="button" onClick={() => copyMessage(msg.text)} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Copy className="w-3 h-3" /> Copy</button>
                                   {!msg.attachmentMime?.startsWith('video/') && msg.attachmentUrl && (
@@ -1215,6 +1457,7 @@ export function GMatchDMs({
                         })}
                       </div>
                     </div>
+                    </Fragment>
                   );
                 })}
               </>
@@ -1265,6 +1508,16 @@ export function GMatchDMs({
             )}
 
             <form onSubmit={handleSend} className="p-3 border-t border-border-glass bg-glass-w5 flex items-center gap-2 shrink-0">
+              {laneUnavailableReason ? (
+                <div
+                  role="status"
+                  className="flex-1 flex items-center gap-2 text-xs text-retro-muted bg-glass-w8 border border-border-glass rounded-md px-3 py-2"
+                >
+                  <Globe className="w-3.5 h-3.5 shrink-0" />
+                  <span>{laneUnavailableReason}</span>
+                </div>
+              ) : (
+              <>
               {(activePmPeer && openTarget === 'peer') || openTarget === 'group' ? (
                 <button
                   type="button"
@@ -1287,7 +1540,13 @@ export function GMatchDMs({
                   ref={textareaRef}
                   rows={1}
                   value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
+                  onChange={(e) => {
+                    setInputText(e.target.value);
+                    // Courier transport throttles the sealed ping (3s) and
+                    // never persists it; calling per keystroke is safe.
+                    if (openTarget === 'peer' && activePmPeer) onTyping?.(activePmPeer.orbitId);
+                  }}
+                  maxLength={4000}
                   onPaste={handleComposerPaste}
                   onKeyDown={(e) => {
                     // Enter sends explicitly — do not rely on implicit form
@@ -1327,6 +1586,8 @@ export function GMatchDMs({
               >
                 <Send className="w-4 h-4" />
               </button>
+              </>
+              )}
             </form>
           </>
         ) : (
@@ -1347,6 +1608,16 @@ export function GMatchDMs({
           users={users}
           profilePics={profilePics}
           onOpenProfile={onOpenProfile}
+          onMessagePlayer={(p) => {
+            playPress(800);
+            setListMode(false);
+            setSidebarOpen(false);
+            onSelectGroup?.(null);
+            onSelectRoom?.(null);
+            onSelectPeer?.({ orbitId: p.orbitId, name: p.name, pfp: p.pfp });
+          }}
+          onInvitePlayer={onInviteToGame}
+          inviteUnavailableReason={inviteUnavailableReason}
         />
       </div>
     </div>

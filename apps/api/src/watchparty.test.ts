@@ -3,7 +3,7 @@ import {
   createParty, getParty, listParties, applyWatch, joinWatch, leaveWatch, leaveAll, applyChat,
   deleteChat, kickWatch, banWatch, muteWatch, transferHost, settingsWatch,
   queueOps, setPartyMedia, __resetParties, partyRoom, MAX_QUEUE, isPartyMediaObject,
-  serializeParties, restoreParties, liveMediaObjectIds, HOST_SEAT_GRACE_MS, type Party,
+  serializeParties, restoreParties, liveMediaObjectIds, HOST_SEAT_GRACE_MS, controlsParty, type Party,
   mintInvite, revokeInvite, redeemInvite, watchReady,
 } from './watchparty'
 import { handleIncoming, conns, createWsTicket, type WsConn } from './ws-bus'
@@ -150,8 +150,24 @@ describe('room model (host, private, queue, chat history)', () => {
     expect(res.payload.find((r: any) => r.type === 'watch.system') !== undefined || res.payload.type === 'watch.system').toBe(true)
   })
 
-  it('leaveAll covers every room the user was in', () => {
-    const a = makeParty('uA')
+  it('the room survives its last member leaving, but the departed host does not keep control', () => {
+    const p = makeParty()
+    leaveWatch('u1', { party: p.id })
+    // Leaving is not closing: the room (and its queue/chat) stays.
+    expect(p.members.size).toBe(0)
+    expect(getParty(p.id)).not.toBeNull()
+    // The crown is held for the grace window, then released — without the stamp
+    // an emptied room kept the departed host as controller forever, so the next
+    // person in could not play, pause, queue or advance anything.
+    expect(p.hostId).toBe('u1')
+    expect(p.hostLeftAt).toBeTruthy()
+    p.hostLeftAt = Date.now() - HOST_SEAT_GRACE_MS - 1
+    joinWatch('u2', 'Bob', { party: p.id })
+    expect(controlsParty(p, 'u2')).toBe(true)
+    expect(controlsParty(p, 'u1')).toBe(false)
+  })
+
+  it('leaveAll covers every room the user was in', () => {    const a = makeParty('uA')
     const b = makeParty('uB')
     joinWatch('u9', 'Ghost', { party: a.id })
     joinWatch('u9', 'Ghost', { party: b.id })
@@ -286,6 +302,19 @@ describe('queue', () => {
     // missing 'before' appends to the end
     queueOps('u1', { party: p.id, op: 'move', id: b })
     expect(p.queue.map((q) => q.name)).toEqual(['a', 'c', 'b'])
+  })
+
+  it('keeps a swarm poster URL on a shared local entry but drops any local path', () => {
+    const p = makeParty()
+    queueOps('u1', { party: p.id, op: 'add', name: 'clip', url: '/api/objects/abc', local: true, thumb: '/api/objects/thumb1' })
+    queueOps('u1', { party: p.id, op: 'add', name: 'bad', url: '/api/objects/def', local: true, thumb: 'file:///C:/Users/me/secret.jpg' })
+    queueOps('u1', { party: p.id, op: 'add', name: 'bad2', url: '/api/objects/ghi', local: true, thumb: 'vault://f/deadbeef' })
+    expect(p.queue[0].thumb).toBe('/api/objects/thumb1')
+    // A sender's local path/blob is meaningless on another machine (and leaks
+    // its filesystem): the entry keeps playing, the poster is simply absent.
+    expect(p.queue[1].thumb).toBeUndefined()
+    expect(p.queue[2].thumb).toBeUndefined()
+    expect(p.queue[1].url).toBe('/api/objects/def')
   })
 
   it('disband closes the room host-only; members get watch.gone', () => {

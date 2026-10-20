@@ -5,7 +5,11 @@ import type { PartyRuntime } from '../../hooks/watchPartyStore'
 import { controlPlayback } from '../../hooks/watchPartyStore'
 
 vi.mock('../../hooks/useObjectImage', () => ({
-  useObjectImage: (url: string | null) => ({ url: url || '/api/watchparty/p1/stream' }),
+  // /api/objects/ rows only render once their bytes are local (swarm); the
+  // room's own stream route resolves from the server.
+  useObjectImage: (url: string | null) => ({
+    url: !url ? '/api/watchparty/p1/stream' : url.startsWith('/api/objects/') ? null : url,
+  }),
 }))
 vi.mock('../../components/media/NativeVideoPlayer', async () => {
   const React = await import('react')
@@ -231,5 +235,42 @@ describe('WatchPartySlot sync tick', () => {
       />,
     )
     expect(screen.getByTestId('v')).toBe(first)
+  })
+})
+
+/**
+ * A consent-shared local file only lives on the sharer (+ whoever fetched it).
+ * The room used a 5s swarm window and nothing else, so a peer's tile sat on a
+ * black box while the bytes were one explicit transfer away.
+ */
+describe('WatchPartySlot shared local media', () => {
+  const sharedParty = {
+    ...party,
+    url: '/api/watchparty/p1/stream',
+    queue: [
+      {
+        id: 'aaaaaaaa',
+        name: 'movie.mp4',
+        url: '/api/objects/11111111-2222-3333-4444-555555555555',
+        local: true,
+        thumb: '/api/objects/22222222-3333-4444-5555-666666666666',
+      },
+    ],
+    current: 'aaaaaaaa',
+  } as unknown as PartyRuntime
+
+  it('auto-starts the transfer and explains it instead of a dead player', async () => {
+    mount(sharedParty)
+    const notice = await screen.findByText(
+      /Waiting for the sharer|Receiving from the sharer|Transfer failed/,
+    )
+    expect(notice).toBeDefined()
+  })
+
+  it('never shows transfer UI for an ordinary remote entry', () => {
+    mount()
+    expect(screen.queryByText(/Waiting for the sharer/)).toBeNull()
+    expect(screen.queryByText(/Receiving from the sharer/)).toBeNull()
+    expect(screen.queryByText('Retry transfer')).toBeNull()
   })
 })

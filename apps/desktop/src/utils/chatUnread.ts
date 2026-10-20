@@ -4,6 +4,8 @@ interface InboundMessageLike {
   ts: number;
   senderOrbitId?: string;
   own?: boolean;
+  /** Deletion tombstone: the row survives, the message does not count. */
+  deletedTs?: number;
 }
 
 /**
@@ -13,7 +15,7 @@ interface InboundMessageLike {
  * seen-stamp. Pure — unit-tested, no React.
  */
 export function countThreadUnread(
-  messages: InboundMessageLike[] | undefined | null,
+  messages: ReadonlyArray<InboundMessageLike> | undefined | null,
   seenAt: number | undefined | null,
   selfId?: string | null,
 ): number {
@@ -24,6 +26,7 @@ export function countThreadUnread(
     if (!m || typeof m.ts !== 'number' || !Number.isFinite(m.ts)) continue;
     if (m.ts <= seen) continue;
     if (m.own) continue;
+    if (m.deletedTs) continue;
     if (selfId && m.senderOrbitId === selfId) continue;
     n += 1;
   }
@@ -32,11 +35,11 @@ export function countThreadUnread(
 
 export function countChatUnread(args: {
   /** peerId -> courier DM thread. */
-  threads?: Record<string, InboundMessageLike[]> | null;
+  threads?: Record<string, ReadonlyArray<InboundMessageLike>> | null;
   dmSeen?: Record<string, number> | null;
   /** Room ids to include. */
   roomIds?: string[] | null;
-  roomMessages?: (roomId: string) => InboundMessageLike[];
+  roomMessages?: (roomId: string) => ReadonlyArray<InboundMessageLike>;
   roomSeen?: Record<string, number> | null;
   selfId?: string | null;
   /** Legacy server lane (nonzero only on old self-hosts). */

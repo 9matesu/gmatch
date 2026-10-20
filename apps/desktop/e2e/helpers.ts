@@ -45,9 +45,10 @@ export function firstRunOverlayKeys(orbitId: string): [string, string][] {
  */
 export async function seedApp(
   page: import('@playwright/test').Page,
-  overrides: { points?: number } = {},
+  overrides: { points?: number; displayName?: string } = {},
 ) {
   const identity = generateIdentity()
+  const displayName = overrides.displayName ?? 'E2E Tester'
   const idleSave = {
     version: 3,
     points: overrides.points ?? 1000,
@@ -77,15 +78,17 @@ export async function seedApp(
     lastSeenAt: Date.now(),
   }
   await page.addInitScript(
-    ([id, save, LEGAL_KEY, overlayKeys, e2eTag]: [Record<string, unknown>, Record<string, unknown>, string, [string, string][], string]) => {
+    ([id, save, LEGAL_KEY, overlayKeys, e2eTag, name]: [Record<string, unknown>, Record<string, unknown>, string, [string, string][], string, string]) => {
       localStorage.setItem('orbit_identity', JSON.stringify(id))
       localStorage.setItem('goonMatch_age_verified', 'true')
       // Legal acceptance gate (C.2): seeded with the CURRENT canonical key
       // (computed node-side; the browser context can't call our modules).
       localStorage.setItem('orbit_legal_accepted', LEGAL_KEY)
       // Non-default display name: the onboarding migration treats default
-      // peer names as "never onboarded" and reopens the profile step.
-      localStorage.setItem('orbit_display_name', 'E2E Tester')
+      // peer names as "never onboarded" and reopens the profile step. The name
+      // is unique per spec peer so a chat test can address one row even when
+      // other specs' leftover identities share the node.
+      localStorage.setItem('orbit_display_name', name)
       // The 'e2e' tag is the only thing distinguishing a throwaway spec
       // identity from a real user: generateIdentity() mints a random keypair
       // with no prefix, and the server creates the Users row as a side effect of
@@ -107,7 +110,7 @@ export async function seedApp(
       // Onboarding + tour + changelog overlays (see firstRunOverlayKeys).
       for (const [k, v] of overlayKeys) localStorage.setItem(k, v)
     },
-    [identity, idleSave, legalVersionKey(), firstRunOverlayKeys(identity.orbitId), E2E_TAG],
+    [identity, idleSave, legalVersionKey(), firstRunOverlayKeys(identity.orbitId), E2E_TAG, displayName],
   )
   return identity
 }

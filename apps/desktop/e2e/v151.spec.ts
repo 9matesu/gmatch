@@ -1,7 +1,19 @@
 import { expect, test } from '@playwright/test'
-import { seedApp } from './helpers'
+import { E2E_CHANGELOG_VERSION, seedApp } from './helpers'
 import { generateIdentity } from '../src/identity.cjs'
 import { legalVersionKey } from '../src/legal/documents'
+
+/**
+ * The dialog is named for the version the app is actually on. Deriving it from
+ * the one e2e owner of that version (`E2E_CHANGELOG_VERSION`, the same value
+ * `seedApp` stamps into `gmatch_last_seen_changelog`) means a release bump
+ * cannot strand this spec on a stale literal — it was pinned to `1.5.[12]`
+ * while the app had shipped 1.5.6.
+ */
+const CHANGELOG_DIALOG = new RegExp(
+  `What's New in version ${E2E_CHANGELOG_VERSION.replace(/\./g, '\\.')}`,
+  'i',
+)
 
 test.describe('v1.5.1 features and regressions', () => {
   test('changelog modal opens on first launch and persists dismissal', async ({ page }) => {
@@ -55,7 +67,7 @@ test.describe('v1.5.1 features and regressions', () => {
     await page.goto('/#/servers')
 
     // Changelog modal should appear automatically
-    const dialog = page.getByRole('dialog', { name: /What's New in version 1\.5\.[12]/i })
+    const dialog = page.getByRole('dialog', { name: CHANGELOG_DIALOG })
     await expect(dialog).toBeVisible({ timeout: 15_000 })
     await expect(page.getByRole('heading', { name: "What's New" })).toBeVisible()
     // The body is a discrete list of changes now, so assert on its SHAPE
@@ -68,9 +80,9 @@ test.describe('v1.5.1 features and regressions', () => {
     await gotItBtn.click()
     await expect(dialog).not.toBeVisible()
 
-    // Verify localStorage has 1.5.2
+    // Verify localStorage records the version the app is on
     const stored = await page.evaluate(() => localStorage.getItem('gmatch_last_seen_changelog'))
-    expect(stored).toBe('1.5.2')
+    expect(stored).toBe(E2E_CHANGELOG_VERSION)
 
     // Reload page -> modal should NOT reopen
     await page.reload()
@@ -89,9 +101,9 @@ test.describe('v1.5.1 features and regressions', () => {
     await expect(whatsNewBtn).toBeVisible({ timeout: 15_000 })
     await whatsNewBtn.click()
 
-    // Any version, not just 1.5.1: the app has since shipped 1.5.2, and this
-    // test is about the changelog REOPENING from settings, not about which
-    // release it shows. (Its sibling assertion above already matches 1.5.[12].)
+    // Any version is accepted here: this test is about the changelog REOPENING
+    // from settings, not about which release it shows. (Its sibling above is the
+    // one that pins the version, and it derives it from the e2e constant.)
     const dialog = page.getByRole('dialog', { name: /What's New in version \d+\.\d+/i })
     await expect(dialog).toBeVisible()
 
@@ -105,16 +117,20 @@ test.describe('v1.5.1 features and regressions', () => {
     // Only verify legal acceptance and age verification, but NO completed onboarding
     const identity = generateIdentity()
     await page.addInitScript(
-      ([id, LEGAL_KEY]: [Record<string, unknown>, string]) => {
+      ([id, LEGAL_KEY, CHANGELOG]: [Record<string, unknown>, string, string]) => {
         localStorage.setItem('orbit_identity', JSON.stringify(id))
         localStorage.setItem('goonMatch_age_verified', 'true')
         localStorage.setItem('orbit_legal_accepted', LEGAL_KEY)
         // No display name set, so user enters onboarding ProfileStep
         localStorage.removeItem('orbit_display_name')
         localStorage.removeItem(`orbit_onboarding_v2:${id.orbitId}`)
-        localStorage.setItem('gmatch_last_seen_changelog', '1.5.2')
+        // Passed IN, not referenced: this body runs in the browser, where the
+        // module constant is undefined (helpers.firstRunOverlayKeys documents
+        // the same trap). The value must be the version the app is on, or the
+        // What's New modal auto-opens over the onboarding screen.
+        localStorage.setItem('gmatch_last_seen_changelog', CHANGELOG)
       },
-      [identity, legalVersionKey()],
+      [identity, legalVersionKey(), E2E_CHANGELOG_VERSION],
     )
 
     await page.goto('/')

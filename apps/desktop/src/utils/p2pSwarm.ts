@@ -17,7 +17,63 @@ export type SwarmMessage =
       dataBase64: string
     }
 
+/**
+ * RAM cache of swarm bytes.
+ *
+ * This used to be an unbounded `Map<string, Blob>`: every object the app ever
+ * saw (feed, stories, avatars, gallery, own uploads) stayed in the JS heap for
+ * the life of the process. After a few minutes of scrolling that is hundreds of
+ * megabytes of decoded media, which is exactly the "app eats RAM" symptom.
+ *
+ * Durable bytes live in the vault (disk) / IndexedDB, so an eviction here only
+ * costs one re-read — never data. Bounded by entries AND bytes, oldest first.
+ */
+const RAM_LIMIT_ENTRIES = 64
+const RAM_LIMIT_BYTES = 96 * 1024 * 1024
 const localObjects = new Map<string, Blob>()
+let localObjectBytes = 0
+
+/** Insert/replace, keeping recency order and evicting oldest over budget. */
+function rememberLocalObject(id: string, blob: Blob): void {
+  const prev = localObjects.get(id)
+  if (prev) {
+    localObjectBytes -= prev.size
+    localObjects.delete(id)
+  }
+  localObjects.set(id, blob)
+  localObjectBytes += blob.size
+  while (
+    (localObjects.size > RAM_LIMIT_ENTRIES || localObjectBytes > RAM_LIMIT_BYTES) &&
+    localObjects.size > 1
+  ) {
+    const oldest = localObjects.keys().next().value as string | undefined
+    if (oldest === undefined || oldest === id) break
+    const victim = localObjects.get(oldest)
+    localObjects.delete(oldest)
+    if (victim) localObjectBytes -= victim.size
+  }
+}
+
+/** Read + mark as recently used. Never returns a half-evicted entry. */
+function lookupLocalObject(id: string): Blob | null {
+  const blob = localObjects.get(id)
+  if (!blob) return null
+  localObjects.delete(id)
+  localObjects.set(id, blob)
+  return blob
+}
+
+/** Test seam: cache contents (bytes, entries, keys in recency order). */
+export function __localObjectCacheForTests(): { bytes: number; keys: string[] } {
+  return { bytes: localObjectBytes, keys: [...localObjects.keys()] }
+}
+
+/** Test seam: drop the RAM cache without touching durability. */
+export function __resetLocalObjectCacheForTests(): void {
+  localObjects.clear()
+  localObjectBytes = 0
+}
+
 const CHUNK_SIZE = 64 * 1024 // 64KB per WebRTC DataChannel chunk
 
 /** SHA-256 hex of a blob's bytes (Web Crypto). Used to VERIFY reassembled
@@ -110,8 +166,9 @@ async function readVaultBlob(id: string): Promise<Blob | null> {
 }
 
 /** Preload persisted swarm bytes into RAM so a restarted seeder can answer
- *  WANTs without first re-viewing each image. Best-effort, capped. */
-export async function hydrateLocalObjects(maxBytes = 256 * 1024 * 1024): Promise<number> {
+ *  WANTs without first re-viewing each image. Best-effort, capped at the RAM
+ *  cache budget: durability lives on disk, so a cache miss only costs a read. */
+export async function hydrateLocalObjects(maxBytes = RAM_LIMIT_BYTES): Promise<number> {
   // Vault (disk, content-addressed) is the authoritative durable store; a
   // restarted seeder re-hydrates its own bytes from there. IndexedDB is the
   // dev fallback when no Electron bridge exists.
@@ -159,7 +216,9 @@ export async function hydrateLocalObjects(maxBytes = 256 * 1024 * 1024): Promise
 
 export function registerLocalObject(id: string, blob: Blob, meta: LocalObjectMeta = {}): void {
   if (!id || !blob) return
-  localObjects.set(id, blob)
+  rememberLocalObject(id, blob)
+  // We hold it now, so it stops being "wanted".
+  wantedObjects.delete(id)
   // Durable bytes go to the encrypted vault first (disk). IndexedDB is the
   // dev fallback. Fire-and-forget so hot paths (swarm assembly, forge) are
   // not blocked; the RAM copy is available immediately.
@@ -167,18 +226,19 @@ export function registerLocalObject(id: string, blob: Blob, meta: LocalObjectMet
 }
 
 export function hasLocalObject(id: string): boolean {
-  return localObjects.has(id)
+  return !!id && localObjects.has(id)
 }
 
 export async function getLocalObject(id: string): Promise<Blob | null> {
   if (!id) return null
-  if (localObjects.has(id)) return localObjects.get(id)!
+  const inRam = lookupLocalObject(id)
+  if (inRam) return inRam
 
   // Vault (disk, content-addressed): id is the content hash. readVaultBlob
   // verifies the file exists and decrypts it; fetch rehydrates the blob.
   const fromVault = await readVaultBlob(id)
   if (fromVault) {
-    localObjects.set(id, fromVault)
+    rememberLocalObject(id, fromVault)
     return fromVault
   }
 
@@ -189,7 +249,7 @@ export async function getLocalObject(id: string): Promise<Blob | null> {
     const data = stored?.data as ArrayBuffer | undefined
     if (stored && data && data.byteLength > 0) {
       const blob = new Blob([data], { type: stored.mime_type || 'application/octet-stream' })
-      localObjects.set(id, blob)
+      rememberLocalObject(id, blob)
       return blob
     }
   } catch {
@@ -223,6 +283,92 @@ interface PendingFetch {
   onProgress?: (received: number, total: number) => void
 }
 const pendingFetches = new Map<string, PendingFetch>()
+
+// ---- SWARM_HAVE: what a peer holds, and what we still need ---------------
+// A HAVE is an advertisement, not a mandate: downloading everything a peer
+// lists would pull the whole world. We only ask for ids this session already
+// wants (a fetch that timed out, or a tile that failed and asked to be
+// retried), we never re-ask for one we hold or have in flight, and the wave is
+// capped so one peer's announcement can't become a download stampede.
+const wantedObjects = new Set<string>()
+const MAX_WANTED_IDS = 128
+const MAX_HAVE_CONCURRENCY = 3
+let haveFetchActive = 0
+/** Bound on ids per HAVE broadcast / request wave. */
+export const SWARM_HAVE_LIMIT = 64
+
+/** Remember that this session still needs `id` (bounded, oldest dropped). */
+export function wantSwarmObject(id: string): void {
+  if (!id || typeof id !== 'string') return
+  if (localObjects.has(id) || pendingFetches.has(id)) return
+  if (wantedObjects.size >= MAX_WANTED_IDS) {
+    const oldest = wantedObjects.values().next().value as string | undefined
+    if (oldest !== undefined) wantedObjects.delete(oldest)
+  }
+  wantedObjects.add(id)
+}
+
+/** Ids this session asked for and did not get (for a later HAVE). */
+export function wantedSwarmObjectIds(): string[] {
+  return [...wantedObjects]
+}
+
+/** Test seam: forget the want registry (durability is untouched). */
+export function __resetWantedObjectsForTests(): void {
+  wantedObjects.clear()
+  haveFetchActive = 0
+}
+
+/** Ids whose bytes this session currently holds, most recent first. */
+export function heldSwarmObjectIds(limit = SWARM_HAVE_LIMIT): string[] {
+  const keys = [...localObjects.keys()]
+  const recent = keys.reverse()
+  return recent.slice(0, Math.max(0, limit))
+}
+
+/**
+ * Tell the swarm which objects we can serve. Called when a peer comes online
+ * (and after boot hydration), so a peer that failed a fetch learns it can ask
+ * us instead of waiting for a broadcast it never saw.
+ */
+export function announceHeldObjects(limit = SWARM_HAVE_LIMIT): number {
+  if (!swarmSend) return 0
+  const ids = heldSwarmObjectIds(limit)
+  if (ids.length === 0) return 0
+  try {
+    swarmSend({ type: 'SWARM_HAVE', ids })
+    return ids.length
+  } catch {
+    return 0
+  }
+}
+
+/**
+ * Answer a peer's HAVE: fetch only what we already want, bounded and with
+ * per-id settlement (one slow id never blocks the rest, and a failure stays
+ * wanted for the next announcement).
+ */
+function fetchWantedFromHave(ids: unknown[]): void {
+  if (!swarmSend) return
+  for (const raw of ids) {
+    if (typeof raw !== 'string' || !raw) continue
+    if (localObjects.has(raw)) {
+      wantedObjects.delete(raw)
+      continue
+    }
+    if (pendingFetches.has(raw) || !wantedObjects.has(raw)) continue
+    if (haveFetchActive >= MAX_HAVE_CONCURRENCY) break
+    haveFetchActive++
+    void requestSwarmObject(raw)
+      .then(() => wantedObjects.delete(raw))
+      .catch(() => {
+        /* still wanted: the next HAVE re-tries */
+      })
+      .finally(() => {
+        haveFetchActive--
+      })
+  }
+}
 
 function decodeChunk(dataBase64: string): Uint8Array {
   const binaryStr = atob(dataBase64)
@@ -269,7 +415,7 @@ async function finishFetch(id: string, req: PendingFetch): Promise<void> {
 export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
   if (!msg || typeof msg !== 'object') return false
   if (msg.type === 'SWARM_WANT') {
-    const blob = localObjects.get(msg.id) || (await getLocalObject(msg.id))
+    const blob = lookupLocalObject(msg.id) || (await getLocalObject(msg.id))
     if (!blob || !swarmSend) return true
     try {
       const buffer = await blob.arrayBuffer()
@@ -300,7 +446,10 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
     if (req.chunks.size === req.total) void finishFetch(msg.id, req)
     return true
   }
-  if (msg.type === 'SWARM_HAVE') return true
+  if (msg.type === 'SWARM_HAVE') {
+    fetchWantedFromHave(Array.isArray(msg.ids) ? msg.ids : [])
+    return true
+  }
   return false
 }
 
@@ -315,7 +464,7 @@ export interface SwarmFetchOptions {
  *  `expectedHash` is given, the assembled bytes must hash to it or the
  *  transfer is rejected (never registered). */
 export function requestSwarmObject(id: string, timeoutMs = 15000, opts: SwarmFetchOptions = {}): Promise<Blob> {
-  const cached = localObjects.get(id)
+  const cached = lookupLocalObject(id)
   if (cached) return Promise.resolve(cached)
   if (!swarmSend) return Promise.reject(new Error('swarm transport unavailable'))
   const existing = pendingFetches.get(id)
@@ -344,6 +493,9 @@ export function requestSwarmObject(id: string, timeoutMs = 15000, opts: SwarmFet
   return new Promise<Blob>((resolve, reject) => {
     const timer = setTimeout(() => {
       pendingFetches.delete(id)
+      // Nobody answered: keep the id on the want list so the next SWARM_HAVE
+      // from a peer that holds it can serve us without a fresh request.
+      wantSwarmObject(id)
       reject(new Error(`Timed out waiting for swarm object ${id}`))
     }, timeoutMs)
     pendingFetches.set(id, { resolve, reject, timer, chunks: new Map(), total: 0, mimeType: '', expectedHash: opts.expectedHash, onProgress: opts.onProgress })

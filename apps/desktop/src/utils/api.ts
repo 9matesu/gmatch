@@ -159,27 +159,38 @@ export function getApiBaseUrl(): string {
   return live || API_BASE
 }
 
+/**
+ * The ONE owner of "API base -> ws URL". Two callers (the P2P swarm socket and
+ * the courier mail socket) used to derive this separately and drifted: the mail
+ * one had no relative-base branch, so in browser dev (`base === ''`) it asked
+ * for `ws:///api/mail/ws` — an invalid URL that throws, leaving DMs and their
+ * acknowledgements to arrive only when something else pulled by hand.
+ *
+ * A relative base means "same origin, ride the dev proxy". With no window at
+ * all (node/tests) loop back to the sidecar.
+ */
+export function wsUrlForBase(base: string | null | undefined, path = '/api/ws'): string {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`
+  const trimmed = (base || '').trim().replace(/\/+$/, '')
+  if (!trimmed) {
+    if (typeof window !== 'undefined' && window.location?.host) {
+      const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws'
+      return `${scheme}://${window.location.host}${cleanPath}`
+    }
+    return `ws://127.0.0.1:8790${cleanPath}`
+  }
+  const scheme = trimmed.startsWith('https') ? 'wss' : 'ws'
+  const hostAndPath = trimmed.includes('://') ? trimmed.slice(trimmed.indexOf('://') + 3) : trimmed.replace(/^\/+/, '')
+  return `${scheme}://${hostAndPath}${cleanPath}`
+}
+
 export function getApiWebSocketUrl(path = '/api/ws'): string {
   let base = API_BASE
   try {
     const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('gmatch.api.url') : null
     if (stored?.trim() && !isCourierApiUrl(stored)) base = stored.trim()
   } catch { /* session-only */ }
-  // Browser dev: API_BASE is relative (''), so the socket must ride the dev
-  // proxy on the page's own origin. Falling through to the courier opened a
-  // socket the courier 404s by design (serve.ts:243) — a dead peer swarm.
-  if (!base) {
-    if (typeof window !== 'undefined' && window.location?.host) {
-      const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws'
-      return `${scheme}://${window.location.host}${path.startsWith('/') ? path : `/${path}`}`
-    }
-    return `ws://127.0.0.1:8790${path.startsWith('/') ? path : `/${path}`}`
-  }
-  base = base.replace(/\/+$/, '')
-  const scheme = base.startsWith('https') ? 'wss' : 'ws'
-  const hostAndPath = base.includes('://') ? base.slice(base.indexOf('://') + 3) : base.replace(/^\/+/, '')
-  const cleanPath = path.startsWith('/') ? path : `/${path}`
-  return `${scheme}://${hostAndPath}${cleanPath}`
+  return wsUrlForBase(base, path)
 }
 
 export function setApiBaseUrl(url: string): void {

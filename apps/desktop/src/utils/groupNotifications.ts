@@ -22,8 +22,9 @@ export interface NotifGroup {
   latest: string
 }
 
-/** Types that fold; everything else (pm, system, invites) renders per-row. */
-const GROUPABLE = new Set(['like', 'comment', 'follow', 'card_purchase', 'card_received'])
+/** Types that fold; everything else (pm, system, invites, mentions) renders
+ *  per-row — a mention is personal and carries its own text. */
+const GROUPABLE = new Set(['like', 'comment', 'reply', 'comment_like', 'follow', 'card_purchase', 'card_received'])
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -50,6 +51,10 @@ function actorOf(n: NotifItem): string {
 
 function subjectOf(n: NotifItem): string {
   const d = dataOf(n)
+  // A reply folds around the COMMENT it replies to, not the post: two threads
+  // on one photo are two conversations. A comment like folds per comment.
+  if (n.type === 'reply') return String(d.parent_comment_id ?? d.comment_id ?? d.post_id ?? '')
+  if (n.type === 'comment_like') return String(d.comment_id ?? d.post_id ?? '')
   return String(d.card_id ?? d.post_id ?? d.object_id ?? '')
 }
 
@@ -58,15 +63,17 @@ export function groupItemIds(g: NotifGroup): string[] {
   return g.items.map((i) => i.id)
 }
 
-/** Where a group should take you: the post it folds around, else the actor. */
-export function groupTarget(g: NotifGroup): { postId?: string; userId?: string } {
+/** Where a group should take you: the post it folds around (and the comment,
+ *  when the row names one), else the actor's profile. */
+export function groupTarget(g: NotifGroup): { postId?: string; commentId?: string; userId?: string } {
   const last = g.items[g.items.length - 1]
   const d = last ? dataOf(last) : {}
   const postId = typeof d.post_id === 'string' ? d.post_id : undefined
+  const commentId = typeof d.comment_id === 'string' ? d.comment_id : undefined
   const userId = typeof d.actor_id === 'string'
     ? d.actor_id
     : typeof d.follower_id === 'string' ? d.follower_id : undefined
-  return { postId, userId }
+  return { postId, ...(commentId ? { commentId } : {}), userId }
 }
 
 export function groupNotifications(rows: NotifItem[]): NotifGroup[] {
@@ -100,6 +107,9 @@ const SENTENCES: Record<string, string> = {
   // said "your card" for every foldable type, which read wrong under a photo.
   like: 'liked your post',
   comment: 'commented on your post',
+  reply: 'replied to your comment',
+  comment_like: 'liked your comment',
+  mention: 'mentioned you',
   follow: 'started following you',
   card_purchase: 'bought your card',
   card_received: 'sent you a card',

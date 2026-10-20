@@ -7,9 +7,14 @@ import { MIN_GAME_CARDS } from '@orbit/shared'
  *
  * Notifications are the persistent record behind the header bell: created
  * server-side for events (match invite, match result, PM, babecock invite,
- * system), stored in the Notifications table, pushed over WS in real time,
- * and replayed via GET /api/notifications on reload. Rows are pruned after
- * 48h by the maintenance sweep (cleanup.ts).
+ * like, comment, reply, mention, comment like, follow, card events, system),
+ * stored in the Notifications table, pushed over WS in real time, and replayed
+ * via GET /api/notifications on reload. Rows are pruned after 48h by the
+ * maintenance sweep (cleanup.ts).
+ *
+ * Writes are idempotent by event key (see `notificationEventKey`), so a retry,
+ * a double-tap or a replayed event cannot produce a second row or a second
+ * push. A user is never notified about their own action.
  *
  * Match invites are the "challenge a specific player" flow: any user with a
  * card can challenge one online player to a direct 1v1 (bypassing the queue).
@@ -17,7 +22,58 @@ import { MIN_GAME_CARDS } from '@orbit/shared'
  * fresh GameMatches duel via lobby.createDirectMatch.
  */
 
-export type NotificationType = 'match_invite' | 'match_result' | 'pm' | 'babecock_invite' | 'babecock_start' | 'like' | 'comment' | 'follow' | 'card_received' | 'card_purchase' | 'system'
+export type NotificationType =
+  | 'match_invite' | 'match_result' | 'pm' | 'babecock_invite' | 'babecock_start'
+  | 'like' | 'comment' | 'reply' | 'mention' | 'comment_like' | 'follow'
+  | 'card_received' | 'card_purchase' | 'system'
+
+/**
+ * Which `data` fields identify the event a notification describes. Two writes
+ * carrying the same values are the same event, whatever produced them.
+ */
+const EVENT_KEY_FIELDS = [
+  'post_id', 'comment_id', 'parent_comment_id', 'actor_id', 'inviter_id',
+  'invitee_id', 'invite_id', 'match_id', 'card_id', 'buyer_id', 'sender_id',
+  'target_user_id',
+] as const
+
+/**
+ * Only notifications this fresh count as "the same event". A retry, a
+ * double-tap or a replayed frame lands within seconds, so a few minutes is
+ * ample — while a genuinely new interaction later (like → unlike → like again,
+ * unfollow → re-follow) must still notify. An unbounded window would silence
+ * those, which is worse than the double row it prevents.
+ */
+const EVENT_DEDUPE_WINDOW_MS = 5 * 60 * 1000
+
+/**
+ * Stable per-event key, computed from the type plus its identifying fields.
+ * Deliberately not stored in a column: the Notifications table is shared with
+ * older nodes and adding a column would need a migration. Comparing the parsed
+ * `data` of recent rows in JS gets the same guarantee with no schema change.
+ */
+export function notificationEventKey(type: string, data?: Record<string, unknown> | null): string {
+  if (!data) return type
+  const parts = [type]
+  for (const field of EVENT_KEY_FIELDS) {
+    const value = data[field]
+    if (typeof value === 'string' && value) parts.push(`${field}=${value}`)
+  }
+  return parts.join('|')
+}
+
+function eventKeyOfRow(row: NotificationRow): string {
+  let data: Record<string, unknown> | null = null
+  if (row.data) {
+    try {
+      const parsed = JSON.parse(row.data)
+      if (parsed && typeof parsed === 'object') data = parsed as Record<string, unknown>
+    } catch {
+      data = null
+    }
+  }
+  return notificationEventKey(row.type, data)
+}
 
 export interface NotificationRow {
   id: string
@@ -55,7 +111,23 @@ export async function createNotification(
 ): Promise<NotificationRow | null> {
   const id = crypto.randomUUID()
   const now = new Date().toISOString()
+  const key = notificationEventKey(type, data)
   try {
+    // Idempotency by event key: a retried write, a double-tap, or a replayed
+    // event must not produce a second row (and therefore a second push and a
+    // second sound). Returning null means "nothing new"; every caller already
+    // treats null as "do not broadcast".
+    const { results } = await db
+      .prepare('SELECT * FROM Notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50')
+      .bind(userId)
+      .all<NotificationRow>()
+    const cutoff = Date.now() - EVENT_DEDUPE_WINDOW_MS
+    for (const row of results || []) {
+      // Rows are newest-first: once we leave the window, nothing older can
+      // match either.
+      if (Date.parse(row.created_at) < cutoff) break
+      if (eventKeyOfRow({ ...row, read: Number(row.read) || 0 }) === key) return null
+    }
     await db
       .prepare(
         'INSERT INTO Notifications (id, user_id, type, title, body, data, read, created_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?)'
@@ -125,6 +197,75 @@ export async function markNotificationsRead(db: D1Turso, userId: string, ids: st
     .bind(userId, ...ids)
     .run()
     .catch(() => {})
+}
+
+// ---------------------------------------------------------------------------
+// Mentions
+// ---------------------------------------------------------------------------
+
+/**
+ * `@token` mentions in free text. Deliberately the same rule the desktop
+ * matcher uses (`utils/mentions.ts`): `@` + word characters, on a boundary.
+ * A name with spaces is mentioned in its underscored form (`@skylar_vox`).
+ */
+export function extractMentionTokens(text: string): string[] {
+  if (typeof text !== 'string' || !text) return []
+  const out: string[] = []
+  const seen = new Set<string>()
+  const re = /(?:^|[^A-Za-z0-9_@])@([A-Za-z0-9_]{2,40})/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) {
+    const token = m[1].toLowerCase()
+    if (!seen.has(token)) {
+      seen.add(token)
+      out.push(token)
+    }
+    if (out.length >= 10) break
+  }
+  return out
+}
+
+/**
+ * Resolve mention tokens to user ids. Matches a display name (underscored or
+ * spaced) and, for tokens that look like one, an orbit-id prefix — the same two
+ * identities the desktop matcher accepts. Bounded by the token count.
+ */
+export async function findMentionedUserIds(
+  db: D1Turso,
+  text: string,
+  excludeIds: ReadonlyArray<string> = [],
+): Promise<string[]> {
+  const tokens = extractMentionTokens(text)
+  if (tokens.length === 0) return []
+  const names = new Set<string>()
+  for (const t of tokens) {
+    names.add(t)
+    names.add(t.replace(/_/g, ' '))
+  }
+  const clauses: string[] = []
+  const binds: unknown[] = []
+  for (const name of names) {
+    clauses.push('LOWER(display_name) = ?')
+    binds.push(name)
+  }
+  for (const t of tokens) {
+    if (t.length >= 6) {
+      clauses.push('LOWER(id) LIKE ?')
+      binds.push(`${t}%`)
+    }
+  }
+  try {
+    const { results } = await db
+      .prepare(`SELECT id FROM Users WHERE ${clauses.join(' OR ')} LIMIT 20`)
+      .bind(...binds)
+      .all<{ id: string }>()
+    const exclude = new Set(excludeIds)
+    return (results || [])
+      .map((r) => r.id)
+      .filter((id): id is string => Boolean(id) && !exclude.has(id))
+  } catch {
+    return []
+  }
 }
 
 // ---------------------------------------------------------------------------

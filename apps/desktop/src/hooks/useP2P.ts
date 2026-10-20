@@ -2,21 +2,24 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { OrbitIdentity } from '@orbit/crypto';
 import { OrbitP2PNode } from '@orbit/protocol';
 import { User, OrbitObject } from '@orbit/shared';
-import { saveObject } from '../utils/storage';
+import { saveObject, getObject } from '../utils/storage';
 import { OrbitPeerRelay } from '../utils/peer-relay';
 import { getApiBaseUrl, getApiWebSocketUrl, orbitFetch, subscribeApiBase } from '../utils/api';
 import { mergeRoster } from '../utils/peerRoster';
 import { presenceBucket } from '../utils/compare';
 import { CHAT_WIPE_SECONDS } from '@orbit/shared';
 import { logger } from '../utils/logger';
-import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, announcePeerOnline, PEER_ONLINE_EVENT, type SwarmMessage } from '../utils/p2pSwarm';
+import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, announcePeerOnline, PEER_ONLINE_EVENT, announceHeldObjects, type SwarmMessage } from '../utils/p2pSwarm';
 import { broadcastPresence, fetchPresenceRoster } from '../services/courierPresence';
 import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh } from '../utils/courierSignaling';
 import { resolveDisplayName } from '../utils/displayName';
 import { parseApiTimestamp } from '../utils/timeAgo';
+import { mediaFlag, resolveClaimedOwner, descriptorUrlFromBytes } from '../utils/objectDescriptor';
 
 const CHAT_WIPE_MS = CHAT_WIPE_SECONDS * 1000;
 const DIRECT_WEBRTC_FANOUT_LIMIT = 3;
+/** Cap on frames parked while the relay socket is down. */
+const MAX_QUEUED_FRAMES = 200;
 
 export interface ChatMessage {
   id: string;
@@ -33,6 +36,10 @@ export interface ChatMessage {
   readByRecipient?: boolean;
   /** Blind-courier DM lifecycle (absent on legacy server-inbox messages). */
   courierStatus?: 'sending' | 'sent' | 'delivered' | 'failed';
+  /** Deletion tombstone, ms. The bubble renders "Message deleted". */
+  deletedAt?: number;
+  /** emoji -> actor orbit ids (sealed courier reactions). */
+  reactions?: Record<string, string[]>;
 }
 
 export interface P2PSwarmMessage {
@@ -42,6 +49,39 @@ export interface P2PSwarmMessage {
   chatMessage?: ChatMessage;
   channel?: string;
   timestamp: number;
+  /**
+   * Sender stamped by the relay socket (it owns the auth ticket), when the
+   * frame arrived through the WS relay. `user.id` alone is client-supplied and
+   * must never be treated as proof of who sent an object.
+   */
+  relayedBy?: string;
+}
+
+/**
+ * Route one inbound P2P frame.
+ *
+ * The relay wraps every client-to-client frame in the `SWARM_FRAME` envelope
+ * (a bare `type` key could shadow a server-published event, audit A2), so both
+ * the swarm byte protocol and the announce shapes arrive wrapped. Swarm shapes
+ * go to the byte protocol; everything else is an announcement and carries the
+ * relay's proven `relayedBy` when one was stamped.
+ */
+function routeInboundFrame(
+  raw: unknown,
+  onSwarm: (msg: SwarmMessage) => void,
+  onAnnounce: (msg: P2PSwarmMessage) => void,
+): boolean {
+  if (!raw || typeof raw !== 'object') return false
+  const frame = raw as { type?: unknown; swarm?: unknown; relayedBy?: unknown }
+  if (frame.type !== 'SWARM_FRAME' || !frame.swarm || typeof frame.swarm !== 'object') return false
+  const inner = frame.swarm as { type?: unknown }
+  if (typeof inner.type === 'string' && inner.type.startsWith('SWARM_')) {
+    onSwarm(inner as SwarmMessage)
+    return true
+  }
+  const announce = frame.swarm as P2PSwarmMessage
+  onAnnounce(typeof frame.relayedBy === 'string' && frame.relayedBy ? { ...announce, relayedBy: frame.relayedBy } : announce)
+  return true
 }
 
 function arePeersStructurallyEqual(a: User[], b: User[]): boolean {
@@ -72,10 +112,16 @@ function transmitOverWebSocket(socket: WebSocket | null, queue: P2PSwarmMessage[
   if (!socket || socket.readyState !== WebSocket.OPEN) {
     logger.log('[ORBIT Network Swarm] WebSocket not open yet. Queuing message for delivery on connect...');
     queue.push(msg);
+    // Bounded: a relay that stays down must not grow this forever.
+    if (queue.length > MAX_QUEUED_FRAMES) queue.splice(0, queue.length - MAX_QUEUED_FRAMES);
     return;
   }
 
-  const fullPayloadStr = JSON.stringify(msg);
+  // Client-to-client frames ride the relay inside the SWARM_FRAME envelope:
+  // a bare `type` key is refused by the node (a forged `feed`/`user_banned`
+  // frame must never shadow a server-published event), which is also why peer
+  // announcements used to vanish unless a direct WebRTC channel existed.
+  const fullPayloadStr = JSON.stringify({ type: 'SWARM_FRAME', swarm: msg });
   const CHUNK_SIZE = 30000;
   if (fullPayloadStr.length > CHUNK_SIZE) {
     const totalChunks = Math.ceil(fullPayloadStr.length / CHUNK_SIZE);
@@ -264,20 +310,38 @@ export function useP2P(identity: OrbitIdentity | null) {
     const unsubMesh = onMeshMessage((data: string) => {
       try {
         const parsed = JSON.parse(data);
-        if (parsed.type === 'SWARM_FRAME' && parsed.swarm) {
-          void handleSwarmMessage(parsed.swarm);
-        } else {
+        if (!routeInboundFrame(parsed, (m) => { void handleSwarmMessage(m); }, processSwarmMessage)) {
           processSwarmMessage(parsed as P2PSwarmMessage);
         }
       } catch {}
     });
     // Local-first seeding: reload persisted bytes into RAM so this client
     // keeps retransmitting its own posts after a restart (packaged exe).
-    void hydrateLocalObjects().catch(() => {})
+    // A peer that just came online may hold bytes we failed to fetch, and our
+    // copy may be one it wants. Announce what we hold — throttled, because a
+    // flapping roster must not become a HAVE storm.
+    let lastHaveAt = 0
+    const announceHave = () => {
+      const now = Date.now()
+      if (now - lastHaveAt < 10_000) return
+      lastHaveAt = now
+      announceHeldObjects()
+    }
+
+    void hydrateLocalObjects()
+      .then((count) => {
+        // On the boot timeline: hydration is the one startup step that grows
+        // with the vault, so its end (and object count) is the evidence a
+        // media-bound spike needs.
+        window.gmatch?.bootMark?.(`swarm:hydrated:${count}`)
+        announceHave()
+      })
+      .catch(() => {})
 
     // Phase 4: resume swarm transfers that failed while a seeder was offline.
     // Bytes only land after hash verification (requestSwarmObject).
     const resumeTransfers = () => {
+      announceHave()
       void import('../utils/pendingTransfers').then(({ resumePendingTransfers }) =>
         resumePendingTransfers((id, hash) =>
           import('../utils/p2pSwarm').then(({ requestSwarmObject }) =>
@@ -351,37 +415,58 @@ export function useP2P(identity: OrbitIdentity | null) {
         const newItem = data.payload;
         logger.log('[ORBIT Network Swarm] Received IMAGE_ANNOUNCE payload from remote peer:', data.user.display_name || data.user.id, 'Item ID:', newItem.id, 'DataURL Length:', newItem.content_url?.length || 0);
 
+        // An announcement DESCRIBES an object; it never carries its bytes. The
+        // provider link is stored as `source_url` — separate from `data` — and
+        // the claimed owner is only accepted when the envelope's sender proves
+        // it (a relayed claim stays unverified instead of impersonating).
+        const claim = resolveClaimedOwner((newItem as any).owner_id, data.relayedBy || data.user?.id)
+
         if (newItem.content_url) {
-          const enc = new TextEncoder()
-          const flagOf = (v: unknown): number | null =>
-            v === 1 || v === true || v === '1' || v === 'true' ? 1 : (v === 0 || v === false || v === '0' ? 0 : null)
-          saveObject({
-            id: newItem.id,
-            name: newItem.id,
-            mime_type: newItem.mime_type || 'image/jpeg',
-            size_bytes: newItem.size_bytes || 0,
-            owner_id: newItem.owner_id,
-            sender_pubkey: newItem.sender_pubkey || '',
-            sender_enc_pubkey: newItem.sender_enc_pubkey || '',
-            created_at: newItem.created_at || new Date().toISOString(),
-            data: enc.encode(newItem.content_url).buffer as ArrayBuffer,
-            is_public: flagOf((newItem as any).is_public),
-            is_story: flagOf((newItem as any).is_story ?? newItem.is_story),
-            is_chat: flagOf((newItem as any).is_chat),
-            is_avatar: flagOf((newItem as any).is_avatar),
-            caption: (newItem as any).caption || (newItem as any).post_caption || '',
-            tags: (newItem as any).tags || [],
-            author_name: (newItem as any).author_name || (newItem as any).sender_name || '',
-            location: (newItem as any).location || '',
-            comments: (newItem as any).comments || [],
-            likes_count: (newItem as any).likes_count || (newItem as any).like_count || 0,
-            comment_count: (newItem as any).comment_count || 0,
-          }).catch(() => {})
+          const sourceUrl = newItem.content_url
+          void (async () => {
+            try {
+              const existing = await getObject(newItem.id)
+              // Real bytes already here: never replace them with a link.
+              if (
+                existing?.data &&
+                existing.data.byteLength > 0 &&
+                !descriptorUrlFromBytes(existing.data)
+              ) {
+                return
+              }
+              await saveObject({
+                id: newItem.id,
+                name: newItem.id,
+                mime_type: newItem.mime_type || 'image/jpeg',
+                size_bytes: newItem.size_bytes || 0,
+                owner_id: claim.owner_id || (data.user?.id ?? ''),
+                owner_verified: claim.owner_verified,
+                sender_pubkey: newItem.sender_pubkey || '',
+                sender_enc_pubkey: newItem.sender_enc_pubkey || '',
+                created_at: newItem.created_at || new Date().toISOString(),
+                data: new ArrayBuffer(0),
+                source_url: sourceUrl,
+                is_public: mediaFlag((newItem as any).is_public),
+                is_story: mediaFlag((newItem as any).is_story),
+                is_chat: mediaFlag((newItem as any).is_chat),
+                is_avatar: mediaFlag((newItem as any).is_avatar),
+                caption: (newItem as any).caption || (newItem as any).post_caption || '',
+                tags: (newItem as any).tags || [],
+                author_name: (newItem as any).author_name || (newItem as any).sender_name || '',
+                location: (newItem as any).location || '',
+                comments: (newItem as any).comments || [],
+                likes_count: (newItem as any).likes_count || (newItem as any).like_count || 0,
+                comment_count: (newItem as any).comment_count || 0,
+              })
+            } catch {
+              /* storage unavailable (tests/SSR/quota) */
+            }
+          })()
         }
 
         setP2pItems((prev) => {
           if (prev.some((item) => item.id === newItem.id)) return prev;
-          const updated = [newItem, ...prev];
+          const updated = [{ ...newItem, owner_verified: claim.owner_verified }, ...prev];
           try {
             const safeItems = updated.slice(0, 50);
             localStorage.setItem('orbit_p2p_gallery', JSON.stringify(safeItems));
@@ -487,8 +572,7 @@ export function useP2P(identity: OrbitIdentity | null) {
             const rawData = JSON.parse(event.data);
             if (!rawData) return;
 
-            if (rawData.type === 'SWARM_FRAME' && rawData.swarm) {
-              void handleSwarmMessage(rawData.swarm);
+            if (routeInboundFrame(rawData, (m) => { void handleSwarmMessage(m); }, processSwarmMessage)) {
               return;
             }
 
@@ -537,8 +621,11 @@ export function useP2P(identity: OrbitIdentity | null) {
                 }
                 chunkBuffersRef.current.delete(transferId);
                 logger.log(`[ORBIT Network Swarm] Reassembled transfer ${transferId} (${(fullStr.length / 1024).toFixed(1)} KB)`);
-                const data: P2PSwarmMessage = JSON.parse(fullStr);
-                processSwarmMessage(data);
+                const parsed = JSON.parse(fullStr);
+                if (!routeInboundFrame(parsed, (m) => { void handleSwarmMessage(m); }, processSwarmMessage)) {
+                  // Legacy peer: an announcement sent unwrapped.
+                  processSwarmMessage(parsed as P2PSwarmMessage);
+                }
               }
               return;
             }
@@ -601,7 +688,7 @@ export function useP2P(identity: OrbitIdentity | null) {
       try { channel.postMessage(msg); } catch {}
 
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify(msg));
+        transmitOverWebSocket(wsRef.current, queuedMessagesRef.current, msg);
       } else if (courierOnlyWs && identity) {
         void broadcastPresence(identity, { displayName: currentSelf.display_name, pfpUrl: currentSelf.pfp_url });
       }
@@ -798,24 +885,40 @@ export function useP2P(identity: OrbitIdentity | null) {
       });
 
       if (item.content_url) {
-        try {
-          const enc = new TextEncoder();
-          saveObject({
-            id: item.id,
-            name: item.id,
-            mime_type: item.mime_type || 'image/jpeg',
-            size_bytes: item.size_bytes || 0,
-            owner_id: item.owner_id || identity.orbitId,
-            sender_pubkey: identity.publicKeyHex,
-            sender_enc_pubkey: identity.encryptionPubHex || '',
-            created_at: item.created_at || new Date().toISOString(),
-            data: enc.encode(item.content_url).buffer,
-            is_public: (item as any).is_public === 1 || (item as any).is_public === true ? 1 : null,
-            is_story: item.is_story === 1 || (item as any).is_story === true ? 1 : null,
-            is_chat: (item as any).is_chat === 1 || (item as any).is_chat === true ? 1 : null,
-            is_avatar: (item as any).is_avatar === 1 || (item as any).is_avatar === true ? 1 : null,
-          }).catch(() => {});
-        } catch {}
+        const sourceUrl = item.content_url
+        void (async () => {
+          try {
+            const existing = await getObject(item.id)
+            // The real bytes are already forged and durable. Publishing must
+            // never replace them with the link that points at them.
+            if (
+              existing?.data &&
+              existing.data.byteLength > 0 &&
+              !descriptorUrlFromBytes(existing.data)
+            ) {
+              return
+            }
+            await saveObject({
+              id: item.id,
+              name: item.id,
+              mime_type: item.mime_type || 'image/jpeg',
+              size_bytes: item.size_bytes || 0,
+              owner_id: item.owner_id || identity.orbitId,
+              owner_verified: true,
+              sender_pubkey: identity.publicKeyHex,
+              sender_enc_pubkey: identity.encryptionPubHex || '',
+              created_at: item.created_at || new Date().toISOString(),
+              data: new ArrayBuffer(0),
+              source_url: sourceUrl,
+              is_public: mediaFlag((item as any).is_public),
+              is_story: mediaFlag((item as any).is_story),
+              is_chat: mediaFlag((item as any).is_chat),
+              is_avatar: mediaFlag((item as any).is_avatar),
+            })
+          } catch {
+            /* storage unavailable (tests/SSR/quota) */
+          }
+        })()
       }
 
       const selfUser = selfUserRef.current;

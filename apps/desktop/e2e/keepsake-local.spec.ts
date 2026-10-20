@@ -96,12 +96,15 @@ async function dismissOverlays(page: Page) {
 
 test('saved image opens from local bytes; provider outage changes nothing', async ({ page }) => {
   await seedApp(page)
-  // Changelog version pinned by helpers is stale (1.5.2 vs app 1.5.5): the
-  // What's New modal would otherwise swallow every click after reload.
+  // No changelog pin here on purpose: `seedApp` already stamps
+  // `gmatch_last_seen_changelog` with `E2E_CHANGELOG_VERSION`, and a hardcoded
+  // version in this file goes stale the moment a release ships (it was pinned
+  // to 1.5.5 for an app that had moved on), letting the What's New modal
+  // swallow every click after reload.
+  //
   // The keepsake merge re-runs on EVERY navigation (seedApp re-seeds
   // gallery:[] each load), so reloads keep the records while IDB keeps bytes.
   await page.addInitScript((stub: string) => {
-    localStorage.setItem('gmatch_last_seen_changelog', '1.5.5')
     const keeps = [
       {
         id: 'e2e-keep-img', url: `${stub}/pic.png`, tags: ['e2e-img'], rarityBase: 1, clicks: 1,
@@ -130,12 +133,16 @@ test('saved image opens from local bytes; provider outage changes nothing', asyn
   await page.goto('/#/grid');
   const saved = await persistInPage(page, picUrl, 'image')
   expect(saved.status).toBe('local')
-  expect(saved.hash).toMatch(/^[0-9a-f]{64}$/)
+  // `ref` IS the content identity (sha256 of the stored bytes) — the field the
+  // pipeline returns; it was renamed from `hash` when localRef became the
+  // single local identity.
+  expect(saved.ref).toMatch(/^[0-9a-f]{64}$/)
   expect(await localBytes(page, picUrl)).toBeGreaterThan(0)
 
   // 2. MP4 (32MB) persists whole-file in dev (no image-oriented cutoff).
   const savedClip = await persistInPage(page, clipUrl, 'video')
   expect(savedClip.status).toBe('local')
+  expect(savedClip.ref).toMatch(/^[0-9a-f]{64}$/)
   expect(await localBytes(page, clipUrl)).toBe(MP4_BYTES)
 
   // Bytes via the real pipeline (records come from the init script above).

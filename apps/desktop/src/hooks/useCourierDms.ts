@@ -12,6 +12,7 @@ import { getApiBaseUrl } from '../utils/api'
 import { logger } from '../utils/logger'
 import { handleInboundSignal } from '../utils/courierSignaling'
 import { ownDisplayName } from '../utils/displayName'
+import { activeTypists, pruneTypingState } from '../utils/dmTyping'
 
 export interface CourierDeps {
   webSocketFactory?: (url: string) => MailSocket
@@ -48,6 +49,8 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
   })
   const [threads, setThreads] = useState<Record<string, DmMessage[]>>({})
   const [rooms, setRoomsState] = useState<Room[]>([])
+  /** peer -> last typing ping (transient; swept, never persisted). */
+  const [typingAt, setTypingAt] = useState<Record<string, number>>({})
   const clientRef = useRef<MailClient | null>(null)
   const managerRef = useRef<DmManager | null>(null)
   const domMgrRef = useRef<DominationMeshManager | null>(null)
@@ -103,7 +106,18 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
       store,
       identity,
       onThreadChanged: refresh,
-      onIncoming: (m) => depsRef.current.onNotify?.(m),
+      onTyping: (peerId, at) => setTypingAt((prev) => ({ ...prev, [peerId]: at })),
+      onIncoming: (m) => {
+        // A delivered message ends the "typing" state: whatever they were
+        // typing has arrived. Without this the bubble lingers for its TTL.
+        setTypingAt((prev) => {
+          if (!(m.peerId in prev)) return prev
+          const next = { ...prev }
+          delete next[m.peerId]
+          return next
+        })
+        depsRef.current.onNotify?.(m)
+      },
     })
     // Mesh domination (Fase 5/6): same sealed transport as DMs, receiver's
     // local consent is authoritative. Events are the stable contract for the
@@ -200,9 +214,9 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
   // The sender is always the local user, so the name is read from the shared
   // storage key rather than threaded through every call site — a caller that
   // forgot to pass it is exactly how names went missing.
-  const send = useCallback(async (peerId: string, text: string, attachmentId?: string): Promise<DmMessage | null> => {
+  const send = useCallback(async (peerId: string, text: string, attachmentId?: string, opts?: { replyToId?: string }): Promise<DmMessage | null> => {
     if (!managerRef.current) return null
-    return managerRef.current.send(peerId, text, attachmentId, ownDisplayName() || undefined)
+    return managerRef.current.send(peerId, text, attachmentId, ownDisplayName() || undefined, opts)
   }, [])
 
   const pull = useCallback(async () => {
@@ -214,6 +228,51 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
     if (!storeRef.current) return null
     return storeRef.current.thread(peerId)
   }, [])
+
+  /** Sealed message events. All return false when the peer cannot be reached,
+   *  so the UI reports a failure instead of pretending the change landed. */
+  const edit = useCallback((peerId: string, id: string, text: string): Promise<boolean> => {
+    return managerRef.current?.edit(peerId, id, text) ?? Promise.resolve(false)
+  }, [])
+
+  const remove = useCallback(
+    (peerId: string, id: string, opts?: { forEveryone?: boolean }): Promise<boolean> => {
+      return managerRef.current?.remove(peerId, id, opts) ?? Promise.resolve(false)
+    },
+    [],
+  )
+
+  const react = useCallback(
+    (peerId: string, id: string, emoji: string, on: boolean): Promise<boolean> => {
+      return managerRef.current?.react(peerId, id, emoji, on) ?? Promise.resolve(false)
+    },
+    [],
+  )
+
+  const type = useCallback((peerId: string) => {
+    managerRef.current?.type(peerId)
+  }, [])
+
+  const markRead = useCallback((peerId: string, upTo: number) => {
+    managerRef.current?.markRead(peerId, upTo)
+  }, [])
+
+  /** True when the peer has a typing ping inside its TTL. */
+  const isTyping = useCallback(
+    (peerId: string) => activeTypists(typingAt, Date.now()).includes(peerId),
+    [typingAt],
+  )
+
+  // Typing has no history, so nothing else will ever clear it: sweep the map
+  // on a timer. `pruneTypingState` returns the same object when nothing
+  // expired, so an idle chat does not re-render every 2s.
+  useEffect(() => {
+    if (!identity) return
+    const timer = setInterval(() => {
+      setTypingAt((prev) => pruneTypingState(prev, Date.now()))
+    }, 2_000)
+    return () => clearInterval(timer)
+  }, [identity])
 
   const registerPeerKeys = useCallback((orbitId: string, publicKeyHex: string, encryptionPubHex: string) => {
     storeRef.current?.rememberPeer(orbitId, { publicKeyHex, encryptionPubHex })
@@ -230,8 +289,10 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
     [],
   )
 
-  /** Whether the peer is mesh-addressable (keys known from roster/TOFU). */
-  const meshPeerKnown = useCallback((orbitId: string): boolean => {
+  /** Whether a sealed message can be addressed to this peer at all (both keys
+   *  known from the roster/TOFU). One probe for every sealed lane — direct
+   *  messages and the domination mesh address a peer the same way. */
+  const peerAddressable = useCallback((orbitId: string): boolean => {
     const k = storeRef.current?.peerKeys(orbitId);
     return Boolean(k?.publicKeyHex && k?.encryptionPubHex);
   }, [])
@@ -285,5 +346,5 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
 
   const courierActive = useMemo(() => mode === 'courier' && !!identity, [mode, identity])
 
-  return { mode, courierActive, send, pull, threadFor, registerPeerKeys, meshSend, meshPeerKnown, threads, rooms, createRoom, inviteToRoom, sayInRoom, leaveRoom, roomMessages }
+  return { mode, courierActive, send, pull, threadFor, registerPeerKeys, meshSend, peerAddressable, threads, rooms, createRoom, inviteToRoom, sayInRoom, leaveRoom, roomMessages, edit, remove, react, type, markRead, isTyping }
 }

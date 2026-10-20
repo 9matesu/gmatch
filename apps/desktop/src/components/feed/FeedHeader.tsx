@@ -1,26 +1,22 @@
 "use client";
 
-import { Bell, ChevronDown, RefreshCw, Search } from 'lucide-react';
+import { ChevronDown, RefreshCw, Search } from 'lucide-react';
 import { playPress } from '../../utils/sounds';
 
 interface FeedHeaderProps {
-  unreadCount?: number;
   onOpenSearch?: () => void;
-  onOpenNotifications?: () => void;
   /** Retrieve-by-force: bypasses the feed response cache and reloads. */
   onRefresh?: () => void;
   /** Sort tabs (For You / Latest) rendered inline — one bar, one row. */
   sortTabs?: React.ReactNode;
-  /** Grid 1-5 picker, rendered next to search/notifications. */
+  /** Grid 1-5 picker, rendered next to search. */
   colsControls?: React.ReactNode;
   /** Collapse control; omit to hide the chevron. */
   onToggleCollapse?: () => void;
 }
 
 export function FeedHeader({
-  unreadCount = 0,
   onOpenSearch,
-  onOpenNotifications,
   onRefresh,
   sortTabs,
   colsControls,
@@ -59,24 +55,6 @@ export function FeedHeader({
           className="p-2 rounded-md text-retro-body hover:bg-glass-w8 transition-colors cursor-pointer"
         >
           <Search className="w-5 h-5" />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => { playPress(800); onOpenNotifications?.(); }}
-          title="Notifications"
-          // The command island has a global Notifications button that is
-          // mounted on every view. Two controls with the identical accessible
-          // name on one screen are indistinguishable to a screen reader, so
-          // this one says which surface it belongs to. The button is identical
-          // in behaviour — only the label changed.
-          aria-label="Feed notifications"
-          className="relative p-2 rounded-md text-retro-body hover:bg-glass-w8 transition-colors cursor-pointer"
-        >
-          <Bell className="w-5 h-5" />
-          {unreadCount > 0 && (
-            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-retro-fg" />
-          )}
         </button>
 
         {onToggleCollapse && (

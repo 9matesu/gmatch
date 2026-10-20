@@ -4,6 +4,7 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import type { User, OrbitObject, ActiveHackDebuff } from '@orbit/shared';
 import type { AppSettings } from '../hooks/useSettings';
 import { Modal } from './Modal';
+import { toChatPeer, type ChatPeer } from './chat/chatPeer';
 import { IdentityModal } from './IdentityModal';
 import { HelpModal } from './HelpModal';
 import { PointsHelpModal } from './PointsHelpModal';
@@ -74,7 +75,7 @@ export interface GlobalModalsProps {
   handleSetMainView: (view: any) => void;
   setMainView: React.Dispatch<React.SetStateAction<any>>;
   setDmMinimized: (v: boolean) => void;
-  setPmPeer: (user: User | null) => void;
+  setPmPeer: (peer: ChatPeer | null) => void;
   setSelectedProfileUser: (user: User | null) => void;
   setSelectedIds: (ids: Set<string>) => void;
   setExpandedItemId: (id: string | null) => void;
@@ -84,6 +85,8 @@ export interface GlobalModalsProps {
   loadGallery: () => any;
   loadStories: () => any;
   loadServerFeed: () => any;
+  /** Called with the post the upload returned: show it now, reconcile after. */
+  onPostCreated?: (created: any) => void;
   handleAddStory: (file: File) => Promise<void>;
 
   toggleFollowUser: (userId: string) => Promise<void>;
@@ -233,8 +236,9 @@ export function GlobalModals(props: GlobalModalsProps) {
             setShowCreatePostModal(false);
             setCreatePostInitialData?.(null);
           }}
-          onPostCreated={() => {
-            loadServerFeed();
+          onPostCreated={(newPost: any) => {
+            if (props.onPostCreated) props.onPostCreated(newPost);
+            else loadServerFeed();
             setShowCreatePostModal(false);
             setCreatePostInitialData?.(null);
           }}
@@ -307,8 +311,8 @@ export function GlobalModals(props: GlobalModalsProps) {
             setStoryViewerUserId(uId);
           }}
           onStartPm={(u) => {
-            const targetUser = users.find((usr) => usr.id === u.id) || ({ id: u.id, display_name: u.display_name } as User);
-            setPmPeer(targetUser);
+            const targetUser = users.find((usr) => usr.id === u.id) || u;
+            setPmPeer(toChatPeer(targetUser));
             handleSetMainView('messages');
           }}
           onSendCard={(userId) => {

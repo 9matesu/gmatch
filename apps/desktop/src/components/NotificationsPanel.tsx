@@ -14,8 +14,11 @@ import {
   Sparkles,
   ShoppingBag,
   X,
+  AtSign,
+  Users,
 } from "lucide-react";
 import { groupNotifications, groupTitle, groupItemIds, groupTarget, type NotifItem } from "../utils/groupNotifications";
+import type { AppNotification, NotificationTarget } from "../utils/notifications";
 import { playPress } from "../utils/sounds";
 import { resolveMediaUrl } from "../utils/media";
 import { formatAbsoluteTime } from "../utils/timeAgo";
@@ -49,8 +52,13 @@ export interface NotificationsPanelProps {
   onMarkAllRead: () => void;
   /** Mark just these notification ids read (per-group / per-row tap). */
   onMarkRead?: (ids: string[]) => void;
-  /** Navigate to the post a group folds around, or to the actor's profile. */
-  onOpenTarget?: (target: { postId?: string; userId?: string }) => void;
+  /** Navigate to whatever the row names: post (+comment), profile, conversation,
+   *  room, invite. Missing/inaccessible targets are handled by the caller. */
+  onOpenTarget?: (target: NotificationTarget) => void;
+  /** Courier-derived rows (DMs, sealed rooms) merged into the same list. */
+  localItems?: AppNotification[];
+  onOpenLocalTarget?: (item: AppNotification) => void;
+  onMarkLocalRead?: (keys: string[]) => void;
   onRespondInvite?: (inviteId: string, accept: boolean) => void;
   onRespondBabecock?: (inviteId: string, accept: boolean) => void;
   onOpenBabecock?: () => void;
@@ -71,6 +79,11 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   // Was missing: the group fold still folded these, but the row fell back to a
   // generic bell, so "bought your card" had no icon.
   card_purchase: <ShoppingBag className="w-4 h-4 text-emerald-300" />,
+  reply: <MessageSquare className="w-4 h-4 text-sky-300" />,
+  comment_like: <Heart className="w-4 h-4 text-rose-400" />,
+  mention: <AtSign className="w-4 h-4 text-amber-400" />,
+  dm: <MessageSquare className="w-4 h-4 text-cyan-400" />,
+  room: <Users className="w-4 h-4 text-violet-400" />,
   system: <Bell className="w-4 h-4 text-retro-muted" />,
 };
 
@@ -82,6 +95,9 @@ export function NotificationsPanel({
   onMarkAllRead,
   onMarkRead,
   onOpenTarget,
+  localItems = [],
+  onOpenLocalTarget,
+  onMarkLocalRead,
   onRespondInvite,
   onRespondBabecock,
   onOpenBabecock,
@@ -115,8 +131,10 @@ export function NotificationsPanel({
     const entries = Object.entries(unreadByType).filter(([, n]) => n > 0)
     if (entries.length < 2) return ''
     const LABELS: Record<string, string> = {
-      like: 'likes', comment: 'comments', follow: 'follows',
+      like: 'likes', comment: 'comments', reply: 'replies', comment_like: 'comment likes',
+      mention: 'mentions', follow: 'follows',
       card_purchase: 'purchases', card_received: 'cards', pm: 'messages',
+      dm: 'messages', room: 'room messages',
     }
     return entries
       .sort((a, b) => b[1] - a[1])
@@ -171,6 +189,48 @@ export function NotificationsPanel({
       )}
 
       <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar p-2 space-y-1">
+        {/* Courier lanes: DMs + sealed rooms. Derived from the durable message
+            stores, so reading one here is the same stamp the chat badge uses. */}
+        {localItems.length > 0 && (
+          <div className="mb-2 space-y-1">
+            <div className="px-3 py-1.5 text-xs font-medium text-retro-muted">Messages</div>
+            {localItems.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => {
+                  playPress(700);
+                  onMarkLocalRead?.([item.key]);
+                  onOpenLocalTarget?.(item);
+                }}
+                className="glass-inset w-full p-3 rounded-lg flex items-start gap-3 text-left cursor-pointer hover:bg-glass-w8 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-full glass-inset flex items-center justify-center shrink-0">
+                  {TYPE_ICONS[item.type] || <Bell className="w-4 h-4" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-retro-fg truncate">{item.title}</p>
+                    <span className="w-1.5 h-1.5 rounded-full bg-retro-accent shrink-0" />
+                  </div>
+                  {item.body && (
+                    <p className="text-xs text-retro-muted mt-0.5 truncate">{item.body}</p>
+                  )}
+                  {typeof item.mentions === 'number' && item.mentions > 0 && (
+                    <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-amber-300">
+                      <AtSign className="w-3 h-3" />
+                      {item.mentions === 1 ? '1 mention' : `${item.mentions} mentions`}
+                    </span>
+                  )}
+                  <time className="mt-1 block text-[10px] text-retro-muted" dateTime={item.createdAt}>
+                    {formatAbsoluteTime(item.createdAt, { dateStyle: "short", timeStyle: "short" })}
+                  </time>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
         {openInvites.length > 0 && (
           <div className="mb-2 space-y-1">
             <div className="px-3 py-1.5 text-xs font-medium text-retro-muted">
@@ -224,12 +284,12 @@ export function NotificationsPanel({
           </div>
         )}
 
-        {items.length === 0 && openInvites.length === 0 ? (
+        {items.length === 0 && openInvites.length === 0 && localItems.length === 0 ? (
           <div className="py-12 text-center space-y-2">
             <Bell className="w-6 h-6 mx-auto text-retro-muted" />
             <p className="text-xs font-medium text-retro-body">No notifications</p>
             <p className="text-xs text-retro-muted">
-              Match invites and results will appear here.
+              Likes, comments, replies, mentions, follows, duels and invites will appear here.
             </p>
           </div>
         ) : (

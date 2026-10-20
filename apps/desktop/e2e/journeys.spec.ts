@@ -1,5 +1,35 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { seedApp, mockBooruFeed } from './helpers'
+
+/**
+ * The idle balance as the STORE holds it. The visible HUD number was removed
+ * (idle points are local-only, so the save is the state of record), which is
+ * why this reads the app's own module rather than scraping a label that no
+ * longer exists in the DOM.
+ */
+async function idlePoints(page: Page): Promise<number> {
+  return page.evaluate(async () => {
+    const mod = await import('/src/game/store.ts')
+    return (mod.useGame.getState() as { points: number }).points
+  })
+}
+
+/** The packaged feed uses Electron IPC, which browser E2E cannot call. Seed a
+ * known foe into the real store so this journey tests the stage click path, not
+ * whether a booru mirror happens to be reachable in Chromium. */
+async function seedPlayableFoe(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const mod = await import('/src/game/store.ts')
+    mod.useGame.setState({
+      current: { id: 'e2e-foe', url: '/__e2e__/foe.png', tags: ['gangbang'], rating: 'e', kind: 'image' },
+      queue: [],
+      foeHp: 100,
+      foeMaxHp: 100,
+      feedOffline: false,
+      imageReady: true,
+    } as never)
+  })
+}
 
 // Journey 1: open -> navigate to Idle -> play -> state updates.
 test('idle: click the stage, points balance grows', async ({ page }) => {
@@ -8,13 +38,12 @@ test('idle: click the stage, points balance grows', async ({ page }) => {
   await page.goto('/#/grid')
   const stage = page.getByRole('button', { name: /attack the current foe/i })
   await expect(stage).toBeVisible({ timeout: 20_000 })
-  await expect(page.getByTestId('gc-balance')).toHaveText('0')
-  await expect
-    .poll(async () => {
-      await stage.click()
-      return page.getByTestId('gc-balance').textContent()
-    }, { timeout: 15_000 })
-    .not.toBe('0')
+  await seedPlayableFoe(page)
+
+  const before = await idlePoints(page)
+  await stage.click()
+  await expect(page.getByText(/^\+\d/).first()).toBeVisible()
+  await expect.poll(() => idlePoints(page), { timeout: 15_000 }).toBeGreaterThan(before)
 })
 
 // Journey 2: open -> navigate to Games -> hub renders its sub-tabs.
@@ -39,17 +68,16 @@ test('navigation round-trip preserves idle state', async ({ page }) => {
   await page.goto('/#/grid')
   const stage = page.getByRole('button', { name: /attack the current foe/i })
   await expect(stage).toBeVisible({ timeout: 20_000 })
-  await expect
-    .poll(async () => {
-      await stage.click()
-      return page.getByTestId('gc-balance').textContent()
-    }, { timeout: 15_000 })
-    .not.toBe('0')
-  const afterClick = await page.getByTestId('gc-balance').textContent()
+  await seedPlayableFoe(page)
+  await stage.click()
+  await expect.poll(() => idlePoints(page), { timeout: 15_000 }).toBeGreaterThan(0)
+  const afterClick = await idlePoints(page)
   await page.goto('/#/games')
   await page.goto('/#/grid')
   await expect(stage).toBeVisible()
-  expect(await page.getByTestId('gc-balance').textContent()).toBe(afterClick)
+  // Exact equality is right here: the seeded starter tags earn 0 pts/s, so with
+  // no clicks in between nothing may change — a reset would show up as 0.
+  expect(await idlePoints(page)).toBe(afterClick)
 })
 
 // Journey 4: refresh keeps the route + app functional.

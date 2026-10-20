@@ -4,14 +4,14 @@
 // the unified rooms chat (GMatchDMs) rendered by App for #/messages and
 // #/rooms; the desktop dock shows the RoomsPreview instead.
 
-import type { User } from '@orbit/shared';
+import type { ChatPeer } from '../chat/chatPeer';
 import { resolveMediaUrl } from '../../utils/media';
 
 export function DmMinimizedView({
   pmPeer,
   profilePics,
 }: {
-  pmPeer: User | null;
+  pmPeer: ChatPeer | null;
   profilePics: Record<string, string>;
 }) {
   return (
@@ -20,10 +20,10 @@ export function DmMinimizedView({
         <div className="mx-auto w-16 h-16 rounded-full bg-glass-w20 p-[3px]">
           <div className="w-full h-full rounded-full bg-surface-canvas overflow-hidden flex items-center justify-center text-sm font-bold text-retro-muted">
             {pmPeer ? (
-              profilePics[pmPeer.id || (pmPeer as any).orbitId || ''] ? (
-                <img src={resolveMediaUrl(profilePics[pmPeer.id || (pmPeer as any).orbitId || ''])} alt="" className="w-full h-full object-cover" />
+              profilePics[pmPeer.id] ? (
+                <img src={resolveMediaUrl(profilePics[pmPeer.id])} alt="" className="w-full h-full object-cover" />
               ) : (
-                (pmPeer.display_name || 'P').charAt(0).toUpperCase()
+                (pmPeer.name || 'P').charAt(0).toUpperCase()
               )
             ) : (
               'D'

@@ -200,6 +200,31 @@ describe('handleIncoming: authenticated dispatch', () => {
     expect(peer.sent).toHaveLength(0)
   })
 
+  it('relays client announcements inside SWARM_FRAME and stamps the proven sender', () => {
+    const sender = authedConn('alice')
+    const peer = authedConn('bob')
+    handleIncoming(
+      sender,
+      JSON.stringify({
+        type: 'SWARM_FRAME',
+        swarm: { type: 'IMAGE_ANNOUNCE', payload: { id: 'obj-9' }, user: { id: 'mallory' } },
+      }),
+    )
+    expect(peer.sent).toHaveLength(1)
+    const relayed = JSON.parse(peer.sent[0])
+    // The socket proved 'alice' at auth; the payload merely claims 'mallory'.
+    expect(relayed.relayedBy).toBe('alice')
+    expect(relayed.swarm.user.id).toBe('mallory')
+  })
+
+  it('still drops bare announce/feed frames (a forgery must not shadow a server event)', () => {
+    const sender = authedConn('s')
+    const peer = authedConn('p')
+    handleIncoming(sender, JSON.stringify({ type: 'IMAGE_ANNOUNCE', user: { id: 's' } }))
+    handleIncoming(sender, JSON.stringify({ type: 'feed', action: 'new' }))
+    expect(peer.sent).toHaveLength(0)
+  })
+
   it('roomless messages fan out to the global swarm', () => {
     const sender = authedConn('s')
     const peer = authedConn('p')

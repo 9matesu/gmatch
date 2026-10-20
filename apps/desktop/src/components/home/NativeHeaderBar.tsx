@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { SpeakerHigh, SpeakerSlash, Minus, Square, X, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import { isAudioMuted, setAudioMuted, playPress } from '../../utils/sounds';
-import { NotificationCenter } from '../notifications/NotificationCenter';
+import { NotificationCenter, type NotificationCenterProps } from '../notifications/NotificationCenter';
 
 export interface NativeHeaderBarProps {
   wsConnected?: boolean;
@@ -11,6 +11,11 @@ export interface NativeHeaderBarProps {
   activeRoomName?: string;
   onGoBack?: () => void;
   onGoForward?: () => void;
+  /**
+   * The unified notification centre's data + handlers. Omitted only in tests /
+   * non-shell embeds; the bell still renders, just with an empty inbox.
+   */
+  notifications?: NotificationCenterProps;
 }
 
 export function NativeHeaderBar({
@@ -19,6 +24,7 @@ export function NativeHeaderBar({
   activeRoomName: _activeRoomName,
   onGoBack,
   onGoForward,
+  notifications,
 }: NativeHeaderBarProps = {}) {
   const [isMuted, setIsMuted] = useState(false);
 
@@ -74,8 +80,16 @@ export function NativeHeaderBar({
         <span className="text-[13px] font-bold tracking-wide text-retro-fg select-none ml-1">gMatch</span>
       </div>
 
-      {/* Center: transient notification island (persistent inbox bell stays separate) */}
-      <NotificationCenter />
+      {/* Center: the unified notification centre (badge, list, invites, toasts) */}
+      <NotificationCenter
+        {...(notifications ?? {
+          onMarkAllRead: () => {},
+          onMarkRead: () => {},
+          onOpenTarget: () => {},
+          onOpenLocalTarget: () => {},
+          onMarkLocalRead: () => {},
+        })}
+      />
 
       {/* Right: mute + window controls (frameless: buttons render
           only when the preload bridge exposes them. Browser/dev = no bridge) */}

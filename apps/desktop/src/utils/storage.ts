@@ -12,6 +12,20 @@ export interface StoredObject {
   sender_enc_pubkey: string
   created_at: string
   data: ArrayBuffer
+  /**
+   * Provider link for a row whose media lives somewhere else (a peer's
+   * `content_url`, a vault address, `/api/objects/<id>`). Kept SEPARATE from
+   * `data`: an announcement describes an object, it does not carry its bytes.
+   * Legacy rows instead wrote that URL string into `data` — see
+   * `utils/objectDescriptor.ts` for the idempotent recovery.
+   */
+  source_url?: string | null
+  /**
+   * Whether the row's `owner_id` was proven rather than merely claimed. The
+   * swarm envelope proves the SENDER; a claim that contradicts it is stored
+   * unverified so it can never render under someone else's name.
+   */
+  owner_verified?: boolean | null
   /** Media-kind flags when known at write time (forge/receive). Absent for
    * legacy rows; gallery rebuilds must treat absent flags as unknown, never
    * as "private card-eligible". */

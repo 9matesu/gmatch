@@ -19,7 +19,7 @@ import { setupTag } from './tags'
 import { getUserExcludes } from './tagFilter'
 import { fetchPosts, fetchPostsMulti } from '../services/booru'
 import type { BooruResponse } from '../services/booru'
-import { MAX_USER_EXCLUDES, useGame, GRID_SIZE, __resetFeedRetryForTests } from './store'
+import { MAX_USER_EXCLUDES, useGame, GRID_SIZE, __resetFeedRetryForTests, __resetSaveSlotForTests } from './store'
 import type { BooruPost } from './types'
 
 const mocked = vi.mocked(fetchPosts)
@@ -52,6 +52,9 @@ beforeEach(() => {
   mocked.mockResolvedValue(offline)
   mockedMulti.mockReset()
   mockedMulti.mockResolvedValue(offline)
+  // The save slot is pinned to the identity it was loaded with; each test
+  // starts from a clean pin so slot assertions describe that test's identity.
+  __resetSaveSlotForTests()
   useGame.getState().resetGame()
 })
 

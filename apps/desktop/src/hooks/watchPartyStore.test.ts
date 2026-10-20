@@ -25,6 +25,7 @@ import {
   sendPartyChat,
   leaveParty,
   controlPlayback,
+  rememberedRooms,
   MAX_SLOTS,
 } from './watchPartyStore'
 
@@ -160,6 +161,18 @@ describe('watchPartyStore', () => {
     leaveParty('b')
     expect(unsub).toHaveBeenCalledTimes(1)
     expect(watchPartyStore.getSnapshot().subscribed).toBe(false)
+  })
+
+  it('leaving a room is not closing it: only watch.leave is sent and the room stays re-enterable', () => {
+    vi.mocked(subscribeOrbitWebSocket).mockReturnValue(vi.fn())
+    joinParty(identity, { id: 'keep-me', name: 'K', url: 'u' })
+    leaveParty('keep-me')
+    // Closing a room is a separate, host-authorized act (`disbandParty`).
+    expect(sendOrbitWebSocket).toHaveBeenCalledWith({ type: 'watch.leave', party: 'keep-me' })
+    expect(sendOrbitWebSocket).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'watch.disband' }))
+    // Private rooms are invisible in the public listing, so the remembered id is
+    // the only way back in — dropping it here would effectively end the room.
+    expect(rememberedRooms().some((r) => r.id === 'keep-me')).toBe(true)
   })
 
   it('joinPartyById fetches the snapshot before joining', async () => {

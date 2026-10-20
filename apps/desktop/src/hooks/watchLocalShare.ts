@@ -46,6 +46,66 @@ function readVideoDuration(file: File): Promise<number> {
   })
 }
 
+/**
+ * Grab a poster frame from a local video (max 1280px wide, JPEG).
+ *
+ * Shared entries used to reach the room as a bare filename: no still in the
+ * queue, and a black frame until the whole file transferred. The poster is
+ * forged as a normal swarm object so peers fetch it over the SAME P2P path as
+ * the video — a sender's local path/blob URL would mean nothing to them.
+ *
+ * Best-effort: any failure (no canvas, undecodable codec, seek timeout) returns
+ * null and the share proceeds without a poster.
+ */
+export async function makeVideoPoster(file: File, maxWidth = 1280): Promise<Blob | null> {
+  if (typeof document === 'undefined') return null
+  const url = URL.createObjectURL(file)
+  const video = document.createElement('video')
+  video.preload = 'auto'
+  video.muted = true
+  video.playsInline = true
+  try {
+    const ready = await new Promise<boolean>((resolve) => {
+      const timer = setTimeout(() => resolve(false), 4000)
+      video.onloadeddata = () => { clearTimeout(timer); resolve(true) }
+      video.onerror = () => { clearTimeout(timer); resolve(false) }
+      video.src = url
+    })
+    if (!ready) return null
+    const duration = Number.isFinite(video.duration) ? video.duration : 0
+    // A frame ~1s in (or a third of a very short clip) beats the black intro.
+    video.currentTime = duration > 0 ? Math.min(1, duration / 3) : 0
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(() => resolve(), 2000)
+      video.onseeked = () => { clearTimeout(timer); resolve() }
+    })
+    const w = video.videoWidth
+    const h = video.videoHeight
+    if (!w || !h) return null
+    const scale = Math.min(1, maxWidth / w)
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(w * scale))
+    canvas.height = Math.max(1, Math.round(h * scale))
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+    return await new Promise<Blob | null>((resolve) => {
+      try {
+        canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.72)
+      } catch {
+        resolve(null)
+      }
+    })
+  } catch {
+    return null
+  } finally {
+    video.onloadeddata = null
+    video.onerror = null
+    video.onseeked = null
+    URL.revokeObjectURL(url)
+  }
+}
+
 export function formatBytes(n: number): string {
   if (!Number.isFinite(n) || n < 0) return '?'
   if (n < 1024) return `${n} B`
@@ -84,6 +144,22 @@ export async function shareLocalFile(
   const entryId = forged.id.slice(0, 8)
   // Own bytes are verified by construction (we just hashed them).
   markVerified(forged.id, meta.hash)
+  // Poster still, distributed like any other object. Never a local path: the
+  // room is on other machines.
+  let thumb: string | undefined
+  try {
+    const poster = await makeVideoPoster(file)
+    if (poster) {
+      const forgedThumb = await forgeMediaLocally(
+        new File([poster], `${entryId}-poster.jpg`, { type: 'image/jpeg' }),
+        identity as never,
+        { caption: `${meta.name} (poster)`.slice(0, 60), isPublic: false, isChat: true, recipients: recipients || undefined },
+      )
+      if (forgedThumb?.id) thumb = `/api/objects/${forgedThumb.id}`
+    }
+  } catch {
+    /* a missing poster is cosmetic: never fail the share for it */
+  }
   sendRoomFrame('watch.queue', {
     party: party.id,
     op: 'add',
@@ -93,6 +169,7 @@ export async function shareLocalFile(
     hash: meta.hash,
     size: meta.size,
     local: true,
+    ...(thumb ? { thumb } : {}),
     provider: 'local',
   })
   if (opts.playNow) {

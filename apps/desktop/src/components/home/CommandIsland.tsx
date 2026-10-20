@@ -20,7 +20,6 @@ import {
   Monitor,
   FilmSlate,
   User,
-  Bell,
 } from '@phosphor-icons/react';
 import { playPress } from '../../utils/sounds';
 import { resolveMediaUrl } from '../../utils/media';
@@ -57,7 +56,6 @@ export interface CommandIslandProps {
   balance?: number;
   wsConnected?: boolean;
   unreadMessagesCount?: number;
-  unreadNotificationsCount?: number;
   /** Live players in queue + in match (Arena badge). Hidden at 0. */
   gamesOnlineCount?: number;
   /** People watching in public rooms (Watch badge). Hidden at 0. */
@@ -74,8 +72,6 @@ export interface CommandIslandProps {
   /** Open the Help & documentation modal. */
   onOpenHelp?: () => void;
   onOpenStore?: () => void;
-  onOpenNotifications?: () => void;
-  notificationsOpen?: boolean;
   onToggleMessages?: () => void;
   messagesOpen?: boolean;
   onOpenWallpaper?: () => void;
@@ -99,7 +95,6 @@ export function CommandIsland({
   balance = 0,
   wsConnected: _wsConnected = false,
   unreadMessagesCount = 0,
-  unreadNotificationsCount = 0,
   gamesOnlineCount = 0,
   watchWatchingCount = 0,
   feedNewPostsCount = 0,
@@ -111,8 +106,6 @@ export function CommandIsland({
   onOpenHelp,
   settingsOpen = false,
   onOpenStore,
-  onOpenNotifications,
-  notificationsOpen = false,
   onToggleMessages,
   messagesOpen = false,
   onOpenWallpaper,
@@ -285,30 +278,8 @@ export function CommandIsland({
             );
           })}
 
-          {/* Notifications Button directly to the left of Chat */}
-          <button
-            type="button"
-            data-notifications-toggle="true"
-            onClick={() => {
-              playPress();
-              onOpenNotifications?.();
-            }}
-            aria-label="Notifications"
-            aria-pressed={notificationsOpen}
-            title="Activity Notifications"
-            className={`relative flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full text-xs font-medium transition-all ${
-              notificationsOpen
-                ? 'bg-retro-accent text-retro-accent-text'
-                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
-            }`}
-          >
-            <Bell
-              className="w-4 h-4"
-              weight={notificationsOpen ? 'fill' : 'regular'}
-            />
-            <span className="text-xs font-medium hidden md:inline">Alerts</span>
-            <CountBadge count={unreadNotificationsCount} />
-          </button>
+          {/* The notification bell lives in the header now (single entry point);
+              the footer island no longer duplicates it. */}
 
           {/* Messages Drawer Toggle Button */}
           <button

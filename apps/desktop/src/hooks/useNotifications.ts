@@ -13,7 +13,8 @@ import { playMatchOnce, playMsgReceive, playQueueJoin, playPress } from '../util
  */
 type ServerNotificationType =
   | 'match_invite' | 'match_result' | 'pm' | 'babecock_invite' | 'babecock_start'
-  | 'like' | 'comment' | 'follow' | 'card_received' | 'card_purchase' | 'system';
+  | 'like' | 'comment' | 'reply' | 'comment_like' | 'mention' | 'follow'
+  | 'card_received' | 'card_purchase' | 'system';
 
 interface NotificationData {
   /** `match_start` is legacy-local; the rest come straight off the server union. */
@@ -37,7 +38,8 @@ interface NotificationData {
 
 /** Engagement that should surface even when the app is in the background. */
 const ENGAGEMENT_TYPES = new Set<ServerNotificationType>([
-  'like', 'comment', 'follow', 'card_purchase', 'card_received',
+  'like', 'comment', 'reply', 'comment_like', 'mention', 'follow',
+  'card_purchase', 'card_received',
 ]);
 
 interface MatchInviteData {

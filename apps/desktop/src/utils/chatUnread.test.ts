@@ -23,6 +23,14 @@ describe('countThreadUnread', () => {
     expect(countThreadUnread(msgs, 0, 'me')).toBe(1);
   });
 
+  it('does not keep a badge lit for a deleted message', () => {
+    const msgs = [
+      { ts: NOW - 1, senderOrbitId: 'bob', deletedTs: NOW },
+      { ts: NOW - 2, senderOrbitId: 'bob' },
+    ];
+    expect(countThreadUnread(msgs, 0, 'me')).toBe(1);
+  });
+
   it('treats missing stamp as everything-unseen, tolerates garbage', () => {
     expect(countThreadUnread([{ ts: NOW - 1 }], undefined, 'me')).toBe(1);
     expect(countThreadUnread(null, 0, 'me')).toBe(0);

@@ -8,7 +8,8 @@ import { Play, Plus } from 'lucide-react'
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer'
 import { useObjectImage } from '../../hooks/useObjectImage'
 import { controlPlayback, serverNow, queueOp, type PartyRuntime } from '../../hooks/watchPartyStore'
-import { isVerified, signalLocalReady } from '../../hooks/watchLocalShare'
+import { isVerified, signalLocalReady, useLocalEntryTransfer, formatBytes } from '../../hooks/watchLocalShare'
+import { PEER_ONLINE_EVENT } from '../../utils/p2pSwarm'
 import { computeTargetPosition, driftCorrection, shouldFireQueueNext } from '../../utils/watchSync'
 
 export function WatchPartySlot({
@@ -60,6 +61,36 @@ export function WatchPartySlot({
 
   const media = useObjectImage(targetMediaUrl, identity, { enabled: Boolean(targetMediaUrl) })
   const src = media.url
+
+  // Consent-shared local entries live on the sharer (and on whoever fetched
+  // them). useObjectImage's swarm window is 5s — fine for a clip, hopeless for
+  // a movie, and nothing else triggered a transfer, so peers sat on "Media
+  // unavailable" while the bytes were one explicit fetch away. Fetch the
+  // playing entry with the long, integrity-checked window and let the tile
+  // re-resolve once the bytes verify.
+  const currentObjectId = useMemo(
+    () => (/\/api\/objects\/([0-9a-fA-F-]{36})/.exec(currentItem?.url || '') || [])[1] || null,
+    [currentItem?.url],
+  )
+  const transfer = useLocalEntryTransfer(currentItem?.local ? currentObjectId : null, currentItem?.hash)
+  // Poster still for the playing entry (shared local videos only). Resolved the
+  // same way as the video: object route → local swarm bytes, never a sender path.
+  const thumbMedia = useObjectImage(currentItem?.thumb ?? null, identity, {
+    enabled: Boolean(currentItem?.thumb),
+  })
+
+  useEffect(() => {
+    if (!currentItem?.local || !currentObjectId) return
+    if (transfer.status === 'idle') void transfer.receive()
+  }, [currentItem?.id, currentItem?.local, currentObjectId, transfer.status])
+
+  useEffect(() => {
+    if (transfer.status !== 'ready' || typeof window === 'undefined') return
+    // The bytes are local now. A tile that exhausted its short swarm window is
+    // parked on a failure; PEER_ONLINE_EVENT is the existing "bytes may be
+    // available, retry" wave that useObjectImage listens for.
+    window.dispatchEvent(new CustomEvent(PEER_ONLINE_EVENT, { detail: { peerId: identity.orbitId } }))
+  }, [transfer.status, identity.orbitId])
 
   useEffect(() => {
     setVideoSrc(src)
@@ -116,6 +147,12 @@ export function WatchPartySlot({
   // 250ms phase and starving the reconciler during chat/roster traffic.
   const frameRef = useRef(party?.frame ?? null)
   frameRef.current = party?.frame ?? null
+  // Same reasoning for the party itself: `current`, `host` and the queue length
+  // all change as the room plays, and listing them reset this interval mid-cycle
+  // on every advance/queue edit (which also reset the phase used for drift
+  // correction). Only a ROOM change (or the media src) may re-create the tick.
+  const partyRef = useRef(party)
+  partyRef.current = party
 
   // 250 ms sync tick, only while a party exists. The video element is read
   // imperatively from the DOM: NativeVideoPlayer keeps it in its own ref.
@@ -124,22 +161,23 @@ export function WatchPartySlot({
     const timer = setInterval(() => {
       const v = wrapRef.current?.querySelector('video')
       const frame = frameRef.current
-      if (!v || !frame || !videoSrc || !party) return
+      const p = partyRef.current
+      if (!v || !frame || !videoSrc || !p) return
       const target = computeTargetPosition(frame, serverNow())
       if (v.duration > 0 && target >= v.duration - 0.25 && frame.action === 'play') {
         // Video ended: the host advances the queue. Keyed by media+frame
         // stamp so a wrap back to the same entry re-arms the guard.
         if (!v.paused) { endPauseRef.current = Date.now(); v.pause() }
-        const endedKey = `${party.current}:${frame.updatedAt}`
+        const endedKey = `${p.current}:${frame.updatedAt}`
         if (shouldFireQueueNext({
-          isHost: party.host === identity.orbitId,
-          queueLength: party.queue.length,
+          isHost: p.host === identity.orbitId,
+          queueLength: p.queue.length,
           action: frame.action,
           endedKey,
           lastFiredKey: endedRef.current,
         })) {
           endedRef.current = endedKey
-          queueOp(party.id, 'next')
+          queueOp(p.id, 'next')
         }
         return
       }
@@ -163,7 +201,7 @@ export function WatchPartySlot({
       if (plan.pause && !v.paused) v.pause()
     }, 250)
     return () => clearInterval(timer)
-  }, [party?.id, videoSrc, party?.current, party?.host, party?.queue.length, identity.orbitId])
+  }, [party?.id, videoSrc, identity.orbitId])
 
   // Stream hiccup recovery. Only a real `error` is worth reloading the
   // element: `stalled` is Chrome's "I asked for data and got nothing" signal,
@@ -264,6 +302,7 @@ export function WatchPartySlot({
             key={party.id}
             src={videoSrc}
             preload="auto"
+            poster={thumbMedia.url ?? undefined}
             disableViewportGating={true}
             loop={false}
             autoPlay={false}
@@ -333,6 +372,44 @@ export function WatchPartySlot({
           )}
         </div>
       )}
+
+      {/* Why the peer's screen is black: a shared local file has to transfer
+          before it can play, and that transfer is not instant. */}
+      {currentItem?.local &&
+        !media.url &&
+        (transfer.status === 'idle' ||
+          transfer.status === 'receiving' ||
+          transfer.status === 'failed' ||
+          transfer.status === 'cancelled') && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1.5 bg-black/70 px-4 text-center">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-retro-fg">
+              {transfer.status === 'receiving'
+                ? 'Receiving from the sharer…'
+                : transfer.status === 'failed'
+                  ? 'Transfer failed'
+                  : transfer.status === 'cancelled'
+                    ? 'Transfer cancelled'
+                    : 'Waiting for the sharer…'}
+            </span>
+            {transfer.status === 'receiving' && transfer.total > 0 && (
+              <span className="font-mono text-[10px] text-retro-muted tabular-nums">
+                {Math.round((transfer.received / transfer.total) * 100)}% · {formatBytes(transfer.received)} / {formatBytes(transfer.total)}
+              </span>
+            )}
+            {transfer.status === 'failed' && (
+              <span className="text-[10px] text-rose-300">{transfer.error || 'No peer answered.'}</span>
+            )}
+            {(transfer.status === 'failed' || transfer.status === 'cancelled' || transfer.status === 'idle') && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); void transfer.receive() }}
+                className="mt-1 rounded-md border border-border-glass bg-glass-w10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-retro-fg hover:bg-glass-w10/80 cursor-pointer"
+              >
+                Retry transfer
+              </button>
+            )}
+          </div>
+        )}
     </div>
   )
 }

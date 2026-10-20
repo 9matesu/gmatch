@@ -156,6 +156,8 @@ export interface GameState {
   tick: (dtMs?: number) => void
   save: () => void
   load: () => void
+  /** Re-read the save from the slot the active identity owns (plan A1). */
+  reload: () => void
   collectOffline: () => void
   verifyAge: () => void
   dismissToast: (id: number) => void
@@ -182,9 +184,25 @@ function saveKey(): string {
   }
 }
 
+/**
+ * The slot the in-memory run belongs to. `load()` pins it, and every read and
+ * write goes through it — so an identity that appears mid-session (login) can
+ * never silently redirect the next autosave into another wallet's slot, and a
+ * logout can never write the account's run back into the pre-login slot. Only
+ * `syncIdleSaveSlotToIdentity` moves the run between slots. Before the store is
+ * loaded at all, the slot follows the current identity (lazy pin), which keeps
+ * pre-load saves honest without inventing a second rule.
+ */
+let activeSlot: string | null = null
+
+function currentSlot(): string {
+  if (activeSlot === null) activeSlot = saveKey()
+  return activeSlot
+}
+
 function readStorage(): string | null {
   try {
-    return typeof localStorage !== 'undefined' ? localStorage.getItem(saveKey()) : null
+    return typeof localStorage !== 'undefined' ? localStorage.getItem(currentSlot()) : null
   } catch {
     return null
   }
@@ -192,7 +210,7 @@ function readStorage(): string | null {
 
 function writeStorage(raw: string): void {
   try {
-    if (typeof localStorage !== 'undefined') localStorage.setItem(saveKey(), raw)
+    if (typeof localStorage !== 'undefined') localStorage.setItem(currentSlot(), raw)
   } catch {
     /* storage unavailable — game still runs in-memory */
   }
@@ -1445,6 +1463,7 @@ export const useGame = create<GameState>((set, get) => ({
   load: () => {
     const s = get()
     if (s.loaded) return
+    activeSlot = saveKey() // pin: this run now owns exactly this slot
     const d = deserialize(readStorage()) ?? defaultSave()
     const now = Date.now()
     // No fallback offers: the player's own picks (or nothing) drive the feed.
@@ -1502,6 +1521,11 @@ export const useGame = create<GameState>((set, get) => ({
       lastSeenAt: now,
       offlineGain: gain >= 1 ? gain : 0,
     })
+  },
+
+  reload: () => {
+    set({ loaded: false })
+    get().load()
   },
 
   collectOffline: () => {
@@ -1671,3 +1695,37 @@ export const useGame = create<GameState>((set, get) => ({
     set({ ...freshData() })
   },
 }))
+
+/**
+ * Point the idle save at the slot the active identity owns (plan A1). Called
+ * when the identity changes (login, account restore, logout):
+ *  1. persist the in-memory run into the slot it was loaded from,
+ *  2. migrate a pre-login plain save into a fresh identity slot (never the
+ *     other way round, and never over an account's existing save),
+ *  3. reload from the new slot.
+ */
+export function syncIdleSaveSlotToIdentity(): void {
+  if (activeSlot === null) return // nothing loaded yet — load() pins the right slot
+  const next = saveKey()
+  if (next === activeSlot) return
+  const previous = activeSlot
+  // Nothing may be lost when the slot swaps (the run keeps its own slot).
+  try { useGame.getState().save() } catch { /* in-memory only */ }
+  try {
+    if (
+      typeof localStorage !== 'undefined' &&
+      next !== SAVE_KEY &&
+      previous === SAVE_KEY &&
+      !localStorage.getItem(next)
+    ) {
+      const legacy = localStorage.getItem(SAVE_KEY)
+      if (legacy) localStorage.setItem(next, legacy)
+    }
+  } catch { /* storage unavailable */ }
+  useGame.getState().reload()
+}
+
+/** --- test seam --- */
+export function __resetSaveSlotForTests(): void {
+  activeSlot = null
+}
