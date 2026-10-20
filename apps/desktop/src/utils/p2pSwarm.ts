@@ -63,6 +63,13 @@ function lookupLocalObject(id: string): Blob | null {
   return blob
 }
 
+function forgetLocalObject(id: string): void {
+  const blob = localObjects.get(id)
+  if (!blob) return
+  localObjects.delete(id)
+  localObjectBytes -= blob.size
+}
+
 /** Test seam: cache contents (bytes, entries, keys in recency order). */
 export function __localObjectCacheForTests(): { bytes: number; keys: string[] } {
   return { bytes: localObjectBytes, keys: [...localObjects.keys()] }
@@ -87,13 +94,6 @@ const MAX_CHUNK_BASE64_LENGTH = Math.floor((MAX_SWARM_FRAME_BYTES - 512) / 4) * 
 export async function sha256HexBlob(blob: Blob): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer())
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('')
-}
-
-function forgetLocalObject(id: string): void {
-  const blob = localObjects.get(id)
-  if (!blob) return
-  localObjects.delete(id)
-  localObjectBytes -= blob.size
 }
 
 function isSha256Hex(value: string): boolean {
@@ -430,6 +430,7 @@ async function finishFetch(id: string, req: PendingFetch): Promise<void> {
     if (pendingFetches.get(id) !== req) return
     void sha256HexBlob(assembled).then(async (got) => {
       if (got !== req.expectedHash) {
+        forgetLocalObject(id)
         failFetch(id, req, new Error(`Swarm object ${id} failed hash verification`))
         return
       }
@@ -552,15 +553,17 @@ export function requestSwarmObject(id: string, timeoutMs = 15000, opts: SwarmFet
   const cached = lookupLocalObject(id)
   if (cached) {
     if (!expectedHash) return Promise.resolve(cached)
-    return sha256HexBlob(cached).then((actualHash) => {
+    return sha256HexBlob(cached).then(async (actualHash) => {
       if (actualHash === expectedHash) return cached
-      forgetLocalObject(id)
-      return requestSwarmObject(id, timeoutMs, { ...opts, expectedHash })
-    }, () => {
-      forgetLocalObject(id)
-      return requestSwarmObject(id, timeoutMs, { ...opts, expectedHash })
+      return fetchVerifiedPeerObject(id, timeoutMs, opts, expectedHash)
+    }, async () => {
+      return fetchVerifiedPeerObject(id, timeoutMs, opts, expectedHash)
     })
   }
+  return fetchVerifiedPeerObject(id, timeoutMs, opts, expectedHash)
+}
+
+function fetchVerifiedPeerObject(id: string, timeoutMs: number, opts: SwarmFetchOptions, expectedHash?: string): Promise<Blob> {
   if (!swarmSend) return Promise.reject(new Error('swarm transport unavailable'))
   const existing = pendingFetches.get(id)
   if (existing) {
