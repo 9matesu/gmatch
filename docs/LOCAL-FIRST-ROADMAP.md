@@ -306,10 +306,13 @@ UI or documentation.
 - After adding the experimental operation primitive, the protocol package
   suite passed (32 tests) and the crypto package suite passed (11 tests); both
   package typechecks passed.
-- Root `npm test` had one failure in
-  `GMatchFeed.inline-expand.test.tsx` (reply button inaccessible); rerunning
-  that file alone passed all 7 tests. Treat the full-suite result as flaky/not
-  green until reproduced and the root cause is understood.
+- Root `npm test` previously had one failure in
+  `GMatchFeed.inline-expand.test.tsx` that passed on a solo rerun. The next
+  full run was green: 239 desktop files / 1,848 tests, crypto 11, protocol 32,
+  shared 21. Root typecheck passed, lint passed with 0 errors / 47 existing
+  warnings, and the desktop build passed with existing chunk warnings. The
+  earlier failure did not reproduce; treat it as an environment flake and
+  re-investigate only if it returns.
 - No independent three-peer durable-replication, process-restart, real
   two-machine NAT, or lifecycle resource evidence is currently recorded.
 - The central deployment's stateful API/CORS failure behavior has not yet been
