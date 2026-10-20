@@ -1928,7 +1928,7 @@ export default function Home() {
   const courierType = courier.type
   const courierIsTyping = courier.isTyping
   const meshSend = courier.meshSend
-  const meshPeerKnown = courier.meshPeerKnown
+  const peerAddressable = courier.peerAddressable
   useEffect(() => {
     if (!courierActive) return
     for (const u of users) {
@@ -2340,24 +2340,24 @@ export default function Home() {
       // already added the peer to Recipients, so they can fetch the bytes).
       // Replies ride it too — the reference survives persistence, so a reply
       // to a message from three days ago still resolves.
-      let msg = await courierSend(peerId, text.trim(), attachment?.id, replyToId ? { replyToId } : undefined)
-      if (msg && msg.status === 'failed') {
-        // Roster is capped — the peer's keys may simply never have been
-        // cached. Resolve them from the public profile and retry once.
+      // Keys first, send second. The sealed lane cannot address a peer whose
+      // keys were never cached (the roster is capped), so resolve them from the
+      // public profile BEFORE the single send attempt: sending first appended a
+      // failed row, and the old "retry once" appended a second one under a new
+      // id — which is how one Enter came to render as two messages.
+      if (!peerAddressable(peerId)) {
         try {
           const pres = await orbitFetch(`/api/users/${encodeURIComponent(peerId)}`, {}, identity)
           if (pres.ok) {
             const pu = ((await pres.json()) as { user?: { public_key?: string; encryption_pub_key?: string } }).user
-            if (pu?.public_key) {
-              registerCourierKeys(peerId, pu.public_key, pu.encryption_pub_key || '')
-              msg = await courierSend(peerId, text.trim(), attachment?.id, replyToId ? { replyToId } : undefined)
-            }
+            if (pu?.public_key) registerCourierKeys(peerId, pu.public_key, pu.encryption_pub_key || '')
           }
-        } catch { /* offline: keep the failed state below */ }
+        } catch { /* offline: the single send below reports the failure */ }
       }
+      const msg = await courierSend(peerId, text.trim(), attachment?.id, replyToId ? { replyToId } : undefined)
       const ok = !!msg && msg.status !== 'failed'
       if (!ok) {
-        toast('Peer key unknown. The message stays local and won\'t deliver until you have their key.', 'error')
+        toast('Message not delivered — it stays local. Check your connection, or that you have their key.', 'error')
       }
       void loadPmMessages(peerId)
       loadPmThreads()
@@ -2406,7 +2406,7 @@ export default function Home() {
       toast('Couldn\'t send the message. The server is unreachable.', 'error')
       return false
     }
-  }, [identity, myProfile.displayName, loadPmMessages, loadPmThreads, toast, courierActive, courierSend, registerCourierKeys])
+  }, [identity, myProfile.displayName, loadPmMessages, loadPmThreads, toast, courierActive, courierSend, registerCourierKeys, peerAddressable])
 
   useEffect(() => {
     if (!identity) return
@@ -4870,7 +4870,7 @@ export default function Home() {
                       activeHack={activeHack}
                       setActiveHack={setActiveHack}
                       onOpenFlash={() => setShowFlashModal(true)}
-                      mesh={{ peerKnown: meshPeerKnown, send: meshSend }}
+                      mesh={{ peerKnown: peerAddressable, send: meshSend }}
                     />
                   )}
 

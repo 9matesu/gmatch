@@ -281,8 +281,10 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
     [],
   )
 
-  /** Whether the peer is mesh-addressable (keys known from roster/TOFU). */
-  const meshPeerKnown = useCallback((orbitId: string): boolean => {
+  /** Whether a sealed message can be addressed to this peer at all (both keys
+   *  known from the roster/TOFU). One probe for every sealed lane — direct
+   *  messages and the domination mesh address a peer the same way. */
+  const peerAddressable = useCallback((orbitId: string): boolean => {
     const k = storeRef.current?.peerKeys(orbitId);
     return Boolean(k?.publicKeyHex && k?.encryptionPubHex);
   }, [])
@@ -314,5 +316,5 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
 
   const courierActive = useMemo(() => mode === 'courier' && !!identity, [mode, identity])
 
-  return { mode, courierActive, send, pull, threadFor, registerPeerKeys, meshSend, meshPeerKnown, threads, rooms, createRoom, inviteToRoom, sayInRoom, leaveRoom, roomMessages, edit, remove, react, type, markRead, isTyping }
+  return { mode, courierActive, send, pull, threadFor, registerPeerKeys, meshSend, peerAddressable, threads, rooms, createRoom, inviteToRoom, sayInRoom, leaveRoom, roomMessages, edit, remove, react, type, markRead, isTyping }
 }

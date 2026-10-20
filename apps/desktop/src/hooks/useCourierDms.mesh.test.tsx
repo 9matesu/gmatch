@@ -62,9 +62,9 @@ describe('useCourierDms mesh domination (Fase 5/6 slice 3)', () => {
       { wrapper },
     )
     await waitFor(() => expect(result.current.courierActive).toBe(true))
-    expect(result.current.meshPeerKnown(bob.orbitId)).toBe(false)
+    expect(result.current.peerAddressable(bob.orbitId)).toBe(false)
     result.current.registerPeerKeys(bob.orbitId, bob.publicKeyHex, bob.encryptionPubHex)
-    expect(result.current.meshPeerKnown(bob.orbitId)).toBe(true)
+    expect(result.current.peerAddressable(bob.orbitId)).toBe(true)
 
     let res: unknown
     await act(async () => {

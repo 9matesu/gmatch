@@ -451,6 +451,16 @@ watermark), `dm_edit` (author-only, last-write-wins on `ts`), `dm_del`
 presence invented, no server acknowledgement on the blind courier. A failed
 seal renders "not delivered".
 
+**One send, one row (2026-10-19).** `sendPm` used to send first and, on
+failure, resolve the peer's keys from the public profile and send *again* —
+appending a second row under a new id, so one Enter rendered as two messages
+and the first (a failed row no longer at the end of its block) showed no state
+at all, reading exactly like one that had landed. The keys are now resolved
+**before** the single send attempt (`peerAddressable`, the same probe the
+domination mesh uses): same outcome, one row, one fewer wasted attempt.
+Delivery-state markers are per message while the block clock stays per block, so
+a failed message always says so even when another message follows it.
+
 **Tombstones:** `dm_del` never hard-deletes — a stub row with `deletedAt`
 stays, so a replayed envelope cannot resurrect removed content. Edits are
 author-only and last-write-wins; inbound reaction/edit/delete events are

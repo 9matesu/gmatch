@@ -89,6 +89,8 @@ export interface GmatchBridge {
   blocklistReset?: () => Promise<{ ok: boolean; data?: BlocklistData; error?: string }>
   /** Fire-and-forget renderer log line; main appends it to userData/main.log. */
   logError?: (scope: string, msg: string) => void
+  /** Startup timeline milestone (main logs it with the boot phases). */
+  bootMark?: (label: string) => void
   /** Opens the userData folder (main.log, saves) in the OS file manager. */
   openLogFolder?: () => Promise<string>
   // P2P mesh (Slice 3): sealed Envelope-v2 objects only. `transport` is the

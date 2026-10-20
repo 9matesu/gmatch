@@ -1327,11 +1327,17 @@ export function GMatchDMs({
                                 </>
                                 )}
                               </div>
-                              {isLast && (
+                              {(isLast || (isOwn && (msg.courierStatus === 'failed' || msg.courierStatus === 'sending'))) && (
                                 <div className={`mt-0.5 flex items-center gap-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                                  <time className="text-[10px] text-retro-muted select-none" dateTime={new Date(msg.timestamp).toISOString()}>
-                                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                  </time>
+                                  {/* The clock labels the block; the delivery state
+                                      belongs to the message. Gating both on isLast
+                                      hid a failed message that was followed by
+                                      another one — it read as if it had landed. */}
+                                  {isLast && (
+                                    <time className="text-[10px] text-retro-muted select-none" dateTime={new Date(msg.timestamp).toISOString()}>
+                                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </time>
+                                  )}
                                   {isOwn && msg.courierStatus === 'failed' && (
                                     <span title="Not delivered" className="text-[10px] text-rose-400">not delivered</span>
                                   )}

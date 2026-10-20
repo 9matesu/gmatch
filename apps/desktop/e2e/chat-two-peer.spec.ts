@@ -40,22 +40,45 @@ function composer(page: Page) {
  * directory row the other client renders comes from /api/users, and a Users
  * row is created with a placeholder until the profile is written (the same
  * call onboarding makes).
+ *
+ * Retried, because the app can replace its own document while this is in
+ * flight (the stale-API-base self-heal purges state and reloads), and a
+ * `page.evaluate` issued into the replaced document dies with "Execution
+ * context was destroyed". That is a harness race, not a failed PATCH: the
+ * PATCH is idempotent, and only a navigation error is retried — a real HTTP
+ * failure still throws.
  */
 async function publishDisplayName(page: Page, name: string) {
-  await page.evaluate(async (displayName: string) => {
-    const mod = await import('/src/utils/api.ts')
-    const ident = JSON.parse(localStorage.getItem('orbit_identity') || 'null')
-    const res = await mod.orbitFetch(
-      '/api/users/profile',
-      {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ display_name: displayName }),
+  await expect
+    .poll(
+      async () => {
+        try {
+          await page.evaluate(async (displayName: string) => {
+            const mod = await import('/src/utils/api.ts')
+            const ident = JSON.parse(localStorage.getItem('orbit_identity') || 'null')
+            const res = await mod.orbitFetch(
+              '/api/users/profile',
+              {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ display_name: displayName }),
+              },
+              ident,
+            )
+            if (!res.ok) throw new Error(`display name PATCH failed: ${res.status}`)
+          }, name)
+          return true
+        } catch (err) {
+          const message = String((err as Error)?.message ?? err)
+          if (/Execution context was destroyed|Target closed|frame was detached|navigation/i.test(message)) {
+            return false
+          }
+          throw err
+        }
       },
-      ident,
+      { timeout: 30_000, message: `could not publish display name ${name}` },
     )
-    if (!res.ok) throw new Error(`display name PATCH failed: ${res.status}`)
-  }, name)
+    .toBe(true)
 }
 
 async function waitForPeer(page: Page, name: string) {
@@ -214,8 +237,11 @@ test('an undeliverable DM says so instead of pretending', async ({ browser }: { 
     await send(alpha, 'this one cannot leave')
     // The failure is stated, and it is stated on THAT message (the indicator
     // lives in the message row, next to the timestamp).
-    await expect(alpha.getByText('not delivered')).toBeVisible({ timeout: 30_000 })
+    await expect(alpha.getByText('not delivered', { exact: true })).toBeVisible({ timeout: 30_000 })
+    // The failed message is ONE row. Two rows for one Enter is the bug this
+    // guards: the row must state its failure, and there must be exactly one.
     await expect(messageRow(alpha, 'this one cannot leave').locator('[title="Not delivered"]')).toBeVisible({ timeout: 10_000 })
+    await expect(alpha.locator('[data-message-row]', { hasText: 'this one cannot leave' })).toHaveCount(1)
     // Nothing invented on the other side.
     await expect(bravo.getByText('this one cannot leave')).toHaveCount(0)
   } finally {

@@ -14,6 +14,7 @@ const wallpaperWin = require('./wallpaperWin.cjs')
 const { sanitizeBounds } = require('./window-bounds-core.cjs')
 const { dapiSource, booruOrgSource, gateBooruOrgEntry } = require('./booru-sources-core.cjs')
 const { loadRegistry: loadBooruRegistry, refererFor: booruRefererFor } = require('./booru-registry.cjs')
+const startupMetrics = require('./startupMetrics.cjs')
 
 // Background video & screen sharing fix: keep video playback running and prevent black screen when alt-tabbed / occluded.
 app.commandLine.appendSwitch('disable-background-timer-throttling')
@@ -51,6 +52,10 @@ function mainLogPath() {
 function mainLog(line) {
   try { appendWithRotation(mainLogPath(), line) } catch { /* last resort only */ }
 }
+
+// Startup sampler (see startupMetrics.cjs). Module-level so createWindow's
+// did-finish-load handler and the renderer's boot:mark IPC can reach it.
+let bootMetrics = null
 process.on('uncaughtException', (err) => {
   mainLog(`uncaught: ${err?.stack || err}`)
   try { dialog.showErrorBox('gMatch hit an unexpected error', `${String(err?.message || err)}\n\n${LOG_HINT}`) } catch { /* headless edge */ }
@@ -1581,6 +1586,13 @@ function createWindow() {
   win.on('moved', persistBounds)
   win.on('resized', persistBounds)
   win.removeMenu()
+  // Boot timeline anchors. The renderer's own marks (first paint, hydration)
+  // arrive over IPC and land on the same clock.
+  win.webContents.on('did-finish-load', () => {
+    mainLog('boot: did-finish-load')
+    bootMetrics?.mark('did-finish-load')
+  })
+  win.once('ready-to-show', () => bootMetrics?.mark('ready-to-show'))
   // The renderer's beforeunload key-save gate must NEVER silently block the
   // close button (1.0.1 bug: "cant close app" — in Electron, a prevented
   // unload just cancels the window close). Surface the page's message as a
@@ -1629,10 +1641,25 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  // Start measuring FIRST: everything below is a boot cost the user feels, and
+  // a Task Manager lifetime average hides it. Bounded (20 s), unref'd, and it
+  // writes nothing until the window closes.
+  bootMetrics = startupMetrics.createStartupMetrics({
+    sample: () => app.getAppMetrics(),
+    log: mainLog,
+    persist: startupMetrics.filePersister(app.getPath('userData')),
+  })
+  bootMetrics.begin()
+  void startupMetrics.logEnvironment(app, mainLog)
   mainLog(`boot: whenReady (v${app.getVersion()}, packaged=${app.isPackaged})`)
+  bootMetrics.mark('whenReady')
   const secureAvailable = initSecureKV()
+  bootMetrics.mark('secureKV')
   mainLog(`boot: secureKV ready (available=${secureAvailable})`)
   ipcMain.on('log:renderer', (_event, { scope, msg }) => mainLog(`[renderer:${scope}] ${msg}`))
+  // Renderer milestones (first paint, hydration end) land in the same timeline
+  // as the main-process phases, so a spike can be attributed to a phase.
+  ipcMain.on('boot:mark', (_event, label) => bootMetrics?.mark(label))
   // Frameless window controls: NativeHeaderBar draws min/max/close and gates
   // them on the bridge exposing winMinimize/winToggleMaximize/winClose (browser
   // dev has no preload -> no buttons). close() routes through the same
@@ -1658,9 +1685,22 @@ app.whenReady().then(async () => {
   let diskKey = null
   try { diskKey = fs.readFileSync(storageKeyPath, 'utf8').trim() } catch {}
   imageCache.init(app.getPath('userData'), UA, diskKey)
+  bootMetrics.mark('imageCache.init')
   // Same storage key as the picture LRU: the vault holds adult media and must
   // never write it to disk in the clear.
   vault.init(app.getPath('userData'), diskKey)
+  bootMetrics.mark('vault.init')
+  // How much local media the boot scan had to look at. A spike in a fresh
+  // profile and a spike after months of keepsakes are not the same bug.
+  try {
+    const vs = vault.stats()
+    const cs = imageCache.cacheStats()
+    mainLog(
+      `boot: data vault=${vs.files} files/${Math.round(vs.bytes / 1048576)}MB ` +
+        `imgcache=${cs.files} files/${Math.round(cs.bytes / 1048576)}MB`,
+    )
+  } catch { /* census is diagnostic only */ }
+  bootMetrics.mark('census')
   vaultServer.start(app.getPath('userData')).catch(() => {
     /* best effort */
   })
@@ -1922,6 +1962,7 @@ app.whenReady().then(async () => {
   // Window first — never gate first paint on the bundled server.
   mainLog(`boot: creating window (v${app.getVersion()}, packaged=${app.isPackaged})`)
   createWindow()
+  bootMetrics.mark('window.created')
   updater?.schedule()
   // Start the bundled server in the background (host mode only). Failures
   // surface as dialogs + log lines; they can never take the window with them.
@@ -1982,7 +2023,12 @@ app.on('second-instance', () => {
   }
 })
 
-app.on('before-quit', () => { apiSidecar.stopApi(); try { if (secureKV) secureKV.flush() } catch { /* best effort */ } })
+app.on('before-quit', () => {
+  // Close the startup window early on quit so the summary is still written
+  // (otherwise a fast close loses the measurement entirely).
+  try { bootMetrics?.finish('quit') } catch { /* diagnostics only */ }
+  apiSidecar.stopApi(); try { if (secureKV) secureKV.flush() } catch { /* best effort */ }
+})
 app.on('will-quit', () => { apiSidecar.stopApi() })
 
 app.on('window-all-closed', () => {

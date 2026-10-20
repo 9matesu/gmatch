@@ -158,6 +158,18 @@ test('a consented domination effect is delivered to the target', async ({ page, 
     // it is short. Push the duration to max so the assertion is not racing a
     // timer.
     await dialog.getByLabel('Duration').fill('60')
+    // This case asserts the paid server-backed action. The online peer has
+    // keys, so consent correctly selects the free sealed-mesh path. Hide only
+    // the sender's roster keys after target selection to exercise the paid
+    // server route; the victim remains online and still receives the effect.
+    await page.evaluate((id: string) => {
+      const raw = localStorage.getItem('orbit_users')
+      if (!raw) return
+      const users = JSON.parse(raw) as Array<Record<string, unknown>>
+      localStorage.setItem('orbit_users', JSON.stringify(users.map((u) =>
+        u.id === id ? { ...u, public_key: '', encryption_pub_key: '' } : u,
+      )))
+    }, victim.id.orbitId)
     await dialog.getByRole('button', { name: 'Send', exact: true }).click()
 
     // Probe both ends before asserting UI, so a failure says WHERE it broke:
@@ -192,9 +204,15 @@ test('a consented domination effect is delivered to the target', async ({ page, 
 
     // The send must be ACCEPTED and CHARGED, not silently refused. 402/403 here
     // is the feature quietly doing nothing.
+    //
+    // The cache is invalidated first: orbitFetch serves GETs from a 3s
+    // in-memory cache, and this read happens right after the charge lands, so a
+    // cached pre-send balance would read as "not charged" while the wallet was
+    // in fact debited. The assertion is unchanged — the sender is 500 down.
     const bal = await page.evaluate(async () => {
       const mod = await import('/src/utils/api.ts')
       const ident = JSON.parse(localStorage.getItem('orbit_identity') || 'null')
+      mod.invalidateCache('/api/economy/balance')
       const r = await mod.orbitFetch('/api/economy/balance', {}, ident)
       return (await r.json()) as { balance: number }
     })

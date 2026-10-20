@@ -14,5 +14,6 @@ window.addEventListener('unhandledrejection', (e) => logger.error('rejection', e
 initSecureStorage()
   .catch(() => { /* falls back to localStorage mode */ })
   .finally(() => {
+    window.gmatch?.bootMark?.('secure-storage:ready')
     void import('./boot').then((m) => m.mount())
   })

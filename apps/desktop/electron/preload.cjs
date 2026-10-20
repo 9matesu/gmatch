@@ -79,5 +79,8 @@ contextBridge.exposeInMainWorld('gmatch', {
     return () => ipcRenderer.removeListener('p2p:message', listener)
   },
   logError: (scope, msg) => { try { ipcRenderer.send('log:renderer', { scope: String(scope || ''), msg: String(msg || '') }) } catch { /* never log-loop */ } },
+  // Startup timeline milestone (no payload beyond a label). Lands in main.log
+  // next to the main-process boot marks.
+  bootMark: (label) => { try { ipcRenderer.send('boot:mark', String(label || '').slice(0, 64)) } catch { /* never log-loop */ } },
   openLogFolder: () => ipcRenderer.invoke('app:open-log'),
 })

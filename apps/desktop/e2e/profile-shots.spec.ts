@@ -19,9 +19,11 @@ const VIEWPORTS = [
   { name: 'narrow', width: 390, height: 844 },
 ]
 
-/** seedApp pins the changelog marker one version back, so the What's New
- *  modal opens over the profile. It mounts after first paint, so this is only
- *  meaningful once the page itself is up. */
+/** The What's New modal is dismissed defensively: `seedApp` stamps the version
+ *  the app is on, so it should not open at all — but if a release bumps the
+ *  changelog and someone forgets the e2e constant, this keeps the capture
+ *  working while the specs that assert the modal still fail loudly. It mounts
+ *  after first paint, so this is only meaningful once the page itself is up. */
 async function dismissChangelog(page: import('@playwright/test').Page) {
   const gotIt = page.getByRole('button', { name: 'Got it' })
   await gotIt.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {})
@@ -87,12 +89,21 @@ test.describe('profile capture', () => {
     const page = await ctx.newPage()
     await seedApp(page)
     await page.goto('/#/profile')
-    const postsTab = page.getByRole('tab', { name: /Posts/ })
-    await expect(postsTab).toBeVisible({ timeout: 30_000 })
+    // The profile switcher is a plain button row — GMatchProfile renders no
+    // tablist/tabpanel roles — so gate on the tab BUTTON and on the empty-state
+    // copy each panel actually renders. The old `getByRole('tab')` /
+    // `getByRole('tabpanel')` waited on roles this component never had.
+    await expect(page.getByRole('button', { name: 'Posts', exact: true })).toBeVisible({ timeout: 30_000 })
     await dismissChangelog(page)
-    for (const tab of ['Saved', 'Reposts', 'Cards']) {
-      await page.getByRole('tab', { name: new RegExp(tab) }).click()
-      await page.getByRole('tabpanel').waitFor({ state: 'visible' })
+    for (const [tab, emptyCopy] of [
+      ['Saved', 'No saved posts'],
+      ['Reposts', 'No reposts yet'],
+      ['Cards', 'No cards yet'],
+    ] as const) {
+      await page.getByRole('button', { name: tab, exact: true }).click()
+      // Asserting the panel is really the EMPTY state is the point of the
+      // capture (its name is "empty states"), not just that something switched.
+      await expect(page.getByText(emptyCopy)).toBeVisible({ timeout: 15_000 })
       await page.screenshot({ path: join(OUT_DIR, `empty-${tab.toLowerCase()}.png`), fullPage: false })
     }
     await ctx.close()

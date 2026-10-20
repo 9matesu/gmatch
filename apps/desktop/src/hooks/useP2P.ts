@@ -328,7 +328,15 @@ export function useP2P(identity: OrbitIdentity | null) {
       announceHeldObjects()
     }
 
-    void hydrateLocalObjects().then(() => announceHave()).catch(() => {})
+    void hydrateLocalObjects()
+      .then((count) => {
+        // On the boot timeline: hydration is the one startup step that grows
+        // with the vault, so its end (and object count) is the evidence a
+        // media-bound spike needs.
+        window.gmatch?.bootMark?.(`swarm:hydrated:${count}`)
+        announceHave()
+      })
+      .catch(() => {})
 
     // Phase 4: resume swarm transfers that failed while a seeder was offline.
     // Bytes only land after hash verification (requestSwarmObject).

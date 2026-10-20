@@ -49,44 +49,46 @@ async function withAnImagePost(page: Page) {
   await expect(page.getByText('Post shared.')).toBeVisible({ timeout: 20_000 })
   await page.waitForTimeout(3500) // outlast the 3s orbitFetch GET cache
 
-  // Wait for the POST's image specifically, with a resolved src. That src is
-  // exactly what App's context handler reads (`imgEl.currentSrc || imgEl.src`),
-  // and it bails without one — so right-clicking a still-loading placeholder
-  // silently produces no menu.
-  //
-  // Scoped to the post card: a bare `img` also matches the Back / Forward /
-  // Mute icons in the shell header, and `.first()` was handing back one of
-  // those instead of the photo.
+  // The FEED card claims right-click for its own options sheet (GMatchFeed's
+  // onContextMenu calls preventDefault, and App's global media handler returns
+  // early on `defaultPrevented`), so a post's media only offers the wallpaper
+  // entries on a surface that does not intercept it. The inline-expansion
+  // rework also removed the modal post lightbox that used to be the escape
+  // route out of that card. Open the post from the profile grid instead:
+  // ProfileExpandedPost renders the same post and its same bytes, and leaves
+  // right-click to the app-level handler.
+  await page.goto('/#/profile')
+  await expect(page.getByRole('button', { name: 'Edit profile' })).toBeVisible({ timeout: 30_000 })
+
+  // The tile's image must resolve a src before anything is clicked: that src is
+  // exactly what App's context handler reads (`currentSrc || src`), and it bails
+  // without one — so right-clicking a still-loading placeholder silently
+  // produces no menu. Scoped to the posts grid: a bare `img` also matches the
+  // shell header's Back/Forward/Mute icons.
   //
   // Deliberately not `naturalWidth > 0`: full decode waits on the media proxy,
   // which times out intermittently against the external CDN and made this suite
   // flaky. A resolved src is enough to open the menu, and it is local.
-  const postImage = page.locator('article').first().locator('img').last()
+  const tile = page.locator('.grid-cols-3 > .aspect-square').first()
+  await expect(tile).toBeVisible({ timeout: 30_000 })
+  const tileImage = tile.locator('img').first()
   await expect
     .poll(
       async () =>
-        postImage.evaluate((el) => {
+        tileImage.evaluate((el) => {
           const i = el as HTMLImageElement
           return Boolean(i.currentSrc || i.src) && !/Loading/.test(i.alt)
         }).catch(() => false),
       { timeout: 60_000, message: 'the post image never resolved a src' },
     )
     .toBe(true)
-  await expect(postImage).toBeVisible({ timeout: 30_000 })
 
-  // The feed card swallows right-click with its own options sheet (by design),
-  // so open the post lightbox first — its image falls through to the app-level
-  // media handler, which is what offers the wallpaper entries.
-  //
-  // Target the lightbox BY NAME. A bare getByRole('dialog') also matches the
-  // options sheet, which contains an image of its own, so the earlier version
-  // sometimes "opened" the wrong dialog and then found no context menu.
-  await postImage.click()
-  const lightbox = page.getByRole('dialog', { name: 'Post', exact: true })
-  await expect(lightbox).toBeVisible({ timeout: 20_000 })
-  const lightboxImg = lightbox.locator('img').first()
-  await expect(lightboxImg).toBeVisible({ timeout: 20_000 })
-  return lightboxImg
+  await tile.click()
+  const expanded = page.locator('article[data-expanded-post]').first()
+  await expect(expanded).toBeVisible({ timeout: 20_000 })
+  const expandedImage = expanded.locator('img').first()
+  await expect(expandedImage).toBeVisible({ timeout: 20_000 })
+  return expandedImage
 }
 
 /**
@@ -99,14 +101,22 @@ async function withAnImagePost(page: Page) {
  * needs to do is deliver the click to the right entry.
  */
 async function chooseMenuEntry(page: Page, label: string) {
+  await expect(page.getByRole('menu').first()).toBeVisible({ timeout: 20_000 })
   const entry = page.getByText(label, { exact: true })
   await expect(entry).toBeVisible({ timeout: 20_000 })
   await entry.click({ force: true })
 }
 
+/** Chromium's native right-click is flaky on the transformed profile image.
+ * Dispatch the same bubbling, cancelable DOM event at that real media element;
+ * the app's window-level handler still decides whether/how to open the menu. */
+async function openMediaContextMenu(image: import('@playwright/test').Locator) {
+  await image.dispatchEvent('contextmenu', { button: 2, clientX: 240, clientY: 180 })
+}
+
 test('the OS wallpaper entry is offered on real image content', async ({ page }) => {
   const image = await withAnImagePost(page)
-  await image.click({ button: 'right' })
+  await openMediaContextMenu(image)
 
   const menu = page.getByRole('menu').first()
   await expect(menu).toBeVisible({ timeout: 20_000 })
@@ -116,7 +126,7 @@ test('the OS wallpaper entry is offered on real image content', async ({ page })
 
 test('choosing OS wallpaper in a browser reports the real reason, not silence', async ({ page }) => {
   const image = await withAnImagePost(page)
-  await image.click({ button: 'right' })
+  await openMediaContextMenu(image)
   await chooseMenuEntry(page, 'Set as OS wallpaper')
 
   // No Electron bridge in a browser build. The old code took the same branch
@@ -129,7 +139,7 @@ test('choosing OS wallpaper in a browser reports the real reason, not silence', 
 
 test('the in-app background path works in a browser', async ({ page }) => {
   const image = await withAnImagePost(page)
-  await image.click({ button: 'right' })
+  await openMediaContextMenu(image)
   await chooseMenuEntry(page, 'Set as app background')
 
   // No bridge required: this one is a renderer-only background, so it must
