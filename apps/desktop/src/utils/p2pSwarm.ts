@@ -541,6 +541,7 @@ export function requestSwarmObject(id: string, timeoutMs = 15000, opts: SwarmFet
   if (!id || id.length > 256 || (opts.expectedHash && !isSha256Hex(opts.expectedHash))) {
     return Promise.reject(new Error('Invalid swarm object request'))
   }
+  const expectedHash = opts.expectedHash?.toLowerCase()
   const cached = lookupLocalObject(id)
   if (cached) return Promise.resolve(cached)
   if (!swarmSend) return Promise.reject(new Error('swarm transport unavailable'))
@@ -548,11 +549,11 @@ export function requestSwarmObject(id: string, timeoutMs = 15000, opts: SwarmFet
   if (existing) {
     // A second waiter joins the in-flight fetch and shares its integrity
     // contract: it may add an expectation, never contradict one.
-    if (opts.expectedHash) {
-      if (existing.expectedHash && existing.expectedHash !== opts.expectedHash) {
+    if (expectedHash) {
+      if (existing.expectedHash && existing.expectedHash !== expectedHash) {
         return Promise.reject(new Error(`Swarm object ${id} requested with conflicting hashes`))
       }
-      existing.expectedHash = opts.expectedHash
+      existing.expectedHash = expectedHash
     }
     if (opts.onProgress) {
       const prev = existing.onProgress
@@ -575,7 +576,7 @@ export function requestSwarmObject(id: string, timeoutMs = 15000, opts: SwarmFet
       wantSwarmObject(id)
       reject(new Error(`Timed out waiting for swarm object ${id}`))
     }, timeoutMs)
-    pendingFetches.set(id, { resolve, reject, timer, chunks: new Map(), receivedBytes: 0, total: 0, mimeType: '', expectedHash: opts.expectedHash, onProgress: opts.onProgress })
+    pendingFetches.set(id, { resolve, reject, timer, chunks: new Map(), receivedBytes: 0, total: 0, mimeType: '', expectedHash, onProgress: opts.onProgress })
     try {
       swarmSend!({ type: 'SWARM_WANT', id })
     } catch (err) {
@@ -742,6 +743,7 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
     if (!id || id.length > 256 || (expectedHash && !isSha256Hex(expectedHash))) {
       return Promise.reject(new Error('Invalid swarm object request'))
     }
+    expectedHash = expectedHash?.toLowerCase()
     // Immediate local session hit
     if (sessionStore.has(id)) {
       return Promise.resolve(sessionStore.get(id)!)

@@ -183,6 +183,17 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
     setSwarmTransport(null)
   })
 
+  it('normalizes uppercase SHA-256 expectations before verifying content', async () => {
+    const text = 'uppercase hash test'
+    const blob = new Blob([text], { type: 'text/plain' })
+    serveBlob('hash-uppercase', blob, 'text/plain')
+    vi.stubGlobal('window', { gmatch: { vaultPutBytes: vi.fn().mockResolvedValue({ ok: true }) } })
+    const uppercase = (await sha256HexText(text)).toUpperCase()
+    await expect(requestSwarmObject('hash-uppercase', 5000, { expectedHash: uppercase })).resolves.toHaveProperty('size', blob.size)
+    setSwarmTransport(null)
+    vi.unstubAllGlobals()
+  })
+
   it('does not serve zero-byte or over-limit local objects', async () => {
     const send = vi.fn()
     setSwarmTransport(send)
