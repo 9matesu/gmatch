@@ -162,6 +162,46 @@ export class SocialOperationLog {
     }
     return removed
   }
+
+  /**
+   * Replay driver: walk every pending entry once, oldest first, and try to
+   * deliver it. Called on boot, on reconnect, and after each publish.
+   *
+   * Recovery contract for every crash boundary:
+   * - crash before append        -> entry never existed, nothing to lose;
+   * - crash after append         -> next flush sees status 'committed';
+   * - crash mid-send             -> status stuck at 'sending', which is still
+   *                                 pending, so the next flush retries it;
+   * - crash after remote ack but
+   *   before the local status
+   *   update                     -> the retry re-delivers; downstream applies
+   *                                 by operationId, so the duplicate is a no-op.
+   *
+   * `deliver` returning true means durably accepted remotely (or already
+   * present there — same verdict). False/throw means retry later; the entry
+   * stays pending with attempts bumped.
+   */
+  async flushPendingOperations(deliver: (entry: LoggedOperation) => Promise<boolean>): Promise<{ delivered: number; retried: number }> {
+    const summary = { delivered: 0, retried: 0 }
+    const pending = await this.listPendingOperations()
+    for (const entry of pending) {
+      await this.advanceStatus(entry.operationId, 'sending')
+      await this.bumpAttempts(entry.operationId)
+      let ok = false
+      try {
+        ok = await deliver(entry)
+      } catch {
+        ok = false
+      }
+      if (ok) {
+        await this.advanceStatus(entry.operationId, 'delivered')
+        summary.delivered += 1
+      } else {
+        summary.retried += 1
+      }
+    }
+    return summary
+  }
 }
 
 // ---- IndexedDB backend (renderer; mirrors utils/storage.ts patterns) ----

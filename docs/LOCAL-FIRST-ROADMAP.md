@@ -77,12 +77,15 @@ rules are fixed.
 
 **Purpose:** make a local mutation survive process exit before any network call.
 
-Progress: slice 1 exists — `apps/desktop/src/services/socialOperationLog.ts`
+Progress: slices 1–2 exist — `apps/desktop/src/services/socialOperationLog.ts`
 (IndexedDB-backed, injectable backend, immutable idempotent appends, monotonic
 status, bounded size with delivered-first eviction, oldest-first pending
-replay, surfaced storage failures; 9 node tests). Not yet wired into any
-publish path, and the legacy `localStorage` outbox migration plus real
-crash/restart recovery evidence are still open.
+replay, surfaced storage failures) plus `flushPendingOperations`, the replay
+driver whose reopen-based tests cover every crash boundary (before append,
+after append, mid-send, and remote-ack-before-status-update, absorbed by
+operationId idempotence). 13 node tests pass. Not yet wired into any publish
+path, and the legacy `localStorage` outbox migration plus real
+IndexedDB process-restart evidence are still open.
 
 - [ ] Replace social mutation durability based on `localStorage` with an
   IndexedDB/Electron durable operation store. Keep old keys readable and

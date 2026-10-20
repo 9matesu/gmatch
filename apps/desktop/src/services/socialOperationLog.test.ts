@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from 'vitest'
+import { describe, expect, it, beforeEach, vi } from 'vitest'
 import {
   SocialOperationLog,
   createIndexedDbOperationLogBackend,
@@ -136,5 +136,60 @@ describe('SocialOperationLog (L1 slice 1)', () => {
 
   it('exposes an IndexedDB backend constructor for the renderer', () => {
     expect(typeof createIndexedDbOperationLogBackend).toBe('function')
+  })
+
+  describe('flushPendingOperations (crash-boundary replay)', () => {
+    it('replays pending entries across a reopen and marks them delivered', async () => {
+      await log.append(entry(1))
+      await log.append(entry(2))
+      // Simulate a process restart: a fresh log instance over the same store.
+      const reopened = new SocialOperationLog(backend)
+      const seen: string[] = []
+      const summary = await reopened.flushPendingOperations(async (item) => {
+        seen.push(item.operationId)
+        return true
+      })
+      expect(summary).toEqual({ delivered: 2, retried: 0 })
+      // Oldest first.
+      expect(seen).toEqual([entry(1).operationId, entry(2).operationId])
+      expect(await reopened.listPendingOperations()).toEqual([])
+    })
+
+    it('a crash mid-send leaves the entry retryable, and a duplicate remote delivery is harmless', async () => {
+      await log.append(entry(1))
+      await log.advanceStatus(entry(1).operationId, 'sending') // crash mid-send
+      const reopened = new SocialOperationLog(backend)
+      let calls = 0
+      const summary = await reopened.flushPendingOperations(async () => {
+        calls += 1
+        return true
+      })
+      expect(summary).toEqual({ delivered: 1, retried: 0 })
+      expect(calls).toBe(1) // 'sending' counts as pending exactly once
+      expect((await reopened.listPendingOperations())).toEqual([])
+    })
+
+    it('keeps failed entries pending with bumped attempts while others proceed', async () => {
+      await log.append(entry(1))
+      await log.append(entry(2))
+      const summary = await log.flushPendingOperations(async (item) => {
+        if (item.operationId === entry(1).operationId) throw new Error('peer offline')
+        return true
+      })
+      expect(summary).toEqual({ delivered: 1, retried: 1 })
+      const pending = await log.listPendingOperations()
+      expect(pending.map((item) => item.operationId)).toEqual([entry(1).operationId])
+      expect(pending[0].attempts).toBe(1)
+      expect(pending[0].status).toBe('sending')
+    })
+
+    it('delivers nothing when the log is empty or fully delivered', async () => {
+      const deliver = vi.fn(async () => true)
+      expect(await log.flushPendingOperations(deliver)).toEqual({ delivered: 0, retried: 0 })
+      await log.append(entry(1))
+      await log.advanceStatus(entry(1).operationId, 'delivered')
+      expect(await log.flushPendingOperations(deliver)).toEqual({ delivered: 0, retried: 0 })
+      expect(deliver).not.toHaveBeenCalled()
+    })
   })
 })
