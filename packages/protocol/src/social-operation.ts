@@ -9,6 +9,10 @@ const OPERATION_SIG_DOMAIN = `${SOCIAL_PROTOCOL}|${SOCIAL_PROTOCOL_VERSION}|oper
 const HEX64 = /^[0-9a-f]{64}$/
 const HEX128 = /^[0-9a-f]{128}$/
 const MAX_PAYLOAD_BYTES = 32 * 1024
+const OPERATION_TYPES = new Set([
+  'post.create', 'post.edit', 'post.delete',
+  'comment.create', 'comment.delete', 'reaction.add', 'reaction.remove',
+])
 
 export interface SocialOperation {
   protocol: typeof SOCIAL_PROTOCOL
@@ -35,6 +39,17 @@ function signaturePreimage(operation: Omit<SocialOperation, 'signature'>): Uint8
   return new TextEncoder().encode(OPERATION_SIG_DOMAIN + stableStringify(operation))
 }
 
+function isJsonValue(value: unknown, depth = 0): boolean {
+  if (depth > 32) return false
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true
+  if (typeof value === 'number') return Number.isFinite(value)
+  if (Array.isArray(value)) return Object.keys(value).length === value.length && value.every((entry) => isJsonValue(entry, depth + 1))
+  if (typeof value !== 'object') return false
+  const prototype = Object.getPrototypeOf(value)
+  return (prototype === Object.prototype || prototype === null) &&
+    Object.values(value).every((entry) => isJsonValue(entry, depth + 1))
+}
+
 export function createSocialOperation(
   operation: UnsignedOperation,
   privateKeyHex: string,
@@ -54,7 +69,7 @@ export function validateSocialOperation(value: unknown): string | null {
   const fields = ['protocol', 'version', 'type', 'operationId', 'actorId', 'signingKey', 'actorSequence', 'previousOperationId', 'createdAt', 'objectId', 'payload', 'signature']
   if (Object.keys(op).some((key) => !fields.includes(key))) return 'unknown operation field'
   if (op.protocol !== SOCIAL_PROTOCOL || op.version !== SOCIAL_PROTOCOL_VERSION) return 'unsupported protocol version'
-  if (typeof op.type !== 'string' || !/^[a-z][a-z0-9.]{1,63}$/.test(op.type)) return 'invalid operation type'
+  if (typeof op.type !== 'string' || !OPERATION_TYPES.has(op.type)) return 'unsupported operation type'
   if (typeof op.operationId !== 'string' || !HEX64.test(op.operationId)) return 'invalid operation id'
   if (typeof op.actorId !== 'string' || !HEX64.test(op.actorId)) return 'invalid actor id'
   if (typeof op.signingKey !== 'string' || !HEX64.test(op.signingKey)) return 'invalid signing key'
@@ -64,6 +79,7 @@ export function validateSocialOperation(value: unknown): string | null {
   if (!Number.isSafeInteger(op.createdAt) || (op.createdAt as number) < 0) return 'invalid creation time'
   if (typeof op.objectId !== 'string' || op.objectId.length < 1 || op.objectId.length > 256) return 'invalid object id'
   if (!op.payload || typeof op.payload !== 'object' || Array.isArray(op.payload)) return 'payload must be an object'
+  if (!isJsonValue(op.payload)) return 'payload must contain only bounded-depth JSON values'
   if (typeof op.signature !== 'string' || !HEX128.test(op.signature)) return 'invalid signature'
   try {
     if (new TextEncoder().encode(stableStringify(op.payload)).byteLength > MAX_PAYLOAD_BYTES) return 'payload too large'

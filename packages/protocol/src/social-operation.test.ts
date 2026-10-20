@@ -31,13 +31,36 @@ describe('proposed social operation v1', () => {
     expect(validateSocialOperation(operation)).toBeNull()
   })
 
+  it('canonicalizes payload key order before deriving IDs and signatures', () => {
+    const base = {
+      protocol: 'gmatch-social' as const,
+      version: 1 as const,
+      type: 'post.create',
+      actorId: IDENTITY.orbitId,
+      signingKey: IDENTITY.publicKeyHex,
+      actorSequence: 1,
+      previousOperationId: null,
+      createdAt: 1,
+      objectId: 'obj-1',
+    }
+    const left = createSocialOperation({ ...base, payload: { caption: 'hi', tags: ['a', 'b'] } }, IDENTITY.privateKeyHex)
+    const right = createSocialOperation({ ...base, payload: { tags: ['a', 'b'], caption: 'hi' } }, IDENTITY.privateKeyHex)
+    expect(right.operationId).toBe(left.operationId)
+    expect(right.signature).toBe(left.signature)
+  })
+
   it('rejects tampering, key substitution, unknown versions, and oversized payloads', () => {
     const operation = createFixture()
     const cases: Partial<SocialOperation>[] = [
       { ...operation, payload: { caption: 'changed' } },
       { ...operation, actorId: 'f'.repeat(64) },
       { ...operation, version: 2 as 1 },
+      { ...operation, type: 'future.operation' },
       { ...operation, payload: { body: 'x'.repeat(33 * 1024) } },
+      { ...operation, payload: { bad: Number.NaN } },
+      { ...operation, payload: { bad: undefined } },
+      { ...operation, payload: { bad: [, 1] } },
+      { ...operation, payload: { bad: new Date(0) } },
       { ...operation, experimentalField: true },
     ]
     for (const invalid of cases) expect(validateSocialOperation(invalid)).not.toBeNull()

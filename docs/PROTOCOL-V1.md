@@ -46,6 +46,12 @@ not replace content encryption or authorization.
 - All IDs/hashes are lowercase hex in canonical records. Parsers may accept
   uppercase only at documented legacy boundaries and normalize before
   verification; canonical v1 records reject noncanonical casing.
+- The experimental common-envelope validator accepts only the currently
+  enumerated operation names (`post.create`, `post.edit`, `post.delete`,
+  `comment.create`, `comment.delete`, `reaction.add`, `reaction.remove`), JSON
+  payload values no deeper than 32 levels, and payloads up to 32 KiB. Unknown
+  names/types fail closed. These bounds are provisional and operation-specific
+  payload schemas still need to be specified before application use.
 
 ## Operation record
 

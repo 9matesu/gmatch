@@ -287,14 +287,16 @@ UI or documentation.
   full L0 operation/CID/encryption conformance suite.
 - An experimental pure operation helper now exists at
   `packages/protocol/src/social-operation.ts`, with fixed operation-ID and
-  signature coverage. It is intentionally not connected to application
+  signature coverage, canonical key-order behavior, strict known operation
+  names, JSON-only bounded payloads, and basic sequence/previous-ID shape
+  checks. It is intentionally not connected to application
   persistence or network paths; operation-specific authorization, encryption,
   migration, and cross-language vectors remain incomplete.
 - The focused API gossip suite passed (8 tests); workspace typecheck passed;
   lint passed with 0 errors / 47 existing warnings; desktop build passed with
   existing chunk warnings.
 - After adding the experimental operation primitive, the protocol package
-  suite passed (25 tests) and the crypto package suite passed (9 tests); both
+  suite passed (26 tests) and the crypto package suite passed (9 tests); both
   package typechecks passed.
 - Root `npm test` had one failure in
   `GMatchFeed.inline-expand.test.tsx` (reply button inaccessible); rerunning
