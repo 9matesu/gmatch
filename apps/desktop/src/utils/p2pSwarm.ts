@@ -24,6 +24,8 @@ export type SwarmMessage =
     }
   | { type: 'SWARM_CHALLENGE'; id: string; challenge: string }
   | { type: 'SWARM_RECEIPT'; id: string; receipt: unknown }
+  /** A signed social operation travelling between peers (L4 transport). */
+  | { type: 'SWARM_OP'; operation: unknown }
 
 /**
  * RAM cache of swarm bytes.
@@ -553,6 +555,26 @@ export function getDurableReplication(id: string): { receipt: ReplicationReceipt
   return moduleReceiptRoles.getDurableReplication(id)
 }
 
+// ---- SWARM_OP: signed social operations riding the same channel ---------
+// The frame is untrusted transport: the injected handler (wired by useP2P to
+// acceptInboundOperation) re-validates everything before anything is stored.
+
+let swarmOperationHandler: ((operation: unknown) => Promise<void>) | null = null
+export function setSwarmOperationHandler(handler: ((operation: unknown) => Promise<void>) | null): void {
+  swarmOperationHandler = handler
+}
+
+/** Fire one frame out over every wired transport pipe. Best-effort. */
+export function sendSwarmFrame(msg: SwarmMessage): boolean {
+  if (!swarmSend) return false
+  try {
+    swarmSend(msg)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** Test seam for the durable read-back (node tests have no vault). */
 let __durableReadBackForTests: ((id: string) => Promise<boolean>) | null = null
 export function __setDurableReadBackForTests(fn: ((id: string) => Promise<boolean>) | null): void {
@@ -807,6 +829,11 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
   }
   if (msg.type === 'SWARM_RECEIPT') {
     moduleReceiptRoles.handleReceipt(msg.id, msg.receipt)
+    return true
+  }
+  if (msg.type === 'SWARM_OP') {
+    // Untrusted transport: validation lives in the injected handler.
+    void swarmOperationHandler?.(msg.operation)
     return true
   }
   return false

@@ -46,7 +46,18 @@ not replace content encryption or authorization.
 - All IDs/hashes are lowercase hex in canonical records. Parsers may accept
   uppercase only at documented legacy boundaries and normalize before
   verification; canonical v1 records reject noncanonical casing.
-- The experimental common-envelope validator accepts only the currently
+- Experimental transport status: operations ride `SWARM_OP` frames over the
+existing swarm channel. Broadcast is fire-and-forget and only advances an
+entry to `sending`; `delivered` remains reserved for proof-backed
+acknowledgement (a future operation ack mirroring the object receipts), so no
+status anywhere claims replication that was not evidenced. Inbound acceptance
+re-validates signature, actor binding, and manifest self-consistency (the
+claim derivable from the payload must hash to `payload.manifestHash`), then
+authorizes against the receiver's retained log history before a durable
+append. Byte availability is proven separately: the media is fetched over the
+swarm with `expectedHash = contentCid`.
+
+The experimental common-envelope validator accepts only the currently
   enumerated operation names (`post.create`, `post.edit`, `post.delete`,
   `comment.create`, `comment.delete`, `reaction.add`, `reaction.remove`), JSON
   payload values no deeper than 32 levels, and payloads up to 32 KiB. Unknown

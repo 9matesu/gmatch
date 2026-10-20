@@ -21,7 +21,10 @@
  *   crash between them is recovered by replay, which must apply by
  *   operationId idempotently (same rule as every other apply path).
  * - Entries are never silently dropped: at capacity the OLDEST DELIVERED
- *   entries are evicted first; undelivered entries are never evicted.
+ *   entries are evicted first, then entries stuck in 'sending' past
+ *   SENDING_EVICT_MS (already broadcast; actor heads are still never evicted,
+ *   and authorization tolerates the resulting detectable gaps). Fresh
+ *   undelivered entries are never evicted.
  */
 
 export type OperationLogStatus = 'committed' | 'sending' | 'delivered'
@@ -49,6 +52,10 @@ export const MAX_LOG_ENTRIES = 512
 export const MAX_RECORD_BYTES = 64 * 1024
 /** Delivered entries linger this long so reconciliation can see them. */
 export const DELIVERED_GRACE_MS = 5 * 60_000
+/** A broadcast operation stuck in 'sending' this long is evictable: it was
+ *  handed to the network repeatedly; keeping it forever would fill the log
+ *  (broadcast has no delivery proof — see socialOpTransport). */
+export const SENDING_EVICT_MS = 7 * 24 * 3600_000
 
 const HEX64 = /^[0-9a-f]{64}$/
 const STATUS_RANK: Record<OperationLogStatus, number> = { committed: 0, sending: 1, delivered: 2 }
@@ -93,7 +100,14 @@ export interface AppendResult {
 }
 
 export class SocialOperationLog {
-  constructor(private readonly backend: OperationLogBackend) {}
+  private readonly maxEntries: number
+
+  constructor(
+    private readonly backend: OperationLogBackend,
+    options: { maxEntries?: number } = {},
+  ) {
+    this.maxEntries = options.maxEntries ?? MAX_LOG_ENTRIES
+  }
 
   async append(input: {
     operationId: string
@@ -115,16 +129,21 @@ export class SocialOperationLog {
       updatedAt: now,
     }
     if (!isValidLogEntryShape(entry)) throw new Error('invalid log entry')
-    // Capacity: evict oldest delivered first; never evict undelivered work or
-    // an actor's chain head (losing the head forks that actor's history).
+    // Capacity: evict oldest delivered first, then long-stuck 'sending'
+    // entries (already broadcast); never evict fresh pending work, actor
+    // chain heads, or anything else.
     const all = await this.backend.getAll()
-    if (all.length >= MAX_LOG_ENTRIES) {
+    if (all.length >= this.maxEntries) {
+      const now = Date.now()
       const protectedIds = new Set([...actorHeads(all).values()].map((head) => head.operationId))
       const evictable = all
-        .filter((candidate) => candidate.status === 'delivered' && !protectedIds.has(candidate.operationId))
+        .filter((candidate) => !protectedIds.has(candidate.operationId) && (
+          candidate.status === 'delivered' ||
+          (candidate.status === 'sending' && now - candidate.updatedAt > SENDING_EVICT_MS)
+        ))
         .sort((a, b) => a.updatedAt - b.updatedAt)
       let room = all.length
-      const limit = MAX_LOG_ENTRIES - 1
+      const limit = this.maxEntries - 1
       for (const victim of evictable) {
         if (room <= limit) break
         await this.backend.delete(victim.operationId)
@@ -134,6 +153,12 @@ export class SocialOperationLog {
     }
     await this.backend.put(entry)
     return { outcome: 'appended', entry }
+  }
+
+  /** Fast duplicate check for inbound transports (append is still the
+   *  authoritative dedupe — this is the cheap pre-check). */
+  async hasOperation(operationId: string): Promise<boolean> {
+    return !!(await this.backend.get(operationId))
   }
 
   /** Monotonic status advance; returns false on a rejected downgrade/no-op. */

@@ -204,6 +204,21 @@ message or sender acknowledgement alone.
 **Purpose:** remove API dependence from the core public-feed read/write path
 without losing existing posts or weakening moderation/safety behavior.
 
+Progress: the transport seed exists — signed operations now travel between
+peers over the swarm channel (`SWARM_OP` frames,
+`services/socialOpTransport.ts`). Inbound operations are re-validated
+(signature, actor binding, manifest self-consistency, authorization against
+the local log's retained history) before a durable append; duplicates are
+no-ops; out-of-order operations are rejected until their predecessor lands.
+Outbound waves (`broadcastPendingOperations`, wired in `useP2P` on boot and
+peer-online) advance entries to 'sending' — never 'delivered', which stays
+reserved for proof-backed acks; long-stuck 'sending' entries become evictable
+past a 7-day window (heads still never evicted, gaps stay detectable).
+8 transport tests pass, including full author→peer replication. Still open:
+the peer feed projection (applying accepted operations to the visible feed),
+operation acks, comment/reaction operations on the wire, offline read paths,
+and the migration/compatibility work below.
+
 - [ ] Define signed, versioned post operations and deterministic feed ordering,
   pagination, edits, deletes/tombstones, reposts, and duplicate/conflict rules.
 - [ ] Build a local projection/index over received operations and media

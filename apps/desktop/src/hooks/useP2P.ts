@@ -9,7 +9,7 @@ import { mergeRoster } from '../utils/peerRoster';
 import { presenceBucket } from '../utils/compare';
 import { CHAT_WIPE_SECONDS } from '@orbit/shared';
 import { logger } from '../utils/logger';
-import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, hydrateDurableReplications, announcePeerOnline, PEER_ONLINE_EVENT, announceHeldObjects, setSwarmReceiptIdentity, type SwarmMessage } from '../utils/p2pSwarm';
+import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, hydrateDurableReplications, announcePeerOnline, PEER_ONLINE_EVENT, announceHeldObjects, setSwarmReceiptIdentity, setSwarmOperationHandler, sendSwarmFrame, type SwarmMessage } from '../utils/p2pSwarm';
 import { broadcastPresence, fetchPresenceRoster } from '../services/courierPresence';
 import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh } from '../utils/courierSignaling';
 import { resolveDisplayName } from '../utils/displayName';
@@ -363,6 +363,29 @@ export function useP2P(identity: OrbitIdentity | null) {
     }
     resumeTransfers()
     window.addEventListener(PEER_ONLINE_EVENT, resumeTransfers);
+
+    // L4 transport: signed social operations travel over the swarm channel.
+    // Inbound frames are re-validated + authorized before the durable log
+    // accepts them; outbound waves hand every pending operation to the
+    // network on boot and whenever a peer comes online. Broadcast is
+    // fire-and-forget ('sending', never 'delivered' — proof comes later).
+    let teardownOperations: (() => void) | null = null
+    void import('../services/socialOperationLog').then(async ({ SocialOperationLog, createIndexedDbOperationLogBackend }) => {
+      const { acceptInboundOperation, broadcastPendingOperations } = await import('../services/socialOpTransport')
+      const operationLog = new SocialOperationLog(createIndexedDbOperationLogBackend())
+      setSwarmOperationHandler((operation) => acceptInboundOperation(operationLog, operation).then(() => undefined))
+      const broadcastOperations = () => {
+        void broadcastPendingOperations(operationLog, (operation) => {
+          sendSwarmFrame({ type: 'SWARM_OP', operation })
+        }).catch(() => {})
+      }
+      broadcastOperations()
+      window.addEventListener(PEER_ONLINE_EVENT, broadcastOperations)
+      teardownOperations = () => {
+        window.removeEventListener(PEER_ONLINE_EVENT, broadcastOperations)
+        setSwarmOperationHandler(null)
+      }
+    }).catch(() => { /* operation transport unavailable this session */ })
 
     // Load saved known peers from storage on mount. Entries unseen for over
     // 24h are dropped so ancient ghosts never resurrect; the rest hydrate as
@@ -828,6 +851,8 @@ export function useP2P(identity: OrbitIdentity | null) {
       channelRef.current = null;
       setSwarmTransport(null);
       window.removeEventListener(PEER_ONLINE_EVENT, resumeTransfers);
+      if (teardownOperations) teardownOperations();
+      setSwarmOperationHandler(null);
       unsubMesh();
       if (wsRef.current) {
         wsRef.current.close();
