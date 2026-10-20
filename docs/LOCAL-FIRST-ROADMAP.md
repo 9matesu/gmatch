@@ -297,7 +297,7 @@ UI or documentation.
   lint passed with 0 errors / 47 existing warnings; desktop build passed with
   existing chunk warnings.
 - After adding the experimental operation primitive, the protocol package
-  suite passed (27 tests) and the crypto package suite passed (9 tests); both
+  suite passed (28 tests) and the crypto package suite passed (9 tests); both
   package typechecks passed.
 - Root `npm test` had one failure in
   `GMatchFeed.inline-expand.test.tsx` (reply button inaccessible); rerunning

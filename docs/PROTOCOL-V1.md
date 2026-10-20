@@ -143,6 +143,36 @@ supersedes the current head, or that reaction removals are authorized. Those
 checks require the replicated operation view and must be completed before
 network integration.
 
+### Public-operation authorization and projection rules (proposal)
+
+- `post.create`: the signed actor creates `objectId`; a second create with the
+  same ID is a conflict, not an overwrite. The referenced manifest must be
+  author-signed by the same actor and its CID/size/MIME must agree with payload.
+- `post.edit`: only the post creator may edit. `supersedes` must name exactly
+  the current unsuperseded create/edit head operation IDs for that post. A
+  concurrent edit creates multiple heads; a later edit may resolve them by
+  naming every head. Do not use wall-clock last-write-wins.
+- `post.delete`: only the post creator may tombstone it, and
+  `targetOperationId` must identify that post's create operation. Tombstone is
+  terminal in the normal author model; later create/edit/replay cannot
+  resurrect the object. Moderation override is deliberately not defined here.
+- `comment.create`: the referenced post must exist and not be tombstoned. A
+  non-null parent must identify a comment on the same post and must not be
+  tombstoned. The new comment's `objectId` is unique.
+- `comment.delete`: only the actor who created the target comment may delete
+  it; target and operation `objectId` must resolve to the same comment.
+- `reaction.add`: actor creates a unique reaction operation. Target must be a
+  live post/comment. V1 permits only `like` and at most one active like per
+  actor/target; duplicate adds remain in history but project to one active
+  state.
+- `reaction.remove`: every target must be a `reaction.add` by the same actor
+  and target. Removal is exact-ID based, so a later concurrent add remains
+  active. A remove cannot revoke another actor's reaction.
+
+These rules require a validated operation graph. Until that graph/index and
+authorization checker exist, the package helper only validates record/payload
+shape and signatures; it must not be used as a write authorization decision.
+
 ## Content and transfer contract
 
 - Plaintext object CID is SHA-256 of exact plaintext bytes. Encrypted objects

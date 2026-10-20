@@ -95,4 +95,14 @@ describe('proposed social operation v1', () => {
     const post = createSocialOperation({ ...common, type: 'post.create', payload: payloads[0][1] }, IDENTITY.privateKeyHex)
     expect(validateSocialOperation({ ...post, payload: { ...post.payload, unexpected: true } })).toMatch(/payload/)
   })
+
+  it('does not create an operation when the supplied private key cannot sign for its public key', () => {
+    const other = restoreIdentity('22'.repeat(32), '33'.repeat(32))
+    expect(() => createSocialOperation({
+      protocol: 'gmatch-social', version: 1, type: 'post.create',
+      actorId: IDENTITY.orbitId, signingKey: IDENTITY.publicKeyHex,
+      actorSequence: 1, previousOperationId: null, createdAt: 1, objectId: 'post-1',
+      payload: { contentCid: 'a'.repeat(64), manifestHash: 'b'.repeat(64), mimeType: 'image/jpeg', sizeBytes: 1 },
+    }, other.privateKeyHex)).toThrow(/invalid signature/)
+  })
 })
