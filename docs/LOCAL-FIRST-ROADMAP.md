@@ -293,6 +293,9 @@ UI or documentation.
 - The focused API gossip suite passed (8 tests); workspace typecheck passed;
   lint passed with 0 errors / 47 existing warnings; desktop build passed with
   existing chunk warnings.
+- After adding the experimental operation primitive, the protocol package
+  suite passed (25 tests) and the crypto package suite passed (9 tests); both
+  package typechecks passed.
 - Root `npm test` had one failure in
   `GMatchFeed.inline-expand.test.tsx` (reply button inaccessible); rerunning
   that file alone passed all 7 tests. Treat the full-suite result as flaky/not
