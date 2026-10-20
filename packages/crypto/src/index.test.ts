@@ -14,6 +14,7 @@ import {
   hexToBytes,
   signContentManifest,
   verifyContentManifest,
+  bytesToHex,
 } from './index';
 
 describe('Crypto Identity & Encryption', () => {
@@ -48,6 +49,18 @@ describe('Crypto Identity & Encryption', () => {
 
     const isInvalid = verifySignature(signature, new TextEncoder().encode('Tampered message'), identity.publicKeyHex);
     expect(isInvalid).toBe(false);
+  });
+
+  it('matches the fixed Ed25519 identity and signature interoperability vector', () => {
+    const identity = restoreIdentity('00'.repeat(32), '11'.repeat(32));
+    const message = new TextEncoder().encode('gmatch-social|1|test|{}');
+    const signature = signMessage(message, identity.privateKeyHex);
+
+    expect(identity.publicKeyHex).toBe('3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29');
+    expect(identity.orbitId).toBe('139e3940e64b5491722088d9a0d741628fc826e09475d341a780acde3c4b8070');
+    expect(bytesToHex(signature)).toBe('abe93333b41bfde024bb2ec60ccc8a9ae78d50f4ed2a57e60b063559526dc2ec2603518ba8a576ae7f940b1f9a72815cbe42a143d0993aec407aaeaad54d6c0b');
+    expect(verifySignature(signature, message, identity.publicKeyHex)).toBe(true);
+    expect(verifySignature(signature, new TextEncoder().encode('gmatch-social|1|test|{"x":1}'), identity.publicKeyHex)).toBe(false);
   });
 
   it('should encrypt and decrypt payloads with X25519 shared secret', () => {
