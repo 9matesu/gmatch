@@ -88,7 +88,7 @@ function pickDestDir(userExePath, tempDir) {
   return null
 }
 
-function createUpdater({ app, webContents, log = () => {} }) {
+function createUpdater({ app, webContents, log = () => {}, spawnFn = spawn }) {
   let state = { phase: 'idle', current: app.getVersion() }
   const insecureOverride = Boolean(process.env.GMATCH_RELEASE_URL)
   const apiUrl = process.env.GMATCH_RELEASE_URL || RELEASE_URL
@@ -120,6 +120,10 @@ function createUpdater({ app, webContents, log = () => {} }) {
         setStatus({ phase: 'downloading', percent: Math.max(0, percent), bytes: received })
       }, { insecure: insecureOverride })
       const expected = plan.digest || null
+      // Size first (cheap truncation catch), then the published digest.
+      if (plan.sizeBytes !== null && bytes !== plan.sizeBytes) {
+        throw new Error('downloaded size does not match the published size; the download was discarded')
+      }
       const verified = expected ? sha256 === expected : null
       if (verified === false) throw new Error('sha256 mismatch. The download was discarded.')
       fs.renameSync(partial, dest)
@@ -136,23 +140,45 @@ function createUpdater({ app, webContents, log = () => {} }) {
 
   async function check(manual) {
     if (state.phase === 'downloading') return state
+    // Capture the pre-check state: setStatus(clobbering to 'checking') below
+    // must not erase what the already-downloaded guard needs to compare.
+    const prev = { phase: state.phase, version: state.version, destPath: state.destPath }
     setStatus({ phase: 'checking', manual: Boolean(manual) })
     try {
       const release = await getJson(apiUrl, { insecure: insecureOverride })
       const plan = core.planCheck(release, app.getVersion(), { insecure: insecureOverride })
       if (plan.action === 'current') return setStatus({ phase: 'current', latest: plan.version })
       if (plan.action === 'error') return setStatus({ phase: 'error', error: plan.error })
+      // Already downloaded these exact bytes and the file is still there:
+      // repeated checks (daily timer, manual) must not re-download the same
+      // version over and over.
+      if (plan.action === 'download' && prev.phase === 'ready' &&
+          prev.version === plan.version && prev.destPath && fs.existsSync(prev.destPath)) {
+        return setStatus({ phase: 'ready', version: plan.version, destPath: prev.destPath })
+      }
       setStatus({ phase: 'available', version: plan.version })
       void startDownload(plan) // auto-download; the user only confirms the swap
       return state
     } catch (err) {
-      return setStatus({ phase: 'error', error: String(err?.message || err) })
+      const message = String(err?.message || err)
+      // A 503 from the release host is a cold-start (free-tier dyno waking),
+      // not a missing release: say so instead of reading like a dead link.
+      const friendly = message.includes('503')
+        ? `${message} (the release host may be waking up - retry in a minute)`
+        : message
+      return setStatus({ phase: 'error', error: friendly })
     }
   }
 
   /** Hand off to cmd.exe (replace the user's portable exe + relaunch) and quit. */
+  let installing = false
   function install() {
     if (state.phase !== 'ready' || !state.destPath) return { ok: false, error: 'nothing downloaded yet' }
+    if (installing) return { ok: false, error: 'update is already installing' }
+    // Never execute an unverified update artifact: refuse when the published
+    // hash was absent or mismatched (mismatch already aborts the download).
+    if (state.verified !== true) return { ok: false, error: 'refusing to install: download integrity was not verified' }
+    installing = true
     const target = portableExePath()
     const script = core.buildUpdaterScript({
       source: state.destPath,
@@ -162,8 +188,16 @@ function createUpdater({ app, webContents, log = () => {} }) {
     const cmdPath = path.join(app.getPath('temp'), 'gmatch-update.cmd')
     try {
       fs.writeFileSync(cmdPath, script)
-      spawn('cmd.exe', ['/c', cmdPath], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
+      // windowsHide gives cmd.exe an INVISIBLE console that the batch's
+      // children (ping.exe, etc.) inherit. `detached: true` was removed on
+      // purpose: DETACHED_PROCESS leaves cmd with NO console, and every
+      // external console exe the batch calls then allocates its own VISIBLE
+      // window — the "reappearing ping prompts" update-loop report. Windows
+      // children survive the parent quitting (no job object), and .unref()
+      // detaches the child from this process's event loop.
+      spawnFn('cmd.exe', ['/c', cmdPath], { stdio: 'ignore', windowsHide: true }).unref()
     } catch (err) {
+      installing = false
       return { ok: false, error: String(err?.message || err) }
     }
     log(`[updater] handing swap of ${path.basename(target)} to ${cmdPath}`)

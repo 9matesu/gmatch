@@ -403,6 +403,21 @@ offline earnings). Each +5% click power. Persist across prestige.
   `.github/workflows/release.yml` (lint+typecheck+test gate → GitHub Release
   asset), used for mirrors, not the primary link. Unsigned exe → SmartScreen
   "More info → Run anyway".
+- Portable self-updater (`electron/updater.cjs` + `updater-core.cjs`,
+  packaged builds only): daily + manual check of the site `release.json`,
+  auto-download verified against the published SHA-256 **and** size, then the
+  user's "Install & Restart" hands a hidden cmd.exe a bounded swap script
+  (3s/6s/10s backoff, 30 tries ≈ 3 min) that moves the new exe over the old
+  one and relaunches. On terminal swap failure it **relaunches the OLD exe**
+  (the downloaded file stays for manual replacement) so no failure path ends
+  with a closed app, and the next attempt needs fresh user consent — no
+  automatic update/restart loop exists. The cmd runs `windowsHide` WITHOUT
+  `detached`: a detached cmd has no console, so every console exe it calls
+  (the retry `ping`) would allocate its own visible window — the old
+  "reappearing command prompts" bug. Unverified downloads (missing published
+  hash) are never installed. The sidecar's quit-time `taskkill` is likewise
+  hidden. A 503 from the release host is the free-tier dyno waking up — an
+  error to retry, not a missing release.
 
 ## 13. Servers (directory, federation, admin) — v1.1+
 

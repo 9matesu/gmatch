@@ -45,7 +45,7 @@ function parseRelease(release, opts) {
     const okUrl = url.startsWith('https://') || (allowHttp && url.startsWith('http://'))
     if (!version || !okUrl) continue
     if (!best || isNewer(version, best.version)) {
-      best = { version, name: String(a.name), url, digest: parseDigest(a.digest) }
+      best = { version, name: String(a.name), url, digest: parseDigest(a.digest), sizeBytes: sizeField(a.size) }
     }
   }
   if (best) return best
@@ -75,12 +75,18 @@ function parseSiteRelease(meta, base = 'https://gmatch-wcz1.onrender.com') {
   const rel = `/releases/${name.replace(/[^\w.-]/g, '')}`
   let url = String(meta.downloadUrl || '')
   if (!/^https?:\/\//i.test(url)) url = base + rel
-  return { version, name, url, digest: shaField(meta.sha256) }
+  return { version, name, url, digest: shaField(meta.sha256), sizeBytes: sizeField(meta.sizeBytes) }
 }
 
 /** Lowercase 64-hex sha256 or null. */
 function shaField(v) {
   return /^[0-9a-f]{64}$/i.test(String(v || '')) ? String(v).toLowerCase() : null
+}
+
+/** Positive integer byte size or null (used to validate the downloaded file). */
+function sizeField(v) {
+  const n = Number(v)
+  return Number.isSafeInteger(n) && n > 0 ? n : null
 }
 
 /** Decision for a fresh release payload against the installed version. Accepts
@@ -112,6 +118,13 @@ function sanitizePath(p) {
  * Batch script that runs AFTER the app quits: retry-move the downloaded exe
  * over the old one (AV scanners release their handle late), relaunch, and
  * self-delete. Pure string builder — tested directly.
+ *
+ * Window visibility contract: the cmd.exe that runs this script must be
+ * spawned with `windowsHide: true` and WITHOUT `detached: true` (see
+ * updater.cjs). A detached cmd has NO console at all, so every external
+ * console exe the batch calls — `ping.exe` below — allocates its own
+ * VISIBLE window on every retry (the "reappearing command prompts" bug).
+ * With windowsHide the cmd owns an invisible console its children inherit.
  */
 function buildUpdaterScript({ source, target, logPath }) {
   const src = sanitizePath(source)
@@ -125,13 +138,24 @@ function buildUpdaterScript({ source, target, logPath }) {
     'set /a TRIES+=1',
     `move /y "${src}" "${dst}" >> "${log}" 2>&1`,
     'if not errorlevel 1 goto launch',
-    'if %TRIES% GEQ 30 (',
-    `  echo [updater] could not replace "${dst}" after 30 attempts >> "${log}"`,
-    `  echo [updater] keep the downloaded file and replace manually >> "${log}"`,
-    '  goto end',
-    ')',
-    'ping -n 4 127.0.0.1 >nul',
+    'if %TRIES% GEQ 30 goto giveup',
+    // Progressive backoff between move attempts: ~3s for the first ten
+    // (the common AV-handle case clears in seconds), ~6s for the next ten,
+    // ~10s for the last ten. Bounded: 30 tries, about three minutes total.
+    'set /a WAIT=3',
+    'if %TRIES% GTR 10 set /a WAIT=6',
+    'if %TRIES% GTR 20 set /a WAIT=10',
+    'ping -n %WAIT% 127.0.0.1 >nul',
     'goto retry',
+    ':giveup',
+    `echo [updater] could not replace "${dst}" after 30 attempts >> "${log}"`,
+    `echo [updater] downloaded file kept at "${src}" - replace manually >> "${log}"`,
+    // Terminal failure must never leave the user without a working app:
+    // the move failed, so the OLD exe is still in place — relaunch it. The
+    // next update attempt requires the user's consent again, so this
+    // cannot loop by itself.
+    `start "" "${dst}"`,
+    'goto end',
     ':launch',
     `start "" "${dst}"`,
     ':end',
@@ -141,4 +165,4 @@ function buildUpdaterScript({ source, target, logPath }) {
   ].join('\r\n')
 }
 
-module.exports = { isNewer, parsePortableName, parseDigest, parseRelease, parseSiteRelease, shaField, shaFromReleaseJson, planCheck, sanitizePath, buildUpdaterScript, PORTABLE_RE }
+module.exports = { isNewer, parsePortableName, parseDigest, parseRelease, parseSiteRelease, shaField, sizeField, shaFromReleaseJson, planCheck, sanitizePath, buildUpdaterScript, PORTABLE_RE }
