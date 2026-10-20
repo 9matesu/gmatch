@@ -189,7 +189,7 @@ function stopApi() {
     try {
       if (process.platform === 'win32' && pid) {
         const { execSync } = require('node:child_process')
-        try { execSync(`taskkill /pid ${pid} /T /F`, { stdio: 'ignore' }) } catch { /* already dead */ }
+        try { execSync(`taskkill /pid ${pid} /T /F`, { stdio: 'ignore', windowsHide: true }) } catch { /* already dead */ }
       }
     } catch { /* best effort */ }
     try {
