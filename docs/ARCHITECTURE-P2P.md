@@ -475,6 +475,17 @@ equal SHA-256 of the enclosed Ed25519 public key, both when a relay accepts an
 envelope and when a host applies a pulled one. This prevents a valid key from
 signing posts under an unrelated account ID; it does not prove media availability.
 
+Experimental (protocol proposal v1): level-4 evidence now exists as signed
+replication receipts. A serving peer mints a fresh challenge per served
+content-addressed object (`SWARM_CHALLENGE`), and the fetching peer — after
+verifying, persisting, and reading back the bytes from its durable store —
+returns a SIGNED receipt bound to that challenge (`SWARM_RECEIPT`,
+`createSwarmReceiptRoles` in `utils/p2pSwarm.ts`). Only a receipt matching
+the seeder's outstanding challenge counts (`getDurableReplication`);
+tampered, stale-challenge, unsolicited, or un-attested transfers (failed
+read-back, no signing identity) never do. Receipts are recorded per session
+and are not yet surfaced in the UI or persisted across restarts.
+
 Pending swarm transfers persist (`gmatch_pending_transfers_v1`) and resume on
 boot and on `PEER_ONLINE_EVENT`, so an offline seeder is retried later rather
 than lost. Two-machine delivery remains **unverified** until tested on real

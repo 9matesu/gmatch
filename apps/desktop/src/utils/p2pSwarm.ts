@@ -5,6 +5,12 @@
  * without routing heavy media blobs through the central server.
  */
 
+import {
+  createReplicationReceipt,
+  validateReplicationReceipt,
+  type ReplicationReceipt,
+} from '@orbit/protocol'
+
 export type SwarmMessage =
   | { type: 'SWARM_HAVE'; ids: string[] }
   | { type: 'SWARM_WANT'; id: string }
@@ -16,6 +22,8 @@ export type SwarmMessage =
       mimeType: string
       dataBase64: string
     }
+  | { type: 'SWARM_CHALLENGE'; id: string; challenge: string }
+  | { type: 'SWARM_RECEIPT'; id: string; receipt: unknown }
 
 /**
  * RAM cache of swarm bytes.
@@ -266,18 +274,16 @@ export function hasLocalObject(id: string): boolean {
   return !!id && localObjects.has(id)
 }
 
-export async function getLocalObject(id: string): Promise<Blob | null> {
-  if (!id) return null
-  const inRam = lookupLocalObject(id)
-  if (inRam) return inRam
-
+/**
+ * Durable-only read (vault then IndexedDB): NEVER the RAM cache. Used by
+ * getLocalObject for a durable rehydrate and by the replication-receipt path
+ * to prove bytes are really on disk before this node claims durable custody.
+ */
+async function readDurableObject(id: string): Promise<Blob | null> {
   // Vault (disk, content-addressed): id is the content hash. readVaultBlob
   // verifies the file exists and decrypts it; fetch rehydrates the blob.
   const fromVault = await readVaultBlob(id)
-  if (fromVault) {
-    rememberLocalObject(id, fromVault)
-    return fromVault
-  }
+  if (fromVault) return fromVault
 
   // Fallback: IndexedDB (survives reload; dev-only path)
   try {
@@ -285,15 +291,22 @@ export async function getLocalObject(id: string): Promise<Blob | null> {
     const stored = await getObject(id)
     const data = stored?.data as ArrayBuffer | undefined
     if (stored && data && data.byteLength > 0) {
-      const blob = new Blob([data], { type: stored.mime_type || 'application/octet-stream' })
-      rememberLocalObject(id, blob)
-      return blob
+      return new Blob([data], { type: stored.mime_type || 'application/octet-stream' })
     }
   } catch {
     /* storage unavailable */
   }
 
   return null
+}
+
+export async function getLocalObject(id: string): Promise<Blob | null> {
+  if (!id) return null
+  const inRam = lookupLocalObject(id)
+  if (inRam) return inRam
+  const durable = await readDurableObject(id)
+  if (durable) rememberLocalObject(id, durable)
+  return durable
 }
 
 // ---- Swarm transport: module-level WANT/CHUNK request/response ------------
@@ -307,6 +320,204 @@ let swarmSend: SwarmSend | null = null
 
 export function setSwarmTransport(send: SwarmSend | null): void {
   swarmSend = send
+}
+
+// ---- SWARM_CHALLENGE / SWARM_RECEIPT: durable-replication evidence -------
+// Protocol proposal v1 (roadmap L2). A serving peer mints a fresh challenge
+// per served object; the FETCHING peer — after it verified the assembled
+// bytes, persisted them, and read them back from its durable store — signs a
+// replication receipt bound to that challenge. The seeder only records the
+// receipt when the challenge matches its outstanding one, so replayed or
+// unsolicited receipts are ignored. A HAVE message or a completed send is
+// never evidence; only a valid receipt marks an object as held on another
+// node (roles.getDurableReplication).
+// Limitation (deliberate, v1): challenges/receipts exist only for
+// content-addressed ids (the id IS the sha256), and manifest-less legacy
+// objects bind manifestHash = objectCid (the content hash is the integrity
+// anchor; v1-manifest objects will bind the real manifest hash).
+
+export interface SwarmReceiptIdentity {
+  orbitId: string
+  publicKeyHex: string
+  privateKeyHex: string
+}
+
+const MAX_OUTSTANDING_CHALLENGES = 64
+const MAX_PENDING_CHALLENGES = 64
+const MAX_DURABLE_REPLICATIONS = 256
+const MAX_RECENTLY_DURABLE = 256
+
+export interface SwarmReceiptRolesOptions {
+  send: (msg: SwarmMessage) => void
+  /** Durable read-back: prove the bytes are really on disk before attesting. */
+  readBack: (id: string) => Promise<boolean>
+  /** This node's signing identity for receipts it issues as a FETCHER. */
+  identity: () => SwarmReceiptIdentity | null
+}
+
+export interface SwarmReceiptRoles {
+  /** Seeder: mint + send a fresh challenge after serving an object. */
+  mintChallengeFor(id: string): void
+  /** Fetcher: a fetch's bytes just reached the durable store. */
+  noteDurablePersist(id: string): void
+  /** Inbound: a seeder challenged us to attest durable custody. */
+  handleChallenge(id: string, challenge: string): void
+  /** Inbound: a fetcher claims durable custody of an object we serve. */
+  handleReceipt(id: string, receipt: unknown): void
+  getDurableReplication(id: string): { receipt: ReplicationReceipt; confirmedAt: number } | null
+  reset(): void
+}
+
+function boundMap<K, V>(map: Map<K, V>, max: number): void {
+  while (map.size > max) {
+    const oldest = map.keys().next().value as K | undefined
+    if (oldest === undefined) break
+    map.delete(oldest)
+  }
+}
+
+/**
+ * One receipt state machine per transport context: the module singleton owns
+ * the production pipes; each `createSwarmSession` peer owns an isolated one,
+ * which is what makes the two-peer handshake testable in-process.
+ */
+export function createSwarmReceiptRoles(options: SwarmReceiptRolesOptions): SwarmReceiptRoles {
+  /** Seeder side: id -> the challenge it most recently minted for that object. */
+  const outstandingChallenges = new Map<string, { challenge: string; mintedAt: number }>()
+  /** Fetcher side: id -> challenge awaiting a durable persist to answer. */
+  const pendingChallenges = new Map<string, string>()
+  /** Fetcher side: ids durably persisted (late-challenge path). */
+  const recentlyDurablyHeld = new Map<string, number>()
+  /** Seeder side: recorded valid receipts (bounded, latest per object). */
+  const durableReplications = new Map<string, { receipt: ReplicationReceipt; confirmedAt: number }>()
+
+  async function signAndSendReceipt(id: string, challenge: string): Promise<void> {
+    const identity = options.identity()
+    if (!identity) return
+    if (!await options.readBack(id)) return // honest: no read-back, no receipt
+    try {
+      const receipt = createReplicationReceipt({
+        protocol: 'gmatch-social',
+        version: 1,
+        receiverId: identity.orbitId,
+        receiverKey: identity.publicKeyHex,
+        objectCid: id,
+        manifestHash: id, // manifest-less legacy objects: see block comment above
+        durable: true,
+        challenge,
+        createdAt: Date.now(),
+      }, identity.privateKeyHex)
+      options.send({ type: 'SWARM_RECEIPT', id, receipt })
+    } catch {
+      /* cannot attest: stay silent, the seeder simply never records us */
+    }
+  }
+
+  function attest(id: string, challenge: string): void {
+    void signAndSendReceipt(id, challenge)
+  }
+
+  return {
+    mintChallengeFor(id) {
+      if (!isSha256Hex(id)) return
+      const bytes = new Uint8Array(32)
+      crypto.getRandomValues(bytes)
+      const challenge = Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('')
+      outstandingChallenges.set(id, { challenge, mintedAt: Date.now() })
+      boundMap(outstandingChallenges, MAX_OUTSTANDING_CHALLENGES)
+      try {
+        options.send({ type: 'SWARM_CHALLENGE', id, challenge })
+      } catch {
+        /* transport hiccup: no receipt will validate, correct failure mode */
+      }
+    },
+    noteDurablePersist(id) {
+      recentlyDurablyHeld.set(id, Date.now())
+      boundMap(recentlyDurablyHeld, MAX_RECENTLY_DURABLE)
+      const challenge = pendingChallenges.get(id)
+      if (challenge) {
+        pendingChallenges.delete(id)
+        attest(id, challenge)
+      }
+    },
+    handleChallenge(id, challenge) {
+      if (!isSha256Hex(id) || !isSha256Hex(challenge)) return
+      pendingChallenges.set(id, challenge)
+      boundMap(pendingChallenges, MAX_PENDING_CHALLENGES)
+      // The challenge may arrive after our persist already completed.
+      if (recentlyDurablyHeld.has(id)) {
+        pendingChallenges.delete(id)
+        attest(id, challenge)
+      }
+    },
+    handleReceipt(id, receipt) {
+      // Consume silently unless it matches our outstanding challenge and
+      // fully validates (signature, identity binding, freshness, durability).
+      const outstanding = outstandingChallenges.get(id)
+      if (!outstanding || !isSha256Hex(id)) return
+      if (validateReplicationReceipt(receipt)) return
+      const valid = receipt as ReplicationReceipt
+      if (valid.challenge !== outstanding.challenge) return // replay/stale
+      if (valid.objectCid !== id) return
+      outstandingChallenges.delete(id)
+      durableReplications.set(id, { receipt: valid, confirmedAt: Date.now() })
+      boundMap(durableReplications, MAX_DURABLE_REPLICATIONS)
+    },
+    getDurableReplication(id) {
+      return durableReplications.get(id) ?? null
+    },
+    reset() {
+      outstandingChallenges.clear()
+      pendingChallenges.clear()
+      recentlyDurablyHeld.clear()
+      durableReplications.clear()
+    },
+  }
+}
+
+let receiptIdentity: SwarmReceiptIdentity | null = null
+/** This node's signing identity for receipts it issues as a FETCHER. */
+export function setSwarmReceiptIdentity(identity: SwarmReceiptIdentity | null): void {
+  receiptIdentity = identity
+}
+
+/**
+ * Durable custody proof for the FETCHER's side: re-read the bytes from the
+ * durable store (never RAM) and re-verify the content hash before this node
+ * is allowed to claim durable custody in a receipt.
+ */
+async function confirmDurableHold(id: string): Promise<boolean> {
+  if (typeof __durableReadBackForTests === 'function') return __durableReadBackForTests(id)
+  try {
+    const blob = await readDurableObject(id)
+    if (!blob || !isSha256Hex(id)) return false
+    return (await sha256HexBlob(blob)) === id
+  } catch {
+    return false
+  }
+}
+
+const moduleReceiptRoles = createSwarmReceiptRoles({
+  send: (msg) => { try { swarmSend?.(msg) } catch { /* transport hiccup */ } },
+  readBack: confirmDurableHold,
+  identity: () => receiptIdentity,
+})
+
+/** Latest valid durable-replication receipt recorded for an object we serve. */
+export function getDurableReplication(id: string): { receipt: ReplicationReceipt; confirmedAt: number } | null {
+  return moduleReceiptRoles.getDurableReplication(id)
+}
+
+/** Test seam for the durable read-back (node tests have no vault). */
+let __durableReadBackForTests: ((id: string) => Promise<boolean>) | null = null
+export function __setDurableReadBackForTests(fn: ((id: string) => Promise<boolean>) | null): void {
+  __durableReadBackForTests = fn
+}
+
+/** Test seam: wipe challenge/receipt state (durable bytes untouched). */
+export function __resetReceiptStateForTests(): void {
+  moduleReceiptRoles.reset()
+  receiptIdentity = null
 }
 
 interface PendingFetch {
@@ -415,6 +626,12 @@ function decodeChunk(dataBase64: string): Uint8Array {
   return bytes
 }
 
+/** Fetcher-side bookkeeping after a fetch's bytes reached the durable store:
+ *  answer any outstanding challenge with a signed durable-custody receipt. */
+function noteDurableFetchComplete(id: string): void {
+  moduleReceiptRoles.noteDurablePersist(id)
+}
+
 async function finishFetch(id: string, req: PendingFetch): Promise<void> {
   clearTimeout(req.timer)
     const parts: Uint8Array[] = []
@@ -438,6 +655,7 @@ async function finishFetch(id: string, req: PendingFetch): Promise<void> {
       try {
         await persistLocalObject(id, assembled)
         if (pendingFetches.get(id) === req) pendingFetches.delete(id)
+        noteDurableFetchComplete(id)
         req.resolve(assembled)
       } catch (error) {
         failFetch(id, req, error instanceof Error ? error : new Error('Object persistence failed'))
@@ -449,6 +667,7 @@ async function finishFetch(id: string, req: PendingFetch): Promise<void> {
   try {
     await persistLocalObject(id, assembled)
     if (pendingFetches.get(id) === req) pendingFetches.delete(id)
+    noteDurableFetchComplete(id)
     req.resolve(assembled)
   } catch (error) {
     failFetch(id, req, error instanceof Error ? error : new Error('Object persistence failed'))
@@ -481,6 +700,9 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
         if (!isBoundedChunkFrame(frame)) return true
         swarmSend(frame)
       }
+      // v1 replication evidence: challenge the fetcher to attest durable
+      // custody once it lands the bytes (content-addressed ids only).
+      moduleReceiptRoles.mintChallengeFor(msg.id)
     } catch {
       /* read failed */
     }
@@ -530,6 +752,14 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
   }
   if (msg.type === 'SWARM_HAVE') {
     fetchWantedFromHave(Array.isArray(msg.ids) ? msg.ids : [])
+    return true
+  }
+  if (msg.type === 'SWARM_CHALLENGE') {
+    moduleReceiptRoles.handleChallenge(msg.id, msg.challenge)
+    return true
+  }
+  if (msg.type === 'SWARM_RECEIPT') {
+    moduleReceiptRoles.handleReceipt(msg.id, msg.receipt)
     return true
   }
   return false
@@ -622,6 +852,10 @@ export function cancelSwarmObject(id: string): boolean {
 export interface SwarmSessionOptions {
   send: (msg: SwarmMessage) => void
   localStore?: Map<string, Blob>
+  /** Signing identity for durable-custody receipts this session issues. */
+  receiptIdentity?: SwarmReceiptIdentity | null
+  /** Test override for the session's durable read-back. */
+  durableReadBack?: (id: string) => Promise<boolean>
 }
 
 export interface SwarmSession {
@@ -629,10 +863,27 @@ export interface SwarmSession {
   requestObject: (id: string, timeoutMs?: number, expectedHash?: string) => Promise<Blob>
   registerLocalObject: (id: string, blob: Blob) => void
   cancelObject: (id: string) => boolean
+  /** This session's receipt state machine (two-peer tests + future transports). */
+  receiptRoles: SwarmReceiptRoles
 }
 
 export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
   const sessionStore = options.localStore || new Map<string, Blob>()
+  const receiptRoles = createSwarmReceiptRoles({
+    send: options.send,
+    identity: () => options.receiptIdentity ?? null,
+    readBack: options.durableReadBack ?? (async (id) => {
+      // A session's durable store is its sessionStore: the read-back hashes
+      // the stored bytes against the content-addressed id.
+      const blob = sessionStore.get(id)
+      if (!blob || !isSha256Hex(id)) return false
+      try {
+        return (await sha256HexBlob(blob)) === id
+      } catch {
+        return false
+      }
+    }),
+  })
   const pendingRequests = new Map<
     string,
     {
@@ -681,6 +932,7 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
         if (!isBoundedChunkFrame(frame)) return
         options.send(frame)
       }
+      receiptRoles.mintChallengeFor(msg.id)
       return
     }
 
@@ -742,7 +994,9 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
             }
             clearTimeout(req.timer)
             pendingRequests.delete(msg.id)
+            sessionStore.set(msg.id, assembledBlob)
             registerLocalObject(msg.id, assembledBlob)
+            receiptRoles.noteDurablePersist(msg.id)
             req.resolve(assembledBlob)
           }).catch(() => {
             if (pendingRequests.get(msg.id) !== req) return
@@ -754,10 +1008,21 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
           if (pendingRequests.get(msg.id) !== req) return
           clearTimeout(req.timer)
           pendingRequests.delete(msg.id)
+          sessionStore.set(msg.id, assembledBlob)
           registerLocalObject(msg.id, assembledBlob)
+          receiptRoles.noteDurablePersist(msg.id)
           req.resolve(assembledBlob)
         }
       }
+    }
+
+    if (msg.type === 'SWARM_CHALLENGE') {
+      receiptRoles.handleChallenge(msg.id, msg.challenge)
+      return
+    }
+    if (msg.type === 'SWARM_RECEIPT') {
+      receiptRoles.handleReceipt(msg.id, msg.receipt)
+      return
     }
   }
 
@@ -816,6 +1081,7 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
     handleMessage,
     requestObject,
     registerLocalObject: (id: string, blob: Blob) => sessionStore.set(id, blob),
+    receiptRoles,
     cancelObject(id: string) {
       const req = pendingRequests.get(id)
       if (!req) return false

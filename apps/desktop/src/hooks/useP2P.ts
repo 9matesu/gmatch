@@ -9,7 +9,7 @@ import { mergeRoster } from '../utils/peerRoster';
 import { presenceBucket } from '../utils/compare';
 import { CHAT_WIPE_SECONDS } from '@orbit/shared';
 import { logger } from '../utils/logger';
-import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, announcePeerOnline, PEER_ONLINE_EVENT, announceHeldObjects, type SwarmMessage } from '../utils/p2pSwarm';
+import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, announcePeerOnline, PEER_ONLINE_EVENT, announceHeldObjects, setSwarmReceiptIdentity, type SwarmMessage } from '../utils/p2pSwarm';
 import { broadcastPresence, fetchPresenceRoster } from '../services/courierPresence';
 import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh } from '../utils/courierSignaling';
 import { resolveDisplayName } from '../utils/displayName';
@@ -147,6 +147,14 @@ function transmitOverWebSocket(socket: WebSocket | null, queue: P2PSwarmMessage[
 
 export function useP2P(identity: OrbitIdentity | null) {
   const [peers, setPeers] = useState<User[]>([]);
+  // v1 replication receipts: this node signs durable-custody attestations for
+  // objects it fetches, and validates receipts for objects it serves.
+  useEffect(() => {
+    setSwarmReceiptIdentity(identity
+      ? { orbitId: identity.orbitId, publicKeyHex: identity.publicKeyHex, privateKeyHex: identity.privateKeyHex }
+      : null);
+    return () => { setSwarmReceiptIdentity(null); };
+  }, [identity]);
   const [isWsConnected, setIsWsConnected] = useState(false);
   const [localDisplayName, setLocalDisplayName] = useState<string>(() => {
     if (typeof window === 'undefined') return '';
