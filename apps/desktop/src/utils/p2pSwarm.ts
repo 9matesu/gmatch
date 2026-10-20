@@ -89,6 +89,13 @@ export async function sha256HexBlob(blob: Blob): Promise<string> {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
+function forgetLocalObject(id: string): void {
+  const blob = localObjects.get(id)
+  if (!blob) return
+  localObjects.delete(id)
+  localObjectBytes -= blob.size
+}
+
 function isSha256Hex(value: string): boolean {
   return /^[a-f\d]{64}$/i.test(value)
 }
@@ -543,7 +550,17 @@ export function requestSwarmObject(id: string, timeoutMs = 15000, opts: SwarmFet
   }
   const expectedHash = opts.expectedHash?.toLowerCase()
   const cached = lookupLocalObject(id)
-  if (cached) return Promise.resolve(cached)
+  if (cached) {
+    if (!expectedHash) return Promise.resolve(cached)
+    return sha256HexBlob(cached).then((actualHash) => {
+      if (actualHash === expectedHash) return cached
+      forgetLocalObject(id)
+      return requestSwarmObject(id, timeoutMs, { ...opts, expectedHash })
+    }, () => {
+      forgetLocalObject(id)
+      return requestSwarmObject(id, timeoutMs, { ...opts, expectedHash })
+    })
+  }
   if (!swarmSend) return Promise.reject(new Error('swarm transport unavailable'))
   const existing = pendingFetches.get(id)
   if (existing) {
@@ -576,14 +593,16 @@ export function requestSwarmObject(id: string, timeoutMs = 15000, opts: SwarmFet
       wantSwarmObject(id)
       reject(new Error(`Timed out waiting for swarm object ${id}`))
     }, timeoutMs)
-    pendingFetches.set(id, { resolve, reject, timer, chunks: new Map(), receivedBytes: 0, total: 0, mimeType: '', expectedHash, onProgress: opts.onProgress })
-    try {
-      swarmSend!({ type: 'SWARM_WANT', id })
-    } catch (err) {
-      clearTimeout(timer)
-      pendingFetches.delete(id)
-      reject(err instanceof Error ? err : new Error('swarm send failed'))
+    const request = () => {
+      pendingFetches.set(id, { resolve, reject, timer, chunks: new Map(), receivedBytes: 0, total: 0, mimeType: '', expectedHash, onProgress: opts.onProgress })
+      try { swarmSend!({ type: 'SWARM_WANT', id }) }
+      catch (err) {
+        clearTimeout(timer)
+        pendingFetches.delete(id)
+        reject(err instanceof Error ? err : new Error('swarm send failed'))
+      }
     }
+    request()
   })
 }
 
