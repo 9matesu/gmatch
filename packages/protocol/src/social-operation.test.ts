@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { restoreIdentity } from '@orbit/crypto'
 import {
   createSocialOperation,
+  authorizeSocialOperation,
   validateSocialOperation,
   type SocialOperation,
 } from './social-operation'
 
 const IDENTITY = restoreIdentity('00'.repeat(32), '11'.repeat(32))
+const OTHER = restoreIdentity('22'.repeat(32), '33'.repeat(32))
 
 function createFixture() {
   return createSocialOperation({
@@ -97,12 +99,111 @@ describe('proposed social operation v1', () => {
   })
 
   it('does not create an operation when the supplied private key cannot sign for its public key', () => {
-    const other = restoreIdentity('22'.repeat(32), '33'.repeat(32))
     expect(() => createSocialOperation({
       protocol: 'gmatch-social', version: 1, type: 'post.create',
       actorId: IDENTITY.orbitId, signingKey: IDENTITY.publicKeyHex,
       actorSequence: 1, previousOperationId: null, createdAt: 1, objectId: 'post-1',
       payload: { contentCid: 'a'.repeat(64), manifestHash: 'b'.repeat(64), mimeType: 'image/jpeg', sizeBytes: 1 },
-    }, other.privateKeyHex)).toThrow(/invalid signature/)
+    }, OTHER.privateKeyHex)).toThrow(/invalid signature/)
+  })
+
+  it('authorizes ownership, causal edits, tombstones, comments, and reactions', () => {
+    const history: SocialOperation[] = []
+    const make = (identity: typeof IDENTITY, type: string, objectId: string, payload: Record<string, unknown>) => {
+      const prior = history.filter((entry) => entry.actorId === identity.orbitId)
+        .sort((a, b) => b.actorSequence - a.actorSequence)[0]
+      return createSocialOperation({
+        protocol: 'gmatch-social', version: 1, type, actorId: identity.orbitId,
+        signingKey: identity.publicKeyHex, actorSequence: (prior?.actorSequence ?? 0) + 1,
+        previousOperationId: prior?.operationId ?? null, createdAt: 1, objectId, payload,
+      }, identity.privateKeyHex)
+    }
+    const append = (identity: typeof IDENTITY, type: string, objectId: string, payload: Record<string, unknown>) => {
+      const operation = make(identity, type, objectId, payload)
+      expect(authorizeSocialOperation(operation, history)).toBeNull()
+      history.push(operation)
+      return operation
+    }
+
+    const post = append(IDENTITY, 'post.create', 'post-1', {
+      contentCid: 'a'.repeat(64), manifestHash: 'b'.repeat(64), mimeType: 'image/jpeg', sizeBytes: 1,
+    })
+    const outsiderEdit = make(OTHER, 'post.edit', 'post-1', {
+      supersedes: [post.operationId], contentCid: 'c'.repeat(64), manifestHash: 'd'.repeat(64), mimeType: 'image/jpeg', sizeBytes: 1,
+    })
+    expect(authorizeSocialOperation(outsiderEdit, history)).toMatch(/only the post author/)
+
+    const edit = append(IDENTITY, 'post.edit', 'post-1', {
+      supersedes: [post.operationId], contentCid: 'c'.repeat(64), manifestHash: 'd'.repeat(64), mimeType: 'image/jpeg', sizeBytes: 1,
+    })
+    const staleEdit = make(IDENTITY, 'post.edit', 'post-1', {
+      supersedes: [post.operationId], contentCid: 'e'.repeat(64), manifestHash: 'f'.repeat(64), mimeType: 'image/jpeg', sizeBytes: 1,
+    })
+    expect(authorizeSocialOperation(staleEdit, history)).toMatch(/current post heads/)
+
+    const comment = append(OTHER, 'comment.create', 'comment-1', { postId: 'post-1', parentCommentId: null, body: 'hello' })
+    const unauthorizedDelete = make(IDENTITY, 'comment.delete', 'comment-1', { targetOperationId: comment.operationId })
+    expect(authorizeSocialOperation(unauthorizedDelete, history)).toMatch(/only the comment author/)
+    append(OTHER, 'comment.delete', 'comment-1', { targetOperationId: comment.operationId })
+
+    const add = append(OTHER, 'reaction.add', 'reaction-1', { targetType: 'post', targetId: 'post-1', reaction: 'like' })
+    const removeByOther = make(IDENTITY, 'reaction.remove', 'reaction-remove-1', { targetAddOperationIds: [add.operationId] })
+    expect(authorizeSocialOperation(removeByOther, history)).toMatch(/not owned by actor/)
+    append(OTHER, 'reaction.remove', 'reaction-remove-2', { targetAddOperationIds: [add.operationId] })
+
+    const deletePost = append(IDENTITY, 'post.delete', 'post-1', { targetOperationId: post.operationId })
+    expect(deletePost.operationId).toBeTruthy()
+    const afterDelete = make(OTHER, 'comment.create', 'comment-2', { postId: 'post-1', parentCommentId: null, body: 'late' })
+    expect(authorizeSocialOperation(afterDelete, history)).toMatch(/post is unavailable/)
+    expect(edit.operationId).not.toBe(post.operationId)
+  })
+
+  it('rejects sequence reuse and predecessor mismatches', () => {
+    const first = createFixture()
+    const history = [first]
+    const reused = createSocialOperation({
+      protocol: 'gmatch-social', version: 1, type: 'post.create', actorId: IDENTITY.orbitId,
+      signingKey: IDENTITY.publicKeyHex, actorSequence: 1, previousOperationId: null,
+      createdAt: 2, objectId: 'post-2',
+      payload: { contentCid: 'c'.repeat(64), manifestHash: 'd'.repeat(64), mimeType: 'image/jpeg', sizeBytes: 1 },
+    }, IDENTITY.privateKeyHex)
+    expect(authorizeSocialOperation(reused, history)).toMatch(/sequence already used/)
+    const missingParent = createSocialOperation({
+      protocol: 'gmatch-social', version: 1, type: 'post.create', actorId: IDENTITY.orbitId,
+      signingKey: IDENTITY.publicKeyHex, actorSequence: 3, previousOperationId: 'f'.repeat(64),
+      createdAt: 3, objectId: 'post-3',
+      payload: { contentCid: 'e'.repeat(64), manifestHash: 'a'.repeat(64), mimeType: 'image/jpeg', sizeBytes: 1 },
+    }, IDENTITY.privateKeyHex)
+    expect(authorizeSocialOperation(missingParent, history)).toMatch(/predecessor is missing/)
+  })
+
+  it('rejects equivocation or broken chains already present in the accepted history', () => {
+    const first = createFixture()
+    const second = createSocialOperation({
+      protocol: 'gmatch-social', version: 1, type: 'post.create', actorId: IDENTITY.orbitId,
+      signingKey: IDENTITY.publicKeyHex, actorSequence: 2, previousOperationId: first.operationId,
+      createdAt: 2, objectId: 'post-2',
+      payload: { contentCid: 'c'.repeat(64), manifestHash: 'd'.repeat(64), mimeType: 'image/jpeg', sizeBytes: 1 },
+    }, IDENTITY.privateKeyHex)
+    const fork = createSocialOperation({
+      protocol: 'gmatch-social', version: 1, type: 'post.create', actorId: IDENTITY.orbitId,
+      signingKey: IDENTITY.publicKeyHex, actorSequence: 2, previousOperationId: first.operationId,
+      createdAt: 3, objectId: 'post-3',
+      payload: { contentCid: 'e'.repeat(64), manifestHash: 'f'.repeat(64), mimeType: 'image/jpeg', sizeBytes: 1 },
+    }, IDENTITY.privateKeyHex)
+    expect(authorizeSocialOperation(createFixture(), [first, second, fork])).toMatch(/equivocation/)
+    const broken = createSocialOperation({
+      protocol: 'gmatch-social', version: 1, type: 'post.create', actorId: IDENTITY.orbitId,
+      signingKey: IDENTITY.publicKeyHex, actorSequence: 3, previousOperationId: 'f'.repeat(64),
+      createdAt: 3, objectId: 'post-4',
+      payload: { contentCid: 'a'.repeat(64), manifestHash: 'c'.repeat(64), mimeType: 'image/jpeg', sizeBytes: 1 },
+    }, IDENTITY.privateKeyHex)
+    const unrelated = createSocialOperation({
+      protocol: 'gmatch-social', version: 1, type: 'post.create', actorId: OTHER.orbitId,
+      signingKey: OTHER.publicKeyHex, actorSequence: 1, previousOperationId: null,
+      createdAt: 1, objectId: 'other-post',
+      payload: { contentCid: 'a'.repeat(64), manifestHash: 'c'.repeat(64), mimeType: 'image/jpeg', sizeBytes: 1 },
+    }, OTHER.privateKeyHex)
+    expect(authorizeSocialOperation(unrelated, [first, broken])).toMatch(/missing or mismatched/)
   })
 })

@@ -143,6 +143,12 @@ supersedes the current head, or that reaction removals are authorized. Those
 checks require the replicated operation view and must be completed before
 network integration.
 
+The experimental pure checker accepts one candidate plus the complete
+signature-verified history needed for its references. It rejects a repeated
+actor sequence, a missing/mismatched predecessor, and a fork already present
+in that history. It does not fetch missing history or merge remote forks;
+callers must retain the fork evidence and wait for explicit resolution.
+
 ### Public-operation authorization and projection rules (proposal)
 
 - `post.create`: the signed actor creates `objectId`; a second create with the

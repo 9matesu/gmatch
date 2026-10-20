@@ -146,3 +146,112 @@ export function validateSocialOperation(value: unknown): string | null {
   }
   return null
 }
+
+/** Authorize one operation against an accepted, signature-verified history. */
+export function authorizeSocialOperation(
+  value: unknown,
+  acceptedHistory: SocialOperation[],
+): string | null {
+  const malformed = validateSocialOperation(value)
+  if (malformed) return malformed
+  const operation = value as SocialOperation
+  const historyError = acceptedHistory.find((entry) => validateSocialOperation(entry))
+  if (historyError) return 'accepted history contains an invalid operation'
+  const historyIds = new Map(acceptedHistory.map((entry) => [entry.operationId, entry]))
+  const actorSequences = new Set<string>()
+  for (const entry of acceptedHistory) {
+    const key = `${entry.actorId}:${entry.actorSequence}`
+    if (actorSequences.has(key)) return 'accepted history contains actor equivocation'
+    actorSequences.add(key)
+    if (entry.actorSequence > 1) {
+      const predecessor = historyIds.get(entry.previousOperationId!)
+      if (!predecessor || predecessor.actorId !== entry.actorId || predecessor.actorSequence !== entry.actorSequence - 1) {
+        return 'accepted history has a missing or mismatched actor predecessor'
+      }
+    }
+  }
+  if (acceptedHistory.some((entry) => entry.operationId === operation.operationId)) return 'operation already accepted'
+  if (acceptedHistory.some((entry) => entry.actorId === operation.actorId && entry.actorSequence === operation.actorSequence)) {
+    return 'actor sequence already used; possible equivocation'
+  }
+  if (operation.actorSequence > 1 && !acceptedHistory.some((entry) =>
+    entry.actorId === operation.actorId && entry.actorSequence === operation.actorSequence - 1 &&
+    entry.operationId === operation.previousOperationId)) return 'actor predecessor is missing or mismatched'
+
+  const byId = (id: unknown) => acceptedHistory.find((entry) => entry.operationId === id)
+  const postCreate = (id: string) => acceptedHistory.find((entry) => entry.type === 'post.create' && entry.objectId === id)
+  const commentCreate = (id: string) => acceptedHistory.find((entry) => entry.type === 'comment.create' && entry.objectId === id)
+  const postIsDeleted = (post: SocialOperation) => acceptedHistory.some((entry) =>
+    entry.type === 'post.delete' && (entry.payload as { targetOperationId: string }).targetOperationId === post.operationId)
+  const commentIsDeleted = (comment: SocialOperation) => acceptedHistory.some((entry) =>
+    entry.type === 'comment.delete' && (entry.payload as { targetOperationId: string }).targetOperationId === comment.operationId)
+
+  if (operation.type === 'post.create') {
+    return postCreate(operation.objectId) ? 'post already created' : null
+  }
+  if (operation.type === 'post.edit' || operation.type === 'post.delete') {
+    const post = postCreate(operation.objectId)
+    if (!post) return 'post does not exist'
+    if (post.actorId !== operation.actorId) return 'only the post author may mutate it'
+    if (postIsDeleted(post)) return 'post is tombstoned'
+    if (operation.type === 'post.delete') {
+      return operation.payload.targetOperationId === post.operationId ? null : 'delete target does not match post'
+    }
+    const heads = acceptedHistory
+      .filter((entry) => entry.objectId === post.objectId && (entry.type === 'post.create' || entry.type === 'post.edit'))
+      .filter((entry) => !acceptedHistory.some((candidate) =>
+        candidate.type === 'post.edit' &&
+        (candidate.payload as { supersedes: string[] }).supersedes.includes(entry.operationId)))
+      .map((entry) => entry.operationId)
+      .sort()
+    const supersedes = [...operation.payload.supersedes as string[]].sort()
+    return supersedes.length === heads.length && supersedes.every((id, i) => id === heads[i])
+      ? null
+      : 'edit must supersede exactly the current post heads'
+  }
+  if (operation.type === 'comment.create') {
+    const post = postCreate(operation.payload.postId as string)
+    if (!post || postIsDeleted(post)) return 'comment target post is unavailable'
+    const parentId = operation.payload.parentCommentId
+    if (parentId !== null) {
+      const parent = commentCreate(parentId as string)
+      if (!parent || parent.payload.postId !== post.objectId || commentIsDeleted(parent)) return 'comment parent is unavailable'
+    }
+    return commentCreate(operation.objectId) ? 'comment already created' : null
+  }
+  if (operation.type === 'comment.delete') {
+    const comment = byId(operation.payload.targetOperationId)
+    if (!comment || comment.type !== 'comment.create' || comment.objectId !== operation.objectId) return 'delete target does not match comment'
+    if (comment.actorId !== operation.actorId) return 'only the comment author may delete it'
+    return commentIsDeleted(comment) ? 'comment is already tombstoned' : null
+  }
+  if (operation.type === 'reaction.add') {
+    const targetType = operation.payload.targetType
+    const targetId = operation.payload.targetId as string
+    const target = targetType === 'post' ? postCreate(targetId) : commentCreate(targetId)
+    if (!target || (targetType === 'post' ? postIsDeleted(target) : commentIsDeleted(target))) return 'reaction target is unavailable'
+    const removed = new Set(acceptedHistory.filter((entry) => entry.type === 'reaction.remove')
+      .flatMap((entry) => entry.payload.targetAddOperationIds as string[]))
+    const active = acceptedHistory.some((entry) => entry.type === 'reaction.add' &&
+      entry.actorId === operation.actorId && entry.payload.targetType === targetType &&
+      entry.payload.targetId === targetId && !removed.has(entry.operationId))
+    return active ? 'actor already has an active like' : null
+  }
+  const adds = operation.payload.targetAddOperationIds as string[]
+  const first = byId(adds[0])
+  if (!first || first.type !== 'reaction.add' || first.actorId !== operation.actorId) return 'reaction removal is not owned by actor'
+  const targetType = first.payload.targetType
+  const targetId = first.payload.targetId
+  for (const id of adds) {
+    const add = byId(id)
+    if (!add || add.type !== 'reaction.add' || add.actorId !== operation.actorId ||
+        add.payload.targetType !== targetType || add.payload.targetId !== targetId) {
+      return 'reaction removal must reference only the actor’s adds for one target'
+    }
+  }
+  if (acceptedHistory.some((entry) => entry.type === 'reaction.remove' &&
+      (entry.payload.targetAddOperationIds as string[]).some((id) => adds.includes(id)))) {
+    return 'reaction add already removed'
+  }
+  return null
+}

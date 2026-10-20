@@ -289,12 +289,12 @@ UI or documentation.
   `packages/protocol/src/social-operation.ts`, with fixed operation-ID and
   signature coverage, canonical key-order behavior, strict known operation
   names, exact payload keys and per-type shape bounds, JSON-only bounded
-  payloads, and basic sequence/previous-ID shape checks. It is intentionally
-  not connected to application
-  persistence or network paths; operation-specific authorization, encryption,
-  migration, and cross-language vectors remain incomplete. Public-operation
-  authorization/projection rules are written as a proposal but are not yet
-  enforced against an operation graph.
+  payloads, sequence-chain checks, and a pure authorizer for ownership,
+  current edit heads, tombstones, comment hierarchy, and reaction add/remove.
+  The authorizer accepts a complete already-verified history; it does not
+  validate manifests or resolve incomplete/forked history. It is intentionally
+  not connected to application persistence or network paths; migration and
+  cross-language end-to-end vectors remain incomplete.
 - `packages/crypto` now exposes experimental XChaCha20-Poly1305 DEK helpers
   with caller-provided AAD. Round-trip and context/ciphertext tampering tests
   pass, including a fixed decrypt/context vector. They are not wired into media
@@ -303,9 +303,8 @@ UI or documentation.
   lint passed with 0 errors / 47 existing warnings; desktop build passed with
   existing chunk warnings.
 - After adding the experimental operation primitive, the protocol package
-  suite passed (28 tests) and the crypto package suite passed (9 tests); both
-  package typechecks passed. After adding the AAD encryption helper, crypto
-  tests passed (11) and crypto typecheck passed.
+  suite passed (31 tests) and the crypto package suite passed (11 tests); both
+  package typechecks passed.
 - Root `npm test` had one failure in
   `GMatchFeed.inline-expand.test.tsx` (reply button inaccessible); rerunning
   that file alone passed all 7 tests. Treat the full-suite result as flaky/not
