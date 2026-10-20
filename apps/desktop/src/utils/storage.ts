@@ -138,6 +138,26 @@ export async function getAllObjects(): Promise<StoredObject[]> {
   }
 }
 
+export function selectObjectsForSwarm(objects: StoredObject[], maxBytes: number): StoredObject[] {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) return []
+  const selected: StoredObject[] = []
+  let used = 0
+  for (const object of objects) {
+    const data = object?.data
+    if (!object?.id || !data || typeof data.byteLength !== 'number' || data.byteLength === 0) continue
+    const size = data.byteLength
+    if (size > maxBytes - used) continue
+    selected.push(object)
+    used += size
+  }
+  return selected
+}
+
+/** Read a bounded, stable set of persisted objects for swarm rehydration. */
+export async function getObjectsForSwarm(maxBytes: number): Promise<StoredObject[]> {
+  return selectObjectsForSwarm(await getAllObjects(), maxBytes)
+}
+
 export async function deleteObject(id: string): Promise<void> {
   const db = await openDB()
   return new Promise((resolve, reject) => {

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   registerLocalObject,
   hasLocalObject,
@@ -141,30 +141,107 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
     const blob = new Blob([text], { type: 'video/mp4' })
     serveBlob('hash-ok', blob, 'video/mp4')
     const hash = await sha256HexText(text)
+    vi.stubGlobal('window', { gmatch: { vaultPutBytes: vi.fn().mockResolvedValue({ ok: true }) } })
     const received = await requestSwarmObject('hash-ok', 5000, { expectedHash: hash })
     expect(received.size).toBe(blob.size)
     expect(hasLocalObject('hash-ok')).toBe(true)
     setSwarmTransport(null)
+    vi.unstubAllGlobals()
   })
 
   it('rejects tampered bytes and never registers them', async () => {
     const text = 'c'.repeat(70 * 1024)
     const blob = new Blob([text], { type: 'video/mp4' })
     serveBlob('hash-bad', blob, 'video/mp4')
+    vi.stubGlobal('window', { gmatch: { vaultPutBytes: vi.fn().mockResolvedValue({ ok: true }) } })
     await expect(requestSwarmObject('hash-bad', 5000, { expectedHash: '0'.repeat(64) })).rejects.toThrow(/hash verification/i)
     expect(hasLocalObject('hash-bad')).toBe(false)
     setSwarmTransport(null)
+    vi.unstubAllGlobals()
+  })
+
+  it('rejects duplicate and inconsistent chunks and permits cancellation', async () => {
+    const session = createSwarmSession({ send: () => {} })
+    const pending = session.requestObject('session-invalid', 1000)
+    await session.handleMessage({
+      type: 'SWARM_CHUNK', id: 'session-invalid', index: 0, total: 2,
+      mimeType: 'text/plain', dataBase64: 'YQ==',
+    })
+    await expect(pending).rejects.toThrow(/invalid swarm chunk/i)
+
+    const cancelled = session.requestObject('session-cancel', 1000)
+    expect(session.cancelObject('session-cancel')).toBe(true)
+    await expect(cancelled).rejects.toThrow(/cancelled/i)
+    expect(session.cancelObject('session-cancel')).toBe(false)
+  })
+
+  it('rejects malformed expected hashes before sending a request', async () => {
+    const send = vi.fn()
+    setSwarmTransport(send)
+    await expect(requestSwarmObject('hash-invalid', 1000, { expectedHash: 'not-a-hash' })).rejects.toThrow(/invalid swarm object request/i)
+    expect(send).not.toHaveBeenCalled()
+    setSwarmTransport(null)
+  })
+
+  it('does not serve zero-byte or over-limit local objects', async () => {
+    const send = vi.fn()
+    setSwarmTransport(send)
+    registerLocalObject('empty', new Blob([]))
+    await handleSwarmMessage({ type: 'SWARM_WANT', id: 'empty' })
+    expect(send).not.toHaveBeenCalled()
+    setSwarmTransport(null)
+  })
+
+  it('rejects malformed chunk metadata and lengths before storing bytes', async () => {
+    const cases = [
+      { index: 1, total: 1, data: 'eA==' }, // index outside transfer
+      { index: 0, total: 9000, data: 'eA==' }, // exceeds object limit
+      { index: 0, total: 2, data: 'eA==' }, // truncated non-final chunk
+      { index: 0, total: 1, data: '***' }, // malformed base64
+    ]
+    for (const [n, testCase] of cases.entries()) {
+      const id = `malformed-${n}`
+      setSwarmTransport((msg) => {
+        if (msg.type === 'SWARM_WANT' && msg.id === id) {
+          void handleSwarmMessage({
+            type: 'SWARM_CHUNK', id, index: testCase.index, total: testCase.total,
+            mimeType: 'image/png', dataBase64: testCase.data,
+          })
+        }
+      })
+      await expect(requestSwarmObject(id, 1000)).rejects.toThrow(/invalid swarm chunk/i)
+      expect(hasLocalObject(id)).toBe(false)
+    }
+    setSwarmTransport(null)
+  })
+
+  it('does not resolve a received object until durable storage succeeds', async () => {
+    const id = 'persist-failure'
+    const bytes = new Blob(['persist me'])
+    const dataBase64 = btoa(String.fromCharCode(...new Uint8Array(await bytes.arrayBuffer())))
+    vi.stubGlobal('window', { gmatch: { vaultPutBytes: vi.fn().mockResolvedValue({ ok: false }) } })
+    setSwarmTransport((msg) => {
+      if (msg.type === 'SWARM_WANT' && msg.id === id) {
+        void handleSwarmMessage({ type: 'SWARM_CHUNK', id, index: 0, total: 1, mimeType: 'text/plain', dataBase64 })
+      }
+    })
+    await expect(requestSwarmObject(id, 1000)).rejects.toThrow(/could not be persisted/i)
+    expect(hasLocalObject(id)).toBe(false)
+    setSwarmTransport(null)
+    vi.unstubAllGlobals()
   })
 
   it('reports transfer progress per chunk', async () => {
     const text = 'd'.repeat(130 * 1024) // three chunks
     const blob = new Blob([text], { type: 'video/mp4' })
     serveBlob('progress-1', blob, 'video/mp4')
+    vi.stubGlobal('window', { gmatch: { vaultPutBytes: vi.fn().mockResolvedValue({ ok: true }) } })
     const seen: Array<[number, number]> = []
     await requestSwarmObject('progress-1', 5000, { onProgress: (r, t) => { seen.push([r, t]) } })
     expect(seen.length).toBeGreaterThanOrEqual(3)
     expect(seen.at(-1)).toEqual([3, 3])
     setSwarmTransport(null)
+    vi.unstubAllGlobals()
   })
 
   it('cancels an in-flight fetch and drops partial chunks', async () => {
@@ -223,12 +300,11 @@ describe('p2pSwarm RAM cache is bounded (memory)', () => {
     expect(hasLocalObject('mem-f0')).toBe(false)
   })
 
-  it('an object larger than the byte budget is still served (never evicts the entry just added)', () => {
+  it('does not register an object above the transfer size limit', () => {
     const huge = new Blob(['huge'])
-    Object.defineProperty(huge, 'size', { value: 200 * 1024 * 1024 })
+    Object.defineProperty(huge, 'size', { value: 65 * 1024 * 1024 })
     registerLocalObject('mem-huge', huge)
-    expect(hasLocalObject('mem-huge')).toBe(true)
-    expect(__localObjectCacheForTests().keys).toEqual(['mem-huge'])
+    expect(hasLocalObject('mem-huge')).toBe(false)
   })
 
   it('eviction from RAM never deletes the durable copy (bytes are re-read)', async () => {

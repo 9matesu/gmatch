@@ -9,6 +9,9 @@
  */
 
 export const PENDING_TRANSFERS_KEY = 'gmatch_pending_transfers_v1';
+const MAX_PENDING_TRANSFERS = 128
+const MAX_TRANSFER_ID_LENGTH = 256
+const MAX_ATTEMPTS = 1000
 
 export interface PendingTransfer {
   id: string;
@@ -21,7 +24,15 @@ function readAll(): PendingTransfer[] {
   try {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(PENDING_TRANSFERS_KEY) : null;
     const list = raw ? JSON.parse(raw) : [];
-    return Array.isArray(list) ? list.filter((e) => e && typeof e.id === 'string') : [];
+    return Array.isArray(list) ? list
+      .filter((e) => e && typeof e.id === 'string' && e.id.length > 0 && e.id.length <= MAX_TRANSFER_ID_LENGTH)
+      .slice(-MAX_PENDING_TRANSFERS)
+      .map((e) => ({
+        id: e.id,
+        hash: typeof e.hash === 'string' && /^[a-f\d]{64}$/i.test(e.hash) ? e.hash : null,
+        attempts: Number.isSafeInteger(e.attempts) && e.attempts >= 0 ? Math.min(e.attempts, MAX_ATTEMPTS) : 0,
+        addedAt: Number.isSafeInteger(e.addedAt) && e.addedAt > 0 ? e.addedAt : Date.now(),
+      })) : [];
   } catch {
     return [];
   }
@@ -38,9 +49,10 @@ export function listPendingTransfers(): PendingTransfer[] {
 }
 
 export function enqueuePendingTransfer(id: string, hash: string | null): void {
-  if (!id) return;
+  if (!id || id.length > MAX_TRANSFER_ID_LENGTH || (hash !== null && !/^[a-f\d]{64}$/i.test(hash))) return;
   const list = readAll();
   if (list.some((e) => e.id === id)) return;
+  if (list.length >= MAX_PENDING_TRANSFERS) list.shift();
   list.push({ id, hash: hash || null, attempts: 0, addedAt: Date.now() });
   writeAll(list);
 }

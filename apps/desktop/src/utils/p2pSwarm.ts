@@ -75,6 +75,8 @@ export function __resetLocalObjectCacheForTests(): void {
 }
 
 const CHUNK_SIZE = 64 * 1024 // 64KB per WebRTC DataChannel chunk
+const MAX_OBJECT_BYTES = 64 * 1024 * 1024
+const MAX_CHUNKS = Math.ceil(MAX_OBJECT_BYTES / CHUNK_SIZE)
 
 /** SHA-256 hex of a blob's bytes (Web Crypto). Used to VERIFY reassembled
  *  swarm media against the object's content_hash before accepting it —
@@ -82,6 +84,10 @@ const CHUNK_SIZE = 64 * 1024 // 64KB per WebRTC DataChannel chunk
 export async function sha256HexBlob(blob: Blob): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer())
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+function isSha256Hex(value: string): boolean {
+  return /^[a-f\d]{64}$/i.test(value)
 }
 
 /** Broadcast by useP2P whenever a peer transitions to online (swarm or
@@ -107,25 +113,24 @@ export interface LocalObjectMeta {
   isAvatar?: boolean
 }
 
-async function persistToVault(id: string, blob: Blob, meta: LocalObjectMeta = {}): Promise<void> {
-  // arrayBuffer() is not available on every Blob implementation (e.g. jsdom).
-  // When it is missing, the RAM copy is still registered; disk persistence is
-  // best-effort and must never throw.
+async function persistToVault(id: string, blob: Blob, meta: LocalObjectMeta = {}): Promise<boolean> {
+  // A swarm fetch is not complete until bytes reach a durable store.
   let buf: ArrayBuffer | null = null
   try {
     buf = await blob.arrayBuffer()
   } catch {
-    /* arrayBuffer unavailable — skip durable write, RAM copy stands */
+    /* arrayBuffer unavailable */
   }
-  if (!buf || buf.byteLength === 0) return
+  if (!buf || buf.byteLength === 0) return false
   // Renderer side: ArrayBuffer crosses IPC cleanly; the main process
   // re-verifies the sha256 before filing it under `id`.
   if (typeof window !== 'undefined' && window.gmatch?.vaultPutBytes) {
     try {
-      await window.gmatch.vaultPutBytes(id, blob.type || 'application/octet-stream', buf)
-      return // durable on disk; nothing more to do
+      const result = await window.gmatch.vaultPutBytes(id, blob.type || 'application/octet-stream', buf)
+      if (result?.ok) return true
+      return false
     } catch {
-      /* fall through to IndexedDB fallback below */
+      return false
     }
   }
   // Browser dev / no bridge: IndexedDB survives reload but is not the app disk.
@@ -145,9 +150,10 @@ async function persistToVault(id: string, blob: Blob, meta: LocalObjectMeta = {}
       is_story: typeof meta.isStory === 'boolean' ? (meta.isStory ? 1 : 0) : null,
       is_chat: typeof meta.isChat === 'boolean' ? (meta.isChat ? 1 : 0) : null,
       is_avatar: typeof meta.isAvatar === 'boolean' ? (meta.isAvatar ? 1 : 0) : null,
-    }).catch(() => {})
+    })
+    return true
   } catch {
-    /* storage unavailable (tests/SSR/quota) */
+    return false
   }
 }
 
@@ -194,14 +200,14 @@ export async function hydrateLocalObjects(maxBytes = RAM_LIMIT_BYTES): Promise<n
     }
   }
   try {
-    const { getAllObjects } = await import('./storage')
-    const all = await getAllObjects()
+    const { getObjectsForSwarm } = await import('./storage')
+    const all = await getObjectsForSwarm(maxBytes)
     let used = 0
     let count = 0
     for (const o of all) {
       const data = o?.data as ArrayBuffer | undefined
       if (!o?.id || !data || !(data instanceof ArrayBuffer) || data.byteLength === 0) continue
-      if (used + data.byteLength > maxBytes) break
+      if (used + data.byteLength > maxBytes) continue
       if (!localObjects.has(o.id)) {
         localObjects.set(o.id, new Blob([data], { type: o.mime_type || 'application/octet-stream' }))
         used += data.byteLength
@@ -215,7 +221,7 @@ export async function hydrateLocalObjects(maxBytes = RAM_LIMIT_BYTES): Promise<n
 }
 
 export function registerLocalObject(id: string, blob: Blob, meta: LocalObjectMeta = {}): void {
-  if (!id || !blob) return
+  if (!id || id.length > 256 || !blob || blob.size === 0 || blob.size > MAX_OBJECT_BYTES) return
   rememberLocalObject(id, blob)
   // We hold it now, so it stops being "wanted".
   wantedObjects.delete(id)
@@ -223,6 +229,23 @@ export function registerLocalObject(id: string, blob: Blob, meta: LocalObjectMet
   // dev fallback. Fire-and-forget so hot paths (swarm assembly, forge) are
   // not blocked; the RAM copy is available immediately.
   void persistToVault(id, blob, meta)
+}
+
+/** Register and confirm persistence before reporting an object as received. */
+export async function persistLocalObject(id: string, blob: Blob, meta: LocalObjectMeta = {}): Promise<void> {
+  if (!id || !blob || blob.size < 1 || blob.size > MAX_OBJECT_BYTES) throw new Error('Invalid local object')
+  const previous = localObjects.get(id)
+  rememberLocalObject(id, blob)
+  wantedObjects.delete(id)
+  if (!await persistToVault(id, blob, meta)) {
+    if (previous) rememberLocalObject(id, previous)
+    else {
+      const current = localObjects.get(id)
+      if (current) localObjectBytes -= current.size
+      localObjects.delete(id)
+    }
+    throw new Error(`Swarm object ${id} could not be persisted`)
+  }
 }
 
 export function hasLocalObject(id: string): boolean {
@@ -277,6 +300,7 @@ interface PendingFetch {
   reject: (err: Error) => void
   timer: ReturnType<typeof setTimeout>
   chunks: Map<number, Uint8Array>
+  receivedBytes: number
   total: number
   mimeType: string
   expectedHash?: string
@@ -377,16 +401,8 @@ function decodeChunk(dataBase64: string): Uint8Array {
   return bytes
 }
 
-async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', buffer)
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
-}
-
 async function finishFetch(id: string, req: PendingFetch): Promise<void> {
   clearTimeout(req.timer)
-  pendingFetches.delete(id)
   const parts: Uint8Array[] = []
   for (let i = 0; i < req.total; i++) {
     const chunk = req.chunks.get(i)
@@ -397,18 +413,38 @@ async function finishFetch(id: string, req: PendingFetch): Promise<void> {
   // hash-mismatched blob must never enter the durable local store.
   const assembled = new Blob(parts as BlobPart[], { type: req.mimeType || 'application/octet-stream' })
   if (req.expectedHash) {
-    void sha256HexBlob(assembled).then((got) => {
+    if (pendingFetches.get(id) !== req) return
+    void sha256HexBlob(assembled).then(async (got) => {
       if (got !== req.expectedHash) {
-        req.reject(new Error(`Swarm object ${id} failed hash verification`))
+        failFetch(id, req, new Error(`Swarm object ${id} failed hash verification`))
         return
       }
-      registerLocalObject(id, assembled)
-      req.resolve(assembled)
-    }).catch(() => req.reject(new Error(`Swarm object ${id} verification failed`)))
+      if (pendingFetches.get(id) !== req) return
+      try {
+        await persistLocalObject(id, assembled)
+        if (pendingFetches.get(id) === req) pendingFetches.delete(id)
+        req.resolve(assembled)
+      } catch (error) {
+        failFetch(id, req, error instanceof Error ? error : new Error('Object persistence failed'))
+      }
+    }).catch(() => failFetch(id, req, new Error(`Swarm object ${id} verification failed`)))
     return
   }
-  registerLocalObject(id, assembled)
-  req.resolve(assembled)
+  if (pendingFetches.get(id) !== req) return
+  try {
+    await persistLocalObject(id, assembled)
+    if (pendingFetches.get(id) === req) pendingFetches.delete(id)
+    req.resolve(assembled)
+  } catch (error) {
+    failFetch(id, req, error instanceof Error ? error : new Error('Object persistence failed'))
+  }
+}
+
+function failFetch(id: string, req: PendingFetch, error: Error): void {
+  clearTimeout(req.timer)
+  if (pendingFetches.get(id) !== req) return
+  pendingFetches.delete(id)
+  req.reject(error)
 }
 
 /** Route an inbound swarm message. Returns true when consumed. */
@@ -419,6 +455,7 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
     if (!blob || !swarmSend) return true
     try {
       const buffer = await blob.arrayBuffer()
+      if (buffer.byteLength === 0 || buffer.byteLength > MAX_OBJECT_BYTES) return true
       const totalChunks = Math.ceil(buffer.byteLength / CHUNK_SIZE) || 1
       const mimeType = blob.type || 'application/octet-stream'
       for (let i = 0; i < totalChunks; i++) {
@@ -435,15 +472,43 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
   if (msg.type === 'SWARM_CHUNK') {
     const req = pendingFetches.get(msg.id)
     if (!req) return false
-    req.chunks.set(msg.index, decodeChunk(msg.dataBase64))
-    req.total = msg.total
-    req.mimeType = msg.mimeType
+    try {
+      if (!Number.isSafeInteger(msg.total) || msg.total < 1 || msg.total > MAX_CHUNKS ||
+          !Number.isSafeInteger(msg.index) || msg.index < 0 || msg.index >= msg.total ||
+          typeof msg.mimeType !== 'string' || msg.mimeType.length > 128 ||
+          typeof msg.dataBase64 !== 'string' || msg.dataBase64.length > Math.ceil(CHUNK_SIZE / 3) * 4 ||
+          (req.total !== 0 && req.total !== msg.total) ||
+          (req.mimeType !== '' && req.mimeType !== msg.mimeType) ||
+          req.chunks.has(msg.index)) {
+        throw new Error('Invalid swarm chunk metadata')
+      }
+      let bytes: Uint8Array
+      try {
+        bytes = decodeChunk(msg.dataBase64)
+      } catch {
+        throw new Error('Invalid swarm chunk encoding')
+      }
+      const isLast = msg.index === msg.total - 1
+      if (!bytes.byteLength || bytes.byteLength > CHUNK_SIZE || (!isLast && bytes.byteLength !== CHUNK_SIZE) ||
+          req.receivedBytes + bytes.byteLength > MAX_OBJECT_BYTES) {
+        throw new Error('Invalid swarm chunk length')
+      }
+      req.chunks.set(msg.index, bytes)
+      req.receivedBytes += bytes.byteLength
+      req.total = msg.total
+      req.mimeType = msg.mimeType
+    } catch (error) {
+      failFetch(msg.id, req, error instanceof Error ? error : new Error('Invalid swarm chunk'))
+      return true
+    }
     try {
       req.onProgress?.(req.chunks.size, req.total)
     } catch {
       /* progress listener must never break assembly */
     }
-    if (req.chunks.size === req.total) void finishFetch(msg.id, req)
+    if (req.chunks.size === req.total) void finishFetch(msg.id, req).catch((error) => {
+      failFetch(msg.id, req, error instanceof Error ? error : new Error('Swarm assembly failed'))
+    })
     return true
   }
   if (msg.type === 'SWARM_HAVE') {
@@ -464,6 +529,9 @@ export interface SwarmFetchOptions {
  *  `expectedHash` is given, the assembled bytes must hash to it or the
  *  transfer is rejected (never registered). */
 export function requestSwarmObject(id: string, timeoutMs = 15000, opts: SwarmFetchOptions = {}): Promise<Blob> {
+  if (!id || id.length > 256 || (opts.expectedHash && !isSha256Hex(opts.expectedHash))) {
+    return Promise.reject(new Error('Invalid swarm object request'))
+  }
   const cached = lookupLocalObject(id)
   if (cached) return Promise.resolve(cached)
   if (!swarmSend) return Promise.reject(new Error('swarm transport unavailable'))
@@ -498,7 +566,7 @@ export function requestSwarmObject(id: string, timeoutMs = 15000, opts: SwarmFet
       wantSwarmObject(id)
       reject(new Error(`Timed out waiting for swarm object ${id}`))
     }, timeoutMs)
-    pendingFetches.set(id, { resolve, reject, timer, chunks: new Map(), total: 0, mimeType: '', expectedHash: opts.expectedHash, onProgress: opts.onProgress })
+    pendingFetches.set(id, { resolve, reject, timer, chunks: new Map(), receivedBytes: 0, total: 0, mimeType: '', expectedHash: opts.expectedHash, onProgress: opts.onProgress })
     try {
       swarmSend!({ type: 'SWARM_WANT', id })
     } catch (err) {
@@ -528,6 +596,7 @@ export interface SwarmSession {
   handleMessage: (msg: SwarmMessage) => Promise<void>
   requestObject: (id: string, timeoutMs?: number, expectedHash?: string) => Promise<Blob>
   registerLocalObject: (id: string, blob: Blob) => void
+  cancelObject: (id: string) => boolean
 }
 
 export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
@@ -539,8 +608,9 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
       reject: (err: Error) => void
       timer: ReturnType<typeof setTimeout>
       chunks: Map<number, Uint8Array>
-      total: number
-      mimeType: string
+        total: number
+        receivedBytes: number
+        mimeType: string
       expectedHash?: string
     }
   >()
@@ -550,6 +620,7 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
       const blob = sessionStore.get(msg.id) || (await getLocalObject(msg.id))
       if (!blob) return
 
+      if (blob.size === 0 || blob.size > MAX_OBJECT_BYTES) return
       const buffer = await blob.arrayBuffer()
       const totalBytes = buffer.byteLength
       const totalChunks = Math.ceil(totalBytes / CHUNK_SIZE) || 1
@@ -583,21 +654,35 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
       const req = pendingRequests.get(msg.id)
       if (!req) return
 
-      // Decode base64 chunk
-      const binaryStr = atob(msg.dataBase64)
-      const bytes = new Uint8Array(binaryStr.length)
-      for (let i = 0; i < binaryStr.length; i++) {
-        bytes[i] = binaryStr.charCodeAt(i)
+      let bytes: Uint8Array
+      try {
+        if (!Number.isSafeInteger(msg.total) || msg.total < 1 || msg.total > MAX_CHUNKS ||
+            !Number.isSafeInteger(msg.index) || msg.index < 0 || msg.index >= msg.total ||
+            typeof msg.mimeType !== 'string' || msg.mimeType.length > 128 ||
+            typeof msg.dataBase64 !== 'string' || msg.dataBase64.length > Math.ceil(CHUNK_SIZE / 3) * 4 ||
+            (req.total !== 0 && req.total !== msg.total) ||
+            (req.mimeType !== '' && req.mimeType !== msg.mimeType) || req.chunks.has(msg.index)) {
+          throw new Error('Invalid swarm chunk metadata')
+        }
+        bytes = decodeChunk(msg.dataBase64)
+        const last = msg.index === msg.total - 1
+        if (!bytes.byteLength || bytes.byteLength > CHUNK_SIZE || (!last && bytes.byteLength !== CHUNK_SIZE) ||
+            req.receivedBytes + bytes.byteLength > MAX_OBJECT_BYTES) {
+          throw new Error('Invalid swarm chunk length')
+        }
+      } catch (error) {
+        clearTimeout(req.timer)
+        pendingRequests.delete(msg.id)
+        req.reject(error instanceof Error ? error : new Error('Invalid swarm chunk'))
+        return
       }
 
       req.chunks.set(msg.index, bytes)
+      req.receivedBytes += bytes.byteLength
       req.total = msg.total
       req.mimeType = msg.mimeType
 
       if (req.chunks.size === req.total) {
-        clearTimeout(req.timer)
-        pendingRequests.delete(msg.id)
-
         // Assemble all chunks in order
         const parts: Uint8Array[] = []
         for (let i = 0; i < req.total; i++) {
@@ -607,15 +692,34 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
 
         const assembledBlob = new Blob(parts as BlobPart[], { type: req.mimeType })
         if (req.expectedHash) {
+          if (!isSha256Hex(req.expectedHash)) {
+            clearTimeout(req.timer)
+            pendingRequests.delete(msg.id)
+            req.reject(new Error('Invalid expected swarm hash'))
+            return
+          }
           void sha256HexBlob(assembledBlob).then((got) => {
+            if (pendingRequests.get(msg.id) !== req) return
             if (got !== req.expectedHash) {
+              clearTimeout(req.timer)
+              pendingRequests.delete(msg.id)
               req.reject(new Error(`Swarm object ${msg.id} failed hash verification`))
               return
             }
+            clearTimeout(req.timer)
+            pendingRequests.delete(msg.id)
             registerLocalObject(msg.id, assembledBlob)
             req.resolve(assembledBlob)
-          }).catch(() => req.reject(new Error(`Swarm object ${msg.id} verification failed`)))
+          }).catch(() => {
+            if (pendingRequests.get(msg.id) !== req) return
+            clearTimeout(req.timer)
+            pendingRequests.delete(msg.id)
+            req.reject(new Error(`Swarm object ${msg.id} verification failed`))
+          })
         } else {
+          if (pendingRequests.get(msg.id) !== req) return
+          clearTimeout(req.timer)
+          pendingRequests.delete(msg.id)
           registerLocalObject(msg.id, assembledBlob)
           req.resolve(assembledBlob)
         }
@@ -624,9 +728,26 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
   }
 
   function requestObject(id: string, timeoutMs = 15000, expectedHash?: string): Promise<Blob> {
+    if (!id || id.length > 256 || (expectedHash && !isSha256Hex(expectedHash))) {
+      return Promise.reject(new Error('Invalid swarm object request'))
+    }
     // Immediate local session hit
     if (sessionStore.has(id)) {
       return Promise.resolve(sessionStore.get(id)!)
+    }
+
+    const existing = pendingRequests.get(id)
+    if (existing) {
+      if (expectedHash && existing.expectedHash && expectedHash !== existing.expectedHash) {
+        return Promise.reject(new Error('Conflicting expected swarm hashes'))
+      }
+      if (expectedHash) existing.expectedHash = expectedHash
+      return new Promise<Blob>((resolve, reject) => {
+        const oldResolve = existing.resolve
+        const oldReject = existing.reject
+        existing.resolve = (blob) => { oldResolve(blob); resolve(blob) }
+        existing.reject = (error) => { oldReject(error); reject(error) }
+      })
     }
 
     return new Promise<Blob>((resolve, reject) => {
@@ -640,12 +761,19 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
         reject,
         timer,
         chunks: new Map(),
+        receivedBytes: 0,
         total: 0,
         mimeType: '',
         expectedHash,
       })
 
-      options.send({ type: 'SWARM_WANT', id })
+      try {
+        options.send({ type: 'SWARM_WANT', id })
+      } catch (error) {
+        clearTimeout(timer)
+        pendingRequests.delete(id)
+        reject(error instanceof Error ? error : new Error('swarm send failed'))
+      }
     })
   }
 
@@ -653,5 +781,13 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
     handleMessage,
     requestObject,
     registerLocalObject: (id: string, blob: Blob) => sessionStore.set(id, blob),
+    cancelObject(id: string) {
+      const req = pendingRequests.get(id)
+      if (!req) return false
+      clearTimeout(req.timer)
+      pendingRequests.delete(id)
+      req.reject(new Error('swarm fetch cancelled'))
+      return true
+    },
   }
 }
